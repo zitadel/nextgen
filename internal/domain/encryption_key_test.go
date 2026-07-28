@@ -30,7 +30,7 @@ func TestNewDEK(t *testing.T) {
 		projectID := "proj-1"
 		alg := jose.A256GCM
 
-		dek, err := NewDEK(projectID, alg, kek)
+		dek, err := NewEncryptionKey(projectID, EncryptionKeyPurposeDEK, alg, kek)
 		require.NoError(t, err)
 		require.NotNil(t, dek)
 
@@ -50,9 +50,9 @@ func TestNewDEK(t *testing.T) {
 
 	t.Run("two DEKs get distinct random keys", func(t *testing.T) {
 		kek := &crypto.InverseCrypter{}
-		a, err := NewDEK("proj", jose.A256GCM, kek)
+		a, err := NewEncryptionKey("proj", EncryptionKeyPurposeDEK, jose.A256GCM, kek)
 		require.NoError(t, err)
-		b, err := NewDEK("proj", jose.A256GCM, kek)
+		b, err := NewEncryptionKey("proj", EncryptionKeyPurposeDEK, jose.A256GCM, kek)
 		require.NoError(t, err)
 		assert.NotEqual(t, a.Key, b.Key)
 		assert.NotEqual(t, a.ID, b.ID)
@@ -63,7 +63,7 @@ func TestNewDEK(t *testing.T) {
 		kek := cryptomock.NewMockCrypter(gomock.NewController(t))
 		kek.EXPECT().Encrypt(gomock.Any()).Return("", sentinel)
 
-		_, err := NewDEK("proj", jose.A256GCM, kek)
+		_, err := NewEncryptionKey("proj", EncryptionKeyPurposeDEK, jose.A256GCM, kek)
 		require.Error(t, err)
 		var de Error
 		require.ErrorAs(t, err, &de)

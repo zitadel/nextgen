@@ -1,0 +1,96 @@
+package domain
+
+import (
+	"crypto/rand"
+	"time"
+
+	"github.com/go-jose/go-jose/v4"
+	"github.com/zitadel/nextgen/internal/crypto"
+)
+
+const (
+	PrefixSigningKey ResourcePrefix = "sig_key"
+)
+
+type SigningKeyPurpose string
+
+const (
+	SigningKeyPurposeToken = "token"
+)
+
+type SigningKey struct {
+	ID          string
+	ProjectID   string
+	Purpose     SigningKeyPurpose
+	Key         string
+	Algorithm   jose.SignatureAlgorithm
+	State       KeyState
+	CreatedAt   time.Time
+	ActivatedAt *time.Time
+	RetiredAt   *time.Time
+}
+
+func NewSigningKey(
+	projectID string,
+	purpose SigningKeyPurpose,
+	algorithm jose.SignatureAlgorithm,
+	kek crypto.Crypter,
+) (*SigningKey, error) {
+	id, err := newID(PrefixSigningKey)
+	if err != nil {
+		return nil, err
+	}
+
+	var key [32]byte
+	_, err = rand.Read(key[:])
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to generate new DEK key")
+	}
+
+	encryptedKey, err := kek.Encrypt(string(key[:]))
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to encrypt dek")
+	}
+
+	// createdAt is set by db
+	return &SigningKey{
+		ID:        id,
+		ProjectID: projectID,
+		Key:       encryptedKey,
+		Algorithm: algorithm,
+		State:     KeyStateNotActiveYet,
+		Purpose:   purpose,
+	}, nil
+}
+
+func (k *SigningKey) Signer(kek crypto.Crypter) (jose.Signer, error) {
+	decrypted, err := kek.Decrypt(k.Key)
+	if err != nil {
+		return nil, ErrDecryptionFailed(err)
+	}
+	return jose.NewSigner(
+		jose.SigningKey{
+			Algorithm: k.Algorithm,
+			Key: &jose.JSONWebKey{
+				Key:   []byte(decrypted),
+				KeyID: k.ID,
+			},
+		},
+		nil,
+	)
+}
+
+type SigningKeyField uint8
+
+const (
+	SigningKeyFieldUnspecified SigningKeyField = iota
+	SigningKeyFieldID
+	SigningKeyFieldProjectID
+	SigningKeyFieldKey
+	SigningKeyFieldAlgorithm
+	SigningKeyFieldState
+	SigningKeyFieldCreatedAt
+	SigningKeyFieldActivatedAt
+	SigningKeyFieldRetiredAt
+	SigningKeyFieldPurpose
+)

@@ -37,7 +37,7 @@ func newMockedKeyService(t *testing.T) (
 
 func newActiveDEK(t *testing.T, projectID string, kek op.Crypto) *domain.EncryptionKey {
 	t.Helper()
-	dek, err := domain.NewDEK(projectID, jose.A256GCM, kek)
+	dek, err := domain.NewEncryptionKey(projectID, domain.EncryptionKeyPurposeDEK, jose.A256GCM, kek)
 	require.NoError(t, err)
 	dek.Activate(nil)
 	return dek
@@ -72,7 +72,7 @@ func TestKeyService_GetCrypter(t *testing.T) {
 			// ARRANGE
 			svc, statements, kek := newMockedKeyService(t)
 
-			dek, err := domain.NewDEK("project-1", jose.A256GCM, kek)
+			dek, err := domain.NewEncryptionKey("project-1", domain.EncryptionKeyPurposeDEK, jose.A256GCM, kek)
 			require.NoError(t, err)
 			dekCrypter, err := dek.Crypter(kek)
 			require.NoError(t, err)

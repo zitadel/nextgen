@@ -2419,6 +2419,7 @@ func (*ErrorDetailsStatusCode) setUserPasswordRes()          {}
 func (*ErrorDetailsStatusCode) submitFlowEventRes()          {}
 func (*ErrorDetailsStatusCode) submitFlowStepRes()           {}
 func (*ErrorDetailsStatusCode) updateFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) updateUserByIDRes()           {}
 
 type ExchangeHandoffBadRequest ErrorDetails
 
@@ -12018,6 +12019,42 @@ func (*UpdateFlowDefinitionBadRequest) updateFlowDefinitionRes() {}
 type UpdateFlowDefinitionNotFound ErrorDetails
 
 func (*UpdateFlowDefinitionNotFound) updateFlowDefinitionRes() {}
+
+type UpdateUserByIDForbidden ErrorDetails
+
+func (*UpdateUserByIDForbidden) updateUserByIDRes() {}
+
+type UpdateUserByIDNotFound ErrorDetails
+
+func (*UpdateUserByIDNotFound) updateUserByIDRes() {}
+
+type UpdateUserByIDOK map[string]jx.Raw
+
+func (s *UpdateUserByIDOK) init() UpdateUserByIDOK {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+func (*UpdateUserByIDOK) updateUserByIDRes() {}
+
+type UpdateUserByIDReq map[string]jx.Raw
+
+func (s *UpdateUserByIDReq) init() UpdateUserByIDReq {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+type UpdateUserByIDUnauthorized ErrorDetails
+
+func (*UpdateUserByIDUnauthorized) updateUserByIDRes() {}
 
 // A user represents an individual identity in the system. It can be used to
 // represent a human user, but also a service account or any other type of

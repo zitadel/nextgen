@@ -86,8 +86,10 @@ func TestProjectService_Create(t *testing.T) {
 			seedDefaults:   true,
 			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
 				kek.EXPECT().Encrypt(gomock.Any())
+				kek.EXPECT().Decrypt(gomock.Any()).Return("thiskeyis32byteslongforsurerealy", nil)
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
-				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any())
+				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(3)
+				statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 			},
@@ -100,8 +102,10 @@ func TestProjectService_Create(t *testing.T) {
 			seedDefaults:   true,
 			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
 				kek.EXPECT().Encrypt(gomock.Any())
+				kek.EXPECT().Decrypt(gomock.Any()).Return("thiskeyis32byteslongforsurerealy", nil)
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
-				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any())
+				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(3)
+				statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 			},
@@ -113,8 +117,10 @@ func TestProjectService_Create(t *testing.T) {
 			seedDefaults: false,
 			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
 				kek.EXPECT().Encrypt(gomock.Any())
+				kek.EXPECT().Decrypt(gomock.Any()).Return("thiskeyis32byteslongforsurerealy", nil)
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
-				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any())
+				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(3)
+				statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 				// No schema/flow-definition seeding when seedDefaults is false.
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any()).Times(0)
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any()).Times(0)
@@ -126,6 +132,7 @@ func TestProjectService_Create(t *testing.T) {
 			projectName: "test",
 			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
 				kek.EXPECT().Encrypt(gomock.Any())
+				kek.EXPECT().Decrypt(gomock.Any()).Return("thiskeyis32byteslongforsurerealy", nil)
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).Return(assert.AnError)
 			},
 			wantErr: domain.ErrInternal(assert.AnError),

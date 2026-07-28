@@ -10,23 +10,23 @@ import (
 )
 
 const (
-	PrefixDEK ResourcePrefix = "dek"
+	PrefixEncryptionKey ResourcePrefix = "enc_key"
 )
 
 func ErrSupportedEncryptionAlgorithm(alg jose.ContentEncryption) Error {
-	return newError(PrefixDEK.ErrorCodePrefix("unknown_alg"), "unsupported encryption algorithm", map[string]any{"algorithm": alg}, nil)
+	return newError(PrefixEncryptionKey.ErrorCodePrefix("unknown_alg"), "unsupported encryption algorithm", map[string]any{"algorithm": alg}, nil)
 }
 
 func ErrNoReplacementKey() Error {
-	return newError(PrefixDEK.ErrorCodePrefix("no_replacement_key"), "no replacement key was provided while retiring the current one", nil, nil)
+	return newError(PrefixEncryptionKey.ErrorCodePrefix("no_replacement_key"), "no replacement key was provided while retiring the current one", nil, nil)
 }
 
 func ErrEncryptionKeyNotFound() Error {
-	return newError(PrefixDEK.ErrorCodePrefix("not_found"), "encryption key not found", nil, nil)
+	return newError(PrefixEncryptionKey.ErrorCodePrefix("not_found"), "encryption key not found", nil, nil)
 }
 
 func ErrDecryptionFailed(parent error) Error {
-	return newError(PrefixDEK.ErrorCodePrefix("decrypt_failed"), "failed to decrypt key", nil, parent)
+	return newError(PrefixEncryptionKey.ErrorCodePrefix("decrypt_failed"), "failed to decrypt key", nil, parent)
 }
 
 type KeyState string
@@ -41,7 +41,9 @@ const (
 type EncryptionKeyPurpose string
 
 const (
-	EncryptionKeyPurposeDEK EncryptionKeyPurpose = "dek"
+	EncryptionKeyPurposeDEK    EncryptionKeyPurpose = "dek"
+	EncryptionKeyPurposeToken  EncryptionKeyPurpose = "token"
+	EncryptionKeyPurposeSecret EncryptionKeyPurpose = "secret"
 )
 
 type EncryptionKey struct {
@@ -56,8 +58,13 @@ type EncryptionKey struct {
 	RetiredAt   *time.Time
 }
 
-func NewDEK(projectID string, algorithm jose.ContentEncryption, kek crypto.Crypter) (*EncryptionKey, error) {
-	id, err := newID(PrefixDEK)
+func NewEncryptionKey(
+	projectID string,
+	purpose EncryptionKeyPurpose,
+	algorithm jose.ContentEncryption,
+	kek crypto.Crypter,
+) (*EncryptionKey, error) {
+	id, err := newID(PrefixEncryptionKey)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +87,7 @@ func NewDEK(projectID string, algorithm jose.ContentEncryption, kek crypto.Crypt
 		Key:       encryptedKey,
 		Algorithm: algorithm,
 		State:     KeyStateNotActiveYet,
-		Purpose:   EncryptionKeyPurposeDEK,
+		Purpose:   purpose,
 	}, nil
 }
 
@@ -130,7 +137,7 @@ func (k *EncryptionKey) Crypter(kek crypto.Crypter) (crypto.Crypter, error) {
 type EncryptionKeyField uint8
 
 const (
-	DEKFieldUnspecified EncryptionKeyField = iota
+	EncryptionKeyFieldUnspecified EncryptionKeyField = iota
 	EncryptionKeyFieldID
 	EncryptionKeyFieldProjectID
 	EncryptionKeyFieldKey

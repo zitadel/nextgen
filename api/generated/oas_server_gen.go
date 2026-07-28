@@ -433,6 +433,12 @@ type Handler interface {
 	//
 	// PUT /flow_definitions/{id}
 	UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
+	// UpdateUserByID implements UpdateUserByID operation.
+	//
+	// Update user by ID.
+	//
+	// PATCH /users/{user_id}
+	UpdateUserByID(ctx context.Context, req UpdateUserByIDReq, params UpdateUserByIDParams) (UpdateUserByIDRes, error)
 	// VerifyChallengeProof implements verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.

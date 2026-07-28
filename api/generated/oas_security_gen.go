@@ -166,6 +166,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	UpdateFlowDefinitionOperation: []string{
 		"flow_definitions.write",
 	},
+	UpdateUserByIDOperation: []string{
+		"user.write",
+	},
 	VerifyChallengeProofOperation: []string{
 		"auth_attempts.write",
 	},

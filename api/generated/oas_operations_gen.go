@@ -57,5 +57,6 @@ const (
 	SubmitFlowEventOperation          OperationName = "SubmitFlowEvent"
 	SubmitFlowStepOperation           OperationName = "SubmitFlowStep"
 	UpdateFlowDefinitionOperation     OperationName = "UpdateFlowDefinition"
+	UpdateUserByIDOperation           OperationName = "UpdateUserByID"
 	VerifyChallengeProofOperation     OperationName = "VerifyChallengeProof"
 )

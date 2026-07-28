@@ -205,6 +205,10 @@ type UpdateFlowDefinitionRes interface {
 	updateFlowDefinitionRes()
 }
 
+type UpdateUserByIDRes interface {
+	updateUserByIDRes()
+}
+
 type VerifyChallengeProofRes interface {
 	verifyChallengeProofRes()
 }
