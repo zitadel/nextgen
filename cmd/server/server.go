@@ -170,7 +170,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		serviceDBPool,
 		sessionResolver,
 		userLookup,
-		serviceDBPool.Statements(),
 		userPasskeyRepo,
 		passwordHasher,
 	)

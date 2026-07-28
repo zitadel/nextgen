@@ -1,6 +1,6 @@
-//go:build postgres_integration
+//go:build spanner_integration
 
-package postgres
+package spanner
 
 import (
 	"testing"
@@ -11,29 +11,30 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	legacydb "github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-func userPasswordByUser(projectID, userID string) database.Filter[domain.UserPasswordField] {
-	return database.And(
-		database.Equal(database.Col(domain.UserPasswordFieldProjectID), projectID),
-		database.Equal(database.Col(domain.UserPasswordFieldUserID), userID),
+func userPasswordByUser(projectID, userID string) v2database.Filter[domain.UserPasswordField] {
+	return v2database.And(
+		v2database.Equal(v2database.Col(domain.UserPasswordFieldProjectID), projectID),
+		v2database.Equal(v2database.Col(domain.UserPasswordFieldUserID), userID),
 	)
 }
 
-func userPasswordByID(id int64) database.Filter[domain.UserPasswordField] {
-	return database.Equal(database.Col(domain.UserPasswordFieldID), id)
+func userPasswordByID(id int64) v2database.Filter[domain.UserPasswordField] {
+	return v2database.Equal(v2database.Col(domain.UserPasswordFieldID), id)
 }
 
 func TestUserPasswordStatements_SetGetDelete(t *testing.T) {
 	ctx := t.Context()
+	stmts := testClient.Statements()
 	projectID, schemaURL := ensureUserTestProject(t)
 	userID := "usr_pw"
 
-	require.NoError(t, testPool.CreateUser(ctx, newTestUser(t, projectID, schemaURL, userID, "pw@example.com", "PW User")))
+	require.NoError(t, stmts.CreateUser(ctx, newTestUser(t, projectID, schemaURL, userID, "pw@example.com", "PW User")))
 
 	vid := "verif-1"
-	require.NoError(t, testPool.SetUserPassword(ctx, &domain.SetUserPassword{
+	require.NoError(t, stmts.SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:      projectID,
 		UserID:         userID,
 		EncodedHash:    "argon2id$v=19$m=65536,t=3,p=4$fake",
@@ -42,7 +43,7 @@ func TestUserPasswordStatements_SetGetDelete(t *testing.T) {
 	}))
 
 	byUser := userPasswordByUser(projectID, userID)
-	got, err := testPool.GetUserPassword(ctx, byUser)
+	got, err := stmts.GetUserPassword(ctx, byUser)
 	require.NoError(t, err)
 	require.Positive(t, got.ID)
 	assert.Equal(t, projectID, got.ProjectID)
@@ -52,64 +53,65 @@ func TestUserPasswordStatements_SetGetDelete(t *testing.T) {
 	require.NotNil(t, got.VerificationID)
 	assert.Equal(t, vid, *got.VerificationID)
 
-	gotByID, err := testPool.GetUserPassword(ctx, userPasswordByID(got.ID))
+	gotByID, err := stmts.GetUserPassword(ctx, userPasswordByID(got.ID))
 	require.NoError(t, err)
 	assert.Equal(t, got.ID, gotByID.ID)
 
-	list, err := testPool.ListUserPasswords(ctx, &database.ListOptions[domain.UserPasswordField]{
-		Filter: database.Equal(database.Col(domain.UserPasswordFieldProjectID), projectID),
+	list, err := stmts.ListUserPasswords(ctx, &v2database.ListOptions[domain.UserPasswordField]{
+		Filter: v2database.Equal(v2database.Col(domain.UserPasswordFieldProjectID), projectID),
 	})
 	require.NoError(t, err)
 	require.Len(t, list.Items, 1)
 
-	require.NoError(t, testPool.DeleteUserPassword(ctx, userPasswordByID(got.ID)))
-	_, err = testPool.GetUserPassword(ctx, byUser)
+	require.NoError(t, stmts.DeleteUserPassword(ctx, userPasswordByID(got.ID)))
+	_, err = stmts.GetUserPassword(ctx, byUser)
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 
-	require.NoError(t, testPool.SetUserPassword(ctx, &domain.SetUserPassword{
+	require.NoError(t, stmts.SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:   projectID,
 		UserID:      userID,
 		EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$fake",
 	}))
-	got2, err := testPool.GetUserPassword(ctx, byUser)
+	got2, err := stmts.GetUserPassword(ctx, byUser)
 	require.NoError(t, err)
 	require.Positive(t, got2.ID)
-	require.NoError(t, testPool.DeleteUserPassword(ctx, byUser))
-	_, err = testPool.GetUserPassword(ctx, byUser)
+	require.NoError(t, stmts.DeleteUserPassword(ctx, byUser))
+	_, err = stmts.GetUserPassword(ctx, byUser)
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 }
 
 func TestUserPasswordStatements_SetUpsert(t *testing.T) {
 	ctx := t.Context()
+	stmts := testClient.Statements()
 	projectID, schemaURL := ensureUserTestProject(t)
 	userID := "usr_pw_upsert"
 
-	require.NoError(t, testPool.CreateUser(ctx, newTestUser(t, projectID, schemaURL, userID, "pw-upsert@example.com", "PW Upsert")))
+	require.NoError(t, stmts.CreateUser(ctx, newTestUser(t, projectID, schemaURL, userID, "pw-upsert@example.com", "PW Upsert")))
 
 	byUser := userPasswordByUser(projectID, userID)
-	require.NoError(t, testPool.SetUserPassword(ctx, &domain.SetUserPassword{
+	require.NoError(t, stmts.SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:      projectID,
 		UserID:         userID,
 		EncodedHash:    "argon2id$v=19$m=65536,t=3,p=4$initial",
 		ChangeRequired: true,
 	}))
-	got, err := testPool.GetUserPassword(ctx, byUser)
+	got, err := stmts.GetUserPassword(ctx, byUser)
 	require.NoError(t, err)
 	initialID := got.ID
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	require.NoError(t, testPool.UpdateUserPassword(ctx, byUser,
+	require.NoError(t, stmts.UpdateUserPassword(ctx, byUser,
 		&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 3},
 		&domain.UserPasswordLastSuccessfulCheckUpdate{LastSuccessfulCheck: now},
 	))
 
-	require.NoError(t, testPool.SetUserPassword(ctx, &domain.SetUserPassword{
+	require.NoError(t, stmts.SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:      projectID,
 		UserID:         userID,
 		EncodedHash:    "argon2id$v=19$m=65536,t=3,p=4$updated",
 		ChangeRequired: false,
 	}))
-	got2, err := testPool.GetUserPassword(ctx, byUser)
+	got2, err := stmts.GetUserPassword(ctx, byUser)
 	require.NoError(t, err)
 	assert.Equal(t, initialID, got2.ID)
 	assert.Equal(t, "argon2id$v=19$m=65536,t=3,p=4$updated", got2.EncodedHash)
@@ -121,9 +123,10 @@ func TestUserPasswordStatements_SetUpsert(t *testing.T) {
 
 func TestUserPasswordStatements_SetMissingUser(t *testing.T) {
 	ctx := t.Context()
+	stmts := testClient.Statements()
 	projectID, _ := ensureUserTestProject(t)
 
-	err := testPool.SetUserPassword(ctx, &domain.SetUserPassword{
+	err := stmts.SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:   projectID,
 		UserID:      "missing-user",
 		EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$fake",
@@ -134,11 +137,12 @@ func TestUserPasswordStatements_SetMissingUser(t *testing.T) {
 
 func TestUserPasswordStatements_Update(t *testing.T) {
 	ctx := t.Context()
+	stmts := testClient.Statements()
 	projectID, schemaURL := ensureUserTestProject(t)
 	userID := "usr_pw_upd"
 
-	require.NoError(t, testPool.CreateUser(ctx, newTestUser(t, projectID, schemaURL, userID, "pw-upd@example.com", "PW Update")))
-	require.NoError(t, testPool.SetUserPassword(ctx, &domain.SetUserPassword{
+	require.NoError(t, stmts.CreateUser(ctx, newTestUser(t, projectID, schemaURL, userID, "pw-upd@example.com", "PW Update")))
+	require.NoError(t, stmts.SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:   projectID,
 		UserID:      userID,
 		EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$initial",
@@ -146,16 +150,16 @@ func TestUserPasswordStatements_Update(t *testing.T) {
 
 	byUser := userPasswordByUser(projectID, userID)
 
-	err := testPool.UpdateUserPassword(ctx, byUser)
-	assert.ErrorIs(t, err, database.ErrNoChanges)
+	err := stmts.UpdateUserPassword(ctx, byUser)
+	assert.ErrorIs(t, err, v2database.ErrNoChanges)
 
-	err = testPool.UpdateUserPassword(ctx, userPasswordByUser(projectID, "missing-user"),
+	err = stmts.UpdateUserPassword(ctx, userPasswordByUser(projectID, "missing-user"),
 		&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 1},
 	)
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	require.NoError(t, testPool.UpdateUserPassword(ctx, byUser,
+	require.NoError(t, stmts.UpdateUserPassword(ctx, byUser,
 		&domain.UserPasswordEncodedHashUpdate{EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$rotated"},
 		&domain.UserPasswordChangeRequiredUpdate{ChangeRequired: true},
 		&domain.UserPasswordChangedAtUpdate{ChangedAt: now},
@@ -164,7 +168,7 @@ func TestUserPasswordStatements_Update(t *testing.T) {
 		&domain.UserPasswordResetFailedAttemptsUpdate{},
 	))
 
-	got, err := testPool.GetUserPassword(ctx, byUser)
+	got, err := stmts.GetUserPassword(ctx, byUser)
 	require.NoError(t, err)
 	assert.Equal(t, "argon2id$v=19$m=65536,t=3,p=4$rotated", got.EncodedHash)
 	assert.True(t, got.ChangeRequired)
@@ -175,14 +179,14 @@ func TestUserPasswordStatements_Update(t *testing.T) {
 	assert.WithinDuration(t, now, *got.LastSuccessfulCheck, time.Second)
 	assert.Zero(t, got.FailedAttempts)
 
-	require.NoError(t, testPool.UpdateUserPassword(ctx, byUser,
+	require.NoError(t, stmts.UpdateUserPassword(ctx, byUser,
 		&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 2},
 	))
-	got, err = testPool.GetUserPassword(ctx, byUser)
+	got, err = stmts.GetUserPassword(ctx, byUser)
 	require.NoError(t, err)
 	assert.Equal(t, int16(2), got.FailedAttempts)
 
-	require.NoError(t, testPool.DeleteUserPassword(ctx, byUser))
-	_, err = testPool.GetUserPassword(ctx, byUser)
+	require.NoError(t, stmts.DeleteUserPassword(ctx, byUser))
+	_, err = stmts.GetUserPassword(ctx, byUser)
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 }

@@ -82,7 +82,10 @@ func TestImport_loadAndSkip(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "usr_import_1", got.ID)
 
-	pw, err := v2Pool.Statements().GetUserPasswordByUserID(ctx, "proj_demo", "usr_import_1")
+	pw, err := v2Pool.Statements().GetUserPassword(ctx, v2database.And(
+		v2database.Equal(v2database.Col(domain.UserPasswordFieldProjectID), "proj_demo"),
+		v2database.Equal(v2database.Col(domain.UserPasswordFieldUserID), "usr_import_1"),
+	))
 	require.NoError(t, err)
 	require.NotEmpty(t, pw.EncodedHash)
 

@@ -40,13 +40,6 @@ func newUserPasswordStatements(client queryExecutor) userPasswordStatements {
 	}
 }
 
-func userPasswordByUserFilter(projectID, userID string) database.Filter[domain.UserPasswordField] {
-	return database.And(
-		database.Equal(database.Col(domain.UserPasswordFieldProjectID), projectID),
-		database.Equal(database.Col(domain.UserPasswordFieldUserID), userID),
-	)
-}
-
 // SetUserPassword implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error {
 	_, err := ps.client.Exec(ctx, setUserPasswordStmt,
@@ -61,32 +54,18 @@ func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain
 
 // GetUserPassword implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) GetUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) (*domain.UserPassword, error) {
-	if filter == nil {
-		return nil, fmt.Errorf("UserPassword filter is required")
-	}
-	return ps.getUserPassword(ctx, &database.ListOptions[domain.UserPasswordField]{Filter: filter})
-}
-
-// GetUserPasswordByUserID implements [service.UserPasswordStatements].
-func (ps userPasswordStatements) GetUserPasswordByUserID(ctx context.Context, projectID, userID string) (*domain.UserPassword, error) {
-	return ps.GetUserPassword(ctx, userPasswordByUserFilter(projectID, userID))
-}
-
-func (ps userPasswordStatements) getUserPassword(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*domain.UserPassword, error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, userPasswordQuery, filter, userPasswordSchema); err != nil {
+	result, err := ps.ListUserPasswords(ctx, &database.ListOptions[domain.UserPasswordField]{Filter: filter})
+	if err != nil {
 		return nil, err
 	}
-
-	rows, err := ps.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
+	switch len(result.Items) {
+	case 0:
+		return nil, wrapError(pgx.ErrNoRows)
+	case 1:
+		return result.Items[0], nil
+	default:
+		return nil, wrapError(pgx.ErrTooManyRows)
 	}
-	pw, err := pgx.CollectExactlyOneRow(rows, ps.scanUserPassword)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	return pw, nil
 }
 
 // ListUserPasswords implements [service.UserPasswordStatements].
@@ -188,11 +167,6 @@ func (ps userPasswordStatements) DeleteUserPassword(ctx context.Context, filter 
 	compileFilter(&c, filter, userPasswordSchema)
 	_, err := ps.client.Exec(ctx, c.String(), c.args...)
 	return wrapError(err)
-}
-
-// DeleteUserPasswordByUserID implements [service.UserPasswordStatements].
-func (ps userPasswordStatements) DeleteUserPasswordByUserID(ctx context.Context, projectID, userID string) error {
-	return ps.DeleteUserPassword(ctx, userPasswordByUserFilter(projectID, userID))
 }
 
 func (ps userPasswordStatements) scanUserPassword(row pgx.CollectableRow) (*domain.UserPassword, error) {

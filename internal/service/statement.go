@@ -219,11 +219,9 @@ type UserPasswordStatements interface {
 	Statements
 	SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error
 	GetUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) (*domain.UserPassword, error)
-	GetUserPasswordByUserID(ctx context.Context, projectID, userID string) (*domain.UserPassword, error)
 	ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error)
 	UpdateUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField], updates ...domain.UserPasswordUpdate) error
 	DeleteUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) error
-	DeleteUserPasswordByUserID(ctx context.Context, projectID, userID string) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
