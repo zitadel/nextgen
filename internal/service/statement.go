@@ -231,10 +231,8 @@ type UserTOTPStatements interface {
 type UserRecoveryCodesStatements interface {
 	Statements
 	CreateUserRecoveryCodes(ctx context.Context, codes *domain.CreateRecoveryCodes) error
-	GetUserRecoveryCodesByID(ctx context.Context, id int64) (*domain.UserRecoveryCodes, error)
-	GetUserRecoveryCodesByUserID(ctx context.Context, projectID, userID string) (*domain.UserRecoveryCodes, error)
+	GetUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField]) (*domain.UserRecoveryCodes, error)
 	ListUserRecoveryCodes(ctx context.Context, filter *database.ListOptions[domain.UserRecoveryCodesField]) (*database.ListResult[*domain.UserRecoveryCodes], error)
-	UpdateUserRecoveryCodes(ctx context.Context, projectID, userID string, updates ...domain.UserRecoveryCodesUpdate) error
-	DeleteUserRecoveryCodesByID(ctx context.Context, id int64) error
-	DeleteUserRecoveryCodesByUserID(ctx context.Context, projectID, userID string) error
+	UpdateUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField], updates ...domain.UserRecoveryCodesUpdate) error
+	DeleteUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField]) error
 }

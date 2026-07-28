@@ -16,6 +16,17 @@ import (
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
+func recoveryCodesByUserFilter(projectID, userID string) v2database.Filter[domain.UserRecoveryCodesField] {
+	return v2database.And(
+		v2database.Equal(v2database.Col(domain.UserRecoveryCodesFieldProjectID), projectID),
+		v2database.Equal(v2database.Col(domain.UserRecoveryCodesFieldUserID), userID),
+	)
+}
+
+func recoveryCodesByIDFilter(id int64) v2database.Filter[domain.UserRecoveryCodesField] {
+	return v2database.Equal(v2database.Col(domain.UserRecoveryCodesFieldID), id)
+}
+
 func insertUserRecoveryCodesFixtures(t *testing.T, ctx context.Context, pid, tid, schemaURL, userID string) {
 	t.Helper()
 	require.NoError(t, testPool.CreateProject(ctx, newTestProject(pid)))
@@ -61,12 +72,12 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 		RecoveryCodes: codes,
 	}))
 
-	got, err := testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
+	got, err := testPool.GetUserRecoveryCodes(ctx, recoveryCodesByUserFilter(pid, userID))
 	require.NoError(t, err)
 	require.Positive(t, got.ID)
 	require.Equal(t, codes, got.RecoveryCodes)
 
-	byID, err := testPool.GetUserRecoveryCodesByID(ctx, got.ID)
+	byID, err := testPool.GetUserRecoveryCodes(ctx, recoveryCodesByIDFilter(got.ID))
 	require.NoError(t, err)
 	require.Equal(t, got.ID, byID.ID)
 
@@ -76,8 +87,8 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
 
-	require.NoError(t, testPool.DeleteUserRecoveryCodesByID(ctx, got.ID))
-	_, err = testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
+	require.NoError(t, testPool.DeleteUserRecoveryCodes(ctx, recoveryCodesByIDFilter(got.ID)))
+	_, err = testPool.GetUserRecoveryCodes(ctx, recoveryCodesByUserFilter(pid, userID))
 	require.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 
 	require.NoError(t, testPool.CreateUserRecoveryCodes(ctx, &domain.CreateRecoveryCodes{
@@ -85,11 +96,11 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 		UserID:        userID,
 		RecoveryCodes: codes,
 	}))
-	got2, err := testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
+	got2, err := testPool.GetUserRecoveryCodes(ctx, recoveryCodesByUserFilter(pid, userID))
 	require.NoError(t, err)
 	require.Positive(t, got2.ID)
-	require.NoError(t, testPool.DeleteUserRecoveryCodesByUserID(ctx, pid, userID))
-	_, err = testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
+	require.NoError(t, testPool.DeleteUserRecoveryCodes(ctx, recoveryCodesByUserFilter(pid, userID)))
+	_, err = testPool.GetUserRecoveryCodes(ctx, recoveryCodesByUserFilter(pid, userID))
 	require.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 }
 
@@ -134,49 +145,51 @@ func TestUserRecoveryCodesStatements_Update(t *testing.T) {
 		RecoveryCodes: []string{"old-code-1"},
 	}))
 
-	err := testPool.UpdateUserRecoveryCodes(ctx, pid, userID)
+	byUser := recoveryCodesByUserFilter(pid, userID)
+
+	err := testPool.UpdateUserRecoveryCodes(ctx, byUser)
 	assert.ErrorIs(t, err, v2database.ErrNoChanges)
 
-	err = testPool.UpdateUserRecoveryCodes(ctx, pid, "missing-user",
+	err = testPool.UpdateUserRecoveryCodes(ctx, recoveryCodesByUserFilter(pid, "missing-user"),
 		&domain.UserRecoveryCodesIncrementFailedAttemptsUpdate{Delta: 1},
 	)
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 
-	err = testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
+	err = testPool.UpdateUserRecoveryCodes(ctx, byUser,
 		domain.NewUserRecoveryCodesCodesUpdate(nil),
 	)
 	assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
 
-	err = testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
+	err = testPool.UpdateUserRecoveryCodes(ctx, byUser,
 		domain.NewUserRecoveryCodesCodesUpdate([]string{}),
 	)
 	assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
+	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, byUser,
 		domain.NewUserRecoveryCodesCodesUpdate([]string{"new-a", "new-b"}),
 		&domain.UserRecoveryCodesLastSuccessfulCheckUpdate{LastSuccessfulCheck: &now},
 		&domain.UserRecoveryCodesResetFailedAttemptsUpdate{},
 	))
 
-	got, err := testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
+	got, err := testPool.GetUserRecoveryCodes(ctx, byUser)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"new-a", "new-b"}, got.RecoveryCodes)
 	require.NotNil(t, got.LastSuccessfulCheck)
 	assert.WithinDuration(t, now, *got.LastSuccessfulCheck, time.Second)
 	assert.Zero(t, got.FailedAttempts)
 
-	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
+	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, byUser,
 		&domain.UserRecoveryCodesIncrementFailedAttemptsUpdate{Delta: 2},
 	))
-	got, err = testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
+	got, err = testPool.GetUserRecoveryCodes(ctx, byUser)
 	require.NoError(t, err)
 	assert.Equal(t, int16(2), got.FailedAttempts)
 
-	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
+	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, byUser,
 		&domain.UserRecoveryCodesLastSuccessfulCheckUpdate{LastSuccessfulCheck: nil},
 	))
-	got, err = testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
+	got, err = testPool.GetUserRecoveryCodes(ctx, byUser)
 	require.NoError(t, err)
 	assert.Nil(t, got.LastSuccessfulCheck)
 }

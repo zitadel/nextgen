@@ -17,10 +17,6 @@ const createUserRecoveryCodesStmt = `INSERT INTO zitadel_nextgen.user_recovery_c
 	project_id, user_id, recovery_codes
 ) VALUES ($1, $2, $3)`
 
-const deleteUserRecoveryCodesByIDStmt = `DELETE FROM zitadel_nextgen.user_recovery_codes WHERE id = $1`
-
-const deleteUserRecoveryCodesByUserIDStmt = `DELETE FROM zitadel_nextgen.user_recovery_codes WHERE project_id = $1 AND user_id = $2`
-
 const userRecoveryCodesQuery = `SELECT id, project_id, user_id, recovery_codes,
 	last_successful_check, failed_attempts, created_at, updated_at
 FROM zitadel_nextgen.user_recovery_codes`
@@ -44,93 +40,12 @@ func (s userRecoveryCodesStatements) CreateUserRecoveryCodes(ctx context.Context
 	return wrapError(err)
 }
 
-// DeleteUserRecoveryCodesByID implements [service.UserRecoveryCodesStatements].
-func (s userRecoveryCodesStatements) DeleteUserRecoveryCodesByID(ctx context.Context, id int64) error {
-	_, err := s.client.Exec(ctx, deleteUserRecoveryCodesByIDStmt, id)
-	return wrapError(err)
-}
-
-// DeleteUserRecoveryCodesByUserID implements [service.UserRecoveryCodesStatements].
-func (s userRecoveryCodesStatements) DeleteUserRecoveryCodesByUserID(ctx context.Context, projectID, userID string) error {
-	_, err := s.client.Exec(ctx, deleteUserRecoveryCodesByUserIDStmt, projectID, userID)
-	return wrapError(err)
-}
-
-// UpdateUserRecoveryCodes implements [service.UserRecoveryCodesStatements].
-func (s userRecoveryCodesStatements) UpdateUserRecoveryCodes(ctx context.Context, projectID, userID string, updates ...domain.UserRecoveryCodesUpdate) error {
-	if len(updates) == 0 {
-		return database.ErrNoChanges
+// GetUserRecoveryCodes implements [service.UserRecoveryCodesStatements].
+func (s userRecoveryCodesStatements) GetUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField]) (*domain.UserRecoveryCodes, error) {
+	if filter == nil {
+		return nil, fmt.Errorf("UserRecoveryCodes filter is required")
 	}
-
-	var c statementCompiler
-	c.WriteString("UPDATE zitadel_nextgen.user_recovery_codes SET ")
-	sep := ""
-	writeAssign := func(col string, arg any) {
-		c.WriteString(sep)
-		sep = ", "
-		c.WriteString(col)
-		c.WriteString(" = ")
-		c.WriteArg(arg)
-	}
-
-	for _, update := range updates {
-		switch u := update.(type) {
-		case *domain.UserRecoveryCodesCodesUpdate:
-			if err := domain.RequireNonEmptyRecoveryCodes(u.Codes); err != nil {
-				return err
-			}
-			writeAssign("recovery_codes", u.Codes)
-		case *domain.UserRecoveryCodesLastSuccessfulCheckUpdate:
-			c.WriteString(sep)
-			sep = ", "
-			c.WriteString("last_successful_check = ")
-			if u.LastSuccessfulCheck == nil {
-				c.WriteString("NULL")
-			} else {
-				c.WriteArg(*u.LastSuccessfulCheck)
-			}
-		case *domain.UserRecoveryCodesIncrementFailedAttemptsUpdate:
-			c.WriteString(sep)
-			sep = ", "
-			c.WriteString("failed_attempts = failed_attempts + ")
-			c.WriteArg(u.Delta)
-		case *domain.UserRecoveryCodesResetFailedAttemptsUpdate:
-			writeAssign("failed_attempts", int16(0))
-		default:
-			return fmt.Errorf("unknown UserRecoveryCodesUpdate %T", update)
-		}
-	}
-
-	c.WriteString(", updated_at = NOW() WHERE project_id = ")
-	c.WriteArg(projectID)
-	c.WriteString(" AND user_id = ")
-	c.WriteArg(userID)
-
-	tag, err := s.client.Exec(ctx, c.String(), c.args...)
-	if err != nil {
-		return wrapError(err)
-	}
-	if tag.RowsAffected() == 0 {
-		return wrapError(pgx.ErrNoRows)
-	}
-	return nil
-}
-
-// GetUserRecoveryCodesByID implements [service.UserRecoveryCodesStatements].
-func (s userRecoveryCodesStatements) GetUserRecoveryCodesByID(ctx context.Context, id int64) (*domain.UserRecoveryCodes, error) {
-	return s.getUserRecoveryCodes(ctx, &database.ListOptions[domain.UserRecoveryCodesField]{
-		Filter: database.Equal(database.Col(domain.UserRecoveryCodesFieldID), id),
-	})
-}
-
-// GetUserRecoveryCodesByUserID implements [service.UserRecoveryCodesStatements].
-func (s userRecoveryCodesStatements) GetUserRecoveryCodesByUserID(ctx context.Context, projectID, userID string) (*domain.UserRecoveryCodes, error) {
-	return s.getUserRecoveryCodes(ctx, &database.ListOptions[domain.UserRecoveryCodesField]{
-		Filter: database.And(
-			database.Equal(database.Col(domain.UserRecoveryCodesFieldProjectID), projectID),
-			database.Equal(database.Col(domain.UserRecoveryCodesFieldUserID), userID),
-		),
-	})
+	return s.getUserRecoveryCodes(ctx, &database.ListOptions[domain.UserRecoveryCodesField]{Filter: filter})
 }
 
 func (s userRecoveryCodesStatements) getUserRecoveryCodes(ctx context.Context, filter *database.ListOptions[domain.UserRecoveryCodesField]) (*domain.UserRecoveryCodes, error) {
@@ -180,6 +95,79 @@ func (s userRecoveryCodesStatements) ListUserRecoveryCodes(ctx context.Context, 
 		Items:      items,
 		NextCursor: nextCursor,
 	}, nil
+}
+
+// UpdateUserRecoveryCodes implements [service.UserRecoveryCodesStatements].
+func (s userRecoveryCodesStatements) UpdateUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField], updates ...domain.UserRecoveryCodesUpdate) error {
+	if filter == nil {
+		return fmt.Errorf("UserRecoveryCodes filter is required")
+	}
+	if len(updates) == 0 {
+		return database.ErrNoChanges
+	}
+
+	var c statementCompiler
+	c.WriteString("UPDATE zitadel_nextgen.user_recovery_codes SET ")
+	sep := ""
+	writeAssign := func(col string, arg any) {
+		c.WriteString(sep)
+		sep = ", "
+		c.WriteString(col)
+		c.WriteString(" = ")
+		c.WriteArg(arg)
+	}
+
+	for _, update := range updates {
+		switch u := update.(type) {
+		case *domain.UserRecoveryCodesCodesUpdate:
+			if err := domain.RequireNonEmptyRecoveryCodes(u.Codes); err != nil {
+				return err
+			}
+			writeAssign("recovery_codes", u.Codes)
+		case *domain.UserRecoveryCodesLastSuccessfulCheckUpdate:
+			c.WriteString(sep)
+			sep = ", "
+			c.WriteString("last_successful_check = ")
+			if u.LastSuccessfulCheck == nil {
+				c.WriteString("NULL")
+			} else {
+				c.WriteArg(*u.LastSuccessfulCheck)
+			}
+		case *domain.UserRecoveryCodesIncrementFailedAttemptsUpdate:
+			c.WriteString(sep)
+			sep = ", "
+			c.WriteString("failed_attempts = failed_attempts + ")
+			c.WriteArg(u.Delta)
+		case *domain.UserRecoveryCodesResetFailedAttemptsUpdate:
+			writeAssign("failed_attempts", int16(0))
+		default:
+			return fmt.Errorf("unknown UserRecoveryCodesUpdate %T", update)
+		}
+	}
+
+	c.WriteString(", updated_at = NOW() WHERE ")
+	compileFilter(&c, filter, userRecoveryCodesSchema)
+
+	tag, err := s.client.Exec(ctx, c.String(), c.args...)
+	if err != nil {
+		return wrapError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return wrapError(pgx.ErrNoRows)
+	}
+	return nil
+}
+
+// DeleteUserRecoveryCodes implements [service.UserRecoveryCodesStatements].
+func (s userRecoveryCodesStatements) DeleteUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField]) error {
+	if filter == nil {
+		return fmt.Errorf("UserRecoveryCodes filter is required")
+	}
+	var c statementCompiler
+	c.WriteString("DELETE FROM zitadel_nextgen.user_recovery_codes WHERE ")
+	compileFilter(&c, filter, userRecoveryCodesSchema)
+	_, err := s.client.Exec(ctx, c.String(), c.args...)
+	return wrapError(err)
 }
 
 func (s userRecoveryCodesStatements) scanUserRecoveryCodes(row pgx.CollectableRow) (*domain.UserRecoveryCodes, error) {

@@ -1154,78 +1154,40 @@ func (c *MockAllStatementsDeleteUserByIDCall) DoAndReturn(f func(context.Context
 	return c
 }
 
-// DeleteUserRecoveryCodesByID mocks base method.
-func (m *MockAllStatements) DeleteUserRecoveryCodesByID(ctx context.Context, id int64) error {
+// DeleteUserRecoveryCodes mocks base method.
+func (m *MockAllStatements) DeleteUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField]) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteUserRecoveryCodesByID", ctx, id)
+	ret := m.ctrl.Call(m, "DeleteUserRecoveryCodes", ctx, filter)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// DeleteUserRecoveryCodesByID indicates an expected call of DeleteUserRecoveryCodesByID.
-func (mr *MockAllStatementsMockRecorder) DeleteUserRecoveryCodesByID(ctx, id any) *MockAllStatementsDeleteUserRecoveryCodesByIDCall {
+// DeleteUserRecoveryCodes indicates an expected call of DeleteUserRecoveryCodes.
+func (mr *MockAllStatementsMockRecorder) DeleteUserRecoveryCodes(ctx, filter any) *MockAllStatementsDeleteUserRecoveryCodesCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserRecoveryCodesByID", reflect.TypeOf((*MockAllStatements)(nil).DeleteUserRecoveryCodesByID), ctx, id)
-	return &MockAllStatementsDeleteUserRecoveryCodesByIDCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserRecoveryCodes", reflect.TypeOf((*MockAllStatements)(nil).DeleteUserRecoveryCodes), ctx, filter)
+	return &MockAllStatementsDeleteUserRecoveryCodesCall{Call: call}
 }
 
-// MockAllStatementsDeleteUserRecoveryCodesByIDCall wrap *gomock.Call
-type MockAllStatementsDeleteUserRecoveryCodesByIDCall struct {
+// MockAllStatementsDeleteUserRecoveryCodesCall wrap *gomock.Call
+type MockAllStatementsDeleteUserRecoveryCodesCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsDeleteUserRecoveryCodesByIDCall) Return(arg0 error) *MockAllStatementsDeleteUserRecoveryCodesByIDCall {
+func (c *MockAllStatementsDeleteUserRecoveryCodesCall) Return(arg0 error) *MockAllStatementsDeleteUserRecoveryCodesCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeleteUserRecoveryCodesByIDCall) Do(f func(context.Context, int64) error) *MockAllStatementsDeleteUserRecoveryCodesByIDCall {
+func (c *MockAllStatementsDeleteUserRecoveryCodesCall) Do(f func(context.Context, database.Filter[domain.UserRecoveryCodesField]) error) *MockAllStatementsDeleteUserRecoveryCodesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeleteUserRecoveryCodesByIDCall) DoAndReturn(f func(context.Context, int64) error) *MockAllStatementsDeleteUserRecoveryCodesByIDCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// DeleteUserRecoveryCodesByUserID mocks base method.
-func (m *MockAllStatements) DeleteUserRecoveryCodesByUserID(ctx context.Context, projectID, userID string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteUserRecoveryCodesByUserID", ctx, projectID, userID)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DeleteUserRecoveryCodesByUserID indicates an expected call of DeleteUserRecoveryCodesByUserID.
-func (mr *MockAllStatementsMockRecorder) DeleteUserRecoveryCodesByUserID(ctx, projectID, userID any) *MockAllStatementsDeleteUserRecoveryCodesByUserIDCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserRecoveryCodesByUserID", reflect.TypeOf((*MockAllStatements)(nil).DeleteUserRecoveryCodesByUserID), ctx, projectID, userID)
-	return &MockAllStatementsDeleteUserRecoveryCodesByUserIDCall{Call: call}
-}
-
-// MockAllStatementsDeleteUserRecoveryCodesByUserIDCall wrap *gomock.Call
-type MockAllStatementsDeleteUserRecoveryCodesByUserIDCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsDeleteUserRecoveryCodesByUserIDCall) Return(arg0 error) *MockAllStatementsDeleteUserRecoveryCodesByUserIDCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeleteUserRecoveryCodesByUserIDCall) Do(f func(context.Context, string, string) error) *MockAllStatementsDeleteUserRecoveryCodesByUserIDCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeleteUserRecoveryCodesByUserIDCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsDeleteUserRecoveryCodesByUserIDCall {
+func (c *MockAllStatementsDeleteUserRecoveryCodesCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserRecoveryCodesField]) error) *MockAllStatementsDeleteUserRecoveryCodesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1775,80 +1737,41 @@ func (c *MockAllStatementsGetUserCall) DoAndReturn(f func(context.Context, datab
 	return c
 }
 
-// GetUserRecoveryCodesByID mocks base method.
-func (m *MockAllStatements) GetUserRecoveryCodesByID(ctx context.Context, id int64) (*domain.UserRecoveryCodes, error) {
+// GetUserRecoveryCodes mocks base method.
+func (m *MockAllStatements) GetUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField]) (*domain.UserRecoveryCodes, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUserRecoveryCodesByID", ctx, id)
+	ret := m.ctrl.Call(m, "GetUserRecoveryCodes", ctx, filter)
 	ret0, _ := ret[0].(*domain.UserRecoveryCodes)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetUserRecoveryCodesByID indicates an expected call of GetUserRecoveryCodesByID.
-func (mr *MockAllStatementsMockRecorder) GetUserRecoveryCodesByID(ctx, id any) *MockAllStatementsGetUserRecoveryCodesByIDCall {
+// GetUserRecoveryCodes indicates an expected call of GetUserRecoveryCodes.
+func (mr *MockAllStatementsMockRecorder) GetUserRecoveryCodes(ctx, filter any) *MockAllStatementsGetUserRecoveryCodesCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserRecoveryCodesByID", reflect.TypeOf((*MockAllStatements)(nil).GetUserRecoveryCodesByID), ctx, id)
-	return &MockAllStatementsGetUserRecoveryCodesByIDCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserRecoveryCodes", reflect.TypeOf((*MockAllStatements)(nil).GetUserRecoveryCodes), ctx, filter)
+	return &MockAllStatementsGetUserRecoveryCodesCall{Call: call}
 }
 
-// MockAllStatementsGetUserRecoveryCodesByIDCall wrap *gomock.Call
-type MockAllStatementsGetUserRecoveryCodesByIDCall struct {
+// MockAllStatementsGetUserRecoveryCodesCall wrap *gomock.Call
+type MockAllStatementsGetUserRecoveryCodesCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsGetUserRecoveryCodesByIDCall) Return(arg0 *domain.UserRecoveryCodes, arg1 error) *MockAllStatementsGetUserRecoveryCodesByIDCall {
+func (c *MockAllStatementsGetUserRecoveryCodesCall) Return(arg0 *domain.UserRecoveryCodes, arg1 error) *MockAllStatementsGetUserRecoveryCodesCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsGetUserRecoveryCodesByIDCall) Do(f func(context.Context, int64) (*domain.UserRecoveryCodes, error)) *MockAllStatementsGetUserRecoveryCodesByIDCall {
+func (c *MockAllStatementsGetUserRecoveryCodesCall) Do(f func(context.Context, database.Filter[domain.UserRecoveryCodesField]) (*domain.UserRecoveryCodes, error)) *MockAllStatementsGetUserRecoveryCodesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsGetUserRecoveryCodesByIDCall) DoAndReturn(f func(context.Context, int64) (*domain.UserRecoveryCodes, error)) *MockAllStatementsGetUserRecoveryCodesByIDCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// GetUserRecoveryCodesByUserID mocks base method.
-func (m *MockAllStatements) GetUserRecoveryCodesByUserID(ctx context.Context, projectID, userID string) (*domain.UserRecoveryCodes, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUserRecoveryCodesByUserID", ctx, projectID, userID)
-	ret0, _ := ret[0].(*domain.UserRecoveryCodes)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetUserRecoveryCodesByUserID indicates an expected call of GetUserRecoveryCodesByUserID.
-func (mr *MockAllStatementsMockRecorder) GetUserRecoveryCodesByUserID(ctx, projectID, userID any) *MockAllStatementsGetUserRecoveryCodesByUserIDCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserRecoveryCodesByUserID", reflect.TypeOf((*MockAllStatements)(nil).GetUserRecoveryCodesByUserID), ctx, projectID, userID)
-	return &MockAllStatementsGetUserRecoveryCodesByUserIDCall{Call: call}
-}
-
-// MockAllStatementsGetUserRecoveryCodesByUserIDCall wrap *gomock.Call
-type MockAllStatementsGetUserRecoveryCodesByUserIDCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsGetUserRecoveryCodesByUserIDCall) Return(arg0 *domain.UserRecoveryCodes, arg1 error) *MockAllStatementsGetUserRecoveryCodesByUserIDCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsGetUserRecoveryCodesByUserIDCall) Do(f func(context.Context, string, string) (*domain.UserRecoveryCodes, error)) *MockAllStatementsGetUserRecoveryCodesByUserIDCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsGetUserRecoveryCodesByUserIDCall) DoAndReturn(f func(context.Context, string, string) (*domain.UserRecoveryCodes, error)) *MockAllStatementsGetUserRecoveryCodesByUserIDCall {
+func (c *MockAllStatementsGetUserRecoveryCodesCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserRecoveryCodesField]) (*domain.UserRecoveryCodes, error)) *MockAllStatementsGetUserRecoveryCodesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -2431,9 +2354,9 @@ func (c *MockAllStatementsUpdateTeamMembershipStatusCall) DoAndReturn(f func(con
 }
 
 // UpdateUserRecoveryCodes mocks base method.
-func (m *MockAllStatements) UpdateUserRecoveryCodes(ctx context.Context, projectID, userID string, updates ...domain.UserRecoveryCodesUpdate) error {
+func (m *MockAllStatements) UpdateUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField], updates ...domain.UserRecoveryCodesUpdate) error {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, userID}
+	varargs := []any{ctx, filter}
 	for _, a := range updates {
 		varargs = append(varargs, a)
 	}
@@ -2443,9 +2366,9 @@ func (m *MockAllStatements) UpdateUserRecoveryCodes(ctx context.Context, project
 }
 
 // UpdateUserRecoveryCodes indicates an expected call of UpdateUserRecoveryCodes.
-func (mr *MockAllStatementsMockRecorder) UpdateUserRecoveryCodes(ctx, projectID, userID any, updates ...any) *MockAllStatementsUpdateUserRecoveryCodesCall {
+func (mr *MockAllStatementsMockRecorder) UpdateUserRecoveryCodes(ctx, filter any, updates ...any) *MockAllStatementsUpdateUserRecoveryCodesCall {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, userID}, updates...)
+	varargs := append([]any{ctx, filter}, updates...)
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateUserRecoveryCodes", reflect.TypeOf((*MockAllStatements)(nil).UpdateUserRecoveryCodes), varargs...)
 	return &MockAllStatementsUpdateUserRecoveryCodesCall{Call: call}
 }
@@ -2462,13 +2385,13 @@ func (c *MockAllStatementsUpdateUserRecoveryCodesCall) Return(arg0 error) *MockA
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsUpdateUserRecoveryCodesCall) Do(f func(context.Context, string, string, ...domain.UserRecoveryCodesUpdate) error) *MockAllStatementsUpdateUserRecoveryCodesCall {
+func (c *MockAllStatementsUpdateUserRecoveryCodesCall) Do(f func(context.Context, database.Filter[domain.UserRecoveryCodesField], ...domain.UserRecoveryCodesUpdate) error) *MockAllStatementsUpdateUserRecoveryCodesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsUpdateUserRecoveryCodesCall) DoAndReturn(f func(context.Context, string, string, ...domain.UserRecoveryCodesUpdate) error) *MockAllStatementsUpdateUserRecoveryCodesCall {
+func (c *MockAllStatementsUpdateUserRecoveryCodesCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserRecoveryCodesField], ...domain.UserRecoveryCodesUpdate) error) *MockAllStatementsUpdateUserRecoveryCodesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -5300,156 +5223,79 @@ func (c *MockUserRecoveryCodesStatementsCreateUserRecoveryCodesCall) DoAndReturn
 	return c
 }
 
-// DeleteUserRecoveryCodesByID mocks base method.
-func (m *MockUserRecoveryCodesStatements) DeleteUserRecoveryCodesByID(ctx context.Context, id int64) error {
+// DeleteUserRecoveryCodes mocks base method.
+func (m *MockUserRecoveryCodesStatements) DeleteUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField]) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteUserRecoveryCodesByID", ctx, id)
+	ret := m.ctrl.Call(m, "DeleteUserRecoveryCodes", ctx, filter)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// DeleteUserRecoveryCodesByID indicates an expected call of DeleteUserRecoveryCodesByID.
-func (mr *MockUserRecoveryCodesStatementsMockRecorder) DeleteUserRecoveryCodesByID(ctx, id any) *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByIDCall {
+// DeleteUserRecoveryCodes indicates an expected call of DeleteUserRecoveryCodes.
+func (mr *MockUserRecoveryCodesStatementsMockRecorder) DeleteUserRecoveryCodes(ctx, filter any) *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserRecoveryCodesByID", reflect.TypeOf((*MockUserRecoveryCodesStatements)(nil).DeleteUserRecoveryCodesByID), ctx, id)
-	return &MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByIDCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserRecoveryCodes", reflect.TypeOf((*MockUserRecoveryCodesStatements)(nil).DeleteUserRecoveryCodes), ctx, filter)
+	return &MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesCall{Call: call}
 }
 
-// MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByIDCall wrap *gomock.Call
-type MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByIDCall struct {
+// MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesCall wrap *gomock.Call
+type MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByIDCall) Return(arg0 error) *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByIDCall {
+func (c *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesCall) Return(arg0 error) *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByIDCall) Do(f func(context.Context, int64) error) *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByIDCall {
+func (c *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesCall) Do(f func(context.Context, database.Filter[domain.UserRecoveryCodesField]) error) *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByIDCall) DoAndReturn(f func(context.Context, int64) error) *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByIDCall {
+func (c *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserRecoveryCodesField]) error) *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
-// DeleteUserRecoveryCodesByUserID mocks base method.
-func (m *MockUserRecoveryCodesStatements) DeleteUserRecoveryCodesByUserID(ctx context.Context, projectID, userID string) error {
+// GetUserRecoveryCodes mocks base method.
+func (m *MockUserRecoveryCodesStatements) GetUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField]) (*domain.UserRecoveryCodes, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteUserRecoveryCodesByUserID", ctx, projectID, userID)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DeleteUserRecoveryCodesByUserID indicates an expected call of DeleteUserRecoveryCodesByUserID.
-func (mr *MockUserRecoveryCodesStatementsMockRecorder) DeleteUserRecoveryCodesByUserID(ctx, projectID, userID any) *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByUserIDCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserRecoveryCodesByUserID", reflect.TypeOf((*MockUserRecoveryCodesStatements)(nil).DeleteUserRecoveryCodesByUserID), ctx, projectID, userID)
-	return &MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByUserIDCall{Call: call}
-}
-
-// MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByUserIDCall wrap *gomock.Call
-type MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByUserIDCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByUserIDCall) Return(arg0 error) *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByUserIDCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByUserIDCall) Do(f func(context.Context, string, string) error) *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByUserIDCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByUserIDCall) DoAndReturn(f func(context.Context, string, string) error) *MockUserRecoveryCodesStatementsDeleteUserRecoveryCodesByUserIDCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// GetUserRecoveryCodesByID mocks base method.
-func (m *MockUserRecoveryCodesStatements) GetUserRecoveryCodesByID(ctx context.Context, id int64) (*domain.UserRecoveryCodes, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUserRecoveryCodesByID", ctx, id)
+	ret := m.ctrl.Call(m, "GetUserRecoveryCodes", ctx, filter)
 	ret0, _ := ret[0].(*domain.UserRecoveryCodes)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetUserRecoveryCodesByID indicates an expected call of GetUserRecoveryCodesByID.
-func (mr *MockUserRecoveryCodesStatementsMockRecorder) GetUserRecoveryCodesByID(ctx, id any) *MockUserRecoveryCodesStatementsGetUserRecoveryCodesByIDCall {
+// GetUserRecoveryCodes indicates an expected call of GetUserRecoveryCodes.
+func (mr *MockUserRecoveryCodesStatementsMockRecorder) GetUserRecoveryCodes(ctx, filter any) *MockUserRecoveryCodesStatementsGetUserRecoveryCodesCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserRecoveryCodesByID", reflect.TypeOf((*MockUserRecoveryCodesStatements)(nil).GetUserRecoveryCodesByID), ctx, id)
-	return &MockUserRecoveryCodesStatementsGetUserRecoveryCodesByIDCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserRecoveryCodes", reflect.TypeOf((*MockUserRecoveryCodesStatements)(nil).GetUserRecoveryCodes), ctx, filter)
+	return &MockUserRecoveryCodesStatementsGetUserRecoveryCodesCall{Call: call}
 }
 
-// MockUserRecoveryCodesStatementsGetUserRecoveryCodesByIDCall wrap *gomock.Call
-type MockUserRecoveryCodesStatementsGetUserRecoveryCodesByIDCall struct {
+// MockUserRecoveryCodesStatementsGetUserRecoveryCodesCall wrap *gomock.Call
+type MockUserRecoveryCodesStatementsGetUserRecoveryCodesCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockUserRecoveryCodesStatementsGetUserRecoveryCodesByIDCall) Return(arg0 *domain.UserRecoveryCodes, arg1 error) *MockUserRecoveryCodesStatementsGetUserRecoveryCodesByIDCall {
+func (c *MockUserRecoveryCodesStatementsGetUserRecoveryCodesCall) Return(arg0 *domain.UserRecoveryCodes, arg1 error) *MockUserRecoveryCodesStatementsGetUserRecoveryCodesCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserRecoveryCodesStatementsGetUserRecoveryCodesByIDCall) Do(f func(context.Context, int64) (*domain.UserRecoveryCodes, error)) *MockUserRecoveryCodesStatementsGetUserRecoveryCodesByIDCall {
+func (c *MockUserRecoveryCodesStatementsGetUserRecoveryCodesCall) Do(f func(context.Context, database.Filter[domain.UserRecoveryCodesField]) (*domain.UserRecoveryCodes, error)) *MockUserRecoveryCodesStatementsGetUserRecoveryCodesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserRecoveryCodesStatementsGetUserRecoveryCodesByIDCall) DoAndReturn(f func(context.Context, int64) (*domain.UserRecoveryCodes, error)) *MockUserRecoveryCodesStatementsGetUserRecoveryCodesByIDCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// GetUserRecoveryCodesByUserID mocks base method.
-func (m *MockUserRecoveryCodesStatements) GetUserRecoveryCodesByUserID(ctx context.Context, projectID, userID string) (*domain.UserRecoveryCodes, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUserRecoveryCodesByUserID", ctx, projectID, userID)
-	ret0, _ := ret[0].(*domain.UserRecoveryCodes)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetUserRecoveryCodesByUserID indicates an expected call of GetUserRecoveryCodesByUserID.
-func (mr *MockUserRecoveryCodesStatementsMockRecorder) GetUserRecoveryCodesByUserID(ctx, projectID, userID any) *MockUserRecoveryCodesStatementsGetUserRecoveryCodesByUserIDCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserRecoveryCodesByUserID", reflect.TypeOf((*MockUserRecoveryCodesStatements)(nil).GetUserRecoveryCodesByUserID), ctx, projectID, userID)
-	return &MockUserRecoveryCodesStatementsGetUserRecoveryCodesByUserIDCall{Call: call}
-}
-
-// MockUserRecoveryCodesStatementsGetUserRecoveryCodesByUserIDCall wrap *gomock.Call
-type MockUserRecoveryCodesStatementsGetUserRecoveryCodesByUserIDCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockUserRecoveryCodesStatementsGetUserRecoveryCodesByUserIDCall) Return(arg0 *domain.UserRecoveryCodes, arg1 error) *MockUserRecoveryCodesStatementsGetUserRecoveryCodesByUserIDCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockUserRecoveryCodesStatementsGetUserRecoveryCodesByUserIDCall) Do(f func(context.Context, string, string) (*domain.UserRecoveryCodes, error)) *MockUserRecoveryCodesStatementsGetUserRecoveryCodesByUserIDCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserRecoveryCodesStatementsGetUserRecoveryCodesByUserIDCall) DoAndReturn(f func(context.Context, string, string) (*domain.UserRecoveryCodes, error)) *MockUserRecoveryCodesStatementsGetUserRecoveryCodesByUserIDCall {
+func (c *MockUserRecoveryCodesStatementsGetUserRecoveryCodesCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserRecoveryCodesField]) (*domain.UserRecoveryCodes, error)) *MockUserRecoveryCodesStatementsGetUserRecoveryCodesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -5530,9 +5376,9 @@ func (c *MockUserRecoveryCodesStatementsListUserRecoveryCodesCall) DoAndReturn(f
 }
 
 // UpdateUserRecoveryCodes mocks base method.
-func (m *MockUserRecoveryCodesStatements) UpdateUserRecoveryCodes(ctx context.Context, projectID, userID string, updates ...domain.UserRecoveryCodesUpdate) error {
+func (m *MockUserRecoveryCodesStatements) UpdateUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField], updates ...domain.UserRecoveryCodesUpdate) error {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, userID}
+	varargs := []any{ctx, filter}
 	for _, a := range updates {
 		varargs = append(varargs, a)
 	}
@@ -5542,9 +5388,9 @@ func (m *MockUserRecoveryCodesStatements) UpdateUserRecoveryCodes(ctx context.Co
 }
 
 // UpdateUserRecoveryCodes indicates an expected call of UpdateUserRecoveryCodes.
-func (mr *MockUserRecoveryCodesStatementsMockRecorder) UpdateUserRecoveryCodes(ctx, projectID, userID any, updates ...any) *MockUserRecoveryCodesStatementsUpdateUserRecoveryCodesCall {
+func (mr *MockUserRecoveryCodesStatementsMockRecorder) UpdateUserRecoveryCodes(ctx, filter any, updates ...any) *MockUserRecoveryCodesStatementsUpdateUserRecoveryCodesCall {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, userID}, updates...)
+	varargs := append([]any{ctx, filter}, updates...)
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateUserRecoveryCodes", reflect.TypeOf((*MockUserRecoveryCodesStatements)(nil).UpdateUserRecoveryCodes), varargs...)
 	return &MockUserRecoveryCodesStatementsUpdateUserRecoveryCodesCall{Call: call}
 }
@@ -5561,13 +5407,13 @@ func (c *MockUserRecoveryCodesStatementsUpdateUserRecoveryCodesCall) Return(arg0
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserRecoveryCodesStatementsUpdateUserRecoveryCodesCall) Do(f func(context.Context, string, string, ...domain.UserRecoveryCodesUpdate) error) *MockUserRecoveryCodesStatementsUpdateUserRecoveryCodesCall {
+func (c *MockUserRecoveryCodesStatementsUpdateUserRecoveryCodesCall) Do(f func(context.Context, database.Filter[domain.UserRecoveryCodesField], ...domain.UserRecoveryCodesUpdate) error) *MockUserRecoveryCodesStatementsUpdateUserRecoveryCodesCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserRecoveryCodesStatementsUpdateUserRecoveryCodesCall) DoAndReturn(f func(context.Context, string, string, ...domain.UserRecoveryCodesUpdate) error) *MockUserRecoveryCodesStatementsUpdateUserRecoveryCodesCall {
+func (c *MockUserRecoveryCodesStatementsUpdateUserRecoveryCodesCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserRecoveryCodesField], ...domain.UserRecoveryCodesUpdate) error) *MockUserRecoveryCodesStatementsUpdateUserRecoveryCodesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
