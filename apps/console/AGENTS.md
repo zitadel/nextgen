@@ -26,8 +26,9 @@ are the agreed direction for upcoming work (issue
   on the server-held secret until session-derived permissions exist.
 - [ADR 0004: Deployment modes](docs/adrs/0004-console-deployment-modes.md)
   — one build serves cloud and self-host; the initial standalone Console uses
-  one default project (the first-created — `zitadel setup`'s — becomes the default; the
-  server never creates it). A minimal per-request runtime document carries
+  one default project (the first project created by `zitadel setup` through
+  `POST /projects`; the server never creates it). A minimal per-request runtime
+  document carries
   `mode` + the sign-in project id, and portal surfaces (billing,
   multi-project, support) render from **effective permissions** (user
   grants ∩ deployment profile, computed server-side) via
