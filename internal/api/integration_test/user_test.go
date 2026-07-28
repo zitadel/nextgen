@@ -427,51 +427,92 @@ func TestGetMyUser(t *testing.T) {
 func TestListPasskeys(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
-	require.NoError(t, err)
-
-	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-		ProjectID: project.ID,
-		User:      harness.TestData.Generator.GenerateUser(t, "testgetuser@example.com"),
-	})
-	require.NoError(t, err)
-
-	userID := user["id"].(string)
-	harness.RegisterPasskey(t, project.ID, userID, "first passkey")
-	harness.RegisterPasskey(t, project.ID, userID, "second passkey")
-
-	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
-	require.NoError(t, err)
-	harness.SetProjectSecretOnApiClient(t, client, project)
-
-	t.Run("lists registered passkeys", func(t *testing.T) {
-		params := api.ListUserPassKeysParams{
-			ProjectID: api.ProjectID(project.ID),
-			UserID:    api.UserID(userID),
-		}
-
-		resp, err := client.ListUserPassKeys(t.Context(), params)
+	dependencies := func() (project *domain.Project, user map[string]any, client *helpers.ApiClient) {
+		project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
 
-		if assert.IsType(t, &api.ListUserPasskeysResponse{}, resp, helpers.MustMarshal(t, resp)) {
-			passkeys := resp.(*api.ListUserPasskeysResponse)
-			require.Len(t, passkeys.Passkeys, 2)
-
-			names := []string{passkeys.Passkeys[0].Name, passkeys.Passkeys[1].Name}
-			assert.ElementsMatch(t, []string{"first passkey", "second passkey"}, names)
-
-			for _, pk := range passkeys.Passkeys {
-				assert.NotEmpty(t, pk.ID)
-				assert.False(t, pk.CreatedAt.IsZero())
-			}
-		}
-	})
-
-	t.Run("unknown user returns 404", func(t *testing.T) {
-		resp, err := client.ListUserPassKeys(t.Context(), api.ListUserPassKeysParams{
-			ProjectID: api.ProjectID(project.ID),
-			UserID:    api.UserID("user_does_not_exist"),
+		user, err = harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+			ProjectID: project.ID,
+			User:      harness.TestData.Generator.GenerateUser(t, "testgetuser@example.com"),
 		})
 		require.NoError(t, err)
-		assert.IsType(t, &api.ListUserPassKeysNotFound{}, resp, helpers.MustMarshal(t, resp))
+
+		client, err = helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, client, project)
+
+		return project, user, client
+	}
+
+	t.Run("ok", func(t *testing.T) {
+		t.Run("lists registered passkeys", func(t *testing.T) {
+			t.Parallel()
+
+			project, user, client := dependencies()
+
+			userID := user["id"].(string)
+			harness.RegisterPasskey(t, project.ID, userID, "first passkey")
+			harness.RegisterPasskey(t, project.ID, userID, "second passkey")
+
+			params := api.ListUserPassKeysParams{
+				ProjectID: api.ProjectID(project.ID),
+				UserID:    api.UserID(userID),
+			}
+
+			resp, err := client.ListUserPassKeys(t.Context(), params)
+			require.NoError(t, err)
+
+			if assert.IsType(t, &api.ListUserPasskeysResponse{}, resp, helpers.MustMarshal(t, resp)) {
+				passkeys := resp.(*api.ListUserPasskeysResponse)
+				require.Len(t, passkeys.Passkeys, 2)
+
+				names := []string{passkeys.Passkeys[0].Name, passkeys.Passkeys[1].Name}
+				assert.ElementsMatch(t, []string{"first passkey", "second passkey"}, names)
+
+				for _, pk := range passkeys.Passkeys {
+					assert.NotEmpty(t, pk.ID)
+					assert.False(t, pk.CreatedAt.IsZero())
+				}
+			}
+		})
+
+		t.Run("empty passkeys", func(t *testing.T) {
+			t.Parallel()
+
+			project, user, client := dependencies()
+
+			params := api.ListUserPassKeysParams{
+				ProjectID: api.ProjectID(project.ID),
+				UserID:    api.UserID(user["id"].(string)),
+			}
+
+			resp, err := client.ListUserPassKeys(t.Context(), params)
+			require.NoError(t, err)
+
+			if assert.IsType(t, &api.ListUserPasskeysResponse{}, resp, helpers.MustMarshal(t, resp)) {
+				passkeys := resp.(*api.ListUserPasskeysResponse)
+				require.Len(t, passkeys.Passkeys, 0)
+			}
+		})
 	})
+
+	t.Run("error", func(t *testing.T) {
+		t.Run("unknown user returns 404", func(t *testing.T) {
+			t.Parallel()
+
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+			require.NoError(t, err)
+
+			client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+			require.NoError(t, err)
+			harness.SetProjectSecretOnApiClient(t, client, project)
+
+			resp, err := client.ListUserPassKeys(t.Context(), api.ListUserPassKeysParams{
+				ProjectID: api.ProjectID(project.ID),
+				UserID:    "user_does_not_exist",
+			})
+			require.NoError(t, err)
+			assert.IsType(t, &api.ListUserPassKeysNotFound{}, resp, helpers.MustMarshal(t, resp))
+		})
+	})
+}
