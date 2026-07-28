@@ -10,50 +10,23 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-func TestNewUserTOTPUpdates_failedAttempts(t *testing.T) {
+func TestUserTOTPUpdate_implementsInterface(t *testing.T) {
 	t.Parallel()
 
-	got := domain.NewUserTOTPUpdates(
-		domain.WithUserTOTPIncrementFailedAttempts(),
-		domain.WithUserTOTPIncrementFailedAttempts(),
-	)
-	assert.Equal(t, int16(2), got.FailedAttemptsDelta)
-	assert.False(t, got.ResetFailedAttempts)
-
-	got = domain.NewUserTOTPUpdates(
-		domain.WithUserTOTPIncrementFailedAttempts(),
-		domain.WithUserTOTPResetFailedAttempts(),
-	)
-	assert.Zero(t, got.FailedAttemptsDelta)
-	assert.True(t, got.ResetFailedAttempts)
-
-	got = domain.NewUserTOTPUpdates(
-		domain.WithUserTOTPResetFailedAttempts(),
-		domain.WithUserTOTPIncrementFailedAttempts(),
-	)
-	assert.Equal(t, int16(1), got.FailedAttemptsDelta)
-	assert.False(t, got.ResetFailedAttempts)
+	var _ domain.UserTOTPUpdate = domain.NewUserTOTPSecretUpdate([]byte("x"))
+	var _ domain.UserTOTPUpdate = &domain.UserTOTPVerifiedAtUpdate{VerifiedAt: time.Now()}
+	var _ domain.UserTOTPUpdate = &domain.UserTOTPLastSuccessfulCheckUpdate{LastSuccessfulCheck: time.Now()}
+	var _ domain.UserTOTPUpdate = &domain.UserTOTPIncrementFailedAttemptsUpdate{Delta: 1}
+	var _ domain.UserTOTPUpdate = &domain.UserTOTPResetFailedAttemptsUpdate{}
 }
 
-func TestNewUserTOTPUpdates_lastWinsSets(t *testing.T) {
+func TestNewUserTOTPSecretUpdate_copies(t *testing.T) {
 	t.Parallel()
 
-	first := time.Unix(1, 0).UTC()
-	second := time.Unix(2, 0).UTC()
-	got := domain.NewUserTOTPUpdates(
-		domain.WithUserTOTPSecret([]byte("a")),
-		domain.WithUserTOTPSecret([]byte("b")),
-		domain.WithUserTOTPVerifiedAt(first),
-		domain.WithUserTOTPVerifiedAt(second),
-	)
-	require.NotNil(t, got.Secret)
-	assert.Equal(t, []byte("b"), *got.Secret)
-	require.NotNil(t, got.VerifiedAt)
-	assert.Equal(t, second, *got.VerifiedAt)
-	assert.False(t, got.Empty())
-}
-
-func TestNewUserTOTPUpdates_empty(t *testing.T) {
-	t.Parallel()
-	assert.True(t, domain.NewUserTOTPUpdates().Empty())
+	src := []byte("secret")
+	got := domain.NewUserTOTPSecretUpdate(src)
+	require.NotNil(t, got)
+	assert.Equal(t, []byte("secret"), got.Secret)
+	src[0] ^= 0xff
+	assert.Equal(t, []byte("secret"), got.Secret)
 }

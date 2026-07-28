@@ -2,63 +2,41 @@ package domain
 
 import "time"
 
-type UserTOTPUpdate func(*UserTOTPUpdates)
-
-// UserTOTPUpdates is the accumulated field patch for UpdateUserTOTP.
-type UserTOTPUpdates struct {
-	Secret              *[]byte
-	VerifiedAt          *time.Time
-	LastSuccessfulCheck *time.Time
-	FailedAttemptsDelta int16
-	ResetFailedAttempts bool
+// UserTOTPUpdate is one typed mid-lifecycle change for user_totp rows.
+// Callers must pass pointers (e.g. &UserTOTPVerifiedAtUpdate{...}).
+type UserTOTPUpdate interface {
+	userTOTPUpdate()
 }
 
-func NewUserTOTPUpdates(opts ...UserTOTPUpdate) *UserTOTPUpdates {
-	u := &UserTOTPUpdates{}
-	for _, opt := range opts {
-		opt(u)
-	}
-	return u
+type UserTOTPSecretUpdate struct {
+	Secret []byte
 }
 
-func (u *UserTOTPUpdates) Empty() bool {
-	return u == nil ||
-		(u.Secret == nil &&
-			u.VerifiedAt == nil &&
-			u.LastSuccessfulCheck == nil &&
-			u.FailedAttemptsDelta == 0 &&
-			!u.ResetFailedAttempts)
+func (*UserTOTPSecretUpdate) userTOTPUpdate() {}
+
+type UserTOTPVerifiedAtUpdate struct {
+	VerifiedAt time.Time
 }
 
-func WithUserTOTPSecret(secret []byte) UserTOTPUpdate {
-	copied := append([]byte(nil), secret...)
-	return func(u *UserTOTPUpdates) {
-		u.Secret = &copied
-	}
+func (*UserTOTPVerifiedAtUpdate) userTOTPUpdate() {}
+
+type UserTOTPLastSuccessfulCheckUpdate struct {
+	LastSuccessfulCheck time.Time
 }
 
-func WithUserTOTPVerifiedAt(at time.Time) UserTOTPUpdate {
-	return func(u *UserTOTPUpdates) {
-		u.VerifiedAt = &at
-	}
+func (*UserTOTPLastSuccessfulCheckUpdate) userTOTPUpdate() {}
+
+type UserTOTPIncrementFailedAttemptsUpdate struct {
+	Delta int16
 }
 
-func WithUserTOTPLastSuccessfulCheck(at time.Time) UserTOTPUpdate {
-	return func(u *UserTOTPUpdates) {
-		u.LastSuccessfulCheck = &at
-	}
-}
+func (*UserTOTPIncrementFailedAttemptsUpdate) userTOTPUpdate() {}
 
-func WithUserTOTPIncrementFailedAttempts() UserTOTPUpdate {
-	return func(u *UserTOTPUpdates) {
-		u.ResetFailedAttempts = false
-		u.FailedAttemptsDelta++
-	}
-}
+type UserTOTPResetFailedAttemptsUpdate struct{}
 
-func WithUserTOTPResetFailedAttempts() UserTOTPUpdate {
-	return func(u *UserTOTPUpdates) {
-		u.ResetFailedAttempts = true
-		u.FailedAttemptsDelta = 0
-	}
+func (*UserTOTPResetFailedAttemptsUpdate) userTOTPUpdate() {}
+
+// NewUserTOTPSecretUpdate copies secret so callers cannot share a mutable buffer.
+func NewUserTOTPSecretUpdate(secret []byte) *UserTOTPSecretUpdate {
+	return &UserTOTPSecretUpdate{Secret: append([]byte(nil), secret...)}
 }

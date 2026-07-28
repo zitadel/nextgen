@@ -72,17 +72,17 @@ func TestUserTOTPStatements_Update(t *testing.T) {
 	assert.ErrorIs(t, err, database.ErrNoChanges)
 
 	err = testPool.UpdateUserTOTP(ctx, projectID, "missing-user",
-		domain.WithUserTOTPIncrementFailedAttempts(),
+		&domain.UserTOTPIncrementFailedAttemptsUpdate{Delta: 1},
 	)
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	newSecret := []byte("rotated-secret")
 	require.NoError(t, testPool.UpdateUserTOTP(ctx, projectID, userID,
-		domain.WithUserTOTPSecret(newSecret),
-		domain.WithUserTOTPVerifiedAt(now),
-		domain.WithUserTOTPLastSuccessfulCheck(now),
-		domain.WithUserTOTPResetFailedAttempts(),
+		domain.NewUserTOTPSecretUpdate(newSecret),
+		&domain.UserTOTPVerifiedAtUpdate{VerifiedAt: now},
+		&domain.UserTOTPLastSuccessfulCheckUpdate{LastSuccessfulCheck: now},
+		&domain.UserTOTPResetFailedAttemptsUpdate{},
 	))
 
 	got, err := testPool.GetUserTOTPByUserID(ctx, projectID, userID)
@@ -94,8 +94,8 @@ func TestUserTOTPStatements_Update(t *testing.T) {
 	assert.Zero(t, got.FailedAttempts)
 
 	require.NoError(t, testPool.UpdateUserTOTP(ctx, projectID, userID,
-		domain.WithUserTOTPIncrementFailedAttempts(),
-		domain.WithUserTOTPIncrementFailedAttempts(),
+		&domain.UserTOTPIncrementFailedAttemptsUpdate{Delta: 1},
+		&domain.UserTOTPIncrementFailedAttemptsUpdate{Delta: 1},
 	))
 	got, err = testPool.GetUserTOTPByUserID(ctx, projectID, userID)
 	require.NoError(t, err)
