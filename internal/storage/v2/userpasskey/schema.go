@@ -70,23 +70,13 @@ var Schema = database.NewSchema(map[domain.UserPasskeyField]database.FieldBindin
 		Coerce: database.CoerceTime,
 	},
 	domain.UserPasskeyFieldCreatedAt: {
-		SQLName: "created_at",
-		Accessor: func(p *domain.UserPasskey) any {
-			if p.CreatedAt == nil {
-				return time.Time{}
-			}
-			return *p.CreatedAt
-		},
-		Coerce: database.CoerceTime,
+		SQLName:  "created_at",
+		Accessor: func(p *domain.UserPasskey) any { return p.CreatedAt },
+		Coerce:   database.CoerceTime,
 	},
 	domain.UserPasskeyFieldUpdatedAt: {
-		SQLName: "updated_at",
-		Accessor: func(p *domain.UserPasskey) any {
-			if p.UpdatedAt == nil {
-				return time.Time{}
-			}
-			return *p.UpdatedAt
-		},
-		Coerce: database.CoerceTime,
+		SQLName:  "updated_at",
+		Accessor: func(p *domain.UserPasskey) any { return p.UpdatedAt },
+		Coerce:   database.CoerceTime,
 	},
 })

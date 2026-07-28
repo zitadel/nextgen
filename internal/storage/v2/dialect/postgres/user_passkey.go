@@ -53,7 +53,7 @@ func (ps userPasskeyStatements) CreateUserPasskey(ctx context.Context, p *domain
 		p.SignCount,
 		p.BackupEligible,
 		p.BackupState,
-		nullStringArg(p.Name),
+		p.Name,
 		p.VerifiedAt,
 	)
 	return wrapError(err)
@@ -186,8 +186,6 @@ func (ps userPasskeyStatements) scanUserPasskey(row pgx.CollectableRow) (*domain
 		name            *string
 		verifiedAt      *time.Time
 		lastUsedAt      *time.Time
-		createdAt       time.Time
-		updatedAt       time.Time
 	)
 	if err := row.Scan(
 		&p.ID,
@@ -204,8 +202,8 @@ func (ps userPasskeyStatements) scanUserPasskey(row pgx.CollectableRow) (*domain
 		&name,
 		&verifiedAt,
 		&lastUsedAt,
-		&createdAt,
-		&updatedAt,
+		&p.CreatedAt,
+		&p.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -214,7 +212,7 @@ func (ps userPasskeyStatements) scanUserPasskey(row pgx.CollectableRow) (*domain
 	if transports == nil {
 		p.Transports = []string{}
 	} else {
-		p.Transports = append([]string(nil), transports...)
+		p.Transports = append([]string{}, transports...)
 	}
 	p.AttestationType = attestationType
 	if name != nil {
@@ -222,21 +220,11 @@ func (ps userPasskeyStatements) scanUserPasskey(row pgx.CollectableRow) (*domain
 	}
 	p.VerifiedAt = verifiedAt
 	p.LastUsedAt = lastUsedAt
-	cr, up := createdAt, updatedAt
-	p.CreatedAt = &cr
-	p.UpdatedAt = &up
 	return p, nil
 }
 
 func nullBytesArg(v []byte) any {
 	if len(v) == 0 {
-		return nil
-	}
-	return v
-}
-
-func nullStringArg(v string) any {
-	if v == "" {
 		return nil
 	}
 	return v

@@ -17,8 +17,8 @@ type UserPasskey struct {
 	Name            string
 	VerifiedAt      *time.Time
 	LastUsedAt      *time.Time
-	CreatedAt       *time.Time
-	UpdatedAt       *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 type CreateUserPasskey struct {

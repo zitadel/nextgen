@@ -3,7 +3,6 @@ package spanner
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"cloud.google.com/go/spanner"
 
@@ -54,7 +53,7 @@ func (ps userPasskeyStatements) CreateUserPasskey(ctx context.Context, p *domain
 		p.SignCount,
 		p.BackupEligible,
 		p.BackupState,
-		nullStringArg(p.Name),
+		p.Name,
 		p.VerifiedAt,
 	).statement())
 	return wrapError(err)
@@ -187,8 +186,6 @@ func (ps userPasskeyStatements) scanUserPasskey(row *spanner.Row) (*domain.UserP
 		name            spanner.NullString
 		verifiedAt      spanner.NullTime
 		lastUsedAt      spanner.NullTime
-		createdAt       time.Time
-		updatedAt       time.Time
 	)
 	if err := row.Columns(
 		&p.ID,
@@ -205,8 +202,8 @@ func (ps userPasskeyStatements) scanUserPasskey(row *spanner.Row) (*domain.UserP
 		&name,
 		&verifiedAt,
 		&lastUsedAt,
-		&createdAt,
-		&updatedAt,
+		&p.CreatedAt,
+		&p.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -215,7 +212,7 @@ func (ps userPasskeyStatements) scanUserPasskey(row *spanner.Row) (*domain.UserP
 	if transports == nil {
 		p.Transports = []string{}
 	} else {
-		p.Transports = append([]string(nil), transports...)
+		p.Transports = append([]string{}, transports...)
 	}
 	if attestationType.Valid {
 		v := attestationType.StringVal
@@ -232,21 +229,11 @@ func (ps userPasskeyStatements) scanUserPasskey(row *spanner.Row) (*domain.UserP
 		ts := lastUsedAt.Time
 		p.LastUsedAt = &ts
 	}
-	cr, up := createdAt, updatedAt
-	p.CreatedAt = &cr
-	p.UpdatedAt = &up
 	return p, nil
 }
 
 func nullBytesArg(v []byte) any {
 	if len(v) == 0 {
-		return nil
-	}
-	return v
-}
-
-func nullStringArg(v string) any {
-	if v == "" {
 		return nil
 	}
 	return v

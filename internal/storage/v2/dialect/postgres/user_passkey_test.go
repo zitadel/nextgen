@@ -23,37 +23,87 @@ func userPasskeyKeyFilter(projectID, userID, credentialID string) database.Filte
 	)
 }
 
-func ensureUserPasskeyTestFixture(t *testing.T) (projectID, userID, credentialID string) {
+func ensureUserPasskeyTestUser(t *testing.T, userID, email string) (projectID string) {
 	t.Helper()
 	ctx := t.Context()
+	projectID, schemaURL := ensureUserTestProject(t)
+	require.NoError(t, testPool.CreateUser(ctx, newTestUser(t, projectID, schemaURL, userID, email, "Passkey User")))
+	return projectID
+}
 
-	project := newTestProject(uniqueProjectID(t))
-	require.NoError(t, testPool.CreateProject(ctx, project))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), project.ID) })
+func TestUserPasskeyStatements_CreateGetListDelete(t *testing.T) {
+	ctx := t.Context()
+	userID := "user_passkey_crud"
+	credentialID := "cred-passkey-crud"
+	projectID := ensureUserPasskeyTestUser(t, userID, "passkey-crud@example.com")
+	byKey := userPasskeyKeyFilter(projectID, userID, credentialID)
 
-	schemaURL := "https://example.com/schemas/test-user-passkey"
-	_, err := testPool.pool.Exec(ctx,
-		`INSERT INTO zitadel_nextgen.json_schemas (project_id, url, payload) VALUES ($1, $2, $3)`,
-		project.ID, schemaURL, []byte(`{"type":"object"}`),
-	)
-	require.NoError(t, err)
-
-	userID = "user_passkey_1"
-	emailAttr, err := domain.NewCreateAttribute("email", "passkey@example.com", domain.AttributeUniquenessProject)
-	require.NoError(t, err)
-	require.NoError(t, testPool.CreateUser(ctx, &domain.CreateUser{
-		ProjectID:  project.ID,
-		SchemaURL:  schemaURL,
-		ID:         userID,
-		Attributes: []*domain.CreateAttribute{emailAttr},
-	}))
-	t.Cleanup(func() { _ = testPool.DeleteUserByID(context.Background(), project.ID, userID) })
-
-	credentialID = "cred-passkey-1"
 	attestation := "none"
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	require.NoError(t, testPool.CreateUserPasskey(ctx, &domain.CreateUserPasskey{
-		ProjectID:       project.ID,
+		ProjectID:       projectID,
+		UserID:          userID,
+		CredentialID:    credentialID,
+		PublicKey:       []byte{0x01, 0x02, 0x03},
+		AAGUID:          []byte{0x0a, 0x0b},
+		AttestationType: &attestation,
+		Transports:      []string{"internal"},
+		SignCount:       1,
+		BackupEligible:  true,
+		BackupState:     false,
+		Name:            "Laptop",
+		VerifiedAt:      &now,
+	}))
+	t.Cleanup(func() {
+		_ = testPool.DeleteUserPasskey(context.Background(), byKey)
+	})
+
+	got, err := testPool.GetUserPasskey(ctx, byKey)
+	require.NoError(t, err)
+	require.Positive(t, got.ID)
+	assert.Equal(t, projectID, got.ProjectID)
+	assert.Equal(t, userID, got.UserID)
+	assert.Equal(t, credentialID, got.CredentialID)
+	assert.Equal(t, []byte{0x01, 0x02, 0x03}, got.PublicKey)
+	assert.Equal(t, []byte{0x0a, 0x0b}, got.AAGUID)
+	require.NotNil(t, got.AttestationType)
+	assert.Equal(t, "none", *got.AttestationType)
+	assert.Equal(t, []string{"internal"}, got.Transports)
+	assert.Equal(t, int64(1), got.SignCount)
+	assert.True(t, got.BackupEligible)
+	assert.False(t, got.BackupState)
+	assert.Equal(t, "Laptop", got.Name)
+	require.NotNil(t, got.VerifiedAt)
+	assert.WithinDuration(t, now, *got.VerifiedAt, time.Second)
+	assert.False(t, got.CreatedAt.IsZero())
+	assert.False(t, got.UpdatedAt.IsZero())
+
+	listed, err := testPool.ListUserPasskeys(ctx, &database.ListOptions[domain.UserPasskeyField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserPasskeyFieldProjectID), projectID),
+			database.Equal(database.Col(domain.UserPasskeyFieldUserID), userID),
+		),
+	})
+	require.NoError(t, err)
+	require.Len(t, listed.Items, 1)
+	assert.Equal(t, got.ID, listed.Items[0].ID)
+
+	require.NoError(t, testPool.DeleteUserPasskey(ctx, byKey))
+	_, err = testPool.GetUserPasskey(ctx, byKey)
+	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+}
+
+func TestUserPasskeyStatements_Update(t *testing.T) {
+	ctx := t.Context()
+	userID := "user_passkey_1"
+	credentialID := "cred-passkey-1"
+	projectID := ensureUserPasskeyTestUser(t, userID, "passkey@example.com")
+	byKey := userPasskeyKeyFilter(projectID, userID, credentialID)
+
+	attestation := "none"
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	require.NoError(t, testPool.CreateUserPasskey(ctx, &domain.CreateUserPasskey{
+		ProjectID:       projectID,
 		UserID:          userID,
 		CredentialID:    credentialID,
 		PublicKey:       []byte{0x01, 0x02, 0x03},
@@ -66,16 +116,8 @@ func ensureUserPasskeyTestFixture(t *testing.T) (projectID, userID, credentialID
 		VerifiedAt:      &now,
 	}))
 	t.Cleanup(func() {
-		_ = testPool.DeleteUserPasskey(context.Background(), userPasskeyKeyFilter(project.ID, userID, credentialID))
+		_ = testPool.DeleteUserPasskey(context.Background(), byKey)
 	})
-
-	return project.ID, userID, credentialID
-}
-
-func TestUserPasskeyStatements_Update(t *testing.T) {
-	ctx := t.Context()
-	projectID, userID, credentialID := ensureUserPasskeyTestFixture(t)
-	byKey := userPasskeyKeyFilter(projectID, userID, credentialID)
 
 	err := testPool.UpdateUserPasskey(ctx, byKey)
 	assert.ErrorIs(t, err, database.ErrNoChanges)
@@ -85,7 +127,6 @@ func TestUserPasskeyStatements_Update(t *testing.T) {
 	)
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 
-	now := time.Now().UTC().Truncate(time.Millisecond)
 	require.NoError(t, testPool.UpdateUserPasskey(ctx, byKey,
 		&domain.UserPasskeyAttestationTypeUpdate{AttestationType: "direct"},
 		&domain.UserPasskeyTransportsUpdate{Transports: []string{"usb", "nfc"}},

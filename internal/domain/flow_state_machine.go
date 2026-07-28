@@ -879,7 +879,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			userID = newID
 			state.CollectedData.UserID = userID
 			// Mark as provisional: user doesn't exist in the DB yet.
-			// The verify leg will call HandleProvisional + RegisterCreatedUser.
+			// The verify leg will call CreateProvisionalUser + RegisterCreatedUser.
 			state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey = true
 		}
 		username, displayName := passkeyRegistrationDisplay(passkeyResolved, state.CollectedData.UserData)

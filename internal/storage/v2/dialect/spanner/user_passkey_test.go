@@ -4,19 +4,14 @@ package spanner
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 	"time"
 
-	"cloud.google.com/go/spanner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	legacydb "github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
-	spannerdialect "github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner/migration"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -28,57 +23,80 @@ func userPasskeyKeyFilter(projectID, userID, credentialID string) database.Filte
 	)
 }
 
-func TestUserPasskeyStatements_Update(t *testing.T) {
+func TestUserPasskeyStatements_CreateGetListDelete(t *testing.T) {
 	ctx := t.Context()
-
-	connector, stop, err := dbtest.Spanner(ctx)
-	require.NoError(t, err)
-	t.Cleanup(stop)
-
-	cfg, ok := connector.(*spannerdialect.Config)
-	require.True(t, ok)
-
-	sqlDB, err := sql.Open("spanner", cfg.DSN)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = sqlDB.Close() })
-	require.NoError(t, migration.Migrate(ctx, sqlDB))
-
-	dialect, err := DecodeConfig(cfg.DSN)
-	require.NoError(t, err)
-	pool, err := dialect.Connect(ctx)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = pool.Close(ctx) })
-
-	client := pool.(*Client)
-	stmts := client.Statements()
-
-	projectID := "proj_passkey_upd"
-	userID := "user_passkey_upd"
-	credentialID := "cred-passkey-upd"
-	schemaURL := "https://example.com/schemas/test-user-passkey"
+	stmts := testClient.Statements()
+	projectID, schemaURL := ensureUserTestProject(t)
+	userID := "user_passkey_crud"
+	credentialID := "cred-passkey-crud"
 	byKey := userPasskeyKeyFilter(projectID, userID, credentialID)
 
-	require.NoError(t, stmts.CreateProject(ctx, &domain.Project{ID: projectID, PreviewOrigins: []string{}}))
-	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), projectID) })
+	require.NoError(t, stmts.CreateUser(ctx, newTestUser(t, projectID, schemaURL, userID, "passkey-crud@example.com", "Passkey User")))
 
-	_, err = client.client.Apply(ctx, []*spanner.Mutation{
-		spanner.InsertMap("json_schemas", map[string]any{
-			"project_id": projectID,
-			"url":        schemaURL,
-			"payload":    spanner.NullJSON{Value: map[string]any{"type": "object"}, Valid: true},
-		}),
+	attestation := "none"
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	require.NoError(t, stmts.CreateUserPasskey(ctx, &domain.CreateUserPasskey{
+		ProjectID:       projectID,
+		UserID:          userID,
+		CredentialID:    credentialID,
+		PublicKey:       []byte{0x01, 0x02, 0x03},
+		AAGUID:          []byte{0x0a, 0x0b},
+		AttestationType: &attestation,
+		Transports:      []string{"internal"},
+		SignCount:       1,
+		BackupEligible:  true,
+		BackupState:     false,
+		Name:            "Laptop",
+		VerifiedAt:      &now,
+	}))
+	t.Cleanup(func() {
+		_ = stmts.DeleteUserPasskey(context.Background(), byKey)
+	})
+
+	got, err := stmts.GetUserPasskey(ctx, byKey)
+	require.NoError(t, err)
+	require.Positive(t, got.ID)
+	assert.Equal(t, projectID, got.ProjectID)
+	assert.Equal(t, userID, got.UserID)
+	assert.Equal(t, credentialID, got.CredentialID)
+	assert.Equal(t, []byte{0x01, 0x02, 0x03}, got.PublicKey)
+	assert.Equal(t, []byte{0x0a, 0x0b}, got.AAGUID)
+	require.NotNil(t, got.AttestationType)
+	assert.Equal(t, "none", *got.AttestationType)
+	assert.Equal(t, []string{"internal"}, got.Transports)
+	assert.Equal(t, int64(1), got.SignCount)
+	assert.True(t, got.BackupEligible)
+	assert.False(t, got.BackupState)
+	assert.Equal(t, "Laptop", got.Name)
+	require.NotNil(t, got.VerifiedAt)
+	assert.WithinDuration(t, now, *got.VerifiedAt, time.Second)
+	assert.False(t, got.CreatedAt.IsZero())
+	assert.False(t, got.UpdatedAt.IsZero())
+
+	listed, err := stmts.ListUserPasskeys(ctx, &database.ListOptions[domain.UserPasskeyField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserPasskeyFieldProjectID), projectID),
+			database.Equal(database.Col(domain.UserPasskeyFieldUserID), userID),
+		),
 	})
 	require.NoError(t, err)
+	require.Len(t, listed.Items, 1)
+	assert.Equal(t, got.ID, listed.Items[0].ID)
 
-	emailAttr, err := domain.NewCreateAttribute("email", "passkey-upd@example.com", domain.AttributeUniquenessProject)
-	require.NoError(t, err)
-	require.NoError(t, stmts.CreateUser(ctx, &domain.CreateUser{
-		ProjectID:  projectID,
-		SchemaURL:  schemaURL,
-		ID:         userID,
-		Attributes: []*domain.CreateAttribute{emailAttr},
-	}))
-	t.Cleanup(func() { _ = stmts.DeleteUserByID(context.Background(), projectID, userID) })
+	require.NoError(t, stmts.DeleteUserPasskey(ctx, byKey))
+	_, err = stmts.GetUserPasskey(ctx, byKey)
+	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+}
+
+func TestUserPasskeyStatements_Update(t *testing.T) {
+	ctx := t.Context()
+	stmts := testClient.Statements()
+	projectID, schemaURL := ensureUserTestProject(t)
+	userID := "user_passkey_upd"
+	credentialID := "cred-passkey-upd"
+	byKey := userPasskeyKeyFilter(projectID, userID, credentialID)
+
+	require.NoError(t, stmts.CreateUser(ctx, newTestUser(t, projectID, schemaURL, userID, "passkey-upd@example.com", "Passkey Update")))
 
 	attestation := "none"
 	now := time.Now().UTC().Truncate(time.Millisecond)
@@ -99,7 +117,7 @@ func TestUserPasskeyStatements_Update(t *testing.T) {
 		_ = stmts.DeleteUserPasskey(context.Background(), byKey)
 	})
 
-	err = stmts.UpdateUserPasskey(ctx, byKey)
+	err := stmts.UpdateUserPasskey(ctx, byKey)
 	assert.ErrorIs(t, err, database.ErrNoChanges)
 
 	err = stmts.UpdateUserPasskey(ctx, userPasskeyKeyFilter(projectID, userID, "missing-cred"),
