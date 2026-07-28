@@ -172,7 +172,7 @@ describe("release artifact helpers", () => {
         version: "0.1.0-alpha.6",
         run: async () => undefined,
       }),
-    ).rejects.toThrow("requires apps/cli/dist before packing");
+    ).rejects.toThrow(/requires .+\/dist before packing/);
   });
 
   it("stamps CLI release packs with the production telemetry channel", async () => {
