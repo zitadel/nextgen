@@ -132,7 +132,8 @@ func TestUserPasswordStatements_SetMissingUser(t *testing.T) {
 		EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$fake",
 	})
 	require.Error(t, err)
-	assert.ErrorIs(t, err, new(legacydb.ForeignKeyError))
+	// Spanner surfaces FK failures as FailedPrecondition → CheckError.
+	assert.ErrorIs(t, err, new(legacydb.CheckError))
 }
 
 func TestUserPasswordStatements_Update(t *testing.T) {
