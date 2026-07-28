@@ -208,7 +208,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		schemaStore,
 	)
 	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaStore)
-	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, serviceDBPool, ids)
+	passkeyRegSvc := service.NewPasskeyRegistrationService(serviceDBPool, ids)
 	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,

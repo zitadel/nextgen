@@ -11,6 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/userpasskey"
 )
 
 const (
@@ -20,7 +21,7 @@ const (
 ) VALUES (
 	@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8,
 	@p9, @p10, @p11, @p12
-) THEN RETURN id, created_at, updated_at`
+)`
 	userPasskeyQuery = `SELECT id, project_id, user_id, credential_id, public_key, aaguid, attestation_type, transports,
 	sign_count, backup_eligible, backup_state, name, verified_at, last_used_at, created_at, updated_at
 FROM user_passkeys`
@@ -42,7 +43,7 @@ func (ps userPasskeyStatements) CreateUserPasskey(ctx context.Context, p *domain
 	if transports == nil {
 		transports = []string{}
 	}
-	stmt := buildStatement(createUserPasskeyStmt,
+	_, err := ps.db.Update(ctx, buildStatement(createUserPasskeyStmt,
 		p.ProjectID,
 		p.UserID,
 		p.CredentialID,
@@ -55,50 +56,30 @@ func (ps userPasskeyStatements) CreateUserPasskey(ctx context.Context, p *domain
 		p.BackupState,
 		nullStringArg(p.Name),
 		p.VerifiedAt,
-	).statement()
-
-	return ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
-		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			var (
-				id                   int64
-				createdAt, updatedAt time.Time
-			)
-			return struct{}{}, row.Columns(&id, &createdAt, &updatedAt)
-		})
-		return err
-	})
+	).statement())
+	return wrapError(err)
 }
 
 // GetUserPasskey implements [service.UserPasskeyStatements].
 func (ps userPasskeyStatements) GetUserPasskey(ctx context.Context, filter database.Filter[domain.UserPasskeyField]) (*domain.UserPasskey, error) {
-	if filter == nil {
-		return nil, fmt.Errorf("UserPasskey filter is required")
-	}
-	return ps.getUserPasskey(ctx, &database.ListOptions[domain.UserPasskeyField]{Filter: filter})
-}
-
-func (ps userPasskeyStatements) getUserPasskey(ctx context.Context, filter *database.ListOptions[domain.UserPasskeyField]) (*domain.UserPasskey, error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, userPasskeyQuery, filter, userPasskeySchema); err != nil {
-		return nil, err
-	}
-
-	var passkey *domain.UserPasskey
-	err := ps.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		passkey, err = collectOneRow(iter, ps.scanUserPasskey)
-		return err
-	})
+	result, err := ps.ListUserPasskeys(ctx, &database.ListOptions[domain.UserPasskeyField]{Filter: filter})
 	if err != nil {
 		return nil, err
 	}
-	return passkey, nil
+	switch len(result.Items) {
+	case 0:
+		return nil, wrapError(spanner.ErrRowNotFound)
+	case 1:
+		return result.Items[0], nil
+	default:
+		return nil, wrapError(errTooManyRows)
+	}
 }
 
 // ListUserPasskeys implements [service.UserPasskeyStatements].
 func (ps userPasskeyStatements) ListUserPasskeys(ctx context.Context, filter *database.ListOptions[domain.UserPasskeyField]) (*database.ListResult[*domain.UserPasskey], error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, userPasskeyQuery, filter, userPasskeySchema); err != nil {
+	if err := compileRead(&compiler, userPasskeyQuery, filter, userpasskey.Schema); err != nil {
 		return nil, err
 	}
 
@@ -109,14 +90,14 @@ func (ps userPasskeyStatements) ListUserPasskeys(ctx context.Context, filter *da
 		return err
 	})
 	if err != nil {
-		return nil, err
+		return nil, wrapError(err)
 	}
 
 	var nextCursor []byte
 	if filter.Pagination.Limit > 0 && len(passkeys) == int(filter.Pagination.Limit) {
 		cursor := &pagination.Cursor[domain.UserPasskeyField]{
 			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  userPasskeySchema.ValuesFrom(passkeys[len(passkeys)-1], filter.Pagination.OrderBy.Columns),
+			Values:  userpasskey.Schema.ValuesFrom(passkeys[len(passkeys)-1], filter.Pagination.OrderBy.Columns),
 		}
 		nextCursor = cursor.Marshal()
 	}
@@ -174,7 +155,7 @@ func (ps userPasskeyStatements) UpdateUserPasskey(ctx context.Context, filter da
 	}
 
 	c.WriteString(", updated_at = CURRENT_TIMESTAMP() WHERE ")
-	compileFilter(&c, filter, userPasskeySchema)
+	compileFilter(&c, filter, userpasskey.Schema)
 
 	n, err := ps.db.Update(ctx, c.statement())
 	if err != nil {
@@ -193,7 +174,7 @@ func (ps userPasskeyStatements) DeleteUserPasskey(ctx context.Context, filter da
 	}
 	var c statementCompiler
 	c.WriteString("DELETE FROM user_passkeys WHERE ")
-	compileFilter(&c, filter, userPasskeySchema)
+	compileFilter(&c, filter, userpasskey.Schema)
 	_, err := ps.db.Update(ctx, c.statement())
 	return wrapError(err)
 }
@@ -272,95 +253,4 @@ func nullStringArg(v string) any {
 	return v
 }
 
-func optionalTimeAccessor(get func(*domain.UserPasskey) *time.Time) func(*domain.UserPasskey) any {
-	return func(p *domain.UserPasskey) any {
-		if v := get(p); v != nil {
-			return *v
-		}
-		return time.Time{}
-	}
-}
-
-func coerceBool(v any) (any, error) {
-	switch b := v.(type) {
-	case bool:
-		return b, nil
-	default:
-		return nil, database.ErrCoerceExpectedType("bool", v)
-	}
-}
-
 var _ service.UserPasskeyStatements = (*userPasskeyStatements)(nil)
-
-var userPasskeySchema = database.NewSchema(map[domain.UserPasskeyField]database.FieldBinding[domain.UserPasskey]{
-	domain.UserPasskeyFieldID: {
-		SQLName:  "id",
-		Accessor: func(p *domain.UserPasskey) any { return p.ID },
-		Coerce:   database.CoerceNumber[int64],
-	},
-	domain.UserPasskeyFieldProjectID: {
-		SQLName:  "project_id",
-		Accessor: func(p *domain.UserPasskey) any { return p.ProjectID },
-		Coerce:   database.CoerceString,
-	},
-	domain.UserPasskeyFieldUserID: {
-		SQLName:  "user_id",
-		Accessor: func(p *domain.UserPasskey) any { return p.UserID },
-		Coerce:   database.CoerceString,
-	},
-	domain.UserPasskeyFieldCredentialID: {
-		SQLName:  "credential_id",
-		Accessor: func(p *domain.UserPasskey) any { return p.CredentialID },
-		Coerce:   database.CoerceString,
-	},
-	domain.UserPasskeyFieldSignCount: {
-		SQLName:  "sign_count",
-		Accessor: func(p *domain.UserPasskey) any { return p.SignCount },
-		Coerce:   database.CoerceNumber[int64],
-	},
-	domain.UserPasskeyFieldBackupEligible: {
-		SQLName:  "backup_eligible",
-		Accessor: func(p *domain.UserPasskey) any { return p.BackupEligible },
-		Coerce:   coerceBool,
-	},
-	domain.UserPasskeyFieldBackupState: {
-		SQLName:  "backup_state",
-		Accessor: func(p *domain.UserPasskey) any { return p.BackupState },
-		Coerce:   coerceBool,
-	},
-	domain.UserPasskeyFieldName: {
-		SQLName:  "name",
-		Accessor: func(p *domain.UserPasskey) any { return p.Name },
-		Coerce:   database.CoerceString,
-	},
-	domain.UserPasskeyFieldVerifiedAt: {
-		SQLName:  "verified_at",
-		Accessor: optionalTimeAccessor(func(p *domain.UserPasskey) *time.Time { return p.VerifiedAt }),
-		Coerce:   database.CoerceTime,
-	},
-	domain.UserPasskeyFieldLastUsedAt: {
-		SQLName:  "last_used_at",
-		Accessor: optionalTimeAccessor(func(p *domain.UserPasskey) *time.Time { return p.LastUsedAt }),
-		Coerce:   database.CoerceTime,
-	},
-	domain.UserPasskeyFieldCreatedAt: {
-		SQLName: "created_at",
-		Accessor: func(p *domain.UserPasskey) any {
-			if p.CreatedAt == nil {
-				return time.Time{}
-			}
-			return *p.CreatedAt
-		},
-		Coerce: database.CoerceTime,
-	},
-	domain.UserPasskeyFieldUpdatedAt: {
-		SQLName: "updated_at",
-		Accessor: func(p *domain.UserPasskey) any {
-			if p.UpdatedAt == nil {
-				return time.Time{}
-			}
-			return *p.UpdatedAt
-		},
-		Coerce: database.CoerceTime,
-	},
-})

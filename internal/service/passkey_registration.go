@@ -20,18 +20,15 @@ const passkeyRegistrationDefaultUsername = "Passkey account"
 // ceremony. It exposes [Begin] and [Finish] for direct callers and is wrapped by
 // [FlowPasskeyRegistrationAdapter] for the flow engine.
 type PasskeyRegistrationService struct {
-	pool   database.Pool
 	v2Pool StatementPool
 	ids    idgen.Generator
 }
 
 func NewPasskeyRegistrationService(
-	pool database.Pool,
 	v2Pool StatementPool,
 	ids idgen.Generator,
 ) *PasskeyRegistrationService {
 	return &PasskeyRegistrationService{
-		pool:   pool,
 		v2Pool: v2Pool,
 		ids:    ids,
 	}
@@ -126,14 +123,16 @@ type FinishRegistrationInput struct {
 // credential. The user identity is authoritative from the stored challenge record.
 // Rejection surfaces as [domain.ErrAuthAttemptProofRejected].
 func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegistrationInput) error {
-	return s.FinishWith(ctx, s.pool, in)
+	return s.FinishWith(ctx, s.v2Pool.Statements(), in)
 }
 
-// FinishWith is like [Finish] but joins the caller's transaction when client is a
-// v2 Statementer: registration Get/Delete and UserPasskey Create share that txn;
-// otherwise they use the v2 pool.
-func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client database.QueryExecutor, in FinishRegistrationInput) error {
-	stmts := s.passkeyStmts(client)
+// FinishWith is like [Finish] but runs registration Get/Delete and UserPasskey Create
+// through the provided statements (typically a v2 transaction). When stmts is nil,
+// the service pool is used.
+func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, stmts AllStatements, in FinishRegistrationInput) error {
+	if stmts == nil {
+		stmts = s.v2Pool.Statements()
+	}
 	reg, err := stmts.GetPasskeyRegistration(ctx, in.ProjectID, in.RegistrationID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -156,13 +155,6 @@ func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client data
 	// Best-effort cleanup; don't shadow the success.
 	_ = stmts.DeletePasskeyRegistration(ctx, in.ProjectID, in.RegistrationID)
 	return nil
-}
-
-func (s *PasskeyRegistrationService) passkeyStmts(client database.QueryExecutor) AllStatements {
-	if tx, ok := client.(Statementer[AllStatements]); ok {
-		return tx.Statements()
-	}
-	return s.v2Pool.Statements()
 }
 
 func (s *PasskeyRegistrationService) listPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {

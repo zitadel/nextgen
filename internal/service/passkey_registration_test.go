@@ -88,7 +88,7 @@ func buildTestRegistrationSvc(t *testing.T, regState *passkeyRegState, userState
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
 	regState.expectCRUD(statements)
 	userState.expectUserPasskeys(statements)
-	return service.NewPasskeyRegistrationService(nil, pool, &fakeIDGen{next: "pkreg_test01"})
+	return service.NewPasskeyRegistrationService(pool, &fakeIDGen{next: "pkreg_test01"})
 }
 
 func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {

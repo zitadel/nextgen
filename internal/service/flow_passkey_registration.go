@@ -41,12 +41,16 @@ func (a *FlowPasskeyRegistrationAdapter) IssuePasskeyRegistrationChallenge(ctx c
 }
 
 // SubmitPasskeyRegistration implements [domain.FlowPasskeyRegistrationService].
-// client is forwarded to FinishWith: when it is a v2 statements transaction the
-// credential write shares that txn; otherwise the v2 pool is used.
+// When client is a v2 Statementer, credential writes join that transaction;
+// otherwise the service pool is used.
 func (a *FlowPasskeyRegistrationAdapter) SubmitPasskeyRegistration(ctx context.Context, client database.QueryExecutor, in domain.FlowSubmitPasskeyRegistrationInput) error {
-	return a.svc.FinishWith(ctx, client, FinishRegistrationInput{
+	finishIn := FinishRegistrationInput{
 		ProjectID:      in.ProjectID,
 		RegistrationID: in.ChallengeID,
 		Attestation:    in.Attestation,
-	})
+	}
+	if tx, ok := client.(Statementer[AllStatements]); ok {
+		return a.svc.FinishWith(ctx, tx.Statements(), finishIn)
+	}
+	return a.svc.Finish(ctx, finishIn)
 }

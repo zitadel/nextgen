@@ -2,4 +2,4 @@
 "@zitadel/server": patch
 ---
 
-Reshape UserPasskeyStatements to a 1:1 Filter-based Get/Update/Delete API (typed updates, uint32 IncrementSignCount Delta, no coalesce).
+Migrate user passkey persistence from the v1 repository to storage v2 statements (PostgreSQL and Spanner) with filter-based Get/List/Update/Delete.
