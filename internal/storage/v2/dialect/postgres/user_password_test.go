@@ -143,18 +143,18 @@ func TestUserPasswordStatements_Update(t *testing.T) {
 	assert.ErrorIs(t, err, database.ErrNoChanges)
 
 	err = testPool.UpdateUserPassword(t.Context(), projectID, "missing-user",
-		domain.WithUserPasswordIncrementFailedAttempts(),
+		&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 1},
 	)
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	require.NoError(t, testPool.UpdateUserPassword(t.Context(), projectID, userID,
-		domain.WithUserPasswordEncodedHash("argon2id$v=19$m=65536,t=3,p=4$rotated"),
-		domain.WithUserPasswordChangeRequired(true),
-		domain.WithUserPasswordChangedAt(now),
-		domain.WithUserPasswordVerificationID("verif-upd"),
-		domain.WithUserPasswordLastSuccessfulCheck(now),
-		domain.WithUserPasswordResetFailedAttempts(),
+		&domain.UserPasswordEncodedHashUpdate{EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$rotated"},
+		&domain.UserPasswordChangeRequiredUpdate{ChangeRequired: true},
+		&domain.UserPasswordChangedAtUpdate{ChangedAt: now},
+		&domain.UserPasswordVerificationIDUpdate{VerificationID: "verif-upd"},
+		&domain.UserPasswordLastSuccessfulCheckUpdate{LastSuccessfulCheck: now},
+		&domain.UserPasswordResetFailedAttemptsUpdate{},
 	))
 
 	got, err := testPool.GetUserPasswordByUserID(t.Context(), projectID, userID)
@@ -169,8 +169,8 @@ func TestUserPasswordStatements_Update(t *testing.T) {
 	assert.Zero(t, got.FailedAttempts)
 
 	require.NoError(t, testPool.UpdateUserPassword(t.Context(), projectID, userID,
-		domain.WithUserPasswordIncrementFailedAttempts(),
-		domain.WithUserPasswordIncrementFailedAttempts(),
+		&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 1},
+		&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 1},
 	))
 	got, err = testPool.GetUserPasswordByUserID(t.Context(), projectID, userID)
 	require.NoError(t, err)
