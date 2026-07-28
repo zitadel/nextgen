@@ -18,9 +18,7 @@ type FlowPasskeyRegistrationService interface {
 
 	// SubmitPasskeyRegistration verifies the attestation against the issued
 	// challenge and persists the new credential. Rejection surfaces as
-	// [ErrAuthAttemptProofRejected]. client is retained for the flow state
-	// machine's QueryExecutor contract; the adapter currently persists via the
-	// v2 statement pool.
+	// [ErrAuthAttemptProofRejected].
 	SubmitPasskeyRegistration(ctx context.Context, in FlowSubmitPasskeyRegistrationInput) error
 }
 

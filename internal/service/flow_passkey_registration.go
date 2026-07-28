@@ -40,8 +40,6 @@ func (a *FlowPasskeyRegistrationAdapter) IssuePasskeyRegistrationChallenge(ctx c
 }
 
 // SubmitPasskeyRegistration implements [domain.FlowPasskeyRegistrationService].
-// The flow engine still passes a v1 QueryExecutor; passkey persistence uses the
-// service's v2 statement pool (provisional user creation is a separate ApplyActions txn).
 func (a *FlowPasskeyRegistrationAdapter) SubmitPasskeyRegistration(ctx context.Context, in domain.FlowSubmitPasskeyRegistrationInput) error {
 	return a.svc.Finish(ctx, FinishRegistrationInput{
 		ProjectID:      in.ProjectID,

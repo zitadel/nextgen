@@ -10,13 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // newAuthAttemptServiceForIntegration wires the service with real statement pools.
 // The password verifier is nil because these tests exercise only the
 // user-proof path, which never touches it.
-func newAuthAttemptServiceForIntegration(pool database.Pool, v2Pool service.StatementPool) service.AuthAttemptService {
+func newAuthAttemptServiceForIntegration(v2Pool service.StatementPool) service.AuthAttemptService {
 	return service.NewAuthAttemptService(
 		v2Pool,
 		service.SessionStatementsResolver{Pool: v2Pool},
@@ -45,7 +44,7 @@ func issueUserChallenge(t *testing.T, svc service.AuthAttemptService, projectID 
 
 func TestAuthAttemptService_VerifyProof_integration(t *testing.T) {
 	pool := integrationPoolOrFail(t)
-	svc := newAuthAttemptServiceForIntegration(pool, integrationV2PoolOrFail(t))
+	svc := newAuthAttemptServiceForIntegration(integrationV2PoolOrFail(t))
 
 	t.Run("user_not_found_records_failure_on_bound_challenge", func(t *testing.T) {
 		projectID := "p-aa-not-found-" + time.Now().Format("150405.000000")

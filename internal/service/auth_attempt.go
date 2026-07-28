@@ -8,7 +8,6 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -165,14 +164,10 @@ func (PasskeyProof) proofCheckType() domain.AuthCheckType { return domain.AuthCh
 
 // ---- Secondary ports -------------------------------------------------------------
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/auth_attempt.mock.go . SessionResolver,ProjectLoader,UserLookup
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/auth_attempt.mock.go . SessionResolver,UserLookup
 
 type SessionResolver interface {
 	Get(ctx context.Context, projectID, sessionID string) (*domain.Session, error)
-}
-
-type ProjectLoader interface {
-	Get(ctx context.Context, client database.QueryExecutor, id string) (*domain.Project, error)
 }
 
 type UserLookup interface {
@@ -208,12 +203,7 @@ func NewAuthAttemptService(
 func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (res *domain.AuthAttempt, err error) {
 	requiredChecks := input.RequiredChecks
 	if requiredChecks == nil {
-		// TODO: implement this
-		//project, err := s.projects.Get(ctx, s.pool, input.ProjectID)
-		//if err != nil {
-		//	return nil, domain.ErrInternal(err).WithMessage("failed to load project config")
-		//}
-		// requiredChecks = project.DefaultRequiredChecks
+		// TODO: load project default required checks
 	}
 
 	opts := make([]domain.AuthAttemptOption, 0, 1)
