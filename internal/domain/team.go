@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strings"
 	"time"
 )
 
@@ -54,6 +55,7 @@ func NewTeam(projectID, name string) (*Team, error) {
 		return nil, ErrInternal(err).WithMessage("failed to create team id")
 	}
 
+	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, ErrTeamNameInvalid()
 	}

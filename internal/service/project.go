@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/ianlancetaylor/jsonschema"
@@ -222,6 +223,7 @@ func (s *projectService) Update(ctx context.Context, id, name string) (*domain.P
 	if id == "" {
 		return nil, domain.ErrMissingProjectID()
 	}
+	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, domain.ErrProjectNameInvalid()
 	}

@@ -34,10 +34,29 @@ func TestNewTeam(t *testing.T) {
 			wantErr: nil,
 		},
 		{
+			name: "team name is trimmed",
+			args: args{
+				projectID: "proj_1",
+				name:      "  my-team  ",
+			},
+			check: func(t *testing.T, got *domain.Team) {
+				assert.Equal(t, "my-team", got.Name)
+			},
+			wantErr: nil,
+		},
+		{
 			name: "team with empty name",
 			args: args{
 				projectID: "proj_1",
 				name:      "",
+			},
+			wantErr: domain.ErrTeamNameInvalid(),
+		},
+		{
+			name: "team with whitespace-only name",
+			args: args{
+				projectID: "proj_1",
+				name:      "   ",
 			},
 			wantErr: domain.ErrTeamNameInvalid(),
 		},

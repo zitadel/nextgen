@@ -257,9 +257,32 @@ func TestProjectService_Update(t *testing.T) {
 			wantErr:     domain.ErrMissingProjectID(),
 		},
 		{
+			name:        "project name is trimmed",
+			id:          "proj_aaa",
+			projectName: "  updated project name  ",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, project *domain.Project) error {
+						project.CreatedAt = createdAt
+						project.UpdatedAt = updatedAt
+						return nil
+					})
+			},
+			check: func(t *testing.T, got *domain.Project) {
+				assert.Equal(t, "updated project name", got.Name)
+			},
+		},
+		{
 			name:        "missing project name",
 			id:          "proj_aaa",
 			projectName: "",
+			setupStmt:   func(*servicemocks.MockAllStatements) {},
+			wantErr:     domain.ErrProjectNameInvalid(),
+		},
+		{
+			name:        "whitespace-only project name",
+			id:          "proj_aaa",
+			projectName: "   ",
 			setupStmt:   func(*servicemocks.MockAllStatements) {},
 			wantErr:     domain.ErrProjectNameInvalid(),
 		},
