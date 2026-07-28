@@ -2077,9 +2077,13 @@ type CreateTeamBadRequest ErrorDetails
 
 func (*CreateTeamBadRequest) createTeamRes() {}
 
+type CreateTeamConflict ErrorDetails
+
+func (*CreateTeamConflict) createTeamRes() {}
+
 // Ref: #
 type CreateTeamRequest struct {
-	// The name of the team.
+	// The name of the team. Must be unique within the project.
 	Name string `json:"name"`
 }
 

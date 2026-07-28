@@ -4,6 +4,7 @@ package spanner
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -43,4 +44,32 @@ func TestTeamStatements_CRUD(t *testing.T) {
 	_, err = stmts.GetTeamByID(ctx, project.ID, "missing")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
+}
+
+func TestTeamStatements_NameUniquePerProject(t *testing.T) {
+	ctx := t.Context()
+	stmts := testClient.Statements()
+
+	project := newTestProject(uniqueProjectID(t))
+	require.NoError(t, stmts.CreateProject(ctx, project))
+	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+
+	other := newTestProject(uniqueProjectID(t) + "_other")
+	require.NoError(t, stmts.CreateProject(ctx, other))
+	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), other.ID) })
+
+	team := newTestTeam(project.ID, "team_v2_unique")
+	require.NoError(t, stmts.CreateTeam(ctx, team))
+
+	duplicate := newTestTeam(project.ID, "team_v2_unique_2")
+	duplicate.Name = team.Name
+	assert.ErrorIs(t, stmts.CreateTeam(ctx, duplicate), new(database.UniqueError))
+
+	differentCase := newTestTeam(project.ID, "team_v2_unique_3")
+	differentCase.Name = strings.ToUpper(team.Name)
+	assert.ErrorIs(t, stmts.CreateTeam(ctx, differentCase), new(database.UniqueError))
+
+	sameNameOtherProject := newTestTeam(other.ID, "team_v2_unique")
+	sameNameOtherProject.Name = team.Name
+	require.NoError(t, stmts.CreateTeam(ctx, sameNameOtherProject))
 }

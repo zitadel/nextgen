@@ -24,6 +24,10 @@ func ErrTeamNameInvalid() Error {
 	return newError(PrefixTeam.ErrorCodePrefix("name_invalid"), "The team name is invalid. Expected a non-empty string.", nil, nil)
 }
 
+func ErrTeamAlreadyExists() Error {
+	return newError(PrefixTeam.ErrorCodePrefix("already_exists"), "a team with this name already exists in the project", nil, nil)
+}
+
 func ErrTeamNotFound() Error {
 	return newError(PrefixTeam.ErrorCodePrefix("team_not_found"), "team not found", nil, nil)
 }

@@ -55,6 +55,8 @@ func teamErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrTeamPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
+	case domain.ErrTeamAlreadyExists().Code:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
 	default:
 		return internalErrorResponse(err)
 	}

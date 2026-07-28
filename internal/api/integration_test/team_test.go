@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,8 +40,59 @@ func TestCreateTeam(t *testing.T) {
 		assert.Equal(t, name, created.Name)
 	})
 
+	t.Run("same name in another project", func(t *testing.T) {
+		t.Parallel()
+
+		otherProject, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		otherClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, otherClient, otherProject)
+
+		name := helpers.TeamName()
+		for _, tc := range []struct {
+			client    *helpers.ApiClient
+			projectID string
+		}{
+			{client, project.ID},
+			{otherClient, otherProject.ID},
+		} {
+			resp, err := tc.client.CreateTeam(t.Context(),
+				&api.CreateTeamRequest{Name: name},
+				api.CreateTeamParams{ProjectID: api.ProjectID(tc.projectID)},
+			)
+			require.NoError(t, err)
+			assert.IsType(t, &api.CreateTeamResponse{}, resp, helpers.MustMarshal(t, resp))
+		}
+	})
+
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
+
+		for _, tc := range []struct {
+			name    string
+			nameFor func(string) string
+		}{
+			{"duplicate name", func(name string) string { return name }},
+			{"duplicate name differing only in case", strings.ToUpper},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				name := helpers.TeamName()
+				params := api.CreateTeamParams{
+					ProjectID: api.ProjectID(project.ID),
+				}
+
+				resp, err := client.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: name}, params)
+				require.NoError(t, err)
+				require.IsType(t, &api.CreateTeamResponse{}, resp, helpers.MustMarshal(t, resp))
+
+				resp, err = client.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: tc.nameFor(name)}, params)
+				require.NoError(t, err)
+				assert.IsType(t, &api.CreateTeamConflict{}, resp, helpers.MustMarshal(t, resp))
+			})
+		}
 
 		t.Run("no project", func(t *testing.T) {
 			t.Parallel()

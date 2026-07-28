@@ -4,4 +4,4 @@ required:
 properties:
   name:
     type: string
-    description: The name of the team.
+    description: The name of the team. Must be unique within the project.

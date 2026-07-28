@@ -71,6 +71,43 @@ func TestTeamStatements_Create(t *testing.T) {
 		err := testPool.CreateTeam(t.Context(), newTestTeam(projectID, teamID))
 		assert.Error(t, err)
 	})
+
+	t.Run("duplicate name in the same project returns error", func(t *testing.T) {
+		for _, tc := range []struct {
+			name    string
+			nameFor func(string) string
+		}{
+			{"exact match", func(name string) string { return name }},
+			{"differing only in case", strings.ToUpper},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				projectID, teamID := uniqueTeamIDs(t)
+				ensureTestProject(t, projectID)
+
+				team := newTestTeam(projectID, teamID)
+				require.NoError(t, testPool.CreateTeam(t.Context(), team))
+
+				duplicate := newTestTeam(projectID, teamID+"-2")
+				duplicate.Name = tc.nameFor(team.Name)
+				err := testPool.CreateTeam(t.Context(), duplicate)
+				assert.ErrorIs(t, err, new(legacydb.UniqueError))
+			})
+		}
+	})
+
+	t.Run("same name in different projects is allowed", func(t *testing.T) {
+		projectID, teamID := uniqueTeamIDs(t)
+		ensureTestProject(t, projectID)
+		otherProjectID := projectID + "-other"
+		ensureTestProject(t, otherProjectID)
+
+		team := newTestTeam(projectID, teamID)
+		require.NoError(t, testPool.CreateTeam(t.Context(), team))
+
+		other := newTestTeam(otherProjectID, teamID)
+		other.Name = team.Name
+		require.NoError(t, testPool.CreateTeam(t.Context(), other))
+	})
 }
 
 func TestTeamStatements_Get(t *testing.T) {

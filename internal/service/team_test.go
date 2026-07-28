@@ -51,6 +51,20 @@ func TestTeamService_CreateTeam(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrTeamNameInvalid())
 	})
 
+	t.Run("duplicate name", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		pool := servicemocks.NewMockPool(ctrl)
+		statements := servicemocks.NewMockAllStatements(ctrl)
+		pool.EXPECT().Statements().Return(statements)
+		statements.EXPECT().
+			CreateTeam(gomock.Any(), gomock.Any()).
+			Return(database.NewUniqueError("teams", "teams_project_id_name_key", nil))
+
+		svc := service.NewTeamService(service.NewPool(pool))
+		_, err := svc.CreateTeam(t.Context(), service.CreateTeamInput{ProjectID: "proj_1", Name: "team-1"})
+		assert.ErrorIs(t, err, domain.ErrTeamAlreadyExists())
+	})
+
 	t.Run("create fails", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		pool := servicemocks.NewMockPool(ctrl)
