@@ -1470,21 +1470,126 @@ describe("<zitadel-login> against the typed Flow API", () => {
       expect(backSubmit).toBeDefined();
     });
 
-    it("calls history.pushState when step has kind: back action", async () => {
+    it("pushes a single sentinel entry without touching the URL", async () => {
+      await settleHistory();
       const pushState = vi.spyOn(history, "pushState");
       try {
         const element = await mount(host);
         await navigateToRegisterPassword(element);
 
-        // pushState should have been called for register-password (has back)
+        // Exactly one sentinel for the back-capable step, and no URL
+        // argument — the host page's location (including any hash-router
+        // fragment) stays untouched.
         const zlCalls = pushState.mock.calls.filter(
           ([state]) => (state as { zl?: boolean } | null)?.zl === true,
         );
-        expect(zlCalls.length).toBeGreaterThanOrEqual(1);
-        const lastCall = zlCalls.at(-1);
-        expect(lastCall?.[2]).toMatch(/^#s\d+$/);
+        expect(zlCalls).toHaveLength(1);
+        expect(zlCalls[0]?.[2]).toBeUndefined();
       } finally {
         pushState.mockRestore();
+      }
+    });
+
+    /**
+     * jsdom performs `history.back()` traversals asynchronously — a retire
+     * from a previous test can deliver its `popstate` into the current
+     * one. Drain the queue (including any bounce responses) before
+     * installing spies so assertions only see this test's activity.
+     */
+    async function settleHistory(): Promise<void> {
+      for (let i = 0; i < 5; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    }
+
+    it("browser back gesture submits the back action, re-arms, then retires the sentinel", async () => {
+      const pushState = vi.spyOn(history, "pushState");
+      const back = vi.spyOn(history, "back");
+      try {
+        const element = await mount(host);
+        await navigateToRegisterPassword(element);
+        await settleHistory();
+        const zlPushesBefore = pushState.mock.calls.filter(
+          ([state]) => (state as { zl?: boolean } | null)?.zl === true,
+        ).length;
+        const backCallsBefore = back.mock.calls.length;
+
+        // Simulate the browser consuming the sentinel (back gesture).
+        window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+
+        // The gesture maps to the step's back action…
+        await waitFor(() => {
+          const link = element.shadowRoot?.querySelector('[data-action="back"]');
+          return link === null ? true : null;
+        });
+        const submits = mock
+          .getCaptured()
+          .filter(
+            (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+              req.kind === "submitFlowStep",
+          );
+        expect(submits.find((s) => s.body.action === "back")).toBeDefined();
+
+        // …the sentinel was re-armed before submitting…
+        const zlPushesAfter = pushState.mock.calls.filter(
+          ([state]) => (state as { zl?: boolean } | null)?.zl === true,
+        ).length;
+        expect(zlPushesAfter).toBe(zlPushesBefore + 1);
+
+        // …and retired once the resulting step (register, no back action)
+        // rendered, so the next back press leaves the widget.
+        expect(back.mock.calls.length).toBe(backCallsBefore + 1);
+      } finally {
+        back.mockRestore();
+        pushState.mockRestore();
+      }
+    });
+
+    it("back gesture on a step without a back action leaves history alone", async () => {
+      await mount(host);
+      await settleHistory();
+      const pushState = vi.spyOn(history, "pushState");
+      const back = vi.spyOn(history, "back");
+      const forward = vi.spyOn(history, "forward");
+      try {
+        const submitsBefore = mock
+          .getCaptured()
+          .filter((req) => req.kind === "submitFlowStep").length;
+
+        // Initial step is never armed — a popstate here is host-page
+        // traversal and must not be intercepted or bounced.
+        window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+
+        const submitsAfter = mock
+          .getCaptured()
+          .filter((req) => req.kind === "submitFlowStep").length;
+        expect(submitsAfter).toBe(submitsBefore);
+        expect(back).not.toHaveBeenCalled();
+        expect(forward).not.toHaveBeenCalled();
+        const zlCalls = pushState.mock.calls.filter(
+          ([state]) => (state as { zl?: boolean } | null)?.zl === true,
+        );
+        expect(zlCalls).toHaveLength(0);
+      } finally {
+        forward.mockRestore();
+        back.mockRestore();
+        pushState.mockRestore();
+      }
+    });
+
+    it("forward press onto a retired sentinel bounces back", async () => {
+      await mount(host);
+      await settleHistory();
+      const back = vi.spyOn(history, "back");
+      try {
+        // A retired sentinel survives as a forward entry; traversing onto
+        // it must bounce — the flow cannot move forward through browser
+        // navigation (ADR 022 §Edge cases).
+        window.dispatchEvent(new PopStateEvent("popstate", { state: { zl: true } }));
+
+        expect(back).toHaveBeenCalledTimes(1);
+      } finally {
+        back.mockRestore();
       }
     });
 

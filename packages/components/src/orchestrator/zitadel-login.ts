@@ -225,12 +225,23 @@ export class ZitadelLogin extends LitElement {
   private tenantTemplateCache: { source: string; template: Template[] } | null = null;
 
   /**
-   * Incrementing counter for opaque, fragment-based history entries
-   * (`#s0`, `#s1`, …). The fragment has no semantic meaning — it exists
-   * only to create same-document navigation entries so the browser's back
-   * gesture fires `popstate` without reloading the page.
+   * Whether the widget currently owns a same-document history entry (the
+   * "sentinel"). The sentinel exists so the browser's back gesture fires
+   * `popstate` instead of leaving the page. Exactly one sentinel is on
+   * the stack at a time: it is pushed when a step with a `kind: "back"`
+   * action renders, re-armed by `onPopState` after the browser consumes
+   * it, and retired by `applyResponse` when a step without a back action
+   * renders. The entry reuses the current URL, so the host page's
+   * location (including any hash-router fragment) is never modified.
    */
-  private stepSeq = 0;
+  private armed = false;
+
+  /**
+   * Set immediately before a self-initiated `history.back()` so the
+   * resulting `popstate` is ignored instead of being interpreted as a
+   * user back gesture.
+   */
+  private ignoreNextPop = false;
 
   /** Bound `popstate` handler stored for cleanup in `disconnectedCallback`. */
   private readonly handlePopState = this.onPopState.bind(this);
@@ -549,14 +560,24 @@ export class ZitadelLogin extends LitElement {
     // carry-over from prior steps) win on conflict.
     this.formValues = { ...collectInitialValues(wire.step), ...this.formValues };
 
-    // History API: push a new entry when the step supports back-navigation
-    // so the browser's back gesture fires `popstate`. Steps without a
-    // `kind: "back"` action get no new entry — the browser's back button
-    // then navigates the host page (leaves the flow), which is correct.
+    // History API (ADR 022): keep exactly one same-document entry — the
+    // sentinel — on the stack while the current step supports
+    // back-navigation, so the browser's back gesture fires `popstate`
+    // (handled in `onPopState`) instead of leaving the page. Arming only
+    // on the unarmed → armed transition means consecutive back-capable
+    // steps (and re-renders of the same step, e.g. after a failed submit)
+    // never grow the stack. Steps without a `kind: "back"` action retire
+    // the sentinel — the next back press then navigates the host page
+    // (leaves the flow), which is correct.
     if (typeof window !== "undefined") {
       const hasBack = Boolean(wire.step.actions?.some((a) => a.kind === "back"));
-      if (hasBack) {
-        history.pushState({ zl: true, seq: this.stepSeq }, "", `#s${this.stepSeq++}`);
+      if (hasBack && !this.armed) {
+        history.pushState({ zl: true }, "");
+        this.armed = true;
+      } else if (!hasBack && this.armed) {
+        this.armed = false;
+        this.ignoreNextPop = true;
+        history.back();
       }
     }
 
@@ -1046,34 +1067,42 @@ export class ZitadelLogin extends LitElement {
   }
 
   /**
-   * Handle the browser's back/forward gesture. When `popstate` fires:
+   * Handle the browser's back/forward gesture (ADR 022). When `popstate`
+   * fires:
    *
-   * - **Backward** with a `kind: "back"` action → submit it to the API.
-   * - **Backward** without a back action → `history.forward()` to restore
-   *   the consumed entry (the flow's entries are eventually exhausted and
-   *   the host page becomes reachable again).
-   * - **Forward** after going back → `history.back()` to undo the
-   *   traversal; the flow state is server-authoritative, the browser
-   *   cannot skip ahead (ADR 022 §Edge cases).
+   * - **Self-initiated** (`ignoreNextPop`) → `applyResponse` is retiring
+   *   the sentinel; ignore.
+   * - **Back press while armed** → the browser consumed the sentinel.
+   *   Re-arm it immediately — so the stack shape is identical on every
+   *   step and repeated presses behave the same at any flow depth — then
+   *   submit the step's `kind: "back"` action.
+   * - **Forward press onto a retired sentinel** (it survives as a forward
+   *   entry after `history.back()`) → bounce back: flow state is
+   *   server-authoritative, the browser cannot skip ahead
+   *   (ADR 022 §Edge cases).
+   * - Anything else is host-page traversal — leave the browser alone.
    */
   private onPopState(event: PopStateEvent): void {
-    if (!this.response?.step?.actions) return;
-
-    // Detect forward navigation: the state's seq is at or ahead of our
-    // current stepSeq counter → the user pressed forward.
-    const stateSeq = (event.state as { seq?: number } | null)?.seq;
-    if (stateSeq !== undefined && stateSeq >= this.stepSeq) {
-      history.back();
+    if (this.ignoreNextPop) {
+      this.ignoreNextPop = false;
       return;
     }
 
-    const backAction = this.response.step.actions.find((a) => a.kind === "back");
-    if (backAction) {
-      void this.submit(backAction.name);
-    } else {
-      // No back action — restore the consumed history entry so the
-      // browser's back button eventually reaches the host page.
-      history.forward();
+    if (this.armed) {
+      // Back press: the browser popped the sentinel.
+      this.armed = false;
+      const backAction = this.response?.step?.actions?.find((a) => a.kind === "back");
+      if (backAction) {
+        history.pushState({ zl: true }, "");
+        this.armed = true;
+        void this.submit(backAction.name);
+      }
+      return;
+    }
+
+    if ((event.state as { zl?: boolean } | null)?.zl === true) {
+      this.ignoreNextPop = true;
+      history.back();
     }
   }
 
