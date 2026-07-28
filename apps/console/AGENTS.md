@@ -47,8 +47,29 @@ rule).
 ## Local tasks
 
 ```sh
-moon run console:dev        # dev server on http://localhost:5174
+moon run console:dev-real   # seeded real backend + dev server (default loop)
+moon run console:dev        # dev server only on http://localhost:5174
 moon run console:typecheck
 moon run console:test
 moon run console:build
 ```
+
+## Develop against real data, not the mock
+
+The console manages an instance, so **use `console:dev-real`** — it boots a real
+ephemeral instance and seeds users, so list screens show real API responses.
+`@zitadel/api-mock` has no user store; a users list read from it is a fiction.
+
+Two things to know:
+
+- `listUsers` requires `user.read`, which only the project secret carries — the
+  publishable key is deliberately refused (`internal/api/user.go`). A signed-in
+  console is not sufficient for real list data; the proxy secret is.
+- The mock's flow shape now mirrors the real default flow (split
+  `identifier` → `password`), so it is trustworthy for chrome — but it has no user
+  store and cannot prove authorization. Keep it that way: the authority is
+  `packages/config/defaults/default-login.json`, and a step fixture must be
+  diffed against it before being changed (`packages/api-mock/AGENTS.md`).
+
+See the Local development section of [`README.md`](README.md) for all three
+backends and when each applies.
