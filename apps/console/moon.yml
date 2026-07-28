@@ -61,6 +61,17 @@ tasks:
       persistent: true
       runInCI: false
 
+  # Real-data dev loop: boots a seeded ephemeral instance, then the dev server
+  # against it. The console manages an instance, so its list screens are only
+  # meaningful against a real backend (see scripts/dev-real.mts).
+  dev-real:
+    command: "corepack pnpm run dev:real"
+    deps:
+      - "server:build"
+    options:
+      persistent: true
+      runInCI: false
+
   preview:
     command: "corepack pnpm run preview"
     deps:

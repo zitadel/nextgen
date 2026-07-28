@@ -100,13 +100,60 @@ on flow calls and the handoff exchange. Sign-in therefore needs no
 (operator-plane) data calls until session-derived permissions land
 (ADR 0003 §4).
 
-Local dev prerequisites for a working sign-in: the effective project
-(`VITE_CONSOLE_PROJECT_ID` when set, otherwise the discovered
-`console_project_id`) needs at least one user — seed one with the server's
-`--user-file` bootstrap flag. When using the dev proxy's
-`CONSOLE_PROJECT_SECRET` for data calls, that secret must belong to the same
-project, so keep `VITE_CONSOLE_PROJECT_ID` set to that project while the
-secret-based interim lasts.
+## Local development
+
+The console manages an instance, so its screens are only honest against a real
+backend: `@zitadel/api-mock` has no user store, so a users list read from it is
+a fiction. **Default to the real-data loop.**
+
+### Real data (default)
+
+```sh
+moon run console:dev-real
+```
+
+One command: boots an ephemeral real instance (binary runtime + embedded
+Postgres, no Docker) via `@zitadel/testing`, bootstraps a project with the
+default schema and login flow, seeds users, then starts the dev server with the
+proxy bound to that instance. It prints the sign-in credentials
+(`dev@zitadel.local` / `Console-dev-1` by default). HMR is the normal Vite loop.
+
+Each run is a fresh database, so the seeded list is identical every time — a
+screenshot diff reflects code changes, not reshuffled fixtures — at the cost of
+signing in again after a restart. `--seed-only` boots and seeds without starting
+Vite, for pointing a separately-running console at a fresh instance. Overrides:
+`CONSOLE_DEV_EMAIL`, `CONSOLE_DEV_PASSWORD`, `CONSOLE_DEV_ZITADEL_PORT`,
+`CONSOLE_DEV_ORIGIN`. See [`scripts/dev-real.mts`](scripts/dev-real.mts).
+
+Note `listUsers` requires `user.read`, which only the **project secret** carries
+— the browser-plane publishable key is deliberately refused
+(`internal/api/user.go`). So real list screens need the proxy's
+`CONSOLE_PROJECT_SECRET`, which this script supplies; sign-in alone does not.
+
+### Mock backend
+
+```sh
+PORT=8080 moon run api-mock:start          # terminal 1
+VITE_CONSOLE_PROJECT_ID=proj_dev_mock \
+  moon run console:dev                     # terminal 2
+```
+
+Fast and offline, and the full sign-in loop works (the mock serves
+`/sessions/exchange` and `/sessions/me`), with the same split
+`identifier` → `password` flow the real server emits. Use it only for chrome that
+needs no real data: it has **no user store**, so list screens cannot be
+meaningful and nothing about authorization can be proven there. It also serves no
+`/console/runtime.json`, so runtime discovery falls back to `standalone` and the
+project id must come from `VITE_CONSOLE_PROJECT_ID`.
+
+### Embedded build
+
+```sh
+moon run workspace:server
+```
+
+Serves the built bundle under `/ui/console/` — no HMR. Use it only to verify the
+embed base path.
 
 ## Environment variables
 
@@ -120,7 +167,8 @@ secret-based interim lasts.
 ## Commands
 
 ```sh
-moon run console:dev
+moon run console:dev-real   # dev server + seeded real backend (preferred)
+moon run console:dev        # dev server only (bring your own backend)
 moon run console:test
 moon run console:typecheck
 ```

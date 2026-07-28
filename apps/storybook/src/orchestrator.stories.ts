@@ -1,10 +1,8 @@
-import { applyBranding, clearBranding, setupMockHandlers } from "@zitadel/api-mock";
 import type { Meta, StoryObj } from "@storybook/web-components-vite";
+import { applyBranding, clearBranding, setupMockHandlers } from "@zitadel/api-mock";
 import { html } from "lit";
 import { initialize, mswLoader } from "msw-storybook-addon";
-
 import "@zitadel/components";
-
 import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
 
 // MSW lives only on the orchestrator (the atoms make no requests), so the
@@ -17,14 +15,15 @@ initialize({ onUnhandledRequest: "bypass" });
  * flow machine + orval-typed fixtures), wired through `msw-storybook-addon`.
  *
  * One component, knobs for the rest:
- * - `purpose` switches the flow (Sign in -> email + password; Sign up ->
- *   email, given name, family name, date of birth), so the rendered fields
- *   change without a separate component.
+ * - `purpose` switches the flow (Sign in -> email, then the credential on its
+ *   own step; Sign up -> email, given name, family name, date of birth), so the
+ *   rendered fields change without a separate component.
  * - `branding` swaps the tenant payload the mock overlays on every response.
  *
  * Interactive fixture emails (typed live in the rendered form):
- * - `wrong@example.com` -> inline "Wrong email or password." on Sign in
- * - `server@example.com` -> form alert on Sign in
+ * - `wrong@example.com` -> inline "Wrong email or password." on the password
+ *   step (credential failures surface there, not on the identifier)
+ * - `server@example.com` -> form alert on the password step
  * - `exists@example.com` -> inline "account already exists" on Sign up
  * - any other email -> happy path to signed-in
  *
@@ -72,7 +71,11 @@ const meta: Meta<OrchestratorArgs> = {
 export default meta;
 type Story = StoryObj<OrchestratorArgs>;
 
-/** Combined sign-in step: email + password. */
+/**
+ * Sign-in, first step: the identifier collects the email only. Submitting
+ * advances to the password step — the split shape the real default flow
+ * defines (`packages/config/defaults/default-login.json`).
+ */
 export const SignIn: Story = {};
 
 /**

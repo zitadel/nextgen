@@ -1,3 +1,11 @@
+import {
+  applyBranding,
+  clearBranding,
+  PASSWORD_FIELD,
+  setupMockHandlers,
+  type CapturedRequest,
+  type MockHandle,
+} from "@zitadel/api-mock";
 /**
  * jsdom-friendly integration tests for `<zitadel-login>`. Network calls go
  * through the typed `@zitadel/api` fetch client; we intercept them
@@ -10,13 +18,6 @@
  * `ElementInternals` implementation.
  */
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
-import {
-  applyBranding,
-  clearBranding,
-  setupMockHandlers,
-  type CapturedRequest,
-  type MockHandle,
-} from "@zitadel/api-mock";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -68,32 +69,38 @@ async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Pr
   throw new Error("waitFor timed out");
 }
 
-/** Walks the api-mock login path: combined sign-in → done. */
+function type(element: ZitadelLogin, name: string, value: string): void {
+  element.shadowRoot?.dispatchEvent(
+    new CustomEvent("zl-input", { bubbles: true, composed: true, detail: { name, value } }),
+  );
+}
+
+function submit(element: ZitadelLogin, action = "submit"): void {
+  element.shadowRoot?.dispatchEvent(
+    new CustomEvent("zl-submit", { bubbles: true, composed: true, detail: { action } }),
+  );
+}
+
+/**
+ * Walks the login path the real default flow defines, which the api-mock now
+ * mirrors: `identifier` (email) → `password` → `done`. Two round trips, so
+ * callers must await the password step rendering between them.
+ *
+ * The credential is keyed by the schema pointer {@link PASSWORD_FIELD}, exactly
+ * as the server emits and requires it — submitting a plain `password` key makes
+ * the real backend answer `req.invalid`.
+ */
 async function advanceMockLoginFlow(
   element: ZitadelLogin,
   email = "alice@acme.com",
 ): Promise<void> {
-  element.shadowRoot?.dispatchEvent(
-    new CustomEvent("zl-input", {
-      bubbles: true,
-      composed: true,
-      detail: { name: "email", value: email },
-    }),
-  );
-  element.shadowRoot?.dispatchEvent(
-    new CustomEvent("zl-input", {
-      bubbles: true,
-      composed: true,
-      detail: { name: "password", value: "hunter2" },
-    }),
-  );
-  element.shadowRoot?.dispatchEvent(
-    new CustomEvent("zl-submit", {
-      bubbles: true,
-      composed: true,
-      detail: { action: "submit" },
-    }),
-  );
+  type(element, "email", email);
+  submit(element);
+  // The identifier submit swaps in the password step; wait for its field to
+  // exist before typing into it, or the value lands on the previous step.
+  await waitFor(() => element.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`));
+  type(element, PASSWORD_FIELD, "hunter2");
+  submit(element);
 }
 
 /** Create and attach a login element without waiting for a render. */
@@ -127,10 +134,30 @@ describe("<zitadel-login> against the typed Flow API", () => {
     const element = await mount(host);
     const root = element.shadowRoot;
     expect(root).toBeTruthy();
+    // The default flow's identifier step collects the email only; the
+    // credential lives on its own step (see `advanceMockLoginFlow`).
     const fields = root?.querySelectorAll("zl-field") ?? [];
-    expect(fields.length).toBe(2);
+    expect(fields.length).toBe(1);
     expect(fields[0]?.getAttribute("name")).toBe("email");
-    expect(fields[1]?.getAttribute("name")).toBe("password");
+  });
+
+  it("advances from the identifier step to the credential step", async () => {
+    const element = await mount(host);
+    type(element, "email", "alice@acme.com");
+    submit(element);
+
+    const field = await waitFor(() =>
+      element.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`),
+    );
+    expect(field.getAttribute("type")).toBe("password");
+    // The identifier submit carries only what that step declared.
+    const submitted = mock
+      .getCaptured()
+      .find(
+        (request): request is CapturedRequest & { kind: "submitFlowStep" } =>
+          request.kind === "submitFlowStep",
+      );
+    expect(submitted?.body.fields).toEqual({ email: "alice@acme.com" });
   });
 
   it("starts a flow from project-id / proxy-path attributes with no global config", async () => {
@@ -255,33 +282,11 @@ describe("<zitadel-login> against the typed Flow API", () => {
   it("submits with {session_token, action, fields} and applies the next step", async () => {
     const element = await mount(host);
 
-    // Simulate the user typing into the identifier field by feeding the
-    // `zl-input` event the orchestrator listens for. The atom-level event
-    // is the same one form-associated `<zl-field>` instances dispatch in
-    // a real browser; here we sidestep the form-association code path
-    // because jsdom only partially implements `ElementInternals`.
-    element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-input", {
-        bubbles: true,
-        composed: true,
-        detail: { name: "email", value: "alice@acme.com" },
-      }),
-    );
-    element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-input", {
-        bubbles: true,
-        composed: true,
-        detail: { name: "password", value: "hunter2" },
-      }),
-    );
-
-    element.shadowRoot?.dispatchEvent(
-      new CustomEvent("zl-submit", {
-        bubbles: true,
-        composed: true,
-        detail: { action: "submit" },
-      }),
-    );
+    // `advanceMockLoginFlow` feeds the `zl-input`/`zl-submit` events the
+    // orchestrator listens for — the same ones form-associated `<zl-field>`
+    // instances dispatch in a real browser. We sidestep the form-association
+    // code path because jsdom only partially implements `ElementInternals`.
+    await advanceMockLoginFlow(element);
 
     await waitFor(() => {
       const title = element.shadowRoot?.querySelector(".zl-card-title");
@@ -294,12 +299,18 @@ describe("<zitadel-login> against the typed Flow API", () => {
         (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
           req.kind === "submitFlowStep",
       );
-    expect(submits).toHaveLength(1);
+    // One submit per step of the split flow, each carrying only that step's
+    // own declared fields — the credential never rides along with the email.
+    expect(submits).toHaveLength(2);
     expect(submits[0]?.body).toMatchObject({
       action: "submit",
-      fields: { email: "alice@acme.com", password: "hunter2" },
+      fields: { email: "alice@acme.com" },
     });
-    expect(typeof submits[0]?.body.session_token).toBe("string");
+    expect(submits[1]?.body).toMatchObject({
+      action: "submit",
+      fields: { [PASSWORD_FIELD]: "hunter2" },
+    });
+    expect(submits.every((req) => typeof req.body.session_token === "string")).toBe(true);
   });
 
   it("emits zitadel-flow-complete when the step ends with `complete: show`", async () => {
@@ -1383,7 +1394,8 @@ describe("<zitadel-login> against the typed Flow API", () => {
         (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
           req.kind === "submitFlowStep",
       );
-    expect(submits[0]?.body.fields).toEqual({ email: "", password: "" });
+    // The identifier step declares only `email`.
+    expect(submits[0]?.body.fields).toEqual({ email: "" });
   });
 
   describe("back-navigation (ADR 022)", () => {
