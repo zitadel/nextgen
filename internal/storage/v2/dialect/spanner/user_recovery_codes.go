@@ -63,75 +63,51 @@ func (s userRecoveryCodesStatements) DeleteUserRecoveryCodesByUserID(ctx context
 	return err
 }
 
-type userRecoveryCodesPatch struct {
-	codes               []string
-	setCodes            bool
-	lastSuccessfulCheck *time.Time
-	setLastCheck        bool
-	clearLastCheck      bool
-	delta               int16
-	resetFailedAttempts bool
-}
-
-func coalesceUserRecoveryCodesUpdates(updates []domain.UserRecoveryCodesUpdate) (userRecoveryCodesPatch, error) {
-	var patch userRecoveryCodesPatch
-	for _, u := range updates {
-		switch v := u.(type) {
-		case *domain.UserRecoveryCodesCodesUpdate:
-			if err := domain.RequireNonEmptyRecoveryCodes(v.Codes); err != nil {
-				return userRecoveryCodesPatch{}, err
-			}
-			patch.codes = append([]string(nil), v.Codes...)
-			patch.setCodes = true
-		case *domain.UserRecoveryCodesLastSuccessfulCheckUpdate:
-			patch.setLastCheck = true
-			if v.LastSuccessfulCheck == nil {
-				patch.clearLastCheck = true
-				patch.lastSuccessfulCheck = nil
-			} else {
-				t := *v.LastSuccessfulCheck
-				patch.clearLastCheck = false
-				patch.lastSuccessfulCheck = &t
-			}
-		case *domain.UserRecoveryCodesIncrementFailedAttemptsUpdate:
-			if v.Delta <= 0 {
-				return userRecoveryCodesPatch{}, fmt.Errorf("UserRecoveryCodesIncrementFailedAttemptsUpdate.Delta must be > 0, got %d", v.Delta)
-			}
-			patch.resetFailedAttempts = false
-			patch.delta += v.Delta
-		case *domain.UserRecoveryCodesResetFailedAttemptsUpdate:
-			patch.resetFailedAttempts = true
-			patch.delta = 0
-		default:
-			return userRecoveryCodesPatch{}, fmt.Errorf("unknown UserRecoveryCodesUpdate %T", u)
-		}
-	}
-	return patch, nil
-}
-
-func (p userRecoveryCodesPatch) empty() bool {
-	return !p.setCodes &&
-		!p.setLastCheck &&
-		!p.resetFailedAttempts &&
-		p.delta == 0
-}
-
 // UpdateUserRecoveryCodes implements [service.UserRecoveryCodesStatements].
 func (s userRecoveryCodesStatements) UpdateUserRecoveryCodes(ctx context.Context, projectID, userID string, updates ...domain.UserRecoveryCodesUpdate) error {
 	if len(updates) == 0 {
 		return database.ErrNoChanges
 	}
-	patch, err := coalesceUserRecoveryCodesUpdates(updates)
-	if err != nil {
-		return err
-	}
-	if patch.empty() {
-		return database.ErrNoChanges
-	}
 
 	var c statementCompiler
 	c.WriteString("UPDATE user_recovery_codes SET ")
-	writeUserRecoveryCodesPatch(&c, patch)
+	sep := ""
+	writeAssign := func(col string, arg any) {
+		c.WriteString(sep)
+		sep = ", "
+		c.WriteString(col)
+		c.WriteString(" = ")
+		c.WriteArg(arg)
+	}
+
+	for _, update := range updates {
+		switch u := update.(type) {
+		case *domain.UserRecoveryCodesCodesUpdate:
+			if err := domain.RequireNonEmptyRecoveryCodes(u.Codes); err != nil {
+				return err
+			}
+			writeAssign("recovery_codes", u.Codes)
+		case *domain.UserRecoveryCodesLastSuccessfulCheckUpdate:
+			c.WriteString(sep)
+			sep = ", "
+			c.WriteString("last_successful_check = ")
+			if u.LastSuccessfulCheck == nil {
+				c.WriteString("NULL")
+			} else {
+				c.WriteArg(*u.LastSuccessfulCheck)
+			}
+		case *domain.UserRecoveryCodesIncrementFailedAttemptsUpdate:
+			c.WriteString(sep)
+			sep = ", "
+			c.WriteString("failed_attempts = failed_attempts + ")
+			c.WriteArg(int64(u.Delta))
+		case *domain.UserRecoveryCodesResetFailedAttemptsUpdate:
+			writeAssign("failed_attempts", int64(0))
+		default:
+			return fmt.Errorf("unknown UserRecoveryCodesUpdate %T", update)
+		}
+	}
+
 	c.WriteString(", updated_at = CURRENT_TIMESTAMP() WHERE project_id = ")
 	c.WriteArg(projectID)
 	c.WriteString(" AND user_id = ")
@@ -145,38 +121,6 @@ func (s userRecoveryCodesStatements) UpdateUserRecoveryCodes(ctx context.Context
 		return wrapError(spanner.ErrRowNotFound)
 	}
 	return nil
-}
-
-func writeUserRecoveryCodesPatch(c *statementCompiler, patch userRecoveryCodesPatch) {
-	sep := ""
-	writeAssign := func(col string, arg any) {
-		c.WriteString(sep)
-		sep = ", "
-		c.WriteString(col)
-		c.WriteString(" = ")
-		c.WriteArg(arg)
-	}
-	if patch.setCodes {
-		writeAssign("recovery_codes", patch.codes)
-	}
-	if patch.setLastCheck {
-		c.WriteString(sep)
-		sep = ", "
-		c.WriteString("last_successful_check = ")
-		if patch.clearLastCheck {
-			c.WriteString("NULL")
-		} else {
-			c.WriteArg(*patch.lastSuccessfulCheck)
-		}
-	}
-	switch {
-	case patch.resetFailedAttempts:
-		writeAssign("failed_attempts", int64(0))
-	case patch.delta > 0:
-		c.WriteString(sep)
-		c.WriteString("failed_attempts = failed_attempts + ")
-		c.WriteArg(int64(patch.delta))
-	}
 }
 
 // GetUserRecoveryCodesByID implements [service.UserRecoveryCodesStatements].

@@ -167,8 +167,7 @@ func TestUserRecoveryCodesStatements_Update(t *testing.T) {
 	assert.Zero(t, got.FailedAttempts)
 
 	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
-		&domain.UserRecoveryCodesIncrementFailedAttemptsUpdate{Delta: 1},
-		&domain.UserRecoveryCodesIncrementFailedAttemptsUpdate{Delta: 1},
+		&domain.UserRecoveryCodesIncrementFailedAttemptsUpdate{Delta: 2},
 	))
 	got, err = testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
 	require.NoError(t, err)

@@ -37,7 +37,7 @@ type UserRecoveryCodesLastSuccessfulCheckUpdate struct {
 func (*UserRecoveryCodesLastSuccessfulCheckUpdate) userRecoveryCodesUpdate() {}
 
 type UserRecoveryCodesIncrementFailedAttemptsUpdate struct {
-	Delta int16
+	Delta uint8
 }
 
 func (*UserRecoveryCodesIncrementFailedAttemptsUpdate) userRecoveryCodesUpdate() {}
