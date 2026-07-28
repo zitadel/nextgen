@@ -25,8 +25,8 @@ are the agreed direction for upcoming work (issue
   shell; the session cookie authenticates the UI while management calls stay
   on the server-held secret until session-derived permissions exist.
 - [ADR 0004: Deployment modes](docs/adrs/0004-console-deployment-modes.md)
-  — one build serves cloud and self-host; standalone tracks exactly one
-  project (the first-created — `zitadel setup`'s — becomes the default; the
+  — one build serves cloud and self-host; the initial standalone Console uses
+  one default project (the first-created — `zitadel setup`'s — becomes the default; the
   server never creates it). A minimal per-request runtime document carries
   `mode` + the sign-in project id, and portal surfaces (billing,
   multi-project, support) render from **effective permissions** (user
