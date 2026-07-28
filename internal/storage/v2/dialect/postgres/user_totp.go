@@ -35,7 +35,7 @@ func newUserTOTPStatements(client queryExecutor) userTOTPStatements {
 
 // CreateUserTOTP implements [service.UserTOTPStatements].
 func (us userTOTPStatements) CreateUserTOTP(ctx context.Context, totp *domain.CreateUserTOTP) error {
-	_, err := us.client.Exec(ctx, createUserTOTPStmt, totp.ProjectID, totp.UserID, totp.Secret)
+	_, err := us.client.Exec(ctx, createUserTOTPStmt, totp.ProjectID, totp.UserID, append([]byte(nil), totp.Secret...))
 	return wrapError(err)
 }
 
@@ -91,7 +91,7 @@ func (us userTOTPStatements) UpdateUserTOTP(ctx context.Context, projectID, user
 	for _, update := range updates {
 		switch u := update.(type) {
 		case *domain.UserTOTPSecretUpdate:
-			writeAssign("secret", u.Secret)
+			writeAssign("secret", append([]byte(nil), u.Secret...))
 		case *domain.UserTOTPVerifiedAtUpdate:
 			writeAssign("verified_at", u.VerifiedAt)
 		case *domain.UserTOTPLastSuccessfulCheckUpdate:

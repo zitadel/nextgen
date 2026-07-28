@@ -2,8 +2,6 @@ package domain
 
 import "time"
 
-// UserTOTPUpdate is one typed mid-lifecycle change for user_totp rows.
-// Callers must pass pointers (e.g. &UserTOTPVerifiedAtUpdate{...}).
 type UserTOTPUpdate interface {
 	userTOTPUpdate()
 }
@@ -35,8 +33,3 @@ func (*UserTOTPIncrementFailedAttemptsUpdate) userTOTPUpdate() {}
 type UserTOTPResetFailedAttemptsUpdate struct{}
 
 func (*UserTOTPResetFailedAttemptsUpdate) userTOTPUpdate() {}
-
-// NewUserTOTPSecretUpdate copies secret so callers cannot share a mutable buffer.
-func NewUserTOTPSecretUpdate(secret []byte) *UserTOTPSecretUpdate {
-	return &UserTOTPSecretUpdate{Secret: append([]byte(nil), secret...)}
-}

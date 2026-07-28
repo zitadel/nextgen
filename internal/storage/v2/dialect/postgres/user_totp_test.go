@@ -79,7 +79,7 @@ func TestUserTOTPStatements_Update(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	newSecret := []byte("rotated-secret")
 	require.NoError(t, testPool.UpdateUserTOTP(ctx, projectID, userID,
-		domain.NewUserTOTPSecretUpdate(newSecret),
+		&domain.UserTOTPSecretUpdate{Secret: newSecret},
 		&domain.UserTOTPVerifiedAtUpdate{VerifiedAt: now},
 		&domain.UserTOTPLastSuccessfulCheckUpdate{LastSuccessfulCheck: now},
 		&domain.UserTOTPResetFailedAttemptsUpdate{},

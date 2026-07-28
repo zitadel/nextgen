@@ -39,7 +39,7 @@ func (us userTOTPStatements) CreateUserTOTP(ctx context.Context, totp *domain.Cr
 	_, err := us.db.Update(ctx, buildStatement(createUserTOTPStmt,
 		totp.ProjectID,
 		totp.UserID,
-		totp.Secret,
+		append([]byte(nil), totp.Secret...),
 	).statement())
 	return wrapError(err)
 }
@@ -75,7 +75,7 @@ func (us userTOTPStatements) UpdateUserTOTP(ctx context.Context, projectID, user
 	for _, update := range updates {
 		switch u := update.(type) {
 		case *domain.UserTOTPSecretUpdate:
-			writeAssign("secret", u.Secret)
+			writeAssign("secret", append([]byte(nil), u.Secret...))
 		case *domain.UserTOTPVerifiedAtUpdate:
 			writeAssign("verified_at", u.VerifiedAt)
 		case *domain.UserTOTPLastSuccessfulCheckUpdate:

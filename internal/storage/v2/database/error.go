@@ -8,7 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/errreport"
 )
 
-// ErrNoChanges is returned when an Update is called with an empty patch.
+// ErrNoChanges is returned when an Update is called with no updates.
 var ErrNoChanges = errors.New("update must contain a change")
 
 // NewError constructs a storage v2 database error.
