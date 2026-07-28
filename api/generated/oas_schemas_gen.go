@@ -2834,14 +2834,12 @@ func (s *FieldValidationFormat) UnmarshalText(data []byte) error {
 type FilterField string
 
 const (
-	FilterFieldName      FilterField = "name"
 	FilterFieldCreatedAt FilterField = "createdAt"
 )
 
 // AllValues returns all FilterField values.
 func (FilterField) AllValues() []FilterField {
 	return []FilterField{
-		FilterFieldName,
 		FilterFieldCreatedAt,
 	}
 }
@@ -2849,8 +2847,6 @@ func (FilterField) AllValues() []FilterField {
 // MarshalText implements encoding.TextMarshaler.
 func (s FilterField) MarshalText() ([]byte, error) {
 	switch s {
-	case FilterFieldName:
-		return []byte(s), nil
 	case FilterFieldCreatedAt:
 		return []byte(s), nil
 	default:
@@ -2861,9 +2857,6 @@ func (s FilterField) MarshalText() ([]byte, error) {
 // UnmarshalText implements encoding.TextUnmarshaler.
 func (s *FilterField) UnmarshalText(data []byte) error {
 	switch FilterField(data) {
-	case FilterFieldName:
-		*s = FilterFieldName
-		return nil
 	case FilterFieldCreatedAt:
 		*s = FilterFieldCreatedAt
 		return nil

@@ -12,16 +12,16 @@ import (
 // NOTE: user creation currently runs in a separate transaction from passkey registration persistence.
 type FlowCreateUserForPasskeyHandler struct {
 	userService *UserService
-	schemaRepo  domain.JSONSchemaRepository
+	schemaStore domain.JSONSchemaStore
 }
 
 func NewFlowCreateUserForPasskeyHandler(
 	userService *UserService,
-	schemaRepo domain.JSONSchemaRepository,
+	schemaStore domain.JSONSchemaStore,
 ) *FlowCreateUserForPasskeyHandler {
 	return &FlowCreateUserForPasskeyHandler{
 		userService: userService,
-		schemaRepo:  schemaRepo,
+		schemaStore: schemaStore,
 	}
 }
 
@@ -33,7 +33,7 @@ func (h *FlowCreateUserForPasskeyHandler) CreateProvisionalUser(ctx context.Cont
 			User:      state.CollectedData.UserData,
 			ID:        userID,
 		},
-		h.schemaRepo,
+		h.schemaStore,
 	)
 	err := h.userService.ApplyActions(ctx, action)
 	if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {

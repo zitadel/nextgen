@@ -16,18 +16,18 @@ type FlowCreateUserWithPasswordHandler struct {
 	passwordRepo domain.UserPasswordRepository
 	hasher       crypto.Hasher
 	userService  *UserService
-	schemaRepo   domain.JSONSchemaRepository
+	schemaStore  domain.JSONSchemaStore
 }
 
 func NewFlowCreateUserHandler(
 	passwordRepo domain.UserPasswordRepository,
 	hasher crypto.Hasher,
 	userService *UserService,
-	schemaRepo domain.JSONSchemaRepository,
+	schemaStore domain.JSONSchemaStore,
 ) *FlowCreateUserWithPasswordHandler {
 	return &FlowCreateUserWithPasswordHandler{
 		userService:  userService,
-		schemaRepo:   schemaRepo,
+		schemaStore:  schemaStore,
 		hasher:       hasher,
 		passwordRepo: passwordRepo,
 	}
@@ -42,7 +42,7 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 			ProjectID: in.ProjectID,
 			User:      in.State.CollectedData.UserData,
 		},
-		h.schemaRepo,
+		h.schemaStore,
 	)
 
 	if in.State.CollectedData.AuthMethods.Password == "" {

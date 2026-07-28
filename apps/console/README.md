@@ -63,6 +63,98 @@ same-origin API base (`/api` by default), and a server-side proxy attaches the
 `Authorization: Bearer` token before forwarding to the API. See the Vite proxy
 config and environment variables below.
 
+### Console sign-in (Console ADR 0003)
+
+Console users sign in through the embedded `<zitadel-login>` widget on
+`/login` (via `@zitadel/sdk-react`). Completing the flow exchanges the
+widget's handoff token for the `__nextgen_session` HttpOnly cookie; the
+pathless `_authed` layout guards every screen by confirming that cookie
+against `GET /sessions/me` and redirects unauthenticated visitors to
+`/login?next=…`. Sign-out lives in the sidebar user menu
+(`DELETE /sessions/me`).
+
+The cookie authenticates the console UI and the session endpoints; the
+management API still authorizes via the server-held project secret (injected
+by the proxy) until session-derived permissions land server-side — see
+[ADR 0003](docs/adrs/0003-console-authentication.md) for the model and its
+caveats (including the widget's dark-only styling for now).
+
+### Runtime discovery and the default project (Console ADR 0004)
+
+At boot the console fetches `GET /console/runtime.json` (public, served by
+the Go server; proxied in dev) to learn the deployment `mode` and which
+project to sign into. A standalone (self-host) deployment **tracks exactly
+one project, and the server never creates it**: the first project created —
+by the customer's `zitadel setup` (`POST /projects`) — becomes the default
+the console signs into and manages. `platform.project_id` /
+`NEXTGEN_PLATFORM_PROJECT_ID` pins a specific existing project instead.
+While no project exists yet, the login screen shows a "run `zitadel setup`"
+hint; refresh after setup and the console picks the new project up. Only
+`standalone` mode exists today; `platform` (cloud portal) mode is future
+work.
+
+The runtime document also carries the default project's **publishable key**
+(root ADR 036): a browser-safe, origin-scoped bearer the login widget sends
+on flow calls and the handoff exchange. Sign-in therefore needs no
+`CONSOLE_PROJECT_SECRET` — the secret remains only for the management
+(operator-plane) data calls until session-derived permissions land
+(ADR 0003 §4).
+
+## Local development
+
+The console manages an instance, so its screens are only honest against a real
+backend: `@zitadel/api-mock` has no user store, so a users list read from it is
+a fiction. **Default to the real-data loop.**
+
+### Real data (default)
+
+```sh
+moon run console:dev-real
+```
+
+One command: boots an ephemeral real instance (binary runtime + embedded
+Postgres, no Docker) via `@zitadel/testing`, bootstraps a project with the
+default schema and login flow, seeds users, then starts the dev server with the
+proxy bound to that instance. It prints the sign-in credentials
+(`dev@zitadel.local` / `Console-dev-1` by default). HMR is the normal Vite loop.
+
+Each run is a fresh database, so the seeded list is identical every time — a
+screenshot diff reflects code changes, not reshuffled fixtures — at the cost of
+signing in again after a restart. `--seed-only` boots and seeds without starting
+Vite, for pointing a separately-running console at a fresh instance. Overrides:
+`CONSOLE_DEV_EMAIL`, `CONSOLE_DEV_PASSWORD`, `CONSOLE_DEV_ZITADEL_PORT`,
+`CONSOLE_DEV_ORIGIN`. See [`scripts/dev-real.mts`](scripts/dev-real.mts).
+
+Note `listUsers` requires `user.read`, which only the **project secret** carries
+— the browser-plane publishable key is deliberately refused
+(`internal/api/user.go`). So real list screens need the proxy's
+`CONSOLE_PROJECT_SECRET`, which this script supplies; sign-in alone does not.
+
+### Mock backend
+
+```sh
+PORT=8080 moon run api-mock:start          # terminal 1
+VITE_CONSOLE_PROJECT_ID=proj_dev_mock \
+  moon run console:dev                     # terminal 2
+```
+
+Fast and offline, and the full sign-in loop works (the mock serves
+`/sessions/exchange` and `/sessions/me`), with the same split
+`identifier` → `password` flow the real server emits. Use it only for chrome that
+needs no real data: it has **no user store**, so list screens cannot be
+meaningful and nothing about authorization can be proven there. It also serves no
+`/console/runtime.json`, so runtime discovery falls back to `standalone` and the
+project id must come from `VITE_CONSOLE_PROJECT_ID`.
+
+### Embedded build
+
+```sh
+moon run workspace:server
+```
+
+Serves the built bundle under `/ui/console/` — no HMR. Use it only to verify the
+embed base path.
+
 ## Environment variables
 
 | Variable | Where | Purpose |
@@ -70,12 +162,13 @@ config and environment variables below.
 | `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.mts`) |
 | `CONSOLE_PROJECT_SECRET` | Node (dev proxy) | Bearer attached by the proxy; never shipped to the browser |
 | `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api`) |
-| `VITE_CONSOLE_PROJECT_ID` | Client | Project id sent with API requests (optional) |
+| `VITE_CONSOLE_PROJECT_ID` | Client | Dev override for the project id; when unset it is discovered from `/console/runtime.json` (Console ADR 0004) |
 
 ## Commands
 
 ```sh
-moon run console:dev
+moon run console:dev-real   # dev server + seeded real backend (preferred)
+moon run console:dev        # dev server only (bring your own backend)
 moon run console:test
 moon run console:typecheck
 ```

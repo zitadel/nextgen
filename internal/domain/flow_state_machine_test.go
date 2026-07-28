@@ -70,6 +70,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		AnyTimes()
 
 	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	schemaStore := domainmock.NewMockJSONSchemaStore(mock)
 	authAttemptService := domainmock.NewMockFlowAuthAttemptService(mock)
 	passkeyRegService := domainmock.NewMockFlowPasskeyRegistrationService(mock)
 	createUser := domainmock.NewMockFlowOnSuccessHandler(mock)
@@ -82,6 +83,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 
 	sm := domain.NewFlowStateMachine(
 		schemaResolver,
+		schemaStore,
 		resolver,
 		createUser,
 		createUserForPasskey,

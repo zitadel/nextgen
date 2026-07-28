@@ -12,12 +12,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
 	pgold "github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 	v2postgres "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
 )
 
@@ -71,7 +73,10 @@ func TestImport_loadAndSkip(t *testing.T) {
 
 	require.NoError(t, users.Import(ctx, testPool, v2Pool, hasher, pgold.Name, []string{path}))
 
-	got, err := v2Pool.Statements().GetUserByID(ctx, "proj_demo", nil, "usr_import_1", service.UserReadOptions{
+	got, err := v2Pool.Statements().GetUser(ctx, v2database.And(
+		v2database.Equal(v2database.Col(domain.UserFieldProjectID), "proj_demo"),
+		v2database.Equal(v2database.Col(domain.UserFieldID), "usr_import_1"),
+	), service.UserQueryOptions{
 		AttributeKeys: []string{"username"},
 	})
 	require.NoError(t, err)

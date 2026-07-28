@@ -243,12 +243,16 @@ export function applyBrandingTokens(
   (shadowRoot as ShadowRoot & { __zlTokenSheet?: CSSStyleSheet }).__zlTokenSheet = sheet;
 }
 
+/**
+ * Standalone branding→theme resolution for callers outside the orchestrator
+ * (SSR, tests, embedders composing atoms by hand). `<zitadel-login>` itself
+ * uses {@link ThemeController}, which layers the element's `theme` property
+ * and a variant-derived fallback on top of the same branding input.
+ *
+ * Defaults to dark: the design system's primary surface, and the mode a
+ * hosted login page renders when a tenant states no preference.
+ */
 export function resolveTheme(branding: Branding | undefined): ResolvedTheme {
-  // Default is dark — the design system only publishes a dark variable mode
-  // today. `light` and `auto` are accepted as branding inputs so existing
-  // payloads round-trip, but until a light mode lands they fall back to the
-  // dark surface. Light support is gated by a future Figma sync that fills
-  // the `[data-theme="light"]` block in tokens.css.
   const mode = branding?.theme?.mode ?? "dark";
   if (mode === "light") return "light";
   if (mode === "dark") return "dark";

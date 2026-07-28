@@ -251,11 +251,20 @@ async function expectVirtualCredentialCount(
 
 async function logout(page: Page): Promise<void> {
   const logout = logoutLocator(page);
-  if (!(await logout.first().isVisible({ timeout: 1000 }).catch(() => false))) {
-    await page.getByRole("button", { name: /open user menu/i }).click();
+  const userMenu = page.getByRole("button", { name: /open user menu/i });
+
+  // `<zitadel-session>` exposes Sign out directly; `<zitadel-logout>` hides it
+  // behind an avatar menu. Wait for either surface, and only open the menu when
+  // the direct logout control is not already visible.
+  await Promise.race([
+    logout.waitFor({ state: "visible", timeout: 30_000 }),
+    userMenu.waitFor({ state: "visible", timeout: 30_000 }),
+  ]);
+  if (!(await logout.isVisible().catch(() => false))) {
+    await userMenu.click();
+    await logout.waitFor({ state: "visible", timeout: 5_000 });
   }
-  await expect(logout.first()).toBeVisible({ timeout: 5000 });
-  await logout.first().click();
+  await logout.click();
   const loggedOutUrl = expectsProtectedRouteRedirect
     ? loginUrl
     : /\/(?:login)?(?:[/?#]|$)/;

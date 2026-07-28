@@ -16,7 +16,7 @@ export {
   buildBrandingStylesheet,
   resolveTheme,
 } from "./branding-to-tokens.js";
-export { ThemeController, type ResolvedTheme } from "./theme-controller.js";
+export { ThemeController, type ResolvedTheme, type ThemeMode } from "./theme-controller.js";
 export { applyFontUrl } from "./font-loader.js";
 // `createLiquidEngine` is intentionally NOT re-exported: it returns LiquidJS'
 // `Liquid` type, whose declarations reference Node ambient types (`NodeJS`),

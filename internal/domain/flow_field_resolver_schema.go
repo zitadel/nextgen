@@ -6,8 +6,6 @@ import (
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/ianlancetaylor/jsonschema/types"
-
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_field_resolver.schema.mock.go . SchemaResolver
@@ -17,7 +15,7 @@ import (
 // access; [SchemaFieldResolver] is the translator that runs on top of
 // the loaded schema.
 type SchemaResolver interface {
-	Resolve(ctx context.Context, client database.QueryExecutor, projectID, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error)
+	Resolve(ctx context.Context, store JSONSchemaStore, projectID, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error)
 }
 
 // SchemaFieldResolver is the production [FlowFieldResolver]. It is a

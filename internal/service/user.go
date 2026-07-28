@@ -23,7 +23,7 @@ type CreateUserInput struct {
 
 type UserAction interface {
 	Prepare(ctx context.Context, db database.QueryExecutor) error
-	Apply(ctx context.Context, tx Statementer[AllStatements]) error
+	Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error
 }
 
 type SetPasswordInput struct {
@@ -58,23 +58,23 @@ type GetMyUserInput struct {
 type UserService struct {
 	pool         database.Pool
 	v2Pool       StatementPool
+	schemaStore  domain.JSONSchemaStore
 	passwordRepo domain.UserPasswordRepository
-	schemaRepo   domain.JSONSchemaRepository
 	hasher       crypto.Hasher
 }
 
 func NewUserService(
 	pool database.Pool,
 	v2Pool StatementPool,
+	schemaStore domain.JSONSchemaStore,
 	passwordRepo domain.UserPasswordRepository,
-	schemaRepo domain.JSONSchemaRepository,
 	hasher crypto.Hasher,
 ) *UserService {
 	return &UserService{
 		pool:         pool,
 		v2Pool:       v2Pool,
+		schemaStore:  schemaStore,
 		passwordRepo: passwordRepo,
-		schemaRepo:   schemaRepo,
 		hasher:       hasher,
 	}
 }
@@ -88,16 +88,19 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		qtx, ok := tx.(StatementerWithQueryExecutor[AllStatements])
+		if !ok {
+			return domain.ErrInternal(nil).WithMessage("transaction does not support query execution")
+		}
 		for _, action := range actions {
-			if err := action.Apply(ctx, tx); err != nil {
+			if err := action.Apply(ctx, qtx); err != nil {
 				return err
 			}
 		}
 		return nil
 	})
 	if err != nil {
-		var de domain.Error
-		if errors.As(err, &de) {
+		if de, ok := errors.AsType[domain.Error](err); ok {
 			return de
 		}
 		return domain.ErrInternal(err).WithMessage("failed to commit transaction")
@@ -106,18 +109,15 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 }
 
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
-	action := NewCreateUserAction(input, s.schemaRepo)
+	action := NewCreateUserAction(input, s.schemaStore)
 	err = action.Prepare(ctx, s.pool)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		return action.Apply(ctx, tx)
-	})
+	err = applyCreateUser(ctx, s.v2Pool.Statements(), action.CreateUser)
 	if err != nil {
-		var de domain.Error
-		if errors.As(err, &de) {
+		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create user")
@@ -130,10 +130,14 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 // shape CreateUser returns and GET /users/{id} serves), ordered by
 // creation time so pagination windows are stable.
 func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]map[string]any, error) {
+	limit := input.Limit
+	if input.Offset > 0 {
+		limit = input.Offset + input.Limit
+	}
 	result, err := s.v2Pool.Statements().ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
 		Filter: v2database.Equal(v2database.Col(domain.UserFieldProjectID), input.ProjectID),
 		Pagination: v2database.Page[domain.UserField]{
-			Limit: input.Limit,
+			Limit: limit,
 			OrderBy: v2database.OrderBy[domain.UserField]{
 				Columns: []v2database.Column[domain.UserField]{
 					v2database.Col(domain.UserFieldCreatedAt),
@@ -142,13 +146,22 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]ma
 				Direction: v2database.OrderAsc,
 			},
 		},
-	}, input.Offset, UserReadOptions{})
+	}, UserQueryOptions{})
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to list users from database")
 	}
 
-	users := make([]map[string]any, 0, len(result.Items))
-	for _, flatUser := range result.Items {
+	items := result.Items
+	if input.Offset > 0 {
+		if int(input.Offset) >= len(items) {
+			items = nil
+		} else {
+			items = items[input.Offset:]
+		}
+	}
+
+	users := make([]map[string]any, 0, len(items))
+	for _, flatUser := range items {
 		user, err := domain.BuildAttributeTree(flatUser.Attributes)
 		if err != nil {
 			return nil, domain.ErrInternal(err).WithMessage("failed to parse user attributes")
@@ -160,7 +173,10 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]ma
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {
-	flatUser, err := s.v2Pool.Statements().GetUserByID(ctx, input.ProjectID, input.TeamID, input.UserID, UserReadOptions{})
+	flatUser, err := s.v2Pool.Statements().GetUser(ctx, v2database.And(
+		v2database.Equal(v2database.Col(domain.UserFieldProjectID), input.ProjectID),
+		v2database.Equal(v2database.Col(domain.UserFieldID), input.UserID),
+	), UserQueryOptions{MembershipTeamID: input.TeamID})
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()
@@ -191,7 +207,10 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 		return nil, domain.ErrSessionTokenInvalid()
 	}
 
-	user, err := s.v2Pool.Statements().GetUserByID(ctx, sessionToken.ProjectID, nil, sessionToken.UserID, UserReadOptions{})
+	user, err := s.v2Pool.Statements().GetUser(ctx, v2database.And(
+		v2database.Equal(v2database.Col(domain.UserFieldProjectID), sessionToken.ProjectID),
+		v2database.Equal(v2database.Col(domain.UserFieldID), sessionToken.UserID),
+	), UserQueryOptions{})
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()
@@ -212,15 +231,15 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 type CreateUserAction struct {
 	CreateUserInput
 
-	schemaRepo domain.JSONSchemaRepository
+	schemaStore domain.JSONSchemaStore
 
 	CreateUser *domain.CreateUser
 }
 
-func NewCreateUserAction(input CreateUserInput, schemaRepo domain.JSONSchemaRepository) *CreateUserAction {
+func NewCreateUserAction(input CreateUserInput, schemaStore domain.JSONSchemaStore) *CreateUserAction {
 	return &CreateUserAction{
 		CreateUserInput: input,
-		schemaRepo:      schemaRepo,
+		schemaStore:     schemaStore,
 	}
 }
 
@@ -230,7 +249,7 @@ func (o *CreateUserAction) Prepare(ctx context.Context, db database.QueryExecuto
 		return err
 	}
 
-	schemaEntity, err := o.schemaRepo.GetByID(ctx, db, o.ProjectID, schemaURL)
+	schemaEntity, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, schemaURL)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return domain.ErrUserInvalid().WithDetails("$schema is not known to the system. First create a schema, then create users.")
@@ -247,15 +266,18 @@ func (o *CreateUserAction) Prepare(ctx context.Context, db database.QueryExecuto
 	return nil
 }
 
-func (o *CreateUserAction) Apply(ctx context.Context, tx Statementer[AllStatements]) error {
-	err := tx.Statements().CreateUser(ctx, o.CreateUser)
+func (o *CreateUserAction) Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error {
+	return applyCreateUser(ctx, tx.Statements(), o.CreateUser)
+}
+
+func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.CreateUser) error {
+	err := stmts.CreateUser(ctx, user)
 	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
 			return domain.ErrUserAlreadyExists().WithParent(err)
 		}
 		return domain.ErrInternal(err).WithMessage("failed to create user in the database")
 	}
-
 	return nil
 }
 
@@ -283,12 +305,8 @@ func (o *SetPasswordUserAction) Prepare(_ context.Context, _ database.QueryExecu
 	return err
 }
 
-func (o *SetPasswordUserAction) Apply(ctx context.Context, tx Statementer[AllStatements]) error {
-	db, ok := tx.(database.QueryExecutor)
-	if !ok {
-		return domain.ErrInternal(nil).WithMessage("transaction does not support password repository writes")
-	}
-	err := o.passwordRepo.Set(ctx, db, &domain.SetUserPassword{
+func (o *SetPasswordUserAction) Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error {
+	err := o.passwordRepo.Set(ctx, tx, &domain.SetUserPassword{
 		ProjectID:      o.ProjectID,
 		UserID:         o.UserID,
 		EncodedHash:    o.hash,
@@ -333,12 +351,8 @@ func (o *LazyUserAction) Prepare(ctx context.Context, db database.QueryExecutor)
 	return action.Prepare(ctx, db)
 }
 
-func (o *LazyUserAction) Apply(ctx context.Context, tx Statementer[AllStatements]) error {
-	db, ok := tx.(database.QueryExecutor)
-	if !ok {
-		return domain.ErrInternal(nil).WithMessage("transaction does not support lazy user action")
-	}
-	action, err := o.Action(ctx, db)
+func (o *LazyUserAction) Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error {
+	action, err := o.Action(ctx, tx)
 	if err != nil {
 		return err
 	}
@@ -362,7 +376,10 @@ type UserStatementsLookup struct {
 }
 
 func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error) {
-	return l.Pool.Statements().GetUserByAttributes(ctx, projectID, attrs, UserReadOptions{})
+	return l.Pool.Statements().GetUser(ctx,
+		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
+		UserQueryOptions{Attributes: attrs},
+	)
 }
 
 // UserStatementsIdentityReader adapts [UserStatements] to [UserIdentityReader].
@@ -371,7 +388,8 @@ type UserStatementsIdentityReader struct {
 }
 
 func (r UserStatementsIdentityReader) GetIdentity(ctx context.Context, projectID, userID string, attributeKeys ...string) (*domain.User, error) {
-	return r.Pool.Statements().GetUserByID(ctx, projectID, nil, userID, UserReadOptions{
-		AttributeKeys: attributeKeys,
-	})
+	return r.Pool.Statements().GetUser(ctx, v2database.And(
+		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
+		v2database.Equal(v2database.Col(domain.UserFieldID), userID),
+	), UserQueryOptions{AttributeKeys: attributeKeys})
 }

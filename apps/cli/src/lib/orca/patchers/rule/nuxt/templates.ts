@@ -38,6 +38,9 @@ await navigateTo("/login", { replace: true });
 /** A login/register page rendering `<zitadel-login>` inside `<ClientOnly>`. */
 function authPage(purpose: "login" | "register"): string {
   const purposeAttr = purpose === "register" ? '\n        purpose="register"' : "";
+  // variant="page" makes the widget paint the full-page chrome itself
+  // (viewport height, surface background) from design tokens; the <main>
+  // wrapper only pins the color scheme.
   return `<script setup lang="ts">
 ${MANAGED_MARKER}
 import { useZitadelProject } from "@zitadel/sdk-nuxt";
@@ -46,9 +49,10 @@ const project = useZitadelProject();
 </script>
 
 <template>
-  <main style="${MAIN_STYLE}">
+  <main style="color-scheme: dark">
     <ClientOnly>
       <zitadel-login
+        variant="page"
         :project="project"${purposeAttr}
         post-sign-in-url="/profile"
       />

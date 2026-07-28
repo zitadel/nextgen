@@ -38,7 +38,10 @@ describe("NuxtPatcher.plan", () => {
     const plan = new NuxtPatcher().plan(ctx("app"));
     expect(writeContents(plan, "app/app.vue")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "app/pages/login.vue")).toContain(MANAGED_MARKER);
-    expect(writeContents(plan, "app/pages/login.vue")).toContain("background: #0f0f11");
+    // Page chrome comes from the widget itself now — the wrapper only pins
+    // the color scheme, and no token hex is duplicated into generated code.
+    expect(writeContents(plan, "app/pages/login.vue")).toContain('variant="page"');
+    expect(writeContents(plan, "app/pages/login.vue")).not.toContain("background: #0f0f11");
     expect(writeContents(plan, "app/pages/login.vue")).toContain("color-scheme: dark");
     expect(writeContents(plan, "app/pages/login.vue")).not.toContain("background: #f3f4f6");
     expect(writeContents(plan, "app/pages/login.vue")).not.toContain("align-items: center");

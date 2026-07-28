@@ -18,7 +18,15 @@ type statements struct {
 	projectStatements
 	flowDefinitionStatements
 	cryptoKeyStatements
+	jsonSchemaStatements
+	teamStatements
+	teamMembershipStatements
+	tokenStatements
+	passkeyRegistrationStatements
+	sessionStatements
+	authAttemptStatements
 	userStatements
+	userTOTPStatements
 	userRecoveryCodesStatements
 }
 
@@ -31,15 +39,24 @@ func (s statements) IsStatements() {}
 
 func newStatements(client queryExecutor) statements {
 	return statements{
-		projectStatements:           newProjectStatements(client),
-		flowDefinitionStatements:    newFlowDefinitionStatements(client),
-		cryptoKeyStatements:         newCryptoKeyStatements(client),
-		userStatements:              newUserStatements(client),
-		userRecoveryCodesStatements: newUserRecoveryCodesStatements(client),
+		projectStatements:             newProjectStatements(client),
+		flowDefinitionStatements:      newFlowDefinitionStatements(client),
+		cryptoKeyStatements:           newCryptoKeyStatements(client),
+		jsonSchemaStatements:          newJSONSchemaStatements(client),
+		teamStatements:                newTeamStatements(client),
+		teamMembershipStatements:      newTeamMembershipStatements(client),
+		tokenStatements:               newTokenStatements(client),
+		passkeyRegistrationStatements: newPasskeyRegistrationStatements(client),
+		sessionStatements:             newSessionStatements(client),
+		authAttemptStatements:         newAuthAttemptStatements(client),
+		userStatements:                newUserStatements(client),
+		userTOTPStatements:            newUserTOTPStatements(client),
+		userRecoveryCodesStatements:   newUserRecoveryCodesStatements(client),
 	}
 }
 
 var _ service.Statements = (*statements)(nil)
+var _ service.AllStatements = (*statements)(nil)
 
 type statement struct {
 	client queryExecutor
