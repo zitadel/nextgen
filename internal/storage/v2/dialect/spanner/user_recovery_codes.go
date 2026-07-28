@@ -48,12 +48,8 @@ func (s userRecoveryCodesStatements) GetUserRecoveryCodes(ctx context.Context, f
 	if filter == nil {
 		return nil, fmt.Errorf("UserRecoveryCodes filter is required")
 	}
-	return s.getUserRecoveryCodes(ctx, &database.ListOptions[domain.UserRecoveryCodesField]{Filter: filter})
-}
-
-func (s userRecoveryCodesStatements) getUserRecoveryCodes(ctx context.Context, filter *database.ListOptions[domain.UserRecoveryCodesField]) (*domain.UserRecoveryCodes, error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, userRecoveryCodesQuery, filter, userRecoveryCodesSchema); err != nil {
+	if err := compileRead(&compiler, userRecoveryCodesQuery, &database.ListOptions[domain.UserRecoveryCodesField]{Filter: filter}, userRecoveryCodesSchema); err != nil {
 		return nil, err
 	}
 
