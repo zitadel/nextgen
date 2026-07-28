@@ -1116,40 +1116,40 @@ func (c *MockAllStatementsDeleteUserByIDCall) DoAndReturn(f func(context.Context
 	return c
 }
 
-// DeleteUserTOTPByUserID mocks base method.
-func (m *MockAllStatements) DeleteUserTOTPByUserID(ctx context.Context, projectID, userID string) error {
+// DeleteUserTOTP mocks base method.
+func (m *MockAllStatements) DeleteUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField]) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteUserTOTPByUserID", ctx, projectID, userID)
+	ret := m.ctrl.Call(m, "DeleteUserTOTP", ctx, filter)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// DeleteUserTOTPByUserID indicates an expected call of DeleteUserTOTPByUserID.
-func (mr *MockAllStatementsMockRecorder) DeleteUserTOTPByUserID(ctx, projectID, userID any) *MockAllStatementsDeleteUserTOTPByUserIDCall {
+// DeleteUserTOTP indicates an expected call of DeleteUserTOTP.
+func (mr *MockAllStatementsMockRecorder) DeleteUserTOTP(ctx, filter any) *MockAllStatementsDeleteUserTOTPCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserTOTPByUserID", reflect.TypeOf((*MockAllStatements)(nil).DeleteUserTOTPByUserID), ctx, projectID, userID)
-	return &MockAllStatementsDeleteUserTOTPByUserIDCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserTOTP", reflect.TypeOf((*MockAllStatements)(nil).DeleteUserTOTP), ctx, filter)
+	return &MockAllStatementsDeleteUserTOTPCall{Call: call}
 }
 
-// MockAllStatementsDeleteUserTOTPByUserIDCall wrap *gomock.Call
-type MockAllStatementsDeleteUserTOTPByUserIDCall struct {
+// MockAllStatementsDeleteUserTOTPCall wrap *gomock.Call
+type MockAllStatementsDeleteUserTOTPCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsDeleteUserTOTPByUserIDCall) Return(arg0 error) *MockAllStatementsDeleteUserTOTPByUserIDCall {
+func (c *MockAllStatementsDeleteUserTOTPCall) Return(arg0 error) *MockAllStatementsDeleteUserTOTPCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeleteUserTOTPByUserIDCall) Do(f func(context.Context, string, string) error) *MockAllStatementsDeleteUserTOTPByUserIDCall {
+func (c *MockAllStatementsDeleteUserTOTPCall) Do(f func(context.Context, database.Filter[domain.UserTOTPField]) error) *MockAllStatementsDeleteUserTOTPCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeleteUserTOTPByUserIDCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsDeleteUserTOTPByUserIDCall {
+func (c *MockAllStatementsDeleteUserTOTPCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserTOTPField]) error) *MockAllStatementsDeleteUserTOTPCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1661,41 +1661,41 @@ func (c *MockAllStatementsGetUserCall) DoAndReturn(f func(context.Context, datab
 	return c
 }
 
-// GetUserTOTPByUserID mocks base method.
-func (m *MockAllStatements) GetUserTOTPByUserID(ctx context.Context, projectID, userID string) (*domain.UserTOTP, error) {
+// GetUserTOTP mocks base method.
+func (m *MockAllStatements) GetUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField]) (*domain.UserTOTP, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUserTOTPByUserID", ctx, projectID, userID)
+	ret := m.ctrl.Call(m, "GetUserTOTP", ctx, filter)
 	ret0, _ := ret[0].(*domain.UserTOTP)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetUserTOTPByUserID indicates an expected call of GetUserTOTPByUserID.
-func (mr *MockAllStatementsMockRecorder) GetUserTOTPByUserID(ctx, projectID, userID any) *MockAllStatementsGetUserTOTPByUserIDCall {
+// GetUserTOTP indicates an expected call of GetUserTOTP.
+func (mr *MockAllStatementsMockRecorder) GetUserTOTP(ctx, filter any) *MockAllStatementsGetUserTOTPCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserTOTPByUserID", reflect.TypeOf((*MockAllStatements)(nil).GetUserTOTPByUserID), ctx, projectID, userID)
-	return &MockAllStatementsGetUserTOTPByUserIDCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserTOTP", reflect.TypeOf((*MockAllStatements)(nil).GetUserTOTP), ctx, filter)
+	return &MockAllStatementsGetUserTOTPCall{Call: call}
 }
 
-// MockAllStatementsGetUserTOTPByUserIDCall wrap *gomock.Call
-type MockAllStatementsGetUserTOTPByUserIDCall struct {
+// MockAllStatementsGetUserTOTPCall wrap *gomock.Call
+type MockAllStatementsGetUserTOTPCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsGetUserTOTPByUserIDCall) Return(arg0 *domain.UserTOTP, arg1 error) *MockAllStatementsGetUserTOTPByUserIDCall {
+func (c *MockAllStatementsGetUserTOTPCall) Return(arg0 *domain.UserTOTP, arg1 error) *MockAllStatementsGetUserTOTPCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsGetUserTOTPByUserIDCall) Do(f func(context.Context, string, string) (*domain.UserTOTP, error)) *MockAllStatementsGetUserTOTPByUserIDCall {
+func (c *MockAllStatementsGetUserTOTPCall) Do(f func(context.Context, database.Filter[domain.UserTOTPField]) (*domain.UserTOTP, error)) *MockAllStatementsGetUserTOTPCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsGetUserTOTPByUserIDCall) DoAndReturn(f func(context.Context, string, string) (*domain.UserTOTP, error)) *MockAllStatementsGetUserTOTPByUserIDCall {
+func (c *MockAllStatementsGetUserTOTPCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserTOTPField]) (*domain.UserTOTP, error)) *MockAllStatementsGetUserTOTPCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -2008,6 +2008,45 @@ func (c *MockAllStatementsListTokensCall) DoAndReturn(f func(context.Context, *d
 	return c
 }
 
+// ListUserTOTPs mocks base method.
+func (m *MockAllStatements) ListUserTOTPs(ctx context.Context, filter *database.ListOptions[domain.UserTOTPField]) (*database.ListResult[*domain.UserTOTP], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListUserTOTPs", ctx, filter)
+	ret0, _ := ret[0].(*database.ListResult[*domain.UserTOTP])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListUserTOTPs indicates an expected call of ListUserTOTPs.
+func (mr *MockAllStatementsMockRecorder) ListUserTOTPs(ctx, filter any) *MockAllStatementsListUserTOTPsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUserTOTPs", reflect.TypeOf((*MockAllStatements)(nil).ListUserTOTPs), ctx, filter)
+	return &MockAllStatementsListUserTOTPsCall{Call: call}
+}
+
+// MockAllStatementsListUserTOTPsCall wrap *gomock.Call
+type MockAllStatementsListUserTOTPsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListUserTOTPsCall) Return(arg0 *database.ListResult[*domain.UserTOTP], arg1 error) *MockAllStatementsListUserTOTPsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListUserTOTPsCall) Do(f func(context.Context, *database.ListOptions[domain.UserTOTPField]) (*database.ListResult[*domain.UserTOTP], error)) *MockAllStatementsListUserTOTPsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListUserTOTPsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.UserTOTPField]) (*database.ListResult[*domain.UserTOTP], error)) *MockAllStatementsListUserTOTPsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListUsers mocks base method.
 func (m *MockAllStatements) ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
 	m.ctrl.T.Helper()
@@ -2200,9 +2239,9 @@ func (c *MockAllStatementsUpdateTeamMembershipStatusCall) DoAndReturn(f func(con
 }
 
 // UpdateUserTOTP mocks base method.
-func (m *MockAllStatements) UpdateUserTOTP(ctx context.Context, projectID, userID string, updates ...domain.UserTOTPUpdate) error {
+func (m *MockAllStatements) UpdateUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField], updates ...domain.UserTOTPUpdate) error {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, userID}
+	varargs := []any{ctx, filter}
 	for _, a := range updates {
 		varargs = append(varargs, a)
 	}
@@ -2212,9 +2251,9 @@ func (m *MockAllStatements) UpdateUserTOTP(ctx context.Context, projectID, userI
 }
 
 // UpdateUserTOTP indicates an expected call of UpdateUserTOTP.
-func (mr *MockAllStatementsMockRecorder) UpdateUserTOTP(ctx, projectID, userID any, updates ...any) *MockAllStatementsUpdateUserTOTPCall {
+func (mr *MockAllStatementsMockRecorder) UpdateUserTOTP(ctx, filter any, updates ...any) *MockAllStatementsUpdateUserTOTPCall {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, userID}, updates...)
+	varargs := append([]any{ctx, filter}, updates...)
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateUserTOTP", reflect.TypeOf((*MockAllStatements)(nil).UpdateUserTOTP), varargs...)
 	return &MockAllStatementsUpdateUserTOTPCall{Call: call}
 }
@@ -2231,13 +2270,13 @@ func (c *MockAllStatementsUpdateUserTOTPCall) Return(arg0 error) *MockAllStateme
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsUpdateUserTOTPCall) Do(f func(context.Context, string, string, ...domain.UserTOTPUpdate) error) *MockAllStatementsUpdateUserTOTPCall {
+func (c *MockAllStatementsUpdateUserTOTPCall) Do(f func(context.Context, database.Filter[domain.UserTOTPField], ...domain.UserTOTPUpdate) error) *MockAllStatementsUpdateUserTOTPCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsUpdateUserTOTPCall) DoAndReturn(f func(context.Context, string, string, ...domain.UserTOTPUpdate) error) *MockAllStatementsUpdateUserTOTPCall {
+func (c *MockAllStatementsUpdateUserTOTPCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserTOTPField], ...domain.UserTOTPUpdate) error) *MockAllStatementsUpdateUserTOTPCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -4808,79 +4847,79 @@ func (c *MockUserTOTPStatementsCreateUserTOTPCall) DoAndReturn(f func(context.Co
 	return c
 }
 
-// DeleteUserTOTPByUserID mocks base method.
-func (m *MockUserTOTPStatements) DeleteUserTOTPByUserID(ctx context.Context, projectID, userID string) error {
+// DeleteUserTOTP mocks base method.
+func (m *MockUserTOTPStatements) DeleteUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField]) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteUserTOTPByUserID", ctx, projectID, userID)
+	ret := m.ctrl.Call(m, "DeleteUserTOTP", ctx, filter)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// DeleteUserTOTPByUserID indicates an expected call of DeleteUserTOTPByUserID.
-func (mr *MockUserTOTPStatementsMockRecorder) DeleteUserTOTPByUserID(ctx, projectID, userID any) *MockUserTOTPStatementsDeleteUserTOTPByUserIDCall {
+// DeleteUserTOTP indicates an expected call of DeleteUserTOTP.
+func (mr *MockUserTOTPStatementsMockRecorder) DeleteUserTOTP(ctx, filter any) *MockUserTOTPStatementsDeleteUserTOTPCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserTOTPByUserID", reflect.TypeOf((*MockUserTOTPStatements)(nil).DeleteUserTOTPByUserID), ctx, projectID, userID)
-	return &MockUserTOTPStatementsDeleteUserTOTPByUserIDCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserTOTP", reflect.TypeOf((*MockUserTOTPStatements)(nil).DeleteUserTOTP), ctx, filter)
+	return &MockUserTOTPStatementsDeleteUserTOTPCall{Call: call}
 }
 
-// MockUserTOTPStatementsDeleteUserTOTPByUserIDCall wrap *gomock.Call
-type MockUserTOTPStatementsDeleteUserTOTPByUserIDCall struct {
+// MockUserTOTPStatementsDeleteUserTOTPCall wrap *gomock.Call
+type MockUserTOTPStatementsDeleteUserTOTPCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockUserTOTPStatementsDeleteUserTOTPByUserIDCall) Return(arg0 error) *MockUserTOTPStatementsDeleteUserTOTPByUserIDCall {
+func (c *MockUserTOTPStatementsDeleteUserTOTPCall) Return(arg0 error) *MockUserTOTPStatementsDeleteUserTOTPCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserTOTPStatementsDeleteUserTOTPByUserIDCall) Do(f func(context.Context, string, string) error) *MockUserTOTPStatementsDeleteUserTOTPByUserIDCall {
+func (c *MockUserTOTPStatementsDeleteUserTOTPCall) Do(f func(context.Context, database.Filter[domain.UserTOTPField]) error) *MockUserTOTPStatementsDeleteUserTOTPCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserTOTPStatementsDeleteUserTOTPByUserIDCall) DoAndReturn(f func(context.Context, string, string) error) *MockUserTOTPStatementsDeleteUserTOTPByUserIDCall {
+func (c *MockUserTOTPStatementsDeleteUserTOTPCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserTOTPField]) error) *MockUserTOTPStatementsDeleteUserTOTPCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
-// GetUserTOTPByUserID mocks base method.
-func (m *MockUserTOTPStatements) GetUserTOTPByUserID(ctx context.Context, projectID, userID string) (*domain.UserTOTP, error) {
+// GetUserTOTP mocks base method.
+func (m *MockUserTOTPStatements) GetUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField]) (*domain.UserTOTP, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUserTOTPByUserID", ctx, projectID, userID)
+	ret := m.ctrl.Call(m, "GetUserTOTP", ctx, filter)
 	ret0, _ := ret[0].(*domain.UserTOTP)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetUserTOTPByUserID indicates an expected call of GetUserTOTPByUserID.
-func (mr *MockUserTOTPStatementsMockRecorder) GetUserTOTPByUserID(ctx, projectID, userID any) *MockUserTOTPStatementsGetUserTOTPByUserIDCall {
+// GetUserTOTP indicates an expected call of GetUserTOTP.
+func (mr *MockUserTOTPStatementsMockRecorder) GetUserTOTP(ctx, filter any) *MockUserTOTPStatementsGetUserTOTPCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserTOTPByUserID", reflect.TypeOf((*MockUserTOTPStatements)(nil).GetUserTOTPByUserID), ctx, projectID, userID)
-	return &MockUserTOTPStatementsGetUserTOTPByUserIDCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserTOTP", reflect.TypeOf((*MockUserTOTPStatements)(nil).GetUserTOTP), ctx, filter)
+	return &MockUserTOTPStatementsGetUserTOTPCall{Call: call}
 }
 
-// MockUserTOTPStatementsGetUserTOTPByUserIDCall wrap *gomock.Call
-type MockUserTOTPStatementsGetUserTOTPByUserIDCall struct {
+// MockUserTOTPStatementsGetUserTOTPCall wrap *gomock.Call
+type MockUserTOTPStatementsGetUserTOTPCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockUserTOTPStatementsGetUserTOTPByUserIDCall) Return(arg0 *domain.UserTOTP, arg1 error) *MockUserTOTPStatementsGetUserTOTPByUserIDCall {
+func (c *MockUserTOTPStatementsGetUserTOTPCall) Return(arg0 *domain.UserTOTP, arg1 error) *MockUserTOTPStatementsGetUserTOTPCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserTOTPStatementsGetUserTOTPByUserIDCall) Do(f func(context.Context, string, string) (*domain.UserTOTP, error)) *MockUserTOTPStatementsGetUserTOTPByUserIDCall {
+func (c *MockUserTOTPStatementsGetUserTOTPCall) Do(f func(context.Context, database.Filter[domain.UserTOTPField]) (*domain.UserTOTP, error)) *MockUserTOTPStatementsGetUserTOTPCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserTOTPStatementsGetUserTOTPByUserIDCall) DoAndReturn(f func(context.Context, string, string) (*domain.UserTOTP, error)) *MockUserTOTPStatementsGetUserTOTPByUserIDCall {
+func (c *MockUserTOTPStatementsGetUserTOTPCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserTOTPField]) (*domain.UserTOTP, error)) *MockUserTOTPStatementsGetUserTOTPCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -4921,10 +4960,49 @@ func (c *MockUserTOTPStatementsIsStatementsCall) DoAndReturn(f func()) *MockUser
 	return c
 }
 
-// UpdateUserTOTP mocks base method.
-func (m *MockUserTOTPStatements) UpdateUserTOTP(ctx context.Context, projectID, userID string, updates ...domain.UserTOTPUpdate) error {
+// ListUserTOTPs mocks base method.
+func (m *MockUserTOTPStatements) ListUserTOTPs(ctx context.Context, filter *database.ListOptions[domain.UserTOTPField]) (*database.ListResult[*domain.UserTOTP], error) {
 	m.ctrl.T.Helper()
-	varargs := []any{ctx, projectID, userID}
+	ret := m.ctrl.Call(m, "ListUserTOTPs", ctx, filter)
+	ret0, _ := ret[0].(*database.ListResult[*domain.UserTOTP])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListUserTOTPs indicates an expected call of ListUserTOTPs.
+func (mr *MockUserTOTPStatementsMockRecorder) ListUserTOTPs(ctx, filter any) *MockUserTOTPStatementsListUserTOTPsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUserTOTPs", reflect.TypeOf((*MockUserTOTPStatements)(nil).ListUserTOTPs), ctx, filter)
+	return &MockUserTOTPStatementsListUserTOTPsCall{Call: call}
+}
+
+// MockUserTOTPStatementsListUserTOTPsCall wrap *gomock.Call
+type MockUserTOTPStatementsListUserTOTPsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserTOTPStatementsListUserTOTPsCall) Return(arg0 *database.ListResult[*domain.UserTOTP], arg1 error) *MockUserTOTPStatementsListUserTOTPsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserTOTPStatementsListUserTOTPsCall) Do(f func(context.Context, *database.ListOptions[domain.UserTOTPField]) (*database.ListResult[*domain.UserTOTP], error)) *MockUserTOTPStatementsListUserTOTPsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserTOTPStatementsListUserTOTPsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.UserTOTPField]) (*database.ListResult[*domain.UserTOTP], error)) *MockUserTOTPStatementsListUserTOTPsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// UpdateUserTOTP mocks base method.
+func (m *MockUserTOTPStatements) UpdateUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField], updates ...domain.UserTOTPUpdate) error {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, filter}
 	for _, a := range updates {
 		varargs = append(varargs, a)
 	}
@@ -4934,9 +5012,9 @@ func (m *MockUserTOTPStatements) UpdateUserTOTP(ctx context.Context, projectID, 
 }
 
 // UpdateUserTOTP indicates an expected call of UpdateUserTOTP.
-func (mr *MockUserTOTPStatementsMockRecorder) UpdateUserTOTP(ctx, projectID, userID any, updates ...any) *MockUserTOTPStatementsUpdateUserTOTPCall {
+func (mr *MockUserTOTPStatementsMockRecorder) UpdateUserTOTP(ctx, filter any, updates ...any) *MockUserTOTPStatementsUpdateUserTOTPCall {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{ctx, projectID, userID}, updates...)
+	varargs := append([]any{ctx, filter}, updates...)
 	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateUserTOTP", reflect.TypeOf((*MockUserTOTPStatements)(nil).UpdateUserTOTP), varargs...)
 	return &MockUserTOTPStatementsUpdateUserTOTPCall{Call: call}
 }
@@ -4953,13 +5031,13 @@ func (c *MockUserTOTPStatementsUpdateUserTOTPCall) Return(arg0 error) *MockUserT
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockUserTOTPStatementsUpdateUserTOTPCall) Do(f func(context.Context, string, string, ...domain.UserTOTPUpdate) error) *MockUserTOTPStatementsUpdateUserTOTPCall {
+func (c *MockUserTOTPStatementsUpdateUserTOTPCall) Do(f func(context.Context, database.Filter[domain.UserTOTPField], ...domain.UserTOTPUpdate) error) *MockUserTOTPStatementsUpdateUserTOTPCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockUserTOTPStatementsUpdateUserTOTPCall) DoAndReturn(f func(context.Context, string, string, ...domain.UserTOTPUpdate) error) *MockUserTOTPStatementsUpdateUserTOTPCall {
+func (c *MockUserTOTPStatementsUpdateUserTOTPCall) DoAndReturn(f func(context.Context, database.Filter[domain.UserTOTPField], ...domain.UserTOTPUpdate) error) *MockUserTOTPStatementsUpdateUserTOTPCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -216,7 +216,8 @@ type UserStatements interface {
 type UserTOTPStatements interface {
 	Statements
 	CreateUserTOTP(ctx context.Context, totp *domain.CreateUserTOTP) error
-	GetUserTOTPByUserID(ctx context.Context, projectID, userID string) (*domain.UserTOTP, error)
-	UpdateUserTOTP(ctx context.Context, projectID, userID string, updates ...domain.UserTOTPUpdate) error
-	DeleteUserTOTPByUserID(ctx context.Context, projectID, userID string) error
+	GetUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField]) (*domain.UserTOTP, error)
+	ListUserTOTPs(ctx context.Context, filter *database.ListOptions[domain.UserTOTPField]) (*database.ListResult[*domain.UserTOTP], error)
+	UpdateUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField], updates ...domain.UserTOTPUpdate) error
+	DeleteUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField]) error
 }
