@@ -14,19 +14,17 @@ import (
 )
 
 const (
-	updateUserPasswordStmt = `UPDATE user_passwords SET
-	encoded_hash = @p3,
-	change_required = @p4,
-	verification_id = @p5,
+	setUserPasswordStmt = `INSERT INTO user_passwords (
+	project_id, user_id, encoded_hash, change_required, verification_id
+) VALUES (@p1, @p2, @p3, @p4, @p5)
+ON CONFLICT (project_id, user_id) DO UPDATE SET
+	encoded_hash = EXCLUDED.encoded_hash,
+	change_required = EXCLUDED.change_required,
+	verification_id = EXCLUDED.verification_id,
 	changed_at = CURRENT_TIMESTAMP(),
 	failed_attempts = 0,
 	last_successful_check = NULL,
-	updated_at = CURRENT_TIMESTAMP()
-WHERE project_id = @p1 AND user_id = @p2`
-
-	insertUserPasswordStmt = `INSERT INTO user_passwords (
-	project_id, user_id, encoded_hash, change_required, verification_id
-) VALUES (@p1, @p2, @p3, @p4, @p5)`
+	updated_at = CURRENT_TIMESTAMP()`
 
 	userPasswordQuery = `SELECT id, project_id, user_id, encoded_hash, change_required,
 	changed_at, verification_id, last_successful_check, failed_attempts, created_at, updated_at
@@ -45,29 +43,14 @@ func newUserPasswordStatements(db queryExecutor) userPasswordStatements {
 
 // SetUserPassword implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error {
-	return withTransaction(ctx, ps.db, func(ctx context.Context, tx queryExecutor) error {
-		n, err := tx.Update(ctx, buildStatement(updateUserPasswordStmt,
-			pw.ProjectID,
-			pw.UserID,
-			pw.EncodedHash,
-			pw.ChangeRequired,
-			verificationIDArg(pw.VerificationID),
-		).statement())
-		if err != nil {
-			return wrapError(err)
-		}
-		if n > 0 {
-			return nil
-		}
-		_, err = tx.Update(ctx, buildStatement(insertUserPasswordStmt,
-			pw.ProjectID,
-			pw.UserID,
-			pw.EncodedHash,
-			pw.ChangeRequired,
-			verificationIDArg(pw.VerificationID),
-		).statement())
-		return wrapError(err)
-	})
+	_, err := ps.db.Update(ctx, buildStatement(setUserPasswordStmt,
+		pw.ProjectID,
+		pw.UserID,
+		pw.EncodedHash,
+		pw.ChangeRequired,
+		verificationIDArg(pw.VerificationID),
+	).statement())
+	return wrapError(err)
 }
 
 // GetUserPassword implements [service.UserPasswordStatements].
