@@ -16,6 +16,7 @@ type statements struct {
 	sessionStatements
 	authAttemptStatements
 	userStatements
+	userPasswordStatements
 	userTOTPStatements
 	userRecoveryCodesStatements
 }
@@ -40,6 +41,7 @@ func newStatements(db queryExecutor) statements {
 		sessionStatements:             newSessionStatements(db),
 		authAttemptStatements:         newAuthAttemptStatements(db),
 		userStatements:                newUserStatements(db),
+		userPasswordStatements:        newUserPasswordStatements(db),
 		userTOTPStatements:            newUserTOTPStatements(db),
 		userRecoveryCodesStatements:   newUserRecoveryCodesStatements(db),
 	}

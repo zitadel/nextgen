@@ -8,7 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserTOTPStatements,UserRecoveryCodesStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserRecoveryCodesStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -31,6 +31,7 @@ type AllStatements interface {
 	SessionStatements
 	AuthAttemptStatements
 	UserStatements
+	UserPasswordStatements
 	UserTOTPStatements
 	UserRecoveryCodesStatements
 	Statements
@@ -206,6 +207,21 @@ type UserStatements interface {
 	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error
 	DeleteUserByID(ctx context.Context, projectID, userID string) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type UserPasswordPool interface {
+// 	Statementer[UserPasswordStatements]
+// 	Transactioner[UserPasswordStatements]
+// }
+
+type UserPasswordStatements interface {
+	Statements
+	SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error
+	GetUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) (*domain.UserPassword, error)
+	ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error)
+	UpdateUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField], updates ...domain.UserPasswordUpdate) error
+	DeleteUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
