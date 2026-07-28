@@ -9,6 +9,7 @@ post:
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
   requestBody:
+    required: true
     content:
       application/json:
         schema:

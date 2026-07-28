@@ -25,7 +25,8 @@ func TestCreateTeam(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
 
-		req := &api.CreateTeamRequest{}
+		name := helpers.TeamName()
+		req := &api.CreateTeamRequest{Name: name}
 		params := api.CreateTeamParams{
 			ProjectID: api.ProjectID(project.ID),
 		}
@@ -33,7 +34,9 @@ func TestCreateTeam(t *testing.T) {
 		resp, err := client.CreateTeam(t.Context(), req, params)
 		require.NoError(t, err)
 
-		assert.IsType(t, &api.CreateTeamResponse{}, resp, helpers.MustMarshal(t, resp))
+		created, ok := resp.(*api.CreateTeamResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Equal(t, name, created.Name)
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -42,8 +45,22 @@ func TestCreateTeam(t *testing.T) {
 		t.Run("no project", func(t *testing.T) {
 			t.Parallel()
 
-			req := &api.CreateTeamRequest{}
+			req := &api.CreateTeamRequest{Name: helpers.TeamName()}
 			params := api.CreateTeamParams{}
+
+			resp, err := client.CreateTeam(t.Context(), req, params)
+			require.NoError(t, err)
+
+			assert.IsType(t, &api.CreateTeamBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		})
+
+		t.Run("empty name", func(t *testing.T) {
+			t.Parallel()
+
+			req := &api.CreateTeamRequest{Name: ""}
+			params := api.CreateTeamParams{
+				ProjectID: api.ProjectID(project.ID),
+			}
 
 			resp, err := client.CreateTeam(t.Context(), req, params)
 			require.NoError(t, err)
@@ -68,6 +85,7 @@ func TestGetTeam(t *testing.T) {
 
 		team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 			ProjectID: project.ID,
+			Name:      helpers.TeamName(),
 		})
 		require.NoError(t, err)
 
@@ -79,7 +97,9 @@ func TestGetTeam(t *testing.T) {
 		resp, err := client.GetTeam(t.Context(), params)
 		require.NoError(t, err)
 
-		assert.IsType(t, &api.GetTeamResponse{}, resp, helpers.MustMarshal(t, resp))
+		got, ok := resp.(*api.GetTeamResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Equal(t, team.Name, got.Name)
 	})
 
 	t.Run("error", func(t *testing.T) {
