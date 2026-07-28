@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -72,67 +71,43 @@ func (us userTOTPStatements) GetUserTOTPByUserID(ctx context.Context, projectID,
 	return totp, nil
 }
 
-type userTOTPPatch struct {
-	secret              *[]byte
-	verifiedAt          *time.Time
-	lastSuccessfulCheck *time.Time
-	delta               int16
-	resetFailedAttempts bool
-}
-
-func coalesceUserTOTPUpdates(updates []domain.UserTOTPUpdate) (userTOTPPatch, error) {
-	var patch userTOTPPatch
-	for _, u := range updates {
-		switch v := u.(type) {
-		case *domain.UserTOTPSecretUpdate:
-			s := append([]byte(nil), v.Secret...)
-			patch.secret = &s
-		case *domain.UserTOTPVerifiedAtUpdate:
-			t := v.VerifiedAt
-			patch.verifiedAt = &t
-		case *domain.UserTOTPLastSuccessfulCheckUpdate:
-			t := v.LastSuccessfulCheck
-			patch.lastSuccessfulCheck = &t
-		case *domain.UserTOTPIncrementFailedAttemptsUpdate:
-			if v.Delta <= 0 {
-				return userTOTPPatch{}, fmt.Errorf("UserTOTPIncrementFailedAttemptsUpdate.Delta must be > 0, got %d", v.Delta)
-			}
-			patch.resetFailedAttempts = false
-			patch.delta += v.Delta
-		case *domain.UserTOTPResetFailedAttemptsUpdate:
-			patch.resetFailedAttempts = true
-			patch.delta = 0
-		default:
-			return userTOTPPatch{}, fmt.Errorf("unknown UserTOTPUpdate %T", u)
-		}
-	}
-	return patch, nil
-}
-
-func (p userTOTPPatch) empty() bool {
-	return p.secret == nil &&
-		p.verifiedAt == nil &&
-		p.lastSuccessfulCheck == nil &&
-		!p.resetFailedAttempts &&
-		p.delta == 0
-}
-
 // UpdateUserTOTP implements [service.UserTOTPStatements].
 func (us userTOTPStatements) UpdateUserTOTP(ctx context.Context, projectID, userID string, updates ...domain.UserTOTPUpdate) error {
 	if len(updates) == 0 {
 		return database.ErrNoChanges
 	}
-	patch, err := coalesceUserTOTPUpdates(updates)
-	if err != nil {
-		return err
-	}
-	if patch.empty() {
-		return database.ErrNoChanges
-	}
 
 	var c statementCompiler
 	c.WriteString("UPDATE zitadel_nextgen.user_totp SET ")
-	writeUserTOTPPatch(&c, patch)
+	sep := ""
+	writeAssign := func(col string, arg any) {
+		c.WriteString(sep)
+		sep = ", "
+		c.WriteString(col)
+		c.WriteString(" = ")
+		c.WriteArg(arg)
+	}
+
+	for _, update := range updates {
+		switch u := update.(type) {
+		case *domain.UserTOTPSecretUpdate:
+			writeAssign("secret", u.Secret)
+		case *domain.UserTOTPVerifiedAtUpdate:
+			writeAssign("verified_at", u.VerifiedAt)
+		case *domain.UserTOTPLastSuccessfulCheckUpdate:
+			writeAssign("last_successful_check", u.LastSuccessfulCheck)
+		case *domain.UserTOTPIncrementFailedAttemptsUpdate:
+			c.WriteString(sep)
+			sep = ", "
+			c.WriteString("failed_attempts = failed_attempts + ")
+			c.WriteArg(u.Delta)
+		case *domain.UserTOTPResetFailedAttemptsUpdate:
+			writeAssign("failed_attempts", int16(0))
+		default:
+			return fmt.Errorf("unknown UserTOTPUpdate %T", update)
+		}
+	}
+
 	c.WriteString(", updated_at = NOW() WHERE project_id = ")
 	c.WriteArg(projectID)
 	c.WriteString(" AND user_id = ")
@@ -146,34 +121,6 @@ func (us userTOTPStatements) UpdateUserTOTP(ctx context.Context, projectID, user
 		return wrapError(pgx.ErrNoRows)
 	}
 	return nil
-}
-
-func writeUserTOTPPatch(c *statementCompiler, patch userTOTPPatch) {
-	sep := ""
-	writeAssign := func(col string, arg any) {
-		c.WriteString(sep)
-		sep = ", "
-		c.WriteString(col)
-		c.WriteString(" = ")
-		c.WriteArg(arg)
-	}
-	if patch.secret != nil {
-		writeAssign("secret", *patch.secret)
-	}
-	if patch.verifiedAt != nil {
-		writeAssign("verified_at", *patch.verifiedAt)
-	}
-	if patch.lastSuccessfulCheck != nil {
-		writeAssign("last_successful_check", *patch.lastSuccessfulCheck)
-	}
-	switch {
-	case patch.resetFailedAttempts:
-		writeAssign("failed_attempts", int16(0))
-	case patch.delta > 0:
-		c.WriteString(sep)
-		c.WriteString("failed_attempts = failed_attempts + ")
-		c.WriteArg(patch.delta)
-	}
 }
 
 // DeleteUserTOTPByUserID implements [service.UserTOTPStatements].

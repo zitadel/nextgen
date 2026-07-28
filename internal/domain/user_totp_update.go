@@ -27,7 +27,7 @@ type UserTOTPLastSuccessfulCheckUpdate struct {
 func (*UserTOTPLastSuccessfulCheckUpdate) userTOTPUpdate() {}
 
 type UserTOTPIncrementFailedAttemptsUpdate struct {
-	Delta int16
+	Delta uint8
 }
 
 func (*UserTOTPIncrementFailedAttemptsUpdate) userTOTPUpdate() {}

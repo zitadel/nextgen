@@ -94,8 +94,7 @@ func TestUserTOTPStatements_Update(t *testing.T) {
 	assert.Zero(t, got.FailedAttempts)
 
 	require.NoError(t, testPool.UpdateUserTOTP(ctx, projectID, userID,
-		&domain.UserTOTPIncrementFailedAttemptsUpdate{Delta: 1},
-		&domain.UserTOTPIncrementFailedAttemptsUpdate{Delta: 1},
+		&domain.UserTOTPIncrementFailedAttemptsUpdate{Delta: 2},
 	))
 	got, err = testPool.GetUserTOTPByUserID(ctx, projectID, userID)
 	require.NoError(t, err)
