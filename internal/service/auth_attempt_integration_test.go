@@ -14,14 +14,14 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
-// newAuthAttemptServiceForIntegration wires the service with real repos.
+// newAuthAttemptServiceForIntegration wires the service with real statement pools.
 // The password verifier is nil because these tests exercise only the
 // user-proof path, which never touches it.
 func newAuthAttemptServiceForIntegration(pool database.Pool, v2Pool service.StatementPool) service.AuthAttemptService {
 	return service.NewAuthAttemptService(
 		pool,
-		repository.NewAuthAttemptRepository(pool),
-		repository.NewSessionRepository(pool),
+		v2Pool,
+		service.SessionStatementsResolver{Pool: v2Pool},
 		service.UserStatementsLookup{Pool: v2Pool},
 		v2Pool.Statements(),
 		repository.NewUserPasskeyRepository(),

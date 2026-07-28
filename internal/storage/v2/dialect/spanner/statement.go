@@ -8,8 +8,16 @@ type statements struct {
 	projectStatements
 	flowDefinitionStatements
 	cryptoKeyStatements
+	jsonSchemaStatements
+	teamStatements
+	teamMembershipStatements
+	tokenStatements
+	passkeyRegistrationStatements
+	sessionStatements
+	authAttemptStatements
 	userStatements
 	userPasswordStatements
+	userTOTPStatements
 }
 
 func (s statements) Statements() service.AllStatements {
@@ -21,11 +29,19 @@ func (s statements) IsStatements() {}
 
 func newStatements(db queryExecutor) statements {
 	return statements{
-		projectStatements:        newProjectStatements(db),
-		flowDefinitionStatements: newFlowDefinitionStatements(db),
-		cryptoKeyStatements:      newCryptoKeyStatements(db),
-		userStatements:           newUserStatements(db),
-		userPasswordStatements:   newUserPasswordStatements(db),
+		projectStatements:             newProjectStatements(db),
+		flowDefinitionStatements:      newFlowDefinitionStatements(db),
+		cryptoKeyStatements:           newCryptoKeyStatements(db),
+		jsonSchemaStatements:          newJSONSchemaStatements(db),
+		teamStatements:                newTeamStatements(db),
+		teamMembershipStatements:      newTeamMembershipStatements(db),
+		tokenStatements:               newTokenStatements(db),
+		passkeyRegistrationStatements: newPasskeyRegistrationStatements(db),
+		sessionStatements:             newSessionStatements(db),
+		authAttemptStatements:         newAuthAttemptStatements(db),
+		userStatements:                newUserStatements(db),
+		userPasswordStatements:        newUserPasswordStatements(db),
+		userTOTPStatements:            newUserTOTPStatements(db),
 	}
 }
 

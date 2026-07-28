@@ -39,4 +39,17 @@ vcs:
 pipeline:
   installDependencies: false
 
+# Depot CI runners inject DEPOT_CACHE_TOKEN at launch; when the variable is
+# absent (local dev, forks) moon disables remote caching and runs fully local.
+remote:
+  host: "grpcs://cache.depot.dev"
+  auth:
+    token: "DEPOT_CACHE_TOKEN"
+  cache:
+    # No compression: Depot's endpoint rejects zstd via capabilities and moon
+    # would warn on every run.
+    instanceName: "zitadel-nextgen"
+    localReadOnly: true
+    verifyIntegrity: true
+
 telemetry: false

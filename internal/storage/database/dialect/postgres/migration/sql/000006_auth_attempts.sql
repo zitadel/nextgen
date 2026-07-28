@@ -11,7 +11,7 @@ CREATE TABLE zitadel_nextgen.auth_attempts (
 
     , PRIMARY KEY (project_id, id)
     , UNIQUE (project_id, handoff_token)
-    , FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.projects(id)
+    , FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.projects(id) ON DELETE CASCADE
 );
 
 -- +goose Down

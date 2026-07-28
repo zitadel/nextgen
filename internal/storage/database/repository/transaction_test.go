@@ -39,24 +39,3 @@ func TestWithTransaction_NonBeginnerRunsDirectly(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, called)
 }
-
-func TestTeamRepository_Deactivate_OpensTransactionOnClientAndEndsWithError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	pool := dbmock.NewMockPool(ctrl)
-	tx := dbmock.NewMockTransaction(ctrl)
-	want := errors.New("team update failed")
-
-	repo := &TeamRepository{
-		meta:             teamMeta{tableName: pgTableTeams},
-		membershipsTable: pgTableMemberships,
-		usersTable:       pgTableUsers,
-		now:              database.NowInstruction,
-	}
-
-	pool.EXPECT().Begin(gomock.Any(), gomock.Nil()).Return(tx, nil)
-	tx.EXPECT().Exec(gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(0), want)
-	tx.EXPECT().End(gomock.Any(), want).Return(want)
-
-	err := repo.Deactivate(context.Background(), pool, "proj", "team")
-	require.ErrorIs(t, err, want)
-}

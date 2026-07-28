@@ -1,10 +1,7 @@
 package domain
 
 import (
-	"context"
 	"time"
-
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 type UserTOTP struct {
@@ -20,35 +17,7 @@ type UserTOTP struct {
 }
 
 type CreateUserTOTP struct {
-	ProjectID      string
-	UserID         string
-	Secret         []byte
-	VerificationID *string
-}
-
-type UserTOTPRepository interface {
-	Repository
-
-	userTOTPConditions
-	userTOTPChanges
-
-	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*UserTOTP, error)
-	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*UserTOTP, error)
-	Create(ctx context.Context, client database.QueryExecutor, totp *CreateUserTOTP) error
-	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
-}
-
-type userTOTPConditions interface {
-	ProjectIDCondition(projectID string) database.Condition
-	UserIDCondition(userID string) database.Condition
-	PrimaryKeyCondition(id int64) database.Condition
-	UniqueCondition(projectID, userID string) database.Condition
-}
-
-type userTOTPChanges interface {
-	SetSecret([]byte) database.Change
-	SetVerifiedAt(time.Time) database.Change
-	SetLastSuccessfulCheck(time.Time) database.Change
-	IncrementFailedAttempts() database.Change
-	ResetFailedAttempts() database.Change
+	ProjectID string
+	UserID    string
+	Secret    []byte
 }

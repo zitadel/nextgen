@@ -8,6 +8,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // ---- Input types -------------------------------------------------------------
@@ -32,37 +33,24 @@ type ListSchemasOutputItem struct {
 // ---- Secondary ports -------------------------------------------------------------
 
 type SchemaService struct {
-	pool            database.Pool
-	schemaRepo      domain.JSONSchemaRepository
+	v2Pool          *DB
 	schemaResolver  *domain.JSONSchemaResolver
 	schemaValidator *domain.SchemaValidator
 }
 
 func NewSchemaService(
-	pool database.Pool,
-	schemaRepo domain.JSONSchemaRepository,
+	v2Pool *DB,
 	schemaResolver *domain.JSONSchemaResolver,
 	schemaValidator *domain.SchemaValidator,
 ) *SchemaService {
 	return &SchemaService{
-		pool:            pool,
-		schemaRepo:      schemaRepo,
+		v2Pool:          v2Pool,
 		schemaResolver:  schemaResolver,
 		schemaValidator: schemaValidator,
 	}
 }
 
 func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInput) (_ *domain.JSONSchema, err error) {
-	tx, err := s.pool.Begin(ctx, nil)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
-
 	model, err := domain.NewJSONSchema(input.ProjectID, input.Schema)
 	if err != nil {
 		return nil, err
@@ -73,24 +61,28 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		return nil, domain.ErrJSONSchemaInvalid().WithParent(err)
 	}
 
-	err = s.schemaRepo.Create(ctx, tx, model)
-	if err != nil {
-		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
-			return nil, domain.ErrJSONSchemaAlreadyExists().WithParent(err)
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		stmts := tx.Statements()
+		if err := stmts.CreateJSONSchema(ctx, model); err != nil {
+			if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
+				return domain.ErrJSONSchemaAlreadyExists().WithParent(err)
+			}
+			return domain.ErrInternal(err).WithMessage("failed to create schema in database")
 		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to create schema in database")
-	}
 
-	// Pass the just-created payload so Resolve does not re-load (or HTTP-refetch
-	// and re-insert) the same URL inside this transaction — Spanner can surface
-	// the duplicate as a commit-time AlreadyExists otherwise.
-	_, err = s.schemaResolver.Resolve(ctx, tx, input.ProjectID, model.URL, model.Schema)
+		// Pass the just-created payload so Resolve does not re-load (or HTTP-refetch
+		// and re-insert) the same URL inside this transaction — Spanner can surface
+		// the duplicate as a commit-time AlreadyExists otherwise.
+		_, err := s.schemaResolver.Resolve(ctx, stmts, input.ProjectID, model.URL, model.Schema)
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
-	}
-
-	err = tx.Commit(ctx)
-	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
+		}
 		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
 			return nil, domain.ErrJSONSchemaAlreadyExists().WithParent(err)
 		}
@@ -101,32 +93,26 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 }
 
 func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchemaByURLInput) (*domain.JSONSchema, error) {
-	tx, err := s.pool.Begin(ctx, nil)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to start transaction")
-	}
-	defer func() {
+	strURI := input.URL.String()
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		_, err := s.schemaResolver.Resolve(ctx, tx.Statements(), input.ProjectID, strURI, nil)
 		if err != nil {
-			_ = tx.Rollback(ctx)
+			return domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
 		}
-	}()
-
-	strUri := input.URL.String()
-	_, err = s.schemaResolver.Resolve(ctx, tx, input.ProjectID, strUri, nil)
+		return nil
+	})
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
-	}
-
-	err = tx.Commit(ctx)
-	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
+		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 
-	return s.schemaRepo.GetByID(ctx, s.pool, input.ProjectID, strUri)
+	return s.v2Pool.Statements().GetJSONSchemaByID(ctx, input.ProjectID, strURI)
 }
 
 func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
-	schema, err := s.schemaRepo.GetByID(ctx, s.pool, projectID, schemaID)
+	schema, err := s.v2Pool.Statements().GetJSONSchemaByID(ctx, projectID, schemaID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrJSONSchemaNotFound()
@@ -137,30 +123,33 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 }
 
 func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType string, offset int, token string) ([]ListSchemasOutputItem, error) {
-	conditions := []database.Condition{
-		s.schemaRepo.ProjectIDCondition(projectID),
+	filters := []v2database.Filter[domain.JSONSchemaField]{
+		v2database.Equal(v2database.Col(domain.JSONSchemaFieldProjectID), projectID),
 	}
 	if objectType != "" {
-		conditions = append(conditions,
-			s.schemaRepo.ObjectTypeCondition(objectType),
+		filters = append(filters,
+			v2database.Equal(v2database.Col(domain.JSONSchemaFieldObjectType), objectType),
 		)
 	}
 
 	// TODO: implement pagination
 
-	opts := []database.QueryOption{
-		database.WithCondition(database.And(conditions...)),
-		database.WithOrderByDescending(s.schemaRepo.CreatedAt()),
-	}
-
-	// TODO: make list not return the entire schema, just the fields we want
-	schemas, err := s.schemaRepo.List(ctx, s.pool, opts...)
+	result, err := s.v2Pool.Statements().ListJSONSchemas(ctx, &v2database.ListOptions[domain.JSONSchemaField]{
+		Filter: v2database.And(filters...),
+		Pagination: v2database.Page[domain.JSONSchemaField]{
+			OrderBy: v2database.OrderBy[domain.JSONSchemaField]{
+				Columns:   []v2database.Column[domain.JSONSchemaField]{v2database.Col(domain.JSONSchemaFieldCreatedAt)},
+				Direction: v2database.OrderDesc,
+			},
+		},
+	})
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to list schemas")
 	}
 
-	output := make([]ListSchemasOutputItem, len(schemas), len(schemas))
-	for i, schema := range schemas {
+	// TODO: make list not return the entire schema, just the fields we want
+	output := make([]ListSchemasOutputItem, len(result.Items))
+	for i, schema := range result.Items {
 		output[i] = ListSchemasOutputItem{
 			ID:        schema.URL,
 			CreatedAt: schema.CreatedAt,

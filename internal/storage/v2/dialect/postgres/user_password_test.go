@@ -9,10 +9,18 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/zitadel/nextgen/internal/domain"
 	legacydb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
+
+func userPasswordByUser(projectID, userID string) database.Filter[domain.UserPasswordField] {
+	return database.And(
+		database.Equal(database.Col(domain.UserPasswordFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserPasswordFieldUserID), userID),
+	)
+}
 
 func seedUserForPassword(t *testing.T, projectID, teamID, schemaURL, userID string) {
 	t.Helper()
@@ -50,7 +58,8 @@ func TestUserPasswordStatements_SetGetDelete(t *testing.T) {
 		VerificationID: &vid,
 	}))
 
-	got, err := testPool.GetUserPasswordByUserID(t.Context(), projectID, userID)
+	byUser := userPasswordByUser(projectID, userID)
+	got, err := testPool.GetUserPassword(t.Context(), byUser)
 	require.NoError(t, err)
 	require.Positive(t, got.ID)
 	assert.Equal(t, projectID, got.ProjectID)
@@ -60,6 +69,10 @@ func TestUserPasswordStatements_SetGetDelete(t *testing.T) {
 	require.NotNil(t, got.VerificationID)
 	assert.Equal(t, vid, *got.VerificationID)
 
+	gotByID, err := testPool.GetUserPasswordByUserID(t.Context(), projectID, userID)
+	require.NoError(t, err)
+	assert.Equal(t, got.ID, gotByID.ID)
+
 	list, err := testPool.ListUserPasswords(t.Context(), &database.ListOptions[domain.UserPasswordField]{
 		Filter: database.Equal(database.Col(domain.UserPasswordFieldProjectID), projectID),
 	})
@@ -67,7 +80,7 @@ func TestUserPasswordStatements_SetGetDelete(t *testing.T) {
 	require.Len(t, list.Items, 1)
 
 	require.NoError(t, testPool.DeleteUserPasswordByUserID(t.Context(), projectID, userID))
-	_, err = testPool.GetUserPasswordByUserID(t.Context(), projectID, userID)
+	_, err = testPool.GetUserPassword(t.Context(), byUser)
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 }
 
@@ -139,16 +152,18 @@ func TestUserPasswordStatements_Update(t *testing.T) {
 		EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$initial",
 	}))
 
-	err := testPool.UpdateUserPassword(t.Context(), projectID, userID)
+	byUser := userPasswordByUser(projectID, userID)
+
+	err := testPool.UpdateUserPassword(t.Context(), byUser)
 	assert.ErrorIs(t, err, database.ErrNoChanges)
 
-	err = testPool.UpdateUserPassword(t.Context(), projectID, "missing-user",
+	err = testPool.UpdateUserPassword(t.Context(), userPasswordByUser(projectID, "missing-user"),
 		&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 1},
 	)
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	require.NoError(t, testPool.UpdateUserPassword(t.Context(), projectID, userID,
+	require.NoError(t, testPool.UpdateUserPassword(t.Context(), byUser,
 		&domain.UserPasswordEncodedHashUpdate{EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$rotated"},
 		&domain.UserPasswordChangeRequiredUpdate{ChangeRequired: true},
 		&domain.UserPasswordChangedAtUpdate{ChangedAt: now},
@@ -157,7 +172,7 @@ func TestUserPasswordStatements_Update(t *testing.T) {
 		&domain.UserPasswordResetFailedAttemptsUpdate{},
 	))
 
-	got, err := testPool.GetUserPasswordByUserID(t.Context(), projectID, userID)
+	got, err := testPool.GetUserPassword(t.Context(), byUser)
 	require.NoError(t, err)
 	assert.Equal(t, "argon2id$v=19$m=65536,t=3,p=4$rotated", got.EncodedHash)
 	assert.True(t, got.ChangeRequired)
@@ -168,10 +183,14 @@ func TestUserPasswordStatements_Update(t *testing.T) {
 	assert.WithinDuration(t, now, *got.LastSuccessfulCheck, time.Second)
 	assert.Zero(t, got.FailedAttempts)
 
-	require.NoError(t, testPool.UpdateUserPassword(t.Context(), projectID, userID,
+	require.NoError(t, testPool.UpdateUserPassword(t.Context(), byUser,
 		&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 2},
 	))
-	got, err = testPool.GetUserPasswordByUserID(t.Context(), projectID, userID)
+	got, err = testPool.GetUserPassword(t.Context(), byUser)
 	require.NoError(t, err)
 	assert.Equal(t, int16(2), got.FailedAttempts)
+
+	require.NoError(t, testPool.DeleteUserPassword(t.Context(), byUser))
+	_, err = testPool.GetUserPassword(t.Context(), byUser)
+	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 }

@@ -103,14 +103,31 @@ it entirely (paid licence) or swap it for a `custom_link`. The
 attribution chip itself is a `<zl-pill>` so the visual treatment matches
 the rest of the chrome.
 
-### 5. Dark mode is the only mode for v1
+### 5. Dark is the primary mode; light ships alongside it
 
-Figma currently publishes only a dark variable mode. The orchestrator's
-`ThemeController` and `branding-to-tokens.resolveTheme` both default to
-dark; light mode is opt-in (`branding.theme.mode = "light"` or
-auto-detected via `prefers-color-scheme`), but it falls through to dark
-until Figma publishes a light variable mode and the build emits a
-matching `[data-theme="light"]` block in `tokens.css`.
+**Amended 2026-07-25 — the original decision ("dark is the only mode for
+v1") is superseded.** Both modes now carry real values: the legacy
+semantic tokens in `src/legacy.tokens.json` are authored as
+`{ dark, light }` pairs, and `scripts/build.ts` emits the light halves
+into the `[data-theme="light"]` block of `tokens.css`. Light values
+mirror the position each token occupies on the (dark-first) gray ramp —
+`gray.50` is the darkest shade and `gray.900` the lightest — so light
+mode is a systematic reflection of the published scale rather than a
+second, hand-tuned palette. Accent tints step to their deeper shades
+(`purple.300` → `purple.600`) because a tint chosen for legibility on a
+dark surface has too little contrast on a light one.
+
+Dark remains the **primary** surface: it is what the hosted login and
+`variant="page"` render when nobody states a preference. Resolution
+precedence, strongest first: the element's `theme` property →
+`branding.theme.mode` → a variant-derived default (`dark` for `page`,
+`auto` for `widget`, so an embedded widget follows the visitor's
+`prefers-color-scheme` instead of forcing dark onto a light host page).
+
+Naming caveat: the legacy token names encode their dark-mode appearance
+(`--zl-color-text-primary-white` resolves to a near-black in light mode).
+The names are a frozen public surface — see `MIGRATION.md`; the shadcn
+namespace (`--zl-foreground`) is the mode-neutral successor.
 
 ## Consequences
 

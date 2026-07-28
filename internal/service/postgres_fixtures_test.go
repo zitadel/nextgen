@@ -10,14 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 func ensureProject(t *testing.T, pool database.QueryExecutor, projectID string) {
 	t.Helper()
+	// name is NOT NULL; derive it from the project ID
 	_, err := pool.Exec(t.Context(),
-		`INSERT INTO zitadel_nextgen.projects (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
-		projectID,
+		`INSERT INTO zitadel_nextgen.projects (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
+		projectID, "project-"+projectID,
 	)
 	require.NoError(t, err)
 }
@@ -34,7 +34,7 @@ func handoffCompletedAttempt(
 	mutate func(*domain.AuthAttempt),
 ) (plainToken string, attempt *domain.AuthAttempt) {
 	t.Helper()
-	authRepo := repository.NewAuthAttemptRepository(pool)
+	v2 := integrationV2PoolOrFail(t)
 
 	plainToken = "handoff_" + projectID + "_" + time.Now().Format("150405.000000")
 	attempt = &domain.AuthAttempt{
@@ -46,9 +46,9 @@ func handoffCompletedAttempt(
 		mutate(attempt)
 	}
 	ensureProject(t, pool, projectID)
-	require.NoError(t, authRepo.Create(t.Context(), pool, attempt))
+	require.NoError(t, v2.Statements().CreateAuthAttempt(t.Context(), attempt))
 	attempt.HandoffToken = handoffTokenForIntegration(plainToken)
-	require.NoError(t, authRepo.Handoff(t.Context(), pool, attempt))
+	require.NoError(t, v2.Statements().HandoffAuthAttempt(t.Context(), attempt))
 	return plainToken, attempt
 }
 
