@@ -8,7 +8,6 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -165,62 +164,35 @@ func (PasskeyProof) proofCheckType() domain.AuthCheckType { return domain.AuthCh
 
 // ---- Secondary ports -------------------------------------------------------------
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/auth_attempt.mock.go . SessionResolver,ProjectLoader,UserLookup,UserPasskeys
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/auth_attempt.mock.go . SessionResolver,UserLookup
 
 type SessionResolver interface {
 	Get(ctx context.Context, projectID, sessionID string) (*domain.Session, error)
-}
-
-type ProjectLoader interface {
-	Get(ctx context.Context, client database.QueryExecutor, id string) (*domain.Project, error)
 }
 
 type UserLookup interface {
 	GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error)
 }
 
-type UserPasskeys interface {
-	userPasskeyConditions
-
-	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPasskey, error)
-	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*domain.UserPasskey, error)
-	Update(ctx context.Context, client database.QueryExecutor, condition database.Condition, changes ...database.Change) error
-}
-
-type userPasskeyConditions interface {
-	UserIDCondition(userID string) database.Condition
-	ProjectIDCondition(pid string) database.Condition
-	UniqueCondition(projectID, userID, credentialID string) database.Condition
-	SetSignCount(int64) database.Change
-	SetBackupState(bool) database.Change
-	SetLastUsedAt(time.Time) database.Change
-}
-
 // ---- Implementation ----------------------------------------------------------
 
 type authAttemptService struct {
-	pool             database.Pool
 	stmts            StatementPool
 	sessions         SessionResolver
 	users            UserLookup
-	userPasskeys     UserPasskeys
 	passwordVerifier crypto.HashVerifier
 }
 
 func NewAuthAttemptService(
-	pool database.Pool,
 	stmts StatementPool,
 	sessions SessionResolver,
 	users UserLookup,
-	userPasskeys UserPasskeys,
 	passwordVerifier crypto.HashVerifier,
 ) AuthAttemptService {
 	return &authAttemptService{
-		pool:             pool,
 		stmts:            stmts,
 		sessions:         sessions,
 		users:            users,
-		userPasskeys:     userPasskeys,
 		passwordVerifier: passwordVerifier,
 	}
 }
@@ -231,12 +203,7 @@ func NewAuthAttemptService(
 func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (res *domain.AuthAttempt, err error) {
 	requiredChecks := input.RequiredChecks
 	if requiredChecks == nil {
-		// TODO: implement this
-		//project, err := s.projects.Get(ctx, s.pool, input.ProjectID)
-		//if err != nil {
-		//	return nil, domain.ErrInternal(err).WithMessage("failed to load project config")
-		//}
-		// requiredChecks = project.DefaultRequiredChecks
+		// TODO: load project default required checks
 	}
 
 	opts := make([]domain.AuthAttemptOption, 0, 1)
@@ -473,30 +440,36 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 	}
 }
 
-// recordPasskeyUsage persists the authenticator's advanced sign count, backup state and
-// last-used time after a successful assertion. It is best-effort: a write failure must not
-// turn an otherwise valid proof into a rejection (the verify dispatch treats post-challenge
-// errors as proof rejections), and the stored sign count is a clone-detection signal rather
-// than an auth gate.
+// recordPasskeyUsage persists sign count, backup state, and last-used time after a
+// successful assertion. Best-effort: write failure must not reject an otherwise valid proof.
 func (s *authAttemptService) recordPasskeyUsage(ctx context.Context, projectID string, v *domain.PasskeyVerification) {
-	_ = s.userPasskeys.Update(
+	_ = s.stmts.Statements().UpdateUserPasskey(
 		ctx,
-		s.pool,
-		s.userPasskeys.UniqueCondition(projectID, v.UserID, domain.EncodePasskeyCredentialID(v.CredentialID)),
-		s.userPasskeys.SetSignCount(int64(v.SignCount)),
-		s.userPasskeys.SetBackupState(v.BackupState),
-		s.userPasskeys.SetLastUsedAt(time.Now()),
+		userPasskeyKeyFilter(projectID, v.UserID, domain.EncodePasskeyCredentialID(v.CredentialID)),
+		&domain.UserPasskeySignCountUpdate{SignCount: int64(v.SignCount)},
+		&domain.UserPasskeyBackupStateUpdate{BackupState: v.BackupState},
+		&domain.UserPasskeyLastUsedAtUpdate{LastUsedAt: time.Now()},
 	)
 }
 
 func (s *authAttemptService) listUserPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
-	return s.userPasskeys.List(
-		ctx,
-		s.pool,
-		database.WithCondition(database.And(
-			s.userPasskeys.ProjectIDCondition(projectID),
-			s.userPasskeys.UserIDCondition(userID),
-		)),
+	result, err := s.stmts.Statements().ListUserPasskeys(ctx, &v2database.ListOptions[domain.UserPasskeyField]{
+		Filter: v2database.And(
+			v2database.Equal(v2database.Col(domain.UserPasskeyFieldProjectID), projectID),
+			v2database.Equal(v2database.Col(domain.UserPasskeyFieldUserID), userID),
+		),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
+}
+
+func userPasskeyKeyFilter(projectID, userID, credentialID string) v2database.Filter[domain.UserPasskeyField] {
+	return v2database.And(
+		v2database.Equal(v2database.Col(domain.UserPasskeyFieldProjectID), projectID),
+		v2database.Equal(v2database.Col(domain.UserPasskeyFieldUserID), userID),
+		v2database.Equal(v2database.Col(domain.UserPasskeyFieldCredentialID), credentialID),
 	)
 }
 
