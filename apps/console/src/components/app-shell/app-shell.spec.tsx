@@ -1,10 +1,19 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { THEME_STORAGE_KEY } from "../../theme";
 import { createAppRouter } from "../../router";
+
+// The `_authed` layout guards every screen behind `GET /sessions/me`
+// (Console ADR 0003); mock the auth module so routes render as signed in.
+vi.mock("@/auth/session", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/auth/session")>();
+  const { makeTestSession } = await import("@/auth/session.fixture");
+  return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
+});
+
 
 /**
  * The sidebar reproduces the Figma `Sidebar 08.` mock: a flat list of 7 items.

@@ -43,18 +43,18 @@ func (m *MockSessionResolver) EXPECT() *MockSessionResolverMockRecorder {
 }
 
 // Get mocks base method.
-func (m *MockSessionResolver) Get(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error) {
+func (m *MockSessionResolver) Get(ctx context.Context, projectID, sessionID string) (*domain.Session, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", ctx, q, projectID, sessionID)
+	ret := m.ctrl.Call(m, "Get", ctx, projectID, sessionID)
 	ret0, _ := ret[0].(*domain.Session)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockSessionResolverMockRecorder) Get(ctx, q, projectID, sessionID any) *MockSessionResolverGetCall {
+func (mr *MockSessionResolverMockRecorder) Get(ctx, projectID, sessionID any) *MockSessionResolverGetCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockSessionResolver)(nil).Get), ctx, q, projectID, sessionID)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockSessionResolver)(nil).Get), ctx, projectID, sessionID)
 	return &MockSessionResolverGetCall{Call: call}
 }
 
@@ -70,13 +70,13 @@ func (c *MockSessionResolverGetCall) Return(arg0 *domain.Session, arg1 error) *M
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockSessionResolverGetCall) Do(f func(context.Context, database.QueryExecutor, string, string) (*domain.Session, error)) *MockSessionResolverGetCall {
+func (c *MockSessionResolverGetCall) Do(f func(context.Context, string, string) (*domain.Session, error)) *MockSessionResolverGetCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockSessionResolverGetCall) DoAndReturn(f func(context.Context, database.QueryExecutor, string, string) (*domain.Session, error)) *MockSessionResolverGetCall {
+func (c *MockSessionResolverGetCall) DoAndReturn(f func(context.Context, string, string) (*domain.Session, error)) *MockSessionResolverGetCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

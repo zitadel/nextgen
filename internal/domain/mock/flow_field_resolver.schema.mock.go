@@ -14,7 +14,7 @@ import (
 	reflect "reflect"
 
 	jsonschema "github.com/ianlancetaylor/jsonschema"
-	database "github.com/zitadel/nextgen/internal/storage/database"
+	domain "github.com/zitadel/nextgen/internal/domain"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -43,18 +43,18 @@ func (m *MockSchemaResolver) EXPECT() *MockSchemaResolverMockRecorder {
 }
 
 // Resolve mocks base method.
-func (m *MockSchemaResolver) Resolve(ctx context.Context, client database.QueryExecutor, projectID, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
+func (m *MockSchemaResolver) Resolve(ctx context.Context, store domain.JSONSchemaStore, projectID, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Resolve", ctx, client, projectID, schemaURL, rootSchema)
+	ret := m.ctrl.Call(m, "Resolve", ctx, store, projectID, schemaURL, rootSchema)
 	ret0, _ := ret[0].(*jsonschema.Schema)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Resolve indicates an expected call of Resolve.
-func (mr *MockSchemaResolverMockRecorder) Resolve(ctx, client, projectID, schemaURL, rootSchema any) *MockSchemaResolverResolveCall {
+func (mr *MockSchemaResolverMockRecorder) Resolve(ctx, store, projectID, schemaURL, rootSchema any) *MockSchemaResolverResolveCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Resolve", reflect.TypeOf((*MockSchemaResolver)(nil).Resolve), ctx, client, projectID, schemaURL, rootSchema)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Resolve", reflect.TypeOf((*MockSchemaResolver)(nil).Resolve), ctx, store, projectID, schemaURL, rootSchema)
 	return &MockSchemaResolverResolveCall{Call: call}
 }
 
@@ -70,13 +70,13 @@ func (c *MockSchemaResolverResolveCall) Return(arg0 *jsonschema.Schema, arg1 err
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockSchemaResolverResolveCall) Do(f func(context.Context, database.QueryExecutor, string, string, []byte) (*jsonschema.Schema, error)) *MockSchemaResolverResolveCall {
+func (c *MockSchemaResolverResolveCall) Do(f func(context.Context, domain.JSONSchemaStore, string, string, []byte) (*jsonschema.Schema, error)) *MockSchemaResolverResolveCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockSchemaResolverResolveCall) DoAndReturn(f func(context.Context, database.QueryExecutor, string, string, []byte) (*jsonschema.Schema, error)) *MockSchemaResolverResolveCall {
+func (c *MockSchemaResolverResolveCall) DoAndReturn(f func(context.Context, domain.JSONSchemaStore, string, string, []byte) (*jsonschema.Schema, error)) *MockSchemaResolverResolveCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

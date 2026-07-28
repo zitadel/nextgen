@@ -20,6 +20,14 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
+func userPasskeyKeyFilter(projectID, userID, credentialID string) database.Filter[domain.UserPasskeyField] {
+	return database.And(
+		database.Equal(database.Col(domain.UserPasskeyFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserPasskeyFieldUserID), userID),
+		database.Equal(database.Col(domain.UserPasskeyFieldCredentialID), credentialID),
+	)
+}
+
 func TestUserPasskeyStatements_Update(t *testing.T) {
 	ctx := t.Context()
 
@@ -48,6 +56,7 @@ func TestUserPasskeyStatements_Update(t *testing.T) {
 	userID := "user_passkey_upd"
 	credentialID := "cred-passkey-upd"
 	schemaURL := "https://example.com/schemas/test-user-passkey"
+	byKey := userPasskeyKeyFilter(projectID, userID, credentialID)
 
 	require.NoError(t, stmts.CreateProject(ctx, &domain.Project{ID: projectID, PreviewOrigins: []string{}}))
 	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), projectID) })
@@ -87,18 +96,18 @@ func TestUserPasskeyStatements_Update(t *testing.T) {
 		VerifiedAt:      &now,
 	}))
 	t.Cleanup(func() {
-		_ = stmts.DeleteUserPasskey(context.Background(), projectID, userID, credentialID)
+		_ = stmts.DeleteUserPasskey(context.Background(), byKey)
 	})
 
-	err = stmts.UpdateUserPasskey(ctx, projectID, userID, credentialID)
+	err = stmts.UpdateUserPasskey(ctx, byKey)
 	assert.ErrorIs(t, err, database.ErrNoChanges)
 
-	err = stmts.UpdateUserPasskey(ctx, projectID, userID, "missing-cred",
+	err = stmts.UpdateUserPasskey(ctx, userPasskeyKeyFilter(projectID, userID, "missing-cred"),
 		&domain.UserPasskeySignCountUpdate{SignCount: 2},
 	)
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 
-	require.NoError(t, stmts.UpdateUserPasskey(ctx, projectID, userID, credentialID,
+	require.NoError(t, stmts.UpdateUserPasskey(ctx, byKey,
 		&domain.UserPasskeyAttestationTypeUpdate{AttestationType: "direct"},
 		domain.NewUserPasskeyTransportsUpdate([]string{"usb", "nfc"}),
 		&domain.UserPasskeySignCountUpdate{SignCount: 5},
@@ -108,7 +117,7 @@ func TestUserPasskeyStatements_Update(t *testing.T) {
 		&domain.UserPasskeyLastUsedAtUpdate{LastUsedAt: now},
 	))
 
-	got, err := stmts.GetUserPasskey(ctx, projectID, userID, credentialID)
+	got, err := stmts.GetUserPasskey(ctx, byKey)
 	require.NoError(t, err)
 	require.NotNil(t, got.AttestationType)
 	assert.Equal(t, "direct", *got.AttestationType)
@@ -121,17 +130,17 @@ func TestUserPasskeyStatements_Update(t *testing.T) {
 	require.NotNil(t, got.LastUsedAt)
 	assert.WithinDuration(t, now, *got.LastUsedAt, time.Second)
 
-	require.NoError(t, stmts.UpdateUserPasskey(ctx, projectID, userID, credentialID,
+	require.NoError(t, stmts.UpdateUserPasskey(ctx, byKey,
 		&domain.UserPasskeyIncrementSignCountUpdate{Delta: 3},
 	))
-	got, err = stmts.GetUserPasskey(ctx, projectID, userID, credentialID)
+	got, err = stmts.GetUserPasskey(ctx, byKey)
 	require.NoError(t, err)
 	assert.Equal(t, int64(8), got.SignCount)
 
-	require.NoError(t, stmts.UpdateUserPasskey(ctx, projectID, userID, credentialID,
+	require.NoError(t, stmts.UpdateUserPasskey(ctx, byKey,
 		domain.NewUserPasskeyTransportsUpdate(nil),
 	))
-	got, err = stmts.GetUserPasskey(ctx, projectID, userID, credentialID)
+	got, err = stmts.GetUserPasskey(ctx, byKey)
 	require.NoError(t, err)
 	assert.Equal(t, []string{}, got.Transports)
 }

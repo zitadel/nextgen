@@ -6455,8 +6455,6 @@ func (s *FilterField) Decode(d *jx.Decoder) error {
 	}
 	// Try to use constant string.
 	switch FilterField(v) {
-	case FilterFieldName:
-		*s = FilterFieldName
 	case FilterFieldCreatedAt:
 		*s = FilterFieldCreatedAt
 	default:

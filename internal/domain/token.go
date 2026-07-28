@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	crypto2 "github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
@@ -155,23 +154,20 @@ func requireNonEmptyID(id *string, name string) error {
 	return nil
 }
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/token.mock.go . TokenRepository
+// TokenField enumerates the fields of Token which can be used for filtering and
+// ordering in list operations.
+type TokenField uint8
 
-// TokenRepository persists token metadata: identity, scope, optional session and expiry.
-type TokenRepository interface {
-	Repository
-
-	tokenConditions
-
-	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*Token, error)
-	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*Token, error)
-	Create(ctx context.Context, client database.QueryExecutor, token *Token) error
-	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
-}
-
-type tokenConditions interface {
-	PrimaryKeyCondition(projectID, tokenID string) database.Condition
-	ProjectIDCondition(projectID string) database.Condition
-	TokenIDCondition(tokenID string) database.Condition
-	UserIDCondition(userID string) database.Condition
-}
+const (
+	TokenFieldUnspecified TokenField = iota
+	TokenFieldProjectID
+	TokenFieldTokenID
+	TokenFieldUserID
+	TokenFieldType
+	TokenFieldSessionID
+	TokenFieldOIDCSessionID
+	TokenFieldSAMLSessionID
+	TokenFieldScope
+	TokenFieldExpiresAt
+	TokenFieldCreatedAt
+)

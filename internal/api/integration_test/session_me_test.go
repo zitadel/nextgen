@@ -35,8 +35,6 @@ func TestGetMySession_Identity(t *testing.T) {
 	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
 	userSchemaURL := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
-	db := harness.EnsureDBPool(t)
-
 	// The user-id schema (components/schemas/user-id.yaml) requires the
 	// `user_` prefix; ogen response validation enforces it.
 	const userID = "user_session-me-test"
@@ -67,12 +65,12 @@ func TestGetMySession_Identity(t *testing.T) {
 		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
 		Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}},
 	}
-	attemptRepo := harness.EnsureAuthAttemptRepo(t)
-	require.NoError(t, attemptRepo.Create(t.Context(), db, attempt))
+	stmts := harness.EnsureServiceDB(t)
+	require.NoError(t, stmts.Statements().CreateAuthAttempt(t.Context(), attempt))
 	const plainToken = "handoff_session_me_test"
 	sum := sha256.Sum256([]byte(plainToken))
 	attempt.HandoffToken = &domain.HandoffToken{TokenHash: sum[:]}
-	require.NoError(t, attemptRepo.Handoff(t.Context(), db, attempt))
+	require.NoError(t, stmts.Statements().HandoffAuthAttempt(t.Context(), attempt))
 
 	exchangeBody, err := json.Marshal(map[string]string{"handoff_token": plainToken})
 	require.NoError(t, err)

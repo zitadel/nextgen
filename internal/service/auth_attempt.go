@@ -168,7 +168,7 @@ func (PasskeyProof) proofCheckType() domain.AuthCheckType { return domain.AuthCh
 //go:generate go tool mockgen -typed -package mocks -destination ./mocks/auth_attempt.mock.go . SessionResolver,ProjectLoader,UserLookup,UserPasswords,UserPasskeys
 
 type SessionResolver interface {
-	Get(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error)
+	Get(ctx context.Context, projectID, sessionID string) (*domain.Session, error)
 }
 
 type ProjectLoader interface {
@@ -212,18 +212,26 @@ func (s UserPasskeyStatementsStore) ListByUser(ctx context.Context, projectID, u
 }
 
 func (s UserPasskeyStatementsStore) Get(ctx context.Context, projectID, userID, credentialID string) (*domain.UserPasskey, error) {
-	return s.Pool.Statements().GetUserPasskey(ctx, projectID, userID, credentialID)
+	return s.Pool.Statements().GetUserPasskey(ctx, userPasskeyKeyFilter(projectID, userID, credentialID))
 }
 
 func (s UserPasskeyStatementsStore) Update(ctx context.Context, projectID, userID, credentialID string, updates ...domain.UserPasskeyUpdate) error {
-	return s.Pool.Statements().UpdateUserPasskey(ctx, projectID, userID, credentialID, updates...)
+	return s.Pool.Statements().UpdateUserPasskey(ctx, userPasskeyKeyFilter(projectID, userID, credentialID), updates...)
+}
+
+func userPasskeyKeyFilter(projectID, userID, credentialID string) v2database.Filter[domain.UserPasskeyField] {
+	return v2database.And(
+		v2database.Equal(v2database.Col(domain.UserPasskeyFieldProjectID), projectID),
+		v2database.Equal(v2database.Col(domain.UserPasskeyFieldUserID), userID),
+		v2database.Equal(v2database.Col(domain.UserPasskeyFieldCredentialID), credentialID),
+	)
 }
 
 // ---- Implementation ----------------------------------------------------------
 
 type authAttemptService struct {
 	pool             database.Pool
-	attempts         domain.AuthAttemptRepository
+	stmts            StatementPool
 	sessions         SessionResolver
 	users            UserLookup
 	userPasswords    UserPasswords
@@ -233,7 +241,7 @@ type authAttemptService struct {
 
 func NewAuthAttemptService(
 	pool database.Pool,
-	attempts domain.AuthAttemptRepository,
+	stmts StatementPool,
 	sessions SessionResolver,
 	users UserLookup,
 	userPasswords UserPasswords,
@@ -242,7 +250,7 @@ func NewAuthAttemptService(
 ) AuthAttemptService {
 	return &authAttemptService{
 		pool:             pool,
-		attempts:         attempts,
+		stmts:            stmts,
 		sessions:         sessions,
 		users:            users,
 		userPasswords:    userPasswords,
@@ -267,7 +275,7 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 
 	opts := make([]domain.AuthAttemptOption, 0, 1)
 	if input.SessionID != nil {
-		session, err := s.sessions.Get(ctx, s.pool, input.ProjectID, *input.SessionID)
+		session, err := s.sessions.Get(ctx, input.ProjectID, *input.SessionID)
 		if err != nil {
 			if errors.Is(err, domain.ErrSessionNotFound()) {
 				return nil, domain.ErrAuthAttemptInvalidRequest().WithParent(err).WithMessage("The session was not found.")
@@ -282,7 +290,7 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 		return nil, err
 	}
 
-	if err = s.attempts.Create(ctx, s.pool, attempt); err != nil {
+	if err = s.stmts.Statements().CreateAuthAttempt(ctx, attempt); err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("Failed to create the auth attempt.")
 	}
 	return attempt, nil
@@ -290,7 +298,7 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 
 // GetByID retrieves an auth attempt by its ID and all its factors and challenges.
 func (s *authAttemptService) GetByID(ctx context.Context, projectID, attemptID string) (*domain.AuthAttempt, error) {
-	attempt, err := s.attempts.GetByID(ctx, s.pool, projectID, attemptID)
+	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, projectID, attemptID)
 	if err != nil {
 		if errors.Is(err, domain.ErrAuthAttemptNotFound()) {
 			return nil, err
@@ -303,7 +311,7 @@ func (s *authAttemptService) GetByID(ctx context.Context, projectID, attemptID s
 // IssueChallenge issues a challenge for the given check type on an existing attempt.
 // For passkey, the user check must already be verified so the user ID is known.
 func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChallengeInput) (*domain.AuthAttempt, error) {
-	attempt, err := s.attempts.GetByID(ctx, s.pool, input.ProjectID, input.AttemptID)
+	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +321,7 @@ func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChal
 		return nil, err
 	}
 
-	if err := s.attempts.SetChallenge(ctx, s.pool, input.ProjectID, input.AttemptID, challenge); err != nil {
+	if err := s.stmts.Statements().SetAuthAttemptChallenge(ctx, input.ProjectID, input.AttemptID, challenge); err != nil {
 		return nil, err
 	}
 
@@ -325,7 +333,7 @@ func (s *authAttemptService) IssueChallenge(ctx context.Context, input IssueChal
 // required checks are now satisfied.
 // On failure, it records the failed attempt for rate-limiting purposes.
 func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofInput) (res *domain.AuthAttempt, err error) {
-	attempt, err := s.attempts.GetByID(ctx, s.pool, input.ProjectID, input.AttemptID)
+	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
 	}
@@ -335,12 +343,12 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		// Record the failure for rate-limiting — best effort, don't shadow
 		// the original error. Skip when verify couldn't identify a challenge row.
 		if challenge != nil {
-			_ = s.attempts.ChallengeFailed(ctx, s.pool, input.ProjectID, input.AttemptID, challenge)
+			_ = s.stmts.Statements().AuthAttemptChallengeFailed(ctx, input.ProjectID, input.AttemptID, challenge)
 		}
 		return nil, err
 	}
 
-	if err = s.attempts.ChallengeSucceeded(ctx, s.pool, input.ProjectID, input.AttemptID, factor, challenge.GetID()); err != nil {
+	if err = s.stmts.Statements().AuthAttemptChallengeSucceeded(ctx, input.ProjectID, input.AttemptID, factor, challenge.GetID()); err != nil {
 		return nil, err
 	}
 	attempt.SetCheck(factor) // Update the attempt with the successful factor for accurate state in the response
@@ -351,7 +359,7 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 // Handoff mints a single-use handoff token for a completed attempt.
 // The client exchanges the token at POST /sessions/exchange.
 func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*domain.AuthAttempt, error) {
-	attempt, err := s.attempts.GetByID(ctx, s.pool, input.ProjectID, input.AttemptID)
+	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +368,7 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 		return nil, err
 	}
 
-	if err := s.attempts.Handoff(ctx, s.pool, attempt); err != nil {
+	if err := s.stmts.Statements().HandoffAuthAttempt(ctx, attempt); err != nil {
 		return nil, err
 	}
 	return attempt, nil
@@ -372,11 +380,11 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 // can promote the user_id to the session.
 func (s *authAttemptService) RegisterCreatedUser(ctx context.Context, projectID, attemptID, userID string) error {
 	challenge := &domain.AuthChallengeUser{}
-	if err := s.attempts.SetChallenge(ctx, s.pool, projectID, attemptID, challenge); err != nil {
+	if err := s.stmts.Statements().SetAuthAttemptChallenge(ctx, projectID, attemptID, challenge); err != nil {
 		return err
 	}
 	factor := &domain.AuthFactorUser{UserID: userID}
-	return s.attempts.ChallengeSucceeded(ctx, s.pool, projectID, attemptID, factor, challenge.GetID())
+	return s.stmts.Statements().AuthAttemptChallengeSucceeded(ctx, projectID, attemptID, factor, challenge.GetID())
 }
 
 // buildChallenge constructs the challenge for the given check type.

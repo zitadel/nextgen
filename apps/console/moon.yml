@@ -5,6 +5,7 @@ stack: "frontend"
 dependsOn:
   - "api"
   - "design-tokens"
+  - "sdk-react"
   - "ui-react"
 
 tasks:
@@ -13,6 +14,7 @@ tasks:
     deps:
       - "api:generate"
       - "design-tokens:build"
+      - "sdk-react:build"
       - "ui-react:build"
 
   typecheck:
@@ -20,6 +22,7 @@ tasks:
     deps:
       - "api:build"
       - "design-tokens:build"
+      - "sdk-react:build"
       - "ui-react:build"
 
   build:
@@ -27,6 +30,7 @@ tasks:
     deps:
       - "api:build"
       - "design-tokens:build"
+      - "sdk-react:build"
       - "ui-react:build"
     outputs:
       - "/internal/staticui/console/dist/**/*"
@@ -36,6 +40,7 @@ tasks:
     deps:
       - "api:build-release"
       - "design-tokens:build"
+      - "sdk-react:build"
       - "ui-react:build"
     outputs:
       - "/internal/staticui/console/dist/**/*"
@@ -52,6 +57,17 @@ tasks:
 
   dev:
     command: "corepack pnpm run dev"
+    options:
+      persistent: true
+      runInCI: false
+
+  # Real-data dev loop: boots a seeded ephemeral instance, then the dev server
+  # against it. The console manages an instance, so its list screens are only
+  # meaningful against a real backend (see scripts/dev-real.mts).
+  dev-real:
+    command: "corepack pnpm run dev:real"
+    deps:
+      - "server:build"
     options:
       persistent: true
       runInCI: false

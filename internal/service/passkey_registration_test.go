@@ -18,47 +18,43 @@ import (
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-// --- fakes ---
-
-type fakePasskeyRegRepo struct {
-	created   *domain.CreatePasskeyRegistration
-	stored    map[string]*domain.PasskeyRegistration // id → row
-	deleted   []string
-	createErr error
-	getErr    error
+type passkeyRegState struct {
+	created *domain.CreatePasskeyRegistration
+	stored  map[string]*domain.PasskeyRegistration
+	deleted []string
 }
 
-func (f *fakePasskeyRegRepo) Create(_ context.Context, _ database.QueryExecutor, r *domain.CreatePasskeyRegistration) error {
-	if f.createErr != nil {
-		return f.createErr
-	}
-	f.created = r
-	if f.stored == nil {
-		f.stored = map[string]*domain.PasskeyRegistration{}
-	}
-	f.stored[r.ID] = &domain.PasskeyRegistration{
-		ID:        r.ID,
-		ProjectID: r.ProjectID,
-		UserID:    r.UserID,
-		Challenge: r.Challenge,
-		ExpiresAt: r.ExpiresAt,
-	}
-	return nil
-}
-
-func (f *fakePasskeyRegRepo) Get(_ context.Context, _ database.QueryExecutor, _, id string) (*domain.PasskeyRegistration, error) {
-	if f.getErr != nil {
-		return nil, f.getErr
-	}
-	if r, ok := f.stored[id]; ok {
-		return r, nil
-	}
-	return nil, domain.ErrPasskeyRegistrationNotFound()
-}
-
-func (f *fakePasskeyRegRepo) Delete(_ context.Context, _ database.QueryExecutor, _, id string) error {
-	f.deleted = append(f.deleted, id)
-	return nil
+func (s *passkeyRegState) expectCRUD(stmts *servicemocks.MockAllStatements) {
+	stmts.EXPECT().
+		CreatePasskeyRegistration(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, r *domain.CreatePasskeyRegistration) error {
+			s.created = r
+			if s.stored == nil {
+				s.stored = map[string]*domain.PasskeyRegistration{}
+			}
+			s.stored[r.ID] = &domain.PasskeyRegistration{
+				ID:        r.ID,
+				ProjectID: r.ProjectID,
+				UserID:    r.UserID,
+				Challenge: r.Challenge,
+				ExpiresAt: r.ExpiresAt,
+			}
+			return nil
+		}).AnyTimes()
+	stmts.EXPECT().
+		GetPasskeyRegistration(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _, id string) (*domain.PasskeyRegistration, error) {
+			if r, ok := s.stored[id]; ok {
+				return r, nil
+			}
+			return nil, database.NewNoRowFoundError(nil)
+		}).AnyTimes()
+	stmts.EXPECT().
+		DeletePasskeyRegistration(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _, id string) error {
+			s.deleted = append(s.deleted, id)
+			return nil
+		}).AnyTimes()
 }
 
 type passkeyUserState struct {
@@ -84,24 +80,21 @@ type fakeIDGen struct{ next string }
 
 func (f *fakeIDGen) New(_ string) (string, error) { return f.next, nil }
 
-// --- helpers ---
-
-func buildTestRegistrationSvc(t *testing.T, regRepo *fakePasskeyRegRepo, state *passkeyUserState) *service.PasskeyRegistrationService {
+func buildTestRegistrationSvc(t *testing.T, regState *passkeyRegState, userState *passkeyUserState) *service.PasskeyRegistrationService {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockStatementPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
-	state.expectUserPasskeys(statements)
-	return service.NewPasskeyRegistrationService(nil, pool, regRepo, &fakeIDGen{next: "pkreg_test01"})
+	regState.expectCRUD(statements)
+	userState.expectUserPasskeys(statements)
+	return service.NewPasskeyRegistrationService(nil, pool, &fakeIDGen{next: "pkreg_test01"})
 }
 
-// --- tests ---
-
 func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
-	regRepo := &fakePasskeyRegRepo{}
-	state := &passkeyUserState{}
-	svc := buildTestRegistrationSvc(t, regRepo, state)
+	regState := &passkeyRegState{}
+	userState := &passkeyUserState{}
+	svc := buildTestRegistrationSvc(t, regState, userState)
 
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
 		ProjectID:   "proj-1",
@@ -115,7 +108,6 @@ func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	assert.Equal(t, "pkreg_test01", out.RegistrationID)
 	assert.NotEmpty(t, out.Options)
 
-	// Options should be valid JSON containing creation challenge fields.
 	var optMap map[string]any
 	require.NoError(t, json.Unmarshal(out.Options, &optMap))
 	assert.Contains(t, optMap, "challenge")
@@ -125,20 +117,19 @@ func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	assert.Equal(t, "alice@example.com", user["name"])
 	assert.Equal(t, "Alice Example", user["displayName"])
 
-	// Session must be persisted.
-	require.NotNil(t, regRepo.created)
-	assert.Equal(t, "proj-1", regRepo.created.ProjectID)
-	assert.Equal(t, "user-1", regRepo.created.UserID)
-	assert.Equal(t, "pkreg_test01", regRepo.created.ID)
-	assert.Equal(t, "alice@example.com", regRepo.created.Challenge.Username)
-	assert.Equal(t, "Alice Example", regRepo.created.Challenge.DisplayName)
-	assert.True(t, regRepo.created.ExpiresAt.After(time.Now()))
+	require.NotNil(t, regState.created)
+	assert.Equal(t, "proj-1", regState.created.ProjectID)
+	assert.Equal(t, "user-1", regState.created.UserID)
+	assert.Equal(t, "pkreg_test01", regState.created.ID)
+	assert.Equal(t, "alice@example.com", regState.created.Challenge.Username)
+	assert.Equal(t, "Alice Example", regState.created.Challenge.DisplayName)
+	assert.True(t, regState.created.ExpiresAt.After(time.Now()))
 }
 
 func TestPasskeyRegistrationService_Begin_UsesNeutralLabelWithoutUsername(t *testing.T) {
-	regRepo := &fakePasskeyRegRepo{}
-	state := &passkeyUserState{}
-	svc := buildTestRegistrationSvc(t, regRepo, state)
+	regState := &passkeyRegState{}
+	userState := &passkeyUserState{}
+	svc := buildTestRegistrationSvc(t, regState, userState)
 
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
 		ProjectID: "proj-1",
@@ -155,14 +146,14 @@ func TestPasskeyRegistrationService_Begin_UsesNeutralLabelWithoutUsername(t *tes
 	require.True(t, ok, "creation options must include a user object")
 	assert.Equal(t, "Passkey account", user["name"])
 	assert.Empty(t, user["displayName"])
-	assert.Equal(t, "Passkey account", regRepo.created.Challenge.Username)
-	assert.Empty(t, regRepo.created.Challenge.DisplayName)
+	assert.Equal(t, "Passkey account", regState.created.Challenge.Username)
+	assert.Empty(t, regState.created.Challenge.DisplayName)
 }
 
 func TestPasskeyRegistrationService_Begin_RequestsDiscoverableCredential(t *testing.T) {
-	regRepo := &fakePasskeyRegRepo{}
-	state := &passkeyUserState{}
-	svc := buildTestRegistrationSvc(t, regRepo, state)
+	regState := &passkeyRegState{}
+	userState := &passkeyUserState{}
+	svc := buildTestRegistrationSvc(t, regState, userState)
 
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
 		ProjectID: "proj-1",
@@ -181,9 +172,9 @@ func TestPasskeyRegistrationService_Begin_RequestsDiscoverableCredential(t *test
 }
 
 func TestPasskeyRegistrationService_Finish_NotFoundReturnsError(t *testing.T) {
-	regRepo := &fakePasskeyRegRepo{}
-	state := &passkeyUserState{}
-	svc := buildTestRegistrationSvc(t, regRepo, state)
+	regState := &passkeyRegState{}
+	userState := &passkeyUserState{}
+	svc := buildTestRegistrationSvc(t, regState, userState)
 
 	err := svc.Finish(context.Background(), service.FinishRegistrationInput{
 		ProjectID:      "proj-1",
@@ -191,14 +182,14 @@ func TestPasskeyRegistrationService_Finish_NotFoundReturnsError(t *testing.T) {
 		Attestation:    []byte(`{}`),
 	})
 	require.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrPasskeyRegistrationNotFound()))
 }
 
 func TestPasskeyRegistrationService_Finish_InvalidAttestationReturnsProofRejected(t *testing.T) {
-	regRepo := &fakePasskeyRegRepo{}
-	state := &passkeyUserState{}
-	svc := buildTestRegistrationSvc(t, regRepo, state)
+	regState := &passkeyRegState{}
+	userState := &passkeyUserState{}
+	svc := buildTestRegistrationSvc(t, regState, userState)
 
-	// First begin a ceremony to create the session.
 	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
 		ProjectID: "proj-1",
 		UserID:    "user-1",
@@ -207,15 +198,12 @@ func TestPasskeyRegistrationService_Finish_InvalidAttestationReturnsProofRejecte
 	})
 	require.NoError(t, err)
 
-	// Submit a garbage attestation — the domain should reject it.
 	err = svc.Finish(context.Background(), service.FinishRegistrationInput{
 		ProjectID:      "proj-1",
 		RegistrationID: out.RegistrationID,
 		Attestation:    []byte(`{"not":"valid-webauthn"}`),
 	})
 	require.Error(t, err)
-	// Domain wraps parse/verify errors as proof-rejected.
 	assert.True(t, errors.Is(err, domain.ErrAuthAttemptProofRejected(nil)))
-	// Session is NOT deleted on failure (caller may retry).
-	assert.Empty(t, regRepo.deleted)
+	assert.Empty(t, regState.deleted)
 }

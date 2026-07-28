@@ -9,7 +9,6 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
@@ -22,8 +21,6 @@ const (
 	@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8,
 	@p9, @p10, @p11, @p12
 ) THEN RETURN id, created_at, updated_at`
-	deleteUserPasskeyStmt = `DELETE FROM user_passkeys
-WHERE project_id = @p1 AND user_id = @p2 AND credential_id = @p3`
 	userPasskeyQuery = `SELECT id, project_id, user_id, credential_id, public_key, aaguid, attestation_type, transports,
 	sign_count, backup_eligible, backup_state, name, verified_at, last_used_at, created_at, updated_at
 FROM user_passkeys`
@@ -73,15 +70,16 @@ func (ps userPasskeyStatements) CreateUserPasskey(ctx context.Context, p *domain
 }
 
 // GetUserPasskey implements [service.UserPasskeyStatements].
-func (ps userPasskeyStatements) GetUserPasskey(ctx context.Context, projectID, userID, credentialID string) (*domain.UserPasskey, error) {
+func (ps userPasskeyStatements) GetUserPasskey(ctx context.Context, filter database.Filter[domain.UserPasskeyField]) (*domain.UserPasskey, error) {
+	if filter == nil {
+		return nil, fmt.Errorf("UserPasskey filter is required")
+	}
+	return ps.getUserPasskey(ctx, &database.ListOptions[domain.UserPasskeyField]{Filter: filter})
+}
+
+func (ps userPasskeyStatements) getUserPasskey(ctx context.Context, filter *database.ListOptions[domain.UserPasskeyField]) (*domain.UserPasskey, error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, userPasskeyQuery, &database.ListOptions[domain.UserPasskeyField]{
-		Filter: database.And(
-			database.Equal(database.Col(domain.UserPasskeyFieldProjectID), projectID),
-			database.Equal(database.Col(domain.UserPasskeyFieldUserID), userID),
-			database.Equal(database.Col(domain.UserPasskeyFieldCredentialID), credentialID),
-		),
-	}, userPasskeySchema); err != nil {
+	if err := compileRead(&compiler, userPasskeyQuery, filter, userPasskeySchema); err != nil {
 		return nil, err
 	}
 
@@ -130,7 +128,10 @@ func (ps userPasskeyStatements) ListUserPasskeys(ctx context.Context, filter *da
 }
 
 // UpdateUserPasskey implements [service.UserPasskeyStatements].
-func (ps userPasskeyStatements) UpdateUserPasskey(ctx context.Context, projectID, userID, credentialID string, updates ...domain.UserPasskeyUpdate) error {
+func (ps userPasskeyStatements) UpdateUserPasskey(ctx context.Context, filter database.Filter[domain.UserPasskeyField], updates ...domain.UserPasskeyUpdate) error {
+	if filter == nil {
+		return fmt.Errorf("UserPasskey filter is required")
+	}
 	if len(updates) == 0 {
 		return database.ErrNoChanges
 	}
@@ -172,12 +173,8 @@ func (ps userPasskeyStatements) UpdateUserPasskey(ctx context.Context, projectID
 		}
 	}
 
-	c.WriteString(", updated_at = CURRENT_TIMESTAMP() WHERE project_id = ")
-	c.WriteArg(projectID)
-	c.WriteString(" AND user_id = ")
-	c.WriteArg(userID)
-	c.WriteString(" AND credential_id = ")
-	c.WriteArg(credentialID)
+	c.WriteString(", updated_at = CURRENT_TIMESTAMP() WHERE ")
+	compileFilter(&c, filter, userPasskeySchema)
 
 	n, err := ps.db.Update(ctx, c.statement())
 	if err != nil {
@@ -190,19 +187,15 @@ func (ps userPasskeyStatements) UpdateUserPasskey(ctx context.Context, projectID
 }
 
 // DeleteUserPasskey implements [service.UserPasskeyStatements].
-func (ps userPasskeyStatements) DeleteUserPasskey(ctx context.Context, projectID, userID, credentialID string) error {
-	stmt := buildStatement(deleteUserPasskeyStmt, projectID, userID, credentialID).statement()
-	n, err := ps.db.Update(ctx, stmt)
-	if err != nil {
-		return err
+func (ps userPasskeyStatements) DeleteUserPasskey(ctx context.Context, filter database.Filter[domain.UserPasskeyField]) error {
+	if filter == nil {
+		return fmt.Errorf("UserPasskey filter is required")
 	}
-	if n == 0 {
-		return storagedb.NewNoRowFoundError(nil)
-	}
-	if n > 1 {
-		return storagedb.NewMultipleRowsFoundError(nil)
-	}
-	return nil
+	var c statementCompiler
+	c.WriteString("DELETE FROM user_passkeys WHERE ")
+	compileFilter(&c, filter, userPasskeySchema)
+	_, err := ps.db.Update(ctx, c.statement())
+	return wrapError(err)
 }
 
 func (ps userPasskeyStatements) scanUserPasskey(row *spanner.Row) (*domain.UserPasskey, error) {

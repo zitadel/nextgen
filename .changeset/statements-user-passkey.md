@@ -2,4 +2,4 @@
 "@zitadel/server": patch
 ---
 
-Add UserPasskeyStatements storage v2 API with functional-option UpdateUserPasskey for PostgreSQL and Spanner.
+Reshape UserPasskeyStatements to a 1:1 Filter-based Get/Update/Delete API (typed updates, uint32 IncrementSignCount Delta, no coalesce).
