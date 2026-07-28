@@ -165,7 +165,7 @@ func (PasskeyProof) proofCheckType() domain.AuthCheckType { return domain.AuthCh
 
 // ---- Secondary ports -------------------------------------------------------------
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/auth_attempt.mock.go . SessionResolver,ProjectLoader,UserLookup,UserPasswords,UserPasskeys
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/auth_attempt.mock.go . SessionResolver,ProjectLoader,UserLookup,UserPasskeys
 
 type SessionResolver interface {
 	Get(ctx context.Context, projectID, sessionID string) (*domain.Session, error)
@@ -177,12 +177,6 @@ type ProjectLoader interface {
 
 type UserLookup interface {
 	GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error)
-}
-
-type UserPasswords interface {
-	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*domain.UserPassword, error)
-	UserIDCondition(userID string) database.Condition
-	ProjectIDCondition(pid string) database.Condition
 }
 
 type UserPasskeys interface {
@@ -234,7 +228,6 @@ type authAttemptService struct {
 	stmts            StatementPool
 	sessions         SessionResolver
 	users            UserLookup
-	userPasswords    UserPasswords
 	userPasskeys     UserPasskeys
 	passwordVerifier crypto.HashVerifier
 }
@@ -244,7 +237,6 @@ func NewAuthAttemptService(
 	stmts StatementPool,
 	sessions SessionResolver,
 	users UserLookup,
-	userPasswords UserPasswords,
 	userPasskeys UserPasskeys,
 	passwordVerifier crypto.HashVerifier,
 ) AuthAttemptService {
@@ -253,7 +245,6 @@ func NewAuthAttemptService(
 		stmts:            stmts,
 		sessions:         sessions,
 		users:            users,
-		userPasswords:    userPasswords,
 		userPasskeys:     userPasskeys,
 		passwordVerifier: passwordVerifier,
 	}
@@ -448,14 +439,10 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return nil, nil, err
 		}
-		password, err := s.userPasswords.Get(
-			ctx,
-			s.pool,
-			database.WithCondition(database.And(
-				s.userPasswords.ProjectIDCondition(attempt.ProjectID),
-				s.userPasswords.UserIDCondition(userFactor.UserID),
-			)),
-		)
+		password, err := s.stmts.Statements().GetUserPassword(ctx, v2database.And(
+			v2database.Equal(v2database.Col(domain.UserPasswordFieldProjectID), attempt.ProjectID),
+			v2database.Equal(v2database.Col(domain.UserPasswordFieldUserID), userFactor.UserID),
+		))
 		if err != nil {
 			return passwordChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
 		}

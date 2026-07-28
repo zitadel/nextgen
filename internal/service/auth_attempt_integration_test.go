@@ -11,7 +11,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 // newAuthAttemptServiceForIntegration wires the service with real statement pools.
@@ -23,7 +22,6 @@ func newAuthAttemptServiceForIntegration(pool database.Pool, v2Pool service.Stat
 		v2Pool,
 		service.SessionStatementsResolver{Pool: v2Pool},
 		service.UserStatementsLookup{Pool: v2Pool},
-		repository.NewUserPasswordRepository(),
 		service.UserPasskeyStatementsStore{Pool: v2Pool},
 		nil,
 	)
