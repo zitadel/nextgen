@@ -21,10 +21,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { api } from "../../api/zitadel";
-import { field } from "../../lib/record";
+import { api } from "../../../api/zitadel";
+import { field } from "../../../lib/record";
+import { userDisplayName } from "../../../lib/user";
 
-export const Route = createFileRoute("/users/")({
+export const Route = createFileRoute("/_authed/users/")({
   staticData: { nav: { label: "Users", order: 2, icon: Users } },
   loader: () => api.listUsers(),
   component: UsersScreen,
@@ -90,15 +91,15 @@ function UsersScreen() {
   }, [users, query, sortAsc]);
 
   return (
-    <div className="px-4 pb-8 pt-9 sm:px-8">
-      <h1 className="font-serif text-2xl leading-6 tracking-tight text-foreground">Users</h1>
+    <div className="px-4 pt-9 pb-8 sm:px-8">
+      <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight">Users</h1>
 
       <div className="mt-6 flex flex-col gap-4 lg:h-10 lg:flex-row lg:items-center lg:justify-end">
         <div className="flex w-full flex-col gap-2.5 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
           <div className="relative w-full lg:w-[373px]">
             <Search
               aria-hidden
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
             />
             <Input
               ref={searchRef}
@@ -108,9 +109,9 @@ function UsersScreen() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               aria-label="Search users"
-              className="pl-9 pr-14"
+              className="pr-14 pl-9"
             />
-            <kbd className="pointer-events-none absolute right-2 top-1/2 flex h-5 -translate-y-1/2 items-center gap-0.5 rounded-sm bg-muted px-1.5 font-sans text-[10px] font-medium text-muted-foreground">
+            <kbd className="bg-muted text-muted-foreground pointer-events-none absolute top-1/2 right-2 flex h-5 -translate-y-1/2 items-center gap-0.5 rounded-sm px-1.5 font-sans text-[10px] font-medium">
               {searchShortcutLabel()}
             </kbd>
           </div>
@@ -121,7 +122,7 @@ function UsersScreen() {
         </div>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-2xl border border-sidebar-border bg-card">
+      <div className="border-sidebar-border bg-card mt-6 overflow-hidden rounded-2xl border">
         <Table className="table-fixed text-xs">
           <colgroup>
             <col className="w-[240px]" />
@@ -130,7 +131,7 @@ function UsersScreen() {
             <col className="w-[60px]" />
           </colgroup>
           <TableHeader>
-            <TableRow className="border-b border-border hover:bg-transparent">
+            <TableRow className="border-border border-b hover:bg-transparent">
               <HeadCell
                 sortable
                 ariaSort={sortAsc === null ? "none" : sortAsc ? "ascending" : "descending"}
@@ -146,13 +147,13 @@ function UsersScreen() {
           <TableBody>
             {rows.length === 0 ? (
               <TableRow className="border-0 hover:bg-transparent">
-                <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={4} className="text-muted-foreground h-24 text-center">
                   {users.length === 0 ? "No users yet." : "No users match the current filters."}
                 </TableCell>
               </TableRow>
             ) : (
               rows.map((user) => (
-                <TableRow key={user.id} className="border-0 hover:bg-muted/40">
+                <TableRow key={user.id} className="hover:bg-muted/40 border-0">
                   <TableCell className="h-11 truncate px-4 py-0">
                     <div className="flex items-center gap-2">
                       <Avatar size="sm">
@@ -161,16 +162,16 @@ function UsersScreen() {
                       <Link
                         to="/users/$userId"
                         params={{ userId: user.id }}
-                        className="truncate font-medium text-foreground underline-offset-2 hover:underline"
+                        className="text-foreground truncate font-medium underline-offset-2 hover:underline"
                       >
                         {user.name}
                       </Link>
                     </div>
                   </TableCell>
-                  <TableCell className="h-11 truncate px-2 py-0 text-muted-foreground">
+                  <TableCell className="text-muted-foreground h-11 truncate px-2 py-0">
                     {user.email}
                   </TableCell>
-                  <TableCell className="h-11 truncate px-2 py-0 text-foreground">
+                  <TableCell className="text-foreground h-11 truncate px-2 py-0">
                     {user.id}
                   </TableCell>
                   <TableCell className="h-11 px-2 py-0">
@@ -191,7 +192,9 @@ function toUserRow(user: Record<string, unknown>, index: number): UserRow {
   const email = field(user, "email") ?? "—";
   return {
     id,
-    name: field(user, "username") ?? (email === "—" ? id : email),
+    // Fall back to the email, then the id: a `minimal` user schema defines only
+    // `email`, so a name is genuinely absent rather than missing.
+    name: userDisplayName(user) ?? (email === "—" ? id : email),
     email,
   };
 }
@@ -211,7 +214,7 @@ function HeadCell({
   // Figma header labels use the display face (`font-serif` → APK Futural),
   // uppercase 12px with 0.96px tracking, inset by a ghost-button (h-9, px-2.5).
   const label = (
-    <span className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 py-2 font-serif text-xs uppercase tracking-[0.96px] text-muted-foreground">
+    <span className="text-muted-foreground inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 py-2 font-serif text-xs tracking-[0.96px] uppercase">
       {children}
       {sortable && <ArrowUpDown className="size-4" aria-hidden />}
     </span>

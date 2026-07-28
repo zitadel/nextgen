@@ -125,7 +125,10 @@ against local `@zitadel/*` tarballs instead of public npm (details in
 [CONTRIBUTING.md](CONTRIBUTING.md#testing-the-cli-from-source)). Set
 `ZITADEL_CLI_USE_PUBLIC_PACKAGES=1` only when intentionally testing published
 packages; pass `--runtime docker`, `--image`, or `ZITADEL_LOCAL_IMAGE` when
-intentionally testing the Docker backend.
+intentionally testing the Docker backend. Invoking `apps/cli/bin/run.js`
+directly runs the last-built `dist/` — in a fresh checkout or after source
+changes, run `pnpm install` and `moon run cli:build` first (the wrapper above
+does this for you).
 
 ## Local Checks
 

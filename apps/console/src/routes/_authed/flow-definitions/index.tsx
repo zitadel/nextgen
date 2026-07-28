@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Pill } from "@zitadel/ui-react";
 
-import { api, projectId } from "../../api/zitadel";
-import { ContentGrid, Page } from "../../components/layout";
-import { DataTable, PageHeader, TableLink } from "../../components/resource-page";
+import { api } from "../../../api/zitadel";
+import { getConsoleProjectId } from "../../../runtime/runtime";
+import { ContentGrid, Page } from "../../../components/layout";
+import { DataTable, PageHeader, TableLink } from "../../../components/resource-page";
 
-export const Route = createFileRoute("/flow-definitions/")({
-  loader: () => api.listFlowDefinitions({ project_id: projectId }),
+export const Route = createFileRoute("/_authed/flow-definitions/")({
+  loader: () => api.listFlowDefinitions({ project_id: getConsoleProjectId() }),
   component: FlowDefinitionsList,
 });
 
