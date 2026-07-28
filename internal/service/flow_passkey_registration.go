@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // FlowPasskeyRegistrationAdapter wraps [*PasskeyRegistrationService] and implements
@@ -43,7 +42,7 @@ func (a *FlowPasskeyRegistrationAdapter) IssuePasskeyRegistrationChallenge(ctx c
 // SubmitPasskeyRegistration implements [domain.FlowPasskeyRegistrationService].
 // The flow engine still passes a v1 QueryExecutor; passkey persistence uses the
 // service's v2 statement pool (provisional user creation is a separate ApplyActions txn).
-func (a *FlowPasskeyRegistrationAdapter) SubmitPasskeyRegistration(ctx context.Context, _ database.QueryExecutor, in domain.FlowSubmitPasskeyRegistrationInput) error {
+func (a *FlowPasskeyRegistrationAdapter) SubmitPasskeyRegistration(ctx context.Context, in domain.FlowSubmitPasskeyRegistrationInput) error {
 	return a.svc.Finish(ctx, FinishRegistrationInput{
 		ProjectID:      in.ProjectID,
 		RegistrationID: in.ChallengeID,

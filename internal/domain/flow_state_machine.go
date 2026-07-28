@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain/idgen"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // Step error text keys the state machine emits when an auth-attempt
@@ -51,10 +50,10 @@ func FlowStepErrorAllowed(key string) bool {
 // challenges, no gates. `Pop` on [FlowStepResult] stays reserved for
 // the deferred pivot work.
 type FlowStateMachine interface {
-	Start(ctx context.Context, client database.QueryExecutor, in FlowStartInput) (FlowStepResult, error)
-	Process(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error)
+	Start(ctx context.Context, in FlowStartInput) (FlowStepResult, error)
+	Process(ctx context.Context, def *FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error)
 	// Render re-emits the current step without advancing. Backs GET /flow/{id}.
-	Render(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState) (FlowStepResult, error)
+	Render(ctx context.Context, def *FlowDefinition, state *FlowState) (FlowStepResult, error)
 }
 
 // FlowStartInput carries everything the state machine needs to
@@ -247,7 +246,7 @@ func NewFlowStateMachine(
 
 var _ FlowStateMachine = (*FlowStateMachineRuntime)(nil)
 
-func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.QueryExecutor, in FlowStartInput) (FlowStepResult, error) {
+func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) (FlowStepResult, error) {
 	if in.Definition == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: start without definition", ErrFlowIntegrity())
 	}
@@ -288,7 +287,7 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 	}
 	state.AuthAttemptID = attemptID
 
-	step, err := r.renderStep(ctx, client, in.Definition, state)
+	step, err := r.renderStep(ctx, in.Definition, state)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -297,11 +296,11 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 
 // Render re-emits the current step without advancing. Refreshes IssuedAt
 // so the cookie max-age window slides while the user is on the step.
-func (r *FlowStateMachineRuntime) Render(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState) (FlowStepResult, error) {
+func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinition, state *FlowState) (FlowStepResult, error) {
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrFlowIntegrity())
 	}
-	step, err := r.renderStep(ctx, client, def, state)
+	step, err := r.renderStep(ctx, def, state)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -315,7 +314,6 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, client database.Qu
 // per-kind methods and their helpers.
 type processCtx struct {
 	ctx         context.Context
-	client      database.QueryExecutor
 	def         *FlowDefinition
 	state       *FlowState
 	currentStep *FlowDefinitionStep
@@ -324,7 +322,7 @@ type processCtx struct {
 
 // Process advances the flow one step by dispatching the submission to
 // the handler for its action kind.
-func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error) {
+func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error) {
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: process without definition or state", ErrFlowIntegrity())
 	}
@@ -340,7 +338,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 		return FlowStepResult{}, fmt.Errorf("%w: current step %q missing from definition", ErrFlowIntegrity(), state.CurrentStep)
 	}
 
-	pc := &processCtx{ctx: ctx, client: client, def: def, state: state, currentStep: currentStep, in: in}
+	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep, in: in}
 	actionKind := stepActionKind(currentStep, in.Action)
 
 	// Back and Navigate both skip the input pipeline entirely.
@@ -483,7 +481,7 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 		return r.terminate(pc, nextStep)
 	}
 
-	step, err := r.renderStep(pc.ctx, pc.client, pc.def, pc.state)
+	step, err := r.renderStep(pc.ctx, pc.def, pc.state)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -742,7 +740,7 @@ type passkeyPhaseResult struct {
 //     was selected → use the resolved user id or mint a provisional one, then
 //     issue a creation challenge.
 func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowResolvedFields, passkeyResolved FlowResolvedFields, actionKind FlowActionKind) (passkeyPhaseResult, error) {
-	ctx, client, state, step, in := pc.ctx, pc.client, pc.state, pc.currentStep, pc.in
+	ctx, state, step, in := pc.ctx, pc.state, pc.currentStep, pc.in
 	switch {
 	// A ceremony is in flight but no proof arrived: resume or abandon.
 	case state.PendingChallenge != nil && in.ChallengeResponse == nil:
@@ -779,7 +777,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 					return passkeyPhaseResult{}, fmt.Errorf("flow state machine: ensure user exists: %w", err)
 				}
 			}
-			err := r.passkeyRegistration.SubmitPasskeyRegistration(ctx, client, FlowSubmitPasskeyRegistrationInput{
+			err := r.passkeyRegistration.SubmitPasskeyRegistration(ctx, FlowSubmitPasskeyRegistrationInput{
 				ProjectID:   state.ProjectID,
 				UserID:      userID,
 				ChallengeID: challengeID,
@@ -1010,7 +1008,7 @@ func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, e
 	pc.state.CurrentPurpose = prev.Purpose
 	pc.state.ClearPendingChallenge()
 
-	step, err := r.renderStep(pc.ctx, pc.client, pc.def, pc.state)
+	step, err := r.renderStep(pc.ctx, pc.def, pc.state)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -1023,7 +1021,7 @@ func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, e
 // point-of-no-return.
 func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *FlowDefinitionStep) (FlowStepResult, error) {
 	pc.state.ClearBackStack()
-	rendered, err := r.renderStep(pc.ctx, pc.client, pc.def, pc.state)
+	rendered, err := r.renderStep(pc.ctx, pc.def, pc.state)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -1064,7 +1062,7 @@ func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *FlowDefinition
 // renderStep renders the step currently pinned by state.CurrentStep.
 // Callers advance state (or pop for back) before invoking so
 // state.CurrentStep already points at the step they want rendered.
-func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState) (*FlowStep, error) {
+func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *FlowDefinition, state *FlowState) (*FlowStep, error) {
 	step, ok := def.FindStep(state.CurrentStep)
 	if !ok {
 		return nil, fmt.Errorf("%w: render unknown step %q", ErrFlowIntegrity(), state.CurrentStep)

@@ -30,7 +30,6 @@ func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
 	t.Helper()
 	if h.FlowService == nil {
 		h.FlowService = service.NewFlowService(
-			h.EnsureDBPool(t),
 			h.EnsureServiceDB(t),
 			h.EnsureFlowStateMachine(t),
 			idgen.NewULID(),

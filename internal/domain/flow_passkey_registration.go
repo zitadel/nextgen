@@ -2,8 +2,6 @@ package domain
 
 import (
 	"context"
-
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_passkey_registration.mock.go . FlowPasskeyRegistrationService
@@ -23,7 +21,7 @@ type FlowPasskeyRegistrationService interface {
 	// [ErrAuthAttemptProofRejected]. client is retained for the flow state
 	// machine's QueryExecutor contract; the adapter currently persists via the
 	// v2 statement pool.
-	SubmitPasskeyRegistration(ctx context.Context, client database.QueryExecutor, in FlowSubmitPasskeyRegistrationInput) error
+	SubmitPasskeyRegistration(ctx context.Context, in FlowSubmitPasskeyRegistrationInput) error
 }
 
 // FlowIssuePasskeyRegistrationChallengeInput carries the relying-party

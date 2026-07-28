@@ -170,7 +170,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		userLookup,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(pool, serviceDBPool, userIdentity, service.SessionConfig{
+	sessionService := service.NewSessionService(serviceDBPool, userIdentity, service.SessionConfig{
 		DefaultTTL: cfg.Session.DefaultTTL,
 		MaxTTL:     cfg.Session.MaxTTL,
 	})
@@ -220,7 +220,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		time.Now,
 	)
 
-	flowService := service.NewFlowService(pool, serviceDBPool, stateMachine, ids)
+	flowService := service.NewFlowService(serviceDBPool, stateMachine, ids)
 	tokenService := service.NewTokenService(keyService)
 
 	// ── Default project resolution ──

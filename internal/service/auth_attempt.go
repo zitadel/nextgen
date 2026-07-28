@@ -208,7 +208,12 @@ func NewAuthAttemptService(
 func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttemptInput) (res *domain.AuthAttempt, err error) {
 	requiredChecks := input.RequiredChecks
 	if requiredChecks == nil {
-		// TODO: load project default required checks
+		// TODO: implement this
+		//project, err := s.projects.Get(ctx, s.pool, input.ProjectID)
+		//if err != nil {
+		//	return nil, domain.ErrInternal(err).WithMessage("failed to load project config")
+		//}
+		// requiredChecks = project.DefaultRequiredChecks
 	}
 
 	opts := make([]domain.AuthAttemptOption, 0, 1)
@@ -422,8 +427,8 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			p.AssertionResponse,
 			userID,
 			passkeys,
-			func(uid string) ([]*domain.UserPasskey, error) {
-				return s.listUserPasskeys(ctx, attempt.ProjectID, uid)
+			func(userID string) ([]*domain.UserPasskey, error) {
+				return s.listUserPasskeys(ctx, attempt.ProjectID, userID)
 			},
 		)
 		if err != nil {
