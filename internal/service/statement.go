@@ -8,7 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserTOTPStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -31,6 +31,7 @@ type AllStatements interface {
 	SessionStatements
 	AuthAttemptStatements
 	UserStatements
+	UserTOTPStatements
 	Statements
 }
 
@@ -204,4 +205,18 @@ type UserStatements interface {
 	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error
 	DeleteUserByID(ctx context.Context, projectID, userID string) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type UserTOTPPool interface {
+// 	Statementer[UserTOTPStatements]
+// 	Transactioner[UserTOTPStatements]
+// }
+
+type UserTOTPStatements interface {
+	Statements
+	CreateUserTOTP(ctx context.Context, totp *domain.CreateUserTOTP) error
+	GetUserTOTPByUserID(ctx context.Context, projectID, userID string) (*domain.UserTOTP, error)
+	UpdateUserTOTP(ctx context.Context, projectID, userID string, updates ...domain.UserTOTPUpdate) error
+	DeleteUserTOTPByUserID(ctx context.Context, projectID, userID string) error
 }
