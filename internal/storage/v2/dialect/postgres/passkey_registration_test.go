@@ -4,8 +4,6 @@ package postgres
 
 import (
 	"context"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -18,7 +16,7 @@ import (
 
 func uniquePasskeyRegIDs(t *testing.T) (projectID, regID, userID string) {
 	t.Helper()
-	suffix := strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	suffix := uniqueSuffix(t)
 	return "proj-pkreg-" + suffix, "pkreg-" + suffix, "usr-pkreg-" + suffix
 }
 

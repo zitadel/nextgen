@@ -4,8 +4,6 @@ package postgres
 
 import (
 	"context"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -19,7 +17,7 @@ import (
 
 func uniqueTokenFixtureIDs(t *testing.T) (projectID, schemaURL, userID string) {
 	t.Helper()
-	suffix := strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	suffix := uniqueSuffix(t)
 	return "proj-token-" + suffix, "https://schemas.test/tokens/" + suffix + ".json", "usr-token-" + suffix
 }
 

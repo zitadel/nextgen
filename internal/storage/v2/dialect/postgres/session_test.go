@@ -5,8 +5,6 @@ package postgres
 import (
 	"context"
 	"crypto/sha256"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -19,8 +17,7 @@ import (
 
 func uniqueSessionFixtureIDs(t *testing.T) string {
 	t.Helper()
-	suffix := strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	return "proj-session-" + suffix
+	return "proj-session-" + uniqueSuffix(t)
 }
 
 func ensureSessionProject(t *testing.T, projectID string) {

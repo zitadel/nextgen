@@ -54,7 +54,7 @@ func TestTeamStatements_NameUniquePerProject(t *testing.T) {
 	require.NoError(t, stmts.CreateProject(ctx, project))
 	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 
-	other := newTestProject(uniqueProjectID(t) + "_other")
+	other := newTestProject(uniqueProjectID(t))
 	require.NoError(t, stmts.CreateProject(ctx, other))
 	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), other.ID) })
 

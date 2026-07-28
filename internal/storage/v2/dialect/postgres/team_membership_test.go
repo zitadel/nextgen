@@ -3,9 +3,7 @@
 package postgres
 
 import (
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -50,7 +48,7 @@ func seedTeamMembershipParents(t *testing.T, projectID, teamID, userID string) {
 
 func uniqueTeamMembershipIDs(t *testing.T) (projectID, teamID, userID string) {
 	t.Helper()
-	suffix := fmt.Sprintf("%s-%d", t.Name(), time.Now().UnixNano())
+	suffix := uniqueSuffix(t)
 	return "proj-tm-" + suffix, "team-tm-" + suffix, "usr-tm-" + suffix
 }
 

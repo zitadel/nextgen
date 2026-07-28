@@ -4,8 +4,6 @@ package postgres
 
 import (
 	"context"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -18,7 +16,7 @@ import (
 
 func uniqueFlowDefinitionID(t *testing.T) string {
 	t.Helper()
-	return "flow-" + strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	return "flow-" + uniqueSuffix(t)
 }
 
 func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {

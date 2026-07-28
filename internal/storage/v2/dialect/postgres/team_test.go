@@ -5,7 +5,6 @@ package postgres
 import (
 	"context"
 	"errors"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -22,7 +21,7 @@ import (
 
 func uniqueTeamIDs(t *testing.T) (projectID, teamID string) {
 	t.Helper()
-	suffix := strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	suffix := uniqueSuffix(t)
 	return "proj-team-" + suffix, "team-" + suffix
 }
 
