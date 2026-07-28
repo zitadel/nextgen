@@ -72,7 +72,7 @@ curl -s -X POST http://localhost:8080/projects \
   -d '{}' | jq .
 ```
 
-The response contains the `id` and `project_secret`:
+The response contains the `id` and `projectSecret`:
 
 ```json
 {
