@@ -190,10 +190,21 @@ func (s *UserService) ListPasskeys(ctx context.Context, input ListPasskeysInput)
 		),
 	)
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, domain.ErrUserNotFound()
-		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get user passkeys from database")
+	}
+
+	// Distinguish "user not found" from "user has no passkeys".
+	if len(passkeys) == 0 {
+		_, err := s.v2Pool.Statements().GetUser(ctx, v2database.And(
+			v2database.Equal(v2database.Col(domain.UserFieldProjectID), input.ProjectID),
+			v2database.Equal(v2database.Col(domain.UserFieldID), input.UserID),
+		), UserQueryOptions{})
+		if err != nil {
+			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+				return nil, domain.ErrUserNotFound()
+			}
+			return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
+		}
 	}
 
 	return passkeys, nil

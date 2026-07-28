@@ -33,7 +33,7 @@ get:
           schema:
             $ref: ../../../../components/error-details.yaml
     '403':
-      description: Client does not have the premissions to perform this action.
+      description: Client does not have the permissions to perform this action.
       content:
         application/json:
           schema:
