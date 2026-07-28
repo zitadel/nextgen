@@ -169,8 +169,7 @@ func TestUserPasswordStatements_Update(t *testing.T) {
 	assert.Zero(t, got.FailedAttempts)
 
 	require.NoError(t, testPool.UpdateUserPassword(t.Context(), projectID, userID,
-		&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 1},
-		&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 1},
+		&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 2},
 	))
 	got, err = testPool.GetUserPasswordByUserID(t.Context(), projectID, userID)
 	require.NoError(t, err)

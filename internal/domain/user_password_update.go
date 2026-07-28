@@ -39,7 +39,7 @@ type UserPasswordLastSuccessfulCheckUpdate struct {
 func (*UserPasswordLastSuccessfulCheckUpdate) userPasswordUpdate() {}
 
 type UserPasswordIncrementFailedAttemptsUpdate struct {
-	Delta int16
+	Delta uint8
 }
 
 func (*UserPasswordIncrementFailedAttemptsUpdate) userPasswordUpdate() {}

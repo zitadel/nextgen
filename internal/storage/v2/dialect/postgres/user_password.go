@@ -75,77 +75,47 @@ func (ps userPasswordStatements) DeleteUserPasswordByUserID(ctx context.Context,
 	return wrapError(err)
 }
 
-type userPasswordPatch struct {
-	encodedHash         *string
-	changeRequired      *bool
-	changedAt           *time.Time
-	verificationID      *string
-	lastSuccessfulCheck *time.Time
-	delta               int16
-	resetFailedAttempts bool
-}
-
-func coalesceUserPasswordUpdates(updates []domain.UserPasswordUpdate) (userPasswordPatch, error) {
-	var patch userPasswordPatch
-	for _, u := range updates {
-		switch v := u.(type) {
-		case *domain.UserPasswordEncodedHashUpdate:
-			h := v.EncodedHash
-			patch.encodedHash = &h
-		case *domain.UserPasswordChangeRequiredUpdate:
-			b := v.ChangeRequired
-			patch.changeRequired = &b
-		case *domain.UserPasswordChangedAtUpdate:
-			t := v.ChangedAt
-			patch.changedAt = &t
-		case *domain.UserPasswordVerificationIDUpdate:
-			id := v.VerificationID
-			patch.verificationID = &id
-		case *domain.UserPasswordLastSuccessfulCheckUpdate:
-			t := v.LastSuccessfulCheck
-			patch.lastSuccessfulCheck = &t
-		case *domain.UserPasswordIncrementFailedAttemptsUpdate:
-			if v.Delta <= 0 {
-				return userPasswordPatch{}, fmt.Errorf("UserPasswordIncrementFailedAttemptsUpdate.Delta must be > 0, got %d", v.Delta)
-			}
-			patch.resetFailedAttempts = false
-			patch.delta += v.Delta
-		case *domain.UserPasswordResetFailedAttemptsUpdate:
-			patch.resetFailedAttempts = true
-			patch.delta = 0
-		default:
-			return userPasswordPatch{}, fmt.Errorf("unknown UserPasswordUpdate %T", u)
-		}
-	}
-	return patch, nil
-}
-
-func (p userPasswordPatch) empty() bool {
-	return p.encodedHash == nil &&
-		p.changeRequired == nil &&
-		p.changedAt == nil &&
-		p.verificationID == nil &&
-		p.lastSuccessfulCheck == nil &&
-		!p.resetFailedAttempts &&
-		p.delta == 0
-}
-
 // UpdateUserPassword implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) UpdateUserPassword(ctx context.Context, projectID, userID string, updates ...domain.UserPasswordUpdate) error {
 	if len(updates) == 0 {
 		return database.ErrNoChanges
 	}
-	patch, err := coalesceUserPasswordUpdates(updates)
-	if err != nil {
-		return err
-	}
-	if patch.empty() {
-		return database.ErrNoChanges
-	}
 
 	var c statementCompiler
 	c.WriteString("UPDATE zitadel_nextgen.user_passwords SET ")
-	writeUserPasswordPatch(&c, patch)
+	sep := ""
+	writeAssign := func(col string, arg any) {
+		c.WriteString(sep)
+		sep = ", "
+		c.WriteString(col)
+		c.WriteString(" = ")
+		c.WriteArg(arg)
+	}
+
+	for _, update := range updates {
+		switch u := update.(type) {
+		case *domain.UserPasswordEncodedHashUpdate:
+			writeAssign("encoded_hash", u.EncodedHash)
+		case *domain.UserPasswordChangeRequiredUpdate:
+			writeAssign("change_required", u.ChangeRequired)
+		case *domain.UserPasswordChangedAtUpdate:
+			writeAssign("changed_at", u.ChangedAt)
+		case *domain.UserPasswordVerificationIDUpdate:
+			writeAssign("verification_id", u.VerificationID)
+		case *domain.UserPasswordLastSuccessfulCheckUpdate:
+			writeAssign("last_successful_check", u.LastSuccessfulCheck)
+		case *domain.UserPasswordIncrementFailedAttemptsUpdate:
+			c.WriteString(sep)
+			sep = ", "
+			c.WriteString("failed_attempts = failed_attempts + ")
+			c.WriteArg(u.Delta)
+		case *domain.UserPasswordResetFailedAttemptsUpdate:
+			writeAssign("failed_attempts", int16(0))
+		default:
+			return fmt.Errorf("unknown UserPasswordUpdate %T", update)
+		}
+	}
+
 	c.WriteString(", updated_at = NOW() WHERE project_id = ")
 	c.WriteArg(projectID)
 	c.WriteString(" AND user_id = ")
@@ -159,40 +129,6 @@ func (ps userPasswordStatements) UpdateUserPassword(ctx context.Context, project
 		return wrapError(pgx.ErrNoRows)
 	}
 	return nil
-}
-
-func writeUserPasswordPatch(c *statementCompiler, patch userPasswordPatch) {
-	sep := ""
-	writeAssign := func(col string, arg any) {
-		c.WriteString(sep)
-		sep = ", "
-		c.WriteString(col)
-		c.WriteString(" = ")
-		c.WriteArg(arg)
-	}
-	if patch.encodedHash != nil {
-		writeAssign("encoded_hash", *patch.encodedHash)
-	}
-	if patch.changeRequired != nil {
-		writeAssign("change_required", *patch.changeRequired)
-	}
-	if patch.changedAt != nil {
-		writeAssign("changed_at", *patch.changedAt)
-	}
-	if patch.verificationID != nil {
-		writeAssign("verification_id", *patch.verificationID)
-	}
-	if patch.lastSuccessfulCheck != nil {
-		writeAssign("last_successful_check", *patch.lastSuccessfulCheck)
-	}
-	switch {
-	case patch.resetFailedAttempts:
-		writeAssign("failed_attempts", int16(0))
-	case patch.delta > 0:
-		c.WriteString(sep)
-		c.WriteString("failed_attempts = failed_attempts + ")
-		c.WriteArg(patch.delta)
-	}
 }
 
 // ListUserPasswords implements [service.UserPasswordStatements].
