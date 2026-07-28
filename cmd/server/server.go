@@ -126,8 +126,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	// ── Repositories ─────────────────
-	userPasswordRepo := repository.NewUserPasswordRepository()
-	userPasskeyRepo := repository.NewUserPasskeyRepository()
 	brandingRepo := repository.NewBrandingRepository(pool)
 
 	serviceDBPool := service.NewPool(v2Pool.(service.Pool))
@@ -167,15 +165,12 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	keyService := service.NewKeyService(serviceDBPool, kek)
 
 	authAttemptSvc := service.NewAuthAttemptService(
-		pool,
 		serviceDBPool,
 		sessionResolver,
 		userLookup,
-		userPasswordRepo,
-		userPasskeyRepo,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(pool, serviceDBPool, userIdentity, service.SessionConfig{
+	sessionService := service.NewSessionService(serviceDBPool, userIdentity, service.SessionConfig{
 		DefaultTTL: cfg.Session.DefaultTTL,
 		MaxTTL:     cfg.Session.MaxTTL,
 	})
@@ -198,7 +193,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		pool,
 		serviceDBPool,
 		schemaStore,
-		userPasswordRepo,
 		passwordHasher,
 	)
 
@@ -207,13 +201,12 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	fields := domain.NewSchemaFieldResolver()
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
 	createUserHandler := service.NewFlowCreateUserHandler(
-		userPasswordRepo,
 		passwordHasher,
 		userService,
 		schemaStore,
 	)
 	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaStore)
-	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, serviceDBPool, userPasskeyRepo, ids)
+	passkeyRegSvc := service.NewPasskeyRegistrationService(serviceDBPool, ids)
 	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
@@ -227,7 +220,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		time.Now,
 	)
 
-	flowService := service.NewFlowService(pool, serviceDBPool, stateMachine, ids)
+	flowService := service.NewFlowService(serviceDBPool, stateMachine, ids)
 	tokenService := service.NewTokenService(keyService)
 
 	// ── Default project resolution ──
