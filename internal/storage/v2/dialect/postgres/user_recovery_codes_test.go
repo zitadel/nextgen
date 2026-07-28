@@ -116,18 +116,18 @@ func TestUserRecoveryCodesStatements_Update(t *testing.T) {
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 
 	err = testPool.UpdateUserRecoveryCodes(ctx, byUser,
-		domain.NewUserRecoveryCodesCodesUpdate(nil),
+		&domain.UserRecoveryCodesCodesUpdate{Codes: nil},
 	)
 	assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
 
 	err = testPool.UpdateUserRecoveryCodes(ctx, byUser,
-		domain.NewUserRecoveryCodesCodesUpdate([]string{}),
+		&domain.UserRecoveryCodesCodesUpdate{Codes: []string{}},
 	)
 	assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, byUser,
-		domain.NewUserRecoveryCodesCodesUpdate([]string{"new-a", "new-b"}),
+		&domain.UserRecoveryCodesCodesUpdate{Codes: []string{"new-a", "new-b"}},
 		&domain.UserRecoveryCodesLastSuccessfulCheckUpdate{LastSuccessfulCheck: &now},
 		&domain.UserRecoveryCodesResetFailedAttemptsUpdate{},
 	))

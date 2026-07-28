@@ -3,7 +3,6 @@ package spanner
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"cloud.google.com/go/spanner"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/userrecoverycodes"
 )
 
 const (
@@ -38,37 +38,31 @@ func (s userRecoveryCodesStatements) CreateUserRecoveryCodes(ctx context.Context
 	_, err := s.db.Update(ctx, buildStatement(createUserRecoveryCodesStmt,
 		codes.ProjectID,
 		codes.UserID,
-		codes.RecoveryCodes,
+		append([]string(nil), codes.RecoveryCodes...),
 	).statement())
-	return err
+	return wrapError(err)
 }
 
 // GetUserRecoveryCodes implements [service.UserRecoveryCodesStatements].
 func (s userRecoveryCodesStatements) GetUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField]) (*domain.UserRecoveryCodes, error) {
-	if filter == nil {
-		return nil, fmt.Errorf("UserRecoveryCodes filter is required")
-	}
-	var compiler statementCompiler
-	if err := compileRead(&compiler, userRecoveryCodesQuery, &database.ListOptions[domain.UserRecoveryCodesField]{Filter: filter}, userRecoveryCodesSchema); err != nil {
-		return nil, err
-	}
-
-	var codes *domain.UserRecoveryCodes
-	err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		codes, err = collectOneRow(iter, s.scanUserRecoveryCodes)
-		return err
-	})
+	result, err := s.ListUserRecoveryCodes(ctx, &database.ListOptions[domain.UserRecoveryCodesField]{Filter: filter})
 	if err != nil {
 		return nil, err
 	}
-	return codes, nil
+	switch len(result.Items) {
+	case 0:
+		return nil, wrapError(spanner.ErrRowNotFound)
+	case 1:
+		return result.Items[0], nil
+	default:
+		return nil, wrapError(errTooManyRows)
+	}
 }
 
 // ListUserRecoveryCodes implements [service.UserRecoveryCodesStatements].
 func (s userRecoveryCodesStatements) ListUserRecoveryCodes(ctx context.Context, filter *database.ListOptions[domain.UserRecoveryCodesField]) (*database.ListResult[*domain.UserRecoveryCodes], error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, userRecoveryCodesQuery, filter, userRecoveryCodesSchema); err != nil {
+	if err := compileRead(&compiler, userRecoveryCodesQuery, filter, userrecoverycodes.Schema); err != nil {
 		return nil, err
 	}
 
@@ -86,7 +80,7 @@ func (s userRecoveryCodesStatements) ListUserRecoveryCodes(ctx context.Context, 
 	if filter.Pagination.Limit > 0 && len(items) == int(filter.Pagination.Limit) {
 		cursor := &pagination.Cursor[domain.UserRecoveryCodesField]{
 			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  userRecoveryCodesSchema.ValuesFrom(items[len(items)-1], filter.Pagination.OrderBy.Columns),
+			Values:  userrecoverycodes.Schema.ValuesFrom(items[len(items)-1], filter.Pagination.OrderBy.Columns),
 		}
 		nextCursor = cursor.Marshal()
 	}
@@ -123,16 +117,9 @@ func (s userRecoveryCodesStatements) UpdateUserRecoveryCodes(ctx context.Context
 			if err := domain.RequireNonEmptyRecoveryCodes(u.Codes); err != nil {
 				return err
 			}
-			writeAssign("recovery_codes", u.Codes)
+			writeAssign("recovery_codes", append([]string(nil), u.Codes...))
 		case *domain.UserRecoveryCodesLastSuccessfulCheckUpdate:
-			c.WriteString(sep)
-			sep = ", "
-			c.WriteString("last_successful_check = ")
-			if u.LastSuccessfulCheck == nil {
-				c.WriteString("NULL")
-			} else {
-				c.WriteArg(*u.LastSuccessfulCheck)
-			}
+			writeAssign("last_successful_check", u.LastSuccessfulCheck)
 		case *domain.UserRecoveryCodesIncrementFailedAttemptsUpdate:
 			c.WriteString(sep)
 			sep = ", "
@@ -146,7 +133,7 @@ func (s userRecoveryCodesStatements) UpdateUserRecoveryCodes(ctx context.Context
 	}
 
 	c.WriteString(", updated_at = CURRENT_TIMESTAMP() WHERE ")
-	compileFilter(&c, filter, userRecoveryCodesSchema)
+	compileFilter(&c, filter, userrecoverycodes.Schema)
 
 	n, err := s.db.Update(ctx, c.statement())
 	if err != nil {
@@ -165,7 +152,7 @@ func (s userRecoveryCodesStatements) DeleteUserRecoveryCodes(ctx context.Context
 	}
 	var c statementCompiler
 	c.WriteString("DELETE FROM user_recovery_codes WHERE ")
-	compileFilter(&c, filter, userRecoveryCodesSchema)
+	compileFilter(&c, filter, userrecoverycodes.Schema)
 	_, err := s.db.Update(ctx, c.statement())
 	return wrapError(err)
 }
@@ -189,11 +176,7 @@ func (s userRecoveryCodesStatements) scanUserRecoveryCodes(row *spanner.Row) (*d
 	); err != nil {
 		return nil, err
 	}
-	if recoveryCodes == nil {
-		codes.RecoveryCodes = []string{}
-	} else {
-		codes.RecoveryCodes = append([]string(nil), recoveryCodes...)
-	}
+	codes.RecoveryCodes = append([]string(nil), recoveryCodes...)
 	if lastSuccessful.Valid {
 		ts := lastSuccessful.Time
 		codes.LastSuccessfulCheck = &ts
@@ -203,51 +186,3 @@ func (s userRecoveryCodesStatements) scanUserRecoveryCodes(row *spanner.Row) (*d
 }
 
 var _ service.UserRecoveryCodesStatements = (*userRecoveryCodesStatements)(nil)
-
-var userRecoveryCodesSchema = database.NewSchema(map[domain.UserRecoveryCodesField]database.FieldBinding[domain.UserRecoveryCodes]{
-	domain.UserRecoveryCodesFieldID: {
-		SQLName:  "id",
-		Accessor: func(c *domain.UserRecoveryCodes) any { return c.ID },
-		Coerce:   database.CoerceNumber[int64],
-	},
-	domain.UserRecoveryCodesFieldProjectID: {
-		SQLName:  "project_id",
-		Accessor: func(c *domain.UserRecoveryCodes) any { return c.ProjectID },
-		Coerce:   database.CoerceString,
-	},
-	domain.UserRecoveryCodesFieldUserID: {
-		SQLName:  "user_id",
-		Accessor: func(c *domain.UserRecoveryCodes) any { return c.UserID },
-		Coerce:   database.CoerceString,
-	},
-	domain.UserRecoveryCodesFieldRecoveryCodes: {
-		SQLName:  "recovery_codes",
-		Accessor: func(c *domain.UserRecoveryCodes) any { return c.RecoveryCodes },
-		Coerce:   database.CoerceSliceAsAny(database.CoerceStringValue),
-	},
-	domain.UserRecoveryCodesFieldLastSuccessfulCheck: {
-		SQLName: "last_successful_check",
-		Accessor: func(c *domain.UserRecoveryCodes) any {
-			if c.LastSuccessfulCheck == nil {
-				return time.Time{}
-			}
-			return *c.LastSuccessfulCheck
-		},
-		Coerce: database.CoerceTime,
-	},
-	domain.UserRecoveryCodesFieldFailedAttempts: {
-		SQLName:  "failed_attempts",
-		Accessor: func(c *domain.UserRecoveryCodes) any { return c.FailedAttempts },
-		Coerce:   database.CoerceNumber[int16],
-	},
-	domain.UserRecoveryCodesFieldCreatedAt: {
-		SQLName:  "created_at",
-		Accessor: func(c *domain.UserRecoveryCodes) any { return c.CreatedAt },
-		Coerce:   database.CoerceTime,
-	},
-	domain.UserRecoveryCodesFieldUpdatedAt: {
-		SQLName:  "updated_at",
-		Accessor: func(c *domain.UserRecoveryCodes) any { return c.UpdatedAt },
-		Coerce:   database.CoerceTime,
-	},
-})
