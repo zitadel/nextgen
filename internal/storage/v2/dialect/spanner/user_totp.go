@@ -3,7 +3,6 @@ package spanner
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"cloud.google.com/go/spanner"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/usertotp"
 )
 
 const (
@@ -45,34 +45,24 @@ func (us userTOTPStatements) CreateUserTOTP(ctx context.Context, totp *domain.Cr
 
 // GetUserTOTP implements [service.UserTOTPStatements].
 func (us userTOTPStatements) GetUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField]) (*domain.UserTOTP, error) {
-	if filter == nil {
-		return nil, fmt.Errorf("UserTOTP filter is required")
-	}
-	return us.getUserTOTP(ctx, &database.ListOptions[domain.UserTOTPField]{Filter: filter})
-}
-
-func (us userTOTPStatements) getUserTOTP(ctx context.Context, filter *database.ListOptions[domain.UserTOTPField]) (*domain.UserTOTP, error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, userTOTPQuery, filter, userTOTPSchema); err != nil {
-		return nil, err
-	}
-
-	var totp *domain.UserTOTP
-	err := us.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		totp, err = collectOneRow(iter, us.scanUserTOTP)
-		return err
-	})
+	result, err := us.ListUserTOTPs(ctx, &database.ListOptions[domain.UserTOTPField]{Filter: filter})
 	if err != nil {
 		return nil, err
 	}
-	return totp, nil
+	switch len(result.Items) {
+	case 0:
+		return nil, wrapError(spanner.ErrRowNotFound)
+	case 1:
+		return result.Items[0], nil
+	default:
+		return nil, wrapError(errTooManyRows)
+	}
 }
 
 // ListUserTOTPs implements [service.UserTOTPStatements].
 func (us userTOTPStatements) ListUserTOTPs(ctx context.Context, filter *database.ListOptions[domain.UserTOTPField]) (*database.ListResult[*domain.UserTOTP], error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, userTOTPQuery, filter, userTOTPSchema); err != nil {
+	if err := compileRead(&compiler, userTOTPQuery, filter, usertotp.Schema); err != nil {
 		return nil, err
 	}
 
@@ -83,14 +73,14 @@ func (us userTOTPStatements) ListUserTOTPs(ctx context.Context, filter *database
 		return err
 	})
 	if err != nil {
-		return nil, err
+		return nil, wrapError(err)
 	}
 
 	var nextCursor []byte
 	if filter.Pagination.Limit > 0 && len(items) == int(filter.Pagination.Limit) {
 		cursor := &pagination.Cursor[domain.UserTOTPField]{
 			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  userTOTPSchema.ValuesFrom(items[len(items)-1], filter.Pagination.OrderBy.Columns),
+			Values:  usertotp.Schema.ValuesFrom(items[len(items)-1], filter.Pagination.OrderBy.Columns),
 		}
 		nextCursor = cursor.Marshal()
 	}
@@ -142,7 +132,7 @@ func (us userTOTPStatements) UpdateUserTOTP(ctx context.Context, filter database
 	}
 
 	c.WriteString(", updated_at = CURRENT_TIMESTAMP() WHERE ")
-	compileFilter(&c, filter, userTOTPSchema)
+	compileFilter(&c, filter, usertotp.Schema)
 
 	n, err := us.db.Update(ctx, c.statement())
 	if err != nil {
@@ -161,7 +151,7 @@ func (us userTOTPStatements) DeleteUserTOTP(ctx context.Context, filter database
 	}
 	var c statementCompiler
 	c.WriteString("DELETE FROM user_totp WHERE ")
-	compileFilter(&c, filter, userTOTPSchema)
+	compileFilter(&c, filter, usertotp.Schema)
 	_, err := us.db.Update(ctx, c.statement())
 	return wrapError(err)
 }
@@ -198,68 +188,4 @@ func (us userTOTPStatements) scanUserTOTP(row *spanner.Row) (*domain.UserTOTP, e
 	return totp, nil
 }
 
-func coerceBytes(v any) (any, error) {
-	switch b := v.(type) {
-	case []byte:
-		return b, nil
-	case string:
-		return []byte(b), nil
-	default:
-		return nil, database.ErrCoerceExpectedType("[]byte", v)
-	}
-}
-
 var _ service.UserTOTPStatements = (*userTOTPStatements)(nil)
-
-var userTOTPSchema = database.NewSchema(map[domain.UserTOTPField]database.FieldBinding[domain.UserTOTP]{
-	domain.UserTOTPFieldID: {
-		SQLName:  "id",
-		Accessor: func(t *domain.UserTOTP) any { return t.ID },
-		Coerce:   database.CoerceNumber[int64],
-	},
-	domain.UserTOTPFieldProjectID: {
-		SQLName:  "project_id",
-		Accessor: func(t *domain.UserTOTP) any { return t.ProjectID },
-		Coerce:   database.CoerceString,
-	},
-	domain.UserTOTPFieldUserID: {
-		SQLName:  "user_id",
-		Accessor: func(t *domain.UserTOTP) any { return t.UserID },
-		Coerce:   database.CoerceString,
-	},
-	domain.UserTOTPFieldSecret: {
-		SQLName:  "secret",
-		Accessor: func(t *domain.UserTOTP) any { return t.Secret },
-		Coerce:   coerceBytes,
-	},
-	domain.UserTOTPFieldVerifiedAt: {
-		SQLName:  "verified_at",
-		Accessor: func(t *domain.UserTOTP) any { return t.VerifiedAt },
-		Coerce:   database.CoerceTime,
-	},
-	domain.UserTOTPFieldLastSuccessfulCheck: {
-		SQLName: "last_successful_check",
-		Accessor: func(t *domain.UserTOTP) any {
-			if t.LastSuccessfulCheck == nil {
-				return time.Time{}
-			}
-			return *t.LastSuccessfulCheck
-		},
-		Coerce: database.CoerceTime,
-	},
-	domain.UserTOTPFieldFailedAttempts: {
-		SQLName:  "failed_attempts",
-		Accessor: func(t *domain.UserTOTP) any { return t.FailedAttempts },
-		Coerce:   database.CoerceNumber[int16],
-	},
-	domain.UserTOTPFieldCreatedAt: {
-		SQLName:  "created_at",
-		Accessor: func(t *domain.UserTOTP) any { return t.CreatedAt },
-		Coerce:   database.CoerceTime,
-	},
-	domain.UserTOTPFieldUpdatedAt: {
-		SQLName:  "updated_at",
-		Accessor: func(t *domain.UserTOTP) any { return t.UpdatedAt },
-		Coerce:   database.CoerceTime,
-	},
-})
