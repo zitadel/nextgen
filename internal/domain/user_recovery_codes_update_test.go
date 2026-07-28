@@ -10,45 +10,38 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
+func TestUserRecoveryCodesUpdate_implementsInterface(t *testing.T) {
+	t.Parallel()
+
+	var _ domain.UserRecoveryCodesUpdate = domain.NewUserRecoveryCodesCodesUpdate([]string{"a"})
+	var _ domain.UserRecoveryCodesUpdate = &domain.UserRecoveryCodesLastSuccessfulCheckUpdate{}
+	var _ domain.UserRecoveryCodesUpdate = &domain.UserRecoveryCodesIncrementFailedAttemptsUpdate{Delta: 1}
+	var _ domain.UserRecoveryCodesUpdate = &domain.UserRecoveryCodesResetFailedAttemptsUpdate{}
+}
+
+func TestNewUserRecoveryCodesCodesUpdate_copies(t *testing.T) {
+	t.Parallel()
+
+	src := []string{"one"}
+	got := domain.NewUserRecoveryCodesCodesUpdate(src)
+	require.NotNil(t, got)
+	assert.Equal(t, []string{"one"}, got.Codes)
+	src[0] = "mutated"
+	assert.Equal(t, []string{"one"}, got.Codes)
+}
+
 func TestRequireNonEmptyRecoveryCodes(t *testing.T) {
+	t.Parallel()
 	assert.ErrorIs(t, domain.RequireNonEmptyRecoveryCodes(nil), domain.ErrEmptyRecoveryCodes)
 	assert.ErrorIs(t, domain.RequireNonEmptyRecoveryCodes([]string{}), domain.ErrEmptyRecoveryCodes)
 	assert.NoError(t, domain.RequireNonEmptyRecoveryCodes([]string{"a"}))
 }
 
-func TestNewUserRecoveryCodesUpdates(t *testing.T) {
-	assert.True(t, domain.NewUserRecoveryCodesUpdates().Empty())
-	assert.True(t, domain.NewUserRecoveryCodesUpdates(nil).Empty())
-
-	now := time.Now().UTC()
-	applied := domain.NewUserRecoveryCodesUpdates(
-		domain.WithUserRecoveryCodesCodes([]string{"a", "b"}),
-		domain.WithUserRecoveryCodesLastSuccessfulCheck(&now),
-		domain.WithUserRecoveryCodesLastSuccessfulCheck(nil),
-		domain.WithUserRecoveryCodesIncrementFailedAttempts(),
-		domain.WithUserRecoveryCodesResetFailedAttempts(),
-	)
-	require.False(t, applied.Empty())
-	ops := applied.Ops()
-	require.Len(t, ops, 5)
-
-	assert.Equal(t, domain.UserRecoveryCodesOpSetCodes, ops[0].Kind)
-	assert.Equal(t, []string{"a", "b"}, ops[0].Codes)
-
-	assert.Equal(t, domain.UserRecoveryCodesOpSetLastSuccessfulCheck, ops[1].Kind)
-	require.NotNil(t, ops[1].Time)
-	assert.Equal(t, now, *ops[1].Time)
-
-	assert.Equal(t, domain.UserRecoveryCodesOpSetLastSuccessfulCheck, ops[2].Kind)
-	assert.Nil(t, ops[2].Time)
-
-	assert.Equal(t, domain.UserRecoveryCodesOpIncrementFailedAttempts, ops[3].Kind)
-	assert.Equal(t, domain.UserRecoveryCodesOpResetFailedAttempts, ops[4].Kind)
-}
-
-func TestWithUserRecoveryCodesCodesCopiesSlice(t *testing.T) {
-	src := []string{"one"}
-	applied := domain.NewUserRecoveryCodesUpdates(domain.WithUserRecoveryCodesCodes(src))
-	src[0] = "mutated"
-	assert.Equal(t, []string{"one"}, applied.Ops()[0].Codes)
+func TestUserRecoveryCodesLastSuccessfulCheckUpdate_nilClears(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	u := &domain.UserRecoveryCodesLastSuccessfulCheckUpdate{LastSuccessfulCheck: &now}
+	assert.NotNil(t, u.LastSuccessfulCheck)
+	u = &domain.UserRecoveryCodesLastSuccessfulCheckUpdate{LastSuccessfulCheck: nil}
+	assert.Nil(t, u.LastSuccessfulCheck)
 }

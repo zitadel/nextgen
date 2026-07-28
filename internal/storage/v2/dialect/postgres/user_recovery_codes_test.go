@@ -138,25 +138,25 @@ func TestUserRecoveryCodesStatements_Update(t *testing.T) {
 	assert.ErrorIs(t, err, v2database.ErrNoChanges)
 
 	err = testPool.UpdateUserRecoveryCodes(ctx, pid, "missing-user",
-		domain.WithUserRecoveryCodesIncrementFailedAttempts(),
+		&domain.UserRecoveryCodesIncrementFailedAttemptsUpdate{Delta: 1},
 	)
 	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 
 	err = testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
-		domain.WithUserRecoveryCodesCodes(nil),
+		domain.NewUserRecoveryCodesCodesUpdate(nil),
 	)
 	assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
 
 	err = testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
-		domain.WithUserRecoveryCodesCodes([]string{}),
+		domain.NewUserRecoveryCodesCodesUpdate([]string{}),
 	)
 	assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
-		domain.WithUserRecoveryCodesCodes([]string{"new-a", "new-b"}),
-		domain.WithUserRecoveryCodesLastSuccessfulCheck(&now),
-		domain.WithUserRecoveryCodesResetFailedAttempts(),
+		domain.NewUserRecoveryCodesCodesUpdate([]string{"new-a", "new-b"}),
+		&domain.UserRecoveryCodesLastSuccessfulCheckUpdate{LastSuccessfulCheck: &now},
+		&domain.UserRecoveryCodesResetFailedAttemptsUpdate{},
 	))
 
 	got, err := testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
@@ -167,15 +167,15 @@ func TestUserRecoveryCodesStatements_Update(t *testing.T) {
 	assert.Zero(t, got.FailedAttempts)
 
 	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
-		domain.WithUserRecoveryCodesIncrementFailedAttempts(),
-		domain.WithUserRecoveryCodesIncrementFailedAttempts(),
+		&domain.UserRecoveryCodesIncrementFailedAttemptsUpdate{Delta: 1},
+		&domain.UserRecoveryCodesIncrementFailedAttemptsUpdate{Delta: 1},
 	))
 	got, err = testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
 	require.NoError(t, err)
 	assert.Equal(t, int16(2), got.FailedAttempts)
 
 	require.NoError(t, testPool.UpdateUserRecoveryCodes(ctx, pid, userID,
-		domain.WithUserRecoveryCodesLastSuccessfulCheck(nil),
+		&domain.UserRecoveryCodesLastSuccessfulCheckUpdate{LastSuccessfulCheck: nil},
 	))
 	got, err = testPool.GetUserRecoveryCodesByUserID(ctx, pid, userID)
 	require.NoError(t, err)

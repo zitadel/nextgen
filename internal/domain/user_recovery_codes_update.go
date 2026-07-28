@@ -17,76 +17,36 @@ func RequireNonEmptyRecoveryCodes(codes []string) error {
 	return nil
 }
 
-// UserRecoveryCodesUpdate configures a mid-lifecycle update for user_recovery_codes rows.
-type UserRecoveryCodesUpdate func(*UserRecoveryCodesUpdates)
-
-// UserRecoveryCodesUpdates accumulates [UserRecoveryCodesUpdate] options into ordered set operations.
-type UserRecoveryCodesUpdates struct {
-	ops []UserRecoveryCodesOp
+// UserRecoveryCodesUpdate is one typed mid-lifecycle change for user_recovery_codes rows.
+// Callers must pass pointers.
+type UserRecoveryCodesUpdate interface {
+	userRecoveryCodesUpdate()
 }
 
-// UserRecoveryCodesOpKind identifies one SET operation for user_recovery_codes.
-type UserRecoveryCodesOpKind uint8
-
-const (
-	UserRecoveryCodesOpUnspecified UserRecoveryCodesOpKind = iota
-	UserRecoveryCodesOpSetCodes
-	UserRecoveryCodesOpSetLastSuccessfulCheck
-	UserRecoveryCodesOpIncrementFailedAttempts
-	UserRecoveryCodesOpResetFailedAttempts
-)
-
-// UserRecoveryCodesOp is one SET clause contribution produced by a [UserRecoveryCodesUpdate].
-type UserRecoveryCodesOp struct {
-	Kind  UserRecoveryCodesOpKind
+type UserRecoveryCodesCodesUpdate struct {
 	Codes []string
-	// Time is used for [UserRecoveryCodesOpSetLastSuccessfulCheck]; nil means SQL NULL.
-	Time *time.Time
 }
 
-// NewUserRecoveryCodesUpdates applies options in order.
-func NewUserRecoveryCodesUpdates(opts ...UserRecoveryCodesUpdate) *UserRecoveryCodesUpdates {
-	u := &UserRecoveryCodesUpdates{}
-	for _, opt := range opts {
-		if opt != nil {
-			opt(u)
-		}
-	}
-	return u
+func (*UserRecoveryCodesCodesUpdate) userRecoveryCodesUpdate() {}
+
+type UserRecoveryCodesLastSuccessfulCheckUpdate struct {
+	// LastSuccessfulCheck nil clears the column to SQL NULL.
+	LastSuccessfulCheck *time.Time
 }
 
-func (u *UserRecoveryCodesUpdates) Empty() bool { return u == nil || len(u.ops) == 0 }
-func (u *UserRecoveryCodesUpdates) Ops() []UserRecoveryCodesOp {
-	return u.ops
+func (*UserRecoveryCodesLastSuccessfulCheckUpdate) userRecoveryCodesUpdate() {}
+
+type UserRecoveryCodesIncrementFailedAttemptsUpdate struct {
+	Delta int16
 }
 
-func WithUserRecoveryCodesCodes(codes []string) UserRecoveryCodesUpdate {
-	copied := append([]string(nil), codes...)
-	return func(u *UserRecoveryCodesUpdates) {
-		u.ops = append(u.ops, UserRecoveryCodesOp{Kind: UserRecoveryCodesOpSetCodes, Codes: copied})
-	}
-}
+func (*UserRecoveryCodesIncrementFailedAttemptsUpdate) userRecoveryCodesUpdate() {}
 
-// WithUserRecoveryCodesLastSuccessfulCheck sets last_successful_check; nil clears to NULL.
-func WithUserRecoveryCodesLastSuccessfulCheck(at *time.Time) UserRecoveryCodesUpdate {
-	var copied *time.Time
-	if at != nil {
-		t := *at
-		copied = &t
-	}
-	return func(u *UserRecoveryCodesUpdates) {
-		u.ops = append(u.ops, UserRecoveryCodesOp{Kind: UserRecoveryCodesOpSetLastSuccessfulCheck, Time: copied})
-	}
-}
+type UserRecoveryCodesResetFailedAttemptsUpdate struct{}
 
-func WithUserRecoveryCodesIncrementFailedAttempts() UserRecoveryCodesUpdate {
-	return func(u *UserRecoveryCodesUpdates) {
-		u.ops = append(u.ops, UserRecoveryCodesOp{Kind: UserRecoveryCodesOpIncrementFailedAttempts})
-	}
-}
+func (*UserRecoveryCodesResetFailedAttemptsUpdate) userRecoveryCodesUpdate() {}
 
-func WithUserRecoveryCodesResetFailedAttempts() UserRecoveryCodesUpdate {
-	return func(u *UserRecoveryCodesUpdates) {
-		u.ops = append(u.ops, UserRecoveryCodesOp{Kind: UserRecoveryCodesOpResetFailedAttempts})
-	}
+// NewUserRecoveryCodesCodesUpdate copies codes so callers cannot share a mutable slice.
+func NewUserRecoveryCodesCodesUpdate(codes []string) *UserRecoveryCodesCodesUpdate {
+	return &UserRecoveryCodesCodesUpdate{Codes: append([]string(nil), codes...)}
 }

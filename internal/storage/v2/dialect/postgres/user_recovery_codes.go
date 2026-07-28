@@ -56,23 +56,75 @@ func (s userRecoveryCodesStatements) DeleteUserRecoveryCodesByUserID(ctx context
 	return wrapError(err)
 }
 
+type userRecoveryCodesPatch struct {
+	codes               []string
+	setCodes            bool
+	lastSuccessfulCheck *time.Time
+	setLastCheck        bool
+	clearLastCheck      bool
+	delta               int16
+	resetFailedAttempts bool
+}
+
+func coalesceUserRecoveryCodesUpdates(updates []domain.UserRecoveryCodesUpdate) (userRecoveryCodesPatch, error) {
+	var patch userRecoveryCodesPatch
+	for _, u := range updates {
+		switch v := u.(type) {
+		case *domain.UserRecoveryCodesCodesUpdate:
+			if err := domain.RequireNonEmptyRecoveryCodes(v.Codes); err != nil {
+				return userRecoveryCodesPatch{}, err
+			}
+			patch.codes = append([]string(nil), v.Codes...)
+			patch.setCodes = true
+		case *domain.UserRecoveryCodesLastSuccessfulCheckUpdate:
+			patch.setLastCheck = true
+			if v.LastSuccessfulCheck == nil {
+				patch.clearLastCheck = true
+				patch.lastSuccessfulCheck = nil
+			} else {
+				t := *v.LastSuccessfulCheck
+				patch.clearLastCheck = false
+				patch.lastSuccessfulCheck = &t
+			}
+		case *domain.UserRecoveryCodesIncrementFailedAttemptsUpdate:
+			if v.Delta <= 0 {
+				return userRecoveryCodesPatch{}, fmt.Errorf("UserRecoveryCodesIncrementFailedAttemptsUpdate.Delta must be > 0, got %d", v.Delta)
+			}
+			patch.resetFailedAttempts = false
+			patch.delta += v.Delta
+		case *domain.UserRecoveryCodesResetFailedAttemptsUpdate:
+			patch.resetFailedAttempts = true
+			patch.delta = 0
+		default:
+			return userRecoveryCodesPatch{}, fmt.Errorf("unknown UserRecoveryCodesUpdate %T", u)
+		}
+	}
+	return patch, nil
+}
+
+func (p userRecoveryCodesPatch) empty() bool {
+	return !p.setCodes &&
+		!p.setLastCheck &&
+		!p.resetFailedAttempts &&
+		p.delta == 0
+}
+
 // UpdateUserRecoveryCodes implements [service.UserRecoveryCodesStatements].
 func (s userRecoveryCodesStatements) UpdateUserRecoveryCodes(ctx context.Context, projectID, userID string, updates ...domain.UserRecoveryCodesUpdate) error {
-	applied := domain.NewUserRecoveryCodesUpdates(updates...)
-	if applied.Empty() {
+	if len(updates) == 0 {
+		return database.ErrNoChanges
+	}
+	patch, err := coalesceUserRecoveryCodesUpdates(updates)
+	if err != nil {
+		return err
+	}
+	if patch.empty() {
 		return database.ErrNoChanges
 	}
 
 	var c statementCompiler
 	c.WriteString("UPDATE zitadel_nextgen.user_recovery_codes SET ")
-	for i, op := range applied.Ops() {
-		if i > 0 {
-			c.WriteString(", ")
-		}
-		if err := writeUserRecoveryCodesOp(&c, op); err != nil {
-			return err
-		}
-	}
+	writeUserRecoveryCodesPatch(&c, patch)
 	c.WriteString(", updated_at = NOW() WHERE project_id = ")
 	c.WriteArg(projectID)
 	c.WriteString(" AND user_id = ")
@@ -88,30 +140,36 @@ func (s userRecoveryCodesStatements) UpdateUserRecoveryCodes(ctx context.Context
 	return nil
 }
 
-func writeUserRecoveryCodesOp(c *statementCompiler, op domain.UserRecoveryCodesOp) error {
-	switch op.Kind {
-	case domain.UserRecoveryCodesOpSetCodes:
-		if err := domain.RequireNonEmptyRecoveryCodes(op.Codes); err != nil {
-			return err
-		}
-		c.WriteString("recovery_codes = ")
-		c.WriteArg(op.Codes)
-	case domain.UserRecoveryCodesOpSetLastSuccessfulCheck:
+func writeUserRecoveryCodesPatch(c *statementCompiler, patch userRecoveryCodesPatch) {
+	sep := ""
+	writeAssign := func(col string, arg any) {
+		c.WriteString(sep)
+		sep = ", "
+		c.WriteString(col)
+		c.WriteString(" = ")
+		c.WriteArg(arg)
+	}
+	if patch.setCodes {
+		writeAssign("recovery_codes", patch.codes)
+	}
+	if patch.setLastCheck {
+		c.WriteString(sep)
+		sep = ", "
 		c.WriteString("last_successful_check = ")
-		if op.Time == nil {
+		if patch.clearLastCheck {
 			c.WriteString("NULL")
 		} else {
-			c.WriteArg(*op.Time)
+			c.WriteArg(*patch.lastSuccessfulCheck)
 		}
-	case domain.UserRecoveryCodesOpIncrementFailedAttempts:
-		c.WriteString("failed_attempts = failed_attempts + 1")
-	case domain.UserRecoveryCodesOpResetFailedAttempts:
-		c.WriteString("failed_attempts = ")
-		c.WriteArg(int16(0))
-	default:
-		return fmt.Errorf("unknown UserRecoveryCodesOp kind %d", op.Kind)
 	}
-	return nil
+	switch {
+	case patch.resetFailedAttempts:
+		writeAssign("failed_attempts", int16(0))
+	case patch.delta > 0:
+		c.WriteString(sep)
+		c.WriteString("failed_attempts = failed_attempts + ")
+		c.WriteArg(patch.delta)
+	}
 }
 
 // GetUserRecoveryCodesByID implements [service.UserRecoveryCodesStatements].
