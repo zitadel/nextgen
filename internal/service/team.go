@@ -12,6 +12,7 @@ import (
 
 type CreateTeamInput struct {
 	ProjectID string
+	Name      string
 }
 
 // ---- Secondary ports -------------------------------------------------------------
@@ -27,7 +28,7 @@ func NewTeamService(v2Pool *DB) *TeamService {
 }
 
 func (s *TeamService) CreateTeam(ctx context.Context, input CreateTeamInput) (*domain.Team, error) {
-	model, err := domain.NewTeam(input.ProjectID)
+	model, err := domain.NewTeam(input.ProjectID, input.Name)
 	if err != nil {
 		return nil, err
 	}

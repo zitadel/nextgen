@@ -25,6 +25,7 @@ func TestTeamService_CreateTeam(t *testing.T) {
 			CreateTeam(gomock.Any(), gomock.Any()).
 			DoAndReturn(func(_ context.Context, team *domain.Team) error {
 				assert.Equal(t, "proj_1", team.ProjectID)
+				assert.Equal(t, "team-1", team.Name)
 				assert.NotEmpty(t, team.ID)
 				team.CreatedAt = time.Now()
 				team.UpdatedAt = team.CreatedAt
@@ -33,11 +34,21 @@ func TestTeamService_CreateTeam(t *testing.T) {
 			})
 
 		svc := service.NewTeamService(service.NewPool(pool))
-		got, err := svc.CreateTeam(t.Context(), service.CreateTeamInput{ProjectID: "proj_1"})
+		got, err := svc.CreateTeam(t.Context(), service.CreateTeamInput{ProjectID: "proj_1", Name: "team-1"})
 		require.NoError(t, err)
 		assert.Equal(t, "proj_1", got.ProjectID)
+		assert.Equal(t, "team-1", got.Name)
 		assert.NotEmpty(t, got.ID)
 		assert.False(t, got.CreatedAt.IsZero())
+	})
+
+	t.Run("empty name", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		pool := servicemocks.NewMockPool(ctrl)
+
+		svc := service.NewTeamService(service.NewPool(pool))
+		_, err := svc.CreateTeam(t.Context(), service.CreateTeamInput{ProjectID: "proj_1"})
+		assert.ErrorIs(t, err, domain.ErrTeamNameInvalid())
 	})
 
 	t.Run("create fails", func(t *testing.T) {
@@ -48,7 +59,7 @@ func TestTeamService_CreateTeam(t *testing.T) {
 		statements.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).Return(assert.AnError)
 
 		svc := service.NewTeamService(service.NewPool(pool))
-		_, err := svc.CreateTeam(t.Context(), service.CreateTeamInput{ProjectID: "proj_1"})
+		_, err := svc.CreateTeam(t.Context(), service.CreateTeamInput{ProjectID: "proj_1", Name: "team-1"})
 		require.Error(t, err)
 	})
 }
@@ -64,6 +75,7 @@ func TestTeamService_GetTeam(t *testing.T) {
 			Return(&domain.Team{
 				ProjectID: "proj_1",
 				ID:        "team_1",
+				Name:      "team-1",
 				Status:    domain.TeamStatusActive,
 				CreatedAt: time.Now(),
 				UpdatedAt: time.Now(),
@@ -74,6 +86,7 @@ func TestTeamService_GetTeam(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "proj_1", got.ProjectID)
 		assert.Equal(t, "team_1", got.ID)
+		assert.Equal(t, "team-1", got.Name)
 	})
 
 	t.Run("not found", func(t *testing.T) {
