@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // ---- Input types -------------------------------------------------------------
@@ -63,7 +63,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
 		if err := stmts.CreateJSONSchema(ctx, model); err != nil {
-			if _, ok := errors.AsType[*v2database.IntegrityViolationError](err); ok {
+			if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
 				return domain.ErrJSONSchemaAlreadyExists().WithParent(err)
 			}
 			return domain.ErrInternal(err).WithMessage("failed to create schema in database")
@@ -82,7 +82,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
 		}
-		if _, ok := errors.AsType[*v2database.IntegrityViolationError](err); ok {
+		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
 			return nil, domain.ErrJSONSchemaAlreadyExists().WithParent(err)
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
@@ -113,7 +113,7 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchem
 func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
 	schema, err := s.v2Pool.Statements().GetJSONSchemaByID(ctx, projectID, schemaID)
 	if err != nil {
-		if _, ok := errors.AsType[*v2database.NoRowFoundError](err); ok {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrJSONSchemaNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")
@@ -122,23 +122,23 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 }
 
 func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType string, offset int, token string) ([]ListSchemasOutputItem, error) {
-	filters := []v2database.Filter[domain.JSONSchemaField]{
-		v2database.Equal(v2database.Col(domain.JSONSchemaFieldProjectID), projectID),
+	filters := []database.Filter[domain.JSONSchemaField]{
+		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
 	}
 	if objectType != "" {
 		filters = append(filters,
-			v2database.Equal(v2database.Col(domain.JSONSchemaFieldObjectType), objectType),
+			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType),
 		)
 	}
 
 	// TODO: implement pagination
 
-	result, err := s.v2Pool.Statements().ListJSONSchemas(ctx, &v2database.ListOptions[domain.JSONSchemaField]{
-		Filter: v2database.And(filters...),
-		Pagination: v2database.Page[domain.JSONSchemaField]{
-			OrderBy: v2database.OrderBy[domain.JSONSchemaField]{
-				Columns:   []v2database.Column[domain.JSONSchemaField]{v2database.Col(domain.JSONSchemaFieldCreatedAt)},
-				Direction: v2database.OrderDesc,
+	result, err := s.v2Pool.Statements().ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
+		Filter: database.And(filters...),
+		Pagination: database.Page[domain.JSONSchemaField]{
+			OrderBy: database.OrderBy[domain.JSONSchemaField]{
+				Columns:   []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldCreatedAt)},
+				Direction: database.OrderDesc,
 			},
 		},
 	})

@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/branding"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniqueBrandingIDs(t *testing.T) (projectID, brandingID string) {
@@ -104,5 +104,5 @@ func TestBrandingStatements_Get_NotFound(t *testing.T) {
 	ensureBrandingProject(t, projectID)
 
 	_, err := testPool.GetBrandingByID(t.Context(), projectID, brandingID)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }

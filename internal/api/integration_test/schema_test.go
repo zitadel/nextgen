@@ -32,7 +32,7 @@ func TestCreateSchema(t *testing.T) {
 		}{
 			{
 				name:   "user-schema in body",
-				schema: harness.TestData.Schemas.CreateSchemaRequestUserSchema,
+				schema: harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema,
 			},
 			// TODO: add this test case once we have a public github-repo from which to get a schema
 			//{
@@ -46,7 +46,7 @@ func TestCreateSchema(t *testing.T) {
 				t.Parallel()
 
 				apiSchema := api.UserSchema{}
-				err = apiSchema.UnmarshalJSON([]byte(tc.schema))
+				err := apiSchema.UnmarshalJSON([]byte(tc.schema))
 				require.NoError(t, err)
 
 				req := api.CreateSchemaReq{
@@ -166,7 +166,7 @@ func TestGetSchema(t *testing.T) {
 		t.Run("simple", func(t *testing.T) {
 			t.Parallel()
 
-			schemaID := harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+			schemaID := harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 
 			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
 				ID:        schemaID,

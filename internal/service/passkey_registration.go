@@ -10,7 +10,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 const passkeyRegistrationTTL = 5 * time.Minute
@@ -59,10 +59,10 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 		return BeginRegistrationOutput{}, err
 	}
 
-	listed, err := s.v2Pool.Statements().ListUserPasskeys(ctx, &v2database.ListOptions[domain.UserPasskeyField]{
-		Filter: v2database.And(
-			v2database.Equal(v2database.Col(domain.UserPasskeyFieldProjectID), in.ProjectID),
-			v2database.Equal(v2database.Col(domain.UserPasskeyFieldUserID), in.UserID),
+	listed, err := s.v2Pool.Statements().ListUserPasskeys(ctx, &database.ListOptions[domain.UserPasskeyField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserPasskeyFieldProjectID), in.ProjectID),
+			database.Equal(database.Col(domain.UserPasskeyFieldUserID), in.UserID),
 		),
 	})
 	if err != nil {
@@ -131,7 +131,7 @@ func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegist
 	stmts := s.v2Pool.Statements()
 	reg, err := stmts.GetPasskeyRegistration(ctx, in.ProjectID, in.RegistrationID)
 	if err != nil {
-		if _, ok := errors.AsType[*v2database.NoRowFoundError](err); ok {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return domain.ErrPasskeyRegistrationNotFound()
 		}
 		return err

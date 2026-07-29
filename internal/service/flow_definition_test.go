@@ -12,7 +12,6 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 	"go.uber.org/mock/gomock"
 )
 
@@ -115,8 +114,8 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					stmts.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *domain.FlowDefinition) error {
 						return nil
 					}).Times(1)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
-						return &v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{}}, nil
+					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+						return &database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{}}, nil
 					}).Times(1)
 					return stmts
 				},
@@ -212,10 +211,10 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 						return nil
 					}).Times(1)
 					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
-						&v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{}}, nil,
+						&database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{}}, nil,
 					).Times(1)
 					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
-						&v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
+						&database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
 							{
 								Name:   "external-flow",
 								Status: domain.FlowDefinitionStatusActive,
@@ -381,8 +380,8 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				},
 				statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
 					stmts := servicemocks.NewMockAllStatements(ctrl)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
-						return &v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{}}, nil
+					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+						return &database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{}}, nil
 					}).Times(2)
 					return stmts
 				},
@@ -446,8 +445,8 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				},
 				statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
 					stmts := servicemocks.NewMockAllStatements(ctrl)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
-						return &v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{}}, nil
+					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+						return &database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{}}, nil
 					}).Times(1)
 					return stmts
 				},
@@ -513,8 +512,8 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 					stmts.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *domain.FlowDefinition) error {
 						return assert.AnError
 					}).Times(1)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
-						return &v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{}}, nil
+					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+						return &database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{}}, nil
 					}).Times(1)
 					return stmts
 				},
@@ -574,8 +573,8 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				},
 				statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
 					stmts := servicemocks.NewMockAllStatements(ctrl)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
-						return &v2database.ListResult[*domain.FlowDefinition]{Items: nil}, assert.AnError
+					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+						return &database.ListResult[*domain.FlowDefinition]{Items: nil}, assert.AnError
 					}).Times(1)
 					return stmts
 				},
@@ -631,8 +630,8 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				},
 				statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
 					stmts := servicemocks.NewMockAllStatements(ctrl)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
-						return &v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
+					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+						return &database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
 							{
 								Name: "login",
 							},
@@ -692,8 +691,8 @@ func Test_flowDefinitionService_Create(t *testing.T) {
 				},
 				statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
 					stmts := servicemocks.NewMockAllStatements(ctrl)
-					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
-						return &v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{}}, nil
+					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+						return &database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{}}, nil
 					}).Times(1)
 					return stmts
 				},
@@ -1048,7 +1047,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 						}, nil
 					}).Times(1)
 					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
-						&v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
+						&database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
 							{
 								ID:     "flowdef_123",
 								Status: domain.FlowDefinitionStatusActive,
@@ -1097,7 +1096,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 						}, nil
 					}).Times(1)
 					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
-						&v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
+						&database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
 							{
 								ID:     "flowdef_123",
 								Status: domain.FlowDefinitionStatusActive,
@@ -1160,7 +1159,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 						return nil
 					}).Times(1)
 					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
-						&v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
+						&database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
 							{
 								ID:     "flowdef_123",
 								Status: domain.FlowDefinitionStatusActive,
@@ -1232,7 +1231,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 						}, nil
 					}).Times(1)
 					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
-						&v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
+						&database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
 							{
 								ID:     "flowdef_123",
 								Status: domain.FlowDefinitionStatusActive,
@@ -1287,7 +1286,7 @@ func Test_flowDefinitionService_Update(t *testing.T) {
 						return nil
 					}).Times(1)
 					stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
-						&v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
+						&database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{
 							{
 								ID:     "flowdef_123",
 								Status: domain.FlowDefinitionStatusActive,
@@ -1618,7 +1617,7 @@ func Test_flowDefinitionService_List(t *testing.T) {
 			statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
 				stmts := servicemocks.NewMockAllStatements(ctrl)
 				stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
-					&v2database.ListResult[*domain.FlowDefinition]{
+					&database.ListResult[*domain.FlowDefinition]{
 						Items: []*domain.FlowDefinition{
 							{
 								ProjectID: "project1",
@@ -1658,7 +1657,7 @@ func Test_flowDefinitionService_List(t *testing.T) {
 			statements: func(ctrl *gomock.Controller) *servicemocks.MockAllStatements {
 				stmts := servicemocks.NewMockAllStatements(ctrl)
 				stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).Return(
-					(*v2database.ListResult[*domain.FlowDefinition])(nil), assert.AnError,
+					(*database.ListResult[*domain.FlowDefinition])(nil), assert.AnError,
 				).Times(1)
 				return stmts
 			},

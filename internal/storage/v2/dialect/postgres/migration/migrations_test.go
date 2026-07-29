@@ -24,7 +24,9 @@ func TestMigrateSupportsSingleConnectionPool(t *testing.T) {
 	if url := os.Getenv("ZITADEL_TEST_POSTGRES_URL"); url != "" {
 		dsn = url
 	} else {
-		_, dsn, stopFn, err := v2embeddedpostgres.StartContainerWithDSN(ctx)
+		var stopFn func()
+		var err error
+		_, dsn, stopFn, err = v2embeddedpostgres.StartContainerWithDSN(ctx)
 		require.NoError(t, err)
 		stop = stopFn
 	}

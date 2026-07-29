@@ -12,9 +12,18 @@ func mapStorageError(err error) error {
 	if err == nil {
 		return nil
 	}
-	var unimplemented *database.UnimplementedError
-	if errors.As(err, &unimplemented) {
+	if _, ok := errors.AsType[*database.UnimplementedError](err); ok {
 		return domain.ErrNotImplemented().WithParent(err)
+	}
+	var dbErr database.Error
+	if errors.As(err, &dbErr) {
+		return domain.Error{
+			Code:    dbErr.Code,
+			Message: dbErr.Message,
+			Details: dbErr.Details,
+			Parent:  dbErr.Parent,
+			Origin:  dbErr.Origin,
+		}
 	}
 	return err
 }

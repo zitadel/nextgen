@@ -19,7 +19,7 @@ import (
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/maputil"
-	v2dberrors "github.com/zitadel/nextgen/internal/storage/v2/database/errors"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 const (
@@ -365,7 +365,7 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, store JSONSche
 	if err == nil {
 		return dbSchema.Schema, nil
 	}
-	var noRowFoundError *v2dberrors.NoRowFoundError
+	var noRowFoundError *database.NoRowFoundError
 	if !errors.As(err, &noRowFoundError) {
 		return nil, err
 	}

@@ -304,12 +304,12 @@ items off as work lands; remove completed entries when no longer useful.
 - [x] Spanner statement execution and dialect registration are in place; remaining Spanner work is migrate/embedded/dbtest parity under v2.
 - [x] Move migrations from v1 to v2 dialect packages (postgres + spanner)
 - [ ] Move embedded postgres startup to v2 postgres dialect
-- [ ] Move `database.Identity` bind/scan to v2 core
+- [x] Move `database.Identity` bind/scan to v2 core (v1 keeps a type alias until dialect retirement)
 - [ ] Move ID generation into v2 dialects (ephemeral via DB identity/function; managed fallback via dialect-chosen Go package or DB function); retire domain-layer `idgen` call sites at storage boundary
 - [x] Add `internal/storage/v2/AGENTS.md` with v2 conventions (including multi-write `withTransaction` rules)
 - [x] Port remaining entities and remove v1 entity repository package
 - [x] Drop QueryExecutor bridge from app callers and v2 transactions
-- [ ] Retire v1 dialect implementations (`internal/storage/database/dialect/`) once migrations/embedded/Identity live in v2
+- [ ] Retire v1 dialect implementations (`internal/storage/database/dialect/`) once embedded bring-up lives in v2 (v1 Migrate remains interim for harnesses)
 
 ## Related ADRs
 
