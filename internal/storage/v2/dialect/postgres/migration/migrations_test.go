@@ -3,28 +3,37 @@
 package migration_test
 
 import (
+	"database/sql"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
+
+	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver used for migrations
+	v2embeddedpostgres "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/embedded"
 	migrationpkg "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/migration"
 )
 
 func TestMigrateSupportsSingleConnectionPool(t *testing.T) {
 	ctx := t.Context()
-	connector, stop, err := dbtest.Postgres(ctx)
-	require.NoError(t, err)
+
+	var (
+		dsn  string
+		stop func() = func() {}
+	)
+	if url := os.Getenv("ZITADEL_TEST_POSTGRES_URL"); url != "" {
+		dsn = url
+	} else {
+		_, dsn, stopFn, err := v2embeddedpostgres.StartContainerWithDSN(ctx)
+		require.NoError(t, err)
+		stop = stopFn
+	}
 	t.Cleanup(stop)
 
-	pool, err := connector.Connect(ctx)
+	db, err := sql.Open("pgx", dsn)
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = pool.Close(t.Context()) })
-
-	testPool, ok := pool.(database.PoolTest)
-	require.True(t, ok)
-	db := testPool.RawDB()
 	t.Cleanup(func() { _ = db.Close() })
+
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 

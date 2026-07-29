@@ -5,7 +5,6 @@ package spanner
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"fmt"
 	"log/slog"
 	"os"
@@ -15,9 +14,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
-	spannerdialect "github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
-	spannermigration "github.com/zitadel/nextgen/internal/storage/v2/dialect/spanner/migration"
+	v2dbtest "github.com/zitadel/nextgen/internal/storage/v2/dbtest"
 )
 
 // testClient is a v2 spanner client connected to the migrated test database,
@@ -35,34 +32,11 @@ func TestMain(m *testing.M) {
 func run(m *testing.M) (int, error) {
 	ctx := context.Background()
 
-	connector, stop, err := dbtest.Spanner(ctx)
+	pool, stop, err := v2dbtest.Spanner(ctx)
 	if err != nil {
 		return 1, err
 	}
 	defer stop()
-
-	cfg, ok := connector.(*spannerdialect.Config)
-	if !ok {
-		return 1, fmt.Errorf("expected *spanner.Config connector, got %T", connector)
-	}
-
-	db, err := sql.Open("spanner", cfg.DSN)
-	if err != nil {
-		return 1, err
-	}
-	defer db.Close()
-	if err := spannermigration.Migrate(ctx, db); err != nil {
-		return 1, err
-	}
-
-	dialect, err := DecodeConfig(cfg.DSN)
-	if err != nil {
-		return 1, err
-	}
-	pool, err := dialect.Connect(ctx)
-	if err != nil {
-		return 1, err
-	}
 	defer pool.Close(ctx)
 
 	c, ok := pool.(*Client)

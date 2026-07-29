@@ -5,7 +5,6 @@ package postgres
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"log/slog"
 	"os"
 	"strconv"
@@ -15,9 +14,7 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver used for migrations
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
-	pgold "github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
-	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/migration"
+	v2dbtest "github.com/zitadel/nextgen/internal/storage/v2/dbtest"
 )
 
 // The v2 postgres tests drive a real database exclusively through the v2 pool.
@@ -36,7 +33,7 @@ func TestMain(m *testing.M) {
 func runTests(m *testing.M) int {
 	ctx := context.Background()
 
-	connector, stop, err := dbtest.Postgres(ctx)
+	pool, stop, err := v2dbtest.Postgres(ctx)
 	if err != nil {
 		slog.Error("failed to start postgres test database", "error", err)
 		if stop != nil {
@@ -46,31 +43,6 @@ func runTests(m *testing.M) int {
 	}
 	defer stop()
 
-	// Recover the DSN from the connector without ever connecting a legacy pool.
-	cfg, ok := connector.(*pgold.Config)
-	if !ok {
-		slog.Error("expected *postgres.Config connector", "type", connector)
-		return 1
-	}
-	dsn := cfg.ConnString()
-
-	// Migrate the zitadel_nextgen schema via a throwaway *sql.DB.
-	if err := migrate(ctx, dsn); err != nil {
-		slog.Error("failed to migrate test database", "error", err)
-		return 1
-	}
-
-	// Connect the v2 pool from the same DSN.
-	dialect, err := DecodeConfig(dsn)
-	if err != nil {
-		slog.Error("failed to decode v2 postgres config", "error", err)
-		return 1
-	}
-	pool, err := dialect.Connect(ctx)
-	if err != nil {
-		slog.Error("failed to connect v2 postgres pool", "error", err)
-		return 1
-	}
 	defer pool.Close(ctx)
 	testPool, ok = pool.(*Pool)
 	if !ok {
@@ -79,15 +51,6 @@ func runTests(m *testing.M) int {
 	}
 
 	return m.Run()
-}
-
-func migrate(ctx context.Context, dsn string) error {
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	return migration.Migrate(ctx, db)
 }
 
 // uniqueProjectID returns a collision-free project ID scoped to the running

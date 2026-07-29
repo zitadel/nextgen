@@ -36,10 +36,10 @@ import (
 	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
 	v2db "github.com/zitadel/nextgen/internal/storage/v2/database"
+	v2postgresembedded "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/embedded"
 	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
-	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
+	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
 
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
@@ -105,8 +105,10 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return err
 	}
 	sfs.Add(func(ctx context.Context) error {
-		if err := pool.Close(ctx); err != nil {
-			return fmt.Errorf("failed close database pool: %w", err)
+		if pool != nil {
+			if err := pool.Close(ctx); err != nil {
+				return fmt.Errorf("failed close database pool: %w", err)
+			}
 		}
 		if err := v2Pool.Close(ctx); err != nil {
 			return fmt.Errorf("failed close v2 database pool: %w", err)
@@ -466,14 +468,15 @@ func startDatabase(ctx context.Context, cfg Config) (database.Pool, v2db.Pool, e
 	if err != nil {
 		return nil, nil, err
 	}
-	pool, err := connector.Connect(ctx)
-	if err != nil {
-		return nil, nil, err
+	var pool database.Pool
+	if connector != nil {
+		pool, err = connector.Connect(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	if dialect == nil {
-		if p, ok := pool.(*embedded.Pool); ok {
-			dialect = &postgres.PoolConfig{Pool: p.Pool.Pool}
-		}
+		return nil, nil, fmt.Errorf("database dialect is nil")
 	}
 	v2Pool, err := v2db.Connect(ctx, dialect)
 	if err != nil {
@@ -489,7 +492,7 @@ func buildDatabaseConnector(cfg Config) (database.Connector, v2db.Dialect, error
 	if len(cfg.Database.Raw) == 0 {
 		options := embeddedPostgresOptions(cfg.Server.DataDir)
 		slog.Info("no database dialect configured, starting embedded postgres", slog.String("filePath", filepath.Dir(options.DataPath)))
-		return embedded.NewConnector(options), nil, nil
+		return nil, v2postgresembedded.NewDialect(options), nil
 	}
 	connector, err := cfg.Database.Build()
 	if err != nil {
@@ -502,9 +505,9 @@ func buildDatabaseConnector(cfg Config) (database.Connector, v2db.Dialect, error
 	return connector, dialect, nil
 }
 
-func embeddedPostgresOptions(dataDir string) embedded.Options {
+func embeddedPostgresOptions(dataDir string) v2postgresembedded.Options {
 	root := filepath.Join(dataDir, "embedded-postgres")
-	return embedded.Options{
+	return v2postgresembedded.Options{
 		RuntimePath: filepath.Join(root, "runtime"),
 		DataPath:    filepath.Join(root, "data"),
 		CachePath:   filepath.Join(root, "cache"),
