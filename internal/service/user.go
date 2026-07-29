@@ -82,9 +82,8 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		stmts := tx.Statements()
 		for _, action := range actions {
-			if err := action.Apply(ctx, stmts); err != nil {
+			if err := action.Apply(ctx, tx.Statements()); err != nil {
 				return err
 			}
 		}
