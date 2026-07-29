@@ -14,15 +14,14 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/secrets"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 type Harness struct {
 	encryptionKey dependency[[]byte]
 	signingKey    dependency[*rsa.PrivateKey]
 
-	dBPool          dependency[database.Pool]
-	dB              dependency[*service.DB]
+	DB *service.DB
+
 	httpClient      dependency[*http.Client]
 	testServer      dependency[*httptest.Server]
 	hasher          dependency[*crypto.PasswapHasher]

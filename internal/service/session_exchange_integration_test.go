@@ -17,18 +17,17 @@ import (
 func newSessionServiceForIntegration(t *testing.T) (service.SessionService, service.SessionConfig) {
 	t.Helper()
 	cfg := service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}
-	v2Pool := integrationV2PoolOrFail(t)
+	v2Pool := integrationPoolOrFail(t)
 	return service.NewSessionService(v2Pool, service.UserStatementsIdentityReader{Pool: v2Pool}, cfg), cfg
 }
 
 func TestSessionService_Exchange_integration(t *testing.T) {
-	pool := integrationPoolOrFail(t)
 	svc, cfg := newSessionServiceForIntegration(t)
-	v2 := integrationV2PoolOrFail(t)
+	v2 := integrationPoolOrFail(t)
 
 	t.Run("new_session_promotes_password", func(t *testing.T) {
 		projectID := "p-svc-ex-new-" + time.Now().Format("150405.000000")
-		plain, _ := handoffCompletedAttempt(t, pool, projectID, nil)
+		plain, _ := handoffCompletedAttempt(t, projectID, nil)
 
 		exchanged, err := svc.Exchange(t.Context(), service.ExchangeInput{
 			ProjectID:    projectID,
@@ -51,7 +50,7 @@ func TestSessionService_Exchange_integration(t *testing.T) {
 
 	t.Run("explicit_ttl", func(t *testing.T) {
 		projectID := "p-svc-ex-ttl-" + time.Now().Format("150405.000000")
-		plain, _ := handoffCompletedAttempt(t, pool, projectID, nil)
+		plain, _ := handoffCompletedAttempt(t, projectID, nil)
 		override := 2 * time.Hour
 
 		exchanged, err := svc.Exchange(t.Context(), service.ExchangeInput{
@@ -71,7 +70,7 @@ func TestSessionService_Exchange_integration(t *testing.T) {
 
 	t.Run("step_up_existing_session", func(t *testing.T) {
 		projectID := "p-svc-ex-step-" + time.Now().Format("150405.000000")
-		ensureProject(t, pool, projectID)
+		ensureProject(t, projectID)
 
 		anonymous, err := domain.NewSession(projectID, nil)
 		require.NoError(t, err)
@@ -79,7 +78,7 @@ func TestSessionService_Exchange_integration(t *testing.T) {
 			return tx.Statements().CreateSession(ctx, anonymous)
 		}))
 
-		plain, _ := handoffCompletedAttempt(t, pool, projectID, func(a *domain.AuthAttempt) {
+		plain, _ := handoffCompletedAttempt(t, projectID, func(a *domain.AuthAttempt) {
 			a.SessionID = &anonymous.ID
 		})
 
@@ -101,7 +100,7 @@ func TestSessionService_Exchange_integration(t *testing.T) {
 
 	t.Run("invalid_handoff_token", func(t *testing.T) {
 		projectID := "p-svc-ex-invalid-" + time.Now().Format("150405.000000")
-		ensureProject(t, pool, projectID)
+		ensureProject(t, projectID)
 
 		_, err := svc.Exchange(t.Context(), service.ExchangeInput{
 			ProjectID:    projectID,
@@ -114,7 +113,7 @@ func TestSessionService_Exchange_integration(t *testing.T) {
 
 	t.Run("consumed_token", func(t *testing.T) {
 		projectID := "p-svc-ex-consume-" + time.Now().Format("150405.000000")
-		plain, _ := handoffCompletedAttempt(t, pool, projectID, nil)
+		plain, _ := handoffCompletedAttempt(t, projectID, nil)
 
 		_, err := svc.Exchange(t.Context(), service.ExchangeInput{
 			ProjectID:    projectID,

@@ -3,30 +3,29 @@
 package migration_test
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
-	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/migration"
+
+	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver used for migrations
+	migrationpkg "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/migration"
+	"github.com/zitadel/nextgen/internal/storage/v2/testdb"
 )
 
 func TestMigrateSupportsSingleConnectionPool(t *testing.T) {
 	ctx := t.Context()
-	connector, stop, err := dbtest.Postgres(ctx)
+
+	dsn, stop, err := testdb.PostgresDSN(ctx)
 	require.NoError(t, err)
 	t.Cleanup(stop)
 
-	pool, err := connector.Connect(ctx)
+	db, err := sql.Open("pgx", dsn)
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = pool.Close(t.Context()) })
-
-	testPool, ok := pool.(database.PoolTest)
-	require.True(t, ok)
-	db := testPool.RawDB()
 	t.Cleanup(func() { _ = db.Close() })
+
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 
-	require.NoError(t, migration.Migrate(ctx, db))
+	require.NoError(t, migrationpkg.Migrate(ctx, db))
 }

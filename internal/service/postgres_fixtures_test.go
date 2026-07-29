@@ -4,22 +4,29 @@ package service_test
 
 import (
 	"crypto/sha256"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-func ensureProject(t *testing.T, pool database.QueryExecutor, projectID string) {
+func ensureProject(t *testing.T, projectID string) {
 	t.Helper()
-	// name is NOT NULL; derive it from the project ID
-	_, err := pool.Exec(t.Context(),
-		`INSERT INTO zitadel_nextgen.projects (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
-		projectID, "project-"+projectID,
-	)
-	require.NoError(t, err)
+	v2 := integrationPoolOrFail(t)
+	err := v2.Statements().CreateProject(t.Context(), &domain.Project{
+		ID:             projectID,
+		Name:           "project-" + projectID,
+		PreviewOrigins: []string{},
+	})
+	if err != nil {
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			return
+		}
+		require.NoError(t, err)
+	}
 }
 
 func handoffTokenForIntegration(plain string) *domain.HandoffToken {
@@ -29,12 +36,11 @@ func handoffTokenForIntegration(plain string) *domain.HandoffToken {
 
 func handoffCompletedAttempt(
 	t *testing.T,
-	pool database.QueryExecutor,
 	projectID string,
 	mutate func(*domain.AuthAttempt),
 ) (plainToken string, attempt *domain.AuthAttempt) {
 	t.Helper()
-	v2 := integrationV2PoolOrFail(t)
+	v2 := integrationPoolOrFail(t)
 
 	plainToken = "handoff_" + projectID + "_" + time.Now().Format("150405.000000")
 	attempt = &domain.AuthAttempt{
@@ -45,7 +51,7 @@ func handoffCompletedAttempt(
 	if mutate != nil {
 		mutate(attempt)
 	}
-	ensureProject(t, pool, projectID)
+	ensureProject(t, projectID)
 	require.NoError(t, v2.Statements().CreateAuthAttempt(t.Context(), attempt))
 	attempt.HandoffToken = handoffTokenForIntegration(plainToken)
 	require.NoError(t, v2.Statements().HandoffAuthAttempt(t.Context(), attempt))
