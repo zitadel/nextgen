@@ -99,7 +99,9 @@ The use-case surface the HTTP handler depends on. Four methods:
 | `Submit` | Re-fetch the definition from `state.DefinitionID`, hand to `stateMachine.Process`. |
 | `GetStep` | Re-fetch the definition, hand to `stateMachine.Render` (no advancement). |
 
-Service holds the database `Pool`, the `FlowDefinitionRepository`, the `FlowStateMachine` interface, and the `idgen.Generator`. Each call passes the pool down — the state machine and resolvers receive a `database.QueryExecutor` per call.
+Service holds `*service.DB` (v2 statements), the `FlowStateMachine` interface,
+and the `idgen.Generator`. Flow definitions are loaded via
+`ListFlowDefinitions` / `GetFlowDefinitionByID` on `AllStatements`.
 
 ### `FlowStateMachineRuntime` (`internal/domain/flow_state_machine.go`)
 

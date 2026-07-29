@@ -321,7 +321,7 @@ items off as work lands; remove completed entries when no longer useful.
 | [027 Cursor-Based Pagination](027-cursor-based-pagination.md) | v2 `ListOptions`/`Page.Cursor` + `pagination.Cursor` is the storage implementation |
 | [011 Resource Identifiers](011-resource-identifiers.md) | ADR 027 refines § Package roles: `Identity` + ID generation move to v2 dialects |
 | [008 Users EAV Store](008-users-eav-store.md) | EAV SQL may remain specialized; port to v2 statements |
-| [010 Session/Auth Attempt](010-session-auth-attempt-check-model.md) | Future v2 port target |
+| [010 Session/Auth Attempt](010-session-auth-attempt-check-model.md) | Session/auth-attempt entity SQL lives in v2 statements; model still authoritative |
 
 ## Consequences
 
@@ -336,11 +336,10 @@ items off as work lands; remove completed entries when no longer useful.
 ### Negative / Risks (during transition only)
 
 - Temporary dual-stack complexity (two pools, hybrid tx bridge) until v2 dialects subsume v1
-- Service layer owns storage surface (`*Statements`) in addition to domain repos until entity port completes
-- Spanner parity requires per-entity hand-written SQL (no shared compiler yet); acceptable trade-off for dialect clarity
+- Spanner still needs per-entity hand-written SQL alongside the shared compiler; acceptable trade-off for dialect clarity
 
 ### Resolved at merge
 
 Pre-merge checklist items (compiler gaps, migrations, Identity, ID generation,
-v1 dialect removal) are blockers for `new-repo` merge, not permanent
-architectural debt.
+v1 dialect removal) are blockers for completing the v2 dialect takeover, not
+permanent architectural debt.
