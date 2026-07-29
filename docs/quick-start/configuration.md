@@ -72,3 +72,11 @@ To rotate the KEK, add a new key marked `use_for_encryption: true` and keep the 
 files in the KEK directory) for decryption; existing DEKs are re-encrypted under the new KEK on the next start. For
 shared or production deployments, provide the key material through managed secrets rather than committing it to source
 control.
+
+Files in `<server.data_dir>/keks/` are merged into `server.encryption_keys` on every start, even when the setting is
+configured explicitly. A file whose name matches a config entry's ID replaces that entry outright, dropping an inline
+`private_key` and `use_for_encryption` — so keep the KEK directory empty when you configure keys yourself, and never
+name an entry after a file that could appear there.
+
+For the full picture — the KEK/DEK envelope, key generation, the KEK-directory discovery rules, and the rotation
+procedure — see [Encryption keys (KEK / DEK)](../operations/encryption-keys.md).
