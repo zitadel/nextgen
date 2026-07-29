@@ -8,7 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserRecoveryCodesStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserPasskeyStatements,UserRecoveryCodesStatements,BrandingStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -33,7 +33,9 @@ type AllStatements interface {
 	UserStatements
 	UserPasswordStatements
 	UserTOTPStatements
+	UserPasskeyStatements
 	UserRecoveryCodesStatements
+	BrandingStatements
 	Statements
 }
 
@@ -233,9 +235,25 @@ type UserPasswordStatements interface {
 type UserTOTPStatements interface {
 	Statements
 	CreateUserTOTP(ctx context.Context, totp *domain.CreateUserTOTP) error
-	GetUserTOTPByUserID(ctx context.Context, projectID, userID string) (*domain.UserTOTP, error)
-	UpdateUserTOTP(ctx context.Context, projectID, userID string, updates ...domain.UserTOTPUpdate) error
-	DeleteUserTOTPByUserID(ctx context.Context, projectID, userID string) error
+	GetUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField]) (*domain.UserTOTP, error)
+	ListUserTOTPs(ctx context.Context, filter *database.ListOptions[domain.UserTOTPField]) (*database.ListResult[*domain.UserTOTP], error)
+	UpdateUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField], updates ...domain.UserTOTPUpdate) error
+	DeleteUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField]) error
+}
+
+// TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type UserPasskeyPool interface {
+// 	Statementer[UserPasskeyStatements]
+// 	Transactioner[UserPasskeyStatements]
+// }
+
+type UserPasskeyStatements interface {
+	Statements
+	CreateUserPasskey(ctx context.Context, passkey *domain.CreateUserPasskey) error
+	GetUserPasskey(ctx context.Context, filter database.Filter[domain.UserPasskeyField]) (*domain.UserPasskey, error)
+	ListUserPasskeys(ctx context.Context, filter *database.ListOptions[domain.UserPasskeyField]) (*database.ListResult[*domain.UserPasskey], error)
+	UpdateUserPasskey(ctx context.Context, filter database.Filter[domain.UserPasskeyField], updates ...domain.UserPasskeyUpdate) error
+	DeleteUserPasskey(ctx context.Context, filter database.Filter[domain.UserPasskeyField]) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -251,4 +269,11 @@ type UserRecoveryCodesStatements interface {
 	ListUserRecoveryCodes(ctx context.Context, filter *database.ListOptions[domain.UserRecoveryCodesField]) (*database.ListResult[*domain.UserRecoveryCodes], error)
 	UpdateUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField], updates ...domain.UserRecoveryCodesUpdate) error
 	DeleteUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField]) error
+}
+
+type BrandingStatements interface {
+	Statements
+	CreateBranding(ctx context.Context, entity *domain.Branding) error
+	GetBrandingByID(ctx context.Context, projectID, id string) (*domain.Branding, error)
+	ListBrandings(ctx context.Context, filter *database.ListOptions[domain.BrandingField]) (*database.ListResult[*domain.Branding], error)
 }

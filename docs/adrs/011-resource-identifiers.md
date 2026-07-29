@@ -124,15 +124,16 @@ type Identity string
 - **Scan:** normalizes `int64`, `int`, `string`, `[]byte`, and `nil` to a decimal string (empty string for SQL `NULL`).
 - **Value:** if the identity is a signed integer decimal, returns `int64` for `BIGINT` columns; otherwise returns `string` for `TEXT` / `STRING` columns.
 
-Domain types may remain plain `string`; repositories convert at the storage boundary (`Identity(id)`, `id.String()`).
+Domain types may remain plain `string`; v2 dialect statements convert at the
+storage boundary (`Identity(id)`, `id.String()`).
 
 ### 4. Package roles
 
 | Package | Role |
 |---------|------|
 | `internal/domain/idgen` | Managed resource id generation only |
-| `internal/storage/database` | `Identity` type and dialect-agnostic bind/scan |
-| `internal/storage/database/repository` | Uses `Identity` for ephemeral columns; maps to domain `string` |
+| `internal/storage/database` | `Identity` type and dialect-agnostic bind/scan (moving to v2 per [ADR 028](028-storage-v2-statements-and-dialects.md)) |
+| `internal/storage/v2/dialect/{postgres,spanner}` | Entity statements use `Identity` for ephemeral columns; map to domain `string` |
 
 ## Consequences
 

@@ -35,7 +35,7 @@ func TestTeamMembershipStatements_CRUD(t *testing.T) {
 	}))
 	require.NoError(t, stmts.CreateTeam(ctx, &domain.Team{ProjectID: project.ID, ID: teamID}))
 
-	// Users are still on the v1 repository; seed the parent row via DML.
+	// Seed the parent user row via DML (integration fixture).
 	_, err := db.Update(ctx, buildStatement(
 		`INSERT INTO users (project_id, schema_url, id, status, created_at, updated_at) VALUES (@p1, @p2, @p3, @p4, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
 		project.ID, schemaURL, userID, domain.UserStatusActive.String(),

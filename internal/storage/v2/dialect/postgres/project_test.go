@@ -168,24 +168,99 @@ func TestProjectStatements_List(t *testing.T) {
 		assert.Equal(t, []string{ids[2], ids[1], ids[0]}, list(t, nil, database.OrderDesc))
 	})
 
-	t.Run("paginates with a cursor", func(t *testing.T) {
-		page := database.Page[domain.ProjectField]{
-			Limit: 2,
-			OrderBy: database.OrderBy[domain.ProjectField]{
-				Columns:   []database.Column[domain.ProjectField]{createdAtCol},
-				Direction: database.OrderAsc,
-			},
-		}
+	cursorTests := []struct {
+		name    string
+		columns []database.Column[domain.ProjectField]
+	}{
+		{"paginates with a cursor", []database.Column[domain.ProjectField]{createdAtCol}},
+		// Callers append id as a tiebreaker, so every cursor a list endpoint
+		// issues spans two columns.
+		{"paginates with a tiebreaker column", []database.Column[domain.ProjectField]{createdAtCol, database.Col(domain.ProjectFieldID)}},
+	}
 
-		first, err := testPool.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: sinceFirst, Pagination: page})
-		require.NoError(t, err)
-		assert.Equal(t, []string{ids[0], ids[1]}, projectIDs(first.Items))
-		require.NotEmpty(t, first.NextCursor)
+	for _, tc := range cursorTests {
+		t.Run(tc.name, func(t *testing.T) {
+			page := database.Page[domain.ProjectField]{
+				Limit: 2,
+				OrderBy: database.OrderBy[domain.ProjectField]{
+					Columns:   tc.columns,
+					Direction: database.OrderAsc,
+				},
+			}
 
-		page.Cursor = first.NextCursor
-		second, err := testPool.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: sinceFirst, Pagination: page})
+			first, err := testPool.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: sinceFirst, Pagination: page})
+			require.NoError(t, err)
+			assert.Equal(t, []string{ids[0], ids[1]}, projectIDs(first.Items))
+			require.NotEmpty(t, first.NextCursor)
+
+			page.Cursor = first.NextCursor
+			second, err := testPool.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: sinceFirst, Pagination: page})
+			require.NoError(t, err)
+			assert.Equal(t, []string{ids[2]}, projectIDs(second.Items))
+			assert.Empty(t, second.NextCursor)
+		})
+	}
+}
+
+// A tie is what the lexicographic cursor expansion exists for: when created_at
+// matches, only the id tiebreaker can decide, so the page boundary falls
+// between two rows that compare equal on the leading column.
+func TestProjectStatements_ListCursorTie(t *testing.T) {
+	ctx := t.Context()
+
+	// One prefix with an ordered suffix, so the ids sort in creation order.
+	prefix := uniqueProjectID(t)
+	ids := []string{prefix + "-0", prefix + "-1", prefix + "-2"}
+
+	// CreateProject leaves created_at to the column default, so the rows are
+	// seeded by DML to share one timestamp. Microseconds round-trip in both
+	// dialects, which keeps the stored value equal to the filter value below.
+	tieCreatedAt := time.Now().UTC().Truncate(time.Microsecond)
+	for _, id := range ids {
+		t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), id) })
+		_, err := testPool.pool.Exec(ctx,
+			`INSERT INTO zitadel_nextgen.projects (id, name, created_at, updated_at) VALUES ($1, $2, $3, $3)`,
+			id, "project-"+id, tieCreatedAt,
+		)
 		require.NoError(t, err)
-		assert.Equal(t, []string{ids[2]}, projectIDs(second.Items))
-		assert.Empty(t, second.NextCursor)
-	})
+	}
+
+	// Selects only this test's rows.
+	tieFilter := database.Equal(database.Col(domain.ProjectFieldCreatedAt), tieCreatedAt)
+
+	tests := []struct {
+		name      string
+		direction database.OrderDirection
+		first     []string
+		second    []string
+	}{
+		{"ascending", database.OrderAsc, []string{ids[0], ids[1]}, []string{ids[2]}},
+		{"descending", database.OrderDesc, []string{ids[2], ids[1]}, []string{ids[0]}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			page := database.Page[domain.ProjectField]{
+				Limit: 2,
+				OrderBy: database.OrderBy[domain.ProjectField]{
+					Columns: []database.Column[domain.ProjectField]{
+						database.Col(domain.ProjectFieldCreatedAt),
+						database.Col(domain.ProjectFieldID),
+					},
+					Direction: tt.direction,
+				},
+			}
+
+			first, err := testPool.ListProjects(ctx, &database.ListOptions[domain.ProjectField]{Filter: tieFilter, Pagination: page})
+			require.NoError(t, err)
+			assert.Equal(t, tt.first, projectIDs(first.Items))
+			require.NotEmpty(t, first.NextCursor)
+
+			page.Cursor = first.NextCursor
+			second, err := testPool.ListProjects(ctx, &database.ListOptions[domain.ProjectField]{Filter: tieFilter, Pagination: page})
+			require.NoError(t, err)
+			assert.Equal(t, tt.second, projectIDs(second.Items))
+			assert.Empty(t, second.NextCursor)
+		})
+	}
 }
