@@ -490,8 +490,7 @@ func startDatabase(ctx context.Context, cfg Config) (database.Pool, v2db.Pool, e
 	if err != nil {
 		return nil, nil, err
 	}
-	err = pool.Migrate(ctx)
-	if err != nil {
+	if err := v2Pool.Migrate(ctx); err != nil {
 		return nil, nil, err
 	}
 	return pool, v2Pool, nil

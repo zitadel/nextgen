@@ -17,7 +17,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
 	pgold "github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/migration"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/migration"
 )
 
 // The v2 postgres tests drive a real database exclusively through the v2 pool.
@@ -54,8 +54,7 @@ func runTests(m *testing.M) int {
 	}
 	dsn := cfg.ConnString()
 
-	// Migrate the zitadel_nextgen schema via a throwaway *sql.DB. migration.Migrate
-	// is pool-independent; borrowing it is unavoidable until v2 grows its own.
+	// Migrate the zitadel_nextgen schema via a throwaway *sql.DB.
 	if err := migrate(ctx, dsn); err != nil {
 		slog.Error("failed to migrate test database", "error", err)
 		return 1

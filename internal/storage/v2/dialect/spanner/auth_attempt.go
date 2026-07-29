@@ -12,9 +12,9 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	storagedb "github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/authattempt"
-	v2session "github.com/zitadel/nextgen/internal/storage/v2/session"
+	"github.com/zitadel/nextgen/internal/storage/v2/session"
 )
 
 const (
@@ -73,7 +73,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 
 	return withTransaction(ctx, as.db, func(ctx context.Context, tx queryExecutor) error {
 		stmt := buildStatement(createAuthAttemptStmt, attempt.ProjectID, req, ttlNanos, sessionID, now).statement()
-		var attemptID storagedb.Identity
+		var attemptID database.Identity
 		err := tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 				return struct{}{}, row.Columns(&attemptID)
@@ -113,9 +113,9 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 			}
 
 			checkStmt := buildStatement(createAuthCheckStmt,
-				attempt.ProjectID, storagedb.Identity(attempt.ID), int64(check.Type()),
+				attempt.ProjectID, database.Identity(attempt.ID), int64(check.Type()),
 				challengedAt, verifiedAt, challengePayload, factorPayload).statement()
-			var checkID storagedb.Identity
+			var checkID database.Identity
 			err = tx.Write(ctx, checkStmt, func(iter *spanner.RowIterator) error {
 				_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 					return struct{}{}, row.Columns(&checkID)
@@ -164,14 +164,14 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 	err := iter.Do(func(row *spanner.Row) error {
 		found = true
 		var (
-			attemptID        storagedb.Identity
+			attemptID        database.Identity
 			handoffToken     []byte
 			handedOffAt      spanner.NullTime
 			sessionID        spanner.NullInt64
 			requiredChecks   []spanner.NullInt64
 			checkType        spanner.NullInt64
 			timeToLiveNanos  spanner.NullInt64
-			challengeID      storagedb.Identity
+			challengeID      database.Identity
 			lastChallengedAt spanner.NullTime
 			verifiedAt       spanner.NullTime
 			lastFailedAt     spanner.NullTime
@@ -229,7 +229,7 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 		if failureCount.Valid {
 			failureCountV = uint16(failureCount.Int64)
 		}
-		checks, err := v2session.DecodeAuthChecks(
+		checks, err := session.DecodeAuthChecks(
 			domain.AuthCheckType(checkType.Int64),
 			challengeID.String(),
 			lastChallengedAtV, lastFailedAtV, verifiedAtV, failureCountV,
@@ -297,7 +297,7 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 
 	stmt := buildStatement(setAuthAttemptChallengeStmt,
 		projectID, id, int64(challenge.Type()), now, payloadStr).statement()
-	var checkID storagedb.Identity
+	var checkID database.Identity
 	err = as.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			return struct{}{}, row.Columns(&checkID)
@@ -366,7 +366,7 @@ func (as authAttemptStatements) AuthAttemptChallengeFailed(ctx context.Context, 
 		return err
 	})
 	if err != nil {
-		var noRow *storagedb.NoRowFoundError
+		var noRow *database.NoRowFoundError
 		if errors.As(err, &noRow) {
 			return domain.ErrAuthAttemptStaleChallenge()
 		}

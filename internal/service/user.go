@@ -8,8 +8,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // ---- Input types -------------------------------------------------------------
@@ -124,16 +123,16 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]ma
 	if input.Offset > 0 {
 		limit = input.Offset + input.Limit
 	}
-	result, err := s.v2Pool.Statements().ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
-		Filter: v2database.Equal(v2database.Col(domain.UserFieldProjectID), input.ProjectID),
-		Pagination: v2database.Page[domain.UserField]{
+	result, err := s.v2Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
+		Filter: database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
+		Pagination: database.Page[domain.UserField]{
 			Limit: limit,
-			OrderBy: v2database.OrderBy[domain.UserField]{
-				Columns: []v2database.Column[domain.UserField]{
-					v2database.Col(domain.UserFieldCreatedAt),
-					v2database.Col(domain.UserFieldID),
+			OrderBy: database.OrderBy[domain.UserField]{
+				Columns: []database.Column[domain.UserField]{
+					database.Col(domain.UserFieldCreatedAt),
+					database.Col(domain.UserFieldID),
 				},
-				Direction: v2database.OrderAsc,
+				Direction: database.OrderAsc,
 			},
 		},
 	}, UserQueryOptions{})
@@ -163,9 +162,9 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]ma
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {
-	flatUser, err := s.v2Pool.Statements().GetUser(ctx, v2database.And(
-		v2database.Equal(v2database.Col(domain.UserFieldProjectID), input.ProjectID),
-		v2database.Equal(v2database.Col(domain.UserFieldID), input.UserID),
+	flatUser, err := s.v2Pool.Statements().GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
+		database.Equal(database.Col(domain.UserFieldID), input.UserID),
 	), UserQueryOptions{MembershipTeamID: input.TeamID})
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -197,9 +196,9 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 		return nil, domain.ErrSessionTokenInvalid()
 	}
 
-	user, err := s.v2Pool.Statements().GetUser(ctx, v2database.And(
-		v2database.Equal(v2database.Col(domain.UserFieldProjectID), sessionToken.ProjectID),
-		v2database.Equal(v2database.Col(domain.UserFieldID), sessionToken.UserID),
+	user, err := s.v2Pool.Statements().GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), sessionToken.ProjectID),
+		database.Equal(database.Col(domain.UserFieldID), sessionToken.UserID),
 	), UserQueryOptions{})
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -365,7 +364,7 @@ type UserStatementsLookup struct {
 
 func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error) {
 	return l.Pool.Statements().GetUser(ctx,
-		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
 		UserQueryOptions{Attributes: attrs},
 	)
 }
@@ -376,8 +375,8 @@ type UserStatementsIdentityReader struct {
 }
 
 func (r UserStatementsIdentityReader) GetIdentity(ctx context.Context, projectID, userID string, attributeKeys ...string) (*domain.User, error) {
-	return r.Pool.Statements().GetUser(ctx, v2database.And(
-		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
-		v2database.Equal(v2database.Col(domain.UserFieldID), userID),
+	return r.Pool.Statements().GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserFieldID), userID),
 	), UserQueryOptions{AttributeKeys: attributeKeys})
 }

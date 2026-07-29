@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -72,7 +71,7 @@ func TestUserTOTPStatements_CRUD(t *testing.T) {
 
 	require.NoError(t, testPool.DeleteUserTOTP(ctx, totpByIDFilter(got.ID)))
 	_, err = testPool.GetUserTOTP(ctx, byUser)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 	require.NoError(t, testPool.CreateUserTOTP(ctx, &domain.CreateUserTOTP{
 		ProjectID: projectID,
@@ -84,7 +83,7 @@ func TestUserTOTPStatements_CRUD(t *testing.T) {
 	require.Positive(t, got2.ID)
 	require.NoError(t, testPool.DeleteUserTOTP(ctx, byUser))
 	_, err = testPool.GetUserTOTP(ctx, byUser)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestUserTOTPStatements_Update(t *testing.T) {
@@ -109,7 +108,7 @@ func TestUserTOTPStatements_Update(t *testing.T) {
 	err = testPool.UpdateUserTOTP(ctx, totpByUserFilter(projectID, "missing-user"),
 		&domain.UserTOTPIncrementFailedAttemptsUpdate{Delta: 1},
 	)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	newSecret := []byte("rotated-secret")

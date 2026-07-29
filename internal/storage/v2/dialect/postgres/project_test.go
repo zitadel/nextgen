@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -41,7 +40,7 @@ func TestProjectStatements_Create(t *testing.T) {
 		require.NoError(t, testPool.CreateProject(t.Context(), project))
 
 		err := testPool.CreateProject(t.Context(), newTestProject(project.ID))
-		assert.ErrorIs(t, err, new(legacydb.UniqueError))
+		assert.ErrorIs(t, err, new(database.UniqueError))
 	})
 }
 
@@ -70,7 +69,7 @@ func TestProjectStatements_Update(t *testing.T) {
 	t.Run("not found returns NoRowFoundError", func(t *testing.T) {
 		project := newTestProject(uniqueProjectID(t))
 		err := testPool.UpdateProject(t.Context(), project)
-		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
 
@@ -90,7 +89,7 @@ func TestProjectStatements_Get(t *testing.T) {
 
 	t.Run("not found returns NoRowFoundError", func(t *testing.T) {
 		_, err := testPool.GetProjectByID(t.Context(), uniqueProjectID(t))
-		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
 
@@ -103,7 +102,7 @@ func TestProjectStatements_Delete(t *testing.T) {
 		require.NoError(t, testPool.DeleteProjectByID(t.Context(), project.ID))
 
 		_, err := testPool.GetProjectByID(t.Context(), project.ID)
-		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 
 	t.Run("deleting a missing project is a no-op", func(t *testing.T) {
