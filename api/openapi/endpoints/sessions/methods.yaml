@@ -19,7 +19,7 @@ post:
     - Sessions
   security:
     - oauth2:
-        - sessions.write
+        - session.write
   requestBody:
     required: true
     content:
@@ -59,7 +59,7 @@ get:
     - Sessions
   security:
     - oauth2:
-        - sessions.read
+        - session.read
   parameters:
     - $ref: ../../components/parameters/limit.yaml
     - $ref: ../../components/parameters/page-token.yaml

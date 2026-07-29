@@ -14,13 +14,32 @@ flows:
       user.delete: Permission to delete users
       team.read: Permission to read teams
       team.write: Permission to create and manage teams
-      flow_definitions.read: Permission to read flow definitions
-      flow_definitions.write: Permission to create and manage flow definitions
-      flow_definitions.delete: Permission to delete flow definitions
+      flow_definition.read: Permission to read flow definitions
+      flow_definition.write: Permission to create and manage flow definitions
+      flow_definition.delete: Permission to delete flow definitions
       project.read: Permission to read projects
       project.write: Permission to create and manage projects
       branding.read: Permission to read branding revisions
       branding.write: Permission to publish branding revisions
+      domain.read: Permission to read project domains
+      domain.write: Permission to create and manage project domains
+      domain.delete: Permission to delete project domains
+      feature.read: Permission to read project feature configuration
+      feature.write: Permission to change project feature configuration
+      allowed_origin.read: Permission to read allowed origins
+      allowed_origin.write: Permission to create and manage allowed origins
+      allowed_origin.delete: Permission to delete allowed origins
+      signing_key.create: Permission to create signing keys
+      signing_key.read: Permission to read signing keys
+      signing_key.delete: Permission to delete signing keys
+      webhook.read: Permission to read webhooks
+      webhook.write: Permission to create and manage webhooks
+      webhook.delete: Permission to delete webhooks
+      session.read: Permission to read sessions
+      session.write: Permission to create and manage sessions
+      session.delete: Permission to revoke sessions
+      auth_attempt.read: Permission to read auth attempts
+      auth_attempt.write: Permission to create and manage auth attempts
   clientCredentials:
     tokenUrl: https://acc.nextgen.zitadel.com/oauth/token
     scopes:
@@ -32,10 +51,29 @@ flows:
       user.delete: Permission to delete users
       team.read: Permission to read teams
       team.write: Permission to create and manage teams
-      flow_definitions.read: Permission to read flow definitions
-      flow_definitions.write: Permission to create and manage flow definitions
-      flow_definitions.delete: Permission to delete flow definitions
+      flow_definition.read: Permission to read flow definitions
+      flow_definition.write: Permission to create and manage flow definitions
+      flow_definition.delete: Permission to delete flow definitions
       project.read: Permission to read projects
       project.write: Permission to create and manage projects
       branding.read: Permission to read branding revisions
       branding.write: Permission to publish branding revisions
+      domain.read: Permission to read project domains
+      domain.write: Permission to create and manage project domains
+      domain.delete: Permission to delete project domains
+      feature.read: Permission to read project feature configuration
+      feature.write: Permission to change project feature configuration
+      allowed_origin.read: Permission to read allowed origins
+      allowed_origin.write: Permission to create and manage allowed origins
+      allowed_origin.delete: Permission to delete allowed origins
+      signing_key.create: Permission to create signing keys
+      signing_key.read: Permission to read signing keys
+      signing_key.delete: Permission to delete signing keys
+      webhook.read: Permission to read webhooks
+      webhook.write: Permission to create and manage webhooks
+      webhook.delete: Permission to delete webhooks
+      session.read: Permission to read sessions
+      session.write: Permission to create and manage sessions
+      session.delete: Permission to revoke sessions
+      auth_attempt.read: Permission to read auth attempts
+      auth_attempt.write: Permission to create and manage auth attempts
