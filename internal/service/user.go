@@ -62,26 +62,23 @@ type GetMyUserInput struct {
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
-	pool         database.Pool
-	v2Pool       StatementPool
-	schemaStore  domain.JSONSchemaStore
-	passwordRepo domain.UserPasswordRepository
-	hasher       crypto.Hasher
+	pool        database.Pool
+	v2Pool      StatementPool
+	schemaStore domain.JSONSchemaStore
+	hasher      crypto.Hasher
 }
 
 func NewUserService(
 	pool database.Pool,
 	v2Pool StatementPool,
 	schemaStore domain.JSONSchemaStore,
-	passwordRepo domain.UserPasswordRepository,
 	hasher crypto.Hasher,
 ) *UserService {
 	return &UserService{
-		pool:         pool,
-		v2Pool:       v2Pool,
-		schemaStore:  schemaStore,
-		passwordRepo: passwordRepo,
-		hasher:       hasher,
+		pool:        pool,
+		v2Pool:      v2Pool,
+		schemaStore: schemaStore,
+		hasher:      hasher,
 	}
 }
 
@@ -200,7 +197,7 @@ func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[
 }
 
 func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
-	action := NewSetUserPasswordAction(input, s.hasher, s.passwordRepo)
+	action := NewSetUserPasswordAction(input, s.hasher)
 	return s.ApplyActions(ctx, action)
 }
 
@@ -292,17 +289,15 @@ func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.Cre
 type SetPasswordUserAction struct {
 	SetPasswordInput
 
-	hasher       crypto.Hasher
-	passwordRepo domain.UserPasswordRepository
+	hasher crypto.Hasher
 
 	hash string
 }
 
-func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher, passwordRepo domain.UserPasswordRepository) *SetPasswordUserAction {
+func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher) *SetPasswordUserAction {
 	return &SetPasswordUserAction{
 		SetPasswordInput: input,
 		hasher:           hasher,
-		passwordRepo:     passwordRepo,
 	}
 }
 
@@ -312,7 +307,7 @@ func (o *SetPasswordUserAction) Prepare(_ context.Context, _ database.QueryExecu
 }
 
 func (o *SetPasswordUserAction) Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error {
-	err := o.passwordRepo.Set(ctx, tx, &domain.SetUserPassword{
+	err := tx.Statements().SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:      o.ProjectID,
 		UserID:         o.UserID,
 		EncodedHash:    o.hash,

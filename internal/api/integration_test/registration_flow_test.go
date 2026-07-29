@@ -15,7 +15,6 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // TestPasskeyRegistrationFlow exercises the full passkey registration ceremony
@@ -71,8 +70,6 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	db := harness.EnsureDBPool(t)
-
 	emailAttr, err := domain.NewCreateAttribute("email", "pkreg-flow@example.com", domain.AttributeUniquenessUnspecified)
 	require.NoError(t, err)
 
@@ -85,8 +82,8 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		Attributes:              []*domain.CreateAttribute{emailAttr},
 	}))
 
-	passkeyRepo := harness.EnsureUserPasskeyRepo(t)
-	require.NoError(t, passkeyRepo.Create(t.Context(), db, &domain.CreateUserPasskey{
+	passkeys := harness.EnsureUserPasskeyFixture(t)
+	require.NoError(t, passkeys.Create(t.Context(), &domain.CreateUserPasskey{
 		ProjectID:    project.ID,
 		UserID:       userID,
 		CredentialID: base64.RawURLEncoding.EncodeToString(credExisting.ID),
@@ -238,10 +235,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	require.True(t, regVerifyOK.Response.Step.Complete.Set, "expected step complete after registration")
 
 	// Confirm a new credential row exists (in addition to the seeded one).
-	pks, err := passkeyRepo.List(t.Context(), db,
-		database.WithCondition(passkeyRepo.ProjectIDCondition(project.ID)),
-		database.WithCondition(passkeyRepo.UserIDCondition(userID)),
-	)
+	pks, err := passkeys.ListByUser(t.Context(), project.ID, userID)
 	require.NoError(t, err)
 	require.Len(t, pks, 2, "expected two passkeys (original + newly registered)")
 }

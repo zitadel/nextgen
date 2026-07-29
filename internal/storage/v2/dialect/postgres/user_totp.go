@@ -10,18 +10,17 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/usertotp"
 )
 
 const createUserTOTPStmt = `INSERT INTO zitadel_nextgen.user_totp (
 	project_id, user_id, secret
 ) VALUES ($1, $2, $3)`
 
-const getUserTOTPByUserIDStmt = `SELECT id, project_id, user_id, secret, verified_at,
+const userTOTPQuery = `SELECT id, project_id, user_id, secret, verified_at,
 	last_successful_check, failed_attempts, created_at, updated_at
-FROM zitadel_nextgen.user_totp
-WHERE project_id = $1 AND user_id = $2`
-
-const deleteUserTOTPByUserIDStmt = `DELETE FROM zitadel_nextgen.user_totp WHERE project_id = $1 AND user_id = $2`
+FROM zitadel_nextgen.user_totp`
 
 type userTOTPStatements struct{ statement }
 
@@ -39,40 +38,59 @@ func (us userTOTPStatements) CreateUserTOTP(ctx context.Context, totp *domain.Cr
 	return wrapError(err)
 }
 
-// GetUserTOTPByUserID implements [service.UserTOTPStatements].
-func (us userTOTPStatements) GetUserTOTPByUserID(ctx context.Context, projectID, userID string) (*domain.UserTOTP, error) {
-	totp := new(domain.UserTOTP)
-	var (
-		verifiedAt          sql.NullTime
-		lastSuccessfulCheck sql.NullTime
-	)
-	err := us.client.QueryRow(ctx, getUserTOTPByUserIDStmt, projectID, userID).Scan(
-		&totp.ID,
-		&totp.ProjectID,
-		&totp.UserID,
-		&totp.Secret,
-		&verifiedAt,
-		&lastSuccessfulCheck,
-		&totp.FailedAttempts,
-		&totp.CreatedAt,
-		&totp.UpdatedAt,
-	)
+// GetUserTOTP implements [service.UserTOTPStatements].
+func (us userTOTPStatements) GetUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField]) (*domain.UserTOTP, error) {
+	result, err := us.ListUserTOTPs(ctx, &database.ListOptions[domain.UserTOTPField]{Filter: filter})
+	if err != nil {
+		return nil, err
+	}
+	switch len(result.Items) {
+	case 0:
+		return nil, wrapError(pgx.ErrNoRows)
+	case 1:
+		return result.Items[0], nil
+	default:
+		return nil, wrapError(pgx.ErrTooManyRows)
+	}
+}
+
+// ListUserTOTPs implements [service.UserTOTPStatements].
+func (us userTOTPStatements) ListUserTOTPs(ctx context.Context, filter *database.ListOptions[domain.UserTOTPField]) (*database.ListResult[*domain.UserTOTP], error) {
+	var compiler statementCompiler
+	if err := compileRead(&compiler, userTOTPQuery, filter, usertotp.Schema); err != nil {
+		return nil, err
+	}
+
+	rows, err := us.client.Query(ctx, compiler.String(), compiler.args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	totp.Secret = append([]byte(nil), totp.Secret...)
-	if verifiedAt.Valid {
-		totp.VerifiedAt = verifiedAt.Time
+
+	items, err := pgx.CollectRows(rows, us.scanUserTOTP)
+	if err != nil {
+		return nil, wrapError(err)
 	}
-	if lastSuccessfulCheck.Valid {
-		t := lastSuccessfulCheck.Time
-		totp.LastSuccessfulCheck = &t
+
+	var nextCursor []byte
+	if filter.Pagination.Limit > 0 && len(items) == int(filter.Pagination.Limit) {
+		cursor := &pagination.Cursor[domain.UserTOTPField]{
+			Columns: filter.Pagination.OrderBy.Columns,
+			Values:  usertotp.Schema.ValuesFrom(items[len(items)-1], filter.Pagination.OrderBy.Columns),
+		}
+		nextCursor = cursor.Marshal()
 	}
-	return totp, nil
+
+	return &database.ListResult[*domain.UserTOTP]{
+		Items:      items,
+		NextCursor: nextCursor,
+	}, nil
 }
 
 // UpdateUserTOTP implements [service.UserTOTPStatements].
-func (us userTOTPStatements) UpdateUserTOTP(ctx context.Context, projectID, userID string, updates ...domain.UserTOTPUpdate) error {
+func (us userTOTPStatements) UpdateUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField], updates ...domain.UserTOTPUpdate) error {
+	if filter == nil {
+		return fmt.Errorf("UserTOTP filter is required")
+	}
 	if len(updates) == 0 {
 		return database.ErrNoChanges
 	}
@@ -108,10 +126,8 @@ func (us userTOTPStatements) UpdateUserTOTP(ctx context.Context, projectID, user
 		}
 	}
 
-	c.WriteString(", updated_at = NOW() WHERE project_id = ")
-	c.WriteArg(projectID)
-	c.WriteString(" AND user_id = ")
-	c.WriteArg(userID)
+	c.WriteString(", updated_at = NOW() WHERE ")
+	compileFilter(&c, filter, usertotp.Schema)
 
 	tag, err := us.client.Exec(ctx, c.String(), c.args...)
 	if err != nil {
@@ -123,10 +139,46 @@ func (us userTOTPStatements) UpdateUserTOTP(ctx context.Context, projectID, user
 	return nil
 }
 
-// DeleteUserTOTPByUserID implements [service.UserTOTPStatements].
-func (us userTOTPStatements) DeleteUserTOTPByUserID(ctx context.Context, projectID, userID string) error {
-	_, err := us.client.Exec(ctx, deleteUserTOTPByUserIDStmt, projectID, userID)
+// DeleteUserTOTP implements [service.UserTOTPStatements].
+func (us userTOTPStatements) DeleteUserTOTP(ctx context.Context, filter database.Filter[domain.UserTOTPField]) error {
+	if filter == nil {
+		return fmt.Errorf("UserTOTP filter is required")
+	}
+	var c statementCompiler
+	c.WriteString("DELETE FROM zitadel_nextgen.user_totp WHERE ")
+	compileFilter(&c, filter, usertotp.Schema)
+	_, err := us.client.Exec(ctx, c.String(), c.args...)
 	return wrapError(err)
+}
+
+func (us userTOTPStatements) scanUserTOTP(row pgx.CollectableRow) (*domain.UserTOTP, error) {
+	totp := new(domain.UserTOTP)
+	var (
+		verifiedAt          sql.NullTime
+		lastSuccessfulCheck sql.NullTime
+	)
+	if err := row.Scan(
+		&totp.ID,
+		&totp.ProjectID,
+		&totp.UserID,
+		&totp.Secret,
+		&verifiedAt,
+		&lastSuccessfulCheck,
+		&totp.FailedAttempts,
+		&totp.CreatedAt,
+		&totp.UpdatedAt,
+	); err != nil {
+		return nil, err
+	}
+	totp.Secret = append([]byte(nil), totp.Secret...)
+	if verifiedAt.Valid {
+		totp.VerifiedAt = verifiedAt.Time
+	}
+	if lastSuccessfulCheck.Valid {
+		t := lastSuccessfulCheck.Time
+		totp.LastSuccessfulCheck = &t
+	}
+	return totp, nil
 }
 
 var _ service.UserTOTPStatements = (*userTOTPStatements)(nil)

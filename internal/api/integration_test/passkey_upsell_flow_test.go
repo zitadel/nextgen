@@ -14,7 +14,6 @@ import (
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // TestPostCreateUserPasskeyUpsell exercises the example 06 distinguishing
@@ -104,7 +103,6 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	zflow = mustExtractZflow(t, pwOK.SetCookie.Value)
 
 	// User is now in the DB (create_user fired).
-	db := harness.EnsureDBPool(t)
 	users := harness.EnsureUserFixture(t)
 	user, err := users.GetByAttributes(t.Context(), project.ID, []domain.Attribute{{Key: "email", Value: newEmail}})
 	require.NoError(t, err, "create_user must persist exactly one user before the upsell")
@@ -168,14 +166,10 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	require.True(t, verifyOK.Response.Step.Complete.Set, "expected terminal step")
 
 	// Passkey row exists for the freshly-created user — the seam works.
-	passkeyRepo := harness.EnsureUserPasskeyRepo(t)
-	_, err = passkeyRepo.Get(t.Context(), db,
-		database.WithCondition(database.And(
-			passkeyRepo.ProjectIDCondition(project.ID),
-			passkeyRepo.UserIDCondition(user.ID),
-		)),
-	)
+	passkeys := harness.EnsureUserPasskeyFixture(t)
+	pks, err := passkeys.ListByUser(t.Context(), project.ID, user.ID)
 	require.NoError(t, err, "passkey_register must enroll exactly one credential against the create_user-pinned ID")
+	require.Len(t, pks, 1)
 }
 
 // TestPostCreateUserPasskeyUpsell_SkipsToDone confirms the skip branch of

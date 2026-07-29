@@ -29,34 +29,31 @@ const passkeyHandlerTestSchema = `{
 }`
 
 type passkeyHandlerFixture struct {
-	handler      *service.FlowCreateUserForPasskeyHandler
-	schemaStore  *domainmock.MockJSONSchemaStore
-	pool         *dbmock.MockPool
-	v2Pool       *servicemocks.MockPool
-	stmts        *servicemocks.MockAllStatements
-	passwordRepo *domainmock.MockUserPasswordRepository
+	handler     *service.FlowCreateUserForPasskeyHandler
+	schemaStore *domainmock.MockJSONSchemaStore
+	pool        *dbmock.MockPool
+	v2Pool      *servicemocks.MockPool
+	stmts       *servicemocks.MockAllStatements
 }
 
 func newPasskeyHandlerFixture(t *testing.T) *passkeyHandlerFixture {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	passwordRepo := domainmock.NewMockUserPasswordRepository(ctrl)
 	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
 	pool := dbmock.NewMockPool(ctrl)
 	v2Pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 
 	v2Pool.EXPECT().Statements().Return(stmts).AnyTimes()
-	userService := service.NewUserService(pool, service.NewPool(v2Pool), schemaStore, passwordRepo, nil)
+	userService := service.NewUserService(pool, service.NewPool(v2Pool), schemaStore, nil)
 	handler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaStore)
 
 	return &passkeyHandlerFixture{
-		handler:      handler,
-		schemaStore:  schemaStore,
-		pool:         pool,
-		v2Pool:       v2Pool,
-		stmts:        stmts,
-		passwordRepo: passwordRepo,
+		handler:     handler,
+		schemaStore: schemaStore,
+		pool:        pool,
+		v2Pool:      v2Pool,
+		stmts:       stmts,
 	}
 }
 

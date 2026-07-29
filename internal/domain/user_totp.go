@@ -21,3 +21,20 @@ type CreateUserTOTP struct {
 	UserID    string
 	Secret    []byte
 }
+
+// UserTOTPField enumerates the fields of UserTOTP which can be used for
+// filtering and ordering in list operations.
+type UserTOTPField uint8
+
+const (
+	UserTOTPFieldUnspecified UserTOTPField = iota
+	UserTOTPFieldID
+	UserTOTPFieldProjectID
+	UserTOTPFieldUserID
+	UserTOTPFieldSecret
+	UserTOTPFieldVerifiedAt
+	UserTOTPFieldLastSuccessfulCheck
+	UserTOTPFieldFailedAttempts
+	UserTOTPFieldCreatedAt
+	UserTOTPFieldUpdatedAt
+)
