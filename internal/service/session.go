@@ -59,7 +59,6 @@ type DeleteSessionInput struct {
 }
 
 type sessionService struct {
-	pool   database.Pool
 	v2Pool StatementPool
 	users  UserIdentityReader
 	cfg    SessionConfig
@@ -130,9 +129,8 @@ func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) e
 	return nil
 }
 
-func NewSessionService(pool database.Pool, v2Pool StatementPool, users UserIdentityReader, cfg SessionConfig) SessionService {
+func NewSessionService(v2Pool StatementPool, users UserIdentityReader, cfg SessionConfig) SessionService {
 	return &sessionService{
-		pool:   pool,
 		v2Pool: v2Pool,
 		users:  users,
 		cfg:    cfg,
