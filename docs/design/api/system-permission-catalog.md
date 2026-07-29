@@ -319,7 +319,7 @@ not yet exposed.
 
 > **Verb model:** runtime — app-plane mutations vs operator admin. **`session.write`**
 > covers both anonymous shell creation and handoff exchange (OpenAPI:
-> `sessions.write` on both). **`session.read`** / **`session.delete`** are
+> `session.write` on both). **`session.read`** / **`session.delete`** are
 > operator management (list/get/revoke).
 >
 > **Held by:** runtime-plane `session.write` belongs to the first-party app /
@@ -335,7 +335,7 @@ not yet exposed.
 ### Auth attempts
 
 > **Verb model:** runtime — `auth_attempt.write` covers start + all mutations
-> (OpenAPI: `auth_attempts.write`). No `auth_attempt.create`.
+> (OpenAPI: `auth_attempt.write`). No `auth_attempt.create`.
 >
 > **Held by:** `auth_attempt.write` belongs to the first-party app / flow-engine
 > backend (`sk_proj_`) or is nonce-gated in the auth flow — **not** admin
@@ -539,10 +539,10 @@ are grantable — browser nonces gate auth flow operations, not management.
 
 ## Drift notes
 
-This catalog is the **target** permission model. OpenAPI and some design docs
-still reflect an older shape. [`authz.md`](authz.md) and
-[`credentials.md`](credentials.md) are aligned with this catalog; the gaps
-below are follow-up work (issue #420, OpenAPI alignment).
+This catalog is the **target** permission model. This PR aligns OpenAPI's
+plural scope names and missing scope declarations with it.
+[`authz.md`](authz.md) and [`credentials.md`](credentials.md) are also aligned.
+The remaining behavioral and endpoint gaps below are follow-up work.
 
 **Verb model.** OpenAPI scopes for several resources use only `.read` and
 `.write`, where `.write` means “create and manage.” This catalog keeps that
@@ -562,32 +562,26 @@ credential-tier ops out of `user.write`:
 **Project-scoped configuration.** OpenAPI already declares and uses
 `branding.read` / `branding.write`. The current authorization compatibility
 layer also lets legacy `project.write` reach branding; the target catalog does
-not define that implication. `domain.*`, `feature.*`, `allowed_origin.*`,
-`signing_key.*`, and `webhook.*` are target names for planned resources and are
-not declared in OpenAPI yet.
+not define that implication. This PR declares `domain.*`, `feature.*`,
+`allowed_origin.*`, `signing_key.*`, and `webhook.*` in OpenAPI so clients can
+request the final names. Their resource-specific endpoints and enforcement
+remain planned; declaring a scope does not make an absent endpoint available.
 
 **Undeclared resource types.** Many other catalog resources have no OpenAPI scope
 entries yet (e.g. `grant`, `api_key`, `team_membership`, `billing`). `/schemas`
 now appears in [`resource-map.md`](resource-map.md#user-schemas) but exposes only
-create/list/get — `schema.write` / `schema.delete` have no `PATCH`/`DELETE`
-endpoint yet.
+create/list/get — `schema.write` covers create today, while update and
+`schema.delete` remain target behavior without `PATCH`/`DELETE` endpoints.
 
-### Naming renames (OpenAPI → catalog)
+### OpenAPI alignment completed in this PR
 
-| Current name | Location | Proposed name | Issue |
-|---|---|---|---|
-| `flow_definitions.read` | `oauth2.yaml` | `flow_definition.read` | Plural → singular |
-| `flow_definitions.write` | `oauth2.yaml` | `flow_definition.write` | Plural → singular |
-| `flow_definitions.delete` | `oauth2.yaml` | `flow_definition.delete` | Plural → singular |
-| `sessions.read` | `oauth2.yaml` endpoint | `session.read` | Plural → singular (already mixed: `session.read` on `by_id`, `sessions.read` on collection) |
-| `sessions.write` | `oauth2.yaml` endpoint | `session.write` | Plural → singular; covers `POST /sessions` (anonymous shell) and `POST /sessions/exchange`. |
-| `auth_attempts.read` | endpoint | `auth_attempt.read` | Plural → singular |
-| `auth_attempts.write` | endpoint | `auth_attempt.write` | Plural → singular; covers `POST /auth_attempts` and challenge/handoff mutations |
-
-**Endpoint ↔ scope mismatches** (same follow-up): `session.*` and
-`auth_attempt.*` scopes are referenced by endpoints but not declared in
-`oauth2.yaml`. Catalog aligns exchange with OpenAPI (`session.write`, not
-`auth_attempt.write`).
+| Previous name / gap | Current OpenAPI | Outcome |
+|---|---|---|
+| `flow_definitions.*` | `flow_definition.read`, `.write`, `.delete` | Renamed in declarations, endpoint security, generated code, and authorization checks. |
+| Mixed `sessions.*` / `session.*` | `session.read`, `.write`, `.delete` | Singular throughout. `session.write` covers both `POST /sessions` and `POST /sessions/exchange`. |
+| `auth_attempts.*` | `auth_attempt.read`, `.write` | Singular throughout. `auth_attempt.write` covers start and challenge/handoff mutations. |
+| Session and auth-attempt endpoint scopes were undeclared | `session.*`, `auth_attempt.*` declared | Endpoint references and OAuth declarations now agree. Exchange remains `session.write`, not `auth_attempt.write`. |
+| Planned project configuration scopes were undeclared | `domain.*`, `feature.*`, `allowed_origin.*`, `signing_key.*`, `webhook.*` declared | Final names are requestable; endpoint implementation remains separate work. |
 
 ---
 
