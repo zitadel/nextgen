@@ -184,7 +184,7 @@ func TestManagementAuthz(t *testing.T) {
 		t.Run("bound to the token's project", func(t *testing.T) {
 			t.Parallel()
 
-			resp, err := foreign.CreateTeam(t.Context(), &api.CreateTeamRequest{}, api.CreateTeamParams{ProjectID: victimID})
+			resp, err := foreign.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: helpers.TeamName()}, api.CreateTeamParams{ProjectID: victimID})
 			require.NoError(t, err)
 			assertAuthzError(t, resp, "team.project_not_found")
 
@@ -196,7 +196,7 @@ func TestManagementAuthz(t *testing.T) {
 		t.Run("preview secret rejected", func(t *testing.T) {
 			t.Parallel()
 
-			resp, err := preview.CreateTeam(t.Context(), &api.CreateTeamRequest{}, api.CreateTeamParams{ProjectID: victimID})
+			resp, err := preview.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: helpers.TeamName()}, api.CreateTeamParams{ProjectID: victimID})
 			require.NoError(t, err)
 			assertAuthzStatus(t, resp, 403, "team.permission_denied")
 		})
@@ -209,7 +209,7 @@ func TestManagementAuthz(t *testing.T) {
 
 			// createTeam declared security: [] before the guard landed; the
 			// typed unauthorized decode pins that a bearer is now mandatory.
-			resp, err := anon.CreateTeam(t.Context(), &api.CreateTeamRequest{}, api.CreateTeamParams{ProjectID: victimID})
+			resp, err := anon.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: helpers.TeamName()}, api.CreateTeamParams{ProjectID: victimID})
 			require.NoError(t, err)
 			require.IsType(t, &api.CreateTeamUnauthorized{}, resp, helpers.MustMarshal(t, resp))
 			assertAuthzError(t, resp, "auth.unauthorized")

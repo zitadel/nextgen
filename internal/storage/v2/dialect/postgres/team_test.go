@@ -60,6 +60,25 @@ func TestTeamStatements_Create(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	t.Run("name violating the column check returns error", func(t *testing.T) {
+		for _, tc := range []struct {
+			name     string
+			teamName string
+		}{
+			{"empty", ""},
+			{"over the length limit", strings.Repeat("a", domain.TeamNameMaxLength+1)},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				projectID, teamID := uniqueTeamIDs(t)
+				ensureTestProject(t, projectID)
+
+				team := newTestTeam(projectID, teamID)
+				team.Name = tc.teamName
+				assert.ErrorIs(t, testPool.CreateTeam(t.Context(), team), new(legacydb.CheckError))
+			})
+		}
+	})
+
 	t.Run("duplicate (project_id, id) returns error", func(t *testing.T) {
 		projectID, teamID := uniqueTeamIDs(t)
 		ensureTestProject(t, projectID)

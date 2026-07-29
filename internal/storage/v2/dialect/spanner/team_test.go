@@ -73,3 +73,26 @@ func TestTeamStatements_NameUniquePerProject(t *testing.T) {
 	sameNameOtherProject.Name = team.Name
 	require.NoError(t, stmts.CreateTeam(ctx, sameNameOtherProject))
 }
+
+func TestTeamStatements_NameColumnConstraints(t *testing.T) {
+	ctx := t.Context()
+	stmts := testClient.Statements()
+
+	project := newTestProject(uniqueProjectID(t))
+	require.NoError(t, stmts.CreateProject(ctx, project))
+	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+
+	t.Run("empty", func(t *testing.T) {
+		team := newTestTeam(project.ID, "team_v2_name_empty")
+		team.Name = ""
+		// Spanner reports a violated CHECK as OutOfRange, which wrapError does
+		// not translate, so the write is only asserted to be rejected.
+		require.Error(t, stmts.CreateTeam(ctx, team))
+	})
+
+	t.Run("over the length limit", func(t *testing.T) {
+		team := newTestTeam(project.ID, "team_v2_name_long")
+		team.Name = strings.Repeat("a", domain.TeamNameMaxLength+1)
+		assert.ErrorIs(t, stmts.CreateTeam(ctx, team), new(database.CheckError))
+	})
+}

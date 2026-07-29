@@ -1,7 +1,9 @@
 package domain_test
 
 import (
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -59,6 +61,47 @@ func TestNewTeam(t *testing.T) {
 				name:      "   ",
 			},
 			wantErr: domain.ErrTeamNameInvalid(),
+		},
+		{
+			name: "team name at the length limit",
+			args: args{
+				projectID: "proj_1",
+				name:      strings.Repeat("a", domain.TeamNameMaxLength),
+			},
+			check: func(t *testing.T, got *domain.Team) {
+				assert.Len(t, got.Name, domain.TeamNameMaxLength)
+			},
+			wantErr: nil,
+		},
+		{
+			name: "multi-byte team name at the length limit",
+			args: args{
+				projectID: "proj_1",
+				name:      strings.Repeat("チ", domain.TeamNameMaxLength),
+			},
+			check: func(t *testing.T, got *domain.Team) {
+				assert.Equal(t, domain.TeamNameMaxLength, utf8.RuneCountInString(got.Name))
+			},
+			wantErr: nil,
+		},
+		{
+			name: "team name over the length limit",
+			args: args{
+				projectID: "proj_1",
+				name:      strings.Repeat("a", domain.TeamNameMaxLength+1),
+			},
+			wantErr: domain.ErrTeamNameInvalid(),
+		},
+		{
+			name: "team name is trimmed before the length check",
+			args: args{
+				projectID: "proj_1",
+				name:      "  " + strings.Repeat("a", domain.TeamNameMaxLength) + "  ",
+			},
+			check: func(t *testing.T, got *domain.Team) {
+				assert.Len(t, got.Name, domain.TeamNameMaxLength)
+			},
+			wantErr: nil,
 		},
 	}
 	for _, tt := range tests {

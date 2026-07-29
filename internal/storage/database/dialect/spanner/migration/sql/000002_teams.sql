@@ -4,12 +4,13 @@
 CREATE TABLE teams (
     project_id  STRING(MAX) NOT NULL,
     id          STRING(MAX) NOT NULL,
-    name        STRING(MAX) NOT NULL,
+    name        STRING(200) NOT NULL,
     created_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     updated_at  TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     -- Spanner cannot index an expression, so the lowered name is materialised
     -- to back the case-insensitive unique index below.
     name_lower  STRING(MAX) AS (LOWER(name)) STORED,
+    CONSTRAINT chk_teams_name CHECK (name <> ''),
     CONSTRAINT fk_teams_project
         FOREIGN KEY (project_id)
         REFERENCES projects (id)

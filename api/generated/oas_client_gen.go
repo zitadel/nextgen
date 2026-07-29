@@ -2166,6 +2166,15 @@ func (c *Client) CreateTeam(ctx context.Context, request *CreateTeamRequest, par
 }
 
 func (c *Client) sendCreateTeam(ctx context.Context, request *CreateTeamRequest, params CreateTeamParams) (res CreateTeamRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("createTeam"),
 		semconv.HTTPRequestMethodKey.String("POST"),

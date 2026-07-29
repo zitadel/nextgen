@@ -3,6 +3,7 @@ package domain
 import (
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -20,8 +21,11 @@ const (
 
 func (s TeamStatus) String() string { return string(s) }
 
+// TeamNameMaxLength bounds the name in characters.
+const TeamNameMaxLength = 200
+
 func ErrTeamNameInvalid() Error {
-	return newError(PrefixTeam.ErrorCodePrefix("name_invalid"), "The team name is invalid. Expected a non-empty string.", nil, nil)
+	return newError(PrefixTeam.ErrorCodePrefix("name_invalid"), "The team name is invalid. Expected a non-empty string of at most 200 characters.", nil, nil)
 }
 
 func ErrTeamAlreadyExists() Error {
@@ -54,14 +58,14 @@ type Team struct {
 }
 
 func NewTeam(projectID, name string) (*Team, error) {
+	name = strings.TrimSpace(name)
+	if name == "" || utf8.RuneCountInString(name) > TeamNameMaxLength {
+		return nil, ErrTeamNameInvalid()
+	}
+
 	id, err := newID(PrefixTeam)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create team id")
-	}
-
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return nil, ErrTeamNameInvalid()
 	}
 
 	return &Team{

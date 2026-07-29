@@ -6,10 +6,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ogen-go/ogen/validate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -90,7 +92,10 @@ func TestCreateTeam(t *testing.T) {
 
 				resp, err = client.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: tc.nameFor(name)}, params)
 				require.NoError(t, err)
-				assert.IsType(t, &api.CreateTeamConflict{}, resp, helpers.MustMarshal(t, resp))
+
+				conflict, ok := resp.(*api.CreateTeamConflict)
+				require.True(t, ok, helpers.MustMarshal(t, resp))
+				assert.Equal(t, api.ErrorCode("team.already_exists"), conflict.Code)
 			})
 		}
 
@@ -103,21 +108,43 @@ func TestCreateTeam(t *testing.T) {
 			resp, err := client.CreateTeam(t.Context(), req, params)
 			require.NoError(t, err)
 
-			assert.IsType(t, &api.CreateTeamBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			badRequest, ok := resp.(*api.CreateTeamBadRequest)
+			require.True(t, ok, helpers.MustMarshal(t, resp))
+			assert.Equal(t, api.ErrorCode("req.invalid"), badRequest.Code)
 		})
 
-		t.Run("empty name", func(t *testing.T) {
+		// The contract carries minLength/maxLength, so the generated client
+		// rejects these before a request is sent.
+		for _, tc := range []struct {
+			name     string
+			teamName string
+		}{
+			{"empty name", ""},
+			{"name over the length limit", strings.Repeat("a", domain.TeamNameMaxLength+1)},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				_, err := client.CreateTeam(t.Context(),
+					&api.CreateTeamRequest{Name: tc.teamName},
+					api.CreateTeamParams{ProjectID: api.ProjectID(project.ID)},
+				)
+				require.ErrorAs(t, err, new(*validate.Error))
+			})
+		}
+
+		t.Run("whitespace-only name", func(t *testing.T) {
 			t.Parallel()
 
-			req := &api.CreateTeamRequest{Name: ""}
-			params := api.CreateTeamParams{
-				ProjectID: api.ProjectID(project.ID),
-			}
-
-			resp, err := client.CreateTeam(t.Context(), req, params)
+			resp, err := client.CreateTeam(t.Context(),
+				&api.CreateTeamRequest{Name: "   "},
+				api.CreateTeamParams{ProjectID: api.ProjectID(project.ID)},
+			)
 			require.NoError(t, err)
 
-			assert.IsType(t, &api.CreateTeamBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			badRequest, ok := resp.(*api.CreateTeamBadRequest)
+			require.True(t, ok, helpers.MustMarshal(t, resp))
+			assert.Equal(t, api.ErrorCode("team.name_invalid"), badRequest.Code)
 		})
 	})
 }
@@ -168,7 +195,9 @@ func TestGetTeam(t *testing.T) {
 			resp, err := client.GetTeam(t.Context(), params)
 			require.NoError(t, err)
 
-			assert.IsType(t, &api.GetTeamNotFound{}, resp, helpers.MustMarshal(t, resp))
+			notFound, ok := resp.(*api.GetTeamNotFound)
+			require.True(t, ok, helpers.MustMarshal(t, resp))
+			assert.Equal(t, api.ErrorCode("team.team_not_found"), notFound.Code)
 		})
 	})
 }
