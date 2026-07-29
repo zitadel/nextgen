@@ -114,8 +114,7 @@ var (
 		"POST": "Authorization,Content-Type",
 	}
 	rn47AllowedHeaders = map[string]string{
-		"GET":   "Authorization",
-		"PATCH": "Authorization,Content-Type",
+		"GET": "Authorization",
 	}
 	rn54AllowedHeaders = map[string]string{
 		"PUT": "Authorization,Content-Type",
@@ -1464,16 +1463,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							s.handleGetUserByIDRequest([1]string{
 								args[0],
 							}, elemIsEscaped, w, r)
-						case "PATCH":
-							s.handleUpdateUserByIDRequest([1]string{
-								args[0],
-							}, elemIsEscaped, w, r)
 						default:
 							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "GET,PATCH",
+								allowedMethods: "GET",
 								allowedHeaders: rn47AllowedHeaders,
 								acceptPost:     "",
-								acceptPatch:    "application/json",
+								acceptPatch:    "",
 							})
 						}
 
@@ -2933,15 +2928,6 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							r.name = GetUserByIDOperation
 							r.summary = "Get user by ID"
 							r.operationID = "GetUserByID"
-							r.operationGroup = ""
-							r.pathPattern = "/users/{user_id}"
-							r.args = args
-							r.count = 1
-							return r, true
-						case "PATCH":
-							r.name = UpdateUserByIDOperation
-							r.summary = "Update user by ID"
-							r.operationID = "UpdateUserByID"
 							r.operationGroup = ""
 							r.pathPattern = "/users/{user_id}"
 							r.args = args

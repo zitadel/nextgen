@@ -592,15 +592,6 @@ func (UnimplementedHandler) UpdateFlowDefinition(ctx context.Context, req *FlowD
 	return r, ht.ErrNotImplemented
 }
 
-// UpdateUserByID implements UpdateUserByID operation.
-//
-// Update user by ID.
-//
-// PATCH /users/{user_id}
-func (UnimplementedHandler) UpdateUserByID(ctx context.Context, req UpdateUserByIDReq, params UpdateUserByIDParams) (r UpdateUserByIDRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
 // VerifyChallengeProof implements verifyChallengeProof operation.
 //
 // Submits a proof (credential, code, assertion) to verify a factor challenge.
