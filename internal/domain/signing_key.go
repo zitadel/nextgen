@@ -12,6 +12,10 @@ const (
 	PrefixSigningKey ResourcePrefix = "sig_key"
 )
 
+func ErrSigningKeyNotFound() Error {
+	return newError(PrefixSigningKey.ErrorCodePrefix("not_found"), "signing key not found", nil, nil)
+}
+
 type SigningKeyPurpose string
 
 const (
@@ -61,6 +65,23 @@ func NewSigningKey(
 		State:     KeyStateNotActiveYet,
 		Purpose:   purpose,
 	}, nil
+}
+
+func (k *SigningKey) Activate(currentKey *SigningKey) {
+	now := time.Now().UTC()
+	if currentKey != nil {
+		currentKey.State = KeyStateExpired
+		currentKey.RetiredAt = new(now)
+	}
+	k.State = KeyStateActive
+	k.ActivatedAt = new(now)
+}
+
+func (k *SigningKey) IsActive() bool {
+	return k.State == KeyStateActive
+}
+func (k *SigningKey) IsRemoved() bool {
+	return k.State == KeyStateRemoved
 }
 
 func (k *SigningKey) Signer(kek crypto.Crypter) (jose.Signer, error) {

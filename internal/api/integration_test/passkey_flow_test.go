@@ -166,8 +166,8 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Purpose:   api.CreateFlowRequestPurposeLogin,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "expected FlowResponseHeaders, got %T", createResp)
+	require.IsType(t, createResp, &api.FlowResponseHeaders{}, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 
 	flowID := flowHeaders.Response.ID
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)

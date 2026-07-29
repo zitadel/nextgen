@@ -80,8 +80,8 @@ func TestPasswordLoginFlow(t *testing.T) {
 		Purpose:   api.CreateFlowRequestPurposeLogin,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "expected FlowResponseHeaders, got %T", createResp)
+	require.IsType(t, createResp, &api.FlowResponseHeaders{}, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 
 	flowID := flowHeaders.Response.ID
 	require.Equal(t, "identifier", flowHeaders.Response.Step.Name)
@@ -149,8 +149,8 @@ func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 		Purpose:   api.CreateFlowRequestPurposeLogin,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "expected FlowResponseHeaders, got %T", createResp)
+	require.IsType(t, createResp, &api.FlowResponseHeaders{}, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
 
@@ -200,8 +200,8 @@ func TestPasswordRegisterFlow(t *testing.T) {
 		Purpose:   api.CreateFlowRequestPurposeRegister,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "expected FlowResponseHeaders, got %T", createResp)
+	require.IsType(t, createResp, &api.FlowResponseHeaders{}, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	require.Equal(t, "signup", flowHeaders.Response.Step.Name)
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
@@ -288,8 +288,8 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 		Purpose:   api.CreateFlowRequestPurposeRegister,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok)
+	require.IsType(t, createResp, &api.FlowResponseHeaders{}, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
 

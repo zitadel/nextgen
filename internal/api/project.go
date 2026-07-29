@@ -16,7 +16,7 @@ func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectReque
 		return nil, err
 	}
 
-	dek, err := h.keyService.GetProjectDEKCrypter(ctx, project.ID)
+	dek, err := h.keyService.GetProjectCrypter(ctx, project.ID, domain.EncryptionKeyPurposeToken)
 	if err != nil {
 		return nil, err
 	}

@@ -27,7 +27,7 @@ func TestGetMySession_Identity(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
-	dek, err := harness.EnsureKeyService(t).GetProjectDEKCrypter(t.Context(), project.ID)
+	dek, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
 	require.NoError(t, err)
 	projectSecret, err := project.ProjectSecret(dek)
 	require.NoError(t, err)

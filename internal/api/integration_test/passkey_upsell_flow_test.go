@@ -59,8 +59,8 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 		Purpose:   api.CreateFlowRequestPurposeRegister,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok)
+	require.IsType(t, createResp, &api.FlowResponseHeaders{}, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	require.Equal(t, "register", flowHeaders.Response.Step.Name)
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
@@ -204,8 +204,8 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		Purpose:   api.CreateFlowRequestPurposeRegister,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "expected FlowResponseHeaders, got %T: %+v", createResp, createResp)
+	require.IsType(t, createResp, &api.FlowResponseHeaders{}, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
 

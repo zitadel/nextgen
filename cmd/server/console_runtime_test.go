@@ -186,7 +186,7 @@ func (f *fakeProjectService) DefaultProject(context.Context, string) (*domain.Pr
 func TestStandaloneRuntimeResolverWithoutProject(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	keys := servicemocks.NewMockKeyService(ctrl)
-	keys.EXPECT().GetProjectDEKCrypter(gomock.Any(), gomock.Any()).Times(0)
+	keys.EXPECT().GetProjectCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 
 	resolve := standaloneRuntimeResolver(&fakeProjectService{}, keys, "")
 	meta, err := resolve(context.Background())
@@ -202,7 +202,7 @@ func TestStandaloneRuntimeResolverDerivesPublishableKey(t *testing.T) {
 	// project DEK; the mocked crypter stands in for the JWE output.
 	dek.EXPECT().Encrypt(gomock.Any()).Return("pk_preview", nil)
 	keys := servicemocks.NewMockKeyService(ctrl)
-	keys.EXPECT().GetProjectDEKCrypter(gomock.Any(), "proj_first").Return(dek, nil)
+	keys.EXPECT().GetProjectCrypter(gomock.Any(), "proj_first", domain.EncryptionKeyPurposeDEK).Return(dek, nil)
 
 	resolve := standaloneRuntimeResolver(
 		&fakeProjectService{project: &domain.Project{ID: "proj_first"}},

@@ -41,9 +41,17 @@ const (
 type EncryptionKeyPurpose string
 
 const (
-	EncryptionKeyPurposeDEK    EncryptionKeyPurpose = "dek"
-	EncryptionKeyPurposeToken  EncryptionKeyPurpose = "token"
+	// EncryptionKeyPurposeDEK indicates the key is the DEK which is used to
+	// encrypt the other keys of the project.
+	EncryptionKeyPurposeDEK EncryptionKeyPurpose = "dek"
+	// EncryptionKeyPurposeToken indicates the key is used to encrypt tokens
+	EncryptionKeyPurposeToken EncryptionKeyPurpose = "token"
+	// EncryptionKeyPurposeSecret indicates the key is used to encrypt
+	// third-party secrets like client-secrets, passwords,... for third party
+	// applications
 	EncryptionKeyPurposeSecret EncryptionKeyPurpose = "secret"
+	// EncryptionKeyPurposeCookie indicates the key is used to encrypt cookies
+	EncryptionKeyPurposeCookie EncryptionKeyPurpose = "cookie"
 )
 
 type EncryptionKey struct {
@@ -91,11 +99,11 @@ func NewEncryptionKey(
 	}, nil
 }
 
-func (k *EncryptionKey) Activate(currentDEK *EncryptionKey) {
+func (k *EncryptionKey) Activate(currentKey *EncryptionKey) {
 	now := time.Now().UTC()
-	if currentDEK != nil {
-		currentDEK.State = KeyStateExpired
-		currentDEK.RetiredAt = new(now)
+	if currentKey != nil {
+		currentKey.State = KeyStateExpired
+		currentKey.RetiredAt = new(now)
 	}
 	k.State = KeyStateActive
 	k.ActivatedAt = new(now)

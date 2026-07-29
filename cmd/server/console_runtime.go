@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -63,7 +64,7 @@ func standaloneRuntimeResolver(projects service.ProjectService, keys service.Key
 		}
 		meta.ConsoleProjectID = project.ID
 
-		dek, err := keys.GetProjectDEKCrypter(ctx, project.ID)
+		dek, err := keys.GetProjectCrypter(ctx, project.ID, domain.EncryptionKeyPurposeDEK)
 		if err != nil {
 			return consoleRuntime{}, err
 		}

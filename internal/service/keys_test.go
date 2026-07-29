@@ -173,7 +173,7 @@ func TestKeyService_GetProjectDEKCrypter(t *testing.T) {
 		statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(dek, nil)
 
 		// ACT
-		gotCrypter, err := svc.GetProjectDEKCrypter(t.Context(), "proj-1")
+		gotCrypter, err := svc.GetProjectCrypter(t.Context(), "proj-1", domain.EncryptionKeyPurposeToken)
 		require.NoError(t, err)
 		require.NotNil(t, gotCrypter)
 
@@ -196,7 +196,7 @@ func TestKeyService_GetProjectDEKCrypter(t *testing.T) {
 				Return(nil, storagedb.NewNoRowFoundError(nil))
 
 			// ACT
-			_, err := svc.GetProjectDEKCrypter(t.Context(), "proj-1")
+			_, err := svc.GetProjectCrypter(t.Context(), "proj-1", domain.EncryptionKeyPurposeToken)
 			require.Error(t, err)
 
 			// ASSERT
@@ -217,7 +217,7 @@ func TestKeyService_GetProjectDEKCrypter(t *testing.T) {
 				Return(nil, sentinel)
 
 			// ACT
-			_, err := svc.GetProjectDEK(t.Context(), "proj-1")
+			_, err := svc.GetProjectEncryptionKey(t.Context(), "proj-1", domain.EncryptionKeyPurposeToken)
 			require.Error(t, err)
 
 			// ASSERT
