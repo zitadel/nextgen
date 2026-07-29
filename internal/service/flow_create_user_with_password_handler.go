@@ -13,23 +13,20 @@ import (
 // FlowCreateUserWithPasswordHandler implements the `create_user` on_success:
 // persist a new user from validated identifier + password fields.
 type FlowCreateUserWithPasswordHandler struct {
-	passwordRepo domain.UserPasswordRepository
-	hasher       crypto.Hasher
-	userService  *UserService
-	schemaStore  domain.JSONSchemaStore
+	hasher      crypto.Hasher
+	userService *UserService
+	schemaStore domain.JSONSchemaStore
 }
 
 func NewFlowCreateUserHandler(
-	passwordRepo domain.UserPasswordRepository,
 	hasher crypto.Hasher,
 	userService *UserService,
 	schemaStore domain.JSONSchemaStore,
 ) *FlowCreateUserWithPasswordHandler {
 	return &FlowCreateUserWithPasswordHandler{
-		userService:  userService,
-		schemaStore:  schemaStore,
-		hasher:       hasher,
-		passwordRepo: passwordRepo,
+		userService: userService,
+		schemaStore: schemaStore,
+		hasher:      hasher,
 	}
 }
 
@@ -57,7 +54,6 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 				Password:  in.State.CollectedData.AuthMethods.Password,
 			},
 			h.hasher,
-			h.passwordRepo,
 		), nil
 	})
 

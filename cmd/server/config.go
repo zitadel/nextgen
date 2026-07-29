@@ -18,6 +18,20 @@ type Config struct {
 	Schema          SchemaConfig           `mapstructure:"schema"`
 	Session         service.SessionConfig  `mapstructure:"session"`
 	Instrumentation instrumentation.Config `mapstructure:"instrumentation"`
+	Platform        PlatformConfig         `mapstructure:"platform"`
+}
+
+// PlatformConfig configures the deployment's default project resolution
+// (Console ADR 0004). Portal-related keys (billing, support access) are
+// intentionally absent until platform mode is implemented; this deployment
+// always reports mode "standalone" for now.
+type PlatformConfig struct {
+	// ProjectID pins the deployment's default project to an existing
+	// project. When empty (the default), a standalone deployment tracks its
+	// first-created project — the one the customer's `zitadel setup`
+	// creates. The server never creates a project itself; a configured id
+	// that does not exist is a startup error.
+	ProjectID string `mapstructure:"project_id"`
 }
 
 func (c Config) Validate() error {

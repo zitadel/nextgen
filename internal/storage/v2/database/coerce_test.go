@@ -20,6 +20,34 @@ func TestCoerceStringValue(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestCoerceBytesValue(t *testing.T) {
+	t.Parallel()
+	got, err := database.CoerceBytesValue([]byte{0x01, 0x02})
+	require.NoError(t, err)
+	assert.Equal(t, []byte{0x01, 0x02}, got)
+
+	got, err = database.CoerceBytesValue("ab")
+	require.NoError(t, err)
+	assert.Equal(t, []byte("ab"), got)
+
+	_, err = database.CoerceBytesValue(1)
+	assert.Error(t, err)
+}
+
+func TestCoerceBoolValue(t *testing.T) {
+	t.Parallel()
+	got, err := database.CoerceBoolValue(true)
+	require.NoError(t, err)
+	assert.True(t, got)
+
+	gotAny, err := database.CoerceBool(false)
+	require.NoError(t, err)
+	assert.Equal(t, false, gotAny)
+
+	_, err = database.CoerceBoolValue("true")
+	assert.Error(t, err)
+}
+
 func TestCoerceTimeValue(t *testing.T) {
 	t.Parallel()
 	createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)

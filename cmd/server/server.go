@@ -36,7 +36,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 	v2db "github.com/zitadel/nextgen/internal/storage/v2/database"
 	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
@@ -124,10 +123,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	// ── Repositories ─────────────────
-	userPasswordRepo := repository.NewUserPasswordRepository()
-	userPasskeyRepo := repository.NewUserPasskeyRepository()
-	brandingRepo := repository.NewBrandingRepository(pool)
-
 	serviceDBPool := service.NewPool(v2Pool.(service.Pool))
 	schemaStore := serviceDBPool.Statements()
 	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
@@ -165,15 +160,12 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	keyService := service.NewKeyService(serviceDBPool, *kek)
 
 	authAttemptSvc := service.NewAuthAttemptService(
-		pool,
 		serviceDBPool,
 		sessionResolver,
 		userLookup,
-		userPasswordRepo,
-		userPasskeyRepo,
 		passwordHasher,
 	)
-	sessionService := service.NewSessionService(pool, serviceDBPool, userIdentity, service.SessionConfig{
+	sessionService := service.NewSessionService(serviceDBPool, userIdentity, service.SessionConfig{
 		DefaultTTL: cfg.Session.DefaultTTL,
 		MaxTTL:     cfg.Session.MaxTTL,
 	})
@@ -191,12 +183,11 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		nil,
 	)
 	teamService := service.NewTeamService(serviceDBPool)
-	brandingService := service.NewBrandingService(pool, brandingRepo)
+	brandingService := service.NewBrandingService(serviceDBPool)
 	userService := service.NewUserService(
 		pool,
 		serviceDBPool,
 		schemaStore,
-		userPasswordRepo,
 		passwordHasher,
 	)
 
@@ -205,13 +196,12 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	fields := domain.NewSchemaFieldResolver()
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
 	createUserHandler := service.NewFlowCreateUserHandler(
-		userPasswordRepo,
 		passwordHasher,
 		userService,
 		schemaStore,
 	)
 	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaStore)
-	passkeyRegSvc := service.NewPasskeyRegistrationService(pool, serviceDBPool, userPasskeyRepo, ids)
+	passkeyRegSvc := service.NewPasskeyRegistrationService(serviceDBPool, ids)
 	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
@@ -225,8 +215,23 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		time.Now,
 	)
 
-	flowService := service.NewFlowService(pool, serviceDBPool, stateMachine, ids)
+	flowService := service.NewFlowService(serviceDBPool, stateMachine, ids)
 	tokenService := service.NewTokenService(keyService)
+
+	// ── Default project resolution ──
+	// Console ADR 0004 §3 (standalone): the deployment tracks exactly one
+	// project — the one the customer's integration (`zitadel setup`) created
+	// first. The server never creates it; it validates an explicitly pinned
+	// id up front and otherwise reports the current state for operators.
+	defaultProject, err := projectService.DefaultProject(ctx, cfg.Platform.ProjectID)
+	if err != nil {
+		return fmt.Errorf("failed to resolve the default project: %w", err)
+	}
+	if defaultProject != nil {
+		slog.Info("default project resolved", slog.String("project_id", defaultProject.ID))
+	} else {
+		slog.Info("no project exists yet; the first project created (e.g. by `zitadel setup`) becomes the default")
+	}
 
 	// ── HTTP Server ─────────────────
 
@@ -259,7 +264,8 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return fmt.Errorf("failed to build api server: %w", err)
 	}
 
-	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer)
+	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
+		standaloneRuntimeResolver(projectService, keyService, cfg.Platform.ProjectID))
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -355,6 +361,10 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
 	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
+	// Empty means "the deployment's first-created project is the default"
+	// (Console ADR 0004 §3); set NEXTGEN_PLATFORM_PROJECT_ID to pin an
+	// existing project instead. The server never creates a project itself.
+	v.SetDefault("platform.project_id", "")
 	v.SetDefault("instrumentation.service_name", "Zitadel")
 	v.SetDefault("instrumentation.log.level", zlog.LevelInfo)
 	v.SetDefault("instrumentation.log.streams", []zlog.Stream{
@@ -415,7 +425,7 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 // ----------------------------- HTTP --------------------------------------
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Handler) (*http.ServeMux, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Handler, runtime runtimeResolver) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	if cfg.LoginEnabled {
@@ -440,6 +450,11 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Ha
 		}
 		mux.Handle(cfg.ConsolePath, consoleHandler)
 		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
+
+		// Pre-session runtime metadata for the embedded console (Console
+		// ADR 0004 §2). Registered as an exact path, so it wins over the
+		// catch-all API mount below.
+		mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
 	}
 
 	mux.Handle("/",

@@ -12,7 +12,6 @@ import (
 func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserWithPasswordHandler {
 	t.Helper()
 	return service.NewFlowCreateUserHandler(
-		h.EnsureUserPasswordRepo(t),
 		h.EnsureHasher(t),
 		h.EnsureUserService(t),
 		h.EnsureSchemaStore(t),
@@ -34,7 +33,6 @@ func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
 
 	if h.flowService.value == nil {
 		h.flowService.value = service.NewFlowService(
-			h.EnsureDBPool(t),
 			h.EnsureServiceDB(t),
 			h.EnsureFlowStateMachine(t),
 			idgen.NewULID(),
@@ -52,9 +50,7 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 		fields := domain.NewSchemaFieldResolver()
 		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t))
 		passkeyRegSvc := service.NewPasskeyRegistrationService(
-			h.EnsureDBPool(t),
 			h.EnsureServiceDB(t),
-			h.EnsureUserPasskeyRepo(t),
 			idgen.NewULID(),
 		)
 		passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)

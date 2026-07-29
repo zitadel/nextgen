@@ -70,9 +70,8 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	db := harness.EnsureDBPool(t)
 	users := harness.EnsureUserFixture(t)
-	passkeyRepo := harness.EnsureUserPasskeyRepo(t)
+	passkeys := harness.EnsureUserPasskeyFixture(t)
 
 	// Decoy: another project holding the SAME user id and credential id but a
 	// different key pair. Credential resolution must stay project-scoped —
@@ -96,7 +95,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Attributes:              []*domain.CreateAttribute{decoyEmailAttr},
 	}))
 	decoyCred := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
-	require.NoError(t, passkeyRepo.Create(t.Context(), db, &domain.CreateUserPasskey{
+	require.NoError(t, passkeys.Create(t.Context(), &domain.CreateUserPasskey{
 		ProjectID:    decoyProject.ID,
 		UserID:       userID,
 		CredentialID: base64.RawURLEncoding.EncodeToString(cred.ID),
@@ -117,7 +116,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Attributes:              []*domain.CreateAttribute{emailAttr},
 	}))
 
-	require.NoError(t, passkeyRepo.Create(t.Context(), db, &domain.CreateUserPasskey{
+	require.NoError(t, passkeys.Create(t.Context(), &domain.CreateUserPasskey{
 		ProjectID:    project.ID,
 		UserID:       userID,
 		CredentialID: base64.RawURLEncoding.EncodeToString(cred.ID),

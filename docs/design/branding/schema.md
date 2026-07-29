@@ -145,6 +145,8 @@ Additional asset URLs alongside the baseline `logo_url` / `hero_url`. The consum
 - **`mode`**: `light` \| `dark` \| `auto` (`auto` uses `prefers-color-scheme`). Resolved value on root `data-theme`.
 - **`dark`**: optional `palette` overrides when dark; missing keys inherit light. Omit `theme` or set `mode: light` to disable.
 
+Both modes carry real token values ([ADR 014 §5](../../adrs/014-design-tokens-and-ui-react-pairs.md)). `mode` is one input among three; resolution runs strongest-first: the embedding page's `<zitadel-login theme="…">` property → this `branding.theme.mode` → a variant-derived default (`dark` for `variant="page"`, `auto` for the embeddable `variant="widget"`). The element wins because the page hosting the widget knows its own surface better than stored tenant branding does.
+
 #### ~~`advanced.custom_css`~~ (removed)
 
 Dropped. The override ladder covers all CSS customization needs:

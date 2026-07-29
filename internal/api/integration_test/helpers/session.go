@@ -14,7 +14,6 @@ func (h *Harness) EnsureSessionService(t *testing.T) service.SessionService {
 
 	if h.sessionService.value == nil {
 		h.sessionService.value = service.NewSessionService(
-			h.EnsureDBPool(t),
 			h.EnsureServiceDB(t),
 			service.UserStatementsIdentityReader{Pool: h.EnsureServiceDB(t)},
 			service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour},
