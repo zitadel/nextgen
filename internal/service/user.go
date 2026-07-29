@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	slogctx "github.com/veqryn/slog-context"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -61,29 +62,23 @@ type GetMyUserInput struct {
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
-	pool         database.Pool
-	v2Pool       StatementPool
-	schemaStore  domain.JSONSchemaStore
-	passwordRepo domain.UserPasswordRepository
-	passkeyRepo  domain.UserPasskeyRepository
-	hasher       crypto.Hasher
+	pool        database.Pool
+	v2Pool      StatementPool
+	schemaStore domain.JSONSchemaStore
+	hasher      crypto.Hasher
 }
 
 func NewUserService(
 	pool database.Pool,
 	v2Pool StatementPool,
 	schemaStore domain.JSONSchemaStore,
-	passwordRepo domain.UserPasswordRepository,
-	passkeyRepo domain.UserPasskeyRepository,
 	hasher crypto.Hasher,
 ) *UserService {
 	return &UserService{
-		pool:         pool,
-		v2Pool:       v2Pool,
-		schemaStore:  schemaStore,
-		passwordRepo: passwordRepo,
-		passkeyRepo:  passkeyRepo,
-		hasher:       hasher,
+		pool:        pool,
+		v2Pool:      v2Pool,
+		schemaStore: schemaStore,
+		hasher:      hasher,
 	}
 }
 
@@ -181,33 +176,37 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]ma
 }
 
 func (s *UserService) ListPasskeys(ctx context.Context, input ListPasskeysInput) ([]*domain.UserPasskey, error) {
-	passkeys, err := s.passkeyRepo.List(ctx, s.pool,
-		database.WithCondition(
-			database.And(
-				s.passkeyRepo.ProjectIDCondition(input.ProjectID),
-				s.passkeyRepo.UserIDCondition(input.UserID),
+	passkeys, err := s.v2Pool.Statements().ListUserPasskeys(
+		ctx, &v2database.ListOptions[domain.UserPasskeyField]{
+			Filter: v2database.And(
+				v2database.Equal(v2database.Col(domain.UserPasskeyFieldProjectID), input.ProjectID),
+				v2database.Equal(v2database.Col(domain.UserPasskeyFieldUserID), input.UserID),
 			),
-		),
+			Pagination: v2database.Page[domain.UserPasskeyField]{
+				Limit: 100, // arbitrary limit of 100, assuming nobody has 100 passkeys attached to their user
+			},
+		},
 	)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to get user passkeys from database")
 	}
 
+	if passkeys.NextCursor != nil {
+		slogctx.Warn(ctx, "listing user passkeys returned multiple pages. This means user has more than 100 passkeys and not all passkeys were returned to the client.")
+	}
+
 	// Distinguish "user not found" from "user has no passkeys".
-	if len(passkeys) == 0 {
-		_, err := s.v2Pool.Statements().GetUser(ctx, v2database.And(
-			v2database.Equal(v2database.Col(domain.UserFieldProjectID), input.ProjectID),
-			v2database.Equal(v2database.Col(domain.UserFieldID), input.UserID),
-		), UserQueryOptions{})
+	if len(passkeys.Items) == 0 {
+		exists, err := s.v2Pool.Statements().UserExists(ctx, input.ProjectID, input.UserID)
 		if err != nil {
-			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-				return nil, domain.ErrUserNotFound()
-			}
 			return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
+		}
+		if !exists {
+			return nil, domain.ErrUserNotFound()
 		}
 	}
 
-	return passkeys, nil
+	return passkeys.Items, nil
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {
@@ -232,7 +231,7 @@ func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[
 }
 
 func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
-	action := NewSetUserPasswordAction(input, s.hasher, s.passwordRepo)
+	action := NewSetUserPasswordAction(input, s.hasher)
 	return s.ApplyActions(ctx, action)
 }
 
@@ -324,17 +323,15 @@ func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.Cre
 type SetPasswordUserAction struct {
 	SetPasswordInput
 
-	hasher       crypto.Hasher
-	passwordRepo domain.UserPasswordRepository
+	hasher crypto.Hasher
 
 	hash string
 }
 
-func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher, passwordRepo domain.UserPasswordRepository) *SetPasswordUserAction {
+func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher) *SetPasswordUserAction {
 	return &SetPasswordUserAction{
 		SetPasswordInput: input,
 		hasher:           hasher,
-		passwordRepo:     passwordRepo,
 	}
 }
 
@@ -344,7 +341,7 @@ func (o *SetPasswordUserAction) Prepare(_ context.Context, _ database.QueryExecu
 }
 
 func (o *SetPasswordUserAction) Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error {
-	err := o.passwordRepo.Set(ctx, tx, &domain.SetUserPassword{
+	err := tx.Statements().SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:      o.ProjectID,
 		UserID:         o.UserID,
 		EncodedHash:    o.hash,

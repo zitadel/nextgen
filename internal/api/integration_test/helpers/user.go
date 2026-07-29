@@ -18,8 +18,6 @@ func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
 			h.EnsureDBPool(t),
 			h.EnsureServiceDB(t),
 			h.EnsureSchemaStore(t),
-			h.EnsureUserPasswordRepo(t),
-			h.EnsureUserPasskeyRepo(t),
 			h.EnsureHasher(t),
 		)
 	}
@@ -54,6 +52,17 @@ func (f UserFixture) GetByAttributes(ctx context.Context, projectID string, attr
 		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
 		service.UserQueryOptions{Attributes: attrs},
 	)
+}
+
+func (f UserFixture) SetPassword(ctx context.Context, pw *domain.SetUserPassword) error {
+	return f.Pool.Statements().SetUserPassword(ctx, pw)
+}
+
+func (f UserFixture) GetPasswordByUserID(ctx context.Context, projectID, userID string) (*domain.UserPassword, error) {
+	return f.Pool.Statements().GetUserPassword(ctx, v2database.And(
+		v2database.Equal(v2database.Col(domain.UserPasswordFieldProjectID), projectID),
+		v2database.Equal(v2database.Col(domain.UserPasswordFieldUserID), userID),
+	))
 }
 
 func CreateSessionUsingPassword(t *testing.T,

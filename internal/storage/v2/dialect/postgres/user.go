@@ -95,6 +95,13 @@ WHERE project_id = $1 AND user_id = $2
 DELETE FROM zitadel_nextgen.users
 WHERE project_id = $1 AND id = $2
 `
+
+	userExistsQuery = `
+SELECT EXISTS (
+    SELECT 1 FROM zitadel_nextgen.users
+    WHERE project_id = $1 AND id = $2
+)
+`
 )
 
 type userStatements struct{ statement }
@@ -271,6 +278,18 @@ func (us userStatements) DeleteUserByID(ctx context.Context, projectID, userID s
 		}
 		return nil
 	})
+}
+
+func (us userStatements) UserExists(ctx context.Context, projectID, userID string) (bool, error) {
+	rows, err := us.client.Query(ctx, userExistsQuery, projectID, userID)
+	if err != nil {
+		return false, wrapError(err)
+	}
+	exists, err := pgx.CollectExactlyOneRow(rows, pgx.RowTo[bool])
+	if err != nil {
+		return false, wrapError(err)
+	}
+	return exists, nil
 }
 
 func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User, opts service.UserQueryOptions) error {

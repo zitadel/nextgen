@@ -269,6 +269,34 @@ func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
 	})
 }
 
+func TestUserStatements_UserExists(t *testing.T) {
+	ctx := t.Context()
+	projectID, schemaURL := ensureUserTestProject(t)
+
+	user := newTestUser(t, projectID, schemaURL, "user_exists_1", "exists@example.com", "Exists")
+	require.NoError(t, testPool.CreateUser(ctx, user))
+
+	t.Run("existing user", func(t *testing.T) {
+		exists, err := testPool.UserExists(ctx, projectID, user.ID)
+		require.NoError(t, err)
+		assert.True(t, exists)
+	})
+
+	t.Run("unknown user is false, not an error", func(t *testing.T) {
+		exists, err := testPool.UserExists(ctx, projectID, "user_exists_missing")
+		require.NoError(t, err)
+		assert.False(t, exists)
+	})
+
+	t.Run("user of another project is false", func(t *testing.T) {
+		otherProjectID, _ := ensureUserTestProject(t)
+
+		exists, err := testPool.UserExists(ctx, otherProjectID, user.ID)
+		require.NoError(t, err)
+		assert.False(t, exists)
+	})
+}
+
 func newTestUserWithRole(t *testing.T, projectID, schemaURL, userID, email, name, role string) *domain.CreateUser {
 	t.Helper()
 

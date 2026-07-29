@@ -12,9 +12,7 @@ import (
 func (h *Harness) EnsurePasskeyRegistrationService(t *testing.T) *service.PasskeyRegistrationService {
 	t.Helper()
 	return service.NewPasskeyRegistrationService(
-		h.EnsureDBPool(t),
 		h.EnsureServiceDB(t),
-		h.EnsureUserPasskeyRepo(t),
 		idgen.NewULID(),
 	)
 }

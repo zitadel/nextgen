@@ -2,12 +2,9 @@ package api
 
 import (
 	"context"
-	"log/slog"
 	"net/http"
 	"strconv"
 
-	"github.com/muhlemmer/gu"
-	slogctx "github.com/veqryn/slog-context"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -94,13 +91,10 @@ func (h *Handler) ListUserPassKeys(ctx context.Context, params api.ListUserPassK
 		Passkeys: make([]api.ListUserPasskeysResponsePasskeysItem, len(keys), len(keys)),
 	}
 	for i, key := range keys {
-		if key.CreatedAt == nil {
-			slogctx.Warn(ctx, "passkey has no createdAt", slog.Int64("key_id", key.ID))
-		}
 		res.Passkeys[i] = api.ListUserPasskeysResponsePasskeysItem{
 			ID:        strconv.FormatInt(key.ID, 10),
 			Name:      key.Name,
-			CreatedAt: gu.Value(key.CreatedAt),
+			CreatedAt: key.CreatedAt,
 		}
 	}
 
