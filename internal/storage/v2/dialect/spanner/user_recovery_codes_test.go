@@ -10,19 +10,18 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-func recoveryCodesByUserFilter(projectID, userID string) v2database.Filter[domain.UserRecoveryCodesField] {
-	return v2database.And(
-		v2database.Equal(v2database.Col(domain.UserRecoveryCodesFieldProjectID), projectID),
-		v2database.Equal(v2database.Col(domain.UserRecoveryCodesFieldUserID), userID),
+func recoveryCodesByUserFilter(projectID, userID string) database.Filter[domain.UserRecoveryCodesField] {
+	return database.And(
+		database.Equal(database.Col(domain.UserRecoveryCodesFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserRecoveryCodesFieldUserID), userID),
 	)
 }
 
-func recoveryCodesByIDFilter(id int64) v2database.Filter[domain.UserRecoveryCodesField] {
-	return v2database.Equal(v2database.Col(domain.UserRecoveryCodesFieldID), id)
+func recoveryCodesByIDFilter(id int64) database.Filter[domain.UserRecoveryCodesField] {
+	return database.Equal(database.Col(domain.UserRecoveryCodesFieldID), id)
 }
 
 func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
@@ -49,15 +48,15 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, got.ID, byID.ID)
 
-	listed, err := stmts.ListUserRecoveryCodes(ctx, &v2database.ListOptions[domain.UserRecoveryCodesField]{
-		Filter: v2database.Equal(v2database.Col(domain.UserRecoveryCodesFieldProjectID), projectID),
+	listed, err := stmts.ListUserRecoveryCodes(ctx, &database.ListOptions[domain.UserRecoveryCodesField]{
+		Filter: database.Equal(database.Col(domain.UserRecoveryCodesFieldProjectID), projectID),
 	})
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
 
 	require.NoError(t, stmts.DeleteUserRecoveryCodes(ctx, recoveryCodesByIDFilter(got.ID)))
 	_, err = stmts.GetUserRecoveryCodes(ctx, recoveryCodesByUserFilter(projectID, userID))
-	require.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
 
 	require.NoError(t, stmts.CreateUserRecoveryCodes(ctx, &domain.CreateRecoveryCodes{
 		ProjectID:     projectID,
@@ -69,7 +68,7 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 	require.Positive(t, got2.ID)
 	require.NoError(t, stmts.DeleteUserRecoveryCodes(ctx, recoveryCodesByUserFilter(projectID, userID)))
 	_, err = stmts.GetUserRecoveryCodes(ctx, recoveryCodesByUserFilter(projectID, userID))
-	require.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	require.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestUserRecoveryCodesStatements_CreateEmptyRejected(t *testing.T) {
@@ -111,12 +110,12 @@ func TestUserRecoveryCodesStatements_Update(t *testing.T) {
 	byUser := recoveryCodesByUserFilter(projectID, userID)
 
 	err := stmts.UpdateUserRecoveryCodes(ctx, byUser)
-	assert.ErrorIs(t, err, v2database.ErrNoChanges)
+	assert.ErrorIs(t, err, database.ErrNoChanges)
 
 	err = stmts.UpdateUserRecoveryCodes(ctx, recoveryCodesByUserFilter(projectID, "missing-user"),
 		&domain.UserRecoveryCodesIncrementFailedAttemptsUpdate{Delta: 1},
 	)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 	err = stmts.UpdateUserRecoveryCodes(ctx, byUser,
 		&domain.UserRecoveryCodesCodesUpdate{Codes: nil},
