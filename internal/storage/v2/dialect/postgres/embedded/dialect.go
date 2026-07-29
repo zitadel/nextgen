@@ -63,16 +63,6 @@ func (p *poolWithStop) Close(ctx context.Context) error {
 	return err
 }
 
-// StartEmbedded starts an embedded postgres v18 instance and returns a connected
-// v2 postgres pool plus a stop function.
-func StartEmbedded(ctx context.Context, options Options) (v2database.Pool, func(), error) {
-	pool, stop, err := startEmbeddedOnce(ctx, options)
-	if err != nil {
-		return nil, nil, err
-	}
-	return &poolWithStop{Pool: pool, stop: stop}, func() {}, nil
-}
-
 func startEmbeddedOnce(ctx context.Context, options Options) (pool *v2postgres.Pool, stop func(), err error) {
 	options, err = normalizeOptions(options)
 	if err != nil {

@@ -15,7 +15,7 @@ import (
 
 func ensureProject(t *testing.T, projectID string) {
 	t.Helper()
-	v2 := integrationV2PoolOrFail(t)
+	v2 := integrationPoolOrFail(t)
 	err := v2.Statements().CreateProject(t.Context(), &domain.Project{
 		ID:             projectID,
 		Name:           "project-" + projectID,
@@ -40,7 +40,7 @@ func handoffCompletedAttempt(
 	mutate func(*domain.AuthAttempt),
 ) (plainToken string, attempt *domain.AuthAttempt) {
 	t.Helper()
-	v2 := integrationV2PoolOrFail(t)
+	v2 := integrationPoolOrFail(t)
 
 	plainToken = "handoff_" + projectID + "_" + time.Now().Format("150405.000000")
 	attempt = &domain.AuthAttempt{

@@ -1,7 +1,6 @@
 //go:build spanner_integration
 
-// Package embedded starts a Cloud Spanner GoogleSQL emulator testcontainer for integration tests.
-package embedded
+package testdb
 
 import (
 	"context"
@@ -16,8 +15,6 @@ import (
 	"cloud.google.com/go/spanner/admin/instance/apiv1/instancepb"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
-	v2spannerdialect "github.com/zitadel/nextgen/internal/storage/v2/dialect/spanner"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -29,13 +26,15 @@ const (
 	testDatabase = "test-database"
 )
 
-// StartEmbedded starts a container running the Cloud Spanner GoogleSQL emulator,
-// creates the test instance and database via the admin API, and returns a
-// connected v2 spanner pool plus a stop function.
-func StartEmbedded(ctx context.Context) (v2database.Pool, func(), error) {
-	// NOTE: testcontainers-go's default readiness probing is for gRPC; the
-	// emulator also exposes HTTP/gateway endpoints but the gRPC port is what
-	// the Spanner client uses.
+// SpannerDSN starts the Cloud Spanner GoogleSQL emulator (unless
+// ZITADEL_TEST_SPANNER_URL is set), creates the test instance/database, sets
+// SPANNER_EMULATOR_HOST, and returns the database DSN plus a stop func that
+// clears the env var and terminates the container.
+func SpannerDSN(ctx context.Context) (string, func(), error) {
+	if url := os.Getenv("ZITADEL_TEST_SPANNER_URL"); url != "" {
+		return url, func() {}, nil
+	}
+
 	req := testcontainers.ContainerRequest{
 		Image:        "gcr.io/cloud-spanner-emulator/emulator:latest",
 		ExposedPorts: []string{"9010/tcp", "9020/tcp"},
@@ -46,7 +45,7 @@ func StartEmbedded(ctx context.Context) (v2database.Pool, func(), error) {
 		Started:          true,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to start Spanner emulator container: %w", err)
+		return "", nil, fmt.Errorf("unable to start Spanner emulator container: %w", err)
 	}
 
 	stop := func() { _ = container.Terminate(context.Background()) }
@@ -54,25 +53,23 @@ func StartEmbedded(ctx context.Context) (v2database.Pool, func(), error) {
 	host, err := container.Host(ctx)
 	if err != nil {
 		stop()
-		return nil, nil, fmt.Errorf("unable to get container host: %w", err)
+		return "", nil, fmt.Errorf("unable to get container host: %w", err)
 	}
 	grpcPort, err := container.MappedPort(ctx, "9010")
 	if err != nil {
 		stop()
-		return nil, nil, fmt.Errorf("unable to get container gRPC port: %w", err)
+		return "", nil, fmt.Errorf("unable to get container gRPC port: %w", err)
 	}
 
 	emulatorHost := fmt.Sprintf("%s:%s", host, grpcPort.Port())
-
 	if err := createInstanceAndDatabase(ctx, emulatorHost); err != nil {
 		stop()
-		return nil, nil, fmt.Errorf("unable to create Spanner instance/database: %w", err)
+		return "", nil, fmt.Errorf("unable to create Spanner instance/database: %w", err)
 	}
 
-	// The client library reads SPANNER_EMULATOR_HOST to route to the local emulator.
 	if err := os.Setenv("SPANNER_EMULATOR_HOST", emulatorHost); err != nil {
 		stop()
-		return nil, nil, fmt.Errorf("unable to set SPANNER_EMULATOR_HOST: %w", err)
+		return "", nil, fmt.Errorf("unable to set SPANNER_EMULATOR_HOST: %w", err)
 	}
 
 	stopWithEnv := func() {
@@ -81,26 +78,14 @@ func StartEmbedded(ctx context.Context) (v2database.Pool, func(), error) {
 	}
 
 	dsn := fmt.Sprintf("projects/%s/instances/%s/databases/%s", testProject, testInstance, testDatabase)
-	dialect, err := v2spannerdialect.DecodeConfig(dsn)
-	if err != nil {
-		stopWithEnv()
-		return nil, nil, fmt.Errorf("unable to decode Spanner config: %w", err)
-	}
-
-	pool, err := dialect.Connect(ctx)
-	if err != nil {
-		stopWithEnv()
-		return nil, nil, err
-	}
-
 	slog.Info("Spanner emulator available", "dsn", dsn, "emulator", emulatorHost)
-	return pool, stopWithEnv, nil
+	return dsn, stopWithEnv, nil
 }
 
 func createInstanceAndDatabase(ctx context.Context, emulatorHost string) error {
 	opts := []option.ClientOption{
 		option.WithEndpoint(emulatorHost),
-		option.WithoutAuthentication(), // TODO: should use authentication in production
+		option.WithoutAuthentication(),
 		option.WithGRPCDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
 	}
 

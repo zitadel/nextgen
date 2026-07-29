@@ -43,7 +43,7 @@ func issueUserChallenge(t *testing.T, svc service.AuthAttemptService, projectID 
 }
 
 func TestAuthAttemptService_VerifyProof_integration(t *testing.T) {
-	svc := newAuthAttemptServiceForIntegration(integrationV2PoolOrFail(t))
+	svc := newAuthAttemptServiceForIntegration(integrationPoolOrFail(t))
 
 	t.Run("user_not_found_records_failure_on_bound_challenge", func(t *testing.T) {
 		projectID := "p-aa-not-found-" + time.Now().Format("150405.000000")

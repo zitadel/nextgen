@@ -18,7 +18,7 @@ func seedIdentityUser(t *testing.T, projectID string) string {
 	ensureProject(t, projectID)
 
 	schemaURL := "https://example.com/schemas/human-user"
-	stmts := integrationV2PoolOrFail(t).Statements()
+	stmts := integrationPoolOrFail(t).Statements()
 	require.NoError(t, stmts.CreateJSONSchema(t.Context(), &domain.JSONSchema{
 		ProjectID: projectID,
 		URL:       schemaURL,
@@ -54,8 +54,6 @@ func TestSessionService_Get_UserIdentity_integration(t *testing.T) {
 	projectID := "p-svc-get-ident-" + time.Now().Format("150405.000000")
 	userID := seedIdentityUser(t, projectID)
 
-	// Exchange a completed attempt that carries a verified user factor so the
-	// session row gets user_id without a raw SQL escape hatch.
 	plain, _ := handoffCompletedAttempt(t, projectID, func(a *domain.AuthAttempt) {
 		now := time.Now()
 		userFactor := domain.SetAuthFactorUser(now)

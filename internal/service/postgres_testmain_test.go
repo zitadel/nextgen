@@ -43,7 +43,7 @@ func runPostgresIntegrationTests(m *testing.M) int {
 	return m.Run()
 }
 
-func integrationV2PoolOrFail(t *testing.T) *service.DB {
+func integrationPoolOrFail(t *testing.T) *service.DB {
 	t.Helper()
 	if integrationPool == nil {
 		t.Fatalf("integration pool not initialized; run with -tags=postgres_integration")
