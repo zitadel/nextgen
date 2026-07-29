@@ -6,6 +6,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/branding"
 )
 
 // ---- Input types -------------------------------------------------------------
@@ -23,20 +24,18 @@ type CreateBrandingInput struct {
 // (ADR 040). Revisions are create-only; flow responses resolve the latest
 // revision per project.
 type BrandingService struct {
-	pool         database.Pool
-	brandingRepo domain.BrandingRepository
+	v2Pool *DB
 }
 
-func NewBrandingService(pool database.Pool, brandingRepo domain.BrandingRepository) *BrandingService {
+func NewBrandingService(v2Pool *DB) *BrandingService {
 	return &BrandingService{
-		pool:         pool,
-		brandingRepo: brandingRepo,
+		v2Pool: v2Pool,
 	}
 }
 
 // Create validates and publishes a new branding revision.
 func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput) (*domain.Branding, error) {
-	branding, err := domain.NewBranding(
+	entity, err := domain.NewBranding(
 		input.ProjectID,
 		input.Layout,
 		input.LiquidTemplate,
@@ -47,7 +46,7 @@ func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.brandingRepo.Create(ctx, s.pool, branding); err != nil {
+	if err := s.v2Pool.Statements().CreateBranding(ctx, entity); err != nil {
 		// The only integrity constraint reachable from user input is the FK to
 		// projects (the ULID primary key cannot realistically collide), so a
 		// violation means the referenced project does not exist.
@@ -56,32 +55,32 @@ func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput)
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create branding revision in database")
 	}
-	return branding, nil
+	return entity, nil
 }
 
 // Get returns a single revision by id.
 func (s *BrandingService) Get(ctx context.Context, projectID, id string) (*domain.Branding, error) {
-	branding, err := s.brandingRepo.GetByID(ctx, s.pool, projectID, id)
+	entity, err := s.v2Pool.Statements().GetBrandingByID(ctx, projectID, id)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrBrandingNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get branding revision from database")
 	}
-	return branding, nil
+	return entity, nil
 }
 
 // GetLatest returns the newest revision for the project, or nil (no error)
 // when the project has none — callers fall back to built-in defaults.
 func (s *BrandingService) GetLatest(ctx context.Context, projectID string) (*domain.Branding, error) {
-	branding, err := s.brandingRepo.GetLatest(ctx, s.pool, projectID)
+	result, err := s.v2Pool.Statements().ListBrandings(ctx, branding.ListOptions(projectID, 1))
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return nil, nil
-		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to resolve latest branding revision")
 	}
-	return branding, nil
+	if len(result.Items) == 0 {
+		return nil, nil
+	}
+	return result.Items[0], nil
 }
 
 // maxBrandingListRevisions caps the list response: revisions accumulate
@@ -93,13 +92,9 @@ const maxBrandingListRevisions = 100
 // List returns the newest revisions for the project, newest first, capped at
 // maxBrandingListRevisions.
 func (s *BrandingService) List(ctx context.Context, projectID string) ([]*domain.Branding, error) {
-	brandings, err := s.brandingRepo.List(ctx, s.pool,
-		database.WithCondition(s.brandingRepo.ProjectIDCondition(projectID)),
-		database.WithOrderByDescending(s.brandingRepo.CreatedAt(), s.brandingRepo.ID()),
-		database.WithLimit(maxBrandingListRevisions),
-	)
+	result, err := s.v2Pool.Statements().ListBrandings(ctx, branding.ListOptions(projectID, maxBrandingListRevisions))
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to list branding revisions")
 	}
-	return brandings, nil
+	return result.Items, nil
 }

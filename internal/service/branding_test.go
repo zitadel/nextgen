@@ -8,22 +8,31 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/internal/domain"
-	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
-	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
 	"go.uber.org/mock/gomock"
+
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
+	"github.com/zitadel/nextgen/internal/storage/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-func TestBrandingServiceCreate(t *testing.T) {
+func newMockedBrandingService(t *testing.T) (*service.BrandingService, *servicemocks.MockAllStatements) {
+	t.Helper()
 	ctrl := gomock.NewController(t)
-	repo := domainmock.NewMockBrandingRepository(ctrl)
-	svc := service.NewBrandingService(nil, repo)
+	pool := servicemocks.NewMockPool(ctrl)
+	statements := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(statements).AnyTimes()
+	return service.NewBrandingService(service.NewPool(pool)), statements
+}
+
+func TestBrandingServiceCreate(t *testing.T) {
+	svc, statements := newMockedBrandingService(t)
 
 	var stored *domain.Branding
-	repo.EXPECT().
-		Create(gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, _ database.QueryExecutor, b *domain.Branding) error {
+	statements.EXPECT().
+		CreateBranding(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, b *domain.Branding) error {
 			stored = b
 			return nil
 		})
@@ -42,10 +51,7 @@ func TestBrandingServiceCreate(t *testing.T) {
 }
 
 func TestBrandingServiceCreateRejectsInvalidTemplate(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	repo := domainmock.NewMockBrandingRepository(ctrl)
-	svc := service.NewBrandingService(nil, repo)
-	// No repo.EXPECT().Create: validation must fail before any write.
+	svc, _ := newMockedBrandingService(t)
 
 	_, err := svc.Create(t.Context(), service.CreateBrandingInput{
 		ProjectID:      "proj_1",
@@ -58,14 +64,10 @@ func TestBrandingServiceCreateRejectsInvalidTemplate(t *testing.T) {
 }
 
 func TestBrandingServiceCreateMapsIntegrityViolation(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	repo := domainmock.NewMockBrandingRepository(ctrl)
-	svc := service.NewBrandingService(nil, repo)
+	svc, statements := newMockedBrandingService(t)
 
-	// The only integrity constraint user input can trip is the FK to
-	// projects, so a violation must surface as brnd.invalid, not a 500.
-	repo.EXPECT().
-		Create(gomock.Any(), gomock.Any(), gomock.Any()).
+	statements.EXPECT().
+		CreateBranding(gomock.Any(), gomock.Any()).
 		Return(database.NewForeignKeyError("branding", "fk_branding_project", nil))
 
 	_, err := svc.Create(t.Context(), service.CreateBrandingInput{
@@ -78,14 +80,15 @@ func TestBrandingServiceCreateMapsIntegrityViolation(t *testing.T) {
 }
 
 func TestBrandingServiceGetLatest(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	repo := domainmock.NewMockBrandingRepository(ctrl)
-	svc := service.NewBrandingService(nil, repo)
+	svc, statements := newMockedBrandingService(t)
 
 	want := &domain.Branding{ProjectID: "proj_1", ID: "brnd_1", Layout: domain.BrandingLayoutCentered}
-	repo.EXPECT().
-		GetLatest(gomock.Any(), gomock.Any(), "proj_1").
-		Return(want, nil)
+	statements.EXPECT().
+		ListBrandings(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, opts *v2database.ListOptions[domain.BrandingField]) (*v2database.ListResult[*domain.Branding], error) {
+			assert.Equal(t, uint32(1), opts.Pagination.Limit)
+			return &v2database.ListResult[*domain.Branding]{Items: []*domain.Branding{want}}, nil
+		})
 
 	got, err := svc.GetLatest(t.Context(), "proj_1")
 	require.NoError(t, err)
@@ -93,13 +96,11 @@ func TestBrandingServiceGetLatest(t *testing.T) {
 }
 
 func TestBrandingServiceGetLatestNoneStored(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	repo := domainmock.NewMockBrandingRepository(ctrl)
-	svc := service.NewBrandingService(nil, repo)
+	svc, statements := newMockedBrandingService(t)
 
-	repo.EXPECT().
-		GetLatest(gomock.Any(), gomock.Any(), "proj_1").
-		Return(nil, &database.NoRowFoundError{})
+	statements.EXPECT().
+		ListBrandings(gomock.Any(), gomock.Any()).
+		Return(&v2database.ListResult[*domain.Branding]{}, nil)
 
 	got, err := svc.GetLatest(t.Context(), "proj_1")
 	require.NoError(t, err, "no stored branding is not an error — callers fall back to defaults")
@@ -107,12 +108,10 @@ func TestBrandingServiceGetLatestNoneStored(t *testing.T) {
 }
 
 func TestBrandingServiceGetNotFound(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	repo := domainmock.NewMockBrandingRepository(ctrl)
-	svc := service.NewBrandingService(nil, repo)
+	svc, statements := newMockedBrandingService(t)
 
-	repo.EXPECT().
-		GetByID(gomock.Any(), gomock.Any(), "proj_1", "brnd_missing").
+	statements.EXPECT().
+		GetBrandingByID(gomock.Any(), "proj_1", "brnd_missing").
 		Return(nil, &database.NoRowFoundError{})
 
 	_, err := svc.Get(t.Context(), "proj_1", "brnd_missing")

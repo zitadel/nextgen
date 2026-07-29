@@ -2,7 +2,6 @@ package spanner
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -50,7 +49,7 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 	if err != nil {
 		return err
 	}
-	definition, err := encodeFlowDefinitionJSON(content)
+	definition, err := encodeNullJSON(content)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -81,7 +80,7 @@ func (f flowDefinitionStatements) UpdateFlowDefinition(ctx context.Context, enti
 	if err != nil {
 		return err
 	}
-	definition, err := encodeFlowDefinitionJSON(content)
+	definition, err := encodeNullJSON(content)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -153,29 +152,11 @@ func (f flowDefinitionStatements) scanFlowDefinition(row *spanner.Row) (*domain.
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	raw, err := decodeFlowDefinitionJSON(definitionJSON)
+	raw, err := decodeNullJSON(definitionJSON)
 	if err != nil {
 		return nil, wrapError(err)
 	}
 	return flowdefinition.ToDomain(projectID, id, name, schemaVersion, status, createdAt, updatedAt, raw)
-}
-
-func encodeFlowDefinitionJSON(b []byte) (spanner.NullJSON, error) {
-	if len(b) == 0 {
-		return spanner.NullJSON{Valid: false}, nil
-	}
-	var v any
-	if err := json.Unmarshal(b, &v); err != nil {
-		return spanner.NullJSON{}, err
-	}
-	return spanner.NullJSON{Value: v, Valid: true}, nil
-}
-
-func decodeFlowDefinitionJSON(v spanner.NullJSON) ([]byte, error) {
-	if !v.Valid {
-		return nil, nil
-	}
-	return json.Marshal(v.Value)
 }
 
 var _ service.FlowDefinitionStatements = (*flowDefinitionStatements)(nil)
