@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniqueSessionFixtureIDs(t *testing.T) string {
@@ -203,14 +203,14 @@ func TestSessionStatements_Exchange_mergeChecks(t *testing.T) {
 		var n int64
 		require.NoError(t, testPool.pool.QueryRow(t.Context(),
 			`SELECT COUNT(*) FROM zitadel_nextgen.checks WHERE project_id = $1 AND session_id = $2`,
-			projectID, legacydb.Identity(sess.ID),
+			projectID, database.Identity(sess.ID),
 		).Scan(&n))
 		assert.Equal(t, int64(1), n)
 
 		var authAttemptID *int64
 		require.NoError(t, testPool.pool.QueryRow(t.Context(),
 			`SELECT auth_attempt_id FROM zitadel_nextgen.checks WHERE project_id = $1 AND session_id = $2 LIMIT 1`,
-			projectID, legacydb.Identity(sess.ID),
+			projectID, database.Identity(sess.ID),
 		).Scan(&authAttemptID))
 		assert.Nil(t, authAttemptID)
 

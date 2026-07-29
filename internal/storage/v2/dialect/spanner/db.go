@@ -6,7 +6,7 @@ import (
 
 	"cloud.google.com/go/spanner"
 
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 type queryExecutor interface {

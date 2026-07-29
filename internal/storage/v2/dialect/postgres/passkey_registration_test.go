@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniquePasskeyRegIDs(t *testing.T) (projectID, regID, userID string) {
@@ -55,7 +55,7 @@ func TestPasskeyRegistrationStatements_CRUD(t *testing.T) {
 
 	require.NoError(t, testPool.DeletePasskeyRegistration(t.Context(), projectID, regID))
 	_, err = testPool.GetPasskeyRegistration(t.Context(), projectID, regID)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestPasskeyRegistrationStatements_Get_Expired(t *testing.T) {
@@ -75,5 +75,5 @@ func TestPasskeyRegistrationStatements_Get_Expired(t *testing.T) {
 	})
 
 	_, err := testPool.GetPasskeyRegistration(t.Context(), projectID, regID)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }

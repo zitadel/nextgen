@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/migration"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/migration"
 )
 
 func TestMigrateSupportsSingleConnectionPool(t *testing.T) {

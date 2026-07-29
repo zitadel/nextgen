@@ -10,8 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // Import loads bootstrap users from JSON files into the database.
@@ -54,9 +53,9 @@ func importFile(
 		return err
 	}
 
-	_, err = v2Pool.Statements().GetUser(ctx, v2database.And(
-		v2database.Equal(v2database.Col(domain.UserFieldProjectID), doc.Header.ProjectID),
-		v2database.Equal(v2database.Col(domain.UserFieldID), doc.Header.ID),
+	_, err = v2Pool.Statements().GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), doc.Header.ProjectID),
+		database.Equal(database.Col(domain.UserFieldID), doc.Header.ID),
 	), service.UserQueryOptions{})
 	if err == nil {
 		slog.Info("bootstrap user: skipped user because they already exists)", slog.String("path", path), slog.String("id", doc.Header.ID))

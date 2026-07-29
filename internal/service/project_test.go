@@ -8,13 +8,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
+
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
-	"go.uber.org/mock/gomock"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func createMockedProjectService(t *testing.T) (svc service.ProjectService,
@@ -385,28 +385,28 @@ func TestProjectService_List(t *testing.T) {
 	tests := []struct {
 		name         string
 		req          service.ListProjectsRequest
-		result       *v2database.ListResult[*domain.Project]
+		result       *database.ListResult[*domain.Project]
 		statementErr error
 		wantErr      error
-		checkOpts    func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField])
+		checkOpts    func(t *testing.T, opts *database.ListOptions[domain.ProjectField])
 		checkResp    func(t *testing.T, resp *service.ListProjectsResponse)
 	}{
 		{
 			name: "defaults",
 			req:  service.ListProjectsRequest{},
-			result: &v2database.ListResult[*domain.Project]{
+			result: &database.ListResult[*domain.Project]{
 				Items:      []*domain.Project{{ID: "proj_a"}, {ID: "proj_b"}},
 				NextCursor: []byte("next"),
 			},
-			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, uint32(20), opts.Pagination.Limit)
 				assert.Nil(t, opts.Pagination.Cursor)
-				assert.Equal(t, v2database.OrderAsc, opts.Pagination.OrderBy.Direction)
-				assert.Equal(t, []v2database.Column[domain.ProjectField]{
-					v2database.Col(domain.ProjectFieldCreatedAt),
-					v2database.Col(domain.ProjectFieldID),
+				assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
+				assert.Equal(t, []database.Column[domain.ProjectField]{
+					database.Col(domain.ProjectFieldCreatedAt),
+					database.Col(domain.ProjectFieldID),
 				}, opts.Pagination.OrderBy.Columns)
-				assert.Equal(t, v2database.And[domain.ProjectField](), opts.Filter)
+				assert.Equal(t, database.And[domain.ProjectField](), opts.Filter)
 			},
 			checkResp: func(t *testing.T, resp *service.ListProjectsResponse) {
 				assert.Len(t, resp.Projects, 2)
@@ -416,36 +416,36 @@ func TestProjectService_List(t *testing.T) {
 		{
 			name:   "limit clamped to max",
 			req:    service.ListProjectsRequest{Limit: 500},
-			result: &v2database.ListResult[*domain.Project]{},
-			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+			result: &database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, uint32(100), opts.Pagination.Limit)
 			},
 		},
 		{
 			name:   "negative limit uses default",
 			req:    service.ListProjectsRequest{Limit: -5},
-			result: &v2database.ListResult[*domain.Project]{},
-			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+			result: &database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, uint32(20), opts.Pagination.Limit)
 			},
 		},
 		{
 			name:   "zero limit uses default, not storage's no-limit",
 			req:    service.ListProjectsRequest{Limit: 0},
-			result: &v2database.ListResult[*domain.Project]{},
-			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+			result: &database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, uint32(20), opts.Pagination.Limit)
 			},
 		},
 		{
 			name: "project id restricts results to that project",
 			req:  service.ListProjectsRequest{ProjectID: "proj_a"},
-			result: &v2database.ListResult[*domain.Project]{
+			result: &database.ListResult[*domain.Project]{
 				Items: []*domain.Project{{ID: "proj_a"}},
 			},
-			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
-				assert.Equal(t, v2database.And(
-					v2database.Equal(v2database.Col(domain.ProjectFieldID), "proj_a"),
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, database.And(
+					database.Equal(database.Col(domain.ProjectFieldID), "proj_a"),
 				), opts.Filter)
 			},
 		},
@@ -455,11 +455,11 @@ func TestProjectService_List(t *testing.T) {
 				ProjectID: "proj_a",
 				Filters:   []service.Filter{{Field: "createdAt", Operation: "equals", Value: createdAt.Format(time.RFC3339)}},
 			},
-			result: &v2database.ListResult[*domain.Project]{},
-			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
-				assert.Equal(t, v2database.And(
-					v2database.Equal(v2database.Col(domain.ProjectFieldID), "proj_a"),
-					v2database.Equal(v2database.Col(domain.ProjectFieldCreatedAt), createdAt),
+			result: &database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, database.And(
+					database.Equal(database.Col(domain.ProjectFieldID), "proj_a"),
+					database.Equal(database.Col(domain.ProjectFieldCreatedAt), createdAt),
 				), opts.Filter)
 			},
 		},
@@ -468,12 +468,12 @@ func TestProjectService_List(t *testing.T) {
 			req: service.ListProjectsRequest{
 				Sorting: &service.Sorting{Field: "createdAt", Direction: "desc"},
 			},
-			result: &v2database.ListResult[*domain.Project]{},
-			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
-				assert.Equal(t, v2database.OrderDesc, opts.Pagination.OrderBy.Direction)
-				assert.Equal(t, []v2database.Column[domain.ProjectField]{
-					v2database.Col(domain.ProjectFieldCreatedAt),
-					v2database.Col(domain.ProjectFieldID),
+			result: &database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, database.OrderDesc, opts.Pagination.OrderBy.Direction)
+				assert.Equal(t, []database.Column[domain.ProjectField]{
+					database.Col(domain.ProjectFieldCreatedAt),
+					database.Col(domain.ProjectFieldID),
 				}, opts.Pagination.OrderBy.Columns)
 			},
 		},
@@ -482,10 +482,10 @@ func TestProjectService_List(t *testing.T) {
 			req: service.ListProjectsRequest{
 				Filters: []service.Filter{{Field: "createdAt", Operation: "equals", Value: createdAt.Format(time.RFC3339)}},
 			},
-			result: &v2database.ListResult[*domain.Project]{},
-			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
-				assert.Equal(t, v2database.And(
-					v2database.Equal(v2database.Col(domain.ProjectFieldCreatedAt), createdAt),
+			result: &database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, database.And(
+					database.Equal(database.Col(domain.ProjectFieldCreatedAt), createdAt),
 				), opts.Filter)
 			},
 		},
@@ -494,10 +494,10 @@ func TestProjectService_List(t *testing.T) {
 			req: service.ListProjectsRequest{
 				Filters: []service.Filter{{Field: "createdAt", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)}},
 			},
-			result: &v2database.ListResult[*domain.Project]{},
-			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
-				assert.Equal(t, v2database.And(
-					v2database.GreaterThan(v2database.Col(domain.ProjectFieldCreatedAt), createdAt),
+			result: &database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, database.And(
+					database.GreaterThan(database.Col(domain.ProjectFieldCreatedAt), createdAt),
 				), opts.Filter)
 			},
 		},
@@ -509,19 +509,19 @@ func TestProjectService_List(t *testing.T) {
 					{Field: "createdAt", Operation: "less_than", Value: createdAt.Add(time.Hour).Format(time.RFC3339)},
 				},
 			},
-			result: &v2database.ListResult[*domain.Project]{},
-			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
-				assert.Equal(t, v2database.And(
-					v2database.GreaterThan(v2database.Col(domain.ProjectFieldCreatedAt), createdAt),
-					v2database.LessThan(v2database.Col(domain.ProjectFieldCreatedAt), createdAt.Add(time.Hour)),
+			result: &database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, database.And(
+					database.GreaterThan(database.Col(domain.ProjectFieldCreatedAt), createdAt),
+					database.LessThan(database.Col(domain.ProjectFieldCreatedAt), createdAt.Add(time.Hour)),
 				), opts.Filter)
 			},
 		},
 		{
 			name:   "page token passed through as cursor",
 			req:    service.ListProjectsRequest{PageToken: "tok"},
-			result: &v2database.ListResult[*domain.Project]{},
-			checkOpts: func(t *testing.T, opts *v2database.ListOptions[domain.ProjectField]) {
+			result: &database.ListResult[*domain.Project]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, []byte("tok"), opts.Pagination.Cursor)
 			},
 		},
@@ -534,13 +534,13 @@ func TestProjectService_List(t *testing.T) {
 		{
 			name:         "invalid cursor maps to request invalid",
 			req:          service.ListProjectsRequest{PageToken: "bad"},
-			statementErr: v2database.ErrInvalidCursor(),
+			statementErr: database.ErrInvalidCursor(),
 			wantErr:      domain.ErrRequestInvalid(),
 		},
 		{
 			name:         "cursor order mismatch maps to request invalid",
 			req:          service.ListProjectsRequest{PageToken: "bad"},
-			statementErr: v2database.ErrCursorOrderMismatch(),
+			statementErr: database.ErrCursorOrderMismatch(),
 			wantErr:      domain.ErrRequestInvalid(),
 		},
 	}
@@ -551,9 +551,9 @@ func TestProjectService_List(t *testing.T) {
 
 			svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
-			var gotOpts *v2database.ListOptions[domain.ProjectField]
+			var gotOpts *database.ListOptions[domain.ProjectField]
 			statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).DoAndReturn(
-				func(_ context.Context, opts *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error) {
+				func(_ context.Context, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
 					gotOpts = opts
 					return tc.result, tc.statementErr
 				})
@@ -650,11 +650,11 @@ func TestProjectService_DefaultProject(t *testing.T) {
 
 		statements.EXPECT().
 			ListProjects(gomock.Any(), gomock.Any()).
-			DoAndReturn(func(_ context.Context, opts *v2database.ListOptions[domain.ProjectField]) (*v2database.ListResult[*domain.Project], error) {
+			DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
 				assert.EqualValues(t, 1, opts.Pagination.Limit)
-				assert.Equal(t, []v2database.Column[domain.ProjectField]{v2database.Col(domain.ProjectFieldCreatedAt)}, opts.Pagination.OrderBy.Columns)
-				assert.Equal(t, v2database.OrderAsc, opts.Pagination.OrderBy.Direction)
-				return &v2database.ListResult[*domain.Project]{Items: []*domain.Project{first}}, nil
+				assert.Equal(t, []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldCreatedAt)}, opts.Pagination.OrderBy.Columns)
+				assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
+				return &database.ListResult[*domain.Project]{Items: []*domain.Project{first}}, nil
 			})
 
 		got, err := svc.DefaultProject(context.Background(), "")
@@ -670,7 +670,7 @@ func TestProjectService_DefaultProject(t *testing.T) {
 
 		statements.EXPECT().
 			ListProjects(gomock.Any(), gomock.Any()).
-			Return(&v2database.ListResult[*domain.Project]{}, nil)
+			Return(&database.ListResult[*domain.Project]{}, nil)
 		statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).Times(0)
 
 		got, err := svc.DefaultProject(context.Background(), "")

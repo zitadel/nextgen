@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -113,10 +112,10 @@ func TestTeamMembershipStatements_CreateGetListUpdate(t *testing.T) {
 
 func TestTeamMembershipStatements_Get_NotFound(t *testing.T) {
 	_, err := testPool.GetTeamMembership(t.Context(), "missing-proj", "missing-team", "missing-user")
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestTeamMembershipStatements_UpdateStatus_NotFound(t *testing.T) {
 	err := testPool.UpdateTeamMembershipStatus(t.Context(), "missing-proj", "missing-team", "missing-user", domain.MembershipStatusInactive)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }

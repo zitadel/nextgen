@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniqueTeamIDs(t *testing.T) (projectID, teamID string) {
@@ -145,7 +145,7 @@ func TestTeamStatements_Get(t *testing.T) {
 
 	t.Run("not found returns NoRowFoundError", func(t *testing.T) {
 		_, err := testPool.GetTeamByID(t.Context(), "proj-nonexistent", "team-nonexistent")
-		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
 

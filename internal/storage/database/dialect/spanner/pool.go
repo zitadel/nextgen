@@ -5,7 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner/migration"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/spanner/migration"
 )
 
 type spannerPool struct {

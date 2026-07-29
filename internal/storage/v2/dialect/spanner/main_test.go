@@ -14,8 +14,8 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
-	spannerdialect "github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner/migration"
+	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/spanner/migration"
 )
 
 // testClient is a v2 spanner client connected to the migrated test database,
@@ -39,7 +39,7 @@ func run(m *testing.M) (int, error) {
 	}
 	defer stop()
 
-	cfg, ok := connector.(*spannerdialect.Config)
+	cfg, ok := connector.(*spanner.Config)
 	if !ok {
 		return 1, fmt.Errorf("expected *spanner.Config connector, got %T", connector)
 	}
