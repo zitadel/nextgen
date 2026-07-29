@@ -58,7 +58,7 @@ delete:
     '204':
       description: Session revoked successfully.
     '401':
-      description: Missing or invalid session token.
+      description: Missing or invalid credentials.
       content:
         application/json:
           schema:
