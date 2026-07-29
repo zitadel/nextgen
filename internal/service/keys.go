@@ -6,8 +6,7 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	database2 "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
@@ -42,9 +41,9 @@ func NewKeyService(
 }
 
 func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*domain.EncryptionKey, error) {
-	key, err := s.db.Statements().GetEncryptionKey(ctx, database2.And(
-		database2.Equal(database2.Col(domain.EncryptionKeyFieldID), keyID),
-		database2.Equal(database2.Col(domain.EncryptionKeyFieldAlgorithm), algorithm),
+	key, err := s.db.Statements().GetEncryptionKey(ctx, database.And(
+		database.Equal(database.Col(domain.EncryptionKeyFieldID), keyID),
+		database.Equal(database.Col(domain.EncryptionKeyFieldAlgorithm), algorithm),
 	))
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -69,10 +68,10 @@ func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jos
 }
 
 func (s *keyService) GetProjectDEK(ctx context.Context, projectID string) (*domain.EncryptionKey, error) {
-	dek, err := s.db.Statements().GetEncryptionKey(ctx, database2.And(
-		database2.Equal(database2.Col(domain.EncryptionKeyFieldProjectID), projectID),
-		database2.Equal(database2.Col(domain.EncryptionKeyFieldState), domain.KeyStateActive),
-		database2.Equal(database2.Col(domain.EncryptionKeyFieldPurpose), domain.EncryptionKeyPurposeDEK),
+	dek, err := s.db.Statements().GetEncryptionKey(ctx, database.And(
+		database.Equal(database.Col(domain.EncryptionKeyFieldProjectID), projectID),
+		database.Equal(database.Col(domain.EncryptionKeyFieldState), domain.KeyStateActive),
+		database.Equal(database.Col(domain.EncryptionKeyFieldPurpose), domain.EncryptionKeyPurposeDEK),
 	))
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -113,12 +112,12 @@ func (s *keyService) GetKekCrypter(ctx context.Context) (op.Crypto, error) {
 }
 
 func (s *keyService) MigrateToLatestRootKEK(ctx context.Context) error {
-	opts := &database2.ListOptions[domain.EncryptionKeyField]{
-		Pagination: database2.Page[domain.EncryptionKeyField]{
+	opts := &database.ListOptions[domain.EncryptionKeyField]{
+		Pagination: database.Page[domain.EncryptionKeyField]{
 			Limit: 100,
-			OrderBy: database2.OrderBy[domain.EncryptionKeyField]{
-				Columns: []database2.Column[domain.EncryptionKeyField]{
-					database2.Col(domain.EncryptionKeyFieldID),
+			OrderBy: database.OrderBy[domain.EncryptionKeyField]{
+				Columns: []database.Column[domain.EncryptionKeyField]{
+					database.Col(domain.EncryptionKeyFieldID),
 				},
 			},
 		},
@@ -131,7 +130,7 @@ func (s *keyService) MigrateToLatestRootKEK(ctx context.Context) error {
 
 	var errs []error
 
-	for key, err := range keys.Iterate(func(cursor []byte) (*database2.ListResult[*domain.EncryptionKey], error) {
+	for key, err := range keys.Iterate(func(cursor []byte) (*database.ListResult[*domain.EncryptionKey], error) {
 		opts.Pagination.Cursor = cursor
 		return s.db.Statements().ListEncryptionKeys(ctx, opts)
 	}) {

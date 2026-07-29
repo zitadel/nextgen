@@ -7,8 +7,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // ---- Input types -------------------------------------------------------------
@@ -123,23 +122,23 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 }
 
 func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType string, offset int, token string) ([]ListSchemasOutputItem, error) {
-	filters := []v2database.Filter[domain.JSONSchemaField]{
-		v2database.Equal(v2database.Col(domain.JSONSchemaFieldProjectID), projectID),
+	filters := []database.Filter[domain.JSONSchemaField]{
+		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
 	}
 	if objectType != "" {
 		filters = append(filters,
-			v2database.Equal(v2database.Col(domain.JSONSchemaFieldObjectType), objectType),
+			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType),
 		)
 	}
 
 	// TODO: implement pagination
 
-	result, err := s.v2Pool.Statements().ListJSONSchemas(ctx, &v2database.ListOptions[domain.JSONSchemaField]{
-		Filter: v2database.And(filters...),
-		Pagination: v2database.Page[domain.JSONSchemaField]{
-			OrderBy: v2database.OrderBy[domain.JSONSchemaField]{
-				Columns:   []v2database.Column[domain.JSONSchemaField]{v2database.Col(domain.JSONSchemaFieldCreatedAt)},
-				Direction: v2database.OrderDesc,
+	result, err := s.v2Pool.Statements().ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
+		Filter: database.And(filters...),
+		Pagination: database.Page[domain.JSONSchemaField]{
+			OrderBy: database.OrderBy[domain.JSONSchemaField]{
+				Columns:   []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldCreatedAt)},
+				Direction: database.OrderDesc,
 			},
 		},
 	})

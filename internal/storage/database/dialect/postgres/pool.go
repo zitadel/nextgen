@@ -7,7 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/migration"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/migration"
 )
 
 type Pool struct {

@@ -10,7 +10,6 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
@@ -277,7 +276,7 @@ func coerceTokenInt64(v any) (any, error) {
 		return id, nil
 	case string:
 		return strconv.ParseInt(id, 10, 64)
-	case storagedb.Identity:
+	case database.Identity:
 		return strconv.ParseInt(string(id), 10, 64)
 	default:
 		s, err := database.CoerceStringValue(v)

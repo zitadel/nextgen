@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -64,7 +63,7 @@ func TestUserPasswordStatements_SetGetDelete(t *testing.T) {
 
 	require.NoError(t, testPool.DeleteUserPassword(ctx, userPasswordByID(got.ID)))
 	_, err = testPool.GetUserPassword(ctx, byUser)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 	require.NoError(t, testPool.SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:   projectID,
@@ -76,7 +75,7 @@ func TestUserPasswordStatements_SetGetDelete(t *testing.T) {
 	require.Positive(t, got2.ID)
 	require.NoError(t, testPool.DeleteUserPassword(ctx, byUser))
 	_, err = testPool.GetUserPassword(ctx, byUser)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestUserPasswordStatements_SetUpsert(t *testing.T) {
@@ -129,7 +128,7 @@ func TestUserPasswordStatements_SetMissingUser(t *testing.T) {
 		EncodedHash: "argon2id$v=19$m=65536,t=3,p=4$fake",
 	})
 	require.Error(t, err)
-	assert.ErrorIs(t, err, new(legacydb.ForeignKeyError))
+	assert.ErrorIs(t, err, new(database.ForeignKeyError))
 }
 
 func TestUserPasswordStatements_Update(t *testing.T) {
@@ -152,7 +151,7 @@ func TestUserPasswordStatements_Update(t *testing.T) {
 	err = testPool.UpdateUserPassword(ctx, userPasswordByUser(projectID, "missing-user"),
 		&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 1},
 	)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	require.NoError(t, testPool.UpdateUserPassword(ctx, byUser,
@@ -184,5 +183,5 @@ func TestUserPasswordStatements_Update(t *testing.T) {
 
 	require.NoError(t, testPool.DeleteUserPassword(ctx, byUser))
 	_, err = testPool.GetUserPassword(ctx, byUser)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }

@@ -11,7 +11,6 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 	v2session "github.com/zitadel/nextgen/internal/storage/v2/session"
@@ -156,7 +155,7 @@ func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.S
 		stmt := buildStatement(`INSERT INTO user_agents (project_id, info) VALUES (@p1, @p2) THEN RETURN id`, session.ProjectID, encodeSpannerJSON(raw)).statement()
 		err = ss.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-				var id storagedb.Identity
+				var id database.Identity
 				if err := row.Columns(&id); err != nil {
 					return struct{}{}, err
 				}
@@ -177,7 +176,7 @@ func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.S
 		session.ProjectID, userAgentID, session.TimeToLive.Nanoseconds()).statement()
 	err := ss.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			var sessionID storagedb.Identity
+			var sessionID database.Identity
 			if err := row.Columns(&sessionID, &session.CreatedAt, &session.UpdatedAt, &session.ExpiresAt); err != nil {
 				return struct{}{}, err
 			}
@@ -334,7 +333,7 @@ func (ss sessionStatements) LoadVerifiedChecks(ctx context.Context, projectID, i
 	var out []v2session.StoredCheck
 	err = ss.db.Query(ctx, buildStatement(query, projectID, parsed).statement(), func(iter *spanner.RowIterator) error {
 		return iter.Do(func(row *spanner.Row) error {
-			var cid storagedb.Identity
+			var cid database.Identity
 			var typ int64
 			var at time.Time
 			if err := row.Columns(&cid, &typ, &at); err != nil {
@@ -353,7 +352,7 @@ func scanSessions(iter *spanner.RowIterator) ([]*domain.Session, error) {
 	err := iter.Do(func(row *spanner.Row) error {
 		var (
 			projectID                                      string
-			sessionID, tokenID                             storagedb.Identity
+			sessionID, tokenID                             database.Identity
 			createdAt, updatedAt, expiresAt                time.Time
 			timeToLiveNanos                                int64
 			userID                                         spanner.NullString
@@ -447,18 +446,18 @@ func parseIdentity(id string) (int64, error) {
 }
 func coerceSessionIdentity(v any) (any, error) {
 	switch id := v.(type) {
-	case storagedb.Identity:
+	case database.Identity:
 		return id, nil
 	case string:
-		return storagedb.Identity(id), nil
+		return database.Identity(id), nil
 	case int64:
-		return storagedb.Identity(strconv.FormatInt(id, 10)), nil
+		return database.Identity(strconv.FormatInt(id, 10)), nil
 	default:
 		s, err := database.CoerceStringValue(v)
 		if err != nil {
 			return nil, err
 		}
-		return storagedb.Identity(s), nil
+		return database.Identity(s), nil
 	}
 }
 func coerceSessionDuration(v any) (any, error) {
@@ -485,12 +484,12 @@ var _ v2session.ExchangeStore = sessionExchangeStore{}
 
 var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBinding[domain.Session]{
 	domain.SessionFieldProjectID:  {SQLName: "s.project_id", Accessor: func(s *domain.Session) any { return s.ProjectID }, Coerce: database.CoerceString},
-	domain.SessionFieldID:         {SQLName: "s.id", Accessor: func(s *domain.Session) any { return storagedb.Identity(s.ID) }, Coerce: coerceSessionIdentity},
+	domain.SessionFieldID:         {SQLName: "s.id", Accessor: func(s *domain.Session) any { return database.Identity(s.ID) }, Coerce: coerceSessionIdentity},
 	domain.SessionFieldCreatedAt:  {SQLName: "s.created_at", Accessor: func(s *domain.Session) any { return s.CreatedAt }, Coerce: database.CoerceTime},
 	domain.SessionFieldUpdatedAt:  {SQLName: "s.updated_at", Accessor: func(s *domain.Session) any { return s.UpdatedAt }, Coerce: database.CoerceTime},
 	domain.SessionFieldExpiresAt:  {SQLName: "s.expires_at", Accessor: func(s *domain.Session) any { return s.ExpiresAt }, Coerce: database.CoerceTime},
 	domain.SessionFieldTimeToLive: {SQLName: "s.time_to_live", Accessor: func(s *domain.Session) any { return s.TimeToLive.Nanoseconds() }, Coerce: coerceSessionDuration},
-	domain.SessionFieldTokenID:    {SQLName: "s.token_id", Accessor: func(s *domain.Session) any { return storagedb.Identity(s.TokenID) }, Coerce: coerceSessionIdentity},
+	domain.SessionFieldTokenID:    {SQLName: "s.token_id", Accessor: func(s *domain.Session) any { return database.Identity(s.TokenID) }, Coerce: coerceSessionIdentity},
 	domain.SessionFieldUserID: {SQLName: "s.user_id", Accessor: func(s *domain.Session) any {
 		if s.UserID == nil {
 			return ""

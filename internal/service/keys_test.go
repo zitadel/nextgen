@@ -10,14 +10,14 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/oidc/v3/pkg/op"
+	"go.uber.org/mock/gomock"
+
 	nextgencrypto "github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
-	storagedb "github.com/zitadel/nextgen/internal/storage/database"
-	databasev2 "github.com/zitadel/nextgen/internal/storage/v2/database"
-	"github.com/zitadel/oidc/v3/pkg/op"
-	"go.uber.org/mock/gomock"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func newMockedKeyService(t *testing.T) (
@@ -152,7 +152,7 @@ func TestKeyService_GetCrypter(t *testing.T) {
 			svc, statements, _ := newMockedKeyService(t)
 			statements.EXPECT().
 				GetEncryptionKey(gomock.Any(), gomock.Any()).
-				Return(nil, storagedb.NewNoRowFoundError(nil))
+				Return(nil, database.NewNoRowFoundError(nil))
 
 			// ACT
 			_, err := svc.GetEncryptionKey(t.Context(), "dek_missing", jose.A256GCM)
@@ -206,7 +206,7 @@ func TestKeyService_GetProjectDEKCrypter(t *testing.T) {
 
 			statements.EXPECT().
 				GetEncryptionKey(gomock.Any(), gomock.Any()).
-				Return(nil, storagedb.NewNoRowFoundError(nil))
+				Return(nil, database.NewNoRowFoundError(nil))
 
 			// ACT
 			_, err := svc.GetProjectDEKCrypter(t.Context(), "proj-1")
@@ -286,8 +286,8 @@ func newWrappedDEK(t *testing.T, id string, kek nextgencrypto.Encrypter) (*domai
 	}, string(raw[:])
 }
 
-func listResult(keys ...*domain.EncryptionKey) *databasev2.ListResult[*domain.EncryptionKey] {
-	return &databasev2.ListResult[*domain.EncryptionKey]{Items: keys}
+func listResult(keys ...*domain.EncryptionKey) *database.ListResult[*domain.EncryptionKey] {
+	return &database.ListResult[*domain.EncryptionKey]{Items: keys}
 }
 
 func TestKeyService_MigrateToLatestRootKEK(t *testing.T) {
@@ -384,7 +384,7 @@ func TestKeyService_MigrateToLatestRootKEK(t *testing.T) {
 		gomock.InOrder(
 			statements.EXPECT().
 				ListEncryptionKeys(gomock.Any(), gomock.Any()).
-				Return(&databasev2.ListResult[*domain.EncryptionKey]{
+				Return(&database.ListResult[*domain.EncryptionKey]{
 					Items:      []*domain.EncryptionKey{dek1},
 					NextCursor: []byte("cursor-1"),
 				}, nil),
