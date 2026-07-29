@@ -37,7 +37,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 	v2db "github.com/zitadel/nextgen/internal/storage/v2/database"
 	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
@@ -126,8 +125,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	// ── Repositories ─────────────────
-	brandingRepo := repository.NewBrandingRepository(pool)
-
 	serviceDBPool := service.NewPool(v2Pool.(service.Pool))
 	schemaStore := serviceDBPool.Statements()
 	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
@@ -188,7 +185,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		nil,
 	)
 	teamService := service.NewTeamService(serviceDBPool)
-	brandingService := service.NewBrandingService(pool, brandingRepo)
+	brandingService := service.NewBrandingService(serviceDBPool)
 	userService := service.NewUserService(
 		pool,
 		serviceDBPool,
