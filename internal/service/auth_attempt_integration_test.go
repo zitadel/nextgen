@@ -43,12 +43,11 @@ func issueUserChallenge(t *testing.T, svc service.AuthAttemptService, projectID 
 }
 
 func TestAuthAttemptService_VerifyProof_integration(t *testing.T) {
-	pool := integrationPoolOrFail(t)
-	svc := newAuthAttemptServiceForIntegration(integrationV2PoolOrFail(t))
+	svc := newAuthAttemptServiceForIntegration(integrationPoolOrFail(t))
 
 	t.Run("user_not_found_records_failure_on_bound_challenge", func(t *testing.T) {
 		projectID := "p-aa-not-found-" + time.Now().Format("150405.000000")
-		ensureProject(t, pool, projectID)
+		ensureProject(t, projectID)
 		attemptID, challengeID := issueUserChallenge(t, svc, projectID)
 
 		_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
@@ -69,7 +68,7 @@ func TestAuthAttemptService_VerifyProof_integration(t *testing.T) {
 
 	t.Run("stale_challenge_id_leaves_row_untouched", func(t *testing.T) {
 		projectID := "p-aa-stale-" + time.Now().Format("150405.000000")
-		ensureProject(t, pool, projectID)
+		ensureProject(t, projectID)
 		attemptID, _ := issueUserChallenge(t, svc, projectID)
 
 		_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
