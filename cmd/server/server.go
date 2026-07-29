@@ -19,6 +19,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	slogctx "github.com/veqryn/slog-context"
+	"go.opentelemetry.io/contrib/bridges/otelslog"
+	"go.opentelemetry.io/otel/log"
+
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/middleware"
@@ -33,13 +36,10 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
-	v2db "github.com/zitadel/nextgen/internal/storage/v2/database"
-	v2postgresembedded "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/embedded"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
 	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
-
-	"go.opentelemetry.io/contrib/bridges/otelslog"
-	"go.opentelemetry.io/otel/log"
+	postgresembedded "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/embedded"
 )
 
 func NewCommand() *cobra.Command {
@@ -381,7 +381,7 @@ func loadConfig(configPath string) (Config, error) {
 	// AutomaticEnv only resolves nested keys viper already knows about
 	// (via default, config file, fields of config struct or explicit BindEnv).
 	// We need to bind all possible env keys of fields which use `mapstructure:",remain"` to ensure they are resolved from env vars.
-	for _, key := range v2db.DialectKeysForEnv() {
+	for _, key := range database.DialectKeysForEnv() {
 		mustBindEnv(v, "database."+key)
 	}
 
@@ -467,12 +467,12 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Ha
 
 // ----------------------------- STORAGE --------------------------------------
 
-func startDatabase(ctx context.Context, cfg Config) (v2db.Pool, error) {
+func startDatabase(ctx context.Context, cfg Config) (database.Pool, error) {
 	dialect, err := buildDatabaseDialect(cfg)
 	if err != nil {
 		return nil, err
 	}
-	v2Pool, err := v2db.Connect(ctx, dialect)
+	v2Pool, err := database.Connect(ctx, dialect)
 	if err != nil {
 		return nil, err
 	}
@@ -482,23 +482,23 @@ func startDatabase(ctx context.Context, cfg Config) (v2db.Pool, error) {
 	return v2Pool, nil
 }
 
-func buildDatabaseDialect(cfg Config) (v2db.Dialect, error) {
+func buildDatabaseDialect(cfg Config) (database.Dialect, error) {
 	if len(cfg.Database.Raw) == 0 {
 		options := embeddedPostgresOptions(cfg.Server.DataDir)
 		slog.Info("no database dialect configured, starting embedded postgres", slog.String("filePath", filepath.Dir(options.DataPath)))
-		return v2postgresembedded.NewDialect(options), nil
+		return postgresembedded.NewDialect(options), nil
 	}
 
-	dialect, err := v2db.Config{Raw: cfg.Database.Raw}.Build()
+	dialect, err := database.Config{Raw: cfg.Database.Raw}.Build()
 	if err != nil {
 		return nil, fmt.Errorf("build database dialect: %w", err)
 	}
 	return dialect, nil
 }
 
-func embeddedPostgresOptions(dataDir string) v2postgresembedded.Options {
+func embeddedPostgresOptions(dataDir string) postgresembedded.Options {
 	root := filepath.Join(dataDir, "embedded-postgres")
-	return v2postgresembedded.Options{
+	return postgresembedded.Options{
 		RuntimePath: filepath.Join(root, "runtime"),
 		DataPath:    filepath.Join(root, "data"),
 		CachePath:   filepath.Join(root, "cache"),
