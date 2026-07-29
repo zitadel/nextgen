@@ -118,8 +118,10 @@ access without making `project.*` an inheritance mechanism.
 ### Project-scoped configuration
 
 These permissions are independent even where the URL remains nested below a
-project. Branding is shipped; the other endpoint mappings are the target
-catalog for the planned paths in [`resource-map.md`](resource-map.md#projects).
+project. Branding is shipped as flat `/branding` (see
+[`resource-map.md`](resource-map.md#branding)); the other endpoint mappings are
+the target catalog for the planned paths in
+[`resource-map.md`](resource-map.md#projects).
 
 | Permission | Endpoints / intended operations | Notes |
 |---|---|---|

@@ -17,7 +17,6 @@ A project is a tenant / deployment. One project is reserved as the **platform pr
 ```http
 /projects
 /projects/{id}
-/projects/{id}/branding
 /projects/{id}/domains
 /projects/{id}/features
 /projects/{id}/allowed_origins
@@ -25,6 +24,32 @@ A project is a tenant / deployment. One project is reserved as the **platform pr
 /projects/{id}/api_keys
 /projects/{id}/webhooks
 ```
+
+Branding is project-scoped but flat by revision id — see [Branding](#branding).
+
+---
+
+## Branding
+
+Immutable per-project login-appearance revisions (ADR 040). Create publishes a
+new revision; there is no update or delete. Flow responses resolve the latest
+revision for the project.
+
+```http
+/branding
+/branding/{id}
+```
+
+Create/list are project-scoped (project id on the request, matching OpenAPI):
+
+```http
+POST /branding                  # publish a new revision
+GET  /branding                  # list revisions for the project, newest first
+GET  /branding/{id}
+```
+
+Permission names in
+[`system-permission-catalog.md`](system-permission-catalog.md#project-scoped-configuration).
 
 ---
 
@@ -319,3 +344,4 @@ continues to come from that source, not from these design sketches.
 - [`url-architecture.md`](url-architecture.md) — flat vs nested rule, no version segment
 - [`authn-and-auth-flows.md`](authn-and-auth-flows.md) — auth_attempts detail
 - [`credentials.md`](credentials.md) — api_keys, `sk_*` tokens
+- [`system-permission-catalog.md`](system-permission-catalog.md) — required permission names
