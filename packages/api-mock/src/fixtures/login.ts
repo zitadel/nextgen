@@ -282,7 +282,6 @@ export function passkeyUpsellStep(input: StepFixtureInput): CreateFlow201 {
         primary: true,
       },
       { name: "skip", kind: "navigate", text_key: "passkey-upsell.action.skip" },
-      { name: "back", kind: "back", text_key: "action.back" },
     ],
     gates: {},
   });

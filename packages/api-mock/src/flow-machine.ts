@@ -235,11 +235,6 @@ export const flowMachine = createMachine({
       on: {
         SUBMIT: [
           {
-            guard: ({ event }) => event.action === "back",
-            target: "identifier",
-            actions: [rotateToken],
-          },
-          {
             guard: ({ event }) => event.action === "skip",
             target: "done",
             actions: [rotateToken],

@@ -1437,49 +1437,21 @@ describe("<zitadel-login> against the typed Flow API", () => {
           detail: { action: "submit" },
         }),
       );
-      await waitFor(() => element.shadowRoot?.querySelector('[data-action="back"]'));
+      await waitFor(() => element.shadowRoot?.querySelector('zl-field[type="password"]'));
     }
 
-    it("renders a back link when the step has a kind: back action", async () => {
+    it("renders no visible control for the kind: back action (gesture-only)", async () => {
       const element = await mount(host);
       await navigateToRegisterPassword(element);
 
-      const backLink = element.shadowRoot?.querySelector<HTMLElement>('[data-action="back"]');
-      expect(backLink).toBeTruthy();
-      expect(backLink?.classList.contains("zl-card-nav__link")).toBe(true);
-    });
-
-    it("does not render a back link on the identifier step", async () => {
-      const element = await mount(host);
-
-      // Identifier is the initial step — no back action
-      const backLink = element.shadowRoot?.querySelector('[data-action="back"]');
-      expect(backLink).toBeNull();
-    });
-
-    it("clicking the back link submits the back action", async () => {
-      const element = await mount(host);
-      await navigateToRegisterPassword(element);
-
-      // Click the back link
-      const backLink = element.shadowRoot?.querySelector<HTMLElement>('[data-action="back"]');
-      backLink?.click();
-
-      // Wait for the step to change back to register (which has no back action)
-      await waitFor(() => {
-        const link = element.shadowRoot?.querySelector('[data-action="back"]');
-        return link === null ? true : null;
-      });
-
-      // Verify the back action was submitted
-      const submits = mock
-        .getCaptured()
-        .filter(
-          (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
-            req.kind === "submitFlowStep",
-        );
-      const backSubmit = submits.find((s) => s.body.action === "back");
-      expect(backSubmit).toBeDefined();
+      // The step carries a kind: "back" action on the wire, but the default
+      // template renders nothing for it — the browser's back gesture is the
+      // affordance (ADR 022). The kind-based exclusion also keeps it out of
+      // the generic secondary-button loop.
+      expect(element.shadowRoot?.querySelector('[data-action="back"]')).toBeNull();
+      expect(
+        element.shadowRoot?.querySelector('[data-testid="zitadel-action-back"]'),
+      ).toBeNull();
     });
 
     it("pushes a single sentinel entry without touching the URL", async () => {
@@ -1531,8 +1503,8 @@ describe("<zitadel-login> against the typed Flow API", () => {
 
         // The gesture maps to the step's back action…
         await waitFor(() => {
-          const link = element.shadowRoot?.querySelector('[data-action="back"]');
-          return link === null ? true : null;
+          const pw = element.shadowRoot?.querySelector('zl-field[type="password"]');
+          return pw === null ? true : null;
         });
         const submits = mock
           .getCaptured()
@@ -1579,8 +1551,8 @@ describe("<zitadel-login> against the typed Flow API", () => {
       // action afterwards.
       window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
       await waitFor(() => {
-        const link = element.shadowRoot?.querySelector('[data-action="back"]');
-        return link === null ? true : null;
+        const pw = element.shadowRoot?.querySelector('zl-field[type="password"]');
+        return pw === null ? true : null;
       });
       const backSubmit = mock
         .getCaptured()

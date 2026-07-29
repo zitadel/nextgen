@@ -69,7 +69,7 @@ This builds the embedded console and login UIs, then starts the Go server on
 ```bash
 curl -s -X POST http://localhost:8080/projects \
   -H 'Content-Type: application/json' \
-  -d '{}' | jq .
+  -d '{"name": "demo"}' | jq .
 ```
 
 The response contains the `id` and `projectSecret`:
@@ -77,7 +77,7 @@ The response contains the `id` and `projectSecret`:
 ```json
 {
   "id": "proj_01JXXXXXXXXXXXXXXXX",
-  "project_secret": "eyJhbGci..."
+  "projectSecret": "eyJhbGci..."
 }
 ```
 
@@ -88,8 +88,10 @@ Update `apps/demo-next/.env.local` with the values from step 2:
 ```env
 ZITADEL_URL=http://localhost:8080
 NEXT_PUBLIC_ZITADEL_PROJECT_ID=proj_01JXXXXXXXXXXXXXXXX
-ZITADEL_PROJECT_SECRET=eyJhbGci...
 ```
+
+The demo only needs the project `id` — `projectSecret` authenticates
+server-side project-management calls and is not read by the demo app.
 
 #### 4. Start demo-next
 

@@ -140,13 +140,6 @@
       </p>
     {% endif %}
 
-    {% assign back = actions | where: "kind", "back" | first %}
-    {% if back %}
-      <p class="zl-card-nav">
-        <a href="#" class="zl-card-nav__link" data-action="{{ back.name }}" data-testid="zitadel-action-back-link">{{ back.text_key | t }}</a>
-      </p>
-    {% endif %}
-
     {% if challenge %}
       {% if challenge.method == "passkey" or challenge.method == "passkey_register" %}
         {% assign ceremony = "authenticate" %}
