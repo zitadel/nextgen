@@ -453,6 +453,7 @@ func TestGetUserMetadata(t *testing.T) {
 
 	if assert.IsType(t, &api.UserMetadata{}, resp, helpers.MustMarshal(t, resp)) {
 		got := resp.(*api.UserMetadata)
+		assert.Equal(t, api.UserMetadataStatusActive, got.Status)
 		// ogen encodes `format: date-time` as RFC3339, which drops sub-second
 		// precision, so the response can only be bracketed to the second: the
 		// lower bound is truncated to match, the upper bound needs no slack
