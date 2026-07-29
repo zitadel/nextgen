@@ -164,4 +164,3 @@ func tryCreateInstanceAndDatabase(ctx context.Context, opts []option.ClientOptio
 
 	return nil
 }
-

@@ -36,9 +36,9 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
 	v2db "github.com/zitadel/nextgen/internal/storage/v2/database"
-	v2postgresembedded "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/embedded"
 	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
 	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
+	v2postgresembedded "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/embedded"
 
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel/log"

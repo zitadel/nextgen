@@ -281,4 +281,3 @@ func getPort() (port uint16, close func() error, err error) {
 	port = uint16(l.Addr().(*net.TCPAddr).Port)
 	return port, l.Close, nil
 }
-

@@ -7,8 +7,8 @@ import (
 	"os"
 
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
-	v2embeddedpostgres "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/embedded"
 	v2postgres "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
+	v2embeddedpostgres "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/embedded"
 )
 
 // Postgres returns a connected v2 pool for the Postgres integration tests.
@@ -43,4 +43,3 @@ func Postgres(ctx context.Context) (v2database.Pool, func(), error) {
 	}
 	return pool, stop, nil
 }
-

@@ -7,8 +7,8 @@ import (
 	"os"
 
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
-	v2embeddedspanner "github.com/zitadel/nextgen/internal/storage/v2/dialect/spanner/embedded"
 	v2spannerdialect "github.com/zitadel/nextgen/internal/storage/v2/dialect/spanner"
+	v2embeddedspanner "github.com/zitadel/nextgen/internal/storage/v2/dialect/spanner/embedded"
 )
 
 // Spanner returns a connected v2 pool for the Spanner integration tests.
@@ -44,4 +44,3 @@ func Spanner(ctx context.Context) (v2database.Pool, func(), error) {
 	}
 	return pool, stop, nil
 }
-

@@ -85,4 +85,3 @@ func StartContainerWithDSN(ctx context.Context) (v2database.Pool, string, func()
 	slog.Info("postgres testcontainer available", "dsn", dsn)
 	return pool, dsn, stop, nil
 }
-
