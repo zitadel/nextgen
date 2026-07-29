@@ -285,7 +285,7 @@ compiler.compileRead(projectQuery, &database.ListOptions{
 4. **Hybrid transactions** — **done.** App callers and bootstrap use statements
    only; v2 tx no longer exposes v1 `QueryExecutor`.
 5. **Retire v1 dialect layer** — delete
-   `internal/storage/database/dialect/` once v2 dialects satisfy all contracts
+   the v1 dialect tree once v2 dialects satisfy all contracts
    (migrations, embedded bring-up, Identity, errors).
 6. **Single pool at startup** — server connects through v2 dialect only; no
    second pool.
@@ -309,7 +309,7 @@ items off as work lands; remove completed entries when no longer useful.
 - [x] Add `internal/storage/v2/AGENTS.md` with v2 conventions (including multi-write `withTransaction` rules)
 - [x] Port remaining entities and remove v1 entity repository package
 - [x] Drop QueryExecutor bridge from app callers and v2 transactions
-- [ ] Retire v1 dialect implementations (`internal/storage/database/dialect/`) once migrations/embedded/Identity live in v2
+- [x] Retire v1 dialect implementations once migrations/embedded/Identity live in v2
 
 ## Related ADRs
 

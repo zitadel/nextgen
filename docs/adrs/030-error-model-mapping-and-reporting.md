@@ -12,8 +12,8 @@
 | Layer | Location | Shape |
 |---|---|---|
 | Domain | `internal/domain/error.go` | `domain.Error` with `Code`, `Message`, `Details`, `Parent`, `Location` |
-| Storage | `internal/storage/database/errors.go` | Typed `database.*Error` values (`NoRowFoundError`, `UniqueError`, …) |
-| Dialect | `internal/storage/database/dialect/*/error.go` | Driver → `database.*Error` normalization |
+| Storage | `internal/storage/v2/database/error.go` | Typed `database.*Error` values (`NoRowFoundError`, `UniqueError`, …) |
+| Dialect | `internal/storage/v2/dialect/*/error.go` | Driver → `database.*Error` normalization |
 | Service | `internal/service/*` | Ad-hoc `errors.AsType` mapping from storage to domain |
 | API | `internal/api/error_handler.go` | Prefix/code routing → HTTP status + `ErrorDetails` |
 | Instrumentation | `internal/instrumentation/config.go`, `zlog/` | GCP log formatting, optional masking, `ErrorConfig` knobs |
@@ -178,7 +178,7 @@ Baseline mapping:
 | `PermissionError` | `auth.unauthorized` or `ErrInternal` | Depends on whether the caller is an end user vs operator |
 | `UnknownError` | `ErrInternal(parent)` | Preserve parent for logs only |
 
-**Do not** map storage errors to domain inside `internal/storage/database/dialect`. Dialect stays driver-aware; domain stays business-aware.
+**Do not** map storage errors to domain inside `internal/storage/v2/dialect`. Dialect stays driver-aware; domain stays business-aware.
 
 Follow-up tracked by [#48](https://github.com/zitadel/nextgen/issues/48): introduce a small shared helper (for example `storagemap.NotFound(err) bool`) only to reduce duplicated `errors.AsType` boilerplate, not to hide resource-specific semantics.
 
