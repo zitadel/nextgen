@@ -16,7 +16,7 @@ import (
 
 // Import loads bootstrap users from JSON files into the database.
 // dialect is the configured database dialect name (e.g. "postgres"); used to reject unsupported backends.
-func Import(ctx context.Context, pool database.Pool, v2Pool service.StatementPool, hashValidator crypto.HashValidator, dialect string, paths []string) error {
+func Import(ctx context.Context, v2Pool service.StatementPool, hashValidator crypto.HashValidator, dialect string, paths []string) error {
 	if len(paths) == 0 {
 		return nil
 	}
@@ -25,7 +25,7 @@ func Import(ctx context.Context, pool database.Pool, v2Pool service.StatementPoo
 	}
 
 	for _, path := range paths {
-		if err := importFile(ctx, pool, v2Pool, hashValidator, path); err != nil {
+		if err := importFile(ctx, v2Pool, hashValidator, path); err != nil {
 			return fmt.Errorf("user file %q: %w", path, err)
 		}
 	}
@@ -34,7 +34,6 @@ func Import(ctx context.Context, pool database.Pool, v2Pool service.StatementPoo
 
 func importFile(
 	ctx context.Context,
-	pool database.Pool,
 	v2Pool service.StatementPool,
 	hashValidator crypto.HashValidator,
 	path string,
@@ -51,7 +50,7 @@ func importFile(
 		return err
 	}
 
-	if err := ensureDependencies(ctx, pool, doc.Header); err != nil {
+	if err := ensureDependencies(ctx, v2Pool.Statements(), doc.Header); err != nil {
 		return err
 	}
 
