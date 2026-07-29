@@ -135,7 +135,7 @@ func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
 }
 
 func (h *Handler) GetUserMetadata(ctx context.Context, params api.GetUserMetadataParams) (api.GetUserMetadataRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opWrite); err != nil {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opRead); err != nil {
 		return nil, err
 	}
 
