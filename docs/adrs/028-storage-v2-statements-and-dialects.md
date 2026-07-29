@@ -167,7 +167,7 @@ are produced for the identifier classes in [ADR 011](011-resource-identifiers.md
 The **dialect** owns the generation strategy per class — not
 `internal/domain/idgen` or service code. Domain keeps prefix rules and
 validation; storage executes generation and returns
-[`Identity`](../../internal/storage/database/identity.go) (moving to v2 core).
+[`Identity`](../../internal/storage/v2/database/identity.go).
 
 PostgreSQL and Spanner already diverge on ephemeral key generation (monotonic
 identity vs bit-reversed identity per ADR 011). Colocating generation with the
@@ -194,21 +194,26 @@ flowchart LR
     goPkg --> identity
 ```
 
-### 9. What moves to v2 before `new-repo` merge
+### 9. What moved to v2 before `new-repo` merge
 
-The following currently live under v1 but are **in scope for v2 dialect
-ownership**, not permanent v1 retention:
+These previously lived under v1 and are now owned by v2 (C3–C6):
 
-- Migrations (postgres + spanner DDL)
-- Embedded postgres startup
-- [`database.Identity`](../../internal/storage/database/identity.go) (ADR 011)
+- Migrations (postgres + spanner DDL) — **done**
+- Embedded postgres startup — **done** (`v2/dialect/postgres/embedded`)
+- Test DSN bring-up — **done** (`v2/testdb` + `v2/dbtest`)
+- [`database.Identity`](../../internal/storage/v2/database/identity.go) (ADR 011) — **done** (v1 keeps a type alias only)
+- Dialect-specific integrity error types — **done** (`v2/database/integrity_errors.go`)
+- Single pool at production startup — **done** (C5)
+- Retire v1 dialect tree — **done** (C6)
+
+Still open:
+
 - ID generation (ephemeral + managed fallback) per dialect
-- Dialect-specific error mapping (already partially in v2 postgres)
 
 **Specialized storage that may keep distinct patterns:** EAV user storage (ADR
-008) — port to v2 statements but may retain EAV-specific SQL structure.
+008) — ported to v2 statements but may retain EAV-specific SQL structure.
 Permission checks and complex conditions (LIKE, JSON paths, EXISTS) are
-capabilities to add to the v2 filter/compiler, not reasons to keep v1 dialects.
+capabilities to add to the v2 filter/compiler.
 
 ### 10. Generics roadmap
 
@@ -299,7 +304,7 @@ items off as work lands; remove completed entries when no longer useful.
 - [x] Spanner statement execution and dialect registration are in place; remaining Spanner work is migrate/embedded/dbtest parity under v2.
 - [x] Move migrations from v1 to v2 dialect packages (postgres + spanner)
 - [x] Move embedded postgres startup to v2 postgres dialect
-- [x] Move `database.Identity` bind/scan to v2 core (v1 package keeps a type alias for remaining interim callers)
+- [x] Move `database.Identity` bind/scan to v2 core (legacy `internal/storage/database` keeps a type alias until that package is retired)
 - [ ] Move ID generation into v2 dialects (ephemeral via DB identity/function; managed fallback via dialect-chosen Go package or DB function); retire domain-layer `idgen` call sites at storage boundary
 - [x] Add `internal/storage/v2/AGENTS.md` with v2 conventions (including multi-write `withTransaction` rules)
 - [x] Port remaining entities and remove v1 entity repository package

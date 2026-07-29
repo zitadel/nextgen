@@ -274,7 +274,7 @@ Startup errors from key configuration are plain `server: …` errors and abort t
 | Startup wiring and validation                                            | `cmd/server/server.go` (`buildRootKEK`)                                                     |
 | DEK lookup, crypter construction, rotation job                           | `internal/service/keys.go`                                                                  |
 | DEK creation at project creation                                         | `internal/service/project.go`                                                               |
-| Schema                                                                   | `internal/storage/database/dialect/{postgres,spanner}/migration/sql/000012_crypto_keys.sql` |
+| Schema                                                                   | `internal/storage/v2/dialect/{postgres,spanner}/migration/sql/000012_crypto_keys.sql` |
 
 ## See also
 

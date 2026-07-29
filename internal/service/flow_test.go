@@ -12,7 +12,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
-	"github.com/zitadel/nextgen/internal/storage/database"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -499,7 +498,7 @@ func stubGetFlowDefinition(t *testing.T, def *domain.FlowDefinition) *service.DB
 	stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ context.Context, projectID, id string) (*domain.FlowDefinition, error) {
 			if def == nil || def.ProjectID != projectID || def.ID != id {
-				return nil, database.NewNoRowFoundError(nil)
+				return nil, v2database.NewNoRowFoundError(nil)
 			}
 			return def, nil
 		},
