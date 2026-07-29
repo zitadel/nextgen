@@ -70,9 +70,9 @@ func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest
 	return projectResponse(project), nil
 }
 
-// QueryProjects has no project parameter: results are scoped by the caller's
-// scope, which today is always bound to a single project. A broader scope
-// would leave ProjectID empty and span every project it reaches.
+// QueryProjects has no project parameter: results are restricted to the
+// caller's project. requireProjectAccess rejects an unbound scope, so the
+// ProjectID passed on is always set.
 func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsRequest) (api.QueryProjectsRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
 	if err := requireProjectAccess(ctx, scopeCtx.ProjectID, projectAccess, opRead); err != nil {
@@ -100,8 +100,7 @@ func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsReque
 func mapQueryProjectsToService(projectID string, req *api.QueryProjectsRequest) service.ListProjectsRequest {
 	svcReq := service.ListProjectsRequest{
 		ProjectID: projectID,
-		// Left at 0 when unset: the service applies the spec's default and cap.
-		Limit:     int(req.Limit.Or(0)),
+		Limit:     int(req.Limit.Or(0)), // if not defined, set to default value in the service layer
 		PageToken: string(req.PageToken.Or("")),
 	}
 	if sorting, ok := req.Sorting.Get(); ok {
@@ -159,7 +158,7 @@ func projectErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrProjectPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
-	case domain.ErrProjectNameInvalid().Code:
+	case domain.ErrProjectNameInvalid().Code, domain.ErrProjectMissingID().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	default:
 		return internalErrorResponse(err)
