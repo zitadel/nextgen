@@ -32,4 +32,3 @@ func (c *Client) Migrate(ctx context.Context) error {
 	c.isMigrated = err == nil
 	return wrapError(err)
 }
-

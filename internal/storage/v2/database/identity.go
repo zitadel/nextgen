@@ -57,4 +57,3 @@ func (id Identity) Value() (driver.Value, error) {
 	}
 	return string(id), nil
 }
-

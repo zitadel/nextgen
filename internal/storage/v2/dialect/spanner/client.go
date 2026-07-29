@@ -10,7 +10,7 @@ import (
 
 type Client struct {
 	client *spanner.Client
-	dsn     string
+	dsn    string
 	// isMigrated gates the one-time goose migrations run.
 	isMigrated bool
 	statements
