@@ -34,8 +34,6 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	_ "github.com/zitadel/nextgen/internal/storage/database/dialect/all"
 	v2db "github.com/zitadel/nextgen/internal/storage/v2/database"
 	v2postgresembedded "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/embedded"
 	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
@@ -100,16 +98,11 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	setUpLogging(cfg.Instrumentation.Log, metrics.LoggerProvider())
 
-	pool, v2Pool, err := startDatabase(ctx, cfg)
+	v2Pool, err := startDatabase(ctx, cfg)
 	if err != nil {
 		return err
 	}
 	sfs.Add(func(ctx context.Context) error {
-		if pool != nil {
-			if err := pool.Close(ctx); err != nil {
-				return fmt.Errorf("failed close database pool: %w", err)
-			}
-		}
 		if err := v2Pool.Close(ctx); err != nil {
 			return fmt.Errorf("failed close v2 database pool: %w", err)
 		}
@@ -377,7 +370,7 @@ func loadConfig(configPath string) (Config, error) {
 	// AutomaticEnv only resolves nested keys viper already knows about
 	// (via default, config file, fields of config struct or explicit BindEnv).
 	// We need to bind all possible env keys of fields which use `mapstructure:",remain"` to ensure they are resolved from env vars.
-	for _, key := range database.DialectKeysForEnv() {
+	for _, key := range v2db.DialectKeysForEnv() {
 		mustBindEnv(v, "database."+key)
 	}
 
@@ -463,46 +456,33 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Ha
 
 // ----------------------------- STORAGE --------------------------------------
 
-func startDatabase(ctx context.Context, cfg Config) (database.Pool, v2db.Pool, error) {
-	connector, dialect, err := buildDatabaseConnector(cfg)
+func startDatabase(ctx context.Context, cfg Config) (v2db.Pool, error) {
+	dialect, err := buildDatabaseDialect(cfg)
 	if err != nil {
-		return nil, nil, err
-	}
-	var pool database.Pool
-	if connector != nil {
-		pool, err = connector.Connect(ctx)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	if dialect == nil {
-		return nil, nil, fmt.Errorf("database dialect is nil")
+		return nil, err
 	}
 	v2Pool, err := v2db.Connect(ctx, dialect)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if err := v2Pool.Migrate(ctx); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return pool, v2Pool, nil
+	return v2Pool, nil
 }
 
-func buildDatabaseConnector(cfg Config) (database.Connector, v2db.Dialect, error) {
+func buildDatabaseDialect(cfg Config) (v2db.Dialect, error) {
 	if len(cfg.Database.Raw) == 0 {
 		options := embeddedPostgresOptions(cfg.Server.DataDir)
 		slog.Info("no database dialect configured, starting embedded postgres", slog.String("filePath", filepath.Dir(options.DataPath)))
-		return nil, v2postgresembedded.NewDialect(options), nil
+		return v2postgresembedded.NewDialect(options), nil
 	}
-	connector, err := cfg.Database.Build()
-	if err != nil {
-		return nil, nil, fmt.Errorf("build database connector: %w", err)
-	}
+
 	dialect, err := v2db.Config{Raw: cfg.Database.Raw}.Build()
 	if err != nil {
-		return nil, nil, fmt.Errorf("build database dialect: %w", err)
+		return nil, fmt.Errorf("build database dialect: %w", err)
 	}
-	return connector, dialect, nil
+	return dialect, nil
 }
 
 func embeddedPostgresOptions(dataDir string) v2postgresembedded.Options {
