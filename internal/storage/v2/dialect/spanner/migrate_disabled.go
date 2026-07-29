@@ -16,4 +16,3 @@ func (c *Client) Migrate(ctx context.Context) error {
 	_ = ctx
 	return errors.New("spanner migrations require build tag spanner_integration")
 }
-

@@ -73,4 +73,3 @@ func NewUnimplementedError(original error) error {
 func NewPermissionError(original error) error {
 	return v2errors.NewPermissionError(original)
 }
-
