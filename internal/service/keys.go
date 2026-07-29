@@ -112,12 +112,12 @@ func (s *keyService) GetKekCrypter(ctx context.Context) (op.Crypto, error) {
 }
 
 func (s *keyService) MigrateToLatestRootKEK(ctx context.Context) error {
-	opts := &database2.ListOptions[domain.EncryptionKeyField]{
-		Pagination: database2.Page[domain.EncryptionKeyField]{
+	opts := &database.ListOptions[domain.EncryptionKeyField]{
+		Pagination: database.Page[domain.EncryptionKeyField]{
 			Limit: 100,
-			OrderBy: database2.OrderBy[domain.EncryptionKeyField]{
-				Columns: []database2.Column[domain.EncryptionKeyField]{
-					database2.Col(domain.EncryptionKeyFieldID),
+			OrderBy: database.OrderBy[domain.EncryptionKeyField]{
+				Columns: []database.Column[domain.EncryptionKeyField]{
+					database.Col(domain.EncryptionKeyFieldID),
 				},
 			},
 		},
@@ -130,7 +130,7 @@ func (s *keyService) MigrateToLatestRootKEK(ctx context.Context) error {
 
 	var errs []error
 
-	for key, err := range keys.Iterate(func(cursor []byte) (*database2.ListResult[*domain.EncryptionKey], error) {
+	for key, err := range keys.Iterate(func(cursor []byte) (*database.ListResult[*domain.EncryptionKey], error) {
 		opts.Pagination.Cursor = cursor
 		return s.db.Statements().ListEncryptionKeys(ctx, opts)
 	}) {
