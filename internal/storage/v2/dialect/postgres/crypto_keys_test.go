@@ -151,3 +151,69 @@ func TestCryptoKeyStatements_GetEncryptionKey(t *testing.T) {
 		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
 	})
 }
+
+// newTestSigningKey builds a persistable signing key in the given state
+// referencing projectID.
+func newTestSigningKey(id, projectID string, state domain.KeyState) *domain.SigningKey {
+	return &domain.SigningKey{
+		ID:        id,
+		ProjectID: projectID,
+		Key:       "this is normally an encrypted seed",
+		Algorithm: jose.EdDSA,
+		State:     state,
+		Purpose:   domain.SigningKeyPurposeToken,
+	}
+}
+
+func TestCryptoKeyStatements_SigningKeys(t *testing.T) {
+	t.Parallel()
+
+	t.Run("round trips a stored key", func(t *testing.T) {
+		t.Parallel()
+
+		projectID := withProject(t)
+		key := newTestSigningKey(uniqueKeyID(t), projectID, domain.KeyStateActive)
+		require.NoError(t, testPool.CreateSigningKey(t.Context(), key))
+		assert.False(t, key.CreatedAt.IsZero(), "created_at is set by the database")
+
+		stored, err := testPool.GetSigningKey(t.Context(),
+			database.And(
+				database.Equal(database.Col(domain.SigningKeyFieldProjectID), projectID),
+				database.Equal(database.Col(domain.SigningKeyFieldState), domain.KeyStateActive),
+				database.Equal(database.Col(domain.SigningKeyFieldPurpose), domain.SigningKeyPurposeToken),
+			))
+		require.NoError(t, err)
+		assert.Equal(t, key.ID, stored.ID)
+		assert.Equal(t, key.Key, stored.Key)
+		assert.EqualValues(t, jose.EdDSA, stored.Algorithm)
+		assert.EqualValues(t, domain.KeyStateActive, stored.State)
+		assert.EqualValues(t, domain.SigningKeyPurposeToken, stored.Purpose)
+	})
+
+	t.Run("filters out non-active keys", func(t *testing.T) {
+		t.Parallel()
+
+		projectID := withProject(t)
+		require.NoError(t, testPool.CreateSigningKey(t.Context(),
+			newTestSigningKey(uniqueKeyID(t), projectID, domain.KeyStateNotActiveYet)))
+
+		_, err := testPool.GetSigningKey(t.Context(),
+			database.And(
+				database.Equal(database.Col(domain.SigningKeyFieldProjectID), projectID),
+				database.Equal(database.Col(domain.SigningKeyFieldState), domain.KeyStateActive),
+			))
+		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	})
+
+	t.Run("at most one active token signing key per project", func(t *testing.T) {
+		t.Parallel()
+
+		projectID := withProject(t)
+		require.NoError(t, testPool.CreateSigningKey(t.Context(),
+			newTestSigningKey(uniqueKeyID(t)+"-a", projectID, domain.KeyStateActive)))
+
+		err := testPool.CreateSigningKey(t.Context(),
+			newTestSigningKey(uniqueKeyID(t)+"-b", projectID, domain.KeyStateActive))
+		require.Error(t, err, "uq_token_signing_keys_active_per_project must reject a second active key")
+	})
+}

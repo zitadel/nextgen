@@ -58,6 +58,12 @@ NULL_FILTERED INDEX idx_encryption_keys_active_secret_encryption_key
     ON encryption_keys (active_secret_encryption_key_project_id)
 -- +goose StatementEnd
 -- +goose StatementBegin
+CREATE
+UNIQUE
+NULL_FILTERED INDEX idx_encryption_keys_active_cookie_encryption_key
+    ON encryption_keys (active_cookie_encryption_key_project_id)
+-- +goose StatementEnd
+-- +goose StatementBegin
 CREATE TABLE signing_keys
 (
     project_id            STRING(MAX) NOT NULL,
@@ -106,6 +112,9 @@ DROP INDEX IF EXISTS idx_encryption_keys_active_token_encryption_key
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_encryption_keys_active_secret_encryption_key
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_encryption_keys_active_cookie_encryption_key
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS encryption_keys

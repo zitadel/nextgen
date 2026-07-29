@@ -3,7 +3,7 @@ package domain
 import (
 	"crypto/ed25519"
 	"crypto/rand"
-	"errors"
+	"fmt"
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
@@ -21,7 +21,7 @@ func ErrSigningKeyNotFound() Error {
 type SigningKeyPurpose string
 
 const (
-	SigningKeyPurposeToken = "token"
+	SigningKeyPurposeToken SigningKeyPurpose = "token"
 )
 
 type SigningKey struct {
@@ -91,11 +91,14 @@ func (k *SigningKey) Signer(kek crypto.Crypter) (jose.Signer, error) {
 	if err != nil {
 		return nil, ErrDecryptionFailed(err)
 	}
+	if len(decrypted) != ed25519.SeedSize {
+		return nil, ErrDecryptionFailed(nil).WithDetails(fmt.Sprintf("signing key seed is not %d bytes", ed25519.SeedSize))
+	}
 	return jose.NewSigner(
 		jose.SigningKey{
 			Algorithm: k.Algorithm,
 			Key: &jose.JSONWebKey{
-				Key:   []byte(decrypted),
+				Key:   ed25519.NewKeyFromSeed([]byte(decrypted)),
 				KeyID: k.ID,
 			},
 		},
