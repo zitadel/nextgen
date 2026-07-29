@@ -3,13 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+type Failure = { name: string; status: string; error: string };
+
 type ReportMoonFailuresModule = {
-  actionTarget: (action: unknown) => string | null;
-  collectFailedActions: (report: unknown) => unknown[];
+  actionName: (action: unknown) => string;
+  normalizeFailures: (report: unknown) => Failure[];
+  escapeAnnotation: (value: string) => string;
   escapeMarkdownTableCell: (value: string) => string;
-  formatFailureReport: (failedActions: unknown[]) => { names: string[]; text: string };
-  formatGithubAnnotations: (failedActions: unknown[]) => string[];
-  formatStepSummary: (failedActions: unknown[]) => string;
+  formatFailureReport: (failures: Failure[]) => string;
+  formatGithubAnnotations: (failures: Failure[]) => string[];
+  formatStepSummary: (failures: Failure[]) => string;
   loadMoonReport: (options?: {
     cacheDir?: string;
     reportPath?: string;
@@ -34,107 +37,83 @@ function failedRunTaskReport() {
         label: "RunTask(server:format)",
         status: "failed",
         error: "Task process exited with a non-zero exit code",
-        node: {
-          action: "run-task",
-          params: {
-            args: [],
-            env: {},
-            interactive: false,
-            persistent: false,
-            priority: 0,
-            target: "server:format",
-          },
-        },
-        operations: [],
+        node: { action: "run-task", params: { target: "server:format" } },
       },
       {
         label: "RunTask(server:test)",
         status: "skipped",
         error: null,
-        node: {
-          action: "run-task",
-          params: {
-            args: [],
-            env: {},
-            interactive: false,
-            persistent: false,
-            priority: 0,
-            target: "server:test",
-          },
-        },
-        operations: [],
+        node: { action: "run-task", params: { target: "server:test" } },
       },
       {
         label: "SetupToolchain",
         status: "passed",
         error: null,
         node: { action: "setup-toolchain", params: { toolchain: "go" } },
-        operations: [],
       },
     ],
   };
 }
 
 describe("report-moon-failures", () => {
-  it("resolves targets from run-task nodes and legacy labels", async () => {
-    const { actionTarget } = await loadModule();
+  it("resolves run-task targets and falls back to labels", async () => {
+    const { actionName } = await loadModule();
     expect(
-      actionTarget({
+      actionName({
         label: "RunTask(server:format)",
-        node: {
-          action: "run-task",
-          params: { target: "server:format" },
-        },
+        node: { action: "run-task", params: { target: "server:format" } },
       }),
     ).toBe("server:format");
-    expect(actionTarget({ label: "RunTarget(types:build)" })).toBe("types:build");
-    expect(actionTarget({ label: "SetupToolchain" })).toBe("SetupToolchain");
+    expect(actionName({ label: "SetupToolchain" })).toBe("SetupToolchain");
   });
 
-  it("collects failed, invalid, and timed-out actions only", async () => {
-    const { collectFailedActions } = await loadModule();
-    const failed = collectFailedActions({
-      actions: [
-        { label: "RunTask(a:lint)", status: "failed" },
-        { label: "RunTask(a:test)", status: "invalid" },
-        { label: "RunTask(a:build)", status: "timed-out" },
-        { label: "RunTask(a:typecheck)", status: "passed" },
-        { label: "RunTask(a:format)", status: "skipped" },
-      ],
-    });
-    expect(failed.map((action) => (action as { label: string }).label)).toEqual([
-      "RunTask(a:lint)",
-      "RunTask(a:test)",
-      "RunTask(a:build)",
+  it("normalizes failed, invalid, and timed-out actions only", async () => {
+    const { normalizeFailures } = await loadModule();
+    expect(
+      normalizeFailures({
+        actions: [
+          { label: "RunTask(a:lint)", status: "failed", node: { action: "run-task", params: { target: "a:lint" } } },
+          { label: "RunTask(a:test)", status: "invalid", node: { action: "run-task", params: { target: "a:test" } } },
+          { label: "RunTask(a:build)", status: "timed-out", node: { action: "run-task", params: { target: "a:build" } } },
+          { label: "RunTask(a:typecheck)", status: "passed", node: { action: "run-task", params: { target: "a:typecheck" } } },
+          { label: "RunTask(a:format)", status: "skipped", node: { action: "run-task", params: { target: "a:format" } } },
+        ],
+      }),
+    ).toEqual([
+      { name: "a:lint", status: "failed", error: "" },
+      { name: "a:test", status: "invalid", error: "" },
+      { name: "a:build", status: "timed-out", error: "" },
     ]);
   });
 
   it("formats a plain-text failure block and GHA annotations", async () => {
-    const { collectFailedActions, formatFailureReport, formatGithubAnnotations } =
-      await loadModule();
-    const failed = collectFailedActions(failedRunTaskReport());
-    const report = formatFailureReport(failed);
-    expect(report.names).toEqual(["server:format"]);
-    expect(report.text).toContain("Failed moon tasks (1):");
-    expect(report.text).toContain("- server:format (failed)");
-    expect(report.text).toContain("error: Task process exited with a non-zero exit code");
-    expect(formatGithubAnnotations(failed)).toEqual([
+    const { normalizeFailures, formatFailureReport, formatGithubAnnotations } = await loadModule();
+    const failures = normalizeFailures(failedRunTaskReport());
+    const text = formatFailureReport(failures);
+    expect(text).toContain("Failed moon tasks (1):");
+    expect(text).toContain("- server:format (failed)");
+    expect(text).toContain("error: Task process exited with a non-zero exit code");
+    expect(formatGithubAnnotations(failures)).toEqual([
       "::error title=Moon task failed::server:format: Task process exited with a non-zero exit code",
     ]);
   });
 
-  it("escapes backslashes before pipes in markdown table cells", async () => {
+  it("escapes workflow-command special characters in annotations", async () => {
+    const { escapeAnnotation, formatGithubAnnotations } = await loadModule();
+    expect(escapeAnnotation("100%\r\nok")).toBe("100%25%0D%0Aok");
+    expect(
+      formatGithubAnnotations([{ name: "a:test", status: "failed", error: "done 50%\nok" }]),
+    ).toEqual(["::error title=Moon task failed::a:test: done 50%25%0Aok"]);
+  });
+
+  it("escapes markdown table cells and collapses newlines", async () => {
     const { escapeMarkdownTableCell, formatStepSummary } = await loadModule();
     expect(escapeMarkdownTableCell("a|b\\c")).toBe("a\\|b\\\\c");
+    expect(escapeMarkdownTableCell("line1\nline2")).toBe("line1 / line2");
     const summary = formatStepSummary([
-      {
-        label: "RunTask(server:format)",
-        status: "failed",
-        error: "path\\with|pipe",
-        node: { action: "run-task", params: { target: "server:format" } },
-      },
+      { name: "server:format", status: "failed", error: "path\\with|pipe\nand more" },
     ]);
-    expect(summary).toContain("path\\\\with\\|pipe");
+    expect(summary).toContain("path\\\\with\\|pipe / and more");
   });
 
   it("loads ciReport.json from a cache dir and writes a step summary", async () => {
