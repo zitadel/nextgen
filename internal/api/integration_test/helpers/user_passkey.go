@@ -23,7 +23,6 @@ func (f UserPasskeyFixture) Create(ctx context.Context, passkey *domain.CreateUs
 	return f.Pool.Statements().CreateUserPasskey(ctx, passkey)
 }
 
-	return h.userPasskeyRepo.value
 func (f UserPasskeyFixture) ListByUser(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
 	result, err := f.Pool.Statements().ListUserPasskeys(ctx, &database.ListOptions[domain.UserPasskeyField]{
 		Filter: database.And(
