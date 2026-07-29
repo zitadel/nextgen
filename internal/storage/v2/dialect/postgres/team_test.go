@@ -74,7 +74,7 @@ func TestTeamStatements_Create(t *testing.T) {
 
 				team := newTestTeam(projectID, teamID)
 				team.Name = tc.teamName
-				assert.ErrorIs(t, testPool.CreateTeam(t.Context(), team), new(legacydb.CheckError))
+				assert.ErrorIs(t, testPool.CreateTeam(t.Context(), team), new(database.CheckError))
 			})
 		}
 	})
@@ -108,7 +108,7 @@ func TestTeamStatements_Create(t *testing.T) {
 				duplicate := newTestTeam(projectID, teamID+"-2")
 				duplicate.Name = tc.nameFor(team.Name)
 				err := testPool.CreateTeam(t.Context(), duplicate)
-				assert.ErrorIs(t, err, new(legacydb.UniqueError))
+				assert.ErrorIs(t, err, new(database.UniqueError))
 			})
 		}
 	})
