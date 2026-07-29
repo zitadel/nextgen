@@ -235,13 +235,20 @@ Wired in as `FlowAuthAttemptService`. The state machine calls `Start` at `FlowSe
 
 Wired in as `FlowPasskeyRegistrationService` via `FlowPasskeyRegistrationAdapter` (`internal/service/flow_passkey_registration.go`), which wraps the broader `PasskeyRegistrationService`. The state machine calls `IssuePasskeyRegistrationChallenge` on Phase 1 of a `passkey_register` action and `SubmitPasskeyRegistration` on Phase 2. The adapter is the seam that lets the engine consume only the two methods it needs without depending on the full passkey-registration service surface.
 
-### `FlowDefinitionRepository`
+### `FlowDefinitionStatements`
 
-`internal/storage/database/repository/flow_definition.go`. Backs `FlowService.Resolve` (list active definitions) and `FlowService.Submit` / `GetStep` (re-fetch by id). Postgres and Spanner migrations both ship `000005_flow_definitions.sql`.
+Postgres and Spanner implementations live under
+`internal/storage/v2/dialect/{postgres,spanner}/flow_definition.go` and back
+`FlowService.Resolve` (list active definitions) and `FlowService.Submit` /
+`GetStep` (re-fetch by id) via `FlowDefinitionService`. Migrations both ship
+`000005_flow_definitions.sql`.
 
 ### User writers
 
-`FlowCreateUserHandler` depends on a narrow `flowUserWriter` (`Create`) and `flowUserPasswordWriter` (`Create`). Today the user repository (`internal/storage/database/repository/user.go`) and password repository satisfy these interfaces — the handler itself is repo-agnostic.
+`FlowCreateUserHandler` depends on a narrow `flowUserWriter` (`Create`) and
+`flowUserPasswordWriter` (`Create`). Production wiring uses
+`UserStatements` / `UserPasswordStatements` (storage v2) through the user
+service — the handler itself stays storage-agnostic.
 
 ### Password hasher
 

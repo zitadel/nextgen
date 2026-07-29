@@ -37,4 +37,6 @@ connection or nest Spanner RW transactions (forbidden).
 
 ### Reference
 
-This mirrors v1 [`repository.withTransaction`](../database/repository/repository.go).
+Multi-write nesting uses the dialect `withTransaction` helpers above
+([`dialect/postgres/with_transaction.go`](dialect/postgres/with_transaction.go),
+[`dialect/spanner/with_transaction.go`](dialect/spanner/with_transaction.go)).
