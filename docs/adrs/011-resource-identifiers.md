@@ -53,7 +53,7 @@ These identifiers are **never** supplied by clients on insert. The database gene
 | `auth_attempt_id` | `auth_attempts` |
 | `check_id` | `checks` (when introduced per ADR 010) |
 
-**Go canonical form:** decimal string (for example `"3458764513820540928"`), carried as [`database.Identity`](../internal/storage/database/identity.go). Not prefixed ULIDs.
+**Go canonical form:** decimal string (for example `"3458764513820540928"`), carried as [`database.Identity`](../internal/storage/v2/database/identity.go). Not prefixed ULIDs.
 
 **Excluded:** `BIGINT` surrogate keys on credential rows (`user_passwords.id`, and similar) remain internal-only and are not ephemeral resource identifiers.
 
@@ -114,7 +114,7 @@ id STRING(MAX) NOT NULL
 
 ### 3. Go type: `database.Identity`
 
-Defined in [`internal/storage/database/identity.go`](../internal/storage/database/identity.go):
+Defined in [`internal/storage/v2/database/identity.go`](../internal/storage/v2/database/identity.go) (v1 keeps a type alias until dialect retirement):
 
 ```go
 type Identity string
@@ -132,7 +132,7 @@ storage boundary (`Identity(id)`, `id.String()`).
 | Package | Role |
 |---------|------|
 | `internal/domain/idgen` | Managed resource id generation only |
-| `internal/storage/database` | `Identity` type and dialect-agnostic bind/scan (moving to v2 per [ADR 028](028-storage-v2-statements-and-dialects.md)) |
+| `internal/storage/v2/database` | `Identity` type and dialect-agnostic bind/scan |
 | `internal/storage/v2/dialect/{postgres,spanner}` | Entity statements use `Identity` for ephemeral columns; map to domain `string` |
 
 ## Consequences

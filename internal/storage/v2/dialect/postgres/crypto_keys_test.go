@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -141,13 +140,13 @@ func TestCryptoKeyStatements_GetEncryptionKey(t *testing.T) {
 				database.Equal(database.Col(domain.EncryptionKeyFieldProjectID), projectID),
 				database.Equal(database.Col(domain.EncryptionKeyFieldState), domain.KeyStateActive),
 			))
-		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 
 	t.Run("unknown project returns NoRowFoundError", func(t *testing.T) {
 		t.Parallel()
 
 		_, err := testPool.GetEncryptionKey(t.Context(), database.Equal(database.Col(domain.EncryptionKeyFieldProjectID), uniqueProjectID(t)))
-		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }

@@ -10,19 +10,18 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-func userPasswordByUser(projectID, userID string) v2database.Filter[domain.UserPasswordField] {
-	return v2database.And(
-		v2database.Equal(v2database.Col(domain.UserPasswordFieldProjectID), projectID),
-		v2database.Equal(v2database.Col(domain.UserPasswordFieldUserID), userID),
+func userPasswordByUser(projectID, userID string) database.Filter[domain.UserPasswordField] {
+	return database.And(
+		database.Equal(database.Col(domain.UserPasswordFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserPasswordFieldUserID), userID),
 	)
 }
 
-func userPasswordByID(id int64) v2database.Filter[domain.UserPasswordField] {
-	return v2database.Equal(v2database.Col(domain.UserPasswordFieldID), id)
+func userPasswordByID(id int64) database.Filter[domain.UserPasswordField] {
+	return database.Equal(database.Col(domain.UserPasswordFieldID), id)
 }
 
 func TestUserPasswordStatements_SetGetDelete(t *testing.T) {
@@ -57,15 +56,15 @@ func TestUserPasswordStatements_SetGetDelete(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, got.ID, gotByID.ID)
 
-	list, err := stmts.ListUserPasswords(ctx, &v2database.ListOptions[domain.UserPasswordField]{
-		Filter: v2database.Equal(v2database.Col(domain.UserPasswordFieldProjectID), projectID),
+	list, err := stmts.ListUserPasswords(ctx, &database.ListOptions[domain.UserPasswordField]{
+		Filter: database.Equal(database.Col(domain.UserPasswordFieldProjectID), projectID),
 	})
 	require.NoError(t, err)
 	require.Len(t, list.Items, 1)
 
 	require.NoError(t, stmts.DeleteUserPassword(ctx, userPasswordByID(got.ID)))
 	_, err = stmts.GetUserPassword(ctx, byUser)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 	require.NoError(t, stmts.SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:   projectID,
@@ -77,7 +76,7 @@ func TestUserPasswordStatements_SetGetDelete(t *testing.T) {
 	require.Positive(t, got2.ID)
 	require.NoError(t, stmts.DeleteUserPassword(ctx, byUser))
 	_, err = stmts.GetUserPassword(ctx, byUser)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestUserPasswordStatements_SetUpsert(t *testing.T) {
@@ -133,7 +132,7 @@ func TestUserPasswordStatements_SetMissingUser(t *testing.T) {
 	})
 	require.Error(t, err)
 	// Spanner surfaces FK failures as FailedPrecondition → CheckError.
-	assert.ErrorIs(t, err, new(legacydb.CheckError))
+	assert.ErrorIs(t, err, new(database.CheckError))
 }
 
 func TestUserPasswordStatements_Update(t *testing.T) {
@@ -152,12 +151,12 @@ func TestUserPasswordStatements_Update(t *testing.T) {
 	byUser := userPasswordByUser(projectID, userID)
 
 	err := stmts.UpdateUserPassword(ctx, byUser)
-	assert.ErrorIs(t, err, v2database.ErrNoChanges)
+	assert.ErrorIs(t, err, database.ErrNoChanges)
 
 	err = stmts.UpdateUserPassword(ctx, userPasswordByUser(projectID, "missing-user"),
 		&domain.UserPasswordIncrementFailedAttemptsUpdate{Delta: 1},
 	)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	require.NoError(t, stmts.UpdateUserPassword(ctx, byUser,
@@ -189,5 +188,5 @@ func TestUserPasswordStatements_Update(t *testing.T) {
 
 	require.NoError(t, stmts.DeleteUserPassword(ctx, byUser))
 	_, err = stmts.GetUserPassword(ctx, byUser)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }

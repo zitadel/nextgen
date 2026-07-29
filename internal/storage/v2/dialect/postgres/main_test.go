@@ -14,13 +14,8 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver used for migrations
 	"github.com/zitadel/nextgen/internal/domain"
-	v2dbtest "github.com/zitadel/nextgen/internal/storage/v2/dbtest"
+	"github.com/zitadel/nextgen/internal/storage/v2/testdb"
 )
-
-// The v2 postgres tests drive a real database exclusively through the v2 pool.
-// The only legacy dependencies are container bring-up (dbtest), DSN recovery
-// (pgold.Config), and the schema migration (migration.Migrate) — the v2 layer
-// has no migrations of its own yet.
 
 // testPool is a v2 postgres pool connected to the migrated test database,
 // shared across the tests in this package.
@@ -33,7 +28,7 @@ func TestMain(m *testing.M) {
 func runTests(m *testing.M) int {
 	ctx := context.Background()
 
-	pool, stop, err := v2dbtest.Postgres(ctx)
+	dsn, stop, err := testdb.PostgresDSN(ctx)
 	if err != nil {
 		slog.Error("failed to start postgres test database", "error", err)
 		if stop != nil {
@@ -43,7 +38,24 @@ func runTests(m *testing.M) int {
 	}
 	defer stop()
 
+	dialect, err := DecodeConfig(dsn)
+	if err != nil {
+		slog.Error("failed to decode v2 postgres config", "error", err)
+		return 1
+	}
+	pool, err := dialect.Connect(ctx)
+	if err != nil {
+		slog.Error("failed to connect v2 postgres pool", "error", err)
+		return 1
+	}
 	defer pool.Close(ctx)
+
+	if err := pool.Migrate(ctx); err != nil {
+		slog.Error("failed to migrate test database", "error", err)
+		return 1
+	}
+
+	var ok bool
 	testPool, ok = pool.(*Pool)
 	if !ok {
 		slog.Error("expected *Pool from the v2 postgres dialect", "type", pool)

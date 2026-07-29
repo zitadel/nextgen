@@ -39,4 +39,4 @@ more than polish.
   focused diagnostics that exclude bulky generated app directories.
 - For local runtime command changes, verify Docker command construction, local
   `.zitadel/local/` state handling, `--server local` resolution, and the
-  zero-config image smoke path with no `NEXTGEN_SERVER_ENCRYPTION_KEY`.
+  zero-config image smoke path with no encryption-key configuration.

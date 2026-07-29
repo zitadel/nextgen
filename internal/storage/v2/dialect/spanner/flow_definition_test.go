@@ -13,8 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniqueFlowDefinitionID(t *testing.T) string {
@@ -72,10 +71,10 @@ func TestFlowDefinitionStatements_CRUD(t *testing.T) {
 	assert.Equal(t, def.UserSchema, got.UserSchema)
 	assert.Equal(t, def.Purposes, got.Purposes)
 
-	listed, err := stmts.ListFlowDefinitions(ctx, &v2database.ListOptions[domain.FlowDefinitionField]{
-		Filter: v2database.And(
-			v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), project.ID),
-			v2database.ArrayContains(v2database.Col(domain.FlowDefinitionFieldPurposes), domain.FlowDefinitionPurposeLogin.String()),
+	listed, err := stmts.ListFlowDefinitions(ctx, &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), project.ID),
+			database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), domain.FlowDefinitionPurposeLogin.String()),
 		),
 	})
 	require.NoError(t, err)

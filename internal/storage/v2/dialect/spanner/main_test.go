@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	v2dbtest "github.com/zitadel/nextgen/internal/storage/v2/dbtest"
+	"github.com/zitadel/nextgen/internal/storage/v2/testdb"
 )
 
 // testClient is a v2 spanner client connected to the migrated test database,
@@ -32,12 +32,25 @@ func TestMain(m *testing.M) {
 func run(m *testing.M) (int, error) {
 	ctx := context.Background()
 
-	pool, stop, err := v2dbtest.Spanner(ctx)
+	dsn, stop, err := testdb.SpannerDSN(ctx)
 	if err != nil {
 		return 1, err
 	}
 	defer stop()
+
+	dialect, err := DecodeConfig(dsn)
+	if err != nil {
+		return 1, err
+	}
+	pool, err := dialect.Connect(ctx)
+	if err != nil {
+		return 1, err
+	}
 	defer pool.Close(ctx)
+
+	if err := pool.Migrate(ctx); err != nil {
+		return 1, err
+	}
 
 	c, ok := pool.(*Client)
 	if !ok {

@@ -9,12 +9,15 @@ import (
 
 func (h *Harness) EnsureSessionService(t *testing.T) service.SessionService {
 	t.Helper()
-	if h.SessionService == nil {
-		h.SessionService = service.NewSessionService(
+	h.sessionService.mutex.Lock()
+	defer h.sessionService.mutex.Unlock()
+
+	if h.sessionService.value == nil {
+		h.sessionService.value = service.NewSessionService(
 			h.EnsureServiceDB(t),
 			service.UserStatementsIdentityReader{Pool: h.EnsureServiceDB(t)},
 			service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour},
 		)
 	}
-	return h.SessionService
+	return h.sessionService.value
 }

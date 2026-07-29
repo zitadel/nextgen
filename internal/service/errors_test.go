@@ -28,6 +28,16 @@ func TestMapStorageError(t *testing.T) {
 		assert.ErrorIs(t, err, &database.UnimplementedError{})
 	})
 
+	t.Run("coded database error", func(t *testing.T) {
+		t.Parallel()
+		err := mapStorageError(database.ErrInvalidCursor())
+		require.Error(t, err)
+		var de domain.Error
+		require.True(t, errors.As(err, &de))
+		assert.Equal(t, "db.invalid_cursor", de.Code)
+		assert.Equal(t, database.ErrInvalidCursor().Message, de.Message)
+	})
+
 	t.Run("passthrough", func(t *testing.T) {
 		t.Parallel()
 		orig := database.NewNoRowFoundError(nil)
