@@ -11,8 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func TestProjectStatements_Create(t *testing.T) {
@@ -131,14 +130,14 @@ func TestProjectStatements_List(t *testing.T) {
 		projects[i] = project
 	}
 
-	createdAtCol := v2database.Col(domain.ProjectFieldCreatedAt)
-	list := func(t *testing.T, filter v2database.Filter[domain.ProjectField], dir v2database.OrderDirection) []string {
+	createdAtCol := database.Col(domain.ProjectFieldCreatedAt)
+	list := func(t *testing.T, filter database.Filter[domain.ProjectField], dir database.OrderDirection) []string {
 		t.Helper()
-		res, err := stmts.ListProjects(t.Context(), &v2database.ListOptions[domain.ProjectField]{
+		res, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
 			Filter: filter,
-			Pagination: v2database.Page[domain.ProjectField]{
-				OrderBy: v2database.OrderBy[domain.ProjectField]{
-					Columns:   []v2database.Column[domain.ProjectField]{createdAtCol},
+			Pagination: database.Page[domain.ProjectField]{
+				OrderBy: database.OrderBy[domain.ProjectField]{
+					Columns:   []database.Column[domain.ProjectField]{createdAtCol},
 					Direction: dir,
 				},
 			},
@@ -148,52 +147,52 @@ func TestProjectStatements_List(t *testing.T) {
 	}
 
 	t.Run("filters by created_at equal", func(t *testing.T) {
-		assert.Equal(t, []string{ids[1]}, list(t, v2database.Equal(createdAtCol, projects[1].CreatedAt), v2database.OrderAsc))
+		assert.Equal(t, []string{ids[1]}, list(t, database.Equal(createdAtCol, projects[1].CreatedAt), database.OrderAsc))
 	})
 
 	t.Run("filters by created_at greater than", func(t *testing.T) {
-		assert.Equal(t, []string{ids[2]}, list(t, v2database.GreaterThan(createdAtCol, projects[1].CreatedAt), v2database.OrderAsc))
+		assert.Equal(t, []string{ids[2]}, list(t, database.GreaterThan(createdAtCol, projects[1].CreatedAt), database.OrderAsc))
 	})
 
 	t.Run("filters by created_at less than", func(t *testing.T) {
-		assert.Equal(t, []string{ids[0]}, list(t, v2database.LessThan(createdAtCol, projects[1].CreatedAt), v2database.OrderAsc))
+		assert.Equal(t, []string{ids[0]}, list(t, database.LessThan(createdAtCol, projects[1].CreatedAt), database.OrderAsc))
 	})
 
 	t.Run("sorts by created_at ascending", func(t *testing.T) {
-		assert.Equal(t, []string{ids[0], ids[1], ids[2]}, list(t, nil, v2database.OrderAsc))
+		assert.Equal(t, []string{ids[0], ids[1], ids[2]}, list(t, nil, database.OrderAsc))
 	})
 
 	t.Run("sorts by created_at descending", func(t *testing.T) {
-		assert.Equal(t, []string{ids[2], ids[1], ids[0]}, list(t, nil, v2database.OrderDesc))
+		assert.Equal(t, []string{ids[2], ids[1], ids[0]}, list(t, nil, database.OrderDesc))
 	})
 
 	cursorTests := []struct {
 		name    string
-		columns []v2database.Column[domain.ProjectField]
+		columns []database.Column[domain.ProjectField]
 	}{
-		{"paginates with a cursor", []v2database.Column[domain.ProjectField]{createdAtCol}},
+		{"paginates with a cursor", []database.Column[domain.ProjectField]{createdAtCol}},
 		// Callers append id as a tiebreaker, so every cursor a list endpoint
 		// issues spans two columns.
-		{"paginates with a tiebreaker column", []v2database.Column[domain.ProjectField]{createdAtCol, v2database.Col(domain.ProjectFieldID)}},
+		{"paginates with a tiebreaker column", []database.Column[domain.ProjectField]{createdAtCol, database.Col(domain.ProjectFieldID)}},
 	}
 
 	for _, tc := range cursorTests {
 		t.Run(tc.name, func(t *testing.T) {
-			page := v2database.Page[domain.ProjectField]{
+			page := database.Page[domain.ProjectField]{
 				Limit: 2,
-				OrderBy: v2database.OrderBy[domain.ProjectField]{
+				OrderBy: database.OrderBy[domain.ProjectField]{
 					Columns:   tc.columns,
-					Direction: v2database.OrderAsc,
+					Direction: database.OrderAsc,
 				},
 			}
 
-			first, err := stmts.ListProjects(t.Context(), &v2database.ListOptions[domain.ProjectField]{Pagination: page})
+			first, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Pagination: page})
 			require.NoError(t, err)
 			assert.Equal(t, []string{ids[0], ids[1]}, projectIDs(first.Items))
 			require.NotEmpty(t, first.NextCursor)
 
 			page.Cursor = first.NextCursor
-			second, err := stmts.ListProjects(t.Context(), &v2database.ListOptions[domain.ProjectField]{Pagination: page})
+			second, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Pagination: page})
 			require.NoError(t, err)
 			assert.Equal(t, []string{ids[2]}, projectIDs(second.Items))
 			assert.Empty(t, second.NextCursor)
@@ -227,38 +226,38 @@ func TestProjectStatements_ListCursorTie(t *testing.T) {
 	}
 
 	// Selects only this test's rows.
-	tieFilter := v2database.Equal(v2database.Col(domain.ProjectFieldCreatedAt), tieCreatedAt)
+	tieFilter := database.Equal(database.Col(domain.ProjectFieldCreatedAt), tieCreatedAt)
 
 	tests := []struct {
 		name      string
-		direction v2database.OrderDirection
+		direction database.OrderDirection
 		first     []string
 		second    []string
 	}{
-		{"ascending", v2database.OrderAsc, []string{ids[0], ids[1]}, []string{ids[2]}},
-		{"descending", v2database.OrderDesc, []string{ids[2], ids[1]}, []string{ids[0]}},
+		{"ascending", database.OrderAsc, []string{ids[0], ids[1]}, []string{ids[2]}},
+		{"descending", database.OrderDesc, []string{ids[2], ids[1]}, []string{ids[0]}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			page := v2database.Page[domain.ProjectField]{
+			page := database.Page[domain.ProjectField]{
 				Limit: 2,
-				OrderBy: v2database.OrderBy[domain.ProjectField]{
-					Columns: []v2database.Column[domain.ProjectField]{
-						v2database.Col(domain.ProjectFieldCreatedAt),
-						v2database.Col(domain.ProjectFieldID),
+				OrderBy: database.OrderBy[domain.ProjectField]{
+					Columns: []database.Column[domain.ProjectField]{
+						database.Col(domain.ProjectFieldCreatedAt),
+						database.Col(domain.ProjectFieldID),
 					},
 					Direction: tt.direction,
 				},
 			}
 
-			first, err := stmts.ListProjects(ctx, &v2database.ListOptions[domain.ProjectField]{Filter: tieFilter, Pagination: page})
+			first, err := stmts.ListProjects(ctx, &database.ListOptions[domain.ProjectField]{Filter: tieFilter, Pagination: page})
 			require.NoError(t, err)
 			assert.Equal(t, tt.first, projectIDs(first.Items))
 			require.NotEmpty(t, first.NextCursor)
 
 			page.Cursor = first.NextCursor
-			second, err := stmts.ListProjects(ctx, &v2database.ListOptions[domain.ProjectField]{Filter: tieFilter, Pagination: page})
+			second, err := stmts.ListProjects(ctx, &database.ListOptions[domain.ProjectField]{Filter: tieFilter, Pagination: page})
 			require.NoError(t, err)
 			assert.Equal(t, tt.second, projectIDs(second.Items))
 			assert.Empty(t, second.NextCursor)

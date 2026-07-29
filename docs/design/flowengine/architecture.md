@@ -182,7 +182,7 @@ A narrow interface for the passkey-register ceremony. The state machine sees
 `IssuePasskeyRegistrationChallenge` (Phase 1 — mints a WebAuthn registration
 challenge keyed to a provisional user id) and `SubmitPasskeyRegistration`
 (Phase 2 — verifies the attestation and persists the credential inside the
-caller's `database.QueryExecutor`, so it can share the transaction that
+caller's statements transaction, so it can share the transaction that
 `HandleProvisional` uses to materialize the user row).
 
 ### Domain types worth knowing

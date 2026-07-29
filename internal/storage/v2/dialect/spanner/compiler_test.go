@@ -61,11 +61,11 @@ func compileReadExpectError[F ~uint8, T any](t *testing.T, stmt string, opts *da
 	return compileRead(&compiler, stmt, opts, schema)
 }
 
-func assertDomainErrorCode(t *testing.T, err error, code string) {
+func assertDatabaseErrorCode(t *testing.T, err error, code string) {
 	t.Helper()
 
 	require.Error(t, err)
-	var dbErr domain.Error
+	var dbErr database.Error
 	require.ErrorAs(t, err, &dbErr)
 	assert.Equal(t, code, dbErr.Code)
 }
@@ -313,7 +313,7 @@ func TestCompileReadInvalidCursorToken(t *testing.T) {
 			Cursor: []byte("not-a-valid-cursor"),
 		},
 	}, projectSchema)
-	assertDomainErrorCode(t, err, "db.invalid_cursor")
+	assertDatabaseErrorCode(t, err, "db.invalid_cursor")
 }
 
 func TestCompileReadCursorOrderMismatch(t *testing.T) {
@@ -339,7 +339,7 @@ func TestCompileReadCursorOrderMismatch(t *testing.T) {
 			Cursor: cursor,
 		},
 	}, projectSchema)
-	assertDomainErrorCode(t, err, "db.cursor_order_mismatch")
+	assertDatabaseErrorCode(t, err, "db.cursor_order_mismatch")
 }
 
 func TestCompileReadCursorCoerceFailure(t *testing.T) {
@@ -363,9 +363,9 @@ func TestCompileReadCursorCoerceFailure(t *testing.T) {
 			Cursor: cursor,
 		},
 	}, projectSchema)
-	assertDomainErrorCode(t, err, "db.invalid_cursor")
+	assertDatabaseErrorCode(t, err, "db.invalid_cursor")
 
-	var dbErr domain.Error
+	var dbErr database.Error
 	require.ErrorAs(t, err, &dbErr)
 	assert.Error(t, dbErr.Parent)
 }

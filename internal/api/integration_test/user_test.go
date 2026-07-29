@@ -119,7 +119,7 @@ func TestCreateUser(t *testing.T) {
 				t.Parallel()
 
 				user := &api.User{}
-				err = user.UnmarshalJSON([]byte(tc.userjson))
+				err := user.UnmarshalJSON([]byte(tc.userjson))
 				require.NoError(t, err)
 
 				resp, err := client.CreateUser(t.Context(), user, params)
@@ -162,7 +162,7 @@ func TestCreateUser(t *testing.T) {
 					t.Parallel()
 
 					user := &api.User{}
-					err = user.UnmarshalJSON([]byte(tc.userjson))
+					err := user.UnmarshalJSON([]byte(tc.userjson))
 					require.NoError(t, err)
 
 					resp, err := client.CreateUser(t.Context(), user, params)
@@ -176,10 +176,10 @@ func TestCreateUser(t *testing.T) {
 		t.Run("duplicate mail address", func(t *testing.T) {
 			t.Parallel()
 
-			usermap := harness.TestData.Generator.GenerateUser(t, "testcreateuser.error.duplicatemailaddress@example.com")
+			usermap := harness.EnsureTestData(t).Generator.GenerateUser(t, "testcreateuser.error.duplicatemailaddress@example.com")
 
 			user := &api.User{}
-			err = user.UnmarshalJSON([]byte(helpers.MustMarshal(t, usermap)))
+			err := user.UnmarshalJSON([]byte(helpers.MustMarshal(t, usermap)))
 			require.NoError(t, err)
 
 			resp, err := client.CreateUser(t.Context(), user, params)
@@ -248,7 +248,7 @@ func TestSetUserPassword(t *testing.T) {
 		t.Helper()
 		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
 			ProjectID: project.ID,
-			User:      harness.TestData.Generator.GenerateUser(t, email),
+			User:      harness.EnsureTestData(t).Generator.GenerateUser(t, email),
 		})
 		require.NoError(t, err)
 		return api.SetUserPasswordParams{
@@ -362,7 +362,7 @@ func TestGetUser(t *testing.T) {
 
 	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
 		ProjectID: project.ID,
-		User:      harness.TestData.Generator.GenerateUser(t, "testgetuser@example.com"),
+		User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuser@example.com"),
 	})
 	require.NoError(t, err)
 
@@ -398,7 +398,7 @@ func TestGetMyUser(t *testing.T) {
 
 		user, err := userService.CreateUser(t.Context(), service.CreateUserInput{
 			ProjectID: project.ID,
-			User:      harness.TestData.Generator.GenerateUser(t, "testgetuser@example.com"),
+			User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuser@example.com"),
 		})
 		require.NoError(t, err)
 		userID := user["id"].(string)

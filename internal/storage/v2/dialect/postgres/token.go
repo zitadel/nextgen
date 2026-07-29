@@ -9,7 +9,6 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
@@ -55,7 +54,7 @@ func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) 
 		scope = []string{}
 	}
 
-	var tokenID storagedb.Identity
+	var tokenID database.Identity
 	err := ts.client.QueryRow(ctx, createTokenStmt,
 		token.ProjectID,
 		tokenUserIDArg(token.UserID, token.Type),
@@ -78,7 +77,7 @@ func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) 
 
 // DeleteTokenByID implements [service.TokenStatements].
 func (ts tokenStatements) DeleteTokenByID(ctx context.Context, projectID, tokenID string) error {
-	_, err := ts.client.Exec(ctx, deleteByIDTokenStmt, projectID, storagedb.Identity(tokenID))
+	_, err := ts.client.Exec(ctx, deleteByIDTokenStmt, projectID, database.Identity(tokenID))
 	return wrapError(err)
 }
 
@@ -88,7 +87,7 @@ func (ts tokenStatements) GetTokenByID(ctx context.Context, projectID, tokenID s
 	if err := compileRead(&compiler, tokenQuery, &database.ListOptions[domain.TokenField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.TokenFieldProjectID), projectID),
-			database.Equal(database.Col(domain.TokenFieldTokenID), storagedb.Identity(tokenID)),
+			database.Equal(database.Col(domain.TokenFieldTokenID), database.Identity(tokenID)),
 		),
 	}, tokenSchema); err != nil {
 		return nil, err
@@ -142,9 +141,9 @@ func (ts tokenStatements) ListTokens(ctx context.Context, filter *database.ListO
 func (ts tokenStatements) scanToken(row pgx.CollectableRow) (*domain.Token, error) {
 	token := new(domain.Token)
 	var (
-		tokenID                          storagedb.Identity
+		tokenID                          database.Identity
 		userID                           *string
-		sessionID, oidcSessionID, samlID storagedb.Identity
+		sessionID, oidcSessionID, samlID database.Identity
 		scope                            []string
 		expiresAt                        *time.Time
 	)
@@ -194,18 +193,18 @@ func tokenUserIDArg(userID string, tokenType domain.TokenType) any {
 	return userID
 }
 
-func tokenSessionIDArg(sessionID *string) storagedb.Identity {
+func tokenSessionIDArg(sessionID *string) database.Identity {
 	if sessionID == nil {
 		return ""
 	}
-	return storagedb.Identity(*sessionID)
+	return database.Identity(*sessionID)
 }
 
 func tokenOptionalIdentity(id *string) any {
 	if id == nil {
 		return nil
 	}
-	return storagedb.Identity(*id)
+	return database.Identity(*id)
 }
 
 func coerceTokenType(v any) (any, error) {
@@ -225,16 +224,16 @@ func coerceTokenType(v any) (any, error) {
 
 func coerceTokenIdentity(v any) (any, error) {
 	switch id := v.(type) {
-	case storagedb.Identity:
+	case database.Identity:
 		return id, nil
 	case string:
-		return storagedb.Identity(id), nil
+		return database.Identity(id), nil
 	default:
 		s, err := database.CoerceStringValue(v)
 		if err != nil {
 			return nil, err
 		}
-		return storagedb.Identity(s), nil
+		return database.Identity(s), nil
 	}
 }
 
@@ -248,7 +247,7 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 	},
 	domain.TokenFieldTokenID: {
 		SQLName:  "token_id",
-		Accessor: func(t *domain.Token) any { return storagedb.Identity(t.TokenID) },
+		Accessor: func(t *domain.Token) any { return database.Identity(t.TokenID) },
 		Coerce:   coerceTokenIdentity,
 	},
 	domain.TokenFieldUserID: {

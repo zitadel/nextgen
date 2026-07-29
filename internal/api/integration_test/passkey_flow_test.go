@@ -36,7 +36,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 
 	// Create the user schema so the resolver can look it up from the DB.  The
 	// schema's $id becomes the URL that the flow definition references.
-	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 
 	userSchemaURL := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
@@ -80,7 +80,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	// fail against its foreign public key.
 	decoyProject, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	harness.CreateUserSchema(t, decoyProject, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, decoyProject, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 	decoyTeam, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: decoyProject.ID,
 	})

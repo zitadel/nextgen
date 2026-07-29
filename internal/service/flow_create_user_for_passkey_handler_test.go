@@ -11,8 +11,7 @@ import (
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/dbmock"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"go.uber.org/mock/gomock"
 )
 
@@ -31,7 +30,6 @@ const passkeyHandlerTestSchema = `{
 type passkeyHandlerFixture struct {
 	handler     *service.FlowCreateUserForPasskeyHandler
 	schemaStore *domainmock.MockJSONSchemaStore
-	pool        *dbmock.MockPool
 	v2Pool      *servicemocks.MockPool
 	stmts       *servicemocks.MockAllStatements
 }
@@ -40,18 +38,16 @@ func newPasskeyHandlerFixture(t *testing.T) *passkeyHandlerFixture {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
-	pool := dbmock.NewMockPool(ctrl)
 	v2Pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 
 	v2Pool.EXPECT().Statements().Return(stmts).AnyTimes()
-	userService := service.NewUserService(pool, service.NewPool(v2Pool), schemaStore, nil)
+	userService := service.NewUserService(service.NewPool(v2Pool), schemaStore, nil)
 	handler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaStore)
 
 	return &passkeyHandlerFixture{
 		handler:     handler,
 		schemaStore: schemaStore,
-		pool:        pool,
 		v2Pool:      v2Pool,
 		stmts:       stmts,
 	}
@@ -70,7 +66,6 @@ func passkeyFlowState(collected map[string]any) *domain.FlowState {
 }
 
 type v2TestTx struct {
-	database.QueryExecutor
 	stmts service.AllStatements
 }
 
@@ -92,7 +87,7 @@ func expectCreateUserTx(f *passkeyHandlerFixture, createFn func(context.Context,
 	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).DoAndReturn(createFn)
 	f.v2Pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
-			return fn(ctx, v2TestTx{QueryExecutor: f.pool, stmts: f.stmts})
+			return fn(ctx, v2TestTx{stmts: f.stmts})
 		})
 }
 
