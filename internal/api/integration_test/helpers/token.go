@@ -8,10 +8,13 @@ import (
 
 func (h *Harness) EnsureTokenService(t *testing.T) service.TokenService {
 	t.Helper()
-	if h.TokenService == nil {
-		h.TokenService = service.NewTokenService(
+	h.tokenService.mutex.Lock()
+	defer h.tokenService.mutex.Unlock()
+
+	if h.tokenService.value == nil {
+		h.tokenService.value = service.NewTokenService(
 			h.EnsureKeyService(t),
 		)
 	}
-	return h.TokenService
+	return h.tokenService.value
 }

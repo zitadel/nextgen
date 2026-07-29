@@ -237,3 +237,41 @@ func (c *MockKeyServiceGetProjectDEKCrypterCall) DoAndReturn(f func(context.Cont
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
+
+// MigrateToLatestRootKEK mocks base method.
+func (m *MockKeyService) MigrateToLatestRootKEK(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MigrateToLatestRootKEK", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MigrateToLatestRootKEK indicates an expected call of MigrateToLatestRootKEK.
+func (mr *MockKeyServiceMockRecorder) MigrateToLatestRootKEK(ctx any) *MockKeyServiceMigrateToLatestRootKEKCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MigrateToLatestRootKEK", reflect.TypeOf((*MockKeyService)(nil).MigrateToLatestRootKEK), ctx)
+	return &MockKeyServiceMigrateToLatestRootKEKCall{Call: call}
+}
+
+// MockKeyServiceMigrateToLatestRootKEKCall wrap *gomock.Call
+type MockKeyServiceMigrateToLatestRootKEKCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockKeyServiceMigrateToLatestRootKEKCall) Return(arg0 error) *MockKeyServiceMigrateToLatestRootKEKCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockKeyServiceMigrateToLatestRootKEKCall) Do(f func(context.Context) error) *MockKeyServiceMigrateToLatestRootKEKCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockKeyServiceMigrateToLatestRootKEKCall) DoAndReturn(f func(context.Context) error) *MockKeyServiceMigrateToLatestRootKEKCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
