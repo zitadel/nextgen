@@ -70,7 +70,7 @@ func TestImport_loadAndSkip(t *testing.T) {
 	path := filepath.Join(dir, "user.json")
 	writeUserFile(t, path, "usr_import_1")
 
-	require.NoError(t, users.Import(ctx, testPool, v2Pool, hasher, pgold.Name, []string{path}))
+	require.NoError(t, users.Import(ctx, v2Pool, hasher, pgold.Name, []string{path}))
 
 	got, err := v2Pool.Statements().GetUser(ctx, v2database.And(
 		v2database.Equal(v2database.Col(domain.UserFieldProjectID), "proj_demo"),
@@ -88,11 +88,11 @@ func TestImport_loadAndSkip(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, pw.EncodedHash)
 
-	require.NoError(t, users.Import(ctx, testPool, v2Pool, hasher, pgold.Name, []string{path}))
+	require.NoError(t, users.Import(ctx, v2Pool, hasher, pgold.Name, []string{path}))
 }
 
 func TestImport_spannerRejected(t *testing.T) {
-	err := users.Import(t.Context(), testPool, testV2Pool(t), testHasher(t), "spanner", []string{"any.json"})
+	err := users.Import(t.Context(), testV2Pool(t), testHasher(t), "spanner", []string{"any.json"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "spanner")
 }

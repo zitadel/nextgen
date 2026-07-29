@@ -129,7 +129,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	schemaStore := serviceDBPool.Statements()
 	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
 
-	if err := users.Import(ctx, pool, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
+	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
 		return fmt.Errorf("failed to bootstrap users: %w", err)
 	}
 
@@ -187,7 +187,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	teamService := service.NewTeamService(serviceDBPool)
 	brandingService := service.NewBrandingService(serviceDBPool)
 	userService := service.NewUserService(
-		pool,
 		serviceDBPool,
 		schemaStore,
 		passwordHasher,
