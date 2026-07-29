@@ -1655,45 +1655,6 @@ func (c *MockAllStatementsGetJSONSchemaByIDCall) DoAndReturn(f func(context.Cont
 	return c
 }
 
-// GetLatestBranding mocks base method.
-func (m *MockAllStatements) GetLatestBranding(ctx context.Context, projectID string) (*domain.Branding, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLatestBranding", ctx, projectID)
-	ret0, _ := ret[0].(*domain.Branding)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetLatestBranding indicates an expected call of GetLatestBranding.
-func (mr *MockAllStatementsMockRecorder) GetLatestBranding(ctx, projectID any) *MockAllStatementsGetLatestBrandingCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLatestBranding", reflect.TypeOf((*MockAllStatements)(nil).GetLatestBranding), ctx, projectID)
-	return &MockAllStatementsGetLatestBrandingCall{Call: call}
-}
-
-// MockAllStatementsGetLatestBrandingCall wrap *gomock.Call
-type MockAllStatementsGetLatestBrandingCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsGetLatestBrandingCall) Return(arg0 *domain.Branding, arg1 error) *MockAllStatementsGetLatestBrandingCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsGetLatestBrandingCall) Do(f func(context.Context, string) (*domain.Branding, error)) *MockAllStatementsGetLatestBrandingCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsGetLatestBrandingCall) DoAndReturn(f func(context.Context, string) (*domain.Branding, error)) *MockAllStatementsGetLatestBrandingCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // GetPasskeyRegistration mocks base method.
 func (m *MockAllStatements) GetPasskeyRegistration(ctx context.Context, projectID, id string) (*domain.PasskeyRegistration, error) {
 	m.ctrl.T.Helper()
@@ -6656,45 +6617,6 @@ func (c *MockBrandingStatementsGetBrandingByIDCall) Do(f func(context.Context, s
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockBrandingStatementsGetBrandingByIDCall) DoAndReturn(f func(context.Context, string, string) (*domain.Branding, error)) *MockBrandingStatementsGetBrandingByIDCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// GetLatestBranding mocks base method.
-func (m *MockBrandingStatements) GetLatestBranding(ctx context.Context, projectID string) (*domain.Branding, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLatestBranding", ctx, projectID)
-	ret0, _ := ret[0].(*domain.Branding)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetLatestBranding indicates an expected call of GetLatestBranding.
-func (mr *MockBrandingStatementsMockRecorder) GetLatestBranding(ctx, projectID any) *MockBrandingStatementsGetLatestBrandingCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLatestBranding", reflect.TypeOf((*MockBrandingStatements)(nil).GetLatestBranding), ctx, projectID)
-	return &MockBrandingStatementsGetLatestBrandingCall{Call: call}
-}
-
-// MockBrandingStatementsGetLatestBrandingCall wrap *gomock.Call
-type MockBrandingStatementsGetLatestBrandingCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockBrandingStatementsGetLatestBrandingCall) Return(arg0 *domain.Branding, arg1 error) *MockBrandingStatementsGetLatestBrandingCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockBrandingStatementsGetLatestBrandingCall) Do(f func(context.Context, string) (*domain.Branding, error)) *MockBrandingStatementsGetLatestBrandingCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockBrandingStatementsGetLatestBrandingCall) DoAndReturn(f func(context.Context, string) (*domain.Branding, error)) *MockBrandingStatementsGetLatestBrandingCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

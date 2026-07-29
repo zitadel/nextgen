@@ -2,7 +2,6 @@ package spanner
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -16,7 +15,7 @@ import (
 
 const (
 	brandingTable      = "branding"
-	createBrandingStmt = `INSERT INTO branding (project_id, id, definition) VALUES (@p1, @p2, @p3) THEN RETURN project_id, id, created_at, definition`
+	createBrandingStmt = `INSERT INTO branding (project_id, id, definition) VALUES (@p1, @p2, @p3) THEN RETURN created_at`
 	brandingQuery      = `SELECT project_id, id, created_at, definition FROM branding`
 )
 
@@ -40,7 +39,7 @@ func (b brandingStatements) CreateBranding(ctx context.Context, entity *domain.B
 	if err != nil {
 		return err
 	}
-	definition, err := encodeBrandingDefinitionJSON(raw)
+	definition, err := encodeNullJSON(raw)
 	if err != nil {
 		return err
 	}
@@ -48,11 +47,10 @@ func (b brandingStatements) CreateBranding(ctx context.Context, entity *domain.B
 	stmt := buildStatement(createBrandingStmt, entity.ProjectID, entity.ID, definition).statement()
 	return b.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			scanned, err := b.scanBranding(row)
-			if err != nil {
+			if err := row.Columns(&entity.CreatedAt); err != nil {
 				return struct{}{}, err
 			}
-			*entity = *scanned
+			entity.CreatedAt = entity.CreatedAt.UTC()
 			return struct{}{}, nil
 		})
 		return err
@@ -66,39 +64,6 @@ func (b brandingStatements) GetBrandingByID(ctx context.Context, projectID, id s
 		return nil, err
 	}
 	return b.scanBranding(row)
-}
-
-// GetLatestBranding implements [service.BrandingStatements].
-func (b brandingStatements) GetLatestBranding(ctx context.Context, projectID string) (*domain.Branding, error) {
-	// id (a ULID, time-ordered) breaks created_at ties deterministically —
-	// e.g. revisions published within one transaction share NOW().
-	var compiler statementCompiler
-	if err := compileRead(&compiler, brandingQuery, &database.ListOptions[domain.BrandingField]{
-		Filter: database.Equal(database.Col(domain.BrandingFieldProjectID), projectID),
-		Pagination: database.Page[domain.BrandingField]{
-			Limit: 1,
-			OrderBy: database.OrderBy[domain.BrandingField]{
-				Columns: []database.Column[domain.BrandingField]{
-					database.Col(domain.BrandingFieldCreatedAt),
-					database.Col(domain.BrandingFieldID),
-				},
-				Direction: database.OrderDesc,
-			},
-		},
-	}, branding.Schema); err != nil {
-		return nil, err
-	}
-
-	var entity *domain.Branding
-	err := b.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		entity, err = collectOneRow(iter, b.scanBranding)
-		return err
-	})
-	if err != nil {
-		return nil, err
-	}
-	return entity, nil
 }
 
 // ListBrandings implements [service.BrandingStatements].
@@ -143,29 +108,11 @@ func (b brandingStatements) scanBranding(row *spanner.Row) (*domain.Branding, er
 	if err := row.Columns(&projectID, &id, &createdAt, &definitionJSON); err != nil {
 		return nil, err
 	}
-	raw, err := decodeBrandingDefinitionJSON(definitionJSON)
+	raw, err := decodeNullJSON(definitionJSON)
 	if err != nil {
 		return nil, err
 	}
 	return branding.ToDomain(projectID, id, createdAt, raw)
-}
-
-func encodeBrandingDefinitionJSON(raw []byte) (spanner.NullJSON, error) {
-	if len(raw) == 0 {
-		return spanner.NullJSON{Valid: false}, nil
-	}
-	var v any
-	if err := json.Unmarshal(raw, &v); err != nil {
-		return spanner.NullJSON{}, err
-	}
-	return spanner.NullJSON{Value: v, Valid: true}, nil
-}
-
-func decodeBrandingDefinitionJSON(v spanner.NullJSON) ([]byte, error) {
-	if !v.Valid {
-		return nil, nil
-	}
-	return json.Marshal(v.Value)
 }
 
 var _ service.BrandingStatements = (*brandingStatements)(nil)

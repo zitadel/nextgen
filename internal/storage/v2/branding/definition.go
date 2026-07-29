@@ -9,9 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// Definition is the JSON payload stored in the definition column. It carries
-// the branding content so future structured extensions (palette, typography,
-// theme) need no migration.
+// Definition is the structure stored inside the definition JSON/JSONB column.
 type Definition struct {
 	Layout         string `json:"layout"`
 	LiquidTemplate string `json:"liquid_template,omitempty"`
@@ -32,8 +30,8 @@ func Marshal(b *domain.Branding) ([]byte, error) {
 	})
 }
 
-// ToDomain rebuilds a domain.Branding from row columns plus the definition
-// JSON payload.
+// ToDomain converts scanned row columns plus the definition JSON payload into
+// a domain.Branding.
 func ToDomain(projectID, id string, createdAt time.Time, definition []byte) (*domain.Branding, error) {
 	var def Definition
 	if len(definition) > 0 {
@@ -49,6 +47,7 @@ func ToDomain(projectID, id string, createdAt time.Time, definition []byte) (*do
 		LogoURL:        def.LogoURL,
 		FontURL:        def.FontURL,
 		HeroURL:        def.HeroURL,
-		CreatedAt:      createdAt,
+		// Spanner returns UTC while pgx defaults to local; normalize to UTC.
+		CreatedAt: createdAt.UTC(),
 	}, nil
 }

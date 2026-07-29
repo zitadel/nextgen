@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	createBrandingStmt = `INSERT INTO zitadel_nextgen.branding (project_id, id, definition) VALUES ($1, $2, $3) RETURNING project_id, id, created_at, definition`
+	createBrandingStmt = `INSERT INTO zitadel_nextgen.branding (project_id, id, definition) VALUES ($1, $2, $3) RETURNING created_at`
 	brandingQuery      = `SELECT project_id, id, created_at, definition FROM zitadel_nextgen.branding`
 )
 
@@ -34,24 +34,11 @@ func (b brandingStatements) CreateBranding(ctx context.Context, entity *domain.B
 	if err != nil {
 		return err
 	}
-
-	var (
-		projectID string
-		id        string
-		createdAt time.Time
-		raw       []byte
-	)
-	err = b.client.QueryRow(ctx, createBrandingStmt, entity.ProjectID, entity.ID, definition).
-		Scan(&projectID, &id, &createdAt, &raw)
-	if err != nil {
+	if err := b.client.QueryRow(ctx, createBrandingStmt, entity.ProjectID, entity.ID, definition).
+		Scan(&entity.CreatedAt); err != nil {
 		return wrapError(err)
 	}
-
-	parsed, err := branding.ToDomain(projectID, id, createdAt, raw)
-	if err != nil {
-		return err
-	}
-	*entity = *parsed
+	entity.CreatedAt = entity.CreatedAt.UTC()
 	return nil
 }
 
@@ -63,38 +50,6 @@ func (b brandingStatements) GetBrandingByID(ctx context.Context, projectID, id s
 			database.Equal(database.Col(domain.BrandingFieldProjectID), projectID),
 			database.Equal(database.Col(domain.BrandingFieldID), id),
 		),
-	}, branding.Schema); err != nil {
-		return nil, err
-	}
-
-	rows, err := b.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	entity, err := pgx.CollectExactlyOneRow(rows, b.scanBranding)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	return entity, nil
-}
-
-// GetLatestBranding implements [service.BrandingStatements].
-func (b brandingStatements) GetLatestBranding(ctx context.Context, projectID string) (*domain.Branding, error) {
-	// id (a ULID, time-ordered) breaks created_at ties deterministically —
-	// e.g. revisions published within one transaction share NOW().
-	var compiler statementCompiler
-	if err := compileRead(&compiler, brandingQuery, &database.ListOptions[domain.BrandingField]{
-		Filter: database.Equal(database.Col(domain.BrandingFieldProjectID), projectID),
-		Pagination: database.Page[domain.BrandingField]{
-			Limit: 1,
-			OrderBy: database.OrderBy[domain.BrandingField]{
-				Columns: []database.Column[domain.BrandingField]{
-					database.Col(domain.BrandingFieldCreatedAt),
-					database.Col(domain.BrandingFieldID),
-				},
-				Direction: database.OrderDesc,
-			},
-		},
 	}, branding.Schema); err != nil {
 		return nil, err
 	}

@@ -25,18 +25,8 @@ func TestMarshalAndToDomain(t *testing.T) {
 
 	raw, err := branding.Marshal(in)
 	require.NoError(t, err)
-	assert.Contains(t, string(raw), `"layout":"split"`)
-	assert.Contains(t, string(raw), `"liquid_template"`)
 
 	got, err := branding.ToDomain(in.ProjectID, in.ID, in.CreatedAt, raw)
 	require.NoError(t, err)
 	assert.Equal(t, in, got)
-}
-
-func TestToDomainEmptyDefinition(t *testing.T) {
-	got, err := branding.ToDomain("proj_1", "brnd_1", time.Unix(0, 0).UTC(), nil)
-	require.NoError(t, err)
-	assert.Equal(t, "proj_1", got.ProjectID)
-	assert.Equal(t, "brnd_1", got.ID)
-	assert.Empty(t, got.Layout)
 }

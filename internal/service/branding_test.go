@@ -14,6 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func newMockedBrandingService(t *testing.T) (*service.BrandingService, *servicemocks.MockAllStatements) {
@@ -51,7 +52,6 @@ func TestBrandingServiceCreate(t *testing.T) {
 
 func TestBrandingServiceCreateRejectsInvalidTemplate(t *testing.T) {
 	svc, _ := newMockedBrandingService(t)
-	// No CreateBranding expectation: validation must fail before any write.
 
 	_, err := svc.Create(t.Context(), service.CreateBrandingInput{
 		ProjectID:      "proj_1",
@@ -66,8 +66,6 @@ func TestBrandingServiceCreateRejectsInvalidTemplate(t *testing.T) {
 func TestBrandingServiceCreateMapsIntegrityViolation(t *testing.T) {
 	svc, statements := newMockedBrandingService(t)
 
-	// The only integrity constraint user input can trip is the FK to
-	// projects, so a violation must surface as brnd.invalid, not a 500.
 	statements.EXPECT().
 		CreateBranding(gomock.Any(), gomock.Any()).
 		Return(database.NewForeignKeyError("branding", "fk_branding_project", nil))
@@ -86,8 +84,11 @@ func TestBrandingServiceGetLatest(t *testing.T) {
 
 	want := &domain.Branding{ProjectID: "proj_1", ID: "brnd_1", Layout: domain.BrandingLayoutCentered}
 	statements.EXPECT().
-		GetLatestBranding(gomock.Any(), "proj_1").
-		Return(want, nil)
+		ListBrandings(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, opts *v2database.ListOptions[domain.BrandingField]) (*v2database.ListResult[*domain.Branding], error) {
+			assert.Equal(t, uint32(1), opts.Pagination.Limit)
+			return &v2database.ListResult[*domain.Branding]{Items: []*domain.Branding{want}}, nil
+		})
 
 	got, err := svc.GetLatest(t.Context(), "proj_1")
 	require.NoError(t, err)
@@ -98,8 +99,8 @@ func TestBrandingServiceGetLatestNoneStored(t *testing.T) {
 	svc, statements := newMockedBrandingService(t)
 
 	statements.EXPECT().
-		GetLatestBranding(gomock.Any(), "proj_1").
-		Return(nil, &database.NoRowFoundError{})
+		ListBrandings(gomock.Any(), gomock.Any()).
+		Return(&v2database.ListResult[*domain.Branding]{}, nil)
 
 	got, err := svc.GetLatest(t.Context(), "proj_1")
 	require.NoError(t, err, "no stored branding is not an error — callers fall back to defaults")

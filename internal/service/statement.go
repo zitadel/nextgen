@@ -271,14 +271,9 @@ type UserRecoveryCodesStatements interface {
 	DeleteUserRecoveryCodes(ctx context.Context, filter database.Filter[domain.UserRecoveryCodesField]) error
 }
 
-// BrandingStatements stores immutable branding revisions. There is no update
-// or delete: publishing is the only write (ADR 040).
 type BrandingStatements interface {
 	Statements
 	CreateBranding(ctx context.Context, entity *domain.Branding) error
 	GetBrandingByID(ctx context.Context, projectID, id string) (*domain.Branding, error)
-	// GetLatestBranding returns the newest revision for the project, or
-	// database.NoRowFoundError when the project has none.
-	GetLatestBranding(ctx context.Context, projectID string) (*domain.Branding, error)
 	ListBrandings(ctx context.Context, filter *database.ListOptions[domain.BrandingField]) (*database.ListResult[*domain.Branding], error)
 }
