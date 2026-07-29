@@ -52,10 +52,10 @@ func TestManagementAuthz(t *testing.T) {
 
 		// Real data in the victim project: the foreign read of its real id
 		// must be indistinguishable from a nonexistent one.
-		realSchemaID := harness.CreateUserSchema(t, victim, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+		realSchemaID := harness.CreateUserSchema(t, victim, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 
 		apiSchema := api.UserSchema{}
-		require.NoError(t, apiSchema.UnmarshalJSON([]byte(harness.TestData.Schemas.CreateSchemaRequestUserSchema)))
+		require.NoError(t, apiSchema.UnmarshalJSON([]byte(harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)))
 		createReq := api.CreateSchemaReq{Type: api.UserSchemaCreateSchemaReq, UserSchema: apiSchema}
 
 		t.Run("bound to the token's project", func(t *testing.T) {
