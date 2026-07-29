@@ -10,10 +10,9 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/migration"
 )
 
-var isMigrated bool
-
 type Pool struct {
-	pool *pgxpool.Pool
+	pool       *pgxpool.Pool
+	isMigrated bool
 	statements
 }
 
@@ -42,13 +41,13 @@ func (p *Pool) Ping(ctx context.Context) error {
 
 // Migrate implements [database.Pool].
 func (p *Pool) Migrate(ctx context.Context) error {
-	if isMigrated {
+	if p.isMigrated {
 		return nil
 	}
 	db := stdlib.OpenDBFromPool(p.pool)
 	defer db.Close()
 	err := migration.Migrate(ctx, db)
-	isMigrated = err == nil
+	p.isMigrated = err == nil
 	return wrapError(err)
 }
 

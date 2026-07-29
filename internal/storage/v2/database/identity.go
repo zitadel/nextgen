@@ -42,7 +42,7 @@ func (id *Identity) Scan(src any) error {
 	case []byte:
 		*id = Identity(string(v))
 	default:
-		return fmt.Errorf("v2 database.Identity: unsupported Scan type %T", src)
+		return fmt.Errorf("database.Identity: unsupported Scan type %T", src)
 	}
 	return nil
 }

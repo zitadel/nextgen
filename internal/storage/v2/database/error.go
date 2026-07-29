@@ -10,8 +10,7 @@ import (
 // ErrNoChanges is returned when an Update is called with no updates.
 var ErrNoChanges = errors.New("update must contain a change")
 
-// Error is a coded storage v2 database error. Callers map it to domain errors
-// at the service boundary; it intentionally does not import internal/domain.
+// Error is a coded storage error. Services map it to domain.Error at the boundary.
 type Error struct {
 	Code    string
 	Message string

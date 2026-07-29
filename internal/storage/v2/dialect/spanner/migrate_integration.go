@@ -15,9 +15,7 @@ func (c *Client) Migrate(ctx context.Context) error {
 		return nil
 	}
 
-	// goose migrations run through database/sql using the go-sql-spanner
-	// driver; the driver is registered by the migration package itself when
-	// built with spanner_integration.
+	// goose uses database/sql via go-sql-spanner (registered by the migration package).
 	db, err := sql.Open("spanner", c.dsn)
 	if err != nil {
 		return wrapError(err)
