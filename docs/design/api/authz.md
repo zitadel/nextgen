@@ -40,6 +40,8 @@ A user can be in the platform project (a developer/admin) or a customer project 
 
 Permissions are flat `{resource}.{verb}` strings such as `user.read`, `project.write`, and `team_membership.write`. Multi-word resource types use `_` (for example `team_membership`, `flow_definition`), not dot nesting. Scope (which project or team) comes from the resolved grant, not from nesting in the permission name. Parent-resource permissions do not inherit into separately cataloged resources: for example, `project.write` does not imply `branding.write`, `allowed_origin.write`, or `webhook.write`. Bundles may grant those permissions together. The resolver answers: "for this principal, in this resolved scope, is this permission granted?" See [`system-permission-catalog.md`](system-permission-catalog.md) for the full list.
 
+> **Not enforced yet.** This is the target model. The server's current compatibility layer (`scopeAllowed` in `internal/api/authz.go`) still treats the legacy operator-grade `project.write` as an umbrella scope that satisfies every finer per-resource scope, including `branding.write`. Per-resource scopes become independently mintable with [ADR 036](../../adrs/036-api-credential-planes.md)'s credential planes; until then, do not assume the stricter model is enforced when configuring clients.
+
 **Grants and roles** provide the mapping:
 
 - **Grant** — an explicit access record: `user ↔ app` (can access this app), `team ↔ project` (this team has access to this project), `user ↔ role-in-team`.

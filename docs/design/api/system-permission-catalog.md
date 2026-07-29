@@ -585,6 +585,22 @@ create/list/get — `schema.write` covers create today, while update and
 | Session and auth-attempt endpoint scopes were undeclared | `session.*`, `auth_attempt.*` declared | Endpoint references and OAuth declarations now agree. Exchange remains `session.write`, not `auth_attempt.write`. |
 | Planned project configuration scopes were undeclared | `domain.*`, `feature.*`, `allowed_origin.*`, `signing_key.*`, `webhook.*` declared | Final names are requestable; endpoint implementation remains separate work. |
 
+**Declared ≠ enforced.** Naming a scope in `oauth2.yaml` and on an operation's
+`security` block records the contract; it does not by itself gate the request.
+`SecurityHandler.HandleOAuth2` (`internal/api/security.go`) verifies the bearer and
+stores the token's scopes in the request context, but ignores the generated
+per-operation requirement list (`oauth2ScopesOAuth2`). Enforcement happens only where
+a handler calls `requireProjectAccess` — currently schemas, flow definitions, users,
+teams, branding, and project management. Session and auth-attempt handlers do **not**
+check `session.*` / `auth_attempt.*` today, so those names are declarations awaiting
+enforcement. Two related consequences:
+
+- Runtime enforcement still routes through the legacy `project.write` umbrella (see
+  [`authz.md`](authz.md#permission-resolution)), so the no-inheritance rule above is
+  not yet observable at runtime.
+- Wiring per-operation scope checks (whether in `HandleOAuth2` or per handler) belongs
+  with the verb-model follow-up, since both change enforcement rather than naming.
+
 ---
 
 ## Open questions
