@@ -10,7 +10,6 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	// v2 dialects use v2/database.Identity (moved from v1).
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 	v2session "github.com/zitadel/nextgen/internal/storage/v2/session"

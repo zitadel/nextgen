@@ -12,7 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
-	storagedb "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"go.uber.org/mock/gomock"
 )
@@ -139,7 +139,7 @@ func TestKeyService_GetCrypter(t *testing.T) {
 			svc, statements, _ := newMockedKeyService(t)
 			statements.EXPECT().
 				GetEncryptionKey(gomock.Any(), gomock.Any()).
-				Return(nil, storagedb.NewNoRowFoundError(nil))
+				Return(nil, database.NewNoRowFoundError(nil))
 
 			// ACT
 			_, err := svc.GetEncryptionKey(t.Context(), "dek_missing", jose.A256GCM)
@@ -193,7 +193,7 @@ func TestKeyService_GetProjectDEKCrypter(t *testing.T) {
 
 			statements.EXPECT().
 				GetEncryptionKey(gomock.Any(), gomock.Any()).
-				Return(nil, storagedb.NewNoRowFoundError(nil))
+				Return(nil, database.NewNoRowFoundError(nil))
 
 			// ACT
 			_, err := svc.GetProjectDEKCrypter(t.Context(), "proj-1")

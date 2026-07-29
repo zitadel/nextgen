@@ -7,7 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
-	migrationpkg "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/migration"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/migration"
 )
 
 var isMigrated bool
@@ -47,7 +47,7 @@ func (p *Pool) Migrate(ctx context.Context) error {
 	}
 	db := stdlib.OpenDBFromPool(p.pool)
 	defer db.Close()
-	err := migrationpkg.Migrate(ctx, db)
+	err := migration.Migrate(ctx, db)
 	isMigrated = err == nil
 	return wrapError(err)
 }

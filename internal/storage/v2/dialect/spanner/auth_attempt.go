@@ -14,7 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/authattempt"
-	v2session "github.com/zitadel/nextgen/internal/storage/v2/session"
+	"github.com/zitadel/nextgen/internal/storage/v2/session"
 )
 
 const (
@@ -229,7 +229,7 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 		if failureCount.Valid {
 			failureCountV = uint16(failureCount.Int64)
 		}
-		checks, err := v2session.DecodeAuthChecks(
+		checks, err := session.DecodeAuthChecks(
 			domain.AuthCheckType(checkType.Int64),
 			challengeID.String(),
 			lastChallengedAtV, lastFailedAtV, verifiedAtV, failureCountV,
