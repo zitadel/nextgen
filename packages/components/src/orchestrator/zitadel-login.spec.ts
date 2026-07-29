@@ -1557,6 +1557,41 @@ describe("<zitadel-login> against the typed Flow API", () => {
       }
     });
 
+    it("ignores a popstate that lands on the sentinel itself", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      await settleHistory();
+      const submitsBefore = mock
+        .getCaptured()
+        .filter((req) => req.kind === "submitFlowStep").length;
+
+      // The host page pushed an entry above the sentinel (e.g. an in-page
+      // #anchor click) and the user backed out of it: the traversal lands
+      // ON the sentinel. That is not a request to go back in the flow.
+      window.dispatchEvent(new PopStateEvent("popstate", { state: { zl: true } }));
+
+      const submitsAfter = mock
+        .getCaptured()
+        .filter((req) => req.kind === "submitFlowStep").length;
+      expect(submitsAfter).toBe(submitsBefore);
+
+      // The widget stays armed: a real back press still maps to the back
+      // action afterwards.
+      window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+      await waitFor(() => {
+        const link = element.shadowRoot?.querySelector('[data-action="back"]');
+        return link === null ? true : null;
+      });
+      const backSubmit = mock
+        .getCaptured()
+        .filter(
+          (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
+            req.kind === "submitFlowStep",
+        )
+        .find((s) => s.body.action === "back");
+      expect(backSubmit).toBeDefined();
+    });
+
     it("back gesture on a step without a back action leaves history alone", async () => {
       await mount(host);
       await settleHistory();

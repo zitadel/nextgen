@@ -1076,6 +1076,10 @@ export class ZitadelLogin extends LitElement {
    *   Re-arm it immediately — so the stack shape is identical on every
    *   step and repeated presses behave the same at any flow depth — then
    *   submit the step's `kind: "back"` action.
+   * - **Landing on the sentinel while armed** → the host page pushed an
+   *   entry above the sentinel (e.g. an in-page `#anchor` click) and the
+   *   user backed out of it. They are back where the widget expects them
+   *   — not asking the flow to go back; do nothing.
    * - **Forward press onto a retired sentinel** (it survives as a forward
    *   entry after `history.back()`) → bounce back: flow state is
    *   server-authoritative, the browser cannot skip ahead
@@ -1089,6 +1093,12 @@ export class ZitadelLogin extends LitElement {
     }
 
     if (this.armed) {
+      if ((event.state as { zl?: boolean } | null)?.zl === true) {
+        // Traversal landed ON the sentinel from an entry above it that the
+        // host page created after we armed. Position is as expected; the
+        // gesture was aimed at the host entry, not the flow.
+        return;
+      }
       // Back press: the browser popped the sentinel.
       this.armed = false;
       const backAction = this.response?.step?.actions?.find((a) => a.kind === "back");
