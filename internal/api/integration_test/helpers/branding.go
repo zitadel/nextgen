@@ -8,10 +8,13 @@ import (
 
 func (h *Harness) EnsureBrandingService(t *testing.T) *service.BrandingService {
 	t.Helper()
-	if h.BrandingService == nil {
-		h.BrandingService = service.NewBrandingService(
+	h.brandingService.mutex.Lock()
+	defer h.brandingService.mutex.Unlock()
+
+	if h.brandingService.value == nil {
+		h.brandingService.value = service.NewBrandingService(
 			h.EnsureServiceDB(t),
 		)
 	}
-	return h.BrandingService
+	return h.brandingService.value
 }

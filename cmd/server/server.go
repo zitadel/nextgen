@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -41,7 +40,6 @@ import (
 	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
 
-	"github.com/zitadel/oidc/v3/pkg/op"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel/log"
 )
@@ -114,7 +112,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return nil
 	})
 
-	kek, err := buildCrypter(cfg.Server.EncryptionKey)
+	kek, err := buildRootKEK(cfg.Server.EncryptionKeys)
 	if err != nil {
 		return fmt.Errorf("failed to create Crypter: %w", err)
 	}
@@ -159,7 +157,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	userIdentity := service.UserStatementsIdentityReader{Pool: serviceDBPool}
 
 	// ── Services ─────────────────────
-	keyService := service.NewKeyService(serviceDBPool, kek)
+	keyService := service.NewKeyService(serviceDBPool, *kek)
 
 	authAttemptSvc := service.NewAuthAttemptService(
 		serviceDBPool,
@@ -281,6 +279,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	serverErr := make(chan error, 1)
+
 	go func() {
 		slog.Info("server listening for requests", slog.String("address", httpServer.Addr))
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -288,6 +287,18 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		}
 		slog.Debug("stopped listening")
 		close(serverErr)
+	}()
+
+	// TODO: on a multi-replica deployment, the migration can happen multiple
+	//       times. This is not a problem since the migration will not remove
+	//       any keys. So nothing breaks. But there is no need to recompute the
+	//       same thing multiple times.
+	go func() {
+		slog.Info("migrate KEKs")
+		if err := keyService.MigrateToLatestRootKEK(ctx); err != nil {
+			slog.Error("error during KEK migration", slog.Any(slogctx.ErrKey, err))
+		}
+		slog.Debug("KEK migration done")
 	}()
 
 	select {
@@ -399,7 +410,7 @@ func loadConfig(configPath string) (Config, error) {
 	if err := v.Unmarshal(&cfg); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w", err)
 	}
-	if err := ensureServerEncryptionKey(&cfg.Server); err != nil {
+	if err := ensureServerKEK(&cfg.Server); err != nil {
 		return Config{}, err
 	}
 
@@ -516,22 +527,39 @@ func embeddedPostgresOptions(dataDir string) embedded.Options {
 
 // ----------------------------- CRYPTO --------------------------------------
 
-// buildCrypter decodes a hex-encoded crypter key and constructs a
-// [crypto.Crypter]. The key must decode to exactly 32 bytes;
-// anything else is a configuration error.
-func buildCrypter(hexKey string) (crypto.Crypter, error) {
-	if hexKey == "" {
-		return nil, errors.New("server: encryption_key is required (set NEXTGEN_SERVER_ENCRYPTION_KEY)")
+func buildRootKEK(keyConfigs map[string]*EncryptionKeyConfig) (*domain.RootKEKs, error) {
+	ks := make([]domain.RootKEK, 0, len(keyConfigs))
+	for id, cfg := range keyConfigs {
+		if cfg == nil || (cfg.PrivateKey == "" && cfg.File == "") {
+			return nil, fmt.Errorf("server: either a private key or file must be provided (%s)", id)
+		}
+
+		raw := cfg.PrivateKey
+		if raw == "" && cfg.File != "" {
+			bs, err := os.ReadFile(cfg.File)
+			if err != nil {
+				return nil, fmt.Errorf("server: failed to read encryption key file %q: %w", cfg.File, err)
+			}
+			raw = string(bs)
+		}
+
+		key, err := crypto.ParseRSAKey(raw)
+		if err != nil {
+			return nil, fmt.Errorf("server: %w", err)
+		}
+		ks = append(ks, domain.NewRootKEK(
+			id,
+			*key,
+			cfg.UseForEncryption,
+		))
 	}
-	key, err := hex.DecodeString(hexKey)
+
+	keks, err := domain.NewRootKEKs(ks)
 	if err != nil {
-		return nil, fmt.Errorf("server: decode encryption_key: %w", err)
+		return nil, fmt.Errorf("server: %w", err)
 	}
-	if len(key) != 32 {
-		return nil, fmt.Errorf("server: encryption_key must decode to %d bytes, got %d", 32, len(key))
-	}
-	crypter := op.NewAES256GCMCrypto([32]byte(key), "") // TODO: key id must be empty to match kek for now
-	return crypter, nil
+
+	return keks, nil
 }
 
 // ----------------------------- INSTRUMENTATION --------------------------------------
