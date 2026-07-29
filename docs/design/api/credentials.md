@@ -53,6 +53,12 @@ sk_team_… MAY:
 sk_team_… MUST NEVER:
   user.set_password                  (account takeover — human/owner op only)
   project.*
+  branding.*
+  domain.*
+  feature.*
+  allowed_origin.*
+  signing_key.*
+  webhook.*
   team.*
   billing.*
   idp.*
@@ -68,7 +74,7 @@ sk_team_… MUST NEVER:
   platform.*                         (cross-project — note: the platform itself is a project)
 ```
 
-Permission names follow the flat `{resource}.{verb}` convention in [`system-permission-catalog.md`](system-permission-catalog.md). Multi-word types use `_` (`team_membership`, not `team.membership`). Project-level sub-resources such as allowed origins and signing keys fold into `project.read` / `project.write`; they are denied here because `project.*` is denied.
+Permission names follow the flat `{resource}.{verb}` convention in [`system-permission-catalog.md`](system-permission-catalog.md). Multi-word types use `_` (`team_membership`, not `team.membership`). Project-scoped configuration resources have independent permissions (`branding.*`, `domain.*`, `feature.*`, `allowed_origin.*`, `signing_key.*`, `webhook.*`); all are explicitly denied to `sk_team_`.
 
 SCIM sync (`scim.sync`) is not listed yet — SCIM is a hosted interop surface
 (`/scim/v2/Users`, `/scim/v2/Groups` in [`resource-map.md`](resource-map.md))

@@ -38,7 +38,7 @@ A user can be in the platform project (a developer/admin) or a customer project 
 
 ## Permission resolution
 
-Permissions are flat `{resource}.{verb}` strings such as `user.read`, `project.write`, and `team_membership.write`. Multi-word resource types use `_` (for example `team_membership`, `flow_definition`), not dot nesting. Scope (which project or team) comes from the resolved grant, not from nesting in the permission name. The resolver answers: "for this principal, in this resolved scope, is this permission granted?" See [`system-permission-catalog.md`](system-permission-catalog.md) for the full list.
+Permissions are flat `{resource}.{verb}` strings such as `user.read`, `project.write`, and `team_membership.write`. Multi-word resource types use `_` (for example `team_membership`, `flow_definition`), not dot nesting. Scope (which project or team) comes from the resolved grant, not from nesting in the permission name. Parent-resource permissions do not inherit into separately cataloged resources: for example, `project.write` does not imply `branding.write`, `allowed_origin.write`, or `webhook.write`. Bundles may grant those permissions together. The resolver answers: "for this principal, in this resolved scope, is this permission granted?" See [`system-permission-catalog.md`](system-permission-catalog.md) for the full list.
 
 **Grants and roles** provide the mapping:
 

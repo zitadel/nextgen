@@ -17,9 +17,11 @@
 - **`read` covers get + list** for every resource in this draft, including
   users. A later split (e.g. directory / non-PII roster vs full PII detail) is
   explicitly deferred — see [§ Open questions](#open-questions).
-- **Project nested paths** (branding, domains, features, allowed_origins,
-  signing_keys, webhooks) fold into `project.read` / `project.write`. They are
-  not separate catalog permissions.
+- **Project-scoped configuration resources are separate permissions.** Branding,
+  domains, features, allowed origins, signing keys, and webhooks use
+  `branding.*`, `domain.*`, `feature.*`, `allowed_origin.*`, `signing_key.*`,
+  and `webhook.*`. Their project grant supplies scope; `project.read` /
+  `project.write` do not imply them.
 - **Compound resource types use `_`.** Multi-word types match the API/FGA name
   (`team_membership`, `flow_definition`, `api_key`). No dot nesting
   (`team.membership.*`) — that would imply `team.write` covers child ops.
@@ -48,7 +50,7 @@
 |---|---|
 | `create` | Create a new resource (`POST` on a collection). |
 | `read` | Read a single resource or list resources of this type. |
-| `write` | Meaning depends on the resource's [verb-model class](#create-vs-write). On **provisioning-boundary** / **soft-split** resources: mutate an **existing** resource only — does **not** imply `create` or `delete`. On **manage** and **runtime** resources: OpenAPI `*.write` semantics — create *and* manage / start *and* mutate (no separate `.create`). For singleton nested config under a parent (e.g. project branding), the first `PATCH` may establish config if none exists — still `write`. |
+| `write` | Meaning depends on the resource's [verb-model class](#create-vs-write). On **provisioning-boundary** / **soft-split** resources: mutate an **existing** resource only — does **not** imply `create` or `delete`. On **manage** and **runtime** resources: OpenAPI `*.write` semantics — create *and* manage / start *and* mutate (no separate `.create`). For singleton project-scoped config, the first write may establish config if none exists — still `write`. |
 | `delete` | Remove / tombstone a resource. |
 
 Resource-specific action verbs are added only when a standard verb is
@@ -70,7 +72,6 @@ see [§ Drift notes](#drift-notes).
 | **provisioning-boundary** | `create` ≠ `write` is **normative now** — bundles or credential classes already depend on it. |
 | **soft split** | `create` vs `write` is useful for custom grants; default bundles may grant both. |
 | **manage** | No `create`/`write` split — `write` means create *and* manage (`read`, `write`, and `delete` where a delete endpoint exists). Matches OpenAPI `*.write` = create-and-manage. Split only if a real RBAC boundary emerges. |
-| **deferred** | Folded into a parent permission for now; may split into its own permission later (e.g. project nested paths → `branding.*`). |
 | **action-verbs** | No generic `write`; use `create`, `delete`, and resource-specific verbs. |
 | **read-write-only** | No create/delete lifecycle (e.g. billing subscription state). |
 | **job-lifecycle** | `create` + `read` only (async job). |
@@ -85,12 +86,15 @@ see [§ Drift notes](#drift-notes).
 | `team_membership` | provisioning-boundary | Invites/direct add (`create`) vs role change (`write`). **`sk_team_` grants `.write` but not `.create`/`.delete`.** |
 | `grant` | soft split | New access binding (`create`) vs change existing binding (`write`) — delegation control. |
 | `api_key` | action-verbs | `create`, `read`, `delete`, `rotate`, `revoke` — no `api_key.write`. |
+| `signing_key` | action-verbs | `create`, `read`, `delete` — manual rotation creates a successor; emergency replacement creates the successor before deleting the compromised key. |
 | `billing` | read-write-only | Tier/subscription/payment — no `billing.create`. |
+| `branding` | manage | Immutable revisions: `write` publishes a revision; no update or delete. Already matches OpenAPI. |
+| `domain`, `allowed_origin`, `webhook` | manage | Project-scoped collections; `write` creates and manages, with separate `delete`. |
+| `feature` | read-write-only | Project feature configuration has no independent create/delete lifecycle. |
 | `import` | job-lifecycle | Start job (`create`); poll status (`read`). |
 | `event`, `audit_event` | read-only | |
 | `session`, `auth_attempt` | runtime | App-plane `*.write` only (no separate `*.create` — OpenAPI `*.write` covers start + mutate). Operator: `session.read` / `session.delete`. |
 | `app`, `idp`, `app_group`, `schema`, `flow_definition` | manage | No create/write split — `write` = create + manage; `read`, `write`, `delete` (where exposed). Matches OpenAPI (`*.write` = create-and-manage; `flow_definition.delete` separate). |
-| Project nested paths (branding, …) | deferred | Folded into `project.read` / `project.write`; singleton config uses `write` only. |
 
 ---
 
@@ -103,16 +107,42 @@ see [§ Drift notes](#drift-notes).
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `project.create` | `POST /projects` (authenticated / on-prem path) | Two creation modes share this URL. **Cloud self-service:** anonymous `POST /projects` (`security: []`) + claim flow — no catalog permission (see [`../platform/claim-flow.md`](../platform/claim-flow.md)). **On-prem / admin-provisioned:** authenticated `POST /projects` gated by `project.create`, no claim — the platform project + default team are seeded at install ([`hierarchy.md`](hierarchy.md#self-hosted-exposes-the-same-api-shape-as-cloud)). How one endpoint reconciles both gatings is an [open question](#open-questions). |
-| `project.read` | `GET /projects`, `GET /projects/{id}` | Includes nested-path reads: branding, domains, features, allowed_origins, signing_keys, webhooks. |
-| `project.write` | `PATCH /projects/{id}` | Includes nested-path writes for the same. |
+| `project.read` | `GET /projects`, `GET /projects/{id}` | Project resource only. Does not imply project-scoped configuration permissions. |
+| `project.write` | `PATCH /projects/{id}` | Project attributes only. Does not imply `branding.*`, `domain.*`, `feature.*`, `allowed_origin.*`, `signing_key.*`, or `webhook.*`. |
 | `project.delete` | `DELETE /projects/{id}` | |
 
-Nested paths under `/projects/{id}/…` fold into `project.read` / `project.write` for
-this draft. **Future least-privilege splits** (same grant boundary, narrower
-permissions) may introduce separate catalog entries without changing URLs, for
-example `branding.*`, `domain.*`, `allowed_origin.*`, `signing_key.*`,
-`webhook.*`, and `feature.*`. MVP may also continue to push some of this via
-config upload (`zitadel push`) rather than REST.
+Project-scoped configuration resources remain scoped through the project grant,
+but require their own permissions below. Bundles provide convenient aggregate
+access without making `project.*` an inheritance mechanism.
+
+### Project-scoped configuration
+
+These permissions are independent even where the URL remains nested below a
+project. Branding is shipped; the other endpoint mappings are the target
+catalog for the planned paths in [`resource-map.md`](resource-map.md#projects).
+
+| Permission | Endpoints / intended operations | Notes |
+|---|---|---|
+| `branding.read` | `GET /branding`, `GET /branding/{id}` | Read/list immutable branding revisions. |
+| `branding.write` | `POST /branding` | Publish a new immutable revision; no separate create/delete permission. |
+| `domain.read` | Read/list `/projects/{id}/domains` | Domain context known to Zitadel; does not imply DNS/TLS infrastructure management. |
+| `domain.write` | Add/update a domain | Create + manage. |
+| `domain.delete` | Remove a domain | |
+| `feature.read` | Read `/projects/{id}/features` | |
+| `feature.write` | Change project feature configuration | No create/delete lifecycle. |
+| `allowed_origin.read` | Read/list `/projects/{id}/allowed_origins` | |
+| `allowed_origin.write` | Add/update an allowed origin | Create + manage. |
+| `allowed_origin.delete` | Remove an allowed origin | |
+| `signing_key.create` | Create a successor signing key | Manual rotation; activation follows [ADR 039](../../adrs/039-signing-key-rotation-and-incident-response.md). |
+| `signing_key.read` | Read/list `/projects/{id}/signing_keys` | Public/status metadata only; never exposes private key material. |
+| `signing_key.delete` | Delete a signing key | Includes emergency removal after a successor exists. |
+| `webhook.read` | Read/list `/projects/{id}/webhooks` | |
+| `webhook.write` | Create/update a webhook | Create + manage. |
+| `webhook.delete` | Remove a webhook | |
+
+Some configuration may continue to be delivered through `zitadel push` rather
+than resource-specific REST endpoints; the pushed operation must still require
+the corresponding resource permission.
 
 ### Teams
 
@@ -349,7 +379,7 @@ Replacements:
 | `team.roles.assign` | `team_membership.write` | **Yes.** Role assignment is a membership mutation. |
 | `team.events.read` | `event.read` | **Yes.** Filter to the team via grant/credential scope. |
 | `team.scim.sync` | TBD (`scim.sync` or similar) | **Parked** — SCIM interop exists (`/scim/v2/*` in resource-map); no management-permission mapping yet. |
-| `allowed_origins.write`, `signing_keys.*` | `project.write` / `project.read` | **Yes.** These are project nested paths, not flat resources. |
+| `allowed_origins.write`, `signing_keys.*` | `allowed_origin.write`, `signing_key.*` | **Yes.** Flat resource permissions; the project grant carries scope. |
 | `apps.write` / `idps.write` | `app.write` / `idp.write` | **Yes.** Plural → singular. |
 | `projects.settings.write` | `project.write` | **Yes.** No separate “settings” resource. |
 
@@ -362,10 +392,16 @@ grants can reference individual permissions directly.
 
 ### `project_admin`
 
-Full control over a project and its nested paths.
+Full control over a project and its project-scoped resources.
 
 ```
 project.create, project.read, project.write, project.delete,
+branding.read, branding.write,
+domain.read, domain.write, domain.delete,
+feature.read, feature.write,
+allowed_origin.read, allowed_origin.write, allowed_origin.delete,
+signing_key.create, signing_key.read, signing_key.delete,
+webhook.read, webhook.write, webhook.delete,
 team.create, team.read, team.write, team.delete,
 user.create, user.read, user.write, user.set_password, user.delete,
 team_membership.create, team_membership.read, team_membership.write, team_membership.delete,
@@ -394,6 +430,12 @@ Read-only access to all project resources.
 
 ```
 project.read,
+branding.read,
+domain.read,
+feature.read,
+allowed_origin.read,
+signing_key.read,
+webhook.read,
 team.read,
 user.read,
 team_membership.read,
@@ -467,6 +509,12 @@ MAY:
 MUST NEVER:
   user.set_password                  (account takeover — human/owner op only)
   project.*
+  branding.*
+  domain.*
+  feature.*
+  allowed_origin.*
+  signing_key.*
+  webhook.*
   team.*
   billing.*
   idp.*
@@ -499,16 +547,26 @@ below are follow-up work (issue #420, OpenAPI alignment).
 **Verb model.** OpenAPI scopes for several resources use only `.read` and
 `.write`, where `.write` means “create and manage.” This catalog keeps that
 model for **manage** resources (`app`, `idp`, `app_group`, `schema`,
-`flow_definition`) — no separate `.create` — and splits `create` from `write`
-only on [provisioning-boundary](#create-vs-write) resources (`user`, `team`,
-`project`, `team_membership`) plus `grant`. Net-new scopes are therefore
-`*.create` / `*.delete` on that provisioning set (not on `schema`, which stays
-`schema.read` / `schema.write`). That delta is smaller than a full-CRUD-everywhere
-model. `user.set_password` also splits credential-tier ops out of `user.write`:
+`flow_definition`, `branding`, `domain`, `allowed_origin`, `webhook`) — no
+separate `.create` — and splits `create` from `write` only on
+[provisioning-boundary](#create-vs-write) resources (`user`, `team`, `project`,
+`team_membership`) plus `grant`. The verb-model follow-up's net-new scopes are
+therefore `*.create` / `*.delete` on that provisioning set (not on `schema`,
+which stays `schema.read` / `schema.write`). `signing_key` independently uses
+action verbs for its create/activate/delete lifecycle. That delta is smaller
+than a full-CRUD-everywhere model. `user.set_password` also splits
+credential-tier ops out of `user.write`:
 `PUT /users/{id}/password` is `user.write` in OpenAPI today and would move to
 `user.set_password`.
 
-**Undeclared resource types.** Many catalog resources have no OpenAPI scope
+**Project-scoped configuration.** OpenAPI already declares and uses
+`branding.read` / `branding.write`. The current authorization compatibility
+layer also lets legacy `project.write` reach branding; the target catalog does
+not define that implication. `domain.*`, `feature.*`, `allowed_origin.*`,
+`signing_key.*`, and `webhook.*` are target names for planned resources and are
+not declared in OpenAPI yet.
+
+**Undeclared resource types.** Many other catalog resources have no OpenAPI scope
 entries yet (e.g. `grant`, `api_key`, `team_membership`, `billing`). `/schemas`
 now appears in [`resource-map.md`](resource-map.md#user-schemas) but exposes only
 create/list/get — `schema.write` / `schema.delete` have no `PATCH`/`DELETE`
@@ -542,20 +600,18 @@ endpoint yet.
    (`/scim/v2/Users`, `/scim/v2/Groups` in resource-map) with no
    **management-permission** mapping yet. Park until `scim.sync` (or similar) is
    defined.
-3. **Webhook management** — currently under `/projects/{id}/webhooks`; folded
-   into `project.write`. Split to `webhook.*` if subscriptions need independent grants.
-4. **Project nested-path permissions** — branding, domains, features,
-   allowed_origins, signing_keys may split out of `project.*` for least privilege
-   (see [Projects](#projects)); URLs unchanged.
-5. **`app_group` product decomposition** — flagged OPEN in resource-map.md.
+3. **Project configuration endpoint shapes** — permission names are locked
+   independently from `project.*`; exact REST operations for domains, features,
+   allowed origins, signing keys, and webhooks still need specification.
+4. **`app_group` product decomposition** — flagged OPEN in resource-map.md.
    Catalog names may change if app_groups are restructured.
-6. **`schema.*` vs `user_schema.*`** — only user schemas exist today; URL is
+5. **`schema.*` vs `user_schema.*`** — only user schemas exist today; URL is
    `/schemas`. Rename permission prefix if a second schema kind appears.
-7. **Billing** — `billing.read` / `billing.write` reserved for platform-project
+6. **Billing** — `billing.read` / `billing.write` reserved for platform-project
    teams; endpoints not specified yet (see [Billing](#billing-platform-project--explicit-not-folded)).
-8. **Invitations** — folded into `team_membership.create` / `.delete` for MVP;
+7. **Invitations** — folded into `team_membership.create` / `.delete` for MVP;
    promote to `invitation.*` if invite-without-membership-admin is needed.
-9. **Project creation gating across deployments** — `POST /projects` is
+8. **Project creation gating across deployments** — `POST /projects` is
    anonymous bootstrap + claim in cloud (self-service signup, `security: []`),
    but authenticated `project.create` with no claim on-prem / when an admin
    provisions an additional project. [`hierarchy.md`](hierarchy.md#self-hosted-exposes-the-same-api-shape-as-cloud)
