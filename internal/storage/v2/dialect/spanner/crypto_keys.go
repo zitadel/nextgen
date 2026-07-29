@@ -95,7 +95,7 @@ func (s cryptoKeyStatements) scanEncryptionKey(row *spanner.Row) (*domain.Encryp
 	return key, nil
 }
 
-// CreateEncryptionKey implements [service.CryptoKeyStatements].
+// CreateSigningKey implements [service.CryptoKeyStatements].
 func (s cryptoKeyStatements) CreateSigningKey(ctx context.Context, key *domain.SigningKey) error {
 	stmt := buildStatement(createSigningKeyStmt,
 		key.ID, key.ProjectID, key.Key, key.Algorithm, key.State, key.ActivatedAt, key.RetiredAt, key.Purpose,

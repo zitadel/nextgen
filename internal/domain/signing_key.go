@@ -1,7 +1,9 @@
 package domain
 
 import (
+	"crypto/ed25519"
 	"crypto/rand"
+	"errors"
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
@@ -45,15 +47,15 @@ func NewSigningKey(
 		return nil, err
 	}
 
-	var key [32]byte
-	_, err = rand.Read(key[:])
+	seed := make([]byte, ed25519.SeedSize)
+	_, err = rand.Read(seed)
 	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to generate new DEK key")
+		return nil, ErrInternal(err).WithMessage("failed to generate new signing key")
 	}
 
-	encryptedKey, err := kek.Encrypt(string(key[:]))
+	encryptedKey, err := kek.Encrypt(string(seed))
 	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to encrypt dek")
+		return nil, ErrInternal(err).WithMessage("failed to encrypt signing key")
 	}
 
 	// createdAt is set by db

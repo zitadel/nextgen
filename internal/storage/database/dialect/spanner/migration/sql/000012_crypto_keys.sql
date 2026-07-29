@@ -25,6 +25,9 @@ CREATE TABLE encryption_keys
     active_secret_encryption_key_project_id STRING(MAX) AS (
         CASE WHEN state = 'active' AND purpose = 'secret' THEN project_id ELSE NULL END
     ) STORED,
+    active_cookie_encryption_key_project_id STRING(MAX) AS (
+        CASE WHEN state = 'active' AND purpose = 'cookie' THEN project_id ELSE NULL END
+    ) STORED,
     CONSTRAINT fk_encryption_keys_project
         FOREIGN KEY (project_id)
             REFERENCES projects (id)
@@ -67,7 +70,7 @@ CREATE TABLE signing_keys
     retired_at            TIMESTAMP,
     purpose               STRING(MAX) NOT NULL,
     active_token_signing_key_project_id STRING(MAX) AS (
-        CASE WHEN state = 'active' AND purpose = 'dek' THEN project_id ELSE NULL END
+        CASE WHEN state = 'active' AND purpose = 'token' THEN project_id ELSE NULL END
     ) STORED,
     CONSTRAINT fk_signing_keys_project
         FOREIGN KEY (project_id)

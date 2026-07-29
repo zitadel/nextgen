@@ -21,6 +21,8 @@ CREATE UNIQUE INDEX uq_token_encryption_keys_active_per_project
     ON zitadel_nextgen.encryption_keys (project_id) WHERE state = 'active' AND purpose = 'token';
 CREATE UNIQUE INDEX uq_secret_encryption_keys_active_per_project
     ON zitadel_nextgen.encryption_keys (project_id) WHERE state = 'active' AND purpose = 'secret';
+CREATE UNIQUE INDEX uq_cookie_encryption_keys_active_per_project
+    ON zitadel_nextgen.encryption_keys (project_id) WHERE state = 'active' AND purpose = 'cookie';
 
 CREATE TABLE zitadel_nextgen.signing_keys
 (
