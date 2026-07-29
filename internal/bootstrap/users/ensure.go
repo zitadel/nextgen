@@ -26,19 +26,12 @@ func ensureDependencies(ctx context.Context, stmts service.AllStatements, h Head
 }
 
 func ensureProject(ctx context.Context, stmts service.AllStatements, projectID string) error {
-	_, err := stmts.GetProjectByID(ctx, projectID)
-	if err == nil {
-		return nil
-	}
-	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-		return fmt.Errorf("ensure project %q: %w", projectID, err)
-	}
-
 	// The bootstrap header carries no project name, so derive a placeholder
 	// name from the project ID to satisfy the NOT NULL name column.
-	err = stmts.CreateProject(ctx, &domain.Project{
-		ID:   projectID,
-		Name: "project-" + projectID,
+	err := stmts.CreateProject(ctx, &domain.Project{
+		ID:             projectID,
+		Name:           "project-" + projectID,
+		PreviewOrigins: []string{},
 	})
 	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
@@ -50,18 +43,7 @@ func ensureProject(ctx context.Context, stmts service.AllStatements, projectID s
 }
 
 func ensureTeam(ctx context.Context, stmts service.AllStatements, projectID, teamID string) error {
-	if err := ensureProject(ctx, stmts, projectID); err != nil {
-		return err
-	}
-	_, err := stmts.GetTeamByID(ctx, projectID, teamID)
-	if err == nil {
-		return nil
-	}
-	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-		return fmt.Errorf("ensure team %q: %w", teamID, err)
-	}
-
-	err = stmts.CreateTeam(ctx, &domain.Team{
+	err := stmts.CreateTeam(ctx, &domain.Team{
 		ProjectID: projectID,
 		ID:        teamID,
 	})
@@ -75,22 +57,10 @@ func ensureTeam(ctx context.Context, stmts service.AllStatements, projectID, tea
 }
 
 func ensureJSONSchema(ctx context.Context, stmts service.AllStatements, projectID, schemaURL string) error {
-	if err := ensureProject(ctx, stmts, projectID); err != nil {
-		return err
-	}
-	_, err := stmts.GetJSONSchemaByID(ctx, projectID, schemaURL)
-	if err == nil {
-		return nil
-	}
-	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-		return fmt.Errorf("ensure json_schema %q: %w", schemaURL, err)
-	}
-
-	err = stmts.CreateJSONSchema(ctx, &domain.JSONSchema{
-		ProjectID:  projectID,
-		URL:        schemaURL,
-		ObjectType: nil,
-		Schema:     []byte("{}"),
+	err := stmts.CreateJSONSchema(ctx, &domain.JSONSchema{
+		ProjectID: projectID,
+		URL:       schemaURL,
+		Schema:    []byte("{}"),
 	})
 	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {

@@ -62,7 +62,7 @@ func importFile(
 		slog.Info("bootstrap user: skipped user because they already exists)", slog.String("path", path), slog.String("id", doc.Header.ID))
 		return nil
 	}
-	if !errors.Is(err, new(database.NoRowFoundError)) {
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
 		return fmt.Errorf("check existing user: %w", err)
 	}
 

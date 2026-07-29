@@ -261,13 +261,6 @@ func buildStatement(sql string, args ...any) spannerStatement {
 	return spannerStatement{SQL: sql, Params: params}
 }
 
-// buildStatementFromPostgresSQL builds a Spanner statement from a PostgreSQL-style SQL string and its arguments.
-// This function is used for backwards compatibility with existing code in the old database package.
-// TODO(adlerhurst): remove this function once the old database package is removed.
-func buildStatementFromPostgresSQL(sql string, args ...any) spannerStatement {
-	return buildStatement(convertPlaceholders(sql), args...)
-}
-
 func paramName(index int) string {
 	return "p" + strconv.Itoa(index)
 }

@@ -23,7 +23,7 @@ type CreateUserInput struct {
 
 type UserAction interface {
 	Prepare(ctx context.Context) error
-	Apply(ctx context.Context, tx Statementer[AllStatements]) error
+	Apply(ctx context.Context, stmts AllStatements) error
 }
 
 type SetPasswordInput struct {
@@ -82,8 +82,9 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		stmts := tx.Statements()
 		for _, action := range actions {
-			if err := action.Apply(ctx, tx); err != nil {
+			if err := action.Apply(ctx, stmts); err != nil {
 				return err
 			}
 		}
@@ -256,8 +257,8 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 	return nil
 }
 
-func (o *CreateUserAction) Apply(ctx context.Context, tx Statementer[AllStatements]) error {
-	return applyCreateUser(ctx, tx.Statements(), o.CreateUser)
+func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	return applyCreateUser(ctx, stmts, o.CreateUser)
 }
 
 func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.CreateUser) error {
@@ -293,8 +294,8 @@ func (o *SetPasswordUserAction) Prepare(_ context.Context) (err error) {
 	return err
 }
 
-func (o *SetPasswordUserAction) Apply(ctx context.Context, tx Statementer[AllStatements]) error {
-	err := tx.Statements().SetUserPassword(ctx, &domain.SetUserPassword{
+func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	err := stmts.SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:      o.ProjectID,
 		UserID:         o.UserID,
 		EncodedHash:    o.hash,
@@ -315,10 +316,10 @@ type UserActionFactory = func(ctx context.Context) (UserAction, error)
 
 // LazyUserAction allows for lazy initialization of a user-action. It forwards
 // the `Prepare` and `Apply` methods to the generated action. The UserAction is
-// only right before it is used in those functions.
+// created right before it is used in those functions.
 //
 // This action can be wrapped around an action when the wrapped action requires
-// an output of a previous action. It can then use a clojure to get the data
+// an output of a previous action. It can then use a closure to get the data
 // from the other action.
 type LazyUserAction struct {
 	factory UserActionFactory
@@ -339,12 +340,12 @@ func (o *LazyUserAction) Prepare(ctx context.Context) (err error) {
 	return action.Prepare(ctx)
 }
 
-func (o *LazyUserAction) Apply(ctx context.Context, tx Statementer[AllStatements]) error {
+func (o *LazyUserAction) Apply(ctx context.Context, stmts AllStatements) error {
 	action, err := o.Action(ctx)
 	if err != nil {
 		return err
 	}
-	return action.Apply(ctx, tx)
+	return action.Apply(ctx, stmts)
 }
 
 func (o *LazyUserAction) Action(ctx context.Context) (UserAction, error) {
