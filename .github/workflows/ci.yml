@@ -62,8 +62,13 @@ jobs:
         run: corepack pnpm --filter @zitadel/components exec playwright install chromium
 
       - name: Run Moon build and test graph
+        id: moon-ci
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon ci :lint :typecheck :build :test :test-browser
+
+      - name: Report Moon CI failures
+        if: ${{ failure() && steps.moon-ci.conclusion == 'failure' }}
+        run: node scripts/report-moon-failures.mjs
 
       - name: Run Go tests
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
