@@ -15,10 +15,10 @@ constructors. That pattern made entity SQL hard to review and hid dialect
 differences across the codebase.
 
 `internal/storage/v2/` is the replacement storage architecture. **Entity
-persistence is fully on v2 statements** (`AllStatements`); the v1 entity
-repository package and v1 dialect tree have been removed. Remaining interim
-work is infrastructure tracked on the ADR 028 checklist (notably ID
-generation).
+persistence is fully on v2 statements** (`AllStatements`); the entire v1
+package under `internal/storage/database/` (repositories, dialects,
+query-builder, aliases) has been removed. Remaining interim work is
+infrastructure tracked on the ADR 028 checklist (notably ID generation).
 
 See also:
 
@@ -201,10 +201,11 @@ These previously lived under v1 and are now owned by v2 (C3–C6):
 - Migrations (postgres + spanner DDL) — **done**
 - Embedded postgres startup — **done** (`v2/dialect/postgres/embedded`)
 - Test DSN bring-up — **done** (`v2/testdb` + `v2/dbtest`)
-- [`database.Identity`](../../internal/storage/v2/database/identity.go) (ADR 011) — **done** (v1 keeps a type alias only)
+- [`database.Identity`](../../internal/storage/v2/database/identity.go) (ADR 011) — **done**
 - Dialect-specific integrity error types — **done** (`v2/database/integrity_errors.go`)
 - Single pool at production startup — **done** (C5)
 - Retire v1 dialect tree — **done** (C6)
+- Retire leftover v1 query-builder / aliases package — **done** (C6)
 
 Still open:
 
@@ -247,7 +248,7 @@ Service wiring lives outside v2:
 |---|---|
 | Dialect registry + config decode | Postgres and Spanner registered for v2 connect paths |
 | Entity statements | All product entities on `AllStatements` (projects, flows, schemas, teams, sessions, users/auth factors, branding, …) in postgres + spanner |
-| v1 entity repositories | Removed (`internal/storage/database/repository/` deleted) |
+| v1 package (`internal/storage/database/`) | Removed (repositories, dialects, query-builder, aliases) |
 | Production usage | Services use `service.DB` / statements; startup owns a single v2 pool |
 | Tests | Service-layer mocks; dialect integration tests; API harness builds v2 pool |
 
@@ -284,9 +285,10 @@ compiler.compileRead(projectQuery, &database.ListOptions{
    repository package removed.
 4. **Hybrid transactions** — **done.** App callers and bootstrap use statements
    only; v2 tx no longer exposes v1 `QueryExecutor`.
-5. **Retire v1 dialect layer** — **done (C6).** Deleted
-   `internal/storage/database/dialect/` after v2 dialects satisfied pool,
-   migrations, embedded bring-up, Identity, and errors.
+5. **Retire v1 dialect layer and leftover v1 package** — **done (C6).** Deleted
+   `internal/storage/database/` (dialects, dbtest, query-builder, mocks, and
+   Identity/error aliases) after v2 dialects satisfied pool, migrations,
+   embedded bring-up, Identity, and errors.
 6. **Single pool at startup** — **done (C5).** Server connects through v2
    dialect only; no second pool.
 
@@ -304,13 +306,14 @@ items off as work lands; remove completed entries when no longer useful.
 - [x] Spanner statement execution and dialect registration are in place; remaining Spanner work is migrate/embedded/dbtest parity under v2.
 - [x] Move migrations from v1 to v2 dialect packages (postgres + spanner)
 - [x] Move embedded postgres startup to v2 postgres dialect
-- [x] Move `database.Identity` bind/scan to v2 core (legacy `internal/storage/database` keeps a type alias until that package is retired)
+- [x] Move `database.Identity` bind/scan to v2 core
 - [ ] Move ID generation into v2 dialects (ephemeral via DB identity/function; managed fallback via dialect-chosen Go package or DB function); retire domain-layer `idgen` call sites at storage boundary
 - [x] Add `internal/storage/v2/AGENTS.md` with v2 conventions (including multi-write `withTransaction` rules)
 - [x] Port remaining entities and remove v1 entity repository package
 - [x] Drop QueryExecutor bridge from app callers and v2 transactions
 - [x] Single v2 pool at production startup (C5)
 - [x] Retire v1 dialect implementations (`internal/storage/database/dialect/`) once no remaining consumers remain (C6)
+- [x] Delete leftover `internal/storage/database/` query-builder, mocks, and aliases (C6)
 
 ## Related ADRs
 

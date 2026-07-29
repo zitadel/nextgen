@@ -11,10 +11,8 @@ scoped `AGENTS.md` files.
   live under `internal/storage/v2/dialect/`.
 - Storage v2 (`internal/storage/v2/`) is the active dialect and statements
   layer. Entity persistence uses v2 statements exclusively.
-- `internal/storage/database/` retains the legacy query-builder surface and
-  thin aliases onto v2 types (`Identity`, some integrity errors). Do not add
-  new dialect or entity code there; prefer deleting remaining callers and the
-  package over extending it.
+- The legacy v1 package `internal/storage/database/` (query-builder, dialects,
+  repositories, aliases) has been removed. Do not reintroduce it.
 
 ## Sub-scoped Guidance
 
