@@ -10,7 +10,6 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -62,7 +61,7 @@ func importFile(
 		slog.Info("bootstrap user: skipped user because they already exists)", slog.String("path", path), slog.String("id", doc.Header.ID))
 		return nil
 	}
-	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+	if _, ok := errors.AsType[*v2database.NoRowFoundError](err); !ok {
 		return fmt.Errorf("check existing user: %w", err)
 	}
 

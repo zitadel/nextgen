@@ -6,7 +6,6 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 	database2 "github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
@@ -46,7 +45,7 @@ func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorit
 		database2.Equal(database2.Col(domain.EncryptionKeyFieldAlgorithm), algorithm),
 	))
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		if _, ok := errors.AsType[*database2.NoRowFoundError](err); ok {
 			return nil, domain.ErrEncryptionKeyNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get DEK from the database")
@@ -74,7 +73,7 @@ func (s *keyService) GetProjectDEK(ctx context.Context, projectID string) (*doma
 		database2.Equal(database2.Col(domain.EncryptionKeyFieldPurpose), domain.EncryptionKeyPurposeDEK),
 	))
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		if _, ok := errors.AsType[*database2.NoRowFoundError](err); ok {
 			return nil, domain.ErrEncryptionKeyNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get DEK from the database")

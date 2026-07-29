@@ -8,7 +8,6 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -168,7 +167,7 @@ func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[
 		v2database.Equal(v2database.Col(domain.UserFieldID), input.UserID),
 	), UserQueryOptions{MembershipTeamID: input.TeamID})
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		if _, ok := errors.AsType[*v2database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
@@ -202,7 +201,7 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 		v2database.Equal(v2database.Col(domain.UserFieldID), sessionToken.UserID),
 	), UserQueryOptions{})
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		if _, ok := errors.AsType[*v2database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
@@ -241,7 +240,7 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 
 	schemaEntity, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, schemaURL)
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		if _, ok := errors.AsType[*v2database.NoRowFoundError](err); ok {
 			return domain.ErrUserInvalid().WithDetails("$schema is not known to the system. First create a schema, then create users.")
 		}
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
@@ -263,7 +262,7 @@ func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error
 func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.CreateUser) error {
 	err := stmts.CreateUser(ctx, user)
 	if err != nil {
-		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+		if _, ok := errors.AsType[*v2database.UniqueError](err); ok {
 			return domain.ErrUserAlreadyExists().WithParent(err)
 		}
 		return domain.ErrInternal(err).WithMessage("failed to create user in the database")
@@ -301,7 +300,7 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) 
 		ChangeRequired: o.IsPasswordChangeRequired,
 	})
 	if err != nil {
-		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+		if _, ok := errors.AsType[*v2database.ForeignKeyError](err); ok {
 			return domain.ErrUserNotFound()
 		}
 		return domain.ErrInternal(err).WithMessage("failed to set password")

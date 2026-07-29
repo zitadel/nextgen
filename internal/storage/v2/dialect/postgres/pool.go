@@ -4,9 +4,13 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	migrationpkg "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/migration"
 )
+
+var isMigrated bool
 
 type Pool struct {
 	pool *pgxpool.Pool
@@ -34,6 +38,18 @@ func (p *Pool) Close(ctx context.Context) error {
 // Ping implements [database.Pool].
 func (p *Pool) Ping(ctx context.Context) error {
 	return p.pool.Ping(ctx)
+}
+
+// Migrate implements [database.Pool].
+func (p *Pool) Migrate(ctx context.Context) error {
+	if isMigrated {
+		return nil
+	}
+	db := stdlib.OpenDBFromPool(p.pool)
+	defer db.Close()
+	err := migrationpkg.Migrate(ctx, db)
+	isMigrated = err == nil
+	return wrapError(err)
 }
 
 func (p *Pool) Statements() service.AllStatements {

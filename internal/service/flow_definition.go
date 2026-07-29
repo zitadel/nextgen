@@ -11,7 +11,6 @@ import (
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -286,7 +285,7 @@ func (fd *flowDefinitionService) Get(ctx context.Context, projectID, id string) 
 	}
 	definition, err := fd.v2Pool.Statements().GetFlowDefinitionByID(ctx, projectID, id)
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		if _, ok := errors.AsType[*v2database.NoRowFoundError](err); ok {
 			return nil, domain.ErrFlowDefinitionNotFound()
 		}
 		return nil, err

@@ -12,7 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
-	storagedb "github.com/zitadel/nextgen/internal/storage/database"
+	storagedb "github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"go.uber.org/mock/gomock"
 )

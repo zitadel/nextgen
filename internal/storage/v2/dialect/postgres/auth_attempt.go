@@ -11,7 +11,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	storagedb "github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/authattempt"
 	v2session "github.com/zitadel/nextgen/internal/storage/v2/session"
 )
@@ -84,20 +84,20 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, authAttem
 
 	rows, err := as.client.Query(ctx, createAuthAttemptStmt,
 		authAttempt.ProjectID, requiredChecks, authAttempt.TimeToLive,
-		storagedb.Identity(authattempt.SessionIDArg(authAttempt.SessionID)), checkRowsJSON)
+		database.Identity(authattempt.SessionIDArg(authAttempt.SessionID)), checkRowsJSON)
 	if err != nil {
 		return wrapError(err)
 	}
 	defer rows.Close()
 
-	challengeIDByType := make(map[domain.AuthCheckType]storagedb.Identity, len(authAttempt.Checks))
+	challengeIDByType := make(map[domain.AuthCheckType]database.Identity, len(authAttempt.Checks))
 	lastChallengedAtByType := make(map[domain.AuthCheckType]time.Time, len(authAttempt.Checks))
 	lastVerifiedAtByType := make(map[domain.AuthCheckType]time.Time, len(authAttempt.Checks))
 	for rows.Next() {
 		var (
-			attemptID        storagedb.Identity
+			attemptID        database.Identity
 			createdAt        time.Time
-			challengeID      storagedb.Identity
+			challengeID      database.Identity
 			checkType        *uint8
 			lastChallengedAt *time.Time
 			lastVerifiedAt   *time.Time
@@ -150,7 +150,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, authAttem
 
 // GetAuthAttemptByID implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) GetAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) (*domain.AuthAttempt, error) {
-	return as.get(ctx, authAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.id = $2`, projectID, storagedb.Identity(authAttemptID))
+	return as.get(ctx, authAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.id = $2`, projectID, database.Identity(authAttemptID))
 }
 
 // GetAuthAttemptByHandoffToken implements [service.AuthAttemptStatements].
@@ -176,7 +176,7 @@ func (as authAttemptStatements) scan(rows pgx.Rows, attempt *domain.AuthAttempt)
 	for rows.Next() {
 		found = true
 		var (
-			attemptID        storagedb.Identity
+			attemptID        database.Identity
 			handoffToken     []byte
 			handedOffAt      *time.Time
 			sessionID        *int64
@@ -260,7 +260,7 @@ func (as authAttemptStatements) scan(rows pgx.Rows, attempt *domain.AuthAttempt)
 
 // DeleteAuthAttemptByID implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) DeleteAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) error {
-	_, err := as.client.Exec(ctx, deleteAuthAttemptByIDStmt, projectID, storagedb.Identity(authAttemptID))
+	_, err := as.client.Exec(ctx, deleteAuthAttemptByIDStmt, projectID, database.Identity(authAttemptID))
 	return wrapError(err)
 }
 
@@ -271,7 +271,7 @@ func (as authAttemptStatements) HandoffAuthAttempt(ctx context.Context, attempt 
 	}
 	var handedOffAt time.Time
 	err := as.client.QueryRow(ctx, handoffAuthAttemptStmt,
-		attempt.ProjectID, storagedb.Identity(attempt.ID), attempt.HandoffToken.TokenHash).Scan(&handedOffAt)
+		attempt.ProjectID, database.Identity(attempt.ID), attempt.HandoffToken.TokenHash).Scan(&handedOffAt)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -288,7 +288,7 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 	var id string
 	var lastChallengedAt time.Time
 	err = as.client.QueryRow(ctx, setAuthAttemptChallengeStmt,
-		projectID, storagedb.Identity(authAttemptID), challenge.Type(), payload).
+		projectID, database.Identity(authAttemptID), challenge.Type(), payload).
 		Scan(&id, &lastChallengedAt)
 	if err != nil {
 		return wrapError(err)
@@ -308,7 +308,7 @@ func (as authAttemptStatements) AuthAttemptChallengeSucceeded(ctx context.Contex
 	}
 	var lastVerifiedAt time.Time
 	err = as.client.QueryRow(ctx, authAttemptChallengeSucceededStmt,
-		projectID, storagedb.Identity(authAttemptID), factor.Type(), factorPayload, challengeID).
+		projectID, database.Identity(authAttemptID), factor.Type(), factorPayload, challengeID).
 		Scan(&lastVerifiedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -325,7 +325,7 @@ func (as authAttemptStatements) AuthAttemptChallengeFailed(ctx context.Context, 
 	var lastFailedAt time.Time
 	var failureCount uint16
 	err := as.client.QueryRow(ctx, authAttemptChallengeFailedStmt,
-		projectID, storagedb.Identity(authAttemptID), challenge.Type(), challenge.GetID()).
+		projectID, database.Identity(authAttemptID), challenge.Type(), challenge.GetID()).
 		Scan(&lastFailedAt, &failureCount)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

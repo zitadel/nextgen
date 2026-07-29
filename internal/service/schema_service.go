@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -64,7 +63,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
 		if err := stmts.CreateJSONSchema(ctx, model); err != nil {
-			if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
+			if _, ok := errors.AsType[*v2database.IntegrityViolationError](err); ok {
 				return domain.ErrJSONSchemaAlreadyExists().WithParent(err)
 			}
 			return domain.ErrInternal(err).WithMessage("failed to create schema in database")
@@ -83,7 +82,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
 		}
-		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
+		if _, ok := errors.AsType[*v2database.IntegrityViolationError](err); ok {
 			return nil, domain.ErrJSONSchemaAlreadyExists().WithParent(err)
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
@@ -114,7 +113,7 @@ func (s *SchemaService) CreateSchemaByUrl(ctx context.Context, input CreateSchem
 func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID string, schemaID string) (*domain.JSONSchema, error) {
 	schema, err := s.v2Pool.Statements().GetJSONSchemaByID(ctx, projectID, schemaID)
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		if _, ok := errors.AsType[*v2database.NoRowFoundError](err); ok {
 			return nil, domain.ErrJSONSchemaNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")

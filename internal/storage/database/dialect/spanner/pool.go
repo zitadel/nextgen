@@ -5,7 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/spanner/migration"
+	migrationpkg "github.com/zitadel/nextgen/internal/storage/v2/dialect/spanner/migration"
 )
 
 type spannerPool struct {
@@ -83,14 +83,14 @@ func (p *spannerPool) Migrate(ctx context.Context) error {
 	if p.isMigrated {
 		return nil
 	}
-	err := migration.Migrate(ctx, p.db)
+	err := migrationpkg.Migrate(ctx, p.db)
 	p.isMigrated = err == nil
 	return wrapError(err)
 }
 
 // MigrateTest implements [database.PoolTest].
 func (p *spannerPool) MigrateTest(ctx context.Context) error {
-	err := migration.Migrate(ctx, p.db)
+	err := migrationpkg.Migrate(ctx, p.db)
 	p.isMigrated = err == nil
 	return err
 }

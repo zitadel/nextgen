@@ -10,7 +10,6 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
-	"github.com/zitadel/nextgen/internal/storage/database"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -132,7 +131,7 @@ func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegist
 	stmts := s.v2Pool.Statements()
 	reg, err := stmts.GetPasskeyRegistration(ctx, in.ProjectID, in.RegistrationID)
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		if _, ok := errors.AsType[*v2database.NoRowFoundError](err); ok {
 			return domain.ErrPasskeyRegistrationNotFound()
 		}
 		return err

@@ -14,7 +14,6 @@ import (
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const projectFieldCreatedAt = "createdAt"
@@ -186,7 +185,7 @@ func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string
 	if cfgProjectID != "" {
 		project, err := s.Get(ctx, cfgProjectID)
 		if err != nil {
-			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			if _, ok := errors.AsType[*v2database.NoRowFoundError](err); ok {
 				return nil, domain.ErrProjectNotFound().
 					WithMessage("configured platform.project_id does not exist").
 					WithDetails(cfgProjectID)
@@ -230,7 +229,7 @@ func (s *projectService) Update(ctx context.Context, id, name string) (*domain.P
 		Name: name,
 	}
 	if err := s.v2Pool.Statements().UpdateProject(ctx, project); err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		if _, ok := errors.AsType[*v2database.NoRowFoundError](err); ok {
 			return nil, domain.ErrProjectNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to update project")

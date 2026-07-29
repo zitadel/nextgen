@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/migration"
+	migrationpkg "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/migration"
 )
 
 func TestMigrateSupportsSingleConnectionPool(t *testing.T) {
@@ -28,5 +28,5 @@ func TestMigrateSupportsSingleConnectionPool(t *testing.T) {
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 
-	require.NoError(t, migration.Migrate(ctx, db))
+	require.NoError(t, migrationpkg.Migrate(ctx, db))
 }

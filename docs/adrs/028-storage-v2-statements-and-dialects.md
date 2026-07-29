@@ -247,7 +247,7 @@ Service wiring lives outside v2:
 | Dialect registry + config decode | Postgres and Spanner registered for v2 connect paths |
 | Entity statements | All product entities on `AllStatements` (projects, flows, schemas, teams, sessions, users/auth factors, branding, …) in postgres + spanner |
 | v1 entity repositories | Removed (`internal/storage/database/repository/` deleted) |
-| Production usage | Services use `service.DB` / statements; startup still dual-pools (v1 connector for migrate + v2 pool for statements) |
+| Production usage | Services use `service.DB` / statements; startup still dual-pools (v1 connector for embedded bring-up; v2 pool for statements + migrations) |
 | Tests | Service-layer mocks; dialect integration tests; API harness builds v2 pool |
 
 ## Worked example: Projects
@@ -299,10 +299,10 @@ embedded postgres, Identity binding, ID generation, and all entity statements.
 These items track remaining infrastructure work after the entity port. Check
 items off as work lands; remove completed entries when no longer useful.
 
-- [ ] Implement `compileColumnName()` mapping from domain field enums to SQL column names
-- [ ] Fix `AndFilter`/`OrFilter` value vs pointer mismatch in postgres compiler
-- [ ] Complete Spanner execution and dialect registration
-- [ ] Move migrations from v1 to v2 dialect packages (postgres + spanner)
+- [x] `compileColumnName()` is no longer a required implementation: v2 compilers derive SQL column names from the schema `SQLName` bindings.
+- [x] `AndFilter`/`OrFilter` value vs pointer handling in the postgres compiler is already implemented and covered by compiler tests.
+- [x] Spanner statement execution and dialect registration are in place; remaining Spanner work is migrate/embedded/dbtest parity under v2.
+- [x] Move migrations from v1 to v2 dialect packages (postgres + spanner)
 - [ ] Move embedded postgres startup to v2 postgres dialect
 - [ ] Move `database.Identity` bind/scan to v2 core
 - [ ] Move ID generation into v2 dialects (ephemeral via DB identity/function; managed fallback via dialect-chosen Go package or DB function); retire domain-layer `idgen` call sites at storage boundary
@@ -332,7 +332,7 @@ items off as work lands; remove completed entries when no longer useful.
 
 ### Negative / Risks (during transition only)
 
-- Temporary dual-pool complexity at startup (v1 for Migrate/Close) until v2 dialects subsume migrations
+- Temporary dual-pool complexity at startup (v1 connector for embedded bring-up; v2 pool for migrations) until the v1 dialect layer is fully retired
 - Spanner still needs per-entity hand-written SQL alongside the shared compiler; acceptable trade-off for dialect clarity
 
 ### Resolved at merge
