@@ -108,19 +108,15 @@ token signing and opaqueness stay upstream of storage.
 
 v2 dialect implementations
 (`internal/storage/v2/dialect/postgres`, `internal/storage/v2/dialect/spanner`)
-must eventually satisfy **both**:
+must eventually own pool, migrations, Identity, and ID generation alongside
+statement execution. Entity and application paths already use statements only;
+v2 transactions are `Statementer`-only and no longer implement v1
+`database.QueryExecutor`.
 
-- v2 statement interfaces (`ProjectStatements`, …)
-- v1 `database.QueryExecutor` / pool contracts (during entity port)
-
-This allows `internal/storage/database/dialect/` to be deleted once all callers
-migrate. The goal is a **single v2 dialect layer**, not permanent dual dialect
+A long-lived v1 pool remains at startup solely for `Migrate` / `Close` until
+migrations move into v2. That is infrastructure leftover, not an app-layer
+bridge. The goal is a **single v2 dialect layer**, not permanent dual dialect
 code.
-
-**Interim bridge:** v2 postgres [`transaction`](../../internal/storage/v2/dialect/postgres/tx.go)
-still implements v1 `database.QueryExecutor` for callers that have not yet
-dropped raw executor use (for example bootstrap seeding and some user-action
-prepare paths). This bridge is a migration aid, not the long-term architecture.
 
 ```mermaid
 flowchart TB
@@ -137,8 +133,8 @@ flowchart TB
         pg["postgres: statement_*.go + compiler.go"]
         sp["spanner: statement_*.go partial"]
     end
-    subgraph interim [Interim during entity port]
-        v1Repos["repository via QueryExecutor bridge"]
+    subgraph interim [Interim infrastructure]
+        v1Migrate["v1 pool for Migrate/Close only"]
     end
     subgraph endState [End state on new-repo]
         v2Only["v2 dialects own pool tx migrations Identity ID gen"]
@@ -150,7 +146,7 @@ flowchart TB
     StatementIfaces --> sp
     pg --> CoreTypes
     DialectReg --> pg
-    pg --> v1Repos
+    v1Migrate -.->|"startup only"| pg
     pg -.-> endState
     sp -.-> endState
 ```
@@ -286,8 +282,8 @@ compiler.compileRead(projectQuery, &database.ListOptions{
 3. **Entity-by-entity port** — **done.** Entity SQL lives in per-dialect
    statement files; `AllStatements` covers product entities; v1 entity
    repository package removed.
-4. **Hybrid transactions (interim)** — v2 tx may still expose v1
-   `QueryExecutor` until remaining callers drop it.
+4. **Hybrid transactions** — **done.** App callers and bootstrap use statements
+   only; v2 tx no longer exposes v1 `QueryExecutor`.
 5. **Retire v1 dialect layer** — delete
    `internal/storage/database/dialect/` once v2 dialects satisfy all contracts
    (migrations, embedded bring-up, Identity, errors).
@@ -312,6 +308,7 @@ items off as work lands; remove completed entries when no longer useful.
 - [ ] Move ID generation into v2 dialects (ephemeral via DB identity/function; managed fallback via dialect-chosen Go package or DB function); retire domain-layer `idgen` call sites at storage boundary
 - [x] Add `internal/storage/v2/AGENTS.md` with v2 conventions (including multi-write `withTransaction` rules)
 - [x] Port remaining entities and remove v1 entity repository package
+- [x] Drop QueryExecutor bridge from app callers and v2 transactions
 - [ ] Retire v1 dialect implementations (`internal/storage/database/dialect/`) once migrations/embedded/Identity live in v2
 
 ## Related ADRs
@@ -335,7 +332,7 @@ items off as work lands; remove completed entries when no longer useful.
 
 ### Negative / Risks (during transition only)
 
-- Temporary dual-stack complexity (two pools, hybrid tx bridge) until v2 dialects subsume v1
+- Temporary dual-pool complexity at startup (v1 for Migrate/Close) until v2 dialects subsume migrations
 - Spanner still needs per-entity hand-written SQL alongside the shared compiler; acceptable trade-off for dialect clarity
 
 ### Resolved at merge

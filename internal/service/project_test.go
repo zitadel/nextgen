@@ -25,7 +25,7 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 	kek *cryptomock.MockCrypter,
 	pool *servicemocks.MockPool,
 	transaction *servicemocks.MockTransactioner[service.AllStatements],
-	statementer *servicemocks.MockStatementerWithQueryExecutor[service.AllStatements],
+	statementer *servicemocks.MockStatementer[service.AllStatements],
 	statements *servicemocks.MockAllStatements,
 ) {
 	t.Helper()
@@ -39,7 +39,7 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 	keyService.EXPECT().GetKekCrypter(gomock.Any()).Return(kek, nil).AnyTimes()
 
 	transaction = servicemocks.NewMockTransactioner[service.AllStatements](mock)
-	statementer = servicemocks.NewMockStatementerWithQueryExecutor[service.AllStatements](mock)
+	statementer = servicemocks.NewMockStatementer[service.AllStatements](mock)
 	statements = servicemocks.NewMockAllStatements(mock)
 
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
