@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 type ReportMoonFailuresModule = {
   actionTarget: (action: unknown) => string | null;
   collectFailedActions: (report: unknown) => unknown[];
+  escapeMarkdownTableCell: (value: string) => string;
   formatFailureReport: (failedActions: unknown[]) => { names: string[]; text: string };
   formatGithubAnnotations: (failedActions: unknown[]) => string[];
   formatStepSummary: (failedActions: unknown[]) => string;
@@ -120,6 +121,20 @@ describe("report-moon-failures", () => {
     expect(formatGithubAnnotations(failed)).toEqual([
       "::error title=Moon task failed::server:format: Task process exited with a non-zero exit code",
     ]);
+  });
+
+  it("escapes backslashes before pipes in markdown table cells", async () => {
+    const { escapeMarkdownTableCell, formatStepSummary } = await loadModule();
+    expect(escapeMarkdownTableCell("a|b\\c")).toBe("a\\|b\\\\c");
+    const summary = formatStepSummary([
+      {
+        label: "RunTask(server:format)",
+        status: "failed",
+        error: "path\\with|pipe",
+        node: { action: "run-task", params: { target: "server:format" } },
+      },
+    ]);
+    expect(summary).toContain("path\\\\with\\|pipe");
   });
 
   it("loads ciReport.json from a cache dir and writes a step summary", async () => {

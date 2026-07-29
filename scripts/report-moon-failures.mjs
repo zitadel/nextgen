@@ -75,6 +75,11 @@ export function formatGithubAnnotations(failedActions) {
   });
 }
 
+/** Escape backslashes before pipes so markdown table cells stay intact. */
+export function escapeMarkdownTableCell(value) {
+  return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
+}
+
 export function formatStepSummary(failedActions) {
   const { names } = formatFailureReport(failedActions);
   const rows = failedActions.map((action) => {
@@ -82,7 +87,7 @@ export function formatStepSummary(failedActions) {
     const status = action?.status ?? "failed";
     const error =
       typeof action?.error === "string" && action.error.trim()
-        ? action.error.trim().replace(/\|/g, "\\|")
+        ? escapeMarkdownTableCell(action.error.trim())
         : "";
     return `| \`${name}\` | ${status} | ${error} |`;
   });
