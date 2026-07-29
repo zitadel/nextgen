@@ -15,8 +15,8 @@ import (
 
 func ensureProject(t *testing.T, projectID string) {
 	t.Helper()
-	v2 := integrationPoolOrFail(t)
-	err := v2.Statements().CreateProject(t.Context(), &domain.Project{
+	pool := integrationPoolOrFail(t)
+	err := pool.Statements().CreateProject(t.Context(), &domain.Project{
 		ID:             projectID,
 		Name:           "project-" + projectID,
 		PreviewOrigins: []string{},
@@ -40,7 +40,7 @@ func handoffCompletedAttempt(
 	mutate func(*domain.AuthAttempt),
 ) (plainToken string, attempt *domain.AuthAttempt) {
 	t.Helper()
-	v2 := integrationPoolOrFail(t)
+	pool := integrationPoolOrFail(t)
 
 	plainToken = "handoff_" + projectID + "_" + time.Now().Format("150405.000000")
 	attempt = &domain.AuthAttempt{
@@ -52,9 +52,9 @@ func handoffCompletedAttempt(
 		mutate(attempt)
 	}
 	ensureProject(t, projectID)
-	require.NoError(t, v2.Statements().CreateAuthAttempt(t.Context(), attempt))
+	require.NoError(t, pool.Statements().CreateAuthAttempt(t.Context(), attempt))
 	attempt.HandoffToken = handoffTokenForIntegration(plainToken)
-	require.NoError(t, v2.Statements().HandoffAuthAttempt(t.Context(), attempt))
+	require.NoError(t, pool.Statements().HandoffAuthAttempt(t.Context(), attempt))
 	return plainToken, attempt
 }
 
