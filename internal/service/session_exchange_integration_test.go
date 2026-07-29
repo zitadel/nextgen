@@ -16,10 +16,9 @@ import (
 
 func newSessionServiceForIntegration(t *testing.T) (service.SessionService, service.SessionConfig) {
 	t.Helper()
-	pool := integrationPoolOrFail(t)
 	cfg := service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}
 	v2Pool := integrationV2PoolOrFail(t)
-	return service.NewSessionService(pool, v2Pool, service.UserStatementsIdentityReader{Pool: v2Pool}, cfg), cfg
+	return service.NewSessionService(v2Pool, service.UserStatementsIdentityReader{Pool: v2Pool}, cfg), cfg
 }
 
 func TestSessionService_Exchange_integration(t *testing.T) {

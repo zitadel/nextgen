@@ -46,12 +46,9 @@ type Harness struct {
 	KeyService            service.KeyService
 	TokenService          service.TokenService
 
-	SchemaStore      domain.JSONSchemaStore
-	SchemaResolver   *domain.JSONSchemaResolver
-	SchemaValidator  *domain.SchemaValidator
-	UserPasswordRepo domain.UserPasswordRepository
-	UserPasskeyRepo  domain.UserPasskeyRepository
-	BrandingRepo     domain.BrandingRepository
+	SchemaStore     domain.JSONSchemaStore
+	SchemaResolver  *domain.JSONSchemaResolver
+	SchemaValidator *domain.SchemaValidator
 
 	TestData test_data.TestData
 }

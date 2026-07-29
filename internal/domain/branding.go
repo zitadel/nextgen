@@ -1,10 +1,7 @@
 package domain
 
 import (
-	"context"
 	"time"
-
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const PrefixBranding ResourcePrefix = "brnd"
@@ -47,6 +44,17 @@ type Branding struct {
 	CreatedAt      time.Time
 }
 
+// BrandingField enumerates the fields of Branding which can be used for
+// filtering and ordering in list operations.
+type BrandingField uint8
+
+const (
+	BrandingFieldUnspecified BrandingField = iota
+	BrandingFieldProjectID
+	BrandingFieldID
+	BrandingFieldCreatedAt
+)
+
 // NewBranding builds a new revision, defaulting the layout, and validates it
 // with the lexical gate in branding_validator.go.
 func NewBranding(projectID string, layout, liquidTemplate, logoURL, fontURL, heroURL string) (*Branding, error) {
@@ -74,34 +82,4 @@ func NewBranding(projectID string, layout, liquidTemplate, logoURL, fontURL, her
 		return nil, err
 	}
 	return b, nil
-}
-
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/branding.mock.go . BrandingRepository
-
-// BrandingRepository stores immutable branding revisions. There is no update
-// or delete: publishing is the only write, mirroring JSON schemas.
-type BrandingRepository interface {
-	Repository
-
-	brandingColumns
-	brandingConditions
-
-	Create(ctx context.Context, client database.QueryExecutor, branding *Branding) error
-	GetByID(ctx context.Context, client database.QueryExecutor, projectID, id string) (*Branding, error)
-	// GetLatest returns the newest revision for the project, or
-	// database.NoRowFoundError when the project has none.
-	GetLatest(ctx context.Context, client database.QueryExecutor, projectID string) (*Branding, error)
-	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*Branding, error)
-}
-
-type brandingColumns interface {
-	ProjectID() database.Column
-	ID() database.Column
-	CreatedAt() database.Column
-	Definition() database.Column
-}
-
-type brandingConditions interface {
-	PrimaryKeyCondition(projectID, id string) database.Condition
-	ProjectIDCondition(projectID string) database.Condition
 }

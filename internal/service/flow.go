@@ -7,7 +7,6 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
-	"github.com/zitadel/nextgen/internal/storage/database"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -70,13 +69,11 @@ type ResolveFlowHint struct {
 }
 
 func NewFlowService(
-	pool database.Pool,
 	v2Pool *DB,
 	stateMachine domain.FlowStateMachine,
 	ids idgen.Generator,
 ) FlowService {
 	return &flowService{
-		pool:         pool,
 		v2Pool:       v2Pool,
 		stateMachine: stateMachine,
 		ids:          ids,
@@ -84,7 +81,6 @@ func NewFlowService(
 }
 
 type flowService struct {
-	pool         database.Pool
 	v2Pool       *DB
 	stateMachine domain.FlowStateMachine
 	ids          idgen.Generator
@@ -225,7 +221,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 		in.AuthRequest = &domain.FlowAuthRequestRef{ID: *req.AuthRequestID}
 	}
 
-	result, err := s.stateMachine.Start(ctx, s.pool, in)
+	result, err := s.stateMachine.Start(ctx, in)
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
@@ -258,7 +254,7 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain
 	if req.SSOProviderID != nil {
 		in.SSOProvider = &domain.FlowSSOProviderRef{ID: *req.SSOProviderID}
 	}
-	result, err := s.stateMachine.Process(ctx, s.pool, def, req.State, in)
+	result, err := s.stateMachine.Process(ctx, def, req.State, in)
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
@@ -278,7 +274,7 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (doma
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
-	result, err := s.stateMachine.Render(ctx, s.pool, def, req.State)
+	result, err := s.stateMachine.Render(ctx, def, req.State)
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
