@@ -135,13 +135,15 @@ func (k *EncryptionKey) DecryptedKey(kek crypto.Decrypter) ([32]byte, error) {
 	return [32]byte(decryptedBs), nil
 }
 
-func (k *EncryptionKey) MigrateToNewKEK(oldKEK crypto.Crypter, newKEK crypto.Crypter) error {
-	decrypted, err := oldKEK.Decrypt(k.Key)
+// MigrateToNewMasterKey re-wraps the key material under newMasterKey without
+// changing the key itself, so nothing encrypted by this key has to be touched.
+func (k *EncryptionKey) MigrateToNewMasterKey(oldMasterKey crypto.Crypter, newMasterKey crypto.Crypter) error {
+	decrypted, err := oldMasterKey.Decrypt(k.Key)
 	if err != nil {
 		return ErrDecryptionFailed(err)
 	}
 
-	encrypted, err := newKEK.Encrypt(decrypted)
+	encrypted, err := newMasterKey.Encrypt(decrypted)
 	if err != nil {
 		return ErrEncryptionFailed(err)
 	}
@@ -197,15 +199,15 @@ func NewMasterKey(
 }
 
 // masterKeyAlgorithm and masterKeyContentEncryption are the JWE algorithms used
-// to wrap keys with a root KEK. RSA-OAEP-256 fixes the OAEP hash to SHA-256.
+// to wrap keys with a master key. RSA-OAEP-256 fixes the OAEP hash to SHA-256.
 const (
 	masterKeyAlgorithm         = jose.RSA_OAEP_256
 	masterKeyContentEncryption = jose.A256GCM
 )
 
-// Encrypt wraps decrypted with the root KEK and returns a JWE compact
-// serialization. The JWE protected header carries the KEK's ID as "kid" so the
-// key can later be resolved without trying every configured KEK.
+// Encrypt wraps decrypted with the master key and returns a JWE compact
+// serialization. The JWE protected header carries the master key's ID as "kid"
+// so the key can later be resolved without trying every configured master key.
 func (k *MasterKey) Encrypt(decrypted string) (string, error) {
 	encrypter, err := jose.NewEncrypter(
 		masterKeyContentEncryption,

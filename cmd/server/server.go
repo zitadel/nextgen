@@ -112,7 +112,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return nil
 	})
 
-	masterKey, err := buildMasterKey(cfg.Server.EncryptionKeys)
+	masterKey, err := buildMasterKey(cfg.Server.MasterKeys)
 	if err != nil {
 		return fmt.Errorf("failed to create Crypter: %w", err)
 	}
@@ -294,11 +294,11 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	//       any keys. So nothing breaks. But there is no need to recompute the
 	//       same thing multiple times.
 	go func() {
-		slog.Info("migrate KEKs")
+		slog.Info("migrate keys to latest master key")
 		if err := keyService.MigrateToLatestMasterKey(ctx); err != nil {
-			slog.Error("error during KEK migration", slog.Any(slogctx.ErrKey, err))
+			slog.Error("error during master key migration", slog.Any(slogctx.ErrKey, err))
 		}
-		slog.Debug("KEK migration done")
+		slog.Debug("master key migration done")
 	}()
 
 	select {
@@ -410,7 +410,7 @@ func loadConfig(configPath string) (Config, error) {
 	if err := v.Unmarshal(&cfg); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w", err)
 	}
-	if err := ensureServerKEK(&cfg.Server); err != nil {
+	if err := ensureServerMasterKey(&cfg.Server); err != nil {
 		return Config{}, err
 	}
 
@@ -527,7 +527,7 @@ func embeddedPostgresOptions(dataDir string) embedded.Options {
 
 // ----------------------------- CRYPTO --------------------------------------
 
-func buildMasterKey(keyConfigs map[string]*EncryptionKeyConfig) (*domain.MasterKeys, error) {
+func buildMasterKey(keyConfigs map[string]*MasterKeyConfig) (*domain.MasterKeys, error) {
 	ks := make([]domain.MasterKey, 0, len(keyConfigs))
 	for id, cfg := range keyConfigs {
 		if cfg == nil || (cfg.PrivateKey == "" && cfg.File == "") {
@@ -554,12 +554,12 @@ func buildMasterKey(keyConfigs map[string]*EncryptionKeyConfig) (*domain.MasterK
 		))
 	}
 
-	keks, err := domain.NewMasterKeys(ks)
+	masterKeys, err := domain.NewMasterKeys(ks)
 	if err != nil {
 		return nil, fmt.Errorf("server: %w", err)
 	}
 
-	return keks, nil
+	return masterKeys, nil
 }
 
 // ----------------------------- INSTRUMENTATION --------------------------------------

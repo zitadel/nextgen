@@ -241,17 +241,17 @@ func TestKeyService_GetProjectCrypter(t *testing.T) {
 	})
 }
 
-// newRootKEK builds a root KEK backed by a fresh RSA key. A 2048-bit key keeps
+// newMasterKey builds a master key backed by a fresh RSA key. A 2048-bit key keeps
 // the test fast while remaining large enough to wrap a 256-bit content key.
-func newRootKEK(t *testing.T, id string, useForEncryption bool) domain.MasterKey {
+func newMasterKey(t *testing.T, id string, useForEncryption bool) domain.MasterKey {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 	return domain.NewMasterKey(id, *key, useForEncryption)
 }
 
-// newMigrationKeyService wires a key service around the given root KEKs.
-func newMigrationKeyService(t *testing.T, keks ...domain.MasterKey) (service.KeyService, *servicemocks.MockAllStatements) {
+// newMigrationKeyService wires a key service around the given master keys.
+func newMigrationKeyService(t *testing.T, masterKeys ...domain.MasterKey) (service.KeyService, *servicemocks.MockAllStatements) {
 	t.Helper()
 
 	ctrl := gomock.NewController(t)
@@ -259,22 +259,22 @@ func newMigrationKeyService(t *testing.T, keks ...domain.MasterKey) (service.Key
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
 
-	rootKEKs, err := domain.NewMasterKeys(keks)
+	allMasterKeys, err := domain.NewMasterKeys(masterKeys)
 	require.NoError(t, err)
 
-	return service.NewKeyService(service.NewPool(pool), *rootKEKs), statements
+	return service.NewKeyService(service.NewPool(pool), *allMasterKeys), statements
 }
 
-// newWrappedDEK returns an encryption key whose material is wrapped by the given
+// newWrappedKEK returns a project KEK whose material is wrapped by the given
 // crypter, together with the raw material for later verification.
-func newWrappedKEK(t *testing.T, id string, kek nextgencrypto.Encrypter) (*domain.EncryptionKey, string) {
+func newWrappedKEK(t *testing.T, id string, masterKey nextgencrypto.Encrypter) (*domain.EncryptionKey, string) {
 	t.Helper()
 
 	var raw [32]byte
 	_, err := rand.Read(raw[:])
 	require.NoError(t, err)
 
-	wrapped, err := kek.Encrypt(string(raw[:]))
+	wrapped, err := masterKey.Encrypt(string(raw[:]))
 	require.NoError(t, err)
 
 	return &domain.EncryptionKey{
@@ -290,22 +290,22 @@ func listResult(keys ...*domain.EncryptionKey) *databasev2.ListResult[*domain.En
 	return &databasev2.ListResult[*domain.EncryptionKey]{Items: keys}
 }
 
-func TestKeyService_MigrateToLatestRootKEK(t *testing.T) {
+func TestKeyService_MigrateToLatestMasterKey(t *testing.T) {
 	t.Parallel()
 
-	t.Run("re-wraps a key encrypted with an older root kek", func(t *testing.T) {
+	t.Run("re-wraps a key encrypted with an older master key", func(t *testing.T) {
 		t.Parallel()
 
 		// ARRANGE
-		oldKEK := newRootKEK(t, "old-kek", false)
-		newKEK := newRootKEK(t, "new-kek", true)
-		svc, statements := newMigrationKeyService(t, oldKEK, newKEK)
+		oldMasterKey := newMasterKey(t, "old-master-key", false)
+		newMasterKey := newMasterKey(t, "new-master-key", true)
+		svc, statements := newMigrationKeyService(t, oldMasterKey, newMasterKey)
 
-		dek, raw := newWrappedKEK(t, "project-kek-1", &oldKEK)
+		kek, raw := newWrappedKEK(t, "project-kek-1", &oldMasterKey)
 
 		statements.EXPECT().
 			ListEncryptionKeys(gomock.Any(), gomock.Any()).
-			Return(listResult(dek), nil)
+			Return(listResult(kek), nil)
 
 		var migratedKey string
 		statements.EXPECT().
@@ -319,47 +319,47 @@ func TestKeyService_MigrateToLatestRootKEK(t *testing.T) {
 		err := svc.MigrateToLatestMasterKey(t.Context())
 		require.NoError(t, err)
 
-		// ASSERT: the key is now wrapped by the latest root kek and still
+		// ASSERT: the key is now wrapped by the latest master key and still
 		// decrypts to the original material.
 		header, err := domain.DecodeJWEHeader(migratedKey)
 		require.NoError(t, err)
-		assert.Equal(t, "new-kek", header.KeyID)
+		assert.Equal(t, "new-master-key", header.KeyID)
 
-		decrypted, err := newKEK.Decrypt(migratedKey)
+		decrypted, err := newMasterKey.Decrypt(migratedKey)
 		require.NoError(t, err)
 		assert.Equal(t, raw, decrypted)
 	})
 
-	t.Run("skips a key already wrapped by the latest root kek", func(t *testing.T) {
+	t.Run("skips a key already wrapped by the latest master key", func(t *testing.T) {
 		t.Parallel()
 
 		// ARRANGE
-		oldKEK := newRootKEK(t, "old-kek", false)
-		newKEK := newRootKEK(t, "new-kek", true)
-		svc, statements := newMigrationKeyService(t, oldKEK, newKEK)
+		oldMasterKey := newMasterKey(t, "old-master-key", false)
+		newMasterKey := newMasterKey(t, "new-master-key", true)
+		svc, statements := newMigrationKeyService(t, oldMasterKey, newMasterKey)
 
-		dek, _ := newWrappedKEK(t, "dek-1", &newKEK)
+		kek, _ := newWrappedKEK(t, "kek-1", &newMasterKey)
 
 		// No UpdateKey call is expected: the mock controller fails the test if
 		// one happens.
 		statements.EXPECT().
 			ListEncryptionKeys(gomock.Any(), gomock.Any()).
-			Return(listResult(dek), nil)
+			Return(listResult(kek), nil)
 
 		// ACT + ASSERT
 		require.NoError(t, svc.MigrateToLatestMasterKey(t.Context()))
 	})
 
-	t.Run("skips a key wrapped by a non-root key", func(t *testing.T) {
+	t.Run("skips a key wrapped by a project kek", func(t *testing.T) {
 		t.Parallel()
 
 		// ARRANGE
-		newKEK := newRootKEK(t, "new-kek", true)
-		svc, statements := newMigrationKeyService(t, newKEK)
+		newMasterKey := newMasterKey(t, "new-master-key", true)
+		svc, statements := newMigrationKeyService(t, newMasterKey)
 
-		// Wrapped by a DEK crypter, so its kid is not a root kek.
-		dekCrypter := op.NewAES256GCMCrypto([32]byte([]byte("MasterkeyNeedsToHave32Characters")), "some-dek-id")
-		key, _ := newWrappedKEK(t, "tek-1", dekCrypter)
+		// Wrapped by a project KEK crypter, so its kid is not a master key.
+		kekCrypter := op.NewAES256GCMCrypto([32]byte([]byte("MasterkeyNeedsToHave32Characters")), "some-kek-id")
+		key, _ := newWrappedKEK(t, "tek-1", kekCrypter)
 
 		statements.EXPECT().
 			ListEncryptionKeys(gomock.Any(), gomock.Any()).
@@ -373,24 +373,24 @@ func TestKeyService_MigrateToLatestRootKEK(t *testing.T) {
 		t.Parallel()
 
 		// ARRANGE
-		oldKEK := newRootKEK(t, "old-kek", false)
-		newKEK := newRootKEK(t, "new-kek", true)
-		svc, statements := newMigrationKeyService(t, oldKEK, newKEK)
+		oldMasterKey := newMasterKey(t, "old-master-key", false)
+		newMasterKey := newMasterKey(t, "new-master-key", true)
+		svc, statements := newMigrationKeyService(t, oldMasterKey, newMasterKey)
 
-		dek1, _ := newWrappedKEK(t, "dek-1", &oldKEK)
-		dek2, _ := newWrappedKEK(t, "dek-2", &oldKEK)
+		kek1, _ := newWrappedKEK(t, "kek-1", &oldMasterKey)
+		kek2, _ := newWrappedKEK(t, "kek-2", &oldMasterKey)
 
 		// First page carries a cursor so the service fetches a second page.
 		gomock.InOrder(
 			statements.EXPECT().
 				ListEncryptionKeys(gomock.Any(), gomock.Any()).
 				Return(&databasev2.ListResult[*domain.EncryptionKey]{
-					Items:      []*domain.EncryptionKey{dek1},
+					Items:      []*domain.EncryptionKey{kek1},
 					NextCursor: []byte("cursor-1"),
 				}, nil),
 			statements.EXPECT().
 				ListEncryptionKeys(gomock.Any(), gomock.Any()).
-				Return(listResult(dek2), nil),
+				Return(listResult(kek2), nil),
 		)
 
 		migrated := make(map[string]string)
@@ -410,7 +410,7 @@ func TestKeyService_MigrateToLatestRootKEK(t *testing.T) {
 		for id, key := range migrated {
 			header, err := domain.DecodeJWEHeader(key)
 			require.NoErrorf(t, err, "key %s", id)
-			assert.Equalf(t, "new-kek", header.KeyID, "key %s", id)
+			assert.Equalf(t, "new-master-key", header.KeyID, "key %s", id)
 		}
 	})
 
@@ -418,7 +418,7 @@ func TestKeyService_MigrateToLatestRootKEK(t *testing.T) {
 		t.Parallel()
 
 		// ARRANGE
-		svc, statements := newMigrationKeyService(t, newRootKEK(t, "new-kek", true))
+		svc, statements := newMigrationKeyService(t, newMasterKey(t, "new-master-key", true))
 		sentinel := errors.New("connection refused")
 
 		statements.EXPECT().

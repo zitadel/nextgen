@@ -18,8 +18,7 @@ import (
 )
 
 type Harness struct {
-	encryptionKey dependency[[]byte]
-	signingKey    dependency[*rsa.PrivateKey]
+	signingKey dependency[*rsa.PrivateKey]
 
 	dBPool          dependency[database.Pool]
 	dB              dependency[*service.DB]

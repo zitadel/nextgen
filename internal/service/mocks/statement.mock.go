@@ -357,17 +357,17 @@ func (c *MockAllStatementsCreateBrandingCall) DoAndReturn(f func(context.Context
 }
 
 // CreateEncryptionKey mocks base method.
-func (m *MockAllStatements) CreateEncryptionKey(ctx context.Context, dek *domain.EncryptionKey) error {
+func (m *MockAllStatements) CreateEncryptionKey(ctx context.Context, key *domain.EncryptionKey) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateEncryptionKey", ctx, dek)
+	ret := m.ctrl.Call(m, "CreateEncryptionKey", ctx, key)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateEncryptionKey indicates an expected call of CreateEncryptionKey.
-func (mr *MockAllStatementsMockRecorder) CreateEncryptionKey(ctx, dek any) *MockAllStatementsCreateEncryptionKeyCall {
+func (mr *MockAllStatementsMockRecorder) CreateEncryptionKey(ctx, key any) *MockAllStatementsCreateEncryptionKeyCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEncryptionKey", reflect.TypeOf((*MockAllStatements)(nil).CreateEncryptionKey), ctx, dek)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEncryptionKey", reflect.TypeOf((*MockAllStatements)(nil).CreateEncryptionKey), ctx, key)
 	return &MockAllStatementsCreateEncryptionKeyCall{Call: call}
 }
 
@@ -3671,17 +3671,17 @@ func (m *MockCryptoKeyStatements) EXPECT() *MockCryptoKeyStatementsMockRecorder 
 }
 
 // CreateEncryptionKey mocks base method.
-func (m *MockCryptoKeyStatements) CreateEncryptionKey(ctx context.Context, dek *domain.EncryptionKey) error {
+func (m *MockCryptoKeyStatements) CreateEncryptionKey(ctx context.Context, key *domain.EncryptionKey) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateEncryptionKey", ctx, dek)
+	ret := m.ctrl.Call(m, "CreateEncryptionKey", ctx, key)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateEncryptionKey indicates an expected call of CreateEncryptionKey.
-func (mr *MockCryptoKeyStatementsMockRecorder) CreateEncryptionKey(ctx, dek any) *MockCryptoKeyStatementsCreateEncryptionKeyCall {
+func (mr *MockCryptoKeyStatementsMockRecorder) CreateEncryptionKey(ctx, key any) *MockCryptoKeyStatementsCreateEncryptionKeyCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEncryptionKey", reflect.TypeOf((*MockCryptoKeyStatements)(nil).CreateEncryptionKey), ctx, dek)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEncryptionKey", reflect.TypeOf((*MockCryptoKeyStatements)(nil).CreateEncryptionKey), ctx, key)
 	return &MockCryptoKeyStatementsCreateEncryptionKeyCall{Call: call}
 }
 

@@ -99,9 +99,10 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 		return nil, domain.ErrInternal(err).WithMessage("failed to decode decryption key")
 	}
 
-	// TODO match the key id with the key id from one of the master keys once they are implemented
-	if kek := s.masterKeys.GetByKeyID(jweHeader.KeyID); kek != nil {
-		return key.Crypter(kek)
+	// A key wrapped directly by a master key carries that master key's ID; every
+	// other key is wrapped by the project KEK and resolved recursively below.
+	if masterKey := s.masterKeys.GetByKeyID(jweHeader.KeyID); masterKey != nil {
+		return key.Crypter(masterKey)
 	}
 
 	kek, err := s.GetCrypter(ctx, jweHeader.KeyID, jweHeader.EncryptionAlgorithm)
@@ -183,18 +184,19 @@ func (s *keyService) MigrateToLatestMasterKey(ctx context.Context) error {
 			continue
 		}
 
-		kek := s.masterKeys.GetByKeyID(jweHeader.KeyID)
-		if kek == nil {
-			// if no key is encrypted by another key than the kek, we don't need to migrate
+		masterKey := s.masterKeys.GetByKeyID(jweHeader.KeyID)
+		if masterKey == nil {
+			// the key is wrapped by a project KEK rather than a master key, so
+			// master key rotation does not touch it
 			continue
 		}
 
-		if kek.ID == s.masterKeys.EncryptionKey.ID {
-			// if key already the latest kek, we don't need to migrate
+		if masterKey.ID == s.masterKeys.EncryptionKey.ID {
+			// already wrapped by the latest master key, nothing to migrate
 			continue
 		}
 
-		if err = key.MigrateToNewKEK(kek, new(s.masterKeys.EncryptionKey)); err != nil {
+		if err = key.MigrateToNewMasterKey(masterKey, new(s.masterKeys.EncryptionKey)); err != nil {
 			errs = append(errs, domain.ErrInternal(err).
 				WithMessage("failed to migrate key").
 				WithDetails(map[string]any{"keyID": key.ID}))
