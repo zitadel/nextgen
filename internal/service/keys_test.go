@@ -153,7 +153,7 @@ func TestKeyService_GetCrypter(t *testing.T) {
 	})
 }
 
-func TestKeyService_GetProjectDEKCrypter(t *testing.T) {
+func TestKeyService_GetProjectCrypter(t *testing.T) {
 	t.Parallel()
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
