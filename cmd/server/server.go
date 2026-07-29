@@ -38,7 +38,6 @@ import (
 	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
-	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
 	postgresembedded "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/embedded"
 )
 
@@ -96,13 +95,13 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 
 	setUpLogging(cfg.Instrumentation.Log, metrics.LoggerProvider())
 
-	v2Pool, err := startDatabase(ctx, cfg)
+	pool, err := startDatabase(ctx, cfg)
 	if err != nil {
 		return err
 	}
 	sfs.Add(func(ctx context.Context) error {
-		if err := v2Pool.Close(ctx); err != nil {
-			return fmt.Errorf("failed close v2 database pool: %w", err)
+		if err := pool.Close(ctx); err != nil {
+			return fmt.Errorf("failed to close database pool: %w", err)
 		}
 		return nil
 	})
@@ -118,7 +117,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	// ── Repositories ─────────────────
-	serviceDBPool := service.NewPool(v2Pool.(service.Pool))
+	serviceDBPool := service.NewPool(pool.(service.Pool))
 	schemaStore := serviceDBPool.Statements()
 	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
 
@@ -472,14 +471,14 @@ func startDatabase(ctx context.Context, cfg Config) (database.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
-	v2Pool, err := database.Connect(ctx, dialect)
+	pool, err := database.Connect(ctx, dialect)
 	if err != nil {
 		return nil, err
 	}
-	if err := v2Pool.Migrate(ctx); err != nil {
+	if err := pool.Migrate(ctx); err != nil {
 		return nil, err
 	}
-	return v2Pool, nil
+	return pool, nil
 }
 
 func buildDatabaseDialect(cfg Config) (database.Dialect, error) {
@@ -489,7 +488,7 @@ func buildDatabaseDialect(cfg Config) (database.Dialect, error) {
 		return postgresembedded.NewDialect(options), nil
 	}
 
-	dialect, err := database.Config{Raw: cfg.Database.Raw}.Build()
+	dialect, err := cfg.Database.Build()
 	if err != nil {
 		return nil, fmt.Errorf("build database dialect: %w", err)
 	}
