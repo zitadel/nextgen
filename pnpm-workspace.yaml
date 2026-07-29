@@ -69,7 +69,7 @@ catalog:
   jsdom: ^29.0.2
   json-schema-typed: ^8.0.2
   lightningcss: ^1.30.1
-  liquidjs: ^10.26.0
+  liquidjs: ^10.27.1
   lit: ^3.3.2
   lucide: ^1.16.0
   lucide-react: ^1.16.0
@@ -82,9 +82,9 @@ catalog:
   playwright: ^1.60.0
   prettier: ^3.0.0
   radix-ui: ^1.6.4
-  react: ^19.2.5
-  react-dom: ^19.2.5
-  react-server-dom-webpack: 19.2.5
+  react: ^19.2.8
+  react-dom: ^19.2.8
+  react-server-dom-webpack: 19.2.8
   safe-stable-stringify: ^2.5.0
   sharp: ^0.35.3
   shiki: ^4.2.0
