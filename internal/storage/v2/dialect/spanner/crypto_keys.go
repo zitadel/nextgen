@@ -7,6 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
 
 const (
@@ -19,6 +20,7 @@ const (
 	SELECT id, project_id, key, algorithm, state, created_at, activated_at, retired_at, purpose
 	FROM encryption_keys
 `
+	updateEncryptionKeyStmt = `UPDATE encryption_keys SET key = @p2 WHERE id = @p1`
 )
 
 type cryptoKeyStatements struct{ statement }
@@ -74,6 +76,51 @@ func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter databa
 		return nil, errTooManyRows
 	}
 	return keys[0], nil
+}
+
+// ListEncryptionKeys implements [service.CryptoKeyStatements].
+func (s cryptoKeyStatements) ListEncryptionKeys(ctx context.Context, opts *database.ListOptions[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error) {
+	if opts == nil {
+		opts = &database.ListOptions[domain.EncryptionKeyField]{}
+	}
+
+	var compiler statementCompiler
+	if err := compileRead(&compiler, encryptionKeyQuery, opts, encryptionKeySchema); err != nil {
+		return nil, err
+	}
+
+	var keys []*domain.EncryptionKey
+	err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		keys, err = collectRows(iter, s.scanEncryptionKey)
+		return err
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+
+	var nextCursor []byte
+	if opts.Pagination.Limit > 0 && len(keys) == int(opts.Pagination.Limit) {
+		cursor := &pagination.Cursor[domain.EncryptionKeyField]{
+			Columns: opts.Pagination.OrderBy.Columns,
+			Values:  encryptionKeySchema.ValuesFrom(keys[len(keys)-1], opts.Pagination.OrderBy.Columns),
+		}
+		nextCursor = cursor.Marshal()
+	}
+
+	return &database.ListResult[*domain.EncryptionKey]{
+		Items:      keys,
+		NextCursor: nextCursor,
+	}, nil
+}
+
+// UpdateKey implements [service.CryptoKeyStatements].
+func (s cryptoKeyStatements) UpdateKey(ctx context.Context, id string, key string) error {
+	stmt := buildStatement(updateEncryptionKeyStmt, id, key).statement()
+	if _, err := s.db.Update(ctx, stmt); err != nil {
+		return wrapError(err)
+	}
+	return nil
 }
 
 func (s cryptoKeyStatements) scanEncryptionKey(row *spanner.Row) (*domain.EncryptionKey, error) {

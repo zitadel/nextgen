@@ -15,7 +15,6 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 type passkeyRegState struct {
@@ -65,8 +64,8 @@ type passkeyUserState struct {
 func (s *passkeyUserState) expectUserPasskeys(stmts *servicemocks.MockAllStatements) {
 	stmts.EXPECT().
 		ListUserPasskeys(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, _ *v2database.ListOptions[domain.UserPasskeyField]) (*v2database.ListResult[*domain.UserPasskey], error) {
-			return &v2database.ListResult[*domain.UserPasskey]{Items: s.listed}, nil
+		DoAndReturn(func(_ context.Context, _ *database.ListOptions[domain.UserPasskeyField]) (*database.ListResult[*domain.UserPasskey], error) {
+			return &database.ListResult[*domain.UserPasskey]{Items: s.listed}, nil
 		}).AnyTimes()
 	stmts.EXPECT().
 		CreateUserPasskey(gomock.Any(), gomock.Any()).

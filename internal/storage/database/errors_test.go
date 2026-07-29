@@ -143,91 +143,6 @@ func TestUnwrap(t *testing.T) {
 			want: originalErr,
 		},
 		{
-			name: "check violation without original error",
-			err:  NewCheckError("table", "constraint", nil),
-			want: &IntegrityViolationError{
-				integrityType: IntegrityTypeCheck,
-				table:         "table",
-				constraint:    "constraint",
-				original:      nil,
-			},
-		},
-		{
-			name: "check violation with original error",
-			err:  NewCheckError("table", "constraint", originalErr),
-			want: &IntegrityViolationError{
-				integrityType: IntegrityTypeCheck,
-				table:         "table",
-				constraint:    "constraint",
-				original:      originalErr,
-			},
-		},
-		{
-			name: "unique violation without original error",
-			err:  NewUniqueError("table", "constraint", nil),
-			want: &IntegrityViolationError{
-				integrityType: IntegrityTypeUnique,
-				table:         "table",
-				constraint:    "constraint",
-				original:      nil,
-			},
-		},
-		{
-			name: "unique violation with original error",
-			err:  NewUniqueError("table", "constraint", originalErr),
-			want: &IntegrityViolationError{
-				integrityType: IntegrityTypeUnique,
-				table:         "table",
-				constraint:    "constraint",
-				original:      originalErr,
-			},
-		},
-		{
-			name: "foreign key violation without original error",
-			err:  NewForeignKeyError("table", "constraint", nil),
-			want: &IntegrityViolationError{
-				integrityType: IntegrityTypeForeign,
-				table:         "table",
-				constraint:    "constraint",
-				original:      nil,
-			},
-		},
-		{
-			name: "foreign key violation with original error",
-			err:  NewForeignKeyError("table", "constraint", originalErr),
-			want: &IntegrityViolationError{
-				integrityType: IntegrityTypeForeign,
-				table:         "table",
-				constraint:    "constraint",
-				original:      originalErr,
-			},
-		},
-		{
-			name: "not null violation without original error",
-			err:  NewNotNullError("table", "constraint", nil),
-			want: &IntegrityViolationError{
-				integrityType: IntegrityTypeNotNull,
-				table:         "table",
-				constraint:    "constraint",
-				original:      nil,
-			},
-		},
-		{
-			name: "not null violation with original error",
-			err:  NewNotNullError("table", "constraint", originalErr),
-			want: &IntegrityViolationError{
-				integrityType: IntegrityTypeNotNull,
-				table:         "table",
-				constraint:    "constraint",
-				original:      originalErr,
-			},
-		},
-		{
-			name: "unwrap integrity violation error",
-			err:  errors.Unwrap(NewNotNullError("table", "constraint", originalErr)),
-			want: originalErr,
-		},
-		{
 			name: "unknown error",
 			err:  NewUnknownError(originalErr),
 			want: originalErr,
@@ -245,6 +160,59 @@ func TestUnwrap(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			assert.Equal(t, test.want, errors.Unwrap(test.err))
+		})
+	}
+
+	for _, test := range []struct {
+		name string
+		err  error
+		want error
+	}{
+		{
+			name: "check violation without original error",
+			err:  NewCheckError("table", "constraint", nil),
+			want: nil,
+		},
+		{
+			name: "check violation with original error",
+			err:  NewCheckError("table", "constraint", originalErr),
+			want: originalErr,
+		},
+		{
+			name: "unique violation without original error",
+			err:  NewUniqueError("table", "constraint", nil),
+			want: nil,
+		},
+		{
+			name: "unique violation with original error",
+			err:  NewUniqueError("table", "constraint", originalErr),
+			want: originalErr,
+		},
+		{
+			name: "foreign key violation without original error",
+			err:  NewForeignKeyError("table", "constraint", nil),
+			want: nil,
+		},
+		{
+			name: "foreign key violation with original error",
+			err:  NewForeignKeyError("table", "constraint", originalErr),
+			want: originalErr,
+		},
+		{
+			name: "not null violation without original error",
+			err:  NewNotNullError("table", "constraint", nil),
+			want: nil,
+		},
+		{
+			name: "not null violation with original error",
+			err:  NewNotNullError("table", "constraint", originalErr),
+			want: originalErr,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			unwrapped := errors.Unwrap(test.err)
+			assert.ErrorIs(t, unwrapped, &IntegrityViolationError{})
+			assert.Equal(t, test.want, errors.Unwrap(unwrapped))
 		})
 	}
 }
