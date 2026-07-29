@@ -23,22 +23,23 @@ type KeyService interface {
 	GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (*domain.SigningKey, error)
 	GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (jose.Signer, error)
 	GetMasterKeyCrypter(ctx context.Context) (op.Crypto, error)
+	MigrateToLatestMasterKey(ctx context.Context) error
 }
 
 // ---- Implementation -------------------------------------------------------------
 
 type keyService struct {
-	db        *DB
-	masterKey op.Crypto
+	db         *DB
+	masterKeys domain.MasterKeys
 }
 
 func NewKeyService(
 	db *DB,
-	masterKey op.Crypto,
+	masterKeys domain.MasterKeys,
 ) KeyService {
 	return &keyService{
-		db:        db,
-		masterKey: masterKey,
+		db:         db,
+		masterKeys: masterKeys,
 	}
 }
 
@@ -99,8 +100,8 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 	}
 
 	// TODO match the key id with the key id from one of the master keys once they are implemented
-	if jweHeader.KeyID == "" && jweHeader.EncryptionAlgorithm == jose.A256GCM {
-		return key.Crypter(s.masterKey)
+	if kek := s.masterKeys.GetByKeyID(jweHeader.KeyID); kek != nil {
+		return key.Crypter(kek)
 	}
 
 	kek, err := s.GetCrypter(ctx, jweHeader.KeyID, jweHeader.EncryptionAlgorithm)
@@ -143,5 +144,71 @@ func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, pur
 }
 
 func (s *keyService) GetMasterKeyCrypter(context.Context) (op.Crypto, error) {
-	return s.masterKey, nil
+	return s.masterKeys, nil
+}
+
+func (s *keyService) MigrateToLatestMasterKey(ctx context.Context) error {
+	opts := &database2.ListOptions[domain.EncryptionKeyField]{
+		Pagination: database2.Page[domain.EncryptionKeyField]{
+			Limit: 100,
+			OrderBy: database2.OrderBy[domain.EncryptionKeyField]{
+				Columns: []database2.Column[domain.EncryptionKeyField]{
+					database2.Col(domain.EncryptionKeyFieldID),
+				},
+			},
+		},
+	}
+
+	keys, err := s.db.Statements().ListEncryptionKeys(ctx, opts)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to get keys from database")
+	}
+
+	var errs []error
+
+	for key, err := range keys.Iterate(func(cursor []byte) (*database2.ListResult[*domain.EncryptionKey], error) {
+		opts.Pagination.Cursor = cursor
+		return s.db.Statements().ListEncryptionKeys(ctx, opts)
+	}) {
+		if err != nil {
+			errs = append(errs, domain.ErrInternal(err).WithMessage("failed to list keys from database"))
+			break
+		}
+
+		jweHeader, err := domain.DecodeJWEHeader(key.Key)
+		if err != nil {
+			errs = append(errs, domain.ErrInternal(err).
+				WithMessage("failed to decode JWE header").
+				WithDetails(map[string]any{"keyID": key.ID}))
+			continue
+		}
+
+		kek := s.masterKeys.GetByKeyID(jweHeader.KeyID)
+		if kek == nil {
+			// if no key is encrypted by another key than the kek, we don't need to migrate
+			continue
+		}
+
+		if kek.ID == s.masterKeys.EncryptionKey.ID {
+			// if key already the latest kek, we don't need to migrate
+			continue
+		}
+
+		if err = key.MigrateToNewKEK(kek, new(s.masterKeys.EncryptionKey)); err != nil {
+			errs = append(errs, domain.ErrInternal(err).
+				WithMessage("failed to migrate key").
+				WithDetails(map[string]any{"keyID": key.ID}))
+			continue
+		}
+
+		if err = s.db.Statements().UpdateKey(ctx, key.ID, key.Key); err != nil {
+			errs = append(errs, domain.ErrInternal(err).WithMessage("failed to save migrated key to the database"))
+			continue
+		}
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	return nil
 }

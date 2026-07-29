@@ -315,3 +315,41 @@ func (c *MockKeyServiceGetProjectSigningKeyCall) DoAndReturn(f func(context.Cont
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
+
+// MigrateToLatestMasterKey mocks base method.
+func (m *MockKeyService) MigrateToLatestMasterKey(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MigrateToLatestMasterKey", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MigrateToLatestMasterKey indicates an expected call of MigrateToLatestMasterKey.
+func (mr *MockKeyServiceMockRecorder) MigrateToLatestMasterKey(ctx any) *MockKeyServiceMigrateToLatestMasterKeyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MigrateToLatestMasterKey", reflect.TypeOf((*MockKeyService)(nil).MigrateToLatestMasterKey), ctx)
+	return &MockKeyServiceMigrateToLatestMasterKeyCall{Call: call}
+}
+
+// MockKeyServiceMigrateToLatestMasterKeyCall wrap *gomock.Call
+type MockKeyServiceMigrateToLatestMasterKeyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockKeyServiceMigrateToLatestMasterKeyCall) Return(arg0 error) *MockKeyServiceMigrateToLatestMasterKeyCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockKeyServiceMigrateToLatestMasterKeyCall) Do(f func(context.Context) error) *MockKeyServiceMigrateToLatestMasterKeyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockKeyServiceMigrateToLatestMasterKeyCall) DoAndReturn(f func(context.Context) error) *MockKeyServiceMigrateToLatestMasterKeyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}

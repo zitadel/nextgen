@@ -22,8 +22,8 @@ type CreateUserInput struct {
 }
 
 type UserAction interface {
-	Prepare(ctx context.Context, db database.QueryExecutor) error
-	Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error
+	Prepare(ctx context.Context) error
+	Apply(ctx context.Context, stmts AllStatements) error
 }
 
 type SetPasswordInput struct {
@@ -62,20 +62,17 @@ type GetMyUserInput struct {
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
-	pool        database.Pool
 	v2Pool      StatementPool
 	schemaStore domain.JSONSchemaStore
 	hasher      crypto.Hasher
 }
 
 func NewUserService(
-	pool database.Pool,
 	v2Pool StatementPool,
 	schemaStore domain.JSONSchemaStore,
 	hasher crypto.Hasher,
 ) *UserService {
 	return &UserService{
-		pool:        pool,
 		v2Pool:      v2Pool,
 		schemaStore: schemaStore,
 		hasher:      hasher,
@@ -84,19 +81,15 @@ func NewUserService(
 
 func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (err error) {
 	for _, action := range actions {
-		err = action.Prepare(ctx, s.pool)
+		err = action.Prepare(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		qtx, ok := tx.(StatementerWithQueryExecutor[AllStatements])
-		if !ok {
-			return domain.ErrInternal(nil).WithMessage("transaction does not support query execution")
-		}
 		for _, action := range actions {
-			if err := action.Apply(ctx, qtx); err != nil {
+			if err := action.Apply(ctx, tx.Statements()); err != nil {
 				return err
 			}
 		}
@@ -113,7 +106,7 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
 	action := NewCreateUserAction(input, s.schemaStore)
-	err = action.Prepare(ctx, s.pool)
+	err = action.Prepare(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +239,7 @@ func NewCreateUserAction(input CreateUserInput, schemaStore domain.JSONSchemaSto
 	}
 }
 
-func (o *CreateUserAction) Prepare(ctx context.Context, db database.QueryExecutor) error {
+func (o *CreateUserAction) Prepare(ctx context.Context) error {
 	schemaURL, err := domain.SchemaFromUserMap(o.User)
 	if err != nil {
 		return err
@@ -269,8 +262,8 @@ func (o *CreateUserAction) Prepare(ctx context.Context, db database.QueryExecuto
 	return nil
 }
 
-func (o *CreateUserAction) Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error {
-	return applyCreateUser(ctx, tx.Statements(), o.CreateUser)
+func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	return applyCreateUser(ctx, stmts, o.CreateUser)
 }
 
 func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.CreateUser) error {
@@ -301,13 +294,13 @@ func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher) *Set
 	}
 }
 
-func (o *SetPasswordUserAction) Prepare(_ context.Context, _ database.QueryExecutor) (err error) {
+func (o *SetPasswordUserAction) Prepare(_ context.Context) (err error) {
 	o.hash, err = domain.HashPassword(o.Password, o.hasher)
 	return err
 }
 
-func (o *SetPasswordUserAction) Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error {
-	err := tx.Statements().SetUserPassword(ctx, &domain.SetUserPassword{
+func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	err := stmts.SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:      o.ProjectID,
 		UserID:         o.UserID,
 		EncodedHash:    o.hash,
@@ -324,14 +317,14 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, tx StatementerWithQue
 
 // ---- Lazy ACTION -------------------------------------------------------------
 
-type UserActionFactory = func(ctx context.Context, db database.QueryExecutor) (UserAction, error)
+type UserActionFactory = func(ctx context.Context) (UserAction, error)
 
 // LazyUserAction allows for lazy initialization of a user-action. It forwards
 // the `Prepare` and `Apply` methods to the generated action. The UserAction is
-// only right before it is used in those functions.
+// created right before it is used in those functions.
 //
 // This action can be wrapped around an action when the wrapped action requires
-// an output of a previous action. It can then use a clojure to get the data
+// an output of a previous action. It can then use a closure to get the data
 // from the other action.
 type LazyUserAction struct {
 	factory UserActionFactory
@@ -344,25 +337,25 @@ func NewLazyUserAction(factory UserActionFactory) *LazyUserAction {
 	}
 }
 
-func (o *LazyUserAction) Prepare(ctx context.Context, db database.QueryExecutor) (err error) {
-	action, err := o.Action(ctx, db)
+func (o *LazyUserAction) Prepare(ctx context.Context) (err error) {
+	action, err := o.Action(ctx)
 	if err != nil {
 		return err
 	}
-	return action.Prepare(ctx, db)
+	return action.Prepare(ctx)
 }
 
-func (o *LazyUserAction) Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error {
-	action, err := o.Action(ctx, tx)
+func (o *LazyUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	action, err := o.Action(ctx)
 	if err != nil {
 		return err
 	}
-	return action.Apply(ctx, tx)
+	return action.Apply(ctx, stmts)
 }
 
-func (o *LazyUserAction) Action(ctx context.Context, db database.QueryExecutor) (UserAction, error) {
+func (o *LazyUserAction) Action(ctx context.Context) (UserAction, error) {
 	if o.action == nil {
-		action, err := o.factory(ctx, db)
+		action, err := o.factory(ctx)
 		if err != nil {
 			return nil, err
 		}

@@ -9,7 +9,10 @@ import (
 
 func (h *Harness) EnsureJoseSigner(t *testing.T) jose.Signer {
 	t.Helper()
-	if h.JoseSigner == nil {
+	h.joseSigner.mutex.Lock()
+	defer h.joseSigner.mutex.Unlock()
+
+	if h.joseSigner.value == nil {
 		signer, err := jose.NewSigner(
 			jose.SigningKey{
 				Algorithm: jose.RS256,
@@ -18,7 +21,7 @@ func (h *Harness) EnsureJoseSigner(t *testing.T) jose.Signer {
 			nil,
 		)
 		require.NoError(t, err)
-		h.JoseSigner = signer
+		h.joseSigner.value = signer
 	}
-	return h.JoseSigner
+	return h.joseSigner.value
 }
