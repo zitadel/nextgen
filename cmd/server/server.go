@@ -289,6 +289,10 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		close(serverErr)
 	}()
 
+	// TODO: on a multi-replica deployment, the migration can happen multiple
+	//       times. This is not a problem since the migration will not remove
+	//       any keys. So nothing breaks. But there is no need to recompute the
+	//       same thing multiple times.
 	go func() {
 		slog.Info("migrate KEKs")
 		if err := keyService.MigrateToLatestRootKEK(ctx); err != nil {

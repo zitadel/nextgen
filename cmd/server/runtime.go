@@ -105,6 +105,7 @@ func ensureServerKEK(cfg *ServerConfig) error {
 				UseForEncryption: true,
 			},
 		}
+		// TODO: add a flag which allows to disable the auto generation of a KEK (https://github.com/zitadel/nextgen/issues/655)
 		fmt.Fprintf(os.Stderr, "created server KEK file at %s (generated for local/dev only; configure server.encryption_keys for production)\n", filePath)
 	}
 
