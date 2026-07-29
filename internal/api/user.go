@@ -156,7 +156,7 @@ func mapUserMetadata(user *domain.UserMetadata) (*api.UserMetadata, error) {
 	case domain.UserStatusActive:
 		status = api.UserMetadataStatusActive
 	case domain.UserStatusDeactivated:
-		status = api.UserMetadataStatusActive
+		status = api.UserMetadataStatusDeactivated
 	case domain.UserStatusSuspended:
 		status = api.UserMetadataStatusSuspended
 	case domain.UserStatusPendingPurge:

@@ -237,7 +237,7 @@ func (s *UserService) GetUserMetadata(ctx context.Context, input GetUserMetadata
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrUserNotFound()
 		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
+		return nil, domain.ErrInternal(err).WithMessage("failed to get user metadata from database")
 	}
 	return user, nil
 }
