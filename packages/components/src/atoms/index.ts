@@ -7,6 +7,7 @@ export { ZlIcon, zlIconManifest, type IconName } from "./zl-icon.js";
 export { ZlPageShell, zlPageShellManifest } from "./zl-page-shell.js";
 export { ZlPasskey, zlPasskeyManifest, type ZlPasskeyResultDetail, type ZlPasskeyErrorDetail } from "./zl-passkey.js";
 export { ZlPill, zlPillManifest } from "./zl-pill.js";
+export { ZlTitle, zlTitleManifest } from "./zl-title.js";
 export {
   ZlSelect,
   zlSelectManifest,

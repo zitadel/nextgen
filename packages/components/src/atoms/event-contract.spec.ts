@@ -20,6 +20,7 @@ describe("atom event contract", () => {
     "zl-passkey": ["zl-passkey-result", "zl-passkey-error", "zl-passkey-started"],
     "zl-pill": [],
     "zl-select": ["zl-change"],
+    "zl-title": ["zl-submit"],
   };
 
   for (const manifest of manifestRegistry) {

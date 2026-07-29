@@ -87,7 +87,7 @@ describe("branding design catalog", () => {
         expect(html).toContain("<zl-page-shell");
       });
 
-      it("renders no visible control for a kind: back action (gesture-only)", () => {
+      it("renders a kind: back action as the title chevron, not a secondary button", () => {
         const engine = createLiquidEngine({ locale });
         const { template } = getDefaultBrandingConfig(design);
         const rendered = engine.parseAndRenderSync(template, {
@@ -95,9 +95,10 @@ describe("branding design catalog", () => {
           actions: [...step.actions, { name: "back", kind: "back", text_key: "action.back" }],
         });
         const html2 = createSanitiser()(rendered);
-        // Back-navigation is gesture-only (ADR 022): no nav link, and the
-        // kind-based exclusion keeps it out of the secondary-button loop.
-        expect(html2).not.toContain('data-testid="zitadel-action-back-link"');
+        // The title carries the back affordance (<zl-title back-action>);
+        // the kind-based exclusion keeps it out of the secondary-button loop.
+        expect(html2).toContain('back-action="back"');
+        expect(html2).toContain("<zl-title");
         expect(html2).not.toContain('data-testid="zitadel-action-back"');
       });
     });
