@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -90,7 +89,7 @@ func TestUserPasskeyStatements_CreateGetListDelete(t *testing.T) {
 
 	require.NoError(t, testPool.DeleteUserPasskey(ctx, byKey))
 	_, err = testPool.GetUserPasskey(ctx, byKey)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestUserPasskeyStatements_Update(t *testing.T) {
@@ -125,7 +124,7 @@ func TestUserPasskeyStatements_Update(t *testing.T) {
 	err = testPool.UpdateUserPasskey(ctx, userPasskeyKeyFilter(projectID, userID, "missing-cred"),
 		&domain.UserPasskeySignCountUpdate{SignCount: 2},
 	)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 	require.NoError(t, testPool.UpdateUserPasskey(ctx, byKey,
 		&domain.UserPasskeyAttestationTypeUpdate{AttestationType: "direct"},
