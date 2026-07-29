@@ -18,6 +18,12 @@ jobs:
     # which inject DEPOT_CACHE_TOKEN independently of GitHub secret filtering.
     runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'depot-ubuntu-24.04-16' }}
     timeout-minutes: 120
+    env:
+      # Moon marks failed tasks by color alone, so a failed `moon ci` can end at
+      # "Tasks: 1 failed" with no named target. The summary names them in plain
+      # text and replays each failed task's own output. Green runs pay only a
+      # pass/fail list; the replay section is empty when nothing failed.
+      MOON_SUMMARY: detailed
     steps:
       - uses: actions/checkout@v6
         with:
