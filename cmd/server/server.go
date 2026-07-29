@@ -114,7 +114,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		return nil
 	})
 
-	kek, err := buildCrypter(cfg.Server.EncryptionKey)
+	masterKey, err := buildCrypter(cfg.Server.EncryptionKey)
 	if err != nil {
 		return fmt.Errorf("failed to create Crypter: %w", err)
 	}
@@ -159,7 +159,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	userIdentity := service.UserStatementsIdentityReader{Pool: serviceDBPool}
 
 	// ── Services ─────────────────────
-	keyService := service.NewKeyService(serviceDBPool, kek)
+	keyService := service.NewKeyService(serviceDBPool, masterKey)
 
 	authAttemptSvc := service.NewAuthAttemptService(
 		serviceDBPool,
@@ -531,7 +531,7 @@ func buildCrypter(hexKey string) (crypto.Crypter, error) {
 	if len(key) != 32 {
 		return nil, fmt.Errorf("server: encryption_key must decode to %d bytes, got %d", 32, len(key))
 	}
-	crypter := op.NewAES256GCMCrypto([32]byte(key), "") // TODO: key id must be empty to match kek for now
+	crypter := op.NewAES256GCMCrypto([32]byte(key), "") // TODO: key id must be empty to match the master key for now
 	return crypter, nil
 }
 

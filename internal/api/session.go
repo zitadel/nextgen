@@ -31,12 +31,12 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 		return nil, err
 	}
 
-	dek, err := h.keyService.GetProjectCrypter(ctx, string(req.ProjectID), domain.EncryptionKeyPurposeToken)
+	tokenCrypter, err := h.keyService.GetProjectCrypter(ctx, string(req.ProjectID), domain.EncryptionKeyPurposeToken)
 	if err != nil {
 		return nil, err
 	}
 
-	return sessionWithTokenToAPI(session, dek)
+	return sessionWithTokenToAPI(session, tokenCrypter)
 }
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
@@ -49,12 +49,12 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 		return nil, err
 	}
 
-	dek, err := h.keyService.GetProjectCrypter(ctx, string(params.ProjectID), domain.EncryptionKeyPurposeToken)
+	tokenCrypter, err := h.keyService.GetProjectCrypter(ctx, string(params.ProjectID), domain.EncryptionKeyPurposeToken)
 	if err != nil {
 		return nil, err
 	}
 
-	return sessionWithTokenToAPI(session, dek)
+	return sessionWithTokenToAPI(session, tokenCrypter)
 }
 
 func exchangeInputFromRequest(req *api.ExchangeRequest, params api.ExchangeHandoffParams) (service.ExchangeInput, error) {

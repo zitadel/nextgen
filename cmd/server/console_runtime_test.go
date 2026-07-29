@@ -197,12 +197,12 @@ func TestStandaloneRuntimeResolverWithoutProject(t *testing.T) {
 
 func TestStandaloneRuntimeResolverDerivesPublishableKey(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	dek := cryptomock.NewMockCrypter(ctrl)
+	tokenCrypter := cryptomock.NewMockCrypter(ctrl)
 	// PreviewSecret serializes the read-only token and encrypts it with the
-	// project DEK; the mocked crypter stands in for the JWE output.
-	dek.EXPECT().Encrypt(gomock.Any()).Return("pk_preview", nil)
+	// project's token encryption key; the mocked crypter stands in for the JWE output.
+	tokenCrypter.EXPECT().Encrypt(gomock.Any()).Return("pk_preview", nil)
 	keys := servicemocks.NewMockKeyService(ctrl)
-	keys.EXPECT().GetProjectCrypter(gomock.Any(), "proj_first", domain.EncryptionKeyPurposeDEK).Return(dek, nil)
+	keys.EXPECT().GetProjectCrypter(gomock.Any(), "proj_first", domain.EncryptionKeyPurposeToken).Return(tokenCrypter, nil)
 
 	resolve := standaloneRuntimeResolver(
 		&fakeProjectService{project: &domain.Project{ID: "proj_first"}},

@@ -84,12 +84,12 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 		return nil, err
 	}
 
-	kek, err := s.keyService.GetKekCrypter(ctx)
+	masterKey, err := s.keyService.GetMasterKeyCrypter(ctx)
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to get kek")
+		return nil, domain.ErrInternal(err).WithMessage("failed to get master key")
 	}
 
-	keyset, err := project.GenerateNewKeySet(kek)
+	keyset, err := project.GenerateNewKeySet(masterKey)
 	if err != nil {
 		return nil, err
 	}
@@ -103,8 +103,8 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 			return domain.ErrInternal(err).WithMessage("failed to create project in the database")
 		}
 
-		if err := tx.Statements().CreateEncryptionKey(ctx, keyset.DataEncryptionKey); err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to create project encryption key in the database")
+		if err := tx.Statements().CreateEncryptionKey(ctx, keyset.KeyEncryptionKey); err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to create project key encryption key in the database")
 		}
 		if err := tx.Statements().CreateEncryptionKey(ctx, keyset.TokenEncryptionKey); err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to create project token encryption key in the database")

@@ -20,7 +20,7 @@ import (
 func newMockedKeyService(t *testing.T) (
 	svc service.KeyService,
 	statements *servicemocks.MockAllStatements,
-	kek op.Crypto,
+	masterKey op.Crypto,
 ) {
 	t.Helper()
 
@@ -29,18 +29,18 @@ func newMockedKeyService(t *testing.T) (
 	pool := servicemocks.NewMockPool(ctrl)
 	statements = servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
-	kek = op.NewAES256GCMCrypto([32]byte([]byte("MasterkeyNeedsToHave32Characters")), "")
+	masterKey = op.NewAES256GCMCrypto([32]byte([]byte("MasterkeyNeedsToHave32Characters")), "")
 
-	svc = service.NewKeyService(service.NewPool(pool), kek)
-	return svc, statements, kek
+	svc = service.NewKeyService(service.NewPool(pool), masterKey)
+	return svc, statements, masterKey
 }
 
-func newActiveDEK(t *testing.T, projectID string, kek op.Crypto) *domain.EncryptionKey {
+func newActiveKEK(t *testing.T, projectID string, masterKey op.Crypto) *domain.EncryptionKey {
 	t.Helper()
-	dek, err := domain.NewEncryptionKey(projectID, domain.EncryptionKeyPurposeDEK, jose.A256GCM, kek)
+	kek, err := domain.NewEncryptionKey(projectID, domain.EncryptionKeyPurposeKEK, jose.A256GCM, masterKey)
 	require.NoError(t, err)
-	dek.Activate(nil)
-	return dek
+	kek.Activate(nil)
+	return kek
 }
 
 func newTokenEncryptionKey(t *testing.T, id, projectID string, encrypter nextgencrypto.Encrypter) *domain.EncryptionKey {
@@ -66,25 +66,25 @@ func TestKeyService_GetCrypter(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("dek (direct kek)", func(t *testing.T) {
+		t.Run("project kek (wrapped by the master key)", func(t *testing.T) {
 			t.Parallel()
 
 			// ARRANGE
-			svc, statements, kek := newMockedKeyService(t)
+			svc, statements, masterKey := newMockedKeyService(t)
 
-			dek, err := domain.NewEncryptionKey("project-1", domain.EncryptionKeyPurposeDEK, jose.A256GCM, kek)
+			kek, err := domain.NewEncryptionKey("project-1", domain.EncryptionKeyPurposeKEK, jose.A256GCM, masterKey)
 			require.NoError(t, err)
-			dekCrypter, err := dek.Crypter(kek)
+			kekCrypter, err := kek.Crypter(masterKey)
 			require.NoError(t, err)
 
 			const payload = "secret-payload"
-			encrypted, err := dekCrypter.Encrypt(payload)
+			encrypted, err := kekCrypter.Encrypt(payload)
 			require.NoError(t, err)
 
-			statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(dek, nil)
+			statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(kek, nil)
 
 			// ACT
-			got, err := svc.GetCrypter(t.Context(), dek.ID, dek.Algorithm)
+			got, err := svc.GetCrypter(t.Context(), kek.ID, kek.Algorithm)
 			require.NoError(t, err)
 			require.NotNil(t, got)
 
@@ -98,14 +98,14 @@ func TestKeyService_GetCrypter(t *testing.T) {
 			t.Parallel()
 
 			// ARRANGE
-			svc, statements, kek := newMockedKeyService(t)
+			svc, statements, masterKey := newMockedKeyService(t)
 
-			dek := newActiveDEK(t, "proj-1", kek)
-			dekCrypter, err := dek.Crypter(kek)
+			kek := newActiveKEK(t, "proj-1", masterKey)
+			kekCrypter, err := kek.Crypter(masterKey)
 			require.NoError(t, err)
 
-			tokenKey := newTokenEncryptionKey(t, "tek_child_1", "proj-1", dekCrypter)
-			tokenKeyCrypter, err := tokenKey.Crypter(dekCrypter)
+			tokenKey := newTokenEncryptionKey(t, "tek_child_1", "proj-1", kekCrypter)
+			tokenKeyCrypter, err := tokenKey.Crypter(kekCrypter)
 			require.NoError(t, err)
 
 			const payload = "secret-payload"
@@ -114,7 +114,7 @@ func TestKeyService_GetCrypter(t *testing.T) {
 
 			gomock.InOrder(
 				statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(tokenKey, nil),
-				statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(dek, nil),
+				statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(kek, nil),
 			)
 
 			// ACT
@@ -142,7 +142,7 @@ func TestKeyService_GetCrypter(t *testing.T) {
 				Return(nil, storagedb.NewNoRowFoundError(nil))
 
 			// ACT
-			_, err := svc.GetEncryptionKey(t.Context(), "dek_missing", jose.A256GCM)
+			_, err := svc.GetEncryptionKey(t.Context(), "enc_key_missing", jose.A256GCM)
 			require.Error(t, err)
 
 			// ASSERT
@@ -159,18 +159,18 @@ func TestKeyService_GetProjectCrypter(t *testing.T) {
 		t.Parallel()
 
 		// ARRANGE
-		svc, statements, kek := newMockedKeyService(t)
+		svc, statements, masterKey := newMockedKeyService(t)
 
-		dek := newActiveDEK(t, "proj-1", kek)
-		dekCrypter, err := dek.Crypter(kek)
+		kek := newActiveKEK(t, "proj-1", masterKey)
+		kekCrypter, err := kek.Crypter(masterKey)
 		require.NoError(t, err)
-		require.NotNil(t, dekCrypter)
+		require.NotNil(t, kekCrypter)
 
 		const payload = "secret-payload"
-		encrypted, err := dekCrypter.Encrypt(payload)
+		encrypted, err := kekCrypter.Encrypt(payload)
 		require.NoError(t, err)
 
-		statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(dek, nil)
+		statements.EXPECT().GetEncryptionKey(gomock.Any(), gomock.Any()).Return(kek, nil)
 
 		// ACT
 		gotCrypter, err := svc.GetProjectCrypter(t.Context(), "proj-1", domain.EncryptionKeyPurposeToken)

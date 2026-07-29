@@ -79,39 +79,41 @@ func (p *Project) PreviewSecret(encrypter op.Encrypter) (string, error) {
 	return previewSecret, nil
 }
 
-func (p *Project) GenerateNewKeySet(kek crypto.Crypter) (*ProjectKeySet, error) {
-	dek, err := NewEncryptionKey(p.ID, EncryptionKeyPurposeDEK, jose.A256GCM, kek)
+// GenerateNewKeySet creates the project's key encryption key, wrapped by the
+// deployment's master key, and the purpose-scoped keys wrapped by that KEK.
+func (p *Project) GenerateNewKeySet(masterKey crypto.Crypter) (*ProjectKeySet, error) {
+	kek, err := NewEncryptionKey(p.ID, EncryptionKeyPurposeKEK, jose.A256GCM, masterKey)
 	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to create project encryption key")
+		return nil, ErrInternal(err).WithMessage("failed to create project key encryption key")
 	}
 
-	dekCrypter, err := dek.Crypter(kek)
+	kekCrypter, err := kek.Crypter(masterKey)
 	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to decrypt project encryption key")
+		return nil, ErrInternal(err).WithMessage("failed to decrypt project key encryption key")
 	}
 
-	tek, err := NewEncryptionKey(p.ID, EncryptionKeyPurposeToken, jose.A256GCM, dekCrypter)
+	tek, err := NewEncryptionKey(p.ID, EncryptionKeyPurposeToken, jose.A256GCM, kekCrypter)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create project token encryption key")
 	}
 
-	sek, err := NewEncryptionKey(p.ID, EncryptionKeyPurposeSecret, jose.A256GCM, dekCrypter)
+	sek, err := NewEncryptionKey(p.ID, EncryptionKeyPurposeSecret, jose.A256GCM, kekCrypter)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create project secret encryption key")
 	}
 
-	cek, err := NewEncryptionKey(p.ID, EncryptionKeyPurposeCookie, jose.A256GCM, dekCrypter)
+	cek, err := NewEncryptionKey(p.ID, EncryptionKeyPurposeCookie, jose.A256GCM, kekCrypter)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create project cookie encryption key")
 	}
 
-	tsk, err := NewSigningKey(p.ID, SigningKeyPurposeToken, jose.EdDSA, dekCrypter)
+	tsk, err := NewSigningKey(p.ID, SigningKeyPurposeToken, jose.EdDSA, kekCrypter)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create project token signing key")
 	}
 
 	return &ProjectKeySet{
-		DataEncryptionKey:   dek,
+		KeyEncryptionKey:    kek,
 		TokenEncryptionKey:  tek,
 		SecretEncryptionKey: sek,
 		CookieEncryptionKey: cek,
@@ -132,7 +134,7 @@ const (
 )
 
 type ProjectKeySet struct {
-	DataEncryptionKey   *EncryptionKey
+	KeyEncryptionKey    *EncryptionKey
 	TokenEncryptionKey  *EncryptionKey
 	SecretEncryptionKey *EncryptionKey
 	CookieEncryptionKey *EncryptionKey
@@ -141,13 +143,13 @@ type ProjectKeySet struct {
 
 func (s *ProjectKeySet) Activate(oldKeys *ProjectKeySet) {
 	if oldKeys != nil {
-		s.DataEncryptionKey.Activate(oldKeys.DataEncryptionKey)
+		s.KeyEncryptionKey.Activate(oldKeys.KeyEncryptionKey)
 		s.TokenEncryptionKey.Activate(oldKeys.TokenEncryptionKey)
 		s.SecretEncryptionKey.Activate(oldKeys.SecretEncryptionKey)
 		s.CookieEncryptionKey.Activate(oldKeys.CookieEncryptionKey)
 		s.TokenSigningKey.Activate(oldKeys.TokenSigningKey)
 	} else {
-		s.DataEncryptionKey.Activate(nil)
+		s.KeyEncryptionKey.Activate(nil)
 		s.TokenEncryptionKey.Activate(nil)
 		s.SecretEncryptionKey.Activate(nil)
 		s.CookieEncryptionKey.Activate(nil)

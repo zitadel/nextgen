@@ -17,19 +17,19 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-// This is a storage-level test for the v2 postgres crypto-key (DEK) statements.
+// This is a storage-level test for the v2 postgres crypto-key statements.
 // It follows the same shape as project_test.go: it drives the real database
-// through the shared v2 testPool set up in TestMain. DEKs are foreign-keyed to a
-// project, so each test creates a throwaway project and relies on the ON DELETE
-// CASCADE from projects to clean up its DEKs.
+// through the shared v2 testPool set up in TestMain. Encryption keys are
+// foreign-keyed to a project, so each test creates a throwaway project and
+// relies on the ON DELETE CASCADE from projects to clean up its keys.
 
-// uniqueKeyID returns a collision-free DEK ID scoped to the running (sub)test.
+// uniqueKeyID returns a collision-free key ID scoped to the running (sub)test.
 func uniqueKeyID(t *testing.T) string {
 	t.Helper()
-	return "dek-" + strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	return "kek-" + strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 }
 
-// newTestKey builds a persistable DEK in the given state referencing projectID.
+// newTestKey builds a persistable project KEK in the given state referencing projectID.
 func newTestKey(id, projectID string, state domain.KeyState) *domain.EncryptionKey {
 	return &domain.EncryptionKey{
 		ID:        id,
@@ -37,7 +37,7 @@ func newTestKey(id, projectID string, state domain.KeyState) *domain.EncryptionK
 		Key:       "this is normally an encrypted key",
 		Algorithm: jose.A256GCM,
 		State:     state,
-		Purpose:   domain.EncryptionKeyPurposeDEK,
+		Purpose:   domain.EncryptionKeyPurposeKEK,
 	}
 }
 
@@ -53,7 +53,7 @@ func withProject(t *testing.T) string {
 func TestCryptoKeyStatements_CreateEncryptionKey(t *testing.T) {
 	t.Parallel()
 
-	t.Run("creates dek and created_at is set", func(t *testing.T) {
+	t.Run("creates key and created_at is set", func(t *testing.T) {
 		t.Parallel()
 
 		projectID := withProject(t)
@@ -79,28 +79,28 @@ func TestCryptoKeyStatements_CreateEncryptionKey(t *testing.T) {
 		t.Parallel()
 
 		projectID := withProject(t)
-		dek := newTestKey(uniqueKeyID(t), projectID, domain.KeyStateActive)
-		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), dek))
+		kek := newTestKey(uniqueKeyID(t), projectID, domain.KeyStateActive)
+		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), kek))
 
-		err := testPool.CreateEncryptionKey(t.Context(), newTestKey(dek.ID, projectID, domain.KeyStateActive))
+		err := testPool.CreateEncryptionKey(t.Context(), newTestKey(kek.ID, projectID, domain.KeyStateActive))
 		assert.Error(t, err)
 	})
 
 	t.Run("unknown project returns error", func(t *testing.T) {
 		t.Parallel()
 
-		dek := newTestKey(uniqueKeyID(t), uniqueProjectID(t), domain.KeyStateActive)
-		err := testPool.CreateEncryptionKey(t.Context(), dek)
+		kek := newTestKey(uniqueKeyID(t), uniqueProjectID(t), domain.KeyStateActive)
+		err := testPool.CreateEncryptionKey(t.Context(), kek)
 		assert.Error(t, err)
 	})
 
-	t.Run("second active dek for the same project is rejected", func(t *testing.T) {
+	t.Run("second active kek for the same project is rejected", func(t *testing.T) {
 		t.Parallel()
 
 		projectID := withProject(t)
 		require.NoError(t, testPool.CreateEncryptionKey(t.Context(), newTestKey(uniqueKeyID(t)+"-a", projectID, domain.KeyStateActive)))
 
-		// The partial unique index permits only one active DEK per project.
+		// The partial unique index permits only one active KEK per project.
 		err := testPool.CreateEncryptionKey(t.Context(), newTestKey(uniqueKeyID(t)+"-b", projectID, domain.KeyStateActive))
 		assert.Error(t, err)
 	})

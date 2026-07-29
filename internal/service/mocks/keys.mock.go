@@ -121,41 +121,41 @@ func (c *MockKeyServiceGetEncryptionKeyCall) DoAndReturn(f func(context.Context,
 	return c
 }
 
-// GetKekCrypter mocks base method.
-func (m *MockKeyService) GetKekCrypter(ctx context.Context) (op.Crypto, error) {
+// GetMasterKeyCrypter mocks base method.
+func (m *MockKeyService) GetMasterKeyCrypter(ctx context.Context) (op.Crypto, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetKekCrypter", ctx)
+	ret := m.ctrl.Call(m, "GetMasterKeyCrypter", ctx)
 	ret0, _ := ret[0].(op.Crypto)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetKekCrypter indicates an expected call of GetKekCrypter.
-func (mr *MockKeyServiceMockRecorder) GetKekCrypter(ctx any) *MockKeyServiceGetKekCrypterCall {
+// GetMasterKeyCrypter indicates an expected call of GetMasterKeyCrypter.
+func (mr *MockKeyServiceMockRecorder) GetMasterKeyCrypter(ctx any) *MockKeyServiceGetMasterKeyCrypterCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetKekCrypter", reflect.TypeOf((*MockKeyService)(nil).GetKekCrypter), ctx)
-	return &MockKeyServiceGetKekCrypterCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMasterKeyCrypter", reflect.TypeOf((*MockKeyService)(nil).GetMasterKeyCrypter), ctx)
+	return &MockKeyServiceGetMasterKeyCrypterCall{Call: call}
 }
 
-// MockKeyServiceGetKekCrypterCall wrap *gomock.Call
-type MockKeyServiceGetKekCrypterCall struct {
+// MockKeyServiceGetMasterKeyCrypterCall wrap *gomock.Call
+type MockKeyServiceGetMasterKeyCrypterCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockKeyServiceGetKekCrypterCall) Return(arg0 op.Crypto, arg1 error) *MockKeyServiceGetKekCrypterCall {
+func (c *MockKeyServiceGetMasterKeyCrypterCall) Return(arg0 op.Crypto, arg1 error) *MockKeyServiceGetMasterKeyCrypterCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockKeyServiceGetKekCrypterCall) Do(f func(context.Context) (op.Crypto, error)) *MockKeyServiceGetKekCrypterCall {
+func (c *MockKeyServiceGetMasterKeyCrypterCall) Do(f func(context.Context) (op.Crypto, error)) *MockKeyServiceGetMasterKeyCrypterCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockKeyServiceGetKekCrypterCall) DoAndReturn(f func(context.Context) (op.Crypto, error)) *MockKeyServiceGetKekCrypterCall {
+func (c *MockKeyServiceGetMasterKeyCrypterCall) DoAndReturn(f func(context.Context) (op.Crypto, error)) *MockKeyServiceGetMasterKeyCrypterCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

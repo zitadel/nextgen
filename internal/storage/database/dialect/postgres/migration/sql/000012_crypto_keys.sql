@@ -15,8 +15,8 @@ CREATE TABLE zitadel_nextgen.encryption_keys
     PRIMARY KEY (project_id, id)
 );
 
-CREATE UNIQUE INDEX uq_deks_active_per_project
-    ON zitadel_nextgen.encryption_keys (project_id) WHERE state = 'active' AND purpose = 'dek';
+CREATE UNIQUE INDEX uq_keks_active_per_project
+    ON zitadel_nextgen.encryption_keys (project_id) WHERE state = 'active' AND purpose = 'kek';
 CREATE UNIQUE INDEX uq_token_encryption_keys_active_per_project
     ON zitadel_nextgen.encryption_keys (project_id) WHERE state = 'active' AND purpose = 'token';
 CREATE UNIQUE INDEX uq_secret_encryption_keys_active_per_project
@@ -44,7 +44,7 @@ CREATE UNIQUE INDEX uq_token_signing_keys_active_per_project
     ON zitadel_nextgen.signing_keys (project_id) WHERE state = 'active' AND purpose = 'token';
 
 -- +goose Down
-DROP INDEX IF EXISTS uq_deks_active_per_project;
+DROP INDEX IF EXISTS uq_keks_active_per_project;
 DROP INDEX IF EXISTS uq_token_encryption_keys_active_per_project;
 DROP INDEX IF EXISTS uq_secret_encryption_keys_active_per_project;
 DROP INDEX IF EXISTS uq_token_signing_keys_active_per_project;

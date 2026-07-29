@@ -41,9 +41,10 @@ const (
 type EncryptionKeyPurpose string
 
 const (
-	// EncryptionKeyPurposeDEK indicates the key is the DEK which is used to
-	// encrypt the other keys of the project.
-	EncryptionKeyPurposeDEK EncryptionKeyPurpose = "dek"
+	// EncryptionKeyPurposeKEK indicates the key is the project's key encryption
+	// key which is used to encrypt the purpose-scoped keys of the project. It is
+	// itself encrypted by the master key.
+	EncryptionKeyPurposeKEK EncryptionKeyPurpose = "kek"
 	// EncryptionKeyPurposeToken indicates the key is used to encrypt tokens
 	EncryptionKeyPurposeToken EncryptionKeyPurpose = "token"
 	// EncryptionKeyPurposeSecret indicates the key is used to encrypt
@@ -80,12 +81,12 @@ func NewEncryptionKey(
 	var key [32]byte
 	_, err = rand.Read(key[:])
 	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to generate new DEK key")
+		return nil, ErrInternal(err).WithMessage("failed to generate new encryption key")
 	}
 
 	encryptedKey, err := kek.Encrypt(string(key[:]))
 	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to encrypt dek")
+		return nil, ErrInternal(err).WithMessage("failed to encrypt the new encryption key")
 	}
 
 	// createdAt is set by db

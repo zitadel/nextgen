@@ -22,23 +22,23 @@ type KeyService interface {
 	GetProjectCrypter(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (op.Crypto, error)
 	GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (*domain.SigningKey, error)
 	GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (jose.Signer, error)
-	GetKekCrypter(ctx context.Context) (op.Crypto, error)
+	GetMasterKeyCrypter(ctx context.Context) (op.Crypto, error)
 }
 
 // ---- Implementation -------------------------------------------------------------
 
 type keyService struct {
-	db  *DB
-	kek op.Crypto
+	db        *DB
+	masterKey op.Crypto
 }
 
 func NewKeyService(
 	db *DB,
-	kek op.Crypto,
+	masterKey op.Crypto,
 ) KeyService {
 	return &keyService{
-		db:  db,
-		kek: kek,
+		db:        db,
+		masterKey: masterKey,
 	}
 }
 
@@ -51,7 +51,7 @@ func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorit
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrEncryptionKeyNotFound()
 		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to get DEK from the database")
+		return nil, domain.ErrInternal(err).WithMessage("failed to get encryption key from the database")
 	}
 	return key, nil
 }
@@ -98,9 +98,9 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 		return nil, domain.ErrInternal(err).WithMessage("failed to decode decryption key")
 	}
 
-	// TODO match the key id with the key id from one of the keks once they are implemented
+	// TODO match the key id with the key id from one of the master keys once they are implemented
 	if jweHeader.KeyID == "" && jweHeader.EncryptionAlgorithm == jose.A256GCM {
-		return key.Crypter(s.kek)
+		return key.Crypter(s.masterKey)
 	}
 
 	kek, err := s.GetCrypter(ctx, jweHeader.KeyID, jweHeader.EncryptionAlgorithm)
@@ -142,6 +142,6 @@ func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, pur
 	return key.Signer(kek)
 }
 
-func (s *keyService) GetKekCrypter(context.Context) (op.Crypto, error) {
-	return s.kek, nil
+func (s *keyService) GetMasterKeyCrypter(context.Context) (op.Crypto, error) {
+	return s.masterKey, nil
 }

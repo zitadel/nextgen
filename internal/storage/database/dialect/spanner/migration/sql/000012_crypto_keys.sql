@@ -12,12 +12,12 @@ CREATE TABLE encryption_keys
     activated_at          TIMESTAMP,
     retired_at            TIMESTAMP,
     purpose               STRING(MAX) NOT NULL,
-    -- active_dek_project_id holds the project_id only while this row is the
-    -- project's active DEK, and is NULL otherwise. Paired with the
-    -- NULL_FILTERED unique index below it enforces "at most one active DEK per
+    -- active_kek_project_id holds the project_id only while this row is the
+    -- project's active key encryption key, and is NULL otherwise. Paired with the
+    -- NULL_FILTERED unique index below it enforces "at most one active KEK per
     -- project" — Spanner's equivalent of the postgres partial unique index.
-    active_dek_project_id STRING(MAX) AS (
-        CASE WHEN state = 'active' AND purpose = 'dek' THEN project_id ELSE NULL END
+    active_kek_project_id STRING(MAX) AS (
+        CASE WHEN state = 'active' AND purpose = 'kek' THEN project_id ELSE NULL END
     ) STORED,
     active_token_encryption_key_project_id STRING(MAX) AS (
         CASE WHEN state = 'active' AND purpose = 'token' THEN project_id ELSE NULL END
@@ -42,8 +42,8 @@ CREATE TABLE encryption_keys
 -- +goose StatementBegin
 CREATE
 UNIQUE
-NULL_FILTERED INDEX idx_encryption_keys_active_dek
-    ON encryption_keys (active_dek_project_id)
+NULL_FILTERED INDEX idx_encryption_keys_active_kek
+    ON encryption_keys (active_kek_project_id)
 -- +goose StatementEnd
 -- +goose StatementBegin
 CREATE
@@ -105,7 +105,7 @@ DROP INDEX IF EXISTS idx_signing_keys_active_token_signing_key
 DROP TABLE IF EXISTS signing_keys
 -- +goose StatementEnd
 -- +goose StatementBegin
-DROP INDEX IF EXISTS idx_encryption_keys_active_dek
+DROP INDEX IF EXISTS idx_encryption_keys_active_kek
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_encryption_keys_active_token_encryption_key
