@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-import { appendFile, readFile } from "node:fs/promises";
+import { appendFile, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, isDirectRun } from "./dev-process.mjs";
 
 const FAILURE_STATUSES = new Set(["failed", "invalid", "timed-out"]);
+const REPORT_FILE_NAMES = ["ciReport.json", "runReport.json"];
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const defaultCacheDir = join(repoRoot, ".moon", "cache");
 
@@ -17,7 +18,18 @@ export function actionName(action) {
   return typeof action?.label === "string" && action.label ? action.label : "unknown";
 }
 
-export function actionError(action) {
+/**
+ * A failed task's `error` is always the same sentence ("Task <target> failed to
+ * run."), so the exit code from its task-execution operation is the only detail
+ * worth carrying: 127 reads as a missing binary, 1 as a check that rejected the
+ * tree. Setup and sync actions run no task and do put a real message in `error`.
+ */
+export function actionDetail(action) {
+  const operations = Array.isArray(action?.operations) ? action.operations : [];
+  const execution = operations.find((operation) => operation?.meta?.type === "task-execution");
+  if (typeof execution?.meta?.exitCode === "number") {
+    return `exit ${execution.meta.exitCode}`;
+  }
   return typeof action?.error === "string" ? action.error.trim() : "";
 }
 
@@ -28,7 +40,7 @@ export function normalizeFailures(report) {
     .map((action) => ({
       name: actionName(action),
       status: action.status,
-      error: actionError(action),
+      detail: actionDetail(action),
     }));
 }
 
@@ -45,35 +57,26 @@ export function escapeMarkdownTableCell(value) {
     .replace(/\|/g, "\\|");
 }
 
-export function formatFailureReport(failures) {
-  const lines = [`Failed moon tasks (${failures.length}):`];
-  for (const failure of failures) {
-    lines.push(`- ${failure.name} (${failure.status})`);
-    if (failure.error) {
-      lines.push(`  error: ${failure.error}`);
-    }
-  }
-  return `${lines.join("\n")}\n`;
-}
-
 export function formatGithubAnnotations(failures) {
   return failures.map((failure) => {
-    const detail = failure.error ? `${failure.name}: ${failure.error}` : failure.name;
-    return `::error title=Moon task failed::${escapeAnnotation(detail)}`;
+    const summary = failure.detail
+      ? `${failure.name} ${failure.status} (${failure.detail})`
+      : `${failure.name} ${failure.status}`;
+    return `::error title=Moon task failed::${escapeAnnotation(summary)}`;
   });
 }
 
 export function formatStepSummary(failures) {
   const rows = failures.map((failure) => {
-    const error = failure.error ? escapeMarkdownTableCell(failure.error) : "";
-    return `| \`${failure.name}\` | ${failure.status} | ${error} |`;
+    const detail = failure.detail ? escapeMarkdownTableCell(failure.detail) : "";
+    return `| \`${failure.name}\` | ${failure.status} | ${detail} |`;
   });
   return [
     "## Failed Moon tasks",
     "",
     `Moon reported **${failures.length}** failed action${failures.length === 1 ? "" : "s"}.`,
     "",
-    "| Task | Status | Error |",
+    "| Task | Status | Detail |",
     "| --- | --- | --- |",
     ...rows,
     "",
@@ -86,12 +89,16 @@ export async function loadMoonReport(options = {}) {
     return { report: JSON.parse(raw), path: options.reportPath };
   }
 
+  // `moon ci` writes ciReport.json and `moon run` writes runReport.json into the
+  // same cache dir, so a job that does both leaves two reports behind. Read the
+  // newest: preferring a fixed name reports the earlier step's failures.
   const cacheDir = options.cacheDir ?? defaultCacheDir;
-  for (const fileName of ["ciReport.json", "runReport.json"]) {
+  const candidates = [];
+  for (const fileName of REPORT_FILE_NAMES) {
     const candidate = join(cacheDir, fileName);
     try {
-      const raw = await readFile(candidate, "utf8");
-      return { report: JSON.parse(raw), path: candidate };
+      const stats = await stat(candidate);
+      candidates.push({ path: candidate, modifiedAt: stats.mtimeMs });
     } catch (error) {
       if (error && typeof error === "object" && error.code === "ENOENT") {
         continue;
@@ -99,7 +106,13 @@ export async function loadMoonReport(options = {}) {
       throw error;
     }
   }
-  return null;
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  candidates.sort((left, right) => right.modifiedAt - left.modifiedAt);
+  const newest = candidates[0].path;
+  return { report: JSON.parse(await readFile(newest, "utf8")), path: newest };
 }
 
 export async function reportMoonFailures(options = {}) {
@@ -115,7 +128,8 @@ export async function reportMoonFailures(options = {}) {
     return { failedCount: 0, skipped: false, path: loaded.path };
   }
 
-  process.stdout.write(formatFailureReport(failures));
+  // No plain-text block here: MOON_SUMMARY (set on the CI job) already prints a
+  // named pass/fail list and replays failed task output into the same log.
   for (const annotation of formatGithubAnnotations(failures)) {
     console.log(annotation);
   }
@@ -170,7 +184,9 @@ function parseArgs(argv) {
 function printUsage() {
   console.log(`Usage: node scripts/report-moon-failures.mjs [--report <path>] [--cache-dir <dir>]
 
-Reads moon's ciReport.json (or runReport.json) and prints failed tasks for CI logs.
+Reads moon's newest report (ciReport.json / runReport.json) and turns failed
+actions into GitHub Actions error annotations plus a job-summary table, so a
+failure is visible on the run page without opening the job log.
 Always exits 0 so a missing report cannot replace the moon step's exit code.
 `);
 }
