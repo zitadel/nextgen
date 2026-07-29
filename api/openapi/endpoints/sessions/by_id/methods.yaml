@@ -57,9 +57,6 @@ delete:
   responses:
     '204':
       description: Session revoked successfully.
-      headers:
-        Set-Cookie:
-          $ref: ../../../components/headers/set-cookie-session-token.yaml
     '401':
       description: Missing or invalid session token.
       content:
