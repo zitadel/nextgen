@@ -55,7 +55,7 @@ delete:
           $ref: ../../../components/schemas/user-id.yaml
     security:
       - oauth2:
-          - user.write
+          - user.delete
     responses:
       '204':
         description: User deleted successfully.
