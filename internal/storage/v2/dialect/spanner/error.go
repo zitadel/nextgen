@@ -38,7 +38,7 @@ func wrapError(err error) error {
 	case codes.AlreadyExists:
 		return database.NewUniqueError("", "", err)
 	case codes.FailedPrecondition, codes.InvalidArgument:
-		return database.NewCheckError("", "", err)
+		return classifyIntegrityError(err)
 	default:
 		if strings.HasPrefix(err.Error(), "scany: expected 1 row, got: ") {
 			return database.NewMultipleRowsFoundError(err)
@@ -47,5 +47,21 @@ func wrapError(err error) error {
 			return database.NewScanError(err)
 		}
 		return database.NewUnknownError(err)
+	}
+}
+
+// classifyIntegrityError maps Spanner FailedPrecondition / InvalidArgument
+// messages onto the same typed integrity errors Postgres returns.
+func classifyIntegrityError(err error) error {
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "foreign key"):
+		return database.NewForeignKeyError("", "", err)
+	case strings.Contains(msg, "unique"):
+		return database.NewUniqueError("", "", err)
+	case strings.Contains(msg, "not null"):
+		return database.NewNotNullError("", "", err)
+	default:
+		return database.NewCheckError("", "", err)
 	}
 }

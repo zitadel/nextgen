@@ -127,9 +127,11 @@ func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionPara
 	if err != nil {
 		return nil, err
 	}
-	return &api.RevokeSessionNoContent{
-		SetCookie: deleteSessionCookie(),
-	}, nil
+	// No Set-Cookie: this operation revokes a session by id on behalf of an
+	// operator, so the caller's own __nextgen_session cookie is unrelated to the
+	// revoked session. Clearing it here signs the operator out. Cookie clearing
+	// belongs to RevokeMySession, which acts on the cookie's own session.
+	return &api.RevokeSessionNoContent{}, nil
 }
 
 func (h Handler) RevokeMySession(ctx context.Context) (api.RevokeMySessionRes, error) {

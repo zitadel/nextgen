@@ -1,7 +1,7 @@
 # Encryption keys (master key / project KEK)
 
-How the server protects secrets at rest: what a master key is, how it is
-generated, how it is configured, and how it is rotated.
+How the server protects secrets at rest: what a master key is, how it is generated, how it is configured, and how it is
+rotated.
 
 Design rationale lives in
 [ADR 029](../adrs/029-cryptography-secrets-and-key-lifecycle.md) and
@@ -23,20 +23,18 @@ graph TD
     PurposeKeys -- " encrypt (AES-256-GCM) " --> Data
 ```
 
-|            | Master key                                                  | Project KEK                                    | Purpose-scoped keys                             |
-|------------|-------------------------------------------------------------|------------------------------------------------|-------------------------------------------------|
-| Type       | RSA private key (asymmetric)                                | 32 random bytes (AES-256)                      | 32 random bytes (AES-256), or EdDSA for signing |
-| Scope      | Global, one per deployment (plus decrypt-only predecessors) | One active key per project                     | One active key per purpose, per project         |
-| Lives in   | Config file or a file on disk                               | `encryption_keys` table, wrapped               | `encryption_keys` / `signing_keys`, wrapped     |
-| Created by | The operator (or auto-generated for local dev)              | The server, at project creation                | The server, at project creation                 |
-| Rotated by | The operator, by adding a new key to config                 | Re-wrapped on master key rotation; not on a schedule | Not rotated on a schedule                 |
+|            | Master key                                                  | Project KEK                                          | Purpose-scoped keys                             |
+|------------|-------------------------------------------------------------|------------------------------------------------------|-------------------------------------------------|
+| Type       | RSA private key (asymmetric)                                | 32 random bytes (AES-256)                            | 32 random bytes (AES-256), or EdDSA for signing |
+| Scope      | Global, one per deployment (plus decrypt-only predecessors) | One active key per project                           | One active key per purpose, per project         |
+| Lives in   | Config file or a file on disk                               | `encryption_keys` table, wrapped                     | `encryption_keys` / `signing_keys`, wrapped     |
+| Created by | The operator (or auto-generated for local dev)              | The server, at project creation                      | The server, at project creation                 |
+| Rotated by | The operator, by adding a new key to config                 | Re-wrapped on master key rotation; not on a schedule | Not rotated on a schedule                       |
 
-Neither the master key nor the project KEK encrypts application data directly —
-the master key only wraps project KEKs, and a project KEK only wraps that
-project's purpose-scoped keys. Because each class of data has its own key, a
-purpose-scoped key can be rotated without re-encrypting anything the other keys
-protect. No key below the master key ever leaves the database in plaintext; each
-exists in plaintext only in memory, after a successful unwrap.
+Neither the master key nor the project KEK encrypts application data directly — the master key only wraps project KEKs,
+and a project KEK only wraps that project's purpose-scoped keys. Because each class of data has its own key, a
+purpose-scoped key can be rotated without re-encrypting anything the other keys protect. No key below the master key
+ever leaves the database in plaintext; each exists in plaintext only in memory, after a successful unwrap.
 
 ## Key identity is part of the ciphertext
 
@@ -73,8 +71,8 @@ created server master key file at .../master-keys/master-key.pem (generated for 
 The key is reused on subsequent starts as long as `server.data_dir` persists.
 `server.data_dir` defaults to a `nextgen-data` directory next to the binary; in the Docker Compose quick start it is
 backed by the `nextgen-server-data`
-volume. If that directory is wiped, the key is gone and every project KEK — and therefore everything encrypted under it
-— is unrecoverable.
+volume. If that directory is wiped, the key is gone and every project KEK — and therefore everything encrypted under
+it — is unrecoverable.
 
 ### Manual (any shared or production deployment)
 
@@ -147,7 +145,7 @@ missing) and merges every file it finds into
 |-----------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Config has keys                         | Directory files are added as **decrypt-only** entries (they never get `use_for_encryption`). A directory file whose name equals a config entry's ID **overwrites** that entry |
 | Config has no keys, directory has files | All files are loaded; the one with the newest mtime is marked for encryption                                                                                                  |
-| Neither                                 | A 4096-bit key is generated at `master-keys/master-key.pem` and marked for encryption                                                                                        |
+| Neither                                 | A 4096-bit key is generated at `master-keys/master-key.pem` and marked for encryption                                                                                         |
 
 > **⚠ The merge is not skipped when `server.master_keys` is set.** Directory
 > scanning happens on every start, even for a fully explicit configuration, and
@@ -186,13 +184,13 @@ missing) and merges every file it finds into
 A project's full key set is created when the project is created (`projectService.Create`) and inserted in the same
 transaction as the project, so a project never exists without one:
 
-| Key                     | Purpose value | Wrapped by      | Used for                                    |
-|-------------------------|---------------|-----------------|---------------------------------------------|
-| Key encryption key      | `kek`         | The master key  | Wrapping the project's other keys           |
-| Token encryption key    | `token`       | The project KEK | Opaque tokens, project and preview secrets  |
-| Secret encryption key   | `secret`      | The project KEK | Third-party secrets (IdP secrets, API keys) |
-| Cookie encryption key   | `cookie`      | The project KEK | Flow state cookies                          |
-| Token signing key       | `token`       | The project KEK | Signing tokens (EdDSA, `signing_keys` table)|
+| Key                   | Purpose value | Wrapped by      | Used for                                     |
+|-----------------------|---------------|-----------------|----------------------------------------------|
+| Key encryption key    | `kek`         | The master key  | Wrapping the project's other keys            |
+| Token encryption key  | `token`       | The project KEK | Opaque tokens, project and preview secrets   |
+| Secret encryption key | `secret`      | The project KEK | Third-party secrets (IdP secrets, API keys)  |
+| Cookie encryption key | `cookie`      | The project KEK | Flow state cookies                           |
+| Token signing key     | `token`       | The project KEK | Signing tokens (EdDSA, `signing_keys` table) |
 
 Each key is 32 bytes from `crypto/rand` (the signing key is an EdDSA key pair), wrapped and activated at creation.
 
@@ -281,16 +279,16 @@ Startup errors from key configuration are plain `server: …` errors and abort t
 
 ## Where this lives in the code
 
-| Concern                                                                       | Location                                                                                    |
-|-------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
-| `MasterKey` / `MasterKeys`, `EncryptionKey`, wrap/unwrap, rotation primitive   | `internal/domain/encryption_key.go`                                                         |
-| RSA key parsing (PEM / OpenSSH / JWK)                                         | `internal/crypto/key_parser.go`                                                             |
-| Config shape                                                                  | `cmd/server/config.go` (`MasterKeyConfig`)                                                  |
-| Master key directory handling and dev key generation                          | `cmd/server/runtime.go` (`ensureServerMasterKey`)                                           |
-| Startup wiring and validation                                                 | `cmd/server/server.go` (`buildMasterKey`)                                                   |
-| Key lookup by purpose, crypter construction, rotation job                     | `internal/service/keys.go`                                                                  |
-| Project key set creation                                                      | `internal/domain/project.go` (`GenerateNewKeySet`), `internal/service/project.go`            |
-| Schema                                                                        | `internal/storage/database/dialect/{postgres,spanner}/migration/sql/000012_crypto_keys.sql` |
+| Concern                                                                      | Location                                                                              |
+|------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
+| `MasterKey` / `MasterKeys`, `EncryptionKey`, wrap/unwrap, rotation primitive | `internal/domain/encryption_key.go`                                                   |
+| RSA key parsing (PEM / OpenSSH / JWK)                                        | `internal/crypto/key_parser.go`                                                       |
+| Config shape                                                                 | `cmd/server/config.go` (`MasterKeyConfig`)                                            |
+| Master key directory handling and dev key generation                         | `cmd/server/runtime.go` (`ensureServerMasterKey`)                                     |
+| Startup wiring and validation                                                | `cmd/server/server.go` (`buildMasterKey`)                                             |
+| Key lookup by purpose, crypter construction, rotation job                    | `internal/service/keys.go`                                                            |
+| Project key set creation                                                     | `internal/domain/project.go` (`GenerateNewKeySet`), `internal/service/project.go`     |
+| Schema                                                                       | `internal/storage/v2/dialect/{postgres,spanner}/migration/sql/000012_crypto_keys.sql` |
 
 ## See also
 
