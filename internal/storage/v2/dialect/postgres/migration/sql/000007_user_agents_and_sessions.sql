@@ -24,7 +24,10 @@ CREATE TABLE zitadel_nextgen.sessions (
     , PRIMARY KEY (project_id, id)
     , UNIQUE (project_id, token_id)
     , FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.projects(id) ON DELETE CASCADE
-    , FOREIGN KEY (project_id, user_id) REFERENCES zitadel_nextgen.users(project_id, id)
+    , CONSTRAINT fk_sessions_user
+        FOREIGN KEY (project_id, user_id)
+        REFERENCES zitadel_nextgen.users(project_id, id)
+        ON DELETE CASCADE
     , FOREIGN KEY (project_id, user_agent_id) REFERENCES zitadel_nextgen.user_agents(project_id, id)
 );
 
