@@ -584,9 +584,6 @@ func (s *Server) decodeCreateTeamRequest(r *http.Request) (
 			rerr = errors.Join(rerr, close())
 		}
 	}()
-	if _, ok := r.Header["Content-Type"]; !ok && r.ContentLength == 0 {
-		return req, rawBody, close, nil
-	}
 	ct, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil {
 		return req, rawBody, close, errors.Wrap(err, "parse media type")
@@ -594,7 +591,7 @@ func (s *Server) decodeCreateTeamRequest(r *http.Request) (
 	switch {
 	case ct == "application/json":
 		if r.ContentLength == 0 {
-			return req, rawBody, close, nil
+			return req, rawBody, close, validate.ErrBodyRequired
 		}
 		buf, err := io.ReadAll(r.Body)
 		defer func() {
@@ -608,20 +605,17 @@ func (s *Server) decodeCreateTeamRequest(r *http.Request) (
 		r.Body = io.NopCloser(bytes.NewBuffer(buf))
 
 		if len(buf) == 0 {
-			return req, rawBody, close, nil
+			return req, rawBody, close, validate.ErrBodyRequired
 		}
 
 		rawBody = append(rawBody, buf...)
 		d := jx.DecodeBytes(buf)
 
-		var request *CreateTeamRequest
+		var request CreateTeamRequest
 		if err := func() error {
-			request = nil
-			var elem CreateTeamRequest
-			if err := elem.Decode(d); err != nil {
+			if err := request.Decode(d); err != nil {
 				return err
 			}
-			request = &elem
 			if err := d.Skip(); err != io.EOF {
 				return errors.New("unexpected trailing data")
 			}
@@ -634,7 +628,15 @@ func (s *Server) decodeCreateTeamRequest(r *http.Request) (
 			}
 			return req, rawBody, close, err
 		}
-		return request, rawBody, close, nil
+		if err := func() error {
+			if err := request.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return req, rawBody, close, errors.Wrap(err, "validate")
+		}
+		return &request, rawBody, close, nil
 	default:
 		return req, rawBody, close, validate.InvalidContentType(ct)
 	}

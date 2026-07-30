@@ -32,7 +32,7 @@ func TestTeamMembershipStatements_CRUD(t *testing.T) {
 		URL:       schemaURL,
 		Schema:    []byte("{}"),
 	}))
-	require.NoError(t, stmts.CreateTeam(ctx, &domain.Team{ProjectID: project.ID, ID: teamID}))
+	require.NoError(t, stmts.CreateTeam(ctx, newTestTeam(project.ID, teamID)))
 
 	// Seed the parent user row via DML (integration fixture).
 	_, err := db.Update(ctx, buildStatement(
