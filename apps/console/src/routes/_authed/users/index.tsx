@@ -1,7 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ArrowUpDown, MoreVertical, Plus, Search, Users } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
+import { AddUserSheet } from "@/components/add-user-sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,6 +49,7 @@ function searchShortcutLabel(): string {
 
 function UsersScreen() {
   const users = Route.useLoaderData();
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [sortAsc, setSortAsc] = useState<boolean | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -115,10 +117,12 @@ function UsersScreen() {
               {searchShortcutLabel()}
             </kbd>
           </div>
-          <Button className="w-full lg:w-auto">
-            Add
-            <Plus aria-hidden />
-          </Button>
+          <AddUserSheet onCreated={() => router.invalidate()}>
+            <Button className="w-full lg:w-auto">
+              Add
+              <Plus aria-hidden />
+            </Button>
+          </AddUserSheet>
         </div>
       </div>
 
