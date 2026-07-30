@@ -516,8 +516,10 @@ func (UnimplementedHandler) RevokeMySession(ctx context.Context) (r RevokeMySess
 
 // RevokeSession implements revokeSession operation.
 //
-// Revokes the session immediately (`state: revoked`). This is the logout operation.
-// The session_token issued at creation (or superseded by a handoff exchange) is required.
+// Revokes the session immediately (`state: revoked`).
+// This is the operator revoke path and requires the `session.delete` scope on a
+// project-bound credential. End-user logout with the `__nextgen_session` cookie is
+// `DELETE /sessions/me` (`nextgenSession` scheme).
 // After revocation, any tokens derived from this session are invalidated.
 //
 // DELETE /sessions/{session_id}
