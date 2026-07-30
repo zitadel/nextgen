@@ -27,10 +27,11 @@ var PasskeyRelyingParty = virtualwebauthn.RelyingParty{
 }
 
 // RegisterPasskey runs a full registration ceremony and leaves one credential
-// behind for the user. Finish verifies the attestation against the stored
-// challenge, so this mints a real virtual authenticator — a fresh one per call,
-// since Begin excludes the credentials already registered for the user.
-func (h *Harness) RegisterPasskey(t *testing.T, projectID, userID, displayName string) {
+// behind for the user, named passkeyName. Finish verifies the attestation
+// against the stored challenge, so this mints a real virtual authenticator — a
+// fresh one per call, since Begin excludes the credentials already registered
+// for the user.
+func (h *Harness) RegisterPasskey(t *testing.T, projectID, userID, passkeyName string) {
 	t.Helper()
 
 	passkeyService := h.EnsurePasskeyRegistrationService(t)
@@ -40,7 +41,7 @@ func (h *Harness) RegisterPasskey(t *testing.T, projectID, userID, displayName s
 		ProjectID:   projectID,
 		UserID:      userID,
 		Username:    "username",
-		DisplayName: displayName,
+		DisplayName: "Test User",
 		RPID:        rp.ID,
 		RPOrigins:   []string{rp.Origin},
 	})
@@ -60,6 +61,7 @@ func (h *Harness) RegisterPasskey(t *testing.T, projectID, userID, displayName s
 		ProjectID:      projectID,
 		RegistrationID: registration.RegistrationID,
 		Attestation:    []byte(attestation),
+		PasskeyName:    passkeyName,
 	})
 	require.NoError(t, err)
 }
