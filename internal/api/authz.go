@@ -45,6 +45,11 @@ type resourceAccess struct {
 	// planes; until then the legacy operator-grade project.write implies all
 	// of them and is accepted everywhere without being listed here).
 	scopes map[accessOp][]string
+	// strictScopes opts the resource out of the project.write umbrella: only
+	// the scopes listed above reach the operation. Use it where the umbrella
+	// would grant a materially different blast radius than project
+	// administration, not merely a wider one.
+	strictScopes bool
 	// readMiss and writeMiss are the anti-oracle answers for a project the
 	// token is not bound to; writeMiss doubles as the nonexistent-project
 	// answer since the guard cannot (and must not) tell the two apart.
@@ -99,15 +104,26 @@ var teamAccess = resourceAccess{
 // sessionAccess gates operator session management (get/list/revoke by id).
 // Create and exchange stay on the runtime/app plane and are not checked here.
 // Both plural (current OpenAPI) and singular (catalog target) finer scopes are
-// accepted so project binding lands before the #645 rename merges.
+// accepted so project binding does not depend on the rename landing first.
+//
+// This is the one strict row: revoking sessions is an end-user-facing runtime
+// act — one call logs a person out, a loop logs out a project — which is a
+// different blast radius from editing project configuration, so the legacy
+// project.write umbrella must not reach it. No credential mints session.*
+// today (project secrets carry project.write + project.read, preview secrets
+// project.read), so these operator endpoints answer permission_denied until
+// ADR 036's credential planes issue the app-plane scopes. Failing closed is
+// deliberate: before this guard existed any decryptable token, including the
+// browser-shipped preview secret, could revoke any session by id.
 var sessionAccess = resourceAccess{
 	scopes: map[accessOp][]string{
 		opRead:   {"session.read", "sessions.read", "session.write", "sessions.write"},
 		opDelete: {"session.delete", "sessions.delete"},
 	},
-	readMiss:  domain.ErrSessionNotFound,
-	writeMiss: domain.ErrSessionNotFound,
-	denied:    domain.ErrSessionPermissionDenied,
+	strictScopes: true,
+	readMiss:     domain.ErrSessionNotFound,
+	writeMiss:    domain.ErrSessionNotFound,
+	denied:       domain.ErrSessionPermissionDenied,
 }
 
 // brandingAccess is the row this access model was generalized from (ADR 040,
@@ -150,10 +166,19 @@ func requireProjectAccess(ctx context.Context, projectID string, res resourceAcc
 		}
 		return res.readMiss()
 	}
-	if !scopeAllowed(scope.Scope, res.scopes[op]) {
+	if !res.allows(scope.Scope, op) {
 		return res.denied()
 	}
 	return nil
+}
+
+// allows reports whether the granted scopes reach op on this resource,
+// honouring strictScopes.
+func (res resourceAccess) allows(granted []string, op accessOp) bool {
+	if res.strictScopes {
+		return scopeListed(granted, res.scopes[op])
+	}
+	return scopeAllowed(granted, res.scopes[op])
 }
 
 // scopeAllowed reports whether any granted scope reaches the operation:
@@ -165,6 +190,14 @@ func scopeAllowed(granted, accepted []string) bool {
 		if s == "project.write" {
 			return true
 		}
+	}
+	return scopeListed(granted, accepted)
+}
+
+// scopeListed reports whether a granted scope appears verbatim in accepted,
+// without admitting the project.write umbrella.
+func scopeListed(granted, accepted []string) bool {
+	for _, s := range granted {
 		for _, a := range accepted {
 			if s == a {
 				return true

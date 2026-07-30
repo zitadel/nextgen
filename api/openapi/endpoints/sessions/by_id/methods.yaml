@@ -29,6 +29,12 @@ get:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
     '404':
       description: Session not found.
       content:
@@ -62,6 +68,12 @@ delete:
           $ref: ../../../components/headers/set-cookie-session-token.yaml
     '401':
       description: Missing or invalid session token.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
       content:
         application/json:
           schema:

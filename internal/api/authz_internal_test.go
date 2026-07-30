@@ -69,6 +69,9 @@ func TestResourceAccessScopes(t *testing.T) {
 		{"session.read cannot delete", sessionAccess, opDelete, "session.read", false},
 		{"session.delete deletes", sessionAccess, opDelete, "session.delete", true},
 		{"sessions.delete deletes", sessionAccess, opDelete, "sessions.delete", true},
+		// The strict row: sessions are the one resource the umbrella misses.
+		{"project.write does not read sessions", sessionAccess, opRead, "project.write", false},
+		{"project.write does not revoke sessions", sessionAccess, opDelete, "project.write", false},
 
 		{"project.read does not read project management state", projectAccess, opRead, "project.read", false},
 		{"project.read cannot write project state", projectAccess, opWrite, "project.read", false},
@@ -79,7 +82,7 @@ func TestResourceAccessScopes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := scopeAllowed([]string{tt.scope}, tt.res.scopes[tt.op]); got != tt.want {
+			if got := tt.res.allows([]string{tt.scope}, tt.op); got != tt.want {
 				t.Fatalf("scope %q for op %d = %v, want %v", tt.scope, tt.op, got, tt.want)
 			}
 		})
@@ -126,12 +129,8 @@ func TestRequireProjectAccess(t *testing.T) {
 			readMiss: domain.ErrTeamNotFound().Code, writeMiss: domain.ErrTeamProjectNotFound().Code,
 			denied: domain.ErrTeamPermissionDenied().Code,
 		},
-		{
-			name:     "session",
-			res:      sessionAccess,
-			readMiss: domain.ErrSessionNotFound().Code, writeMiss: domain.ErrSessionNotFound().Code,
-			denied: domain.ErrSessionPermissionDenied().Code,
-		},
+		// sessionAccess is deliberately absent: it is the one strict resource,
+		// so the project secret does not reach it. See the dedicated subtest.
 		{
 			name:     "project",
 			res:      projectAccess,
@@ -179,15 +178,40 @@ func TestRequireProjectAccess(t *testing.T) {
 			t.Fatalf("project.write implies delete: %v", err)
 		}
 
-		sessionReader := WithScopeContext(context.Background(), ScopeContext{
+	})
+
+	// Sessions opt out of the project.write umbrella (see sessionAccess):
+	// revoking sessions logs people out, which is not project administration.
+	t.Run("session management refuses the project.write umbrella", func(t *testing.T) {
+		err := requireProjectAccess(operator, "proj_a", sessionAccess, opRead)
+		assertDomainCode(t, err, domain.ErrSessionPermissionDenied().Code)
+		err = requireProjectAccess(operator, "proj_a", sessionAccess, opDelete)
+		assertDomainCode(t, err, domain.ErrSessionPermissionDenied().Code)
+		err = requireProjectAccess(preview, "proj_a", sessionAccess, opRead)
+		assertDomainCode(t, err, domain.ErrSessionPermissionDenied().Code)
+
+		reader := WithScopeContext(context.Background(), ScopeContext{
 			ProjectID: "proj_a",
 			Scope:     []string{"session.read"},
 		})
-		err = requireProjectAccess(sessionReader, "proj_a", sessionAccess, opDelete)
-		assertDomainCode(t, err, domain.ErrSessionPermissionDenied().Code)
-		if err := requireProjectAccess(operator, "proj_a", sessionAccess, opDelete); err != nil {
-			t.Fatalf("project.write implies session delete: %v", err)
+		if err := requireProjectAccess(reader, "proj_a", sessionAccess, opRead); err != nil {
+			t.Fatalf("session.read should reach an own-project read: %v", err)
 		}
+		err = requireProjectAccess(reader, "proj_a", sessionAccess, opDelete)
+		assertDomainCode(t, err, domain.ErrSessionPermissionDenied().Code)
+
+		deleter := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"session.delete"},
+		})
+		if err := requireProjectAccess(deleter, "proj_a", sessionAccess, opDelete); err != nil {
+			t.Fatalf("session.delete should reach an own-project revoke: %v", err)
+		}
+
+		// Binding is checked before scopes, so a foreign project still misses
+		// rather than denying — the anti-oracle answer holds for strict rows.
+		err = requireProjectAccess(deleter, "proj_b", sessionAccess, opDelete)
+		assertDomainCode(t, err, domain.ErrSessionNotFound().Code)
 	})
 
 	t.Run("foreign deletes miss like reads", func(t *testing.T) {
