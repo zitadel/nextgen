@@ -134,7 +134,7 @@ tasks:
       - "sqlite_integration"
       - "-timeout"
       - "5m"
-      - "./internal/storage/v2/dialect/sqlite/..."
+      - "./..."
     inputs:
       - "@group(serverInputs)"
     options:
