@@ -25,7 +25,7 @@ func recoveryCodesByIDFilter(id int64) database.Filter[domain.UserRecoveryCodesF
 }
 
 func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 		userID := "usr_rc"
 
@@ -72,7 +72,7 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 }
 
 func TestUserRecoveryCodesStatements_CreateEmptyRejected(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 		userID := "usr_rc_empty"
 
@@ -95,7 +95,7 @@ func TestUserRecoveryCodesStatements_CreateEmptyRejected(t *testing.T) {
 }
 
 func TestUserRecoveryCodesStatements_Update(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 		userID := "usr_rc_upd"
 

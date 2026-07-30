@@ -31,7 +31,7 @@ func ensureUserPasskeyTestUser(t *testing.T, stmts service.AllStatements, userID
 }
 
 func TestUserPasskeyStatements_CreateGetListDelete(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		userID := "user_passkey_crud"
 		credentialID := "cred-passkey-crud"
 		projectID := ensureUserPasskeyTestUser(t, d.stmts, userID, "passkey-crud@example.com")
@@ -94,7 +94,7 @@ func TestUserPasskeyStatements_CreateGetListDelete(t *testing.T) {
 }
 
 func TestUserPasskeyStatements_Update(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		userID := "user_passkey_1"
 		credentialID := "cred-passkey-1"
 		projectID := ensureUserPasskeyTestUser(t, d.stmts, userID, "passkey@example.com")

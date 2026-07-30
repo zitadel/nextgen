@@ -25,7 +25,7 @@ func userPasswordByID(id int64) database.Filter[domain.UserPasswordField] {
 }
 
 func TestUserPasswordStatements_SetGetDelete(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 		userID := "usr_pw"
 
@@ -80,7 +80,7 @@ func TestUserPasswordStatements_SetGetDelete(t *testing.T) {
 }
 
 func TestUserPasswordStatements_SetUpsert(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 		userID := "usr_pw_upsert"
 
@@ -121,7 +121,7 @@ func TestUserPasswordStatements_SetUpsert(t *testing.T) {
 }
 
 func TestUserPasswordStatements_SetMissingUser(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, _ := ensureUserTestProject(t, d.stmts)
 
 		err := d.stmts.SetUserPassword(t.Context(), &domain.SetUserPassword{
@@ -135,7 +135,7 @@ func TestUserPasswordStatements_SetMissingUser(t *testing.T) {
 }
 
 func TestUserPasswordStatements_Update(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 		userID := "usr_pw_upd"
 

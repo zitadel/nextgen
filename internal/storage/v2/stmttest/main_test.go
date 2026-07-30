@@ -84,16 +84,12 @@ func run(m *testing.M) int {
 	return m.Run()
 }
 
-// runTest runs fn once per brought-up dialect as a subtest named dialect[/name].
-func runTest(t *testing.T, name string, fn func(t *testing.T, d dialect)) {
+// forEachDialect runs fn once per brought-up dialect as a subtest named after the dialect.
+func forEachDialect(t *testing.T, fn func(t *testing.T, d dialect)) {
 	t.Helper()
 	require.NotEmpty(t, dialects)
 	for _, d := range dialects {
-		sub := d.name
-		if name != "" {
-			sub = d.name + "/" + name
-		}
-		t.Run(sub, func(t *testing.T) {
+		t.Run(d.name, func(t *testing.T) {
 			fn(t, d)
 		})
 	}

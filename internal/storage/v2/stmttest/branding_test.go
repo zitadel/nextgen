@@ -42,7 +42,7 @@ func sampleBranding(projectID, id string) *domain.Branding {
 }
 
 func TestBrandingStatements_CreateAndGet(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, brandingID := uniqueBrandingIDs(t)
 		ensureBrandingProject(t, d.stmts, projectID)
 
@@ -66,7 +66,7 @@ func TestBrandingStatements_CreateAndGet(t *testing.T) {
 }
 
 func TestBrandingStatements_ListNewestFirst(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, _ := uniqueBrandingIDs(t)
 		ensureBrandingProject(t, d.stmts, projectID)
 
@@ -92,7 +92,7 @@ func TestBrandingStatements_ListNewestFirst(t *testing.T) {
 }
 
 func TestBrandingStatements_ListEmpty(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, _ := uniqueBrandingIDs(t)
 		ensureBrandingProject(t, d.stmts, projectID)
 
@@ -103,7 +103,7 @@ func TestBrandingStatements_ListEmpty(t *testing.T) {
 }
 
 func TestBrandingStatements_Get_NotFound(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, brandingID := uniqueBrandingIDs(t)
 		ensureBrandingProject(t, d.stmts, projectID)
 

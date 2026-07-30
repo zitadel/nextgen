@@ -35,7 +35,7 @@ func ensureUserTestProject(t *testing.T, stmts service.AllStatements) (projectID
 }
 
 func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 
 		user1 := newTestUser(t, projectID, schemaURL, "user_v2_lookup_1", "alpha@example.com", "Alpha")
@@ -95,7 +95,7 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 }
 
 func TestUserStatements_ListUsersAttributesAndAttributeKeys(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 
 		user1 := newTestUser(t, projectID, schemaURL, "user_attr_1", "alpha@example.com", "Alpha")
@@ -161,7 +161,7 @@ func TestUserStatements_ListUsersAttributesAndAttributeKeys(t *testing.T) {
 }
 
 func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 		teamID := "team_unified_filters"
 

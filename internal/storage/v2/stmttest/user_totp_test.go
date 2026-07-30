@@ -26,7 +26,7 @@ func totpByIDFilter(id int64) database.Filter[domain.UserTOTPField] {
 }
 
 func TestUserTOTPStatements_CRUD(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 		userID := "user_totp_1"
 
@@ -88,7 +88,7 @@ func TestUserTOTPStatements_CRUD(t *testing.T) {
 }
 
 func TestUserTOTPStatements_Update(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 		userID := "user_totp_update"
 

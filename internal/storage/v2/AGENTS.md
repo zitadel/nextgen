@@ -46,7 +46,7 @@ Multi-write nesting uses the dialect `withTransaction` helpers above
 Behavioral statement parity across dialects lives in
 [`stmttest`](stmttest/) (see ADR 041). Shared suites assert through
 `service.AllStatements`; build-tagged registration brings up postgres and/or
-spanner, and `runTest` loops dialects. CI still runs one tag per job; both
+spanner, and `forEachDialect` loops dialects. CI still runs one tag per job; both
 tags are supported in one process for local parity checks.
 
 [`dbtest.Pool`](dbtest/dbtest.go) is the migrated bring-up type

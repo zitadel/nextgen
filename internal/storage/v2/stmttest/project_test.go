@@ -16,102 +16,110 @@ import (
 )
 
 func TestProjectStatements_Create(t *testing.T) {
-	runTest(t, "creates project and timestamps are set", func(t *testing.T, d dialect) {
-		project := newTestProject(uniqueProjectID(t))
-		t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		t.Run("creates project and timestamps are set", func(t *testing.T) {
+			project := newTestProject(uniqueProjectID(t))
+			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 
-		require.NoError(t, d.stmts.CreateProject(t.Context(), project))
-		assert.False(t, project.CreatedAt.IsZero())
-		assert.False(t, project.UpdatedAt.IsZero())
-		assert.WithinDuration(t, time.Now(), project.CreatedAt, 5*time.Second)
-		assert.WithinDuration(t, time.Now(), project.UpdatedAt, 5*time.Second)
+			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
+			assert.False(t, project.CreatedAt.IsZero())
+			assert.False(t, project.UpdatedAt.IsZero())
+			assert.WithinDuration(t, time.Now(), project.CreatedAt, 5*time.Second)
+			assert.WithinDuration(t, time.Now(), project.UpdatedAt, 5*time.Second)
 
-		stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
-		require.NoError(t, err)
-		assert.Equal(t, project.ID, stored.ID)
-		assert.Equal(t, project.Name, stored.Name)
-		assert.False(t, stored.CreatedAt.IsZero())
-		assert.False(t, stored.UpdatedAt.IsZero())
-	})
+			stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
+			require.NoError(t, err)
+			assert.Equal(t, project.ID, stored.ID)
+			assert.Equal(t, project.Name, stored.Name)
+			assert.False(t, stored.CreatedAt.IsZero())
+			assert.False(t, stored.UpdatedAt.IsZero())
+		})
 
-	runTest(t, "duplicate ID returns error", func(t *testing.T, d dialect) {
-		project := newTestProject(uniqueProjectID(t))
-		t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
-		require.NoError(t, d.stmts.CreateProject(t.Context(), project))
+		t.Run("duplicate ID returns error", func(t *testing.T) {
+			project := newTestProject(uniqueProjectID(t))
+			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 
-		err := d.stmts.CreateProject(t.Context(), newTestProject(project.ID))
-		assert.ErrorIs(t, err, new(database.UniqueError))
+			err := d.stmts.CreateProject(t.Context(), newTestProject(project.ID))
+			assert.ErrorIs(t, err, new(database.UniqueError))
+		})
 	})
 }
 
 func TestProjectStatements_Update(t *testing.T) {
-	runTest(t, "updates name and refreshes updated_at", func(t *testing.T, d dialect) {
-		project := newTestProject(uniqueProjectID(t))
-		project.PreviewOrigins = []string{"*.example.com", "localhost:3000"}
-		t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
-		require.NoError(t, d.stmts.CreateProject(t.Context(), project))
-		createdUpdatedAt := project.UpdatedAt
-		createdAt := project.CreatedAt
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		t.Run("updates name and refreshes updated_at", func(t *testing.T) {
+			project := newTestProject(uniqueProjectID(t))
+			project.PreviewOrigins = []string{"*.example.com", "localhost:3000"}
+			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
+			createdUpdatedAt := project.UpdatedAt
+			createdAt := project.CreatedAt
 
-		projectName := "project-" + rand.Text()
-		project.Name = projectName
-		require.NoError(t, d.stmts.UpdateProject(t.Context(), project))
-		assert.True(t, project.UpdatedAt.After(createdUpdatedAt))
-		assert.Equal(t, createdAt.UTC(), project.CreatedAt.UTC())
-		assert.Equal(t, []string{"*.example.com", "localhost:3000"}, project.PreviewOrigins)
+			projectName := "project-" + rand.Text()
+			project.Name = projectName
+			require.NoError(t, d.stmts.UpdateProject(t.Context(), project))
+			assert.True(t, project.UpdatedAt.After(createdUpdatedAt))
+			assert.Equal(t, createdAt.UTC(), project.CreatedAt.UTC())
+			assert.Equal(t, []string{"*.example.com", "localhost:3000"}, project.PreviewOrigins)
 
-		stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
-		require.NoError(t, err)
-		assert.Equal(t, projectName, stored.Name)
-		assert.Equal(t, project.UpdatedAt.UTC(), stored.UpdatedAt.UTC())
-	})
+			stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
+			require.NoError(t, err)
+			assert.Equal(t, projectName, stored.Name)
+			assert.Equal(t, project.UpdatedAt.UTC(), stored.UpdatedAt.UTC())
+		})
 
-	runTest(t, "not found returns NoRowFoundError", func(t *testing.T, d dialect) {
-		project := newTestProject(uniqueProjectID(t))
-		err := d.stmts.UpdateProject(t.Context(), project)
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		t.Run("not found returns NoRowFoundError", func(t *testing.T) {
+			project := newTestProject(uniqueProjectID(t))
+			err := d.stmts.UpdateProject(t.Context(), project)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		})
 	})
 }
 
 func TestProjectStatements_Get(t *testing.T) {
-	runTest(t, "returns project by ID", func(t *testing.T, d dialect) {
-		project := newTestProject(uniqueProjectID(t))
-		t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
-		require.NoError(t, d.stmts.CreateProject(t.Context(), project))
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		t.Run("returns project by ID", func(t *testing.T) {
+			project := newTestProject(uniqueProjectID(t))
+			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 
-		stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
-		require.NoError(t, err)
-		assert.Equal(t, project.ID, stored.ID)
-		assert.Equal(t, project.Name, stored.Name)
-		assert.False(t, stored.CreatedAt.IsZero())
-		assert.False(t, stored.UpdatedAt.IsZero())
-	})
+			stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
+			require.NoError(t, err)
+			assert.Equal(t, project.ID, stored.ID)
+			assert.Equal(t, project.Name, stored.Name)
+			assert.False(t, stored.CreatedAt.IsZero())
+			assert.False(t, stored.UpdatedAt.IsZero())
+		})
 
-	runTest(t, "not found returns NoRowFoundError", func(t *testing.T, d dialect) {
-		_, err := d.stmts.GetProjectByID(t.Context(), uniqueProjectID(t))
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		t.Run("not found returns NoRowFoundError", func(t *testing.T) {
+			_, err := d.stmts.GetProjectByID(t.Context(), uniqueProjectID(t))
+			assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		})
 	})
 }
 
 func TestProjectStatements_Delete(t *testing.T) {
-	runTest(t, "deletes an existing project", func(t *testing.T, d dialect) {
-		project := newTestProject(uniqueProjectID(t))
-		t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
-		require.NoError(t, d.stmts.CreateProject(t.Context(), project))
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		t.Run("deletes an existing project", func(t *testing.T) {
+			project := newTestProject(uniqueProjectID(t))
+			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 
-		require.NoError(t, d.stmts.DeleteProjectByID(t.Context(), project.ID))
+			require.NoError(t, d.stmts.DeleteProjectByID(t.Context(), project.ID))
 
-		_, err := d.stmts.GetProjectByID(t.Context(), project.ID)
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
-	})
+			_, err := d.stmts.GetProjectByID(t.Context(), project.ID)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		})
 
-	runTest(t, "deleting a missing project is a no-op", func(t *testing.T, d dialect) {
-		assert.NoError(t, d.stmts.DeleteProjectByID(t.Context(), uniqueProjectID(t)))
+		t.Run("deleting a missing project is a no-op", func(t *testing.T) {
+			assert.NoError(t, d.stmts.DeleteProjectByID(t.Context(), uniqueProjectID(t)))
+		})
 	})
 }
 
 func TestProjectStatements_List(t *testing.T) {
-	runTest(t, "", func(t *testing.T, d dialect) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
 		projects := make([]*domain.Project, 3)
 		for i := range projects {
 			if i > 0 {
@@ -234,14 +242,16 @@ func TestProjectStatements_List(t *testing.T) {
 }
 
 func TestProjectStatements_ListCursorTie(t *testing.T) {
-	runTest(t, "ascending", func(t *testing.T, d dialect) {
-		runListCursorTie(t, d, database.OrderAsc, func(ids []string) (first, second []string) {
-			return []string{ids[0], ids[1]}, []string{ids[2]}
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		t.Run("ascending", func(t *testing.T) {
+			runListCursorTie(t, d, database.OrderAsc, func(ids []string) (first, second []string) {
+				return []string{ids[0], ids[1]}, []string{ids[2]}
+			})
 		})
-	})
-	runTest(t, "descending", func(t *testing.T, d dialect) {
-		runListCursorTie(t, d, database.OrderDesc, func(ids []string) (first, second []string) {
-			return []string{ids[2], ids[1]}, []string{ids[0]}
+		t.Run("descending", func(t *testing.T) {
+			runListCursorTie(t, d, database.OrderDesc, func(ids []string) (first, second []string) {
+				return []string{ids[2], ids[1]}, []string{ids[0]}
+			})
 		})
 	})
 }

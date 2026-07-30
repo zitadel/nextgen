@@ -25,8 +25,9 @@ boundary without pulling in unrelated orchestration.
 - **Build-tag registration:** each dialect appends an opener under
   `postgres_integration` and/or `spanner_integration`. `TestMain` brings up
   every registered dialect.
-- **`runTest`:** suite cases call `runTest(t, name, fn)` so the body runs once
-  per dialect as a subtest (`postgres/...`, `spanner/...`).
+- **`forEachDialect`:** suite cases call `forEachDialect(t, fn)` so the body
+  runs once per dialect as a subtest (`postgres`, `spanner`); use normal
+  `t.Run` for case names inside.
 - **CI:** still one tag per job (`server:test-postgres` /
   `server:test-spanner`). Locally, both tags may be set in one process.
 - **Assertions:** domain fields, list/filter/cursor behavior, and typed
