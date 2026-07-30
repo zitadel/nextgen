@@ -2077,13 +2077,32 @@ type CreateTeamBadRequest ErrorDetails
 
 func (*CreateTeamBadRequest) createTeamRes() {}
 
+type CreateTeamConflict ErrorDetails
+
+func (*CreateTeamConflict) createTeamRes() {}
+
 // Ref: #
-type CreateTeamRequest struct{}
+type CreateTeamRequest struct {
+	// The name of the team. Must be unique within the project.
+	Name string `json:"name"`
+}
+
+// GetName returns the value of Name.
+func (s *CreateTeamRequest) GetName() string {
+	return s.Name
+}
+
+// SetName sets the value of Name.
+func (s *CreateTeamRequest) SetName(val string) {
+	s.Name = val
+}
 
 // Ref: #
 type CreateTeamResponse struct {
 	// The unique identifier of the team.
 	ID string `json:"id"`
+	// The name of the team.
+	Name string `json:"name"`
 	// The time when the team was created.
 	CreatedAt time.Time `json:"createdAt"`
 }
@@ -2091,6 +2110,11 @@ type CreateTeamResponse struct {
 // GetID returns the value of ID.
 func (s *CreateTeamResponse) GetID() string {
 	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *CreateTeamResponse) GetName() string {
+	return s.Name
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -2101,6 +2125,11 @@ func (s *CreateTeamResponse) GetCreatedAt() time.Time {
 // SetID sets the value of ID.
 func (s *CreateTeamResponse) SetID(val string) {
 	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *CreateTeamResponse) SetName(val string) {
+	s.Name = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.
@@ -5073,6 +5102,8 @@ func (*GetTeamNotFound) getTeamRes() {}
 type GetTeamResponse struct {
 	// The unique identifier of the team.
 	ID string `json:"id"`
+	// The name of the team.
+	Name string `json:"name"`
 	// The time when the team was created.
 	CreatedAt time.Time `json:"createdAt"`
 	// The time when the team was last updated.
@@ -5082,6 +5113,11 @@ type GetTeamResponse struct {
 // GetID returns the value of ID.
 func (s *GetTeamResponse) GetID() string {
 	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *GetTeamResponse) GetName() string {
+	return s.Name
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -5097,6 +5133,11 @@ func (s *GetTeamResponse) GetUpdatedAt() time.Time {
 // SetID sets the value of ID.
 func (s *GetTeamResponse) SetID(val string) {
 	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *GetTeamResponse) SetName(val string) {
+	s.Name = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.

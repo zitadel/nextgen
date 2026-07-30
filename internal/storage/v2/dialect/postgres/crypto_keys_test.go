@@ -4,8 +4,6 @@ package postgres
 
 import (
 	"context"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -25,7 +23,7 @@ import (
 // uniqueKeyID returns a collision-free DEK ID scoped to the running (sub)test.
 func uniqueKeyID(t *testing.T) string {
 	t.Helper()
-	return "dek-" + strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	return "dek-" + uniqueSuffix(t)
 }
 
 // newTestKey builds a persistable DEK in the given state referencing projectID.

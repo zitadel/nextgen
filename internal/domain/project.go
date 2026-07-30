@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strings"
 	"time"
 
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -44,6 +45,7 @@ func NewProject(name string, previewOrigins []string) (*Project, error) {
 		return nil, ErrInternal(err).WithMessage("failed to create project id")
 	}
 
+	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, ErrProjectNameInvalid()
 	}
