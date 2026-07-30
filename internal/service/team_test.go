@@ -15,7 +15,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-func TestTeamService_CreateTeam(t *testing.T) {
+func TestTeamService_Create(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -74,7 +74,7 @@ func TestTeamService_CreateTeam(t *testing.T) {
 
 			svc := newMockedTeamService(t, tc.setupStmt)
 
-			got, err := svc.CreateTeam(t.Context(), tc.input)
+			got, err := svc.Create(t.Context(), tc.input)
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
 				assert.Nil(t, got)
@@ -86,7 +86,7 @@ func TestTeamService_CreateTeam(t *testing.T) {
 	}
 }
 
-func TestTeamService_GetTeam(t *testing.T) {
+func TestTeamService_Get(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -133,7 +133,7 @@ func TestTeamService_GetTeam(t *testing.T) {
 
 			svc := newMockedTeamService(t, tc.setupStmt)
 
-			got, err := svc.GetTeam(t.Context(), "proj_1", tc.teamID)
+			got, err := svc.Get(t.Context(), "proj_1", tc.teamID)
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
 				assert.Nil(t, got)

@@ -13,7 +13,7 @@ func (h *Handler) CreateTeam(ctx context.Context, req *api.CreateTeamRequest, pa
 	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opWrite); err != nil {
 		return nil, err
 	}
-	team, err := h.teamService.CreateTeam(ctx, service.CreateTeamInput{
+	team, err := h.teamService.Create(ctx, service.CreateTeamInput{
 		ProjectID: string(params.ProjectID),
 		Name:      req.Name,
 	})
@@ -31,7 +31,7 @@ func (h *Handler) GetTeam(ctx context.Context, params api.GetTeamParams) (api.Ge
 	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opRead); err != nil {
 		return nil, err
 	}
-	team, err := h.teamService.GetTeam(ctx, string(params.ProjectID), string(params.TeamID))
+	team, err := h.teamService.Get(ctx, string(params.ProjectID), string(params.TeamID))
 	if err != nil {
 		return nil, err
 	}

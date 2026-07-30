@@ -162,7 +162,7 @@ func TestGetTeam(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
 
-		team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+		team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 			ProjectID: project.ID,
 			Name:      helpers.TeamName(),
 		})
