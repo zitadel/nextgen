@@ -39,7 +39,7 @@ No background or automatic migration from schema v1 to v2. The intended flow:
 3. The client sends a **self-contained** update (PUT and/or PATCH) that sets **`$schema`** to the v2 URL and includes all attribute additions, updates, and removals required to satisfy v2 in **one request**.
 4. The server applies changes in a **single transaction**, materializes the new user state, **validates it against the v2 schema before commit**, and returns the new state. Validation failure aborts the transaction.
 
-SQL-oriented put/patch contracts under `internal/storage/database/dialect/postgres/migration/004_users/example/` already reflect single-transaction user updates; HTTP APIs should preserve that atomicity.
+SQL-oriented put/patch contracts under `internal/storage/v2/dialect/postgres/migration/004_users/example/` already reflect single-transaction user updates; HTTP APIs should preserve that atomicity.
 
 ```mermaid
 sequenceDiagram
