@@ -10,13 +10,12 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // Import loads bootstrap users from JSON files into the database.
 // dialect is the configured database dialect name (e.g. "postgres"); used to reject unsupported backends.
-func Import(ctx context.Context, pool database.Pool, v2Pool service.StatementPool, hashValidator crypto.HashValidator, dialect string, paths []string) error {
+func Import(ctx context.Context, v2Pool service.StatementPool, hashValidator crypto.HashValidator, dialect string, paths []string) error {
 	if len(paths) == 0 {
 		return nil
 	}
@@ -25,7 +24,7 @@ func Import(ctx context.Context, pool database.Pool, v2Pool service.StatementPoo
 	}
 
 	for _, path := range paths {
-		if err := importFile(ctx, pool, v2Pool, hashValidator, path); err != nil {
+		if err := importFile(ctx, v2Pool, hashValidator, path); err != nil {
 			return fmt.Errorf("user file %q: %w", path, err)
 		}
 	}
@@ -34,7 +33,6 @@ func Import(ctx context.Context, pool database.Pool, v2Pool service.StatementPoo
 
 func importFile(
 	ctx context.Context,
-	pool database.Pool,
 	v2Pool service.StatementPool,
 	hashValidator crypto.HashValidator,
 	path string,
@@ -51,19 +49,19 @@ func importFile(
 		return err
 	}
 
-	if err := ensureDependencies(ctx, pool, doc.Header); err != nil {
+	if err := ensureDependencies(ctx, v2Pool.Statements(), doc.Header); err != nil {
 		return err
 	}
 
-	_, err = v2Pool.Statements().GetUser(ctx, v2database.And(
-		v2database.Equal(v2database.Col(domain.UserFieldProjectID), doc.Header.ProjectID),
-		v2database.Equal(v2database.Col(domain.UserFieldID), doc.Header.ID),
+	_, err = v2Pool.Statements().GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), doc.Header.ProjectID),
+		database.Equal(database.Col(domain.UserFieldID), doc.Header.ID),
 	), service.UserQueryOptions{})
 	if err == nil {
 		slog.Info("bootstrap user: skipped user because they already exists)", slog.String("path", path), slog.String("id", doc.Header.ID))
 		return nil
 	}
-	if !errors.Is(err, new(database.NoRowFoundError)) {
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
 		return fmt.Errorf("check existing user: %w", err)
 	}
 

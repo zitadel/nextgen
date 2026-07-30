@@ -9,56 +9,38 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
-	pgold "github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
-	"github.com/zitadel/nextgen/internal/storage/database/dialect/postgres/embedded"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
-	v2postgres "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
+	v2dbtest "github.com/zitadel/nextgen/internal/storage/v2/dbtest"
 )
 
 func TestMain(m *testing.M) {
 	ctx := context.Background()
-	connector, stop, err := dbtest.Postgres(ctx)
+	pool, stop, err := v2dbtest.Postgres(ctx)
 	if err != nil {
 		panic(err)
 	}
 	defer stop()
 
-	pool_, err := connector.Connect(ctx)
-	if err != nil {
-		panic(err)
+	v2, ok := pool.(service.Pool)
+	if !ok {
+		panic("expected v2 service.Pool")
 	}
-	testPool = pool_.(database.PoolTest)
-	if err := testPool.MigrateTest(ctx); err != nil {
-		panic(err)
-	}
-	defer testPool.Close(ctx)
+	testV2ServiceDB = service.NewPool(v2)
+	defer pool.Close(ctx)
 
 	os.Exit(m.Run())
 }
 
-var testPool database.PoolTest
+var testV2ServiceDB *service.DB
 
 func testV2Pool(t *testing.T) *service.DB {
 	t.Helper()
-	var pgxPool *pgxpool.Pool
-	switch p := testPool.(type) {
-	case *embedded.Pool:
-		pgxPool = p.Pool.Pool
-	case *pgold.Pool:
-		pgxPool = p.Pool
-	default:
-		t.Fatalf("unsupported pool type %T", testPool)
-	}
-	v2, err := (&v2postgres.PoolConfig{Pool: pgxPool}).Connect(t.Context())
-	require.NoError(t, err)
-	return service.NewPool(v2.(service.Pool))
+	require.NotNil(t, testV2ServiceDB)
+	return testV2ServiceDB
 }
 
 func TestImport_loadAndSkip(t *testing.T) {
@@ -70,7 +52,7 @@ func TestImport_loadAndSkip(t *testing.T) {
 	path := filepath.Join(dir, "user.json")
 	writeUserFile(t, path, "usr_import_1")
 
-	require.NoError(t, users.Import(ctx, testPool, v2Pool, hasher, pgold.Name, []string{path}))
+	require.NoError(t, users.Import(ctx, v2Pool, hasher, "postgres", []string{path}))
 
 	got, err := v2Pool.Statements().GetUser(ctx, v2database.And(
 		v2database.Equal(v2database.Col(domain.UserFieldProjectID), "proj_demo"),
@@ -88,11 +70,11 @@ func TestImport_loadAndSkip(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, pw.EncodedHash)
 
-	require.NoError(t, users.Import(ctx, testPool, v2Pool, hasher, pgold.Name, []string{path}))
+	require.NoError(t, users.Import(ctx, v2Pool, hasher, "postgres", []string{path}))
 }
 
 func TestImport_spannerRejected(t *testing.T) {
-	err := users.Import(t.Context(), testPool, testV2Pool(t), testHasher(t), "spanner", []string{"any.json"})
+	err := users.Import(t.Context(), testV2Pool(t), testHasher(t), "spanner", []string{"any.json"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "spanner")
 }

@@ -7,7 +7,6 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	storagedb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 	"github.com/zitadel/nextgen/internal/storage/v2/teammembership"
@@ -93,7 +92,7 @@ func (s teamMembershipStatements) UpdateTeamMembershipStatus(ctx context.Context
 		return wrapError(err)
 	}
 	if tag.RowsAffected() == 0 {
-		return storagedb.NewNoRowFoundError(nil)
+		return database.NewNoRowFoundError(nil)
 	}
 	return nil
 }

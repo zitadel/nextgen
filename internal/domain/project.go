@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strings"
 	"time"
 
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -12,6 +13,10 @@ const (
 
 func ErrProjectNameInvalid() Error {
 	return newError(PrefixProject.ErrorCodePrefix("name_invalid"), "The project name is invalid. Expected a non-empty string.", nil, nil)
+}
+
+func ErrProjectMissingID() Error {
+	return newError(PrefixProject.ErrorCodePrefix("missing_id"), "project: missing id", nil, nil)
 }
 
 func ErrProjectNotFound() Error {
@@ -40,6 +45,7 @@ func NewProject(name string, previewOrigins []string) (*Project, error) {
 		return nil, ErrInternal(err).WithMessage("failed to create project id")
 	}
 
+	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, ErrProjectNameInvalid()
 	}

@@ -4,8 +4,6 @@ package postgres
 
 import (
 	"context"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,13 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniqueTokenFixtureIDs(t *testing.T) (projectID, schemaURL, userID string) {
 	t.Helper()
-	suffix := strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	suffix := uniqueSuffix(t)
 	return "proj-token-" + suffix, "https://schemas.test/tokens/" + suffix + ".json", "usr-token-" + suffix
 }
 
@@ -55,7 +52,7 @@ func ensureTokenTestUser(t *testing.T, projectID, schemaURL, userID string) {
 func requireGeneratedTokenID(t *testing.T, tokenID string) {
 	t.Helper()
 	require.NotEmpty(t, tokenID)
-	require.True(t, legacydb.Identity(tokenID).IsNumeric())
+	require.True(t, v2database.Identity(tokenID).IsNumeric())
 }
 
 func TestTokenStatements_CRUD_OIDCAccessToken(t *testing.T) {
@@ -102,7 +99,7 @@ func TestTokenStatements_CRUD_OIDCAccessToken(t *testing.T) {
 	require.NoError(t, testPool.DeleteTokenByID(t.Context(), projectID, tok.TokenID))
 
 	_, err = testPool.GetTokenByID(t.Context(), projectID, tok.TokenID)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(v2database.NoRowFoundError))
 }
 
 func TestTokenStatements_SessionToken(t *testing.T) {
@@ -237,7 +234,7 @@ func TestTokenStatements_Get_NotFound(t *testing.T) {
 	ensureTokenTestUser(t, projectID, schemaURL, userID)
 
 	_, err := testPool.GetTokenByID(t.Context(), projectID, "999999")
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(v2database.NoRowFoundError))
 }
 
 func TestTokenStatements_List_NextCursorRequiresOrderBy(t *testing.T) {

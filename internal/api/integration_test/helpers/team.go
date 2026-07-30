@@ -8,10 +8,13 @@ import (
 
 func (h *Harness) EnsureTeamService(t *testing.T) *service.TeamService {
 	t.Helper()
-	if h.TeamService == nil {
-		h.TeamService = service.NewTeamService(
+	h.teamService.mutex.Lock()
+	defer h.teamService.mutex.Unlock()
+
+	if h.teamService.value == nil {
+		h.teamService.value = service.NewTeamService(
 			h.EnsureServiceDB(t),
 		)
 	}
-	return h.TeamService
+	return h.teamService.value
 }

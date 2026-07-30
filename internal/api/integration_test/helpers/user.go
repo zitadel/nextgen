@@ -13,15 +13,17 @@ import (
 
 func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
 	t.Helper()
-	if h.UserService == nil {
-		h.UserService = service.NewUserService(
-			h.EnsureDBPool(t),
+	h.userService.mutex.Lock()
+	defer h.userService.mutex.Unlock()
+
+	if h.userService.value == nil {
+		h.userService.value = service.NewUserService(
 			h.EnsureServiceDB(t),
 			h.EnsureSchemaStore(t),
 			h.EnsureHasher(t),
 		)
 	}
-	return h.UserService
+	return h.userService.value
 }
 
 // UserFixture exposes UserStatements helpers for integration tests.

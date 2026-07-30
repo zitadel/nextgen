@@ -7,6 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
 
 const (
@@ -19,6 +20,7 @@ const (
 	SELECT id, project_id, key, algorithm, state, created_at, activated_at, retired_at, purpose
 	FROM zitadel_nextgen.encryption_keys
 `
+	updateEncryptionKeyStmt = `UPDATE zitadel_nextgen.encryption_keys SET key = $2 WHERE id = $1`
 )
 
 type cryptoKeyStatements struct{ statement }
@@ -58,6 +60,48 @@ func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter databa
 		return nil, wrapError(err)
 	}
 	return key, nil
+}
+
+func (s cryptoKeyStatements) ListEncryptionKeys(ctx context.Context, opts *database.ListOptions[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error) {
+	if opts == nil {
+		opts = &database.ListOptions[domain.EncryptionKeyField]{}
+	}
+
+	var compiler statementCompiler
+	if err := compileRead(&compiler, encryptionKeyQuery, opts, encryptionKeySchema); err != nil {
+		return nil, err
+	}
+
+	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+
+	keys, err := pgx.CollectRows(rows, s.scanEncryptionKey)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+
+	var nextCursor []byte
+	if opts.Pagination.Limit > 0 && len(keys) == int(opts.Pagination.Limit) {
+		cursor := &pagination.Cursor[domain.EncryptionKeyField]{
+			Columns: opts.Pagination.OrderBy.Columns,
+			Values:  encryptionKeySchema.ValuesFrom(keys[len(keys)-1], opts.Pagination.OrderBy.Columns),
+		}
+		nextCursor = cursor.Marshal()
+	}
+
+	return &database.ListResult[*domain.EncryptionKey]{
+		Items:      keys,
+		NextCursor: nextCursor,
+	}, nil
+}
+
+func (s cryptoKeyStatements) UpdateKey(ctx context.Context, id string, key string) error {
+	if _, err := s.client.Exec(ctx, updateEncryptionKeyStmt, id, key); err != nil {
+		return wrapError(err)
+	}
+	return nil
 }
 
 func (s cryptoKeyStatements) scanEncryptionKey(row pgx.CollectableRow) (*domain.EncryptionKey, error) {

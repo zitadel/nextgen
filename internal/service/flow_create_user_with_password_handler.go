@@ -7,7 +7,6 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // FlowCreateUserWithPasswordHandler implements the `create_user` on_success:
@@ -46,7 +45,7 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
 	}
 
-	setPasswordAction := NewLazyUserAction(func(ctx context.Context, db database.QueryExecutor) (UserAction, error) {
+	setPasswordAction := NewLazyUserAction(func(ctx context.Context) (UserAction, error) {
 		return NewSetUserPasswordAction(
 			SetPasswordInput{
 				ProjectID: in.ProjectID,
