@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	slogctx "github.com/veqryn/slog-context"
-	"github.com/zitadel/nextgen/internal/domain/idgen"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/idgen"
 )
 
 func WithRequestIdentification(generator idgen.Generator, next http.Handler) http.Handler {

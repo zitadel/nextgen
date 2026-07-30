@@ -27,6 +27,9 @@ func (s *passkeyRegState) expectCRUD(stmts *servicemocks.MockAllStatements) {
 	stmts.EXPECT().
 		CreatePasskeyRegistration(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, r *domain.CreatePasskeyRegistration) error {
+			if r.ID == "" {
+				r.ID = "pkreg_test01"
+			}
 			s.created = r
 			if s.stored == nil {
 				s.stored = map[string]*domain.PasskeyRegistration{}
@@ -75,10 +78,6 @@ func (s *passkeyUserState) expectUserPasskeys(stmts *servicemocks.MockAllStateme
 		}).AnyTimes()
 }
 
-type fakeIDGen struct{ next string }
-
-func (f *fakeIDGen) New(_ string) (string, error) { return f.next, nil }
-
 func buildTestRegistrationSvc(t *testing.T, regState *passkeyRegState, userState *passkeyUserState) *service.PasskeyRegistrationService {
 	t.Helper()
 	ctrl := gomock.NewController(t)
@@ -87,7 +86,7 @@ func buildTestRegistrationSvc(t *testing.T, regState *passkeyRegState, userState
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
 	regState.expectCRUD(statements)
 	userState.expectUserPasskeys(statements)
-	return service.NewPasskeyRegistrationService(pool, &fakeIDGen{next: "pkreg_test01"})
+	return service.NewPasskeyRegistrationService(pool)
 }
 
 func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
@@ -105,6 +104,7 @@ func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "pkreg_test01", out.RegistrationID)
+	assert.Equal(t, "user-1", out.UserID)
 	assert.NotEmpty(t, out.Options)
 
 	var optMap map[string]any
@@ -123,6 +123,30 @@ func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	assert.Equal(t, "alice@example.com", regState.created.Challenge.Username)
 	assert.Equal(t, "Alice Example", regState.created.Challenge.DisplayName)
 	assert.True(t, regState.created.ExpiresAt.After(time.Now()))
+}
+
+func TestPasskeyRegistrationService_Begin_MintsUserIDWhenEmpty(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockStatementPool(ctrl)
+	statements := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(statements).AnyTimes()
+
+	regState := &passkeyRegState{}
+	userState := &passkeyUserState{}
+	regState.expectCRUD(statements)
+	userState.expectUserPasskeys(statements)
+	statements.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_minted01", nil)
+
+	svc := service.NewPasskeyRegistrationService(pool)
+	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
+		ProjectID: "proj-1",
+		RPID:      "example.com",
+		RPOrigins: []string{"https://example.com"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "user_minted01", out.UserID)
+	require.NotNil(t, regState.created)
+	assert.Equal(t, "user_minted01", regState.created.UserID)
 }
 
 func TestPasskeyRegistrationService_Begin_UsesNeutralLabelWithoutUsername(t *testing.T) {

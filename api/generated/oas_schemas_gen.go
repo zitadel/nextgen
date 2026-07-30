@@ -12048,10 +12048,6 @@ type UpdateFlowDefinitionNotFound ErrorDetails
 
 func (*UpdateFlowDefinitionNotFound) updateFlowDefinitionRes() {}
 
-// A user represents an individual identity in the system. It can be used to
-// represent a human user, but also a service account or any other type of
-// identity. The content of a user is determined by the configured schema for
-// users, this is only a base schema.
 // Ref: #
 type User struct {
 	// The schema that defines the content of the user. These schemas can be

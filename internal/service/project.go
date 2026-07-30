@@ -91,12 +91,6 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 		return nil, domain.ErrInternal(err).WithMessage("failed to get kek")
 	}
 
-	dek, err := domain.NewDEK(project.ID, jose.A256GCM, kek)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to create project encryption key")
-	}
-	dek.Activate(nil)
-
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().CreateProject(ctx, project); err != nil {
 			if mapped := mapStorageError(err); mapped != err {
@@ -104,6 +98,12 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 			}
 			return domain.ErrInternal(err).WithMessage("failed to create project in the database")
 		}
+
+		dek, err := domain.NewDEK(project.ID, jose.A256GCM, kek)
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to create project encryption key")
+		}
+		dek.Activate(nil)
 
 		if err := tx.Statements().CreateEncryptionKey(ctx, dek); err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to create project encryption key in the database")

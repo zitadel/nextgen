@@ -86,7 +86,12 @@ func TestProjectService_Create(t *testing.T) {
 			seedDefaults:   true,
 			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
 				kek.EXPECT().Encrypt(gomock.Any())
-				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
+				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, p *domain.Project) error {
+						p.ID = "proj_generated"
+						return nil
+					},
+				)
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
@@ -100,7 +105,12 @@ func TestProjectService_Create(t *testing.T) {
 			seedDefaults:   true,
 			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
 				kek.EXPECT().Encrypt(gomock.Any())
-				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
+				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, p *domain.Project) error {
+						p.ID = "proj_generated"
+						return nil
+					},
+				)
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
@@ -113,7 +123,12 @@ func TestProjectService_Create(t *testing.T) {
 			seedDefaults: false,
 			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
 				kek.EXPECT().Encrypt(gomock.Any())
-				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
+				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, p *domain.Project) error {
+						p.ID = "proj_generated"
+						return nil
+					},
+				)
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any())
 				// No schema/flow-definition seeding when seedDefaults is false.
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any()).Times(0)
@@ -125,7 +140,6 @@ func TestProjectService_Create(t *testing.T) {
 			name:        "project creation error should bubble up",
 			projectName: "test",
 			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
-				kek.EXPECT().Encrypt(gomock.Any())
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).Return(assert.AnError)
 			},
 			wantErr: domain.ErrInternal(assert.AnError),

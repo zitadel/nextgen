@@ -33,6 +33,12 @@ var _ domain.FlowOnSuccessHandler = (*FlowCreateUserWithPasswordHandler)(nil)
 
 func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domain.FlowOnSuccessInput) (domain.FlowOnSuccessResult, error) {
 	in.State.CollectedData.UserData["$schema"] = in.UserSchemaURL
+
+	password := in.State.CollectedData.AuthMethods.Password
+	if password == "" {
+		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
+	}
+
 	createUserAction := NewCreateUserAction(
 		CreateUserInput{
 			ProjectID: in.ProjectID,
@@ -40,21 +46,7 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 		},
 		h.schemaStore,
 	)
-
-	if in.State.CollectedData.AuthMethods.Password == "" {
-		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
-	}
-
-	setPasswordAction := NewLazyUserAction(func(ctx context.Context) (UserAction, error) {
-		return NewSetUserPasswordAction(
-			SetPasswordInput{
-				ProjectID: in.ProjectID,
-				UserID:    createUserAction.CreateUser.ID,
-				Password:  in.State.CollectedData.AuthMethods.Password,
-			},
-			h.hasher,
-		), nil
-	})
+	setPasswordAction := NewSetUserPasswordAfterCreateAction(createUserAction, password, h.hasher)
 
 	err := h.userService.ApplyActions(ctx, createUserAction, setPasswordAction)
 	if err != nil {

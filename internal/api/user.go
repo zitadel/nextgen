@@ -22,6 +22,9 @@ func (h *Handler) CreateUser(ctx context.Context, req *api.User, params api.Crea
 	if err != nil {
 		return nil, err
 	}
+	if _, hasID := (*user)["id"]; hasID {
+		return nil, domain.ErrUserInvalid().WithDetails("id is server-assigned and must not be set on create")
+	}
 
 	u, err := h.userService.CreateUser(ctx, service.CreateUserInput{
 		ProjectID: string(params.ProjectID),

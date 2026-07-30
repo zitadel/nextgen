@@ -52,6 +52,7 @@ func newActiveDEK(t *testing.T, projectID string, kek op.Crypto) *domain.Encrypt
 	t.Helper()
 	dek, err := domain.NewDEK(projectID, jose.A256GCM, kek)
 	require.NoError(t, err)
+	dek.ID = "encryption_key_test"
 	dek.Activate(nil)
 	return dek
 }
@@ -87,6 +88,7 @@ func TestKeyService_GetCrypter(t *testing.T) {
 
 			dek, err := domain.NewDEK("project-1", jose.A256GCM, kek)
 			require.NoError(t, err)
+			dek.ID = "encryption_key_test_dek"
 			dekCrypter, err := dek.Crypter(kek)
 			require.NoError(t, err)
 

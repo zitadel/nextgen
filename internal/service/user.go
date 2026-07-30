@@ -112,6 +112,7 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 		return nil, domain.ErrInternal(err).WithMessage("failed to create user")
 	}
 
+	action.User["id"] = action.CreateUser.ID
 	return action.User, nil
 }
 
@@ -251,12 +252,15 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 		return err
 	}
 
-	o.User["id"] = o.CreateUser.ID
 	return nil
 }
 
 func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error {
-	return applyCreateUser(ctx, stmts, o.CreateUser)
+	if err := applyCreateUser(ctx, stmts, o.CreateUser); err != nil {
+		return err
+	}
+	o.User["id"] = o.CreateUser.ID
+	return nil
 }
 
 func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.CreateUser) error {
@@ -278,6 +282,8 @@ type SetPasswordUserAction struct {
 	hasher crypto.Hasher
 
 	hash string
+	// create binds UserID in Apply after CreateUser (dialect-assigned id).
+	create *CreateUserAction
 }
 
 func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher) *SetPasswordUserAction {
@@ -287,15 +293,36 @@ func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher) *Set
 	}
 }
 
+// NewSetUserPasswordAfterCreateAction hashes in Prepare and reads UserID from
+// create in Apply.
+func NewSetUserPasswordAfterCreateAction(
+	create *CreateUserAction,
+	password string,
+	hasher crypto.Hasher,
+) *SetPasswordUserAction {
+	return &SetPasswordUserAction{
+		SetPasswordInput: SetPasswordInput{
+			ProjectID: create.ProjectID,
+			Password:  password,
+		},
+		hasher: hasher,
+		create: create,
+	}
+}
+
 func (o *SetPasswordUserAction) Prepare(_ context.Context) (err error) {
 	o.hash, err = domain.HashPassword(o.Password, o.hasher)
 	return err
 }
 
 func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	userID := o.UserID
+	if o.create != nil {
+		userID = o.create.CreateUser.ID
+	}
 	err := stmts.SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:      o.ProjectID,
-		UserID:         o.UserID,
+		UserID:         userID,
 		EncodedHash:    o.hash,
 		ChangeRequired: o.IsPasswordChangeRequired,
 	})
@@ -306,55 +333,6 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) 
 		return domain.ErrInternal(err).WithMessage("failed to set password")
 	}
 	return nil
-}
-
-// ---- Lazy ACTION -------------------------------------------------------------
-
-type UserActionFactory = func(ctx context.Context) (UserAction, error)
-
-// LazyUserAction allows for lazy initialization of a user-action. It forwards
-// the `Prepare` and `Apply` methods to the generated action. The UserAction is
-// created right before it is used in those functions.
-//
-// This action can be wrapped around an action when the wrapped action requires
-// an output of a previous action. It can then use a closure to get the data
-// from the other action.
-type LazyUserAction struct {
-	factory UserActionFactory
-	action  UserAction
-}
-
-func NewLazyUserAction(factory UserActionFactory) *LazyUserAction {
-	return &LazyUserAction{
-		factory: factory,
-	}
-}
-
-func (o *LazyUserAction) Prepare(ctx context.Context) (err error) {
-	action, err := o.Action(ctx)
-	if err != nil {
-		return err
-	}
-	return action.Prepare(ctx)
-}
-
-func (o *LazyUserAction) Apply(ctx context.Context, stmts AllStatements) error {
-	action, err := o.Action(ctx)
-	if err != nil {
-		return err
-	}
-	return action.Apply(ctx, stmts)
-}
-
-func (o *LazyUserAction) Action(ctx context.Context) (UserAction, error) {
-	if o.action == nil {
-		action, err := o.factory(ctx)
-		if err != nil {
-			return nil, err
-		}
-		o.action = action
-	}
-	return o.action, nil
 }
 
 // UserStatementsLookup adapts [UserStatements] to [UserLookup] for AuthAttemptService.
