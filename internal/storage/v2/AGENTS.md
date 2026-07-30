@@ -40,3 +40,15 @@ connection or nest Spanner RW transactions (forbidden).
 Multi-write nesting uses the dialect `withTransaction` helpers above
 ([`dialect/postgres/with_transaction.go`](dialect/postgres/with_transaction.go),
 [`dialect/spanner/with_transaction.go`](dialect/spanner/with_transaction.go)).
+
+## Statement contract tests
+
+Behavioral statement parity across dialects lives in
+[`stmttest`](stmttest/): shared integration suites assert domain-visible
+behavior through `service.Pool` / `AllStatements`. Run with exactly one
+integration build tag (`postgres_integration` or `spanner_integration`),
+matching CI.
+
+Dialect packages keep engine-specific tests (compiler SQL shape, error
+wrapping, `withTransaction` nesting, migrations, and cases that need
+dialect DML such as project list cursor ties).

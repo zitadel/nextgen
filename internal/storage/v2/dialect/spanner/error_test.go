@@ -48,9 +48,14 @@ func TestWrapError(t *testing.T) {
 			want: new(database.UniqueError),
 		},
 		{
-			name: "grpc failed precondition",
+			name: "grpc failed precondition check",
 			err:  status.Error(codes.FailedPrecondition, "check failed"),
 			want: new(database.CheckError),
+		},
+		{
+			name: "grpc failed precondition foreign key",
+			err:  status.Error(codes.FailedPrecondition, "Foreign key `fk_user_passwords_user` constraint violation on table `user_passwords`"),
+			want: new(database.ForeignKeyError),
 		},
 		{
 			name: "unknown error",

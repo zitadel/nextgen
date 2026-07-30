@@ -38,7 +38,21 @@ func wrapError(err error) error {
 	case codes.AlreadyExists:
 		return database.NewUniqueError("", "", err)
 	case codes.FailedPrecondition, codes.InvalidArgument:
-		return database.NewCheckError("", "", err)
+		// Spanner surfaces several integrity failures as FailedPrecondition /
+		// InvalidArgument; classify from the message when possible so callers
+		// see the same typed errors as Postgres.
+		msg := err.Error()
+		lower := strings.ToLower(msg)
+		switch {
+		case strings.Contains(msg, "Foreign key"):
+			return database.NewForeignKeyError("", "", err)
+		case strings.Contains(lower, "unique"):
+			return database.NewUniqueError("", "", err)
+		case strings.Contains(lower, "not null"):
+			return database.NewNotNullError("", "", err)
+		default:
+			return database.NewCheckError("", "", err)
+		}
 	default:
 		if strings.HasPrefix(err.Error(), "scany: expected 1 row, got: ") {
 			return database.NewMultipleRowsFoundError(err)
