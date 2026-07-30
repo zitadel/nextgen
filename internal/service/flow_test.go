@@ -12,7 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func stubV2Pool() *service.DB { return nil }
@@ -29,7 +29,7 @@ func stubListFlowDefinitions(t *testing.T, defs []*domain.FlowDefinition, times 
 	pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ context.Context, opts *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
+		func(_ context.Context, opts *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
 			out := make([]*domain.FlowDefinition, 0, len(defs))
 			for _, def := range defs {
 				if !matchesFlowDefinitionFilter(def, opts) {
@@ -37,31 +37,31 @@ func stubListFlowDefinitions(t *testing.T, defs []*domain.FlowDefinition, times 
 				}
 				out = append(out, def)
 			}
-			return &v2database.ListResult[*domain.FlowDefinition]{Items: out}, nil
+			return &database.ListResult[*domain.FlowDefinition]{Items: out}, nil
 		},
 	).Times(n)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	return service.NewPool(pool)
 }
 
-func matchesFlowDefinitionFilter(def *domain.FlowDefinition, opts *v2database.ListOptions[domain.FlowDefinitionField]) bool {
+func matchesFlowDefinitionFilter(def *domain.FlowDefinition, opts *database.ListOptions[domain.FlowDefinitionField]) bool {
 	if opts == nil || opts.Filter == nil {
 		return true
 	}
 	return filterMatches(def, opts.Filter)
 }
 
-func filterMatches(def *domain.FlowDefinition, filter v2database.Filter[domain.FlowDefinitionField]) bool {
+func filterMatches(def *domain.FlowDefinition, filter database.Filter[domain.FlowDefinitionField]) bool {
 	switch f := filter.(type) {
-	case v2database.AndFilter[domain.FlowDefinitionField]:
+	case database.AndFilter[domain.FlowDefinitionField]:
 		for _, child := range f.Filters {
 			if !filterMatches(def, child) {
 				return false
 			}
 		}
 		return true
-	case *v2database.CompareFilter[domain.FlowDefinitionField]:
-		if f.Op != v2database.OpEqual || len(f.Terms) != 1 {
+	case *database.CompareFilter[domain.FlowDefinitionField]:
+		if f.Op != database.OpEqual || len(f.Terms) != 1 {
 			return true
 		}
 		term := f.Terms[0]
@@ -79,7 +79,7 @@ func filterMatches(def *domain.FlowDefinition, filter v2database.Filter[domain.F
 		default:
 			return true
 		}
-	case *v2database.ArrayContainsFilter[domain.FlowDefinitionField]:
+	case *database.ArrayContainsFilter[domain.FlowDefinitionField]:
 		if f.Column.Field() != domain.FlowDefinitionFieldPurposes {
 			return true
 		}
@@ -146,7 +146,7 @@ func TestResolve_ResolveByName_FiltersWithRequestedOptions(t *testing.T) {
 	pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	stmts.EXPECT().ListFlowDefinitions(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ context.Context, opts *v2database.ListOptions[domain.FlowDefinitionField]) (*v2database.ListResult[*domain.FlowDefinition], error) {
+		func(_ context.Context, opts *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
 			if opts == nil || opts.Filter == nil {
 				t.Fatal("expected filter")
 			}
@@ -154,16 +154,16 @@ func TestResolve_ResolveByName_FiltersWithRequestedOptions(t *testing.T) {
 				t.Errorf("filter did not match expected definition attributes")
 			}
 			// assert required fields are restricted
-			if !opts.Filter.Restricts(v2database.Col(domain.FlowDefinitionFieldName)) {
+			if !opts.Filter.Restricts(database.Col(domain.FlowDefinitionFieldName)) {
 				t.Error("expected Name filter")
 			}
-			if !opts.Filter.Restricts(v2database.Col(domain.FlowDefinitionFieldStatus)) {
+			if !opts.Filter.Restricts(database.Col(domain.FlowDefinitionFieldStatus)) {
 				t.Error("expected Status filter")
 			}
-			if !opts.Filter.Restricts(v2database.Col(domain.FlowDefinitionFieldSchemaVersion)) {
+			if !opts.Filter.Restricts(database.Col(domain.FlowDefinitionFieldSchemaVersion)) {
 				t.Error("expected SchemaVersion filter")
 			}
-			return &v2database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{def}}, nil
+			return &database.ListResult[*domain.FlowDefinition]{Items: []*domain.FlowDefinition{def}}, nil
 		},
 	)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
@@ -498,7 +498,7 @@ func stubGetFlowDefinition(t *testing.T, def *domain.FlowDefinition) *service.DB
 	stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ context.Context, projectID, id string) (*domain.FlowDefinition, error) {
 			if def == nil || def.ProjectID != projectID || def.ID != id {
-				return nil, v2database.NewNoRowFoundError(nil)
+				return nil, database.NewNoRowFoundError(nil)
 			}
 			return def, nil
 		},
