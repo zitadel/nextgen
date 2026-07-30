@@ -156,6 +156,15 @@ func TestCreateUser(t *testing.T) {
 						"password":   "my-strong-password",
 					}),
 				},
+				{
+					name: "client-supplied resource id",
+					userjson: helpers.MustMarshal(t, map[string]any{
+						"$schema":  "https://test.example.schemas.com/schemas/default-human-user.json",
+						"id":       "user_client_supplied",
+						"email":    "john.doe.clientsuppliedid@example.com",
+						"password": "my-strong-password",
+					}),
+				},
 			}
 
 			for _, tc := range tcs {
