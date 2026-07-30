@@ -330,15 +330,15 @@ func NewDeleteUserAction(input DeleteUserInput) *DeleteUserAction {
 	}
 }
 
-func (o *DeleteUserAction) Prepare(_ context.Context, _ database.QueryExecutor) error {
+func (o *DeleteUserAction) Prepare(_ context.Context) error {
 	return nil
 }
 
-func (o *DeleteUserAction) Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error {
-	err := tx.Statements().DeleteUserByID(ctx, o.ProjectID, o.UserID)
+func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	err := stmts.DeleteUserByID(ctx, o.ProjectID, o.UserID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return domain.ErrUserNotFound()
+			return nil
 		}
 		return domain.ErrInternal(err).WithMessage("failed to delete user")
 	}

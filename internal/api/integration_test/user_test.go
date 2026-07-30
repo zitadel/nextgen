@@ -200,35 +200,59 @@ func TestDeleteUser(t *testing.T) {
 	// ARRANGE
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-		ProjectID: project.ID,
-		User:      harness.TestData.Generator.GenerateUser(t, "testdeleteuser@example.com"),
-	})
-	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	// ACT
-	deleteParams := api.DeleteUserByIDParams{
-		ProjectID: api.ProjectID(project.ID),
-		UserID:    api.UserID(user["id"].(string)),
-	}
-	deleteResp, err := client.DeleteUserByID(t.Context(), deleteParams)
-	require.NoError(t, err)
+	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
 
-	// ASSERT
-	assert.IsType(t, &api.DeleteUserByIDNoContent{}, deleteResp, helpers.MustMarshal(t, deleteResp))
+		t.Run("simple delete", func(t *testing.T) {
+			t.Parallel()
 
-	getUserParams := api.GetUserByIDParams{
-		ProjectID: api.ProjectID(project.ID),
-		UserID:    api.UserID(user["id"].(string)),
-	}
-	getResp, err := client.GetUserByID(t.Context(), getUserParams)
-	require.NoError(t, err)
+			user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+				ProjectID: project.ID,
+				User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "testdeleteuser@example.com"),
+			})
+			require.NoError(t, err)
 
-	assert.IsType(t, &api.GetUserByIDNotFound{}, getResp, helpers.MustMarshal(t, getResp))
+			// ACT
+			deleteParams := api.DeleteUserByIDParams{
+				ProjectID: api.ProjectID(project.ID),
+				UserID:    api.UserID(user["id"].(string)),
+			}
+			deleteResp, err := client.DeleteUserByID(t.Context(), deleteParams)
+			require.NoError(t, err)
+
+			// ASSERT
+			assert.IsType(t, &api.DeleteUserByIDNoContent{}, deleteResp, helpers.MustMarshal(t, deleteResp))
+
+			getUserParams := api.GetUserByIDParams{
+				ProjectID: api.ProjectID(project.ID),
+				UserID:    api.UserID(user["id"].(string)),
+			}
+			getResp, err := client.GetUserByID(t.Context(), getUserParams)
+			require.NoError(t, err)
+
+			assert.IsType(t, &api.GetUserByIDNotFound{}, getResp, helpers.MustMarshal(t, getResp))
+		})
+
+		t.Run("unknown user should not return 404", func(t *testing.T) {
+			t.Parallel()
+
+			// ACT
+			deleteParams := api.DeleteUserByIDParams{
+				ProjectID: api.ProjectID(project.ID),
+				UserID:    api.UserID("user_idwhichdoesnotexist"),
+			}
+			deleteResp, err := client.DeleteUserByID(t.Context(), deleteParams)
+			require.NoError(t, err)
+
+			// ASSERT
+			assert.IsType(t, &api.DeleteUserByIDNoContent{}, deleteResp, helpers.MustMarshal(t, deleteResp))
+		})
+	})
 }
 
 func TestSetUserPassword(t *testing.T) {
