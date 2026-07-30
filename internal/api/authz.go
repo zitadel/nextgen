@@ -96,6 +96,20 @@ var teamAccess = resourceAccess{
 	denied:    domain.ErrTeamPermissionDenied,
 }
 
+// sessionAccess gates operator session management (get/list/revoke by id).
+// Create and exchange stay on the runtime/app plane and are not checked here.
+// Both plural (current OpenAPI) and singular (catalog target) finer scopes are
+// accepted so project binding lands before the #645 rename merges.
+var sessionAccess = resourceAccess{
+	scopes: map[accessOp][]string{
+		opRead:   {"session.read", "sessions.read", "session.write", "sessions.write"},
+		opDelete: {"session.delete", "sessions.delete"},
+	},
+	readMiss:  domain.ErrSessionNotFound,
+	writeMiss: domain.ErrSessionNotFound,
+	denied:    domain.ErrSessionPermissionDenied,
+}
+
 // brandingAccess is the row this access model was generalized from (ADR 040,
 // "Access model"): managing templates and rendering them during login are
 // different planes, and the login path never calls the branding management

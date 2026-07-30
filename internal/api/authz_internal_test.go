@@ -63,6 +63,13 @@ func TestResourceAccessScopes(t *testing.T) {
 		{"team.read reads", teamAccess, opRead, "team.read", true},
 		{"team.read cannot write", teamAccess, opWrite, "team.read", false},
 
+		{"session.read reads", sessionAccess, opRead, "session.read", true},
+		{"sessions.read reads", sessionAccess, opRead, "sessions.read", true},
+		{"session.write implies read", sessionAccess, opRead, "session.write", true},
+		{"session.read cannot delete", sessionAccess, opDelete, "session.read", false},
+		{"session.delete deletes", sessionAccess, opDelete, "session.delete", true},
+		{"sessions.delete deletes", sessionAccess, opDelete, "sessions.delete", true},
+
 		{"project.read does not read project management state", projectAccess, opRead, "project.read", false},
 		{"project.read cannot write project state", projectAccess, opWrite, "project.read", false},
 		{"project.write reaches patchProject", projectAccess, opWrite, "project.write", true},
@@ -120,6 +127,12 @@ func TestRequireProjectAccess(t *testing.T) {
 			denied: domain.ErrTeamPermissionDenied().Code,
 		},
 		{
+			name:     "session",
+			res:      sessionAccess,
+			readMiss: domain.ErrSessionNotFound().Code, writeMiss: domain.ErrSessionNotFound().Code,
+			denied: domain.ErrSessionPermissionDenied().Code,
+		},
+		{
 			name:     "project",
 			res:      projectAccess,
 			readMiss: domain.ErrProjectNotFound().Code, writeMiss: domain.ErrProjectNotFound().Code,
@@ -165,11 +178,23 @@ func TestRequireProjectAccess(t *testing.T) {
 		if err := requireProjectAccess(operator, "proj_a", flowDefinitionAccess, opDelete); err != nil {
 			t.Fatalf("project.write implies delete: %v", err)
 		}
+
+		sessionReader := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"session.read"},
+		})
+		err = requireProjectAccess(sessionReader, "proj_a", sessionAccess, opDelete)
+		assertDomainCode(t, err, domain.ErrSessionPermissionDenied().Code)
+		if err := requireProjectAccess(operator, "proj_a", sessionAccess, opDelete); err != nil {
+			t.Fatalf("project.write implies session delete: %v", err)
+		}
 	})
 
 	t.Run("foreign deletes miss like reads", func(t *testing.T) {
 		err := requireProjectAccess(operator, "proj_b", flowDefinitionAccess, opDelete)
 		assertDomainCode(t, err, domain.ErrFlowDefinitionNotFound().Code)
+		err = requireProjectAccess(operator, "proj_b", sessionAccess, opDelete)
+		assertDomainCode(t, err, domain.ErrSessionNotFound().Code)
 	})
 }
 
