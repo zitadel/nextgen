@@ -36,7 +36,7 @@ func (h *Handler) CreateUser(ctx context.Context, req *api.User, params api.Crea
 }
 
 func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDParams) (api.DeleteUserByIDRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opWrite); err != nil {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opDelete); err != nil {
 		return nil, err
 	}
 
