@@ -312,4 +312,35 @@ describe("add user sheet", () => {
     // The accessible name must not absorb the marker.
     expect(screen.getByLabelText("Family name")).toBeInTheDocument();
   });
+  it("sends a numeric property as a JSON number, not a string", async () => {
+    // `schemaFields` maps `type: number|integer` to a number input, but an input
+    // always yields a string — JSON Schema validates the property against a JSON
+    // number, so `"42"` would be rejected.
+    stubSchemas({
+      sch_seats: {
+        ...BUSINESS,
+        required: ["email"],
+        properties: {
+          email: { type: "string", format: "email" },
+          seats: { type: "integer" },
+        },
+      },
+    });
+    let body: Record<string, unknown> | undefined;
+    server.use(
+      http.post(USERS_URL, async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: "user_1" }, { status: 201 });
+      }),
+    );
+    await openSheet();
+
+    await userEvent.type(await screen.findByLabelText("Email"), "a@acme.com");
+    await userEvent.type(screen.getByLabelText("Seats"), "42");
+    await userEvent.click(screen.getByRole("button", { name: "Add user" }));
+
+    await waitFor(() => expect(body).toBeDefined());
+    expect(body?.seats).toBe(42);
+    expect(typeof body?.seats).toBe("number");
+  });
 });
