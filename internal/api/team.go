@@ -35,12 +35,31 @@ func (h *Handler) GetTeam(ctx context.Context, params api.GetTeamParams) (api.Ge
 	if err != nil {
 		return nil, err
 	}
+	return teamResponse(team), nil
+}
+
+func (h *Handler) UpdateTeam(ctx context.Context, req *api.UpdateTeamRequest, params api.UpdateTeamParams) (api.UpdateTeamRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opWrite); err != nil {
+		return nil, err
+	}
+	team, err := h.teamService.Update(ctx, service.UpdateTeamInput{
+		ProjectID: string(params.ProjectID),
+		TeamID:    string(params.TeamID),
+		Name:      req.Name,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return teamResponse(team), nil
+}
+
+func teamResponse(team *domain.Team) *api.TeamResponse {
 	return &api.TeamResponse{
 		ID:        team.ID,
 		Name:      team.Name,
 		CreatedAt: team.CreatedAt,
 		UpdatedAt: team.UpdatedAt,
-	}, nil
+	}
 }
 
 // ------------------ Errors ---------------

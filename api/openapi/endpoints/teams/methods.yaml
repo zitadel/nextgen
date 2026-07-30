@@ -33,6 +33,12 @@ post:
         application/json:
           schema:
             $ref: ../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
     '409':
       description: |
         A team with the given name already exists in this project.

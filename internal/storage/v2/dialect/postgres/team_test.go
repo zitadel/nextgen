@@ -214,6 +214,19 @@ func TestTeamStatements_UpdateTeam(t *testing.T) {
 		)
 	})
 
+	t.Run("unchanged name", func(t *testing.T) {
+		projectID, teamID := uniqueTeamIDs(t)
+		ensureTestProject(t, projectID)
+		team := newTestTeam(projectID, teamID)
+		require.NoError(t, testPool.CreateTeam(t.Context(), team))
+		name := team.Name
+
+		// The row already holds the name it is updated to, so the unique index
+		// must not read it as a collision.
+		require.NoError(t, testPool.UpdateTeam(t.Context(), team))
+		assert.Equal(t, name, team.Name)
+	})
+
 	t.Run("same name in another project", func(t *testing.T) {
 		projectID, teamID := uniqueTeamIDs(t)
 		ensureTestProject(t, projectID)

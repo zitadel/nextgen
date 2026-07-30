@@ -109,6 +109,18 @@ func TestTeamStatements_UpdateTeam(t *testing.T) {
 		assert.ErrorIs(t, stmts.UpdateTeam(ctx, team), new(database.UniqueError))
 	})
 
+	t.Run("unchanged name", func(t *testing.T) {
+		project := newProject(t)
+		team := newTestTeam(project.ID, "team_v2_update_same_name")
+		require.NoError(t, stmts.CreateTeam(ctx, team))
+		name := team.Name
+
+		// The row already holds the name it is updated to, so the unique index
+		// must not read it as a collision.
+		require.NoError(t, stmts.UpdateTeam(ctx, team))
+		assert.Equal(t, name, team.Name)
+	})
+
 	t.Run("same name in another project", func(t *testing.T) {
 		project := newProject(t)
 		team := newTestTeam(project.ID, "team_v2_update_src")
