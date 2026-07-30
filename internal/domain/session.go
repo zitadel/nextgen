@@ -33,7 +33,7 @@ func ErrSessionTokenInvalid() Error {
 }
 
 func ErrSessionPermissionDenied() Error {
-	return newError(PrefixSession.ErrorCodePrefix("permission_denied"), "session: requires a session.* scope bound to the project", nil, nil)
+	return newError(PrefixSession.ErrorCodePrefix("permission_denied"), "session: requires a session scope bound to the project", nil, nil)
 }
 
 func ErrSessionInvalidTTL() Error {

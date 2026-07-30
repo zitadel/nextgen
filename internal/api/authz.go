@@ -63,9 +63,9 @@ var schemaAccess = resourceAccess{
 		opWrite: {"schema.write"},
 	},
 	legacyProjectWriteUmbrella: true,
-	readMiss:                  domain.ErrJSONSchemaNotFound,
-	writeMiss:                 func() domain.Error { return domain.ErrJSONSchemaInvalid().WithDetails("project does not exist") },
-	denied:                    domain.ErrJSONSchemaPermissionDenied,
+	readMiss:                   domain.ErrJSONSchemaNotFound,
+	writeMiss:                  func() domain.Error { return domain.ErrJSONSchemaInvalid().WithDetails("project does not exist") },
+	denied:                     domain.ErrJSONSchemaPermissionDenied,
 }
 
 var flowDefinitionAccess = resourceAccess{
@@ -75,9 +75,9 @@ var flowDefinitionAccess = resourceAccess{
 		opDelete: {"flow_definitions.delete"},
 	},
 	legacyProjectWriteUmbrella: true,
-	readMiss:                  domain.ErrFlowDefinitionNotFound,
-	writeMiss:                 func() domain.Error { return domain.ErrFlowDefinitionInvalid("project does not exist", nil) },
-	denied:                    domain.ErrFlowDefinitionPermissionDenied,
+	readMiss:                   domain.ErrFlowDefinitionNotFound,
+	writeMiss:                  func() domain.Error { return domain.ErrFlowDefinitionInvalid("project does not exist", nil) },
+	denied:                     domain.ErrFlowDefinitionPermissionDenied,
 }
 
 var userAccess = resourceAccess{
@@ -86,9 +86,9 @@ var userAccess = resourceAccess{
 		opWrite: {"user.write"},
 	},
 	legacyProjectWriteUmbrella: true,
-	readMiss:                  domain.ErrUserNotFound,
-	writeMiss:                 func() domain.Error { return domain.ErrUserInvalid().WithDetails("project does not exist") },
-	denied:                    domain.ErrUserPermissionDenied,
+	readMiss:                   domain.ErrUserNotFound,
+	writeMiss:                  func() domain.Error { return domain.ErrUserInvalid().WithDetails("project does not exist") },
+	denied:                     domain.ErrUserPermissionDenied,
 }
 
 var teamAccess = resourceAccess{
@@ -97,7 +97,7 @@ var teamAccess = resourceAccess{
 		opWrite: {"team.write"},
 	},
 	legacyProjectWriteUmbrella: true,
-	readMiss:                  domain.ErrTeamNotFound,
+	readMiss:                   domain.ErrTeamNotFound,
 	// The team service already answers nonexistent projects with
 	// team.project_not_found; foreign projects must be indistinguishable.
 	writeMiss: domain.ErrTeamProjectNotFound,
@@ -138,9 +138,9 @@ var brandingAccess = resourceAccess{
 		opWrite: {"branding.write"},
 	},
 	legacyProjectWriteUmbrella: true,
-	readMiss:                  domain.ErrBrandingNotFound,
-	writeMiss:                 func() domain.Error { return domain.ErrBrandingInvalid("project does not exist", nil) },
-	denied:                    domain.ErrBrandingPermissionDenied,
+	readMiss:                   domain.ErrBrandingNotFound,
+	writeMiss:                  func() domain.Error { return domain.ErrBrandingInvalid("project does not exist", nil) },
+	denied:                     domain.ErrBrandingPermissionDenied,
 }
 
 // projectAccess deliberately lists no finer read scope: project.read is the
