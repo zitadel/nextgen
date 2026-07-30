@@ -5,6 +5,7 @@ package spanner
 import (
 	"context"
 	"crypto/rand"
+	"strconv"
 	"testing"
 	"time"
 
@@ -74,14 +75,18 @@ func TestProjectStatements_Update(t *testing.T) {
 
 	t.Run("updates name and refreshes updated_at", func(t *testing.T) {
 		project := newTestProject(uniqueProjectID(t))
+		project.PreviewOrigins = []string{"*.example.com", "localhost:3000"}
 		t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 		require.NoError(t, stmts.CreateProject(t.Context(), project))
 		createdUpdatedAt := project.UpdatedAt
+		createdAt := project.CreatedAt
 
 		projectName := "project-" + rand.Text()
 		project.Name = projectName
 		require.NoError(t, stmts.UpdateProject(t.Context(), project))
-		assert.False(t, project.UpdatedAt.Before(createdUpdatedAt))
+		assert.True(t, project.UpdatedAt.After(createdUpdatedAt))
+		assert.Equal(t, createdAt.UTC(), project.CreatedAt.UTC())
+		assert.Equal(t, []string{"*.example.com", "localhost:3000"}, project.PreviewOrigins)
 
 		got, err := stmts.GetProjectByID(t.Context(), project.ID)
 		require.NoError(t, err)
@@ -118,23 +123,32 @@ func TestProjectStatements_Delete(t *testing.T) {
 func TestProjectStatements_List(t *testing.T) {
 	stmts := testClient.Statements()
 
-	ids := []string{"proj_v2_list_0", "proj_v2_list_1", "proj_v2_list_2"}
-	projects := make([]*domain.Project, len(ids))
-	for i, id := range ids {
+	projects := make([]*domain.Project, 3)
+	for i := range projects {
 		if i > 0 {
 			time.Sleep(2 * time.Millisecond)
 		}
-		project := &domain.Project{ID: id, Name: "project-" + id, PreviewOrigins: []string{}}
-		t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), id) })
+		project := newTestProject(uniqueProjectID(t) + "-" + strconv.Itoa(i))
+		t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 		require.NoError(t, stmts.CreateProject(t.Context(), project))
 		projects[i] = project
 	}
+	ids := projectIDs(projects)
 
 	createdAtCol := database.Col(domain.ProjectFieldCreatedAt)
+	// The table is shared with the rest of the package. Naming the fixtures keeps
+	// foreign rows out of the assertions without constraining the column under test.
+	idCol := database.Col(domain.ProjectFieldID)
+	onlyFixtures := database.Or(
+		database.Equal(idCol, ids[0]),
+		database.Equal(idCol, ids[1]),
+		database.Equal(idCol, ids[2]),
+	)
+
 	list := func(t *testing.T, filter database.Filter[domain.ProjectField], dir database.OrderDirection) []string {
 		t.Helper()
 		res, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
-			Filter: filter,
+			Filter: database.And(onlyFixtures, filter),
 			Pagination: database.Page[domain.ProjectField]{
 				OrderBy: database.OrderBy[domain.ProjectField]{
 					Columns:   []database.Column[domain.ProjectField]{createdAtCol},
@@ -156,6 +170,13 @@ func TestProjectStatements_List(t *testing.T) {
 
 	t.Run("filters by created_at less than", func(t *testing.T) {
 		assert.Equal(t, []string{ids[0]}, list(t, database.LessThan(createdAtCol, projects[1].CreatedAt), database.OrderAsc))
+	})
+
+	t.Run("filters by a created_at range", func(t *testing.T) {
+		assert.Equal(t, []string{ids[1]}, list(t, database.And(
+			database.GreaterThan(createdAtCol, projects[0].CreatedAt),
+			database.LessThan(createdAtCol, projects[2].CreatedAt),
+		), database.OrderAsc))
 	})
 
 	t.Run("sorts by created_at ascending", func(t *testing.T) {
@@ -186,18 +207,48 @@ func TestProjectStatements_List(t *testing.T) {
 				},
 			}
 
-			first, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Pagination: page})
+			first, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: onlyFixtures, Pagination: page})
 			require.NoError(t, err)
 			assert.Equal(t, []string{ids[0], ids[1]}, projectIDs(first.Items))
 			require.NotEmpty(t, first.NextCursor)
 
 			page.Cursor = first.NextCursor
-			second, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Pagination: page})
+			second, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: onlyFixtures, Pagination: page})
 			require.NoError(t, err)
 			assert.Equal(t, []string{ids[2]}, projectIDs(second.Items))
 			assert.Empty(t, second.NextCursor)
 		})
 	}
+
+	// The cursor terms and the caller's filter both target created_at, so the
+	// keyset has to compose with a predicate on its own sort column.
+	t.Run("paginates under a created_at filter", func(t *testing.T) {
+		filter := database.And(onlyFixtures, database.GreaterThan(createdAtCol, projects[0].CreatedAt))
+		page := database.Page[domain.ProjectField]{
+			Limit: 1,
+			OrderBy: database.OrderBy[domain.ProjectField]{
+				Columns:   []database.Column[domain.ProjectField]{createdAtCol},
+				Direction: database.OrderAsc,
+			},
+		}
+
+		first, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: filter, Pagination: page})
+		require.NoError(t, err)
+		assert.Equal(t, []string{ids[1]}, projectIDs(first.Items))
+		require.NotEmpty(t, first.NextCursor)
+
+		// A full page always carries a cursor, so the last page is identified by
+		// its contents rather than by an empty NextCursor.
+		page.Cursor = first.NextCursor
+		second, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: filter, Pagination: page})
+		require.NoError(t, err)
+		assert.Equal(t, []string{ids[2]}, projectIDs(second.Items))
+
+		page.Cursor = second.NextCursor
+		third, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: filter, Pagination: page})
+		require.NoError(t, err)
+		assert.Empty(t, projectIDs(third.Items))
+	})
 }
 
 // A tie is what the lexicographic cursor expansion exists for: when created_at

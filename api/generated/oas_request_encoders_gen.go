@@ -119,9 +119,7 @@ func encodeCreateTeamRequest(
 	const contentType = "application/json"
 	e := new(jx.Encoder)
 	{
-		if req != nil {
-			req.Encode(e)
-		}
+		req.Encode(e)
 	}
 	encoded := e.Bytes()
 	ht.SetBody(r, bytes.NewReader(encoded), contentType)

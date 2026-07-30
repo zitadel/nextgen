@@ -67,6 +67,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	// Seed team + user + existing passkey.
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 

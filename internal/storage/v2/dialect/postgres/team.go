@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	createTeamStmt = `INSERT INTO zitadel_nextgen.teams (project_id, id) VALUES ($1, $2) RETURNING project_id, id, status, created_at, updated_at`
-	teamQuery      = `SELECT project_id, id, status, created_at, updated_at FROM zitadel_nextgen.teams`
+	createTeamStmt = `INSERT INTO zitadel_nextgen.teams (project_id, id, name) VALUES ($1, $2, $3) RETURNING project_id, id, name, status, created_at, updated_at`
+	teamQuery      = `SELECT project_id, id, name, status, created_at, updated_at FROM zitadel_nextgen.teams`
 
 	deactivateTeamStmt = `
 UPDATE zitadel_nextgen.teams
@@ -56,8 +56,8 @@ func (ts teamStatements) CreateTeam(ctx context.Context, team *domain.Team) erro
 		return errors.New("team ID must not be empty")
 	}
 	var status string
-	err := ts.client.QueryRow(ctx, createTeamStmt, team.ProjectID, team.ID).
-		Scan(&team.ProjectID, &team.ID, &status, &team.CreatedAt, &team.UpdatedAt)
+	err := ts.client.QueryRow(ctx, createTeamStmt, team.ProjectID, team.ID, team.Name).
+		Scan(&team.ProjectID, &team.ID, &team.Name, &status, &team.CreatedAt, &team.UpdatedAt)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -115,7 +115,7 @@ func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id strin
 func (ts teamStatements) scanTeam(row pgx.CollectableRow) (*domain.Team, error) {
 	team := new(domain.Team)
 	var status string
-	if err := row.Scan(&team.ProjectID, &team.ID, &status, &team.CreatedAt, &team.UpdatedAt); err != nil {
+	if err := row.Scan(&team.ProjectID, &team.ID, &team.Name, &status, &team.CreatedAt, &team.UpdatedAt); err != nil {
 		return nil, err
 	}
 	team.Status = domain.TeamStatus(status)
@@ -133,6 +133,11 @@ var teamSchema = database.NewSchema(map[domain.TeamField]database.FieldBinding[d
 	domain.TeamFieldID: {
 		SQLName:  "id",
 		Accessor: func(t *domain.Team) any { return t.ID },
+		Coerce:   database.CoerceString,
+	},
+	domain.TeamFieldName: {
+		SQLName:  "name",
+		Accessor: func(t *domain.Team) any { return t.Name },
 		Coerce:   database.CoerceString,
 	},
 	domain.TeamFieldStatus: {

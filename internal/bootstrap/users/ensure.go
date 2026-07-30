@@ -43,9 +43,12 @@ func ensureProject(ctx context.Context, stmts service.AllStatements, projectID s
 }
 
 func ensureTeam(ctx context.Context, stmts service.AllStatements, projectID, teamID string) error {
+	// The bootstrap header carries no team name, so derive a placeholder
+	// name from the team ID to satisfy the NOT NULL name column.
 	err := stmts.CreateTeam(ctx, &domain.Team{
 		ProjectID: projectID,
 		ID:        teamID,
+		Name:      "team-" + teamID,
 	})
 	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {

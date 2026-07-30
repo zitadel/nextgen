@@ -5,25 +5,15 @@ package postgres
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"log/slog"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib" // registers the "pgx" database/sql driver used for migrations
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database/dbtest"
-	pgold "github.com/zitadel/nextgen/internal/storage/database/dialect/postgres"
-	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/migration"
+	"github.com/zitadel/nextgen/internal/storage/v2/testdb"
 )
-
-// The v2 postgres tests drive a real database exclusively through the v2 pool.
-// The only legacy dependencies are container bring-up (dbtest), DSN recovery
-// (pgold.Config), and the schema migration (migration.Migrate) — the v2 layer
-// has no migrations of its own yet.
 
 // testPool is a v2 postgres pool connected to the migrated test database,
 // shared across the tests in this package.
@@ -36,7 +26,7 @@ func TestMain(m *testing.M) {
 func runTests(m *testing.M) int {
 	ctx := context.Background()
 
-	connector, stop, err := dbtest.Postgres(ctx)
+	dsn, stop, err := testdb.PostgresDSN(ctx)
 	if err != nil {
 		slog.Error("failed to start postgres test database", "error", err)
 		if stop != nil {
@@ -46,21 +36,6 @@ func runTests(m *testing.M) int {
 	}
 	defer stop()
 
-	// Recover the DSN from the connector without ever connecting a legacy pool.
-	cfg, ok := connector.(*pgold.Config)
-	if !ok {
-		slog.Error("expected *postgres.Config connector", "type", connector)
-		return 1
-	}
-	dsn := cfg.ConnString()
-
-	// Migrate the zitadel_nextgen schema via a throwaway *sql.DB.
-	if err := migrate(ctx, dsn); err != nil {
-		slog.Error("failed to migrate test database", "error", err)
-		return 1
-	}
-
-	// Connect the v2 pool from the same DSN.
 	dialect, err := DecodeConfig(dsn)
 	if err != nil {
 		slog.Error("failed to decode v2 postgres config", "error", err)
@@ -72,6 +47,13 @@ func runTests(m *testing.M) int {
 		return 1
 	}
 	defer pool.Close(ctx)
+
+	if err := pool.Migrate(ctx); err != nil {
+		slog.Error("failed to migrate test database", "error", err)
+		return 1
+	}
+
+	var ok bool
 	testPool, ok = pool.(*Pool)
 	if !ok {
 		slog.Error("expected *Pool from the v2 postgres dialect", "type", pool)
@@ -81,13 +63,11 @@ func runTests(m *testing.M) int {
 	return m.Run()
 }
 
-func migrate(ctx context.Context, dsn string) error {
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	return migration.Migrate(ctx, db)
+// uniqueSuffix builds a fixture suffix that is unique across calls.
+// In the case of a time-based randomness, two calls within one test can read the same clock value and lead to flakiness.
+func uniqueSuffix(t *testing.T) string {
+	t.Helper()
+	return strings.ReplaceAll(t.Name(), "/", "_") + "-" + rand.Text()
 }
 
 // uniqueProjectID returns a collision-free project ID scoped to the running
@@ -95,13 +75,18 @@ func migrate(ctx context.Context, dsn string) error {
 // relies on unique IDs plus DeleteProjectByID cleanup rather than a transaction.
 func uniqueProjectID(t *testing.T) string {
 	t.Helper()
-	return "proj-" + strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	return "proj-" + uniqueSuffix(t)
 }
 
 // newTestProject builds a persistable project. PreviewOrigins is a non-nil empty
 // slice because the projects table declares preview_origins NOT NULL.
 func newTestProject(id string) *domain.Project {
 	return &domain.Project{ID: id, Name: "project-" + rand.Text(), PreviewOrigins: []string{}}
+}
+
+// newTestTeam builds a persistable team.
+func newTestTeam(projectID, id string) *domain.Team {
+	return &domain.Team{ProjectID: projectID, ID: id, Name: "team-" + rand.Text()}
 }
 
 func projectIDs(projects []*domain.Project) []string {

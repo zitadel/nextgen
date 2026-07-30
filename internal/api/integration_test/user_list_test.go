@@ -28,6 +28,7 @@ func TestListUsers(t *testing.T) {
 	require.NoError(t, err)
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
