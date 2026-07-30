@@ -55,7 +55,7 @@ rejects a client-supplied `id` with 400.
 |---|---|
 | JSON Schema `$id` | Client-authored document URI (GitOps-stable). If omitted, dialect generates `sch_<ulid>` on create. |
 | SSO provider `id` in flow definitions | Config key inside the definition document, not a storage PK. |
-| Middleware `req_*` | Request correlation IDs; may use dialect `idgen` but are not persisted resource PKs. |
+| Middleware `req_*` | Request correlation IDs; not resource PKs. The HTTP middleware takes a local `RequestIDGenerator`; the composition root may pass dialect `idgen.NewULID()`. |
 | Secret tokens (`sk_*`, handoff tokens) | Cryptographic secrets, not resource identifiers. |
 
 ### 4. Pre-persist ceremony IDs

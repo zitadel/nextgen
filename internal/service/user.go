@@ -99,20 +99,9 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
 	action := NewCreateUserAction(input, s.schemaStore)
-	err = action.Prepare(ctx)
-	if err != nil {
+	if err := s.ApplyActions(ctx, action); err != nil {
 		return nil, err
 	}
-
-	err = applyCreateUser(ctx, s.v2Pool.Statements(), action.CreateUser)
-	if err != nil {
-		if de, ok := errors.AsType[domain.Error](err); ok {
-			return nil, de
-		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to create user")
-	}
-
-	action.User["id"] = action.CreateUser.ID
 	return action.User, nil
 }
 
@@ -282,8 +271,6 @@ type SetPasswordUserAction struct {
 	hasher crypto.Hasher
 
 	hash string
-	// create binds UserID in Apply after CreateUser (dialect-assigned id).
-	create *CreateUserAction
 }
 
 func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher) *SetPasswordUserAction {
@@ -293,36 +280,15 @@ func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher) *Set
 	}
 }
 
-// NewSetUserPasswordAfterCreateAction hashes in Prepare and reads UserID from
-// create in Apply.
-func NewSetUserPasswordAfterCreateAction(
-	create *CreateUserAction,
-	password string,
-	hasher crypto.Hasher,
-) *SetPasswordUserAction {
-	return &SetPasswordUserAction{
-		SetPasswordInput: SetPasswordInput{
-			ProjectID: create.ProjectID,
-			Password:  password,
-		},
-		hasher: hasher,
-		create: create,
-	}
-}
-
 func (o *SetPasswordUserAction) Prepare(_ context.Context) (err error) {
 	o.hash, err = domain.HashPassword(o.Password, o.hasher)
 	return err
 }
 
 func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) error {
-	userID := o.UserID
-	if o.create != nil {
-		userID = o.create.CreateUser.ID
-	}
 	err := stmts.SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:      o.ProjectID,
-		UserID:         userID,
+		UserID:         o.UserID,
 		EncodedHash:    o.hash,
 		ChangeRequired: o.IsPasswordChangeRequired,
 	})
