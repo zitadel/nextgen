@@ -27,11 +27,12 @@ import {
 } from "@/components/ui/sheet";
 
 import { api } from "../api/zitadel";
-import {
-  ProjectAccess,
-  type ProjectAccessRow,
-  type ProjectOption,
-} from "./project-access";
+// Parked until the backend can grant roles — see the block below.
+// import {
+//   ProjectAccess,
+//   type ProjectAccessRow,
+//   type ProjectOption,
+// } from "./project-access";
 import {
   type SchemaField,
   type UserSchema,
@@ -110,10 +111,9 @@ function AddUserForm({
   const [schemas, setSchemas] = useState<SchemaOption[] | undefined>(undefined);
   const [schemaId, setSchemaId] = useState<string | undefined>(undefined);
   const [values, setValues] = useState<Record<string, string>>({});
-  const [projects, setProjects] = useState<ProjectOption[]>([]);
-  // The design's resting state already shows one empty row (`702:3994`,
-  // "No access yet — the whole block is optional").
-  const [access, setAccess] = useState<ProjectAccessRow[]>([{ roles: [] }]);
+  // const [projects, setProjects] = useState<ProjectOption[]>([]);
+  // The design's resting state already shows one empty row.
+  // const [access, setAccess] = useState<ProjectAccessRow[]>([{ roles: [] }]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -142,13 +142,13 @@ function AddUserForm({
         setSchemas(options);
         // Projects are a secondary concern: a failure here must not block user
         // creation, so it leaves the block empty rather than surfacing an error.
-        void api
-          .queryProjects({})
-          .then((result) => {
-            if (cancelled) return;
-            setProjects(result.projects.map((project) => ({ id: project.id, name: project.name })));
-          })
-          .catch(() => undefined);
+        // void api
+        //   .queryProjects({})
+        //   .then((result) => {
+        //     if (cancelled) return;
+        //     setProjects(result.projects.map((p) => ({ id: p.id, name: p.name })));
+        //   })
+        //   .catch(() => undefined);
         // Preselect when there is no choice to make (the common case: one
         // project-wide schema), matching the design's preselected picker.
         const only = options.length === 1 ? options[0] : undefined;
@@ -253,8 +253,15 @@ function AddUserForm({
             />
           ))}
         </div>
-        <Separator />
-        <ProjectAccess projects={projects} rows={access} onChange={setAccess} />
+        {/* Projects block — hidden until the backend can actually grant access.
+            It needs a role catalogue (ADR 034's app-group catalog, epic #419)
+            and a multi-project scope; today `queryProjects` returns only the
+            caller's own project (ADR 0004) and `POST /users` accepts no grants,
+            so the block could select things it could never save. The component,
+            its unit spec and its e2e coverage are kept intact alongside this —
+            restore all four together when the endpoints land. */}
+        {/* <Separator />
+        <ProjectAccess projects={projects} rows={access} onChange={setAccess} /> */}
         {error && (
           <Alert variant="destructive">
             <AlertCircle aria-hidden />

@@ -80,6 +80,10 @@ async function openSheet() {
 }
 
 describe("add user sheet", () => {
+  // The Projects block is hidden until the backend can grant access (roles need
+  // ADR 034's app-group catalog, epic #419; `queryProjects` is single-project per
+  // ADR 0004). Its specs are parked with it rather than deleted — restore the
+  // block, this file's cases and `project-access.spec.tsx` together.
   it("builds the form from the selected schema's properties", async () => {
     // The whole point of the screen: controls come from the schema, not a
     // hardcoded list, so a `business` schema asks for the company too.
@@ -227,70 +231,71 @@ describe("add user sheet", () => {
     expect(alert).toHaveTextContent("Could not create the user.");
     expect(alert).not.toHaveTextContent(/returned 502/);
   });
-  it("offers the real project list and keeps roles empty (no role endpoint exists)", async () => {
-    // ADR 034 puts app roles in the app-group permission catalog, which is
-    // unimplemented (#419). The control is wired but must not invent a
-    // vocabulary, so it opens genuinely empty.
-    stubSchemas({ sch_business: BUSINESS }, [{ id: "proj_1", name: "console-dev" }]);
-    await openSheet();
+  // it("offers the real project list and keeps roles empty (no role endpoint exists)", async () => {
+  //   // ADR 034 puts app roles in the app-group permission catalog, which is
+  //   // unimplemented (#419). The control is wired but must not invent a
+  //   // vocabulary, so it opens genuinely empty.
+  //   stubSchemas({ sch_business: BUSINESS }, [{ id: "proj_1", name: "console-dev" }]);
+  //   await openSheet();
+//
+  //   const project = await screen.findByRole("combobox", { name: "Select project" });
+  //   // Roles cannot be chosen until a project is, matching the design's resting row.
+  //   expect(screen.getByRole("combobox", { name: "Select roles" })).toHaveAttribute(
+  //     "aria-disabled",
+  //     "true",
+  //   );
+//
+  //   await userEvent.click(project);
+  //   await userEvent.click(await screen.findByRole("option", { name: "console-dev" }));
+  //   expect(project).toHaveTextContent("console-dev");
+//
+  //   const roles = screen.getByRole("combobox", { name: "Select roles" });
+  //   expect(roles).toBeEnabled();
+  //   await userEvent.click(roles);
+  //   expect(await screen.findByText("No roles available.")).toBeInTheDocument();
+  //   expect(screen.queryAllByRole("option")).toHaveLength(0);
+  // });
 
-    const project = await screen.findByRole("combobox", { name: "Select project" });
-    // Roles cannot be chosen until a project is, matching the design's resting row.
-    expect(screen.getByRole("combobox", { name: "Select roles" })).toHaveAttribute(
-      "aria-disabled",
-      "true",
-    );
+  // it("hides + Add project once every project has a row, and restores it on remove", async () => {
+  //   stubSchemas({ sch_business: BUSINESS }, [{ id: "proj_1", name: "console-dev" }]);
+  //   await openSheet();
+//
+  //   // One project, one row: nothing left to add.
+  //   const project = await screen.findByRole("combobox", { name: "Select project" });
+  //   expect(screen.queryByRole("button", { name: /Add project/ })).not.toBeInTheDocument();
+//
+  //   // `Row · empty` carries no Remove — it appears once the row holds a project.
+  //   expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+  //   await userEvent.click(project);
+  //   await userEvent.click(await screen.findByRole("option", { name: "console-dev" }));
+//
+  //   await userEvent.click(screen.getByRole("button", { name: "Remove" }));
+  //   expect(screen.getByRole("button", { name: /Add project/ })).toBeInTheDocument();
+  // });
 
-    await userEvent.click(project);
-    await userEvent.click(await screen.findByRole("option", { name: "console-dev" }));
-    expect(project).toHaveTextContent("console-dev");
+  // it("sends no project data on create, because nothing can grant it yet", async () => {
+  //   // `POST /users` accepts no grants, and the only selectable project is the
+  //   // one the create call is already scoped to — so a chosen project changes
+  //   // nothing and silently drops nothing.
+  //   stubSchemas({ sch_business: BUSINESS }, [{ id: "proj_1", name: "console-dev" }]);
+  //   let body: Record<string, unknown> | undefined;
+  //   server.use(
+  //     http.post(USERS_URL, async ({ request }) => {
+  //       body = (await request.json()) as Record<string, unknown>;
+  //       return HttpResponse.json({ id: "user_1" }, { status: 201 });
+  //     }),
+  //   );
+  //   await openSheet();
+//
+  //   await userEvent.click(await screen.findByRole("combobox", { name: "Select project" }));
+  //   await userEvent.click(await screen.findByRole("option", { name: "console-dev" }));
+  //   await userEvent.type(screen.getByLabelText("Email"), "a@acme.com");
+  //   await userEvent.click(screen.getByRole("button", { name: "Add user" }));
+//
+  //   await waitFor(() => expect(body).toBeDefined());
+  //   expect(body).toEqual({ $schema: "sch_business", email: "a@acme.com" });
+  // });
 
-    const roles = screen.getByRole("combobox", { name: "Select roles" });
-    expect(roles).toBeEnabled();
-    await userEvent.click(roles);
-    expect(await screen.findByText("No roles available.")).toBeInTheDocument();
-    expect(screen.queryAllByRole("option")).toHaveLength(0);
-  });
-
-  it("hides + Add project once every project has a row, and restores it on remove", async () => {
-    stubSchemas({ sch_business: BUSINESS }, [{ id: "proj_1", name: "console-dev" }]);
-    await openSheet();
-
-    // One project, one row: nothing left to add.
-    const project = await screen.findByRole("combobox", { name: "Select project" });
-    expect(screen.queryByRole("button", { name: /Add project/ })).not.toBeInTheDocument();
-
-    // `Row · empty` carries no Remove — it appears once the row holds a project.
-    expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
-    await userEvent.click(project);
-    await userEvent.click(await screen.findByRole("option", { name: "console-dev" }));
-
-    await userEvent.click(screen.getByRole("button", { name: "Remove" }));
-    expect(screen.getByRole("button", { name: /Add project/ })).toBeInTheDocument();
-  });
-
-  it("sends no project data on create, because nothing can grant it yet", async () => {
-    // `POST /users` accepts no grants, and the only selectable project is the
-    // one the create call is already scoped to — so a chosen project changes
-    // nothing and silently drops nothing.
-    stubSchemas({ sch_business: BUSINESS }, [{ id: "proj_1", name: "console-dev" }]);
-    let body: Record<string, unknown> | undefined;
-    server.use(
-      http.post(USERS_URL, async ({ request }) => {
-        body = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ id: "user_1" }, { status: 201 });
-      }),
-    );
-    await openSheet();
-
-    await userEvent.click(await screen.findByRole("combobox", { name: "Select project" }));
-    await userEvent.click(await screen.findByRole("option", { name: "console-dev" }));
-    await userEvent.type(screen.getByLabelText("Email"), "a@acme.com");
-    await userEvent.click(screen.getByRole("button", { name: "Add user" }));
-
-    await waitFor(() => expect(body).toBeDefined());
-    expect(body).toEqual({ $schema: "sch_business", email: "a@acme.com" });
-  });
   it("marks fields the schema does not require, and leaves required ones unmarked", async () => {
     // `Optional` (`27843:10611`) sits beside the label, driven by the schema's
     // `required` array rather than by which fields the design happens to mark.
