@@ -20,8 +20,12 @@ server:
   login_enabled: true
   login_path: /ui/login
 
-database:
-  postgres: postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable
+# Optional. When omitted, the server uses SQLite at <data_dir>/zitadel.db.
+# Configure exactly one dialect to override the default:
+# database:
+#   sqlite: ./nextgen-data/zitadel.db
+#   # or:
+#   # postgres: postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable
 
 password_hasher:
   # Algorithm used to hash new passwords/secrets. Defaults to argon2id

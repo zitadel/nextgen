@@ -29,7 +29,7 @@ export function connectZitadel(handle: InstanceHandle): ConnectedZitadel {
 }
 
 /**
- * Boot an ephemeral local instance (binary runtime + embedded Postgres, no
+ * Boot an ephemeral local instance (binary runtime + SQLite by default, no
  * Docker) and bootstrap a project + default schema + login flow on it. The
  * result can seed loginable password users immediately.
  */

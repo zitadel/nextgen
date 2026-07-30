@@ -33,7 +33,7 @@ export interface BootedServer {
 /**
  * Boot an ephemeral local server by shelling out to `zitadel start` and parse
  * its JSON envelope. The CLI owns the subtle parts (port preflight, health
- * wait, process-group stop, embedded-Postgres reaping), so this module stays a
+ * wait, process-group stop, optional embedded-Postgres reaping), so this module stays a
  * thin adapter; swapping it for direct library calls later must not change the
  * shape returned here.
  */

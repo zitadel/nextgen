@@ -358,8 +358,10 @@ example via nvm) before running any `corepack` or `pnpm` command.
 ### System dependencies for Go tests
 
 `libicu-dev` and `libssl-dev` are required at runtime by `embedded-postgres`
-(the Go test helper that auto-downloads PostgreSQL, currently 18). If Go
-tests fail with missing-library errors, install them once with
+when intentionally running Postgres-backed tests or an explicit
+`database.postgres:` / embedded Postgres path. The default local runtime uses
+SQLite and does not need them. If Go tests fail with missing-library errors
+while using embedded Postgres, install them once with
 `sudo apt-get install -y -qq libicu-dev libssl-dev`.
 
 ### Playwright browser install gotcha

@@ -11,7 +11,6 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/authattempt"
 	v2session "github.com/zitadel/nextgen/internal/storage/v2/session"
 )
@@ -379,8 +378,7 @@ func (as authAttemptStatements) AuthAttemptChallengeFailed(ctx context.Context, 
 		now.UnixNano(), projectID, attemptID, int64(challenge.Type()), checkID,
 	).Scan(&failureCount, &lastFailedNano)
 	if err != nil {
-		var noRow *database.NoRowFoundError
-		if errors.As(err, &noRow) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return domain.ErrAuthAttemptStaleChallenge()
 		}
 		return fmt.Errorf("failed to update challenge failed: %w", wrapError(err))

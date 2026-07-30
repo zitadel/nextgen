@@ -28,12 +28,12 @@ func newJSONSchemaStatements(client queryExecutor) jsonSchemaStatements {
 // CreateJSONSchema implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *domain.JSONSchema) error {
 	now := nowUnixNano()
-	var payloadArg sql.NullString
-	if len(schema.Schema) > 0 {
-		payloadArg = sql.NullString{String: string(schema.Schema), Valid: true}
+	payload := string(schema.Schema)
+	if payload == "" {
+		payload = "{}"
 	}
 	row := js.client.QueryRow(ctx, createJSONSchemaStmt,
-		schema.ProjectID, schema.URL, schema.ObjectType, payloadArg, now,
+		schema.ProjectID, schema.URL, schema.ObjectType, payload, now,
 	)
 	scanned, err := scanJSONSchemaRow(row)
 	if err != nil {

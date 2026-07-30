@@ -1,7 +1,7 @@
 # @zitadel/testing
 
 Test-kit for **seeded ephemeral local Zitadel instances**: boot the real server
-(binary runtime + embedded Postgres, no Docker) from test code, create a
+(binary runtime + SQLite by default, no Docker) from test code, create a
 project with the default login flow, and mint password users that can complete
 the real login journey immediately.
 
@@ -77,7 +77,7 @@ z.handle;   // serializable: { baseUrl, projectId, projectSecret, schemaId, prev
 z.api;      // authenticated @zitadel/api client (bearer = projectSecret)
 z.appEnv;   // { ZITADEL_URL, NEXT_PUBLIC_ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET }
 await z.seedUser({ email?, password?, attributes? }); // → { id, email, password }
-await z.stop(); // stop server, reap embedded Postgres, remove owned temp dir
+await z.stop(); // stop server, reap any leftover embedded Postgres, remove owned temp dir
 ```
 
 `connectZitadel(handle)` returns the same surface minus lifecycle — this is
@@ -87,9 +87,9 @@ build on.
 ## How it works
 
 - **Lifecycle** shells out to `zitadel start/stop --json` (the CLI owns port
-  preflight, the health wait, process-group stop, and embedded-Postgres
-  reaping). Swapping this for direct library calls later will not change the
-  public API.
+  preflight, the health wait, process-group stop, and optional embedded-Postgres
+  reaping for older runtimes). Swapping this for direct library calls later will
+  not change the public API.
 - **Bootstrap** is the server-side half of `zitadel setup`, no files:
   `POST /projects` (unauthenticated; returns the `projectSecret` used as
   bearer for everything else) → `POST /schemas` (server assigns the schema id)
@@ -109,9 +109,9 @@ Measured on an arm64 macBook (dev build, July 2026):
 
 | Operation | Time |
 | --- | --- |
-| Cold boot (fresh data dir: initdb + migrations + health) | ~20–27s |
-| Warm restart (existing data dir) | ~15s |
-| Stop incl. embedded-Postgres reap | ~12s |
+| Cold boot (fresh data dir: SQLite migrate + health) | much faster than embedded Postgres (~20–27s historically) |
+| Warm restart (existing data dir) | seconds |
+| Stop | seconds (Postgres reap only if an old embedded postmaster is present) |
 | Bootstrap (project + schema + flow) | ~100ms |
 | Seed one user (create + password) | ~50ms |
 | Full `e2e-real` suite (boot + Next dev + 2 browser tests) | ~25s |

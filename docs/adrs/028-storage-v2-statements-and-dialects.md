@@ -294,7 +294,11 @@ compiler.compileRead(projectQuery, &database.ListOptions{
 
 **End state:** one dialect implementation per engine under
 `internal/storage/v2/dialect/`, owning connections, transactions, migrations,
-embedded postgres, Identity binding, ID generation, and all entity statements.
+Identity binding, ID generation, and all entity statements. PostgreSQL and
+Spanner remain production targets; **SQLite** is the zero-config local/homelab
+default (`dialect/sqlite`, file under `server.data_dir`) and is not a Spanner
+production peer. Embedded Postgres remains available for tests that need a real
+Postgres engine.
 
 ## Pre-merge checklist
 

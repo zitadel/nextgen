@@ -6,7 +6,9 @@ scoped `AGENTS.md` files.
 ## Storage Scope
 
 - Storage is SQL-first. Prefer SQL-compatible modeling and query patterns.
-- Supported databases are PostgreSQL and Spanner.
+- Supported databases are PostgreSQL, Spanner, and SQLite.
+- SQLite is the zero-config / local (and small homelab) default when no
+  `database:` dialect is configured. It is not a production peer to Spanner.
 - Dialect implementations (pool, migrations, embedded bring-up, statements)
   live under `internal/storage/v2/dialect/`.
 - Storage v2 (`internal/storage/v2/`) is the active dialect and statements

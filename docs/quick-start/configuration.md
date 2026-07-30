@@ -19,7 +19,15 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 
 ## Database
 
-Configure exactly one dialect:
+When `database:` is omitted, the server uses **SQLite** at
+`<server.data_dir>/zitadel.db` (local / homelab default).
+
+Configure exactly one dialect to override:
+
+```yaml
+database:
+  sqlite: ./nextgen-data/zitadel.db
+```
 
 ```yaml
 database:
@@ -29,8 +37,13 @@ database:
 Or via environment:
 
 ```sh
+export NEXTGEN_DATABASE_SQLITE='./nextgen-data/zitadel.db'
+# or
 export NEXTGEN_DATABASE_POSTGRES='postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable'
 ```
+
+SQLite is intended for local development and small single-node deployments
+(single-writer limits apply). Use PostgreSQL or Spanner for production.
 
 Migrations run automatically when the server starts.
 

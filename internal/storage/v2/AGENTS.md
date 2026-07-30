@@ -16,6 +16,7 @@ in the dialect helper:
 
 - Postgres: [`withTransaction`](dialect/postgres/with_transaction.go)
 - Spanner: [`withTransaction`](dialect/spanner/with_transaction.go)
+- SQLite: [`withTransaction`](dialect/sqlite/with_transaction.go)
 
 Inside the callback, use the **inner** `tx` for every write — never the outer
 `s.client` / `s.db`.
@@ -39,4 +40,5 @@ connection or nest Spanner RW transactions (forbidden).
 
 Multi-write nesting uses the dialect `withTransaction` helpers above
 ([`dialect/postgres/with_transaction.go`](dialect/postgres/with_transaction.go),
-[`dialect/spanner/with_transaction.go`](dialect/spanner/with_transaction.go)).
+[`dialect/spanner/with_transaction.go`](dialect/spanner/with_transaction.go),
+[`dialect/sqlite/with_transaction.go`](dialect/sqlite/with_transaction.go)).
