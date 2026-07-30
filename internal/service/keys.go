@@ -104,6 +104,9 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 		return key.Crypter(masterKey)
 	}
 
+	// This call does a database call to fetch the key with the given id and
+	// recurses. This can be a performance hit. Maybe caching or a better
+	// database query is required in the future?
 	kek, err := s.GetCrypter(ctx, jweHeader.KeyID, jweHeader.EncryptionAlgorithm)
 	if err != nil {
 		return nil, err
