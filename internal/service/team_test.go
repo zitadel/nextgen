@@ -145,6 +145,96 @@ func TestTeamService_Get(t *testing.T) {
 	}
 }
 
+func TestTeamService_Update(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		input     service.UpdateTeamInput
+		setupStmt func(*servicemocks.MockAllStatements)
+		wantErr   error
+		check     func(t *testing.T, got *domain.Team)
+	}{
+		{
+			name:  "ok",
+			input: service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1", Name: "renamed"},
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().UpdateTeam(gomock.Any(), &domain.Team{ProjectID: "proj_1", ID: "team_1", Name: "renamed"}).
+					DoAndReturn(func(_ context.Context, team *domain.Team) error {
+						team.Status = domain.TeamStatusActive
+						team.CreatedAt = time.Now()
+						team.UpdatedAt = team.CreatedAt
+						return nil
+					})
+			},
+			check: func(t *testing.T, got *domain.Team) {
+				assert.Equal(t, "proj_1", got.ProjectID)
+				assert.Equal(t, "team_1", got.ID)
+				assert.Equal(t, "renamed", got.Name)
+				assert.Equal(t, domain.TeamStatusActive, got.Status)
+				assert.False(t, got.CreatedAt.IsZero())
+			},
+		},
+		{
+			name:  "name is trimmed before the update",
+			input: service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1", Name: "  renamed  "},
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().UpdateTeam(gomock.Any(), &domain.Team{ProjectID: "proj_1", ID: "team_1", Name: "renamed"}).
+					Return(nil)
+			},
+			check: func(t *testing.T, got *domain.Team) {
+				assert.Equal(t, "renamed", got.Name)
+			},
+		},
+		{
+			name:    "whitespace-only name",
+			input:   service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1", Name: "   "},
+			wantErr: domain.ErrTeamNameInvalid(),
+		},
+		{
+			name:  "duplicate name",
+			input: service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1", Name: "renamed"},
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().UpdateTeam(gomock.Any(), &domain.Team{ProjectID: "proj_1", ID: "team_1", Name: "renamed"}).
+					Return(database.NewUniqueError("teams", "uq_teams_project_name", nil))
+			},
+			wantErr: domain.ErrTeamAlreadyExists(),
+		},
+		{
+			name:  "team not found",
+			input: service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "missing", Name: "renamed"},
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().UpdateTeam(gomock.Any(), &domain.Team{ProjectID: "proj_1", ID: "missing", Name: "renamed"}).
+					Return(database.NewNoRowFoundError(nil))
+			},
+			wantErr: domain.ErrTeamNotFound(),
+		},
+		{
+			name:  "update fails",
+			input: service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1", Name: "renamed"},
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().UpdateTeam(gomock.Any(), gomock.Any()).Return(assert.AnError)
+			},
+			wantErr: domain.ErrInternal(assert.AnError),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			svc := newMockedTeamService(t, tc.setupStmt)
+			got, err := svc.Update(t.Context(), tc.input)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				assert.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			tc.check(t, got)
+		})
+	}
+}
+
 func newMockedTeamService(t *testing.T, setupStmt func(*servicemocks.MockAllStatements)) *service.TeamService {
 	t.Helper()
 

@@ -8,13 +8,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-// ---- Input types -------------------------------------------------------------
-
-type CreateTeamInput struct {
-	ProjectID string
-	Name      string
-}
-
 type TeamService struct {
 	v2Pool *DB
 }
@@ -23,6 +16,11 @@ func NewTeamService(v2Pool *DB) *TeamService {
 	return &TeamService{
 		v2Pool: v2Pool,
 	}
+}
+
+type CreateTeamInput struct {
+	ProjectID string
+	Name      string
 }
 
 func (s *TeamService) Create(ctx context.Context, input CreateTeamInput) (*domain.Team, error) {
@@ -35,7 +33,7 @@ func (s *TeamService) Create(ctx context.Context, input CreateTeamInput) (*domai
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
 			return nil, domain.ErrTeamAlreadyExists().WithParent(err)
 		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to create team in database")
+		return nil, domain.ErrInternal(err).WithMessage("failed to create team")
 	}
 	return model, nil
 }
@@ -46,7 +44,31 @@ func (s *TeamService) Get(ctx context.Context, projectID string, teamID string) 
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrTeamNotFound()
 		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to get team from database")
+		return nil, domain.ErrInternal(err).WithMessage("failed to get team")
+	}
+	return team, nil
+}
+
+type UpdateTeamInput struct {
+	ProjectID string
+	TeamID    string
+	Name      string
+}
+
+func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (*domain.Team, error) {
+	name, err := domain.ValidateTeamName(input.Name)
+	if err != nil {
+		return nil, err
+	}
+	team := &domain.Team{ProjectID: input.ProjectID, ID: input.TeamID, Name: name}
+	if err := s.v2Pool.Statements().UpdateTeam(ctx, team); err != nil {
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			return nil, domain.ErrTeamAlreadyExists().WithParent(err)
+		}
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrTeamNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to update team")
 	}
 	return team, nil
 }
