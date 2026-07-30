@@ -111,8 +111,8 @@ func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	require.NoError(t, json.Unmarshal(out.Options, &optMap))
 	assert.Contains(t, optMap, "challenge")
 	assert.Contains(t, optMap, "rp")
-	user, ok := optMap["user"].(map[string]any)
-	require.True(t, ok, "creation options must include a user object")
+	require.IsType(t, map[string]any{}, optMap["user"], "creation options must include a user object")
+	user := optMap["user"].(map[string]any)
 	assert.Equal(t, "alice@example.com", user["name"])
 	assert.Equal(t, "Alice Example", user["displayName"])
 
@@ -141,8 +141,8 @@ func TestPasskeyRegistrationService_Begin_UsesNeutralLabelWithoutUsername(t *tes
 
 	var optMap map[string]any
 	require.NoError(t, json.Unmarshal(out.Options, &optMap))
-	user, ok := optMap["user"].(map[string]any)
-	require.True(t, ok, "creation options must include a user object")
+	require.IsType(t, map[string]any{}, optMap["user"], "creation options must include a user object")
+	user := optMap["user"].(map[string]any)
 	assert.Equal(t, "Passkey account", user["name"])
 	assert.Empty(t, user["displayName"])
 	assert.Equal(t, "Passkey account", regState.created.Challenge.Username)
@@ -164,8 +164,8 @@ func TestPasskeyRegistrationService_Begin_RequestsDiscoverableCredential(t *test
 
 	var optMap map[string]any
 	require.NoError(t, json.Unmarshal(out.Options, &optMap))
-	selection, ok := optMap["authenticatorSelection"].(map[string]any)
-	require.True(t, ok, "creation options must include authenticatorSelection")
+	require.IsType(t, map[string]any{}, optMap["authenticatorSelection"], "creation options must include authenticatorSelection")
+	selection := optMap["authenticatorSelection"].(map[string]any)
 	assert.Equal(t, "required", selection["residentKey"])
 	assert.Equal(t, "preferred", selection["userVerification"])
 }

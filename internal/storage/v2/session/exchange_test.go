@@ -119,8 +119,8 @@ func TestDecodeAuthChecks(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.Len(t, checks, 1)
-	userFactor, ok := checks[0].(*domain.AuthFactorUser)
-	require.True(t, ok)
+	require.IsType(t, &domain.AuthFactorUser{}, checks[0])
+	userFactor := checks[0].(*domain.AuthFactorUser)
 	assert.Equal(t, "u-1", userFactor.UserID)
 
 	_, err = session.DecodeAuthChecks(domain.AuthCheckType(255), "x", time.Time{}, time.Time{}, time.Time{}, 0, nil, nil)

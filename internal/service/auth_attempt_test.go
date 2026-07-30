@@ -405,8 +405,8 @@ func TestAuthAttemptService_VerifyProof(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, got)
-		userFactor, ok := succeededFactor.(*domain.AuthFactorUser)
-		require.True(t, ok, "ChallengeSucceeded factor must be *domain.AuthFactorUser")
+		require.IsType(t, &domain.AuthFactorUser{}, succeededFactor, "ChallengeSucceeded factor must be *domain.AuthFactorUser")
+		userFactor := succeededFactor.(*domain.AuthFactorUser)
 		assert.Equal(t, "user-1", userFactor.UserID)
 	})
 
@@ -641,8 +641,8 @@ func TestAuthAttemptService_IssuePasskeyChallenge(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	challenge, ok := setChallenge.(*domain.AuthChallengePasskey)
-	require.True(t, ok, "SetChallenge must receive a *domain.AuthChallengePasskey")
+	require.IsType(t, &domain.AuthChallengePasskey{}, setChallenge, "SetChallenge must receive a *domain.AuthChallengePasskey")
+	challenge := setChallenge.(*domain.AuthChallengePasskey)
 	assert.NotEmpty(t, challenge.Challenge, "issued passkey challenge must carry a WebAuthn challenge")
 	assert.Equal(t, passkeyRPID, challenge.RPID)
 }
@@ -690,8 +690,8 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 
 		require.NoError(t, err)
 		require.NotNil(t, got)
-		factor, ok := succeededFactor.(*domain.AuthFactorPasskey)
-		require.True(t, ok, "ChallengeSucceeded factor must be *domain.AuthFactorPasskey")
+		require.IsType(t, &domain.AuthFactorPasskey{}, succeededFactor, "ChallengeSucceeded factor must be *domain.AuthFactorPasskey")
+		factor := succeededFactor.(*domain.AuthFactorPasskey)
 		assert.Equal(t, passkeyUserID, factor.UserID, "verified passkey factor must carry the user")
 		assert.Equal(t, f.cred.ID, factor.CredentialID)
 		assert.Equal(t, int64(1), persistedSignCount)

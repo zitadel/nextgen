@@ -115,8 +115,8 @@ func TestCreateProject(t *testing.T) {
 			resp, err := client.CreateProject(t.Context(), tc.req)
 			require.NoError(t, err)
 
-			got, ok := resp.(*api.CreateProjectResponse)
-			require.True(t, ok, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+			got := resp.(*api.CreateProjectResponse)
 			assert.NotEmpty(t, got.ID)
 			assert.NotEmpty(t, got.ProjectSecret)
 			assert.NotEmpty(t, got.PreviewSecret)
@@ -471,8 +471,8 @@ func TestQueryProjectsPageTokenRoundTrip(t *testing.T) {
 	req := &api.QueryProjectsRequest{Limit: api.NewOptLimit(1)}
 	first, err := client.QueryProjects(t.Context(), req)
 	require.NoError(t, err)
-	firstPage, ok := first.(*api.QueryProjectsResponse)
-	require.True(t, ok, helpers.MustMarshal(t, first))
+	require.IsType(t, &api.QueryProjectsResponse{}, first, helpers.MustMarshal(t, first))
+	firstPage := first.(*api.QueryProjectsResponse)
 	require.Len(t, firstPage.Projects, 1)
 
 	pageToken, ok := firstPage.NextPageToken.Get()
@@ -481,8 +481,8 @@ func TestQueryProjectsPageTokenRoundTrip(t *testing.T) {
 	req.PageToken = api.NewOptNilPageToken(pageToken)
 	second, err := client.QueryProjects(t.Context(), req)
 	require.NoError(t, err)
-	secondPage, ok := second.(*api.QueryProjectsResponse)
-	require.True(t, ok, helpers.MustMarshal(t, second))
+	require.IsType(t, &api.QueryProjectsResponse{}, second, helpers.MustMarshal(t, second))
+	secondPage := second.(*api.QueryProjectsResponse)
 	assert.Empty(t, secondPage.Projects)
 	assert.False(t, secondPage.NextPageToken.IsSet())
 }
@@ -497,8 +497,8 @@ func assertProjectResponse(t *testing.T, want, got any) {
 
 	switch expected := want.(type) {
 	case *api.ProjectResponse:
-		actual, ok := got.(*api.ProjectResponse)
-		require.True(t, ok)
+		require.IsType(t, &api.ProjectResponse{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.ProjectResponse)
 
 		assert.NotEmpty(t, actual.ID)
 		assert.Equal(t, expected.Name, actual.Name)
@@ -506,8 +506,8 @@ func assertProjectResponse(t *testing.T, want, got any) {
 		assert.NotEmpty(t, actual.CreatedAt)
 		assert.False(t, actual.UpdatedAt.Before(actual.CreatedAt))
 	case *api.QueryProjectsResponse:
-		actual, ok := got.(*api.QueryProjectsResponse)
-		require.True(t, ok)
+		require.IsType(t, &api.QueryProjectsResponse{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.QueryProjectsResponse)
 
 		if !assert.Len(t, actual.Projects, len(expected.Projects), helpers.MustMarshal(t, got)) {
 			return
@@ -519,27 +519,27 @@ func assertProjectResponse(t *testing.T, want, got any) {
 		// worth pinning.
 		assert.Equal(t, expected.NextPageToken.IsSet(), actual.NextPageToken.IsSet())
 	case *api.QueryProjectsBadRequest:
-		actual, ok := got.(*api.QueryProjectsBadRequest)
-		require.True(t, ok)
+		require.IsType(t, &api.QueryProjectsBadRequest{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.QueryProjectsBadRequest)
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)
 		assert.Equal(t, expected.Details, actual.Details)
 	case *api.GetProjectNotFound:
-		actual, ok := got.(*api.GetProjectNotFound)
-		require.True(t, ok)
+		require.IsType(t, &api.GetProjectNotFound{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.GetProjectNotFound)
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)
 	case *api.PatchProjectBadRequest:
-		actual, ok := got.(*api.PatchProjectBadRequest)
-		require.True(t, ok)
+		require.IsType(t, &api.PatchProjectBadRequest{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.PatchProjectBadRequest)
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)
 	case *api.PatchProjectNotFound:
-		actual, ok := got.(*api.PatchProjectNotFound)
-		require.True(t, ok)
+		require.IsType(t, &api.PatchProjectNotFound{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.PatchProjectNotFound)
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)

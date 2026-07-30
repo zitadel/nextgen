@@ -277,8 +277,8 @@ func TestManagementAuthz(t *testing.T) {
 				// other, must not see victim).
 				resp, err := foreign.QueryProjects(t.Context(), &api.QueryProjectsRequest{})
 				require.NoError(t, err)
-				listResp, ok := resp.(*api.QueryProjectsResponse)
-				require.True(t, ok, helpers.MustMarshal(t, resp))
+				require.IsType(t, &api.QueryProjectsResponse{}, resp, helpers.MustMarshal(t, resp))
+				listResp := resp.(*api.QueryProjectsResponse)
 				require.Len(t, listResp.Projects, 1, "the foreign secret sees only its own project")
 				assert.Equal(t, other.ID, listResp.Projects[0].ID, "the foreign secret sees exactly its own project (other)")
 
@@ -289,8 +289,8 @@ func TestManagementAuthz(t *testing.T) {
 
 				ownResp, err := ownClient.QueryProjects(t.Context(), &api.QueryProjectsRequest{})
 				require.NoError(t, err)
-				ownListResp, ok := ownResp.(*api.QueryProjectsResponse)
-				require.True(t, ok, helpers.MustMarshal(t, ownResp))
+				require.IsType(t, &api.QueryProjectsResponse{}, ownResp, helpers.MustMarshal(t, ownResp))
+				ownListResp := ownResp.(*api.QueryProjectsResponse)
 				require.Len(t, ownListResp.Projects, 1, "the own secret sees only its own project")
 				assert.Equal(t, victim.ID, ownListResp.Projects[0].ID, "the own secret sees exactly its own project (victim)")
 			})
