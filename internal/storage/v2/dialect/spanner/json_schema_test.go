@@ -10,8 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func TestJSONSchemaStatements_CRUD(t *testing.T) {
@@ -43,12 +42,12 @@ func TestJSONSchemaStatements_CRUD(t *testing.T) {
 	assert.Contains(t, string(got.Schema), `"type":"object"`)
 	assert.Equal(t, schema.CreatedAt.UTC(), got.CreatedAt.UTC())
 
-	listed, err := stmts.ListJSONSchemas(ctx, &v2database.ListOptions[domain.JSONSchemaField]{
-		Filter: v2database.Equal(v2database.Col(domain.JSONSchemaFieldProjectID), project.ID),
-		Pagination: v2database.Page[domain.JSONSchemaField]{
+	listed, err := stmts.ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
+		Filter: database.Equal(database.Col(domain.JSONSchemaFieldProjectID), project.ID),
+		Pagination: database.Page[domain.JSONSchemaField]{
 			Limit: 10,
-			OrderBy: v2database.OrderBy[domain.JSONSchemaField]{
-				Columns: []v2database.Column[domain.JSONSchemaField]{v2database.Col(domain.JSONSchemaFieldCreatedAt)},
+			OrderBy: database.OrderBy[domain.JSONSchemaField]{
+				Columns: []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldCreatedAt)},
 			},
 		},
 	})

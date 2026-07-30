@@ -6,15 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/ianlancetaylor/jsonschema"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 const projectFieldCreatedAt = "createdAt"
@@ -41,13 +41,14 @@ type ProjectService interface {
 	DefaultProject(ctx context.Context, cfgProjectID string) (*domain.Project, error)
 
 	// Update updates the name of a project.
-	// Returns domain.ErrMissingProjectID or domain.ErrProjectNameInvalid for validation failures.
+	// Returns domain.ErrProjectMissingID or domain.ErrProjectNameInvalid for validation failures.
 	// Returns domain.ErrProjectNotFound when no project with the given ID exists; other failures return domain.ErrInternal.
 	Update(ctx context.Context, id, name string) (*domain.Project, error)
 
 	// List returns projects matching the request, ordered and paginated with an
 	// opaque cursor token. The returned NextPageToken is empty when the last page
 	// has been reached.
+	// Returns domain.ErrProjectMissingID when the request carries no project.
 	List(ctx context.Context, req ListProjectsRequest) (*ListProjectsResponse, error)
 
 	// Delete hard-deletes a project, cascading to its child resources through the
@@ -200,12 +201,12 @@ func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string
 	// (created_at ascending) so every replica answers the same, and cheap
 	// enough to resolve per runtime.json request — no cached state to
 	// invalidate when `zitadel setup` creates the first project.
-	result, err := s.v2Pool.Statements().ListProjects(ctx, &v2database.ListOptions[domain.ProjectField]{
-		Pagination: v2database.Page[domain.ProjectField]{
+	result, err := s.v2Pool.Statements().ListProjects(ctx, &database.ListOptions[domain.ProjectField]{
+		Pagination: database.Page[domain.ProjectField]{
 			Limit: 1,
-			OrderBy: v2database.OrderBy[domain.ProjectField]{
-				Columns:   []v2database.Column[domain.ProjectField]{v2database.Col(domain.ProjectFieldCreatedAt)},
-				Direction: v2database.OrderAsc,
+			OrderBy: database.OrderBy[domain.ProjectField]{
+				Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldCreatedAt)},
+				Direction: database.OrderAsc,
 			},
 		},
 	})
@@ -220,8 +221,9 @@ func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string
 
 func (s *projectService) Update(ctx context.Context, id, name string) (*domain.Project, error) {
 	if id == "" {
-		return nil, domain.ErrMissingProjectID()
+		return nil, domain.ErrProjectMissingID()
 	}
+	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, domain.ErrProjectNameInvalid()
 	}
@@ -240,11 +242,9 @@ func (s *projectService) Update(ctx context.Context, id, name string) (*domain.P
 
 // ListProjectsRequest is the input for listing projects.
 type ListProjectsRequest struct {
-	// ProjectID, if set, restricts results to that single project.
-	// It is set based on the scope of the caller.
-	// If it's bound to a single project, the ProjectID should be set by the handler.
-	// Left empty, the list spans all projects: the handler need not pass a ProjectID
-	// if the caller has broader access (e.g., system-level read access).
+	// ProjectID restricts results to that single project. Handlers set it from
+	// the caller's scope, and every credential today is bound to one project.
+	// Required.
 	ProjectID string
 	Limit     int
 	PageToken string
@@ -259,10 +259,13 @@ type ListProjectsResponse struct {
 }
 
 func (s *projectService) List(ctx context.Context, req ListProjectsRequest) (*ListProjectsResponse, error) {
-	filters := make([]v2database.Filter[domain.ProjectField], 0, len(req.Filters)+1)
-	if req.ProjectID != "" {
-		filters = append(filters, v2database.Equal(v2database.Col(domain.ProjectFieldID), req.ProjectID))
+	// TODO (grvijayan): update once a credential can hold a scope wider than one project (ADR 036).
+	if req.ProjectID == "" {
+		return nil, domain.ErrProjectMissingID()
 	}
+
+	filters := make([]database.Filter[domain.ProjectField], 0, len(req.Filters)+1)
+	filters = append(filters, database.Equal(database.Col(domain.ProjectFieldID), req.ProjectID))
 	for _, f := range req.Filters {
 		filter, err := projectFilter(f)
 		if err != nil {
@@ -281,9 +284,9 @@ func (s *projectService) List(ctx context.Context, req ListProjectsRequest) (*Li
 		cursor = []byte(req.PageToken)
 	}
 
-	opts := &v2database.ListOptions[domain.ProjectField]{
-		Filter: v2database.And(filters...),
-		Pagination: v2database.Page[domain.ProjectField]{
+	opts := &database.ListOptions[domain.ProjectField]{
+		Filter: database.And(filters...),
+		Pagination: database.Page[domain.ProjectField]{
 			Limit:   uint32(normalizeLimit(req.Limit)),
 			OrderBy: orderBy,
 			Cursor:  cursor,
@@ -303,39 +306,39 @@ func (s *projectService) List(ctx context.Context, req ListProjectsRequest) (*Li
 
 // projectOrderBy builds the sort order, defaulting to createdAt ascending, and
 // appends id as a tiebreaker so equal sort keys page deterministically.
-func projectOrderBy(sorting *Sorting) (v2database.OrderBy[domain.ProjectField], error) {
+func projectOrderBy(sorting *Sorting) (database.OrderBy[domain.ProjectField], error) {
 	sortField := domain.ProjectFieldCreatedAt
-	direction := v2database.OrderAsc
+	direction := database.OrderAsc
 
 	if sorting != nil {
 		if sorting.Field != "" {
 			f, err := projectField(sorting.Field)
 			if err != nil {
-				return v2database.OrderBy[domain.ProjectField]{}, err
+				return database.OrderBy[domain.ProjectField]{}, err
 			}
 			sortField = f
 		}
 		dir, err := parseSortDirection(sorting.Direction)
 		if err != nil {
-			return v2database.OrderBy[domain.ProjectField]{}, err
+			return database.OrderBy[domain.ProjectField]{}, err
 		}
 		direction = dir
 	}
 
-	columns := []v2database.Column[domain.ProjectField]{v2database.Col(sortField)}
+	columns := []database.Column[domain.ProjectField]{database.Col(sortField)}
 	// id is unique, so appending it gives the sort a total order. Without it,
 	// rows sharing a sort-key value (e.g. equal createdAt) have no stable
 	// order, and cursor pagination could skip or repeat them across pages.
 	if sortField != domain.ProjectFieldID {
-		columns = append(columns, v2database.Col(domain.ProjectFieldID))
+		columns = append(columns, database.Col(domain.ProjectFieldID))
 	}
-	return v2database.OrderBy[domain.ProjectField]{Columns: columns, Direction: direction}, nil
+	return database.OrderBy[domain.ProjectField]{Columns: columns, Direction: direction}, nil
 }
 
 // projectFilter maps an API filter predicate to a storage filter. Operations the
 // v2 filter layer cannot express return [domain.ErrNotImplemented];
 // invalid field/operation/value combinations return [domain.ErrRequestInvalid].
-func projectFilter(f Filter) (v2database.Filter[domain.ProjectField], error) {
+func projectFilter(f Filter) (database.Filter[domain.ProjectField], error) {
 	field, err := projectField(f.Field)
 	if err != nil {
 		return nil, err
@@ -347,11 +350,12 @@ func projectFilter(f Filter) (v2database.Filter[domain.ProjectField], error) {
 	}
 	// The createdAt filter value arrives as an untyped string (the filter-value union in the openapi contract
 	// does not specify a format for a timestamp); parse it into the time.Time needed for the comparison.
-	value, err := v2database.CoerceTimeValue(raw)
+	value, err := database.CoerceTimeValue(raw)
 	if err != nil {
-		return nil, domain.ErrRequestInvalid().WithDetails("createdAt filter value must be a valid RFC3339 timestamp")
+		return nil, domain.ErrRequestInvalid().WithDetails(
+			fmt.Sprintf("createdAt filter value %q is not a valid RFC3339 timestamp", raw))
 	}
-	return compareFilter(f.Operation, v2database.Col(field), value)
+	return compareFilter(f.Operation, database.Col(field), value)
 }
 
 // projectField maps an API field name to its [domain.ProjectField].
@@ -366,7 +370,7 @@ func projectField(field string) (domain.ProjectField, error) {
 
 func (s *projectService) Delete(ctx context.Context, id string) error {
 	if id == "" {
-		return domain.ErrMissingProjectID()
+		return domain.ErrProjectMissingID()
 	}
 	if err := s.v2Pool.Statements().DeleteProjectByID(ctx, id); err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to delete project")

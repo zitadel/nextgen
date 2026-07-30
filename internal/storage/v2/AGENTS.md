@@ -40,3 +40,17 @@ connection or nest Spanner RW transactions (forbidden).
 Multi-write nesting uses the dialect `withTransaction` helpers above
 ([`dialect/postgres/with_transaction.go`](dialect/postgres/with_transaction.go),
 [`dialect/spanner/with_transaction.go`](dialect/spanner/with_transaction.go)).
+
+## Statement contract tests
+
+Behavioral statement parity across dialects lives in
+[`stmttest`](stmttest/) (see ADR 041). Shared suites assert through
+`service.AllStatements`; build-tagged registration brings up postgres and/or
+spanner, and `forEachDialect` loops dialects. CI still runs one tag per job; both
+tags are supported in one process for local parity checks.
+
+[`dbtest.Pool`](dbtest/dbtest.go) is the migrated bring-up type
+(`database.Pool` + `service.Pool`). Dialect packages keep engine-specific
+tests (compiler SQL shape, error wrapping, `withTransaction` nesting,
+migrations). Cursor-tie project seeding uses dialect
+`SeedProjectsTiedAt` helpers under the integration build tags.

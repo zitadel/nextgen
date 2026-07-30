@@ -13,8 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func newMockedBrandingService(t *testing.T) (*service.BrandingService, *servicemocks.MockAllStatements) {
@@ -85,9 +84,9 @@ func TestBrandingServiceGetLatest(t *testing.T) {
 	want := &domain.Branding{ProjectID: "proj_1", ID: "brnd_1", Layout: domain.BrandingLayoutCentered}
 	statements.EXPECT().
 		ListBrandings(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, opts *v2database.ListOptions[domain.BrandingField]) (*v2database.ListResult[*domain.Branding], error) {
+		DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.BrandingField]) (*database.ListResult[*domain.Branding], error) {
 			assert.Equal(t, uint32(1), opts.Pagination.Limit)
-			return &v2database.ListResult[*domain.Branding]{Items: []*domain.Branding{want}}, nil
+			return &database.ListResult[*domain.Branding]{Items: []*domain.Branding{want}}, nil
 		})
 
 	got, err := svc.GetLatest(t.Context(), "proj_1")
@@ -100,7 +99,7 @@ func TestBrandingServiceGetLatestNoneStored(t *testing.T) {
 
 	statements.EXPECT().
 		ListBrandings(gomock.Any(), gomock.Any()).
-		Return(&v2database.ListResult[*domain.Branding]{}, nil)
+		Return(&database.ListResult[*domain.Branding]{}, nil)
 
 	got, err := svc.GetLatest(t.Context(), "proj_1")
 	require.NoError(t, err, "no stored branding is not an error — callers fall back to defaults")

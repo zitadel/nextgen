@@ -9,13 +9,16 @@ import (
 )
 
 type Client struct {
-	client *spanner.Client
+	client     *spanner.Client
+	dsn        string
+	isMigrated bool
 	statements
 }
 
-func newClient(spannerClient *spanner.Client) *Client {
+func newClient(dsn string, spannerClient *spanner.Client) *Client {
 	return &Client{
 		client:     spannerClient,
+		dsn:        dsn,
 		statements: newStatements(newClientDB(spannerClient)),
 	}
 }

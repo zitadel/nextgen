@@ -4,8 +4,6 @@ package postgres
 
 import (
 	"context"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -26,7 +23,7 @@ import (
 // uniqueKeyID returns a collision-free DEK ID scoped to the running (sub)test.
 func uniqueKeyID(t *testing.T) string {
 	t.Helper()
-	return "dek-" + strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	return "dek-" + uniqueSuffix(t)
 }
 
 // newTestKey builds a persistable DEK in the given state referencing projectID.
@@ -141,13 +138,13 @@ func TestCryptoKeyStatements_GetEncryptionKey(t *testing.T) {
 				database.Equal(database.Col(domain.EncryptionKeyFieldProjectID), projectID),
 				database.Equal(database.Col(domain.EncryptionKeyFieldState), domain.KeyStateActive),
 			))
-		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 
 	t.Run("unknown project returns NoRowFoundError", func(t *testing.T) {
 		t.Parallel()
 
 		_, err := testPool.GetEncryptionKey(t.Context(), database.Equal(database.Col(domain.EncryptionKeyFieldProjectID), uniqueProjectID(t)))
-		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }

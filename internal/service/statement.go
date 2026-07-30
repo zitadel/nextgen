@@ -72,7 +72,9 @@ type FlowDefinitionStatements interface {
 type CryptoKeyStatements interface {
 	Statements
 	GetEncryptionKey(ctx context.Context, filter database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error)
+	ListEncryptionKeys(ctx context.Context, opts *database.ListOptions[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error)
 	CreateEncryptionKey(ctx context.Context, dek *domain.EncryptionKey) error
+	UpdateKey(ctx context.Context, id string, key string) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

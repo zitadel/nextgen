@@ -4,13 +4,14 @@ package spanner
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func TestTeamStatements_CRUD(t *testing.T) {
@@ -21,7 +22,7 @@ func TestTeamStatements_CRUD(t *testing.T) {
 	require.NoError(t, stmts.CreateProject(ctx, project))
 	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 
-	team := &domain.Team{ProjectID: project.ID, ID: "team_v2_crud"}
+	team := newTestTeam(project.ID, "team_v2_crud")
 	require.NoError(t, stmts.CreateTeam(ctx, team))
 	assert.Equal(t, domain.TeamStatusActive, team.Status)
 	assert.False(t, team.CreatedAt.IsZero())
@@ -31,6 +32,7 @@ func TestTeamStatements_CRUD(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, team.ID, got.ID)
 	assert.Equal(t, project.ID, got.ProjectID)
+	assert.Equal(t, team.Name, got.Name)
 	assert.Equal(t, domain.TeamStatusActive, got.Status)
 
 	require.NoError(t, stmts.DeactivateTeam(ctx, project.ID, team.ID))
@@ -42,4 +44,55 @@ func TestTeamStatements_CRUD(t *testing.T) {
 	_, err = stmts.GetTeamByID(ctx, project.ID, "missing")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
+}
+
+func TestTeamStatements_NameUniquePerProject(t *testing.T) {
+	ctx := t.Context()
+	stmts := testClient.Statements()
+
+	project := newTestProject(uniqueProjectID(t))
+	require.NoError(t, stmts.CreateProject(ctx, project))
+	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+
+	other := newTestProject(uniqueProjectID(t))
+	require.NoError(t, stmts.CreateProject(ctx, other))
+	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), other.ID) })
+
+	team := newTestTeam(project.ID, "team_v2_unique")
+	require.NoError(t, stmts.CreateTeam(ctx, team))
+
+	duplicate := newTestTeam(project.ID, "team_v2_unique_2")
+	duplicate.Name = team.Name
+	assert.ErrorIs(t, stmts.CreateTeam(ctx, duplicate), new(database.UniqueError))
+
+	differentCase := newTestTeam(project.ID, "team_v2_unique_3")
+	differentCase.Name = strings.ToUpper(team.Name)
+	assert.ErrorIs(t, stmts.CreateTeam(ctx, differentCase), new(database.UniqueError))
+
+	sameNameOtherProject := newTestTeam(other.ID, "team_v2_unique")
+	sameNameOtherProject.Name = team.Name
+	require.NoError(t, stmts.CreateTeam(ctx, sameNameOtherProject))
+}
+
+func TestTeamStatements_NameColumnConstraints(t *testing.T) {
+	ctx := t.Context()
+	stmts := testClient.Statements()
+
+	project := newTestProject(uniqueProjectID(t))
+	require.NoError(t, stmts.CreateProject(ctx, project))
+	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+
+	t.Run("empty", func(t *testing.T) {
+		team := newTestTeam(project.ID, "team_v2_name_empty")
+		team.Name = ""
+		// Spanner reports a violated CHECK as OutOfRange, which wrapError does
+		// not translate, so the write is only asserted to be rejected.
+		require.Error(t, stmts.CreateTeam(ctx, team))
+	})
+
+	t.Run("over the length limit", func(t *testing.T) {
+		team := newTestTeam(project.ID, "team_v2_name_long")
+		team.Name = strings.Repeat("a", domain.TeamNameMaxLength+1)
+		assert.ErrorIs(t, stmts.CreateTeam(ctx, team), new(database.CheckError))
+	})
 }

@@ -8,8 +8,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // ---- Input types -------------------------------------------------------------
@@ -22,8 +21,8 @@ type CreateUserInput struct {
 }
 
 type UserAction interface {
-	Prepare(ctx context.Context, db database.QueryExecutor) error
-	Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error
+	Prepare(ctx context.Context) error
+	Apply(ctx context.Context, stmts AllStatements) error
 }
 
 type SetPasswordInput struct {
@@ -61,20 +60,17 @@ type GetUserMetadataInput struct {
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
-	pool        database.Pool
 	v2Pool      StatementPool
 	schemaStore domain.JSONSchemaStore
 	hasher      crypto.Hasher
 }
 
 func NewUserService(
-	pool database.Pool,
 	v2Pool StatementPool,
 	schemaStore domain.JSONSchemaStore,
 	hasher crypto.Hasher,
 ) *UserService {
 	return &UserService{
-		pool:        pool,
 		v2Pool:      v2Pool,
 		schemaStore: schemaStore,
 		hasher:      hasher,
@@ -83,19 +79,15 @@ func NewUserService(
 
 func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (err error) {
 	for _, action := range actions {
-		err = action.Prepare(ctx, s.pool)
+		err = action.Prepare(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		qtx, ok := tx.(StatementerWithQueryExecutor[AllStatements])
-		if !ok {
-			return domain.ErrInternal(nil).WithMessage("transaction does not support query execution")
-		}
 		for _, action := range actions {
-			if err := action.Apply(ctx, qtx); err != nil {
+			if err := action.Apply(ctx, tx.Statements()); err != nil {
 				return err
 			}
 		}
@@ -112,7 +104,7 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
 	action := NewCreateUserAction(input, s.schemaStore)
-	err = action.Prepare(ctx, s.pool)
+	err = action.Prepare(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -136,16 +128,16 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]ma
 	if input.Offset > 0 {
 		limit = input.Offset + input.Limit
 	}
-	result, err := s.v2Pool.Statements().ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
-		Filter: v2database.Equal(v2database.Col(domain.UserFieldProjectID), input.ProjectID),
-		Pagination: v2database.Page[domain.UserField]{
+	result, err := s.v2Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
+		Filter: database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
+		Pagination: database.Page[domain.UserField]{
 			Limit: limit,
-			OrderBy: v2database.OrderBy[domain.UserField]{
-				Columns: []v2database.Column[domain.UserField]{
-					v2database.Col(domain.UserFieldCreatedAt),
-					v2database.Col(domain.UserFieldID),
+			OrderBy: database.OrderBy[domain.UserField]{
+				Columns: []database.Column[domain.UserField]{
+					database.Col(domain.UserFieldCreatedAt),
+					database.Col(domain.UserFieldID),
 				},
-				Direction: v2database.OrderAsc,
+				Direction: database.OrderAsc,
 			},
 		},
 	}, UserQueryOptions{})
@@ -175,9 +167,9 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]ma
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {
-	flatUser, err := s.v2Pool.Statements().GetUser(ctx, v2database.And(
-		v2database.Equal(v2database.Col(domain.UserFieldProjectID), input.ProjectID),
-		v2database.Equal(v2database.Col(domain.UserFieldID), input.UserID),
+	flatUser, err := s.v2Pool.Statements().GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
+		database.Equal(database.Col(domain.UserFieldID), input.UserID),
 	), UserQueryOptions{MembershipTeamID: input.TeamID})
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -209,9 +201,9 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 		return nil, domain.ErrSessionTokenInvalid()
 	}
 
-	user, err := s.v2Pool.Statements().GetUser(ctx, v2database.And(
-		v2database.Equal(v2database.Col(domain.UserFieldProjectID), sessionToken.ProjectID),
-		v2database.Equal(v2database.Col(domain.UserFieldID), sessionToken.UserID),
+	user, err := s.v2Pool.Statements().GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), sessionToken.ProjectID),
+		database.Equal(database.Col(domain.UserFieldID), sessionToken.UserID),
 	), UserQueryOptions{})
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -256,7 +248,7 @@ func NewCreateUserAction(input CreateUserInput, schemaStore domain.JSONSchemaSto
 	}
 }
 
-func (o *CreateUserAction) Prepare(ctx context.Context, db database.QueryExecutor) error {
+func (o *CreateUserAction) Prepare(ctx context.Context) error {
 	schemaURL, err := domain.SchemaFromUserMap(o.User)
 	if err != nil {
 		return err
@@ -279,8 +271,8 @@ func (o *CreateUserAction) Prepare(ctx context.Context, db database.QueryExecuto
 	return nil
 }
 
-func (o *CreateUserAction) Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error {
-	return applyCreateUser(ctx, tx.Statements(), o.CreateUser)
+func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	return applyCreateUser(ctx, stmts, o.CreateUser)
 }
 
 func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.CreateUser) error {
@@ -311,13 +303,13 @@ func NewSetUserPasswordAction(input SetPasswordInput, hasher crypto.Hasher) *Set
 	}
 }
 
-func (o *SetPasswordUserAction) Prepare(_ context.Context, _ database.QueryExecutor) (err error) {
+func (o *SetPasswordUserAction) Prepare(_ context.Context) (err error) {
 	o.hash, err = domain.HashPassword(o.Password, o.hasher)
 	return err
 }
 
-func (o *SetPasswordUserAction) Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error {
-	err := tx.Statements().SetUserPassword(ctx, &domain.SetUserPassword{
+func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	err := stmts.SetUserPassword(ctx, &domain.SetUserPassword{
 		ProjectID:      o.ProjectID,
 		UserID:         o.UserID,
 		EncodedHash:    o.hash,
@@ -334,14 +326,14 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, tx StatementerWithQue
 
 // ---- Lazy ACTION -------------------------------------------------------------
 
-type UserActionFactory = func(ctx context.Context, db database.QueryExecutor) (UserAction, error)
+type UserActionFactory = func(ctx context.Context) (UserAction, error)
 
 // LazyUserAction allows for lazy initialization of a user-action. It forwards
 // the `Prepare` and `Apply` methods to the generated action. The UserAction is
-// only right before it is used in those functions.
+// created right before it is used in those functions.
 //
 // This action can be wrapped around an action when the wrapped action requires
-// an output of a previous action. It can then use a clojure to get the data
+// an output of a previous action. It can then use a closure to get the data
 // from the other action.
 type LazyUserAction struct {
 	factory UserActionFactory
@@ -354,25 +346,25 @@ func NewLazyUserAction(factory UserActionFactory) *LazyUserAction {
 	}
 }
 
-func (o *LazyUserAction) Prepare(ctx context.Context, db database.QueryExecutor) (err error) {
-	action, err := o.Action(ctx, db)
+func (o *LazyUserAction) Prepare(ctx context.Context) (err error) {
+	action, err := o.Action(ctx)
 	if err != nil {
 		return err
 	}
-	return action.Prepare(ctx, db)
+	return action.Prepare(ctx)
 }
 
-func (o *LazyUserAction) Apply(ctx context.Context, tx StatementerWithQueryExecutor[AllStatements]) error {
-	action, err := o.Action(ctx, tx)
+func (o *LazyUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	action, err := o.Action(ctx)
 	if err != nil {
 		return err
 	}
-	return action.Apply(ctx, tx)
+	return action.Apply(ctx, stmts)
 }
 
-func (o *LazyUserAction) Action(ctx context.Context, db database.QueryExecutor) (UserAction, error) {
+func (o *LazyUserAction) Action(ctx context.Context) (UserAction, error) {
 	if o.action == nil {
-		action, err := o.factory(ctx, db)
+		action, err := o.factory(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -388,7 +380,7 @@ type UserStatementsLookup struct {
 
 func (l UserStatementsLookup) GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error) {
 	return l.Pool.Statements().GetUser(ctx,
-		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
 		UserQueryOptions{Attributes: attrs},
 	)
 }
@@ -399,8 +391,8 @@ type UserStatementsIdentityReader struct {
 }
 
 func (r UserStatementsIdentityReader) GetIdentity(ctx context.Context, projectID, userID string, attributeKeys ...string) (*domain.User, error) {
-	return r.Pool.Statements().GetUser(ctx, v2database.And(
-		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
-		v2database.Equal(v2database.Col(domain.UserFieldID), userID),
+	return r.Pool.Statements().GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserFieldID), userID),
 	), UserQueryOptions{AttributeKeys: attributeKeys})
 }

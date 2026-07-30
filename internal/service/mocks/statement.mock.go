@@ -2236,6 +2236,45 @@ func (c *MockAllStatementsListBrandingsCall) DoAndReturn(f func(context.Context,
 	return c
 }
 
+// ListEncryptionKeys mocks base method.
+func (m *MockAllStatements) ListEncryptionKeys(ctx context.Context, opts *database.ListOptions[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEncryptionKeys", ctx, opts)
+	ret0, _ := ret[0].(*database.ListResult[*domain.EncryptionKey])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEncryptionKeys indicates an expected call of ListEncryptionKeys.
+func (mr *MockAllStatementsMockRecorder) ListEncryptionKeys(ctx, opts any) *MockAllStatementsListEncryptionKeysCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEncryptionKeys", reflect.TypeOf((*MockAllStatements)(nil).ListEncryptionKeys), ctx, opts)
+	return &MockAllStatementsListEncryptionKeysCall{Call: call}
+}
+
+// MockAllStatementsListEncryptionKeysCall wrap *gomock.Call
+type MockAllStatementsListEncryptionKeysCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListEncryptionKeysCall) Return(arg0 *database.ListResult[*domain.EncryptionKey], arg1 error) *MockAllStatementsListEncryptionKeysCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListEncryptionKeysCall) Do(f func(context.Context, *database.ListOptions[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error)) *MockAllStatementsListEncryptionKeysCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListEncryptionKeysCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error)) *MockAllStatementsListEncryptionKeysCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListFlowDefinitions mocks base method.
 func (m *MockAllStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
 	m.ctrl.T.Helper()
@@ -2775,6 +2814,44 @@ func (c *MockAllStatementsUpdateFlowDefinitionCall) Do(f func(context.Context, *
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsUpdateFlowDefinitionCall) DoAndReturn(f func(context.Context, *domain.FlowDefinition) error) *MockAllStatementsUpdateFlowDefinitionCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// UpdateKey mocks base method.
+func (m *MockAllStatements) UpdateKey(ctx context.Context, id, key string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateKey", ctx, id, key)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateKey indicates an expected call of UpdateKey.
+func (mr *MockAllStatementsMockRecorder) UpdateKey(ctx, id, key any) *MockAllStatementsUpdateKeyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateKey", reflect.TypeOf((*MockAllStatements)(nil).UpdateKey), ctx, id, key)
+	return &MockAllStatementsUpdateKeyCall{Call: call}
+}
+
+// MockAllStatementsUpdateKeyCall wrap *gomock.Call
+type MockAllStatementsUpdateKeyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsUpdateKeyCall) Return(arg0 error) *MockAllStatementsUpdateKeyCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsUpdateKeyCall) Do(f func(context.Context, string, string) error) *MockAllStatementsUpdateKeyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsUpdateKeyCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsUpdateKeyCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -3664,6 +3741,83 @@ func (c *MockCryptoKeyStatementsIsStatementsCall) Do(f func()) *MockCryptoKeySta
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockCryptoKeyStatementsIsStatementsCall) DoAndReturn(f func()) *MockCryptoKeyStatementsIsStatementsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListEncryptionKeys mocks base method.
+func (m *MockCryptoKeyStatements) ListEncryptionKeys(ctx context.Context, opts *database.ListOptions[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEncryptionKeys", ctx, opts)
+	ret0, _ := ret[0].(*database.ListResult[*domain.EncryptionKey])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEncryptionKeys indicates an expected call of ListEncryptionKeys.
+func (mr *MockCryptoKeyStatementsMockRecorder) ListEncryptionKeys(ctx, opts any) *MockCryptoKeyStatementsListEncryptionKeysCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEncryptionKeys", reflect.TypeOf((*MockCryptoKeyStatements)(nil).ListEncryptionKeys), ctx, opts)
+	return &MockCryptoKeyStatementsListEncryptionKeysCall{Call: call}
+}
+
+// MockCryptoKeyStatementsListEncryptionKeysCall wrap *gomock.Call
+type MockCryptoKeyStatementsListEncryptionKeysCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockCryptoKeyStatementsListEncryptionKeysCall) Return(arg0 *database.ListResult[*domain.EncryptionKey], arg1 error) *MockCryptoKeyStatementsListEncryptionKeysCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockCryptoKeyStatementsListEncryptionKeysCall) Do(f func(context.Context, *database.ListOptions[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error)) *MockCryptoKeyStatementsListEncryptionKeysCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockCryptoKeyStatementsListEncryptionKeysCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error)) *MockCryptoKeyStatementsListEncryptionKeysCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// UpdateKey mocks base method.
+func (m *MockCryptoKeyStatements) UpdateKey(ctx context.Context, id, key string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateKey", ctx, id, key)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateKey indicates an expected call of UpdateKey.
+func (mr *MockCryptoKeyStatementsMockRecorder) UpdateKey(ctx, id, key any) *MockCryptoKeyStatementsUpdateKeyCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateKey", reflect.TypeOf((*MockCryptoKeyStatements)(nil).UpdateKey), ctx, id, key)
+	return &MockCryptoKeyStatementsUpdateKeyCall{Call: call}
+}
+
+// MockCryptoKeyStatementsUpdateKeyCall wrap *gomock.Call
+type MockCryptoKeyStatementsUpdateKeyCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockCryptoKeyStatementsUpdateKeyCall) Return(arg0 error) *MockCryptoKeyStatementsUpdateKeyCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockCryptoKeyStatementsUpdateKeyCall) Do(f func(context.Context, string, string) error) *MockCryptoKeyStatementsUpdateKeyCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockCryptoKeyStatementsUpdateKeyCall) DoAndReturn(f func(context.Context, string, string) error) *MockCryptoKeyStatementsUpdateKeyCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
