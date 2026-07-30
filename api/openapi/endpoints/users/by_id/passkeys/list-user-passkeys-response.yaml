@@ -22,3 +22,10 @@ properties:
           type: string
           format: date-time
           description: The timestamp when the passkey was created.
+  next_page_token:
+    description: |
+      Token to pass as `page_token` in the next request to fetch the following page.
+      Absent when there are no more results.
+    oneOf:
+      - $ref: ../../../../components/schemas/page-token.yaml
+      - type: 'null'

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"time"
 
-	slogctx "github.com/veqryn/slog-context"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
@@ -50,6 +49,8 @@ type ListUsersInput struct {
 type ListPasskeysInput struct {
 	ProjectID string
 	UserID    string
+	PageToken string
+	Limit     int
 }
 
 type GetMyUserInput struct {
@@ -167,38 +168,41 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]ma
 	return users, nil
 }
 
-func (s *UserService) ListPasskeys(ctx context.Context, input ListPasskeysInput) ([]*domain.UserPasskey, error) {
-	passkeys, err := s.v2Pool.Statements().ListUserPasskeys(
-		ctx, &v2database.ListOptions[domain.UserPasskeyField]{
-			Filter: v2database.And(
-				v2database.Equal(v2database.Col(domain.UserPasskeyFieldProjectID), input.ProjectID),
-				v2database.Equal(v2database.Col(domain.UserPasskeyFieldUserID), input.UserID),
+func (s *UserService) ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error) {
+	dbpasskeys, err := s.v2Pool.Statements().ListUserPasskeys(
+		ctx, &database.ListOptions[domain.UserPasskeyField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.UserPasskeyFieldProjectID), input.ProjectID),
+				database.Equal(database.Col(domain.UserPasskeyFieldUserID), input.UserID),
 			),
-			Pagination: v2database.Page[domain.UserPasskeyField]{
-				Limit: 100, // arbitrary limit of 100, assuming nobody has 100 passkeys attached to their user
+			Pagination: database.Page[domain.UserPasskeyField]{
+				Limit:  uint32(normalizeLimit(input.Limit)),
+				Cursor: []byte(input.PageToken),
+				OrderBy: database.OrderBy[domain.UserPasskeyField]{
+					Columns: []database.Column[domain.UserPasskeyField]{
+						database.Col(domain.UserPasskeyFieldCreatedAt),
+					},
+					Direction: database.OrderDesc,
+				},
 			},
 		},
 	)
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to get user passkeys from database")
-	}
-
-	if passkeys.NextCursor != nil {
-		slogctx.Warn(ctx, "listing user passkeys returned multiple pages. This means user has more than 100 passkeys and not all passkeys were returned to the client.")
+		return nil, "", domain.ErrInternal(err).WithMessage("failed to get user passkeys from database")
 	}
 
 	// Distinguish "user not found" from "user has no passkeys".
-	if len(passkeys.Items) == 0 {
+	if len(dbpasskeys.Items) == 0 {
 		exists, err := s.v2Pool.Statements().UserExists(ctx, input.ProjectID, input.UserID)
 		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
+			return nil, "", domain.ErrInternal(err).WithMessage("failed to get user from database")
 		}
 		if !exists {
-			return nil, domain.ErrUserNotFound()
+			return nil, "", domain.ErrUserNotFound()
 		}
 	}
 
-	return passkeys.Items, nil
+	return dbpasskeys.Items, string(dbpasskeys.NextCursor), nil
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {

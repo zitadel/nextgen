@@ -13884,10 +13884,17 @@ func (s *ListUserPasskeysResponse) encodeFields(e *jx.Encoder) {
 		}
 		e.ArrEnd()
 	}
+	{
+		if s.NextPageToken.Set {
+			e.FieldStart("next_page_token")
+			s.NextPageToken.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfListUserPasskeysResponse = [1]string{
+var jsonFieldsNameOfListUserPasskeysResponse = [2]string{
 	0: "passkeys",
+	1: "next_page_token",
 }
 
 // Decode decodes ListUserPasskeysResponse from json.
@@ -13916,6 +13923,16 @@ func (s *ListUserPasskeysResponse) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"passkeys\"")
+			}
+		case "next_page_token":
+			if err := func() error {
+				s.NextPageToken.Reset()
+				if err := s.NextPageToken.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"next_page_token\"")
 			}
 		default:
 			return d.Skip()

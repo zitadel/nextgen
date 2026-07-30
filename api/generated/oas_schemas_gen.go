@@ -6341,6 +6341,9 @@ func (*ListUserPassKeysUnauthorized) listUserPassKeysRes() {}
 // Ref: #
 type ListUserPasskeysResponse struct {
 	Passkeys []ListUserPasskeysResponsePasskeysItem `json:"passkeys"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
 
 // GetPasskeys returns the value of Passkeys.
@@ -6348,9 +6351,19 @@ func (s *ListUserPasskeysResponse) GetPasskeys() []ListUserPasskeysResponsePassk
 	return s.Passkeys
 }
 
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListUserPasskeysResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
 // SetPasskeys sets the value of Passkeys.
 func (s *ListUserPasskeysResponse) SetPasskeys(val []ListUserPasskeysResponsePasskeysItem) {
 	s.Passkeys = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListUserPasskeysResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
 }
 
 func (*ListUserPasskeysResponse) listUserPassKeysRes() {}

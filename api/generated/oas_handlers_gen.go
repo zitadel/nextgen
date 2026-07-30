@@ -7678,6 +7678,14 @@ func (s *Server) handleListUserPassKeysRequest(args [1]string, argsEscaped bool,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
+					Name: "limit",
+					In:   "query",
+				}: params.Limit,
+				{
+					Name: "page_token",
+					In:   "query",
+				}: params.PageToken,
+				{
 					Name: "project_id",
 					In:   "query",
 				}: params.ProjectID,

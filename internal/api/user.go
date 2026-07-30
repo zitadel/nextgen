@@ -79,18 +79,24 @@ func (h *Handler) ListUserPassKeys(ctx context.Context, params api.ListUserPassK
 		return nil, err
 	}
 
-	keys, err := h.userService.ListPasskeys(ctx, service.ListPasskeysInput{
+	passkeys, nextPage, err := h.userService.ListPasskeys(ctx, service.ListPasskeysInput{
 		ProjectID: string(params.ProjectID),
 		UserID:    string(params.UserID),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	res := &api.ListUserPasskeysResponse{
-		Passkeys: make([]api.ListUserPasskeysResponsePasskeysItem, len(keys), len(keys)),
+		Passkeys: make([]api.ListUserPasskeysResponsePasskeysItem, len(passkeys), len(passkeys)),
 	}
-	for i, key := range keys {
+	if nextPage != "" {
+		res.NextPageToken = api.NewOptNilPageToken(api.PageToken(nextPage))
+	}
+
+	for i, key := range passkeys {
 		res.Passkeys[i] = api.ListUserPasskeysResponsePasskeysItem{
 			ID:        strconv.FormatInt(key.ID, 10),
 			Name:      key.Name,
