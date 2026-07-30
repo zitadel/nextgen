@@ -63,13 +63,8 @@ type EncryptionKey struct {
 }
 
 func NewDEK(projectID string, algorithm jose.ContentEncryption, kek crypto.Crypter) (*EncryptionKey, error) {
-	id, err := newID(PrefixEncryptionKey)
-	if err != nil {
-		return nil, err
-	}
-
 	var key [32]byte
-	_, err = rand.Read(key[:])
+	_, err := rand.Read(key[:])
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to generate new DEK key")
 	}
@@ -81,7 +76,6 @@ func NewDEK(projectID string, algorithm jose.ContentEncryption, kek crypto.Crypt
 
 	// createdAt is set by db
 	return &EncryptionKey{
-		ID:        id,
 		ProjectID: projectID,
 		Key:       encryptedKey,
 		Algorithm: algorithm,

@@ -4,6 +4,7 @@ package postgres
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -56,6 +57,30 @@ func TestPasskeyRegistrationStatements_CRUD(t *testing.T) {
 	require.NoError(t, testPool.DeletePasskeyRegistration(t.Context(), projectID, regID))
 	_, err = testPool.GetPasskeyRegistration(t.Context(), projectID, regID)
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
+}
+
+func TestPasskeyRegistrationStatements_Create_EmptyIDAssigned(t *testing.T) {
+	projectID, _, userID := uniquePasskeyRegIDs(t)
+	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
+	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+
+	create := &domain.CreatePasskeyRegistration{
+		ProjectID: projectID,
+		UserID:    userID,
+		Challenge: &domain.PasskeyRegistrationChallenge{Username: "alice"},
+		ExpiresAt: time.Now().Add(5 * time.Minute),
+	}
+	require.NoError(t, testPool.CreatePasskeyRegistration(t.Context(), create))
+	t.Cleanup(func() {
+		_ = testPool.DeletePasskeyRegistration(context.Background(), projectID, create.ID)
+	})
+
+	require.NotEmpty(t, create.ID)
+	assert.True(t, strings.HasPrefix(create.ID, string(domain.PrefixPasskeyRegistration)+"_"))
+
+	got, err := testPool.GetPasskeyRegistration(t.Context(), projectID, create.ID)
+	require.NoError(t, err)
+	assert.Equal(t, create.ID, got.ID)
 }
 
 func TestPasskeyRegistrationStatements_Get_Expired(t *testing.T) {

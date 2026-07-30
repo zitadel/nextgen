@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"errors"
 
 	"github.com/jackc/pgx/v5"
 
@@ -52,8 +51,8 @@ func newTeamStatements(client queryExecutor) teamStatements {
 
 // CreateTeam implements [service.TeamStatements].
 func (ts teamStatements) CreateTeam(ctx context.Context, team *domain.Team) error {
-	if team.ID == "" {
-		return errors.New("team ID must not be empty")
+	if err := ensureManagedID(&team.ID, domain.PrefixTeam); err != nil {
+		return err
 	}
 	var status string
 	err := ts.client.QueryRow(ctx, createTeamStmt, team.ProjectID, team.ID, team.Name).

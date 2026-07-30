@@ -31,14 +31,14 @@ func NewULID() *ULID {
 }
 
 // New implements [Generator]. It returns a new ID in the form "<prefix>_<ulid>",
-// for example "att_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C".
+// for example "user_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C".
 // A trailing underscore on prefix is stripped automatically.
 func (g *ULID) New(prefix string) (string, error) {
 	if prefix == "" {
 		return "", fmt.Errorf("idgen: prefix must not be empty")
 	}
-	// Be lenient: strip a trailing underscore so callers using e.g. "att_" and
-	// "att" both produce the same canonical form "att_<ulid>".
+	// Be lenient: strip a trailing underscore so callers using e.g. "user_" and
+	// "user" both produce the same canonical form "user_<ulid>".
 	if prefix[len(prefix)-1] == '_' {
 		prefix = prefix[:len(prefix)-1]
 	}

@@ -63,14 +63,8 @@ func NewTeam(projectID, name string) (*Team, error) {
 		return nil, ErrTeamNameInvalid()
 	}
 
-	id, err := newID(PrefixTeam)
-	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to create team id")
-	}
-
 	return &Team{
 		ProjectID: projectID,
-		ID:        id,
 		Name:      name,
 	}, nil
 }

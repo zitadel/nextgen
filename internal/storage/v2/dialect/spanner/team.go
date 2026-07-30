@@ -2,7 +2,6 @@ package spanner
 
 import (
 	"context"
-	"errors"
 
 	"cloud.google.com/go/spanner"
 
@@ -55,8 +54,8 @@ func newTeamStatements(db queryExecutor) teamStatements {
 
 // CreateTeam implements [service.TeamStatements].
 func (ts teamStatements) CreateTeam(ctx context.Context, team *domain.Team) error {
-	if team.ID == "" {
-		return errors.New("team ID must not be empty")
+	if err := ensureManagedID(&team.ID, domain.PrefixTeam); err != nil {
+		return err
 	}
 	stmt := buildStatement(createTeamStmt, team.ProjectID, team.ID, team.Name).statement()
 	return ts.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {

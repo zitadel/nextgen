@@ -46,6 +46,25 @@ func TestTeamStatements_CRUD(t *testing.T) {
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
+func TestTeamStatements_Create_EmptyIDAssigned(t *testing.T) {
+	ctx := t.Context()
+	stmts := testClient.Statements()
+
+	project := newTestProject(uniqueProjectID(t))
+	require.NoError(t, stmts.CreateProject(ctx, project))
+	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+
+	team := newTestTeam(project.ID, "")
+	team.Name = "empty-id-team"
+	require.NoError(t, stmts.CreateTeam(ctx, team))
+	require.NotEmpty(t, team.ID)
+	assert.True(t, strings.HasPrefix(team.ID, string(domain.PrefixTeam)+"_"))
+
+	got, err := stmts.GetTeamByID(ctx, project.ID, team.ID)
+	require.NoError(t, err)
+	assert.Equal(t, team.ID, got.ID)
+}
+
 func TestTeamStatements_NameUniquePerProject(t *testing.T) {
 	ctx := t.Context()
 	stmts := testClient.Statements()

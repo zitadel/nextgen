@@ -52,12 +52,18 @@ func TestTeamStatements_Create(t *testing.T) {
 		assert.Equal(t, domain.TeamStatusActive, stored.Status)
 	})
 
-	t.Run("empty id returns error", func(t *testing.T) {
+	t.Run("empty id is assigned by dialect", func(t *testing.T) {
 		projectID, _ := uniqueTeamIDs(t)
 		ensureTestProject(t, projectID)
 
-		err := testPool.CreateTeam(t.Context(), newTestTeam(projectID, ""))
-		assert.Error(t, err)
+		team := newTestTeam(projectID, "")
+		require.NoError(t, testPool.CreateTeam(t.Context(), team))
+		require.NotEmpty(t, team.ID)
+		assert.True(t, strings.HasPrefix(team.ID, string(domain.PrefixTeam)+"_"))
+
+		stored, err := testPool.GetTeamByID(t.Context(), projectID, team.ID)
+		require.NoError(t, err)
+		assert.Equal(t, team.ID, stored.ID)
 	})
 
 	t.Run("name violating the column check returns error", func(t *testing.T) {

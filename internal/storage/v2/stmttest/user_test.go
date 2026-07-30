@@ -5,6 +5,7 @@ package stmttest
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,6 +33,27 @@ func ensureUserTestProject(t *testing.T, stmts service.AllStatements) (projectID
 		_ = stmts.DeleteJSONSchemaByID(context.Background(), project.ID, schemaURL)
 	})
 	return project.ID, schemaURL
+}
+
+func TestUserStatements_Create_EmptyIDAssigned(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+
+		user := newTestUser(t, projectID, schemaURL, "", "empty-id@example.com", "EmptyID")
+		require.NoError(t, d.stmts.CreateUser(t.Context(), user))
+		require.NotEmpty(t, user.ID)
+		assert.True(t, strings.HasPrefix(user.ID, string(domain.PrefixUser)+"_"))
+
+		got, err := d.stmts.GetUser(t.Context(),
+			database.And(
+				database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+				database.Equal(database.Col(domain.UserFieldID), user.ID),
+			),
+			service.UserQueryOptions{},
+		)
+		require.NoError(t, err)
+		assert.Equal(t, user.ID, got.ID)
+	})
 }
 
 func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {

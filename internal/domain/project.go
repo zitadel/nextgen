@@ -40,11 +40,6 @@ type Project struct {
 }
 
 func NewProject(name string, previewOrigins []string) (*Project, error) {
-	id, err := newID(PrefixProject)
-	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to create project id")
-	}
-
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, ErrProjectNameInvalid()
@@ -55,7 +50,6 @@ func NewProject(name string, previewOrigins []string) (*Project, error) {
 	}
 
 	return &Project{
-		ID:             id,
 		Name:           name,
 		PreviewOrigins: previewOrigins,
 	}, nil

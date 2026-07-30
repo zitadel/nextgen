@@ -34,6 +34,9 @@ func newCryptoKeyStatements(client queryExecutor) cryptoKeyStatements {
 }
 
 func (s cryptoKeyStatements) CreateEncryptionKey(ctx context.Context, key *domain.EncryptionKey) error {
+	if err := ensureManagedID(&key.ID, domain.PrefixEncryptionKey); err != nil {
+		return err
+	}
 	return s.client.QueryRow(ctx, createEncryptionKeyStmt,
 		key.ID, key.ProjectID, key.Key, key.Algorithm, key.State, key.ActivatedAt, key.RetiredAt, key.Purpose,
 	).Scan(&key.ID, &key.CreatedAt)

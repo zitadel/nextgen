@@ -34,7 +34,7 @@ func TestNewDEK(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, dek)
 
-		assert.NotEmpty(t, dek.ID)
+		assert.Empty(t, dek.ID, "ID is assigned by the dialect on create")
 		assert.Equal(t, projectID, dek.ProjectID)
 		assert.Equal(t, alg, dek.Algorithm)
 		assert.Equal(t, KeyStateNotActiveYet, dek.State)
@@ -55,7 +55,8 @@ func TestNewDEK(t *testing.T) {
 		b, err := NewDEK("proj", jose.A256GCM, kek)
 		require.NoError(t, err)
 		assert.NotEqual(t, a.Key, b.Key)
-		assert.NotEqual(t, a.ID, b.ID)
+		assert.Empty(t, a.ID)
+		assert.Empty(t, b.ID)
 	})
 
 	t.Run("encrypt error is propagated", func(t *testing.T) {
