@@ -201,15 +201,6 @@ func scanToken(rows *sql.Rows) (*domain.Token, error) {
 	return token, nil
 }
 
-// parseIdentity parses a string integer identity (session id, token id, etc.) used in INTEGER PRIMARY KEY columns.
-func parseIdentity(id string) (int64, error) {
-	parsed, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid identity %q: %w", id, err)
-	}
-	return parsed, nil
-}
-
 func tokenUserIDArg(userID string, tokenType domain.TokenType) any {
 	if tokenType == domain.TokenTypeSessionToken && userID == "" {
 		return nil

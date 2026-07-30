@@ -195,15 +195,11 @@ func writeConjunct(c *statementCompiler, hasWhere *bool) {
 func (us userStatements) DeactivateUser(ctx context.Context, projectID, userID string) error {
 	return withTransaction(ctx, us.client, func(ctx context.Context, tx queryExecutor) error {
 		now := nowUnixNano()
-		result, err := tx.Exec(ctx, deactivateUserStmt,
+		n, err := execAffected(ctx, tx, deactivateUserStmt,
 			domain.UserStatusDeactivated.String(), now, projectID, userID,
 		)
 		if err != nil {
-			return wrapError(err)
-		}
-		n, err := result.RowsAffected()
-		if err != nil {
-			return wrapError(err)
+			return err
 		}
 		if n == 0 {
 			return database.NewNoRowFoundError(nil)
@@ -222,13 +218,9 @@ func (us userStatements) DeleteUserByID(ctx context.Context, projectID, userID s
 		if _, err := tx.Exec(ctx, deleteUserMembershipsStmt, projectID, userID); err != nil {
 			return wrapError(err)
 		}
-		result, err := tx.Exec(ctx, deleteUserStmt, projectID, userID)
+		n, err := execAffected(ctx, tx, deleteUserStmt, projectID, userID)
 		if err != nil {
-			return wrapError(err)
-		}
-		n, err := result.RowsAffected()
-		if err != nil {
-			return wrapError(err)
+			return err
 		}
 		if n == 0 {
 			return database.NewNoRowFoundError(nil)
@@ -243,44 +235,50 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 	}
 
 	for _, group := range v2user.GroupByProject(users) {
-		idsJSON, err := json.Marshal(group.IDs)
-		if err != nil {
+		if err := us.hydrateUserGroup(ctx, group, opts); err != nil {
 			return err
-		}
-		var rows *sql.Rows
-		if len(opts.AttributeKeys) > 0 {
-			keysJSON, err := json.Marshal(opts.AttributeKeys)
-			if err != nil {
-				return err
-			}
-			rows, err = us.client.Query(ctx, userAttributesByIDsAndKeysQuery, group.ProjectID, string(idsJSON), string(keysJSON))
-		} else {
-			rows, err = us.client.Query(ctx, userAttributesByIDsQuery, group.ProjectID, string(idsJSON))
-		}
-		if err != nil {
-			return wrapError(err)
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var userID, key, valueJSON string
-			if err := rows.Scan(&userID, &key, &valueJSON); err != nil {
-				return err
-			}
-			var val any
-			if err := json.Unmarshal([]byte(valueJSON), &val); err != nil {
-				return fmt.Errorf("decode attribute value for %q: %w", key, err)
-			}
-			user, ok := group.ByID[userID]
-			if !ok {
-				continue
-			}
-			user.Attributes = append(user.Attributes, domain.Attribute{Key: key, Value: val})
-		}
-		if err := rows.Err(); err != nil {
-			return wrapError(err)
 		}
 	}
 	return nil
+}
+
+func (us userStatements) hydrateUserGroup(ctx context.Context, group v2user.ProjectGroup, opts service.UserQueryOptions) error {
+	idsJSON, err := json.Marshal(group.IDs)
+	if err != nil {
+		return err
+	}
+	var rows *sql.Rows
+	if len(opts.AttributeKeys) > 0 {
+		var keysJSON []byte
+		keysJSON, err = json.Marshal(opts.AttributeKeys)
+		if err != nil {
+			return err
+		}
+		rows, err = us.client.Query(ctx, userAttributesByIDsAndKeysQuery, group.ProjectID, string(idsJSON), string(keysJSON))
+	} else {
+		rows, err = us.client.Query(ctx, userAttributesByIDsQuery, group.ProjectID, string(idsJSON))
+	}
+	if err != nil {
+		return wrapError(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var userID, key, valueJSON string
+		if err := rows.Scan(&userID, &key, &valueJSON); err != nil {
+			return err
+		}
+		var val any
+		if err := json.Unmarshal([]byte(valueJSON), &val); err != nil {
+			return fmt.Errorf("decode attribute value for %q: %w", key, err)
+		}
+		user, ok := group.ByID[userID]
+		if !ok {
+			continue
+		}
+		user.Attributes = append(user.Attributes, domain.Attribute{Key: key, Value: val})
+	}
+	return wrapError(rows.Err())
 }
 
 func scanUserHeader(rows *sql.Rows) (*domain.User, error) {

@@ -3,9 +3,9 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"errors"
 
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/sqlite/migration"
 )
 
@@ -24,24 +24,10 @@ func newPool(sqlDB *sql.DB) *Pool {
 }
 
 // Transaction implements [service.Transactioner].
-func (p *Pool) Transaction(ctx context.Context, fn func(ctx context.Context, tx service.Statementer[service.AllStatements]) error) (err error) {
-	sqlTx, err := p.sqlDB.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if p := recover(); p != nil {
-			_ = sqlTx.Rollback()
-			panic(p)
-		}
-		if err != nil {
-			err = errors.Join(err, sqlTx.Rollback())
-			return
-		}
-		err = sqlTx.Commit()
-	}()
-	txStmts := newStatements(txExecutor{sqlTx: sqlTx})
-	return fn(ctx, txStmts)
+func (p *Pool) Transaction(ctx context.Context, fn func(ctx context.Context, tx service.Statementer[service.AllStatements]) error) error {
+	return withTransaction(ctx, db{sqlDB: p.sqlDB}, func(ctx context.Context, tx queryExecutor) error {
+		return fn(ctx, newStatements(tx))
+	})
 }
 
 // Close implements [database.Pool].
@@ -68,3 +54,8 @@ func (p *Pool) Migrate(ctx context.Context) error {
 func (p *Pool) Statements() service.AllStatements {
 	return newStatements(db{sqlDB: p.sqlDB})
 }
+
+var (
+	_ database.Pool         = (*Pool)(nil)
+	_ service.AllStatements = (*Pool)(nil)
+)

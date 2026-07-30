@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -174,51 +173,3 @@ var projectSchema = database.NewSchema(map[domain.ProjectField]database.FieldBin
 		Coerce:   database.CoerceSliceAsAny(database.CoerceStringValue),
 	},
 })
-
-// collectRows iterates rows and calls scan for each, collecting results.
-func collectRows[T any](rows *sql.Rows, scan func(*sql.Rows) (T, error)) ([]T, error) {
-	var items []T
-	for rows.Next() {
-		item, err := scan(rows)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, item)
-	}
-	return items, rows.Err()
-}
-
-// collectExactlyOneRow returns exactly one result or an error.
-func collectExactlyOneRow[T any](rows *sql.Rows, scan func(*sql.Rows) (T, error)) (T, error) {
-	var (
-		zero T
-		item T
-		n    int
-	)
-	for rows.Next() {
-		n++
-		if n > 1 {
-			return zero, errTooManyRows
-		}
-		var err error
-		item, err = scan(rows)
-		if err != nil {
-			return zero, err
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return zero, err
-	}
-	if n == 0 {
-		return zero, sql.ErrNoRows
-	}
-	return item, nil
-}
-
-// nullableTime converts a sql.NullInt64 nanosecond column to a zero time or UTC time.
-func nullableTime(n sql.NullInt64) time.Time {
-	if !n.Valid {
-		return time.Time{}
-	}
-	return timeFromUnixNano(n.Int64)
-}

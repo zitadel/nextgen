@@ -96,7 +96,7 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
       { cause: error },
     );
     // start exited 0, so a server may well be running despite the unusable
-    // output — stop it instead of orphaning it and its embedded Postgres.
+    // output — stop it instead of orphaning it.
     try {
       await stopViaCli();
     } catch (stopError) {
@@ -122,7 +122,7 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
   };
   // Memoize the in-flight stop so concurrent callers await the same cleanup,
   // and reset on failure so a failed stop can be retried instead of silently
-  // leaving the server and embedded Postgres behind.
+  // leaving the server behind.
   let stopPromise: Promise<void> | undefined;
   const stop = (): Promise<void> => {
     stopPromise ??= runStop().catch((error: unknown) => {

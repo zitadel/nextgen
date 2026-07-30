@@ -34,7 +34,7 @@ func (ps passkeyRegistrationStatements) CreatePasskeyRegistration(ctx context.Co
 	}
 	now := nowUnixNano()
 	_, err = ps.client.Exec(ctx, createPasskeyRegistrationStmt,
-		reg.ID, reg.ProjectID, reg.UserID, string(challengeJSON), unixNano(reg.ExpiresAt), now,
+		reg.ID, reg.ProjectID, reg.UserID, string(challengeJSON), reg.ExpiresAt.UnixNano(), now,
 	)
 	return wrapError(err)
 }

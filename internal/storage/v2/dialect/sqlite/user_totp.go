@@ -128,13 +128,9 @@ func (us userTOTPStatements) UpdateUserTOTP(ctx context.Context, filter database
 	c.WriteString(" WHERE ")
 	compileFilter(&c, filter, usertotp.Schema)
 
-	result, err := us.client.Exec(ctx, c.String(), c.args...)
+	n, err := execAffected(ctx, us.client, c.String(), c.args...)
 	if err != nil {
-		return wrapError(err)
-	}
-	n, err := result.RowsAffected()
-	if err != nil {
-		return wrapError(err)
+		return err
 	}
 	if n == 0 {
 		return database.NewNoRowFoundError(nil)

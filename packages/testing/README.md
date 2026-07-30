@@ -77,7 +77,7 @@ z.handle;   // serializable: { baseUrl, projectId, projectSecret, schemaId, prev
 z.api;      // authenticated @zitadel/api client (bearer = projectSecret)
 z.appEnv;   // { ZITADEL_URL, NEXT_PUBLIC_ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET }
 await z.seedUser({ email?, password?, attributes? }); // → { id, email, password }
-await z.stop(); // stop server, reap any leftover embedded Postgres, remove owned temp dir
+await z.stop(); // stop server and remove owned temp dir
 ```
 
 `connectZitadel(handle)` returns the same surface minus lifecycle — this is
@@ -109,9 +109,9 @@ Measured on an arm64 macBook (dev build, July 2026):
 
 | Operation | Time |
 | --- | --- |
-| Cold boot (fresh data dir: SQLite migrate + health) | much faster than embedded Postgres (~20–27s historically) |
-| Warm restart (existing data dir) | seconds |
-| Stop | seconds (Postgres reap only if an old embedded postmaster is present) |
+| Cold boot (fresh data dir: SQLite migrate + health) | typically under a few seconds |
+| Warm restart (existing data dir) | typically under a second |
+| Stop | typically under a second |
 | Bootstrap (project + schema + flow) | ~100ms |
 | Seed one user (create + password) | ~50ms |
 | Full `e2e-real` suite (boot + Next dev + 2 browser tests) | ~25s |

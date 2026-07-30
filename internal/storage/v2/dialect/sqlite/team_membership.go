@@ -86,13 +86,9 @@ func (s teamMembershipStatements) ListTeamMemberships(ctx context.Context, filte
 // UpdateTeamMembershipStatus implements [service.TeamMembershipStatements].
 func (s teamMembershipStatements) UpdateTeamMembershipStatus(ctx context.Context, projectID, teamID, userID string, status domain.MembershipStatus) error {
 	now := nowUnixNano()
-	result, err := s.client.Exec(ctx, updateTeamMembershipStatusStmt, status.String(), now, projectID, teamID, userID)
+	n, err := execAffected(ctx, s.client, updateTeamMembershipStatusStmt, status.String(), now, projectID, teamID, userID)
 	if err != nil {
-		return wrapError(err)
-	}
-	n, err := result.RowsAffected()
-	if err != nil {
-		return wrapError(err)
+		return err
 	}
 	if n == 0 {
 		return database.NewNoRowFoundError(nil)

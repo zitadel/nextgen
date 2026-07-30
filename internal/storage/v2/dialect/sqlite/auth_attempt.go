@@ -248,8 +248,8 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 			domain.AuthCheckType(checkType.Int64),
 			strconv.FormatInt(checkID.Int64, 10),
 			lastChallengedAt, lastFailedAt, verifiedAt, fc,
-			json.RawMessage(nullStringJSON(challengePayload)),
-			json.RawMessage(nullStringJSON(factorPayload)),
+			json.RawMessage(nullJSONBytes(challengePayload)),
+			json.RawMessage(nullJSONBytes(factorPayload)),
 		)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal auth check: %w", err)
@@ -343,14 +343,10 @@ func (as authAttemptStatements) AuthAttemptChallengeSucceeded(ctx context.Contex
 	if factorStr != nil {
 		factorArg = *factorStr
 	}
-	result, err := as.client.Exec(ctx, authAttemptChallengeSucceededStmt,
+	n, err := execAffected(ctx, as.client, authAttemptChallengeSucceededStmt,
 		now.UnixNano(), factorArg, projectID, attemptID, int64(factor.Type()), checkID)
 	if err != nil {
-		return fmt.Errorf("failed to set challenge succeeded: %w", wrapError(err))
-	}
-	n, err := result.RowsAffected()
-	if err != nil {
-		return wrapError(err)
+		return fmt.Errorf("failed to set challenge succeeded: %w", err)
 	}
 	if n == 0 {
 		return domain.ErrAuthAttemptStaleChallenge()

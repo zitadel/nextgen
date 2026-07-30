@@ -125,6 +125,26 @@ tasks:
       # selects the `test` task by name, not `test-spanner`.
       runInCI: true
 
+  test-sqlite:
+    command: "go"
+    args:
+      - "test"
+      - "-v"
+      - "-tags"
+      - "sqlite_integration"
+      - "-timeout"
+      - "5m"
+      - "./internal/storage/v2/dialect/sqlite/..."
+    inputs:
+      - "@group(serverInputs)"
+    options:
+      runFromWorkspaceRoot: true
+      # Invoked explicitly by the CI "Run Go integration tests (sqlite)" step.
+      # runInCI must be true, otherwise moon hides the task from `moon run` in CI
+      # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
+      # selects the `test` task by name, not `test-sqlite`.
+      runInCI: true
+
   build:
     command: "go build -trimpath -o dist/server/nextgen ."
     deps:

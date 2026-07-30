@@ -135,13 +135,9 @@ func (s userRecoveryCodesStatements) UpdateUserRecoveryCodes(ctx context.Context
 	c.WriteString(" WHERE ")
 	compileFilter(&c, filter, userrecoverycodes.Schema)
 
-	result, err := s.client.Exec(ctx, c.String(), c.args...)
+	n, err := execAffected(ctx, s.client, c.String(), c.args...)
 	if err != nil {
-		return wrapError(err)
-	}
-	n, err := result.RowsAffected()
-	if err != nil {
-		return wrapError(err)
+		return err
 	}
 	if n == 0 {
 		return database.NewNoRowFoundError(nil)

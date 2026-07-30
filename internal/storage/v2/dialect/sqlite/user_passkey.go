@@ -155,13 +155,9 @@ func (ps userPasskeyStatements) UpdateUserPasskey(ctx context.Context, filter da
 	c.WriteString(" WHERE ")
 	compileFilter(&c, filter, userpasskey.Schema)
 
-	result, err := ps.client.Exec(ctx, c.String(), c.args...)
+	n, err := execAffected(ctx, ps.client, c.String(), c.args...)
 	if err != nil {
-		return wrapError(err)
-	}
-	n, err := result.RowsAffected()
-	if err != nil {
-		return wrapError(err)
+		return err
 	}
 	if n == 0 {
 		return database.NewNoRowFoundError(nil)

@@ -88,13 +88,9 @@ func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, se
 	if err != nil {
 		return err
 	}
-	result, err := ss.client.Exec(ctx, `DELETE FROM sessions WHERE project_id = ? AND id = ?`, projectID, id)
+	n, err := execAffected(ctx, ss.client, `DELETE FROM sessions WHERE project_id = ? AND id = ?`, projectID, id)
 	if err != nil {
-		return wrapError(err)
-	}
-	n, err := result.RowsAffected()
-	if err != nil {
-		return wrapError(err)
+		return err
 	}
 	if n == 0 {
 		return domain.ErrSessionNotFound()
@@ -249,13 +245,9 @@ func (ss sessionStatements) UpdateSessionAfterExchange(ctx context.Context, proj
 	c.WriteArg(projectID)
 	c.WriteString(" AND id = ")
 	c.WriteArg(id)
-	result, err := ss.client.Exec(ctx, c.String(), c.args...)
+	n, err := execAffected(ctx, ss.client, c.String(), c.args...)
 	if err != nil {
-		return wrapError(err)
-	}
-	n, err := result.RowsAffected()
-	if err != nil {
-		return wrapError(err)
+		return err
 	}
 	if n == 0 {
 		return domain.ErrSessionNotFound()
@@ -277,15 +269,11 @@ func (ss sessionStatements) ApplyExchange(ctx context.Context, projectID, sessio
 		if err != nil {
 			return err
 		}
-		result, err := ss.client.Exec(ctx,
+		n, err := execAffected(ctx, ss.client,
 			`UPDATE checks SET session_id = ?, auth_attempt_id = NULL, challenge_payload = NULL, last_challenged_at = NULL, last_failed_at = NULL, failure_count = 0 WHERE project_id = ? AND id = ? AND auth_attempt_id IS NOT NULL`,
 			sid, projectID, cid)
 		if err != nil {
-			return wrapError(err)
-		}
-		n, err := result.RowsAffected()
-		if err != nil {
-			return wrapError(err)
+			return err
 		}
 		if n == 0 {
 			return fmt.Errorf("failed to promote check %s", c.ID)
@@ -448,8 +436,8 @@ func scanSessions(rows *sql.Rows) ([]*domain.Session, error) {
 			domain.AuthCheckType(checkType.Int64),
 			strconv.FormatInt(checkID.Int64, 10),
 			lastChallengedAt, lastFailedAt, verifiedAt, fc,
-			nullStringJSON(challengePayload),
-			nullStringJSON(factorPayload),
+			nullJSONBytes(challengePayload),
+			nullJSONBytes(factorPayload),
 		)
 		if err != nil {
 			return nil, err
@@ -468,14 +456,6 @@ func scanSessions(rows *sql.Rows) ([]*domain.Session, error) {
 		out = append(out, byID[id])
 	}
 	return out, nil
-}
-
-// nullStringJSON converts a NullString TEXT column to json.RawMessage.
-func nullStringJSON(s sql.NullString) []byte {
-	if !s.Valid || s.String == "" {
-		return nil
-	}
-	return []byte(s.String)
 }
 
 func coerceSessionIdentity(v any) (any, error) {
