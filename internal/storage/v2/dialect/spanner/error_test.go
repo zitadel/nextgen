@@ -58,6 +58,21 @@ func TestWrapError(t *testing.T) {
 			want: new(database.ForeignKeyError),
 		},
 		{
+			name: "grpc failed precondition unique",
+			err:  status.Error(codes.FailedPrecondition, "Unique index violation on index projects_pkey"),
+			want: new(database.UniqueError),
+		},
+		{
+			name: "grpc failed precondition not null",
+			err:  status.Error(codes.FailedPrecondition, "NOT NULL constraint violated"),
+			want: new(database.NotNullError),
+		},
+		{
+			name: "grpc invalid argument foreign key",
+			err:  status.Error(codes.InvalidArgument, "foreign key constraint violation"),
+			want: new(database.ForeignKeyError),
+		},
+		{
 			name: "unknown error",
 			err:  errors.New("driver exploded"),
 			want: new(database.UnknownError),

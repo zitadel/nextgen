@@ -45,10 +45,12 @@ Multi-write nesting uses the dialect `withTransaction` helpers above
 
 Behavioral statement parity across dialects lives in
 [`stmttest`](stmttest/): shared integration suites assert domain-visible
-behavior through `service.Pool` / `AllStatements`. Run with exactly one
-integration build tag (`postgres_integration` or `spanner_integration`),
-matching CI.
+behavior through `service.AllStatements`. A single `TestMain` calls
+dialect-tagged `openPool` / `bindSeed`. Run with exactly one integration
+build tag (`postgres_integration` or `spanner_integration`), matching CI.
 
-Dialect packages keep engine-specific tests (compiler SQL shape, error
-wrapping, `withTransaction` nesting, migrations, and cases that need
-dialect DML such as project list cursor ties).
+[`dbtest.Pool`](dbtest/dbtest.go) is the migrated bring-up type
+(`database.Pool` + `service.Pool`). Dialect packages keep engine-specific
+tests (compiler SQL shape, error wrapping, `withTransaction` nesting,
+migrations). Cursor-tie project seeding uses dialect
+`SeedProjectsTiedAt` helpers under the integration build tags.

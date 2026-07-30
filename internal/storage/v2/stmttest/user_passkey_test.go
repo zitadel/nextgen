@@ -25,15 +25,13 @@ func userPasskeyKeyFilter(projectID, userID, credentialID string) database.Filte
 func ensureUserPasskeyTestUser(t *testing.T, userID, email string) (projectID string) {
 	t.Helper()
 	ctx := t.Context()
-	s := stmts()
 	projectID, schemaURL := ensureUserTestProject(t)
-	require.NoError(t, s.CreateUser(ctx, newTestUser(t, projectID, schemaURL, userID, email, "Passkey User")))
+	require.NoError(t, stmts.CreateUser(ctx, newTestUser(t, projectID, schemaURL, userID, email, "Passkey User")))
 	return projectID
 }
 
 func TestUserPasskeyStatements_CreateGetListDelete(t *testing.T) {
 	ctx := t.Context()
-	s := stmts()
 	userID := "user_passkey_crud"
 	credentialID := "cred-passkey-crud"
 	projectID := ensureUserPasskeyTestUser(t, userID, "passkey-crud@example.com")
@@ -41,7 +39,7 @@ func TestUserPasskeyStatements_CreateGetListDelete(t *testing.T) {
 
 	attestation := "none"
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	require.NoError(t, s.CreateUserPasskey(ctx, &domain.CreateUserPasskey{
+	require.NoError(t, stmts.CreateUserPasskey(ctx, &domain.CreateUserPasskey{
 		ProjectID:       projectID,
 		UserID:          userID,
 		CredentialID:    credentialID,
@@ -56,10 +54,10 @@ func TestUserPasskeyStatements_CreateGetListDelete(t *testing.T) {
 		VerifiedAt:      &now,
 	}))
 	t.Cleanup(func() {
-		_ = s.DeleteUserPasskey(context.Background(), byKey)
+		_ = stmts.DeleteUserPasskey(context.Background(), byKey)
 	})
 
-	got, err := s.GetUserPasskey(ctx, byKey)
+	got, err := stmts.GetUserPasskey(ctx, byKey)
 	require.NoError(t, err)
 	require.Positive(t, got.ID)
 	assert.Equal(t, projectID, got.ProjectID)
@@ -79,7 +77,7 @@ func TestUserPasskeyStatements_CreateGetListDelete(t *testing.T) {
 	assert.False(t, got.CreatedAt.IsZero())
 	assert.False(t, got.UpdatedAt.IsZero())
 
-	listed, err := s.ListUserPasskeys(ctx, &database.ListOptions[domain.UserPasskeyField]{
+	listed, err := stmts.ListUserPasskeys(ctx, &database.ListOptions[domain.UserPasskeyField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.UserPasskeyFieldProjectID), projectID),
 			database.Equal(database.Col(domain.UserPasskeyFieldUserID), userID),
@@ -89,14 +87,13 @@ func TestUserPasskeyStatements_CreateGetListDelete(t *testing.T) {
 	require.Len(t, listed.Items, 1)
 	assert.Equal(t, got.ID, listed.Items[0].ID)
 
-	require.NoError(t, s.DeleteUserPasskey(ctx, byKey))
-	_, err = s.GetUserPasskey(ctx, byKey)
+	require.NoError(t, stmts.DeleteUserPasskey(ctx, byKey))
+	_, err = stmts.GetUserPasskey(ctx, byKey)
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestUserPasskeyStatements_Update(t *testing.T) {
 	ctx := t.Context()
-	s := stmts()
 	userID := "user_passkey_1"
 	credentialID := "cred-passkey-1"
 	projectID := ensureUserPasskeyTestUser(t, userID, "passkey@example.com")
@@ -104,7 +101,7 @@ func TestUserPasskeyStatements_Update(t *testing.T) {
 
 	attestation := "none"
 	now := time.Now().UTC().Truncate(time.Millisecond)
-	require.NoError(t, s.CreateUserPasskey(ctx, &domain.CreateUserPasskey{
+	require.NoError(t, stmts.CreateUserPasskey(ctx, &domain.CreateUserPasskey{
 		ProjectID:       projectID,
 		UserID:          userID,
 		CredentialID:    credentialID,
@@ -118,18 +115,18 @@ func TestUserPasskeyStatements_Update(t *testing.T) {
 		VerifiedAt:      &now,
 	}))
 	t.Cleanup(func() {
-		_ = s.DeleteUserPasskey(context.Background(), byKey)
+		_ = stmts.DeleteUserPasskey(context.Background(), byKey)
 	})
 
-	err := s.UpdateUserPasskey(ctx, byKey)
+	err := stmts.UpdateUserPasskey(ctx, byKey)
 	assert.ErrorIs(t, err, database.ErrNoChanges)
 
-	err = s.UpdateUserPasskey(ctx, userPasskeyKeyFilter(projectID, userID, "missing-cred"),
+	err = stmts.UpdateUserPasskey(ctx, userPasskeyKeyFilter(projectID, userID, "missing-cred"),
 		&domain.UserPasskeySignCountUpdate{SignCount: 2},
 	)
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
-	require.NoError(t, s.UpdateUserPasskey(ctx, byKey,
+	require.NoError(t, stmts.UpdateUserPasskey(ctx, byKey,
 		&domain.UserPasskeyAttestationTypeUpdate{AttestationType: "direct"},
 		&domain.UserPasskeyTransportsUpdate{Transports: []string{"usb", "nfc"}},
 		&domain.UserPasskeySignCountUpdate{SignCount: 5},
@@ -139,7 +136,7 @@ func TestUserPasskeyStatements_Update(t *testing.T) {
 		&domain.UserPasskeyLastUsedAtUpdate{LastUsedAt: now},
 	))
 
-	got, err := s.GetUserPasskey(ctx, byKey)
+	got, err := stmts.GetUserPasskey(ctx, byKey)
 	require.NoError(t, err)
 	require.NotNil(t, got.AttestationType)
 	assert.Equal(t, "direct", *got.AttestationType)
@@ -152,10 +149,10 @@ func TestUserPasskeyStatements_Update(t *testing.T) {
 	require.NotNil(t, got.LastUsedAt)
 	assert.WithinDuration(t, now, *got.LastUsedAt, time.Second)
 
-	require.NoError(t, s.UpdateUserPasskey(ctx, byKey,
+	require.NoError(t, stmts.UpdateUserPasskey(ctx, byKey,
 		&domain.UserPasskeyTransportsUpdate{Transports: nil},
 	))
-	got, err = s.GetUserPasskey(ctx, byKey)
+	got, err = stmts.GetUserPasskey(ctx, byKey)
 	require.NoError(t, err)
 	assert.Equal(t, []string{}, got.Transports)
 }

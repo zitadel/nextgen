@@ -24,14 +24,9 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	defer stop()
-
-	v2, ok := pool.(service.Pool)
-	if !ok {
-		panic("expected v2 service.Pool")
-	}
-	testV2ServiceDB = service.NewPool(v2)
 	defer pool.Close(ctx)
 
+	testV2ServiceDB = service.NewPool(pool)
 	os.Exit(m.Run())
 }
 

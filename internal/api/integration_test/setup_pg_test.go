@@ -28,12 +28,6 @@ func runTests(m *testing.M) int {
 	defer stop()
 	defer pool.Close(ctx)
 
-	v2, ok := pool.(service.Pool)
-	if !ok {
-		slog.Error("setup: pool does not implement v2 service.Pool", "type", pool)
-		return 1
-	}
-	harness.DB = service.NewPool(v2)
-
+	harness.DB = service.NewPool(pool)
 	return m.Run()
 }

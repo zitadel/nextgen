@@ -4,8 +4,6 @@ package stmttest
 
 import (
 	"context"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -19,15 +17,15 @@ import (
 
 func uniqueBrandingIDs(t *testing.T) (projectID, brandingID string) {
 	t.Helper()
-	suffix := strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	suffix := uniqueSuffix(t)
 	return "proj-brnd-" + suffix, "brnd-" + suffix
 }
 
 func ensureBrandingProject(t *testing.T, projectID string) {
 	t.Helper()
 	project := newTestProject(projectID)
-	require.NoError(t, stmts().CreateProject(t.Context(), project))
-	t.Cleanup(func() { _ = stmts().DeleteProjectByID(context.Background(), projectID) })
+	require.NoError(t, stmts.CreateProject(t.Context(), project))
+	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), projectID) })
 }
 
 func sampleBranding(projectID, id string) *domain.Branding {
@@ -43,16 +41,15 @@ func sampleBranding(projectID, id string) *domain.Branding {
 }
 
 func TestBrandingStatements_CreateAndGet(t *testing.T) {
-	s := stmts()
 	projectID, brandingID := uniqueBrandingIDs(t)
 	ensureBrandingProject(t, projectID)
 
 	entity := sampleBranding(projectID, brandingID)
-	require.NoError(t, s.CreateBranding(t.Context(), entity))
+	require.NoError(t, stmts.CreateBranding(t.Context(), entity))
 	assert.False(t, entity.CreatedAt.IsZero())
 	assert.WithinDuration(t, time.Now(), entity.CreatedAt, 5*time.Second)
 
-	got, err := s.GetBrandingByID(t.Context(), projectID, brandingID)
+	got, err := stmts.GetBrandingByID(t.Context(), projectID, brandingID)
 	require.NoError(t, err)
 
 	assert.Equal(t, entity.ProjectID, got.ProjectID)
@@ -66,47 +63,44 @@ func TestBrandingStatements_CreateAndGet(t *testing.T) {
 }
 
 func TestBrandingStatements_ListNewestFirst(t *testing.T) {
-	s := stmts()
 	projectID, _ := uniqueBrandingIDs(t)
 	ensureBrandingProject(t, projectID)
 
 	// Within one fast sequence both rows can share created_at; resolution
 	// falls back to the time-ordered id, which these fixture ids mimic.
 	first := sampleBranding(projectID, "brnd-001")
-	require.NoError(t, s.CreateBranding(t.Context(), first))
+	require.NoError(t, stmts.CreateBranding(t.Context(), first))
 
 	second := sampleBranding(projectID, "brnd-002")
 	second.LiquidTemplate = `<p data-rev="2">{% mandatory_gates %}</p>`
-	require.NoError(t, s.CreateBranding(t.Context(), second))
+	require.NoError(t, stmts.CreateBranding(t.Context(), second))
 
-	got, err := s.ListBrandings(t.Context(), branding.ListOptions(projectID, 0))
+	got, err := stmts.ListBrandings(t.Context(), branding.ListOptions(projectID, 0))
 	require.NoError(t, err)
 	require.Len(t, got.Items, 2)
 	assert.Equal(t, "brnd-002", got.Items[0].ID)
 	assert.Equal(t, second.LiquidTemplate, got.Items[0].LiquidTemplate)
 	assert.Equal(t, "brnd-001", got.Items[1].ID)
 
-	latest, err := s.ListBrandings(t.Context(), branding.ListOptions(projectID, 1))
+	latest, err := stmts.ListBrandings(t.Context(), branding.ListOptions(projectID, 1))
 	require.NoError(t, err)
 	require.Len(t, latest.Items, 1)
 	assert.Equal(t, "brnd-002", latest.Items[0].ID)
 }
 
 func TestBrandingStatements_ListEmpty(t *testing.T) {
-	s := stmts()
 	projectID, _ := uniqueBrandingIDs(t)
 	ensureBrandingProject(t, projectID)
 
-	got, err := s.ListBrandings(t.Context(), branding.ListOptions(projectID, 1))
+	got, err := stmts.ListBrandings(t.Context(), branding.ListOptions(projectID, 1))
 	require.NoError(t, err)
 	assert.Empty(t, got.Items)
 }
 
 func TestBrandingStatements_Get_NotFound(t *testing.T) {
-	s := stmts()
 	projectID, brandingID := uniqueBrandingIDs(t)
 	ensureBrandingProject(t, projectID)
 
-	_, err := s.GetBrandingByID(t.Context(), projectID, brandingID)
+	_, err := stmts.GetBrandingByID(t.Context(), projectID, brandingID)
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }

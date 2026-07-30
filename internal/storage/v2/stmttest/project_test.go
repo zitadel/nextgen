@@ -16,19 +16,18 @@ import (
 )
 
 func TestProjectStatements_Create(t *testing.T) {
-	s := stmts()
 
 	t.Run("creates project and timestamps are set", func(t *testing.T) {
 		project := newTestProject(uniqueProjectID(t))
-		t.Cleanup(func() { _ = s.DeleteProjectByID(context.Background(), project.ID) })
+		t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 
-		require.NoError(t, s.CreateProject(t.Context(), project))
+		require.NoError(t, stmts.CreateProject(t.Context(), project))
 		assert.False(t, project.CreatedAt.IsZero())
 		assert.False(t, project.UpdatedAt.IsZero())
 		assert.WithinDuration(t, time.Now(), project.CreatedAt, 5*time.Second)
 		assert.WithinDuration(t, time.Now(), project.UpdatedAt, 5*time.Second)
 
-		stored, err := s.GetProjectByID(t.Context(), project.ID)
+		stored, err := stmts.GetProjectByID(t.Context(), project.ID)
 		require.NoError(t, err)
 		assert.Equal(t, project.ID, stored.ID)
 		assert.Equal(t, project.Name, stored.Name)
@@ -38,33 +37,32 @@ func TestProjectStatements_Create(t *testing.T) {
 
 	t.Run("duplicate ID returns error", func(t *testing.T) {
 		project := newTestProject(uniqueProjectID(t))
-		t.Cleanup(func() { _ = s.DeleteProjectByID(context.Background(), project.ID) })
-		require.NoError(t, s.CreateProject(t.Context(), project))
+		t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+		require.NoError(t, stmts.CreateProject(t.Context(), project))
 
-		err := s.CreateProject(t.Context(), newTestProject(project.ID))
+		err := stmts.CreateProject(t.Context(), newTestProject(project.ID))
 		assert.ErrorIs(t, err, new(database.UniqueError))
 	})
 }
 
 func TestProjectStatements_Update(t *testing.T) {
-	s := stmts()
 
 	t.Run("updates name and refreshes updated_at", func(t *testing.T) {
 		project := newTestProject(uniqueProjectID(t))
 		project.PreviewOrigins = []string{"*.example.com", "localhost:3000"}
-		t.Cleanup(func() { _ = s.DeleteProjectByID(context.Background(), project.ID) })
-		require.NoError(t, s.CreateProject(t.Context(), project))
+		t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+		require.NoError(t, stmts.CreateProject(t.Context(), project))
 		createdUpdatedAt := project.UpdatedAt
 		createdAt := project.CreatedAt
 
 		projectName := "project-" + rand.Text()
 		project.Name = projectName
-		require.NoError(t, s.UpdateProject(t.Context(), project))
+		require.NoError(t, stmts.UpdateProject(t.Context(), project))
 		assert.True(t, project.UpdatedAt.After(createdUpdatedAt))
 		assert.Equal(t, createdAt.UTC(), project.CreatedAt.UTC())
 		assert.Equal(t, []string{"*.example.com", "localhost:3000"}, project.PreviewOrigins)
 
-		stored, err := s.GetProjectByID(t.Context(), project.ID)
+		stored, err := stmts.GetProjectByID(t.Context(), project.ID)
 		require.NoError(t, err)
 		assert.Equal(t, projectName, stored.Name)
 		assert.Equal(t, project.UpdatedAt.UTC(), stored.UpdatedAt.UTC())
@@ -72,20 +70,19 @@ func TestProjectStatements_Update(t *testing.T) {
 
 	t.Run("not found returns NoRowFoundError", func(t *testing.T) {
 		project := newTestProject(uniqueProjectID(t))
-		err := s.UpdateProject(t.Context(), project)
+		err := stmts.UpdateProject(t.Context(), project)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
 
 func TestProjectStatements_Get(t *testing.T) {
-	s := stmts()
 
 	t.Run("returns project by ID", func(t *testing.T) {
 		project := newTestProject(uniqueProjectID(t))
-		t.Cleanup(func() { _ = s.DeleteProjectByID(context.Background(), project.ID) })
-		require.NoError(t, s.CreateProject(t.Context(), project))
+		t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+		require.NoError(t, stmts.CreateProject(t.Context(), project))
 
-		stored, err := s.GetProjectByID(t.Context(), project.ID)
+		stored, err := stmts.GetProjectByID(t.Context(), project.ID)
 		require.NoError(t, err)
 		assert.Equal(t, project.ID, stored.ID)
 		assert.Equal(t, project.Name, stored.Name)
@@ -94,40 +91,38 @@ func TestProjectStatements_Get(t *testing.T) {
 	})
 
 	t.Run("not found returns NoRowFoundError", func(t *testing.T) {
-		_, err := s.GetProjectByID(t.Context(), uniqueProjectID(t))
+		_, err := stmts.GetProjectByID(t.Context(), uniqueProjectID(t))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
 
 func TestProjectStatements_Delete(t *testing.T) {
-	s := stmts()
 
 	t.Run("deletes an existing project", func(t *testing.T) {
 		project := newTestProject(uniqueProjectID(t))
-		t.Cleanup(func() { _ = s.DeleteProjectByID(context.Background(), project.ID) })
-		require.NoError(t, s.CreateProject(t.Context(), project))
+		t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+		require.NoError(t, stmts.CreateProject(t.Context(), project))
 
-		require.NoError(t, s.DeleteProjectByID(t.Context(), project.ID))
+		require.NoError(t, stmts.DeleteProjectByID(t.Context(), project.ID))
 
-		_, err := s.GetProjectByID(t.Context(), project.ID)
+		_, err := stmts.GetProjectByID(t.Context(), project.ID)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 
 	t.Run("deleting a missing project is a no-op", func(t *testing.T) {
-		assert.NoError(t, s.DeleteProjectByID(t.Context(), uniqueProjectID(t)))
+		assert.NoError(t, stmts.DeleteProjectByID(t.Context(), uniqueProjectID(t)))
 	})
 }
 
 func TestProjectStatements_List(t *testing.T) {
-	s := stmts()
 	projects := make([]*domain.Project, 3)
 	for i := range projects {
 		if i > 0 {
 			time.Sleep(2 * time.Millisecond)
 		}
 		project := newTestProject(uniqueProjectID(t) + "-" + strconv.Itoa(i))
-		t.Cleanup(func() { _ = s.DeleteProjectByID(context.Background(), project.ID) })
-		require.NoError(t, s.CreateProject(t.Context(), project))
+		t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+		require.NoError(t, stmts.CreateProject(t.Context(), project))
 		projects[i] = project
 	}
 	ids := projectIDs(projects)
@@ -144,7 +139,7 @@ func TestProjectStatements_List(t *testing.T) {
 
 	list := func(t *testing.T, filter database.Filter[domain.ProjectField], dir database.OrderDirection) []string {
 		t.Helper()
-		res, err := s.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
+		res, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
 			Filter: database.And(onlyFixtures, filter),
 			Pagination: database.Page[domain.ProjectField]{
 				OrderBy: database.OrderBy[domain.ProjectField]{
@@ -204,13 +199,13 @@ func TestProjectStatements_List(t *testing.T) {
 				},
 			}
 
-			first, err := s.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: onlyFixtures, Pagination: page})
+			first, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: onlyFixtures, Pagination: page})
 			require.NoError(t, err)
 			assert.Equal(t, []string{ids[0], ids[1]}, projectIDs(first.Items))
 			require.NotEmpty(t, first.NextCursor)
 
 			page.Cursor = first.NextCursor
-			second, err := s.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: onlyFixtures, Pagination: page})
+			second, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: onlyFixtures, Pagination: page})
 			require.NoError(t, err)
 			assert.Equal(t, []string{ids[2]}, projectIDs(second.Items))
 			assert.Empty(t, second.NextCursor)
@@ -229,7 +224,7 @@ func TestProjectStatements_List(t *testing.T) {
 			},
 		}
 
-		first, err := s.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: filter, Pagination: page})
+		first, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: filter, Pagination: page})
 		require.NoError(t, err)
 		assert.Equal(t, []string{ids[1]}, projectIDs(first.Items))
 		require.NotEmpty(t, first.NextCursor)
@@ -237,13 +232,67 @@ func TestProjectStatements_List(t *testing.T) {
 		// A full page always carries a cursor, so the last page is identified by
 		// its contents rather than by an empty NextCursor.
 		page.Cursor = first.NextCursor
-		second, err := s.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: filter, Pagination: page})
+		second, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: filter, Pagination: page})
 		require.NoError(t, err)
 		assert.Equal(t, []string{ids[2]}, projectIDs(second.Items))
 
 		page.Cursor = second.NextCursor
-		third, err := s.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: filter, Pagination: page})
+		third, err := stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: filter, Pagination: page})
 		require.NoError(t, err)
 		assert.Empty(t, projectIDs(third.Items))
 	})
+}
+
+// ListCursorTie covers lexicographic keyset paging when created_at ties and only
+// the id tiebreaker distinguishes rows. Seeding uses dialect DML via seedProjectsTiedAt.
+func TestProjectStatements_ListCursorTie(t *testing.T) {
+	ctx := t.Context()
+	require.NotNil(t, seedProjectsTiedAt)
+
+	prefix := uniqueProjectID(t)
+	ids := []string{prefix + "-0", prefix + "-1", prefix + "-2"}
+
+	tieCreatedAt := time.Now().UTC().Truncate(time.Microsecond)
+	for _, id := range ids {
+		t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), id) })
+	}
+	require.NoError(t, seedProjectsTiedAt(ctx, ids, tieCreatedAt))
+
+	tieFilter := database.Equal(database.Col(domain.ProjectFieldCreatedAt), tieCreatedAt)
+
+	tests := []struct {
+		name      string
+		direction database.OrderDirection
+		first     []string
+		second    []string
+	}{
+		{"ascending", database.OrderAsc, []string{ids[0], ids[1]}, []string{ids[2]}},
+		{"descending", database.OrderDesc, []string{ids[2], ids[1]}, []string{ids[0]}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			page := database.Page[domain.ProjectField]{
+				Limit: 2,
+				OrderBy: database.OrderBy[domain.ProjectField]{
+					Columns: []database.Column[domain.ProjectField]{
+						database.Col(domain.ProjectFieldCreatedAt),
+						database.Col(domain.ProjectFieldID),
+					},
+					Direction: tt.direction,
+				},
+			}
+
+			first, err := stmts.ListProjects(ctx, &database.ListOptions[domain.ProjectField]{Filter: tieFilter, Pagination: page})
+			require.NoError(t, err)
+			assert.Equal(t, tt.first, projectIDs(first.Items))
+			require.NotEmpty(t, first.NextCursor)
+
+			page.Cursor = first.NextCursor
+			second, err := stmts.ListProjects(ctx, &database.ListOptions[domain.ProjectField]{Filter: tieFilter, Pagination: page})
+			require.NoError(t, err)
+			assert.Equal(t, tt.second, projectIDs(second.Items))
+			assert.Empty(t, second.NextCursor)
+		})
+	}
 }

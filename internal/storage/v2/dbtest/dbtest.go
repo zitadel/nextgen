@@ -4,3 +4,24 @@
 // Helpers return already-connected v2 pools with migrations applied (via the
 // v2 pool's Migrate API).
 package dbtest
+
+import (
+	"fmt"
+
+	"github.com/zitadel/nextgen/internal/service"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+)
+
+// Pool is a migrated v2 pool usable for both storage lifecycle and statements.
+type Pool interface {
+	v2database.Pool
+	service.Pool
+}
+
+func asPool(pool v2database.Pool) (Pool, error) {
+	p, ok := pool.(Pool)
+	if !ok {
+		return nil, fmt.Errorf("dbtest: pool %T does not implement dbtest.Pool", pool)
+	}
+	return p, nil
+}

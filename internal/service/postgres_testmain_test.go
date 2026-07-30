@@ -30,16 +30,9 @@ func runPostgresIntegrationTests(m *testing.M) int {
 		return 1
 	}
 	defer stop()
-
 	defer pool.Close(ctx)
 
-	v2, ok := pool.(service.Pool)
-	if !ok {
-		slog.Error("integration: pool does not implement v2 service.Pool", "type", pool)
-		return 1
-	}
-	integrationPool = service.NewPool(v2)
-
+	integrationPool = service.NewPool(pool)
 	return m.Run()
 }
 
