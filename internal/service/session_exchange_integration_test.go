@@ -17,13 +17,13 @@ import (
 func newSessionServiceForIntegration(t *testing.T) (service.SessionService, service.SessionConfig) {
 	t.Helper()
 	cfg := service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}
-	v2Pool := integrationPoolOrFail(t)
-	return service.NewSessionService(v2Pool, service.UserStatementsIdentityReader{Pool: v2Pool}, cfg), cfg
+	pool := integrationPoolOrFail(t)
+	return service.NewSessionService(pool, service.UserStatementsIdentityReader{Pool: pool}, cfg), cfg
 }
 
 func TestSessionService_Exchange_integration(t *testing.T) {
 	svc, cfg := newSessionServiceForIntegration(t)
-	v2 := integrationPoolOrFail(t)
+	pool := integrationPoolOrFail(t)
 
 	t.Run("new_session_promotes_password", func(t *testing.T) {
 		projectID := "p-svc-ex-new-" + time.Now().Format("150405.000000")
@@ -74,7 +74,7 @@ func TestSessionService_Exchange_integration(t *testing.T) {
 
 		anonymous, err := domain.NewSession(projectID, nil)
 		require.NoError(t, err)
-		require.NoError(t, v2.Transaction(t.Context(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+		require.NoError(t, pool.Transaction(t.Context(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
 			return tx.Statements().CreateSession(ctx, anonymous)
 		}))
 

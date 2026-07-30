@@ -3647,7 +3647,7 @@ func decodeGetProjectResponse(resp *http.Response) (res GetProjectRes, _ error) 
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response GetProjectResponse
+			var response ProjectResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5690,7 +5690,7 @@ func decodePatchProjectResponse(resp *http.Response) (res PatchProjectRes, _ err
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response GetProjectResponse
+			var response ProjectResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err

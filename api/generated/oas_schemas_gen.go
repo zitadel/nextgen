@@ -4923,74 +4923,6 @@ type GetProjectNotFound ErrorDetails
 
 func (*GetProjectNotFound) getProjectRes() {}
 
-// The current state of a project.
-// Ref: #
-type GetProjectResponse struct {
-	// The unique identifier of the project.
-	ID string `json:"id"`
-	// The name of the project.
-	Name string `json:"name"`
-	// Origins which are allowed for previewing and testing the project.
-	PreviewOrigins []string `json:"previewOrigins"`
-	// The time when the project was created.
-	CreatedAt time.Time `json:"createdAt"`
-	// The time when the project was last updated.
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-// GetID returns the value of ID.
-func (s *GetProjectResponse) GetID() string {
-	return s.ID
-}
-
-// GetName returns the value of Name.
-func (s *GetProjectResponse) GetName() string {
-	return s.Name
-}
-
-// GetPreviewOrigins returns the value of PreviewOrigins.
-func (s *GetProjectResponse) GetPreviewOrigins() []string {
-	return s.PreviewOrigins
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *GetProjectResponse) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// GetUpdatedAt returns the value of UpdatedAt.
-func (s *GetProjectResponse) GetUpdatedAt() time.Time {
-	return s.UpdatedAt
-}
-
-// SetID sets the value of ID.
-func (s *GetProjectResponse) SetID(val string) {
-	s.ID = val
-}
-
-// SetName sets the value of Name.
-func (s *GetProjectResponse) SetName(val string) {
-	s.Name = val
-}
-
-// SetPreviewOrigins sets the value of PreviewOrigins.
-func (s *GetProjectResponse) SetPreviewOrigins(val []string) {
-	s.PreviewOrigins = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *GetProjectResponse) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-// SetUpdatedAt sets the value of UpdatedAt.
-func (s *GetProjectResponse) SetUpdatedAt(val time.Time) {
-	s.UpdatedAt = val
-}
-
-func (*GetProjectResponse) getProjectRes()   {}
-func (*GetProjectResponse) patchProjectRes() {}
-
 type GetProjectUnauthorized ErrorDetails
 
 func (*GetProjectUnauthorized) getProjectRes() {}
@@ -10944,6 +10876,74 @@ func (s *PostTokenRequestGrantType) UnmarshalText(data []byte) error {
 
 type ProjectID string
 
+// The current state of a project.
+// Ref: #
+type ProjectResponse struct {
+	// The unique identifier of the project.
+	ID string `json:"id"`
+	// The name of the project.
+	Name string `json:"name"`
+	// Origins which are allowed for previewing and testing the project.
+	PreviewOrigins []string `json:"previewOrigins"`
+	// The time when the project was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the project was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// GetID returns the value of ID.
+func (s *ProjectResponse) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *ProjectResponse) GetName() string {
+	return s.Name
+}
+
+// GetPreviewOrigins returns the value of PreviewOrigins.
+func (s *ProjectResponse) GetPreviewOrigins() []string {
+	return s.PreviewOrigins
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ProjectResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *ProjectResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ProjectResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *ProjectResponse) SetName(val string) {
+	s.Name = val
+}
+
+// SetPreviewOrigins sets the value of PreviewOrigins.
+func (s *ProjectResponse) SetPreviewOrigins(val []string) {
+	s.PreviewOrigins = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ProjectResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *ProjectResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*ProjectResponse) getProjectRes()   {}
+func (*ProjectResponse) patchProjectRes() {}
+
 type QueryProjectsBadRequest ErrorDetails
 
 func (*QueryProjectsBadRequest) queryProjectsRes() {}
@@ -11070,14 +11070,14 @@ func (s *QueryProjectsRequestSorting) SetDirection(val SortDirection) {
 // Paginated list of projects.
 // Ref: #
 type QueryProjectsResponse struct {
-	Projects []GetProjectResponse `json:"projects"`
+	Projects []ProjectResponse `json:"projects"`
 	// Token to pass as `page_token` in the next request to fetch the following page.
 	// Absent when there are no more results.
 	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
 
 // GetProjects returns the value of Projects.
-func (s *QueryProjectsResponse) GetProjects() []GetProjectResponse {
+func (s *QueryProjectsResponse) GetProjects() []ProjectResponse {
 	return s.Projects
 }
 
@@ -11087,7 +11087,7 @@ func (s *QueryProjectsResponse) GetNextPageToken() OptNilPageToken {
 }
 
 // SetProjects sets the value of Projects.
-func (s *QueryProjectsResponse) SetProjects(val []GetProjectResponse) {
+func (s *QueryProjectsResponse) SetProjects(val []ProjectResponse) {
 	s.Projects = val
 }
 

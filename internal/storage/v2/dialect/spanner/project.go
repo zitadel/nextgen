@@ -14,13 +14,13 @@ import (
 const (
 	projectsTable         = "projects"
 	createProjectStmt     = `INSERT INTO projects (id, name, preview_origins) VALUES (@p1, @p2, @p3) THEN RETURN id, created_at, updated_at`
-	updateProjectStmt     = `UPDATE projects SET name = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN updated_at`
+	updateProjectStmt     = `UPDATE projects SET name = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id, name, preview_origins, created_at, updated_at`
 	deleteByIDProjectStmt = `DELETE FROM projects WHERE id = @p1`
-	projectQuery          = "SELECT id, name, created_at, updated_at, preview_origins FROM projects"
+	projectQuery          = "SELECT id, name, preview_origins, created_at, updated_at FROM projects"
 )
 
 var projectColumns = []string{
-	"id", "name", "created_at", "updated_at", "preview_origins",
+	"id", "name", "preview_origins", "created_at", "updated_at",
 }
 
 type projectStatements struct{ statement }
@@ -65,15 +65,17 @@ func (ps projectStatements) GetProjectByID(ctx context.Context, id string) (*dom
 }
 
 // UpdateProject implements [service.ProjectStatements].
-// Only name is updated; preview origins are left untouched.
-// updated_at is refreshed and read back onto project.
+// Only the name is updated; preview origins are left untouched. The whole row is
+// read back onto the project.
 func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.Project) error {
 	stmt := buildStatement(updateProjectStmt, project.ID, project.Name).statement()
 	return ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
-		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			return struct{}{}, row.Columns(&project.UpdatedAt)
-		})
-		return err
+		updated, err := collectOneRow(iter, ps.scanProject)
+		if err != nil {
+			return err
+		}
+		*project = *updated
+		return nil
 	})
 }
 
@@ -112,7 +114,7 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 func (ps projectStatements) scanProject(row *spanner.Row) (*domain.Project, error) {
 	project := new(domain.Project)
 	var previewOriginsJSON string
-	if err := row.Columns(&project.ID, &project.Name, &project.CreatedAt, &project.UpdatedAt, &previewOriginsJSON); err != nil {
+	if err := row.Columns(&project.ID, &project.Name, &previewOriginsJSON, &project.CreatedAt, &project.UpdatedAt); err != nil {
 		return nil, err
 	}
 	origins, err := decodePreviewOrigins(previewOriginsJSON)

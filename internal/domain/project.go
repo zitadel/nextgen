@@ -15,6 +15,10 @@ func ErrProjectNameInvalid() Error {
 	return newError(PrefixProject.ErrorCodePrefix("name_invalid"), "The project name is invalid. Expected a non-empty string.", nil, nil)
 }
 
+func ErrProjectMissingID() Error {
+	return newError(PrefixProject.ErrorCodePrefix("missing_id"), "project: missing id", nil, nil)
+}
+
 func ErrProjectNotFound() Error {
 	return newError(PrefixProject.ErrorCodePrefix("not_found"), "project not found", nil, nil)
 }

@@ -41,13 +41,14 @@ type ProjectService interface {
 	DefaultProject(ctx context.Context, cfgProjectID string) (*domain.Project, error)
 
 	// Update updates the name of a project.
-	// Returns domain.ErrMissingProjectID or domain.ErrProjectNameInvalid for validation failures.
+	// Returns domain.ErrProjectMissingID or domain.ErrProjectNameInvalid for validation failures.
 	// Returns domain.ErrProjectNotFound when no project with the given ID exists; other failures return domain.ErrInternal.
 	Update(ctx context.Context, id, name string) (*domain.Project, error)
 
 	// List returns projects matching the request, ordered and paginated with an
 	// opaque cursor token. The returned NextPageToken is empty when the last page
 	// has been reached.
+	// Returns domain.ErrProjectMissingID when the request carries no project.
 	List(ctx context.Context, req ListProjectsRequest) (*ListProjectsResponse, error)
 
 	// Delete hard-deletes a project, cascading to its child resources through the
@@ -220,7 +221,7 @@ func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string
 
 func (s *projectService) Update(ctx context.Context, id, name string) (*domain.Project, error) {
 	if id == "" {
-		return nil, domain.ErrMissingProjectID()
+		return nil, domain.ErrProjectMissingID()
 	}
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -241,11 +242,9 @@ func (s *projectService) Update(ctx context.Context, id, name string) (*domain.P
 
 // ListProjectsRequest is the input for listing projects.
 type ListProjectsRequest struct {
-	// ProjectID, if set, restricts results to that single project.
-	// It is set based on the scope of the caller.
-	// If it's bound to a single project, the ProjectID should be set by the handler.
-	// Left empty, the list spans all projects: the handler need not pass a ProjectID
-	// if the caller has broader access (e.g., system-level read access).
+	// ProjectID restricts results to that single project. Handlers set it from
+	// the caller's scope, and every credential today is bound to one project.
+	// Required.
 	ProjectID string
 	Limit     int
 	PageToken string
@@ -260,10 +259,13 @@ type ListProjectsResponse struct {
 }
 
 func (s *projectService) List(ctx context.Context, req ListProjectsRequest) (*ListProjectsResponse, error) {
-	filters := make([]database.Filter[domain.ProjectField], 0, len(req.Filters)+1)
-	if req.ProjectID != "" {
-		filters = append(filters, database.Equal(database.Col(domain.ProjectFieldID), req.ProjectID))
+	// TODO (grvijayan): update once a credential can hold a scope wider than one project (ADR 036).
+	if req.ProjectID == "" {
+		return nil, domain.ErrProjectMissingID()
 	}
+
+	filters := make([]database.Filter[domain.ProjectField], 0, len(req.Filters)+1)
+	filters = append(filters, database.Equal(database.Col(domain.ProjectFieldID), req.ProjectID))
 	for _, f := range req.Filters {
 		filter, err := projectFilter(f)
 		if err != nil {
@@ -350,7 +352,8 @@ func projectFilter(f Filter) (database.Filter[domain.ProjectField], error) {
 	// does not specify a format for a timestamp); parse it into the time.Time needed for the comparison.
 	value, err := database.CoerceTimeValue(raw)
 	if err != nil {
-		return nil, domain.ErrRequestInvalid().WithDetails("createdAt filter value must be a valid RFC3339 timestamp")
+		return nil, domain.ErrRequestInvalid().WithDetails(
+			fmt.Sprintf("createdAt filter value %q is not a valid RFC3339 timestamp", raw))
 	}
 	return compareFilter(f.Operation, database.Col(field), value)
 }
@@ -367,7 +370,7 @@ func projectField(field string) (domain.ProjectField, error) {
 
 func (s *projectService) Delete(ctx context.Context, id string) error {
 	if id == "" {
-		return domain.ErrMissingProjectID()
+		return domain.ErrProjectMissingID()
 	}
 	if err := s.v2Pool.Statements().DeleteProjectByID(ctx, id); err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to delete project")

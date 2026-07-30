@@ -1788,7 +1788,7 @@ func encodeGetOpenIDConfigurationResponse(response GetOpenIDConfigurationRes, w 
 
 func encodeGetProjectResponse(response GetProjectRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *GetProjectResponse:
+	case *ProjectResponse:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
 		span.SetStatus(codes.Ok, http.StatusText(200))
@@ -2758,7 +2758,7 @@ func encodeListUsersResponse(response ListUsersRes, w http.ResponseWriter, span 
 
 func encodePatchProjectResponse(response PatchProjectRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *GetProjectResponse:
+	case *ProjectResponse:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
 		span.SetStatus(codes.Ok, http.StatusText(200))
