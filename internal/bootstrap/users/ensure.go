@@ -43,6 +43,11 @@ func ensureProject(ctx context.Context, stmts service.AllStatements, projectID s
 }
 
 func ensureTeam(ctx context.Context, stmts service.AllStatements, projectID, teamID string) error {
+	// Team names are unique per project too, so a UniqueError from the insert
+	// below does not prove the team exists.
+	if _, err := stmts.GetTeamByID(ctx, projectID, teamID); err == nil {
+		return nil
+	}
 	// The bootstrap header carries no team name, so derive a placeholder
 	// name from the team ID to satisfy the NOT NULL name column.
 	err := stmts.CreateTeam(ctx, &domain.Team{
@@ -51,9 +56,6 @@ func ensureTeam(ctx context.Context, stmts service.AllStatements, projectID, tea
 		Name:      "team-" + teamID,
 	})
 	if err != nil {
-		if _, ok := errors.AsType[*database.UniqueError](err); ok {
-			return nil
-		}
 		return fmt.Errorf("ensure team %q: %w", teamID, err)
 	}
 	return nil
