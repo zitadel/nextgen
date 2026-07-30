@@ -254,7 +254,7 @@ func TestProjectService_Update(t *testing.T) {
 			id:          "",
 			projectName: "updated project name",
 			setupStmt:   func(*servicemocks.MockAllStatements) {},
-			wantErr:     domain.ErrMissingProjectID(),
+			wantErr:     domain.ErrProjectMissingID(),
 		},
 		{
 			name:        "missing project name",
@@ -333,7 +333,7 @@ func TestProjectService_Delete(t *testing.T) {
 			name:      "missing project id",
 			id:        "",
 			setupStmt: func(*servicemocks.MockAllStatements) {},
-			wantErr:   domain.ErrMissingProjectID(),
+			wantErr:   domain.ErrProjectMissingID(),
 		},
 	}
 
@@ -370,7 +370,7 @@ func TestProjectService_List(t *testing.T) {
 	}{
 		{
 			name: "defaults",
-			req:  service.ListProjectsRequest{},
+			req:  service.ListProjectsRequest{ProjectID: "proj_a"},
 			result: &database.ListResult[*domain.Project]{
 				Items:      []*domain.Project{{ID: "proj_a"}, {ID: "proj_b"}},
 				NextCursor: []byte("next"),
@@ -383,7 +383,9 @@ func TestProjectService_List(t *testing.T) {
 					database.Col(domain.ProjectFieldCreatedAt),
 					database.Col(domain.ProjectFieldID),
 				}, opts.Pagination.OrderBy.Columns)
-				assert.Equal(t, database.And[domain.ProjectField](), opts.Filter)
+				assert.Equal(t, database.And(
+					database.Equal(database.Col(domain.ProjectFieldID), "proj_a"),
+				), opts.Filter)
 			},
 			checkResp: func(t *testing.T, resp *service.ListProjectsResponse) {
 				assert.Len(t, resp.Projects, 2)
@@ -392,7 +394,7 @@ func TestProjectService_List(t *testing.T) {
 		},
 		{
 			name:   "limit clamped to max",
-			req:    service.ListProjectsRequest{Limit: 500},
+			req:    service.ListProjectsRequest{ProjectID: "proj_a", Limit: 500},
 			result: &database.ListResult[*domain.Project]{},
 			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, uint32(100), opts.Pagination.Limit)
@@ -400,7 +402,7 @@ func TestProjectService_List(t *testing.T) {
 		},
 		{
 			name:   "negative limit uses default",
-			req:    service.ListProjectsRequest{Limit: -5},
+			req:    service.ListProjectsRequest{ProjectID: "proj_a", Limit: -5},
 			result: &database.ListResult[*domain.Project]{},
 			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, uint32(20), opts.Pagination.Limit)
@@ -408,7 +410,7 @@ func TestProjectService_List(t *testing.T) {
 		},
 		{
 			name:   "zero limit uses default, not storage's no-limit",
-			req:    service.ListProjectsRequest{Limit: 0},
+			req:    service.ListProjectsRequest{ProjectID: "proj_a", Limit: 0},
 			result: &database.ListResult[*domain.Project]{},
 			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, uint32(20), opts.Pagination.Limit)
@@ -427,23 +429,10 @@ func TestProjectService_List(t *testing.T) {
 			},
 		},
 		{
-			name: "project id filter",
-			req: service.ListProjectsRequest{
-				ProjectID: "proj_a",
-				Filters:   []service.Filter{{Field: "createdAt", Operation: "equals", Value: createdAt.Format(time.RFC3339)}},
-			},
-			result: &database.ListResult[*domain.Project]{},
-			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
-				assert.Equal(t, database.And(
-					database.Equal(database.Col(domain.ProjectFieldID), "proj_a"),
-					database.Equal(database.Col(domain.ProjectFieldCreatedAt), createdAt),
-				), opts.Filter)
-			},
-		},
-		{
 			name: "sort by createdAt desc",
 			req: service.ListProjectsRequest{
-				Sorting: &service.Sorting{Field: "createdAt", Direction: "desc"},
+				ProjectID: "proj_a",
+				Sorting:   &service.Sorting{Field: "createdAt", Direction: "desc"},
 			},
 			result: &database.ListResult[*domain.Project]{},
 			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
@@ -457,11 +446,13 @@ func TestProjectService_List(t *testing.T) {
 		{
 			name: "filter equals createdAt",
 			req: service.ListProjectsRequest{
-				Filters: []service.Filter{{Field: "createdAt", Operation: "equals", Value: createdAt.Format(time.RFC3339)}},
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "createdAt", Operation: "equals", Value: createdAt.Format(time.RFC3339)}},
 			},
 			result: &database.ListResult[*domain.Project]{},
 			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, database.And(
+					database.Equal(database.Col(domain.ProjectFieldID), "proj_a"),
 					database.Equal(database.Col(domain.ProjectFieldCreatedAt), createdAt),
 				), opts.Filter)
 			},
@@ -469,11 +460,13 @@ func TestProjectService_List(t *testing.T) {
 		{
 			name: "filter greater_than createdAt parses RFC3339",
 			req: service.ListProjectsRequest{
-				Filters: []service.Filter{{Field: "createdAt", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)}},
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "createdAt", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)}},
 			},
 			result: &database.ListResult[*domain.Project]{},
 			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, database.And(
+					database.Equal(database.Col(domain.ProjectFieldID), "proj_a"),
 					database.GreaterThan(database.Col(domain.ProjectFieldCreatedAt), createdAt),
 				), opts.Filter)
 			},
@@ -481,6 +474,7 @@ func TestProjectService_List(t *testing.T) {
 		{
 			name: "createdAt range filter ANDs both bounds",
 			req: service.ListProjectsRequest{
+				ProjectID: "proj_a",
 				Filters: []service.Filter{
 					{Field: "createdAt", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)},
 					{Field: "createdAt", Operation: "less_than", Value: createdAt.Add(time.Hour).Format(time.RFC3339)},
@@ -489,6 +483,7 @@ func TestProjectService_List(t *testing.T) {
 			result: &database.ListResult[*domain.Project]{},
 			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, database.And(
+					database.Equal(database.Col(domain.ProjectFieldID), "proj_a"),
 					database.GreaterThan(database.Col(domain.ProjectFieldCreatedAt), createdAt),
 					database.LessThan(database.Col(domain.ProjectFieldCreatedAt), createdAt.Add(time.Hour)),
 				), opts.Filter)
@@ -496,7 +491,7 @@ func TestProjectService_List(t *testing.T) {
 		},
 		{
 			name:   "page token passed through as cursor",
-			req:    service.ListProjectsRequest{PageToken: "tok"},
+			req:    service.ListProjectsRequest{ProjectID: "proj_a", PageToken: "tok"},
 			result: &database.ListResult[*domain.Project]{},
 			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, []byte("tok"), opts.Pagination.Cursor)
@@ -504,19 +499,19 @@ func TestProjectService_List(t *testing.T) {
 		},
 		{
 			name:         "statement error is wrapped",
-			req:          service.ListProjectsRequest{},
+			req:          service.ListProjectsRequest{ProjectID: "proj_a"},
 			statementErr: assert.AnError,
 			wantErr:      domain.ErrInternal(assert.AnError),
 		},
 		{
 			name:         "invalid cursor maps to request invalid",
-			req:          service.ListProjectsRequest{PageToken: "bad"},
+			req:          service.ListProjectsRequest{ProjectID: "proj_a", PageToken: "bad"},
 			statementErr: database.ErrInvalidCursor(),
 			wantErr:      domain.ErrRequestInvalid(),
 		},
 		{
 			name:         "cursor order mismatch maps to request invalid",
-			req:          service.ListProjectsRequest{PageToken: "bad"},
+			req:          service.ListProjectsRequest{ProjectID: "proj_a", PageToken: "bad"},
 			statementErr: database.ErrCursorOrderMismatch(),
 			wantErr:      domain.ErrRequestInvalid(),
 		},
@@ -560,37 +555,47 @@ func TestProjectService_List_ValidationErrors(t *testing.T) {
 		wantErr error
 	}{
 		{
+			name:    "missing project id is refused",
+			req:     service.ListProjectsRequest{},
+			wantErr: domain.ErrProjectMissingID(),
+		},
+		{
 			name: "unsupported operation not implemented",
 			req: service.ListProjectsRequest{
-				Filters: []service.Filter{{Field: "createdAt", Operation: "not_equals", Value: time.Now().UTC().Format(time.RFC3339)}},
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "createdAt", Operation: "not_equals", Value: time.Now().UTC().Format(time.RFC3339)}},
 			},
 			wantErr: domain.ErrNotImplemented(),
 		},
 		{
 			name: "unknown field is invalid",
 			req: service.ListProjectsRequest{
-				Filters: []service.Filter{{Field: "name", Operation: "equals", Value: "x"}},
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "name", Operation: "equals", Value: "x"}},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},
 		{
 			name: "unknown sort direction is invalid",
 			req: service.ListProjectsRequest{
-				Sorting: &service.Sorting{Field: "createdAt", Direction: "sideways"},
+				ProjectID: "proj_a",
+				Sorting:   &service.Sorting{Field: "createdAt", Direction: "sideways"},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},
 		{
 			name: "non-string createdAt value is invalid",
 			req: service.ListProjectsRequest{
-				Filters: []service.Filter{{Field: "createdAt", Operation: "equals", Value: 42}},
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "createdAt", Operation: "equals", Value: 42}},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},
 		{
 			name: "unparseable createdAt value is invalid",
 			req: service.ListProjectsRequest{
-				Filters: []service.Filter{{Field: "createdAt", Operation: "equals", Value: "not-a-time"}},
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "createdAt", Operation: "equals", Value: "not-a-time"}},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},

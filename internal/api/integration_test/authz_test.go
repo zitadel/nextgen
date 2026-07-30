@@ -244,7 +244,7 @@ func TestManagementAuthz(t *testing.T) {
 
 			okResp, err := ownClient.GetProject(t.Context(), api.GetProjectParams{ProjectID: victimID})
 			require.NoError(t, err)
-			assert.IsType(t, &api.GetProjectResponse{}, okResp, helpers.MustMarshal(t, okResp))
+			assert.IsType(t, &api.ProjectResponse{}, okResp, helpers.MustMarshal(t, okResp))
 		})
 
 		t.Run("preview secret rejected", func(t *testing.T) {
@@ -255,16 +255,22 @@ func TestManagementAuthz(t *testing.T) {
 			assertAuthzStatus(t, resp, 403, "proj.permission_denied")
 		})
 
-		// queryProjects has no handler yet; until then it always
-		// answers ht.ErrNotImplemented regardless of caller, so there is no authz
-		// signal to probe. #410 implements the handler and un-skips this.
+		t.Run("preview secret cannot patch", func(t *testing.T) {
+			t.Parallel()
+
+			resp, err := preview.PatchProject(t.Context(),
+				&api.PatchProjectRequest{Name: api.NewOptNilString(helpers.ProjectName())},
+				api.PatchProjectParams{ProjectID: victimID},
+			)
+			require.NoError(t, err)
+			assertAuthzStatus(t, resp, 403, "proj.permission_denied")
+		})
+
 		t.Run("query projects", func(t *testing.T) {
 			t.Parallel()
 
 			t.Run("bound to the token's project", func(t *testing.T) {
 				t.Parallel()
-				// todo (grvijayan)
-				t.Skip("queryProjects handler not yet implemented")
 
 				// queryProjects is scoped to the caller's bound project: each secret sees
 				// exactly its own project and never one it isn't bound to (foreign, bound to
@@ -291,12 +297,10 @@ func TestManagementAuthz(t *testing.T) {
 
 			t.Run("preview secret rejected", func(t *testing.T) {
 				t.Parallel()
-				// todo (grvijayan)
-				t.Skip("queryProjects handler not yet implemented")
 
 				resp, err := preview.QueryProjects(t.Context(), &api.QueryProjectsRequest{})
 				require.NoError(t, err)
-				assertAuthzStatus(t, resp, 403, "proj.permission_denied")
+				assertAuthzError(t, resp, "proj.permission_denied")
 			})
 		})
 	})
