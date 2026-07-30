@@ -2,10 +2,10 @@
 // implementations.
 //
 // Suites assert domain-visible behavior through [service.AllStatements], not
-// dialect SQL. Run with exactly one integration build tag (as CI does):
+// dialect SQL. Dialects register via build tags; TestMain brings up every
+// registered dialect and [runTest] loops them:
 //
 //	go test -tags postgres_integration ./internal/storage/v2/stmttest/
 //	go test -tags spanner_integration ./internal/storage/v2/stmttest/
-//
-// Setting both tags is unsupported (no dialect openPool).
+//	go test -tags 'postgres_integration,spanner_integration' ./internal/storage/v2/stmttest/
 package stmttest

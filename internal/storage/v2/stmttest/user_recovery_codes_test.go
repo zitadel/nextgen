@@ -25,130 +25,133 @@ func recoveryCodesByIDFilter(id int64) database.Filter[domain.UserRecoveryCodesF
 }
 
 func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
-	ctx := t.Context()
-	projectID, schemaURL := ensureUserTestProject(t)
-	userID := "usr_rc"
+	runTest(t, "", func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		userID := "usr_rc"
 
-	require.NoError(t, stmts.CreateUser(ctx, newTestUser(t, projectID, schemaURL, userID, "rc@example.com", "RC User")))
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "rc@example.com", "RC User")))
 
-	codes := []string{"aaaa-bbbb-cccc", "dddd-eeee-ffff"}
-	require.NoError(t, stmts.CreateUserRecoveryCodes(ctx, &domain.CreateRecoveryCodes{
-		ProjectID:     projectID,
-		UserID:        userID,
-		RecoveryCodes: codes,
-	}))
+		codes := []string{"aaaa-bbbb-cccc", "dddd-eeee-ffff"}
+		require.NoError(t, d.stmts.CreateUserRecoveryCodes(t.Context(), &domain.CreateRecoveryCodes{
+			ProjectID:     projectID,
+			UserID:        userID,
+			RecoveryCodes: codes,
+		}))
 
-	got, err := stmts.GetUserRecoveryCodes(ctx, recoveryCodesByUserFilter(projectID, userID))
-	require.NoError(t, err)
-	require.Positive(t, got.ID)
-	require.Equal(t, codes, got.RecoveryCodes)
+		got, err := d.stmts.GetUserRecoveryCodes(t.Context(), recoveryCodesByUserFilter(projectID, userID))
+		require.NoError(t, err)
+		require.Positive(t, got.ID)
+		require.Equal(t, codes, got.RecoveryCodes)
 
-	byID, err := stmts.GetUserRecoveryCodes(ctx, recoveryCodesByIDFilter(got.ID))
-	require.NoError(t, err)
-	require.Equal(t, got.ID, byID.ID)
+		byID, err := d.stmts.GetUserRecoveryCodes(t.Context(), recoveryCodesByIDFilter(got.ID))
+		require.NoError(t, err)
+		require.Equal(t, got.ID, byID.ID)
 
-	listed, err := stmts.ListUserRecoveryCodes(ctx, &database.ListOptions[domain.UserRecoveryCodesField]{
-		Filter: database.Equal(database.Col(domain.UserRecoveryCodesFieldProjectID), projectID),
+		listed, err := d.stmts.ListUserRecoveryCodes(t.Context(), &database.ListOptions[domain.UserRecoveryCodesField]{
+			Filter: database.Equal(database.Col(domain.UserRecoveryCodesFieldProjectID), projectID),
+		})
+		require.NoError(t, err)
+		require.Len(t, listed.Items, 1)
+
+		require.NoError(t, d.stmts.DeleteUserRecoveryCodes(t.Context(), recoveryCodesByIDFilter(got.ID)))
+		_, err = d.stmts.GetUserRecoveryCodes(t.Context(), recoveryCodesByUserFilter(projectID, userID))
+		require.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		require.NoError(t, d.stmts.CreateUserRecoveryCodes(t.Context(), &domain.CreateRecoveryCodes{
+			ProjectID:     projectID,
+			UserID:        userID,
+			RecoveryCodes: codes,
+		}))
+		got2, err := d.stmts.GetUserRecoveryCodes(t.Context(), recoveryCodesByUserFilter(projectID, userID))
+		require.NoError(t, err)
+		require.Positive(t, got2.ID)
+		require.NoError(t, d.stmts.DeleteUserRecoveryCodes(t.Context(), recoveryCodesByUserFilter(projectID, userID)))
+		_, err = d.stmts.GetUserRecoveryCodes(t.Context(), recoveryCodesByUserFilter(projectID, userID))
+		require.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
-	require.NoError(t, err)
-	require.Len(t, listed.Items, 1)
-
-	require.NoError(t, stmts.DeleteUserRecoveryCodes(ctx, recoveryCodesByIDFilter(got.ID)))
-	_, err = stmts.GetUserRecoveryCodes(ctx, recoveryCodesByUserFilter(projectID, userID))
-	require.ErrorIs(t, err, new(database.NoRowFoundError))
-
-	require.NoError(t, stmts.CreateUserRecoveryCodes(ctx, &domain.CreateRecoveryCodes{
-		ProjectID:     projectID,
-		UserID:        userID,
-		RecoveryCodes: codes,
-	}))
-	got2, err := stmts.GetUserRecoveryCodes(ctx, recoveryCodesByUserFilter(projectID, userID))
-	require.NoError(t, err)
-	require.Positive(t, got2.ID)
-	require.NoError(t, stmts.DeleteUserRecoveryCodes(ctx, recoveryCodesByUserFilter(projectID, userID)))
-	_, err = stmts.GetUserRecoveryCodes(ctx, recoveryCodesByUserFilter(projectID, userID))
-	require.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestUserRecoveryCodesStatements_CreateEmptyRejected(t *testing.T) {
-	ctx := t.Context()
-	projectID, schemaURL := ensureUserTestProject(t)
-	userID := "usr_rc_empty"
+	runTest(t, "", func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		userID := "usr_rc_empty"
 
-	require.NoError(t, stmts.CreateUser(ctx, newTestUser(t, projectID, schemaURL, userID, "rc-empty@example.com", "RC Empty")))
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "rc-empty@example.com", "RC Empty")))
 
-	err := stmts.CreateUserRecoveryCodes(ctx, &domain.CreateRecoveryCodes{
-		ProjectID:     projectID,
-		UserID:        userID,
-		RecoveryCodes: nil,
+		err := d.stmts.CreateUserRecoveryCodes(t.Context(), &domain.CreateRecoveryCodes{
+			ProjectID:     projectID,
+			UserID:        userID,
+			RecoveryCodes: nil,
+		})
+		assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
+
+		err = d.stmts.CreateUserRecoveryCodes(t.Context(), &domain.CreateRecoveryCodes{
+			ProjectID:     projectID,
+			UserID:        userID,
+			RecoveryCodes: []string{},
+		})
+		assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
 	})
-	assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
-
-	err = stmts.CreateUserRecoveryCodes(ctx, &domain.CreateRecoveryCodes{
-		ProjectID:     projectID,
-		UserID:        userID,
-		RecoveryCodes: []string{},
-	})
-	assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
 }
 
 func TestUserRecoveryCodesStatements_Update(t *testing.T) {
-	ctx := t.Context()
-	projectID, schemaURL := ensureUserTestProject(t)
-	userID := "usr_rc_upd"
+	runTest(t, "", func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		userID := "usr_rc_upd"
 
-	require.NoError(t, stmts.CreateUser(ctx, newTestUser(t, projectID, schemaURL, userID, "rc-upd@example.com", "RC Update")))
-	require.NoError(t, stmts.CreateUserRecoveryCodes(ctx, &domain.CreateRecoveryCodes{
-		ProjectID:     projectID,
-		UserID:        userID,
-		RecoveryCodes: []string{"old-code-1"},
-	}))
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "rc-upd@example.com", "RC Update")))
+		require.NoError(t, d.stmts.CreateUserRecoveryCodes(t.Context(), &domain.CreateRecoveryCodes{
+			ProjectID:     projectID,
+			UserID:        userID,
+			RecoveryCodes: []string{"old-code-1"},
+		}))
 
-	byUser := recoveryCodesByUserFilter(projectID, userID)
+		byUser := recoveryCodesByUserFilter(projectID, userID)
 
-	err := stmts.UpdateUserRecoveryCodes(ctx, byUser)
-	assert.ErrorIs(t, err, database.ErrNoChanges)
+		err := d.stmts.UpdateUserRecoveryCodes(t.Context(), byUser)
+		assert.ErrorIs(t, err, database.ErrNoChanges)
 
-	err = stmts.UpdateUserRecoveryCodes(ctx, recoveryCodesByUserFilter(projectID, "missing-user"),
-		&domain.UserRecoveryCodesIncrementFailedAttemptsUpdate{Delta: 1},
-	)
-	assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		err = d.stmts.UpdateUserRecoveryCodes(t.Context(), recoveryCodesByUserFilter(projectID, "missing-user"),
+			&domain.UserRecoveryCodesIncrementFailedAttemptsUpdate{Delta: 1},
+		)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
-	err = stmts.UpdateUserRecoveryCodes(ctx, byUser,
-		&domain.UserRecoveryCodesCodesUpdate{Codes: nil},
-	)
-	assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
+		err = d.stmts.UpdateUserRecoveryCodes(t.Context(), byUser,
+			&domain.UserRecoveryCodesCodesUpdate{Codes: nil},
+		)
+		assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
 
-	err = stmts.UpdateUserRecoveryCodes(ctx, byUser,
-		&domain.UserRecoveryCodesCodesUpdate{Codes: []string{}},
-	)
-	assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
+		err = d.stmts.UpdateUserRecoveryCodes(t.Context(), byUser,
+			&domain.UserRecoveryCodesCodesUpdate{Codes: []string{}},
+		)
+		assert.ErrorIs(t, err, domain.ErrEmptyRecoveryCodes)
 
-	now := time.Now().UTC().Truncate(time.Millisecond)
-	require.NoError(t, stmts.UpdateUserRecoveryCodes(ctx, byUser,
-		&domain.UserRecoveryCodesCodesUpdate{Codes: []string{"new-a", "new-b"}},
-		&domain.UserRecoveryCodesLastSuccessfulCheckUpdate{LastSuccessfulCheck: &now},
-		&domain.UserRecoveryCodesResetFailedAttemptsUpdate{},
-	))
+		now := time.Now().UTC().Truncate(time.Millisecond)
+		require.NoError(t, d.stmts.UpdateUserRecoveryCodes(t.Context(), byUser,
+			&domain.UserRecoveryCodesCodesUpdate{Codes: []string{"new-a", "new-b"}},
+			&domain.UserRecoveryCodesLastSuccessfulCheckUpdate{LastSuccessfulCheck: &now},
+			&domain.UserRecoveryCodesResetFailedAttemptsUpdate{},
+		))
 
-	got, err := stmts.GetUserRecoveryCodes(ctx, byUser)
-	require.NoError(t, err)
-	assert.Equal(t, []string{"new-a", "new-b"}, got.RecoveryCodes)
-	require.NotNil(t, got.LastSuccessfulCheck)
-	assert.WithinDuration(t, now, *got.LastSuccessfulCheck, time.Second)
-	assert.Zero(t, got.FailedAttempts)
+		got, err := d.stmts.GetUserRecoveryCodes(t.Context(), byUser)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"new-a", "new-b"}, got.RecoveryCodes)
+		require.NotNil(t, got.LastSuccessfulCheck)
+		assert.WithinDuration(t, now, *got.LastSuccessfulCheck, time.Second)
+		assert.Zero(t, got.FailedAttempts)
 
-	require.NoError(t, stmts.UpdateUserRecoveryCodes(ctx, byUser,
-		&domain.UserRecoveryCodesIncrementFailedAttemptsUpdate{Delta: 2},
-	))
-	got, err = stmts.GetUserRecoveryCodes(ctx, byUser)
-	require.NoError(t, err)
-	assert.Equal(t, int16(2), got.FailedAttempts)
+		require.NoError(t, d.stmts.UpdateUserRecoveryCodes(t.Context(), byUser,
+			&domain.UserRecoveryCodesIncrementFailedAttemptsUpdate{Delta: 2},
+		))
+		got, err = d.stmts.GetUserRecoveryCodes(t.Context(), byUser)
+		require.NoError(t, err)
+		assert.Equal(t, int16(2), got.FailedAttempts)
 
-	require.NoError(t, stmts.UpdateUserRecoveryCodes(ctx, byUser,
-		&domain.UserRecoveryCodesLastSuccessfulCheckUpdate{LastSuccessfulCheck: nil},
-	))
-	got, err = stmts.GetUserRecoveryCodes(ctx, byUser)
-	require.NoError(t, err)
-	assert.Nil(t, got.LastSuccessfulCheck)
+		require.NoError(t, d.stmts.UpdateUserRecoveryCodes(t.Context(), byUser,
+			&domain.UserRecoveryCodesLastSuccessfulCheckUpdate{LastSuccessfulCheck: nil},
+		))
+		got, err = d.stmts.GetUserRecoveryCodes(t.Context(), byUser)
+		require.NoError(t, err)
+		assert.Nil(t, got.LastSuccessfulCheck)
+	})
 }

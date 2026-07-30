@@ -1,4 +1,4 @@
-//go:build spanner_integration && !postgres_integration
+//go:build spanner_integration
 
 package stmttest
 
@@ -10,12 +10,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/spanner"
 )
 
-func openPool(ctx context.Context) (dbtest.Pool, func(), error) {
-	return dbtest.Spanner(ctx)
-}
-
-func bindSeed(pool dbtest.Pool) func(ctx context.Context, ids []string, createdAt time.Time) error {
-	return func(ctx context.Context, ids []string, createdAt time.Time) error {
+func init() {
+	registerDialect("spanner", dbtest.Spanner, func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error {
 		return spanner.SeedProjectsTiedAt(ctx, pool, ids, createdAt)
-	}
+	})
 }

@@ -44,10 +44,10 @@ Multi-write nesting uses the dialect `withTransaction` helpers above
 ## Statement contract tests
 
 Behavioral statement parity across dialects lives in
-[`stmttest`](stmttest/): shared integration suites assert domain-visible
-behavior through `service.AllStatements`. A single `TestMain` calls
-dialect-tagged `openPool` / `bindSeed`. Run with exactly one integration
-build tag (`postgres_integration` or `spanner_integration`), matching CI.
+[`stmttest`](stmttest/) (see ADR 041). Shared suites assert through
+`service.AllStatements`; build-tagged registration brings up postgres and/or
+spanner, and `runTest` loops dialects. CI still runs one tag per job; both
+tags are supported in one process for local parity checks.
 
 [`dbtest.Pool`](dbtest/dbtest.go) is the migrated bring-up type
 (`database.Pool` + `service.Pool`). Dialect packages keep engine-specific
