@@ -2677,7 +2677,7 @@ func encodeListSessionsResponse(response ListSessionsRes, w http.ResponseWriter,
 	}
 }
 
-func encodeListUserPassKeysResponse(response ListUserPassKeysRes, w http.ResponseWriter, span trace.Span) error {
+func encodeListUserPasskeysResponse(response ListUserPasskeysRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
 	case *ListUserPasskeysResponse:
 		if err := func() error {
@@ -2700,7 +2700,7 @@ func encodeListUserPassKeysResponse(response ListUserPassKeysRes, w http.Respons
 
 		return nil
 
-	case *ListUserPassKeysBadRequest:
+	case *ListUserPasskeysBadRequest:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(400)
 		span.SetStatus(codes.Error, http.StatusText(400))
@@ -2713,7 +2713,7 @@ func encodeListUserPassKeysResponse(response ListUserPassKeysRes, w http.Respons
 
 		return nil
 
-	case *ListUserPassKeysUnauthorized:
+	case *ListUserPasskeysUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 		span.SetStatus(codes.Error, http.StatusText(401))
@@ -2726,7 +2726,7 @@ func encodeListUserPassKeysResponse(response ListUserPassKeysRes, w http.Respons
 
 		return nil
 
-	case *ListUserPassKeysForbidden:
+	case *ListUserPasskeysForbidden:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(403)
 		span.SetStatus(codes.Error, http.StatusText(403))
@@ -2739,7 +2739,7 @@ func encodeListUserPassKeysResponse(response ListUserPassKeysRes, w http.Respons
 
 		return nil
 
-	case *ListUserPassKeysNotFound:
+	case *ListUserPasskeysNotFound:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(404)
 		span.SetStatus(codes.Error, http.StatusText(404))
@@ -2752,7 +2752,7 @@ func encodeListUserPassKeysResponse(response ListUserPassKeysRes, w http.Respons
 
 		return nil
 
-	case *ListUserPassKeysInternalServerError:
+	case *ListUserPasskeysInternalServerError:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(500)
 		span.SetStatus(codes.Error, http.StatusText(500))

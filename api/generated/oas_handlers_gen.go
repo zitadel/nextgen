@@ -7534,16 +7534,16 @@ func (s *Server) handleListSessionsRequest(args [0]string, argsEscaped bool, w h
 	}
 }
 
-// handleListUserPassKeysRequest handles listUserPassKeys operation.
+// handleListUserPasskeysRequest handles listUserPasskeys operation.
 //
 // List user passkeys.
 //
 // GET /users/{user_id}/passkeys
-func (s *Server) handleListUserPassKeysRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleListUserPasskeysRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("listUserPassKeys"),
+		otelogen.OperationID("listUserPasskeys"),
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.HTTPRouteKey.String("/users/{user_id}/passkeys"),
 	}
@@ -7551,7 +7551,7 @@ func (s *Server) handleListUserPassKeysRequest(args [1]string, argsEscaped bool,
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), ListUserPassKeysOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), ListUserPasskeysOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -7606,15 +7606,15 @@ func (s *Server) handleListUserPassKeysRequest(args [1]string, argsEscaped bool,
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: ListUserPassKeysOperation,
-			ID:   "listUserPassKeys",
+			Name: ListUserPasskeysOperation,
+			ID:   "listUserPasskeys",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, ListUserPassKeysOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, ListUserPasskeysOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -7654,7 +7654,7 @@ func (s *Server) handleListUserPassKeysRequest(args [1]string, argsEscaped bool,
 			return
 		}
 	}
-	params, err := decodeListUserPassKeysParams(args, argsEscaped, r)
+	params, err := decodeListUserPasskeysParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -7667,13 +7667,13 @@ func (s *Server) handleListUserPassKeysRequest(args [1]string, argsEscaped bool,
 
 	var rawBody []byte
 
-	var response ListUserPassKeysRes
+	var response ListUserPasskeysRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    ListUserPassKeysOperation,
+			OperationName:    ListUserPasskeysOperation,
 			OperationSummary: "List user passkeys",
-			OperationID:      "listUserPassKeys",
+			OperationID:      "listUserPasskeys",
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -7699,8 +7699,8 @@ func (s *Server) handleListUserPassKeysRequest(args [1]string, argsEscaped bool,
 
 		type (
 			Request  = struct{}
-			Params   = ListUserPassKeysParams
-			Response = ListUserPassKeysRes
+			Params   = ListUserPasskeysParams
+			Response = ListUserPasskeysRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -7709,14 +7709,14 @@ func (s *Server) handleListUserPassKeysRequest(args [1]string, argsEscaped bool,
 		](
 			m,
 			mreq,
-			unpackListUserPassKeysParams,
+			unpackListUserPasskeysParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.ListUserPassKeys(ctx, params)
+				response, err = s.h.ListUserPasskeys(ctx, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.ListUserPassKeys(ctx, params)
+		response, err = s.h.ListUserPasskeys(ctx, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -7724,7 +7724,7 @@ func (s *Server) handleListUserPassKeysRequest(args [1]string, argsEscaped bool,
 		return
 	}
 
-	if err := encodeListUserPassKeysResponse(response, w, span); err != nil {
+	if err := encodeListUserPasskeysResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)

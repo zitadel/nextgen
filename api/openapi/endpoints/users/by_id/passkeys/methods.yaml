@@ -1,5 +1,5 @@
 get:
-  operationId: listUserPassKeys
+  operationId: listUserPasskeys
   summary: List user passkeys
   tags:
     - Users

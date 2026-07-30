@@ -428,7 +428,7 @@ func TestGetMyUser(t *testing.T) {
 func TestListPasskeys(t *testing.T) {
 	t.Parallel()
 
-	dependencies := func() (project *domain.Project, user map[string]any, client *helpers.ApiClient) {
+	dependencies := func(t *testing.T) (project *domain.Project, user map[string]any, client *helpers.ApiClient) {
 		project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
 
@@ -449,18 +449,18 @@ func TestListPasskeys(t *testing.T) {
 		t.Run("lists registered passkeys", func(t *testing.T) {
 			t.Parallel()
 
-			project, user, client := dependencies()
+			project, user, client := dependencies(t)
 
 			userID := user["id"].(string)
 			harness.RegisterPasskey(t, project.ID, userID, "first passkey")
 			harness.RegisterPasskey(t, project.ID, userID, "second passkey")
 
-			params := api.ListUserPassKeysParams{
+			params := api.ListUserPasskeysParams{
 				ProjectID: api.ProjectID(project.ID),
 				UserID:    api.UserID(userID),
 			}
 
-			resp, err := client.ListUserPassKeys(t.Context(), params)
+			resp, err := client.ListUserPasskeys(t.Context(), params)
 			require.NoError(t, err)
 
 			if assert.IsType(t, &api.ListUserPasskeysResponse{}, resp, helpers.MustMarshal(t, resp)) {
@@ -480,14 +480,14 @@ func TestListPasskeys(t *testing.T) {
 		t.Run("empty passkeys", func(t *testing.T) {
 			t.Parallel()
 
-			project, user, client := dependencies()
+			project, user, client := dependencies(t)
 
-			params := api.ListUserPassKeysParams{
+			params := api.ListUserPasskeysParams{
 				ProjectID: api.ProjectID(project.ID),
 				UserID:    api.UserID(user["id"].(string)),
 			}
 
-			resp, err := client.ListUserPassKeys(t.Context(), params)
+			resp, err := client.ListUserPasskeys(t.Context(), params)
 			require.NoError(t, err)
 
 			if assert.IsType(t, &api.ListUserPasskeysResponse{}, resp, helpers.MustMarshal(t, resp)) {
@@ -507,11 +507,11 @@ func TestListPasskeys(t *testing.T) {
 		require.NoError(t, err)
 		harness.SetProjectSecretOnApiClient(t, client, project)
 
-		resp, err := client.ListUserPassKeys(t.Context(), api.ListUserPassKeysParams{
+		resp, err := client.ListUserPasskeys(t.Context(), api.ListUserPasskeysParams{
 			ProjectID: api.ProjectID(project.ID),
 			UserID:    "user_does_not_exist",
 		})
 		require.NoError(t, err)
-		assert.IsType(t, &api.ListUserPassKeysNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.IsType(t, &api.ListUserPasskeysNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})
 }

@@ -74,7 +74,7 @@ func (h *Handler) ListUsers(ctx context.Context, params api.ListUsersParams) (ap
 	return res, nil
 }
 
-func (h *Handler) ListUserPassKeys(ctx context.Context, params api.ListUserPassKeysParams) (api.ListUserPassKeysRes, error) {
+func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPasskeysParams) (api.ListUserPasskeysRes, error) {
 	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opRead); err != nil {
 		return nil, err
 	}

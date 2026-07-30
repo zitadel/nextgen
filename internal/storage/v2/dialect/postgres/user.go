@@ -96,7 +96,7 @@ DELETE FROM zitadel_nextgen.users
 WHERE project_id = $1 AND id = $2
 `
 
-	userExistsQuery = `
+	userExistsStmt = `
 SELECT EXISTS (
     SELECT 1 FROM zitadel_nextgen.users
     WHERE project_id = $1 AND id = $2
@@ -281,7 +281,7 @@ func (us userStatements) DeleteUserByID(ctx context.Context, projectID, userID s
 }
 
 func (us userStatements) UserExists(ctx context.Context, projectID, userID string) (bool, error) {
-	rows, err := us.client.Query(ctx, userExistsQuery, projectID, userID)
+	rows, err := us.client.Query(ctx, userExistsStmt, projectID, userID)
 	if err != nil {
 		return false, wrapError(err)
 	}

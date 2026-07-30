@@ -46,7 +46,7 @@ WHERE project_id = @p2 AND user_id = @p3 AND status <> @p1`
 
 	deleteUserStmt = `DELETE FROM users WHERE project_id = @p1 AND id = @p2`
 
-	userExistsQuery = `SELECT EXISTS (
+	userExistsStmt = `SELECT EXISTS (
     SELECT 1 FROM users WHERE project_id = @p1 AND id = @p2
 )`
 )
@@ -241,7 +241,7 @@ func (us userStatements) DeleteUserByID(ctx context.Context, projectID, userID s
 
 func (us userStatements) UserExists(ctx context.Context, projectID, userID string) (bool, error) {
 	var exists bool
-	err := us.db.Query(ctx, buildStatement(userExistsQuery, projectID, userID).statement(),
+	err := us.db.Query(ctx, buildStatement(userExistsStmt, projectID, userID).statement(),
 		func(iter *spanner.RowIterator) error {
 			var qErr error
 			exists, qErr = collectOneRow(iter, func(row *spanner.Row) (bool, error) {

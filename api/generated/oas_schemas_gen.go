@@ -2438,7 +2438,7 @@ func (*ErrorDetailsStatusCode) listBrandingRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
 func (*ErrorDetailsStatusCode) listSchemasRes()              {}
 func (*ErrorDetailsStatusCode) listSessionsRes()             {}
-func (*ErrorDetailsStatusCode) listUserPassKeysRes()         {}
+func (*ErrorDetailsStatusCode) listUserPasskeysRes()         {}
 func (*ErrorDetailsStatusCode) listUsersRes()                {}
 func (*ErrorDetailsStatusCode) patchProjectRes()             {}
 func (*ErrorDetailsStatusCode) queryProjectsRes()            {}
@@ -6317,25 +6317,21 @@ type ListSessionsUnauthorized ErrorDetails
 
 func (*ListSessionsUnauthorized) listSessionsRes() {}
 
-type ListUserPassKeysBadRequest ErrorDetails
+type ListUserPasskeysBadRequest ErrorDetails
 
-func (*ListUserPassKeysBadRequest) listUserPassKeysRes() {}
+func (*ListUserPasskeysBadRequest) listUserPasskeysRes() {}
 
-type ListUserPassKeysForbidden ErrorDetails
+type ListUserPasskeysForbidden ErrorDetails
 
-func (*ListUserPassKeysForbidden) listUserPassKeysRes() {}
+func (*ListUserPasskeysForbidden) listUserPasskeysRes() {}
 
-type ListUserPassKeysInternalServerError ErrorDetails
+type ListUserPasskeysInternalServerError ErrorDetails
 
-func (*ListUserPassKeysInternalServerError) listUserPassKeysRes() {}
+func (*ListUserPasskeysInternalServerError) listUserPasskeysRes() {}
 
-type ListUserPassKeysNotFound ErrorDetails
+type ListUserPasskeysNotFound ErrorDetails
 
-func (*ListUserPassKeysNotFound) listUserPassKeysRes() {}
-
-type ListUserPassKeysUnauthorized ErrorDetails
-
-func (*ListUserPassKeysUnauthorized) listUserPassKeysRes() {}
+func (*ListUserPasskeysNotFound) listUserPasskeysRes() {}
 
 // Response containing the user's passkeys.
 // Ref: #
@@ -6366,7 +6362,7 @@ func (s *ListUserPasskeysResponse) SetNextPageToken(val OptNilPageToken) {
 	s.NextPageToken = val
 }
 
-func (*ListUserPasskeysResponse) listUserPassKeysRes() {}
+func (*ListUserPasskeysResponse) listUserPasskeysRes() {}
 
 type ListUserPasskeysResponsePasskeysItem struct {
 	// The unique identifier of the passkey.
@@ -6406,6 +6402,10 @@ func (s *ListUserPasskeysResponsePasskeysItem) SetName(val string) {
 func (s *ListUserPasskeysResponsePasskeysItem) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
 }
+
+type ListUserPasskeysUnauthorized ErrorDetails
+
+func (*ListUserPasskeysUnauthorized) listUserPasskeysRes() {}
 
 type ListUsersBadRequest ErrorDetails
 

@@ -5512,7 +5512,7 @@ func decodeListSessionsResponse(resp *http.Response) (res ListSessionsRes, _ err
 	return res, nil
 }
 
-func decodeListUserPassKeysResponse(resp *http.Response) (res ListUserPassKeysRes, _ error) {
+func decodeListUserPasskeysResponse(resp *http.Response) (res ListUserPasskeysRes, _ error) {
 	switch resp.StatusCode {
 	case 200:
 		// Code 200.
@@ -5572,7 +5572,7 @@ func decodeListUserPassKeysResponse(resp *http.Response) (res ListUserPassKeysRe
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ListUserPassKeysBadRequest
+			var response ListUserPasskeysBadRequest
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5607,7 +5607,7 @@ func decodeListUserPassKeysResponse(resp *http.Response) (res ListUserPassKeysRe
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ListUserPassKeysUnauthorized
+			var response ListUserPasskeysUnauthorized
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5642,7 +5642,7 @@ func decodeListUserPassKeysResponse(resp *http.Response) (res ListUserPassKeysRe
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ListUserPassKeysForbidden
+			var response ListUserPasskeysForbidden
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5677,7 +5677,7 @@ func decodeListUserPassKeysResponse(resp *http.Response) (res ListUserPassKeysRe
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ListUserPassKeysNotFound
+			var response ListUserPasskeysNotFound
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5712,7 +5712,7 @@ func decodeListUserPassKeysResponse(resp *http.Response) (res ListUserPassKeysRe
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ListUserPassKeysInternalServerError
+			var response ListUserPasskeysInternalServerError
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5735,7 +5735,7 @@ func decodeListUserPassKeysResponse(resp *http.Response) (res ListUserPassKeysRe
 		}
 	}
 	// Default response.
-	res, err := func() (res ListUserPassKeysRes, err error) {
+	res, err := func() (res ListUserPasskeysRes, err error) {
 		ct, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 		if err != nil {
 			return res, errors.Wrap(err, "parse media type")

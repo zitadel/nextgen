@@ -13677,17 +13677,17 @@ func (s *ListSessionsUnauthorized) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes ListUserPassKeysBadRequest as json.
-func (s *ListUserPassKeysBadRequest) Encode(e *jx.Encoder) {
+// Encode encodes ListUserPasskeysBadRequest as json.
+func (s *ListUserPasskeysBadRequest) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes ListUserPassKeysBadRequest from json.
-func (s *ListUserPassKeysBadRequest) Decode(d *jx.Decoder) error {
+// Decode decodes ListUserPasskeysBadRequest from json.
+func (s *ListUserPasskeysBadRequest) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode ListUserPassKeysBadRequest to nil")
+		return errors.New("invalid: unable to decode ListUserPasskeysBadRequest to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -13698,34 +13698,34 @@ func (s *ListUserPassKeysBadRequest) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = ListUserPassKeysBadRequest(unwrapped)
+	*s = ListUserPasskeysBadRequest(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *ListUserPassKeysBadRequest) MarshalJSON() ([]byte, error) {
+func (s *ListUserPasskeysBadRequest) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ListUserPassKeysBadRequest) UnmarshalJSON(data []byte) error {
+func (s *ListUserPasskeysBadRequest) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes ListUserPassKeysForbidden as json.
-func (s *ListUserPassKeysForbidden) Encode(e *jx.Encoder) {
+// Encode encodes ListUserPasskeysForbidden as json.
+func (s *ListUserPasskeysForbidden) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes ListUserPassKeysForbidden from json.
-func (s *ListUserPassKeysForbidden) Decode(d *jx.Decoder) error {
+// Decode decodes ListUserPasskeysForbidden from json.
+func (s *ListUserPasskeysForbidden) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode ListUserPassKeysForbidden to nil")
+		return errors.New("invalid: unable to decode ListUserPasskeysForbidden to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -13736,34 +13736,34 @@ func (s *ListUserPassKeysForbidden) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = ListUserPassKeysForbidden(unwrapped)
+	*s = ListUserPasskeysForbidden(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *ListUserPassKeysForbidden) MarshalJSON() ([]byte, error) {
+func (s *ListUserPasskeysForbidden) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ListUserPassKeysForbidden) UnmarshalJSON(data []byte) error {
+func (s *ListUserPasskeysForbidden) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes ListUserPassKeysInternalServerError as json.
-func (s *ListUserPassKeysInternalServerError) Encode(e *jx.Encoder) {
+// Encode encodes ListUserPasskeysInternalServerError as json.
+func (s *ListUserPasskeysInternalServerError) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes ListUserPassKeysInternalServerError from json.
-func (s *ListUserPassKeysInternalServerError) Decode(d *jx.Decoder) error {
+// Decode decodes ListUserPasskeysInternalServerError from json.
+func (s *ListUserPasskeysInternalServerError) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode ListUserPassKeysInternalServerError to nil")
+		return errors.New("invalid: unable to decode ListUserPasskeysInternalServerError to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -13774,34 +13774,34 @@ func (s *ListUserPassKeysInternalServerError) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = ListUserPassKeysInternalServerError(unwrapped)
+	*s = ListUserPasskeysInternalServerError(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *ListUserPassKeysInternalServerError) MarshalJSON() ([]byte, error) {
+func (s *ListUserPasskeysInternalServerError) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ListUserPassKeysInternalServerError) UnmarshalJSON(data []byte) error {
+func (s *ListUserPasskeysInternalServerError) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes ListUserPassKeysNotFound as json.
-func (s *ListUserPassKeysNotFound) Encode(e *jx.Encoder) {
+// Encode encodes ListUserPasskeysNotFound as json.
+func (s *ListUserPasskeysNotFound) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes ListUserPassKeysNotFound from json.
-func (s *ListUserPassKeysNotFound) Decode(d *jx.Decoder) error {
+// Decode decodes ListUserPasskeysNotFound from json.
+func (s *ListUserPasskeysNotFound) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode ListUserPassKeysNotFound to nil")
+		return errors.New("invalid: unable to decode ListUserPasskeysNotFound to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -13812,57 +13812,19 @@ func (s *ListUserPassKeysNotFound) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = ListUserPassKeysNotFound(unwrapped)
+	*s = ListUserPasskeysNotFound(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *ListUserPassKeysNotFound) MarshalJSON() ([]byte, error) {
+func (s *ListUserPasskeysNotFound) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ListUserPassKeysNotFound) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes ListUserPassKeysUnauthorized as json.
-func (s *ListUserPassKeysUnauthorized) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes ListUserPassKeysUnauthorized from json.
-func (s *ListUserPassKeysUnauthorized) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode ListUserPassKeysUnauthorized to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = ListUserPassKeysUnauthorized(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *ListUserPassKeysUnauthorized) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ListUserPassKeysUnauthorized) UnmarshalJSON(data []byte) error {
+func (s *ListUserPasskeysNotFound) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -14116,6 +14078,44 @@ func (s *ListUserPasskeysResponsePasskeysItem) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *ListUserPasskeysResponsePasskeysItem) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ListUserPasskeysUnauthorized as json.
+func (s *ListUserPasskeysUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes ListUserPasskeysUnauthorized from json.
+func (s *ListUserPasskeysUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListUserPasskeysUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = ListUserPasskeysUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ListUserPasskeysUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListUserPasskeysUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

@@ -4746,8 +4746,8 @@ func decodeListSessionsParams(args [0]string, argsEscaped bool, r *http.Request)
 	return params, nil
 }
 
-// ListUserPassKeysParams is parameters of listUserPassKeys operation.
-type ListUserPassKeysParams struct {
+// ListUserPasskeysParams is parameters of listUserPasskeys operation.
+type ListUserPasskeysParams struct {
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results.
@@ -4760,7 +4760,7 @@ type ListUserPassKeysParams struct {
 	UserID    UserID
 }
 
-func unpackListUserPassKeysParams(packed middleware.Parameters) (params ListUserPassKeysParams) {
+func unpackListUserPasskeysParams(packed middleware.Parameters) (params ListUserPasskeysParams) {
 	{
 		key := middleware.ParameterKey{
 			Name: "limit",
@@ -4796,7 +4796,7 @@ func unpackListUserPassKeysParams(packed middleware.Parameters) (params ListUser
 	return params
 }
 
-func decodeListUserPassKeysParams(args [1]string, argsEscaped bool, r *http.Request) (params ListUserPassKeysParams, _ error) {
+func decodeListUserPasskeysParams(args [1]string, argsEscaped bool, r *http.Request) (params ListUserPasskeysParams, _ error) {
 	q := uri.NewQueryDecoder(r.URL.Query())
 	// Set default value for query: limit.
 	{

@@ -366,12 +366,12 @@ type Invoker interface {
 	//
 	// GET /sessions
 	ListSessions(ctx context.Context, params ListSessionsParams) (ListSessionsRes, error)
-	// ListUserPassKeys invokes listUserPassKeys operation.
+	// ListUserPasskeys invokes listUserPasskeys operation.
 	//
 	// List user passkeys.
 	//
 	// GET /users/{user_id}/passkeys
-	ListUserPassKeys(ctx context.Context, params ListUserPassKeysParams) (ListUserPassKeysRes, error)
+	ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (ListUserPasskeysRes, error)
 	// ListUsers invokes listUsers operation.
 	//
 	// List users.
@@ -6201,19 +6201,19 @@ func (c *Client) sendListSessions(ctx context.Context, params ListSessionsParams
 	return result, nil
 }
 
-// ListUserPassKeys invokes listUserPassKeys operation.
+// ListUserPasskeys invokes listUserPasskeys operation.
 //
 // List user passkeys.
 //
 // GET /users/{user_id}/passkeys
-func (c *Client) ListUserPassKeys(ctx context.Context, params ListUserPassKeysParams) (ListUserPassKeysRes, error) {
-	res, err := c.sendListUserPassKeys(ctx, params)
+func (c *Client) ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (ListUserPasskeysRes, error) {
+	res, err := c.sendListUserPasskeys(ctx, params)
 	return res, err
 }
 
-func (c *Client) sendListUserPassKeys(ctx context.Context, params ListUserPassKeysParams) (res ListUserPassKeysRes, err error) {
+func (c *Client) sendListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (res ListUserPasskeysRes, err error) {
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("listUserPassKeys"),
+		otelogen.OperationID("listUserPasskeys"),
 		semconv.HTTPRequestMethodKey.String("GET"),
 		semconv.URLTemplateKey.String("/users/{user_id}/passkeys"),
 	}
@@ -6231,7 +6231,7 @@ func (c *Client) sendListUserPassKeys(ctx context.Context, params ListUserPassKe
 	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
 
 	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, ListUserPassKeysOperation,
+	ctx, span := c.cfg.Tracer.Start(ctx, ListUserPasskeysOperation,
 		trace.WithAttributes(otelAttrs...),
 		clientSpanKind,
 	)
@@ -6346,7 +6346,7 @@ func (c *Client) sendListUserPassKeys(ctx context.Context, params ListUserPassKe
 		var satisfied bitset
 		{
 			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, ListUserPassKeysOperation, r); {
+			switch err := c.securityOAuth2(ctx, ListUserPasskeysOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
@@ -6383,7 +6383,7 @@ func (c *Client) sendListUserPassKeys(ctx context.Context, params ListUserPassKe
 	defer body.Close()
 
 	stage = "DecodeResponse"
-	result, err := decodeListUserPassKeysResponse(resp)
+	result, err := decodeListUserPasskeysResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

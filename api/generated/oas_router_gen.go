@@ -1502,7 +1502,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 								// Leaf node.
 								switch r.Method {
 								case "GET":
-									s.handleListUserPassKeysRequest([1]string{
+									s.handleListUserPasskeysRequest([1]string{
 										args[0],
 									}, elemIsEscaped, w, r)
 								default:
@@ -3006,9 +3006,9 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 								// Leaf node.
 								switch method {
 								case "GET":
-									r.name = ListUserPassKeysOperation
+									r.name = ListUserPasskeysOperation
 									r.summary = "List user passkeys"
-									r.operationID = "listUserPassKeys"
+									r.operationID = "listUserPasskeys"
 									r.operationGroup = ""
 									r.pathPattern = "/users/{user_id}/passkeys"
 									r.args = args
