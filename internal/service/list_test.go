@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func TestNormalizeLimit(t *testing.T) {
@@ -39,7 +39,7 @@ func TestMapListError(t *testing.T) {
 
 	t.Run("invalid cursor maps to request invalid", func(t *testing.T) {
 		t.Parallel()
-		err := mapListError(v2database.ErrInvalidCursor(), "failed to list projects")
+		err := mapListError(database.ErrInvalidCursor(), "failed to list projects")
 		require.ErrorIs(t, err, domain.ErrRequestInvalid())
 		var de domain.Error
 		require.ErrorAs(t, err, &de)
@@ -48,7 +48,7 @@ func TestMapListError(t *testing.T) {
 
 	t.Run("cursor order mismatch maps to request invalid", func(t *testing.T) {
 		t.Parallel()
-		err := mapListError(v2database.ErrCursorOrderMismatch(), "failed to list projects")
+		err := mapListError(database.ErrCursorOrderMismatch(), "failed to list projects")
 		require.ErrorIs(t, err, domain.ErrRequestInvalid())
 		var de domain.Error
 		require.ErrorAs(t, err, &de)
@@ -72,13 +72,13 @@ func TestParseSortDirection(t *testing.T) {
 	tests := []struct {
 		name      string
 		direction string
-		want      v2database.OrderDirection
+		want      database.OrderDirection
 		wantErr   error
 	}{
-		{name: "empty defaults to ascending", direction: "", want: v2database.OrderAsc},
-		{name: "asc", direction: sortAsc, want: v2database.OrderAsc},
-		{name: "desc", direction: sortDesc, want: v2database.OrderDesc},
-		{name: "unknown is invalid", direction: "sideways", want: v2database.OrderAsc, wantErr: domain.ErrRequestInvalid()},
+		{name: "empty defaults to ascending", direction: "", want: database.OrderAsc},
+		{name: "asc", direction: sortAsc, want: database.OrderAsc},
+		{name: "desc", direction: sortDesc, want: database.OrderDesc},
+		{name: "unknown is invalid", direction: "sideways", want: database.OrderAsc, wantErr: domain.ErrRequestInvalid()},
 	}
 
 	for _, tc := range tests {
@@ -98,21 +98,21 @@ func TestParseSortDirection(t *testing.T) {
 func TestCompareFilter(t *testing.T) {
 	t.Parallel()
 
-	col := v2database.Col(domain.ProjectFieldCreatedAt)
+	col := database.Col(domain.ProjectFieldCreatedAt)
 	ts := time.Now().UTC().Truncate(time.Second)
 
 	tests := []struct {
 		name    string
 		op      string
 		value   any
-		want    v2database.Filter[domain.ProjectField]
+		want    database.Filter[domain.ProjectField]
 		wantErr error
 	}{
-		{name: "equals string", op: filterOpEquals, value: "v", want: v2database.Equal(col, "v")},
-		{name: "equals time", op: filterOpEquals, value: ts, want: v2database.Equal(col, ts)},
-		{name: "equals int", op: filterOpEquals, value: 42, want: v2database.Equal(col, 42)},
-		{name: "less_than time", op: filterOpLessThan, value: ts, want: v2database.LessThan(col, ts)},
-		{name: "greater_than time", op: filterOpGreaterThan, value: ts, want: v2database.GreaterThan(col, ts)},
+		{name: "equals string", op: filterOpEquals, value: "v", want: database.Equal(col, "v")},
+		{name: "equals time", op: filterOpEquals, value: ts, want: database.Equal(col, ts)},
+		{name: "equals int", op: filterOpEquals, value: 42, want: database.Equal(col, 42)},
+		{name: "less_than time", op: filterOpLessThan, value: ts, want: database.LessThan(col, ts)},
+		{name: "greater_than time", op: filterOpGreaterThan, value: ts, want: database.GreaterThan(col, ts)},
 		{name: "not_equals not implemented", op: filterOpNotEquals, value: "v", wantErr: domain.ErrNotImplemented()},
 		{name: "less_than_or_equal not implemented", op: filterOpLessThanOrEqual, value: "v", wantErr: domain.ErrNotImplemented()},
 		{name: "greater_than_or_equal not implemented", op: filterOpGreaterThanOrEqual, value: "v", wantErr: domain.ErrNotImplemented()},
@@ -139,17 +139,17 @@ func TestCompareFilter(t *testing.T) {
 func TestStringFilter(t *testing.T) {
 	t.Parallel()
 
-	col := v2database.Col(domain.ProjectFieldName)
+	col := database.Col(domain.ProjectFieldName)
 	value := "acme"
 
 	tests := []struct {
 		name    string
 		op      string
-		want    v2database.Filter[domain.ProjectField]
+		want    database.Filter[domain.ProjectField]
 		wantErr error
 	}{
-		{name: "equals", op: filterOpEquals, want: v2database.StringEqual(col, value)},
-		{name: "contains", op: filterOpContains, want: v2database.StringContains(col, value)},
+		{name: "equals", op: filterOpEquals, want: database.StringEqual(col, value)},
+		{name: "contains", op: filterOpContains, want: database.StringContains(col, value)},
 		{name: "not_equals not implemented", op: filterOpNotEquals, wantErr: domain.ErrNotImplemented()},
 		{name: "not_contains not implemented", op: filterOpNotContains, wantErr: domain.ErrNotImplemented()},
 		{name: "less_than is invalid for a string field", op: filterOpLessThan, wantErr: domain.ErrRequestInvalid()},

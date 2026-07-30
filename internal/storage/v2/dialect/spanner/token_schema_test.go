@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
 
@@ -23,9 +23,9 @@ func TestTokenSchema_CursorPreservesLargeInt64IDs(t *testing.T) {
 		SessionID: &sess,
 	}
 
-	cols := []v2database.Column[domain.TokenField]{
-		v2database.Col(domain.TokenFieldTokenID),
-		v2database.Col(domain.TokenFieldSessionID),
+	cols := []database.Column[domain.TokenField]{
+		database.Col(domain.TokenFieldTokenID),
+		database.Col(domain.TokenFieldSessionID),
 	}
 	values := tokenSchema.ValuesFrom(tok, cols)
 	require.Len(t, values, 2)
@@ -47,8 +47,8 @@ func TestTokenSchema_CursorPreservesLargeInt64IDs(t *testing.T) {
 func TestTokenSchema_CursorRejectsJSONFloatIDs(t *testing.T) {
 	t.Parallel()
 
-	cols := []v2database.Column[domain.TokenField]{
-		v2database.Col(domain.TokenFieldTokenID),
+	cols := []database.Column[domain.TokenField]{
+		database.Col(domain.TokenFieldTokenID),
 	}
 	_, err := tokenSchema.CoerceCursorValues(cols, []any{float64(math.MaxInt64)})
 	require.Error(t, err)
