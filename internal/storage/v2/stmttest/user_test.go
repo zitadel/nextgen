@@ -12,7 +12,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func ensureUserTestProject(t *testing.T) (projectID, schemaURL string) {
@@ -43,12 +43,12 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 	require.NoError(t, stmts.CreateUser(ctx, user1))
 	require.NoError(t, stmts.CreateUser(ctx, user2))
 
-	list, err := stmts.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
-		Filter: v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
-		Pagination: v2database.Page[domain.UserField]{
-			OrderBy: v2database.OrderBy[domain.UserField]{
-				Columns:   []v2database.Column[domain.UserField]{v2database.Col(domain.UserFieldID)},
-				Direction: v2database.OrderAsc,
+	list, err := stmts.ListUsers(ctx, &database.ListOptions[domain.UserField]{
+		Filter: database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		Pagination: database.Page[domain.UserField]{
+			OrderBy: database.OrderBy[domain.UserField]{
+				Columns:   []database.Column[domain.UserField]{database.Col(domain.UserFieldID)},
+				Direction: database.OrderAsc,
 			},
 		},
 	}, service.UserQueryOptions{
@@ -64,8 +64,8 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 		{Key: "email", Value: "alpha@example.com"},
 		{Key: "name", Value: "Alpha"},
 	}
-	matches, err := stmts.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
-		Filter: v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
+	matches, err := stmts.ListUsers(ctx, &database.ListOptions[domain.UserField]{
+		Filter: database.Equal(database.Col(domain.UserFieldProjectID), projectID),
 	}, service.UserQueryOptions{
 		Attributes:    attrs,
 		AttributeKeys: []string{"email", "name"},
@@ -79,7 +79,7 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 	})
 
 	got, err := stmts.GetUser(ctx,
-		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
 		service.UserQueryOptions{
 			Attributes:    attrs,
 			AttributeKeys: []string{"email", "name"},
@@ -102,16 +102,16 @@ func TestUserStatements_ListUsersAttributesAndAttributeKeys(t *testing.T) {
 	require.NoError(t, stmts.CreateUser(ctx, user1))
 	require.NoError(t, stmts.CreateUser(ctx, user2))
 
-	projectFilter := v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID)
-	orderByID := v2database.Page[domain.UserField]{
-		OrderBy: v2database.OrderBy[domain.UserField]{
-			Columns:   []v2database.Column[domain.UserField]{v2database.Col(domain.UserFieldID)},
-			Direction: v2database.OrderAsc,
+	projectFilter := database.Equal(database.Col(domain.UserFieldProjectID), projectID)
+	orderByID := database.Page[domain.UserField]{
+		OrderBy: database.OrderBy[domain.UserField]{
+			Columns:   []database.Column[domain.UserField]{database.Col(domain.UserFieldID)},
+			Direction: database.OrderAsc,
 		},
 	}
 
 	t.Run("AttributesMatchOnly", func(t *testing.T) {
-		list, err := stmts.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+		list, err := stmts.ListUsers(ctx, &database.ListOptions[domain.UserField]{
 			Filter: projectFilter,
 		}, service.UserQueryOptions{
 			Attributes: []domain.Attribute{{Key: "email", Value: "alpha@example.com"}},
@@ -126,7 +126,7 @@ func TestUserStatements_ListUsersAttributesAndAttributeKeys(t *testing.T) {
 	})
 
 	t.Run("AttributesMatchWithSubsetAttributeKeys", func(t *testing.T) {
-		list, err := stmts.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+		list, err := stmts.ListUsers(ctx, &database.ListOptions[domain.UserField]{
 			Filter: projectFilter,
 		}, service.UserQueryOptions{
 			Attributes: []domain.Attribute{
@@ -144,7 +144,7 @@ func TestUserStatements_ListUsersAttributesAndAttributeKeys(t *testing.T) {
 	})
 
 	t.Run("AttributeKeysOnlyHydrate", func(t *testing.T) {
-		list, err := stmts.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+		list, err := stmts.ListUsers(ctx, &database.ListOptions[domain.UserField]{
 			Filter:     projectFilter,
 			Pagination: orderByID,
 		}, service.UserQueryOptions{
@@ -165,13 +165,13 @@ func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
 
 	require.NoError(t, stmts.CreateTeam(ctx, newTestTeam(projectID, teamID)))
 
-	orderByID := v2database.Page[domain.UserField]{
-		OrderBy: v2database.OrderBy[domain.UserField]{
-			Columns:   []v2database.Column[domain.UserField]{v2database.Col(domain.UserFieldID)},
-			Direction: v2database.OrderAsc,
+	orderByID := database.Page[domain.UserField]{
+		OrderBy: database.OrderBy[domain.UserField]{
+			Columns:   []database.Column[domain.UserField]{database.Col(domain.UserFieldID)},
+			Direction: database.OrderAsc,
 		},
 	}
-	projectFilter := v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID)
+	projectFilter := database.Equal(database.Col(domain.UserFieldProjectID), projectID)
 
 	t.Run("AttributesAndLimit", func(t *testing.T) {
 		for _, spec := range []struct {
@@ -185,9 +185,9 @@ func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
 			require.NoError(t, stmts.CreateUser(ctx, user))
 		}
 
-		page, err := stmts.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+		page, err := stmts.ListUsers(ctx, &database.ListOptions[domain.UserField]{
 			Filter: projectFilter,
-			Pagination: v2database.Page[domain.UserField]{
+			Pagination: database.Page[domain.UserField]{
 				OrderBy: orderByID.OrderBy,
 				Limit:   2,
 			},
@@ -199,9 +199,9 @@ func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
 		assert.NotEmpty(t, page.NextCursor)
 		assert.Equal(t, []string{"user_unified_1", "user_unified_2"}, userIDs(page.Items))
 
-		page2, err := stmts.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+		page2, err := stmts.ListUsers(ctx, &database.ListOptions[domain.UserField]{
 			Filter: projectFilter,
-			Pagination: v2database.Page[domain.UserField]{
+			Pagination: database.Page[domain.UserField]{
 				OrderBy: orderByID.OrderBy,
 				Limit:   2,
 				Cursor:  page.NextCursor,
@@ -226,9 +226,9 @@ func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
 			Status:    domain.MembershipStatusActive,
 		}))
 
-		list, err := stmts.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+		list, err := stmts.ListUsers(ctx, &database.ListOptions[domain.UserField]{
 			Filter: projectFilter,
-			Pagination: v2database.Page[domain.UserField]{
+			Pagination: database.Page[domain.UserField]{
 				OrderBy: orderByID.OrderBy,
 			},
 		}, service.UserQueryOptions{
@@ -254,9 +254,9 @@ func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
 			}
 		}
 
-		list, err := stmts.ListUsers(ctx, &v2database.ListOptions[domain.UserField]{
+		list, err := stmts.ListUsers(ctx, &database.ListOptions[domain.UserField]{
 			Filter: projectFilter,
-			Pagination: v2database.Page[domain.UserField]{
+			Pagination: database.Page[domain.UserField]{
 				OrderBy: orderByID.OrderBy,
 				Limit:   2,
 			},

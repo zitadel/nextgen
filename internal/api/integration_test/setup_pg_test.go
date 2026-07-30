@@ -10,7 +10,6 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 	"github.com/zitadel/nextgen/internal/service"
-	v2dbtest "github.com/zitadel/nextgen/internal/storage/v2/dbtest"
 )
 
 func TestMain(m *testing.M) {
@@ -20,7 +19,7 @@ func TestMain(m *testing.M) {
 func runTests(m *testing.M) int {
 	ctx := context.Background()
 
-	pool, stop, err := v2dbtest.Postgres(ctx)
+	pool, stop, err := dbtest.Postgres(ctx)
 	if err != nil {
 		slog.Error("setup: failed to start database", slogctx.Err(err))
 		return 1

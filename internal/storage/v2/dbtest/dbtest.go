@@ -9,16 +9,16 @@ import (
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/service"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // Pool is a migrated v2 pool usable for both storage lifecycle and statements.
 type Pool interface {
-	v2database.Pool
+	database.Pool
 	service.Pool
 }
 
-func asPool(pool v2database.Pool) (Pool, error) {
+func asPool(pool database.Pool) (Pool, error) {
 	p, ok := pool.(Pool)
 	if !ok {
 		return nil, fmt.Errorf("dbtest: pool %T does not implement dbtest.Pool", pool)
