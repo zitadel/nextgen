@@ -101,8 +101,8 @@ func scanEncryptionKey(rows *sql.Rows) (*domain.EncryptionKey, error) {
 	key := new(domain.EncryptionKey)
 	var (
 		algorithmStr, stateStr, purposeStr string
-		createdNano                         int64
-		activatedNano, retiredNano          sql.NullInt64
+		createdNano                        int64
+		activatedNano, retiredNano         sql.NullInt64
 	)
 	if err := rows.Scan(
 		&key.ID, &key.ProjectID, &key.Key, &algorithmStr, &stateStr,

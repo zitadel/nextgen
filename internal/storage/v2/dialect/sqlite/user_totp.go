@@ -157,9 +157,9 @@ func (us userTOTPStatements) DeleteUserTOTP(ctx context.Context, filter database
 func scanUserTOTP(rows *sql.Rows) (*domain.UserTOTP, error) {
 	totp := new(domain.UserTOTP)
 	var (
-		verifiedNano        sql.NullInt64
-		lastSuccessNano     sql.NullInt64
-		failedAttempts      int64
+		verifiedNano         sql.NullInt64
+		lastSuccessNano      sql.NullInt64
+		failedAttempts       int64
 		createdNano, updNano int64
 	)
 	if err := rows.Scan(

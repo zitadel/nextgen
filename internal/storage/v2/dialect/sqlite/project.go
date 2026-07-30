@@ -84,7 +84,7 @@ func (ps projectStatements) UpdateProject(ctx context.Context, project *domain.P
 
 func (ps projectStatements) scanProjectRow(row *sql.Row, project *domain.Project) error {
 	var (
-		originsStr          string
+		originsStr           string
 		createdNano, updNano int64
 	)
 	if err := row.Scan(&project.ID, &project.Name, &originsStr, &createdNano, &updNano); err != nil {

@@ -84,8 +84,8 @@ func (b brandingStatements) ListBrandings(ctx context.Context, filter *database.
 
 func scanBranding(rows *sql.Rows) (*domain.Branding, error) {
 	var (
-		projectID  string
-		id         string
+		projectID   string
+		id          string
 		createdNano int64
 		definition  sql.NullString
 	)

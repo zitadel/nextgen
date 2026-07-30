@@ -184,12 +184,12 @@ func (ps userPasskeyStatements) DeleteUserPasskey(ctx context.Context, filter da
 func scanUserPasskey(rows *sql.Rows) (*domain.UserPasskey, error) {
 	p := new(domain.UserPasskey)
 	var (
-		aaguid            []byte
-		attestationType   sql.NullString
-		transportsStr     string
-		name              sql.NullString
-		verifiedNano      sql.NullInt64
-		lastUsedNano      sql.NullInt64
+		aaguid               []byte
+		attestationType      sql.NullString
+		transportsStr        string
+		name                 sql.NullString
+		verifiedNano         sql.NullInt64
+		lastUsedNano         sql.NullInt64
 		createdNano, updNano int64
 	)
 	if err := rows.Scan(

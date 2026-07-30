@@ -136,8 +136,8 @@ func (f flowDefinitionStatements) DeleteFlowDefinitionByID(ctx context.Context, 
 func (f flowDefinitionStatements) scanFlowDefinition(rows *sql.Rows) (*domain.FlowDefinition, error) {
 	var (
 		projectID, id, name, schemaVersion, statusStr string
-		definitionStr                                  sql.NullString
-		createdNano, updatedNano                       int64
+		definitionStr                                 sql.NullString
+		createdNano, updatedNano                      int64
 	)
 	if err := rows.Scan(&projectID, &id, &name, &schemaVersion, &statusStr, &definitionStr, &createdNano, &updatedNano); err != nil {
 		return nil, err

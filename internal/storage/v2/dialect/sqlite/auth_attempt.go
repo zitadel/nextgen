@@ -371,7 +371,7 @@ func (as authAttemptStatements) AuthAttemptChallengeFailed(ctx context.Context, 
 		return err
 	}
 	var (
-		failureCount int64
+		failureCount   int64
 		lastFailedNano int64
 	)
 	err = as.client.QueryRow(ctx, authAttemptChallengeFailedStmt,

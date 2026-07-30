@@ -376,16 +376,16 @@ func scanSessions(rows *sql.Rows) ([]*domain.Session, error) {
 	order := []string{}
 	for rows.Next() {
 		var (
-			projectID                          string
-			sessionID, tokenID                 int64
-			createdNano, updatedNano, expiresNano int64
-			timeToLiveNanos                    int64
-			userID                             sql.NullString
-			userAgentID                        sql.NullInt64
-			userAgentInfo                      sql.NullString
-			checkType, checkID, failureCount   sql.NullInt64
+			projectID                                            string
+			sessionID, tokenID                                   int64
+			createdNano, updatedNano, expiresNano                int64
+			timeToLiveNanos                                      int64
+			userID                                               sql.NullString
+			userAgentID                                          sql.NullInt64
+			userAgentInfo                                        sql.NullString
+			checkType, checkID, failureCount                     sql.NullInt64
 			lastChallengedNano, lastVerifiedNano, lastFailedNano sql.NullInt64
-			challengePayload, factorPayload    sql.NullString
+			challengePayload, factorPayload                      sql.NullString
 		)
 		if err := rows.Scan(
 			&projectID, &sessionID, &createdNano, &updatedNano, &expiresNano, &timeToLiveNanos, &tokenID, &userID,

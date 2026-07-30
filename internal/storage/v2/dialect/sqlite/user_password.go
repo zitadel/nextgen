@@ -172,11 +172,11 @@ func (ps userPasswordStatements) DeleteUserPassword(ctx context.Context, filter 
 func scanUserPassword(rows *sql.Rows) (*domain.UserPassword, error) {
 	pw := new(domain.UserPassword)
 	var (
-		verificationID      sql.NullString
-		lastSuccessNano     sql.NullInt64
-		changedNano         int64
+		verificationID       sql.NullString
+		lastSuccessNano      sql.NullInt64
+		changedNano          int64
 		createdNano, updNano int64
-		failedAttempts      int64
+		failedAttempts       int64
 	)
 	if err := rows.Scan(
 		&pw.ID,
