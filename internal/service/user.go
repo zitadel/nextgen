@@ -32,12 +32,6 @@ type SetPasswordInput struct {
 	IsPasswordChangeRequired bool
 }
 
-type UpdateUserInput struct {
-	ProjectID string
-	UserID    string
-	User      map[string]any
-}
-
 type GetUserInput struct {
 	ProjectID string
 	TeamID    *string

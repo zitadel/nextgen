@@ -154,7 +154,7 @@ func (s cryptoKeyStatements) CreateSigningKey(ctx context.Context, key *domain.S
 	})
 }
 
-// GetEncryptionKey implements [service.CryptoKeyStatements].
+// GetSigningKey implements [service.CryptoKeyStatements].
 func (s cryptoKeyStatements) GetSigningKey(ctx context.Context, filter database.Filter[domain.SigningKeyField]) (*domain.SigningKey, error) {
 	var compiler statementCompiler
 	err := compileRead(
