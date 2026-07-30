@@ -266,7 +266,9 @@ scoped SQL query against data we already own.
    `project.app.read`, `project.app.write`, `project.app.delete` — and
    extend to all Zitadel resource types.
 2. Design relational migrations for `resource_scope_index` and agent
-   delegation tables.
+   delegation tables. Wave 0 DDL spike and locked decisions:
+   [`docs/design/api/permission-storage.md`](../design/api/permission-storage.md)
+   (implementation tracked by [issue #422](https://github.com/zitadel/nextgen/issues/422)).
 3. Update OpenAPI security declarations to use the final permission names.
 4. Define agent delegation schema, audit record shape, and denial
    explanation fields.
