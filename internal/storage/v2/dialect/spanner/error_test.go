@@ -73,6 +73,11 @@ func TestWrapError(t *testing.T) {
 			want: new(database.ForeignKeyError),
 		},
 		{
+			name: "grpc out of range check",
+			err:  status.Error(codes.OutOfRange, "Check constraint `teams`.`chk_teams_name` is violated for key (proj_1,team_1)"),
+			want: new(database.CheckError),
+		},
+		{
 			name: "unknown error",
 			err:  errors.New("driver exploded"),
 			want: new(database.UnknownError),

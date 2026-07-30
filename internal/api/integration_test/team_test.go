@@ -3,6 +3,9 @@
 package integration_test
 
 import (
+	"io"
+	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -147,6 +150,50 @@ func TestCreateTeam(t *testing.T) {
 			assert.Equal(t, api.ErrorCode("team.name_invalid"), badRequest.Code)
 		})
 	})
+}
+
+// TestCreateTeamRawRequest sends raw bodies (e.g., from a curl request or from a non-generated SDK).
+func TestCreateTeamRawRequest(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	for _, tc := range []struct {
+		name     string
+		teamName string
+	}{
+		{"empty name", ""},
+		{"name over the length limit", strings.Repeat("a", domain.TeamNameMaxLength+1)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			body := helpers.MustMarshal(t, api.CreateTeamRequest{Name: tc.teamName})
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+				harness.EnsureTestServer(t).URL+"/teams?project_id="+url.QueryEscape(project.ID),
+				strings.NewReader(body),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+client.Token())
+
+			resp, err := harness.EnsureHttpClient(t).Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			raw, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(raw))
+			details := helpers.MustUnmarshal[api.ErrorDetails](t, raw)
+			assert.Equal(t, api.ErrorCode("req.invalid"), details.Code)
+		})
+	}
 }
 
 func TestGetTeam(t *testing.T) {

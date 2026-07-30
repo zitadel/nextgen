@@ -37,7 +37,8 @@ func wrapError(err error) error {
 		return database.NewNoRowFoundError(err)
 	case codes.AlreadyExists:
 		return database.NewUniqueError("", "", err)
-	case codes.FailedPrecondition, codes.InvalidArgument:
+	// A violated CHECK constraint arrives as OutOfRange.
+	case codes.FailedPrecondition, codes.InvalidArgument, codes.OutOfRange:
 		return classifyIntegrityError(err)
 	default:
 		if strings.HasPrefix(err.Error(), "scany: expected 1 row, got: ") {
@@ -50,8 +51,8 @@ func wrapError(err error) error {
 	}
 }
 
-// classifyIntegrityError maps Spanner FailedPrecondition / InvalidArgument
-// messages onto the same typed integrity errors Postgres returns.
+// classifyIntegrityError maps Spanner integrity failures onto the same typed
+// errors Postgres returns.
 func classifyIntegrityError(err error) error {
 	msg := strings.ToLower(err.Error())
 	switch {
