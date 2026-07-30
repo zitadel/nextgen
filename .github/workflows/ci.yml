@@ -29,8 +29,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: moonrepo/setup-toolchain@v0
-
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -47,6 +45,11 @@ jobs:
 
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
+
+      # Bare `moon` below is the workspace's own pinned @moonrepo/cli, so CI
+      # runs the exact version the lockfile resolves — same as local dev.
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Detect CI mode
         id: ci-mode
@@ -70,7 +73,7 @@ jobs:
       - name: Run Moon build and test graph
         id: moon-ci
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: moon ci :lint :typecheck :build :test :test-browser
+        run: moon ci :lint :typecheck :build :test :test-browser :check-adrs
 
       - name: Report Moon CI failures
         if: ${{ failure() && steps.moon-ci.conclusion == 'failure' }}
