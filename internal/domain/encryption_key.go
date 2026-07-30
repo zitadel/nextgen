@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	PrefixEncryptionKey ResourcePrefix = "encryption_key"
+	PrefixEncryptionKey ResourcePrefix = "enc_key"
 )
 
 func ErrSupportedEncryptionAlgorithm(alg jose.ContentEncryption) Error {
