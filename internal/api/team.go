@@ -35,7 +35,7 @@ func (h *Handler) GetTeam(ctx context.Context, params api.GetTeamParams) (api.Ge
 	if err != nil {
 		return nil, err
 	}
-	return &api.GetTeamResponse{
+	return &api.TeamResponse{
 		ID:        team.ID,
 		Name:      team.Name,
 		CreatedAt: team.CreatedAt,

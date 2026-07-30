@@ -592,6 +592,15 @@ func (UnimplementedHandler) UpdateFlowDefinition(ctx context.Context, req *FlowD
 	return r, ht.ErrNotImplemented
 }
 
+// UpdateTeam implements updateTeam operation.
+//
+// Update team. Only active teams can be updated.
+//
+// PATCH /teams/{team_id}
+func (UnimplementedHandler) UpdateTeam(ctx context.Context, req *UpdateTeamRequest, params UpdateTeamParams) (r UpdateTeamRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // VerifyChallengeProof implements verifyChallengeProof operation.
 //
 // Submits a proof (credential, code, assertion) to verify a factor challenge.

@@ -176,7 +176,7 @@ func TestGetTeam(t *testing.T) {
 		resp, err := client.GetTeam(t.Context(), params)
 		require.NoError(t, err)
 
-		got, ok := resp.(*api.GetTeamResponse)
+		got, ok := resp.(*api.TeamResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
 		assert.Equal(t, team.Name, got.Name)
 	})
