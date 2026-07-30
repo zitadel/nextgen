@@ -33,7 +33,7 @@ func ErrSessionTokenInvalid() Error {
 }
 
 func ErrSessionPermissionDenied() Error {
-	return newError(PrefixSession.ErrorCodePrefix("permission_denied"), "session: requires an operator-grade token bound to the project (project.write or a session.* scope)", nil, nil)
+	return newError(PrefixSession.ErrorCodePrefix("permission_denied"), "session: requires a session.* scope bound to the project", nil, nil)
 }
 
 func ErrSessionInvalidTTL() Error {

@@ -41,15 +41,14 @@ const (
 // resource's errorResponse switch).
 type resourceAccess struct {
 	// scopes lists, per operation, the finer per-resource scopes declared in
-	// the OpenAPI contract (which become mintable with ADR 036's credential
-	// planes; until then the legacy operator-grade project.write implies all
-	// of them and is accepted everywhere without being listed here).
+	// the OpenAPI contract.
 	scopes map[accessOp][]string
-	// strictScopes opts the resource out of the project.write umbrella: only
-	// the scopes listed above reach the operation. Use it where the umbrella
-	// would grant a materially different blast radius than project
-	// administration, not merely a wider one.
-	strictScopes bool
+	// legacyProjectWriteUmbrella temporarily lets the project secret's
+	// project.write scope satisfy the finer scopes above. Strict matching is
+	// the default and target model; set this only on resources that existing
+	// callers cannot reach until ADR 036's credential planes mint their
+	// resource-specific scopes.
+	legacyProjectWriteUmbrella bool
 	// readMiss and writeMiss are the anti-oracle answers for a project the
 	// token is not bound to; writeMiss doubles as the nonexistent-project
 	// answer since the guard cannot (and must not) tell the two apart.
@@ -63,9 +62,10 @@ var schemaAccess = resourceAccess{
 		opRead:  {"schema.read", "schema.write"},
 		opWrite: {"schema.write"},
 	},
-	readMiss:  domain.ErrJSONSchemaNotFound,
-	writeMiss: func() domain.Error { return domain.ErrJSONSchemaInvalid().WithDetails("project does not exist") },
-	denied:    domain.ErrJSONSchemaPermissionDenied,
+	legacyProjectWriteUmbrella: true,
+	readMiss:                  domain.ErrJSONSchemaNotFound,
+	writeMiss:                 func() domain.Error { return domain.ErrJSONSchemaInvalid().WithDetails("project does not exist") },
+	denied:                    domain.ErrJSONSchemaPermissionDenied,
 }
 
 var flowDefinitionAccess = resourceAccess{
@@ -74,9 +74,10 @@ var flowDefinitionAccess = resourceAccess{
 		opWrite:  {"flow_definitions.write"},
 		opDelete: {"flow_definitions.delete"},
 	},
-	readMiss:  domain.ErrFlowDefinitionNotFound,
-	writeMiss: func() domain.Error { return domain.ErrFlowDefinitionInvalid("project does not exist", nil) },
-	denied:    domain.ErrFlowDefinitionPermissionDenied,
+	legacyProjectWriteUmbrella: true,
+	readMiss:                  domain.ErrFlowDefinitionNotFound,
+	writeMiss:                 func() domain.Error { return domain.ErrFlowDefinitionInvalid("project does not exist", nil) },
+	denied:                    domain.ErrFlowDefinitionPermissionDenied,
 }
 
 var userAccess = resourceAccess{
@@ -84,9 +85,10 @@ var userAccess = resourceAccess{
 		opRead:  {"user.read", "user.write"},
 		opWrite: {"user.write"},
 	},
-	readMiss:  domain.ErrUserNotFound,
-	writeMiss: func() domain.Error { return domain.ErrUserInvalid().WithDetails("project does not exist") },
-	denied:    domain.ErrUserPermissionDenied,
+	legacyProjectWriteUmbrella: true,
+	readMiss:                  domain.ErrUserNotFound,
+	writeMiss:                 func() domain.Error { return domain.ErrUserInvalid().WithDetails("project does not exist") },
+	denied:                    domain.ErrUserPermissionDenied,
 }
 
 var teamAccess = resourceAccess{
@@ -94,7 +96,8 @@ var teamAccess = resourceAccess{
 		opRead:  {"team.read", "team.write"},
 		opWrite: {"team.write"},
 	},
-	readMiss: domain.ErrTeamNotFound,
+	legacyProjectWriteUmbrella: true,
+	readMiss:                  domain.ErrTeamNotFound,
 	// The team service already answers nonexistent projects with
 	// team.project_not_found; foreign projects must be indistinguishable.
 	writeMiss: domain.ErrTeamProjectNotFound,
@@ -106,10 +109,10 @@ var teamAccess = resourceAccess{
 // Both plural (current OpenAPI) and singular (catalog target) finer scopes are
 // accepted so project binding does not depend on the rename landing first.
 //
-// This is the one strict row: revoking sessions is an end-user-facing runtime
-// act — one call logs a person out, a loop logs out a project — which is a
-// different blast radius from editing project configuration, so the legacy
-// project.write umbrella must not reach it. No credential mints session.*
+// Strict scope matching is the default. Revoking sessions is an end-user-facing
+// runtime act — one call logs a person out, a loop logs out a project — which
+// is a different blast radius from editing project configuration, so this row
+// does not opt into the legacy project.write umbrella. No credential mints session.*
 // today (project secrets carry project.write + project.read, preview secrets
 // project.read), so these operator endpoints answer permission_denied until
 // ADR 036's credential planes issue the app-plane scopes. Failing closed is
@@ -120,10 +123,9 @@ var sessionAccess = resourceAccess{
 		opRead:   {"session.read", "sessions.read", "session.write", "sessions.write"},
 		opDelete: {"session.delete", "sessions.delete"},
 	},
-	strictScopes: true,
-	readMiss:     domain.ErrSessionNotFound,
-	writeMiss:    domain.ErrSessionNotFound,
-	denied:       domain.ErrSessionPermissionDenied,
+	readMiss:  domain.ErrSessionNotFound,
+	writeMiss: domain.ErrSessionNotFound,
+	denied:    domain.ErrSessionPermissionDenied,
 }
 
 // brandingAccess is the row this access model was generalized from (ADR 040,
@@ -135,9 +137,10 @@ var brandingAccess = resourceAccess{
 		opRead:  {"branding.read", "branding.write"},
 		opWrite: {"branding.write"},
 	},
-	readMiss:  domain.ErrBrandingNotFound,
-	writeMiss: func() domain.Error { return domain.ErrBrandingInvalid("project does not exist", nil) },
-	denied:    domain.ErrBrandingPermissionDenied,
+	legacyProjectWriteUmbrella: true,
+	readMiss:                  domain.ErrBrandingNotFound,
+	writeMiss:                 func() domain.Error { return domain.ErrBrandingInvalid("project does not exist", nil) },
+	denied:                    domain.ErrBrandingPermissionDenied,
 }
 
 // projectAccess deliberately lists no finer read scope: project.read is the
@@ -145,10 +148,11 @@ var brandingAccess = resourceAccess{
 // operator read. Until ADR 036 splits the schemes, project.write is the only
 // scope that reaches project management operations.
 var projectAccess = resourceAccess{
-	scopes:    map[accessOp][]string{},
-	readMiss:  domain.ErrProjectNotFound,
-	writeMiss: domain.ErrProjectNotFound,
-	denied:    domain.ErrProjectPermissionDenied,
+	scopes:                     map[accessOp][]string{},
+	legacyProjectWriteUmbrella: true,
+	readMiss:                   domain.ErrProjectNotFound,
+	writeMiss:                  domain.ErrProjectNotFound,
+	denied:                     domain.ErrProjectPermissionDenied,
 }
 
 // requireProjectAccess gates a management operation: the bearer must be bound
@@ -172,13 +176,14 @@ func requireProjectAccess(ctx context.Context, projectID string, res resourceAcc
 	return nil
 }
 
-// allows reports whether the granted scopes reach op on this resource,
-// honouring strictScopes.
+// allows reports whether the granted scopes reach op on this resource.
+// Matching is strict by default; only explicitly marked legacy rows admit the
+// project.write umbrella.
 func (res resourceAccess) allows(granted []string, op accessOp) bool {
-	if res.strictScopes {
-		return scopeListed(granted, res.scopes[op])
+	if res.legacyProjectWriteUmbrella {
+		return scopeAllowed(granted, res.scopes[op])
 	}
-	return scopeAllowed(granted, res.scopes[op])
+	return scopeListed(granted, res.scopes[op])
 }
 
 // scopeAllowed reports whether any granted scope reaches the operation:

@@ -69,7 +69,7 @@ func TestResourceAccessScopes(t *testing.T) {
 		{"session.read cannot delete", sessionAccess, opDelete, "session.read", false},
 		{"session.delete deletes", sessionAccess, opDelete, "session.delete", true},
 		{"sessions.delete deletes", sessionAccess, opDelete, "sessions.delete", true},
-		// The strict row: sessions are the one resource the umbrella misses.
+		// Strict is the default: sessions do not opt into the legacy umbrella.
 		{"project.write does not read sessions", sessionAccess, opRead, "project.write", false},
 		{"project.write does not revoke sessions", sessionAccess, opDelete, "project.write", false},
 
@@ -129,8 +129,9 @@ func TestRequireProjectAccess(t *testing.T) {
 			readMiss: domain.ErrTeamNotFound().Code, writeMiss: domain.ErrTeamProjectNotFound().Code,
 			denied: domain.ErrTeamPermissionDenied().Code,
 		},
-		// sessionAccess is deliberately absent: it is the one strict resource,
-		// so the project secret does not reach it. See the dedicated subtest.
+		// sessionAccess is deliberately absent: it does not opt into the
+		// legacy umbrella, so the project secret does not reach it. See the
+		// dedicated subtest.
 		{
 			name:     "project",
 			res:      projectAccess,
@@ -180,8 +181,9 @@ func TestRequireProjectAccess(t *testing.T) {
 
 	})
 
-	// Sessions opt out of the project.write umbrella (see sessionAccess):
-	// revoking sessions logs people out, which is not project administration.
+	// Sessions keep the strict default rather than opting into the legacy
+	// project.write umbrella: revoking sessions logs people out, which is not
+	// project administration.
 	t.Run("session management refuses the project.write umbrella", func(t *testing.T) {
 		err := requireProjectAccess(operator, "proj_a", sessionAccess, opRead)
 		assertDomainCode(t, err, domain.ErrSessionPermissionDenied().Code)
@@ -209,7 +211,8 @@ func TestRequireProjectAccess(t *testing.T) {
 		}
 
 		// Binding is checked before scopes, so a foreign project still misses
-		// rather than denying — the anti-oracle answer holds for strict rows.
+		// rather than denying — the anti-oracle answer holds under strict
+		// matching too.
 		err = requireProjectAccess(deleter, "proj_b", sessionAccess, opDelete)
 		assertDomainCode(t, err, domain.ErrSessionNotFound().Code)
 	})
