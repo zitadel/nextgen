@@ -31,9 +31,26 @@ func TestNewProject(t *testing.T) {
 			wantErr: nil,
 		},
 		{
+			name: "project name is trimmed",
+			args: args{
+				name: "  my-project  ",
+			},
+			check: func(t *testing.T, got *domain.Project) {
+				assert.Equal(t, "my-project", got.Name)
+			},
+			wantErr: nil,
+		},
+		{
 			name: "project with empty name",
 			args: args{
 				name: "",
+			},
+			wantErr: domain.ErrProjectNameInvalid(),
+		},
+		{
+			name: "project with whitespace-only name",
+			args: args{
+				name: "   ",
 			},
 			wantErr: domain.ErrProjectNameInvalid(),
 		},

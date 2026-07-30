@@ -3,9 +3,12 @@
 package integration_test
 
 import (
+	"cmp"
 	"context"
 	"testing"
+	"time"
 
+	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
@@ -226,6 +229,238 @@ func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
 func TestGetProject(t *testing.T) {
 	t.Parallel()
 
+	previewOrigins := []string{"*.example.com", "localhost:3000"}
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), previewOrigins, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	notFound := domain.ErrProjectNotFound()
+
+	tcs := []struct {
+		name string
+		// projectID targets a project other than the caller's own.
+		projectID api.ProjectID
+		want      api.GetProjectRes
+	}{
+		{
+			name: "ok",
+			want: &api.ProjectResponse{Name: project.Name, PreviewOrigins: previewOrigins},
+		},
+		{
+			name:      "not found",
+			projectID: "does_not_exist",
+			want:      &api.GetProjectNotFound{Code: api.ErrorCode(notFound.Code), Message: notFound.Message},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			resp, err := client.GetProject(t.Context(), api.GetProjectParams{
+				ProjectID: cmp.Or(tc.projectID, api.ProjectID(project.ID)),
+			})
+
+			assert.NoError(t, err)
+			assertProjectResponse(t, tc.want, resp)
+		})
+	}
+}
+
+func TestPatchProject(t *testing.T) {
+	t.Parallel()
+
+	foreign, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	var (
+		renamed       = helpers.ProjectName()
+		renamedKeep   = helpers.ProjectName()
+		keptOrigins   = []string{"*.example.com", "localhost:3000"}
+		nameInvalid   = domain.ErrProjectNameInvalid()
+		notFound      = domain.ErrProjectNotFound()
+		validRenameTo = &api.PatchProjectRequest{Name: api.NewOptNilString(helpers.ProjectName())}
+	)
+
+	tcs := []struct {
+		name           string
+		previewOrigins []string
+		projectID      api.ProjectID
+		req            *api.PatchProjectRequest
+		want           api.PatchProjectRes
+	}{
+		{
+			name: "rename",
+			req:  &api.PatchProjectRequest{Name: api.NewOptNilString(renamed)},
+			want: &api.ProjectResponse{Name: renamed, PreviewOrigins: []string{}},
+		},
+		{
+			name:           "preview origins are left untouched",
+			previewOrigins: keptOrigins,
+			req:            &api.PatchProjectRequest{Name: api.NewOptNilString(renamedKeep)},
+			want:           &api.ProjectResponse{Name: renamedKeep, PreviewOrigins: keptOrigins},
+		},
+		{
+			name: "absent name",
+			req:  &api.PatchProjectRequest{},
+			want: &api.PatchProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
+		},
+		{
+			name: "null name",
+			req:  &api.PatchProjectRequest{Name: api.OptNilString{Set: true, Null: true}},
+			want: &api.PatchProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
+		},
+		{
+			name: "empty name",
+			req:  &api.PatchProjectRequest{Name: api.NewOptNilString("")},
+			want: &api.PatchProjectBadRequest{Code: api.ErrorCode(nameInvalid.Code), Message: nameInvalid.Message},
+		},
+		{
+			name:      "nonexistent project",
+			projectID: "does_not_exist",
+			req:       validRenameTo,
+			want:      &api.PatchProjectNotFound{Code: api.ErrorCode(notFound.Code), Message: notFound.Message},
+		},
+		{
+			name:      "foreign project",
+			projectID: api.ProjectID(foreign.ID),
+			req:       validRenameTo,
+			want:      &api.PatchProjectNotFound{Code: api.ErrorCode(notFound.Code), Message: notFound.Message},
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), tc.previewOrigins, true)
+			require.NoError(t, err)
+
+			client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+			require.NoError(t, err)
+			harness.SetProjectSecretOnApiClient(t, client, project)
+
+			projectID := cmp.Or(tc.projectID, api.ProjectID(project.ID))
+
+			resp, err := client.PatchProject(t.Context(), tc.req,
+				api.PatchProjectParams{ProjectID: projectID},
+			)
+			assert.NoError(t, err)
+			assertProjectResponse(t, tc.want, resp)
+		})
+	}
+}
+
+func TestQueryProjects(t *testing.T) {
+	t.Parallel()
+
+	previewOrigins := []string{"*.example.com", "localhost:3000"}
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), previewOrigins, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	var (
+		own            = api.ProjectResponse{Name: project.Name, PreviewOrigins: previewOrigins}
+		requestInvalid = domain.ErrRequestInvalid()
+		// A minute of slack absorbs the whole-second truncation RFC3339 applies.
+		before = project.CreatedAt.Add(-time.Minute).Format(time.RFC3339)
+		after  = project.CreatedAt.Add(time.Minute).Format(time.RFC3339)
+	)
+
+	createdAtFilter := func(op api.FilterOperation, value api.FilterValue) []api.QueryProjectsRequestFilterItem {
+		return []api.QueryProjectsRequestFilterItem{{
+			Field:     api.FilterFieldCreatedAt,
+			Operation: op,
+			Value:     api.NewOptFilterValue(value),
+		}}
+	}
+
+	badRequest := func(details string) *api.QueryProjectsBadRequest {
+		return &api.QueryProjectsBadRequest{
+			Code:    api.ErrorCode(requestInvalid.Code),
+			Message: requestInvalid.Message,
+			Details: api.NewOptErrorDetailsDetails(api.ErrorDetailsDetails{
+				"details": jx.Raw(helpers.MustMarshal(t, details)),
+			}),
+		}
+	}
+
+	tcs := []struct {
+		name string
+		req  *api.QueryProjectsRequest
+		want api.QueryProjectsRes
+	}{
+		{
+			name: "empty request returns the caller's project",
+			req:  &api.QueryProjectsRequest{},
+			want: &api.QueryProjectsResponse{Projects: []api.ProjectResponse{own}},
+		},
+		{
+			name: "createdAt filter matches",
+			req:  &api.QueryProjectsRequest{Filter: createdAtFilter(api.FilterOperationGreaterThan, api.NewStringFilterValue(before))},
+			want: &api.QueryProjectsResponse{Projects: []api.ProjectResponse{own}},
+		},
+		{
+			name: "createdAt filter excludes",
+			req:  &api.QueryProjectsRequest{Filter: createdAtFilter(api.FilterOperationGreaterThan, api.NewStringFilterValue(after))},
+			want: &api.QueryProjectsResponse{Projects: []api.ProjectResponse{}},
+		},
+		{
+			name: "sorting",
+			req: &api.QueryProjectsRequest{Sorting: api.NewOptQueryProjectsRequestSorting(api.QueryProjectsRequestSorting{
+				Field:     api.FilterFieldCreatedAt,
+				Direction: api.SortDirectionDesc,
+			})},
+			want: &api.QueryProjectsResponse{Projects: []api.ProjectResponse{own}},
+		},
+		{
+			// A full page always carries a cursor: the store cannot know the
+			// next one is empty without reading it.
+			name: "limit fills the page",
+			req:  &api.QueryProjectsRequest{Limit: api.NewOptLimit(1)},
+			want: &api.QueryProjectsResponse{
+				Projects:      []api.ProjectResponse{own},
+				NextPageToken: api.NewOptNilPageToken("opaque, only its presence is asserted"),
+			},
+		},
+		{
+			name: "malformed page token",
+			req:  &api.QueryProjectsRequest{PageToken: api.NewOptNilPageToken("not-a-cursor")},
+			want: badRequest("invalid page token"),
+		},
+		{
+			name: "filter value is not a timestamp",
+			req:  &api.QueryProjectsRequest{Filter: createdAtFilter(api.FilterOperationEquals, api.NewStringFilterValue("yesterday"))},
+			want: badRequest(`createdAt filter value "yesterday" is not a valid RFC3339 timestamp`),
+		},
+		{
+			name: "filter value is not a string",
+			req:  &api.QueryProjectsRequest{Filter: createdAtFilter(api.FilterOperationEquals, api.NewBoolFilterValue(true))},
+			want: badRequest("createdAt filter value must be an RFC3339 string"),
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			resp, err := client.QueryProjects(t.Context(), tc.req)
+
+			assert.NoError(t, err)
+			assertProjectResponse(t, tc.want, resp)
+		})
+	}
+}
+
+func TestQueryProjectsPageTokenRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
@@ -233,38 +468,82 @@ func TestGetProject(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	t.Run("ok", func(t *testing.T) {
-		t.Parallel()
+	req := &api.QueryProjectsRequest{Limit: api.NewOptLimit(1)}
+	first, err := client.QueryProjects(t.Context(), req)
+	require.NoError(t, err)
+	firstPage, ok := first.(*api.QueryProjectsResponse)
+	require.True(t, ok, helpers.MustMarshal(t, first))
+	require.Len(t, firstPage.Projects, 1)
 
-		params := api.GetProjectParams{
-			ProjectID: api.ProjectID(project.ID),
+	pageToken, ok := firstPage.NextPageToken.Get()
+	require.True(t, ok, "a full page carries a cursor")
+
+	req.PageToken = api.NewOptNilPageToken(pageToken)
+	second, err := client.QueryProjects(t.Context(), req)
+	require.NoError(t, err)
+	secondPage, ok := second.(*api.QueryProjectsResponse)
+	require.True(t, ok, helpers.MustMarshal(t, second))
+	assert.Empty(t, secondPage.Projects)
+	assert.False(t, secondPage.NextPageToken.IsSet())
+}
+
+// assertProjectResponse covers every operation answering with the shared
+// project body: getProject, patchProject, and each item of queryProjects.
+func assertProjectResponse(t *testing.T, want, got any) {
+	t.Helper()
+	if !assert.IsType(t, want, got, helpers.MustMarshal(t, got)) {
+		return
+	}
+
+	switch expected := want.(type) {
+	case *api.ProjectResponse:
+		actual, ok := got.(*api.ProjectResponse)
+		require.True(t, ok)
+
+		assert.NotEmpty(t, actual.ID)
+		assert.Equal(t, expected.Name, actual.Name)
+		assert.Equal(t, expected.PreviewOrigins, actual.PreviewOrigins)
+		assert.NotEmpty(t, actual.CreatedAt)
+		assert.False(t, actual.UpdatedAt.Before(actual.CreatedAt))
+	case *api.QueryProjectsResponse:
+		actual, ok := got.(*api.QueryProjectsResponse)
+		require.True(t, ok)
+
+		if !assert.Len(t, actual.Projects, len(expected.Projects), helpers.MustMarshal(t, got)) {
+			return
 		}
-
-		resp, err := client.GetProject(t.Context(), params)
-
-		assert.NoError(t, err)
-		if assert.IsType(t, &api.GetProjectResponse{}, resp, helpers.MustMarshal(t, resp)) {
-			got := resp.(*api.GetProjectResponse)
-			assert.NotEmpty(t, got.CreatedAt)
-			assert.NotEmpty(t, got.UpdatedAt)
-			assert.Equal(t, project.ID, got.ID)
+		for i := range expected.Projects {
+			assertProjectResponse(t, &expected.Projects[i], &actual.Projects[i])
 		}
-	})
+		// The token is an opaque cursor; only whether a next page exists is
+		// worth pinning.
+		assert.Equal(t, expected.NextPageToken.IsSet(), actual.NextPageToken.IsSet())
+	case *api.QueryProjectsBadRequest:
+		actual, ok := got.(*api.QueryProjectsBadRequest)
+		require.True(t, ok)
 
-	t.Run("error", func(t *testing.T) {
-		t.Parallel()
+		assert.Equal(t, expected.Code, actual.Code)
+		assert.Equal(t, expected.Message, actual.Message)
+		assert.Equal(t, expected.Details, actual.Details)
+	case *api.GetProjectNotFound:
+		actual, ok := got.(*api.GetProjectNotFound)
+		require.True(t, ok)
 
-		t.Run("not found", func(t *testing.T) {
-			t.Parallel()
+		assert.Equal(t, expected.Code, actual.Code)
+		assert.Equal(t, expected.Message, actual.Message)
+	case *api.PatchProjectBadRequest:
+		actual, ok := got.(*api.PatchProjectBadRequest)
+		require.True(t, ok)
 
-			params := api.GetProjectParams{
-				ProjectID: "does_not_exist",
-			}
+		assert.Equal(t, expected.Code, actual.Code)
+		assert.Equal(t, expected.Message, actual.Message)
+	case *api.PatchProjectNotFound:
+		actual, ok := got.(*api.PatchProjectNotFound)
+		require.True(t, ok)
 
-			resp, err := client.GetProject(t.Context(), params)
-
-			assert.NoError(t, err)
-			assert.IsType(t, &api.GetProjectNotFound{}, resp, helpers.MustMarshal(t, resp))
-		})
-	})
+		assert.Equal(t, expected.Code, actual.Code)
+		assert.Equal(t, expected.Message, actual.Message)
+	default:
+		assert.Fail(t, "unexpected response type", helpers.MustMarshal(t, got))
+	}
 }

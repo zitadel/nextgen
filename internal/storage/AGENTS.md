@@ -7,14 +7,12 @@ scoped `AGENTS.md` files.
 
 - Storage is SQL-first. Prefer SQL-compatible modeling and query patterns.
 - Supported databases are PostgreSQL and Spanner.
-- Keep dialect-specific SQL behavior, query building, and migrations in
-  `internal/storage/v2/dialect/` (v2, while v1 remains interim for pool /
-  embedded bring-up until the pre-merge checklist in
-  [ADR 028](../../docs/adrs/028-storage-v2-statements-and-dialects.md) is
-  complete).
-- Storage v2 lives in `internal/storage/v2/` and is the target dialect layer.
-  Entity persistence uses v2 statements; v1 dialects remain for pool and
-  embedded bring-up until that checklist closes.
+- Dialect implementations (pool, migrations, embedded bring-up, statements)
+  live under `internal/storage/v2/dialect/`.
+- Storage v2 (`internal/storage/v2/`) is the active dialect and statements
+  layer. Entity persistence uses v2 statements exclusively.
+- The legacy v1 package `internal/storage/database/` (query-builder, dialects,
+  repositories, aliases) has been removed. Do not reintroduce it.
 
 ## Sub-scoped Guidance
 

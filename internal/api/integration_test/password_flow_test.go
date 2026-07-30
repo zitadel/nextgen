@@ -28,6 +28,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 
@@ -252,6 +253,7 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 
