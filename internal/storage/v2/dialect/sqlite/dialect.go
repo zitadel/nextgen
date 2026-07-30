@@ -36,9 +36,13 @@ func (c Config) Connect(ctx context.Context) (database.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
-	// SQLite allows one writer; keep the pool small and rely on busy_timeout.
-	sqlDB.SetMaxOpenConns(4)
-	sqlDB.SetMaxIdleConns(4)
+	// SQLite allows one writer. A single connection serializes access in
+	// database/sql and avoids SQLITE_BUSY_SNAPSHOT across pooled connections
+	// (busy_timeout does not retry snapshot conflicts). Concurrent HTTP
+	// handlers (e.g. Playwright workers) otherwise wrap lock errors as
+	// sess.exchange_conflict during session exchange.
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
 	if err := applyPragmas(ctx, sqlDB); err != nil {
 		_ = sqlDB.Close()
 		return nil, err
@@ -76,14 +80,17 @@ func (c Config) dsn() (string, error) {
 	return "file:" + filepath.ToSlash(abs) + "?" + sqlitePragmaQuery, nil
 }
 
-const sqlitePragmaQuery = "_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)"
+// _txlock=immediate acquires the write lock at BEGIN so deferred read
+// transactions cannot upgrade into SQLITE_BUSY_SNAPSHOT after another writer
+// commits. busy_timeout covers remaining lock waits if MaxOpenConns is raised.
+const sqlitePragmaQuery = "_txlock=immediate&_pragma=busy_timeout(30000)&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)"
 
 func applyPragmas(ctx context.Context, sqlDB *sql.DB) error {
 	// Belt-and-suspenders for the connection(s) already in the pool; DSN
 	// pragmas cover subsequent opens.
 	for _, pragma := range []string{
 		"PRAGMA journal_mode=WAL",
-		"PRAGMA busy_timeout=5000",
+		"PRAGMA busy_timeout=30000",
 		"PRAGMA foreign_keys=ON",
 		"PRAGMA synchronous=NORMAL",
 	} {
