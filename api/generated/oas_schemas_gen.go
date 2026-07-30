@@ -11189,19 +11189,7 @@ type RevokeSessionConflict ErrorDetails
 func (*RevokeSessionConflict) revokeSessionRes() {}
 
 // RevokeSessionNoContent is response for RevokeSession operation.
-type RevokeSessionNoContent struct {
-	SetCookie string
-}
-
-// GetSetCookie returns the value of SetCookie.
-func (s *RevokeSessionNoContent) GetSetCookie() string {
-	return s.SetCookie
-}
-
-// SetSetCookie sets the value of SetCookie.
-func (s *RevokeSessionNoContent) SetSetCookie(val string) {
-	s.SetCookie = val
-}
+type RevokeSessionNoContent struct{}
 
 func (*RevokeSessionNoContent) revokeSessionRes() {}
 
