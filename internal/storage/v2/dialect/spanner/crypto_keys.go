@@ -6,7 +6,6 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	database2 "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
@@ -80,7 +79,7 @@ func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter databa
 	}
 
 	if len(keys) == 0 {
-		return nil, database2.NewNoRowFoundError(nil)
+		return nil, database.NewNoRowFoundError(nil)
 	}
 	if len(keys) > 1 {
 		return nil, errTooManyRows
@@ -179,7 +178,7 @@ func (s cryptoKeyStatements) GetSigningKey(ctx context.Context, filter database.
 	}
 
 	if len(keys) == 0 {
-		return nil, database2.NewNoRowFoundError(nil)
+		return nil, database.NewNoRowFoundError(nil)
 	}
 	if len(keys) > 1 {
 		return nil, errTooManyRows

@@ -5,8 +5,6 @@ package postgres
 import (
 	"context"
 	"crypto/sha256"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -14,13 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniqueSessionFixtureIDs(t *testing.T) string {
 	t.Helper()
-	suffix := strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
-	return "proj-session-" + suffix
+	return "proj-session-" + uniqueSuffix(t)
 }
 
 func ensureSessionProject(t *testing.T, projectID string) {
@@ -206,14 +203,14 @@ func TestSessionStatements_Exchange_mergeChecks(t *testing.T) {
 		var n int64
 		require.NoError(t, testPool.pool.QueryRow(t.Context(),
 			`SELECT COUNT(*) FROM zitadel_nextgen.checks WHERE project_id = $1 AND session_id = $2`,
-			projectID, legacydb.Identity(sess.ID),
+			projectID, database.Identity(sess.ID),
 		).Scan(&n))
 		assert.Equal(t, int64(1), n)
 
 		var authAttemptID *int64
 		require.NoError(t, testPool.pool.QueryRow(t.Context(),
 			`SELECT auth_attempt_id FROM zitadel_nextgen.checks WHERE project_id = $1 AND session_id = $2 LIMIT 1`,
-			projectID, legacydb.Identity(sess.ID),
+			projectID, database.Identity(sess.ID),
 		).Scan(&authAttemptID))
 		assert.Nil(t, authAttemptID)
 

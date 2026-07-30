@@ -1,7 +1,9 @@
 package domain
 
 import (
+	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -18,6 +20,17 @@ const (
 )
 
 func (s TeamStatus) String() string { return string(s) }
+
+// TeamNameMaxLength bounds the name in characters.
+const TeamNameMaxLength = 200
+
+func ErrTeamNameInvalid() Error {
+	return newError(PrefixTeam.ErrorCodePrefix("name_invalid"), "The team name is invalid. Expected a non-empty string of at most 200 characters.", nil, nil)
+}
+
+func ErrTeamAlreadyExists() Error {
+	return newError(PrefixTeam.ErrorCodePrefix("already_exists"), "a team with this name already exists in the project", nil, nil)
+}
 
 func ErrTeamNotFound() Error {
 	return newError(PrefixTeam.ErrorCodePrefix("team_not_found"), "team not found", nil, nil)
@@ -38,12 +51,18 @@ type Team struct {
 	ProjectID string
 	// ID is the unique identifier for the team within the project.
 	ID        string
+	Name      string
 	Status    TeamStatus
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
-func NewTeam(projectID string) (*Team, error) {
+func NewTeam(projectID, name string) (*Team, error) {
+	name = strings.TrimSpace(name)
+	if name == "" || utf8.RuneCountInString(name) > TeamNameMaxLength {
+		return nil, ErrTeamNameInvalid()
+	}
+
 	id, err := newID(PrefixTeam)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create team id")
@@ -52,6 +71,7 @@ func NewTeam(projectID string) (*Team, error) {
 	return &Team{
 		ProjectID: projectID,
 		ID:        id,
+		Name:      name,
 	}, nil
 }
 
@@ -62,6 +82,7 @@ const (
 	TeamFieldUnspecified TeamField = iota
 	TeamFieldProjectID
 	TeamFieldID
+	TeamFieldName
 	TeamFieldStatus
 	TeamFieldCreatedAt
 	TeamFieldUpdatedAt

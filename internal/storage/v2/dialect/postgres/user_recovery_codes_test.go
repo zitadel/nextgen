@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
 	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -56,7 +55,7 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 
 	require.NoError(t, testPool.DeleteUserRecoveryCodes(ctx, recoveryCodesByIDFilter(got.ID)))
 	_, err = testPool.GetUserRecoveryCodes(ctx, recoveryCodesByUserFilter(projectID, userID))
-	require.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	require.ErrorIs(t, err, new(v2database.NoRowFoundError))
 
 	require.NoError(t, testPool.CreateUserRecoveryCodes(ctx, &domain.CreateRecoveryCodes{
 		ProjectID:     projectID,
@@ -68,7 +67,7 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 	require.Positive(t, got2.ID)
 	require.NoError(t, testPool.DeleteUserRecoveryCodes(ctx, recoveryCodesByUserFilter(projectID, userID)))
 	_, err = testPool.GetUserRecoveryCodes(ctx, recoveryCodesByUserFilter(projectID, userID))
-	require.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	require.ErrorIs(t, err, new(v2database.NoRowFoundError))
 }
 
 func TestUserRecoveryCodesStatements_CreateEmptyRejected(t *testing.T) {
@@ -113,7 +112,7 @@ func TestUserRecoveryCodesStatements_Update(t *testing.T) {
 	err = testPool.UpdateUserRecoveryCodes(ctx, recoveryCodesByUserFilter(projectID, "missing-user"),
 		&domain.UserRecoveryCodesIncrementFailedAttemptsUpdate{Delta: 1},
 	)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(v2database.NoRowFoundError))
 
 	err = testPool.UpdateUserRecoveryCodes(ctx, byUser,
 		&domain.UserRecoveryCodesCodesUpdate{Codes: nil},

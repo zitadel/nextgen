@@ -3,15 +3,13 @@
 package postgres
 
 import (
-	"fmt"
+	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -20,7 +18,7 @@ func seedTeamMembershipParents(t *testing.T, projectID, teamID, userID string) {
 	ctx := t.Context()
 	project := newTestProject(projectID)
 	require.NoError(t, testPool.CreateProject(ctx, project))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(ctx, projectID) })
+	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 
 	schemaURL := "https://schemas.test/team-membership/v1.json"
 	_, err := testPool.pool.Exec(ctx,
@@ -30,15 +28,16 @@ func seedTeamMembershipParents(t *testing.T, projectID, teamID, userID string) {
 	require.NoError(t, err)
 
 	_, err = testPool.pool.Exec(ctx,
-		`INSERT INTO zitadel_nextgen.teams (project_id, id) VALUES ($1, $2)`,
-		projectID, teamID,
+		`INSERT INTO zitadel_nextgen.teams (project_id, id, name) VALUES ($1, $2, $3)`,
+		projectID, teamID, "team-"+teamID,
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		_, _ = testPool.pool.Exec(ctx, `DELETE FROM zitadel_nextgen.team_memberships WHERE project_id = $1`, projectID)
-		_, _ = testPool.pool.Exec(ctx, `DELETE FROM zitadel_nextgen.users WHERE project_id = $1`, projectID)
-		_, _ = testPool.pool.Exec(ctx, `DELETE FROM zitadel_nextgen.teams WHERE project_id = $1`, projectID)
-		_, _ = testPool.pool.Exec(ctx, `DELETE FROM zitadel_nextgen.json_schemas WHERE project_id = $1`, projectID)
+		cleanupCtx := context.Background()
+		_, _ = testPool.pool.Exec(cleanupCtx, `DELETE FROM zitadel_nextgen.team_memberships WHERE project_id = $1`, projectID)
+		_, _ = testPool.pool.Exec(cleanupCtx, `DELETE FROM zitadel_nextgen.users WHERE project_id = $1`, projectID)
+		_, _ = testPool.pool.Exec(cleanupCtx, `DELETE FROM zitadel_nextgen.teams WHERE project_id = $1`, projectID)
+		_, _ = testPool.pool.Exec(cleanupCtx, `DELETE FROM zitadel_nextgen.json_schemas WHERE project_id = $1`, projectID)
 	})
 
 	_, err = testPool.pool.Exec(ctx,
@@ -50,7 +49,7 @@ func seedTeamMembershipParents(t *testing.T, projectID, teamID, userID string) {
 
 func uniqueTeamMembershipIDs(t *testing.T) (projectID, teamID, userID string) {
 	t.Helper()
-	suffix := fmt.Sprintf("%s-%d", t.Name(), time.Now().UnixNano())
+	suffix := uniqueSuffix(t)
 	return "proj-tm-" + suffix, "team-tm-" + suffix, "usr-tm-" + suffix
 }
 
@@ -113,10 +112,10 @@ func TestTeamMembershipStatements_CreateGetListUpdate(t *testing.T) {
 
 func TestTeamMembershipStatements_Get_NotFound(t *testing.T) {
 	_, err := testPool.GetTeamMembership(t.Context(), "missing-proj", "missing-team", "missing-user")
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestTeamMembershipStatements_UpdateStatus_NotFound(t *testing.T) {
 	err := testPool.UpdateTeamMembershipStatus(t.Context(), "missing-proj", "missing-team", "missing-user", domain.MembershipStatusInactive)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }

@@ -67,6 +67,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	// user_attributes is partitioned by team; a team is required.
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 
@@ -83,6 +84,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	harness.CreateUserSchema(t, decoyProject, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 	decoyTeam, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: decoyProject.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 	decoyEmailAttr, err := domain.NewCreateAttribute("email", "pk-flow-test@example.com", domain.AttributeUniquenessUnspecified)

@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 var errTooManyRows = errors.New("spanner: multiple rows in result set")

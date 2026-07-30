@@ -6,8 +6,7 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	database2 "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
@@ -44,9 +43,9 @@ func NewKeyService(
 }
 
 func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*domain.EncryptionKey, error) {
-	key, err := s.db.Statements().GetEncryptionKey(ctx, database2.And(
-		database2.Equal(database2.Col(domain.EncryptionKeyFieldID), keyID),
-		database2.Equal(database2.Col(domain.EncryptionKeyFieldAlgorithm), algorithm),
+	key, err := s.db.Statements().GetEncryptionKey(ctx, database.And(
+		database.Equal(database.Col(domain.EncryptionKeyFieldID), keyID),
+		database.Equal(database.Col(domain.EncryptionKeyFieldAlgorithm), algorithm),
 	))
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -71,10 +70,10 @@ func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jos
 }
 
 func (s *keyService) GetProjectEncryptionKey(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (*domain.EncryptionKey, error) {
-	key, err := s.db.Statements().GetEncryptionKey(ctx, database2.And(
-		database2.Equal(database2.Col(domain.EncryptionKeyFieldProjectID), projectID),
-		database2.Equal(database2.Col(domain.EncryptionKeyFieldState), domain.KeyStateActive),
-		database2.Equal(database2.Col(domain.EncryptionKeyFieldPurpose), purpose),
+	key, err := s.db.Statements().GetEncryptionKey(ctx, database.And(
+		database.Equal(database.Col(domain.EncryptionKeyFieldProjectID), projectID),
+		database.Equal(database.Col(domain.EncryptionKeyFieldState), domain.KeyStateActive),
+		database.Equal(database.Col(domain.EncryptionKeyFieldPurpose), purpose),
 	))
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -113,10 +112,10 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 }
 
 func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (*domain.SigningKey, error) {
-	key, err := s.db.Statements().GetSigningKey(ctx, database2.And(
-		database2.Equal(database2.Col(domain.SigningKeyFieldProjectID), projectID),
-		database2.Equal(database2.Col(domain.SigningKeyFieldState), domain.KeyStateActive),
-		database2.Equal(database2.Col(domain.SigningKeyFieldPurpose), purpose),
+	key, err := s.db.Statements().GetSigningKey(ctx, database.And(
+		database.Equal(database.Col(domain.SigningKeyFieldProjectID), projectID),
+		database.Equal(database.Col(domain.SigningKeyFieldState), domain.KeyStateActive),
+		database.Equal(database.Col(domain.SigningKeyFieldPurpose), purpose),
 	))
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -149,12 +148,12 @@ func (s *keyService) GetMasterKeyCrypter(context.Context) (op.Crypto, error) {
 }
 
 func (s *keyService) MigrateToLatestMasterKey(ctx context.Context) error {
-	opts := &database2.ListOptions[domain.EncryptionKeyField]{
-		Pagination: database2.Page[domain.EncryptionKeyField]{
+	opts := &database.ListOptions[domain.EncryptionKeyField]{
+		Pagination: database.Page[domain.EncryptionKeyField]{
 			Limit: 100,
-			OrderBy: database2.OrderBy[domain.EncryptionKeyField]{
-				Columns: []database2.Column[domain.EncryptionKeyField]{
-					database2.Col(domain.EncryptionKeyFieldID),
+			OrderBy: database.OrderBy[domain.EncryptionKeyField]{
+				Columns: []database.Column[domain.EncryptionKeyField]{
+					database.Col(domain.EncryptionKeyFieldID),
 				},
 			},
 		},
@@ -167,7 +166,7 @@ func (s *keyService) MigrateToLatestMasterKey(ctx context.Context) error {
 
 	var errs []error
 
-	for key, err := range keys.Iterate(func(cursor []byte) (*database2.ListResult[*domain.EncryptionKey], error) {
+	for key, err := range keys.Iterate(func(cursor []byte) (*database.ListResult[*domain.EncryptionKey], error) {
 		opts.Pagination.Cursor = cursor
 		return s.db.Statements().ListEncryptionKeys(ctx, opts)
 	}) {

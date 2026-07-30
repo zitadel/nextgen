@@ -11,8 +11,7 @@ import (
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 type FlowDefinitionService interface {
@@ -72,11 +71,11 @@ func NewFlowDefinitionService(
 }
 
 func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error) {
-	existing, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, &v2database.ListOptions[domain.FlowDefinitionField]{
-		Filter: v2database.And(
-			v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
-			v2database.Equal(v2database.Col(domain.FlowDefinitionFieldName), req.Name),
-			v2database.Equal(v2database.Col(domain.FlowDefinitionFieldSchemaVersion), req.SchemaVersion),
+	existing, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
+			database.Equal(database.Col(domain.FlowDefinitionFieldName), req.Name),
+			database.Equal(database.Col(domain.FlowDefinitionFieldSchemaVersion), req.SchemaVersion),
 		),
 	})
 	if err != nil {
@@ -195,10 +194,10 @@ func (fd *flowDefinitionService) isUpdateAllowed(
 		return cmp.Compare(a.String(), b.String())
 	})
 
-	fds, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, &v2database.ListOptions[domain.FlowDefinitionField]{
-		Filter: v2database.And(
-			v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), projectID),
-			v2database.Equal(v2database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
+	fds, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
+			database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
 		),
 	})
 	if err != nil {
@@ -246,11 +245,11 @@ func (fd *flowDefinitionService) validatePivotingTargets(ctx context.Context, pi
 		return nil
 	}
 	for _, target := range pivotingTargets {
-		defs, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, &v2database.ListOptions[domain.FlowDefinitionField]{
-			Filter: v2database.And(
-				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), projectID),
-				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldName), target.Name),
-				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
+		defs, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, &database.ListOptions[domain.FlowDefinitionField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
+				database.Equal(database.Col(domain.FlowDefinitionFieldName), target.Name),
+				database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
 			),
 		})
 		if err != nil {
@@ -311,23 +310,23 @@ func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitio
 	if req.ProjectID == "" {
 		return nil, domain.ErrMissingProjectID()
 	}
-	filters := []v2database.Filter[domain.FlowDefinitionField]{
-		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
+	filters := []database.Filter[domain.FlowDefinitionField]{
+		database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
 	}
 	if req.Purpose != "" {
 		purpose, err := domain.FlowDefinitionPurposeString(req.Purpose)
 		if err != nil {
 			return nil, domain.ErrFlowDefinitionInvalid("invalid purpose", nil)
 		}
-		filters = append(filters, v2database.ArrayContains(v2database.Col(domain.FlowDefinitionFieldPurposes), purpose.String()))
+		filters = append(filters, database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), purpose.String()))
 	}
 	var cursor []byte
 	if req.PageToken != "" {
 		cursor = []byte(req.PageToken)
 	}
-	opts := &v2database.ListOptions[domain.FlowDefinitionField]{
-		Filter: v2database.And(filters...),
-		Pagination: v2database.Page[domain.FlowDefinitionField]{
+	opts := &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.And(filters...),
+		Pagination: database.Page[domain.FlowDefinitionField]{
 			Limit:  uint32(req.Limit),
 			Cursor: cursor,
 		},
