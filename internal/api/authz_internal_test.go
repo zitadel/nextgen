@@ -58,6 +58,15 @@ func TestResourceAccessScopes(t *testing.T) {
 		{"user.write writes", userAccess, opWrite, "user.write", true},
 		{"user.read reads", userAccess, opRead, "user.read", true},
 		{"user.read cannot write", userAccess, opWrite, "user.read", false},
+		{"user.write does not imply delete", userAccess, opDelete, "user.write", false},
+		{"user.read does not imply delete", userAccess, opDelete, "user.read", false},
+		{"user.delete deletes", userAccess, opDelete, "user.delete", true},
+		{"user.delete cannot write", userAccess, opWrite, "user.delete", false},
+		{"user.delete cannot read", userAccess, opRead, "user.delete", false},
+
+		// A resource that declares no delete scope admits nothing finer than
+		// the operator-grade project secret for deletes.
+		{"schema.write does not delete", schemaAccess, opDelete, "schema.write", false},
 
 		{"team.write writes", teamAccess, opWrite, "team.write", true},
 		{"team.read reads", teamAccess, opRead, "team.read", true},
@@ -155,22 +164,69 @@ func TestRequireProjectAccess(t *testing.T) {
 		})
 	}
 
-	t.Run("delete is scope-gated separately", func(t *testing.T) {
-		deleter := WithScopeContext(context.Background(), ScopeContext{
-			ProjectID: "proj_a",
-			Scope:     []string{"flow_definitions.write"},
-		})
-		err := requireProjectAccess(deleter, "proj_a", flowDefinitionAccess, opDelete)
-		assertDomainCode(t, err, domain.ErrFlowDefinitionPermissionDenied().Code)
-		if err := requireProjectAccess(operator, "proj_a", flowDefinitionAccess, opDelete); err != nil {
-			t.Fatalf("project.write implies delete: %v", err)
-		}
-	})
+	// Every resource that declares a *.delete scope gates deletes on it alone:
+	// deleteUserByID and deleteFlowDefinition are the two operations reached
+	// this way.
+	deletable := []struct {
+		name                    string
+		res                     resourceAccess
+		writeScope, deleteScope string
+		denied, readMiss        string
+	}{
+		{
+			name: "flow definition", res: flowDefinitionAccess,
+			writeScope: "flow_definitions.write", deleteScope: "flow_definitions.delete",
+			denied:   domain.ErrFlowDefinitionPermissionDenied().Code,
+			readMiss: domain.ErrFlowDefinitionNotFound().Code,
+		},
+		{
+			name: "user", res: userAccess,
+			writeScope: "user.write", deleteScope: "user.delete",
+			denied:   domain.ErrUserPermissionDenied().Code,
+			readMiss: domain.ErrUserNotFound().Code,
+		},
+	}
 
-	t.Run("foreign deletes miss like reads", func(t *testing.T) {
-		err := requireProjectAccess(operator, "proj_b", flowDefinitionAccess, opDelete)
-		assertDomainCode(t, err, domain.ErrFlowDefinitionNotFound().Code)
-	})
+	for _, res := range deletable {
+		t.Run(res.name+" delete is scope-gated separately", func(t *testing.T) {
+			writer := WithScopeContext(context.Background(), ScopeContext{
+				ProjectID: "proj_a",
+				Scope:     []string{res.writeScope},
+			})
+			deleter := WithScopeContext(context.Background(), ScopeContext{
+				ProjectID: "proj_a",
+				Scope:     []string{res.deleteScope},
+			})
+
+			// Write does not imply delete…
+			err := requireProjectAccess(writer, "proj_a", res.res, opDelete)
+			assertDomainCode(t, err, res.denied)
+
+			// …and the delete scope reaches the delete and nothing else.
+			if err := requireProjectAccess(deleter, "proj_a", res.res, opDelete); err != nil {
+				t.Fatalf("the resource's delete scope must reach delete: %v", err)
+			}
+			err = requireProjectAccess(deleter, "proj_a", res.res, opWrite)
+			assertDomainCode(t, err, res.denied)
+			err = requireProjectAccess(deleter, "proj_a", res.res, opRead)
+			assertDomainCode(t, err, res.denied)
+
+			if err := requireProjectAccess(operator, "proj_a", res.res, opDelete); err != nil {
+				t.Fatalf("project.write implies delete: %v", err)
+			}
+
+			err = requireProjectAccess(preview, "proj_a", res.res, opDelete)
+			assertDomainCode(t, err, res.denied)
+		})
+
+		t.Run(res.name+" foreign deletes miss like reads", func(t *testing.T) {
+			err := requireProjectAccess(operator, "proj_b", res.res, opDelete)
+			assertDomainCode(t, err, res.readMiss)
+
+			err = requireProjectAccess(context.Background(), "proj_a", res.res, opDelete)
+			assertDomainCode(t, err, res.readMiss)
+		})
+	}
 }
 
 func assertDomainCode(t *testing.T, err error, want string) {
