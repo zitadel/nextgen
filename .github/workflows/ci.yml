@@ -23,6 +23,12 @@ jobs:
       # Required to mint the OIDC token for Workload Identity Federation when
       # authenticating to the Spanner test instance (trusted runs only).
       id-token: write
+    env:
+      # Moon marks failed tasks by color alone, so a failed `moon ci` can end at
+      # "Tasks: 1 failed" with no named target. The summary names them in plain
+      # text and replays each failed task's own output. Green runs pay only a
+      # pass/fail list; the replay section is empty when nothing failed.
+      MOON_SUMMARY: detailed
     steps:
       - uses: actions/checkout@v6
         with:
@@ -67,8 +73,13 @@ jobs:
         run: corepack pnpm --filter @zitadel/components exec playwright install chromium
 
       - name: Run Moon build and test graph
+        id: moon-ci
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon ci :lint :typecheck :build :test :test-browser
+
+      - name: Report Moon CI failures
+        if: ${{ failure() && steps.moon-ci.conclusion == 'failure' }}
+        run: node scripts/report-moon-failures.mjs
 
       - name: Run Go tests
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
@@ -135,7 +146,7 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         env:
           # Trusted runs target the real instance; fork PRs get an empty value
-          # and fall back to the emulator (see dbtest.Spanner precedence).
+          # and fall back to the emulator (see testdb.SpannerDSN precedence).
           ZITADEL_TEST_SPANNER_INSTANCE: ${{ (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && vars.SPANNER_TEST_INSTANCE || '' }}
         run: moon run server:test-spanner
 

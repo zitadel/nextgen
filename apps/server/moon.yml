@@ -28,7 +28,9 @@ tasks:
     script: |
       unformatted="$(git ls-files -z -- '*.go' | xargs -0 gofmt -l)"
       if [ -n "$unformatted" ]; then
-        printf '%s\n' "$unformatted"
+        echo "error: gofmt would rewrite the following files:" >&2
+        printf '%s\n' "$unformatted" >&2
+        echo "hint: run gofmt -w on those paths, then re-check with moon run server:format" >&2
         exit 1
       fi
     inputs:

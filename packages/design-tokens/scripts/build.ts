@@ -209,7 +209,8 @@ function build(): BuildResult {
   // ---- overrides: focus ----
   push(cssVarName("focus", "width"), overrides.focus.width, ["focus", "width"]);
   push(cssVarName("focus", "offset"), overrides.focus.offset, ["focus", "offset"]);
-  push(cssVarName("focus", "color"), resolveFocusColor(), ["focus", "color"]);
+  const focusColor = resolveFocusColor();
+  push(cssVarName("focus", "color"), focusColor.dark, ["focus", "color"], focusColor.light);
 
   // ---- overrides: breakpoints ----
   for (const [name, value] of Object.entries(overrides.breakpoint)) {
@@ -257,7 +258,13 @@ function containerStep(name: string): Px {
   return px;
 }
 
-function resolveFocusColor(): Hex {
+/**
+ * The focus ring reads its colour from a legacy semantic token, so it
+ * inherits that token's theming: a ring the colour of dark-mode text would
+ * be invisible on a light surface. Returns both modes when the source token
+ * is mode-aware.
+ */
+function resolveFocusColor(): { dark: Hex; light?: Hex } {
   const parts = overrides.focus.colorToken.split("/").map((p) => p.trim().toLowerCase().replaceAll(" ", "-"));
   const [category, group, ...nameParts] = parts;
   if (category !== "color" || !group) {
@@ -272,7 +279,13 @@ function resolveFocusColor(): Hex {
   if (!raw) {
     throw new Error(`overrides.focus.colorToken ${overrides.focus.colorToken} not found in figma.tokens.json (group=${group}, name=${name})`);
   }
-  return resolveSemantic(raw);
+  if (isModeValue(raw)) {
+    return {
+      dark: resolveSemantic(raw.dark),
+      light: raw.light !== undefined ? resolveSemantic(raw.light) : undefined,
+    };
+  }
+  return { dark: resolveSemantic(raw) };
 }
 
 function emitCss(vars: Array<[string, string]>, lightVars: Array<[string, string]>): string {

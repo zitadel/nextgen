@@ -28,6 +28,7 @@ func TestListUsers(t *testing.T) {
 	require.NoError(t, err)
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
@@ -57,13 +58,12 @@ func TestListUsers(t *testing.T) {
 	assert.Empty(t, listIDs(t, api.ListUsersParams{}))
 
 	// Seed two users in creation order.
-	db := harness.EnsureDBPool(t)
-	userRepo := harness.EnsureUserRepo(t)
+	users := harness.EnsureUserFixture(t)
 	for i, id := range []string{"list-user-01", "list-user-02"} {
 		emailAttr, err := domain.NewCreateAttribute(
 			"email", fmt.Sprintf("list-%d@example.com", i), domain.AttributeUniquenessProject)
 		require.NoError(t, err)
-		require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
+		require.NoError(t, users.Create(t.Context(), &domain.CreateUser{
 			ProjectID:               project.ID,
 			SchemaURL:               schemaURL,
 			ID:                      id,

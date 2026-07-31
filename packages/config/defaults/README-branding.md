@@ -25,5 +25,22 @@ by re-applying an earlier template.
   field, gate, or submit action your template forgot, so a broken template
   still yields a submittable step.
 
+## Make it yours
+
+- In the split-family designs (`split`, `split-right`, `hero`) the
+  `.zl-split__brand` pane is yours: structural HTML plus inline `style=""`
+  attributes are allowed; `button`, `input`, and `form` tags are stripped —
+  use `<a>` for landing CTAs. The `hero` design ships a full landing-page
+  starting point on token-styled `zl-hero__*` classes.
+- On narrow viewports the brand pane collapses and the `.zl-split__compact`
+  node inside the form pane takes over (logo or brand line) — keep one so
+  your identity survives on phones.
+- The split chrome is tunable from your template root's `style` attribute
+  (`--zl-split-columns`, `--zl-split-align`, `--zl-split-brand-mobile`), and
+  `zl-split--right` on the wrapper mirrors the panes. Knob reference:
+  `docs/design/branding/templates.md` in the Zitadel repo.
+- The "Secured with Zitadel" attribution is licence-gated and on by default.
+
 Start over anytime with `zitadel branding eject --design <name>` (designs:
-`centered`, `split`, `split-right`, `minimal`; add `--force` to overwrite).
+`centered`, `split`, `split-right`, `hero`, `minimal`; add `--force` to
+overwrite).

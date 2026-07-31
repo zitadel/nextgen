@@ -10,7 +10,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/domain/idgen"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 const passkeyRegistrationTTL = 5 * time.Minute
@@ -20,23 +20,17 @@ const passkeyRegistrationDefaultUsername = "Passkey account"
 // ceremony. It exposes [Begin] and [Finish] for direct callers and is wrapped by
 // [FlowPasskeyRegistrationAdapter] for the flow engine.
 type PasskeyRegistrationService struct {
-	pool     database.Pool
-	v2Pool   StatementPool
-	passkeys domain.UserPasskeyRepository
-	ids      idgen.Generator
+	v2Pool StatementPool
+	ids    idgen.Generator
 }
 
 func NewPasskeyRegistrationService(
-	pool database.Pool,
 	v2Pool StatementPool,
-	passkeys domain.UserPasskeyRepository,
 	ids idgen.Generator,
 ) *PasskeyRegistrationService {
 	return &PasskeyRegistrationService{
-		pool:     pool,
-		v2Pool:   v2Pool,
-		passkeys: passkeys,
-		ids:      ids,
+		v2Pool: v2Pool,
+		ids:    ids,
 	}
 }
 
@@ -65,7 +59,12 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 		return BeginRegistrationOutput{}, err
 	}
 
-	existing, err := s.listPasskeys(ctx, in.ProjectID, in.UserID)
+	listed, err := s.v2Pool.Statements().ListUserPasskeys(ctx, &database.ListOptions[domain.UserPasskeyField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserPasskeyFieldProjectID), in.ProjectID),
+			database.Equal(database.Col(domain.UserPasskeyFieldUserID), in.UserID),
+		),
+	})
 	if err != nil {
 		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: list passkeys: %w", err)
 	}
@@ -73,7 +72,7 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 	username, displayName := passkeyRegistrationLabels(in.Username, in.DisplayName)
 	challenge, err := domain.CreatePasskeyRegistrationChallenge(
 		in.UserID, username, displayName,
-		existing,
+		listed.Items,
 		in.RPID, origins,
 	)
 	if err != nil {
@@ -129,14 +128,7 @@ type FinishRegistrationInput struct {
 // credential. The user identity is authoritative from the stored challenge record.
 // Rejection surfaces as [domain.ErrAuthAttemptProofRejected].
 func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegistrationInput) error {
-	return s.FinishWith(ctx, s.pool, in)
-}
-
-// FinishWith is like [Finish] but writes the UserPasskey through client (v1 QueryExecutor).
-// Registration Get/Delete use client when it is a v2 Statementer so they join the caller
-// transaction; otherwise they use the v2 pool.
-func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client database.QueryExecutor, in FinishRegistrationInput) error {
-	stmts := s.passkeyRegistrationStmts(client)
+	stmts := s.v2Pool.Statements()
 	reg, err := stmts.GetPasskeyRegistration(ctx, in.ProjectID, in.RegistrationID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -152,31 +144,13 @@ func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client data
 	newPasskey.ProjectID = in.ProjectID
 	newPasskey.UserID = reg.UserID
 
-	if err := s.passkeys.Create(ctx, client, newPasskey); err != nil {
+	if err := stmts.CreateUserPasskey(ctx, newPasskey); err != nil {
 		return fmt.Errorf("passkey registration: store credential: %w", err)
 	}
 
 	// Best-effort cleanup; don't shadow the success.
 	_ = stmts.DeletePasskeyRegistration(ctx, in.ProjectID, in.RegistrationID)
 	return nil
-}
-
-func (s *PasskeyRegistrationService) passkeyRegistrationStmts(client database.QueryExecutor) PasskeyRegistrationStatements {
-	if tx, ok := client.(Statementer[AllStatements]); ok {
-		return tx.Statements()
-	}
-	return s.v2Pool.Statements()
-}
-
-func (s *PasskeyRegistrationService) listPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
-	return s.passkeys.List(
-		ctx,
-		s.pool,
-		database.WithCondition(database.And(
-			s.passkeys.ProjectIDCondition(projectID),
-			s.passkeys.UserIDCondition(userID),
-		)),
-	)
 }
 
 func parseOrigins(raw []string) ([]url.URL, error) {

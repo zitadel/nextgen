@@ -4,8 +4,6 @@ package postgres
 
 import (
 	"context"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,12 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniquePasskeyRegIDs(t *testing.T) (projectID, regID, userID string) {
 	t.Helper()
-	suffix := strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	suffix := uniqueSuffix(t)
 	return "proj-pkreg-" + suffix, "pkreg-" + suffix, "usr-pkreg-" + suffix
 }
 
@@ -57,7 +55,7 @@ func TestPasskeyRegistrationStatements_CRUD(t *testing.T) {
 
 	require.NoError(t, testPool.DeletePasskeyRegistration(t.Context(), projectID, regID))
 	_, err = testPool.GetPasskeyRegistration(t.Context(), projectID, regID)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestPasskeyRegistrationStatements_Get_Expired(t *testing.T) {
@@ -77,5 +75,5 @@ func TestPasskeyRegistrationStatements_Get_Expired(t *testing.T) {
 	})
 
 	_, err := testPool.GetPasskeyRegistration(t.Context(), projectID, regID)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }

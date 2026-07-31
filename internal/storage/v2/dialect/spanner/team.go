@@ -12,7 +12,7 @@ import (
 
 const (
 	teamsTable     = "teams"
-	createTeamStmt = `INSERT INTO teams (project_id, id) VALUES (@p1, @p2) THEN RETURN project_id, id, status, created_at, updated_at`
+	createTeamStmt = `INSERT INTO teams (project_id, id, name) VALUES (@p1, @p2, @p3) THEN RETURN project_id, id, name, status, created_at, updated_at`
 
 	deactivateTeamStmt = `
 UPDATE teams
@@ -40,7 +40,7 @@ WHERE project_id = @p2 AND status <> @p1
 )
 
 var teamColumns = []string{
-	"project_id", "id", "status", "created_at", "updated_at",
+	"project_id", "id", "name", "status", "created_at", "updated_at",
 }
 
 type teamStatements struct{ statement }
@@ -58,11 +58,11 @@ func (ts teamStatements) CreateTeam(ctx context.Context, team *domain.Team) erro
 	if team.ID == "" {
 		return errors.New("team ID must not be empty")
 	}
-	stmt := buildStatement(createTeamStmt, team.ProjectID, team.ID).statement()
+	stmt := buildStatement(createTeamStmt, team.ProjectID, team.ID, team.Name).statement()
 	return ts.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			var status string
-			if err := row.Columns(&team.ProjectID, &team.ID, &status, &team.CreatedAt, &team.UpdatedAt); err != nil {
+			if err := row.Columns(&team.ProjectID, &team.ID, &team.Name, &status, &team.CreatedAt, &team.UpdatedAt); err != nil {
 				return struct{}{}, err
 			}
 			team.Status = domain.TeamStatus(status)
@@ -108,7 +108,7 @@ func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id strin
 func (ts teamStatements) scanTeam(row *spanner.Row) (*domain.Team, error) {
 	team := new(domain.Team)
 	var status string
-	if err := row.Columns(&team.ProjectID, &team.ID, &status, &team.CreatedAt, &team.UpdatedAt); err != nil {
+	if err := row.Columns(&team.ProjectID, &team.ID, &team.Name, &status, &team.CreatedAt, &team.UpdatedAt); err != nil {
 		return nil, err
 	}
 	team.Status = domain.TeamStatus(status)

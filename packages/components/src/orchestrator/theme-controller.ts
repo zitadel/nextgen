@@ -14,6 +14,9 @@ import type { Branding } from "./branding.js";
 
 export type ResolvedTheme = "light" | "dark";
 
+/** Theme inputs a caller may express, before resolution. */
+export type ThemeMode = "light" | "dark" | "auto";
+
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
 export class ThemeController implements ReactiveController {
@@ -21,11 +24,16 @@ export class ThemeController implements ReactiveController {
 
   private branding: Branding | undefined;
 
+  /** Element-level `theme` property — the embedding developer's explicit call. */
+  private explicitMode: ThemeMode | undefined;
+
+  /** Used when neither the element nor the branding payload names a mode. */
+  private fallbackMode: ThemeMode = "dark";
+
   private mediaQuery: MediaQueryList | null = null;
 
-  // Default surface is dark — the design system only publishes a dark
-  // variable mode today. See `branding-to-tokens.resolveTheme` for the
-  // matching logic on the orchestrator side.
+  // Initial value before the first resolve; dark is the design system's
+  // primary surface. Both modes ship real token values.
   private _theme: ResolvedTheme = "dark";
 
   constructor(host: ReactiveControllerHost) {
@@ -42,6 +50,20 @@ export class ThemeController implements ReactiveController {
     this.refresh();
   }
 
+  /**
+   * Sets the element-level preference and the fallback used when neither the
+   * element nor the branding payload names a mode. Precedence, strongest
+   * first: element `theme` property → `branding.theme.mode` → fallback. The
+   * element wins because the page embedding the widget knows its own surface
+   * better than the tenant's stored branding does.
+   */
+  setModePreference(explicit: ThemeMode | undefined, fallback: ThemeMode): void {
+    if (this.explicitMode === explicit && this.fallbackMode === fallback) return;
+    this.explicitMode = explicit;
+    this.fallbackMode = fallback;
+    this.refresh();
+  }
+
   hostConnected(): void {
     this.refresh();
   }
@@ -51,12 +73,12 @@ export class ThemeController implements ReactiveController {
   }
 
   private refresh(): void {
-    const mode = this.branding?.theme?.mode ?? "dark";
+    const mode = this.explicitMode ?? this.branding?.theme?.mode ?? this.fallbackMode;
     if (mode === "auto") {
       this.attach();
-      // When tenants opt into auto and the OS preference is unknown, we
-      // bias toward dark since that's the only mode the design system
-      // currently publishes.
+      // Follow `prefers-color-scheme`. Where `matchMedia` is unavailable the
+      // preference is unknowable, so fall back to the design system's
+      // primary surface rather than guessing light.
       this.update(this.mediaQuery?.matches === false ? "light" : "dark");
       return;
     }

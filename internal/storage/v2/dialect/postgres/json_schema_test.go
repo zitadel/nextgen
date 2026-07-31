@@ -4,8 +4,6 @@ package postgres
 
 import (
 	"context"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,13 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniqueJSONSchemaIDs(t *testing.T) (projectID, schemaURL string) {
 	t.Helper()
-	suffix := strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	suffix := uniqueSuffix(t)
 	return "proj-schema-" + suffix, "https://example.test/schemas/" + suffix + ".json"
 }
 
@@ -55,12 +52,12 @@ func TestJSONSchemaStatements_CRUD(t *testing.T) {
 	assert.Contains(t, string(got.Schema), `"type":"object"`)
 	assert.False(t, got.CreatedAt.IsZero())
 
-	listed, err := testPool.ListJSONSchemas(t.Context(), &v2database.ListOptions[domain.JSONSchemaField]{
-		Filter: v2database.Equal(v2database.Col(domain.JSONSchemaFieldProjectID), projectID),
-		Pagination: v2database.Page[domain.JSONSchemaField]{
-			OrderBy: v2database.OrderBy[domain.JSONSchemaField]{
-				Columns:   []v2database.Column[domain.JSONSchemaField]{v2database.Col(domain.JSONSchemaFieldCreatedAt)},
-				Direction: v2database.OrderDesc,
+	listed, err := testPool.ListJSONSchemas(t.Context(), &database.ListOptions[domain.JSONSchemaField]{
+		Filter: database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
+		Pagination: database.Page[domain.JSONSchemaField]{
+			OrderBy: database.OrderBy[domain.JSONSchemaField]{
+				Columns:   []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldCreatedAt)},
+				Direction: database.OrderDesc,
 			},
 		},
 	})
@@ -71,7 +68,7 @@ func TestJSONSchemaStatements_CRUD(t *testing.T) {
 	require.NoError(t, testPool.DeleteJSONSchemaByID(t.Context(), projectID, schemaURL))
 
 	_, err = testPool.GetJSONSchemaByID(t.Context(), projectID, schemaURL)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestJSONSchemaStatements_Get_NotFound(t *testing.T) {
@@ -79,7 +76,7 @@ func TestJSONSchemaStatements_Get_NotFound(t *testing.T) {
 	ensureJSONSchemaProject(t, projectID)
 
 	_, err := testPool.GetJSONSchemaByID(t.Context(), projectID, schemaURL)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestJSONSchemaStatements_Create_Duplicate(t *testing.T) {

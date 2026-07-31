@@ -6,7 +6,7 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 const Name = "zitadel/backend/v3/instrumentation/tracing"
@@ -18,6 +18,20 @@ type Config struct {
 	Schema          SchemaConfig           `mapstructure:"schema"`
 	Session         service.SessionConfig  `mapstructure:"session"`
 	Instrumentation instrumentation.Config `mapstructure:"instrumentation"`
+	Platform        PlatformConfig         `mapstructure:"platform"`
+}
+
+// PlatformConfig configures the deployment's default project resolution
+// (Console ADR 0004). Portal-related keys (billing, support access) are
+// intentionally absent until platform mode is implemented; this deployment
+// always reports mode "standalone" for now.
+type PlatformConfig struct {
+	// ProjectID pins the deployment's default project to an existing
+	// project. When empty (the default), a standalone deployment tracks its
+	// first-created project — the one the customer's `zitadel setup`
+	// creates. The server never creates a project itself; a configured id
+	// that does not exist is a startup error.
+	ProjectID string `mapstructure:"project_id"`
 }
 
 func (c Config) Validate() error {
@@ -41,13 +55,20 @@ type ServerConfig struct {
 	// DataDir is the local runtime root used by zero-config server defaults.
 	// When unset, it defaults to a nextgen-data directory next to the binary.
 	DataDir string `mapstructure:"data_dir"`
-	// EncryptionKey is the 32-byte (hex-encoded, 64 chars) symmetric
-	// key used to seal flow cookies. If unset, the server creates or reuses
-	// EncryptionKeyFile.
-	EncryptionKey string `mapstructure:"encryption_key"`
-	// EncryptionKeyFile stores the generated encryption key for zero-config
-	// local starts. When unset, it defaults under DataDir.
-	EncryptionKeyFile string `mapstructure:"encryption_key_file"`
+	// EncryptionKeys is a collection of encryption keys used as KEK (key
+	// encryption key) by the application. DEKs (data encryption key) will be
+	// created by the application and encrypted with a KEK.
+	//
+	// This is a collection to enable encryption key rotation. Multiple keys
+	// can be provided but only one should be marked to be used for encryption.
+	// Once multiple keys are provided, all DEKs will be re-encrypted using the
+	// KEK marked to use for encryption.
+	//
+	// If no encryption keys are provided, a default encryption key is created
+	// in the kek directory. If there are no keys specified in the config but
+	// files exist in the kek directory, the newest file is used for
+	// encryption.
+	EncryptionKeys map[string]*EncryptionKeyConfig `mapstructure:"encryption_keys"`
 
 	ConsoleEnabled bool   `mapstructure:"console_enabled"`
 	ConsolePath    string `mapstructure:"console_path"`
@@ -58,4 +79,20 @@ type ServerConfig struct {
 type SchemaConfig struct {
 	BuiltinPublicBase string `mapstructure:"builtin_public_base"`
 	LRUCacheSize      int    `mapstructure:"lru_cache_size"`
+}
+
+type EncryptionKeyConfig struct {
+	// File is the path to a file which contains the RSA private key in either a
+	// JWK or a PEM file.
+	//
+	// Not required when PrivateKey is provided.
+	// When PrivateKey is provided, File is ignored.
+	File string `mapstructure:"file"`
+	// UseForEncryption indicates whether this key should be used for
+	// encryption. Exactly one key must be marked for encryption, otherwise the
+	// application won't start.
+	UseForEncryption bool `mapstructure:"use_for_encryption"`
+	// PrivateKey is the RSA private key used to decrypt wrapped data.
+	// It may be provided as PEM (including OpenSSH) or as a private JWK.
+	PrivateKey string `mapstructure:"private_key"`
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/flowdefinition"
 )
 
 const testProjectQuery = "SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins FROM projects"
@@ -60,11 +61,11 @@ func compileReadExpectError[F ~uint8, T any](t *testing.T, stmt string, opts *da
 	return compileRead(&compiler, stmt, opts, schema)
 }
 
-func assertDomainErrorCode(t *testing.T, err error, code string) {
+func assertDatabaseErrorCode(t *testing.T, err error, code string) {
 	t.Helper()
 
 	require.Error(t, err)
-	var dbErr domain.Error
+	var dbErr database.Error
 	require.ErrorAs(t, err, &dbErr)
 	assert.Equal(t, code, dbErr.Code)
 }
@@ -112,10 +113,11 @@ func TestCompileReadCompareGreater(t *testing.T) {
 		),
 	})
 
-	assert.Contains(t, sql, "(created_at, id) > (@p1, @p2)")
-	require.Len(t, args, 2)
+	assert.Contains(t, sql, "((created_at > @p1) OR (created_at = @p2 AND id > @p3))")
+	require.Len(t, args, 3)
 	assert.Equal(t, createdAt, args[0])
-	assert.Equal(t, "proj_1", args[1])
+	assert.Equal(t, createdAt, args[1])
+	assert.Equal(t, "proj_1", args[2])
 }
 
 func TestCompileReadKeysetCursorAsc(t *testing.T) {
@@ -144,11 +146,12 @@ func TestCompileReadKeysetCursorAsc(t *testing.T) {
 		},
 	})
 
-	assert.Contains(t, sql, "(created_at, id) > (@p1, @p2)")
-	require.Len(t, args, 3)
+	assert.Contains(t, sql, "((created_at > @p1) OR (created_at = @p2 AND id > @p3))")
+	require.Len(t, args, 4)
 	assert.Equal(t, createdAt, args[0])
-	assert.Equal(t, "proj_1", args[1])
-	assert.Equal(t, int64(5), args[2])
+	assert.Equal(t, createdAt, args[1])
+	assert.Equal(t, "proj_1", args[2])
+	assert.Equal(t, int64(5), args[3])
 }
 
 func TestCompileReadStringContains(t *testing.T) {
@@ -212,6 +215,30 @@ func TestCompileReadStringEqualFold(t *testing.T) {
 	assert.Equal(t, "Login", args[0])
 }
 
+func TestCompileArrayContains(t *testing.T) {
+	t.Parallel()
+
+	sql, args := compileFilterOnly(t,
+		database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), "login"),
+		flowdefinition.Schema,
+	)
+	assert.Equal(t, "@p1 IN UNNEST(purposes)", sql)
+	require.Len(t, args, 1)
+	assert.Equal(t, "login", args[0])
+}
+
+func TestCompileStatusEqualNoParamCast(t *testing.T) {
+	t.Parallel()
+
+	sql, args := compileFilterOnly(t,
+		database.Equal(database.Col(domain.FlowDefinitionFieldStatus), "active"),
+		flowdefinition.Schema,
+	)
+	assert.Equal(t, "status = @p1", sql)
+	require.Len(t, args, 1)
+	assert.Equal(t, "active", args[0])
+}
+
 func TestCompileReadCursorDesc(t *testing.T) {
 	t.Parallel()
 
@@ -237,10 +264,11 @@ func TestCompileReadCursorDesc(t *testing.T) {
 		},
 	})
 
-	assert.Contains(t, sql, "(created_at, id) < (@p1, @p2)")
-	require.Len(t, args, 2)
+	assert.Contains(t, sql, "((created_at < @p1) OR (created_at = @p2 AND id < @p3))")
+	require.Len(t, args, 3)
 	assert.Equal(t, createdAt, args[0])
-	assert.Equal(t, "proj_1", args[1])
+	assert.Equal(t, createdAt, args[1])
+	assert.Equal(t, "proj_1", args[2])
 }
 
 func TestCompileReadCursorWithBaseFilter(t *testing.T) {
@@ -269,11 +297,12 @@ func TestCompileReadCursorWithBaseFilter(t *testing.T) {
 		},
 	})
 
-	assert.Contains(t, sql, "WHERE (id = @p1 AND (created_at, id) > (@p2, @p3))")
-	require.Len(t, args, 3)
+	assert.Contains(t, sql, "WHERE (id = @p1 AND ((created_at > @p2) OR (created_at = @p3 AND id > @p4)))")
+	require.Len(t, args, 4)
 	assert.Equal(t, "proj_1", args[0])
 	assert.Equal(t, createdAt, args[1])
-	assert.Equal(t, "proj_1", args[2])
+	assert.Equal(t, createdAt, args[2])
+	assert.Equal(t, "proj_1", args[3])
 }
 
 func TestCompileReadInvalidCursorToken(t *testing.T) {
@@ -284,7 +313,7 @@ func TestCompileReadInvalidCursorToken(t *testing.T) {
 			Cursor: []byte("not-a-valid-cursor"),
 		},
 	}, projectSchema)
-	assertDomainErrorCode(t, err, "db.invalid_cursor")
+	assertDatabaseErrorCode(t, err, "db.invalid_cursor")
 }
 
 func TestCompileReadCursorOrderMismatch(t *testing.T) {
@@ -310,7 +339,7 @@ func TestCompileReadCursorOrderMismatch(t *testing.T) {
 			Cursor: cursor,
 		},
 	}, projectSchema)
-	assertDomainErrorCode(t, err, "db.cursor_order_mismatch")
+	assertDatabaseErrorCode(t, err, "db.cursor_order_mismatch")
 }
 
 func TestCompileReadCursorCoerceFailure(t *testing.T) {
@@ -334,9 +363,9 @@ func TestCompileReadCursorCoerceFailure(t *testing.T) {
 			Cursor: cursor,
 		},
 	}, projectSchema)
-	assertDomainErrorCode(t, err, "db.invalid_cursor")
+	assertDatabaseErrorCode(t, err, "db.invalid_cursor")
 
-	var dbErr domain.Error
+	var dbErr database.Error
 	require.ErrorAs(t, err, &dbErr)
 	assert.Error(t, dbErr.Parent)
 }
@@ -518,9 +547,10 @@ func TestCompileCompareFilterTuple(t *testing.T) {
 
 	createdAt := time.Date(2026, 6, 26, 10, 0, 0, 0, time.UTC)
 	tests := []struct {
-		name    string
-		filter  database.Filter[domain.ProjectField]
-		wantSQL string
+		name     string
+		filter   database.Filter[domain.ProjectField]
+		wantSQL  string
+		wantArgs []any
 	}{
 		{
 			name: "compare less tuple",
@@ -528,7 +558,8 @@ func TestCompileCompareFilterTuple(t *testing.T) {
 				database.Term(database.Col(domain.ProjectFieldCreatedAt), createdAt),
 				database.Term(database.Col(domain.ProjectFieldID), "proj_1"),
 			),
-			wantSQL: "(created_at, id) < (@p1, @p2)",
+			wantSQL:  "((created_at < @p1) OR (created_at = @p2 AND id < @p3))",
+			wantArgs: []any{createdAt, createdAt, "proj_1"},
 		},
 		{
 			name: "compare equal tuple",
@@ -536,7 +567,8 @@ func TestCompileCompareFilterTuple(t *testing.T) {
 				database.Term(database.Col(domain.ProjectFieldCreatedAt), createdAt),
 				database.Term(database.Col(domain.ProjectFieldID), "proj_1"),
 			),
-			wantSQL: "(created_at, id) = (@p1, @p2)",
+			wantSQL:  "(created_at = @p1 AND id = @p2)",
+			wantArgs: []any{createdAt, "proj_1"},
 		},
 	}
 
@@ -546,9 +578,7 @@ func TestCompileCompareFilterTuple(t *testing.T) {
 
 			sql, args := compileFilterOnly(t, tt.filter, projectSchema)
 			assert.Equal(t, tt.wantSQL, sql)
-			require.Len(t, args, 2)
-			assert.Equal(t, createdAt, args[0])
-			assert.Equal(t, "proj_1", args[1])
+			assert.Equal(t, tt.wantArgs, args)
 		})
 	}
 }
@@ -617,7 +647,7 @@ func TestCompileStringFilter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			sql, args := compileFilterOnly(t, tt.filter, flowDefinitionSchema)
+			sql, args := compileFilterOnly(t, tt.filter, flowdefinition.Schema)
 			assert.Equal(t, tt.wantSQL, sql)
 			require.Len(t, args, 1)
 			assert.Equal(t, tt.wantArg, args[0])
@@ -717,7 +747,7 @@ func compileFlowDefinitionRead(t *testing.T, opts *database.ListOptions[domain.F
 	t.Helper()
 
 	var compiler statementCompiler
-	err := compileRead(&compiler, testFlowDefinitionQuery, opts, flowDefinitionSchema)
+	err := compileRead(&compiler, testFlowDefinitionQuery, opts, flowdefinition.Schema)
 	require.NoError(t, err)
 	return compiler.String(), compiler.args
 }

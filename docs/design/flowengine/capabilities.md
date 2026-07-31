@@ -22,12 +22,13 @@ to be a fast answer to "can I build flow X right now?"
 ### Resolution
 
 - Direct lookup by `name` (with optional `schema_version`). Multiple matches resolve via `pickLatestFlowVersion` — a lexicographic compare over `schema_version` strings (see [Missing → Resolution](#resolution-1)).
-- Audience-based resolution by `purpose` plus active `status`. The repository returns rows ordered `created_at DESC, id DESC`; the service takes the first.
+- Audience-based resolution by `purpose` plus active `status`. Statement list
+  options order `created_at DESC, id DESC`; the service takes the first.
 - Fails with `ErrFlowDefinitionPurposeMismatch` when a name-resolved definition doesn't serve the requested purpose.
 
 ### Definitions
 
-- `FlowDefinitionRepository` over Postgres and Spanner.
+- `FlowDefinitionStatements` over Postgres and Spanner (storage v2).
 - Status enum: `draft`, `active`, `deprecated`, `archived`.
 - Per-definition `user_schema` URL, captured into `FlowState` at `Start`.
 

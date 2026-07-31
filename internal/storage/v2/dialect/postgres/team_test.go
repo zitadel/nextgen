@@ -5,7 +5,6 @@ package postgres
 import (
 	"context"
 	"errors"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -17,12 +16,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniqueTeamIDs(t *testing.T) (projectID, teamID string) {
 	t.Helper()
-	suffix := strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	suffix := uniqueSuffix(t)
 	return "proj-team-" + suffix, "team-" + suffix
 }
 
@@ -38,7 +37,7 @@ func TestTeamStatements_Create(t *testing.T) {
 		projectID, teamID := uniqueTeamIDs(t)
 		ensureTestProject(t, projectID)
 
-		team := &domain.Team{ProjectID: projectID, ID: teamID}
+		team := newTestTeam(projectID, teamID)
 		require.NoError(t, testPool.CreateTeam(t.Context(), team))
 		assert.Equal(t, domain.TeamStatusActive, team.Status)
 		assert.False(t, team.CreatedAt.IsZero())
@@ -49,6 +48,7 @@ func TestTeamStatements_Create(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, projectID, stored.ProjectID)
 		assert.Equal(t, teamID, stored.ID)
+		assert.Equal(t, team.Name, stored.Name)
 		assert.Equal(t, domain.TeamStatusActive, stored.Status)
 	})
 
@@ -56,19 +56,75 @@ func TestTeamStatements_Create(t *testing.T) {
 		projectID, _ := uniqueTeamIDs(t)
 		ensureTestProject(t, projectID)
 
-		err := testPool.CreateTeam(t.Context(), &domain.Team{ProjectID: projectID, ID: ""})
+		err := testPool.CreateTeam(t.Context(), newTestTeam(projectID, ""))
 		assert.Error(t, err)
+	})
+
+	t.Run("name violating the column check returns error", func(t *testing.T) {
+		for _, tc := range []struct {
+			name     string
+			teamName string
+		}{
+			{"empty", ""},
+			{"over the length limit", strings.Repeat("a", domain.TeamNameMaxLength+1)},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				projectID, teamID := uniqueTeamIDs(t)
+				ensureTestProject(t, projectID)
+
+				team := newTestTeam(projectID, teamID)
+				team.Name = tc.teamName
+				assert.ErrorIs(t, testPool.CreateTeam(t.Context(), team), new(database.CheckError))
+			})
+		}
 	})
 
 	t.Run("duplicate (project_id, id) returns error", func(t *testing.T) {
 		projectID, teamID := uniqueTeamIDs(t)
 		ensureTestProject(t, projectID)
 
-		team := &domain.Team{ProjectID: projectID, ID: teamID}
+		team := newTestTeam(projectID, teamID)
 		require.NoError(t, testPool.CreateTeam(t.Context(), team))
 
-		err := testPool.CreateTeam(t.Context(), &domain.Team{ProjectID: projectID, ID: teamID})
+		err := testPool.CreateTeam(t.Context(), newTestTeam(projectID, teamID))
 		assert.Error(t, err)
+	})
+
+	t.Run("duplicate name in the same project returns error", func(t *testing.T) {
+		for _, tc := range []struct {
+			name    string
+			nameFor func(string) string
+		}{
+			{"exact match", func(name string) string { return name }},
+			{"differing only in case", strings.ToUpper},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				projectID, teamID := uniqueTeamIDs(t)
+				ensureTestProject(t, projectID)
+
+				team := newTestTeam(projectID, teamID)
+				require.NoError(t, testPool.CreateTeam(t.Context(), team))
+
+				duplicate := newTestTeam(projectID, teamID+"-2")
+				duplicate.Name = tc.nameFor(team.Name)
+				err := testPool.CreateTeam(t.Context(), duplicate)
+				assert.ErrorIs(t, err, new(database.UniqueError))
+			})
+		}
+	})
+
+	t.Run("same name in different projects is allowed", func(t *testing.T) {
+		projectID, teamID := uniqueTeamIDs(t)
+		ensureTestProject(t, projectID)
+		otherProjectID := projectID + "-other"
+		ensureTestProject(t, otherProjectID)
+
+		team := newTestTeam(projectID, teamID)
+		require.NoError(t, testPool.CreateTeam(t.Context(), team))
+
+		other := newTestTeam(otherProjectID, teamID)
+		other.Name = team.Name
+		require.NoError(t, testPool.CreateTeam(t.Context(), other))
 	})
 }
 
@@ -76,25 +132,27 @@ func TestTeamStatements_Get(t *testing.T) {
 	t.Run("returns team by project_id and id", func(t *testing.T) {
 		projectID, teamID := uniqueTeamIDs(t)
 		ensureTestProject(t, projectID)
-		require.NoError(t, testPool.CreateTeam(t.Context(), &domain.Team{ProjectID: projectID, ID: teamID}))
+		team := newTestTeam(projectID, teamID)
+		require.NoError(t, testPool.CreateTeam(t.Context(), team))
 
 		stored, err := testPool.GetTeamByID(t.Context(), projectID, teamID)
 		require.NoError(t, err)
 		assert.Equal(t, projectID, stored.ProjectID)
 		assert.Equal(t, teamID, stored.ID)
+		assert.Equal(t, team.Name, stored.Name)
 		assert.False(t, stored.CreatedAt.IsZero())
 	})
 
 	t.Run("not found returns NoRowFoundError", func(t *testing.T) {
 		_, err := testPool.GetTeamByID(t.Context(), "proj-nonexistent", "team-nonexistent")
-		assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
 
 func TestTeamStatements_Deactivate(t *testing.T) {
 	projectID, teamID := uniqueTeamIDs(t)
 	ensureTestProject(t, projectID)
-	require.NoError(t, testPool.CreateTeam(t.Context(), &domain.Team{ProjectID: projectID, ID: teamID}))
+	require.NoError(t, testPool.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
 
 	// DeactivateTeam opens its own withTransaction when called via pool.Statements().
 	require.NoError(t, testPool.DeactivateTeam(t.Context(), projectID, teamID))
@@ -108,8 +166,8 @@ func TestTeamStatements_Deactivate_CascadesMembershipsAndOwnedUsers(t *testing.T
 	projectID, ownerTeamID := uniqueTeamIDs(t)
 	_, otherTeamID := uniqueTeamIDs(t)
 	ensureTestProject(t, projectID)
-	require.NoError(t, testPool.CreateTeam(t.Context(), &domain.Team{ProjectID: projectID, ID: ownerTeamID}))
-	require.NoError(t, testPool.CreateTeam(t.Context(), &domain.Team{ProjectID: projectID, ID: otherTeamID}))
+	require.NoError(t, testPool.CreateTeam(t.Context(), newTestTeam(projectID, ownerTeamID)))
+	require.NoError(t, testPool.CreateTeam(t.Context(), newTestTeam(projectID, otherTeamID)))
 
 	schemaURL := "https://schemas.test/team-cascade/" + ownerTeamID + ".json"
 	_, err := testPool.pool.Exec(t.Context(),
@@ -191,7 +249,7 @@ func TestTeamStatements_Deactivate_CascadesMembershipsAndOwnedUsers(t *testing.T
 func TestDeactivateTeam_rollsBackWhenSecondWriteFails(t *testing.T) {
 	projectID, teamID := uniqueTeamIDs(t)
 	ensureTestProject(t, projectID)
-	require.NoError(t, testPool.CreateTeam(t.Context(), &domain.Team{ProjectID: projectID, ID: teamID}))
+	require.NoError(t, testPool.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
 
 	forced := errors.New("forced second write failure")
 	client := &failAfterNBeginner{Pool: testPool.pool, succeed: 1, err: forced}

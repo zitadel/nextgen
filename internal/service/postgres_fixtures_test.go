@@ -4,22 +4,29 @@ package service_test
 
 import (
 	"crypto/sha256"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-func ensureProject(t *testing.T, pool database.QueryExecutor, projectID string) {
+func ensureProject(t *testing.T, projectID string) {
 	t.Helper()
-	_, err := pool.Exec(t.Context(),
-		`INSERT INTO zitadel_nextgen.projects (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
-		projectID,
-	)
-	require.NoError(t, err)
+	pool := integrationPoolOrFail(t)
+	err := pool.Statements().CreateProject(t.Context(), &domain.Project{
+		ID:             projectID,
+		Name:           "project-" + projectID,
+		PreviewOrigins: []string{},
+	})
+	if err != nil {
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			return
+		}
+		require.NoError(t, err)
+	}
 }
 
 func handoffTokenForIntegration(plain string) *domain.HandoffToken {
@@ -29,12 +36,11 @@ func handoffTokenForIntegration(plain string) *domain.HandoffToken {
 
 func handoffCompletedAttempt(
 	t *testing.T,
-	pool database.QueryExecutor,
 	projectID string,
 	mutate func(*domain.AuthAttempt),
 ) (plainToken string, attempt *domain.AuthAttempt) {
 	t.Helper()
-	authRepo := repository.NewAuthAttemptRepository(pool)
+	pool := integrationPoolOrFail(t)
 
 	plainToken = "handoff_" + projectID + "_" + time.Now().Format("150405.000000")
 	attempt = &domain.AuthAttempt{
@@ -45,10 +51,10 @@ func handoffCompletedAttempt(
 	if mutate != nil {
 		mutate(attempt)
 	}
-	ensureProject(t, pool, projectID)
-	require.NoError(t, authRepo.Create(t.Context(), pool, attempt))
+	ensureProject(t, projectID)
+	require.NoError(t, pool.Statements().CreateAuthAttempt(t.Context(), attempt))
 	attempt.HandoffToken = handoffTokenForIntegration(plainToken)
-	require.NoError(t, authRepo.Handoff(t.Context(), pool, attempt))
+	require.NoError(t, pool.Statements().HandoffAuthAttempt(t.Context(), attempt))
 	return plainToken, attempt
 }
 

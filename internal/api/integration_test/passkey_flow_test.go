@@ -36,7 +36,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 
 	// Create the user schema so the resolver can look it up from the DB.  The
 	// schema's $id becomes the URL that the flow definition references.
-	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 
 	userSchemaURL := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
@@ -67,12 +67,12 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	// user_attributes is partitioned by team; a team is required.
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 
-	db := harness.EnsureDBPool(t)
-	userRepo := harness.EnsureUserRepo(t)
-	passkeyRepo := harness.EnsureUserPasskeyRepo(t)
+	users := harness.EnsureUserFixture(t)
+	passkeys := harness.EnsureUserPasskeyFixture(t)
 
 	// Decoy: another project holding the SAME user id and credential id but a
 	// different key pair. Credential resolution must stay project-scoped —
@@ -81,14 +81,15 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	// fail against its foreign public key.
 	decoyProject, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	harness.CreateUserSchema(t, decoyProject, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, decoyProject, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 	decoyTeam, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: decoyProject.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 	decoyEmailAttr, err := domain.NewCreateAttribute("email", "pk-flow-test@example.com", domain.AttributeUniquenessUnspecified)
 	require.NoError(t, err)
-	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
+	require.NoError(t, users.Create(t.Context(), &domain.CreateUser{
 		ProjectID:               decoyProject.ID,
 		SchemaURL:               userSchemaURL,
 		ID:                      userID,
@@ -96,7 +97,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Attributes:              []*domain.CreateAttribute{decoyEmailAttr},
 	}))
 	decoyCred := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
-	require.NoError(t, passkeyRepo.Create(t.Context(), db, &domain.CreateUserPasskey{
+	require.NoError(t, passkeys.Create(t.Context(), &domain.CreateUserPasskey{
 		ProjectID:    decoyProject.ID,
 		UserID:       userID,
 		CredentialID: base64.RawURLEncoding.EncodeToString(cred.ID),
@@ -109,7 +110,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	emailAttr, err := domain.NewCreateAttribute("email", "pk-flow-test@example.com", domain.AttributeUniquenessUnspecified)
 	require.NoError(t, err)
 
-	require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
+	require.NoError(t, users.Create(t.Context(), &domain.CreateUser{
 		ProjectID:               project.ID,
 		SchemaURL:               userSchemaURL,
 		ID:                      userID,
@@ -117,7 +118,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Attributes:              []*domain.CreateAttribute{emailAttr},
 	}))
 
-	require.NoError(t, passkeyRepo.Create(t.Context(), db, &domain.CreateUserPasskey{
+	require.NoError(t, passkeys.Create(t.Context(), &domain.CreateUserPasskey{
 		ProjectID:    project.ID,
 		UserID:       userID,
 		CredentialID: base64.RawURLEncoding.EncodeToString(cred.ID),
