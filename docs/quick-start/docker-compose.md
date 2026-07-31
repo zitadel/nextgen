@@ -32,10 +32,10 @@ The template exposes:
 
 The compose file sets `NEXTGEN_DATABASE_POSTGRES` for the bundled Postgres
 container and persists server data under the `nextgen-server-data` volume. When
-no encryption keys are configured, the server generates and reuses an RSA
-key-encryption key (KEK) under `keks/` in that mounted data directory. Losing
-that volume makes every encrypted value unrecoverable; see
-[Encryption keys (KEK / DEK)](../operations/encryption-keys.md).
+no master keys are configured, the server generates and reuses an RSA master
+key under `master-keys/` in that mounted data directory. Losing that volume
+makes every encrypted value unrecoverable; see
+[Encryption keys (master key / project KEK)](../operations/encryption-keys.md).
 
 ## Bootstrap users
 

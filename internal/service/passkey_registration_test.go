@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -205,4 +206,71 @@ func TestPasskeyRegistrationService_Finish_InvalidAttestationReturnsProofRejecte
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrAuthAttemptProofRejected(nil)))
 	assert.Empty(t, regState.deleted)
+}
+
+func TestPasskeyRegistrationService_Finish_StoresPasskeyName(t *testing.T) {
+	tests := []struct {
+		name         string
+		passkeyName  string
+		expectedName string
+	}{
+		{
+			name:         "caller-supplied name is stored",
+			passkeyName:  "Work laptop",
+			expectedName: "Work laptop",
+		},
+		{
+			// Without a name the credential still needs something displayable;
+			// the user's display name is not it — it is the same for every
+			// credential the user registers.
+			name:         "no name falls back to the credential's own properties",
+			expectedName: domain.PasskeyNameDeviceBound,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			regState := &passkeyRegState{}
+			userState := &passkeyUserState{}
+			svc := buildTestRegistrationSvc(t, regState, userState)
+
+			out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
+				ProjectID:   "proj-1",
+				UserID:      "user-1",
+				Username:    "alice@example.com",
+				DisplayName: "Alice Example",
+				RPID:        passkeyRPID,
+				RPOrigins:   []string{passkeyOrigin},
+			})
+			require.NoError(t, err)
+
+			err = svc.Finish(context.Background(), service.FinishRegistrationInput{
+				ProjectID:      "proj-1",
+				RegistrationID: out.RegistrationID,
+				Attestation:    []byte(attestPasskeyRegistration(t, out.Options)),
+				PasskeyName:    tt.passkeyName,
+			})
+			require.NoError(t, err)
+
+			require.Len(t, userState.created, 1)
+			assert.Equal(t, tt.expectedName, userState.created[0].Name)
+		})
+	}
+}
+
+// attestPasskeyRegistration answers creation options with a real attestation
+// from a fresh virtual authenticator.
+func attestPasskeyRegistration(t *testing.T, options []byte) string {
+	t.Helper()
+
+	rp := virtualwebauthn.RelyingParty{ID: passkeyRPID, Name: "Example", Origin: passkeyOrigin}
+	auth := virtualwebauthn.NewAuthenticatorWithOptions(virtualwebauthn.AuthenticatorOptions{
+		UserHandle: []byte("user-1"),
+	})
+	cred := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
+	auth.AddCredential(cred)
+
+	attestationOptions, err := virtualwebauthn.ParseAttestationOptions(string(options))
+	require.NoError(t, err)
+
+	return virtualwebauthn.CreateAttestationResponse(rp, auth, cred, *attestationOptions)
 }
