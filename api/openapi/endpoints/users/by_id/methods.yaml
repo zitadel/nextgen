@@ -77,4 +77,3 @@ delete:
           application/json:
             schema:
               $ref: ../../../components/error-details.yaml
-
