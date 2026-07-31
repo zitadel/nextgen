@@ -499,6 +499,8 @@ high-risk names (not a second allow path).
 
 ```
 MAY:
+  team.read                          (own team only — resolver-enforced team
+                                      scope)
   user.read, user.write              (within this team only; profile edits only,
                                       NOT user.set_password)
   team_membership.read, team_membership.write
@@ -517,7 +519,9 @@ MUST NEVER:
   allowed_origin.*
   signing_key.*
   webhook.*
-  team.*
+  team.create, team.write, team.delete
+                                     (team administration stays human/team_admin;
+                                      own-team team.read is under MAY)
   billing.*
   idp.*
   app.*

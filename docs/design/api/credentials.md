@@ -41,6 +41,9 @@ All three variants carry the same prefix and differ only by metadata bound at cr
 
 ```text
 sk_team_… MAY:
+  team.read                          (own team only — resolver-enforced team
+                                      scope; metadata / identity of the token's
+                                      team, not team administration)
   user.read, user.write              (within this team only; profile edits only,
                                       NOT user.set_password)
   team_membership.read, team_membership.write
@@ -59,11 +62,10 @@ sk_team_… MUST NEVER:
   allowed_origin.*
   signing_key.*
   webhook.*
-  team.*                             (machine tokens manage team-scoped members/
-                                      keys, not the team resource itself —
-                                      even GET /teams/{own id} stays human/user-
-                                      token territory; team_member may hold
-                                      team.read)
+  team.create, team.write, team.delete
+                                     (creating/renaming/deleting the team is
+                                      human/team_admin territory; team.read of
+                                      the token's own team is under MAY)
   billing.*
   idp.*
   app.*
