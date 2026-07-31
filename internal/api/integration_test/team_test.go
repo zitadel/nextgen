@@ -38,8 +38,8 @@ func TestCreateTeam(t *testing.T) {
 		resp, err := client.CreateTeam(t.Context(), req, params)
 		require.NoError(t, err)
 
-		created, ok := resp.(*api.CreateTeamResponse)
-		require.True(t, ok, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.CreateTeamResponse{}, resp, helpers.MustMarshal(t, resp))
+		created := resp.(*api.CreateTeamResponse)
 		assert.Equal(t, name, created.Name)
 	})
 
@@ -94,8 +94,8 @@ func TestCreateTeam(t *testing.T) {
 				resp, err = client.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: tc.nameFor(name)}, params)
 				require.NoError(t, err)
 
-				conflict, ok := resp.(*api.CreateTeamConflict)
-				require.True(t, ok, helpers.MustMarshal(t, resp))
+				require.IsType(t, &api.CreateTeamConflict{}, resp, helpers.MustMarshal(t, resp))
+				conflict := resp.(*api.CreateTeamConflict)
 				assert.Equal(t, api.ErrorCode("team.already_exists"), conflict.Code)
 			})
 		}
@@ -109,8 +109,8 @@ func TestCreateTeam(t *testing.T) {
 			resp, err := client.CreateTeam(t.Context(), req, params)
 			require.NoError(t, err)
 
-			badRequest, ok := resp.(*api.CreateTeamBadRequest)
-			require.True(t, ok, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateTeamBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			badRequest := resp.(*api.CreateTeamBadRequest)
 			assert.Equal(t, api.ErrorCode("req.invalid"), badRequest.Code)
 		})
 
@@ -143,8 +143,8 @@ func TestCreateTeam(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			badRequest, ok := resp.(*api.CreateTeamBadRequest)
-			require.True(t, ok, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateTeamBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			badRequest := resp.(*api.CreateTeamBadRequest)
 			assert.Equal(t, api.ErrorCode("team.name_invalid"), badRequest.Code)
 		})
 	})
@@ -177,8 +177,8 @@ func TestGetTeam(t *testing.T) {
 		resp, err := client.GetTeam(t.Context(), params)
 		require.NoError(t, err)
 
-		got, ok := resp.(*api.TeamResponse)
-		require.True(t, ok, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.TeamResponse{}, resp, helpers.MustMarshal(t, resp))
+		got := resp.(*api.TeamResponse)
 		assert.Equal(t, team.Name, got.Name)
 	})
 
@@ -196,8 +196,8 @@ func TestGetTeam(t *testing.T) {
 			resp, err := client.GetTeam(t.Context(), params)
 			require.NoError(t, err)
 
-			notFound, ok := resp.(*api.GetTeamNotFound)
-			require.True(t, ok, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.GetTeamNotFound{}, resp, helpers.MustMarshal(t, resp))
+			notFound := resp.(*api.GetTeamNotFound)
 			assert.Equal(t, api.ErrorCode("team.team_not_found"), notFound.Code)
 		})
 	})
@@ -235,8 +235,8 @@ func TestUpdateTeam(t *testing.T) {
 		resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(name)}, params)
 		require.NoError(t, err)
 
-		updated, ok := resp.(*api.TeamResponse)
-		require.True(t, ok, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.TeamResponse{}, resp, helpers.MustMarshal(t, resp))
+		updated := resp.(*api.TeamResponse)
 		assert.Equal(t, name, updated.Name)
 		assert.False(t, updated.UpdatedAt.Before(updated.CreatedAt))
 	})
@@ -259,8 +259,8 @@ func TestUpdateTeam(t *testing.T) {
 		resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString("  " + name + "  ")}, params)
 		require.NoError(t, err)
 
-		updated, ok := resp.(*api.TeamResponse)
-		require.True(t, ok, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.TeamResponse{}, resp, helpers.MustMarshal(t, resp))
+		updated := resp.(*api.TeamResponse)
 		assert.Equal(t, name, updated.Name)
 	})
 
@@ -316,8 +316,8 @@ func TestUpdateTeam(t *testing.T) {
 			resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString("   ")}, params)
 			require.NoError(t, err)
 
-			badRequest, ok := resp.(*api.UpdateTeamBadRequest)
-			require.True(t, ok, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.UpdateTeamBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			badRequest := resp.(*api.UpdateTeamBadRequest)
 			assert.Equal(t, api.ErrorCode("team.name_invalid"), badRequest.Code)
 		})
 
@@ -338,8 +338,8 @@ func TestUpdateTeam(t *testing.T) {
 			resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{}, params)
 			require.NoError(t, err)
 
-			badRequest, ok := resp.(*api.UpdateTeamBadRequest)
-			require.True(t, ok, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.UpdateTeamBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			badRequest := resp.(*api.UpdateTeamBadRequest)
 			assert.Equal(t, api.ErrorCode("team.name_invalid"), badRequest.Code)
 		})
 
@@ -354,8 +354,8 @@ func TestUpdateTeam(t *testing.T) {
 			resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, params)
 			require.NoError(t, err)
 
-			notFound, ok := resp.(*api.UpdateTeamNotFound)
-			require.True(t, ok, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.UpdateTeamNotFound{}, resp, helpers.MustMarshal(t, resp))
+			notFound := resp.(*api.UpdateTeamNotFound)
 			assert.Equal(t, api.ErrorCode("team.team_not_found"), notFound.Code)
 		})
 
@@ -378,8 +378,8 @@ func TestUpdateTeam(t *testing.T) {
 			resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, params)
 			require.NoError(t, err)
 
-			notFound, ok := resp.(*api.UpdateTeamNotFound)
-			require.True(t, ok, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.UpdateTeamNotFound{}, resp, helpers.MustMarshal(t, resp))
+			notFound := resp.(*api.UpdateTeamNotFound)
 			assert.Equal(t, api.ErrorCode("team.team_not_found"), notFound.Code)
 		})
 
@@ -414,8 +414,8 @@ func TestUpdateTeam(t *testing.T) {
 				resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(tc.teamName)}, params)
 				require.NoError(t, err)
 
-				conflict, ok := resp.(*api.UpdateTeamConflict)
-				require.True(t, ok, helpers.MustMarshal(t, resp))
+				require.IsType(t, &api.UpdateTeamConflict{}, resp, helpers.MustMarshal(t, resp))
+				conflict := resp.(*api.UpdateTeamConflict)
 				assert.Equal(t, api.ErrorCode("team.already_exists"), conflict.Code)
 			})
 		}
