@@ -41,9 +41,10 @@ func TestCreateTeam(t *testing.T) {
 		resp, err := client.CreateTeam(t.Context(), req, params)
 		require.NoError(t, err)
 
-		require.IsType(t, &api.CreateTeamResponse{}, resp, helpers.MustMarshal(t, resp))
-		created := resp.(*api.CreateTeamResponse)
+		require.IsType(t, &api.TeamResponse{}, resp, helpers.MustMarshal(t, resp))
+		created := resp.(*api.TeamResponse)
 		assert.Equal(t, name, created.Name)
+		assert.Equal(t, api.TeamStatusActive, created.Status)
 	})
 
 	t.Run("same name in another project", func(t *testing.T) {
@@ -68,7 +69,7 @@ func TestCreateTeam(t *testing.T) {
 				api.CreateTeamParams{ProjectID: api.ProjectID(tc.projectID)},
 			)
 			require.NoError(t, err)
-			assert.IsType(t, &api.CreateTeamResponse{}, resp, helpers.MustMarshal(t, resp))
+			assert.IsType(t, &api.TeamResponse{}, resp, helpers.MustMarshal(t, resp))
 		}
 	})
 
@@ -92,7 +93,7 @@ func TestCreateTeam(t *testing.T) {
 
 				resp, err := client.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: name}, params)
 				require.NoError(t, err)
-				require.IsType(t, &api.CreateTeamResponse{}, resp, helpers.MustMarshal(t, resp))
+				require.IsType(t, &api.TeamResponse{}, resp, helpers.MustMarshal(t, resp))
 
 				resp, err = client.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: tc.nameFor(name)}, params)
 				require.NoError(t, err)
@@ -199,9 +200,12 @@ func TestCreateTeamRawRequest(t *testing.T) {
 
 func TestGetTeam(t *testing.T) {
 	t.Parallel()
-
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		// Teams have no delete statement; they cascade with their project.
+		_ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
+	})
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -227,6 +231,32 @@ func TestGetTeam(t *testing.T) {
 		require.IsType(t, &api.TeamResponse{}, resp, helpers.MustMarshal(t, resp))
 		got := resp.(*api.TeamResponse)
 		assert.Equal(t, team.Name, got.Name)
+		assert.Equal(t, api.TeamStatusActive, got.Status)
+	})
+
+	// A deactivated team is a tombstone: it is still readable, its status tells
+	// it apart from an active one.
+	t.Run("deactivated team", func(t *testing.T) {
+		t.Parallel()
+
+		team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+			ProjectID: project.ID,
+			Name:      helpers.TeamName(),
+		})
+		require.NoError(t, err)
+		require.NoError(t, harness.EnsureServiceDB(t).Statements().DeactivateTeam(t.Context(), project.ID, team.ID))
+
+		params := api.GetTeamParams{
+			ProjectID: api.ProjectID(project.ID),
+			TeamID:    api.TeamID(team.ID),
+		}
+
+		resp, err := client.GetTeam(t.Context(), params)
+		require.NoError(t, err)
+
+		require.IsType(t, &api.TeamResponse{}, resp, helpers.MustMarshal(t, resp))
+		got := resp.(*api.TeamResponse)
+		assert.Equal(t, api.TeamStatusDeactivated, got.Status)
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -285,6 +315,7 @@ func TestUpdateTeam(t *testing.T) {
 		require.IsType(t, &api.TeamResponse{}, resp, helpers.MustMarshal(t, resp))
 		updated := resp.(*api.TeamResponse)
 		assert.Equal(t, name, updated.Name)
+		assert.Equal(t, api.TeamStatusActive, updated.Status)
 		assert.False(t, updated.UpdatedAt.Before(updated.CreatedAt))
 	})
 
