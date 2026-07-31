@@ -318,8 +318,8 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("login-flow", userSchemaURI)),
 	)
 	require.NoError(t, err)
-	loginFlowDef, ok := createResp.(*api.FlowDefinitionDetailResponse)
-	require.True(t, ok)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, createResp, helpers.MustMarshal(t, createResp))
+	loginFlowDef := createResp.(*api.FlowDefinitionDetailResponse)
 
 	multiPurposeResp, err := client.CreateFlowDefinition(
 		t.Context(),
@@ -333,8 +333,8 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		}()),
 	)
 	require.NoError(t, err)
-	loginRegisterFlowDef, ok := multiPurposeResp.(*api.FlowDefinitionDetailResponse)
-	require.True(t, ok)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, multiPurposeResp, helpers.MustMarshal(t, multiPurposeResp))
+	loginRegisterFlowDef := multiPurposeResp.(*api.FlowDefinitionDetailResponse)
 
 	tests := []struct {
 		name     string
@@ -538,55 +538,43 @@ func assertFlowDefinitionResponse(t *testing.T, want, got any) {
 		return
 	}
 
-	switch want.(type) {
+	switch expected := want.(type) {
 	case *api.FlowDefinitionDetailResponse:
-		expected, ok := want.(*api.FlowDefinitionDetailResponse)
-		require.True(t, ok)
-		actual, ok := got.(*api.FlowDefinitionDetailResponse)
-		require.True(t, ok)
+		require.IsType(t, &api.FlowDefinitionDetailResponse{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.FlowDefinitionDetailResponse)
 
 		assert.NotEmpty(t, actual.ID)
 		assert.Equal(t, expected.ProjectID, actual.ProjectID)
 		assert.Equal(t, expected.FlowDefinition, actual.FlowDefinition)
 	case *api.CreateFlowDefinitionBadRequest:
-		expected, ok := want.(*api.CreateFlowDefinitionBadRequest)
-		require.True(t, ok)
-		actual, ok := got.(*api.CreateFlowDefinitionBadRequest)
-		require.True(t, ok)
+		require.IsType(t, &api.CreateFlowDefinitionBadRequest{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.CreateFlowDefinitionBadRequest)
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)
 		assert.Equal(t, expected.Details, actual.Details)
 	case *api.CreateFlowDefinitionConflict:
-		expected, ok := want.(*api.CreateFlowDefinitionConflict)
-		require.True(t, ok)
-		actual, ok := got.(*api.CreateFlowDefinitionConflict)
-		require.True(t, ok)
+		require.IsType(t, &api.CreateFlowDefinitionConflict{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.CreateFlowDefinitionConflict)
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)
 	case *api.UpdateFlowDefinitionBadRequest:
-		expected, ok := want.(*api.UpdateFlowDefinitionBadRequest)
-		require.True(t, ok)
-		actual, ok := got.(*api.UpdateFlowDefinitionBadRequest)
-		require.True(t, ok)
+		require.IsType(t, &api.UpdateFlowDefinitionBadRequest{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.UpdateFlowDefinitionBadRequest)
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)
 		assert.Equal(t, expected.Details, actual.Details)
 	case *api.UpdateFlowDefinitionNotFound:
-		expected, ok := want.(*api.UpdateFlowDefinitionNotFound)
-		require.True(t, ok)
-		actual, ok := got.(*api.UpdateFlowDefinitionNotFound)
-		require.True(t, ok)
+		require.IsType(t, &api.UpdateFlowDefinitionNotFound{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.UpdateFlowDefinitionNotFound)
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)
 	case *api.ErrorDetailsStatusCode:
-		expected, ok := want.(*api.ErrorDetailsStatusCode)
-		require.True(t, ok)
-		actual, ok := got.(*api.ErrorDetailsStatusCode)
-		require.True(t, ok)
+		require.IsType(t, &api.ErrorDetailsStatusCode{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.ErrorDetailsStatusCode)
 
 		assert.Equal(t, expected.StatusCode, actual.StatusCode)
 		assert.Equal(t, expected.Response.Code, actual.Response.Code)
@@ -667,8 +655,8 @@ func TestGetFlowDefinition(t *testing.T) {
 			Steps: validSteps(),
 		},
 	})
-	flowDef, ok := createResp.(*api.FlowDefinitionDetailResponse)
-	require.True(t, ok)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, createResp, helpers.MustMarshal(t, createResp))
+	flowDef := createResp.(*api.FlowDefinitionDetailResponse)
 
 	tests := []struct {
 		name     string
@@ -1035,8 +1023,8 @@ func TestDeleteFlowDefinition(t *testing.T) {
 	})
 	assert.IsType(t, &api.FlowDefinitionDetailResponse{}, createResp, helpers.MustMarshal(t, createResp))
 
-	flowDef, ok := createResp.(*api.FlowDefinitionDetailResponse)
-	require.True(t, ok)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, createResp, helpers.MustMarshal(t, createResp))
+	flowDef := createResp.(*api.FlowDefinitionDetailResponse)
 
 	tests := []struct {
 		name     string

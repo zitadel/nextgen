@@ -40,8 +40,8 @@ func TestCreateTeam(t *testing.T) {
 		resp, err := client.CreateTeam(t.Context(), req, params)
 		require.NoError(t, err)
 
-		created, ok := resp.(*api.CreateTeamResponse)
-		require.True(t, ok, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.CreateTeamResponse{}, resp, helpers.MustMarshal(t, resp))
+		created := resp.(*api.CreateTeamResponse)
 		assert.Equal(t, name, created.Name)
 	})
 
@@ -96,8 +96,8 @@ func TestCreateTeam(t *testing.T) {
 				resp, err = client.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: tc.nameFor(name)}, params)
 				require.NoError(t, err)
 
-				conflict, ok := resp.(*api.CreateTeamConflict)
-				require.True(t, ok, helpers.MustMarshal(t, resp))
+				require.IsType(t, &api.CreateTeamConflict{}, resp, helpers.MustMarshal(t, resp))
+				conflict := resp.(*api.CreateTeamConflict)
 				assert.Equal(t, api.ErrorCode("team.already_exists"), conflict.Code)
 			})
 		}
@@ -111,8 +111,8 @@ func TestCreateTeam(t *testing.T) {
 			resp, err := client.CreateTeam(t.Context(), req, params)
 			require.NoError(t, err)
 
-			badRequest, ok := resp.(*api.CreateTeamBadRequest)
-			require.True(t, ok, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateTeamBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			badRequest := resp.(*api.CreateTeamBadRequest)
 			assert.Equal(t, api.ErrorCode("req.invalid"), badRequest.Code)
 		})
 
@@ -145,8 +145,8 @@ func TestCreateTeam(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			badRequest, ok := resp.(*api.CreateTeamBadRequest)
-			require.True(t, ok, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateTeamBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			badRequest := resp.(*api.CreateTeamBadRequest)
 			assert.Equal(t, api.ErrorCode("team.name_invalid"), badRequest.Code)
 		})
 	})
@@ -223,8 +223,8 @@ func TestGetTeam(t *testing.T) {
 		resp, err := client.GetTeam(t.Context(), params)
 		require.NoError(t, err)
 
-		got, ok := resp.(*api.GetTeamResponse)
-		require.True(t, ok, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.GetTeamResponse{}, resp, helpers.MustMarshal(t, resp))
+		got := resp.(*api.GetTeamResponse)
 		assert.Equal(t, team.Name, got.Name)
 	})
 
@@ -242,8 +242,8 @@ func TestGetTeam(t *testing.T) {
 			resp, err := client.GetTeam(t.Context(), params)
 			require.NoError(t, err)
 
-			notFound, ok := resp.(*api.GetTeamNotFound)
-			require.True(t, ok, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.GetTeamNotFound{}, resp, helpers.MustMarshal(t, resp))
+			notFound := resp.(*api.GetTeamNotFound)
 			assert.Equal(t, api.ErrorCode("team.team_not_found"), notFound.Code)
 		})
 	})
