@@ -148,7 +148,11 @@ only. Permission names in
 
 ## Credentials (globally addressable)
 
-API keys are first-class resources with their own URL. Listing happens under the scope that owns them (`/projects/{id}/api_keys`, `/teams/{id}/api_keys`).
+> **Parked as a management resource** — see
+> [`system-permission-catalog.md` open questions](system-permission-catalog.md#open-questions)
+> and [`credentials.md`](credentials.md#api-keys-as-first-class-resources--parked).
+> Opaque `sk_*` service tokens remain; first-class `/api_keys` CRUD is not catalog
+> contract yet. URL inventory below is design sketch only.
 
 ```http
 /api_keys/{id}
@@ -156,7 +160,8 @@ API keys are first-class resources with their own URL. Listing happens under the
 /api_keys/{id}/revoke
 ```
 
-Detail in [`credentials.md`](credentials.md).
+Listing under the owning scope (`/projects/{id}/api_keys`, `/teams/{id}/api_keys`)
+was part of the same sketch. Detail in [`credentials.md`](credentials.md).
 
 ---
 

@@ -23,16 +23,16 @@
   and `webhook.*`. Their project grant supplies scope; `project.read` /
   `project.write` do not imply them.
 - **Compound resource types use `_`.** Multi-word types match the API/FGA name
-  (`team_membership`, `flow_definition`, `api_key`). No dot nesting
-  (`team.membership.*`) — that would imply `team.write` covers child ops.
+  (`team_membership`, `flow_definition`). No dot nesting (`team.membership.*`) —
+  that would imply `team.write` covers child ops.
 - **Users and team memberships are separate resources.** Old names like
   `team.users.read` nested *where* into the permission. The replacement is
   flat `user.*` and `team_membership.*` evaluated at the team (or project)
   grant boundary — see [§ Nested name replacements](#nested-name-replacements).
 - **Create vs write split** — only on [provisioning-boundary](#create-vs-write)
   resources (plus `grant`) where grant boundaries already depend on it.
-  Elsewhere `write` means create *and* manage — there is no separate `.create`
-  (matches OpenAPI `*.write`).
+  Elsewhere `write` means create *and* update — there is no separate `.create`
+  (matches OpenAPI `*.write`; `delete` stays separate where an endpoint exists).
 
 ## Naming convention
 
@@ -50,11 +50,11 @@
 |---|---|
 | `create` | Create a new resource (`POST` on a collection). |
 | `read` | Read a single resource or list resources of this type. |
-| `write` | Meaning depends on the resource's [verb-model class](#create-vs-write). On **provisioning-boundary** / **soft-split** resources: mutate an **existing** resource only — does **not** imply `create` or `delete`. On **manage** and **runtime** resources: OpenAPI `*.write` semantics — create *and* manage / start *and* mutate (no separate `.create`). For singleton project-scoped config, the first write may establish config if none exists — still `write`. |
+| `write` | Meaning depends on the resource's [verb-model class](#create-vs-write). On **provisioning-boundary** / **soft-split** resources: mutate an **existing** resource only — does **not** imply `create` or `delete`. On **manage**-class and **runtime** resources: OpenAPI `*.write` semantics — create *and* update / start *and* mutate (no separate `.create`). `write` never implies `delete`; delete is always its own permission when an endpoint exists. For singleton project-scoped config, the first write may establish config if none exists — still `write`. |
 | `delete` | Remove / tombstone a resource. |
 
 Resource-specific action verbs are added only when a standard verb is
-insufficient (e.g. `api_key.rotate`, `api_key.revoke`).
+insufficient (e.g. `user.set_password`).
 
 ### Create vs write
 
@@ -71,7 +71,7 @@ see [§ Drift notes](#drift-notes).
 |---|---|
 | **provisioning-boundary** | `create` ≠ `write` is **normative now** — bundles or credential classes already depend on it. |
 | **soft split** | `create` vs `write` is useful for custom grants; default bundles may grant both. |
-| **manage** | No `create`/`write` split — `write` means create *and* manage (`read`, `write`, and `delete` where a delete endpoint exists). Matches OpenAPI `*.write` = create-and-manage. Split only if a real RBAC boundary emerges. |
+| **manage** | Full lifecycle *class* for resources with no create/write split: default grants cover `read`, `write` (create + update), and `delete` where a delete endpoint exists. **Grantable permission strings stay `write` and `delete` — there is no `manage` verb.** Holding `write` alone does not authorize delete; admins who should remove resources need `*.delete` too (bundles usually grant both). Split `create` from `write` only if a real RBAC boundary emerges. |
 | **action-verbs** | No generic `write`; use `create`, `delete`, and resource-specific verbs. |
 | **read-write-only** | No create/delete lifecycle (e.g. billing subscription state). |
 | **job-lifecycle** | `create` + `read` only (async job). |
@@ -85,16 +85,15 @@ see [§ Drift notes](#drift-notes).
 | `user` | provisioning-boundary | Onboarding/SCIM (`create`) vs profile edits (`write`). Plus a **credential-tier** split: `user.set_password` (account-takeover-grade) is separate from `user.write`. Stock admin bundles grant all three; custom grants can hold `user.write` alone. |
 | `team_membership` | provisioning-boundary | Invites/direct add (`create`) vs role change (`write`). **`sk_team_` grants `.write` but not `.create`/`.delete`.** |
 | `grant` | soft split | New access binding (`create`) vs change existing binding (`write`) — delegation control. |
-| `api_key` | action-verbs | `create`, `read`, `delete`, `rotate`, `revoke` — no `api_key.write`. |
-| `signing_key` | action-verbs | `create`, `read`, `delete` — manual rotation creates a successor; emergency replacement creates the successor before deleting the compromised key. |
+| `signing_key` | action-verbs | `create`, `read`, `delete` — **no `signing_key.rotate`.** Rotation is create-a-successor ([ADR 039](../../adrs/039-signing-key-rotation-and-incident-response.md)), not in-place secret replacement. Emergency replacement creates the successor before deleting the compromised key. |
 | `billing` | read-write-only | Tier/subscription/payment — no `billing.create`. |
 | `branding` | manage | Immutable revisions: `write` publishes a revision; no update or delete. Already matches OpenAPI. |
-| `domain`, `allowed_origin`, `webhook` | manage | Project-scoped collections; `write` creates and manages, with separate `delete`. |
+| `domain`, `allowed_origin`, `webhook` | manage | Project-scoped collections; `write` = create + update; `delete` separate. Class covers the full set; grant `write` and/or `delete`, never a `manage` permission. |
 | `feature` | read-write-only | Project feature configuration has no independent create/delete lifecycle. |
 | `import` | job-lifecycle | Start job (`create`); poll status (`read`). |
 | `event`, `audit_event` | read-only | |
 | `session`, `auth_attempt` | runtime | App-plane `*.write` only (no separate `*.create` — OpenAPI `*.write` covers start + mutate). Operator: `session.read` / `session.delete`. |
-| `app`, `idp`, `app_group`, `schema`, `flow_definition` | manage | No create/write split — `write` = create + manage; `read`, `write`, `delete` (where exposed). Matches OpenAPI (`*.write` = create-and-manage; `flow_definition.delete` separate). |
+| `app`, `idp`, `app_group`, `schema`, `flow_definition` | manage | No create/write split — `write` = create + update; `delete` where exposed. Matches OpenAPI. Class implies the full CRUD *set*; permissions remain `read` / `write` / `delete` (no `*.manage`). |
 
 ---
 
@@ -107,7 +106,7 @@ see [§ Drift notes](#drift-notes).
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `project.create` | `POST /projects` (authenticated / on-prem path) | Two creation modes share this URL. **Cloud self-service:** anonymous `POST /projects` (`security: []`) + claim flow — no catalog permission (see [`../platform/claim-flow.md`](../platform/claim-flow.md)). **On-prem / admin-provisioned:** authenticated `POST /projects` gated by `project.create`, no claim — the platform project + default team are seeded at install ([`hierarchy.md`](hierarchy.md#self-hosted-exposes-the-same-api-shape-as-cloud)). How one endpoint reconciles both gatings is an [open question](#open-questions). |
-| `project.read` | `POST /projects/query`, `GET /projects/{id}` | Project resource only. Does not imply project-scoped configuration permissions. Listing is `POST /projects/query` — there is no `GET /projects`. |
+| `project.read` | `POST /projects/query`, `GET /projects/{id}` | Project resource only. Does not imply project-scoped configuration permissions. Listing is `POST /projects/query` — there is no `GET /projects`. **Drift ([ADR 036](../../adrs/036-api-credential-planes.md)):** target *operator* read after credential planes split. Today origin-scoped / preview secrets are minted with only `project.read`, while operator `GET`/`query` stay gated by `project.write` — do not treat this row as today's safe preview-secret gate. |
 | `project.write` | `PATCH /projects/{id}` | Project attributes only. Does not imply `branding.*`, `domain.*`, `feature.*`, `allowed_origin.*`, `signing_key.*`, or `webhook.*`. |
 | `project.delete` | `DELETE /projects/{id}` | **Not yet exposed** — target shape. |
 
@@ -135,9 +134,9 @@ the target catalog for the planned paths in
 | `allowed_origin.read` | Read/list `/projects/{id}/allowed_origins` | |
 | `allowed_origin.write` | Add/update an allowed origin | Create + manage. |
 | `allowed_origin.delete` | Remove an allowed origin | |
-| `signing_key.create` | Create a successor signing key | Manual rotation; activation follows [ADR 039](../../adrs/039-signing-key-rotation-and-incident-response.md). |
+| `signing_key.create` | Create a successor signing key | **Rotation = create successor** (no `signing_key.rotate`). Manual or sweep-driven; activation follows [ADR 039](../../adrs/039-signing-key-rotation-and-incident-response.md). Not in-place secret replacement. |
 | `signing_key.read` | Read/list `/projects/{id}/signing_keys` | Public/status metadata only; never exposes private key material. |
-| `signing_key.delete` | Delete a signing key | Includes emergency removal after a successor exists. |
+| `signing_key.delete` | Delete a signing key | Includes emergency removal after a successor exists. Keep `create`/`delete`; do not fold rotation into a single rotate verb. |
 | `webhook.read` | Read/list `/projects/{id}/webhooks` | |
 | `webhook.write` | Create/update a webhook | Create + manage. |
 | `webhook.delete` | Remove a webhook | |
@@ -232,21 +231,9 @@ Planned permissions once specified:
 Until endpoints exist, treat `billing.*` as reserved catalog names — do not
 grant them via `team.write`.
 
-### API keys
-
-> **Verb model:** action-verbs — no `api_key.write`.
-
-| Permission | Endpoints | Notes |
-|---|---|---|
-| `api_key.create` | `POST /projects/{id}/api_keys`, `POST /teams/{id}/api_keys` | Scope determines project vs team key. |
-| `api_key.read` | `GET /projects/{id}/api_keys`, `GET /teams/{id}/api_keys`, `GET /api_keys/{id}` | |
-| `api_key.delete` | `DELETE /api_keys/{id}` | |
-| `api_key.rotate` | `POST /api_keys/{id}/rotate` | Action verb. |
-| `api_key.revoke` | `POST /api_keys/{id}/revoke` | Action verb. |
-
 ### Apps
 
-> **Verb model:** manage — `write` = create + manage (no `app.create`).
+> **Verb model:** manage — `write` = create + update (no `app.create`); `delete` separate. No `app.manage` permission.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
@@ -256,7 +243,7 @@ grant them via `team.write`.
 
 ### Identity providers
 
-> **Verb model:** manage — `write` = create + manage (no `idp.create`).
+> **Verb model:** manage — `write` = create + update (no `idp.create`); `delete` separate. No `idp.manage` permission.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
@@ -266,7 +253,7 @@ grant them via `team.write`.
 
 ### App groups
 
-> **Verb model:** manage — `write` = create + manage (no `app_group.create`).
+> **Verb model:** manage — `write` = create + update (no `app_group.create`); `delete` separate. No `app_group.manage` permission.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
@@ -292,7 +279,7 @@ assignment). This is the `/grants` management resource — **not** OAuth
 
 ### Schemas (user schemas)
 
-> **Verb model:** manage — `write` = create + manage (no `schema.create`); matches OpenAPI `schema.write`.
+> **Verb model:** manage — `write` = create + update (no `schema.create`); matches OpenAPI `schema.write`. `delete` separate where exposed. No `schema.manage` permission.
 
 User profile / directory schema definitions. URL stays `/schemas`; permission
 prefix is `schema.*` for now. Rename to `user_schema.*` is optional if another
@@ -309,7 +296,7 @@ not yet exposed.
 
 ### Flow definitions
 
-> **Verb model:** manage — `write` = create + manage; `delete` separate (already in OpenAPI).
+> **Verb model:** manage — `write` = create + update; `delete` separate (already in OpenAPI). No `flow_definition.manage` permission.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
@@ -407,7 +394,6 @@ webhook.read, webhook.write, webhook.delete,
 team.create, team.read, team.write, team.delete,
 user.create, user.read, user.write, user.set_password, user.delete,
 team_membership.create, team_membership.read, team_membership.write, team_membership.delete,
-api_key.create, api_key.read, api_key.delete, api_key.rotate, api_key.revoke,
 app.read, app.write, app.delete,
 idp.read, idp.write, idp.delete,
 app_group.read, app_group.write, app_group.delete,
@@ -441,7 +427,6 @@ webhook.read,
 team.read,
 user.read,
 team_membership.read,
-api_key.read,
 app.read,
 idp.read,
 app_group.read,
@@ -465,13 +450,17 @@ Manage a team's own resources (scoped to the team grant boundary). Illustrates
 team.read, team.write,
 user.create, user.read, user.write, user.set_password, user.delete,
 team_membership.create, team_membership.read, team_membership.write, team_membership.delete,
-api_key.create, api_key.read, api_key.delete, api_key.rotate, api_key.revoke,
 event.read
 ```
 
 ### `team_member`
 
-Basic team-scoped access.
+**Audience:** org **staff** inside a customer-project team (legacy org-member
+analogue) — not shop end-customers / app users. `user.read` here is roster
+visibility within the team grant, appropriate for operators collaborating in
+that tenant, not for end-user product roles.
+
+Basic team-scoped access:
 
 ```
 team.read,
@@ -489,7 +478,10 @@ enforces these before evaluating grants.
 
 ### `sk_proj_…`
 
-May hold any system permission within the granted project scope.
+May hold any system permission within the granted project scope. This is a
+project-scoped **service token** (opaque `sk_*` bearer), not a user-managed
+PAT. Bootstrap minting (create/claim) is outside this catalog; a first-class
+`api_key` management resource is [parked](#open-questions).
 
 ### `sk_team_…` — LOCKED
 
@@ -506,8 +498,6 @@ MAY:
   team_membership.read, team_membership.write
                                      (not .create / .delete — roster changes
                                       are human/owner operations; see Invitations)
-  api_key.create, api_key.read, api_key.delete, api_key.rotate, api_key.revoke
-                                     (within this team only)
   event.read                         (filtered to this team)
 
 MUST NEVER:
@@ -551,19 +541,29 @@ plural scope names and missing scope declarations with it.
 The remaining behavioral and endpoint gaps below are follow-up work.
 
 **Verb model.** OpenAPI scopes for several resources use only `.read` and
-`.write`, where `.write` means “create and manage.” This catalog keeps that
-model for **manage** resources (`app`, `idp`, `app_group`, `schema`,
-`flow_definition`, `branding`, `domain`, `allowed_origin`, `webhook`) — no
-separate `.create` — and splits `create` from `write` only on
+`.write`, where `.write` means “create and update,” plus a separate `.delete`
+where exposed. This catalog keeps that model for **manage**-class resources
+(`app`, `idp`, `app_group`, `schema`, `flow_definition`, `branding`, `domain`,
+`allowed_origin`, `webhook`): no separate `.create`, and **no grantable
+`manage` verb** — the class name means the resource’s full lifecycle
+(`write` + `delete` where an endpoint exists); grants still name `write` or
+`delete` explicitly (`write` alone does not authorize delete). It splits
+`create` from `write` only on
 [provisioning-boundary](#create-vs-write) resources (`user`, `team`, `project`,
 `team_membership`) plus `grant`. The verb-model follow-up's net-new scopes are
 therefore `*.create` / `*.delete` on that provisioning set (not on `schema`,
 which stays `schema.read` / `schema.write`). `signing_key` independently uses
-action verbs for its create/activate/delete lifecycle. That delta is smaller
-than a full-CRUD-everywhere model. `user.set_password` also splits
-credential-tier ops out of `user.write`:
+`create` / `read` / `delete` (rotation = create successor; no `.rotate`). That
+delta is smaller than a full-CRUD-everywhere model. `user.set_password` also
+splits credential-tier ops out of `user.write`:
 `PUT /users/{id}/password` is `user.write` in OpenAPI today and would move to
 `user.set_password`.
+
+**`project.read` vs preview secrets.** Catalog `project.read` is the target
+operator read after [ADR 036](../../adrs/036-api-credential-planes.md) splits
+credential planes. Until then, preview / origin-scoped secrets carry
+`project.read` while operator project get/query remain `project.write` — see
+the `project.read` row Notes.
 
 **Project-scoped configuration.** OpenAPI already declares and uses
 `branding.read` / `branding.write`. The current authorization compatibility
@@ -574,7 +574,7 @@ request the final names. Their resource-specific endpoints and enforcement
 remain planned; declaring a scope does not make an absent endpoint available.
 
 **Undeclared resource types.** Many other catalog resources have no OpenAPI scope
-entries yet (e.g. `grant`, `api_key`, `team_membership`, `billing`). `/schemas`
+entries yet (e.g. `grant`, `team_membership`, `billing`). `/schemas`
 now appears in [`resource-map.md`](resource-map.md#user-schemas) but exposes only
 create/list/get — `schema.write` covers create today, while update and
 `schema.delete` remain target behavior without `PATCH`/`DELETE` endpoints.
@@ -616,18 +616,25 @@ enforcement. Two related consequences:
    (`/scim/v2/Users`, `/scim/v2/Groups` in resource-map) with no
    **management-permission** mapping yet. Park until `scim.sync` (or similar) is
    defined.
-3. **Project configuration endpoint shapes** — permission names are locked
+3. **API key management resource** — park. Opaque `sk_proj_` / `sk_team_`
+   service tokens remain (bootstrap at project create/claim; see
+   [`credentials.md`](credentials.md)). Do **not** lock `api_key.*` permissions,
+   default-bundle grants, or `sk_team_` allowlist entries until product decides
+   first-class key CRUD vs OAuth2 client-credentials vs secret-rotate-only.
+   URL sketches in resource-map / credentials stay design inventory, not catalog
+   contract.
+4. **Project configuration endpoint shapes** — permission names are locked
    independently from `project.*`; exact REST operations for domains, features,
    allowed origins, signing keys, and webhooks still need specification.
-4. **`app_group` product decomposition** — flagged OPEN in resource-map.md.
+5. **`app_group` product decomposition** — flagged OPEN in resource-map.md.
    Catalog names may change if app_groups are restructured.
-5. **`schema.*` vs `user_schema.*`** — only user schemas exist today; URL is
+6. **`schema.*` vs `user_schema.*`** — only user schemas exist today; URL is
    `/schemas`. Rename permission prefix if a second schema kind appears.
-6. **Billing** — `billing.read` / `billing.write` reserved for platform-project
+7. **Billing** — `billing.read` / `billing.write` reserved for platform-project
    teams; endpoints not specified yet (see [Billing](#billing-platform-project--explicit-not-folded)).
-7. **Invitations** — folded into `team_membership.create` / `.delete` for MVP;
+8. **Invitations** — folded into `team_membership.create` / `.delete` for MVP;
    promote to `invitation.*` if invite-without-membership-admin is needed.
-8. **Project creation gating across deployments** — `POST /projects` is
+9. **Project creation gating across deployments** — `POST /projects` is
    anonymous bootstrap + claim in cloud (self-service signup, `security: []`),
    but authenticated `project.create` with no claim on-prem / when an admin
    provisions an additional project. [`hierarchy.md`](hierarchy.md#self-hosted-exposes-the-same-api-shape-as-cloud)

@@ -30,8 +30,8 @@ All three variants carry the same prefix and differ only by metadata bound at cr
 | Variant | Metadata | When minted | What can it do |
 |---|---|---|---|
 | **Pre-claim** | `pre_claim: true` | `POST /projects` (anonymous; no human yet) | Full project authority against an unclaimed project. See [`../platform/claim-flow.md`](../platform/claim-flow.md). |
-| **Claimed** | `pre_claim: false`, bound to a team | At claim — the pre-claim token is replaced by a first claimed `sk_proj_…` issued as an `api_key` bound to a team in the platform project. | Full project authority, audited under the team. |
-| **Origin-scoped** | `origin_patterns: [...]` | Minted at `POST /projects` alongside pre-claim token, or separately as an `api_key` for preview deploys. | Restricted to calls whose `Origin` matches one of the declared patterns. Replaces what used to be called the "preview secret". |
+| **Claimed** | `pre_claim: false`, bound to a team | At claim — the pre-claim token is replaced by a first claimed `sk_proj_…` bound to a team in the platform project. | Full project authority, audited under the team. |
+| **Origin-scoped** | `origin_patterns: [...]` | Minted at `POST /projects` alongside pre-claim token, or later for preview deploys once a management API exists. | Restricted to calls whose `Origin` matches one of the declared patterns. Replaces what used to be called the "preview secret". |
 
 > **Note:** The old `zp_…` / `zpp_…` prefixes are retired. Any cross-reference in older design notes maps: `zp_` → `sk_proj_`; `zpp_` → origin-scoped `sk_proj_`.
 
@@ -49,8 +49,6 @@ sk_team_… MAY:
   team_membership.read, team_membership.write
                                      (not .create / .delete — roster add/remove
                                       and invitations require a user token)
-  api_key.create, api_key.read, api_key.delete, api_key.rotate, api_key.revoke
-                                     (within this team only)
   event.read                         (filtered to this team)
 
 sk_team_… MUST NEVER:
@@ -91,6 +89,10 @@ SCIM sync (`scim.sync`) is not listed yet — SCIM is a hosted interop surface
 (`/scim/v2/Users`, `/scim/v2/Groups` in [`resource-map.md`](resource-map.md))
 with no **management-permission** mapping yet. Park until that is designed.
 
+`api_key.*` is likewise not listed — first-class API-key management is parked
+in the [system catalog open questions](system-permission-catalog.md#open-questions);
+bootstrap `sk_*` minting does not go through that resource.
+
 Enforced at the **permission-check layer** (`credential × operation → decision`), not at the endpoint layer. A team token hitting `PATCH /projects/{id}` gets 404 regardless of path — the permission check sees "team token + project.write" and rejects before any resource resolution happens.
 
 > **Note:** A single bug that lets an `sk_team_` call `PATCH /projects/{id}` is a cross-tenant admin escalation. Warrants dedicated threat modelling and a test suite that enumerates every entry in the deny list.
@@ -120,9 +122,16 @@ Native mobile apps don't have web origins — any `Origin` header they send is s
 
 Native deep-integration is post-MVP; the discriminator is not. Until then, native clients use server-to-server flows with `sk_proj_…`.
 
-## API keys as first-class resources
+## API keys as first-class resources — PARKED
 
-API keys are globally-addressable resources. Secret material is returned exactly once.
+> **Parked** pending product decision (see
+> [`system-permission-catalog.md` open questions](system-permission-catalog.md#open-questions)):
+> first-class `api_key` CRUD vs OAuth2 client-credentials vs secret-rotate-only.
+> Opaque `sk_proj_` / `sk_team_` **service tokens** still exist (bootstrap at
+> project create/claim). Do not treat the sketch below as a locked permission
+> or OpenAPI contract.
+
+Earlier design sketch (inventory only):
 
 ```http
 POST /projects/{id}/api_keys
@@ -135,7 +144,7 @@ POST /api_keys/{id}/rotate
 POST /api_keys/{id}/revoke
 ```
 
-Listing happens under the scope that owns them (`GET /projects/{id}/api_keys`, `GET /teams/{id}/api_keys`). Individual key management happens flat.
+Listing would happen under the scope that owns them (`GET /projects/{id}/api_keys`, `GET /teams/{id}/api_keys`). Individual key management would be flat.
 
 ## Handoff token hardening
 
