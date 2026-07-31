@@ -59,6 +59,11 @@ type GetMyUserInput struct {
 	SessionToken *domain.Token
 }
 
+type DeleteUserInput struct {
+	ProjectID string
+	UserID    string
+}
+
 // ---- Implementation -------------------------------------------------------------
 
 type UserService struct {
@@ -120,6 +125,11 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 	}
 
 	return action.User, nil
+}
+
+func (s *UserService) DeleteUser(ctx context.Context, input DeleteUserInput) error {
+	action := NewDeleteUserAction(input)
+	return s.ApplyActions(ctx, action)
 }
 
 // ListUsers returns the project's users as attribute trees (the same
@@ -348,6 +358,33 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) 
 			return domain.ErrUserNotFound()
 		}
 		return domain.ErrInternal(err).WithMessage("failed to set password")
+	}
+	return nil
+}
+
+// ---- Delete ACTION -------------------------------------------------------------
+
+type DeleteUserAction struct {
+	DeleteUserInput
+}
+
+func NewDeleteUserAction(input DeleteUserInput) *DeleteUserAction {
+	return &DeleteUserAction{
+		DeleteUserInput: input,
+	}
+}
+
+func (o *DeleteUserAction) Prepare(_ context.Context) error {
+	return nil
+}
+
+func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	err := stmts.DeleteUserByID(ctx, o.ProjectID, o.UserID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil
+		}
+		return domain.ErrInternal(err).WithMessage("failed to delete user")
 	}
 	return nil
 }

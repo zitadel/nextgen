@@ -103,6 +103,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	DeleteFlowDefinitionOperation: []string{
 		"flow_definitions.delete",
 	},
+	DeleteUserByIDOperation: []string{
+		"user.delete",
+	},
 	ExchangeHandoffOperation: []string{
 		"sessions.write",
 	},

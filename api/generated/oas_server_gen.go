@@ -153,6 +153,12 @@ type Handler interface {
 	//
 	// DELETE /flow_definitions/{id}
 	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
+	// DeleteUserByID implements DeleteUserByID operation.
+	//
+	// Delete user by ID.
+	//
+	// DELETE /users/{user_id}
+	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
 	// EndSession implements endSession operation.
 	//
 	// End a session.

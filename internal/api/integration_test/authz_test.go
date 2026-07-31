@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 // TestManagementAuthz exercises the shared project-access guard across the
@@ -160,6 +161,43 @@ func TestManagementAuthz(t *testing.T) {
 			pwResp, err := foreign.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "hijacked-password"}, api.SetUserPasswordParams{ProjectID: victimID, UserID: "user_irrelevant"})
 			require.NoError(t, err)
 			assertAuthzError(t, pwResp, "user.invalid")
+
+			delResp, err := foreign.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{ProjectID: victimID, UserID: "user_irrelevant"})
+			require.NoError(t, err)
+			assertAuthzError(t, delResp, "user.not_found")
+		})
+
+		t.Run("a foreign delete of a real user leaves it standing", func(t *testing.T) {
+			t.Parallel()
+
+			// The other probes use fabricated ids because the guard rejects
+			// before the service. A delete is worth proving against real data:
+			// the answer must not distinguish the user from a nonexistent one,
+			// and the user must survive.
+			victimUser, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+				ProjectID: victim.ID,
+				User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "authz-delete-probe@example.com"),
+			})
+			require.NoError(t, err)
+			victimUserID := api.UserID(victimUser["id"].(string))
+
+			delResp, err := foreign.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{ProjectID: victimID, UserID: victimUserID})
+			require.NoError(t, err)
+			assertAuthzError(t, delResp, "user.not_found")
+
+			ownClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+			require.NoError(t, err)
+			harness.SetProjectSecretOnApiClient(t, ownClient, victim)
+
+			getResp, err := ownClient.GetUserByID(t.Context(), api.GetUserByIDParams{ProjectID: victimID, UserID: victimUserID})
+			require.NoError(t, err)
+			assert.IsType(t, &api.GetUserByIDOK{}, getResp, helpers.MustMarshal(t, getResp))
+
+			// The owner's secret does reach the delete: project.write implies
+			// user.delete, so the rejection above was the binding, not the op.
+			ownDelResp, err := ownClient.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{ProjectID: victimID, UserID: victimUserID})
+			require.NoError(t, err)
+			assert.IsType(t, &api.DeleteUserByIDNoContent{}, ownDelResp, helpers.MustMarshal(t, ownDelResp))
 		})
 
 		t.Run("preview secret rejected", func(t *testing.T) {
@@ -169,6 +207,11 @@ func TestManagementAuthz(t *testing.T) {
 			pwResp, err := preview.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "hijacked-password"}, api.SetUserPasswordParams{ProjectID: victimID, UserID: "user_irrelevant"})
 			require.NoError(t, err)
 			assertAuthzStatus(t, pwResp, 403, "user.permission_denied")
+
+			// …nor delete users…
+			delResp, err := preview.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{ProjectID: victimID, UserID: "user_irrelevant"})
+			require.NoError(t, err)
+			assertAuthzStatus(t, delResp, 403, "user.permission_denied")
 
 			// …and must not enumerate the project's users, even though the
 			// operation is implicitly scoped to its own project.
