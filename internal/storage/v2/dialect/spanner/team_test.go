@@ -62,14 +62,14 @@ func TestTeamStatements_UpdateTeam(t *testing.T) {
 		project := newProject(t)
 		team := newTestTeam(project.ID, "team_v2_update")
 		require.NoError(t, stmts.CreateTeam(ctx, team))
-		createdAt := team.CreatedAt
+		createdAt, updatedAt := team.CreatedAt, team.UpdatedAt
 
 		team.Name = "updated name"
 		require.NoError(t, stmts.UpdateTeam(ctx, team))
 		assert.Equal(t, "updated name", team.Name)
 		assert.Equal(t, domain.TeamStatusActive, team.Status)
 		assert.Equal(t, createdAt, team.CreatedAt)
-		assert.False(t, team.UpdatedAt.Before(createdAt))
+		assert.True(t, team.UpdatedAt.After(updatedAt))
 	})
 
 	t.Run("team not found returns NoRowFoundError", func(t *testing.T) {

@@ -157,7 +157,7 @@ func TestTeamService_Update(t *testing.T) {
 	}{
 		{
 			name:  "ok",
-			input: service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1", Name: "renamed"},
+			input: service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1", Name: new("renamed")},
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().UpdateTeam(gomock.Any(), &domain.Team{ProjectID: "proj_1", ID: "team_1", Name: "renamed"}).
 					DoAndReturn(func(_ context.Context, team *domain.Team) error {
@@ -177,7 +177,7 @@ func TestTeamService_Update(t *testing.T) {
 		},
 		{
 			name:  "name is trimmed before the update",
-			input: service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1", Name: "  renamed  "},
+			input: service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1", Name: new("  renamed  ")},
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().UpdateTeam(gomock.Any(), &domain.Team{ProjectID: "proj_1", ID: "team_1", Name: "renamed"}).
 					Return(nil)
@@ -188,12 +188,17 @@ func TestTeamService_Update(t *testing.T) {
 		},
 		{
 			name:    "whitespace-only name",
-			input:   service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1", Name: "   "},
+			input:   service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1", Name: new("   ")},
+			wantErr: domain.ErrTeamNameInvalid(),
+		},
+		{
+			name:    "omitted name",
+			input:   service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1"},
 			wantErr: domain.ErrTeamNameInvalid(),
 		},
 		{
 			name:  "duplicate name",
-			input: service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1", Name: "renamed"},
+			input: service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1", Name: new("renamed")},
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().UpdateTeam(gomock.Any(), &domain.Team{ProjectID: "proj_1", ID: "team_1", Name: "renamed"}).
 					Return(database.NewUniqueError("teams", "uq_teams_project_name", nil))
@@ -202,7 +207,7 @@ func TestTeamService_Update(t *testing.T) {
 		},
 		{
 			name:  "team not found",
-			input: service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "missing", Name: "renamed"},
+			input: service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "missing", Name: new("renamed")},
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().UpdateTeam(gomock.Any(), &domain.Team{ProjectID: "proj_1", ID: "missing", Name: "renamed"}).
 					Return(database.NewNoRowFoundError(nil))
@@ -211,7 +216,7 @@ func TestTeamService_Update(t *testing.T) {
 		},
 		{
 			name:  "update fails",
-			input: service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1", Name: "renamed"},
+			input: service.UpdateTeamInput{ProjectID: "proj_1", TeamID: "team_1", Name: new("renamed")},
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().UpdateTeam(gomock.Any(), gomock.Any()).Return(assert.AnError)
 			},

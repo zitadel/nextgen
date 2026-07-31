@@ -235,7 +235,7 @@ func TestManagementAuthz(t *testing.T) {
 			require.NoError(t, err)
 			assertAuthzError(t, getResp, "team.team_not_found")
 
-			updateResp, err := foreign.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: helpers.TeamName()}, api.UpdateTeamParams{ProjectID: victimID, TeamID: "team_irrelevant"})
+			updateResp, err := foreign.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, api.UpdateTeamParams{ProjectID: victimID, TeamID: "team_irrelevant"})
 			require.NoError(t, err)
 			assertAuthzError(t, updateResp, "team.project_not_found")
 		})
@@ -248,7 +248,7 @@ func TestManagementAuthz(t *testing.T) {
 			require.IsType(t, &api.CreateTeamForbidden{}, resp, helpers.MustMarshal(t, resp))
 			assertAuthzError(t, resp, "team.permission_denied")
 
-			updateResp, err := preview.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: helpers.TeamName()}, api.UpdateTeamParams{ProjectID: victimID, TeamID: "team_irrelevant"})
+			updateResp, err := preview.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, api.UpdateTeamParams{ProjectID: victimID, TeamID: "team_irrelevant"})
 			require.NoError(t, err)
 			require.IsType(t, &api.UpdateTeamForbidden{}, updateResp, helpers.MustMarshal(t, updateResp))
 			assertAuthzError(t, updateResp, "team.permission_denied")

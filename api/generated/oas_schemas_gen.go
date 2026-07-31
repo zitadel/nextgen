@@ -12178,16 +12178,16 @@ func (*UpdateTeamNotFound) updateTeamRes() {}
 // Ref: #
 type UpdateTeamRequest struct {
 	// The name of the team. Must be unique within the project.
-	Name string `json:"name"`
+	Name OptString `json:"name"`
 }
 
 // GetName returns the value of Name.
-func (s *UpdateTeamRequest) GetName() string {
+func (s *UpdateTeamRequest) GetName() OptString {
 	return s.Name
 }
 
 // SetName sets the value of Name.
-func (s *UpdateTeamRequest) SetName(val string) {
+func (s *UpdateTeamRequest) SetName(val OptString) {
 	s.Name = val
 }
 

@@ -155,7 +155,7 @@ func TestTeamStatements_UpdateTeam(t *testing.T) {
 		ensureTestProject(t, projectID)
 		team := newTestTeam(projectID, teamID)
 		require.NoError(t, testPool.CreateTeam(t.Context(), team))
-		createdAt := team.CreatedAt
+		createdAt, updatedAt := team.CreatedAt, team.UpdatedAt
 
 		team.Name = "updated name"
 		require.NoError(t, testPool.UpdateTeam(t.Context(), team))
@@ -164,7 +164,7 @@ func TestTeamStatements_UpdateTeam(t *testing.T) {
 		assert.Equal(t, teamID, team.ID)
 		assert.Equal(t, domain.TeamStatusActive, team.Status)
 		assert.Equal(t, createdAt, team.CreatedAt)
-		assert.False(t, team.UpdatedAt.Before(createdAt))
+		assert.True(t, team.UpdatedAt.After(updatedAt))
 	})
 
 	t.Run("team not found returns NoRowFoundError", func(t *testing.T) {

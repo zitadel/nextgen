@@ -42,11 +42,14 @@ func (h *Handler) UpdateTeam(ctx context.Context, req *api.UpdateTeamRequest, pa
 	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opWrite); err != nil {
 		return nil, err
 	}
-	team, err := h.teamService.Update(ctx, service.UpdateTeamInput{
+	input := service.UpdateTeamInput{
 		ProjectID: string(params.ProjectID),
 		TeamID:    string(params.TeamID),
-		Name:      req.Name,
-	})
+	}
+	if name, ok := req.Name.Get(); ok {
+		input.Name = &name
+	}
+	team, err := h.teamService.Update(ctx, input)
 	if err != nil {
 		return nil, err
 	}

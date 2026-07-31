@@ -232,7 +232,7 @@ func TestUpdateTeam(t *testing.T) {
 			TeamID:    api.TeamID(team.ID),
 		}
 
-		resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: name}, params)
+		resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(name)}, params)
 		require.NoError(t, err)
 
 		updated, ok := resp.(*api.TeamResponse)
@@ -256,7 +256,7 @@ func TestUpdateTeam(t *testing.T) {
 			TeamID:    api.TeamID(team.ID),
 		}
 
-		resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: "  " + name + "  "}, params)
+		resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString("  " + name + "  ")}, params)
 		require.NoError(t, err)
 
 		updated, ok := resp.(*api.TeamResponse)
@@ -291,7 +291,7 @@ func TestUpdateTeam(t *testing.T) {
 			TeamID:    api.TeamID(team.ID),
 		}
 
-		resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: name}, params)
+		resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(name)}, params)
 		require.NoError(t, err)
 		assert.IsType(t, &api.TeamResponse{}, resp, helpers.MustMarshal(t, resp))
 	})
@@ -313,7 +313,29 @@ func TestUpdateTeam(t *testing.T) {
 				TeamID:    api.TeamID(team.ID),
 			}
 
-			resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: "   "}, params)
+			resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString("   ")}, params)
+			require.NoError(t, err)
+
+			badRequest, ok := resp.(*api.UpdateTeamBadRequest)
+			require.True(t, ok, helpers.MustMarshal(t, resp))
+			assert.Equal(t, api.ErrorCode("team.name_invalid"), badRequest.Code)
+		})
+
+		t.Run("omitted name", func(t *testing.T) {
+			t.Parallel()
+
+			team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+				ProjectID: project.ID,
+				Name:      helpers.TeamName(),
+			})
+			require.NoError(t, err)
+
+			params := api.UpdateTeamParams{
+				ProjectID: api.ProjectID(project.ID),
+				TeamID:    api.TeamID(team.ID),
+			}
+
+			resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{}, params)
 			require.NoError(t, err)
 
 			badRequest, ok := resp.(*api.UpdateTeamBadRequest)
@@ -329,7 +351,7 @@ func TestUpdateTeam(t *testing.T) {
 				TeamID:    api.TeamID("does-not-exist"),
 			}
 
-			resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: helpers.TeamName()}, params)
+			resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, params)
 			require.NoError(t, err)
 
 			notFound, ok := resp.(*api.UpdateTeamNotFound)
@@ -353,7 +375,7 @@ func TestUpdateTeam(t *testing.T) {
 				TeamID:    api.TeamID(team.ID),
 			}
 
-			resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: helpers.TeamName()}, params)
+			resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, params)
 			require.NoError(t, err)
 
 			notFound, ok := resp.(*api.UpdateTeamNotFound)
@@ -361,22 +383,22 @@ func TestUpdateTeam(t *testing.T) {
 			assert.Equal(t, api.ErrorCode("team.team_not_found"), notFound.Code)
 		})
 
+		taken := helpers.TeamName()
+		_, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+			ProjectID: project.ID,
+			Name:      taken,
+		})
+		require.NoError(t, err)
+
 		for _, tc := range []struct {
-			name    string
-			nameFor func(string) string
+			name     string
+			teamName string
 		}{
-			{"duplicate name", func(name string) string { return name }},
-			{"duplicate name differing only in case", strings.ToUpper},
+			{"duplicate name", taken},
+			{"duplicate name differing only in case", strings.ToUpper(taken)},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
-
-				taken := helpers.TeamName()
-				_, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
-					ProjectID: project.ID,
-					Name:      taken,
-				})
-				require.NoError(t, err)
 
 				team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 					ProjectID: project.ID,
@@ -389,7 +411,7 @@ func TestUpdateTeam(t *testing.T) {
 					TeamID:    api.TeamID(team.ID),
 				}
 
-				resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: tc.nameFor(taken)}, params)
+				resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(tc.teamName)}, params)
 				require.NoError(t, err)
 
 				conflict, ok := resp.(*api.UpdateTeamConflict)
@@ -415,7 +437,7 @@ func TestUpdateTeam(t *testing.T) {
 					TeamID:    api.TeamID("does-not-exist"),
 				}
 
-				_, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: tc.teamName}, params)
+				_, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(tc.teamName)}, params)
 				require.ErrorAs(t, err, new(*validate.Error))
 			})
 		}

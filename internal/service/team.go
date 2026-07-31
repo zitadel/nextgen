@@ -52,11 +52,16 @@ func (s *TeamService) Get(ctx context.Context, projectID string, teamID string) 
 type UpdateTeamInput struct {
 	ProjectID string
 	TeamID    string
-	Name      string
+	Name      *string
 }
 
 func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (*domain.Team, error) {
-	name, err := domain.ValidateTeamName(input.Name)
+	// Currently, only the name field can be updated.
+	// In case there are more fields, a nil value would mean no change.
+	if input.Name == nil {
+		return nil, domain.ErrTeamNameInvalid()
+	}
+	name, err := domain.ValidateTeamName(*input.Name)
 	if err != nil {
 		return nil, err
 	}
