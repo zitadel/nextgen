@@ -47,6 +47,28 @@ func (id *Identity) Scan(src any) error {
 	return nil
 }
 
+// DecodeSpanner implements the Cloud Spanner client's spanner.Decoder
+// interface (structurally, without importing the spanner package). The client
+// delivers STRING and INT64 column values as decimal strings and NULL as a
+// typed nil *string.
+func (id *Identity) DecodeSpanner(input any) error {
+	switch v := input.(type) {
+	case nil:
+		*id = ""
+	case string:
+		*id = Identity(v)
+	case *string:
+		if v == nil {
+			*id = ""
+		} else {
+			*id = Identity(*v)
+		}
+	default:
+		return fmt.Errorf("database.Identity: unsupported DecodeSpanner type %T", input)
+	}
+	return nil
+}
+
 // Value implements driver.Valuer.
 func (id Identity) Value() (driver.Value, error) {
 	if id == "" {
