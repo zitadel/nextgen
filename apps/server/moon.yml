@@ -6,6 +6,9 @@ stack: "backend"
 fileGroups:
   serverInputs:
     - "/**/*.go"
+    # Embedded goose migrations (//go:embed sql/*.sql); without these Moon can
+    # cache-hit test/build after schema-only changes while Go would rebuild.
+    - "/**/*.sql"
     - "/go.mod"
     - "/go.sum"
     - "/api/**/*.yaml"
