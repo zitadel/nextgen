@@ -94,7 +94,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		SchemaURL:               userSchemaURL,
 		ID:                      userID,
 		InitialMembershipTeamID: &decoyTeam.ID,
-		Attributes:              []*domain.CreateAttribute{decoyEmailAttr},
+		Attributes:              domain.CreateAttributes{*decoyEmailAttr},
 	}))
 	decoyCred := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
 	require.NoError(t, passkeys.Create(t.Context(), &domain.CreateUserPasskey{
@@ -115,7 +115,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		SchemaURL:               userSchemaURL,
 		ID:                      userID,
 		InitialMembershipTeamID: &team.ID,
-		Attributes:              []*domain.CreateAttribute{emailAttr},
+		Attributes:              domain.CreateAttributes{*emailAttr},
 	}))
 
 	require.NoError(t, passkeys.Create(t.Context(), &domain.CreateUserPasskey{

@@ -175,6 +175,24 @@ func TestCreateUser(t *testing.T) {
 			}
 		})
 
+		t.Run("a caller-supplied id does not shadow the minted one", func(t *testing.T) {
+			t.Parallel()
+
+			// `id` is served as a field of api.User and would be served a second
+			// time if it were also stored as an attribute — and on decode the
+			// second one wins. So a body carrying `id` must not reach the
+			// attributes: the reads below must report the id the platform minted.
+			usermap := harness.EnsureTestData(t).Generator.GenerateUser(t, "testcreateuser.suppliedid@example.com")
+			usermap["id"] = "user_supplied_by_the_caller"
+
+			user := &api.User{}
+			require.NoError(t, user.UnmarshalJSON([]byte(helpers.MustMarshal(t, usermap))))
+
+			resp, err := client.CreateUser(t.Context(), user, params)
+			require.NoError(t, err)
+			require.IsType(t, resp, &api.CreateUserBadRequest{}, helpers.MustMarshal(t, resp))
+		})
+
 		t.Run("duplicate mail address", func(t *testing.T) {
 			t.Parallel()
 

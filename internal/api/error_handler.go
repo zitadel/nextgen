@@ -14,6 +14,12 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
+// FullErrorInResponse attaches the unwrapped cause of an error to the response
+// body under `details.parent`. It is a **test-only** aid: it turns an opaque
+// "an unexpected error occurred" into the chain that produced it, which is what
+// makes a red integration run diagnosable. Never enable it on a served
+// instance — the chain carries internals (SQL, validation paths, wrapped
+// library errors) that the client has no business seeing.
 var FullErrorInResponse = atomic.Bool{}
 
 // domainErrorDetails extracts a domain.Error from err and returns it as an

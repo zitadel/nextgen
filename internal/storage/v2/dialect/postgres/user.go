@@ -119,15 +119,12 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 	if len(user.Attributes) == 0 {
 		return fmt.Errorf("user create requires attributes")
 	}
-	keys := make([]string, len(user.Attributes))
+	keys := make([]domain.AttributeKey, len(user.Attributes))
 	values := make([][]byte, len(user.Attributes))
 	hashes := make([][]byte, len(user.Attributes))
 	scopes := make([]string, len(user.Attributes))
 
 	for i, a := range user.Attributes {
-		if a == nil {
-			return fmt.Errorf("nil attribute at index %d", i)
-		}
 		raw, err := json.Marshal(a.Value)
 		if err != nil {
 			return fmt.Errorf("marshal attribute %q: %w", a.Key, err)

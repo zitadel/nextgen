@@ -49,7 +49,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 		SchemaURL:               schemaURL,
 		ID:                      userID,
 		InitialMembershipTeamID: &team.ID,
-		Attributes:              []*domain.CreateAttribute{emailAttr},
+		Attributes:              domain.CreateAttributes{*emailAttr},
 	}))
 
 	hasher := harness.EnsureHasher(t)
@@ -266,7 +266,7 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 		SchemaURL:               schemaURL,
 		ID:                      "pwregister-conflict-seed",
 		InitialMembershipTeamID: &team.ID,
-		Attributes:              []*domain.CreateAttribute{emailAttr},
+		Attributes:              domain.CreateAttributes{*emailAttr},
 	}))
 
 	server := harness.EnsureTestServer(t)

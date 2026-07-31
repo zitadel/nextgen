@@ -76,9 +76,6 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 		}
 
 		for _, a := range user.Attributes {
-			if a == nil {
-				return fmt.Errorf("nil attribute")
-			}
 			raw, err := json.Marshal(a.Value)
 			if err != nil {
 				return fmt.Errorf("marshal attribute %q: %w", a.Key, err)

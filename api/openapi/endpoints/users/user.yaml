@@ -10,7 +10,7 @@ required:
   - $schema
 properties:
   id:
-    readonly: true
+    readOnly: true
     $ref: ../../components/schemas/user-id.yaml
   metadata:
     readOnly: true

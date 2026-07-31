@@ -146,7 +146,7 @@ type CreateUser struct {
 	// to their default workspace team; an enterprise provisioned user may set both fields to the
 	// same tenant team, but lifecycle ownership and roster membership remain separate concerns.
 	InitialMembershipTeamID *string
-	Attributes              []*CreateAttribute
+	Attributes              CreateAttributes
 }
 
 // AttributeTeamScope returns the team id used for team-scoped unique attributes on create.
@@ -163,6 +163,13 @@ func (c *CreateUser) AttributeTeamScope() string {
 // NewCreateUser builds a [CreateUser] from a schema-validated user map.
 // id passes through when non-empty; otherwise a fresh one is minted.
 func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
+	if _, ok := muser["id"]; ok {
+		return nil, ErrUserInvalid().WithDetails("client cannot choose user id")
+	}
+	if _, ok := muser["metadata"]; ok {
+		return nil, ErrUserInvalid().WithDetails("metadata is readonly and cannot be set")
+	}
+
 	schemaURL, err := SchemaFromUserMap(muser)
 	if err != nil {
 		return nil, err
@@ -192,7 +199,7 @@ func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte,
 		}
 	}
 
-	attrs, err := FlattenMapToCreateAttributes(muser, mschema, "")
+	attrs, err := CreateAttributesFromMap(muser, mschema)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to flatten user attributes")
 	}

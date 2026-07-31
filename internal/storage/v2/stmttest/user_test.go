@@ -305,7 +305,7 @@ func newTestUserWithRole(t *testing.T, projectID, schemaURL, userID, email, name
 	user := newTestUser(t, projectID, schemaURL, userID, email, name)
 	roleAttr, err := domain.NewCreateAttribute("role", role, domain.AttributeUniquenessUnspecified)
 	require.NoError(t, err)
-	user.Attributes = append(user.Attributes, roleAttr)
+	user.Attributes = append(user.Attributes, *roleAttr)
 	return user
 }
 
@@ -321,9 +321,9 @@ func newTestUser(t *testing.T, projectID, schemaURL, userID, email, name string)
 		ProjectID: projectID,
 		SchemaURL: schemaURL,
 		ID:        userID,
-		Attributes: []*domain.CreateAttribute{
-			emailAttr,
-			nameAttr,
+		Attributes: []domain.CreateAttribute{
+			*emailAttr,
+			*nameAttr,
 		},
 	}
 }

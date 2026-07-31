@@ -62,7 +62,7 @@ func TestListUsers(t *testing.T) {
 
 	// Seed two users in creation order.
 	users := harness.EnsureUserFixture(t)
-	for i, id := range []string{"list-user-01", "list-user-02"} {
+	for i, id := range []string{"user_list-user-01", "user_list-user-02"} {
 		emailAttr, err := domain.NewCreateAttribute(
 			"email", fmt.Sprintf("list-%d@example.com", i), domain.AttributeUniquenessProject)
 		require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestListUsers(t *testing.T) {
 			SchemaURL:               schemaURL,
 			ID:                      id,
 			InitialMembershipTeamID: &team.ID,
-			Attributes:              []*domain.CreateAttribute{emailAttr},
+			Attributes:              domain.CreateAttributes{*emailAttr},
 		}))
 	}
 
@@ -81,7 +81,7 @@ func TestListUsers(t *testing.T) {
 	assert.False(t, list.NextPageToken.IsSet(), "the whole result fits in one page")
 
 	newest := list.Users[0]
-	assert.Equal(t, "user_list02", userID(t, newest))
+	assert.Equal(t, "user_list-user-02", userID(t, newest))
 	assert.Equal(t, "list-1@example.com", userProp(t, newest, "email"))
 	assert.Equal(t, schemaURL, newest.Schema)
 
@@ -91,13 +91,13 @@ func TestListUsers(t *testing.T) {
 	assert.False(t, metadata.CreatedAt.IsZero())
 	assert.False(t, metadata.UpdatedAt.Before(metadata.CreatedAt))
 
-	assert.Equal(t, []string{"user_list02", "user_list01"}, listIDs(t, api.ListUsersParams{}),
+	assert.Equal(t, []string{"user_list-user-02", "user_list-user-01"}, listIDs(t, api.ListUsersParams{}),
 		"users are ordered newest first")
 
 	// The window walks backwards through creation time, one page at a time.
 	firstPage := listUsers(t, api.ListUsersParams{Limit: api.NewOptLimit(1)})
 	require.Len(t, firstPage.Users, 1)
-	assert.Equal(t, "user_list02", userID(t, firstPage.Users[0]))
+	assert.Equal(t, "user_list-user-02", userID(t, firstPage.Users[0]))
 	pageToken, ok := firstPage.NextPageToken.Get()
 	require.True(t, ok, "a full page carries a cursor")
 
@@ -106,7 +106,7 @@ func TestListUsers(t *testing.T) {
 		PageToken: api.NewOptPageToken(pageToken),
 	})
 	require.Len(t, secondPage.Users, 1)
-	assert.Equal(t, "user_list01", userID(t, secondPage.Users[0]))
+	assert.Equal(t, "user_list-user-01", userID(t, secondPage.Users[0]))
 
 	// The second page is full too, so it carries a cursor of its own; only the
 	// page past the end reports that there is nothing more.

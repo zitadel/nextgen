@@ -13,7 +13,7 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 			name     string
 			mapValue map[string]any
 			schema   map[string]any
-			expected []*CreateAttribute
+			expected CreateAttributes
 		}{
 			{
 				name: "single layer",
@@ -34,7 +34,7 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 						},
 					},
 				},
-				expected: []*CreateAttribute{
+				expected: CreateAttributes{
 					mustNewCreateAttribute(t, "name", "dummy", AttributeUniquenessUnspecified),
 					mustNewCreateAttribute(t, "email", "test@example.com", AttributeUniquenessTeam),
 				},
@@ -86,7 +86,7 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 						},
 					},
 				},
-				expected: []*CreateAttribute{
+				expected: CreateAttributes{
 					mustNewCreateAttribute(t, "name", "dummy", AttributeUniquenessUnspecified),
 					mustNewCreateAttribute(t, "email", "test@example.com", AttributeUniquenessTeam),
 					mustNewCreateAttribute(t, "address.street", "main street", AttributeUniquenessUnspecified),
@@ -110,7 +110,7 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 						},
 					},
 				},
-				expected: []*CreateAttribute{
+				expected: CreateAttributes{
 					mustNewCreateAttribute(t, "email", "test@example.com", AttributeUniquenessTeam),
 				},
 			},
@@ -140,7 +140,7 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 						},
 					},
 				},
-				expected: []*CreateAttribute{
+				expected: CreateAttributes{
 					mustNewCreateAttribute(t, "email", "unique@example.com", AttributeUniquenessTeam),
 					mustNewCreateAttribute(t, "address.secondary_email", "also@example.com", AttributeUniquenessProject),
 				},
@@ -176,13 +176,13 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 						},
 					},
 				},
-				expected: []*CreateAttribute{},
+				expected: CreateAttributes{},
 			},
 		}
 
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
-				as, err := FlattenMapToCreateAttributes(tc.mapValue, tc.schema, "")
+				as, err := CreateAttributesFromMap(tc.mapValue, tc.schema)
 				assert.NoError(t, err)
 				assert.Equal(t, len(tc.expected), len(as))
 				for _, a := range as {
@@ -252,9 +252,9 @@ func TestAttributes_ToMap(t *testing.T) {
 	})
 }
 
-func mustNewCreateAttribute(t *testing.T, key string, value any, unique AttributeUniqueness) *CreateAttribute {
+func mustNewCreateAttribute(t *testing.T, key AttributeKey, value any, unique AttributeUniqueness) CreateAttribute {
 	t.Helper()
 	a, err := NewCreateAttribute(key, value, unique)
 	require.NoError(t, err)
-	return a
+	return *a
 }
