@@ -16,12 +16,12 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"go.uber.org/mock/gomock"
 )
 
 func expectListUserPasskeys(stmts *mocks.MockAllStatements, keys []*domain.UserPasskey) {
-	stmts.EXPECT().ListUserPasskeys(gomock.Any(), gomock.Any()).Return(&v2database.ListResult[*domain.UserPasskey]{Items: keys}, nil)
+	stmts.EXPECT().ListUserPasskeys(gomock.Any(), gomock.Any()).Return(&database.ListResult[*domain.UserPasskey]{Items: keys}, nil)
 }
 
 const (
@@ -671,7 +671,7 @@ func TestAuthAttemptService_VerifyPasskeyProof(t *testing.T) {
 			gomock.Any(),
 			gomock.Any(),
 			gomock.Any(),
-		).DoAndReturn(func(_ context.Context, _ v2database.Filter[domain.UserPasskeyField], updates ...domain.UserPasskeyUpdate) error {
+		).DoAndReturn(func(_ context.Context, _ database.Filter[domain.UserPasskeyField], updates ...domain.UserPasskeyUpdate) error {
 			for _, u := range updates {
 				if sc, ok := u.(*domain.UserPasskeySignCountUpdate); ok {
 					persistedSignCount = sc.SignCount

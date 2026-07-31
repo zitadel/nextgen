@@ -11,6 +11,7 @@ flows:
       schema.write: Permission to create and manage schemas
       user.write: Permission to create and manage users
       user.read: Permission to read users
+      user.delete: Permission to delete users
       team.read: Permission to read teams
       team.write: Permission to create and manage teams
       flow_definitions.read: Permission to read flow definitions
@@ -28,6 +29,7 @@ flows:
       schema.write: Permission to create and manage schemas
       user.read: Permission to read users
       user.write: Permission to create and manage users
+      user.delete: Permission to delete users
       team.read: Permission to read teams
       team.write: Permission to create and manage teams
       flow_definitions.read: Permission to read flow definitions

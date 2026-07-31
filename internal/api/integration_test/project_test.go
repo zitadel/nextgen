@@ -16,7 +16,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // actionNames returns the names of the given step actions in order, useful
@@ -142,10 +142,10 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 
 	listed, err := harness.EnsureServiceDB(t).Statements().ListFlowDefinitions(
 		t.Context(),
-		&v2database.ListOptions[domain.FlowDefinitionField]{
-			Filter: v2database.And(
-				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), project.ID),
-				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldName), "default-login"),
+		&database.ListOptions[domain.FlowDefinitionField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), project.ID),
+				database.Equal(database.Col(domain.FlowDefinitionFieldName), "default-login"),
 			),
 		},
 	)
@@ -213,10 +213,10 @@ func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
 
 	listed, err := harness.EnsureServiceDB(t).Statements().ListFlowDefinitions(
 		t.Context(),
-		&v2database.ListOptions[domain.FlowDefinitionField]{
-			Filter: v2database.And(
-				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), projectID),
-				v2database.Equal(v2database.Col(domain.FlowDefinitionFieldName), "default-login"),
+		&database.ListOptions[domain.FlowDefinitionField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
+				database.Equal(database.Col(domain.FlowDefinitionFieldName), "default-login"),
 			),
 		},
 	)
