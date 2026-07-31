@@ -106,17 +106,12 @@ tasks:
       runInCI: true
 
   test-spanner:
-    command: "go"
-    args:
-      - "test"
-      - "-v"
-      - "-tags"
-      - "spanner_integration"
-      - "-timeout"
-      - "10m"
-      - "./..."
+    # Wrapper adds -parallel 1 -p 1 when ZITADEL_TEST_SPANNER_INSTANCE is unset
+    # (emulator fallback); see scripts/test-spanner.mjs.
+    command: "node scripts/test-spanner.mjs"
     inputs:
       - "@group(serverInputs)"
+      - "/scripts/test-spanner.mjs"
     options:
       runFromWorkspaceRoot: true
       # Invoked explicitly by the CI "Run Go integration tests (spanner)" step.

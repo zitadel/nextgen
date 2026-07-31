@@ -291,8 +291,8 @@ Docker-outside-of-Docker setup. Run them with the same commands CI's
 # Postgres
 go test -v -tags postgres_integration -timeout=10m ./...
 
-# Spanner
-go test -v -tags spanner_integration -timeout=10m ./...
+# Spanner (prefer the Moon task — see emulator note below)
+moon run server:test-spanner
 ```
 
 To run the integration tests against a database you manage instead of
@@ -303,15 +303,19 @@ these and connects to your database instead of starting a container, so
 the suites run migrations that create the `zitadel_nextgen` schema.
 
 The Spanner emulator only supports one transaction at a time, so concurrent
-integration tests are flaky against it. To run against a real, long-lived
-Spanner test instance instead, set `ZITADEL_TEST_SPANNER_INSTANCE` to an
-instance path (`projects/<project>/instances/<instance>`). The suites then
-provision a uniquely named database on that instance before the run and drop
-it afterwards, so parallel runs stay isolated. Authentication uses Application
-Default Credentials — locally run `gcloud auth application-default login`; CI
-authenticates via Workload Identity Federation. Precedence when multiple are
-set: `ZITADEL_TEST_SPANNER_INSTANCE` > `ZITADEL_TEST_SPANNER_URL` > emulator
-container.
+integration tests are flaky against it. `moon run server:test-spanner`
+therefore passes `-parallel 1 -p 1` whenever `ZITADEL_TEST_SPANNER_INSTANCE`
+is unset (the default for local/OSS contributors and for CI when the GCP
+secrets/vars are not configured). To run against a real, long-lived Spanner
+test instance instead, set `ZITADEL_TEST_SPANNER_INSTANCE` to an instance
+path (`projects/<project>/instances/<instance>`). The suites then provision a
+uniquely named database on that instance before the run and drop it
+afterwards, and the Moon task keeps normal go test parallelism.
+Authentication uses Application Default Credentials — locally run
+`gcloud auth application-default login`; CI authenticates via Workload
+Identity Federation when the GCP secrets and `SPANNER_TEST_INSTANCE` var are
+set. Precedence when multiple are set: `ZITADEL_TEST_SPANNER_INSTANCE` >
+`ZITADEL_TEST_SPANNER_URL` > emulator container.
 
 ### Demo end-to-end suites
 
