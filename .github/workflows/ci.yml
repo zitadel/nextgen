@@ -29,6 +29,11 @@ jobs:
       # text and replays each failed task's own output. Green runs pay only a
       # pass/fail list; the replay section is empty when nothing failed.
       MOON_SUMMARY: detailed
+      # Secrets cannot be referenced in step `if:` expressions. Expose them as
+      # job env so Spanner auth/instance steps can gate on env.* != ''.
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      SPANNER_TEST_INSTANCE: ${{ vars.SPANNER_TEST_INSTANCE }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -95,18 +100,18 @@ jobs:
       # skip auth: server:test-spanner falls back to the emulator with
       # -parallel 1 -p 1 (see scripts/test-spanner.mjs).
       - name: Authenticate to Google Cloud (Spanner test instance)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '' && vars.SPANNER_TEST_INSTANCE != '' }}
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && env.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && env.GCP_SERVICE_ACCOUNT != '' && env.SPANNER_TEST_INSTANCE != '' }}
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
 
       - name: Run Go integration tests (spanner)
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         env:
           # Set only when WIF secrets + SPANNER_TEST_INSTANCE are present on a
           # trusted run; otherwise empty so testdb.SpannerDSN uses the emulator.
-          ZITADEL_TEST_SPANNER_INSTANCE: ${{ (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && secrets.GCP_SERVICE_ACCOUNT != '' && vars.SPANNER_TEST_INSTANCE || '' }}
+          ZITADEL_TEST_SPANNER_INSTANCE: ${{ (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && env.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && env.GCP_SERVICE_ACCOUNT != '' && env.SPANNER_TEST_INSTANCE || '' }}
         run: moon run server:test-spanner
 
       - name: Build release snapshot without container
