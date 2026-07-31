@@ -1,5 +1,5 @@
 type: object
-description: The current state of a team.
+description: Details of a team.
 required:
   - id
   - name

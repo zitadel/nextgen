@@ -2,7 +2,7 @@ get:
   operationId: getTeam
   summary: Get team
   description: |
-    Returns the Team by ID
+    Returns a Team by its id.
   tags:
     - Teams
   parameters:
@@ -17,7 +17,7 @@ get:
         - team.read
   responses:
     '200':
-      description: Team state.
+      description: The team.
       content:
         application/json:
           schema:

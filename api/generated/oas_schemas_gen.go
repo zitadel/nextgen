@@ -12183,7 +12183,7 @@ func (*SubmitFlowStepOK) submitFlowStepRes() {}
 
 type TeamID string
 
-// The current state of a team.
+// Details of a team.
 // Ref: #
 type TeamResponse struct {
 	// The unique identifier of the team.

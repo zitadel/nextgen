@@ -290,7 +290,7 @@ type Handler interface {
 	GetSession(ctx context.Context, params GetSessionParams) (GetSessionRes, error)
 	// GetTeam implements getTeam operation.
 	//
-	// Returns the Team by ID.
+	// Returns a Team by its id.
 	//
 	// GET /teams/{team_id}
 	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
