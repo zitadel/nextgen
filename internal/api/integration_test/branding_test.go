@@ -232,7 +232,7 @@ func createBrandingTestFlow(t *testing.T, client *helpers.ApiClient, projectID s
 		Purpose:   api.CreateFlowRequestPurposeLogin,
 	})
 	require.NoError(t, err)
-	withHeaders, ok := resp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "create flow: %+v", resp)
+	require.IsType(t, resp, &api.FlowResponseHeaders{}, helpers.MustMarshal(t, resp))
+	withHeaders := resp.(*api.FlowResponseHeaders)
 	return withHeaders.Response
 }
