@@ -17,16 +17,16 @@ func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectReque
 		return nil, err
 	}
 
-	dek, err := h.keyService.GetProjectDEKCrypter(ctx, project.ID)
+	tokenCrypter, err := h.keyService.GetProjectCrypter(ctx, project.ID, domain.EncryptionKeyPurposeToken)
 	if err != nil {
 		return nil, err
 	}
 
-	projectSecret, err := project.ProjectSecret(dek)
+	projectSecret, err := project.ProjectSecret(tokenCrypter)
 	if err != nil {
 		return nil, err
 	}
-	previewSecret, err := project.PreviewSecret(dek)
+	previewSecret, err := project.PreviewSecret(tokenCrypter)
 	if err != nil {
 		return nil, err
 	}

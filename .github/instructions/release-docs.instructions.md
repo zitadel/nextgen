@@ -11,8 +11,8 @@ state of the repo.
   CLI smoke checks, npm pack dry runs, Moon release snapshots, and the
   `consumer-journey-e2e` fresh-app quality gate.
 - Local-runtime image changes should preserve the zero-config Docker smoke:
-  mounted `nextgen-data`, a generated root KEK under `keks/`, embedded Postgres,
-  and no required encryption-key configuration.
+  mounted `nextgen-data`, a generated master key under `master-keys/`, embedded
+  Postgres, and no required master-key configuration.
 - The release workflow publishes alpha npm packages and containers, then creates
   or updates a draft product GitHub Release shell. Product prose remains manual
   until maintainers publish the draft.
