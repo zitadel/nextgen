@@ -305,17 +305,17 @@ the suites run migrations that create the `zitadel_nextgen` schema.
 The Spanner emulator only supports one transaction at a time, so concurrent
 integration tests are flaky against it. `moon run server:test-spanner`
 therefore passes `-parallel 1 -p 1` whenever `ZITADEL_TEST_SPANNER_INSTANCE`
-is unset (the default for local/OSS contributors and for CI when the GCP
-secrets/vars are not configured). To run against a real, long-lived Spanner
-test instance instead, set `ZITADEL_TEST_SPANNER_INSTANCE` to an instance
-path (`projects/<project>/instances/<instance>`). The suites then provision a
-uniquely named database on that instance before the run and drop it
-afterwards, and the Moon task keeps normal go test parallelism.
+is unset (the default for local/OSS contributors). To run against a real,
+long-lived Spanner test instance instead, set `ZITADEL_TEST_SPANNER_INSTANCE`
+to an instance path (`projects/<project>/instances/<instance>`). The suites
+then provision a uniquely named database on that instance before the run and
+drop it afterwards, and the Moon task keeps normal go test parallelism.
 Authentication uses Application Default Credentials — locally run
-`gcloud auth application-default login`; CI authenticates via Workload
-Identity Federation when the GCP secrets and `SPANNER_TEST_INSTANCE` var are
-set. Precedence when multiple are set: `ZITADEL_TEST_SPANNER_INSTANCE` >
-`ZITADEL_TEST_SPANNER_URL` > emulator container.
+`gcloud auth application-default login`; CI tries Workload Identity
+Federation and labels the job step as emulator vs test instance depending on
+whether auth succeeded. Precedence when multiple are set:
+`ZITADEL_TEST_SPANNER_INSTANCE` > `ZITADEL_TEST_SPANNER_URL` > emulator
+container.
 
 ### Demo end-to-end suites
 
