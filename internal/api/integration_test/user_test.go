@@ -190,7 +190,7 @@ func TestCreateUser(t *testing.T) {
 
 			resp, err := client.CreateUser(t.Context(), user, params)
 			require.NoError(t, err)
-			require.IsType(t, resp, &api.CreateUserBadRequest{}, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.CreateUserBadRequest{}, resp, helpers.MustMarshal(t, resp))
 		})
 
 		t.Run("duplicate mail address", func(t *testing.T) {

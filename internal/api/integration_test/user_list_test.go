@@ -41,9 +41,8 @@ func TestListUsers(t *testing.T) {
 		t.Helper()
 		res, err := client.ListUsers(t.Context(), params)
 		require.NoError(t, err)
-		list, ok := res.(*api.ListUsersResponse)
-		require.True(t, ok, "unexpected response type %T: %s", res, helpers.MustMarshal(t, res))
-		return list
+		require.IsType(t, &api.ListUsersResponse{}, res, helpers.MustMarshal(t, res))
+		return res.(*api.ListUsersResponse)
 	}
 	listIDs := func(t *testing.T, params api.ListUsersParams) []string {
 		t.Helper()
@@ -130,9 +129,8 @@ func TestListUsers(t *testing.T) {
 
 	otherRes, err := otherClient.ListUsers(t.Context(), api.ListUsersParams{})
 	require.NoError(t, err)
-	if assert.IsType(t, &api.ListUsersResponse{}, otherRes, helpers.MustMarshal(t, otherRes)) {
-		assert.Empty(t, otherRes.(*api.ListUsersResponse).Users)
-	}
+	require.IsType(t, &api.ListUsersResponse{}, otherRes, helpers.MustMarshal(t, otherRes))
+	assert.Empty(t, otherRes.(*api.ListUsersResponse).Users)
 }
 
 // userID reads the listed user's id, which the API carries as a typed field of
