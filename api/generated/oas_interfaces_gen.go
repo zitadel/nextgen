@@ -61,6 +61,10 @@ type DeleteFlowDefinitionRes interface {
 	deleteFlowDefinitionRes()
 }
 
+type DeleteUserByIDRes interface {
+	deleteUserByIDRes()
+}
+
 type EndSessionRes interface {
 	endSessionRes()
 }
@@ -163,6 +167,10 @@ type ListSchemasRes interface {
 
 type ListSessionsRes interface {
 	listSessionsRes()
+}
+
+type ListUserPasskeysRes interface {
+	listUserPasskeysRes()
 }
 
 type ListUsersRes interface {

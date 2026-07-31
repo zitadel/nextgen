@@ -22,7 +22,9 @@ CREATE TABLE sessions (
     user_id        STRING(MAX),
     user_agent_id  INT64,
     FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
-    FOREIGN KEY (project_id, user_id) REFERENCES users(project_id, id),
+    CONSTRAINT fk_sessions_user
+        FOREIGN KEY (project_id, user_id)
+        REFERENCES users(project_id, id) ON DELETE CASCADE,
     FOREIGN KEY (project_id, user_agent_id) REFERENCES user_agents (project_id, id)
 ) PRIMARY KEY (project_id, id)
 -- +goose StatementEnd

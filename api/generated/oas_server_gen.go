@@ -153,6 +153,12 @@ type Handler interface {
 	//
 	// DELETE /flow_definitions/{id}
 	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
+	// DeleteUserByID implements DeleteUserByID operation.
+	//
+	// Delete user by ID.
+	//
+	// DELETE /users/{user_id}
+	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
 	// EndSession implements endSession operation.
 	//
 	// End a session.
@@ -346,6 +352,12 @@ type Handler interface {
 	//
 	// GET /sessions
 	ListSessions(ctx context.Context, params ListSessionsParams) (ListSessionsRes, error)
+	// ListUserPasskeys implements listUserPasskeys operation.
+	//
+	// List user passkeys.
+	//
+	// GET /users/{user_id}/passkeys
+	ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (ListUserPasskeysRes, error)
 	// ListUsers implements listUsers operation.
 	//
 	// List users.

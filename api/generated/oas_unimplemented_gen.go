@@ -203,6 +203,15 @@ func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params Del
 	return r, ht.ErrNotImplemented
 }
 
+// DeleteUserByID implements DeleteUserByID operation.
+//
+// Delete user by ID.
+//
+// DELETE /users/{user_id}
+func (UnimplementedHandler) DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (r DeleteUserByIDRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // EndSession implements endSession operation.
 //
 // End a session.
@@ -471,6 +480,15 @@ func (UnimplementedHandler) ListSchemas(ctx context.Context, params ListSchemasP
 //
 // GET /sessions
 func (UnimplementedHandler) ListSessions(ctx context.Context, params ListSessionsParams) (r ListSessionsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListUserPasskeys implements listUserPasskeys operation.
+//
+// List user passkeys.
+//
+// GET /users/{user_id}/passkeys
+func (UnimplementedHandler) ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (r ListUserPasskeysRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
