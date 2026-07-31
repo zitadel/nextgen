@@ -5,6 +5,7 @@
 package integration_test
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"testing"
@@ -453,7 +454,7 @@ func TestGetUser(t *testing.T) {
 	resp, err := client.GetUserByID(t.Context(), params)
 	assert.NoError(t, err)
 
-	assert.IsType(t, &api.GetUserByIDOK{}, resp, helpers.MustMarshal(t, resp))
+	assert.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 }
 
 func TestGetMyUser(t *testing.T) {
@@ -510,7 +511,7 @@ func TestGetMyUser(t *testing.T) {
 		resp, err := client.GetMyUser(t.Context())
 		assert.NoError(t, err)
 
-		assert.IsType(t, &api.GetMyUserOK{}, resp, helpers.MustMarshal(t, resp))
+		assert.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("missing session cookie", func(t *testing.T) {
@@ -529,10 +530,17 @@ func TestGetMyUser(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
-		assert.JSONEq(t,
-			`{"code":"auth.unauthorized","message":"Missing or invalid session token."}`,
-			string(body),
-		)
+
+		// Only the client-facing code and message are pinned: these tests run
+		// with api.FullErrorInResponse on, which attaches the unwrapped cause
+		// under `details` (never present in production responses).
+		var answer struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		}
+		require.NoError(t, json.Unmarshal(body, &answer))
+		assert.Equal(t, "auth.unauthorized", answer.Code)
+		assert.Equal(t, "Missing or invalid session token.", answer.Message)
 	})
 }
 

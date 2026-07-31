@@ -308,7 +308,8 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 			return wrapError(err)
 		}
 		_, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (struct{}, error) {
-			var userID, key string
+			var userID string
+			var key domain.AttributeKey
 			var value []byte
 			if err := row.Scan(&userID, &key, &value); err != nil {
 				return struct{}{}, err
@@ -343,12 +344,12 @@ func scanUserHeader(row pgx.CollectableRow) (*domain.User, error) {
 		&u.ID,
 		&lifecycleOwnerTeamID,
 		&status,
-		&u.CreatedAt,
-		&u.UpdatedAt,
+		&u.Metadata.CreatedAt,
+		&u.Metadata.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
-	u.Status = domain.UserStatus(status)
+	u.Metadata.Status = domain.UserStatus(status)
 	u.LifecycleOwnerTeamID = lifecycleOwnerTeamID
 	return u, nil
 }

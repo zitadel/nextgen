@@ -4921,19 +4921,6 @@ type GetMySessionUnauthorized ErrorDetails
 
 func (*GetMySessionUnauthorized) getMySessionRes() {}
 
-type GetMyUserOK map[string]jx.Raw
-
-func (s *GetMyUserOK) init() GetMyUserOK {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-func (*GetMyUserOK) getMyUserRes() {}
-
 type GetProjectNotFound ErrorDetails
 
 func (*GetProjectNotFound) getProjectRes() {}
@@ -5174,19 +5161,6 @@ func (*GetTeamUnauthorized) getTeamRes() {}
 type GetUserByIDNotFound ErrorDetails
 
 func (*GetUserByIDNotFound) getUserByIDRes() {}
-
-type GetUserByIDOK map[string]jx.Raw
-
-func (s *GetUserByIDOK) init() GetUserByIDOK {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-func (*GetUserByIDOK) getUserByIDRes() {}
 
 type GetUserByIDUnauthorized ErrorDetails
 
@@ -6429,20 +6403,36 @@ type ListUsersInternalServerError ErrorDetails
 
 func (*ListUsersInternalServerError) listUsersRes() {}
 
-type ListUsersOKApplicationJSON []ListUsersOKItem
-
-func (*ListUsersOKApplicationJSON) listUsersRes() {}
-
-type ListUsersOKItem map[string]jx.Raw
-
-func (s *ListUsersOKItem) init() ListUsersOKItem {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
+// Paginated list of users.
+// Ref: #
+type ListUsersResponse struct {
+	Users []User `json:"users"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
+
+// GetUsers returns the value of Users.
+func (s *ListUsersResponse) GetUsers() []User {
+	return s.Users
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListUsersResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetUsers sets the value of Users.
+func (s *ListUsersResponse) SetUsers(val []User) {
+	s.Users = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListUsersResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListUsersResponse) listUsersRes() {}
 
 type NextgenSession struct {
 	APIKey string
@@ -10292,6 +10282,52 @@ func (o OptUserID) Or(d UserID) UserID {
 	return d
 }
 
+// NewOptUserMetadata returns new OptUserMetadata with value set to v.
+func NewOptUserMetadata(v UserMetadata) OptUserMetadata {
+	return OptUserMetadata{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserMetadata is optional UserMetadata.
+type OptUserMetadata struct {
+	Value UserMetadata
+	Set   bool
+}
+
+// IsSet returns true if OptUserMetadata was set.
+func (o OptUserMetadata) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserMetadata) Reset() {
+	var v UserMetadata
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserMetadata) SetTo(v UserMetadata) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserMetadata) Get() (v UserMetadata, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserMetadata) Or(d UserMetadata) UserMetadata {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserNotFoundDetails returns new OptUserNotFoundDetails with value set to v.
 func NewOptUserNotFoundDetails(v UserNotFoundDetails) OptUserNotFoundDetails {
 	return OptUserNotFoundDetails{
@@ -12159,12 +12195,24 @@ func (*UpdateFlowDefinitionNotFound) updateFlowDefinitionRes() {}
 // users, this is only a base schema.
 // Ref: #
 type User struct {
+	ID       OptUserID       `json:"id"`
+	Metadata OptUserMetadata `json:"metadata"`
 	// The schema that defines the content of the user. These schemas can be
 	// created using the `/schemas` endpoint. A default schema is provided.
 	// This schema can be retrieved using the same endpoint. The schema will
 	// be used to validate the user's properties.
 	Schema          string `json:"$schema"`
 	AdditionalProps UserAdditional
+}
+
+// GetID returns the value of ID.
+func (s *User) GetID() OptUserID {
+	return s.ID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *User) GetMetadata() OptUserMetadata {
+	return s.Metadata
 }
 
 // GetSchema returns the value of Schema.
@@ -12177,6 +12225,16 @@ func (s *User) GetAdditionalProps() UserAdditional {
 	return s.AdditionalProps
 }
 
+// SetID sets the value of ID.
+func (s *User) SetID(val OptUserID) {
+	s.ID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *User) SetMetadata(val OptUserMetadata) {
+	s.Metadata = val
+}
+
 // SetSchema sets the value of Schema.
 func (s *User) SetSchema(val string) {
 	s.Schema = val
@@ -12186,6 +12244,9 @@ func (s *User) SetSchema(val string) {
 func (s *User) SetAdditionalProps(val UserAdditional) {
 	s.AdditionalProps = val
 }
+
+func (*User) getMyUserRes()   {}
+func (*User) getUserByIDRes() {}
 
 type UserAdditional map[string]jx.Raw
 
@@ -12199,6 +12260,102 @@ func (s *UserAdditional) init() UserAdditional {
 }
 
 type UserID string
+
+// Ref: #
+type UserMetadata struct {
+	// The time when the user was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the user was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+	// The status of the user.
+	Status UserMetadataStatus `json:"status"`
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *UserMetadata) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *UserMetadata) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// GetStatus returns the value of Status.
+func (s *UserMetadata) GetStatus() UserMetadataStatus {
+	return s.Status
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *UserMetadata) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *UserMetadata) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+// SetStatus sets the value of Status.
+func (s *UserMetadata) SetStatus(val UserMetadataStatus) {
+	s.Status = val
+}
+
+// The status of the user.
+type UserMetadataStatus string
+
+const (
+	UserMetadataStatusActive       UserMetadataStatus = "active"
+	UserMetadataStatusSuspended    UserMetadataStatus = "suspended"
+	UserMetadataStatusDeactivated  UserMetadataStatus = "deactivated"
+	UserMetadataStatusPendingPurge UserMetadataStatus = "pending_purge"
+)
+
+// AllValues returns all UserMetadataStatus values.
+func (UserMetadataStatus) AllValues() []UserMetadataStatus {
+	return []UserMetadataStatus{
+		UserMetadataStatusActive,
+		UserMetadataStatusSuspended,
+		UserMetadataStatusDeactivated,
+		UserMetadataStatusPendingPurge,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserMetadataStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case UserMetadataStatusActive:
+		return []byte(s), nil
+	case UserMetadataStatusSuspended:
+		return []byte(s), nil
+	case UserMetadataStatusDeactivated:
+		return []byte(s), nil
+	case UserMetadataStatusPendingPurge:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserMetadataStatus) UnmarshalText(data []byte) error {
+	switch UserMetadataStatus(data) {
+	case UserMetadataStatusActive:
+		*s = UserMetadataStatusActive
+		return nil
+	case UserMetadataStatusSuspended:
+		*s = UserMetadataStatusSuspended
+		return nil
+	case UserMetadataStatusDeactivated:
+		*s = UserMetadataStatusDeactivated
+		return nil
+	case UserMetadataStatusPendingPurge:
+		*s = UserMetadataStatusPendingPurge
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Merged schema.
 // Ref: #

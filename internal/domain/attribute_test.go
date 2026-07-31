@@ -193,16 +193,20 @@ func TestFlattenMapToCreateAttributes(t *testing.T) {
 	})
 }
 
-func TestBuildAttributeTree(t *testing.T) {
+func TestAttributes_ToMap(t *testing.T) {
+	t.Parallel()
+
 	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
 		tcs := []struct {
 			name       string
-			attributes []Attribute
+			attributes Attributes
 			expected   map[string]any
 		}{
 			{
 				name: "single layer",
-				attributes: []Attribute{
+				attributes: Attributes{
 					{Key: "name", Value: "dummy"},
 					{Key: "email", Value: "test@example.com"},
 				},
@@ -213,7 +217,7 @@ func TestBuildAttributeTree(t *testing.T) {
 			},
 			{
 				name: "multi layer",
-				attributes: []Attribute{
+				attributes: Attributes{
 					{"name", "dummy"},
 					{"email", "test@example.com"},
 					{"address.street", "main street"},
@@ -238,7 +242,9 @@ func TestBuildAttributeTree(t *testing.T) {
 
 		for _, tc := range tcs {
 			t.Run(tc.name, func(t *testing.T) {
-				m, err := BuildAttributeTree(tc.attributes)
+				t.Parallel()
+
+				m, err := tc.attributes.ToMap()
 				assert.NoError(t, err)
 				assert.EqualValues(t, tc.expected, m)
 			})

@@ -47,12 +47,16 @@ type User struct {
 	ID        string
 	// LifecycleOwnerTeamID is set when a team owns this user's lifecycle; nil means self-owned.
 	LifecycleOwnerTeamID *string
-	Status               UserStatus
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	Metadata             UserMetadata
 
 	// Attributes are populated by user read statements.
-	Attributes []Attribute
+	Attributes Attributes
+}
+
+type UserMetadata struct {
+	Status    UserStatus
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // IsSelfOwned reports whether the user owns their own lifecycle.
@@ -87,15 +91,10 @@ var IdentityAttributeKeys = []string{
 
 // StringAttribute returns the value of the attribute with the given key when
 // it is a non-empty string, and "" otherwise (absent key or non-string value).
-func (u *User) StringAttribute(key string) string {
-	for _, a := range u.Attributes {
-		if a.Key != key {
-			continue
-		}
-		value, _ := a.Value.(string)
-		return value
-	}
-	return ""
+func (u *User) StringAttribute(key AttributeKey) string {
+	value, _ := u.Attributes.Get(key)
+	s, _ := value.(string)
+	return s
 }
 
 // DisplayName resolves the user's human-readable name from the conventional
@@ -118,7 +117,7 @@ func (u *User) DisplayName() string {
 }
 
 // firstStringAttribute returns the first key's non-empty string value.
-func (u *User) firstStringAttribute(keys ...string) string {
+func (u *User) firstStringAttribute(keys ...AttributeKey) string {
 	for _, key := range keys {
 		if value := u.StringAttribute(key); value != "" {
 			return value

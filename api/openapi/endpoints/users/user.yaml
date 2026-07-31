@@ -9,6 +9,12 @@ additionalProperties: true
 required:
   - $schema
 properties:
+  id:
+    readonly: true
+    $ref: ../../components/schemas/user-id.yaml
+  metadata:
+    readOnly: true
+    $ref: user-metadata.yaml
   $schema:
     type: string
     description: |

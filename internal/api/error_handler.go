@@ -3,14 +3,18 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
+	"sync/atomic"
 
 	"github.com/go-faster/errors"
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
+
+var FullErrorInResponse = atomic.Bool{}
 
 // domainErrorDetails extracts a domain.Error from err and returns it as an
 // api.ErrorDetails. If err is not a domain.Error, ErrInternal is used as
@@ -30,16 +34,50 @@ func domainErrorDetails(err error) api.ErrorDetails {
 		Message: domErr.Message,
 	}
 
+	var details map[string]any
+
 	if domErr.Details != nil {
-		if j, err := json.Marshal(domErr.Details); err == nil {
-			errDetails.Details = api.NewOptErrorDetailsDetails(api.ErrorDetailsDetails{
-				"details": j,
-			})
+		details = map[string]any{
+			"details": domErr.Details,
+		}
+	}
+	if FullErrorInResponse.Load() && domErr.Parent != nil {
+		if details == nil {
+			details = make(map[string]any)
+		}
+		if errmap := createFullErrDetailsDetailsMap(domErr.Parent); errmap != nil {
+			details["parent"] = errmap
 		}
 	}
 
+	if details != nil {
+		errDetails.Details = api.NewOptErrorDetailsDetails(api.ErrorDetailsDetails{})
+		for k, v := range details {
+			if j, err := json.Marshal(v); err == nil {
+				errDetails.Details.Value[k] = j
+			}
+		}
+	}
 	return errDetails
 }
+
+func createFullErrDetailsDetailsMap(err error) any {
+	if err == nil {
+		return nil
+	}
+
+	errmap := make(map[string]any)
+	errmap["message"] = err.Error()
+	errmap["type"] = fmt.Sprintf("%T", err)
+
+	var domerr domain.Error
+	if errors.As(err, &domerr) && domerr.Parent != nil {
+		errmap["parent"] = createFullErrDetailsDetailsMap(domerr.Parent)
+	}
+
+	return errmap
+}
+
 func errorResponse(err error) *api.ErrorDetailsStatusCode {
 	var e domain.Error
 	if !errors.As(err, &e) {

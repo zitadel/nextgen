@@ -3,18 +3,30 @@ package domain
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/maputil"
 )
 
-type Attribute struct {
-	Key   string `json:"key"`
-	Value any    `json:"value"`
+type AttributeKey string
+
+func (k AttributeKey) Nodes() []string {
+	return strings.Split(string(k), ".")
 }
 
-type Attributes []Attribute
+func (k AttributeKey) AppendNode(node string) AttributeKey {
+	if len(k) == 0 {
+		return AttributeKey(node)
+	}
+	return AttributeKey(string(k) + "." + node)
+}
+
+type Attribute struct {
+	Key   AttributeKey `json:"key"`
+	Value any          `json:"value"`
+}
 
 type AttributeUniqueness int
 
@@ -45,38 +57,6 @@ func NewCreateAttribute(key string, value any, unique AttributeUniqueness) (*Cre
 		attr.ValueHash = sha256.Sum256(raw)
 	}
 	return attr, nil
-}
-
-func BuildAttributeTree(attributes []Attribute) (map[string]any, error) {
-	tree := make(map[string]any)
-	for i, a := range attributes {
-		keyNodes := strings.Split(a.Key, ".")
-
-		// empty keys are prevented in the DB schema,
-		// this is just a safety check to prevent panics in case of invalid data
-		if keyNodes[0] == "" {
-			return nil, fmt.Errorf("illegal empty key for attribute at index %d", i)
-		}
-
-		setAttribute(keyNodes, a.Value, tree)
-	}
-	return tree, nil
-}
-
-func setAttribute(keyNodes []string, value any, tree map[string]any) {
-	// leaf node, set the value
-	if len(keyNodes) == 1 {
-		tree[keyNodes[0]] = value
-		return
-	}
-
-	// not a leaf node, traverse down the tree
-	subTree, ok := tree[keyNodes[0]].(map[string]any)
-	if !ok {
-		subTree = make(map[string]any)
-		tree[keyNodes[0]] = subTree
-	}
-	setAttribute(keyNodes[1:], value, subTree)
 }
 
 func FlattenMapToCreateAttributes(m map[string]any, schema map[string]any, namePrefix string) ([]*CreateAttribute, error) {
@@ -116,4 +96,86 @@ func FlattenMapToCreateAttributes(m map[string]any, schema map[string]any, nameP
 		}
 	}
 	return attrs, nil
+}
+
+type Attributes []Attribute
+
+func AttributesFromMap(m map[string]any) Attributes {
+	attrs := make(Attributes, 0, len(m))
+	attrs.fromMap(m, "")
+	return attrs
+}
+
+// Get returns the value for the given key.
+//
+// TODO(go v27): make this method generic
+func (attrs Attributes) Get(key AttributeKey) (value any, ok bool) {
+	for _, attr := range attrs {
+		if attr.Key == key {
+			return attr.Value, true
+		}
+	}
+
+	return nil, false
+}
+
+func (attrs *Attributes) fromMap(m map[string]any, keyPrefix AttributeKey) {
+	for key, value := range m {
+		fullKey := keyPrefix.AppendNode(key)
+
+		switch tp := value.(type) {
+		case map[string]any:
+			attrs.fromMap(tp, fullKey)
+		default:
+			*attrs = append(*attrs, Attribute{Key: fullKey, Value: value})
+		}
+	}
+}
+
+func (attrs *Attributes) UnmarshalJSON(data []byte) error {
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		return fmt.Errorf("attribute: %w", err)
+	}
+
+	*attrs = AttributesFromMap(m)
+	return nil
+}
+
+func (attrs Attributes) ToMap() (map[string]any, error) {
+	tree := make(map[string]any)
+	for _, attr := range attrs {
+		keyNodes := attr.Key.Nodes()
+
+		subTree := tree
+		for len(keyNodes) > 1 {
+			// not a leaf node, traverse down the tree
+
+			var m map[string]any
+			v, ok := subTree[keyNodes[0]]
+			if !ok {
+				// nested map does not yet exist, create a new one
+				m = make(map[string]any)
+			} else if m, ok = v.(map[string]any); !ok {
+				// if the key overlaps with another value which is not an object, error to be sure
+				return nil, errors.New("the given key already exists in the map with a value which is not a map")
+			}
+
+			subTree[keyNodes[0]] = m
+			subTree = m
+			keyNodes = keyNodes[1:]
+		}
+
+		subTree[keyNodes[0]] = attr.Value
+
+	}
+	return tree, nil
+}
+
+func (attrs Attributes) MarshalJSON() ([]byte, error) {
+	m, err := attrs.ToMap()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(m)
 }
