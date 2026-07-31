@@ -107,9 +107,9 @@ see [§ Drift notes](#drift-notes).
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `project.create` | `POST /projects` (authenticated / on-prem path) | Two creation modes share this URL. **Cloud self-service:** anonymous `POST /projects` (`security: []`) + claim flow — no catalog permission (see [`../platform/claim-flow.md`](../platform/claim-flow.md)). **On-prem / admin-provisioned:** authenticated `POST /projects` gated by `project.create`, no claim — the platform project + default team are seeded at install ([`hierarchy.md`](hierarchy.md#self-hosted-exposes-the-same-api-shape-as-cloud)). How one endpoint reconciles both gatings is an [open question](#open-questions). |
-| `project.read` | `GET /projects`, `GET /projects/{id}` | Project resource only. Does not imply project-scoped configuration permissions. |
+| `project.read` | `POST /projects/query`, `GET /projects/{id}` | Project resource only. Does not imply project-scoped configuration permissions. Listing is `POST /projects/query` — there is no `GET /projects`. |
 | `project.write` | `PATCH /projects/{id}` | Project attributes only. Does not imply `branding.*`, `domain.*`, `feature.*`, `allowed_origin.*`, `signing_key.*`, or `webhook.*`. |
-| `project.delete` | `DELETE /projects/{id}` | |
+| `project.delete` | `DELETE /projects/{id}` | **Not yet exposed** — target shape. |
 
 Project-scoped configuration resources remain scoped through the project grant,
 but require their own permissions below. Bundles provide convenient aggregate
@@ -153,9 +153,9 @@ the corresponding resource permission.
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `team.create` | `POST /teams` | |
-| `team.read` | `GET /teams`, `GET /teams/{id}` | Team resource only. Does **not** imply `team_membership.*` or `user.*`. |
-| `team.write` | `PATCH /teams/{id}` | Team attributes only. Does **not** imply `team_membership.*`, invitations, or billing. |
-| `team.delete` | `DELETE /teams/{id}` | |
+| `team.read` | `GET /teams/{id}` | Team resource only. Does **not** imply `team_membership.*` or `user.*`. Collection list (`GET /teams`) is **not yet exposed**. |
+| `team.write` | `PATCH /teams/{id}` | Team attributes only. Does **not** imply `team_membership.*`, invitations, or billing. **Not yet exposed**. |
+| `team.delete` | `DELETE /teams/{id}` | **Not yet exposed**. |
 
 ### Users
 
@@ -169,9 +169,9 @@ the corresponding resource permission.
 |---|---|---|
 | `user.create` | `POST /users` | |
 | `user.read` | `GET /users`, `GET /users/{id}` | Get + list; full representation for now. |
-| `user.write` | `PATCH /users/{id}`, non-credential action verbs (e.g. `verify_email`) | Profile / attribute edits. Does **not** include setting another user's password — see `user.set_password`. |
+| `user.write` | `PATCH /users/{id}`, non-credential action verbs (e.g. `verify_email`) | Profile / attribute edits. Does **not** include setting another user's password — see `user.set_password`. `PATCH /users/{id}` is **not yet exposed**. |
 | `user.set_password` | `PUT /users/{id}/password` | **Credential-tier, account-takeover-grade.** Admin sets/resets *another* user's password. Held separately so a profile-editor / help-desk role can hold `user.write` without it. OpenAPI tags this endpoint `user.write` today (see [Drift notes](#drift-notes)). Reserve `user.reset_mfa` / similar for future admin factor-reset endpoints. |
-| `user.delete` | `DELETE /users/{id}` | |
+| `user.delete` | `DELETE /users/{id}` | **Not yet exposed**. |
 
 `/me` and `/me/memberships` are self-access and do not require system
 permissions — they are gated by the session/credential itself. A user changing
@@ -313,9 +313,9 @@ not yet exposed.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
-| `flow_definition.read` | `GET /flow-definitions`, `GET /flow-definitions/{id}` | Includes validate, simulate (read-only probes). |
-| `flow_definition.write` | `POST /flow-definitions`, `PATCH /flow-definitions/{id}`, `POST …/activate`, `POST …/archive` | Create + manage + lifecycle. |
-| `flow_definition.delete` | `DELETE /flow-definitions/{id}` | |
+| `flow_definition.read` | `GET /flow_definitions`, `GET /flow_definitions/{id}` | Get + list. Validate / simulate read-only probes are **planned**, not yet exposed. |
+| `flow_definition.write` | `POST /flow_definitions`, `PUT /flow_definitions/{id}`, `POST /flow_definitions/{id}/activate`, `POST /flow_definitions/{id}/deactivate` | Create + manage + lifecycle. |
+| `flow_definition.delete` | `DELETE /flow_definitions/{id}` | |
 
 ### Sessions
 
@@ -375,8 +375,8 @@ Replacements:
 
 | Old name | Replacement | Still accurate? |
 |---|---|---|
-| `team.users.read` | `user.read` | **Yes.** Nesting only encoded “users in this team”; where stays on the grant/`sk_team_` boundary. Users are a flat resource (`/users`), not a team nested path. |
-| `team.users.write` | `user.write` (and usually `user.create` / `user.delete` as needed) | **Yes.** Same flattening; create/delete should be granted explicitly when needed. |
+| `team.users.read` | `user.read` | **Yes.** Nesting only encoded “users in this team”; where stays on the grant/`sk_team_` boundary. Users are a flat resource (`/users`), not a team nested path. Because the boundary is no longer in the permission string, `sk_team_` grants must carry a resolver-enforced team scope (see [`credentials.md`](credentials.md#sk_team_-narrow-permission-model--locked)). |
+| `team.users.write` | `user.write` (and usually `user.create` / `user.delete` as needed) | **Yes.** Same flattening; create/delete should be granted explicitly when needed. Same team-scope compensating requirement as `user.read`. |
 | `team.memberships.read` / `.write` | `team_membership.read` / `team_membership.write` | **Yes.** Compound type, not dot nesting. |
 | `team.roles.assign` | `team_membership.write` | **Yes.** Role assignment is a membership mutation. |
 | `team.events.read` | `event.read` | **Yes.** Filter to the team via grant/credential scope. |

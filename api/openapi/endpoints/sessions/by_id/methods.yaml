@@ -24,11 +24,7 @@ get:
           schema:
             $ref: ../session-response.yaml
     '401':
-<<<<<<< HEAD
       description: Missing or invalid credentials.
-=======
-      description: Missing or invalid credential.
->>>>>>> f23afe75 (docs(api): address review on permission catalog scope alignment)
       content:
         application/json:
           schema:
@@ -65,11 +61,7 @@ delete:
     '204':
       description: Session revoked successfully.
     '401':
-<<<<<<< HEAD
       description: Missing or invalid credentials.
-=======
-      description: Missing or invalid credential.
->>>>>>> f23afe75 (docs(api): address review on permission catalog scope alignment)
       content:
         application/json:
           schema:
@@ -92,4 +84,3 @@ delete:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
-

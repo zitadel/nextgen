@@ -194,8 +194,10 @@ POST /sessions/exchange
 ```http
 POST   /sessions                         # optional anonymous pre-auth shell
 GET    /sessions                         # list (admin / management)
-GET    /sessions/{id}
-DELETE /sessions/{id}                    # logout
+GET    /sessions/{id}                    # operator get
+DELETE /sessions/{id}                    # operator revoke (not logout)
+GET    /sessions/me                      # end-user get (`nextgenSession` cookie)
+DELETE /sessions/me                      # end-user logout (`nextgenSession` cookie)
 ```
 
 Sessions carry factors + `assurance_levels[]`. Clients read and revoke
@@ -218,14 +220,15 @@ POST /flows/{session_id}/event
 Flow definition management (uploaded via `npx zitadel push`):
 
 ```http
-POST   /flow-definitions
-GET    /flow-definitions/{id}
-PATCH  /flow-definitions/{id}
-DELETE /flow-definitions/{id}
-POST   /flow-definitions/{id}/activate
-POST   /flow-definitions/{id}/archive
-POST   /flow-definitions/{id}/validate
-POST   /flow-definitions/{id}/simulate
+POST   /flow_definitions
+GET    /flow_definitions
+GET    /flow_definitions/{id}
+PUT    /flow_definitions/{id}
+DELETE /flow_definitions/{id}
+POST   /flow_definitions/{id}/activate
+POST   /flow_definitions/{id}/deactivate
+# planned: POST /flow_definitions/{id}/validate
+# planned: POST /flow_definitions/{id}/simulate
 ```
 
 ---

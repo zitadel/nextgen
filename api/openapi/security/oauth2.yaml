@@ -21,20 +21,20 @@ flows:
       project.write: Permission to create and manage projects
       branding.read: Permission to read branding revisions
       branding.write: Permission to publish branding revisions
-      domain.read: Permission to read project domains
-      domain.write: Permission to create and manage project domains
-      domain.delete: Permission to delete project domains
-      feature.read: Permission to read project feature configuration
-      feature.write: Permission to change project feature configuration
-      allowed_origin.read: Permission to read allowed origins
-      allowed_origin.write: Permission to create and manage allowed origins
-      allowed_origin.delete: Permission to delete allowed origins
-      signing_key.create: Permission to create signing keys
-      signing_key.read: Permission to read signing keys
-      signing_key.delete: Permission to delete signing keys
-      webhook.read: Permission to read webhooks
-      webhook.write: Permission to create and manage webhooks
-      webhook.delete: Permission to delete webhooks
+      domain.read: Permission to read project domains (reserved; endpoints not yet available)
+      domain.write: Permission to create and manage project domains (reserved; endpoints not yet available)
+      domain.delete: Permission to delete project domains (reserved; endpoints not yet available)
+      feature.read: Permission to read project feature configuration (reserved; endpoints not yet available)
+      feature.write: Permission to change project feature configuration (reserved; endpoints not yet available)
+      allowed_origin.read: Permission to read allowed origins (reserved; endpoints not yet available)
+      allowed_origin.write: Permission to create and manage allowed origins (reserved; endpoints not yet available)
+      allowed_origin.delete: Permission to delete allowed origins (reserved; endpoints not yet available)
+      signing_key.create: Permission to create signing keys (reserved; endpoints not yet available)
+      signing_key.read: Permission to read signing keys (reserved; endpoints not yet available)
+      signing_key.delete: Permission to delete signing keys (reserved; endpoints not yet available)
+      webhook.read: Permission to read webhooks (reserved; endpoints not yet available)
+      webhook.write: Permission to create and manage webhooks (reserved; endpoints not yet available)
+      webhook.delete: Permission to delete webhooks (reserved; endpoints not yet available)
       session.read: Permission to read sessions
       session.write: Permission to create and manage sessions
       session.delete: Permission to revoke sessions
@@ -58,20 +58,20 @@ flows:
       project.write: Permission to create and manage projects
       branding.read: Permission to read branding revisions
       branding.write: Permission to publish branding revisions
-      domain.read: Permission to read project domains
-      domain.write: Permission to create and manage project domains
-      domain.delete: Permission to delete project domains
-      feature.read: Permission to read project feature configuration
-      feature.write: Permission to change project feature configuration
-      allowed_origin.read: Permission to read allowed origins
-      allowed_origin.write: Permission to create and manage allowed origins
-      allowed_origin.delete: Permission to delete allowed origins
-      signing_key.create: Permission to create signing keys
-      signing_key.read: Permission to read signing keys
-      signing_key.delete: Permission to delete signing keys
-      webhook.read: Permission to read webhooks
-      webhook.write: Permission to create and manage webhooks
-      webhook.delete: Permission to delete webhooks
+      domain.read: Permission to read project domains (reserved; endpoints not yet available)
+      domain.write: Permission to create and manage project domains (reserved; endpoints not yet available)
+      domain.delete: Permission to delete project domains (reserved; endpoints not yet available)
+      feature.read: Permission to read project feature configuration (reserved; endpoints not yet available)
+      feature.write: Permission to change project feature configuration (reserved; endpoints not yet available)
+      allowed_origin.read: Permission to read allowed origins (reserved; endpoints not yet available)
+      allowed_origin.write: Permission to create and manage allowed origins (reserved; endpoints not yet available)
+      allowed_origin.delete: Permission to delete allowed origins (reserved; endpoints not yet available)
+      signing_key.create: Permission to create signing keys (reserved; endpoints not yet available)
+      signing_key.read: Permission to read signing keys (reserved; endpoints not yet available)
+      signing_key.delete: Permission to delete signing keys (reserved; endpoints not yet available)
+      webhook.read: Permission to read webhooks (reserved; endpoints not yet available)
+      webhook.write: Permission to create and manage webhooks (reserved; endpoints not yet available)
+      webhook.delete: Permission to delete webhooks (reserved; endpoints not yet available)
       session.read: Permission to read sessions
       session.write: Permission to create and manage sessions
       session.delete: Permission to revoke sessions

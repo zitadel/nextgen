@@ -59,7 +59,11 @@ sk_team_… MUST NEVER:
   allowed_origin.*
   signing_key.*
   webhook.*
-  team.*
+  team.*                             (machine tokens manage team-scoped members/
+                                      keys, not the team resource itself —
+                                      even GET /teams/{own id} stays human/user-
+                                      token territory; team_member may hold
+                                      team.read)
   billing.*
   idp.*
   app.*
@@ -75,6 +79,11 @@ sk_team_… MUST NEVER:
 ```
 
 Permission names follow the flat `{resource}.{verb}` convention in [`system-permission-catalog.md`](system-permission-catalog.md). Multi-word types use `_` (`team_membership`, not `team.membership`). Project-scoped configuration resources have independent permissions (`branding.*`, `domain.*`, `feature.*`, `allowed_origin.*`, `signing_key.*`, `webhook.*`); all are explicitly denied to `sk_team_`.
+
+Flat `user.*` / `team_membership.*` no longer encode the team boundary in the
+permission string (old `team.users.*` did). Compensating requirement: every
+`sk_team_` grant must carry a resolver-enforced team scope, and the deny-list
+suite must include "team token reads/writes a user outside its team".
 
 SCIM sync (`scim.sync`) is not listed yet — SCIM is a hosted interop surface
 (`/scim/v2/Users`, `/scim/v2/Groups` in [`resource-map.md`](resource-map.md))
