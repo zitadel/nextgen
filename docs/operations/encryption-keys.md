@@ -159,7 +159,7 @@ missing) and merges every file it finds into
 >   with an inline `private_key` is replaced by the RSA key in
 >   `<data_dir>/master-keys/master-key.pem`. The key ID is unchanged, so `kid`
 >   lookups still resolve — they just resolve to a different key, and every
->   unwrap fails at use with `encryption_key.decrypt_failed`.
+>   unwrap fails at use with `enc_key.decrypt_failed`.
 > - **Lost encryption marker.** If the overwritten entry was the one marked
 >   `use_for_encryption` and other keys are configured, startup aborts with
 >   `no key is marked for encryption`.
@@ -253,7 +253,7 @@ to be re-encrypted. Only the small wrapped-key column is rewritten, which is why
 
 - **Do not remove a master key before the project KEKs it wrapped are migrated.** A KEK whose `kid` is no longer
   configured is skipped by the migration (it is indistinguishable from a key wrapped by another database key) and fails
-  at use with `encryption_key.decrypt_failed` / `encryption_key.not_found`.
+  at use with `enc_key.decrypt_failed` / `enc_key.not_found`.
 - **Do not rename a key ID as part of rotation.** Rotation means adding a *new*
   ID; changing an existing ID orphans its ciphertexts.
 - **Keep retired keys until migration is verified**, then destroy them deliberately — a retained compromised master key
@@ -267,13 +267,13 @@ new keys and re-encryption of the data itself rather than just re-wrapping — f
 
 ## Errors
 
-| Code                                | Meaning                                              |
-|-------------------------------------|------------------------------------------------------|
-| `encryption_key.not_found`          | No key row for the requested ID/project/state        |
-| `encryption_key.decrypt_failed`     | Unwrap failed, or the unwrapped key was not 32 bytes |
-| `encryption_key.encrypt_failed`     | Wrapping failed during rotation                      |
-| `encryption_key.unknown_alg`        | Key stored with an algorithm other than `A256GCM`    |
-| `encryption_key.no_replacement_key` | A key was retired without a successor                |
+| Code                         | Meaning                                              |
+|------------------------------|------------------------------------------------------|
+| `enc_key.not_found`          | No key row for the requested ID/project/state        |
+| `enc_key.decrypt_failed`     | Unwrap failed, or the unwrapped key was not 32 bytes |
+| `enc_key.encrypt_failed`     | Wrapping failed during rotation                      |
+| `enc_key.unknown_alg`        | Key stored with an algorithm other than `A256GCM`    |
+| `enc_key.no_replacement_key` | A key was retired without a successor                |
 
 Startup errors from key configuration are plain `server: …` errors and abort the process.
 
