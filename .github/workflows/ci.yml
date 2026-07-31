@@ -29,11 +29,6 @@ jobs:
       # text and replays each failed task's own output. Green runs pay only a
       # pass/fail list; the replay section is empty when nothing failed.
       MOON_SUMMARY: detailed
-      # Secrets cannot be referenced in step `if:` expressions. Expose them as
-      # job env so Spanner auth/instance steps can gate on env.* != ''.
-      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-      SPANNER_TEST_INSTANCE: ${{ vars.SPANNER_TEST_INSTANCE }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -94,24 +89,25 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon run server:test-postgres
 
-      # Authenticate to the shared Spanner test instance via Workload Identity
-      # Federation only when the GCP secrets and SPANNER_TEST_INSTANCE var are
-      # configured (and not on fork PRs, which cannot access secrets). Otherwise
-      # skip auth: server:test-spanner falls back to the emulator with
-      # -parallel 1 -p 1 (see scripts/test-spanner.mjs).
+      # Try WIF auth to the shared Spanner test instance on trusted full runs.
+      # continue-on-error: missing/unconfigured secrets (or other auth failures)
+      # soft-fail and leave INSTANCE unset so server:test-spanner uses the
+      # emulator with -parallel 1 -p 1 (see scripts/test-spanner.mjs). Forks
+      # skip auth (no secret access) and take the same emulator path.
       - name: Authenticate to Google Cloud (Spanner test instance)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && env.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && env.GCP_SERVICE_ACCOUNT != '' && env.SPANNER_TEST_INSTANCE != '' }}
+        id: spanner-auth
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
+        continue-on-error: true
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Run Go integration tests (spanner)
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         env:
-          # Set only when WIF secrets + SPANNER_TEST_INSTANCE are present on a
-          # trusted run; otherwise empty so testdb.SpannerDSN uses the emulator.
-          ZITADEL_TEST_SPANNER_INSTANCE: ${{ (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && env.GCP_WORKLOAD_IDENTITY_PROVIDER != '' && env.GCP_SERVICE_ACCOUNT != '' && env.SPANNER_TEST_INSTANCE || '' }}
+          # Only when WIF auth succeeded; skipped/failed auth → empty → emulator.
+          ZITADEL_TEST_SPANNER_INSTANCE: ${{ steps.spanner-auth.outcome == 'success' && vars.SPANNER_TEST_INSTANCE || '' }}
         run: moon run server:test-spanner
 
       - name: Build release snapshot without container
