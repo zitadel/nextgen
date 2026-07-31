@@ -45,17 +45,21 @@ func ensureProject(ctx context.Context, stmts service.AllStatements, projectID s
 func ensureTeam(ctx context.Context, stmts service.AllStatements, projectID, teamID string) error {
 	// Team names are unique per project too, so a UniqueError from the insert
 	// below does not prove the team exists.
-	if _, err := stmts.GetTeamByID(ctx, projectID, teamID); err == nil {
+	_, err := stmts.GetTeamByID(ctx, projectID, teamID)
+	if err == nil {
 		return nil
+	}
+	// Only a missing row means we still have to create it.
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+		return fmt.Errorf("get team %q: %w", teamID, err)
 	}
 	// The bootstrap header carries no team name, so derive a placeholder
 	// name from the team ID to satisfy the NOT NULL name column.
-	err := stmts.CreateTeam(ctx, &domain.Team{
+	if err := stmts.CreateTeam(ctx, &domain.Team{
 		ProjectID: projectID,
 		ID:        teamID,
 		Name:      "team-" + teamID,
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("ensure team %q: %w", teamID, err)
 	}
 	return nil

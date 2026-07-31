@@ -4,6 +4,7 @@ package users_test
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -42,25 +43,29 @@ func TestImport_loadAndSkip(t *testing.T) {
 	ctx := t.Context()
 	hasher := testHasher(t)
 	v2Pool := testPool(t)
+	stmts := v2Pool.Statements()
 
-	dir := t.TempDir()
-	path := filepath.Join(dir, "user.json")
-	writeUserFile(t, path, "usr_import_1")
+	suffix := rand.Text()
+	projectID := "proj_" + suffix
+	userID := "usr_" + suffix
+	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), projectID) })
+
+	path := writeUserFile(t, projectID, "team_"+suffix, userID)
 
 	require.NoError(t, users.Import(ctx, v2Pool, hasher, "postgres", []string{path}))
 
-	got, err := v2Pool.Statements().GetUser(ctx, database.And(
-		database.Equal(database.Col(domain.UserFieldProjectID), "proj_demo"),
-		database.Equal(database.Col(domain.UserFieldID), "usr_import_1"),
+	got, err := stmts.GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserFieldID), userID),
 	), service.UserQueryOptions{
 		AttributeKeys: []string{"username"},
 	})
 	require.NoError(t, err)
-	require.Equal(t, "usr_import_1", got.ID)
+	require.Equal(t, userID, got.ID)
 
-	pw, err := v2Pool.Statements().GetUserPassword(ctx, database.And(
-		database.Equal(database.Col(domain.UserPasswordFieldProjectID), "proj_demo"),
-		database.Equal(database.Col(domain.UserPasswordFieldUserID), "usr_import_1"),
+	pw, err := stmts.GetUserPassword(ctx, database.And(
+		database.Equal(database.Col(domain.UserPasswordFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserPasswordFieldUserID), userID),
 	))
 	require.NoError(t, err)
 	require.NotEmpty(t, pw.EncodedHash)
@@ -76,47 +81,50 @@ func TestImport_spannerRejected(t *testing.T) {
 
 func TestImport_teamPlaceholderNameTaken(t *testing.T) {
 	ctx := t.Context()
-	v2Pool := testV2Pool(t)
+	v2Pool := testPool(t)
 	stmts := v2Pool.Statements()
 
+	suffix := rand.Text()
+	projectID := "proj_" + suffix
+	teamID := "team_" + suffix
+
 	require.NoError(t, stmts.CreateProject(ctx, &domain.Project{
-		ID:             "proj_123",
-		Name:           "project-proj_123",
+		ID:             projectID,
+		Name:           "project-" + projectID,
 		PreviewOrigins: []string{},
 	}))
-	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), "proj_123") })
+	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), projectID) })
 
 	// The placeholder name is derived from the team ID, so parking it on another
 	// team makes the insert fail on the name index instead of the primary key.
 	require.NoError(t, stmts.CreateTeam(ctx, &domain.Team{
-		ProjectID: "proj_123",
-		ID:        "team_456",
-		Name:      "team-team_123",
+		ProjectID: projectID,
+		ID:        teamID + "_other",
+		Name:      "team-" + teamID,
 	}))
 
-	doc := validDocument()
-	doc.Header.ProjectID = "proj_123"
-	doc.Header.TeamID = "team_123"
-	doc.Header.ID = "usr_name_123"
-	raw, err := json.Marshal(doc)
-	require.NoError(t, err)
-	path := filepath.Join(t.TempDir(), "user.json")
-	require.NoError(t, os.WriteFile(path, raw, 0o600))
+	path := writeUserFile(t, projectID, teamID, "usr_"+suffix)
 
 	// The import fails either way; what matters is that it names the team it
 	// could not create, rather than a later team_memberships insert tripping
 	// over the missing team's foreign key.
-	err = users.Import(ctx, v2Pool, testHasher(t), "postgres", []string{path})
+	err := users.Import(ctx, v2Pool, testHasher(t), "postgres", []string{path})
 	require.Error(t, err)
-	require.Contains(t, err.Error(), `ensure team "team_123"`)
+	require.Contains(t, err.Error(), `ensure team "`+teamID+`"`)
 	require.Contains(t, err.Error(), "uq_teams_project_name")
 }
 
-func writeUserFile(t *testing.T, path, userID string) {
+// writeUserFile writes a valid user document carrying the given IDs and returns
+// its path.
+func writeUserFile(t *testing.T, projectID, teamID, userID string) string {
 	t.Helper()
 	doc := validDocument()
+	doc.Header.ProjectID = projectID
+	doc.Header.TeamID = teamID
 	doc.Header.ID = userID
 	raw, err := json.Marshal(doc)
 	require.NoError(t, err)
+	path := filepath.Join(t.TempDir(), "user.json")
 	require.NoError(t, os.WriteFile(path, raw, 0o600))
+	return path
 }
