@@ -46,6 +46,13 @@ type ListUsersInput struct {
 	Limit  uint32
 }
 
+type ListPasskeysInput struct {
+	ProjectID string
+	UserID    string
+	PageToken string
+	Limit     int
+}
+
 type GetMyUserInput struct {
 	// SessionToken is the parsed session token, already verified at the API
 	// security boundary.
@@ -169,6 +176,43 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]ma
 		users = append(users, user)
 	}
 	return users, nil
+}
+
+func (s *UserService) ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error) {
+	dbpasskeys, err := s.v2Pool.Statements().ListUserPasskeys(
+		ctx, &database.ListOptions[domain.UserPasskeyField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.UserPasskeyFieldProjectID), input.ProjectID),
+				database.Equal(database.Col(domain.UserPasskeyFieldUserID), input.UserID),
+			),
+			Pagination: database.Page[domain.UserPasskeyField]{
+				Limit:  uint32(normalizeLimit(input.Limit)),
+				Cursor: []byte(input.PageToken),
+				OrderBy: database.OrderBy[domain.UserPasskeyField]{
+					Columns: []database.Column[domain.UserPasskeyField]{
+						database.Col(domain.UserPasskeyFieldCreatedAt),
+					},
+					Direction: database.OrderDesc,
+				},
+			},
+		},
+	)
+	if err != nil {
+		return nil, "", domain.ErrInternal(err).WithMessage("failed to get user passkeys from database")
+	}
+
+	// Distinguish "user not found" from "user has no passkeys".
+	if len(dbpasskeys.Items) == 0 {
+		exists, err := s.v2Pool.Statements().UserExists(ctx, input.ProjectID, input.UserID)
+		if err != nil {
+			return nil, "", domain.ErrInternal(err).WithMessage("failed to get user from database")
+		}
+		if !exists {
+			return nil, "", domain.ErrUserNotFound()
+		}
+	}
+
+	return dbpasskeys.Items, string(dbpasskeys.NextCursor), nil
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {

@@ -213,6 +213,7 @@ type UserStatements interface {
 	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error
 	DeleteUserByID(ctx context.Context, projectID, userID string) error
+	UserExists(ctx context.Context, projectID, userID string) (bool, error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

@@ -3142,6 +3142,45 @@ func (c *MockAllStatementsUpdateUserTOTPCall) DoAndReturn(f func(context.Context
 	return c
 }
 
+// UserExists mocks base method.
+func (m *MockAllStatements) UserExists(ctx context.Context, projectID, userID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UserExists", ctx, projectID, userID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UserExists indicates an expected call of UserExists.
+func (mr *MockAllStatementsMockRecorder) UserExists(ctx, projectID, userID any) *MockAllStatementsUserExistsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserExists", reflect.TypeOf((*MockAllStatements)(nil).UserExists), ctx, projectID, userID)
+	return &MockAllStatementsUserExistsCall{Call: call}
+}
+
+// MockAllStatementsUserExistsCall wrap *gomock.Call
+type MockAllStatementsUserExistsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsUserExistsCall) Return(arg0 bool, arg1 error) *MockAllStatementsUserExistsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsUserExistsCall) Do(f func(context.Context, string, string) (bool, error)) *MockAllStatementsUserExistsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsUserExistsCall) DoAndReturn(f func(context.Context, string, string) (bool, error)) *MockAllStatementsUserExistsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // MockProjectStatements is a mock of ProjectStatements interface.
 type MockProjectStatements struct {
 	ctrl     *gomock.Controller
@@ -5796,6 +5835,45 @@ func (c *MockUserStatementsListUsersCall) Do(f func(context.Context, *database.L
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockUserStatementsListUsersCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.UserField], service.UserQueryOptions) (*database.ListResult[*domain.User], error)) *MockUserStatementsListUsersCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// UserExists mocks base method.
+func (m *MockUserStatements) UserExists(ctx context.Context, projectID, userID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UserExists", ctx, projectID, userID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UserExists indicates an expected call of UserExists.
+func (mr *MockUserStatementsMockRecorder) UserExists(ctx, projectID, userID any) *MockUserStatementsUserExistsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserExists", reflect.TypeOf((*MockUserStatements)(nil).UserExists), ctx, projectID, userID)
+	return &MockUserStatementsUserExistsCall{Call: call}
+}
+
+// MockUserStatementsUserExistsCall wrap *gomock.Call
+type MockUserStatementsUserExistsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockUserStatementsUserExistsCall) Return(arg0 bool, arg1 error) *MockUserStatementsUserExistsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockUserStatementsUserExistsCall) Do(f func(context.Context, string, string) (bool, error)) *MockUserStatementsUserExistsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockUserStatementsUserExistsCall) DoAndReturn(f func(context.Context, string, string) (bool, error)) *MockUserStatementsUserExistsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
