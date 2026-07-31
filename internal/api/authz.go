@@ -76,8 +76,9 @@ var flowDefinitionAccess = resourceAccess{
 
 var userAccess = resourceAccess{
 	scopes: map[accessOp][]string{
-		opRead:  {"user.read", "user.write"},
-		opWrite: {"user.write"},
+		opRead:   {"user.read", "user.write"},
+		opWrite:  {"user.write"},
+		opDelete: {"user.delete"},
 	},
 	readMiss:  domain.ErrUserNotFound,
 	writeMiss: func() domain.Error { return domain.ErrUserInvalid().WithDetails("project does not exist") },
