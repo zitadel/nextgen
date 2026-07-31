@@ -20,7 +20,7 @@ post:
       content:
         application/json:
           schema:
-            $ref: create-team-response.yaml
+            $ref: team-response.yaml
     '400':
       description: The provided parameters were not acceptable
       content:

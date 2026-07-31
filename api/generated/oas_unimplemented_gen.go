@@ -391,7 +391,7 @@ func (UnimplementedHandler) GetSession(ctx context.Context, params GetSessionPar
 
 // GetTeam implements getTeam operation.
 //
-// Returns the current state of a team.
+// Returns the Team by ID.
 //
 // GET /teams/{team_id}
 func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (r GetTeamRes, _ error) {

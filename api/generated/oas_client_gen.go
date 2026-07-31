@@ -310,7 +310,7 @@ type Invoker interface {
 	GetSession(ctx context.Context, params GetSessionParams) (GetSessionRes, error)
 	// GetTeam invokes getTeam operation.
 	//
-	// Returns the current state of a team.
+	// Returns the Team by ID.
 	//
 	// GET /teams/{team_id}
 	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
@@ -4874,7 +4874,7 @@ func (c *Client) sendGetSession(ctx context.Context, params GetSessionParams) (r
 
 // GetTeam invokes getTeam operation.
 //
-// Returns the current state of a team.
+// Returns the Team by ID.
 //
 // GET /teams/{team_id}
 func (c *Client) GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error) {

@@ -726,7 +726,15 @@ func encodeCreateSessionResponse(response CreateSessionRes, w http.ResponseWrite
 
 func encodeCreateTeamResponse(response CreateTeamRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *CreateTeamResponse:
+	case *TeamResponse:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(201)
 		span.SetStatus(codes.Ok, http.StatusText(201))
@@ -2225,6 +2233,14 @@ func encodeGetSessionResponse(response GetSessionRes, w http.ResponseWriter, spa
 func encodeGetTeamResponse(response GetTeamRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
 	case *TeamResponse:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
 		span.SetStatus(codes.Ok, http.StatusText(200))
@@ -3795,6 +3811,14 @@ func encodeUpdateFlowDefinitionResponse(response UpdateFlowDefinitionRes, w http
 func encodeUpdateTeamResponse(response UpdateTeamRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
 	case *TeamResponse:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
 		span.SetStatus(codes.Ok, http.StatusText(200))

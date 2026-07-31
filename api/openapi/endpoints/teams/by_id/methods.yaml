@@ -2,7 +2,7 @@ get:
   operationId: getTeam
   summary: Get team
   description: |
-    Returns the current state of a team.
+    Returns the Team by ID
   tags:
     - Teams
   parameters:
