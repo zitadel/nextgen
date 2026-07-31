@@ -89,16 +89,12 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon run server:test-postgres
 
-      # Try WIF auth to the shared Spanner test instance on trusted full runs.
-      # continue-on-error: missing/unconfigured secrets (or other auth failures)
-      # soft-fail so the emulator step runs instead. Forks skip auth (no secret
-      # access) and take the emulator path. Exactly one of the two Spanner test
-      # steps below runs; both call the same moon task (INSTANCE env selects
-      # backend — see scripts/test-spanner.mjs).
+      # Auth when SPANNER_TEST_INSTANCE is set (trusted runs). Vars are safe in
+      # if:; secrets stay only in with:. Unset var / forks → emulator step.
+      # Auth hard-fails if the var is set but WIF is broken (no silent fallback).
       - name: Authenticate to Google Cloud (Spanner test instance)
         id: spanner-auth
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) }}
-        continue-on-error: true
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && vars.SPANNER_TEST_INSTANCE != '' }}
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}

@@ -10,9 +10,7 @@ import (
 )
 
 // Spanner returns a connected v2 pool for the Spanner integration tests.
-// Precedence is owned by testdb.SpannerDSN: ZITADEL_TEST_SPANNER_INSTANCE
-// (provision a fresh database on the shared instance) >
-// ZITADEL_TEST_SPANNER_URL > emulator testcontainer. The returned stop
+// Bring-up precedence is owned by testdb.SpannerDSN. The returned stop
 // function is always non-nil and safe to defer.
 func Spanner(ctx context.Context) (Pool, func(), error) {
 	dsn, stop, err := testdb.SpannerDSN(ctx)

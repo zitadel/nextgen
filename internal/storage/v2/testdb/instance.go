@@ -16,34 +16,25 @@ import (
 	"google.golang.org/api/option"
 )
 
-// InstanceEnv is the environment variable that points the integration suites at
-// a shared Spanner test instance. Its value is an instance path of the form
-// projects/<project>/instances/<instance>. When set, the suites provision a
-// uniquely named database on that instance (created before, dropped after)
-// instead of starting the emulator.
-const InstanceEnv = "ZITADEL_TEST_SPANNER_INSTANCE"
+// instanceEnv names a shared Spanner instance
+// (projects/<project>/instances/<instance>). When set, suites provision a
+// uniquely named database on that instance instead of starting the emulator.
+const instanceEnv = "ZITADEL_TEST_SPANNER_INSTANCE"
 
-// Provision creates a fresh, uniquely named database on the instance named by
-// InstanceEnv and returns its DSN plus a teardown func that drops the database.
-// Authentication uses Application Default Credentials (the caller is expected
-// to have run `gcloud auth application-default login` locally or be
-// authenticated via Workload Identity Federation in CI). The returned drop func
-// is always non-nil and safe to defer.
-func Provision(ctx context.Context) (string, func(), error) {
-	project, instance, err := parseInstancePath(os.Getenv(InstanceEnv))
+func provision(ctx context.Context) (string, func(), error) {
+	project, instance, err := parseInstancePath(strings.TrimSpace(os.Getenv(instanceEnv)))
 	if err != nil {
 		return "", func() {}, err
 	}
 
 	dbID := uniqueDatabaseID()
-	if err := CreateDatabase(ctx, project, instance, dbID); err != nil {
+	if err := createDatabase(ctx, project, instance, dbID); err != nil {
 		return "", func() {}, fmt.Errorf("unable to create Spanner test database %q: %w", dbID, err)
 	}
 
 	drop := func() {
-		// context.Background so teardown still runs when the test context is done.
-		if err := DropDatabase(context.Background(), project, instance, dbID); err != nil {
-			slog.Error("unable to drop Spanner test database", slog.String("database", dbID), slog.Any("err", err))
+		if err := dropDatabase(context.Background(), project, instance, dbID); err != nil {
+			slog.Error("unable to drop Spanner test database", "database", dbID, "err", err)
 		}
 	}
 
@@ -52,10 +43,7 @@ func Provision(ctx context.Context) (string, func(), error) {
 	return dsn, drop, nil
 }
 
-// CreateDatabase creates an empty database on the given instance. opts are
-// passed to the admin client; pass none to use Application Default Credentials
-// (real instance), or the emulator's insecure/no-auth options for the emulator.
-func CreateDatabase(ctx context.Context, project, instance, dbID string, opts ...option.ClientOption) error {
+func createDatabase(ctx context.Context, project, instance, dbID string, opts ...option.ClientOption) error {
 	client, err := database_admin.NewDatabaseAdminClient(ctx, opts...)
 	if err != nil {
 		return fmt.Errorf("database admin client: %w", err)
@@ -75,9 +63,7 @@ func CreateDatabase(ctx context.Context, project, instance, dbID string, opts ..
 	return nil
 }
 
-// DropDatabase drops the database on the given instance. opts follow the same
-// convention as CreateDatabase.
-func DropDatabase(ctx context.Context, project, instance, dbID string, opts ...option.ClientOption) error {
+func dropDatabase(ctx context.Context, project, instance, dbID string, opts ...option.ClientOption) error {
 	client, err := database_admin.NewDatabaseAdminClient(ctx, opts...)
 	if err != nil {
 		return fmt.Errorf("database admin client: %w", err)
@@ -93,45 +79,36 @@ func DropDatabase(ctx context.Context, project, instance, dbID string, opts ...o
 	return nil
 }
 
-// parseInstancePath validates and splits an instance path of the form
-// projects/<project>/instances/<instance>.
 func parseInstancePath(path string) (project, instance string, err error) {
 	parts := strings.Split(path, "/")
 	if len(parts) != 4 || parts[0] != "projects" || parts[2] != "instances" || parts[1] == "" || parts[3] == "" {
-		return "", "", fmt.Errorf("%s must be of the form projects/<project>/instances/<instance>, got %q", InstanceEnv, path)
+		return "", "", fmt.Errorf("%s must be of the form projects/<project>/instances/<instance>, got %q", instanceEnv, path)
 	}
 	return parts[1], parts[3], nil
 }
 
-// uniqueDatabaseID returns a Spanner database ID unique to this test process.
-// Spanner database IDs must be 2-30 chars, start with a lowercase letter, and
-// contain only [a-z0-9_-] with no trailing hyphen. A random suffix is always
-// included so parallel test binaries in the same CI run never collide; the run
-// id is embedded when present to make orphaned databases traceable for cleanup.
+// uniqueDatabaseID builds a Spanner database ID (2–30 chars, [a-z0-9_-], no
+// trailing hyphen). Entropy comes first so a 30-char clamp never drops
+// uniqueness when GITHUB_RUN_ID is long; a short run-id suffix keeps orphans
+// traceable when present.
 func uniqueDatabaseID() string {
-	suffix := randomToken()
+	id := "itest_" + randomToken()
 	if runID := os.Getenv("GITHUB_RUN_ID"); runID != "" {
-		return clampDatabaseID(fmt.Sprintf("itest_%s_%s", runID, suffix))
+		budget := 30 - len(id) - 1
+		if budget > 0 {
+			if len(runID) > budget {
+				runID = runID[len(runID)-budget:]
+			}
+			id = id + "_" + runID
+		}
 	}
-	return fmt.Sprintf("itest_%s", suffix)
+	return strings.TrimRight(id, "-")
 }
 
-// randomToken returns 8 lowercase hex characters.
 func randomToken() string {
 	b := make([]byte, 4)
 	if _, err := rand.Read(b); err != nil {
-		// crypto/rand should never fail; fall back to a fixed token so the run
-		// surfaces a create-database conflict rather than a panic here.
-		return "00000000"
+		panic("crypto/rand unavailable: " + err.Error())
 	}
 	return hex.EncodeToString(b)
-}
-
-// clampDatabaseID trims to the 30-char Spanner limit without leaving a trailing
-// hyphen.
-func clampDatabaseID(id string) string {
-	if len(id) > 30 {
-		id = id[:30]
-	}
-	return strings.TrimRight(id, "-")
 }

@@ -311,10 +311,10 @@ to an instance path (`projects/<project>/instances/<instance>`). The suites
 then provision a uniquely named database on that instance before the run and
 drop it afterwards, and the Moon task keeps normal go test parallelism.
 Authentication uses Application Default Credentials — locally run
-`gcloud auth application-default login`; CI tries Workload Identity
-Federation and labels the job step as emulator vs test instance depending on
-whether auth succeeded. Precedence when multiple are set:
-`ZITADEL_TEST_SPANNER_INSTANCE` > `ZITADEL_TEST_SPANNER_URL` > emulator
+`gcloud auth application-default login`. CI authenticates via Workload
+Identity Federation when `SPANNER_TEST_INSTANCE` is set, and labels the job
+step as emulator vs test instance accordingly. Precedence when multiple are
+set: `ZITADEL_TEST_SPANNER_INSTANCE` > `ZITADEL_TEST_SPANNER_URL` > emulator
 container.
 
 ### Demo end-to-end suites

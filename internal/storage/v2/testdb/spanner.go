@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	instance_admin "cloud.google.com/go/spanner/admin/instance/apiv1"
@@ -32,8 +33,8 @@ const (
 // sets SPANNER_EMULATOR_HOST, and returns the database DSN plus a stop func
 // that clears the env var and terminates the container.
 func SpannerDSN(ctx context.Context) (string, func(), error) {
-	if os.Getenv(InstanceEnv) != "" {
-		return Provision(ctx)
+	if strings.TrimSpace(os.Getenv(instanceEnv)) != "" {
+		return provision(ctx)
 	}
 	if url := os.Getenv("ZITADEL_TEST_SPANNER_URL"); url != "" {
 		return url, func() {}, nil
@@ -87,9 +88,6 @@ func SpannerDSN(ctx context.Context) (string, func(), error) {
 }
 
 func createInstanceAndDatabase(ctx context.Context, emulatorHost string) error {
-	// Emulator-only options: it has no auth and speaks plaintext gRPC. A real
-	// test instance uses Application Default Credentials instead (no opts) via
-	// Provision.
 	opts := []option.ClientOption{
 		option.WithEndpoint(emulatorHost),
 		option.WithoutAuthentication(),
@@ -137,7 +135,5 @@ func tryCreateInstanceAndDatabase(ctx context.Context, opts []option.ClientOptio
 		return fmt.Errorf("wait for instance: %w", err)
 	}
 
-	// Create the database on the freshly created instance, reusing the shared
-	// admin helper (same call path the real test instance uses).
-	return CreateDatabase(ctx, testProject, testInstance, testDatabase, opts...)
+	return createDatabase(ctx, testProject, testInstance, testDatabase, opts...)
 }

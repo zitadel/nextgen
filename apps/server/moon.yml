@@ -109,15 +109,20 @@ tasks:
       runInCI: true
 
   test-spanner:
-    # Wrapper adds -parallel 1 -p 1 when ZITADEL_TEST_SPANNER_INSTANCE is unset
-    # (emulator fallback); see scripts/test-spanner.mjs.
-    command: "node scripts/test-spanner.mjs"
+    # Serializes (-parallel 1 -p 1) when ZITADEL_TEST_SPANNER_INSTANCE is unset
+    # so the single-transaction emulator stays reliable.
+    script: |
+      set -euo pipefail
+      extra=()
+      if [ -z "${ZITADEL_TEST_SPANNER_INSTANCE:-}" ]; then
+        extra+=(-parallel 1 -p 1)
+      fi
+      go test -v -tags spanner_integration -timeout 10m "${extra[@]}" ./...
     inputs:
       - "@group(serverInputs)"
-      - "/scripts/test-spanner.mjs"
     options:
       runFromWorkspaceRoot: true
-      # Invoked explicitly by the CI "Run Go integration tests (spanner)" step.
+      # Invoked by the CI Spanner emulator / test-instance steps.
       # runInCI must be true, otherwise moon hides the task from `moon run` in CI
       # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
       # selects the `test` task by name, not `test-spanner`.
