@@ -122,6 +122,10 @@ type FinishRegistrationInput struct {
 	ProjectID      string
 	RegistrationID string
 	Attestation    []byte
+	// PasskeyName labels the credential in passkey management surfaces.
+	// Optional: when empty, a name is derived from the credential itself
+	// ([domain.GeneratePasskeyCredentialName]).
+	PasskeyName string
 }
 
 // Finish verifies the attestation against the stored challenge and persists the new
@@ -137,7 +141,7 @@ func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegist
 		return err
 	}
 
-	newPasskey, err := domain.VerifyPasskeyRegistration(reg.Challenge, in.Attestation)
+	newPasskey, err := domain.VerifyPasskeyRegistration(reg.Challenge, in.Attestation, in.PasskeyName)
 	if err != nil {
 		return domain.ErrAuthAttemptProofRejected(err)
 	}

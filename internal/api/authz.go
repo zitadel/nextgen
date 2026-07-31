@@ -82,8 +82,9 @@ var flowDefinitionAccess = resourceAccess{
 
 var userAccess = resourceAccess{
 	scopes: map[accessOp][]string{
-		opRead:  {"user.read", "user.write"},
-		opWrite: {"user.write"},
+		opRead:   {"user.read", "user.write"},
+		opWrite:  {"user.write"},
+		opDelete: {"user.delete"},
 	},
 	legacyProjectWriteUmbrella: true,
 	readMiss:                   domain.ErrUserNotFound,

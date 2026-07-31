@@ -239,11 +239,11 @@ func (h *Handler) sealState(ctx context.Context, state *domain.FlowState) (strin
 	if err != nil {
 		return "", fmt.Errorf("marshal flow state: %w", err)
 	}
-	dek, err := h.keyService.GetProjectDEKCrypter(ctx, state.ProjectID)
+	cookieCrypter, err := h.keyService.GetProjectCrypter(ctx, state.ProjectID, domain.EncryptionKeyPurposeCookie)
 	if err != nil {
 		return "", err
 	}
-	return dek.Encrypt(string(payload))
+	return cookieCrypter.Encrypt(string(payload))
 }
 
 func flowSetCookie(value string, clear bool) string {

@@ -6,6 +6,9 @@ stack: "backend"
 fileGroups:
   serverInputs:
     - "/**/*.go"
+    # Embedded goose migrations (//go:embed sql/*.sql); without these Moon can
+    # cache-hit test/build after schema-only changes while Go would rebuild.
+    - "/**/*.sql"
     - "/go.mod"
     - "/go.sum"
     - "/api/**/*.yaml"
@@ -106,20 +109,20 @@ tasks:
       runInCI: true
 
   test-spanner:
-    command: "go"
-    args:
-      - "test"
-      - "-v"
-      - "-tags"
-      - "spanner_integration"
-      - "-timeout"
-      - "10m"
-      - "./..."
+    # Serializes (-parallel 1 -p 1) when ZITADEL_TEST_SPANNER_INSTANCE is unset
+    # so the single-transaction emulator stays reliable.
+    script: |
+      set -euo pipefail
+      extra=()
+      if [ -z "${ZITADEL_TEST_SPANNER_INSTANCE:-}" ]; then
+        extra+=(-parallel 1 -p 1)
+      fi
+      go test -v -tags spanner_integration -timeout 10m "${extra[@]}" ./...
     inputs:
       - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
-      # Invoked explicitly by the CI "Run Go integration tests (spanner)" step.
+      # Invoked by the CI Spanner emulator / test-instance steps.
       # runInCI must be true, otherwise moon hides the task from `moon run` in CI
       # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
       # selects the `test` task by name, not `test-spanner`.

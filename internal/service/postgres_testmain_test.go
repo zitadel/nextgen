@@ -12,7 +12,7 @@ import (
 
 	slogctx "github.com/veqryn/slog-context"
 	"github.com/zitadel/nextgen/internal/service"
-	v2dbtest "github.com/zitadel/nextgen/internal/storage/v2/dbtest"
+	"github.com/zitadel/nextgen/internal/storage/v2/dbtest"
 )
 
 func TestMain(m *testing.M) {
@@ -24,22 +24,15 @@ var integrationPool *service.DB
 func runPostgresIntegrationTests(m *testing.M) int {
 	ctx := context.Background()
 
-	pool, stop, err := v2dbtest.Postgres(ctx)
+	pool, stop, err := dbtest.Postgres(ctx)
 	if err != nil {
 		slog.Error("integration: database setup failed", slogctx.Err(err))
 		return 1
 	}
 	defer stop()
-
 	defer pool.Close(ctx)
 
-	v2, ok := pool.(service.Pool)
-	if !ok {
-		slog.Error("integration: pool does not implement v2 service.Pool", "type", pool)
-		return 1
-	}
-	integrationPool = service.NewPool(v2)
-
+	integrationPool = service.NewPool(pool)
 	return m.Run()
 }
 

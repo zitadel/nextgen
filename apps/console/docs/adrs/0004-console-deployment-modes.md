@@ -60,7 +60,7 @@ Facts that constrain the design:
    (`VITE_CONSOLE_PROJECT_ID`, `CONSOLE_PROJECT_SECRET`) holds hand-minted
    values from such a call. (`--user-file` bootstrap inserts a bare project
    *row* to satisfy FKs — `internal/bootstrap/users/ensure.go` — but that is
-   not a provisioned project: no DEK, no schemas, no flows.) #527's
+   not a provisioned project: no keys, no schemas, no flows.) #527's
    platform-project provisioning question remains open **for platform
    mode**; standalone answers it with "don't provision — resolve".
 4. **Permissions are the authoritative gate.** The permission catalogs
@@ -139,7 +139,7 @@ first `zitadel setup` changes the answer without a server restart.
   (`project.read` only; no management operation accepts it). Never a
   project secret, license key, or feature inventory. *Implemented:*
   `publishable_key` is served alongside the project id, derived per request
-  from the default project's DEK, and the login widget sends it as the
+  from the default project's token encryption key, and the login widget sends it as the
   public-plane bearer — most importantly on the handoff exchange, removing
   the dev proxy's secret from the sign-in path.
 - The console fetches it once in the **root route's `beforeLoad`** (it must
