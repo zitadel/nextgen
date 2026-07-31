@@ -474,6 +474,15 @@ func (UnimplementedHandler) ListSessions(ctx context.Context, params ListSession
 	return r, ht.ErrNotImplemented
 }
 
+// ListUserPasskeys implements listUserPasskeys operation.
+//
+// List user passkeys.
+//
+// GET /users/{user_id}/passkeys
+func (UnimplementedHandler) ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (r ListUserPasskeysRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListUsers implements listUsers operation.
 //
 // List users.

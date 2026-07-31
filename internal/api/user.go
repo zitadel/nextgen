@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"strconv"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -70,6 +71,39 @@ func (h *Handler) ListUsers(ctx context.Context, params api.ListUsersParams) (ap
 	if err != nil {
 		return nil, err
 	}
+	return res, nil
+}
+
+func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPasskeysParams) (api.ListUserPasskeysRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opRead); err != nil {
+		return nil, err
+	}
+
+	passkeys, nextPage, err := h.userService.ListPasskeys(ctx, service.ListPasskeysInput{
+		ProjectID: string(params.ProjectID),
+		UserID:    string(params.UserID),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := &api.ListUserPasskeysResponse{
+		Passkeys: make([]api.ListUserPasskeysResponsePasskeysItem, len(passkeys), len(passkeys)),
+	}
+	if nextPage != "" {
+		res.NextPageToken = api.NewOptNilPageToken(api.PageToken(nextPage))
+	}
+
+	for i, key := range passkeys {
+		res.Passkeys[i] = api.ListUserPasskeysResponsePasskeysItem{
+			ID:        strconv.FormatInt(key.ID, 10),
+			Name:      key.Name,
+			CreatedAt: key.CreatedAt,
+		}
+	}
+
 	return res, nil
 }
 
