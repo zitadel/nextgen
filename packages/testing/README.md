@@ -19,19 +19,29 @@ through the registration UI, serialized per suite. This kit fills the middle:
 
 ## Quick start (Playwright)
 
-Boot + bootstrap once per suite (a Playwright `webServer`), seed per test:
+One instance per suite, seeded per test. `withZitadel()` generates the
+`webServer` entries that boot the instance and run your app against it — no
+wrapper scripts:
 
 ```ts
-// scripts/boot-zitadel.mts — webServer entry, stays in the foreground
-import { startLocalZitadel, writeHandshake } from "@zitadel/testing";
+// playwright.config.ts
+import { defineConfig } from "@playwright/test";
+import { nextAppEnv, withZitadel } from "@zitadel/testing/playwright";
 
-const zitadel = await startLocalZitadel({
-  port: 8092,
-  appOrigins: ["http://localhost:3002"], // your app's origin (proxy origin check)
+export default defineConfig({
+  testDir: "./e2e",
+  ...withZitadel({
+    configDir: import.meta.dirname,
+    port: 8092, // fixed, so the readiness URL is known up front
+    appOrigin: "http://localhost:3002", // your app's origin (proxy origin check)
+    app: {
+      command: ["pnpm", "dev"], // your app's dev server
+      cwd: import.meta.dirname,
+      readyPath: "/login",
+      env: nextAppEnv, // or your own AppEnvTemplate
+    },
+  }),
 });
-await writeHandshake(".zitadel-testing/handshake.json", zitadel.handle);
-process.on("SIGTERM", () => void zitadel.stop().finally(() => process.exit()));
-setInterval(() => {}, 60_000);
 ```
 
 ```ts
@@ -49,10 +59,25 @@ test("user signs in with password", async ({ page, seed }) => {
 });
 ```
 
-The fixtures read `ZITADEL_TESTING_HANDSHAKE` (path to the handshake file) to
-connect. See `apps/demo-next-e2e/playwright.real.config.mts` for the complete
-working wiring, including the app-dev-server wrapper that injects
-`zitadel.appEnv` — run it with `moon run demo-next-e2e:e2e-real`.
+`app.env` is an `AppEnvTemplate`: a serializable mapping from your app's env
+var names to `InstanceHandle` fields. `nextAppEnv` covers `@zitadel/sdk-next`
+apps; the console maps the same fields to `VITE_*`/`CONSOLE_*` names instead.
+The fixtures find the instance through `ZITADEL_TESTING_HANDSHAKE`, which
+`withZitadel()` points at its handshake file.
+
+The two in-repo consumers are `apps/demo-next-e2e/playwright.real.config.mts`
+and `apps/console-e2e/playwright.real.config.mts` — run them with
+`moon run demo-next-e2e:e2e-real` / `moon run console-e2e:e2e-real`.
+
+### Composable pieces
+
+`withZitadel()` is sugar over exported building blocks: a supervisor entry
+that calls `startLocalZitadel()` + `writeHandshake()`, and an app-runner entry
+that `waitForHandshake()`s and spawns the dev server with
+`applyAppEnvTemplate(...)` applied. Suites with unusual topologies (or
+non-Playwright runners) compose those functions directly —
+`apps/console/scripts/dev-real.mts` does, seeding a dev environment rather
+than a test suite.
 
 ## API
 
@@ -83,6 +108,11 @@ await z.stop(); // stop server, reap embedded Postgres, remove owned temp dir
 `connectZitadel(handle)` returns the same surface minus lifecycle — this is
 what the Playwright fixtures use, and what a future remote-instance mode would
 build on.
+
+From `@zitadel/testing/playwright`: the `test`/`expect` fixtures (`seed.user()`
+per test, `zitadel` per worker), plus `withZitadel(options)` returning
+`{ webServer }` for the config, and `nextAppEnv`/`applyAppEnvTemplate` for the
+env-template mechanism described above.
 
 ## How it works
 
@@ -155,12 +185,13 @@ on top, in intended order:
 2. **Email/OTP capture.** `zitadel.email.waitForCode(address)` for
    verification flows. Blocked on a server-side story (dev SMTP sink or
    API-exposed codes); password-only flows don't hit this.
-3. **`withZitadel(config)` orchestration.** A Playwright-config adapter that
-   owns the boot supervisor, handshake, app-env injection, and teardown so
-   consumers stop writing webServer wrapper scripts — plus framework-neutral
-   `appEnv` naming with per-SDK adapters (today's names are Next-shaped), and
-   a session-mint seed-op (authenticated session/token for a seeded user) so
-   backend tests can skip the browser and a vitest surface earns its keep.
+3. **Session-mint seed-op.** The `withZitadel(config)` orchestration half of
+   this item has landed (Playwright-config adapter owning the boot
+   supervisor, handshake, app-env injection, and teardown; `AppEnvTemplate`
+   as the framework-neutral env mechanism with `nextAppEnv` as the first
+   preset). Remaining: a session-mint seed-op (authenticated session/token
+   for a seeded user) so backend tests can skip the browser and a vitest
+   surface earns its keep.
 4. **Remote mode: ephemeral project on a persistent instance.** For app
    deployments that cannot reach a local process (preview environments).
    `bootstrapProject({ baseUrl })` + `connectZitadel(handle)` already compose

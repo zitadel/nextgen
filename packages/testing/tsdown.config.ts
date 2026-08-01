@@ -3,6 +3,10 @@ import { defineConfig } from "tsdown";
 const entry = {
   index: "src/index.ts",
   playwright: "src/playwright.ts",
+  // Executables behind the webServer entries that withZitadel() generates;
+  // resolved as dist siblings of the playwright entry, not via exports.
+  supervisor: "src/supervisor.ts",
+  "app-runner": "src/app-runner.ts",
 };
 
 export default defineConfig([
