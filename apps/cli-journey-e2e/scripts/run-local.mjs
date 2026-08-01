@@ -161,7 +161,14 @@ function assertMatrixPortsAreDynamic(frameworksToRun) {
 
 async function createFrameworkContext(framework) {
   const frameworkWorkDir = join(workDir, framework.id);
-  const appPort = await resolveFrameworkPort("JOURNEY_APP_PORT", 3000);
+  // The testkit suite hands the port to Playwright's webServer readiness
+  // check, which refuses a port that already answers — and 3000 is the most
+  // commonly squatted developer port (an IPv6-wildcard listener also slips
+  // past canListen's IPv4 probe). Prefer a fresh ephemeral port there.
+  const appPort = await resolveFrameworkPort(
+    "JOURNEY_APP_PORT",
+    options.suite === "testkit" ? undefined : 3000,
+  );
   const zitadelPort = await resolveFrameworkPort("JOURNEY_ZITADEL_PORT");
   const appUrl = `http://localhost:${appPort}`;
   const appDir = join(frameworkWorkDir, "myapp");
@@ -292,7 +299,7 @@ async function runTestkitJourney(context) {
     log(`[testkit] preparing fresh ${framework.displayName} app`);
     await run("node", ["apps/cli-journey-e2e/scripts/prepare-app.mjs"], {
       env: {
-        ...process.env,
+        ...scrubRepoOverrides(process.env),
         JOURNEY_APP_DIR: context.appDir,
         JOURNEY_APP_URL: context.appUrl,
         JOURNEY_FRAMEWORK: framework.id,
@@ -310,7 +317,7 @@ async function runTestkitJourney(context) {
     log("[testkit] stopping the setup instance");
     await runCapture("npx", cliArgs(context, ["stop"]), {
       cwd: context.appDir,
-      env: npxEnv(context),
+      env: scrubRepoOverrides(npxEnv(context)),
     });
 
     const playwrightVersion = workspacePlaywrightVersion();
@@ -327,7 +334,7 @@ async function runTestkitJourney(context) {
         "@zitadel/testing@alpha",
         `@playwright/test@${playwrightVersion}`,
       ],
-      { cwd: context.appDir, env: npxEnv(context) },
+      { cwd: context.appDir, env: scrubRepoOverrides(npxEnv(context)) },
     );
 
     log("[testkit] copying the checked-in consumer suite into the app");
@@ -337,7 +344,7 @@ async function runTestkitJourney(context) {
     await run("npx", ["playwright", "test", "--config", "playwright.testkit.config.mjs"], {
       cwd: context.appDir,
       env: {
-        ...npxEnv(context),
+        ...scrubRepoOverrides(npxEnv(context)),
         TESTKIT_APP_PORT: String(context.appPort),
         TESTKIT_ZITADEL_PORT: String(context.zitadelPort),
       },
@@ -347,6 +354,23 @@ async function runTestkitJourney(context) {
     await collectTestkitDiagnostics(context);
     throw new Error(`testkit: ${errorMessage(error)}`, { cause: error });
   }
+}
+
+/**
+ * The testkit lane's contract is "the published binary works unconfigured":
+ * a developer's ZITADEL_SERVER_BINARY or NEXTGEN_* exports leaking into the
+ * scaffold or the inner suite would silently turn it back into an in-repo
+ * run, so strip them instead of trusting the environment.
+ */
+function scrubRepoOverrides(env) {
+  const scrubbed = { ...env };
+  delete scrubbed.ZITADEL_SERVER_BINARY;
+  for (const key of Object.keys(scrubbed)) {
+    if (key.startsWith("NEXTGEN_")) {
+      delete scrubbed[key];
+    }
+  }
+  return scrubbed;
 }
 
 /**

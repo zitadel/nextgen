@@ -24,5 +24,6 @@ test("a seeded user signs in with their password", async ({ page, seed }) => {
   const session = (await page.context().cookies()).find(
     (cookie) => cookie.name === "__nextgen_session",
   );
+  expect(session).toBeDefined();
   expect(session?.httpOnly).toBe(true);
 });
