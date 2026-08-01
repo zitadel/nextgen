@@ -1,4 +1,4 @@
-//go:build postgres_integration
+//go:build postgres_integration || spanner_integration
 
 package integration_test
 
@@ -27,9 +27,9 @@ func TestGetMySession_Identity(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
-	dek, err := harness.EnsureKeyService(t).GetProjectDEKCrypter(t.Context(), project.ID)
+	tokenCrypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
 	require.NoError(t, err)
-	projectSecret, err := project.ProjectSecret(dek)
+	projectSecret, err := project.ProjectSecret(tokenCrypter)
 	require.NoError(t, err)
 
 	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)

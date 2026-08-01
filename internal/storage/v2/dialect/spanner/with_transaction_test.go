@@ -38,8 +38,7 @@ func TestWithTransaction_alreadyInTxnRunsDirectly(t *testing.T) {
 	called := false
 	err := withTransaction(t.Context(), existing, func(ctx context.Context, got queryExecutor) error {
 		called = true
-		_, ok := got.(tx)
-		assert.True(t, ok)
+		assert.IsType(t, tx{}, got)
 		return nil
 	})
 	require.NoError(t, err)
