@@ -29,8 +29,11 @@ export function updateJsonPreservingOrder(
 ): string {
   const value = parseJsonObject(source, path);
   mutate(value);
-  const body = JSON.stringify(value, null, detectIndent(source));
-  return source.endsWith("\n") ? `${body}\n` : body;
+  // JSON.stringify emits LF; re-join with the source's own line endings so a
+  // CRLF document stays CRLF instead of getting a whole-file EOL rewrite.
+  const eol = source.includes("\r\n") ? "\r\n" : "\n";
+  const body = JSON.stringify(value, null, detectIndent(source)).split("\n").join(eol);
+  return source.endsWith("\n") ? `${body}${eol}` : body;
 }
 
 /**

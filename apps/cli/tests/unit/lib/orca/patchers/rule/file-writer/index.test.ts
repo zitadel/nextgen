@@ -63,6 +63,30 @@ describe("scaffold - mkdir", () => {
     expect(second.files).toEqual([]);
     expect(second.filesSkipped).toEqual([join(dir, "app")]);
   });
+
+  it("reports a permission repair on an existing directory as an update, not a skip", async () => {
+    await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o755 }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    const healed = await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o700 }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    expect(healed.files).toEqual([{ path: join(dir, "vault"), kind: "dir", action: "update" }]);
+    expect(healed.filesSkipped).toEqual([]);
+    expect((await stat(join(dir, "vault"))).mode & 0o777).toBe(0o700);
+
+    const settled = await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o700 }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    expect(settled.files).toEqual([]);
+    expect(settled.filesSkipped).toEqual([join(dir, "vault")]);
+  });
 });
 
 describe("scaffold - write", () => {

@@ -40,6 +40,17 @@ describe("updateJsonPreservingOrder", () => {
     expect(out.endsWith("}")).toBe(true);
   });
 
+  it("keeps CRLF line endings, including the trailing one", () => {
+    const source = '{\r\n  "name": "demo",\r\n  "version": "1.0.0"\r\n}\r\n';
+    const out = updateJsonPreservingOrder(source, "package.json", (value) => {
+      value.extra = 1;
+    });
+    expect(out).toContain('{\r\n  "name"');
+    expect(out).toContain('"extra": 1\r\n}');
+    expect(out.endsWith("\r\n")).toBe(true);
+    expect(out).not.toMatch(/[^\r]\n/);
+  });
+
   it("appends a key the source did not have at the end", () => {
     const source = '{\n  "version": "1.0.0",\n  "name": "demo"\n}\n';
     const out = updateJsonPreservingOrder(source, "package.json", (value) => {

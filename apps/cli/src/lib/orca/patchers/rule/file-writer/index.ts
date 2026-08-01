@@ -180,17 +180,19 @@ async function ensureDir(
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
-  // A directory that already exists is a skip, not a write — but the mode is
-  // still (re-)applied below so a rerun heals loosened permissions.
-  const existed = await stat(path).then(
-    (info) => info.isDirectory(),
-    () => false,
-  );
+  // An already-existing directory is a skip — unless its permissions drifted
+  // from the requested mode, in which case the chmod below repairs them and
+  // the report says so (an "update" row, not a silent skip).
+  const pre = await stat(path).catch(() => undefined);
+  const existed = pre?.isDirectory() ?? false;
+  const healsMode = existed && mode !== undefined && (pre!.mode & 0o777) !== mode;
   if (dryRun) {
-    if (existed) {
-      result.filesSkipped.push(path);
-    } else {
+    if (!existed) {
       record(result, path, "dir", "create");
+    } else if (healsMode) {
+      record(result, path, "dir", "update");
+    } else {
+      result.filesSkipped.push(path);
     }
     return;
   }
@@ -198,11 +200,13 @@ async function ensureDir(
   if (mode) {
     await chmod(path, mode).catch(() => undefined);
   }
-  if (existed) {
+  if (!existed) {
+    record(result, path, "dir", "create");
+  } else if (healsMode) {
+    record(result, path, "dir", "update");
+  } else {
     result.filesSkipped.push(path);
-    return;
   }
-  record(result, path, "dir", "create");
 }
 
 async function writeText(
