@@ -175,11 +175,10 @@ Customer installs get the published server binary through `@zitadel/server`'s
 platform packages; the in-repo workspace carries no such binary, so the repo's
 own suites run `moon run server:build` and point the kit at the result via
 `ZITADEL_SERVER_BINARY` (the `withZitadel` option `zitadel.serverBinary` /
-`serverBinaryHint` exists for this). That source build also embeds no UIs, so
-the in-repo moon tasks set `NEXTGEN_SERVER_LOGIN_ENABLED=false` /
-`NEXTGEN_SERVER_CONSOLE_ENABLED=false` — the suites drive the app-embedded
-login, not the server-hosted `/ui/*`. Published binaries ship with both UIs
-embedded and need none of this.
+`serverBinaryHint` exists for this). The in-repo moon tasks set
+`NEXTGEN_SERVER_LOGIN_ENABLED=false` / `NEXTGEN_SERVER_CONSOLE_ENABLED=false`
+— the suites drive the app-embedded login, not the server-hosted `/ui/*`.
+Customer installs need none of this.
 
 ## Known limitations
 
