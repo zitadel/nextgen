@@ -19,7 +19,7 @@ import type {
   PatchResult,
   PatchView,
 } from "../types";
-import { reclaimableOps } from "./reclaim";
+import { reclaimableOps, withoutExistingTargets } from "./reclaim";
 
 /**
  * Base for rule-based (deterministic, template-driven) patchers, as opposed to
@@ -41,24 +41,58 @@ export abstract class AbstractRulePatcher implements Patcher {
   /**
    * Re-apply only the reclaimable subset — env files, gitignore, the SDK
    * dependency, and marker-bearing routes — leaving the user-editable
-   * `.zitadel/` resources untouched. Backs `doctor --fix`.
+   * `.zitadel/` resources untouched. Backs `doctor --fix`. With
+   * `opts.missingOnly` the content ops are further narrowed to files that do
+   * not exist (see {@link withoutExistingTargets}) and the writer runs without
+   * `force`, so the repair restores deleted managed files and can never
+   * overwrite an edited or user-adopted one.
    */
   async repair(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
     const plan = this.plan(ctx);
-    return scaffold({ ops: reclaimableOps(plan), summary: plan.summary }, opts);
+    const ops = opts.missingOnly
+      ? await withoutExistingTargets(reclaimableOps(plan), opts.cwd)
+      : reclaimableOps(plan);
+    const execOpts = opts.missingOnly ? { ...opts, force: false } : opts;
+    return scaffold({ ops, summary: plan.summary }, execOpts);
   }
 
   /** Shared base artifacts plus the subclass's marker-bearing route files. */
   artifacts(view: PatchView): EjectActions {
+    const infrastructure = new Set(this.infrastructureFiles(view));
+    const markedFiles = this.routeFiles(view);
     return {
-      markedFiles: this.routeFiles(view),
+      markedFiles,
       rootConfigFiles: ["zitadel.json"],
       directories: [".zitadel"],
       envBackups: [".env.local"],
       dependencies: this.routeDeps(view),
       configEdits: this.routeConfigEdits(view),
       guidanceFiles: ["AGENTS.md", "README.md"],
+      fileClasses: Object.fromEntries(
+        markedFiles.map((path) => [path, infrastructure.has(path) ? "infrastructure" : "presentation"]),
+      ),
+      conditionalFiles: this.conditionallyScaffoldedFiles(view),
     };
+  }
+
+  /**
+   * The subset of {@link routeFiles} that is load-bearing for the integration
+   * (request boundary, provider, type declarations). The `doctor`
+   * managed-files check fails when one is missing; everything else is a
+   * presentation starting point and only warns. Defaults to none.
+   */
+  protected infrastructureFiles(_view: PatchView): ReadonlyArray<string> {
+    return [];
+  }
+
+  /**
+   * Marked files only written on some scaffolds (e.g. a framework home page
+   * that setup replaces only when it created the app skeleton itself). The
+   * managed-files check excludes them when no scaffold manifest recorded what
+   * was actually written. Defaults to none.
+   */
+  protected conditionallyScaffoldedFiles(_view: PatchView): ReadonlyArray<string> {
+    return [];
   }
 
   /**

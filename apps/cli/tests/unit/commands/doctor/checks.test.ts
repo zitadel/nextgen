@@ -10,6 +10,7 @@ import {
   EnvExampleCheck,
   FrameworkCheck,
   GitignoreCheck,
+  ManagedFilesCheck,
   ProjectMatchCheck,
   SchemaCheck,
   SecretCheck,
@@ -19,6 +20,8 @@ import {
 import { loadPatchContext } from "../../../../src/commands/doctor/patch-context";
 import { createOrca } from "../../../../src/lib/orca";
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
+import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
+import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
 
 const tempDirs: string[] = [];
 
@@ -46,6 +49,7 @@ async function makeProject(): Promise<string> {
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
   await mkdir(join(cwd, "app/login"), { recursive: true });
   await mkdir(join(cwd, "app/register"), { recursive: true });
+  await mkdir(join(cwd, "app/profile"), { recursive: true });
 
   await writeFile(
     join(cwd, "package.json"),
@@ -73,8 +77,25 @@ async function makeProject(): Promise<string> {
   await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify(VALID_USER_SCHEMA));
   await writeFile(join(cwd, "app/login/page.tsx"), `${MANAGED_MARKER}\nexport default function L() {}\n`);
   await writeFile(join(cwd, "app/register/page.tsx"), `${MANAGED_MARKER}\nexport default function R() {}\n`);
+  await writeFile(join(cwd, "app/profile/page.tsx"), `${MANAGED_MARKER}\nexport default function P() {}\n`);
   await writeFile(join(cwd, "middleware.ts"), `${MANAGED_MARKER}\nexport function middleware() {}\n`);
+  await writeFile(join(cwd, "custom-elements.d.ts"), `${MANAGED_MARKER}\nexport {};\n`);
   return cwd;
+}
+
+/** Writes `.zitadel/state.json` carrying a scaffold manifest section. */
+async function writeScaffoldState(cwd: string, scaffold: ScaffoldManifest): Promise<void> {
+  await writeFile(
+    join(cwd, ".zitadel/state.json"),
+    JSON.stringify({ framework: "next", resources: {}, scaffold }),
+  );
+}
+
+async function readScaffoldState(cwd: string): Promise<ScaffoldManifest> {
+  const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+    scaffold: ScaffoldManifest;
+  };
+  return state.scaffold;
 }
 
 function ctxFor(cwd: string, dryRun = false): CheckContext {
@@ -279,6 +300,194 @@ describe("DependencyCheck", () => {
   });
 });
 
+describe("ManagedFilesCheck", () => {
+  type ManagedDetails = {
+    mode: "manifest" | "template";
+    files: Array<{ path: string; class: string; state: string }>;
+  };
+
+  it("passes for a healthy scaffold without a manifest (template mode)", async () => {
+    const cwd = await makeProject();
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("pass");
+    const details = outcome.details as ManagedDetails;
+    expect(details.mode).toBe("template");
+    // The framework home page is conditionally scaffolded (fresh apps only)
+    // and must not be demanded of a pre-existing app without a manifest.
+    expect(details.files.map((file) => file.path)).not.toContain("app/page.tsx");
+    expect(details.files).toHaveLength(5);
+  });
+
+  it("fails when an infrastructure file is missing", async () => {
+    const cwd = await makeProject();
+    await rm(join(cwd, "middleware.ts"));
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("middleware.ts");
+  });
+
+  it("warns (not fails) when a presentation page is missing", async () => {
+    const cwd = await makeProject();
+    await rm(join(cwd, "app/login/page.tsx"));
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("app/login/page.tsx");
+  });
+
+  it("passes for a user-adopted page (marker removed)", async () => {
+    const cwd = await makeProject();
+    await writeFile(join(cwd, "app/register/page.tsx"), "export default function Mine() {}\n");
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("pass");
+    const details = outcome.details as ManagedDetails;
+    expect(details.files.find((file) => file.path === "app/register/page.tsx")?.state).toBe(
+      "adopted",
+    );
+  });
+
+  it("warns instead of failing when nothing can be enumerated", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-checks-bare-"));
+    tempDirs.push(cwd);
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("Could not enumerate");
+  });
+
+  it("template-mode fix restores a deleted boundary and leaves an edited page untouched", async () => {
+    const cwd = await makeProject();
+    const editedLogin = `${MANAGED_MARKER}\nexport default function L() { return "custom"; }\n`;
+    await writeFile(join(cwd, "app/login/page.tsx"), editedLogin);
+    await rm(join(cwd, "middleware.ts"));
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
+    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toBe(editedLogin);
+  });
+
+  it("trusts the manifest over current templates", async () => {
+    const cwd = await makeProject();
+    const middleware = await readFile(join(cwd, "middleware.ts"), "utf8");
+    await writeScaffoldState(cwd, {
+      files: { "middleware.ts": { hash: hashScaffoldFile(middleware), class: "infrastructure" } },
+    });
+    // Deleting a file the manifest never recorded must not matter.
+    await rm(join(cwd, "custom-elements.d.ts"));
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("pass");
+    const details = outcome.details as ManagedDetails;
+    expect(details.mode).toBe("manifest");
+    expect(details.files).toHaveLength(1);
+    expect(details.files[0]).toMatchObject({ path: "middleware.ts", state: "pristine" });
+  });
+
+  it("classifies edited files via the recorded hash", async () => {
+    const cwd = await makeProject();
+    await writeScaffoldState(cwd, {
+      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
+    });
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("pass");
+    const details = outcome.details as ManagedDetails;
+    expect(details.files[0]?.state).toBe("edited");
+  });
+
+  it("fails on missing manifest infrastructure; fix restores it and refreshes the hash", async () => {
+    const cwd = await makeProject();
+    await writeScaffoldState(cwd, {
+      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
+    });
+    await rm(join(cwd, "middleware.ts"));
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
+
+    await check.fix(ctxFor(cwd));
+
+    const outcome = await check.run(ctxFor(cwd));
+    expect(outcome.status).toBe("pass");
+    expect((outcome.details as ManagedDetails).files[0]?.state).toBe("pristine");
+    const restored = await readFile(join(cwd, "middleware.ts"), "utf8");
+    expect(restored).toContain(MANAGED_MARKER);
+    expect((await readScaffoldState(cwd)).files["middleware.ts"]?.hash).toBe(
+      hashScaffoldFile(restored),
+    );
+    // Without `scaffolded_framework` in the manifest, repair must not have
+    // invented a framework home page.
+    await expect(readFile(join(cwd, "app/page.tsx"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
+
+  it("fix never touches edited or adopted files", async () => {
+    const cwd = await makeProject();
+    const editedLogin = `${MANAGED_MARKER}\nexport default function L() { return "edited"; }\n`;
+    const adoptedRegister = "export default function Own() {}\n";
+    await writeFile(join(cwd, "app/login/page.tsx"), editedLogin);
+    await writeFile(join(cwd, "app/register/page.tsx"), adoptedRegister);
+    await writeScaffoldState(cwd, {
+      files: {
+        "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" },
+        "app/login/page.tsx": { hash: "1".repeat(64), class: "presentation" },
+        "app/register/page.tsx": { hash: "2".repeat(64), class: "presentation" },
+      },
+    });
+    await rm(join(cwd, "middleware.ts"));
+
+    await new ManagedFilesCheck().fix(ctxFor(cwd));
+
+    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toBe(editedLogin);
+    expect(await readFile(join(cwd, "app/register/page.tsx"), "utf8")).toBe(adoptedRegister);
+    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
+  });
+
+  it("fix previews without writing under dryRun", async () => {
+    const cwd = await makeProject();
+    await writeScaffoldState(cwd, {
+      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
+    });
+    await rm(join(cwd, "middleware.ts"));
+
+    await new ManagedFilesCheck().fix(ctxFor(cwd, true));
+
+    await expect(readFile(join(cwd, "middleware.ts"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    expect((await readScaffoldState(cwd)).files["middleware.ts"]?.hash).toBe("0".repeat(64));
+  });
+
+  it("restores the framework home page when the manifest recorded a fresh scaffold", async () => {
+    const cwd = await makeProject();
+    await writeScaffoldState(cwd, {
+      files: { "app/page.tsx": { hash: "0".repeat(64), class: "presentation" } },
+      scaffolded_framework: true,
+    });
+
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).status).toBe("warn");
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+    expect(await readFile(join(cwd, "app/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
+  });
+});
+
 describe("ProjectMatchCheck", () => {
   it("passes when secret project_id matches config project", async () => {
     const cwd = await makeProject();
@@ -302,5 +511,48 @@ describe("loadPatchContext", () => {
     expect(ctx.project.id).toBe("proj-001");
     expect(ctx.issuer).toBe("http://localhost:3000");
     expect(ctx.cliVersion).toBe("0.1.0-alpha.0");
+    expect(ctx.preset).toBeUndefined();
+    expect(ctx.scaffoldedFramework).toBeUndefined();
+  });
+
+  it("restores preset, use case, and scaffold facts", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({
+        project: "proj-001",
+        server: "https://api.zitadel.cloud",
+        framework: { id: "next" },
+        environments: { development: { issuer: "http://localhost:3000" } },
+        preset: "passkey-first",
+        useCase: "consumer",
+      }),
+    );
+    await writeScaffoldState(cwd, { files: {}, scaffolded_framework: true, dev_port: 3005 });
+
+    const ctx = await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0");
+
+    expect(ctx.preset).toBe("passkey-first");
+    expect(ctx.useCase).toBe("consumer");
+    expect(ctx.scaffoldedFramework).toBe(true);
+    // The config issuer still wins over the manifest port.
+    expect(ctx.issuer).toBe("http://localhost:3000");
+  });
+
+  it("falls back to the manifest dev_port for the issuer", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({
+        project: "proj-001",
+        server: "https://api.zitadel.cloud",
+        framework: { id: "next" },
+      }),
+    );
+    await writeScaffoldState(cwd, { files: {}, dev_port: 3005 });
+
+    const ctx = await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0");
+
+    expect(ctx.issuer).toBe("http://localhost:3005");
   });
 });

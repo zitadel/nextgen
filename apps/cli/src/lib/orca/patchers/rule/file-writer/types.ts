@@ -51,10 +51,17 @@ export type FileOp =
        * the `vite.config.{ts,mts,js,…}` variants) — the executor edits the first
        * one that exists, falling back to the first candidate when none do. The
        * candidate list itself is generic; which paths to try is the patcher's call.
+       *
+       * `overwrites` marks a transform that replaces the file wholesale instead
+       * of merging into it (its output ignores `source`, e.g. the scaffolded
+       * framework home page). A missing-only repair may replay such an edit only
+       * when no candidate exists; merging edits stay replayable because a
+       * transform whose output equals the input is skipped.
        */
       readonly kind: "edit";
       readonly path: string | ReadonlyArray<string>;
       readonly edit: (source: string | undefined) => string;
+      readonly overwrites?: true;
     };
 
 /**

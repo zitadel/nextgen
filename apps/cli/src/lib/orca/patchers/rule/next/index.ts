@@ -52,6 +52,16 @@ export class NextPatcher extends AbstractRulePatcher {
     return nextCodeFilePaths(view.framework, getRenderer(view.rendererId));
   }
 
+  protected override infrastructureFiles(view: PatchView): ReadonlyArray<string> {
+    return nextInfrastructureFilePaths(view.framework, getRenderer(view.rendererId));
+  }
+
+  protected override conditionallyScaffoldedFiles(view: PatchView): ReadonlyArray<string> {
+    // Written only when setup created the app skeleton itself; on a
+    // pre-existing app the homepage stays user-owned (see nextCodeOps).
+    return [join(view.framework.appDir, "page.tsx")];
+  }
+
   protected routeDeps(view: PatchView): ReadonlyArray<string> {
     return [getRenderer(view.rendererId).dependency.name];
   }
@@ -93,6 +103,28 @@ function nextCodeFilePaths(
   return paths;
 }
 
+/**
+ * The subset of {@link nextCodeFilePaths} that is load-bearing for the auth
+ * integration rather than a presentation starting point: the request boundary
+ * (proxy/middleware), the provider file, and the custom-elements declarations.
+ * Shares path construction with {@link nextCodeFilePaths} so the two cannot
+ * drift; the `doctor` managed-files check fails when one of these is missing.
+ */
+function nextInfrastructureFilePaths(
+  framework: PatchView["framework"],
+  renderer: RendererSpec,
+): ReadonlyArray<string> {
+  const appDir = framework.appDir;
+  const paths = [join(appDir, `../${requestBoundaryFile(framework).filename}`)];
+  if (renderer.templates.provider) {
+    paths.push(join(appDir, renderer.templates.provider.filename));
+  }
+  if (renderer.templates.customElementsDts) {
+    paths.push(join(appDir, "../custom-elements.d.ts"));
+  }
+  return paths;
+}
+
 /** The Next route/request-boundary write ops plus the SDK dependency. */
 function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
   const appDir = ctx.framework.appDir;
@@ -106,6 +138,9 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
           kind: "edit",
           path: join(appDir, "page.tsx"),
           edit: () => homePageTemplate(),
+          // Replaces create-next-app's default homepage wholesale; the
+          // missing-only repair path must not replay it over user content.
+          overwrites: true,
         }
       : undefined,
     {

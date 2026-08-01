@@ -1,0 +1,88 @@
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { join, isAbsolute, relative, sep } from "node:path";
+
+import type { EjectActions } from "./orca/patchers/types";
+import { readState, updateScaffold } from "./sync/state";
+import type { ScaffoldManifest } from "./sync/types";
+
+/**
+ * Content hash of one scaffolded file as recorded in the scaffold manifest.
+ * Deliberately hashes the raw text (not a parsed structure): the manifest
+ * answers "are these still the bytes setup wrote?", nothing more. The sync
+ * loop's hashers work on JSON objects and serve a different contract.
+ */
+export function hashScaffoldFile(contents: string): string {
+  return createHash("sha256").update(contents).digest("hex");
+}
+
+/**
+ * Read the scaffold manifest from `.zitadel/state.json`, or `undefined` when
+ * the file, the section, or its `files` record is missing or malformed.
+ * `undefined` sends the doctor managed-files check into its template-derived
+ * fallback mode, so a corrupt manifest degrades rather than breaks.
+ */
+export async function readScaffoldManifest(cwd: string): Promise<ScaffoldManifest | undefined> {
+  try {
+    const state = await readState(cwd);
+    const scaffold = state.scaffold;
+    if (!scaffold || typeof scaffold !== "object") {
+      return undefined;
+    }
+    if (!scaffold.files || typeof scaffold.files !== "object") {
+      return undefined;
+    }
+    return scaffold;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Record which managed app files `zitadel setup` actually wrote (or found
+ * already matching), keyed by project-root-relative posix path with the
+ * content hash and ownership class. Only marked files that the scaffold run
+ * touched are recorded — a conditional file whose op never ran (e.g. the
+ * framework home page on a pre-existing app) is simply absent, which is what
+ * lets `doctor` later distinguish "CLI wrote this and it vanished" from "the
+ * CLI never owned this".
+ */
+export async function writeScaffoldManifest(options: {
+  cwd: string;
+  actions: EjectActions;
+  /** Paths the scaffold reported written or skipped-as-identical. */
+  written: ReadonlyArray<string>;
+  scaffoldedFramework?: boolean;
+  devPort?: number;
+}): Promise<void> {
+  const { cwd, actions, written, scaffoldedFramework, devPort } = options;
+  const touched = new Set(written.map((path) => relativePosix(cwd, path)));
+  const files: ScaffoldManifest["files"] = {};
+  for (const path of actions.markedFiles) {
+    const key = relativePosix(cwd, path);
+    if (!touched.has(key)) {
+      continue;
+    }
+    let contents: string;
+    try {
+      contents = await readFile(join(cwd, key), "utf8");
+    } catch {
+      continue;
+    }
+    files[key] = {
+      hash: hashScaffoldFile(contents),
+      class: actions.fileClasses?.[path] ?? "presentation",
+    };
+  }
+  await updateScaffold(cwd, {
+    files,
+    ...(scaffoldedFramework ? { scaffolded_framework: true } : {}),
+    ...(typeof devPort === "number" ? { dev_port: devPort } : {}),
+  });
+}
+
+/** Normalizes an absolute or relative path to a cwd-relative posix key. */
+function relativePosix(cwd: string, path: string): string {
+  const rel = isAbsolute(path) ? relative(cwd, path) : path;
+  return rel.split(sep).join("/");
+}

@@ -102,9 +102,14 @@ the CLI's help layer, not the envelope.
   per revision (newest first); interactive adds a picker that fetches and
   pretty-prints the selected revision body.
 - `doctor` — verify generated app files and local state once `zitadel.json`
-  exists. The default local runtime is the `@zitadel/server` npm binary;
-  Docker checks apply only when using `--runtime docker` or `--image`.
-  `--fix` re-applies missing managed files.
+  exists. The `managed-files` check compares the scaffolded app files against
+  the manifest setup recorded in `.zitadel/state.json`: a missing
+  infrastructure file (the request boundary, `custom-elements.d.ts`) fails,
+  a missing generated page warns, and files you edited (marker kept) or
+  replaced (marker removed) pass as `edited`/`adopted`. The default local
+  runtime is the `@zitadel/server` npm binary; Docker checks apply only when
+  using `--runtime docker` or `--image`. `--fix` restores missing managed
+  files and never overwrites an existing file.
 - `status` — summarize the local runtime and project state.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.

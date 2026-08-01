@@ -1,5 +1,6 @@
 import type { FrameworkFacts } from "../detectors/types";
 import type { CreateProjectResponse } from "../../api/client";
+import type { ScaffoldFileClass } from "../../sync/types";
 
 /**
  * The minimal, project-independent view a patcher needs to enumerate the files
@@ -48,6 +49,14 @@ export type PatchExecOptions = Readonly<{
   cwd: string;
   dryRun: boolean;
   force: boolean;
+  /**
+   * Restrict the run to artifacts whose target file does not exist yet.
+   * `doctor --fix` sets this so a repair can only ever restore missing
+   * managed files — never overwrite an edited or user-adopted one.
+   * Additive ops (env merges, gitignore entries, dependency additions)
+   * still apply; they are idempotent by construction.
+   */
+  missingOnly?: boolean;
 }>;
 
 /**
@@ -85,6 +94,15 @@ export type PatchResult = Readonly<{
  *   marker-fenced managed guidance section. `eject` strips just the section
  *   (content outside the markers is preserved); the whole file is deleted only
  *   when nothing but the scaffold-created header would remain.
+ * - `fileClasses` — ownership class per marked file for the `doctor`
+ *   managed-files check: `infrastructure` files are load-bearing (missing ⇒
+ *   fail), everything else is `presentation` (missing ⇒ warn). Optional so
+ *   older/simpler patchers stay compile-compatible; absent means every marked
+ *   file is presentation.
+ * - `conditionalFiles` — marked files only written on some scaffolds (e.g. the
+ *   framework home page, written only when setup created the app skeleton).
+ *   The managed-files check excludes them when no scaffold manifest recorded
+ *   what was actually written.
  */
 export type EjectActions = Readonly<{
   markedFiles: ReadonlyArray<string>;
@@ -94,6 +112,8 @@ export type EjectActions = Readonly<{
   dependencies: ReadonlyArray<string>;
   configEdits: ReadonlyArray<string>;
   guidanceFiles: ReadonlyArray<string>;
+  fileClasses?: Readonly<Record<string, ScaffoldFileClass>>;
+  conditionalFiles?: ReadonlyArray<string>;
 }>;
 
 /**
@@ -110,7 +130,11 @@ export interface Patcher {
   canPatch(framework: string): boolean;
   /** Apply the full Zitadel integration to the project. */
   patch(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult>;
-  /** Re-apply just the managed artifacts, reclaiming locally-edited ones. */
+  /**
+   * Re-apply just the managed artifacts. With `opts.missingOnly` (the
+   * `doctor --fix` path) only missing files are restored; existing files —
+   * edited or user-adopted — are never overwritten.
+   */
   repair(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult>;
   /** Describe the files/dirs this integration owns, for marker-aware ejection. */
   artifacts(view: PatchView): EjectActions;
