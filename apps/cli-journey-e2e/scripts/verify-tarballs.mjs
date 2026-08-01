@@ -8,7 +8,7 @@ import { JOURNEY_ONLY_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/rel
 const [tarballsDir, ...flags] = process.argv.slice(2);
 if (!tarballsDir || tarballsDir.startsWith("--")) {
   throw new Error(
-    "usage: node scripts/verify-tarballs.mjs <tarballs-dir> [--allow-journey-extras]",
+    "usage: node apps/cli-journey-e2e/scripts/verify-tarballs.mjs <tarballs-dir> [--allow-journey-extras]",
   );
 }
 const unknownFlags = flags.filter((flag) => flag !== "--allow-journey-extras");

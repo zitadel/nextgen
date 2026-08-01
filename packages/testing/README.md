@@ -21,6 +21,8 @@ through the registration UI, serialized per suite. This kit fills the middle:
 ## Quick start (Playwright)
 
 ```sh
+# once published to npm — today this resolves only inside this repo and the
+# consumer-journey registry (see the status note above)
 npm i -D @zitadel/testing @playwright/test
 ```
 
@@ -225,9 +227,13 @@ on top, in intended order:
    journey registry now carries the kit. Next: a consumer-journey lane that
    installs the kit from that registry against the published binary, proving
    the customer configuration in CI. Remaining after that: entries in the
-   release manifest and the changeset `fixed` train, the Windows decision
-   (deferred until the SQLite local default removes the embedded-Postgres
-   lifecycle), and the semver commitment.
+   release manifest and the changeset `fixed` train, the one-time npm
+   bootstrap for the new package name (first manual `npm publish --access
+   public` with an OTP, then configuring the GitHub Actions trusted
+   publisher on npmjs so CI's OIDC publishing takes over — same dance as
+   every previous package), the Windows decision (deferred until the SQLite
+   local default removes the embedded-Postgres lifecycle), and the semver
+   commitment.
 
 Parked until server support exists: passkey seeding (pre-registered WebAuthn
 credentials). Independent refactor: extract `apps/cli/src/lib/local-server`
