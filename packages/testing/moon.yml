@@ -46,9 +46,9 @@ tasks:
       - "server:build"
     env:
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
-      # server:build compiles only the Go binary; without console:build /
-      # login-ui:build the embedded UIs are absent and the server refuses to
-      # start. These tests drive the API and app-embedded login, not /ui/*.
+      # server:build embeds the console/login UIs via its task deps; keep the
+      # server-hosted surfaces off anyway — these tests drive the API and
+      # app-embedded login, not /ui/*.
       NEXTGEN_SERVER_LOGIN_ENABLED: "false"
       NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
     options:

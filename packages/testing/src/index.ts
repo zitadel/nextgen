@@ -1,5 +1,6 @@
 import { createZitadelClient } from "@zitadel/api/client";
 
+import { applyAppEnvTemplate, nextAppEnv } from "./app-env";
 import { bootstrapProject, type BootstrapProjectOptions } from "./bootstrap";
 import { bootLocalServer, type BootServerOptions } from "./lifecycle";
 import { seedUser } from "./seed";
@@ -18,11 +19,9 @@ export function connectZitadel(handle: InstanceHandle): ConnectedZitadel {
   return {
     handle,
     api,
-    appEnv: {
-      ZITADEL_URL: handle.baseUrl,
-      NEXT_PUBLIC_ZITADEL_PROJECT_ID: handle.projectId,
-      ZITADEL_PROJECT_SECRET: handle.projectSecret,
-    },
+    // The Next-shaped convenience view; other frameworks apply their own
+    // template to `handle` (see AppEnvTemplate).
+    appEnv: applyAppEnvTemplate(nextAppEnv, handle),
     seedUser: (input) =>
       seedUser(api, { projectId: handle.projectId, schemaId: handle.schemaId }, input),
   };
@@ -75,6 +74,8 @@ export async function startLocalZitadel(
   };
 }
 
+export { applyAppEnvTemplate, nextAppEnv } from "./app-env";
+export type { AppEnvTemplate } from "./app-env";
 export { bootstrapProject } from "./bootstrap";
 export type { BootstrapProjectOptions, BootstrappedProject } from "./bootstrap";
 export { readHandshakeSync, waitForHandshake, writeHandshake } from "./handshake";

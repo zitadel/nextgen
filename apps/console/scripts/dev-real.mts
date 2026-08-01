@@ -38,8 +38,9 @@ const workspaceRoot = resolve(appDir, "../..");
 
 const consoleOrigin = process.env.CONSOLE_DEV_ORIGIN ?? "http://localhost:5174";
 const port = Number(process.env.CONSOLE_DEV_ZITADEL_PORT ?? 8094);
+const configuredServerBinary = process.env.ZITADEL_SERVER_BINARY;
 const serverBinary =
-  process.env.ZITADEL_SERVER_BINARY ?? join(workspaceRoot, "dist", "server", "nextgen");
+  configuredServerBinary || join(workspaceRoot, "dist", "server", "nextgen");
 const seedOnly = process.argv.includes("--seed-only");
 
 /**
@@ -70,13 +71,31 @@ const EXTRA_USERS: ReadonlyArray<{ email: string; givenName: string; familyName:
   { email: "barbara.liskov@example.com", givenName: "Barbara", familyName: "Liskov" },
 ];
 
-await access(serverBinary).catch(() => {
-  console.error(
-    `[console-dev-real] server binary not found at ${serverBinary}\n` +
-      `                   run \`moon run server:build\` first.`,
-  );
-  process.exit(1);
-});
+if (configuredServerBinary) {
+  await access(serverBinary).catch(() => {
+    console.error(`[console-dev-real] server binary not found at ${serverBinary}`);
+    process.exit(1);
+  });
+} else {
+  // Build (or cache-hit) the embedded server binary. Spawned here instead of
+  // declared as a task dep: server:build depends on console:build, so a
+  // dev-real -> server:build task dep would cycle the project graph.
+  await new Promise<void>((resolveBuild, rejectBuild) => {
+    const build = spawn("moon", ["run", "server:build"], {
+      cwd: workspaceRoot,
+      stdio: "inherit",
+    });
+    build.on("error", rejectBuild);
+    build.on("close", (code, signal) => {
+      if (code === 0) {
+        resolveBuild();
+        return;
+      }
+      const detail = signal ? `signal ${signal}` : `exit ${code}`;
+      rejectBuild(new Error(`moon run server:build failed with ${detail}`));
+    });
+  });
+}
 
 // Signal handlers close over this before the asynchronous boot assigns it.
 // oxlint-disable-next-line prefer-const

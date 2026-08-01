@@ -35,6 +35,9 @@ func (s *TeamService) CreateTeam(ctx context.Context, input CreateTeamInput) (*d
 
 	if err := s.v2Pool.Statements().CreateTeam(ctx, model); err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			// Also catches a (project_id, id) primary key collision, which is
+			// unreachable with generated IDs. Discriminating on the constraint
+			// name would need Spanner to report one; today it returns "".
 			return nil, domain.ErrTeamAlreadyExists().WithParent(err)
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create team in database")
