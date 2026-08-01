@@ -21,6 +21,13 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at`
 FROM encryption_keys`
 
 	updateEncryptionKeyStmt = `UPDATE encryption_keys SET key = ? WHERE id = ?`
+
+	createSigningKeyStmt = `INSERT INTO signing_keys
+(id, project_id, key, algorithm, state, activated_at, retired_at, purpose, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id, created_at`
+
+	signingKeyQuery = `SELECT id, project_id, key, algorithm, state, created_at, activated_at, retired_at, purpose
+FROM signing_keys`
 )
 
 type cryptoKeyStatements struct{ statement }
@@ -97,6 +104,39 @@ func (s cryptoKeyStatements) UpdateKey(ctx context.Context, id string, key strin
 	return wrapError(err)
 }
 
+// CreateSigningKey implements [service.CryptoKeyStatements].
+func (s cryptoKeyStatements) CreateSigningKey(ctx context.Context, key *domain.SigningKey) error {
+	now := nowUnixNano()
+	var createdNano int64
+	err := s.client.QueryRow(ctx, createSigningKeyStmt,
+		key.ID, key.ProjectID, key.Key, string(key.Algorithm), string(key.State),
+		nullUnixNano(key.ActivatedAt), nullUnixNano(key.RetiredAt), string(key.Purpose), now,
+	).Scan(&key.ID, &createdNano)
+	if err != nil {
+		return wrapError(err)
+	}
+	key.CreatedAt = timeFromUnixNano(createdNano)
+	return nil
+}
+
+// GetSigningKey implements [service.CryptoKeyStatements].
+func (s cryptoKeyStatements) GetSigningKey(ctx context.Context, filter database.Filter[domain.SigningKeyField]) (*domain.SigningKey, error) {
+	var compiler statementCompiler
+	if err := compileRead(&compiler, signingKeyQuery, &database.ListOptions[domain.SigningKeyField]{Filter: filter}, signingKeySchema); err != nil {
+		return nil, err
+	}
+	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	key, err := collectExactlyOneRow(rows, scanSigningKey)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return key, nil
+}
+
 func scanEncryptionKey(rows *sql.Rows) (*domain.EncryptionKey, error) {
 	key := new(domain.EncryptionKey)
 	var (
@@ -113,6 +153,34 @@ func scanEncryptionKey(rows *sql.Rows) (*domain.EncryptionKey, error) {
 	key.Algorithm = jose.ContentEncryption(algorithmStr)
 	key.State = domain.KeyState(stateStr)
 	key.Purpose = domain.EncryptionKeyPurpose(purposeStr)
+	key.CreatedAt = timeFromUnixNano(createdNano)
+	if activatedNano.Valid {
+		t := timeFromUnixNano(activatedNano.Int64)
+		key.ActivatedAt = &t
+	}
+	if retiredNano.Valid {
+		t := timeFromUnixNano(retiredNano.Int64)
+		key.RetiredAt = &t
+	}
+	return key, nil
+}
+
+func scanSigningKey(rows *sql.Rows) (*domain.SigningKey, error) {
+	key := new(domain.SigningKey)
+	var (
+		algorithmStr, stateStr, purposeStr string
+		createdNano                        int64
+		activatedNano, retiredNano         sql.NullInt64
+	)
+	if err := rows.Scan(
+		&key.ID, &key.ProjectID, &key.Key, &algorithmStr, &stateStr,
+		&createdNano, &activatedNano, &retiredNano, &purposeStr,
+	); err != nil {
+		return nil, err
+	}
+	key.Algorithm = jose.SignatureAlgorithm(algorithmStr)
+	key.State = domain.KeyState(stateStr)
+	key.Purpose = domain.SigningKeyPurpose(purposeStr)
 	key.CreatedAt = timeFromUnixNano(createdNano)
 	if activatedNano.Valid {
 		t := timeFromUnixNano(activatedNano.Int64)
@@ -174,6 +242,54 @@ var encryptionKeySchema = database.NewSchema(map[domain.EncryptionKeyField]datab
 	domain.EncryptionKeyFieldPurpose: {
 		SQLName:  "purpose",
 		Accessor: func(k *domain.EncryptionKey) any { return string(k.Purpose) },
+		Coerce:   database.CoerceString,
+	},
+})
+
+var signingKeySchema = database.NewSchema(map[domain.SigningKeyField]database.FieldBinding[domain.SigningKey]{
+	domain.SigningKeyFieldID: {
+		SQLName:  "id",
+		Accessor: func(k *domain.SigningKey) any { return k.ID },
+		Coerce:   database.CoerceString,
+	},
+	domain.SigningKeyFieldProjectID: {
+		SQLName:  "project_id",
+		Accessor: func(k *domain.SigningKey) any { return k.ProjectID },
+		Coerce:   database.CoerceString,
+	},
+	domain.SigningKeyFieldKey: {
+		SQLName:  "key",
+		Accessor: func(k *domain.SigningKey) any { return k.Key },
+		Coerce:   database.CoerceString,
+	},
+	domain.SigningKeyFieldAlgorithm: {
+		SQLName:  "algorithm",
+		Accessor: func(k *domain.SigningKey) any { return string(k.Algorithm) },
+		Coerce:   database.CoerceString,
+	},
+	domain.SigningKeyFieldState: {
+		SQLName:  "state",
+		Accessor: func(k *domain.SigningKey) any { return string(k.State) },
+		Coerce:   database.CoerceString,
+	},
+	domain.SigningKeyFieldCreatedAt: {
+		SQLName:  "created_at",
+		Accessor: func(k *domain.SigningKey) any { return k.CreatedAt },
+		Coerce:   database.CoerceTime,
+	},
+	domain.SigningKeyFieldActivatedAt: {
+		SQLName:  "activated_at",
+		Accessor: func(k *domain.SigningKey) any { return k.ActivatedAt },
+		Coerce:   database.CoerceTime,
+	},
+	domain.SigningKeyFieldRetiredAt: {
+		SQLName:  "retired_at",
+		Accessor: func(k *domain.SigningKey) any { return k.RetiredAt },
+		Coerce:   database.CoerceTime,
+	},
+	domain.SigningKeyFieldPurpose: {
+		SQLName:  "purpose",
+		Accessor: func(k *domain.SigningKey) any { return string(k.Purpose) },
 		Coerce:   database.CoerceString,
 	},
 })

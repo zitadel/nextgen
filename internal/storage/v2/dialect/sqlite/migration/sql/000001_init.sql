@@ -241,17 +241,31 @@ CREATE INDEX idx_checks_session ON checks (project_id, session_id);
 
 -- +goose StatementBegin
 CREATE TABLE encryption_keys (
-    project_id            TEXT    NOT NULL,
-    id                    TEXT    NOT NULL,
-    key                   TEXT    NOT NULL,
-    algorithm             TEXT    NOT NULL,
-    state                 TEXT    NOT NULL,
-    created_at            INTEGER NOT NULL,
-    activated_at          INTEGER,
-    retired_at            INTEGER,
-    purpose               TEXT    NOT NULL,
-    active_dek_project_id TEXT    GENERATED ALWAYS AS (
-        CASE WHEN state = 'active' AND purpose = 'dek' THEN project_id ELSE NULL END
+    project_id                                 TEXT    NOT NULL,
+    id                                         TEXT    NOT NULL,
+    key                                        TEXT    NOT NULL,
+    algorithm                                  TEXT    NOT NULL,
+    state                                      TEXT    NOT NULL,
+    created_at                                 INTEGER NOT NULL,
+    activated_at                               INTEGER,
+    retired_at                                 INTEGER,
+    purpose                                    TEXT    NOT NULL,
+    -- Generated columns hold project_id only while the row is the project's
+    -- active key for that purpose (NULL otherwise). Paired with the partial
+    -- unique indexes below they enforce "at most one active key per
+    -- (project, purpose)" — SQLite's equivalent of Spanner NULL_FILTERED
+    -- unique indexes / postgres partial unique indexes.
+    active_kek_project_id                      TEXT GENERATED ALWAYS AS (
+        CASE WHEN state = 'active' AND purpose = 'kek' THEN project_id ELSE NULL END
+    ) STORED,
+    active_token_encryption_key_project_id     TEXT GENERATED ALWAYS AS (
+        CASE WHEN state = 'active' AND purpose = 'token' THEN project_id ELSE NULL END
+    ) STORED,
+    active_secret_encryption_key_project_id    TEXT GENERATED ALWAYS AS (
+        CASE WHEN state = 'active' AND purpose = 'secret' THEN project_id ELSE NULL END
+    ) STORED,
+    active_cookie_encryption_key_project_id    TEXT GENERATED ALWAYS AS (
+        CASE WHEN state = 'active' AND purpose = 'cookie' THEN project_id ELSE NULL END
     ) STORED,
     PRIMARY KEY (project_id, id),
     CONSTRAINT chk_encryption_keys_id      CHECK (id <> ''),
@@ -265,9 +279,55 @@ CREATE TABLE encryption_keys (
 -- +goose StatementEnd
 
 -- +goose StatementBegin
-CREATE UNIQUE INDEX idx_encryption_keys_active_dek
-    ON encryption_keys (active_dek_project_id)
-    WHERE active_dek_project_id IS NOT NULL;
+CREATE UNIQUE INDEX idx_encryption_keys_active_kek
+    ON encryption_keys (active_kek_project_id)
+    WHERE active_kek_project_id IS NOT NULL;
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE UNIQUE INDEX idx_encryption_keys_active_token_encryption_key
+    ON encryption_keys (active_token_encryption_key_project_id)
+    WHERE active_token_encryption_key_project_id IS NOT NULL;
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE UNIQUE INDEX idx_encryption_keys_active_secret_encryption_key
+    ON encryption_keys (active_secret_encryption_key_project_id)
+    WHERE active_secret_encryption_key_project_id IS NOT NULL;
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE UNIQUE INDEX idx_encryption_keys_active_cookie_encryption_key
+    ON encryption_keys (active_cookie_encryption_key_project_id)
+    WHERE active_cookie_encryption_key_project_id IS NOT NULL;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE TABLE signing_keys (
+    project_id                          TEXT    NOT NULL,
+    id                                  TEXT    NOT NULL,
+    key                                 TEXT    NOT NULL,
+    algorithm                           TEXT    NOT NULL,
+    state                               TEXT    NOT NULL,
+    created_at                          INTEGER NOT NULL,
+    activated_at                        INTEGER,
+    retired_at                          INTEGER,
+    purpose                             TEXT    NOT NULL,
+    active_token_signing_key_project_id TEXT GENERATED ALWAYS AS (
+        CASE WHEN state = 'active' AND purpose = 'token' THEN project_id ELSE NULL END
+    ) STORED,
+    PRIMARY KEY (project_id, id),
+    CONSTRAINT chk_signing_keys_id      CHECK (id <> ''),
+    CONSTRAINT chk_signing_keys_key     CHECK (key <> ''),
+    CONSTRAINT chk_signing_keys_algo    CHECK (algorithm <> ''),
+    CONSTRAINT chk_signing_keys_state   CHECK (state <> ''),
+    CONSTRAINT chk_signing_keys_purpose CHECK (purpose <> ''),
+    CONSTRAINT fk_signing_keys_project
+        FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE UNIQUE INDEX idx_signing_keys_active_token_signing_key
+    ON signing_keys (active_token_signing_key_project_id)
+    WHERE active_token_signing_key_project_id IS NOT NULL;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -437,7 +497,22 @@ DROP INDEX IF EXISTS idx_branding_project_created_at;
 DROP TABLE IF EXISTS branding;
 -- +goose StatementEnd
 -- +goose StatementBegin
-DROP INDEX IF EXISTS idx_encryption_keys_active_dek;
+DROP INDEX IF EXISTS idx_signing_keys_active_token_signing_key;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP TABLE IF EXISTS signing_keys;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_encryption_keys_active_cookie_encryption_key;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_encryption_keys_active_secret_encryption_key;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_encryption_keys_active_token_encryption_key;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_encryption_keys_active_kek;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS encryption_keys;

@@ -42,6 +42,8 @@ WHERE project_id = ? AND user_id = ? AND status <> ?`
 	deleteUserMembershipsStmt = `DELETE FROM team_memberships WHERE project_id = ? AND user_id = ?`
 
 	deleteUserStmt = `DELETE FROM users WHERE project_id = ? AND id = ?`
+
+	userExistsStmt = `SELECT EXISTS (SELECT 1 FROM users WHERE project_id = ? AND id = ?)`
 )
 
 type userStatements struct{ statement }
@@ -227,6 +229,15 @@ func (us userStatements) DeleteUserByID(ctx context.Context, projectID, userID s
 		}
 		return nil
 	})
+}
+
+// UserExists implements [service.UserStatements].
+func (us userStatements) UserExists(ctx context.Context, projectID, userID string) (bool, error) {
+	var exists bool
+	if err := us.client.QueryRow(ctx, userExistsStmt, projectID, userID).Scan(&exists); err != nil {
+		return false, wrapError(err)
+	}
+	return exists, nil
 }
 
 func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User, opts service.UserQueryOptions) error {
