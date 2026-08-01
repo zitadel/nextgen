@@ -51,6 +51,11 @@ generated app. It must not test the checked-in demo apps.
 - Keep each framework suite Playwright-serial and one-worker. Framework suites
   may run in parallel only when each suite gets its own generated app directory,
   npm cache/tmp directories, app port, Zitadel port, and backend runtime state.
+- Reserve runner ports through the block allocator in `scripts/ports.mjs`,
+  never via a listen-on-zero probe: reserved ports are bound minutes later, and
+  ephemeral-range ports get taken as outbound source ports by the parallel
+  suites' npm traffic in the meantime (the why and the block layout are
+  documented in that file).
 - Passkey coverage is required in CI. `JOURNEY_ENABLE_PASSKEY=0` is only a local
   debugging escape hatch.
 - Keep diagnostics focused. Upload logs, setup JSON, lockfiles, Playwright

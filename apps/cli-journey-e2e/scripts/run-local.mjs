@@ -5,9 +5,9 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import net from "node:net";
 
 import { frameworkForId } from "./frameworks.mjs";
+import { canListen, createJourneyPortAllocator } from "./ports.mjs";
 import {
   localRegistryPaths,
   npmEnvironment,
@@ -34,12 +34,17 @@ const workDir = resolve(
 );
 const diagnosticsDir = join(workDir, "diagnostics");
 const registryPaths = localRegistryPaths(workDir);
+// Reserved ports are bound long after reservation (Verdaccio within seconds,
+// the app and Zitadel ports only minutes later), so they come from the fixed
+// non-ephemeral journey block — see ports.mjs for why listen(:0) flaked.
+const usedPorts = new Set();
+const reserveJourneyPort = createJourneyPortAllocator();
 const registryPort = await resolvePort("JOURNEY_REGISTRY_PORT");
+usedPorts.add(registryPort);
 const registryUrl = `http://127.0.0.1:${registryPort}`;
 const cliPackage = await packageName(repoRoot, "apps/cli");
 const childProcesses = new Set();
 const frameworkContexts = [];
-const usedPorts = new Set([registryPort]);
 const prebuiltTarballsDir = options.tarballsDir || process.env.JOURNEY_TARBALLS_DIR || "";
 let registryProcess;
 let registryLogsCollected = false;
@@ -203,10 +208,7 @@ async function resolveFrameworkPort(envName, preferred) {
     return preferred;
   }
 
-  let port = await freePort();
-  while (usedPorts.has(port)) {
-    port = await freePort();
-  }
+  const port = await reserveJourneyPort(usedPorts);
   usedPorts.add(port);
   return port;
 }
@@ -417,15 +419,12 @@ async function runWithConcurrency(items, limit, worker) {
   }
 }
 
-async function resolvePort(envName, fallback) {
+async function resolvePort(envName) {
   const value = process.env[envName];
   if (value) {
     return validatePortValue(value, envName);
   }
-  if (fallback) {
-    return fallback;
-  }
-  return freePort();
+  return reserveJourneyPort(usedPorts);
 }
 
 function validatePortValue(value, name) {
@@ -434,33 +433,6 @@ function validatePortValue(value, name) {
     throw new Error(`${name} must be a TCP port, got ${value}`);
   }
   return port;
-}
-
-function freePort() {
-  return new Promise((resolvePortPromise, reject) => {
-    const server = net.createServer();
-    server.unref();
-    server.on("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        reject(new Error("unable to allocate TCP port"));
-        return;
-      }
-      server.close(() => resolvePortPromise(address.port));
-    });
-  });
-}
-
-function canListen(port) {
-  return new Promise((resolveCanListen) => {
-    const server = net.createServer();
-    server.unref();
-    server.once("error", () => resolveCanListen(false));
-    server.listen(port, "127.0.0.1", () => {
-      server.close(() => resolveCanListen(true));
-    });
-  });
 }
 
 async function ensurePlaywrightBrowsers() {
@@ -627,6 +599,12 @@ async function collectDiagnostics(context) {
   await copyIfExists(
     join(context.appDir, ".zitadel/local/server.log"),
     join(context.diagnosticsDir, "server.log"),
+  );
+  // The postmaster's own startup error lands only here (logging_collector
+  // redirects it away from server.log); without it a failed boot is opaque.
+  await copyIfExists(
+    join(context.appDir, ".zitadel/local/nextgen-data/embedded-postgres/postgres.log"),
+    join(context.diagnosticsDir, "postgres.log"),
   );
   await mkdir(join(context.diagnosticsDir, "generated-app"), { recursive: true });
   await copyIfExists(

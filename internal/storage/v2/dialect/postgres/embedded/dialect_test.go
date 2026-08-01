@@ -37,6 +37,38 @@ func TestGetPortReleasesReservedTCP4Port(t *testing.T) {
 	_ = listener.Close()
 }
 
+// The port must sit below the OS ephemeral floors (Linux 32768, macOS 49152)
+// so outbound loopback connections can never take it between release and the
+// deferred postmaster bind — see the portBlockStart comment.
+func TestGetPortStaysOutsideEphemeralRange(t *testing.T) {
+	// Pin the block itself, not just membership: moving it above the Linux
+	// floor would silently reintroduce the steal race this fix removed.
+	require.GreaterOrEqual(t, portBlockStart, 1024)
+	require.Less(t, portBlockStart+portBlockSize-1, 32768)
+
+	for range 32 {
+		port, releasePort, err := getPort()
+		require.NoError(t, err)
+		require.NoError(t, releasePort())
+		require.GreaterOrEqual(t, int(port), portBlockStart)
+		require.Less(t, int(port), portBlockStart+portBlockSize)
+	}
+}
+
+func TestGetPortSkipsBoundPorts(t *testing.T) {
+	port, releasePort, err := getPortFrom(0)
+	require.NoError(t, err)
+	defer func() { _ = releasePort() }()
+
+	// Scanning from the same offset again must skip the port the first call
+	// still holds and settle on a later candidate.
+	secondPort, releaseSecondPort, err := getPortFrom(0)
+	require.NoError(t, err)
+	defer func() { _ = releaseSecondPort() }()
+
+	require.Greater(t, secondPort, port)
+}
+
 func TestPostgresLogStartParametersUseConfiguredLogPath(t *testing.T) {
 	logPath := filepath.Join(t.TempDir(), "postgres.log")
 
