@@ -70,6 +70,11 @@ export default defineConfig([
     tsconfig: "tsconfig.lib.json",
     dts: true,
     sourcemap: true,
+    // Shipped React JSX declarations (`exports["./jsx"]`). Copied verbatim
+    // into the outDir: the file is a hand-authored ambient
+    // `declare module "react"` block, which the dts bundler must not process
+    // (see src/jsx.d.ts).
+    copy: ["src/jsx.d.ts"],
     // `clean: true` would wipe the .d.ts files tsgo emits during the
     // `typecheck` target, breaking project-reference consumers
     // (sdk-next, demo-next, demo-nuxt) whose tsgo --build expects those

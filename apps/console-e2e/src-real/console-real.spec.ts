@@ -7,14 +7,14 @@ test.describe.configure({ mode: "parallel" });
 
 /**
  * Completes the console's login screen (Console ADR 0003) with a seeded
- * user: the default-login flow's identifier step ("Work email" + "Sign in"),
+ * user: the default-login flow's identifier step ("Email" + "Sign in"),
  * then the password step ("Password" + "Sign in"). The widget exchanges the
  * handoff for the `__nextgen_session` cookie and performs a full-document
  * navigation away from /login.
  */
 async function signIn(page: Page, user: { email: string; password: string }): Promise<void> {
   await page.goto("/login");
-  await page.getByLabel("Work email").fill(user.email);
+  await page.getByLabel("Email").fill(user.email);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.getByLabel("Password").fill(user.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

@@ -2,15 +2,31 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./out-tsc/vitest",
-    "lib": ["ES2022", "dom", "DOM.Iterable"],
-    "types": ["vitest/globals", "vitest/importMeta", "node", "vitest"],
+    "lib": [
+      "ES2022",
+      "dom",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "vitest/globals",
+      "vitest/importMeta",
+      "node",
+      "vitest"
+    ],
     "module": "nodenext",
     "moduleResolution": "nodenext"
   },
-  "include": ["vitest.config.ts", "src/**/*.spec.ts", "src/**/*.d.ts"],
+  "include": [
+    "vitest.config.ts",
+    "src/**/*.spec.ts",
+    "src/**/*.d.ts"
+  ],
   "references": [
     {
       "path": "./tsconfig.lib.json"
     }
+  ],
+  "exclude": [
+    "src/jsx.d.ts"
   ]
 }

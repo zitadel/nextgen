@@ -17,6 +17,6 @@
  * resolve). Call it inside the same `"use client"` boundary before the
  * components mount.
  */
-export { ZitadelLogin, ZitadelLogout, ZitadelSession } from "@zitadel/components";
+export { ZitadelLogin, ZitadelLogout, ZitadelSession, businessLocales } from "@zitadel/components";
 export { configureZitadel, getApi } from "@zitadel/api/config";
 export type { ZitadelConfig, ZitadelProject } from "@zitadel/api/config";
