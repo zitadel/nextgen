@@ -6,8 +6,9 @@ project with the default login flow, and mint password users that can complete
 the real login journey immediately.
 
 > **Status: alpha.** Published to npm on the shared release train — the kit
-> carries the same version as `@zitadel/cli` and the SDKs, and APIs can still
-> move between alphas. macOS/Linux (see [Known limitations](#known-limitations)).
+> carries the same version as `@zitadel/cli` and the SDKs, the train publishes
+> under the `alpha` dist-tag (install with `@alpha`), and APIs can still move
+> between alphas. macOS/Linux (see [Known limitations](#known-limitations)).
 
 ## Why
 
@@ -20,7 +21,7 @@ through the registration UI, serialized per suite. This kit fills the middle:
 ## Quick start (Playwright)
 
 ```sh
-npm i -D @zitadel/testing @playwright/test
+npm i -D @zitadel/testing@alpha @playwright/test
 ```
 
 The kit drives the `zitadel` CLI, which resolves the published
