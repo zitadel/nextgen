@@ -42,6 +42,12 @@ generated app. It must not test the checked-in demo apps.
   `--allow-journey-extras`, which release verification does not pass.
 - Keep the generated app on `localhost` for browser tests. WebAuthn rejects IP
   address relying-party IDs such as `127.0.0.1`.
+- The testkit suite (`--suite testkit`, moon task `e2e-testkit`) is the
+  customer-configuration proof for `@zitadel/testing`: it scaffolds one next
+  app, installs the kit from the journey registry, copies the checked-in
+  consumer suite from `fixtures/testkit/`, and runs it inside the app. It must
+  never set `ZITADEL_SERVER_BINARY` or `NEXTGEN_*` env — proving that the
+  published binary and its embedded UIs work unconfigured is the point.
 - Keep each framework suite Playwright-serial and one-worker. Framework suites
   may run in parallel only when each suite gets its own generated app directory,
   npm cache/tmp directories, app port, Zitadel port, and backend runtime state.

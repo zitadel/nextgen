@@ -1,5 +1,6 @@
 import { createWriteStream } from "node:fs";
 import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -85,14 +86,20 @@ try {
     frameworkContexts.push(await createFrameworkContext(framework));
   }
 
-  await runWithConcurrency(
-    frameworkContexts,
-    Math.min(options.concurrency, frameworkContexts.length),
-    runFrameworkJourney,
-  );
+  if (options.suite === "testkit") {
+    await runTestkitJourney(frameworkContexts[0]);
+    success = true;
+    log("test-kit consumer journey passed");
+  } else {
+    await runWithConcurrency(
+      frameworkContexts,
+      Math.min(options.concurrency, frameworkContexts.length),
+      runFrameworkJourney,
+    );
 
-  success = true;
-  log("customer local setup journey matrix passed");
+    success = true;
+    log("customer local setup journey matrix passed");
+  }
 } catch (error) {
   await collectRegistryLogs();
   console.error("");
@@ -124,6 +131,9 @@ function printUsage() {
 
 Options:
   --framework <id>         Run one framework: next, nuxt, react, vue, or angular
+  --suite <id>             frameworks (default) or testkit: scaffold one next app,
+                           install @zitadel/testing from the journey registry, and
+                           run the checked-in consumer suite inside it
   --concurrency <n>        Number of framework journeys to run in parallel (default: 5)
   --runtime <binary|docker> Local runtime backend (default: binary)
   --image <docker-tag>     Use an existing local runtime image instead of building one
@@ -265,6 +275,100 @@ async function runFrameworkJourney(context) {
     await collectDiagnostics(context);
     throw new Error(`${framework.id}: ${errorMessage(error)}`, { cause: error });
   }
+}
+
+/**
+ * The customer-configuration proof for @zitadel/testing: scaffold a fresh app
+ * exactly like the framework journey, then use the kit the way its README
+ * tells a customer to — install it from the registry, drop in a Playwright
+ * config built on withZitadel(), and run the suite. No ZITADEL_SERVER_BINARY,
+ * no NEXTGEN_* env: the CLI resolves the published binary and its embedded
+ * login UI on its own.
+ */
+async function runTestkitJourney(context) {
+  const { framework } = context;
+  try {
+    await mkdir(context.diagnosticsDir, { recursive: true });
+    log(`[testkit] preparing fresh ${framework.displayName} app`);
+    await run("node", ["apps/cli-journey-e2e/scripts/prepare-app.mjs"], {
+      env: {
+        ...process.env,
+        JOURNEY_APP_DIR: context.appDir,
+        JOURNEY_APP_URL: context.appUrl,
+        JOURNEY_FRAMEWORK: framework.id,
+        JOURNEY_PRESET: options.preset,
+        JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
+        JOURNEY_REGISTRY_URL: registryUrl,
+        JOURNEY_RUNTIME: options.runtime,
+        JOURNEY_WORK_DIR: context.frameworkWorkDir,
+        NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
+      },
+    });
+
+    // Setup booted an instance to scaffold against; the kit suite boots its
+    // own ephemeral one, so stop it and let the suite reuse the port.
+    log("[testkit] stopping the setup instance");
+    await runCapture("npx", cliArgs(context, ["stop"]), {
+      cwd: context.appDir,
+      env: npxEnv(context),
+    });
+
+    const playwrightVersion = workspacePlaywrightVersion();
+    log(
+      `[testkit] installing @zitadel/testing and @playwright/test@${playwrightVersion} from the journey registry`,
+    );
+    await run(
+      "npm",
+      [
+        "install",
+        "--save-dev",
+        "--no-audit",
+        "--no-fund",
+        "@zitadel/testing@alpha",
+        `@playwright/test@${playwrightVersion}`,
+      ],
+      { cwd: context.appDir, env: npxEnv(context) },
+    );
+
+    log("[testkit] copying the checked-in consumer suite into the app");
+    await cp(join(projectRoot, "fixtures", "testkit"), context.appDir, { recursive: true });
+
+    log("[testkit] running the app's @zitadel/testing suite");
+    await run("npx", ["playwright", "test", "--config", "playwright.testkit.config.mjs"], {
+      cwd: context.appDir,
+      env: {
+        ...npxEnv(context),
+        TESTKIT_APP_PORT: String(context.appPort),
+        TESTKIT_ZITADEL_PORT: String(context.zitadelPort),
+      },
+    });
+    log("[testkit] consumer suite passed");
+  } catch (error) {
+    await collectTestkitDiagnostics(context);
+    throw new Error(`testkit: ${errorMessage(error)}`, { cause: error });
+  }
+}
+
+/**
+ * Pin the app-local Playwright to the workspace's exact version so the inner
+ * suite reuses the Chromium that ensurePlaywrightBrowsers already installed
+ * instead of downloading a different revision mid-journey.
+ */
+function workspacePlaywrightVersion() {
+  const require = createRequire(join(projectRoot, "package.json"));
+  return require("@playwright/test/package.json").version;
+}
+
+async function collectTestkitDiagnostics(context) {
+  await collectDiagnostics(context);
+  await copyIfExists(
+    join(context.appDir, "playwright-report"),
+    join(context.diagnosticsDir, "testkit-playwright-report"),
+  );
+  await copyIfExists(
+    join(context.appDir, "test-results"),
+    join(context.diagnosticsDir, "testkit-test-results"),
+  );
 }
 
 async function runWithConcurrency(items, limit, worker) {

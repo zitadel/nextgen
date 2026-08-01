@@ -1,3 +1,4 @@
+/* oxlint-disable playwright/expect-expect -- node:test file asserting via node:assert */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
