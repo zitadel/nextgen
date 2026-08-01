@@ -56,6 +56,15 @@ jobs:
       - name: Put workspace binaries on PATH
         run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
+      # A PR title is attacker-controlled text on a public repo, so it reaches the
+      # script through the environment — never interpolated into the shell body.
+      - name: Check PR title
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/check-pr-title.mjs --title "$PR_TITLE" --base "$BASE_SHA" --summary
+
       - name: Detect CI mode
         id: ci-mode
         run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
