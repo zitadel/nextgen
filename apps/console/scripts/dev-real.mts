@@ -38,8 +38,9 @@ const workspaceRoot = resolve(appDir, "../..");
 
 const consoleOrigin = process.env.CONSOLE_DEV_ORIGIN ?? "http://localhost:5174";
 const port = Number(process.env.CONSOLE_DEV_ZITADEL_PORT ?? 8094);
+const configuredServerBinary = process.env.ZITADEL_SERVER_BINARY;
 const serverBinary =
-  process.env.ZITADEL_SERVER_BINARY ?? join(workspaceRoot, "dist", "server", "nextgen");
+  configuredServerBinary || join(workspaceRoot, "dist", "server", "nextgen");
 const seedOnly = process.argv.includes("--seed-only");
 
 /**
@@ -70,7 +71,7 @@ const EXTRA_USERS: ReadonlyArray<{ email: string; givenName: string; familyName:
   { email: "barbara.liskov@example.com", givenName: "Barbara", familyName: "Liskov" },
 ];
 
-if (process.env.ZITADEL_SERVER_BINARY) {
+if (configuredServerBinary) {
   await access(serverBinary).catch(() => {
     console.error(`[console-dev-real] server binary not found at ${serverBinary}`);
     process.exit(1);
@@ -85,12 +86,13 @@ if (process.env.ZITADEL_SERVER_BINARY) {
       stdio: "inherit",
     });
     build.on("error", rejectBuild);
-    build.on("exit", (code) => {
+    build.on("close", (code, signal) => {
       if (code === 0) {
         resolveBuild();
-      } else {
-        rejectBuild(new Error(`moon run server:build exited with code ${code}`));
+        return;
       }
+      const detail = signal ? `signal ${signal}` : `exit ${code}`;
+      rejectBuild(new Error(`moon run server:build failed with ${detail}`));
     });
   });
 }
