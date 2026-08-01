@@ -1,4 +1,4 @@
-//go:build postgres_integration
+//go:build postgres_integration || spanner_integration
 
 package integration_test
 
@@ -37,8 +37,8 @@ func TestBranding(t *testing.T) {
 		LiquidTemplate: api.NewOptString(templateRev1),
 	}, params)
 	require.NoError(t, err)
-	rev1, ok := createResp.(*api.BrandingRevisionResponse)
-	require.True(t, ok, "create branding: %+v", createResp)
+	require.IsType(t, &api.BrandingRevisionResponse{}, createResp, "create branding: %s", helpers.MustMarshal(t, createResp))
+	rev1 := createResp.(*api.BrandingRevisionResponse)
 	assert.NotEmpty(t, rev1.ID)
 	assert.Equal(t, api.BrandingLayoutSplit, rev1.Branding.Layout.Value)
 	assert.Equal(t, templateRev1, rev1.Branding.LiquidTemplate.Value)
@@ -49,8 +49,8 @@ func TestBranding(t *testing.T) {
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
-		got, ok := getResp.(*api.BrandingRevisionResponse)
-		require.True(t, ok, "get branding: %+v", getResp)
+		require.IsType(t, &api.BrandingRevisionResponse{}, getResp, "get branding: %s", helpers.MustMarshal(t, getResp))
+		got := getResp.(*api.BrandingRevisionResponse)
 		assert.Equal(t, rev1.ID, got.ID)
 		assert.Equal(t, templateRev1, got.Branding.LiquidTemplate.Value)
 	})
@@ -61,8 +61,8 @@ func TestBranding(t *testing.T) {
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
-		errResp, ok := getResp.(*api.ErrorDetails)
-		require.True(t, ok, "get branding: %+v", getResp)
+		require.IsType(t, &api.ErrorDetails{}, getResp, "get branding: %s", helpers.MustMarshal(t, getResp))
+		errResp := getResp.(*api.ErrorDetails)
 		assert.Equal(t, api.ErrorCode("brnd.not_found"), errResp.Code)
 	})
 
@@ -71,8 +71,8 @@ func TestBranding(t *testing.T) {
 			LiquidTemplate: api.NewOptString(`<img src=x onerror="alert(1)">`),
 		}, params)
 		require.NoError(t, err)
-		errResp, ok := resp.(*api.ErrorDetails)
-		require.True(t, ok, "create branding: %+v", resp)
+		require.IsType(t, &api.ErrorDetails{}, resp, "create branding: %s", helpers.MustMarshal(t, resp))
+		errResp := resp.(*api.ErrorDetails)
 		assert.Equal(t, api.ErrorCode("brnd.invalid"), errResp.Code)
 	})
 
@@ -91,8 +91,8 @@ func TestBranding(t *testing.T) {
 			LiquidTemplate: api.NewOptString(templateRev1),
 		}, params)
 		require.NoError(t, err)
-		createErr, ok := createResp.(*api.ErrorDetails)
-		require.True(t, ok, "cross-project create: %+v", createResp)
+		require.IsType(t, &api.ErrorDetails{}, createResp, "cross-project create: %s", helpers.MustMarshal(t, createResp))
+		createErr := createResp.(*api.ErrorDetails)
 		assert.Equal(t, api.ErrorCode("brnd.invalid"), createErr.Code)
 
 		getResp, err := foreign.GetBrandingById(t.Context(), api.GetBrandingByIdParams{
@@ -100,16 +100,16 @@ func TestBranding(t *testing.T) {
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
-		getErr, ok := getResp.(*api.ErrorDetails)
-		require.True(t, ok, "cross-project get: %+v", getResp)
+		require.IsType(t, &api.ErrorDetails{}, getResp, "cross-project get: %s", helpers.MustMarshal(t, getResp))
+		getErr := getResp.(*api.ErrorDetails)
 		assert.Equal(t, api.ErrorCode("brnd.not_found"), getErr.Code)
 
 		listResp, err := foreign.ListBranding(t.Context(), api.ListBrandingParams{
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
-		listErr, ok := listResp.(*api.ErrorDetailsStatusCode)
-		require.True(t, ok, "cross-project list: %+v", listResp)
+		require.IsType(t, &api.ErrorDetailsStatusCode{}, listResp, "cross-project list: %s", helpers.MustMarshal(t, listResp))
+		listErr := listResp.(*api.ErrorDetailsStatusCode)
 		assert.Equal(t, 404, listErr.StatusCode)
 	})
 
@@ -126,8 +126,8 @@ func TestBranding(t *testing.T) {
 			LiquidTemplate: api.NewOptString(templateRev1),
 		}, params)
 		require.NoError(t, err)
-		createErr, ok := createResp.(*api.ErrorDetailsStatusCode)
-		require.True(t, ok, "preview create: %+v", createResp)
+		require.IsType(t, &api.ErrorDetailsStatusCode{}, createResp, "preview create: %s", helpers.MustMarshal(t, createResp))
+		createErr := createResp.(*api.ErrorDetailsStatusCode)
 		assert.Equal(t, 403, createErr.StatusCode)
 		assert.Equal(t, api.ErrorCode("brnd.permission_denied"), createErr.Response.Code)
 
@@ -135,8 +135,8 @@ func TestBranding(t *testing.T) {
 			ProjectID: api.ProjectID(project.ID),
 		})
 		require.NoError(t, err)
-		listErr, ok := listResp.(*api.ErrorDetailsStatusCode)
-		require.True(t, ok, "preview list: %+v", listResp)
+		require.IsType(t, &api.ErrorDetailsStatusCode{}, listResp, "preview list: %s", helpers.MustMarshal(t, listResp))
+		listErr := listResp.(*api.ErrorDetailsStatusCode)
 		assert.Equal(t, 403, listErr.StatusCode)
 	})
 
@@ -145,8 +145,8 @@ func TestBranding(t *testing.T) {
 			LiquidTemplate: api.NewOptString(templateRev1),
 		}, api.CreateBrandingParams{ProjectID: api.ProjectID("proj_does_not_exist")})
 		require.NoError(t, err)
-		errResp, ok := resp.(*api.ErrorDetails)
-		require.True(t, ok, "create branding: %+v", resp)
+		require.IsType(t, &api.ErrorDetails{}, resp, "create branding: %s", helpers.MustMarshal(t, resp))
+		errResp := resp.(*api.ErrorDetails)
 		assert.Equal(t, api.ErrorCode("brnd.invalid"), errResp.Code)
 	})
 
@@ -157,8 +157,8 @@ func TestBranding(t *testing.T) {
 			FontURL: api.NewOptURI(*fontURL),
 		}, params)
 		require.NoError(t, err)
-		errResp, ok := resp.(*api.ErrorDetails)
-		require.True(t, ok, "create branding: %+v", resp)
+		require.IsType(t, &api.ErrorDetails{}, resp, "create branding: %s", helpers.MustMarshal(t, resp))
+		errResp := resp.(*api.ErrorDetails)
 		assert.Equal(t, api.ErrorCode("brnd.invalid"), errResp.Code)
 	})
 
@@ -169,7 +169,7 @@ func TestBranding(t *testing.T) {
 			FlowDefinition: passwordLoginFlowDefinition(schemaURL),
 		})
 		require.NoError(t, err)
-		require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
+		require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
 		flowResp := createBrandingTestFlow(t, client, project.ID)
 		require.Equal(t, api.BrandingLayoutSplit, flowResp.Branding.Value.Layout.Value)
@@ -182,8 +182,8 @@ func TestBranding(t *testing.T) {
 			LiquidTemplate: api.NewOptString(templateRev2),
 		}, params)
 		require.NoError(t, err)
-		rev2, ok := rev2Resp.(*api.BrandingRevisionResponse)
-		require.True(t, ok, "create branding rev2: %+v", rev2Resp)
+		require.IsType(t, &api.BrandingRevisionResponse{}, rev2Resp, "create branding rev2: %s", helpers.MustMarshal(t, rev2Resp))
+		rev2 := rev2Resp.(*api.BrandingRevisionResponse)
 		require.NotEqual(t, rev1.ID, rev2.ID)
 
 		flowResp = createBrandingTestFlow(t, client, project.ID)
@@ -195,8 +195,8 @@ func TestBranding(t *testing.T) {
 				ProjectID: api.ProjectID(project.ID),
 			})
 			require.NoError(t, err)
-			list, ok := listResp.(*api.ListBrandingResponse)
-			require.True(t, ok, "list branding: %+v", listResp)
+			require.IsType(t, &api.ListBrandingResponse{}, listResp, "list branding: %s", helpers.MustMarshal(t, listResp))
+			list := listResp.(*api.ListBrandingResponse)
 			require.Len(t, *list, 2)
 			assert.Equal(t, rev2.ID, (*list)[0].ID)
 			assert.Equal(t, rev1.ID, (*list)[1].ID)
@@ -217,7 +217,7 @@ func TestBranding(t *testing.T) {
 			FlowDefinition: passwordLoginFlowDefinition(schemaURL),
 		})
 		require.NoError(t, err)
-		require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
+		require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
 		flowResp := createBrandingTestFlow(t, bareClient, bare.ID)
 		assert.Equal(t, api.BrandingLayoutCentered, flowResp.Branding.Value.Layout.Value)
@@ -232,7 +232,7 @@ func createBrandingTestFlow(t *testing.T, client *helpers.ApiClient, projectID s
 		Purpose:   api.CreateFlowRequestPurposeLogin,
 	})
 	require.NoError(t, err)
-	withHeaders, ok := resp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "create flow: %+v", resp)
+	require.IsType(t, &api.FlowResponseHeaders{}, resp, "create flow: %s", helpers.MustMarshal(t, resp))
+	withHeaders := resp.(*api.FlowResponseHeaders)
 	return withHeaders.Response
 }

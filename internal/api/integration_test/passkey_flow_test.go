@@ -1,4 +1,4 @@
-//go:build postgres_integration
+//go:build postgres_integration || spanner_integration
 
 package integration_test
 
@@ -159,7 +159,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition failed: %+v", defResp)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition failed: %s", helpers.MustMarshal(t, defResp))
 
 	// --- Start flow -----------------------------------------------------------
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
@@ -167,8 +167,8 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Purpose:   api.CreateFlowRequestPurposeLogin,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "expected FlowResponseHeaders, got %T", createResp)
+	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 
 	flowID := flowHeaders.Response.ID
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
@@ -182,8 +182,8 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Origin: api.NewOptURI(*rpOriginURL),
 	})
 	require.NoError(t, err)
-	issueOK, ok := issueResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK, got %T: %+v", issueResp, issueResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, issueResp, helpers.MustMarshal(t, issueResp))
+	issueOK := issueResp.(*api.SubmitFlowStepOK)
 	zflow = mustExtractZflow(t, issueOK.SetCookie.Value)
 
 	require.True(t, issueOK.Response.Step.Challenge.Set, "expected step.challenge after passkey issue")
@@ -217,8 +217,8 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	verifyOK, ok := verifyResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK on verify, got %T: %+v", verifyResp, verifyResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, verifyResp, helpers.MustMarshal(t, verifyResp))
+	verifyOK := verifyResp.(*api.SubmitFlowStepOK)
 
 	handoffToken, hasToken := verifyOK.Response.HandoffToken.Get()
 	require.True(t, hasToken, "expected handoff token after successful passkey login")

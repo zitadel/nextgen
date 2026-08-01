@@ -55,20 +55,20 @@ type ServerConfig struct {
 	// DataDir is the local runtime root used by zero-config server defaults.
 	// When unset, it defaults to a nextgen-data directory next to the binary.
 	DataDir string `mapstructure:"data_dir"`
-	// EncryptionKeys is a collection of encryption keys used as KEK (key
-	// encryption key) by the application. DEKs (data encryption key) will be
-	// created by the application and encrypted with a KEK.
+	// MasterKeys is a collection of master keys used by the application to wrap
+	// the key encryption key (KEK) of every project. The KEKs themselves are
+	// created by the application and stored encrypted in the database.
 	//
-	// This is a collection to enable encryption key rotation. Multiple keys
-	// can be provided but only one should be marked to be used for encryption.
-	// Once multiple keys are provided, all DEKs will be re-encrypted using the
-	// KEK marked to use for encryption.
+	// This is a collection to enable master key rotation. Multiple keys can be
+	// provided but only one should be marked to be used for encryption. Once
+	// multiple keys are provided, all wrapped KEKs will be re-encrypted using
+	// the master key marked to use for encryption.
 	//
-	// If no encryption keys are provided, a default encryption key is created
-	// in the kek directory. If there are no keys specified in the config but
-	// files exist in the kek directory, the newest file is used for
+	// If no master keys are provided, a default master key is created in the
+	// master key directory. If there are no keys specified in the config but
+	// files exist in the master key directory, the newest file is used for
 	// encryption.
-	EncryptionKeys map[string]*EncryptionKeyConfig `mapstructure:"encryption_keys"`
+	MasterKeys map[string]*MasterKeyConfig `mapstructure:"master_keys"`
 
 	ConsoleEnabled bool   `mapstructure:"console_enabled"`
 	ConsolePath    string `mapstructure:"console_path"`
@@ -81,7 +81,7 @@ type SchemaConfig struct {
 	LRUCacheSize      int    `mapstructure:"lru_cache_size"`
 }
 
-type EncryptionKeyConfig struct {
+type MasterKeyConfig struct {
 	// File is the path to a file which contains the RSA private key in either a
 	// JWK or a PEM file.
 	//
