@@ -1,8 +1,9 @@
 # ADR 042: Scaffolded File Ownership and Drift Detection
 
-## Status
-
-Accepted
+> **Status:** Accepted
+> **Date:** 2026-08-01
+> **Context:** The `zitadel` CLI's scaffolded app files (orca patchers), the `doctor` command's verification contract, and the `scaffold` manifest in `.zitadel/state.json`.
+> **Relates to:** [ADR 004](004-agent-contract-and-agents-md.md)
 
 ## Context
 

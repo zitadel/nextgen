@@ -109,7 +109,9 @@ the CLI's help layer, not the envelope.
   replaced (marker removed) pass as `edited`/`adopted`. The default local
   runtime is the `@zitadel/server` npm binary; Docker checks apply only when
   using `--runtime docker` or `--image`. `--fix` restores missing managed
-  files and never overwrites an existing file.
+  files and never replaces an existing scaffolded app file; additive repairs
+  (missing `.gitignore` entries, `.env.example` keys, the SDK dependency)
+  still append to their targets.
 - `status` — summarize the local runtime and project state.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.
