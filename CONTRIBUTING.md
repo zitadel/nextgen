@@ -18,9 +18,11 @@ If you want to add Zitadel to your own app rather than contribute here, see the
 
 ### Using the devcontainer
 
-The devcontainer at [.devcontainer/](.devcontainer/) pins Go 1.26 and a
-PostgreSQL sidecar. After changing devcontainer configuration, use
-**Dev Containers: Rebuild Container** so features and volume mounts apply.
+The devcontainer at [.devcontainer/](.devcontainer/) pins Go 1.26. With no
+database configured, the server uses SQLite under the server data directory
+(same zero-config default as outside the container). After changing
+devcontainer configuration, use **Dev Containers: Rebuild Container** so
+features and volume mounts apply.
 
 The devcontainer reuses the host Docker daemon (Docker-outside-of-Docker), so
 container-backed workflows such as the
@@ -67,9 +69,10 @@ moon run console:build login-ui:build
 go run . server
 ```
 
-With no database configured, the server starts embedded Postgres and stores its
-data under the server data directory. Use `-c docs/operations/nextgen.example.yaml`
-or `NEXTGEN_DATABASE_POSTGRES` when you want to point at a database you manage.
+With no database configured, the server uses SQLite at
+`<server.data_dir>/zitadel.db`. Override with `-c docs/operations/nextgen.example.yaml`,
+`NEXTGEN_DATABASE_SQLITE`, or `NEXTGEN_DATABASE_POSTGRES` when you want a
+path or DSN you manage.
 
 Open http://localhost:8080/ui/console/ and http://localhost:8080/ui/login/
 
@@ -257,8 +260,9 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 - `moon run server:check-generate` — Go generated-file drift check.
 - Playwright Chromium install for `@zitadel/components`.
 - `moon ci :lint :typecheck :build :test :test-browser`.
-- `moon run server:test`, then `moon run server:test-postgres` (Spanner
-  integration is not run in CI yet; see the note in the workflow).
+- `moon run server:test`, then `moon run server:test-postgres`,
+  `moon run server:test-spanner` (emulator, or a real instance when
+  `SPANNER_TEST_INSTANCE` is set), and `moon run server:test-sqlite`.
 - `moon run release:snapshot -- --skip-container` — a non-publishing release
   snapshot.
 - The fresh-app consumer journey (`cli-journey-e2e:e2e-local`) with the npm
@@ -279,28 +283,35 @@ the Docker-fallback journey do not run in CI; they stay opt-in local checks
 
 ### Go database integration tests
 
-Both the Postgres and Spanner integration tests use
+SQLite integration tests use a local file database and need no Docker:
+
+```sh
+moon run server:test-sqlite
+# or: go test -v -tags sqlite_integration -timeout=5m ./...
+```
+
+Postgres and Spanner integration tests use
 [testcontainers](https://golang.testcontainers.org/) to start their databases
 (a Postgres container and the Cloud Spanner emulator), so a running Docker
 daemon is required — see
 [Using the devcontainer](#using-the-devcontainer) for the
-Docker-outside-of-Docker setup. Run them with the same commands CI's
-`server:test-postgres` task wraps:
+Docker-outside-of-Docker setup:
 
 ```sh
 # Postgres
-go test -v -tags postgres_integration -timeout=10m ./...
+moon run server:test-postgres
+# or: go test -v -tags postgres_integration -timeout=10m ./...
 
 # Spanner (prefer the Moon task — see emulator note below)
 moon run server:test-spanner
 ```
 
-To run the integration tests against a database you manage instead of
+To run the Postgres or Spanner suites against a database you manage instead of
 testcontainers, set `ZITADEL_TEST_POSTGRES_URL` (Postgres DSN) or
-`ZITADEL_TEST_SPANNER_URL` (Spanner DSN); every integration suite honors
-these and connects to your database instead of starting a container, so
-`go test -tags … ./...` needs no Docker. Point it at a throwaway database —
-the suites run migrations that create the `zitadel_nextgen` schema.
+`ZITADEL_TEST_SPANNER_URL` (Spanner DSN); those suites honor the env vars and
+connect instead of starting a container, so `go test -tags … ./...` needs no
+Docker. Point them at a throwaway database — the suites run migrations that
+create the `zitadel_nextgen` schema.
 
 The Spanner emulator only supports one transaction at a time, so concurrent
 integration tests are flaky against it. `moon run server:test-spanner`
