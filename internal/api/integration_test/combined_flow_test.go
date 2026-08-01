@@ -1,4 +1,4 @@
-//go:build postgres_integration
+//go:build postgres_integration || spanner_integration
 
 package integration_test
 
@@ -38,15 +38,15 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 		FlowDefinition: combinedPasswordFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "expected FlowResponseHeaders, got %T", createResp)
+	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	require.Equal(t, "identifier", flowHeaders.Response.Step.Name)
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
@@ -67,8 +67,8 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	flipOK, ok := flipResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK after flip, got %T: %+v", flipResp, flipResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, flipResp, helpers.MustMarshal(t, flipResp))
+	flipOK := flipResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "register-identifier", flipOK.Response.Step.Name, "user_not_found must flip to register-identifier")
 	zflow = mustExtractZflow(t, flipOK.SetCookie.Value)
 
@@ -84,8 +84,8 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	idOK, ok := idResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK after register identifier, got %T: %+v", idResp, idResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, idResp, helpers.MustMarshal(t, idResp))
+	idOK := idResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "register-password", idOK.Response.Step.Name)
 	zflow = mustExtractZflow(t, idOK.SetCookie.Value)
 
@@ -100,8 +100,8 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	pwOK, ok := pwResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK after register password, got %T: %+v", pwResp, pwResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
+	pwOK := pwResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "done", pwOK.Response.Step.Name)
 	require.True(t, pwOK.Response.Step.Complete.Set, "expected terminal step")
 

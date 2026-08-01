@@ -13,8 +13,8 @@ import (
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
 	slogctx "github.com/veqryn/slog-context"
 
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
-	v2postgres "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
 )
 
 // Options controls where embedded Postgres stores its runtime and data.
@@ -37,13 +37,13 @@ func NewDialect(options Options) *Dialect {
 	return &Dialect{options: options}
 }
 
-// Name implements [v2database.Dialect].
+// Name implements [database.Dialect].
 func (d *Dialect) Name() string {
 	return "postgres-embedded"
 }
 
-// Connect implements [v2database.Dialect].
-func (d *Dialect) Connect(ctx context.Context) (v2database.Pool, error) {
+// Connect implements [database.Dialect].
+func (d *Dialect) Connect(ctx context.Context) (database.Pool, error) {
 	pool, stop, err := startEmbeddedOnce(ctx, d.options)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func (d *Dialect) Connect(ctx context.Context) (v2database.Pool, error) {
 
 // poolWithStop closes the v2 postgres pool and then stops the embedded server.
 type poolWithStop struct {
-	*v2postgres.Pool
+	*postgres.Pool
 	stop func()
 }
 
@@ -63,7 +63,7 @@ func (p *poolWithStop) Close(ctx context.Context) error {
 	return err
 }
 
-func startEmbeddedOnce(ctx context.Context, options Options) (pool *v2postgres.Pool, stop func(), err error) {
+func startEmbeddedOnce(ctx context.Context, options Options) (pool *postgres.Pool, stop func(), err error) {
 	options, err = normalizeOptions(options)
 	if err != nil {
 		return nil, nil, err
@@ -110,7 +110,7 @@ func startEmbeddedOnce(ctx context.Context, options Options) (pool *v2postgres.P
 	// Ensure the database can be reached using IPv4 only and without SSL probing
 	// (otherwise the TLS handshake can hang indefinitely on the embedded binary).
 	url := fmt.Sprintf("postgresql://postgres:postgres@127.0.0.1:%d/postgres?sslmode=disable", port)
-	dialect, err := v2postgres.DecodeConfig(url)
+	dialect, err := postgres.DecodeConfig(url)
 	if err != nil {
 		_ = embedded.Stop()
 		if tailer != nil {
@@ -128,7 +128,7 @@ func startEmbeddedOnce(ctx context.Context, options Options) (pool *v2postgres.P
 		cleanupOptions(options)
 		return nil, nil, err
 	}
-	pool, ok := poolAny.(*v2postgres.Pool)
+	pool, ok := poolAny.(*postgres.Pool)
 	if !ok {
 		_ = poolAny.Close(ctx)
 		_ = embedded.Stop()

@@ -1,4 +1,4 @@
-//go:build postgres_integration
+//go:build postgres_integration || spanner_integration
 
 package integration_test
 
@@ -51,15 +51,15 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 		FlowDefinition: passkeyUpsellFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok)
+	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	require.Equal(t, "register", flowHeaders.Response.Step.Name)
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
@@ -80,8 +80,8 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	regOK, ok := regResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK after register, got %T: %+v", regResp, regResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, regResp, helpers.MustMarshal(t, regResp))
+	regOK := regResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "register-password", regOK.Response.Step.Name)
 	zflow = mustExtractZflow(t, regOK.SetCookie.Value)
 
@@ -96,8 +96,8 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	pwOK, ok := pwResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK after register-password, got %T: %+v", pwResp, pwResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
+	pwOK := pwResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "passkey-upsell", pwOK.Response.Step.Name,
 		"after create_user the session must be threaded into the passkey-upsell step")
 	zflow = mustExtractZflow(t, pwOK.SetCookie.Value)
@@ -116,8 +116,8 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 		Origin: api.NewOptURI(*rpOriginURL),
 	})
 	require.NoError(t, err)
-	issueOK, ok := issueResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK on passkey_register issue, got %T: %+v", issueResp, issueResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, issueResp, helpers.MustMarshal(t, issueResp))
+	issueOK := issueResp.(*api.SubmitFlowStepOK)
 	zflow = mustExtractZflow(t, issueOK.SetCookie.Value)
 
 	require.True(t, issueOK.Response.Step.Challenge.Set, "expected challenge on passkey_register issue")
@@ -160,8 +160,8 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	verifyOK, ok := verifyResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK on passkey_register verify, got %T: %+v", verifyResp, verifyResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, verifyResp, helpers.MustMarshal(t, verifyResp))
+	verifyOK := verifyResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "done", verifyOK.Response.Step.Name)
 	require.True(t, verifyOK.Response.Step.Complete.Set, "expected terminal step")
 
@@ -198,8 +198,8 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		Purpose:   api.CreateFlowRequestPurposeRegister,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "expected FlowResponseHeaders, got %T: %+v", createResp, createResp)
+	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
 
@@ -215,8 +215,8 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		}),
 	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
 	require.NoError(t, err)
-	regOK, ok := regResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK after register, got %T: %+v", regResp, regResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, regResp, helpers.MustMarshal(t, regResp))
+	regOK := regResp.(*api.SubmitFlowStepOK)
 	zflow = mustExtractZflow(t, regOK.SetCookie.Value)
 
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
@@ -226,8 +226,8 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		}),
 	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
 	require.NoError(t, err)
-	pwOK, ok := pwResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK after register-password, got %T: %+v", pwResp, pwResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
+	pwOK := pwResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "passkey-upsell", pwOK.Response.Step.Name)
 	zflow = mustExtractZflow(t, pwOK.SetCookie.Value)
 
@@ -235,8 +235,8 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		Action: "skip",
 	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
 	require.NoError(t, err)
-	skipOK, ok := skipResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK on skip, got %T: %+v", skipResp, skipResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, skipResp, helpers.MustMarshal(t, skipResp))
+	skipOK := skipResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "done", skipOK.Response.Step.Name)
 	require.True(t, skipOK.Response.Step.Complete.Set, "expected terminal step")
 }

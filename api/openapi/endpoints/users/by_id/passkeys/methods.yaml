@@ -1,0 +1,60 @@
+get:
+  operationId: listUserPasskeys
+  summary: List user passkeys
+  tags:
+    - Users
+  parameters:
+    - $ref: ../../../../components/parameters/limit.yaml
+    - $ref: ../../../../components/parameters/page-token.yaml
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - name: user_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../../components/schemas/user-id.yaml
+  security:
+    - oauth2:
+        - user.read
+  responses:
+    '200':
+      description: The passkeys of a user are returned
+      content:
+        application/json:
+          schema:
+            $ref: list-user-passkeys-response.yaml
+    '400':
+      description: The provided input was not valid
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '401':
+      description: Client was not authorized or the session is anonymous.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '403':
+      description: Client does not have the permissions to perform this action.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '404':
+      description: No user was found for the provided user ID
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '500':
+      description: Something went wrong on the server. This was not your fault.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
