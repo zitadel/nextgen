@@ -70,13 +70,30 @@ const EXTRA_USERS: ReadonlyArray<{ email: string; givenName: string; familyName:
   { email: "barbara.liskov@example.com", givenName: "Barbara", familyName: "Liskov" },
 ];
 
-await access(serverBinary).catch(() => {
-  console.error(
-    `[console-dev-real] server binary not found at ${serverBinary}\n` +
-      `                   run \`moon run server:build\` first.`,
-  );
-  process.exit(1);
-});
+if (process.env.ZITADEL_SERVER_BINARY) {
+  await access(serverBinary).catch(() => {
+    console.error(`[console-dev-real] server binary not found at ${serverBinary}`);
+    process.exit(1);
+  });
+} else {
+  // Build (or cache-hit) the embedded server binary. Spawned here instead of
+  // declared as a task dep: server:build depends on console:build, so a
+  // dev-real -> server:build task dep would cycle the project graph.
+  await new Promise<void>((resolveBuild, rejectBuild) => {
+    const build = spawn("moon", ["run", "server:build"], {
+      cwd: workspaceRoot,
+      stdio: "inherit",
+    });
+    build.on("error", rejectBuild);
+    build.on("exit", (code) => {
+      if (code === 0) {
+        resolveBuild();
+      } else {
+        rejectBuild(new Error(`moon run server:build exited with code ${code}`));
+      }
+    });
+  });
+}
 
 // Signal handlers close over this before the asynchronous boot assigns it.
 // oxlint-disable-next-line prefer-const
