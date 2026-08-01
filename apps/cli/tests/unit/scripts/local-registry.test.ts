@@ -111,7 +111,7 @@ describe("local registry helper", () => {
     });
 
     expect(logs).toContain(
-      "building release npm tarballs for @zitadel/cli, @zitadel/server, @zitadel/server-linux-x64, @zitadel/server-linux-arm64, @zitadel/server-darwin-x64, @zitadel/server-darwin-arm64, @zitadel/server-win32-x64, @zitadel/api, @zitadel/config, @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt, @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular, @zitadel/sdk-solid, @zitadel/sdk-svelte, @zitadel/sdk-qwik",
+      "building release npm tarballs for @zitadel/cli, @zitadel/server, @zitadel/server-linux-x64, @zitadel/server-linux-arm64, @zitadel/server-darwin-x64, @zitadel/server-darwin-arm64, @zitadel/server-win32-x64, @zitadel/api, @zitadel/config, @zitadel/components, @zitadel/sdk-core, @zitadel/sdk-next, @zitadel/sdk-nuxt, @zitadel/sdk-react, @zitadel/sdk-vue, @zitadel/sdk-angular, @zitadel/sdk-solid, @zitadel/sdk-svelte, @zitadel/sdk-qwik, @zitadel/testing",
     );
     expect(await readFile(paths.npmrcPath, "utf8")).toContain(
       "//127.0.0.1:51234/:_authToken=journey-token",
@@ -128,24 +128,10 @@ describe("local registry helper", () => {
       args: ["run", "release:pack"],
       options: { cwd: repoRoot, env },
     });
-    // Journey-only packages are built and packed on top of the release set.
-    expect(runCalls).toContainEqual({
-      command: "moon",
-      args: ["run", "testing:build"],
-      options: { cwd: repoRoot, env },
-    });
-    expect(runCalls).toContainEqual({
-      command: "corepack",
-      args: ["pnpm", "--dir", "packages/testing", "pack", "--pack-destination", paths.tarballsDir],
-      options: { cwd: repoRoot, env },
-    });
+    // The registry carries exactly the release tarball set, verified strictly.
     expect(runCalls).toContainEqual({
       command: "node",
-      args: [
-        "apps/cli-journey-e2e/scripts/verify-tarballs.mjs",
-        paths.tarballsDir,
-        "--allow-journey-extras",
-      ],
+      args: ["apps/cli-journey-e2e/scripts/verify-tarballs.mjs", paths.tarballsDir],
       options: { cwd: repoRoot, env },
     });
     expect(calls).toContainEqual({ type: "start-registry", port: 51_234 });
@@ -242,26 +228,11 @@ describe("local registry helper", () => {
       args: ["run", "release:pack"],
       options: { cwd: repoRoot, env },
     });
-    // Prebuilt release tarballs never carry journey-only packages (the
-    // release artifact set must stay exactly the public packages), so the
-    // journey still builds and packs those itself before verifying.
+    // Prebuilt release tarballs already carry the full public set (including
+    // @zitadel/testing), so no build runs — verification comes first.
     expect(runCalls[0]).toEqual({
-      command: "moon",
-      args: ["run", "testing:build"],
-      options: { cwd: repoRoot, env },
-    });
-    expect(runCalls[1]).toEqual({
-      command: "corepack",
-      args: ["pnpm", "--dir", "packages/testing", "pack", "--pack-destination", paths.tarballsDir],
-      options: { cwd: repoRoot, env },
-    });
-    expect(runCalls[2]).toEqual({
       command: "node",
-      args: [
-        "apps/cli-journey-e2e/scripts/verify-tarballs.mjs",
-        paths.tarballsDir,
-        "--allow-journey-extras",
-      ],
+      args: ["apps/cli-journey-e2e/scripts/verify-tarballs.mjs", paths.tarballsDir],
       options: { cwd: repoRoot, env },
     });
     expect(await readFile(join(paths.tarballsDir, "zitadel-cli-0.1.0-alpha.5.tgz"), "utf8")).toBe(

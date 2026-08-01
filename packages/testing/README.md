@@ -5,10 +5,9 @@ Test-kit for **seeded ephemeral local Zitadel instances**: boot the real server
 project with the default login flow, and mint password users that can complete
 the real login journey immediately.
 
-> **Status: pre-release.** Not yet published to npm. The package is consumed
-> in-repo and published to the consumer-journey's temporary registry so a
-> fresh app can install it the way a customer would; publishing to npm is a
-> separate, deliberate step (see [Roadmap](#roadmap)).
+> **Status: alpha.** Published to npm on the shared release train — the kit
+> carries the same version as `@zitadel/cli` and the SDKs, and APIs can still
+> move between alphas. macOS/Linux (see [Known limitations](#known-limitations)).
 
 ## Why
 
@@ -21,8 +20,6 @@ through the registration UI, serialized per suite. This kit fills the middle:
 ## Quick start (Playwright)
 
 ```sh
-# once published to npm — today this resolves only inside this repo and the
-# consumer-journey registry (see the status note above)
 npm i -D @zitadel/testing @playwright/test
 ```
 
@@ -246,18 +243,12 @@ on top, in intended order:
    cookies + issuer + handoff verification through `sandbox.domain()`,
    registering the preview URL as an allowed origin post-deploy
    (`PATCH /projects`), and cleanup that survives failed runs.
-6. **Publishing.** Progress: the API survived a second in-repo consumer, the
-   `@playwright/test` peer-dep story is settled (optional peer), and the
-   journey registry now carries the kit. Next: a consumer-journey lane that
-   installs the kit from that registry against the published binary, proving
-   the customer configuration in CI. Remaining after that: entries in the
-   release manifest and the changeset `fixed` train, the one-time npm
-   bootstrap for the new package name (first manual `npm publish --access
-   public` with an OTP, then configuring the GitHub Actions trusted
-   publisher on npmjs so CI's OIDC publishing takes over — same dance as
-   every previous package), the Windows decision (deferred until the SQLite
-   local default removes the embedded-Postgres lifecycle), and the semver
-   commitment.
+6. **Publishing.** Landed: the consumer journey installs the kit the way a
+   customer would in CI, and the kit ships on the release train (release
+   manifest + changeset `fixed` group), versioned in lockstep with
+   `@zitadel/cli`. Remaining: the Windows decision (deferred until the SQLite
+   local default removes the embedded-Postgres lifecycle) and the stability
+   commitment when the train leaves alpha.
 
 Parked until server support exists: passkey seeding (pre-registered WebAuthn
 credentials). Independent refactor: extract `apps/cli/src/lib/local-server`
