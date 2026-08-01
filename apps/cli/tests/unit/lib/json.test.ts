@@ -33,7 +33,9 @@ describe("updateJsonPreservingOrder", () => {
   });
 
   it("does not invent a trailing newline", () => {
-    const out = updateJsonPreservingOrder('{\n  "name": "demo"\n}', "package.json", () => {});
+    const out = updateJsonPreservingOrder('{\n  "name": "demo"\n}', "package.json", (value) => {
+      value.extra = 1;
+    });
     expect(out.endsWith("\n")).toBe(false);
     expect(out.endsWith("}")).toBe(true);
   });
