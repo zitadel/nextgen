@@ -39,13 +39,14 @@ export interface WithZitadelOptions {
   appOrigin: string;
   /** Boot/bootstrap options forwarded to the instance supervisor. */
   zitadel?: {
+    /** Absolute path to the server binary. */
     serverBinary?: string;
     /** Appended to the missing-binary error, e.g. "run `moon run server:build` first." */
     serverBinaryHint?: string;
     projectName?: string;
     preset?: SupervisorConfig["preset"];
     useCase?: SupervisorConfig["useCase"];
-    /** State directory; defaults to a fresh temp dir removed on stop. */
+    /** Absolute state directory; defaults to a fresh temp dir removed on stop. */
     dir?: string;
     /** Keep the owned temp dir after stop (debugging). */
     keep?: boolean;
@@ -71,7 +72,7 @@ export interface WithZitadelOptions {
     /** How long SIGTERM gets before the app is killed on teardown. */
     gracefulShutdownMs?: number;
   };
-  /** Defaults to `<configDir>/.zitadel-testing/handshake.json`. */
+  /** Absolute path; defaults to `<configDir>/.zitadel-testing/handshake.json`. */
   handshakePath?: string;
 }
 
@@ -125,6 +126,17 @@ export function withZitadel(
   }
   if (!isAbsolute(app.cwd)) {
     throw new Error(`withZitadel: app.cwd must be absolute, got "${app.cwd}"`);
+  }
+  // Path options are consumed by the executables, whose cwd is configDir —
+  // a relative path would silently resolve against that, not the project.
+  for (const [label, value] of [
+    ["zitadel.serverBinary", options.zitadel?.serverBinary],
+    ["zitadel.dir", options.zitadel?.dir],
+    ["handshakePath", options.handshakePath],
+  ] as const) {
+    if (value !== undefined && !isAbsolute(value)) {
+      throw new Error(`withZitadel: ${label} must be an absolute path, got "${value}"`);
+    }
   }
 
   const handshakePath =

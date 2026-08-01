@@ -121,6 +121,26 @@ describe("withZitadel", () => {
     const relCwd = options();
     relCwd.app.cwd = "apps/my-app";
     expect(() => withZitadel(relCwd, fakeResolve)).toThrow(/cwd must be absolute/);
+
+    // The executables resolve paths against configDir, so relative path
+    // options would point somewhere the consumer did not intend.
+    const relBinary = options();
+    relBinary.zitadel = { ...relBinary.zitadel, serverBinary: "dist/server/nextgen" };
+    expect(() => withZitadel(relBinary, fakeResolve)).toThrow(
+      /zitadel\.serverBinary must be an absolute path/,
+    );
+
+    const relStateDir = options();
+    relStateDir.zitadel = { ...relStateDir.zitadel, dir: ".zitadel-state" };
+    expect(() => withZitadel(relStateDir, fakeResolve)).toThrow(
+      /zitadel\.dir must be an absolute path/,
+    );
+
+    const relHandshake = options();
+    relHandshake.handshakePath = "handshake.json";
+    expect(() => withZitadel(relHandshake, fakeResolve)).toThrow(
+      /handshakePath must be an absolute path/,
+    );
   });
 
   it("demands the built package when resolving executables for real", () => {
