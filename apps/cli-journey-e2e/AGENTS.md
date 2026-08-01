@@ -27,19 +27,11 @@ generated app. It must not test the checked-in demo apps.
   `setup --framework <next|nuxt|react|vue|angular|solid|svelte|qwik> --server local`
   from the fresh app directory with `--non-interactive --json`.
 - Docker fallback coverage must opt in with `--runtime docker --image <tag>`.
-- Pack and upload only the public packages:
-  `@zitadel/cli`, `@zitadel/server`, the `@zitadel/server-*` platform
-  packages, `@zitadel/api`, `@zitadel/config`, `@zitadel/components`, `@zitadel/sdk-core`,
-  `@zitadel/sdk-next`, `@zitadel/sdk-nuxt`, `@zitadel/sdk-react`,
-  `@zitadel/sdk-vue`, `@zitadel/sdk-angular`, `@zitadel/sdk-solid`,
-  `@zitadel/sdk-svelte`, and `@zitadel/sdk-qwik`. Private support packages must
-  stay out of the artifact set.
-- `JOURNEY_ONLY_PACKAGES` (`scripts/release-manifest.mjs`, currently
-  `@zitadel/testing`) are the deliberate exception: the journey packs and
-  publishes them into its temporary Verdaccio registry so a fresh app can
-  install them like a customer, but they must never enter the release
-  artifact set — `verify-tarballs.mjs` accepts them only behind
-  `--allow-journey-extras`, which release verification does not pass.
+- Pack and upload only the public packages — `PUBLIC_RELEASE_PACKAGES` in
+  `scripts/release-manifest.mjs` is the authoritative list, and
+  `verify-tarballs.mjs` enforces that both the journey registry and release
+  artifact dirs carry exactly that set. Private support packages must stay out
+  of the artifact set.
 - Keep the generated app on `localhost` for browser tests. WebAuthn rejects IP
   address relying-party IDs such as `127.0.0.1`.
 - The testkit suite (`--suite testkit`, moon task `e2e-testkit`) is the

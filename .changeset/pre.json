@@ -36,7 +36,8 @@
     "@zitadel/docs": "0.0.1",
     "@zitadel/storybook": "0.0.0",
     "@zitadel/mock-zitadel": "0.0.0",
-    "@zitadel/config": "0.1.0-alpha.10"
+    "@zitadel/config": "0.1.0-alpha.10",
+    "@zitadel/testing": "0.0.0"
   },
   "changesets": [
     "add-get-patch-project-endpoints",
