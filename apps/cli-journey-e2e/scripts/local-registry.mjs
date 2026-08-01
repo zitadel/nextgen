@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { cp, mkdir, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+import { JOURNEY_ONLY_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 
 export const packageDirs = [...PUBLIC_PACKAGE_DIRS];
 
@@ -36,6 +36,7 @@ export async function prepareLocalRegistry(input) {
 
   await buildPackages(input.repoRoot, input.run, env, log, input.prebuiltTarballsDir);
   await packPackages(input.repoRoot, paths.tarballsDir, input.run, env, log, input.prebuiltTarballsDir);
+  await packJourneyOnlyPackages(input.repoRoot, paths.tarballsDir, input.run, env, log);
   await verifyTarballs(input.repoRoot, paths.tarballsDir, input.run, env);
   const startRegistry = input.startLocalRegistry ?? startLocalRegistry;
   const registry = await startRegistry({
@@ -82,10 +83,31 @@ export async function packPackages(repoRoot, tarballsDir, _run, _env, log = () =
   }
 }
 
+/**
+ * Journey-only packages never enter the release tarball set
+ * (dist/release/<version>/npm stays exactly PUBLIC_RELEASE_PACKAGES), so the
+ * journey builds and packs them itself — also when running from prebuilt
+ * release tarballs.
+ */
+export async function packJourneyOnlyPackages(repoRoot, tarballsDir, run, env, log = () => undefined) {
+  for (const pkg of JOURNEY_ONLY_PACKAGES) {
+    log(`packing journey-only package ${pkg.name}`);
+    if (pkg.buildTarget) {
+      await run("moon", ["run", pkg.buildTarget], { cwd: repoRoot, env });
+    }
+    await run(
+      "corepack",
+      ["pnpm", "--dir", pkg.dir, "pack", "--pack-destination", tarballsDir],
+      { cwd: repoRoot, env },
+    );
+  }
+}
+
 export async function verifyTarballs(repoRoot, tarballsDir, run, env) {
   await run("node", [
     "apps/cli-journey-e2e/scripts/verify-tarballs.mjs",
     tarballsDir,
+    "--allow-journey-extras",
   ], { cwd: repoRoot, env });
 }
 

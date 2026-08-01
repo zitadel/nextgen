@@ -5,9 +5,10 @@ Test-kit for **seeded ephemeral local Zitadel instances**: boot the real server
 project with the default login flow, and mint password users that can complete
 the real login journey immediately.
 
-> **Status: POC.** Private, in-repo only. The public API validates the
-> "auth in code" L2 shape; publishing to npm is a separate, deliberate step
-> (see [Future work](#future-work)).
+> **Status: pre-release.** Not yet published to npm. The package is consumed
+> in-repo and published to the consumer-journey's temporary registry so a
+> fresh app can install it the way a customer would; publishing to npm is a
+> separate, deliberate step (see [Roadmap](#roadmap)).
 
 ## Why
 
@@ -18,6 +19,13 @@ through the registration UI, serialized per suite. This kit fills the middle:
 **real server, programmatic seeding, parallel-safe per-test users.**
 
 ## Quick start (Playwright)
+
+```sh
+npm i -D @zitadel/testing @playwright/test
+```
+
+The kit drives the `zitadel` CLI, which resolves the published
+`@zitadel/server` platform binary on its own — no binary paths, no env vars.
 
 One instance per suite, seeded per test. `withZitadel()` generates the
 `webServer` entries that boot the instance and run your app against it — no
@@ -159,18 +167,27 @@ mutate project-wide state; revisit with warm-dir reuse if that need appears.
 - A crashed run can orphan a server: `zitadel stop --all` sweeps every
   CLI-managed runtime on the machine.
 
-## Known limitations (POC)
+## Developing in this repo
+
+Customer installs get the published server binary through `@zitadel/server`'s
+platform packages; the in-repo workspace carries no such binary, so the repo's
+own suites run `moon run server:build` and point the kit at the result via
+`ZITADEL_SERVER_BINARY` (the `withZitadel` option `zitadel.serverBinary` /
+`serverBinaryHint` exists for this). That source build also embeds no UIs, so
+the in-repo moon tasks set `NEXTGEN_SERVER_LOGIN_ENABLED=false` /
+`NEXTGEN_SERVER_CONSOLE_ENABLED=false` — the suites drive the app-embedded
+login, not the server-hosted `/ui/*`. Published binaries ship with both UIs
+embedded and need none of this.
+
+## Known limitations
 
 - `@zitadel/api`'s client stores auth in module-global state; avoid
   interleaving calls to *different* instances within one process. Separate
   processes (Playwright workers) are unaffected.
-- Requires the in-repo server binary (`moon run server:build`) via
-  `ZITADEL_SERVER_BINARY`; the npm platform packages carry no binary in-repo.
-  That build also embeds no UIs, so the in-repo moon tasks set
-  `NEXTGEN_SERVER_LOGIN_ENABLED=false` / `NEXTGEN_SERVER_CONSOLE_ENABLED=false`
-  — the suites drive the app-embedded login, not the server-hosted `/ui/*`.
-  Published binaries ship with both UIs embedded.
-- macOS/Linux only (the CLI's port preflight uses `lsof`).
+- macOS/Linux only for now. Not because of the port preflight (it degrades
+  gracefully where `lsof` is missing) — the untested surface on Windows is the
+  process-group stop and embedded-Postgres lifecycle. Revisit once the local
+  runtime's SQLite default removes the Postgres component.
 
 ## Roadmap
 
@@ -203,10 +220,14 @@ on top, in intended order:
    cookies + issuer + handoff verification through `sandbox.domain()`,
    registering the preview URL as an allowed origin post-deploy
    (`PATCH /projects`), and cleanup that survives failed runs.
-6. **Publishing.** Peer-dep story for `@zitadel/cli` and `@playwright/test`,
-   entries in the release manifest and the changeset `fixed` train, Windows
-   support (the CLI port preflight shells `lsof`), and the semver commitment
-   — after the API has survived a second in-repo consumer.
+6. **Publishing.** Progress: the API survived a second in-repo consumer, the
+   `@playwright/test` peer-dep story is settled (optional peer), and the
+   journey registry now carries the kit. Next: a consumer-journey lane that
+   installs the kit from that registry against the published binary, proving
+   the customer configuration in CI. Remaining after that: entries in the
+   release manifest and the changeset `fixed` train, the Windows decision
+   (deferred until the SQLite local default removes the embedded-Postgres
+   lifecycle), and the semver commitment.
 
 Parked until server support exists: passkey seeding (pre-registered WebAuthn
 credentials). Independent refactor: extract `apps/cli/src/lib/local-server`

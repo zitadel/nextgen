@@ -121,6 +121,20 @@ export const PUBLIC_RELEASE_PACKAGES = [
   },
 ];
 
+// Published only to the consumer journey's temporary Verdaccio registry so a
+// fresh app can install them the way a customer would. Deliberately NOT part
+// of PUBLIC_RELEASE_PACKAGES: never packed into release artifacts, never
+// promoted, and never published to npm (each entry must also stay in the
+// changesets ignore list, which skips both version and publish).
+export const JOURNEY_ONLY_PACKAGES = [
+  {
+    name: "@zitadel/testing",
+    dir: "packages/testing",
+    moonProject: "testing",
+    buildTarget: "testing:build",
+  },
+];
+
 export const PUBLIC_PACKAGE_DIRS = PUBLIC_RELEASE_PACKAGES.map((pkg) => pkg.dir);
 export const PUBLIC_PACKAGE_NAMES = PUBLIC_RELEASE_PACKAGES.map((pkg) => pkg.name);
 export const PUBLIC_PACKAGE_BUILD_TARGETS = PUBLIC_RELEASE_PACKAGES
