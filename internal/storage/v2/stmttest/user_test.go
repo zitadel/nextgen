@@ -272,6 +272,35 @@ func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
 	})
 }
 
+func TestUserStatements_UserExists(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+
+		user := newTestUser(t, projectID, schemaURL, "user_exists_1", "exists@example.com", "Exists")
+		require.NoError(t, d.stmts.CreateUser(t.Context(), user))
+
+		t.Run("existing user", func(t *testing.T) {
+			exists, err := d.stmts.UserExists(t.Context(), projectID, user.ID)
+			require.NoError(t, err)
+			assert.True(t, exists)
+		})
+
+		t.Run("unknown user is false, not an error", func(t *testing.T) {
+			exists, err := d.stmts.UserExists(t.Context(), projectID, "user_exists_missing")
+			require.NoError(t, err)
+			assert.False(t, exists)
+		})
+
+		t.Run("user of another project is false", func(t *testing.T) {
+			otherProjectID, _ := ensureUserTestProject(t, d.stmts)
+
+			exists, err := d.stmts.UserExists(t.Context(), otherProjectID, user.ID)
+			require.NoError(t, err)
+			assert.False(t, exists)
+		})
+	})
+}
+
 func newTestUserWithRole(t *testing.T, projectID, schemaURL, userID, email, name, role string) *domain.CreateUser {
 	t.Helper()
 

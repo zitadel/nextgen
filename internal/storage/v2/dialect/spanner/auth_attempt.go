@@ -23,13 +23,18 @@ const (
 		` c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload` +
 		` FROM auth_attempts aa` +
 		` LEFT JOIN checks c ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id`
-	createAuthAttemptStmt       = `INSERT INTO auth_attempts (project_id, required_checks, time_to_live, session_id, created_at) VALUES (@p1, @p2, @p3, @p4, @p5) THEN RETURN id`
-	createAuthCheckStmt         = `INSERT INTO checks (project_id, auth_attempt_id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 0) THEN RETURN id`
-	deleteAuthAttemptByIDStmt   = `DELETE FROM auth_attempts WHERE project_id = @p1 AND id = @p2`
-	handoffAuthAttemptStmt      = `UPDATE auth_attempts SET handoff_token = @p1, handed_off_at = @p2 WHERE project_id = @p3 AND id = @p4`
-	setAuthAttemptChallengeStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload, failure_count, last_failed_at)` +
-		` VALUES (@p1, @p2, @p3, @p4, @p5, 0, NULL) ON CONFLICT (project_id, auth_attempt_id, type)` +
-		` DO UPDATE SET last_challenged_at = EXCLUDED.last_challenged_at, challenge_payload = EXCLUDED.challenge_payload, failure_count = 0, last_failed_at = NULL` +
+	createAuthAttemptStmt     = `INSERT INTO auth_attempts (project_id, required_checks, time_to_live, session_id, created_at) VALUES (@p1, @p2, @p3, @p4, @p5) THEN RETURN id`
+	createAuthCheckStmt       = `INSERT INTO checks (project_id, auth_attempt_id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 0) THEN RETURN id`
+	deleteAuthAttemptByIDStmt = `DELETE FROM auth_attempts WHERE project_id = @p1 AND id = @p2`
+	handoffAuthAttemptStmt    = `UPDATE auth_attempts SET handoff_token = @p1, handed_off_at = @p2 WHERE project_id = @p3 AND id = @p4`
+	// Spanner rejects a NULL_FILTERED unique index as ON CONFLICT arbiter
+	// ("Unimplemented"), so the challenge upsert is update-then-insert inside
+	// withTransaction instead of INSERT ... ON CONFLICT.
+	updateAuthAttemptChallengeStmt = `UPDATE checks SET last_challenged_at = @p4, challenge_payload = @p5, failure_count = 0, last_failed_at = NULL` +
+		` WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3` +
+		` THEN RETURN id`
+	insertAuthAttemptChallengeStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload, failure_count, last_failed_at)` +
+		` VALUES (@p1, @p2, @p3, @p4, @p5, 0, NULL)` +
 		` THEN RETURN id`
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = @p1, factor_payload = @p2, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
 		` WHERE project_id = @p3 AND auth_attempt_id = @p4 AND type = @p5 AND id = @p6`
@@ -39,6 +44,16 @@ const (
 )
 
 type authAttemptStatements struct{ statement }
+
+// encodeSpannerJSONPtr binds an optional pre-marshalled JSON payload as
+// spanner.NullJSON (nil means SQL NULL); plain strings cannot be bound to
+// Spanner JSON columns.
+func encodeSpannerJSONPtr(s *string) any {
+	if s == nil {
+		return spanner.NullJSON{}
+	}
+	return encodeSpannerJSON([]byte(*s))
+}
 
 func newAuthAttemptStatements(db queryExecutor) authAttemptStatements {
 	return authAttemptStatements{
@@ -86,6 +101,11 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 		attempt.ID = attemptID.String()
 		attempt.CreatedAt = now
 
+		attemptIDNum, err := parseIdentity(attempt.ID)
+		if err != nil {
+			return err
+		}
+
 		for _, check := range attempt.Checks {
 			challenge, isChallenge := check.(domain.AuthChallenge)
 			factor, isFactor := check.(domain.AuthFactor)
@@ -113,8 +133,8 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 			}
 
 			checkStmt := buildStatement(createAuthCheckStmt,
-				attempt.ProjectID, database.Identity(attempt.ID), int64(check.Type()),
-				challengedAt, verifiedAt, challengePayload, factorPayload).statement()
+				attempt.ProjectID, attemptIDNum, int64(check.Type()),
+				challengedAt, verifiedAt, encodeSpannerJSONPtr(challengePayload), encodeSpannerJSONPtr(factorPayload)).statement()
 			var checkID database.Identity
 			err = tx.Write(ctx, checkStmt, func(iter *spanner.RowIterator) error {
 				_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
@@ -295,14 +315,27 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 		return err
 	}
 
-	stmt := buildStatement(setAuthAttemptChallengeStmt,
-		projectID, id, int64(challenge.Type()), now, payloadStr).statement()
 	var checkID database.Identity
-	err = as.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+	scanCheckID := func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			return struct{}{}, row.Columns(&checkID)
 		})
 		return err
+	}
+	err = withTransaction(ctx, as.db, func(ctx context.Context, tx queryExecutor) error {
+		update := buildStatement(updateAuthAttemptChallengeStmt,
+			projectID, id, int64(challenge.Type()), now, encodeSpannerJSONPtr(payloadStr)).statement()
+		err := tx.Write(ctx, update, scanCheckID)
+		if err == nil {
+			return nil
+		}
+		var noRow *database.NoRowFoundError
+		if !errors.As(err, &noRow) {
+			return err
+		}
+		insert := buildStatement(insertAuthAttemptChallengeStmt,
+			projectID, id, int64(challenge.Type()), now, encodeSpannerJSONPtr(payloadStr)).statement()
+		return tx.Write(ctx, insert, scanCheckID)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to set challenge: %w", err)
@@ -331,7 +364,7 @@ func (as authAttemptStatements) AuthAttemptChallengeSucceeded(ctx context.Contex
 	}
 
 	stmt := buildStatement(authAttemptChallengeSucceededStmt,
-		now, factorStr, projectID, attemptID, int64(factor.Type()), checkID).statement()
+		now, encodeSpannerJSONPtr(factorStr), projectID, attemptID, int64(factor.Type()), checkID).statement()
 	n, err := as.db.Update(ctx, stmt)
 	if err != nil {
 		return fmt.Errorf("failed to set challenge succeeded: %w", err)

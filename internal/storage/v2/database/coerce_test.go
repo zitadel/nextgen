@@ -94,8 +94,8 @@ func TestCoerceSliceAsAnyJSON(t *testing.T) {
 
 	got, err := coerce(raw)
 	require.NoError(t, err)
-	steps, ok := got.([]domain.FlowDefinitionStep)
-	require.True(t, ok)
+	require.IsType(t, []domain.FlowDefinitionStep{}, got)
+	steps := got.([]domain.FlowDefinitionStep)
 	require.Len(t, steps, 1)
 	assert.Equal(t, "login", steps[0].Name)
 }
