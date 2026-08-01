@@ -39,4 +39,8 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
 });
 
 export { expect } from "@playwright/test";
-export type { ConnectedZitadel, SeededUser, SeedUserInput } from "./types";
+export { applyAppEnvTemplate, nextAppEnv } from "./app-env";
+export type { AppEnvTemplate } from "./app-env";
+export { withZitadel } from "./playwright-config";
+export type { WithZitadelOptions } from "./playwright-config";
+export type { ConnectedZitadel, InstanceHandle, SeededUser, SeedUserInput } from "./types";
