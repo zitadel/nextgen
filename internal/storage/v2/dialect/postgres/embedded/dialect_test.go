@@ -41,6 +41,11 @@ func TestGetPortReleasesReservedTCP4Port(t *testing.T) {
 // so outbound loopback connections can never take it between release and the
 // deferred postmaster bind — see the portBlockStart comment.
 func TestGetPortStaysOutsideEphemeralRange(t *testing.T) {
+	// Pin the block itself, not just membership: moving it above the Linux
+	// floor would silently reintroduce the steal race this fix removed.
+	require.GreaterOrEqual(t, portBlockStart, 1024)
+	require.Less(t, portBlockStart+portBlockSize-1, 32768)
+
 	for range 32 {
 		port, releasePort, err := getPort()
 		require.NoError(t, err)
