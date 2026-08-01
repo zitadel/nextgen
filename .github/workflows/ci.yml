@@ -140,6 +140,18 @@ jobs:
             --work-dir "${RUNNER_TEMP}/ci-journey-passkey-first" \
             --tarballs-dir "dist/release/${version}/npm"
 
+      # Customer-configuration proof for @zitadel/testing: a fresh app
+      # installs the kit from the journey registry and runs its withZitadel()
+      # suite against the published binary — embedded UIs, no repo env
+      # overrides (unlike the in-repo e2e-real lanes below).
+      - name: Run test-kit consumer journey
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: |
+          version="$(node -p "require('./apps/server/package.json').version")"
+          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-testkit -- \
+            --work-dir "${RUNNER_TEMP}/ci-journey-testkit" \
+            --tarballs-dir "dist/release/${version}/npm"
+
       # Gates the test-kit's central promise: boot a real seeded instance,
       # then drive the real browser login with per-test users. Reuses the Go
       # build cache and Playwright Chromium installed above.
@@ -184,6 +196,7 @@ jobs:
           path: |
             ${{ runner.temp }}/ci-journey/diagnostics
             ${{ runner.temp }}/ci-journey-passkey-first/diagnostics
+            ${{ runner.temp }}/ci-journey-testkit/diagnostics
           if-no-files-found: ignore
           retention-days: 7
 
