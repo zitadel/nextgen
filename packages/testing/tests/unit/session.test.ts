@@ -174,6 +174,21 @@ describe("seedSession", () => {
     );
   });
 
+  it("explains a missing Origin when the allowlist rejects the call", async () => {
+    server.use(
+      http.post(`${BASE}/flow`, () =>
+        HttpResponse.json(
+          { code: "req.invalid", message: 'origin "x" is not allowed for this project' },
+          { status: 400 },
+        ),
+      ),
+    );
+    const zitadel = connectZitadel({ ...handle, appOrigin: undefined });
+    await expect(zitadel.seedSession()).rejects.toThrow(
+      /No Origin header was sent.*appOrigins/s,
+    );
+  });
+
   it("caps the number of flow steps instead of looping", async () => {
     server.use(
       http.post(`${BASE}/flow/:id/submit`, () => HttpResponse.json(identifierStep)),

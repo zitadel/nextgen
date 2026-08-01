@@ -120,7 +120,15 @@ async function flowFetch(
   if (!response.ok || !parsed) {
     const detail =
       parsed && typeof parsed === "object" ? ` — ${JSON.stringify(parsed)}` : "";
-    throw new Error(`seed.session: POST ${path} returned ${response.status}${detail}`);
+    // An origin-allowlist rejection without an Origin header is a
+    // configuration gap, not a flow problem — say how to close it. (No eager
+    // check: a project with an empty allowlist may accept originless calls.)
+    const hint =
+      !origin && /origin/i.test(detail)
+        ? "\nNo Origin header was sent: pass `origin` to seedSession() (the Playwright " +
+          "fixtures pass the suite's baseURL) or `appOrigins` to startLocalZitadel()."
+        : "";
+    throw new Error(`seed.session: POST ${path} returned ${response.status}${detail}${hint}`);
   }
   return parsed;
 }
