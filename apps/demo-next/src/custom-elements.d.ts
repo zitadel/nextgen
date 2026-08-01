@@ -11,6 +11,7 @@ declare module "react" {
         "post-sign-in-url"?: string;
         purpose?: string;
         "flow-name"?: string;
+        theme?: "" | "light" | "dark" | "auto";
         lang?: string;
         locales?: Record<string, Locale>;
       };
