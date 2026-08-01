@@ -128,9 +128,24 @@ describe("local registry helper", () => {
       args: ["run", "release:pack"],
       options: { cwd: repoRoot, env },
     });
+    // Journey-only packages are built and packed on top of the release set.
+    expect(runCalls).toContainEqual({
+      command: "moon",
+      args: ["run", "testing:build"],
+      options: { cwd: repoRoot, env },
+    });
+    expect(runCalls).toContainEqual({
+      command: "corepack",
+      args: ["pnpm", "--dir", "packages/testing", "pack", "--pack-destination", paths.tarballsDir],
+      options: { cwd: repoRoot, env },
+    });
     expect(runCalls).toContainEqual({
       command: "node",
-      args: ["apps/cli-journey-e2e/scripts/verify-tarballs.mjs", paths.tarballsDir],
+      args: [
+        "apps/cli-journey-e2e/scripts/verify-tarballs.mjs",
+        paths.tarballsDir,
+        "--allow-journey-extras",
+      ],
       options: { cwd: repoRoot, env },
     });
     expect(calls).toContainEqual({ type: "start-registry", port: 51_234 });
@@ -227,9 +242,26 @@ describe("local registry helper", () => {
       args: ["run", "release:pack"],
       options: { cwd: repoRoot, env },
     });
+    // Prebuilt release tarballs never carry journey-only packages (the
+    // release artifact set must stay exactly the public packages), so the
+    // journey still builds and packs those itself before verifying.
     expect(runCalls[0]).toEqual({
+      command: "moon",
+      args: ["run", "testing:build"],
+      options: { cwd: repoRoot, env },
+    });
+    expect(runCalls[1]).toEqual({
+      command: "corepack",
+      args: ["pnpm", "--dir", "packages/testing", "pack", "--pack-destination", paths.tarballsDir],
+      options: { cwd: repoRoot, env },
+    });
+    expect(runCalls[2]).toEqual({
       command: "node",
-      args: ["apps/cli-journey-e2e/scripts/verify-tarballs.mjs", paths.tarballsDir],
+      args: [
+        "apps/cli-journey-e2e/scripts/verify-tarballs.mjs",
+        paths.tarballsDir,
+        "--allow-journey-extras",
+      ],
       options: { cwd: repoRoot, env },
     });
     expect(await readFile(join(paths.tarballsDir, "zitadel-cli-0.1.0-alpha.5.tgz"), "utf8")).toBe(

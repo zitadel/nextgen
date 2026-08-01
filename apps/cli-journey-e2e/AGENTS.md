@@ -34,6 +34,12 @@ generated app. It must not test the checked-in demo apps.
   `@zitadel/sdk-vue`, `@zitadel/sdk-angular`, `@zitadel/sdk-solid`,
   `@zitadel/sdk-svelte`, and `@zitadel/sdk-qwik`. Private support packages must
   stay out of the artifact set.
+- `JOURNEY_ONLY_PACKAGES` (`scripts/release-manifest.mjs`, currently
+  `@zitadel/testing`) are the deliberate exception: the journey packs and
+  publishes them into its temporary Verdaccio registry so a fresh app can
+  install them like a customer, but they must never enter the release
+  artifact set — `verify-tarballs.mjs` accepts them only behind
+  `--allow-journey-extras`, which release verification does not pass.
 - Keep the generated app on `localhost` for browser tests. WebAuthn rejects IP
   address relying-party IDs such as `127.0.0.1`.
 - Keep each framework suite Playwright-serial and one-worker. Framework suites
