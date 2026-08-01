@@ -1,5 +1,5 @@
 import { ZitadelError } from "../../../../errors";
-import { isObject, parseJsonObject, stableStringify } from "../../../../json";
+import { isObject, parseJsonObject, updateJsonPreservingOrder } from "../../../../json";
 import { npmDistTagForCliVersion } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
@@ -30,8 +30,11 @@ function ensureDevScript(source: string | undefined): string {
   if (scripts?.dev !== undefined) {
     return source;
   }
-  pkg.scripts = { ...(scripts ?? {}), dev: "ng serve" };
-  return `${stableStringify(pkg)}\n`;
+  // package.json is user-owned: add the script without reordering the user's
+  // keys or reformatting the document.
+  return updateJsonPreservingOrder(source, "package.json", (value) => {
+    value.scripts = { ...(scripts ?? {}), dev: "ng serve" };
+  });
 }
 
 /**

@@ -1,6 +1,55 @@
 import { describe, expect, it } from "vitest";
 
-import { parseJsonObject, stableStringify } from "../../../src/lib/json";
+import { parseJsonObject, stableStringify, updateJsonPreservingOrder } from "../../../src/lib/json";
+
+describe("updateJsonPreservingOrder", () => {
+  it("preserves key order while applying the mutation", () => {
+    const source = '{\n  "name": "demo",\n  "version": "1.0.0",\n  "scripts": {}\n}\n';
+    const out = updateJsonPreservingOrder(source, "package.json", (value) => {
+      value.scripts = { dev: "ng serve" };
+    });
+    expect(Object.keys(JSON.parse(out) as Record<string, unknown>)).toEqual([
+      "name",
+      "version",
+      "scripts",
+    ]);
+    expect(out.endsWith("\n")).toBe(true);
+  });
+
+  it("keeps tab indentation", () => {
+    const source = '{\n\t"name": "demo",\n\t"private": true\n}\n';
+    const out = updateJsonPreservingOrder(source, "package.json", (value) => {
+      value.extra = 1;
+    });
+    expect(out).toContain('\n\t"name"');
+    expect(out).toContain('\n\t"extra"');
+  });
+
+  it("keeps a compact document compact", () => {
+    const out = updateJsonPreservingOrder('{"name":"demo"}', "package.json", (value) => {
+      value.extra = 1;
+    });
+    expect(out).toBe('{"name":"demo","extra":1}');
+  });
+
+  it("does not invent a trailing newline", () => {
+    const out = updateJsonPreservingOrder('{\n  "name": "demo"\n}', "package.json", () => {});
+    expect(out.endsWith("\n")).toBe(false);
+    expect(out.endsWith("}")).toBe(true);
+  });
+
+  it("appends a key the source did not have at the end", () => {
+    const source = '{\n  "version": "1.0.0",\n  "name": "demo"\n}\n';
+    const out = updateJsonPreservingOrder(source, "package.json", (value) => {
+      value.dependencies = { a: "1" };
+    });
+    expect(Object.keys(JSON.parse(out) as Record<string, unknown>)).toEqual([
+      "version",
+      "name",
+      "dependencies",
+    ]);
+  });
+});
 
 describe("stableStringify", () => {
   it("produces 2-space indented JSON with sorted keys", () => {

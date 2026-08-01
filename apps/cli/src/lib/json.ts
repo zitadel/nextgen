@@ -14,6 +14,39 @@ export function stableStringify(value: unknown): string {
 }
 
 /**
+ * Apply a mutation to a JSON document while preserving the source's key
+ * order, indentation style, and trailing newline. The counterpart of
+ * {@link stableStringify} for files the CLI does *not* own (the user's
+ * `package.json`): determinism there is the user's formatting, not sorted
+ * keys — reformatting a file we merely merge into turns a one-line change
+ * into a whole-file diff. `JSON.parse` preserves string-key insertion order
+ * per spec, and mutating an existing key keeps its position.
+ */
+export function updateJsonPreservingOrder(
+  source: string,
+  path: string,
+  mutate: (value: Record<string, unknown>) => void,
+): string {
+  const value = parseJsonObject(source, path);
+  mutate(value);
+  const body = JSON.stringify(value, null, detectIndent(source));
+  return source.endsWith("\n") ? `${body}\n` : body;
+}
+
+/**
+ * Infers the indentation unit of a JSON document: the whitespace prefix of
+ * its first indented line, a compact document stays compact, and anything
+ * unrecognizable falls back to two spaces.
+ */
+function detectIndent(source: string): string | number {
+  const match = source.match(/\n([ \t]+)\S/);
+  if (match?.[1]) {
+    return match[1];
+  }
+  return source.trimEnd().includes("\n") ? 2 : 0;
+}
+
+/**
  * Parse `contents` as JSON and assert the root is a plain object (not an
  * array or scalar). The CLI's config and secret files are always objects, so
  * this guards callers from the `JSON.parse` return type of `any` and produces
