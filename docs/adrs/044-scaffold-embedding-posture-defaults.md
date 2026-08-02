@@ -29,8 +29,17 @@ in the scaffold manifest, ADR 042):
 
 ## Decision (proposed)
 
-Scaffolded auth and profile pages derive their default posture from the same
-hinge the homepage uses:
+**Scope: route-based integrations only** — frameworks whose patchers add
+route files without owning the app shell (today: Next, Nuxt). The SPA
+families (React/Vue/Solid/Svelte/Qwik/Angular) are explicitly out of scope
+for the widget posture: their patchers write the app's root component, so on
+a pre-existing app there is no preserved shell for a widget to inherit —
+setup either conflicts with the existing root or, under `--force`, replaces
+it. They keep today's page posture until a non-destructive route/layout
+insertion contract exists for their routers (open question below).
+
+Within scope, scaffolded auth and profile pages derive their default posture
+from the same hinge the homepage uses:
 
 - Fresh scaffold (`scaffolded_framework: true`) → pages pin
   `variant="page"` — unchanged from today.
@@ -38,26 +47,36 @@ hinge the homepage uses:
   layout-neutral wrapper (no forced color scheme, no viewport styling), so
   the card drops into the host app's own layout and theme.
 
-In both postures the emitted comment names the other variant, and editing the
-generated page remains the sanctioned way to change posture (presentation is
-user-owned per ADR 042 — no config knob is introduced). `doctor --fix`
-regenerates the same posture because the hinge is recorded in the manifest
-and restored into the patch context.
+**The chosen posture is recorded in the scaffold manifest** (a
+`posture: "page" | "widget"` field beside `scaffolded_framework`), and
+`doctor --fix` restores from that record. Absence of a posture record —
+every manifest written before this decision, and every manifest-less legacy
+scaffold — restores `page`, which is what all earlier scaffolds were; the
+widget posture is only ever restored on positive evidence. In both postures
+the emitted comment names the other variant, and editing the generated page
+remains the sanctioned way to change posture (presentation is user-owned per
+ADR 042 — no config knob is introduced).
 
 ## Consequences
 
-- Templates branch on `PatchContext.scaffoldedFramework`, which already
-  flows from setup and is restored by doctor; no new state is needed.
-- The journey matrix needs a pre-existing-app lane to cover the widget
-  posture end to end (today's journeys always scaffold fresh).
+- Templates branch on `PatchContext.scaffoldedFramework`; the manifest
+  gains the posture record, and restoration reads it rather than
+  re-deriving the hinge (which a manifest-less legacy scaffold could not
+  answer).
+- The journey matrix needs a pre-existing-app lane (Next, Nuxt) to cover
+  the widget posture end to end (today's journeys always scaffold fresh).
 - Copy in the generated pages' comments and the scaffold guidance must
   describe both postures rather than assuming full-page.
 
 ## Open questions
 
+- A non-destructive route/layout insertion contract for the SPA routers
+  (React Router, Vue Router, Angular routes, …) that would make the widget
+  posture reachable there without touching the app root — a prerequisite
+  for lifting the scope restriction.
 - Whether `--preset`-style explicitness is wanted anyway (e.g. a
   `--surface page|widget` override at setup time) or whether editing the
   generated page stays the only override.
-- Whether the posture should be recorded per page in the scaffold manifest
+- Whether the posture should be recorded per page rather than per scaffold,
   so a later template revision can tell a deliberate user choice from the
   scaffold default.

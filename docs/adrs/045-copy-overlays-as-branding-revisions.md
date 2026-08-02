@@ -30,17 +30,25 @@ Copy overlays become part of the **branding revision** resource:
 
 - A branding revision carries optional per-language copy entries
   (key → string over the built-in dictionary keys, same shape as today's
-  `locales` property values). The server resolves the project's current
-  revision and delivers the merged copy with the flow response; the widgets
+  `locales` property values). The flow response delivers the merged copy of
+  the revision that is **effective for the environment**, and the widgets
   apply it exactly as they apply a `locales` property today (element-level
   `locales` remains as the app-level override with higher precedence).
+- **Effectiveness follows the release boundary, not revision creation.**
+  Under the accepted release/deployment model (ADR 035), a copy-bearing
+  branding revision is an inert draft until a configuration release
+  containing it is deployed to the environment — the flow response serves
+  copy from the environment's current release, never from undeployed
+  drafts. The latest-revision-on-flow-response resolution from ADR 040 is
+  the acknowledged interim until that model lands; this ADR inherits the
+  boundary rather than bypassing it, and copy edits reach runtime through
+  whichever lifecycle is in force (today's eject → edit → apply; release
+  construction + deployment once ADR 035 is implemented).
 - `setup --use-case business` seeds a branding revision carrying the
-  business overlay instead of wiring template props — the generated pages
-  stay copy-agnostic, and every framework gets the overlay through the same
-  server path with zero per-SDK wiring.
-- Copy edits follow the branding lifecycle: eject → edit → apply publishes a
-  new revision (ADR 040's model), making wording changes runtime-effective
-  without app redeploys and giving them revision history.
+  business overlay instead of wiring template props — included in the
+  initial configuration the same way setup's other seeded resources become
+  active — so the generated pages stay copy-agnostic and every framework
+  gets the overlay through the same server path with zero per-SDK wiring.
 
 The bundle keeps only the neutral built-ins; `businessLocales` remains
 exported as a convenience preset for hand-integrators, but the scaffold and
@@ -51,8 +59,11 @@ platform path no longer depend on it.
 - One source of truth for copy across all eight framework scaffolds; the
   per-SDK re-exports and template wiring become a transitional mechanism to
   retire once this lands.
-- Copy joins branding's governance story (revisions, environments per
-  ADR 035/040) instead of being a build-time constant.
+- Copy joins branding's governance story: wording changes ship as
+  configuration changes — no app rebuild or redeploy — and, under ADR 035,
+  carry release/deployment semantics, so two environments can run different
+  wording by running different releases, which a build-time constant cannot
+  express.
 - The flow response grows a copy payload; the widgets' locale resolution
   gains one precedence layer (element property > revision copy > built-ins).
 
