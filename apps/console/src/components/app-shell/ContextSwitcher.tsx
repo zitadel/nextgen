@@ -1,4 +1,5 @@
-import { Box, Building2, ChevronsUpDown, type LucideIcon, Search } from "lucide-react";
+// `Building2` returns with the parked organisation switcher below.
+import { Box, ChevronsUpDown, type LucideIcon, Search } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -28,13 +29,6 @@ interface SwitcherOption {
   plan?: string;
 }
 
-const ORGS: SwitcherOption[] = [
-  { id: "acme", label: "Acme Inc", plan: "Free" },
-  { id: "clearwater", label: "Clearwater Labs", plan: "Pro" },
-  { id: "benimac", label: "Benimac LTD", plan: "Enterprise" },
-  { id: "horizons", label: "Horizons Studio", plan: "Pro" },
-];
-
 export function ContextSwitcher() {
   const projects = useProjects();
   // The console is bound to one project, and `queryProjects` is scope-pinned to
@@ -45,20 +39,28 @@ export function ContextSwitcher() {
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-2 md:w-auto md:flex-row md:items-center">
-      <Switcher
-        icon={Building2}
-        label="Acme Inc"
-        shortLabel="Acme"
-        plan="Free"
-        options={ORGS}
-        ariaLabel="Switch organization"
-      />
-      <Switcher
-        icon={Box}
-        label={current?.label}
-        options={projects}
-        ariaLabel="Switch project"
-      />
+      {/* The organisation switcher is parked. It was four invented orgs —
+          "Acme Inc / Free", "Clearwater Labs / Pro", "Benimac LTD / Enterprise",
+          "Horizons Studio / Pro" — with a hardcoded current selection and a plan
+          badge naming a tier nothing sells yet. It sat at the top of every
+          screen, which made the whole console look like it was scoped to a real
+          organisation on a real plan.
+
+          Organisations are teams in this model, and there is no team list
+          endpoint: the API has `POST /teams` and `GET /teams/{team_id}` only, so
+          the current team cannot be resolved, let alone switched. Restore this
+          when `Team: List/Query` (#620) lands, and take the plan badge from
+          billing (#667) rather than a literal.
+
+          <Switcher
+            icon={Building2}
+            label={currentTeam?.label}
+            shortLabel={currentTeam?.shortLabel}
+            plan={currentTeam?.plan}
+            options={teams}
+            ariaLabel="Switch organization"
+          /> */}
+      <Switcher icon={Box} label={current?.label} options={projects} ariaLabel="Switch project" />
     </div>
   );
 }

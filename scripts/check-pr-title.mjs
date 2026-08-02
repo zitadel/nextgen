@@ -41,13 +41,14 @@ const NON_SHIPPING_TOP_LEVEL_DIRS = [
 ];
 
 // Workspaces that build or exercise the product without ever reaching a user:
-// harnesses, mocks, demos, and the docs site.
+// mocks, demos, and the docs site. (`packages/testing` left this list when it
+// joined the release train in #692 — the manifest-derived PUBLISHED_ROOTS
+// covers it now.)
 const NON_SHIPPING_WORKSPACES = [
   "apps/docs/",
   "apps/mock-zitadel/",
   "apps/storybook/",
   "packages/api-mock/",
-  "packages/testing/",
 ];
 
 // Repo-meta markdown, wherever it sits. Every other `.md` is treated as shipping
@@ -191,7 +192,6 @@ export function suggestType(files) {
         path.includes("/testdata/") ||
         /^apps\/[^/]*-e2e\//.test(path) ||
         /^apps\/demo-[^/]+\//.test(path) ||
-        path.startsWith("packages/testing/") ||
         path.startsWith("apps/mock-zitadel/") ||
         path.startsWith("packages/api-mock/"),
     )
