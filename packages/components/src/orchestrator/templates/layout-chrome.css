@@ -335,12 +335,20 @@ img.zl-split__compact--hero {
   color: var(--zl-color-text-secondary-gray, #bfbfcf);
   font-weight: 600;
 }
-/* Minimal-design chrome (`minimal`): fields straight on the page, no card. */
+/* Minimal-design chrome (`minimal`): fields straight on the page, no card.
+   With no card to carry spacing, the pane's padding IS the page chrome, so
+   it follows the same widget-first rule as the shell's own padding: page
+   mode opts in, a widget embed is content-sized and the embedding app owns
+   spacing. The split panes above are different on purpose — their padding
+   separates the two panes' content and is part of that design's
+   composition, so it survives in both modes. */
 .zl-minimal {
   display: flex;
   flex-direction: column;
   gap: var(--zl-spacing-04, 1.5rem);
   width: min(24rem, 100%);
   margin-inline: auto;
+}
+:host([variant="page"]) .zl-minimal {
   padding: 52px 16px;
 }
