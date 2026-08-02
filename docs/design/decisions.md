@@ -6,7 +6,7 @@
 
 - [ ] **Project & multi-project access** — parked on the permissions foundations (Livio, Sylvana); not needed for MVP. Once ready, the project selector removed in D6 comes back in the role-assignment UI. *(owner: eng)*
 - [ ] **Admin vs. end-user permissions** — separation of instance/Zitadel-admin roles from end-user roles, tied to the same permissions work. *(owner: eng)*
-- [ ] **Schema status & versions** — confirm with Victor (Mon): backend currently has only a "latest" flag — no active/inactive status and no revisions object. Is active/inactive available? *(owner: Julia)*
+- [ ] **Schema status & versions** — confirm with Vitor (Mon): backend currently has only a "latest" flag — no active/inactive status and no revisions object. Is active/inactive available? *(owner: Julia)*
 - [ ] **Projects in navigation** — main nav (key-resource consistency) vs. top context dropdown only. Depends on whether the API can list multiple projects (no API design yet); may be skipped for MVP since there's only one project. *(owner: Julia / eng)*
 - [ ] **"Team" naming** — overloaded (customer-portal team vs. organization/tenant); consider "organization" or "tenant" instead. Note: a Teams API is already built. *(owner: team)*
 - [ ] **Project name scheme** — nature words (e.g. "River") vs. random words for generated project names. *(owner: Julia)*
@@ -15,6 +15,9 @@
 ---
 
 ## Decisions
+
+### D15 · Create uses a right-side drawer — 2026-07-31 · [standing]
+Adding a resource (e.g. a user) opens a drawer from the right — the shadcn/ui default interaction pattern. Fields relevant to the current context (e.g. team) are preselected.
 
 ### D14 · Schema attributes shown as a simple list — 2026-07-31
 On the schema detail, list the pre-populated attributes as a flat, scannable list — not an accordion or a left-nav list (schema setup will get complex, so keep the detail page roomy rather than nesting). If a schema's attribute list gets long, reuse the user-list pattern: search bar + horizontal scroll + "Load more." Rows open the detail on click (shadcn/ui list-item standard).
@@ -41,11 +44,11 @@ Stay with "schema", always qualified (user schema, team schema…). Well-known i
 Agreed in design review. Flagged because dev work had already started.
 → Julia removes it from Figma; sync with Liam to stop the in-progress work.
 
-### D5 · User list: "Load more", no pagination — 2026-07-23
-DB has no offsets, so no pagination and no total count. Use a "Load more" button and make clear it's not the full list. No filtering or sorting in MVP (too expensive; fine at community/test scale).
-
 ### D7 · Schema list columns — 2026-07-23
 Show: template name, object type, authentication methods, last modified. No user count (not computable). List stays small (~20 max), so it doesn't need a dense resource-style table (see D0a).
+
+### D5 · User list: "Load more", no pagination — 2026-07-23
+DB has no offsets, so no pagination and no total count. Use a "Load more" button and make clear it's not the full list. No filtering or sorting in MVP (too expensive; fine at community/test scale).
 
 ### D4 · User table shows all columns — 2026-07-23
 Show every available field for MVP rather than picking defaults. Per-user column customization comes later.
@@ -58,9 +61,6 @@ Irreversible, no recovery. Keep the type-"delete"-to-confirm step + success toas
 
 ### D1 · A user can belong to multiple teams — 2026-07-23
 Use a multi-select / tag input, preselected from current context; reuse this pattern everywhere. Selecting a team also requires selecting a role within that team.
-
-### D15 · Create uses a right-side drawer — 2026-07-23 · [standing]
-Adding a resource (e.g. a user) opens a drawer from the right — the ShadCN default interaction pattern. Fields relevant to the current context (e.g. team) are preselected.
 
 ### D0c · Three default schemas — 2026-07-23 · [standing]
 Minimal (email) · Consumer (email, given name, family name) · Business (+ company name).
