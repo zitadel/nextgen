@@ -7,5 +7,6 @@ fixture to the test-kit: a CDP virtual authenticator (platform authenticator,
 discoverable credentials, automatic user presence) that lets tests complete
 real passkey registration and login ceremonies headlessly, plus
 `credentialCount()` for asserting credential reuse. Chromium projects only,
-and the app under test must be served on `localhost` — WebAuthn rejects IP
-relying-party IDs.
+and the app under test needs an origin WebAuthn accepts as a relying-party
+ID: HTTPS, or `http://localhost` for local tests — raw IP origins are
+invalid.

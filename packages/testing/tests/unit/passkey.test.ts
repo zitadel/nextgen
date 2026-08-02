@@ -100,6 +100,16 @@ describe("enableVirtualPasskey", () => {
     expect(fake.detached).toBe(true);
   });
 
+  it("detaches the session when initialization fails after it opened", async () => {
+    const fake = fakeCdpPage({
+      failSend: (method) =>
+        method === "WebAuthn.enable" ? new Error("WebAuthn domain unavailable") : undefined,
+    });
+
+    await expect(enableVirtualPasskey(fake.page)).rejects.toThrow("WebAuthn domain unavailable");
+    expect(fake.detached).toBe(true);
+  });
+
   it("explains the Chromium requirement when no CDP session is available", async () => {
     const page = {
       context: () => ({

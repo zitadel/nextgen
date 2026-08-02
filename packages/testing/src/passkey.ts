@@ -22,9 +22,10 @@ export interface VirtualPasskey {
  *
  * Chromium only: the CDP WebAuthn domain does not exist in WebKit or Firefox.
  * The authenticator is bound to this page — drive registration and the later
- * login from the same page, or the credential is gone. The app under test
- * must be served on `localhost` (not `127.0.0.1`): WebAuthn rejects IP
- * addresses as relying-party IDs.
+ * login from the same page, or the credential is gone. Serve the app under
+ * test on an origin WebAuthn accepts as a relying-party ID: HTTPS on a real
+ * domain, or `http://localhost` for local runs — raw IP origins such as
+ * `http://127.0.0.1` are invalid RP IDs.
  */
 export async function enableVirtualPasskey(page: Page): Promise<VirtualPasskey> {
   let client: CDPSession;
@@ -38,17 +39,24 @@ export async function enableVirtualPasskey(page: Page): Promise<VirtualPasskey> 
       { cause: error },
     );
   }
-  await client.send("WebAuthn.enable");
-  const { authenticatorId } = await client.send("WebAuthn.addVirtualAuthenticator", {
-    options: {
-      protocol: "ctap2",
-      transport: "internal",
-      hasResidentKey: true,
-      hasUserVerification: true,
-      isUserVerified: true,
-      automaticPresenceSimulation: true,
-    },
-  });
+  let authenticatorId: string;
+  try {
+    await client.send("WebAuthn.enable");
+    ({ authenticatorId } = await client.send("WebAuthn.addVirtualAuthenticator", {
+      options: {
+        protocol: "ctap2",
+        transport: "internal",
+        hasResidentKey: true,
+        hasUserVerification: true,
+        isUserVerified: true,
+        automaticPresenceSimulation: true,
+      },
+    }));
+  } catch (error) {
+    // Don't leave a half-initialized CDP session attached behind a throw.
+    await client.detach().catch(() => undefined);
+    throw error;
+  }
 
   return {
     authenticatorId,

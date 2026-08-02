@@ -50,4 +50,3 @@ async function skipPasskeyUpsellIfVisible(page: Page): Promise<void> {
     await skip.click();
   }
 }
-

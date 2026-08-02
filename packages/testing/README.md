@@ -114,8 +114,9 @@ test("registers and signs in with a passkey", async ({ page, seed, passkey }) =>
 Constraints, all inherent to WebAuthn/CDP: Chromium projects only (the CDP
 WebAuthn domain exists nowhere else); the authenticator is bound to the page,
 so register and sign back in on the same page (sign out by clearing cookies
-instead of opening a fresh context); and serve the app on `localhost`, never
-`127.0.0.1` — WebAuthn rejects IP relying-party IDs. The default
+instead of opening a fresh context); and serve the app on an origin WebAuthn
+accepts as a relying-party ID — HTTPS on a real domain, or `http://localhost`
+for local tests; raw IP origins like `127.0.0.1` are invalid. The default
 `password-first` flow offers passkey registration at the registration-choice
 step; boot `preset: "passkey-first"` for one-tap discoverable-credential
 login flows.
