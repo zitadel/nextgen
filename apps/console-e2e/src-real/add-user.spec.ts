@@ -39,6 +39,12 @@ async function openDrawer(page: Page, user: { email: string; password: string })
   await page.getByRole("button", { name: "Add", exact: true }).click();
   const drawer = page.getByRole("dialog", { name: "Add user" });
   await expect(drawer).toBeVisible();
+  // Two fetches gate the form: the drawer shows "Loading schemas…" until the
+  // list resolves, and fields mount only once the selected schema's definition
+  // arrives. Locator actions auto-wait through both, but one-shot reads
+  // (`renderedFields`) and raw key presses don't — so only hand tests a drawer
+  // whose form is actually on screen.
+  await expect(drawer.locator('input[data-slot="input"]').first()).toBeVisible();
   return drawer;
 }
 
@@ -279,6 +285,9 @@ test("can be completed with the keyboard alone", async ({ page, zitadel, seed })
   await page.getByRole("button", { name: "Add", exact: true }).press("Enter");
   const drawer = page.getByRole("dialog", { name: "Add user" });
   await expect(drawer).toBeVisible();
+  // Same readiness gate as `openDrawer`: a raw Tab loop never auto-waits, so
+  // the schema-driven form must be on screen before traversal starts.
+  await expect(drawer.locator('input[data-slot="input"]').first()).toBeVisible();
 
   const email = uniqueEmail("keyboard");
   for (const property of schema.required) {
