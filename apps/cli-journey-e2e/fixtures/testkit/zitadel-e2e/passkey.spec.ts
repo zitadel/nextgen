@@ -1,6 +1,9 @@
-/* oxlint-disable playwright/no-conditional-in-test -- the registration choice
-   only re-asks for the email on some flow configs; fill it when it renders. */
-import { expect, test } from "@zitadel/testing/playwright";
+import {
+  expect,
+  loginWithPasskey,
+  registerWithPasskey,
+  test,
+} from "@zitadel/testing/playwright";
 
 /**
  * Passkey round-trip with the kit's virtual authenticator: register a fresh
@@ -17,27 +20,14 @@ test("a fresh identity registers and signs in with a passkey", async ({
   const who = seed.identity();
 
   await page.goto("/login");
-  await page.getByLabel(/email/i).fill(who.email);
-  await page
-    .getByRole("button", { name: /continue|sign in/i })
-    .first()
-    .click();
-  await expect(
-    page.getByRole("heading", { name: /create|register|sign up|no-account/i }),
-  ).toBeVisible({ timeout: 30_000 });
-  const emailAgain = page.getByLabel(/email/i).first();
-  if (await emailAgain.isVisible({ timeout: 1_000 }).catch(() => false)) {
-    await emailAgain.fill(who.email);
-  }
-  await page.getByRole("button", { name: /passkey/i }).first().click();
+  await registerWithPasskey(page, { email: who.email });
   await page.waitForURL(/\/profile(?:[/?#]|$)/, { timeout: 30_000 });
   await expect.poll(() => passkey.credentialCount()).toBe(1);
 
   await page.context().clearCookies();
   await page.goto("/login");
   await expect(page.getByLabel(/email/i)).toBeVisible({ timeout: 30_000 });
-  await page.getByLabel(/email/i).fill(who.email);
-  await page.getByRole("button", { name: /passkey/i }).first().click();
+  await loginWithPasskey(page, { email: who.email });
   await page.waitForURL(/\/profile(?:[/?#]|$)/, { timeout: 30_000 });
 
   // Login reused the registered credential instead of minting another.

@@ -102,6 +102,24 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
 export { expect } from "@playwright/test";
 export { applyAppEnvTemplate, nextAppEnv } from "./app-env";
 export type { AppEnvTemplate } from "./app-env";
+export {
+  clickFlowAction,
+  fillFlowField,
+  flowAction,
+  flowField,
+  loginWithPassword,
+  loginWithPasskey,
+  registerWithPassword,
+  registerWithPasskey,
+} from "./flows";
+export type {
+  FlowActionOptions,
+  FlowFieldOptions,
+  LoginCredentials,
+  PasswordRegistrationDetails,
+  ProfileEntry,
+  RegistrationDetails,
+} from "./flows";
 export { enableVirtualPasskey } from "./passkey";
 export type { VirtualPasskey } from "./passkey";
 export { withZitadel } from "./playwright-config";
