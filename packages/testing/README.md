@@ -96,6 +96,31 @@ log in through the UI for those. `seed.identity()` complements registration
 specs: an unused email+password that creates nothing, so the flow under test
 must create the user.
 
+### Test passkey flows
+
+`enableVirtualPasskey(page)` — also available as the on-demand `passkey`
+fixture — attaches a CDP virtual authenticator to the page (a platform
+authenticator with discoverable credentials and automatic user presence), so
+the real registration and login ceremonies complete without an OS dialog:
+
+```ts
+test("registers and signs in with a passkey", async ({ page, seed, passkey }) => {
+  const who = seed.identity();
+  // drive /login → registration choice → "Register with passkey" …
+  await expect.poll(() => passkey.credentialCount()).toBe(1);
+});
+```
+
+Constraints, all inherent to WebAuthn/CDP: Chromium projects only (the CDP
+WebAuthn domain exists nowhere else); the authenticator is bound to the page,
+so register and sign back in on the same page (sign out by clearing cookies
+instead of opening a fresh context); and serve the app on an origin WebAuthn
+accepts as a relying-party ID — HTTPS on a real domain, or `http://localhost`
+for local tests; raw IP origins like `127.0.0.1` are invalid. The default
+`password-first` flow offers passkey registration at the registration-choice
+step; boot `preset: "passkey-first"` for one-tap discoverable-credential
+login flows.
+
 The two in-repo consumers are `apps/demo-next-e2e/playwright.real.config.mts`
 and `apps/console-e2e/playwright.real.config.mts` — run them with
 `moon run demo-next-e2e:e2e-real` / `moon run console-e2e:e2e-real`.
@@ -144,9 +169,10 @@ what the Playwright fixtures use, and what a future remote-instance mode would
 build on.
 
 From `@zitadel/testing/playwright`: the `test`/`expect` fixtures (`seed.user()`
-per test, `zitadel` per worker), plus `withZitadel(options)` returning
-`{ webServer }` for the config, and `nextAppEnv`/`applyAppEnvTemplate` for the
-env-template mechanism described above.
+per test, `zitadel` per worker, `passkey` on demand), plus `withZitadel(options)`
+returning `{ webServer }` for the config, `enableVirtualPasskey(page)` for
+non-fixture pages, and `nextAppEnv`/`applyAppEnvTemplate` for the env-template
+mechanism described above.
 
 ## How it works
 
@@ -251,6 +277,8 @@ on top, in intended order:
    local default removes the embedded-Postgres lifecycle) and the stability
    commitment when the train leaves alpha.
 
-Parked until server support exists: passkey seeding (pre-registered WebAuthn
-credentials). Independent refactor: extract `apps/cli/src/lib/local-server`
-into a shared package and swap the lifecycle shell-out for imports.
+Parked until server support exists: passkey *seeding* (pre-registered WebAuthn
+credentials) — UI-driven passkey ceremonies are covered today by
+`enableVirtualPasskey`. Independent refactor: extract
+`apps/cli/src/lib/local-server` into a shared package and swap the lifecycle
+shell-out for imports.
