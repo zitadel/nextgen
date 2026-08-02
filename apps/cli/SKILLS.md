@@ -85,7 +85,10 @@ the CLI's help layer, not the envelope.
   `.zitadel/flows/default-login.json`, uploads them through the schema and flow
   APIs, then seeds `.zitadel/state.json` so `plan` is immediately empty. Agents
   must pass `--framework` when scaffolding into a fresh directory; interactive
-  humans can omit it and choose from the prompt. Flags:
+  humans can omit it and choose from the prompt. Supported floors: Next.js 15+
+  and React 18+ — `setup` and `doctor` fail with `E_UNSUPPORTED_PROJECT_SHAPE`
+  below them instead of degrading silently (an unparseable version passes).
+  Flags:
   `--framework next|react|vue|angular|nuxt|solid|svelte|qwik`, `--renderer
   react` (selects the Next.js auth-page renderer; accepted for any framework
   and recorded in `zitadel.json` branding, but only Next varies its generated
