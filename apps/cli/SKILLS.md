@@ -82,9 +82,10 @@ the CLI's help layer, not the envelope.
   must pass `--framework` when scaffolding into a fresh directory; interactive
   humans can omit it and choose from the prompt. Flags:
   `--framework next|react|vue|angular|nuxt|solid|svelte|qwik`, `--renderer
-  react|web-component` (selects the Next.js auth-page renderer; accepted for any
-  framework and recorded in `zitadel.json` branding, but only Next varies its
-  generated templates by it), `--dev-port` (dev-server port, also the issuer
+  react` (selects the Next.js auth-page renderer; accepted for any framework
+  and recorded in `zitadel.json` branding, but only Next varies its generated
+  templates by it; the planned `web-component` renderer is not yet available
+  and is rejected if passed), `--dev-port` (dev-server port, also the issuer
   origin registered with Zitadel — use distinct ports to run several scaffolded
   apps side by side), `--preset password-first|passkey-first` (the sign-in
   experience the scaffold starts from: `password-first` is the default —
