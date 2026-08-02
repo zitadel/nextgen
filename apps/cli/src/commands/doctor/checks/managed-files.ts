@@ -302,8 +302,15 @@ async function probeConfigWiring(
  * so the next doctor run gets exact manifest-mode verification instead of
  * template guessing (and its Next-major / template-growth misclassification
  * risk). Marker-less (adopted) files and conditionally-scaffolded ones are
- * deliberately absent. Best-effort: an unreadable state file leaves the app
- * in template mode, same as before.
+ * deliberately absent.
+ *
+ * The manifest is only finalized when every current *infrastructure* file is
+ * present and recordable (marker-bearing): materializing during an
+ * unresolved boundary conflict — or over an adopted boundary — would write a
+ * manifest that tracks no request boundary at all, and deleting the boundary
+ * later would go undetected. Until then the app stays on the template
+ * fallback, whose presence checks keep enforcing the boundary. Best-effort:
+ * an unreadable state file leaves the app in template mode, same as before.
  */
 async function materializeManifest(
   ctx: CheckContext,
@@ -324,6 +331,12 @@ async function materializeManifest(
       if (contents !== undefined && contents.includes(MANAGED_MARKER)) {
         marked.push(path);
       }
+    }
+    const infrastructure = actions.markedFiles.filter(
+      (path) => actions.fileClasses?.[path] === "infrastructure" && !conditional.has(path),
+    );
+    if (!infrastructure.every((path) => marked.includes(path))) {
+      return;
     }
     await writeScaffoldManifest({ cwd: ctx.cwd, actions, written: marked });
   } catch {

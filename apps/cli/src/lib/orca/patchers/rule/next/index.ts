@@ -66,11 +66,20 @@ export class NextPatcher extends AbstractRulePatcher {
     view: PatchView,
   ): Readonly<Record<string, ReadonlyArray<string>>> {
     // Next renamed the request boundary in v16 (middleware.ts → proxy.ts)
-    // and throws at build time when both exist. Whichever name the current
-    // version uses, the other is its retired alternate.
+    // and throws at build time when both exist — but only in the ≥16
+    // direction. On Next 15, proxy.ts was not a reserved convention, so a
+    // root proxy.ts there is the user's own file, never a conflicting
+    // boundary. Declaring the alternate one-way keeps a healthy Next 15 app
+    // with an unrelated proxy.ts passing.
     const current = requestBoundaryFile(view.framework).filename;
-    const other = current === "proxy.ts" ? "middleware.ts" : "proxy.ts";
-    return { [join(view.framework.appDir, `../${current}`)]: [join(view.framework.appDir, `../${other}`)] };
+    if (current !== "proxy.ts") {
+      return {};
+    }
+    return {
+      [join(view.framework.appDir, "../proxy.ts")]: [
+        join(view.framework.appDir, "../middleware.ts"),
+      ],
+    };
   }
 
   protected routeDeps(view: PatchView): ReadonlyArray<string> {

@@ -103,7 +103,15 @@ an overwrite of a user-pinned range, not a restore. A repair can therefore
 restore a deleted managed file but can never overwrite an edited or adopted
 one. On a pre-manifest app, a successful repair also materializes the
 manifest from the marker-bearing files on disk (adopted files stay the
-user's), completing the migration out of fallback mode. This deliberately **narrows** the dependency check's
+user's), completing the migration out of fallback mode — but only once
+every current infrastructure file is present and recordable. During an
+unresolved boundary conflict, or with an adopted boundary, no manifest is
+written: it would track no request boundary, and later deletions would go
+undetected. The template fallback's presence checks stay in charge until
+the boundary is resolved. The retired-alternate mapping itself is
+one-directional: only Next ≥16 declares `middleware.ts` retired — on
+Next 15, `proxy.ts` was not a reserved convention, so a root `proxy.ts`
+there is the user's own file. This deliberately **narrows** the dependency check's
 previous `force: true` repair, which could clobber user edits; the flag's
 documented text ("Re-apply missing managed files") already described the new
 behavior. Restored files are re-hashed into the manifest — the bytes come

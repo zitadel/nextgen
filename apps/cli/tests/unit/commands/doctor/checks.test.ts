@@ -724,6 +724,83 @@ describe("ManagedFilesCheck", () => {
     expect((await check.run(ctxFor(cwd))).status).toBe("fail");
   });
 
+  it("ignores a user-owned proxy.ts on Next 15 (not a reserved convention there)", async () => {
+    const cwd = await makeProject();
+    // The fixture is Next ^15 (boundary: middleware.ts). A root proxy.ts is
+    // simply the user's file and must not trip the boundary-conflict logic.
+    await writeFile(join(cwd, "proxy.ts"), "export function proxy() { /* user-owned */ }\n");
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("pass");
+    expect(outcome.message).not.toContain("conflicting");
+  });
+
+  it("does not materialize a manifest while a boundary conflict is unresolved", async () => {
+    const cwd = await makeProject();
+    // Pre-manifest Next 15 app upgraded to 16 with an edited middleware.ts:
+    // --fix must not finalize a manifest that records no boundary at all.
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+    );
+    await writeFile(
+      join(cwd, "middleware.ts"),
+      `${MANAGED_MARKER}\nexport function middleware() { /* custom */ }\n`,
+    );
+    await writeFile(
+      join(cwd, ".zitadel/state.json"),
+      JSON.stringify({ framework: "next", resources: {} }),
+    );
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
+
+    await check.fix(ctxFor(cwd));
+
+    // No proxy.ts, no manifest: the app stays on the template fallback,
+    // which keeps demanding the boundary — deleting middleware.ts later
+    // still fails instead of passing against an empty manifest.
+    await expect(readFile(join(cwd, "proxy.ts"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+      scaffold?: unknown;
+    };
+    expect(state.scaffold).toBeUndefined();
+    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
+
+    // The user resolves the conflict properly (migrates their edits): the
+    // next --fix materializes a manifest that records the boundary.
+    await rm(join(cwd, "middleware.ts"));
+    await writeFile(join(cwd, "proxy.ts"), `${MANAGED_MARKER}\nexport function proxy() {}\n`);
+    await check.fix(ctxFor(cwd));
+    const scaffold = await readScaffoldState(cwd);
+    expect(scaffold.files["proxy.ts"]?.class).toBe("infrastructure");
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("stays on the template fallback when an infrastructure file was adopted", async () => {
+    const cwd = await makeProject();
+    // The user replaced the boundary with their own marker-less file; a
+    // materialized manifest could not track it, so none is written and the
+    // presence-enforcing fallback stays in charge.
+    await writeFile(join(cwd, "middleware.ts"), "export function middleware() {}\n");
+    await writeFile(
+      join(cwd, ".zitadel/state.json"),
+      JSON.stringify({ framework: "next", resources: {} }),
+    );
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+
+    await check.fix(ctxFor(cwd));
+
+    const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+      scaffold?: unknown;
+    };
+    expect(state.scaffold).toBeUndefined();
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
   it("warns (not fails) when only the convenience dev script is missing", async () => {
     const cwd = await makeAngularProject();
     await writeFile(
