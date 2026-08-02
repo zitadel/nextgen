@@ -34,6 +34,13 @@ import { baseHostStyles, surfaceStyles } from "../styles/index.js";
  *   gap         24px (spacing-04) between header / main / footer slots
  *   footer      min-height 1.5rem to reserve room for the attribution
  *               pill even when the slot is empty (prevents jitter).
+ *
+ * All of the above is page chrome. In widget mode (`data-widget`, stamped
+ * by the orchestrators whenever their `variant` is not `page`) the shell
+ * sheds it entirely — background, viewport min-height, AND the responsive
+ * padding — leaving a transparent, content-sized pass-through: the
+ * embedding app owns spacing around the card. Only the region gap
+ * survives, because it separates real content (card → attribution pill).
  */
 @customElement("zl-page-shell")
 export class ZlPageShell extends LitElement {

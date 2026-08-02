@@ -146,7 +146,20 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
 
     const rect = element.getBoundingClientRect();
     expect(rect.height).toBeGreaterThan(0);
-    expect(rect.height).toBeLessThan(window.innerHeight * 0.9);
+
+    // Content-sized means the shell contributes no padding of its own: the
+    // card sits flush with the host's top edge and nothing but real content
+    // (the attribution pill) sits below it. A 682px host around a 514px
+    // card — page padding surviving into widget mode — is the double-card
+    // dead space this pins against.
+    const card = element.shadowRoot?.querySelector("zl-card") as HTMLElement;
+    expect(card).toBeTruthy();
+    expect(Math.abs(card.getBoundingClientRect().top - rect.top)).toBeLessThanOrEqual(1);
+    const attribution = element.shadowRoot?.querySelector(".zl-attribution") as HTMLElement;
+    expect(attribution).toBeTruthy();
+    expect(Math.abs(attribution.getBoundingClientRect().bottom - rect.bottom)).toBeLessThanOrEqual(
+      1,
+    );
 
     // Outer host.
     expect(getComputedStyle(element).backgroundColor).toBe(TRANSPARENT);
@@ -158,6 +171,9 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     const surface = shell.shadowRoot?.querySelector(".zr-page-shell") as HTMLElement;
     expect(surface).toBeTruthy();
     expect(getComputedStyle(surface).backgroundColor).toBe(TRANSPARENT);
+    // The padded 48rem branch is live in this viewport, so this pins the
+    // widget override beating the media query, not just the narrow default.
+    expect(getComputedStyle(surface).padding).toBe("0px");
   });
 
   it("widget default: no design-system font is injected into the host document", async () => {
