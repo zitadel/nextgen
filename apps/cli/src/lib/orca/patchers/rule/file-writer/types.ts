@@ -62,6 +62,16 @@ export type FileOp =
       readonly path: string | ReadonlyArray<string>;
       readonly edit: (source: string | undefined) => string;
       readonly overwrites?: true;
+      /**
+       * Marks a merging edit as managed *wiring* the doctor managed-files
+       * check verifies via the transform's idempotency: when running the
+       * transform against the current file changes it, the wiring is absent.
+       * `infrastructure` wirings (dev proxy merges, route registrations) fail
+       * the check when detached; `convenience` (the Angular `dev` script)
+       * only warns. Unlabelled edits (guidance sections, the overwriting
+       * home page) are not probed.
+       */
+      readonly wiring?: "infrastructure" | "convenience";
     };
 
 /**

@@ -107,7 +107,10 @@ the CLI's help layer, not the envelope.
   the manifest setup recorded in `.zitadel/state.json`: a missing
   infrastructure file (the request boundary, `custom-elements.d.ts`) fails,
   a missing generated page warns, and files you edited (marker kept) or
-  replaced (marker removed) pass as `edited`/`adopted`. The default local
+  replaced (marker removed) pass as `edited`/`adopted`. It also verifies the
+  managed config wirings (Vite/Nuxt proxy merges, Angular's `angular.json`
+  proxy and auth routes) through the patchers' idempotent transforms — a
+  detached wiring fails and `--fix` re-applies it. The default local
   runtime is the `@zitadel/server` npm binary; Docker checks apply only when
   using `--runtime docker` or `--image`. `--fix` restores missing managed
   files and never replaces an existing scaffolded app file; additive repairs

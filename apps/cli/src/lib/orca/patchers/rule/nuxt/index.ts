@@ -52,6 +52,8 @@ export class NuxtPatcher extends AbstractRulePatcher {
         kind: "edit",
         path: [...NUXT_CONFIG_PATHS],
         edit: nuxtConfigEdit({ projectId: ctx.project.id, server: ctx.server }),
+        // Runtime config + proxy wiring: auth breaks without it.
+        wiring: "infrastructure",
       },
       { kind: "merge-env", path: ".env.example", entries: { NUXT_PUBLIC_ZITADEL_PROJECT_ID: "" } },
       {

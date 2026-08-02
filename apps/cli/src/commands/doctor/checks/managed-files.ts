@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { EjectActions } from "../../../lib/orca/patchers/types";
+import type { ConfigWiringStatus, EjectActions } from "../../../lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../lib/paths";
 import { readRendererId, readZitadelConfig } from "../../../lib/project";
 import {
@@ -66,32 +66,54 @@ export class ManagedFilesCheck implements SanityCheck {
     }
 
     const { mode, rows } = evaluated;
+    const wiring = await probeConfigWiring(ctx);
     const missing = rows.filter((row) => row.state === "missing");
     const missingInfrastructure = missing.filter((row) => row.class === "infrastructure");
-    const details = { mode, files: rows };
+    const detached = wiring.filter((status) => !status.applied);
+    const detachedInfrastructure = detached.filter((s) => s.wiring === "infrastructure");
+    const detachedConvenience = detached.filter((s) => s.wiring === "convenience");
+    const details = {
+      mode,
+      files: rows,
+      ...(wiring.length > 0 ? { config_wiring: wiring } : {}),
+    };
 
+    const failures: string[] = [];
     if (missingInfrastructure.length > 0) {
-      return {
-        name: this.name,
-        status: "fail",
-        message: `missing scaffolded infrastructure file(s): ${listPaths(missingInfrastructure)}`,
-        details,
-      };
+      failures.push(
+        `missing scaffolded infrastructure file(s): ${listPaths(missingInfrastructure)}`,
+      );
     }
+    if (detachedInfrastructure.length > 0) {
+      failures.push(
+        `detached managed config wiring: ${detachedInfrastructure
+          .map((s) => s.path)
+          .join(", ")}`,
+      );
+    }
+    if (failures.length > 0) {
+      return { name: this.name, status: "fail", message: failures.join("; "), details };
+    }
+
+    const warnings: string[] = [];
     if (missing.length > 0) {
-      return {
-        name: this.name,
-        status: "warn",
-        message: `missing scaffolded page(s): ${listPaths(missing)}`,
-        details,
-      };
+      warnings.push(`missing scaffolded page(s): ${listPaths(missing)}`);
     }
+    if (detachedConvenience.length > 0) {
+      warnings.push(
+        `unapplied managed config edit(s): ${detachedConvenience.map((s) => s.path).join(", ")}`,
+      );
+    }
+    if (warnings.length > 0) {
+      return { name: this.name, status: "warn", message: warnings.join("; "), details };
+    }
+
     return {
       name: this.name,
       status: "pass",
       message: `Scaffolded app files are present (${rows.length} tracked${
-        mode === "template" ? ", from templates" : ""
-      })`,
+        wiring.length > 0 ? `, ${wiring.length} wiring${wiring.length === 1 ? "" : "s"} verified` : ""
+      }${mode === "template" ? ", from templates" : ""})`,
       details,
     };
   }
@@ -128,18 +150,63 @@ export class ManagedFilesCheck implements SanityCheck {
     if (missingBefore.length === 0) {
       return;
     }
-    const files = { ...manifest.files };
-    for (const path of missingBefore) {
+    // Reconcile the manifest with the current template set before rewriting
+    // it. Template migrations (Next 15's middleware.ts → Next 16's proxy.ts)
+    // retire paths the current plan no longer writes: repair restores the
+    // *new* boundary, so a retired entry whose file stays absent must be
+    // dropped — keeping it would fail doctor forever, since setup skips
+    // initialized projects. Paths the repair newly introduced are adopted
+    // with their class and on-disk hash.
+    const actions = patcher.artifacts({
+      framework: patchCtx.framework,
+      rendererId: patchCtx.rendererId,
+    });
+    const current = new Set(actions.markedFiles);
+    const conditional = new Set(actions.conditionalFiles ?? []);
+    const files: ScaffoldManifest["files"] = {};
+    for (const [path, entry] of Object.entries(manifest.files)) {
       const contents = await readIfExists(join(ctx.cwd, path));
-      if (contents === undefined) {
+      if (contents === undefined && !current.has(path)) {
+        continue; // retired by a template migration and gone from disk
+      }
+      files[path] =
+        contents !== undefined && missingBefore.includes(path)
+          ? { ...entry, hash: hashScaffoldFile(contents) }
+          : entry;
+    }
+    for (const path of actions.markedFiles) {
+      if (files[path] || conditional.has(path)) {
         continue;
       }
-      const entry = files[path];
-      if (entry) {
-        files[path] = { ...entry, hash: hashScaffoldFile(contents) };
+      const contents = await readIfExists(join(ctx.cwd, path));
+      if (contents !== undefined && contents.includes(MANAGED_MARKER)) {
+        files[path] = {
+          hash: hashScaffoldFile(contents),
+          class: actions.fileClasses?.[path] ?? "presentation",
+        };
       }
     }
     await updateScaffold(ctx.cwd, { ...manifest, files });
+  }
+}
+
+/**
+ * Probe the patcher's managed config wirings (dev proxy merges, route
+ * registrations). Needs the full patch context (project secret et al) to
+ * rebuild the plan; when that fails — missing secret, undetectable
+ * framework — the probe is skipped silently and the responsible check
+ * reports the real problem.
+ */
+async function probeConfigWiring(
+  ctx: CheckContext,
+): Promise<ReadonlyArray<ConfigWiringStatus>> {
+  try {
+    const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca, ctx.cliVersion);
+    return await ctx.orca
+      .patcherFor(patchCtx.framework.id)
+      .verify(patchCtx, { cwd: ctx.cwd });
+  } catch {
+    return [];
   }
 }
 

@@ -117,13 +117,25 @@ export type EjectActions = Readonly<{
 }>;
 
 /**
+ * The verification result for one managed config wiring (a dev-proxy merge,
+ * a route registration): whether the integration's merge is still applied to
+ * the user's config file. Produced by {@link Patcher.verify}.
+ */
+export type ConfigWiringStatus = Readonly<{
+  path: string;
+  wiring: "infrastructure" | "convenience";
+  applied: boolean;
+}>;
+
+/**
  * Integrates Zitadel into an existing project of a specific framework. The
  * interface is execution-strategy-agnostic: a rule-based patcher applies file
  * operations, while a future LLM-based patcher would drive an agent — callers
- * only see {@link patch}/{@link repair}/{@link artifacts} and never a file-op
- * plan. `patch` performs the full integration; `repair` re-applies the managed
- * artifacts (`doctor --fix`); `artifacts` describes them for marker-aware
- * ejection.
+ * only see {@link patch}/{@link repair}/{@link artifacts}/{@link verify} and
+ * never a file-op plan. `patch` performs the full integration; `repair`
+ * re-applies the managed artifacts (`doctor --fix`); `artifacts` describes
+ * them for marker-aware ejection; `verify` probes whether the config wirings
+ * are still applied.
  */
 export interface Patcher {
   /** Whether this patcher integrates the given framework id. */
@@ -138,4 +150,9 @@ export interface Patcher {
   repair(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult>;
   /** Describe the files/dirs this integration owns, for marker-aware ejection. */
   artifacts(view: PatchView): EjectActions;
+  /**
+   * Probe whether the integration's managed config wirings are still applied
+   * to the user's config files, without mutating anything. Read-only.
+   */
+  verify(ctx: PatchContext, opts: { cwd: string }): Promise<ReadonlyArray<ConfigWiringStatus>>;
 }

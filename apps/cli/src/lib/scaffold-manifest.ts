@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join, isAbsolute, relative, sep } from "node:path";
 
+import { isObject } from "./json";
 import type { EjectActions } from "./orca/patchers/types";
 import { readState, updateScaffold } from "./sync/state";
 import type { ScaffoldManifest } from "./sync/types";
@@ -28,14 +29,16 @@ export async function readScaffoldManifest(cwd: string): Promise<ScaffoldManifes
   try {
     const state = await readState(cwd);
     const scaffold = state.scaffold;
-    if (!scaffold || typeof scaffold !== "object") {
+    // isObject rejects arrays too — `typeof [] === "object"`, and an array
+    // `files` would otherwise enter manifest mode as "0 tracked".
+    if (!isObject(scaffold)) {
       return undefined;
     }
-    if (!scaffold.files || typeof scaffold.files !== "object") {
+    if (!isObject(scaffold.files)) {
       return undefined;
     }
     for (const entry of Object.values(scaffold.files)) {
-      if (!entry || typeof entry !== "object") {
+      if (!isObject(entry)) {
         return undefined;
       }
       if (typeof entry.hash !== "string") {
@@ -45,7 +48,7 @@ export async function readScaffoldManifest(cwd: string): Promise<ScaffoldManifes
         return undefined;
       }
     }
-    return scaffold;
+    return scaffold as unknown as ScaffoldManifest;
   } catch {
     return undefined;
   }

@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { metaSchemaFiles, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
 import { stableStringify } from "../../../json";
@@ -12,6 +15,7 @@ import {
   upsertGuidanceSection,
 } from "./guidance";
 import type {
+  ConfigWiringStatus,
   EjectActions,
   Patcher,
   PatchContext,
@@ -54,6 +58,45 @@ export abstract class AbstractRulePatcher implements Patcher {
       : reclaimableOps(plan);
     const execOpts = opts.missingOnly ? { ...opts, force: false } : opts;
     return scaffold({ ops, summary: plan.summary }, execOpts);
+  }
+
+  /**
+   * Probe whether the labelled config wirings are still applied, using each
+   * merge transform's own idempotency: the transforms only add what is
+   * missing and return the source unchanged when everything they manage is
+   * present, so a changed output means the wiring is absent from the user's
+   * config. A transform that throws cannot evaluate the content (e.g. an
+   * unparsable config the user restructured) — the wiring state is unknown
+   * and no verdict is emitted; other checks report unreadable files.
+   * Read-only.
+   */
+  async verify(
+    ctx: PatchContext,
+    opts: { cwd: string },
+  ): Promise<ReadonlyArray<ConfigWiringStatus>> {
+    const statuses: ConfigWiringStatus[] = [];
+    for (const op of this.plan(ctx).ops) {
+      if (op.kind !== "edit" || !op.wiring) {
+        continue;
+      }
+      const candidates = typeof op.path === "string" ? [op.path] : op.path;
+      let path = candidates[0]!;
+      let source: string | undefined;
+      for (const candidate of candidates) {
+        const contents = await readTextIfExists(join(opts.cwd, candidate));
+        if (contents !== undefined) {
+          path = candidate;
+          source = contents;
+          break;
+        }
+      }
+      try {
+        statuses.push({ path, wiring: op.wiring, applied: op.edit(source) === source });
+      } catch {
+        // Unknown state — no verdict.
+      }
+    }
+    return statuses;
   }
 
   /** Shared base artifacts plus the subclass's marker-bearing route files. */
@@ -214,6 +257,15 @@ export abstract class AbstractRulePatcher implements Patcher {
   protected abstract routeDeps(view: PatchView): ReadonlyArray<string>;
   /** One-line summary of what the integration scaffolded. */
   protected abstract summary(ctx: PatchContext): { title: string; detail: string };
+}
+
+/** Reads a text file, mapping every failure to `undefined`. */
+async function readTextIfExists(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, "utf8");
+  } catch {
+    return undefined;
+  }
 }
 
 /** Builds the `zitadel.json` body persisted at the project root. */

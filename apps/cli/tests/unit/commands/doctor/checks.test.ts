@@ -102,6 +102,79 @@ function ctxFor(cwd: string, dryRun = false): CheckContext {
   return { cwd, orca: createOrca(), cliVersion: "0.1.0-alpha.0", dryRun };
 }
 
+/**
+ * A healthy Angular managed project with every config wiring applied:
+ * `angular.json` carries the proxyConfig + port, the auth routes are in the
+ * route table, and a `dev` script exists. The codex-review reproduction:
+ * detaching only the angular.json wiring must fail doctor even though all
+ * marked files are pristine.
+ */
+async function makeAngularProject(): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-checks-ng-"));
+  tempDirs.push(cwd);
+  await mkdir(join(cwd, ".zitadel"), { recursive: true });
+  await mkdir(join(cwd, "src/app"), { recursive: true });
+
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({
+      name: "demo",
+      scripts: { dev: "ng serve" },
+      dependencies: { "@angular/core": "^19.0.0", "@zitadel/sdk-angular": "latest" },
+    }),
+  );
+  await writeFile(
+    join(cwd, "zitadel.json"),
+    JSON.stringify({
+      project: "proj-001",
+      server: "https://api.zitadel.cloud",
+      framework: { id: "angular" },
+      environments: { development: { issuer: "http://localhost:4200" } },
+    }),
+  );
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
+  await chmod(join(cwd, ".zitadel/secret"), 0o600);
+  await writeFile(
+    join(cwd, "angular.json"),
+    JSON.stringify({
+      projects: {
+        demo: {
+          architect: {
+            serve: { options: { proxyConfig: "proxy.conf.cjs", port: 4200 } },
+          },
+        },
+      },
+    }),
+  );
+  await writeFile(
+    join(cwd, "src/app/app.routes.ts"),
+    [
+      'import { Routes } from "@angular/router";',
+      "",
+      "export const routes: Routes = [",
+      '  { path: "login", children: [] },',
+      '  { path: "register", children: [] },',
+      '  { path: "profile", children: [] },',
+      "];",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(join(cwd, "src/app/app.ts"), `${MANAGED_MARKER}\nexport class App {}\n`);
+  await writeFile(join(cwd, "src/app/app.html"), `<!-- ${MANAGED_MARKER} -->\n<main></main>\n`);
+  await writeFile(join(cwd, "proxy.conf.cjs"), `${MANAGED_MARKER}\nmodule.exports = {};\n`);
+  return cwd;
+}
+
+/** Rewrites angular.json with the serve proxyConfig wiring removed. */
+async function detachAngularProxy(cwd: string): Promise<void> {
+  await writeFile(
+    join(cwd, "angular.json"),
+    JSON.stringify({
+      projects: { demo: { architect: { serve: { options: { port: 4200 } } } } },
+    }),
+  );
+}
+
 afterEach(async () => {
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
@@ -530,6 +603,89 @@ describe("ManagedFilesCheck", () => {
     // Adopted and conditionally-scaffolded files stay out of the manifest.
     expect(scaffold.files).not.toHaveProperty("app/register/page.tsx");
     expect(scaffold.files).not.toHaveProperty("app/page.tsx");
+    const after = await check.run(ctxFor(cwd));
+    expect(after.status).toBe("pass");
+    expect((after.details as ManagedDetails).mode).toBe("manifest");
+  });
+
+  it("fails when a managed config wiring is detached, and --fix re-applies it", async () => {
+    const cwd = await makeAngularProject();
+    const check = new ManagedFilesCheck();
+    const healthy = await check.run(ctxFor(cwd));
+    expect(healthy.status).toBe("pass");
+    expect(healthy.message).toContain("wirings verified");
+
+    // The codex repro: only the angular.json proxy wiring is removed — every
+    // marked file stays pristine, yet auth requests are broken.
+    await detachAngularProxy(cwd);
+    const detached = await check.run(ctxFor(cwd));
+    expect(detached.status).toBe("fail");
+    expect(detached.message).toContain("detached managed config wiring: angular.json");
+
+    await check.fix(ctxFor(cwd));
+
+    const repaired = await check.run(ctxFor(cwd));
+    expect(repaired.status).toBe("pass");
+    const angularJson = JSON.parse(await readFile(join(cwd, "angular.json"), "utf8")) as {
+      projects: { demo: { architect: { serve: { options: Record<string, unknown> } } } };
+    };
+    expect(angularJson.projects.demo.architect.serve.options.proxyConfig).toBe("proxy.conf.cjs");
+  });
+
+  it("warns (not fails) when only the convenience dev script is missing", async () => {
+    const cwd = await makeAngularProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { "@angular/core": "^19.0.0", "@zitadel/sdk-angular": "latest" },
+      }),
+    );
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("unapplied managed config edit(s): package.json");
+  });
+
+  it("degrades to template mode when the manifest files record is an array", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, ".zitadel/state.json"),
+      JSON.stringify({ framework: "next", resources: {}, scaffold: { files: [] } }),
+    );
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("pass");
+    expect((outcome.details as ManagedDetails).mode).toBe("template");
+    expect((outcome.details as ManagedDetails).files.length).toBeGreaterThan(0);
+  });
+
+  it("reconciles retired boundary paths across a Next 15 to 16 upgrade", async () => {
+    const cwd = await makeProject();
+    // The app was scaffolded on Next 15 (manifest demands middleware.ts),
+    // then upgraded to Next 16 — the current templates write proxy.ts.
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+    );
+    await writeScaffoldState(cwd, {
+      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
+    });
+    await rm(join(cwd, "middleware.ts"));
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
+
+    await check.fix(ctxFor(cwd));
+
+    // Repair restored the *current* boundary and the manifest converged on
+    // it: the retired middleware.ts entry is gone, so doctor passes instead
+    // of failing forever (setup skips initialized projects).
+    expect(await readFile(join(cwd, "proxy.ts"), "utf8")).toContain(MANAGED_MARKER);
+    const scaffold = await readScaffoldState(cwd);
+    expect(scaffold.files).not.toHaveProperty("middleware.ts");
+    expect(scaffold.files["proxy.ts"]?.class).toBe("infrastructure");
     const after = await check.run(ctxFor(cwd));
     expect(after.status).toBe("pass");
     expect((after.details as ManagedDetails).mode).toBe("manifest");

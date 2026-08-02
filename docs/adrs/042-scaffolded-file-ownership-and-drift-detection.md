@@ -63,8 +63,23 @@ expectations: presence-only checks over the patcher's marked files minus
 conditionally-scaffolded ones. The fallback judges old scaffolds by current
 templates, so template-set growth or a Next major upgrade across the
 `middleware.ts`/`proxy.ts` boundary can misjudge manifest-less apps; that is
-contained to the fallback and resolves the first time setup or `--fix`
-rewrites the manifest.
+contained to the fallback and ends when `doctor --fix` materializes the
+manifest (`setup` skips initialized projects, so `--fix` is the migration
+path). A manifest-mode `--fix` likewise reconciles retired template paths:
+an entry whose file is gone and which the current plan no longer writes is
+dropped, and newly-introduced template paths the repair restored are
+adopted — a Next 15→16 upgrade converges instead of failing forever.
+
+Beyond whole files, the check verifies the managed *config wirings* — the
+merges the CLI applies into user-owned config files (the Vite and Nuxt
+dev-proxy/runtime merges, Angular's `angular.json` `proxyConfig` and auth
+routes, the Angular `dev` script). Each merging transform is idempotent by
+contract (it only adds what is missing), so running it against the current
+content is a structural probe: a changed output means the wiring is absent.
+Detached `infrastructure` wiring fails the check; a missing `convenience`
+wiring (the `dev` script) warns; a transform that throws on restructured
+content yields no verdict. `--fix` re-applies wirings by replaying the same
+edit ops.
 
 ### `doctor --fix` is restore-missing-only
 
