@@ -70,6 +70,11 @@ export default defineConfig([
     tsconfig: "tsconfig.lib.json",
     dts: true,
     sourcemap: true,
+    // Shipped React JSX declarations (`exports["./jsx"]`). Copied verbatim
+    // into the outDir: the file is a hand-authored ambient
+    // `declare module "react"` block, which the dts bundler must not process
+    // (see src/jsx.d.ts).
+    copy: ["src/jsx.d.ts"],
     // The tsc-emitted project-reference outputs now live in `out-tsc/lib`
     // (tsconfig.lib.json outDir), so build and typecheck no longer share
     // files. `clean: false` stays for a different reason: `clean: true`

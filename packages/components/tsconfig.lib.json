@@ -28,7 +28,8 @@
     "src/css-inline.d.ts"
   ],
   "exclude": [
-    "src/**/*.spec.ts"
+    "src/**/*.spec.ts",
+    "src/jsx.d.ts"
   ],
   "references": [
     {
