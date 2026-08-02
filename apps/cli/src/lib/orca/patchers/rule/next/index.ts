@@ -166,12 +166,12 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     {
       kind: "write",
       path: join(appDir, "login/page.tsx"),
-      contents: renderer.templates.authPage("login").contents,
+      contents: renderer.templates.authPage("login", { useCase: ctx.useCase }).contents,
     },
     {
       kind: "write",
       path: join(appDir, "register/page.tsx"),
-      contents: renderer.templates.authPage("register").contents,
+      contents: renderer.templates.authPage("register", { useCase: ctx.useCase }).contents,
     },
     profile
       ? { kind: "write", path: join(appDir, "profile/page.tsx"), contents: profile.contents }

@@ -60,9 +60,9 @@ export class AngularPatcher extends AbstractRulePatcher {
       {
         kind: "write",
         path: "src/app/app.ts",
-        contents: appComponentTemplate(ctx.project.id),
+        contents: appComponentTemplate(ctx),
       },
-      { kind: "write", path: "src/app/app.html", contents: appTemplateHtml() },
+      { kind: "write", path: "src/app/app.html", contents: appTemplateHtml(ctx) },
       {
         kind: "edit",
         path: "src/app/app.routes.ts",

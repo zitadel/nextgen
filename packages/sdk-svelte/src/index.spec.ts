@@ -6,6 +6,7 @@ import type {
 } from "@zitadel/components";
 
 import { render } from "@testing-library/svelte";
+import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
@@ -13,6 +14,7 @@ import {
 } from "@zitadel/sdk-core/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { businessLocales } from "./lib/index";
 import ZitadelLogin from "./lib/ZitadelLogin.svelte";
 import ZitadelLogout from "./lib/ZitadelLogout.svelte";
 import ZitadelSession from "./lib/ZitadelSession.svelte";
@@ -167,5 +169,11 @@ describe("ZitadelSession", () => {
     const el = component.getElement();
     expect(el?.tagName.toLowerCase()).toBe("zitadel-session");
     expect(el).toBe(container.querySelector("zitadel-session"));
+  });
+});
+
+describe("businessLocales", () => {
+  it("re-exports the business copy overlay from @zitadel/components", () => {
+    expect(businessLocales).toBe(componentsBusinessLocales);
   });
 });

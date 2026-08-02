@@ -39,8 +39,8 @@ export class NuxtPatcher extends AbstractRulePatcher {
       // root on Nuxt 3); nuxt.config, env, and the dep stay at the project root.
       { kind: "write", path: src("app.vue"), contents: appVueTemplate() },
       { kind: "write", path: src("pages/index.vue"), contents: indexPageTemplate() },
-      { kind: "write", path: src("pages/login.vue"), contents: loginPageTemplate() },
-      { kind: "write", path: src("pages/register.vue"), contents: registerPageTemplate() },
+      { kind: "write", path: src("pages/login.vue"), contents: loginPageTemplate(ctx) },
+      { kind: "write", path: src("pages/register.vue"), contents: registerPageTemplate(ctx) },
       { kind: "write", path: src("pages/profile.vue"), contents: profilePageTemplate() },
       {
         kind: "write",
