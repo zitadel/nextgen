@@ -2,7 +2,7 @@ import type { GetMySession200 } from "@zitadel/api/generated/model";
 
 import { getZitadelConfig } from "@zitadel/api/config";
 
-import type { ClientAuthResult } from "./types";
+import type { ClientAuthResult } from "./types.js";
 
 /** Matches the `configureZitadel()` default so zero-config apps agree with the scaffold. */
 const DEFAULT_PROXY_PATH = "/__nextgen";
@@ -106,4 +106,4 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
   };
 }
 
-export type { ClientAuthResult, ClientAuthState, ClientSession } from "./types";
+export type { ClientAuthResult, ClientAuthState, ClientSession } from "./types.js";

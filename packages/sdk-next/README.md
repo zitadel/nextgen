@@ -8,6 +8,22 @@ Next.js middleware and helpers for Nextgen Auth.
 pnpm add @zitadel/sdk-next
 ```
 
+## Entry points
+
+| Import                         | Runs in                          | Provides                                         |
+| ------------------------------ | -------------------------------- | ------------------------------------------------ |
+| `@zitadel/sdk-next/middleware` | Edge middleware                  | `nextgenMiddleware`, `createProxy`               |
+| `@zitadel/sdk-next/server`     | Server Components, Route Handlers | `auth()`                                         |
+| `@zitadel/sdk-next/react`      | Client Components                | `NextgenProvider`, `useAuth()`                   |
+| `@zitadel/sdk-next/session`    | Client Components                | `getSession()`                                   |
+| `@zitadel/sdk-next/client`     | Client boundary                  | Web-component registration, `configureZitadel()` |
+
+The package root re-exports the server and client surfaces together for use
+in server modules. Do not import the root from a `"use client"` module: it
+pulls in the server-only `auth()`, which fails the build with an import trace
+(exactly how depends on the bundler's tree shaking — the supported client
+imports are `/react` and `/session`).
+
 ## Setup
 
 ### 1. Middleware
@@ -40,7 +56,7 @@ The middleware runs on every matched route and does three things in one pass:
 ### 2. Reading auth in a Server Component
 
 ```ts
-import { auth } from "@zitadel/sdk-next";
+import { auth } from "@zitadel/sdk-next/server";
 
 export default async function Page() {
   const session = await auth();
@@ -49,36 +65,66 @@ export default async function Page() {
 }
 ```
 
+`auth()` reads the token the middleware tunnelled into the request headers
+and **verifies it before trusting it** — JWTs cryptographically via JWKS,
+opaque tokens against the backend's `GET /sessions/me` (which also supplies
+the user's identity). A forged `x-nextgen-auth-token` header sent directly by
+a client to a route outside the middleware `matcher` is rejected. Two things
+follow:
+
+- `auth()` only reports a session on routes the `matcher` covers — on other
+  routes the token never reaches it (see section 4 for chrome on public
+  pages).
+- If the middleware runs with custom verification options (`audience`,
+  `allowedAlgorithms`, …), pass the same values to `auth()` so both layers
+  accept the same tokens.
+
+`session.token` is the raw session token, available server-side for calling
+upstream APIs. Never forward it into client components yourself —
+`NextgenProvider` strips it for you (next section).
+
 ### 3. Reading auth in a Client Component
 
-Wrap your app in `NextgenProvider` (e.g. in your root layout):
+Seed the client tree once in your root layout (a Server Component), then
+read the state with `useAuth()` anywhere below it:
 
 ```tsx
-import { NextgenProvider } from '@zitadel/sdk-next';
+import { auth } from '@zitadel/sdk-next/server';
+import { NextgenProvider } from '@zitadel/sdk-next/react';
 
 export default async function RootLayout({ children }) {
   const session = await auth();
   return (
     <html>
       <body>
-        <NextgenProvider value={session}>{children}</NextgenProvider>
+        <NextgenProvider session={session}>{children}</NextgenProvider>
       </body>
     </html>
   );
 }
 ```
 
+`NextgenProvider` converts the `auth()` result to the client-safe shape
+**before** it crosses the server→client boundary: client components receive
+`userId` / `email` / `name`, and the raw session token never enters the RSC
+flight payload, where any script on the page could read it.
+
 Then in any client component:
 
 ```tsx
 'use client';
-import { useAuth } from '@zitadel/sdk-next';
+import { useAuth } from '@zitadel/sdk-next/react';
 
 export function UserBadge() {
   const auth = useAuth();
   return <span>{auth.isAuthenticated ? auth.session.email : 'Guest'}</span>;
 }
 ```
+
+`useAuth()` returns the same client-safe `ClientAuthResult` shape as
+`getSession()` and sdk-nuxt's `useAuth()`. It reflects what the server knew
+when the page rendered — which, like `auth()`, is only a live session on
+routes the middleware `matcher` covers.
 
 ### 4. Session state for your own UI (any page)
 
@@ -182,9 +228,10 @@ export function LoginWidget() {
 2. The JWT header is decoded to extract `kid` and `alg`
 3. Tokens with an `alg` not in `allowedAlgorithms` (`RS256`, `ES256` by default) are rejected immediately — no JWKS fetch
 4. Tokens with a `typ` not in `allowedTokenTypes` are rejected immediately
-5. The public key is fetched from `{url}/oauth/v2/keys` (JWKS) using the Web Crypto API, with a 5 s timeout, and cached for 5 minutes per `kid`
+5. The public key is fetched from `{url}/auth/keys` (JWKS) using the Web Crypto API, with a 5 s timeout, and cached for 5 minutes per `kid`
 6. The signature is verified **before** any claim checks
 7. `iss` must be present and must equal `url` — tokens without an issuer are rejected
 8. `exp` must be present and must be in the future (with `clockSkewMs` tolerance) — tokens without an expiry are rejected
 9. `nbf` and `iat` are validated with `clockSkewMs` tolerance when present
 10. The `x-nextgen-auth-token` header is stripped from all proxied requests to prevent internal state leakage
+11. `auth()` re-applies the same verification to the tunnelled token in the server runtime — the header alone is never treated as proof of a session

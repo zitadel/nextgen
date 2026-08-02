@@ -10,7 +10,7 @@ import {
 } from "@zitadel/sdk-core/middleware";
 import { NextResponse } from "next/server";
 
-import { verifyJwt, base64UrlDecode } from "./lib/jwt";
+import { verifyJwt, isJwtShaped } from "./lib/jwt.js";
 
 /**
  * Clones the incoming request headers, injects `extra` key/value pairs,
@@ -124,34 +124,6 @@ export async function nextgenMiddleware(
     jwksTimeoutMs,
     pathname,
   });
-}
-
-const DECODER = new TextDecoder();
-
-/**
- * Returns `true` when `token` looks structurally like a signed JWT (JWS) —
- * NOT an encrypted token (JWE).
- *
- * JWS compact: 3 dot-separated segments; header has `alg` but NOT `enc`.
- * JWE compact: 5 dot-separated segments; header has BOTH `alg` and `enc`.
- *
- * Our backend issues JWE tokens (AES-256-GCM via go-jose `A256GCMKW/A256GCM`),
- * whose compact form is `header.encrypted_key.iv.ciphertext.tag`. The header
- * decodes to JSON with `"alg":"A256GCMKW","enc":"A256GCM"`. Checking for the
- * absence of `enc` correctly identifies signed JWTs without false-positives on
- * JWE tokens.
- *
- * This is a structural check only — not a security check.
- */
-function isJwtShaped(token: string): boolean {
-  const parts = token.split(".");
-  if (parts.length < 3 || !parts[0]) return false;
-  try {
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
-    return typeof header?.alg === "string" && !("enc" in header);
-  } catch {
-    return false;
-  }
 }
 
 /**

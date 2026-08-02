@@ -16,6 +16,10 @@
     "dist"
   ],
   "type": "module",
+  "sideEffects": [
+    "./dist/client.js",
+    "./dist/auth.js"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -28,6 +32,10 @@
     "./client": {
       "types": "./dist/client.d.ts",
       "import": "./dist/client.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
     },
     "./middleware": {
       "types": "./dist/middleware.d.ts",
@@ -45,7 +53,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/middleware.ts src/auth.ts src/context.tsx src/useAuth.ts src/types.ts src/session.ts src/index.ts src/server.ts src/client.ts --format esm --dts --clean --tsconfig tsconfig.build.json && node -e \"require('node:fs').copyFileSync('src/jsx.d.ts', 'dist/jsx.d.ts')\"",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json && node -e \"require('node:fs').copyFileSync('src/jsx.d.ts', 'dist/jsx.d.ts')\"",
     "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run --passWithNoTests",
     "lint": "eslint ."
@@ -81,7 +89,6 @@
     "jsdom": "catalog:",
     "next": "^16.2.11",
     "prettier": "catalog:",
-    "tsup": "catalog:",
     "typescript": "^5.7.3",
     "typescript-eslint": "catalog:",
     "vitest": "^3.0.0"
