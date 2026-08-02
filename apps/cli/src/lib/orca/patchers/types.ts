@@ -1,5 +1,6 @@
 import type { FrameworkFacts } from "../detectors/types";
 import type { CreateProjectResponse } from "../../api/client";
+import type { ScaffoldFileClass } from "../../sync/types";
 
 /**
  * The minimal, project-independent view a patcher needs to enumerate the files
@@ -48,6 +49,22 @@ export type PatchExecOptions = Readonly<{
   cwd: string;
   dryRun: boolean;
   force: boolean;
+  /**
+   * Restrict the run to artifacts whose target file does not exist yet.
+   * `doctor --fix` sets this so a repair can only ever restore missing
+   * managed files — never overwrite an edited or user-adopted one.
+   * Additive ops (env merges, gitignore entries, dependency additions)
+   * still apply; they are idempotent by construction.
+   */
+  missingOnly?: boolean;
+  /**
+   * Paths whose content ops must not run in this repair. `doctor --fix`
+   * excludes a current template file whose retired alternate still exists
+   * with user modifications (creating Next 16's `proxy.ts` beside an edited
+   * `middleware.ts` would break the build) — the conflict is reported
+   * instead.
+   */
+  excludePaths?: ReadonlyArray<string>;
 }>;
 
 /**
@@ -100,6 +117,22 @@ export type PatchResult = Readonly<{
  *   marker-fenced managed guidance section. `eject` strips just the section
  *   (content outside the markers is preserved); the whole file is deleted only
  *   when nothing but the scaffold-created header would remain.
+ * - `fileClasses` — ownership class per marked file for the `doctor`
+ *   managed-files check: `infrastructure` files are load-bearing (missing ⇒
+ *   fail), everything else is `presentation` (missing ⇒ warn). Optional so
+ *   older/simpler patchers stay compile-compatible; absent means every marked
+ *   file is presentation.
+ * - `conditionalFiles` — marked files only written on some scaffolds (e.g. the
+ *   framework home page, written only when setup created the app skeleton).
+ *   The managed-files check excludes them when no scaffold manifest recorded
+ *   what was actually written.
+ * - `retiredAlternates` — maps a current marked file to sibling paths that
+ *   older templates wrote in its place and the framework rejects alongside it
+ *   (Next ≥16 throws when both `proxy.ts` and `middleware.ts` exist). The
+ *   managed-files check uses it to drive boundary migration: a pristine
+ *   retired sibling is removed by `--fix` before the current file is created;
+ *   an edited or adopted one is a conflict the user must resolve, and the
+ *   current file is *not* created next to it.
  */
 export type EjectActions = Readonly<{
   markedFiles: ReadonlyArray<string>;
@@ -109,24 +142,56 @@ export type EjectActions = Readonly<{
   dependencies: ReadonlyArray<string>;
   configEdits: ReadonlyArray<string>;
   guidanceFiles: ReadonlyArray<string>;
+  fileClasses?: Readonly<Record<string, ScaffoldFileClass>>;
+  conditionalFiles?: ReadonlyArray<string>;
+  retiredAlternates?: Readonly<Record<string, ReadonlyArray<string>>>;
+}>;
+
+/**
+ * The verification result for one managed config wiring (a dev-proxy merge,
+ * a route registration). Produced by {@link Patcher.verify}.
+ *
+ * - `applied` — the merge is present in the user's config.
+ * - `detached` — the merge is absent: the transform would re-add it, or the
+ *   host config file does not exist at all (a missing `angular.json` means
+ *   the wiring is definitionally gone, not unknowable).
+ * - `unknown` — the transform cannot evaluate the current content (thrown:
+ *   restructured or unparsable config, e.g. a multi-project `angular.json`
+ *   without `defaultProject`). Surfaced as a warning, never silently
+ *   dropped.
+ */
+export type ConfigWiringStatus = Readonly<{
+  path: string;
+  wiring: "infrastructure" | "convenience";
+  state: "applied" | "detached" | "unknown";
 }>;
 
 /**
  * Integrates Zitadel into an existing project of a specific framework. The
  * interface is execution-strategy-agnostic: a rule-based patcher applies file
  * operations, while a future LLM-based patcher would drive an agent — callers
- * only see {@link patch}/{@link repair}/{@link artifacts} and never a file-op
- * plan. `patch` performs the full integration; `repair` re-applies the managed
- * artifacts (`doctor --fix`); `artifacts` describes them for marker-aware
- * ejection.
+ * only see {@link patch}/{@link repair}/{@link artifacts}/{@link verify} and
+ * never a file-op plan. `patch` performs the full integration; `repair`
+ * re-applies the managed artifacts (`doctor --fix`); `artifacts` describes
+ * them for marker-aware ejection; `verify` probes whether the config wirings
+ * are still applied.
  */
 export interface Patcher {
   /** Whether this patcher integrates the given framework id. */
   canPatch(framework: string): boolean;
   /** Apply the full Zitadel integration to the project. */
   patch(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult>;
-  /** Re-apply just the managed artifacts, reclaiming locally-edited ones. */
+  /**
+   * Re-apply just the managed artifacts. With `opts.missingOnly` (the
+   * `doctor --fix` path) only missing files are restored; existing files —
+   * edited or user-adopted — are never overwritten.
+   */
   repair(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult>;
   /** Describe the files/dirs this integration owns, for marker-aware ejection. */
   artifacts(view: PatchView): EjectActions;
+  /**
+   * Probe whether the integration's managed config wirings are still applied
+   * to the user's config files, without mutating anything. Read-only.
+   */
+  verify(ctx: PatchContext, opts: { cwd: string }): Promise<ReadonlyArray<ConfigWiringStatus>>;
 }

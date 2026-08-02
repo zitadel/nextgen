@@ -108,6 +108,24 @@ export function readRendererId(config: Record<string, unknown>): string {
   return value === "default" ? "react" : value;
 }
 
+/**
+ * Reads the recorded sign-in preset from a parsed `zitadel.json`, if present.
+ * Setup persists it (see the patcher's `projectConfig`); absent means
+ * password-first per the setup default.
+ */
+export function readPreset(config: Record<string, unknown>): string | undefined {
+  return typeof config.preset === "string" ? config.preset : undefined;
+}
+
+/**
+ * Reads the recorded use case from a parsed `zitadel.json`, if present.
+ * Guidance-only, like the field itself — behavior lives in the generated
+ * schema/flow files.
+ */
+export function readUseCase(config: Record<string, unknown>): string | undefined {
+  return typeof config.useCase === "string" ? config.useCase : undefined;
+}
+
 /** Reads `environments.development.issuer` from a parsed `zitadel.json`, if present. */
 export function readDevelopmentIssuer(config: Record<string, unknown>): string | undefined {
   if (isObject(config.environments) && isObject(config.environments.development)) {

@@ -164,6 +164,27 @@ describe("Next setup integration", () => {
       id: schemaId,
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
+    // Setup also records the scaffold manifest: exactly the app files it
+    // wrote, with content hashes and ownership classes, so `doctor` can later
+    // tell missing from edited from user-adopted. This fixture is a
+    // pre-existing app, so the framework home page is absent from the record.
+    const scaffold = (
+      state as unknown as {
+        scaffold: {
+          files: Record<string, { hash: string; class: string }>;
+          scaffolded_framework?: boolean;
+        };
+      }
+    ).scaffold;
+    // The fixture declares next ^16, so the boundary is proxy.ts.
+    expect(scaffold.files["proxy.ts"]).toMatchObject({
+      class: "infrastructure",
+      hash: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(scaffold.files["custom-elements.d.ts"]?.class).toBe("infrastructure");
+    expect(scaffold.files["app/login/page.tsx"]?.class).toBe("presentation");
+    expect(scaffold.files).not.toHaveProperty("app/page.tsx");
+    expect(scaffold.scaffolded_framework).toBeUndefined();
     expect(state.resources[".zitadel/flows/default-login.json"]).toMatchObject({
       id: expect.stringMatching(/^flow_/),
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),
