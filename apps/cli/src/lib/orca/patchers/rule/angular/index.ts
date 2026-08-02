@@ -79,6 +79,12 @@ export class AngularPatcher extends AbstractRulePatcher {
     return ["src/app/app.ts", "src/app/app.html", "proxy.conf.cjs"];
   }
 
+  protected override infrastructureFiles(_view: PatchView): ReadonlyArray<string> {
+    // The dev proxy is the auth request path (it also attaches the project
+    // secret); the root component pair is the user's customization surface.
+    return ["proxy.conf.cjs"];
+  }
+
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {
     return [SDK_DEPENDENCY];
   }

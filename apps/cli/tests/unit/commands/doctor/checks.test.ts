@@ -471,6 +471,70 @@ describe("ManagedFilesCheck", () => {
     expect((await readScaffoldState(cwd)).files["middleware.ts"]?.hash).toBe("0".repeat(64));
   });
 
+  it("fix never re-pins an already-declared SDK dependency version", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^15", "@zitadel/sdk-next": "user-pinned-0.0.1" },
+      }),
+    );
+    await rm(join(cwd, "middleware.ts"));
+
+    await new ManagedFilesCheck().fix(ctxFor(cwd));
+
+    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
+    const pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies["@zitadel/sdk-next"]).toBe("user-pinned-0.0.1");
+  });
+
+  it("degrades to template mode when a manifest entry is malformed", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, ".zitadel/state.json"),
+      JSON.stringify({
+        framework: "next",
+        resources: {},
+        scaffold: { files: { "middleware.ts": null } },
+      }),
+    );
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("pass");
+    expect((outcome.details as ManagedDetails).mode).toBe("template");
+  });
+
+  it("template-mode fix materializes a manifest for pre-manifest apps", async () => {
+    const cwd = await makeProject();
+    // A pre-manifest app: state.json exists (sync resources) but has no
+    // scaffold section. One page was adopted by the user; the boundary is
+    // missing.
+    await writeFile(
+      join(cwd, ".zitadel/state.json"),
+      JSON.stringify({ framework: "next", resources: {} }),
+    );
+    await writeFile(join(cwd, "app/register/page.tsx"), "export default function Own() {}\n");
+    await rm(join(cwd, "middleware.ts"));
+    const check = new ManagedFilesCheck();
+    expect(((await check.run(ctxFor(cwd))).details as ManagedDetails).mode).toBe("template");
+
+    await check.fix(ctxFor(cwd));
+
+    const scaffold = await readScaffoldState(cwd);
+    expect(scaffold.files["middleware.ts"]?.class).toBe("infrastructure");
+    expect(scaffold.files["app/login/page.tsx"]?.class).toBe("presentation");
+    // Adopted and conditionally-scaffolded files stay out of the manifest.
+    expect(scaffold.files).not.toHaveProperty("app/register/page.tsx");
+    expect(scaffold.files).not.toHaveProperty("app/page.tsx");
+    const after = await check.run(ctxFor(cwd));
+    expect(after.status).toBe("pass");
+    expect((after.details as ManagedDetails).mode).toBe("manifest");
+  });
+
   it("restores the framework home page when the manifest recorded a fresh scaffold", async () => {
     const cwd = await makeProject();
     await writeScaffoldState(cwd, {

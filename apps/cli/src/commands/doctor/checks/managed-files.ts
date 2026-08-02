@@ -4,7 +4,11 @@ import { join } from "node:path";
 import type { EjectActions } from "../../../lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../lib/paths";
 import { readRendererId, readZitadelConfig } from "../../../lib/project";
-import { hashScaffoldFile, readScaffoldManifest } from "../../../lib/scaffold-manifest";
+import {
+  hashScaffoldFile,
+  readScaffoldManifest,
+  writeScaffoldManifest,
+} from "../../../lib/scaffold-manifest";
 import { updateScaffold } from "../../../lib/sync/state";
 import type { ScaffoldFileClass, ScaffoldManifest } from "../../../lib/sync/types";
 import { loadPatchContext } from "../patch-context";
@@ -98,19 +102,30 @@ export class ManagedFilesCheck implements SanityCheck {
    * the manifest hashes of the files the repair brought back so they classify
    * as pristine again. The restored bytes come from the *current* templates,
    * which may differ from what the original CLI version wrote; the re-hash
-   * records that honestly.
+   * records that honestly. On a pre-manifest app (template mode) a successful
+   * repair also materializes the manifest from the marker-bearing files now
+   * on disk, completing the migration ADR 042 promises — adopted files stay
+   * the user's and are not recorded.
    */
   async fix(ctx: CheckContext): Promise<void> {
     const manifest = await readScaffoldManifest(ctx.cwd);
     const missingBefore = manifest ? await missingManifestPaths(ctx.cwd, manifest) : [];
     const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca, ctx.cliVersion);
-    await ctx.orca.patcherFor(patchCtx.framework.id).repair(patchCtx, {
+    const patcher = ctx.orca.patcherFor(patchCtx.framework.id);
+    await patcher.repair(patchCtx, {
       cwd: ctx.cwd,
       dryRun: ctx.dryRun,
       force: false,
       missingOnly: true,
     });
-    if (ctx.dryRun || !manifest || missingBefore.length === 0) {
+    if (ctx.dryRun) {
+      return;
+    }
+    if (!manifest) {
+      await materializeManifest(ctx, patchCtx);
+      return;
+    }
+    if (missingBefore.length === 0) {
       return;
     }
     const files = { ...manifest.files };
@@ -125,6 +140,41 @@ export class ManagedFilesCheck implements SanityCheck {
       }
     }
     await updateScaffold(ctx.cwd, { ...manifest, files });
+  }
+}
+
+/**
+ * Migration path for apps scaffolded before the manifest existed: after a
+ * template-mode repair, record the marker-bearing managed files now on disk
+ * so the next doctor run gets exact manifest-mode verification instead of
+ * template guessing (and its Next-major / template-growth misclassification
+ * risk). Marker-less (adopted) files and conditionally-scaffolded ones are
+ * deliberately absent. Best-effort: an unreadable state file leaves the app
+ * in template mode, same as before.
+ */
+async function materializeManifest(
+  ctx: CheckContext,
+  patchCtx: Awaited<ReturnType<typeof loadPatchContext>>,
+): Promise<void> {
+  try {
+    const actions = ctx.orca.patcherFor(patchCtx.framework.id).artifacts({
+      framework: patchCtx.framework,
+      rendererId: patchCtx.rendererId,
+    });
+    const conditional = new Set(actions.conditionalFiles ?? []);
+    const marked: string[] = [];
+    for (const path of actions.markedFiles) {
+      if (conditional.has(path)) {
+        continue;
+      }
+      const contents = await readIfExists(join(ctx.cwd, path));
+      if (contents !== undefined && contents.includes(MANAGED_MARKER)) {
+        marked.push(path);
+      }
+    }
+    await writeScaffoldManifest({ cwd: ctx.cwd, actions, written: marked });
+  } catch {
+    // state.json unreadable or the write raced — stays in template mode.
   }
 }
 

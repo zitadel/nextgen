@@ -77,9 +77,14 @@ export abstract class AbstractRulePatcher implements Patcher {
 
   /**
    * The subset of {@link routeFiles} that is load-bearing for the integration
-   * (request boundary, provider, type declarations). The `doctor`
+   * (request boundary, proxies, plugins, type declarations). The `doctor`
    * managed-files check fails when one is missing; everything else is a
-   * presentation starting point and only warns. Defaults to none.
+   * presentation starting point and only warns. Every patcher whose marked
+   * files include plumbing must override this — Next (boundary/provider/dts),
+   * Angular (proxy.conf.cjs), and Nuxt (plugins) do. The Vite SPAs' only
+   * marked file is the root component (presentation); their plumbing lives in
+   * `vite.config.*`, which is a config-edit merge into a user file and out of
+   * the file check's reach. Defaults to none.
    */
   protected infrastructureFiles(_view: PatchView): ReadonlyArray<string> {
     return [];

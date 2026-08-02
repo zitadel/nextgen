@@ -1,6 +1,7 @@
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { isObject } from "../../../json";
 import { MANAGED_MARKER } from "../../../paths";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 
@@ -34,9 +35,14 @@ export function reclaimableOps(plan: ScaffoldPlan): FileOp[] {
  * content ops (`write`, and `edit` marked `overwrites`) survive only when
  * their target file does not exist, so the repair can restore a deleted
  * managed file but can never touch an edited or user-adopted one. Merging
- * `edit` transforms and the additive kinds (`merge-env`, `append-gitignore`,
- * `add-dep`) pass through — they are idempotent and only add what is missing.
- * Reads the filesystem; paths resolve against `cwd` like the file-writer's.
+ * `edit` transforms and the additive kinds (`merge-env`, `append-gitignore`)
+ * pass through — they are idempotent and only add what is missing. `add-dep`
+ * is additive only while the dependency is absent: `addDependency` replaces
+ * a differing existing version, so under missing-only semantics the op is
+ * dropped whenever the dependency is already declared at *any* version —
+ * repairing an unrelated missing file must never rewrite a user-pinned
+ * range. Reads the filesystem; paths resolve against `cwd` like the
+ * file-writer's.
  */
 export async function withoutExistingTargets(
   ops: ReadonlyArray<FileOp>,
@@ -60,9 +66,40 @@ export async function withoutExistingTargets(
       }
       continue;
     }
+    if (op.kind === "add-dep") {
+      if (!(await dependencyDeclared(cwd, op.name))) {
+        kept.push(op);
+      }
+      continue;
+    }
     kept.push(op);
   }
   return kept;
+}
+
+/**
+ * Whether `package.json` already declares `name` in dependencies or
+ * devDependencies, at any version. A missing or unparsable `package.json`
+ * counts as "not declared" so the op is kept and the file-writer's own
+ * error handling reports the real problem.
+ */
+async function dependencyDeclared(cwd: string, name: string): Promise<boolean> {
+  let contents: string;
+  try {
+    contents = await readFile(join(cwd, "package.json"), "utf8");
+  } catch {
+    return false;
+  }
+  try {
+    const pkg = JSON.parse(contents) as unknown;
+    if (!isObject(pkg)) {
+      return false;
+    }
+    const declared = (key: string): boolean => isObject(pkg[key]) && name in (pkg[key] as object);
+    return declared("dependencies") || declared("devDependencies");
+  } catch {
+    return false;
+  }
 }
 
 async function exists(path: string): Promise<boolean> {

@@ -70,9 +70,13 @@ rewrites the manifest.
 
 All repairs run through the patcher's `repair` with `missingOnly`: content
 ops replay only when their target file does not exist, and additive ops
-(env merges, gitignore entries, the SDK dependency) stay idempotent. A repair
-can therefore restore a deleted managed file but can never overwrite an
-edited or adopted one. This deliberately **narrows** the dependency check's
+(env merges, gitignore entries) stay idempotent. The SDK dependency is
+re-added only while absent — replacing a differing declared version would be
+an overwrite of a user-pinned range, not a restore. A repair can therefore
+restore a deleted managed file but can never overwrite an edited or adopted
+one. On a pre-manifest app, a successful repair also materializes the
+manifest from the marker-bearing files on disk (adopted files stay the
+user's), completing the migration out of fallback mode. This deliberately **narrows** the dependency check's
 previous `force: true` repair, which could clobber user edits; the flag's
 documented text ("Re-apply missing managed files") already described the new
 behavior. Restored files are re-hashed into the manifest — the bytes come

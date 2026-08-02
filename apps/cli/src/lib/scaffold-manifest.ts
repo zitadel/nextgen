@@ -18,9 +18,11 @@ export function hashScaffoldFile(contents: string): string {
 
 /**
  * Read the scaffold manifest from `.zitadel/state.json`, or `undefined` when
- * the file, the section, or its `files` record is missing or malformed.
+ * the file, the section, its `files` record, or any file entry is missing or
+ * malformed (each entry needs a string `hash` and a known `class`).
  * `undefined` sends the doctor managed-files check into its template-derived
- * fallback mode, so a corrupt manifest degrades rather than breaks.
+ * fallback mode, so a corrupt or future-shaped manifest degrades rather than
+ * breaks.
  */
 export async function readScaffoldManifest(cwd: string): Promise<ScaffoldManifest | undefined> {
   try {
@@ -31,6 +33,17 @@ export async function readScaffoldManifest(cwd: string): Promise<ScaffoldManifes
     }
     if (!scaffold.files || typeof scaffold.files !== "object") {
       return undefined;
+    }
+    for (const entry of Object.values(scaffold.files)) {
+      if (!entry || typeof entry !== "object") {
+        return undefined;
+      }
+      if (typeof entry.hash !== "string") {
+        return undefined;
+      }
+      if (entry.class !== "infrastructure" && entry.class !== "presentation") {
+        return undefined;
+      }
     }
     return scaffold;
   } catch {
