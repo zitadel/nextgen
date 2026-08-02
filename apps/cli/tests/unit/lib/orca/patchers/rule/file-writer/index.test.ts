@@ -64,6 +64,27 @@ describe("scaffold - mkdir", () => {
     expect(second.filesSkipped).toEqual([join(dir, "app")]);
   });
 
+  it("never reports mode healing on win32, where POSIX modes are not implemented", async () => {
+    await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o755 }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    const descriptor = Object.getOwnPropertyDescriptor(process, "platform")!;
+    Object.defineProperty(process, "platform", { value: "win32" });
+    try {
+      const rerun = await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o700 }), {
+        cwd: dir,
+        dryRun: false,
+        force: false,
+      });
+      expect(rerun.files).toEqual([]);
+      expect(rerun.filesSkipped).toEqual([join(dir, "vault")]);
+    } finally {
+      Object.defineProperty(process, "platform", descriptor);
+    }
+  });
+
   it("reports a permission repair on an existing directory as an update, not a skip", async () => {
     await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o755 }), {
       cwd: dir,
@@ -560,6 +581,37 @@ describe("scaffold - reporting", () => {
 });
 
 describe("scaffold - add-dep formatting", () => {
+  it("changes only the dependency block, byte-for-byte", async () => {
+    // Blank line + inline nested objects: the splice must not normalize them.
+    const source = `{
+  "name": "demo",
+  "engines": { "node": ">=20" },
+
+  "scripts": {"dev": "next dev"},
+  "dependencies": {
+    "next": "^16"
+  }
+}
+`;
+    await writeFile(join(dir, "package.json"), source);
+    await scaffold(plan({ kind: "add-dep", name: "@zitadel/sdk-next", version: "1.2.3" }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    expect(await readFile(join(dir, "package.json"), "utf8")).toBe(`{
+  "name": "demo",
+  "engines": { "node": ">=20" },
+
+  "scripts": {"dev": "next dev"},
+  "dependencies": {
+    "@zitadel/sdk-next": "1.2.3",
+    "next": "^16"
+  }
+}
+`);
+  });
+
   it("preserves the user's key order, indentation, and trailing newline", async () => {
     const source = `{
     "name": "demo",

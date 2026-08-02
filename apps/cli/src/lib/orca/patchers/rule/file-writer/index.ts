@@ -5,8 +5,8 @@ import { ZitadelError } from "../../../../errors";
 import {
   isObject,
   parseJsonObject,
+  setTopLevelJsonKey,
   stableStringify,
-  updateJsonPreservingOrder,
 } from "../../../../json";
 import type { PatchedFile } from "../../types";
 import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./types";
@@ -182,10 +182,17 @@ async function ensureDir(
 ): Promise<void> {
   // An already-existing directory is a skip — unless its permissions drifted
   // from the requested mode, in which case the chmod below repairs them and
-  // the report says so (an "update" row, not a silent skip).
+  // the report says so (an "update" row, not a silent skip). Windows does not
+  // implement POSIX permission classes (only the write bit is changeable), so
+  // there the mode comparison is meaningless and healing is never reported —
+  // otherwise every rerun would flag `.zitadel` as an update forever.
   const pre = await stat(path).catch(() => undefined);
   const existed = pre?.isDirectory() ?? false;
-  const healsMode = existed && mode !== undefined && (pre!.mode & 0o777) !== mode;
+  const healsMode =
+    existed &&
+    mode !== undefined &&
+    process.platform !== "win32" &&
+    (pre!.mode & 0o777) !== mode;
   if (dryRun) {
     if (!existed) {
       record(result, path, "dir", "create");
@@ -371,12 +378,16 @@ async function addDependency(
     result.filesSkipped.push(path);
     return;
   }
-  // package.json is user-owned: splice the dependency in without reordering
-  // the user's top-level keys or reformatting the document. Only the touched
-  // dependency map is name-sorted, matching what a package manager writes.
-  const contents = updateJsonPreservingOrder(existing, path, (pkg) => {
-    pkg[key] = sortByKey({ ...deps, [op.name]: op.version });
-  });
+  // package.json is user-owned: splice only the dependency map's value into
+  // the document. Every byte outside it — key order, blank lines, inline
+  // objects, line endings — stays untouched; the touched map itself is
+  // name-sorted, matching what a package manager writes.
+  const contents = setTopLevelJsonKey(
+    existing,
+    path,
+    key,
+    sortByKey({ ...deps, [op.name]: op.version }),
+  );
   if (dryRun) {
     record(result, path, "file", "update");
     result.depsAdded.push(op.name);
