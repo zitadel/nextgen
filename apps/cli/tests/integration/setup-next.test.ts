@@ -44,6 +44,7 @@ describe("Next setup integration", () => {
       data: {
         install: { status: string; package_manager: string; command: string };
         files_written: string[];
+        files: Array<{ path: string; kind: string; action: string }>;
         next_actions: string[];
         next_commands: string[];
       };
@@ -67,6 +68,36 @@ describe("Next setup integration", () => {
     expect(setupJson.data.next_actions.join("\n")).toContain("See your changes before they go live");
     expect(setupJson.data.files_written).toContain(".zitadel/schemas/default-human-user.json");
     expect(setupJson.data.files_written).toContain(".zitadel/flows/default-login.json");
+    // files_written carries deduplicated file paths only: no directories,
+    // and a path touched by several plan ops (both env files are) once.
+    expect(new Set(setupJson.data.files_written).size).toBe(setupJson.data.files_written.length);
+    expect(setupJson.data.files_written).not.toContain(".zitadel");
+    expect(setupJson.data.files_written.filter((path) => path === ".env.local")).toHaveLength(1);
+    // The typed rows label each scaffolded artifact with kind and action;
+    // the fixture is a pre-existing app, so its package.json is an update
+    // while the boundary is a create.
+    expect(setupJson.data.files).toContainEqual({
+      path: "proxy.ts",
+      kind: "file",
+      action: "create",
+    });
+    expect(setupJson.data.files).toContainEqual({
+      path: "package.json",
+      kind: "file",
+      action: "update",
+    });
+    expect(setupJson.data.files).toContainEqual({
+      path: ".zitadel",
+      kind: "dir",
+      action: "create",
+    });
+    // package.json stays the user's file: top-level key order and formatting
+    // survive the dependency splice (the fixture starts with name/private).
+    const pkgText = await readFile(join(cwd, "package.json"), "utf8");
+    expect(Object.keys(JSON.parse(pkgText) as Record<string, unknown>).slice(0, 2)).toEqual([
+      "name",
+      "private",
+    ]);
 
     // Scaffolded guidance: AGENTS.md for agents, a README section for
     // humans, and the dialect meta-schemas the flow files' $schema points at.

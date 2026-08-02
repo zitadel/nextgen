@@ -416,6 +416,15 @@ export default class Setup extends BaseCommand {
         framework: framework.id,
         server: answers.server,
         files_written: allFilesWritten.map((file) => relativeDisplay(cwd, file)),
+        // Typed per-artifact rows for the scaffolded app files (the sync
+        // resources continue to report through files_written): one row per
+        // touched path with kind (file/dir) and action (create/update), so
+        // agents can verify what setup did without parsing narration.
+        files: result.files.map((file) => ({
+          path: relativeDisplay(cwd, file.path),
+          kind: file.kind,
+          action: file.action,
+        })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
         next_actions: installOutcome.nextActions,
@@ -640,25 +649,13 @@ function pickWrittenFile(written: string[], suffix: string): string | undefined 
 
 /**
  * Translates a patcher-written path into a single sentence the user can
- * read at narration speed. Returns `null` for directories and other
- * scaffolding artefacts that aren't worth narrating individually — the
- * file count in the closing `success(...)` and the summary's INSTALLED
- * section already cover them. The verb tense flips for `--dry-run` so
- * the user sees a preview ("Would write ...") instead of a claim that
- * something happened.
+ * read at narration speed. The patch result's `filesWritten` carries
+ * deduplicated file paths only (directories stay in the typed `files`
+ * rows), so no artefact filtering is needed here. The verb tense flips
+ * for `--dry-run` so the user sees a preview ("Would write ...") instead
+ * of a claim that something happened.
  */
 function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
-  // Mkdir ops surface in `filesWritten` alongside actual file writes.
-  // They're noise at the per-step layer (the files inside them get
-  // narrated on their own lines), so swallow them here.
-  if (
-    relPath === ".zitadel" ||
-    relPath === ".zitadel/flows" ||
-    relPath === ".zitadel/schemas" ||
-    relPath === ".zitadel/meta"
-  ) {
-    return null;
-  }
   const verb = dryRun ? "Would write" : "Wrote";
   const sentence = SENTENCE_BY_PATH[relPath];
   if (sentence) {
