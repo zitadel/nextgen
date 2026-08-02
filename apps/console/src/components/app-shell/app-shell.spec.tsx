@@ -27,11 +27,22 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * does not exist". Also covers the theme toggle writing `data-theme` and
  * persisting the preference.
  */
-const NAV_ORDER = ["Projects", "Users"];
-// Sessions is absent for a different reason than the other four: its screen was
-// built, but `GET /sessions` answers 501 (#699), so the link only ever reached
-// an error boundary. It returns with the endpoint.
-const NEVER_SHOWN = ["App groups", "Applications", "Analytics", "Activity Log", "Sessions"];
+// Users is the only surface with a design hand-off, so it is the only thing the
+// sidebar offers.
+const NAV_ORDER = ["Users"];
+// Absent for three different reasons, all of them deliberate:
+//   - the first four have no endpoint at all
+//   - Sessions was built, but `GET /sessions` answers 501 (#699)
+//   - Projects works and stays reachable at its URL; it has simply never been
+//     designed, so it is not advertised as a finished screen
+const NEVER_SHOWN = [
+  "App groups",
+  "Applications",
+  "Analytics",
+  "Activity Log",
+  "Sessions",
+  "Projects",
+];
 
 // A path pattern rather than an absolute URL: this spec imports the router
 // statically, so `api/zitadel.ts` evaluates its base URL before `vi.stubEnv`
@@ -53,7 +64,7 @@ function renderShell() {
 describe("app shell navigation", () => {
   it("lists only built screens, every one of them a link", async () => {
     renderShell();
-    await screen.findByRole("link", { name: /^Projects/ });
+    await screen.findByRole("link", { name: /^Users/ });
     const nav = within(screen.getByRole("navigation", { name: "Primary" }));
 
     const items = nav.getAllByRole("listitem");
@@ -67,7 +78,7 @@ describe("app shell navigation", () => {
 
   it("does not advertise screens that have no endpoint behind them", async () => {
     renderShell();
-    await screen.findByRole("link", { name: /^Projects/ });
+    await screen.findByRole("link", { name: /^Users/ });
     const nav = within(screen.getByRole("navigation", { name: "Primary" }));
 
     for (const label of NEVER_SHOWN) {
@@ -85,7 +96,7 @@ describe("theme toggle", () => {
 
   it("switches data-theme and persists the preference", async () => {
     renderShell();
-    await screen.findByRole("link", { name: /^Projects/ });
+    await screen.findByRole("link", { name: /^Users/ });
 
     await userEvent.click(screen.getByRole("radio", { name: "Light" }));
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
