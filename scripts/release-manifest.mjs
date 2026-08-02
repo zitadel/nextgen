@@ -119,6 +119,12 @@ export const PUBLIC_RELEASE_PACKAGES = [
     moonProject: "sdk-qwik",
     buildTarget: "sdk-qwik:build-release",
   },
+  {
+    name: "@zitadel/testing",
+    dir: "packages/testing",
+    moonProject: "testing",
+    buildTarget: "testing:build-release",
+  },
 ];
 
 export const PUBLIC_PACKAGE_DIRS = PUBLIC_RELEASE_PACKAGES.map((pkg) => pkg.dir);

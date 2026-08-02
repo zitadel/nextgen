@@ -63,11 +63,11 @@ tasks:
 
   # Real-data dev loop: boots a seeded ephemeral instance, then the dev server
   # against it. The console manages an instance, so its list screens are only
-  # meaningful against a real backend (see scripts/dev-real.mts).
+  # meaningful against a real backend (see scripts/dev-real.mts). The script
+  # runs `moon run server:build` itself; a task dep on it here would cycle the
+  # project graph, because server:build depends on console:build.
   dev-real:
     command: "corepack pnpm run dev:real"
-    deps:
-      - "server:build"
     options:
       persistent: true
       runInCI: false

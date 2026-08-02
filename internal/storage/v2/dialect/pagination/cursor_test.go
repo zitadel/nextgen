@@ -27,8 +27,7 @@ func TestCursorMarshalRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, decoded.MatchesOrderBy(original.Columns))
 	require.Len(t, decoded.Values, 2)
-	_, ok := decoded.Values[0].(string)
-	assert.True(t, ok, "json round-trip leaves time values as strings before schema coercion")
+	assert.IsType(t, "", decoded.Values[0], "json round-trip leaves time values as strings before schema coercion")
 }
 
 func TestCursorMatchesOrderByMismatch(t *testing.T) {

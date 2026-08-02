@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-webauthn/webauthn/protocol"
@@ -309,7 +310,11 @@ func CreatePasskeyRegistrationChallenge(userID, username, displayName string, ex
 // webauthn.CreateCredential. Returns a CreateUserPasskey ready for storage.
 // CredentialID is base64url-encoded to ensure valid UTF-8 in the TEXT column
 // (valid for both Postgres and Spanner).
-func VerifyPasskeyRegistration(challenge *PasskeyRegistrationChallenge, attestation []byte) (*CreateUserPasskey, error) {
+//
+// name labels the new credential in passkey management surfaces. It is the
+// caller's if supplied, otherwise derived from the credential — see
+// [PasskeyCredentialName].
+func VerifyPasskeyRegistration(challenge *PasskeyRegistrationChallenge, attestation []byte, name string) (*CreateUserPasskey, error) {
 	w, err := webAuthNConfig(challenge.RPID, challenge.RPOrigins...)
 	if err != nil {
 		return nil, err
@@ -333,6 +338,9 @@ func VerifyPasskeyRegistration(challenge *PasskeyRegistrationChallenge, attestat
 		transports[i] = string(t)
 	}
 	now := time.Now()
+	if name = strings.TrimSpace(name); name == "" {
+		name = GeneratePasskeyCredentialName(transports, credential.Flags.BackupEligible)
+	}
 	return &CreateUserPasskey{
 		UserID:          challenge.UserID,
 		CredentialID:    EncodePasskeyCredentialID(credential.ID),
@@ -343,8 +351,39 @@ func VerifyPasskeyRegistration(challenge *PasskeyRegistrationChallenge, attestat
 		SignCount:       int64(credential.Authenticator.SignCount),
 		BackupEligible:  credential.Flags.BackupEligible,
 		BackupState:     credential.Flags.BackupState,
+		Name:            name,
 		VerifiedAt:      &now,
 	}, nil
+}
+
+// Fallback passkey names, used when registration carries no caller-supplied
+// name. WebAuthn reports no human-readable label for the authenticator, so the
+// fallback describes the credential itself.
+const (
+	PasskeyNameSecurityKey = "Security key"
+	PasskeyNameSynced      = "Synced passkey"
+	PasskeyNameDeviceBound = "Device-bound passkey"
+)
+
+// PasskeyCredentialName returns the name stored for a registered credential.
+// A caller-supplied name always wins; otherwise the name is derived from the
+// credential's transports and backup eligibility. It never returns an empty
+// string: the passkey list is a user-facing management surface, so every
+// credential needs something displayable — the user's display name is not a
+// candidate, since it is identical for every credential they register.
+func GeneratePasskeyCredentialName(transports []string, backupEligible bool) string {
+	for _, t := range transports {
+		switch protocol.AuthenticatorTransport(t) {
+		case protocol.USB, protocol.NFC, protocol.BLE:
+			return PasskeyNameSecurityKey
+		}
+	}
+	// A backup-eligible credential is a multi-device credential: the
+	// authenticator may sync it to the user's other devices.
+	if backupEligible {
+		return PasskeyNameSynced
+	}
+	return PasskeyNameDeviceBound
 }
 
 // registrationSessionData reconstructs a webauthn.SessionData from a stored

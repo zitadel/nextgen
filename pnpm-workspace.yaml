@@ -10,7 +10,7 @@ catalog:
   "@faker-js/faker": ^10.4.0
   '@fontsource/arimo': ^5.2.8
   "@fumapress/ai": ^0.6.2
-  "@moonrepo/cli": ^2.3.3
+  "@moonrepo/cli": ^2.4.6
   "@mswjs/http-middleware": ^0.10.3
   '@oclif/core': ^4.11.4
   '@oclif/plugin-autocomplete': ^3.2.50

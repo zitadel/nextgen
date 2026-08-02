@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand/v2"
 	"net"
 	"os"
 	"path/filepath"
@@ -262,12 +263,35 @@ func (t *fileTailer) run() {
 	}
 }
 
+// The postgres port is released before embedded.Start binds it — initdb runs
+// in between, which takes seconds on throttled CI disks. A port from the
+// kernel's ephemeral range does not survive that gap: concurrent processes'
+// outbound loopback connections draw their source ports from the same range
+// and stole the port under CI parallelism (2026-08-01 journey flake, run
+// 30697929038). Scan a fixed block below the ephemeral floors instead (Linux
+// 32768, macOS/Windows 49152); outbound traffic can never take those, and the
+// bind probe skips explicit listeners. The journey runner reserves its ports
+// from 22000-23999 (apps/cli-journey-e2e/scripts/ports.mjs) — keep the blocks
+// disjoint. The random start offset keeps concurrent embedded instances from
+// scanning the same candidates in lockstep.
+const (
+	portBlockStart = 24000
+	portBlockSize  = 8000
+)
+
 // getPort returns a free port and locks it until close is called.
 func getPort() (port uint16, close func() error, err error) {
-	l, err := net.Listen("tcp4", "127.0.0.1:0")
-	if err != nil {
-		return 0, nil, err
+	return getPortFrom(rand.IntN(portBlockSize))
+}
+
+func getPortFrom(offset int) (port uint16, close func() error, err error) {
+	for scanned := range portBlockSize {
+		candidate := portBlockStart + (offset+scanned)%portBlockSize
+		l, listenErr := net.Listen("tcp4", fmt.Sprintf("127.0.0.1:%d", candidate))
+		if listenErr != nil {
+			continue
+		}
+		return uint16(candidate), l.Close, nil
 	}
-	port = uint16(l.Addr().(*net.TCPAddr).Port)
-	return port, l.Close, nil
+	return 0, nil, fmt.Errorf("no free port for embedded postgres in %d-%d", portBlockStart, portBlockStart+portBlockSize-1)
 }
