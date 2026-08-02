@@ -34,11 +34,11 @@ tasks:
       # re-evaluate the config), and those blocks are dynamically scanned
       # reservation domains where a static tenant can be reserved out from
       # under this lane between config evaluation and server bind. 8093 is
-      # below every OS ephemeral floor, so the outbound source-port steals
-      # the blocks guard against cannot hit it; the only collider is an
-      # explicit listener — typically this lane's own orphan from an aborted
-      # run, which fails loud by design (sweep:
-      # `node apps/cli/bin/run.js stop --all`).
+      # below the default ephemeral ranges on our supported runners, so the
+      # outbound source-port steals the blocks guard against cannot hit it;
+      # the only collider is an explicit listener — typically this lane's
+      # own orphan from an aborted run, which fails loud by design (sweep:
+      # `moon run workspace:cli -- stop --all`).
       # Neighbors: 8092 demo-next-e2e e2e-real, 8094 console dev-real.
       REAL_ZITADEL_PORT: "8093"
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
