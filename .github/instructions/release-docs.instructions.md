@@ -24,4 +24,10 @@ state of the repo.
   MIT exceptions for CLI, SDKs, API contracts, and docs.
 - Docs that mention repo behavior should point to `AGENTS.md`; docs that mention
   changeset requirements should point to `.changeset/README.md`; docs that
+  mention PR title conventions should point to
+  [`CONTRIBUTING.md#title-format`](../../CONTRIBUTING.md#title-format); docs that
   mention the CLI agent contract should point to `apps/cli/SKILLS.md`.
+- Changeset summaries are customer-facing copy: they are rendered verbatim into
+  `CHANGELOG.md` and the GitHub Release. Review them for a reader who uses our
+  SDKs and products and has no repo context — no ADR numbers, PR numbers, or
+  internal file paths.

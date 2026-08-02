@@ -3,7 +3,8 @@ import { createZitadelClient } from "@zitadel/api/client";
 import { applyAppEnvTemplate, nextAppEnv } from "./app-env";
 import { bootstrapProject, type BootstrapProjectOptions } from "./bootstrap";
 import { bootLocalServer, type BootServerOptions } from "./lifecycle";
-import { seedUser } from "./seed";
+import { identity, seedUser, seedUsers } from "./seed";
+import { mintSession } from "./session";
 import type { ConnectedZitadel, InstanceHandle, LocalZitadel } from "./types";
 
 export type StartLocalZitadelOptions = BootServerOptions &
@@ -16,15 +17,26 @@ export type StartLocalZitadelOptions = BootServerOptions &
  */
 export function connectZitadel(handle: InstanceHandle): ConnectedZitadel {
   const api = createZitadelClient({ baseUrl: handle.baseUrl, token: handle.projectSecret });
-  return {
+  const context = { projectId: handle.projectId, schemaId: handle.schemaId };
+  const connected: ConnectedZitadel = {
     handle,
     api,
     // The Next-shaped convenience view; other frameworks apply their own
     // template to `handle` (see AppEnvTemplate).
     appEnv: applyAppEnvTemplate(nextAppEnv, handle),
-    seedUser: (input) =>
-      seedUser(api, { projectId: handle.projectId, schemaId: handle.schemaId }, input),
+    seedUser: (input) => seedUser(api, context, input),
+    seedUsers: (count, template) => seedUsers(api, context, count, template),
+    identity,
+    seedSession: async (input = {}) => {
+      const { user: existing, flowDefinitionName, origin, ...userInput } = input;
+      const user = existing ?? (await seedUser(api, context, userInput));
+      return mintSession(api, handle, context, user, {
+        flowDefinitionName,
+        origin: origin ?? handle.appOrigin,
+      });
+    },
   };
+  return connected;
 }
 
 /**
@@ -65,6 +77,7 @@ export async function startLocalZitadel(
     projectSecret: bootstrapped.projectSecret,
     schemaId: bootstrapped.schemaId,
     previewSecret: bootstrapped.previewSecret,
+    appOrigin: options.appOrigins?.[0],
   };
   return {
     ...connectZitadel(handle),
@@ -81,11 +94,17 @@ export type { BootstrapProjectOptions, BootstrappedProject } from "./bootstrap";
 export { readHandshakeSync, waitForHandshake, writeHandshake } from "./handshake";
 export { bootLocalServer } from "./lifecycle";
 export type { BootedServer, BootServerOptions } from "./lifecycle";
+export { SESSION_COOKIE_NAME } from "./session";
 export type {
   ConnectedZitadel,
+  Identity,
   InstanceHandle,
   LocalZitadel,
   LocalZitadelRuntime,
+  MintedSession,
   SeededUser,
+  SeedSessionInput,
   SeedUserInput,
+  SeedUsersTemplate,
+  SessionCookie,
 } from "./types";

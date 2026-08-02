@@ -1,7 +1,9 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { THEME_STORAGE_KEY } from "../../theme";
 import { createAppRouter } from "../../router";
@@ -33,6 +35,18 @@ const NAV_ORDER = [
   "Activity Log",
 ];
 const BUILT_ITEMS = ["Projects", "Users", "Sessions"];
+
+// A path pattern rather than an absolute URL: this spec imports the router
+// statically, so `api/zitadel.ts` evaluates its base URL before `vi.stubEnv`
+// could run — the request goes to the relative default.
+const server = setupServer(
+  http.post("*/api/projects/query", () =>
+    HttpResponse.json({ projects: [{ id: "proj_1", name: "console-dev" }] }),
+  ),
+);
+
+beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
+afterAll(() => server.close());
 
 function renderShell() {
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: ["/"] }) });
@@ -80,5 +94,13 @@ describe("theme toggle", () => {
     await userEvent.click(screen.getByRole("radio", { name: "Dark" }));
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
+  });
+  it("names the project from the API rather than a hardcoded label", async () => {
+    // The switcher used to hardcode "River". `queryProjects` is scope-pinned to
+    // the caller's own project (ADR 0004), so this normally resolves to one entry.
+    renderShell();
+    const switcher = await screen.findByRole("button", { name: "Switch project" });
+    await vi.waitFor(() => expect(switcher).toHaveTextContent("console-dev"));
+    expect(switcher).not.toHaveTextContent("River");
   });
 });
