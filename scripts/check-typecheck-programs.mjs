@@ -23,6 +23,7 @@
  */
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 /** Projects whose typecheck is known-vacuous, pending the follow-up fix. */
 const KNOWN_VACUOUS = new Set(["apps/cli", "packages/sdk-core"]);
@@ -69,54 +70,72 @@ function isSolutionStyle(configPath) {
   return noInputs && Array.isArray(config.references) && config.references.length > 0;
 }
 
-const failures = [];
-const staleAllowlist = [];
+/**
+ * The solution-style tsconfig targets a command's PLAIN (non-build) tsc
+ * segments would load. Classified per `&&` segment: build-mode segments walk
+ * references and are fine, but a plain segment beside them is dead weight
+ * that reads as coverage, so it is still flagged — a whole-command `--build`
+ * short-circuit once let `tsc --build a && tsc --noEmit -p solution.json`
+ * pass. Tools that own their program discovery (vue-tsc behind
+ * `nuxt prepare`, svelte-check) are not `tsc -p` programs.
+ *
+ * `isSolutionStyleTarget` is injected so the regression test can classify
+ * commands without touching the filesystem.
+ */
+export function vacuousTscTargets(command, isSolutionStyleTarget) {
+  if (/vue-tsc|svelte-check/.test(command)) return [];
+  const targets = [];
+  for (const segment of command.split("&&").map((part) => part.trim())) {
+    if (!/(^|\s)tsc(\s|$)/.test(segment)) continue;
+    if (/--build\b|(^|\s)-b\b/.test(segment)) continue;
+    const target = segment.match(/-p\s+(\S+)/)?.[1] ?? "tsconfig.json";
+    if (isSolutionStyleTarget(target)) targets.push(target);
+  }
+  return targets;
+}
 
-for (const dir of projectDirs()) {
-  const command = typecheckCommand(dir);
-  if (!command) continue;
+function main() {
+  const failures = [];
+  const staleAllowlist = [];
 
-  // Tools that discover their own program are not `tsc -p` programs.
-  if (/vue-tsc|svelte-check/.test(command)) continue;
-  // Build mode walks project references — the correct form for solutions.
-  if (/--build|\s-b\b/.test(command)) {
-    if (KNOWN_VACUOUS.has(dir)) staleAllowlist.push(dir);
-    continue;
+  for (const dir of projectDirs()) {
+    const command = typecheckCommand(dir);
+    if (!command) continue;
+
+    const vacuousTargets = vacuousTscTargets(command, (target) =>
+      isSolutionStyle(join(dir, target)),
+    );
+    if (vacuousTargets.length === 0) {
+      if (KNOWN_VACUOUS.has(dir)) staleAllowlist.push(dir);
+      continue;
+    }
+    if (KNOWN_VACUOUS.has(dir)) continue;
+    failures.push(
+      `${dir}: typecheck runs "${command}", and its tsc segment targeting solution-style ` +
+        `${vacuousTargets.join(", ")} checks nothing — non-build tsc ignores references. ` +
+        `Use "tsc --build tsconfig.json" for that segment.`,
+    );
   }
 
-  // Plain tsc: every tsc segment of an `a && b` chain must target a real
-  // program — a vacuous segment beside a real one is dead weight that reads
-  // as coverage. Each segment loads `-p <path>` or defaults to
-  // ./tsconfig.json.
-  const segments = command.split("&&").map((segment) => segment.trim());
-  const tscSegments = segments.filter((segment) => /(^|\s)tsc(\s|$)/.test(segment));
-  if (tscSegments.length === 0) continue;
-  const vacuousTargets = tscSegments
-    .map((segment) => segment.match(/-p\s+(\S+)/)?.[1] ?? "tsconfig.json")
-    .filter((target) => isSolutionStyle(join(dir, target)));
-
-  if (vacuousTargets.length === 0) {
-    if (KNOWN_VACUOUS.has(dir)) staleAllowlist.push(dir);
-    continue;
+  if (staleAllowlist.length > 0) {
+    failures.push(
+      `KNOWN_VACUOUS is stale — these projects now check a real program; remove them from the ` +
+        `allowlist in scripts/check-typecheck-programs.mjs: ${staleAllowlist.join(", ")}`,
+    );
   }
-  if (KNOWN_VACUOUS.has(dir)) continue;
-  failures.push(
-    `${dir}: typecheck runs "${command}", and its tsc segment targeting solution-style ` +
-      `${vacuousTargets.join(", ")} checks nothing — non-build tsc ignores references. ` +
-      `Use "tsc --build tsconfig.json" for that segment.`,
+
+  if (failures.length > 0) {
+    console.error("Vacuous typecheck programs detected:\n");
+    for (const failure of failures) console.error(`  - ${failure}`);
+    process.exit(1);
+  }
+  console.log(
+    "All typecheck tasks target real programs (allowlisted: %s).",
+    [...KNOWN_VACUOUS].join(", ") || "none",
   );
 }
 
-if (staleAllowlist.length > 0) {
-  failures.push(
-    `KNOWN_VACUOUS is stale — these projects now check a real program; remove them from the ` +
-      `allowlist in scripts/check-typecheck-programs.mjs: ${staleAllowlist.join(", ")}`,
-  );
+// Importable for the regression test; audits only when invoked directly.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
 }
-
-if (failures.length > 0) {
-  console.error("Vacuous typecheck programs detected:\n");
-  for (const failure of failures) console.error(`  - ${failure}`);
-  process.exit(1);
-}
-console.log("All typecheck tasks target real programs (allowlisted: %s).", [...KNOWN_VACUOUS].join(", ") || "none");
