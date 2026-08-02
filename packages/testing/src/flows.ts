@@ -55,6 +55,19 @@ export interface PasswordRegistrationDetails extends RegistrationDetails {
 }
 
 /**
+ * The default template marks its render root with `data-zl-template-root`.
+ * A union locator resolves in DOM order across the whole page, so every
+ * candidate built from a broad selector — accessible names, labels, the
+ * generic `data-action` attribute — is scoped to this root; otherwise a
+ * same-named control in the app's own chrome (header nav, footer forms)
+ * could win the union. The `zitadel-*` testid hooks and the `zl-button`
+ * atom are namespaced and stay page-global.
+ */
+function templateRoot(page: Page): Locator {
+  return page.locator("[data-zl-template-root]");
+}
+
+/**
  * Locator for a flow action control by its declared action name. Matches
  * every hook shape the default template emits — host testid, native
  * shadow button/link testids, and the raw `action`/`data-action`
@@ -65,11 +78,12 @@ export function flowAction(page: Page, action: string, options: FlowActionOption
     .getByTestId(`zitadel-action-${action}`)
     .or(page.getByTestId(`zitadel-action-${action}-button`))
     .or(page.getByTestId(`zitadel-action-${action}-link`))
-    .or(page.locator(`zl-button[action="${action}"], [data-action="${action}"]`));
+    .or(page.locator(`zl-button[action="${action}"]`))
+    .or(templateRoot(page).locator(`[data-action="${action}"]`));
   if (options.name) {
     candidates = candidates
-      .or(page.getByRole("button", { name: options.name }))
-      .or(page.getByRole("link", { name: options.name }));
+      .or(templateRoot(page).getByRole("button", { name: options.name }))
+      .or(templateRoot(page).getByRole("link", { name: options.name }));
   }
   return candidates.first();
 }
@@ -83,7 +97,7 @@ export function flowField(page: Page, field: string, options: FlowFieldOptions =
     .getByTestId(`zitadel-input-${field}`)
     .or(page.getByTestId(`zitadel-field-${field}`).locator("input"));
   if (options.label) {
-    candidates = candidates.or(page.getByLabel(options.label));
+    candidates = candidates.or(templateRoot(page).getByLabel(options.label));
   }
   return candidates.first();
 }
@@ -222,7 +236,7 @@ async function advanceToRegistration(
  */
 async function expectRegistrationStep(page: Page): Promise<void> {
   await flowAction(page, "passkey_register")
-    .or(page.getByRole("heading", { name: /create|register|sign up|no-account/i }))
+    .or(templateRoot(page).getByRole("heading", { name: /create|register|sign up|no-account/i }))
     .first()
     .waitFor({ state: "visible", timeout: 30_000 });
 }

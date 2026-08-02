@@ -42,6 +42,12 @@ class FakeLocator {
   locator(selector: string): FakeLocator {
     return new FakeLocator(this.harness, `${this.desc}>>${selector}`);
   }
+  getByRole(role: string, options: { name: RegExp }): FakeLocator {
+    return new FakeLocator(this.harness, `${this.desc}>>role:${role}:${options.name}`);
+  }
+  getByLabel(label: RegExp): FakeLocator {
+    return new FakeLocator(this.harness, `${this.desc}>>label:${label}`);
+  }
   async click(): Promise<void> {
     this.harness.ops.push({ op: "click", target: this.desc });
   }
@@ -75,25 +81,33 @@ function desc(locator: Locator): string {
   return (locator as unknown as FakeLocator).desc;
 }
 
+// The default template marks its render root; broad fallback selectors are
+// scoped to it so they cannot match app chrome outside the widget.
+const ROOT = "css:[data-zl-template-root]";
+
 // The documented hook ladder per action name: host testid, native shadow
-// button/link testids, then the raw attributes (the recover link carries
-// only `data-action`).
+// button/link testids, the zl-button atom, then the generic `data-action`
+// attribute scoped to the template root (the recover link carries only
+// `data-action`).
 const action = (name: string) =>
   `testid:zitadel-action-${name}|testid:zitadel-action-${name}-button|` +
-  `testid:zitadel-action-${name}-link|css:zl-button[action="${name}"], [data-action="${name}"]`;
+  `testid:zitadel-action-${name}-link|css:zl-button[action="${name}"]|` +
+  `${ROOT}>>[data-action="${name}"]`;
 const field = (name: string, label: string) =>
-  `testid:zitadel-input-${name}|testid:zitadel-field-${name}>>input|label:${label}`;
+  `testid:zitadel-input-${name}|testid:zitadel-field-${name}>>input|${ROOT}>>label:${label}`;
 
 const EMAIL = field("email", "/email/i");
 const PASSWORD = field("password", "/password/i");
-const REGISTRATION_STEP = `${action("passkey_register")}|role:heading:/create|register|sign up|no-account/i`;
+const REGISTRATION_STEP = `${action("passkey_register")}|${ROOT}>>role:heading:/create|register|sign up|no-account/i`;
 
 describe("flowAction / flowField", () => {
   it("locks the documented action-hook ladder", () => {
     const fake = fakePage();
     expect(desc(flowAction(fake.page, "submit"))).toBe(action("submit"));
+    // The accessible-name fallback is opt-in and confined to the widget's
+    // template root — a same-named button in the app's header must not match.
     expect(desc(flowAction(fake.page, "register", { name: /sign up/i }))).toBe(
-      `${action("register")}|role:button:/sign up/i|role:link:/sign up/i`,
+      `${action("register")}|${ROOT}>>role:button:/sign up/i|${ROOT}>>role:link:/sign up/i`,
     );
   });
 
