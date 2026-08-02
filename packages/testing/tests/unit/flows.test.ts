@@ -137,6 +137,26 @@ describe("flowAction / flowField", () => {
         `${ROOT}>>[data-action="weird\\"name"]`,
     );
   });
+
+  it("escapes control characters per the CSSOM string rules", () => {
+    // The fake locators never parse CSS, so these lock the exact escape
+    // mapping instead: C0/DEL/C1 control characters become hex code-point
+    // escapes (newline → `\a `, DEL → `\7f `, NEL → `\85 `), NUL becomes
+    // U+FFFD.
+    const fake = fakePage();
+    expect(desc(flowAction(fake.page, "line\nbreak"))).toContain(
+      'css:zl-button[action="line\\a break"]',
+    );
+    expect(desc(flowAction(fake.page, "nul\0mid"))).toContain(
+      'css:zl-button[action="nul�mid"]',
+    );
+    expect(desc(flowAction(fake.page, "del\x7Fend"))).toContain(
+      'css:zl-button[action="del\\7f end"]',
+    );
+    expect(desc(flowAction(fake.page, "nel\u0085end"))).toContain(
+      'css:zl-button[action="nel\\85 end"]',
+    );
+  });
 });
 
 describe("loginWithPassword", () => {
