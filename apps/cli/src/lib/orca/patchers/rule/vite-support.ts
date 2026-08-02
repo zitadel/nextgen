@@ -15,13 +15,13 @@ import { PROXY_PATH } from "./proxy";
  * frameworks (React, Vue, Solid, Svelte, Qwik). It forwards same-origin
  * `/__nextgen/*` calls to the
  * backend, strips the prefix, and attaches the project's service-key secret
- * (read from `ZITADEL_PROJECT_SECRET` in `.env.local`) as the bearer on every
- * proxied request. The secret stays server-side: Vite only exposes vars with the
- * configured `envPrefix` (default `VITE_`) to client bundles, so this server-only
- * key never leaks into the browser.
+ * (read from `ZITADEL_PROJECT_SECRET` in `.env.local`) only to the current
+ * app-plane `POST /sessions/exchange` operation. The secret stays server-side:
+ * Vite only exposes vars with the configured `envPrefix` (default `VITE_`) to
+ * client bundles, so this server-only key never leaks into the browser.
  */
 function proxyEntryCode(server: string): string {
-  return `{
+  return `/* zitadel:proxy:v2 */ {
   target: ${JSON.stringify(server)},
   changeOrigin: false,
   rewrite: (path) => path.replace(/^\\${PROXY_PATH}/, "").replace(/^(?!\\/)/, "/"),
@@ -32,10 +32,35 @@ function proxyEntryCode(server: string): string {
     }
     const bearer = \`Bearer \${secret}\`;
     proxy.on("proxyReq", (proxyReq) => {
-      proxyReq.setHeader("authorization", bearer);
+      const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
+      if (
+        proxyReq.method === "POST" &&
+        pathname === "/sessions/exchange" &&
+        !proxyReq.getHeader("authorization")
+      ) {
+        proxyReq.setHeader("authorization", bearer);
+      }
     });
   },
 }`;
+}
+
+/**
+ * Identifies the exact proxy shape emitted before the exchange-only credential
+ * policy. Setup may replace that generated block, but must preserve a user's
+ * custom `/__nextgen` proxy even when it happens to target the same server.
+ */
+function isLegacyManagedProxy(source: string): boolean {
+  if (source.includes("zitadel:proxy:v2")) {
+    return false;
+  }
+  return [
+    'loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET',
+    'throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).")',
+    "const bearer = `Bearer ${secret}`;",
+    'proxy.on("proxyReq", (proxyReq) => {',
+    'proxyReq.setHeader("authorization", bearer);',
+  ].every((fingerprint) => source.includes(fingerprint));
 }
 
 /** The imports that the injected proxy entry depends on. */
@@ -72,6 +97,9 @@ export function viteProxyEdit(
     }
     const proxyConfig = ensureEditableObject(serverConfig, "proxy");
     if (proxyConfig[PROXY_PATH] === undefined) {
+      proxyConfig[PROXY_PATH] = builders.raw(proxyEntryCode(server));
+      changed = true;
+    } else if (source !== undefined && isLegacyManagedProxy(source)) {
       proxyConfig[PROXY_PATH] = builders.raw(proxyEntryCode(server));
       changed = true;
     }

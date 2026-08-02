@@ -102,7 +102,10 @@ func (h Handler) GetMySession(ctx context.Context) (api.GetMySessionRes, error) 
 	if err := validateSessionToken(session, sessionToken); err != nil {
 		return nil, err
 	}
-	return sessionToAPI(session), nil
+	return &api.SessionResponseHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     *sessionToAPI(session),
+	}, nil
 }
 
 func (h Handler) ListSessions(ctx context.Context, params api.ListSessionsParams) (api.ListSessionsRes, error) {

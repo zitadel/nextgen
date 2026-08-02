@@ -5,12 +5,16 @@ import { viteProxyEdit } from "../../../../../../src/lib/orca/patchers/rule/vite
 const edit = viteProxyEdit(5173, "http://127.0.0.1:8099");
 
 describe("viteProxyEdit", () => {
-  it("adds the /__nextgen proxy with the env-derived project-secret bearer and the backend target", () => {
+  it("adds the /__nextgen proxy with an exchange-only project-secret bearer", () => {
     const out = edit('import { defineConfig } from "vite";\nexport default defineConfig({});');
     expect(out).toContain("/__nextgen");
     expect(out).toContain("loadEnv");
     expect(out).toContain("ZITADEL_PROJECT_SECRET");
     expect(out).toContain("Bearer ${secret}");
+    expect(out).toContain('proxyReq.method === "POST"');
+    expect(out).toContain('pathname === "/sessions/exchange"');
+    expect(out).toContain('!proxyReq.getHeader("authorization")');
+    expect(out).toContain("zitadel:proxy:v2");
     expect(out).toContain("http://127.0.0.1:8099");
     expect(out).toContain("5173");
     // Bind the exact issuer port or fail — never drift to a port not in previewOrigins.
@@ -44,6 +48,50 @@ describe("viteProxyEdit", () => {
   it("is idempotent — re-running over its own output changes nothing", () => {
     const once = edit("export default defineConfig({});");
     expect(edit(once)).toBe(once);
+  });
+
+  it("migrates the legacy generated proxy that stamped the secret on every request", () => {
+    const legacy = `import { defineConfig, loadEnv } from "vite";
+export default defineConfig({
+  server: {
+    proxy: {
+      "/__nextgen": {
+        target: "http://old.example",
+        changeOrigin: false,
+        rewrite: (path) => path.slice("/__nextgen".length),
+        configure: (proxy) => {
+          const secret = loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET;
+          if (!secret) {
+            throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).")
+          }
+          const bearer = \`Bearer \${secret}\`;
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.setHeader("authorization", bearer);
+          });
+        },
+      },
+    },
+  },
+});`;
+
+    const out = edit(legacy);
+
+    expect(out).toContain("zitadel:proxy:v2");
+    expect(out).toContain('pathname === "/sessions/exchange"');
+    expect(out).toContain("http://127.0.0.1:8099");
+    expect(out).not.toContain("http://old.example");
+  });
+
+  it("preserves a custom existing /__nextgen proxy", () => {
+    const custom = `export default defineConfig({
+  server: { proxy: { "/__nextgen": { target: "https://custom.example" } } },
+});`;
+
+    const out = edit(custom);
+
+    expect(out).toContain("https://custom.example");
+    expect(out).not.toContain("zitadel:proxy:v2");
+    expect(out).not.toContain("ZITADEL_PROJECT_SECRET");
   });
 
   it("throws E_VALIDATION when the config is missing", () => {

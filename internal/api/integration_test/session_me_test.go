@@ -105,6 +105,7 @@ func TestGetMySession_Identity(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = meResp.Body.Close() }()
 	require.Equal(t, http.StatusOK, meResp.StatusCode)
+	require.Equal(t, "private, no-store", meResp.Header.Get("Cache-Control"))
 
 	var got struct {
 		UserID string `json:"user_id"`

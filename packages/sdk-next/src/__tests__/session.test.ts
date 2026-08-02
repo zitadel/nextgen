@@ -40,7 +40,7 @@ describe("getSession()", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/__nextgen/sessions/me",
-      expect.objectContaining({ credentials: "include" }),
+      expect.objectContaining({ cache: "no-store", credentials: "include" }),
     );
     expect(result).toEqual({
       isAuthenticated: true,
@@ -61,18 +61,37 @@ describe("getSession()", () => {
     });
   });
 
-  it("treats an anonymous session (no user_id) as signed out", async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse({ session_id: "s", project_id: "p", state: "building", user_id: null }),
-    );
+  it.each([null, ""])(
+    "treats an anonymous session (user_id = %s) as signed out",
+    async (userId) => {
+      fetchMock.mockResolvedValue(
+        jsonResponse({ session_id: "s", project_id: "p", state: "building", user_id: userId }),
+      );
+
+      await expect(getSession()).resolves.toEqual({ isAuthenticated: false, session: null });
+    },
+  );
+
+  it.each([
+    [401, "auth.unauthorized"],
+    [404, "sess.not_found"],
+  ])("treats canonical HTTP %i / %s as definitive signed-out", async (status, code) => {
+    fetchMock.mockResolvedValue(jsonResponse({ code, message: "No live session" }, status));
 
     await expect(getSession()).resolves.toEqual({ isAuthenticated: false, session: null });
   });
 
-  it.each([401, 404])("treats HTTP %i as the server's definitive signed-out", async (status) => {
-    fetchMock.mockResolvedValue(jsonResponse({ error: "no session" }, status));
+  it.each([
+    [401, { error: "no session" }],
+    [404, { error: "no session" }],
+    [401, { code: "auth.unauthorized" }],
+    [404, { code: "route.not_found", message: "Wrong route" }],
+    [401, { code: "sess.not_found", message: "Status/code mismatch" }],
+    [404, { code: "auth.unauthorized", message: "Status/code mismatch" }],
+  ])("throws on non-canonical HTTP %i error body %#", async (status, body) => {
+    fetchMock.mockResolvedValue(jsonResponse(body, status));
 
-    await expect(getSession()).resolves.toEqual({ isAuthenticated: false, session: null });
+    await expect(getSession()).rejects.toThrow(new RegExp(`HTTP ${status}`));
   });
 
   it("throws on other failures instead of silently rendering signed-out", async () => {
@@ -81,7 +100,7 @@ describe("getSession()", () => {
     await expect(getSession()).rejects.toThrow(/HTTP 502/);
   });
 
-  it("throws on a framework's HTML 404 — only the backend's JSON 404 means signed out", async () => {
+  it("throws on a framework's HTML 404 — only the backend's canonical 404 means signed out", async () => {
     // A misrouted proxy (e.g. matcher miss) yields the router's 404 page,
     // not the backend's error details; that must be loud, not "signed out".
     fetchMock.mockResolvedValue(
