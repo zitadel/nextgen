@@ -6,15 +6,15 @@ import type {
 } from "@zitadel/components";
 
 import { $, render, type Signal } from "@builder.io/qwik";
+import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
   ZITADEL_SESSION_EVENT_HANDLERS,
 } from "@zitadel/sdk-core/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import "@zitadel/components";
 
-import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
+import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 const project = { projectId: "proj-test", proxyPath: "/__nextgen" };
 
@@ -242,5 +242,11 @@ describe("ZitadelSession", () => {
     expect(el).not.toBeNull();
     expect(consumerRef.value).toBe(el);
     expect(consumerRef.value?.tagName.toLowerCase()).toBe("zitadel-session");
+  });
+});
+
+describe("businessLocales", () => {
+  it("re-exports the business copy overlay from @zitadel/components", () => {
+    expect(businessLocales).toBe(componentsBusinessLocales);
   });
 });
