@@ -54,7 +54,7 @@ describe("preset selection", () => {
 });
 
 describe("passkey-first preset shape", () => {
-  const schema = getDefaultHumanUserSchema({ preset: "passkey-first" }) as {
+  const schema = getDefaultHumanUserSchema({ preset: "passkey-first" }) as unknown as {
     "x-auth-methods": Record<string, { enabled: boolean; position: number }>;
     required: string[];
   };

@@ -46,9 +46,12 @@ export async function waitForHandshake(path: string, timeoutMs = 60_000): Promis
 }
 
 function validateHandle(value: unknown, source: string): InstanceHandle {
-  const handle = value as Partial<InstanceHandle> | null;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`handshake file ${source} is not an object`);
+  }
+  const handle = value as Partial<InstanceHandle>;
   for (const field of ["baseUrl", "projectId", "projectSecret", "schemaId"] as const) {
-    if (typeof handle?.[field] !== "string" || handle[field].length === 0) {
+    if (typeof handle[field] !== "string" || handle[field].length === 0) {
       throw new Error(`handshake file ${source} is missing "${field}"`);
     }
   }
