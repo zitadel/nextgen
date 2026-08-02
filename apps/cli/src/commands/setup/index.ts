@@ -26,7 +26,10 @@ import {
   type Orca,
   type ScaffoldTarget,
 } from "../../lib/orca";
-import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
+import {
+  AVAILABLE_RENDERER_IDS,
+  RENDERER_IDS,
+} from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
@@ -59,6 +62,22 @@ const FRAMEWORK_OPTIONS = createOrca()
   .availableFrameworks()
   .map((framework) => framework.id);
 
+/**
+ * `--renderer` offers only ids `getRenderer` will resolve: a
+ * declared-but-unpublished renderer (ADR 006) keeps its registry entry to
+ * reserve the id, but is surfaced as unavailable in the flag description
+ * instead of in `options`, so `--help` never advertises a value that is
+ * guaranteed to fail and an explicit pass is rejected at parse time — before
+ * any remote project is created.
+ */
+const UNAVAILABLE_RENDERER_IDS = RENDERER_IDS.filter(
+  (id) => !AVAILABLE_RENDERER_IDS.includes(id),
+);
+const RENDERER_FLAG_DESCRIPTION =
+  UNAVAILABLE_RENDERER_IDS.length === 0
+    ? "Renderer (default: react)."
+    : `Renderer (default: react). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
+
 /** `zitadel setup` — create a project and scaffold local auth.
  *
  * Detects (or, for an empty directory, scaffolds then re-detects) the
@@ -80,8 +99,8 @@ export default class Setup extends BaseCommand {
   static override flags = {
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
     renderer: Flags.string({
-      description: "Renderer (default: react).",
-      options: [...RENDERER_IDS],
+      description: RENDERER_FLAG_DESCRIPTION,
+      options: [...AVAILABLE_RENDERER_IDS],
     }),
     "dev-port": Flags.integer({
       description:

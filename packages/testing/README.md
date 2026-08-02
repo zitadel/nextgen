@@ -5,9 +5,10 @@ Test-kit for **seeded ephemeral local Zitadel instances**: boot the real server
 project with the default login flow, and mint password users that can complete
 the real login journey immediately.
 
-> **Status: POC.** Private, in-repo only. The public API validates the
-> "auth in code" L2 shape; publishing to npm is a separate, deliberate step
-> (see [Future work](#future-work)).
+> **Status: alpha.** Published to npm on the shared release train — the kit
+> carries the same version as `@zitadel/cli` and the SDKs, the train publishes
+> under the `alpha` dist-tag (install with `@alpha`), and APIs can still move
+> between alphas. macOS/Linux (see [Known limitations](#known-limitations)).
 
 ## Why
 
@@ -18,6 +19,13 @@ through the registration UI, serialized per suite. This kit fills the middle:
 **real server, programmatic seeding, parallel-safe per-test users.**
 
 ## Quick start (Playwright)
+
+```sh
+npm i -D @zitadel/testing@alpha @playwright/test
+```
+
+The kit drives the `zitadel` CLI, which resolves the published
+`@zitadel/server` platform binary on its own — no binary paths, no env vars.
 
 One instance per suite, seeded per test. `withZitadel()` generates the
 `webServer` entries that boot the instance and run your app against it — no
@@ -65,6 +73,29 @@ apps; the console maps the same fields to `VITE_*`/`CONSOLE_*` names instead.
 The fixtures find the instance through `ZITADEL_TESTING_HANDSHAKE`, which
 `withZitadel()` points at its handshake file.
 
+### Start tests authenticated
+
+Most app tests don't want to re-test login. `authenticatedPage` seeds a user,
+drives the real login flow headlessly (the same Flow API the login UI renders),
+and injects the resulting session cookie into a dedicated browser context:
+
+```ts
+test("member sees the dashboard", async ({ authenticatedPage }) => {
+  const { page, user } = authenticatedPage;
+  await page.goto("/dashboard"); // already signed in as `user`
+});
+```
+
+Underneath sits `seed.session()`, whose `sessionToken` also drives session
+APIs without any browser — backend tests call the instance directly with the
+cookie header (`cookie: __nextgen_session=<sessionToken>`, the SDK
+middleware's own headless pattern). Scope: password flows (the shipped
+`password-first` presets). A flow step demanding anything beyond the user's
+email and password — a challenge, another factor — fails with the step name;
+log in through the UI for those. `seed.identity()` complements registration
+specs: an unused email+password that creates nothing, so the flow under test
+must create the user.
+
 The two in-repo consumers are `apps/demo-next-e2e/playwright.real.config.mts`
 and `apps/console-e2e/playwright.real.config.mts` — run them with
 `moon run demo-next-e2e:e2e-real` / `moon run console-e2e:e2e-real`.
@@ -102,6 +133,9 @@ z.handle;   // serializable: { baseUrl, projectId, projectSecret, schemaId, prev
 z.api;      // authenticated @zitadel/api client (bearer = projectSecret)
 z.appEnv;   // { ZITADEL_URL, NEXT_PUBLIC_ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET }
 await z.seedUser({ email?, password?, attributes? }); // → { id, email, password }
+await z.seedUsers(8, { email?, password?, attributes? }); // per-index templates
+z.identity(); // unused { email, password } — creates nothing
+await z.seedSession({ user? }); // → { user, sessionToken, expiresAt, cookie }
 await z.stop(); // stop server, reap embedded Postgres, remove owned temp dir
 ```
 
@@ -159,17 +193,26 @@ mutate project-wide state; revisit with warm-dir reuse if that need appears.
 - A crashed run can orphan a server: `zitadel stop --all` sweeps every
   CLI-managed runtime on the machine.
 
-## Known limitations (POC)
+## Developing in this repo
+
+Customer installs get the published server binary through `@zitadel/server`'s
+platform packages; the in-repo workspace carries no such binary, so the repo's
+own suites run `moon run server:build` and point the kit at the result via
+`ZITADEL_SERVER_BINARY` (the `withZitadel` option `zitadel.serverBinary` /
+`serverBinaryHint` exists for this). The in-repo moon tasks set
+`NEXTGEN_SERVER_LOGIN_ENABLED=false` / `NEXTGEN_SERVER_CONSOLE_ENABLED=false`
+— the suites drive the app-embedded login, not the server-hosted `/ui/*`.
+Customer installs need none of this.
+
+## Known limitations
 
 - `@zitadel/api`'s client stores auth in module-global state; avoid
   interleaving calls to *different* instances within one process. Separate
   processes (Playwright workers) are unaffected.
-- Requires the in-repo server binary (`moon run server:build`) via
-  `ZITADEL_SERVER_BINARY`; the npm platform packages carry no binary in-repo.
-  The in-repo moon tasks set `NEXTGEN_SERVER_LOGIN_ENABLED=false` /
-  `NEXTGEN_SERVER_CONSOLE_ENABLED=false` — the suites drive the app-embedded
-  login, not the server-hosted `/ui/*`.
-- macOS/Linux only (the CLI's port preflight uses `lsof`).
+- macOS/Linux only for now. Not because of the port preflight (it degrades
+  gracefully where `lsof` is missing) — the untested surface on Windows is the
+  process-group stop and embedded-Postgres lifecycle. Revisit once the local
+  runtime's SQLite default removes the Postgres component.
 
 ## Roadmap
 
@@ -177,20 +220,19 @@ This package is deliberately the **local runtime core** — "Testcontainers for
 Zitadel" when the app under test and Playwright share one machine. The layers
 on top, in intended order:
 
-1. **Registration fixtures.** `zitadel.identity()` (mint an unused identity
-   *without* creating the user) plus a spec that drives the real registration
-   UI and verifies the created user through the API. Until then,
-   `cli-journey-e2e` keeps covering registration.
+1. **Registration fixtures.** Landed: `zitadel.identity()` plus the
+   demo-next-e2e registration spec driving the real registration UI and
+   verifying the created user through the API. `cli-journey-e2e` keeps the
+   packaged-product registration coverage.
 2. **Email/OTP capture.** `zitadel.email.waitForCode(address)` for
    verification flows. Blocked on a server-side story (dev SMTP sink or
    API-exposed codes); password-only flows don't hit this.
-3. **Session-mint seed-op.** The `withZitadel(config)` orchestration half of
-   this item has landed (Playwright-config adapter owning the boot
-   supervisor, handshake, app-env injection, and teardown; `AppEnvTemplate`
-   as the framework-neutral env mechanism with `nextAppEnv` as the first
-   preset). Remaining: a session-mint seed-op (authenticated session/token
-   for a seeded user) so backend tests can skip the browser and a vitest
-   surface earns its keep.
+3. **Vitest surface.** Landed from this item: `withZitadel(config)`
+   orchestration, `AppEnvTemplate`/`nextAppEnv`, and the session-mint seed-op
+   (`seed.session()` driving the real flow headlessly, `authenticatedPage` on
+   top). Remaining: a dedicated `@zitadel/testing/vitest` entry once a second
+   backend consumer exists — `sessionToken` already serves backend tests
+   directly.
 4. **Remote mode: ephemeral project on a persistent instance.** For app
    deployments that cannot reach a local process (preview environments).
    `bootstrapProject({ baseUrl })` + `connectZitadel(handle)` already compose
@@ -202,10 +244,12 @@ on top, in intended order:
    cookies + issuer + handoff verification through `sandbox.domain()`,
    registering the preview URL as an allowed origin post-deploy
    (`PATCH /projects`), and cleanup that survives failed runs.
-6. **Publishing.** Peer-dep story for `@zitadel/cli` and `@playwright/test`,
-   entries in the release manifest and the changeset `fixed` train, Windows
-   support (the CLI port preflight shells `lsof`), and the semver commitment
-   — after the API has survived a second in-repo consumer.
+6. **Publishing.** Landed: the consumer journey installs the kit the way a
+   customer would in CI, and the kit ships on the release train (release
+   manifest + changeset `fixed` group), versioned in lockstep with
+   `@zitadel/cli`. Remaining: the Windows decision (deferred until the SQLite
+   local default removes the embedded-Postgres lifecycle) and the stability
+   commitment when the train leaves alpha.
 
 Parked until server support exists: passkey seeding (pre-registered WebAuthn
 credentials). Independent refactor: extract `apps/cli/src/lib/local-server`
