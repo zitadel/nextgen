@@ -46,7 +46,7 @@ export async function waitForHandshake(path: string, timeoutMs = 60_000): Promis
 }
 
 function validateHandle(value: unknown, source: string): InstanceHandle {
-  if (typeof value !== "object" || value === null) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error(`handshake file ${source} is not an object`);
   }
   const handle = value as Partial<InstanceHandle>;

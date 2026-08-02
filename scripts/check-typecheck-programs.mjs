@@ -22,7 +22,7 @@
  * follow-up issue). Shrink this list; never grow it.
  */
 import { readdirSync, readFileSync, existsSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join } from "node:path";
 
 /** Projects whose typecheck is known-vacuous, pending the follow-up fix. */
 const KNOWN_VACUOUS = new Set(["apps/cli", "packages/sdk-core"]);
@@ -84,9 +84,10 @@ for (const dir of projectDirs()) {
     continue;
   }
 
-  // Plain tsc: find the config it loads (last `-p <path>` wins; default
-  // ./tsconfig.json). Only the final tsc segment of `a && b` chains matters
-  // for commands that end in a bare tsc run.
+  // Plain tsc: every tsc segment of an `a && b` chain must target a real
+  // program — a vacuous segment beside a real one is dead weight that reads
+  // as coverage. Each segment loads `-p <path>` or defaults to
+  // ./tsconfig.json.
   const segments = command.split("&&").map((segment) => segment.trim());
   const tscSegments = segments.filter((segment) => /(^|\s)tsc(\s|$)/.test(segment));
   if (tscSegments.length === 0) continue;
@@ -100,8 +101,9 @@ for (const dir of projectDirs()) {
   }
   if (KNOWN_VACUOUS.has(dir)) continue;
   failures.push(
-    `${dir}: typecheck runs "${command}" against solution-style ${vacuousTargets.join(", ")} — ` +
-      `non-build tsc ignores references, so this checks NOTHING. Use "tsc --build tsconfig.json".`,
+    `${dir}: typecheck runs "${command}", and its tsc segment targeting solution-style ` +
+      `${vacuousTargets.join(", ")} checks nothing — non-build tsc ignores references. ` +
+      `Use "tsc --build tsconfig.json" for that segment.`,
   );
 }
 
