@@ -168,18 +168,21 @@ export class ZitadelLogin extends ZitadelSurface {
   @property({ type: String }) override accessor lang = "";
 
   /**
-   * Custom locale dictionaries keyed by language code. When set, these take
-   * precedence over the built-in dictionaries for matching language codes.
+   * Custom locale dictionaries keyed by language code. Entries may be
+   * partial — each is merged over the built-in dictionary for its language,
+   * so a preset like {@link businessLocales} (or a hand-written subset) is
+   * directly assignable:
    *
    * ```ts
-   * import { en } from "@zitadel/components";
-   * const locales = {
-   *   en: { ...en, "identifier.title": "Welcome" },
-   *   de: myGermanDict,
-   * };
+   * import { businessLocales } from "@zitadel/components";
+   * loginElement.locales = businessLocales;
+   * // or override individual keys:
+   * loginElement.locales = { en: { "identifier.title": "Welcome" } };
    * ```
    */
-  @property({ attribute: false }) accessor locales: Record<string, Locale> | undefined;
+  @property({ attribute: false }) accessor locales:
+    | Readonly<Record<string, Partial<Locale>>>
+    | undefined;
 
   @state() private accessor response: CreateFlow201 | null = null;
 
@@ -274,8 +277,15 @@ export class ZitadelLogin extends ZitadelSurface {
     const primary = (code.split("-")[0] ?? "").toLowerCase();
     const builtin = builtinLocales[primary] ?? en;
     const custom = this.locales?.[primary];
+    if (!custom) return builtin;
 
-    return custom ? { ...builtin, ...custom } : builtin;
+    // Entries are Partial — merge key-by-key and skip explicit `undefined`
+    // values, which a plain spread would let shadow the built-in copy.
+    const merged: Locale = { ...builtin };
+    for (const [key, value] of Object.entries(custom)) {
+      if (value !== undefined) merged[key] = value;
+    }
+    return merged;
   }
 
   override willUpdate(changed: PropertyValues<this>): void {

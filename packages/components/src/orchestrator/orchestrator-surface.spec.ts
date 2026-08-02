@@ -108,6 +108,18 @@ describe("orchestrator surface contract", () => {
     expect(shell?.hasAttribute("data-widget")).toBe(false);
   });
 
+  it("a widget surface leaves another surface's default font link alone", async () => {
+    // Page-variant session ships the brand font; mounting a widget next to it
+    // (which never wants the default font) must not strip that link.
+    await mount<ZitadelSession>("zitadel-session", (el) => {
+      el.variant = "page";
+    });
+    expect(document.getElementById("zl-default-font-link")).not.toBeNull();
+
+    await mount<ZitadelSession>("zitadel-session");
+    expect(document.getElementById("zl-default-font-link")).not.toBeNull();
+  });
+
   it("<zitadel-logout> resolves an explicit theme instead of pinning dark", async () => {
     const element = await mount<ZitadelLogout>("zitadel-logout", (el) => {
       el.theme = "light";

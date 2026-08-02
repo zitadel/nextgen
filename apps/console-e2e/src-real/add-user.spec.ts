@@ -24,7 +24,7 @@ const ERROR_HEADINGS = ["Not authorized", "Something went wrong"];
 /** See `console-real.spec.ts` — the console's login screen (Console ADR 0003). */
 async function signIn(page: Page, user: { email: string; password: string }): Promise<void> {
   await page.goto("/login");
-  await page.getByLabel("Work email").fill(user.email);
+  await page.getByLabel("Email").fill(user.email);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.getByLabel("Password").fill(user.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

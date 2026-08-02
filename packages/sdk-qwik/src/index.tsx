@@ -45,7 +45,7 @@ function projectProp(
  * `locales`/`lang` are property-only members the custom-element JSX types omit.
  */
 function localeProps(
-  locales: Record<string, Record<string, string>> | undefined,
+  locales: Record<string, Partial<Record<string, string>>> | undefined,
   lang: string | undefined,
 ): Record<string, unknown> {
   return { locales, lang };
@@ -131,6 +131,8 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
       purpose={props.purpose ?? "login"}
       flow-name={props.flowName}
       post-sign-in-url={props.postSignInUrl}
+      variant={props.variant}
+      theme={props.theme}
     />
   );
 });
@@ -185,6 +187,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
       }}
       {...projectProp(props.project, props.projectId, props.proxyPath)}
       post-sign-out-url={props.postSignOutUrl}
+      theme={props.theme}
     />
   );
 });
@@ -240,6 +243,8 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
       post-sign-out-url={props.postSignOutUrl}
       heading={props.heading}
       logout-label={props.logoutLabel}
+      variant={props.variant}
+      theme={props.theme}
     />
   );
 });

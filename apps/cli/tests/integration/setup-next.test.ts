@@ -162,9 +162,16 @@ describe("Next setup integration", () => {
     const profilePage = await readFile(join(cwd, "app/profile/page.tsx"), "utf8");
     expect(profilePage).toContain("zitadel-cli: managed-file v1");
     expect(profilePage).toContain("<zitadel-session");
+    // The session card is widget-first; the dedicated /profile route must opt
+    // into the full-page surface explicitly.
+    expect(profilePage).toContain('variant="page"');
     expect(profilePage).toContain("configureZitadel");
     expect(profilePage).toContain("project={project}");
     expect(profilePage).toContain('post-sign-out-url="/login"');
+    const customElements = await readFile(join(cwd, "custom-elements.d.ts"), "utf8");
+    // The JSX declarations ship with the SDK — the scaffold references them
+    // instead of carrying a hand-maintained copy that drifts.
+    expect(customElements).toContain('/// <reference types="@zitadel/sdk-next/jsx" />');
     const proxy = await readFile(join(cwd, "proxy.ts"), "utf8");
     expect(proxy).toContain("zitadel-cli: managed-file v1");
     expect(proxy).toContain("nextgenMiddleware");

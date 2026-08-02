@@ -20,7 +20,10 @@ import type { ZitadelLogin, ZitadelLogout, ZitadelSession } from "@zitadel/compo
 declare module "react" {
   namespace JSX {
     interface IntrinsicElements {
-      "zitadel-login": React.HTMLAttributes<HTMLElement> & {
+      // `RefAttributes` carries React's `ref`/`key` (HTMLAttributes alone has
+      // neither) and preserves the concrete element type on the ref.
+      "zitadel-login": React.HTMLAttributes<HTMLElement> &
+        React.RefAttributes<ZitadelLogin> & {
         project?: ZitadelLogin["project"];
         variant?: ZitadelLogin["variant"];
         theme?: ZitadelLogin["theme"];
@@ -34,7 +37,8 @@ declare module "react" {
         lang?: string;
         locales?: ZitadelLogin["locales"];
       };
-      "zitadel-session": React.HTMLAttributes<HTMLElement> & {
+      "zitadel-session": React.HTMLAttributes<HTMLElement> &
+        React.RefAttributes<ZitadelSession> & {
         project?: ZitadelSession["project"];
         variant?: ZitadelSession["variant"];
         theme?: ZitadelSession["theme"];
@@ -45,7 +49,8 @@ declare module "react" {
         heading?: string;
         "logout-label"?: string;
       };
-      "zitadel-logout": React.HTMLAttributes<HTMLElement> & {
+      "zitadel-logout": React.HTMLAttributes<HTMLElement> &
+        React.RefAttributes<ZitadelLogout> & {
         project?: ZitadelLogout["project"];
         theme?: ZitadelLogout["theme"];
         "project-id"?: string;
