@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, readFile, realpath, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -207,6 +207,8 @@ describe("Next setup integration", () => {
     expect(loginPage).not.toContain('href="/register"');
     expect(loginPage).not.toContain("next/link");
     expect(loginPage).not.toContain('href="/profile"');
+    // The default (minimal) use case keeps the widget's neutral built-in copy.
+    expect(loginPage).not.toContain("businessLocales");
     const registerPage = await readFile(join(cwd, "app/register/page.tsx"), "utf8");
     expect(registerPage).toContain('purpose="register"');
     expect(registerPage).not.toContain('href="/login"');
@@ -495,6 +497,48 @@ describe("Next setup integration", () => {
     expect(plan.exitCode).toBe(0);
     const planJson = parseJson(plan.stdout) as { data: { total: number } };
     expect(planJson.data.total).toBe(0);
+  });
+
+  it("scaffolds business-use-case pages with the copy overlay and restores them alike", async () => {
+    const cwd = await createNextProject();
+    const setup = await cli([
+      "setup",
+      "--cwd",
+      cwd,
+      "--use-case",
+      "business",
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
+    expect(setup.exitCode).toBe(0);
+
+    // The overlay ships with the SDK; the generated pages wire it up (via the
+    // ref — React 18 safe) so the widget shows work-email wording while its
+    // built-in copy stays neutral.
+    const loginPage = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
+    expect(loginPage).toContain("element.locales = businessLocales");
+    const registerPage = await readFile(join(cwd, "app/register/page.tsx"), "utf8");
+    expect(registerPage).toContain("element.locales = businessLocales");
+    // The choice is recorded so later tooling can regenerate the same markup.
+    const zitadelJson = JSON.parse(await readFile(join(cwd, "zitadel.json"), "utf8")) as {
+      useCase?: string;
+    };
+    expect(zitadelJson.useCase).toBe("business");
+
+    // The A1×B2 seam: a repair regenerates the business-flavored markup, not
+    // the neutral default — doctor restores the renderer context from
+    // zitadel.json rather than assuming setup defaults.
+    await rm(join(cwd, "app/login/page.tsx"));
+    const fake = await fakeDocker();
+    const port = await freePort();
+    const fix = await cli(["doctor", "--cwd", cwd, "--json", "--fix", "--port", String(port)], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
+    expect(fix.exitCode).toBe(0);
+    const restored = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
+    expect(restored).toContain("element.locales = businessLocales");
   });
 
   it("catches server-side flow invariants at plan time, before any mutation", async () => {

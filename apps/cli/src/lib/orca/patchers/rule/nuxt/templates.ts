@@ -1,10 +1,5 @@
 import { MANAGED_MARKER } from "../../../../paths";
 
-// Enforce the dark surface the Zitadel widgets are designed for, so pages never
-// follow the OS light/dark setting.
-const MAIN_STYLE =
-  "min-height: 100vh; background: #0f0f11; color: #f4f4f6; color-scheme: dark";
-
 /** `app.vue` — renders the page router. Marker in an HTML comment. */
 export function appVueTemplate(): string {
   return `<!-- ${MANAGED_MARKER} -->
@@ -51,6 +46,8 @@ const project = useZitadelProject();
 <template>
   <main style="color-scheme: dark">
     <ClientOnly>
+      <!-- variant="page" paints the widget's full-page chrome from design
+           tokens; variant="widget" embeds the card inside a layout you own. -->
       <zitadel-login
         variant="page"
         :project="project"${purposeAttr}
@@ -80,8 +77,10 @@ const project = useZitadelProject();
 </script>
 
 <template>
-  <main style="${MAIN_STYLE}">
+  <main style="color-scheme: dark">
     <ClientOnly>
+      <!-- variant="page" paints the session card's full-page chrome from design
+           tokens; variant="widget" embeds the card inside a layout you own. -->
       <zitadel-session variant="page" :project="project" post-sign-out-url="/login" />
     </ClientOnly>
   </main>
