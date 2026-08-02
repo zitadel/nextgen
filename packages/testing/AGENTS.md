@@ -31,8 +31,12 @@ On the release train since #692: listed in `PUBLIC_RELEASE_PACKAGES`
 the changesets `fixed` group — the two lists must match **in order**
 (`release-manifest.test.ts` enforces it). Consequences:
 
-- **Every observable change needs a changeset** (minor for new API surface).
-  PR type for API changes is `feat` — this is shipped product surface.
+- **Every observable change needs a changeset** (minor for new API surface),
+  and PR titles follow the outcome-based decision table in
+  [`.changeset/README.md`](../../.changeset/README.md). The kit-specific
+  trap: don't reach for `test:` because the package is *about* testing —
+  it is shipped product surface, so a new capability is `feat` and a
+  repair is `fix`.
 - **The `alpha` dist-tag is intentional.** The train publishes in changesets
   pre mode, so releases land on `npm i @zitadel/testing@alpha`; `latest`
   deliberately sits at the `0.0.0` bootstrap placeholder until pre mode
@@ -81,8 +85,10 @@ fact changes:
   `data-action`) stay scoped to the `<zitadel-login>` host: `.or()` unions
   resolve in page-wide DOM order, so an unscoped candidate could match app
   chrome; the host also exists for custom templates that emit no hooks.
-  Free-form action names are CSS-escaped before attribute-selector
-  interpolation.
+  Quotes and backslashes in free-form action names are escaped before
+  attribute-selector interpolation — that is not full CSS-string escaping
+  (control characters remain unhandled), so keep action names
+  identifier-shaped.
 - **Session-mint driver** (`src/session.ts`): the flow is stateless via
   the sealed `_zflow` cookie (raw `fetch` + one-cookie jar — the typed
   client hides response headers), submits must send an `Origin` on the
@@ -104,24 +110,33 @@ a `testing:build` task dep.
 
 - `moon run testing:test testing:lint testing:typecheck` — unit gate.
 - `moon run testing:test-integration` — boots real instances
-  (binary + embedded Postgres), local-only.
+  (binary + embedded Postgres).
 - Dogfood: `moon run demo-next-e2e:e2e-real`, `moon run console-e2e:e2e-real`,
   `env -u CI moon run cli-journey-e2e:e2e-testkit` (customer install path).
 
+The real-instance lanes carry `runInCI: false`, but that only keeps them
+out of moon's automatic CI selection — `full-pr` runs all of them through
+explicit `env -u CI` workflow steps (`.github/workflows/ci.yml`). Locally,
+use the same `env -u CI` incantation.
+
 Serialize moon invocations — two concurrent graphs produce spurious
 failures. Orphaned runtimes from aborted e2e runs squat fixed ports;
-`node apps/cli/bin/run.js stop --all` sweeps them.
+`moon run workspace:cli -- stop --all` sweeps them.
 
 ## Don't
 
-- Don't make seed ops instance-specific. The customer 80% case is a remote
-  dev instance; every seed op must stay meaningful for `connectZitadel`
-  targets, not just locally-booted ones.
+- Don't make seed ops instance-specific. Every seed op must stay
+  meaningful for `connectZitadel` targets (remote dev instances), not just
+  locally-booted ones — the README positions the local runtime as the
+  shipped core and remote mode as roadmap, and seed ops must not foreclose
+  that direction.
 - Don't publish-adjacent by hand: no version edits, no dist-tag changes,
   no manual `npm publish`. The train owns all of it (the one-time name
   bootstrap already happened).
 - Don't remove the `LICENSE` file or `publishConfig.access` — published
-  sibling parity, checked in review not by tooling.
+  sibling parity, checked in review not by tooling. The package is listed
+  in the root [`LICENSING.md`](../../LICENSING.md) MIT exceptions; keep
+  the `license` field, the `LICENSE` file, and that list in agreement.
 - Don't reach for `page.evaluate`-style shortcuts in helpers that model
   customer usage; helpers must only do what a customer's test could do
   with the public product surface.
