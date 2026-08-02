@@ -26,6 +26,10 @@ export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export * from "./types";
 
+// Re-exported so scaffolded apps can wire the business copy overlay without a
+// direct @zitadel/components dependency (strict package managers reject those).
+export { businessLocales } from "@zitadel/components";
+
 /**
  * Passes the project config as a spread because `@zitadel/components`' Qwik JSX
  * types omit these property-only members. Qwik binds object and string values to
