@@ -122,7 +122,9 @@ const ZitadelSession = dynamic(
     const { configureZitadel } = await import("@zitadel/sdk-next/client");
     // Build the SDK project handle and pass it to the session card via the
     // \`project\` prop. The card reads identity from "/__nextgen/sessions/me"
-    // and exposes a Sign out action.
+    // and exposes a Sign out action. Your own components (a header, an
+    // account menu) can make the same read with getSession() from
+    // "@zitadel/sdk-next/session" to swap sign-in CTAs for account chrome.
     const project = configureZitadel({
       projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
       proxyPath: "/__nextgen",

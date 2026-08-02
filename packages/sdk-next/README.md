@@ -80,7 +80,51 @@ export function UserBadge() {
 }
 ```
 
-### 4. Login page
+### 4. Session state for your own UI (any page)
+
+`auth()` only sees a session on routes the middleware `matcher` covers, and the
+scaffolded matcher covers just the proxy path and the protected routes — so a
+header on a public page would always look signed out. For your app's own chrome
+(header navigation, account menus), read the session client-side with
+`getSession()` from `@zitadel/sdk-next/session`. It fetches the same-origin
+`{proxyPath}/sessions/me` — the same read the `<zitadel-session>` card performs —
+so it works on every page and the answer is the server's:
+
+```tsx
+'use client';
+import { useEffect, useState } from 'react';
+import { getSession, type ClientAuthResult } from '@zitadel/sdk-next/session';
+
+export function HeaderNav() {
+  // undefined = not yet known — render neutral chrome, not "Sign in".
+  const [auth, setAuth] = useState<ClientAuthResult>();
+  const [error, setError] = useState<Error>();
+  useEffect(() => {
+    getSession().then(setAuth, setError);
+  }, []);
+  if (error) return <span role="alert">Session unavailable</span>;
+  if (!auth) return null;
+  return auth.isAuthenticated ? (
+    <a href="/profile">{auth.session.name ?? auth.session.email ?? 'Account'}</a>
+  ) : (
+    <a href="/login">Sign in</a>
+  );
+}
+```
+
+A rejected `getSession()` means the state is *unknown* (broken proxy, network,
+5xx) — render a neutral or error state, never the signed-out CTAs.
+
+A `200` with an authenticated user resolves to `{ isAuthenticated: true, session: { userId, email, name } }`
+(client-safe — no token); `401`, the backend's JSON `404`, and anonymous
+sessions resolve to signed out; any other response — including a framework's
+HTML 404 page from a misrouted proxy — throws so a broken proxy doesn't
+silently render as signed out. Sign-in and sign-out navigate (`post-sign-in-url` /
+`post-sign-out-url`), so chrome re-reads on the next page load without extra
+wiring; to react in place, listen for the widgets' `zitadel-signout` /
+`zitadel-flow-complete` events.
+
+### 5. Login page
 
 The `<zitadel-login>` web component (from `@zitadel/components`) must be rendered client-side only. Split it into a server wrapper and a client widget:
 
