@@ -120,7 +120,8 @@ describe("delete user dialog", () => {
     // row is gone from the invalidated list.
     expect(await screen.findByText("Maya Patel deleted")).toBeInTheDocument();
     await waitFor(() =>
-      expect(screen.queryByRole("link", { name: "Maya Patel" })).not.toBeInTheDocument(),
+      // The row's link is its first schema-driven column, not a combined name.
+      expect(screen.queryByRole("link", { name: "maya@acme.com" })).not.toBeInTheDocument(),
     );
   });
 
@@ -149,7 +150,7 @@ describe("delete user dialog", () => {
     // found: opening the dialog from inside the row menu left the menu open
     // underneath, and its `aria-hidden` on the rest of the page outlived the
     // dialog — so the list was invisible to assistive tech after cancelling.
-    expect(screen.getByRole("link", { name: "Maya Patel" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "maya@acme.com" })).toBeInTheDocument();
   });
 
   it("keeps the dialog open and shows the server's message when the delete fails", async () => {
