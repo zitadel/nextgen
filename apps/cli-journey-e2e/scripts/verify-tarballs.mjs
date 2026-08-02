@@ -3,31 +3,24 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
-import { JOURNEY_ONLY_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 
 const [tarballsDir, ...flags] = process.argv.slice(2);
 if (!tarballsDir || tarballsDir.startsWith("--")) {
   throw new Error(
-    "usage: node apps/cli-journey-e2e/scripts/verify-tarballs.mjs <tarballs-dir> [--allow-journey-extras]",
+    "usage: node apps/cli-journey-e2e/scripts/verify-tarballs.mjs <tarballs-dir>",
   );
 }
-const unknownFlags = flags.filter((flag) => flag !== "--allow-journey-extras");
-if (unknownFlags.length > 0) {
-  throw new Error(`unknown flags: ${unknownFlags.join(", ")}`);
+if (flags.length > 0) {
+  throw new Error(`unknown flags: ${flags.join(", ")}`);
 }
-// Journey registries carry the journey-only packages on top of the release
-// set; release artifact dirs are verified without the flag and must contain
-// exactly the public release packages.
-const allowJourneyExtras = flags.includes("--allow-journey-extras");
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
-const requiredPackageDirs = [
-  ...PUBLIC_PACKAGE_DIRS,
-  ...(allowJourneyExtras ? JOURNEY_ONLY_PACKAGES.map((pkg) => pkg.dir) : []),
-];
+// Journey registries and release artifact dirs carry the same set: exactly
+// the public release packages, nothing on top.
 const requiredPackageNames = new Set(
-  await Promise.all(requiredPackageDirs.map(packageName)),
+  await Promise.all(PUBLIC_PACKAGE_DIRS.map(packageName)),
 );
 const dependencyFields = [
   "dependencies",

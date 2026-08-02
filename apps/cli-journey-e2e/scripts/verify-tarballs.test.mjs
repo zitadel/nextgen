@@ -1,3 +1,4 @@
+/* oxlint-disable playwright/expect-expect -- node:test file asserting via node:assert */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -6,10 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, before, test } from "node:test";
 
-import {
-  JOURNEY_ONLY_PACKAGES,
-  PUBLIC_PACKAGE_DIRS,
-} from "../../../scripts/release-manifest.mjs";
+import { PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../../..");
@@ -21,47 +19,45 @@ const script = join(here, "verify-tarballs.mjs");
 // executable bin to satisfy assertServerPlatformBinary.
 let fixtureRoot;
 let releaseSetDir;
-let journeySetDir;
+let extraPackageDir;
+let missingPackageDir;
 
 before(async () => {
   fixtureRoot = await mkdtemp(join(tmpdir(), "verify-tarballs-test-"));
   releaseSetDir = join(fixtureRoot, "release-set");
-  journeySetDir = join(fixtureRoot, "journey-set");
+  extraPackageDir = join(fixtureRoot, "extra-package");
+  missingPackageDir = join(fixtureRoot, "missing-package");
   await mkdir(releaseSetDir, { recursive: true });
 
   for (const dir of PUBLIC_PACKAGE_DIRS) {
     await makeTarball(releaseSetDir, await packageName(dir));
   }
-  // The journey set is the release set plus every journey-only package.
-  await cp(releaseSetDir, journeySetDir, { recursive: true });
-  for (const pkg of JOURNEY_ONLY_PACKAGES) {
-    await makeTarball(journeySetDir, await packageName(pkg.dir));
-  }
+  await cp(releaseSetDir, extraPackageDir, { recursive: true });
+  await makeTarball(extraPackageDir, "@zitadel/api-mock");
+  await cp(releaseSetDir, missingPackageDir, { recursive: true });
+  await rm(join(missingPackageDir, "zitadel-testing-1.0.0.tgz"));
 });
 
 after(async () => {
   await rm(fixtureRoot, { recursive: true, force: true });
 });
 
-test("release mode accepts exactly the public release set", () => {
+test("accepts exactly the public release set", () => {
   const strict = runVerify(releaseSetDir);
   assert.equal(strict.status, 0, strict.stderr);
   assert.match(strict.stdout, /verified \d+ installable tarballs/);
 });
 
-test("release mode rejects journey-only tarballs as unexpected", () => {
-  const result = runVerify(journeySetDir);
+test("rejects tarballs outside the release set as unexpected", () => {
+  const result = runVerify(extraPackageDir);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /unexpected package @zitadel\/testing/);
+  assert.match(result.stderr, /unexpected package @zitadel\/api-mock/);
 });
 
-test("journey mode requires the journey-only packages on top of the release set", () => {
-  const withExtras = runVerify(journeySetDir, "--allow-journey-extras");
-  assert.equal(withExtras.status, 0, withExtras.stderr);
-
-  const missingExtras = runVerify(releaseSetDir, "--allow-journey-extras");
-  assert.notEqual(missingExtras.status, 0);
-  assert.match(missingExtras.stderr, /missing tarball for @zitadel\/testing/);
+test("rejects a set missing a public release package", () => {
+  const result = runVerify(missingPackageDir);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /missing tarball for @zitadel\/testing/);
 });
 
 test("unknown flags are rejected", () => {

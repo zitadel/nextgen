@@ -13,6 +13,9 @@
     "directory": "packages/testing"
   },
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist"
   ],
