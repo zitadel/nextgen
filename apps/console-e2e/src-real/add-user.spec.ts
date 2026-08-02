@@ -1,6 +1,8 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@zitadel/testing/playwright";
 
+import { expectNoErrorBoundary, signIn } from "./support";
+
 /**
  * End-to-end coverage for the Add user drawer (issue #633) against a real
  * instance, so the schema-driven form is exercised over the actual
@@ -20,18 +22,6 @@ test.describe.configure({ mode: "parallel" });
 // `queryProjects` is single-project (ADR 0004). D6 expects it back in a future
 // version, so the cases below are parked with the block, not deleted; restore
 // them alongside the block and the unit specs when both reasons clear.
-
-const ERROR_HEADINGS = ["Not authorized", "Something went wrong"];
-
-/** See `console-real.spec.ts` — the console's login screen (Console ADR 0003). */
-async function signIn(page: Page, user: { email: string; password: string }): Promise<void> {
-  await page.goto("/login");
-  await page.getByLabel("Work email").fill(user.email);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.getByLabel("Password").fill(user.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-}
 
 /** Signs in, lands on /users and opens the drawer. */
 async function openDrawer(page: Page, user: { email: string; password: string }) {
@@ -369,8 +359,3 @@ test("Escape closes the open list first, then the drawer", async ({ page, seed }
   await expect(drawer).toBeHidden();
 });
 
-async function expectNoErrorBoundary(page: Page): Promise<void> {
-  for (const heading of ERROR_HEADINGS) {
-    await expect(page.getByText(heading, { exact: true })).toHaveCount(0);
-  }
-}
