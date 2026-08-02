@@ -23,7 +23,7 @@ On the schema detail, list the pre-populated attributes as a flat, scannable lis
 Vercel-style navigation: no back button and no breadcrumbs anywhere in the console — you move back up via the left-side nav. (Login-flow equivalent is D9.)
 
 ### D12 · Brand colors applied — 2026-07-31 · [standing]
-Use the Citadel brand colors — red and purple — starting with the schema screens. Verified to also work in light mode.
+Use the Zitadel brand colors — red and purple — starting with the schema screens. Verified to also work in light mode.
 
 ### D11 · Projects MVP: minimal list & detail — 2026-07-31
 Projects stay a table view (key resource → table; config → schema). The list returns the single claimed project (created via CLI) — no team/user/app counts, no search, no sorting (only one project), no app groups, no "add application" action. Click a project to see Project ID, issuer URL, created date, and edit the name. No settings and no tab navigation for now. Don't label anything "owning team" — projects aren't owned by teams (a cloud concept, irrelevant for self-hosters).
