@@ -632,6 +632,98 @@ describe("ManagedFilesCheck", () => {
     expect(angularJson.projects.demo.architect.serve.options.proxyConfig).toBe("proxy.conf.cjs");
   });
 
+  it("fails when a wiring's host config file is deleted outright", async () => {
+    const cwd = await makeAngularProject();
+    await rm(join(cwd, "angular.json"));
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("detached managed config wiring: angular.json");
+  });
+
+  it("warns unverifiable when a wiring's config was restructured beyond the transform", async () => {
+    const cwd = await makeAngularProject();
+    // Two projects, no defaultProject: the transform throws rather than
+    // guessing — the wiring state is unknown, which must surface, not vanish.
+    await writeFile(
+      join(cwd, "angular.json"),
+      JSON.stringify({ projects: { a: {}, b: {} } }),
+    );
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("unverifiable managed config wiring");
+    expect(outcome.message).toContain("angular.json");
+  });
+
+  it("migrates a pristine retired boundary: --fix removes middleware.ts and installs proxy.ts", async () => {
+    const cwd = await makeProject();
+    const middleware = `${MANAGED_MARKER}\nexport function middleware() {}\n`;
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+    );
+    await writeScaffoldState(cwd, {
+      files: {
+        "middleware.ts": { hash: hashScaffoldFile(middleware), class: "infrastructure" },
+      },
+    });
+    const check = new ManagedFilesCheck();
+    const before = await check.run(ctxFor(cwd));
+    expect(before.status).toBe("warn");
+    expect(before.message).toContain("retired boundary middleware.ts left over");
+
+    await check.fix(ctxFor(cwd));
+
+    // The pristine leftover is gone, the current boundary exists, and the
+    // manifest swapped over — Next 16 would reject the pair.
+    await expect(readFile(join(cwd, "middleware.ts"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    expect(await readFile(join(cwd, "proxy.ts"), "utf8")).toContain(MANAGED_MARKER);
+    const scaffold = await readScaffoldState(cwd);
+    expect(scaffold.files).not.toHaveProperty("middleware.ts");
+    expect(scaffold.files["proxy.ts"]?.class).toBe("infrastructure");
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("refuses to create proxy.ts beside an edited middleware.ts and reports the conflict", async () => {
+    const cwd = await makeProject();
+    // The user upgraded to Next 16 but kept an edited middleware.ts; an
+    // unrelated page is missing so --fix has repair work to do.
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+    );
+    const editedMiddleware = `${MANAGED_MARKER}\nexport function middleware() { /* custom */ }\n`;
+    await writeFile(join(cwd, "middleware.ts"), editedMiddleware);
+    await writeScaffoldState(cwd, {
+      files: {
+        "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" },
+        "app/login/page.tsx": { hash: "1".repeat(64), class: "presentation" },
+      },
+    });
+    await rm(join(cwd, "app/login/page.tsx"));
+    const check = new ManagedFilesCheck();
+    const before = await check.run(ctxFor(cwd));
+    expect(before.status).toBe("fail");
+    expect(before.message).toContain("conflicting request boundaries");
+    expect(before.message).toContain("middleware.ts");
+
+    await check.fix(ctxFor(cwd));
+
+    // The unrelated page is restored; the conflicting boundary pair is NOT
+    // created — Next throws when both exist — and the user file is untouched.
+    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
+    await expect(readFile(join(cwd, "proxy.ts"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toBe(editedMiddleware);
+    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
+  });
+
   it("warns (not fails) when only the convenience dev script is missing", async () => {
     const cwd = await makeAngularProject();
     await writeFile(

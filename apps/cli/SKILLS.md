@@ -115,7 +115,11 @@ the CLI's help layer, not the envelope.
   replaced (marker removed) pass as `edited`/`adopted`. It also verifies the
   managed config wirings (Vite/Nuxt proxy merges, Angular's `angular.json`
   proxy and auth routes) through the patchers' idempotent transforms — a
-  detached wiring fails and `--fix` re-applies it. The default local
+  detached or missing wiring config fails, an unverifiable one warns, and
+  `--fix` re-applies it. Boundary migrations converge: a pristine leftover
+  `middleware.ts` from a Next 15→16 upgrade is swapped for `proxy.ts`, while
+  an edited one is reported as a conflict instead of creating both (Next
+  rejects the pair). The default local
   runtime is the `@zitadel/server` npm binary; Docker checks apply only when
   using `--runtime docker` or `--image`. `--fix` restores missing managed
   files and never replaces an existing scaffolded app file; additive repairs

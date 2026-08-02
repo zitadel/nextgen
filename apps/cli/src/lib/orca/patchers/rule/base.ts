@@ -53,9 +53,22 @@ export abstract class AbstractRulePatcher implements Patcher {
    */
   async repair(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
     const plan = this.plan(ctx);
-    const ops = opts.missingOnly
+    let ops = opts.missingOnly
       ? await withoutExistingTargets(reclaimableOps(plan), opts.cwd)
       : reclaimableOps(plan);
+    const excluded = new Set(opts.excludePaths ?? []);
+    if (excluded.size > 0) {
+      ops = ops.filter((op) => {
+        if (op.kind === "write") {
+          return !excluded.has(op.path);
+        }
+        if (op.kind === "edit" && op.overwrites) {
+          const candidates = typeof op.path === "string" ? [op.path] : op.path;
+          return !candidates.some((candidate) => excluded.has(candidate));
+        }
+        return true;
+      });
+    }
     const execOpts = opts.missingOnly ? { ...opts, force: false } : opts;
     return scaffold({ ops, summary: plan.summary }, execOpts);
   }
@@ -65,10 +78,11 @@ export abstract class AbstractRulePatcher implements Patcher {
    * merge transform's own idempotency: the transforms only add what is
    * missing and return the source unchanged when everything they manage is
    * present, so a changed output means the wiring is absent from the user's
-   * config. A transform that throws cannot evaluate the content (e.g. an
-   * unparsable config the user restructured) — the wiring state is unknown
-   * and no verdict is emitted; other checks report unreadable files.
-   * Read-only.
+   * config. Every labelled wiring gets a verdict: a missing host file is
+   * `detached` (the wiring cannot be applied in a file that does not exist),
+   * and a transform that throws on restructured content yields `unknown` —
+   * surfaced rather than silently dropped, so a deleted `angular.json` can
+   * never read as healthy. Read-only.
    */
   async verify(
     ctx: PatchContext,
@@ -90,10 +104,18 @@ export abstract class AbstractRulePatcher implements Patcher {
           break;
         }
       }
+      if (source === undefined) {
+        statuses.push({ path, wiring: op.wiring, state: "detached" });
+        continue;
+      }
       try {
-        statuses.push({ path, wiring: op.wiring, applied: op.edit(source) === source });
+        statuses.push({
+          path,
+          wiring: op.wiring,
+          state: op.edit(source) === source ? "applied" : "detached",
+        });
       } catch {
-        // Unknown state — no verdict.
+        statuses.push({ path, wiring: op.wiring, state: "unknown" });
       }
     }
     return statuses;
@@ -115,7 +137,20 @@ export abstract class AbstractRulePatcher implements Patcher {
         markedFiles.map((path) => [path, infrastructure.has(path) ? "infrastructure" : "presentation"]),
       ),
       conditionalFiles: this.conditionallyScaffoldedFiles(view),
+      retiredAlternates: this.retiredAlternateFiles(view),
     };
+  }
+
+  /**
+   * Current marked files mapped to sibling paths that older templates wrote
+   * in their place and the framework rejects alongside them. Drives the
+   * managed-files boundary migration. Defaults to none; Next overrides it
+   * for the `middleware.ts`/`proxy.ts` pair.
+   */
+  protected retiredAlternateFiles(
+    _view: PatchView,
+  ): Readonly<Record<string, ReadonlyArray<string>>> {
+    return {};
   }
 
   /**

@@ -76,10 +76,22 @@ dev-proxy/runtime merges, Angular's `angular.json` `proxyConfig` and auth
 routes, the Angular `dev` script). Each merging transform is idempotent by
 contract (it only adds what is missing), so running it against the current
 content is a structural probe: a changed output means the wiring is absent.
-Detached `infrastructure` wiring fails the check; a missing `convenience`
-wiring (the `dev` script) warns; a transform that throws on restructured
-content yields no verdict. `--fix` re-applies wirings by replaying the same
-edit ops.
+Verification is total — every labelled wiring gets a verdict: `applied`,
+`detached` (including a missing host config file — a deleted `angular.json`
+is definitionally detached wiring, and fails for infrastructure), or
+`unknown` (the transform throws on restructured content, e.g. a
+multi-project `angular.json` without `defaultProject`; warns rather than
+silently vanishing). `--fix` re-applies wirings by replaying the same edit
+ops.
+
+Boundary migration is the one place `--fix` deletes: when the current
+templates write a file whose *retired alternate* still exists (Next ≥16
+rejects `proxy.ts` and `middleware.ts` together), a hash-proven pristine
+alternate — provably the CLI's own bytes per the manifest — is removed and
+the current boundary installed, with the manifest swapping entries.
+Anything less than pristine (edited, adopted, or unhashable in template
+mode) is a conflict: nothing is deleted, the current boundary is *not*
+created beside it, and the check fails with manual-migration guidance.
 
 ### `doctor --fix` is restore-missing-only
 

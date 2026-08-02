@@ -57,6 +57,14 @@ export type PatchExecOptions = Readonly<{
    * still apply; they are idempotent by construction.
    */
   missingOnly?: boolean;
+  /**
+   * Paths whose content ops must not run in this repair. `doctor --fix`
+   * excludes a current template file whose retired alternate still exists
+   * with user modifications (creating Next 16's `proxy.ts` beside an edited
+   * `middleware.ts` would break the build) — the conflict is reported
+   * instead.
+   */
+  excludePaths?: ReadonlyArray<string>;
 }>;
 
 /**
@@ -118,6 +126,13 @@ export type PatchResult = Readonly<{
  *   framework home page, written only when setup created the app skeleton).
  *   The managed-files check excludes them when no scaffold manifest recorded
  *   what was actually written.
+ * - `retiredAlternates` — maps a current marked file to sibling paths that
+ *   older templates wrote in its place and the framework rejects alongside it
+ *   (Next ≥16 throws when both `proxy.ts` and `middleware.ts` exist). The
+ *   managed-files check uses it to drive boundary migration: a pristine
+ *   retired sibling is removed by `--fix` before the current file is created;
+ *   an edited or adopted one is a conflict the user must resolve, and the
+ *   current file is *not* created next to it.
  */
 export type EjectActions = Readonly<{
   markedFiles: ReadonlyArray<string>;
@@ -129,17 +144,26 @@ export type EjectActions = Readonly<{
   guidanceFiles: ReadonlyArray<string>;
   fileClasses?: Readonly<Record<string, ScaffoldFileClass>>;
   conditionalFiles?: ReadonlyArray<string>;
+  retiredAlternates?: Readonly<Record<string, ReadonlyArray<string>>>;
 }>;
 
 /**
  * The verification result for one managed config wiring (a dev-proxy merge,
- * a route registration): whether the integration's merge is still applied to
- * the user's config file. Produced by {@link Patcher.verify}.
+ * a route registration). Produced by {@link Patcher.verify}.
+ *
+ * - `applied` — the merge is present in the user's config.
+ * - `detached` — the merge is absent: the transform would re-add it, or the
+ *   host config file does not exist at all (a missing `angular.json` means
+ *   the wiring is definitionally gone, not unknowable).
+ * - `unknown` — the transform cannot evaluate the current content (thrown:
+ *   restructured or unparsable config, e.g. a multi-project `angular.json`
+ *   without `defaultProject`). Surfaced as a warning, never silently
+ *   dropped.
  */
 export type ConfigWiringStatus = Readonly<{
   path: string;
   wiring: "infrastructure" | "convenience";
-  applied: boolean;
+  state: "applied" | "detached" | "unknown";
 }>;
 
 /**

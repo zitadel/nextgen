@@ -62,6 +62,17 @@ export class NextPatcher extends AbstractRulePatcher {
     return [join(view.framework.appDir, "page.tsx")];
   }
 
+  protected override retiredAlternateFiles(
+    view: PatchView,
+  ): Readonly<Record<string, ReadonlyArray<string>>> {
+    // Next renamed the request boundary in v16 (middleware.ts → proxy.ts)
+    // and throws at build time when both exist. Whichever name the current
+    // version uses, the other is its retired alternate.
+    const current = requestBoundaryFile(view.framework).filename;
+    const other = current === "proxy.ts" ? "middleware.ts" : "proxy.ts";
+    return { [join(view.framework.appDir, `../${current}`)]: [join(view.framework.appDir, `../${other}`)] };
+  }
+
   protected routeDeps(view: PatchView): ReadonlyArray<string> {
     return [getRenderer(view.rendererId).dependency.name];
   }

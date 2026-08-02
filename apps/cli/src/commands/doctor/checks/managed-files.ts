@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import type { ConfigWiringStatus, EjectActions } from "../../../lib/orca/patchers/types";
@@ -67,15 +67,26 @@ export class ManagedFilesCheck implements SanityCheck {
 
     const { mode, rows } = evaluated;
     const wiring = await probeConfigWiring(ctx);
+    const actions = await resolveArtifacts(ctx);
+    const boundaries = actions
+      ? await detectBoundaryConflicts(actions, ctx.cwd, manifest)
+      : [];
     const missing = rows.filter((row) => row.state === "missing");
     const missingInfrastructure = missing.filter((row) => row.class === "infrastructure");
-    const detached = wiring.filter((status) => !status.applied);
-    const detachedInfrastructure = detached.filter((s) => s.wiring === "infrastructure");
-    const detachedConvenience = detached.filter((s) => s.wiring === "convenience");
+    const detachedInfrastructure = wiring.filter(
+      (s) => s.state === "detached" && s.wiring === "infrastructure",
+    );
+    const detachedConvenience = wiring.filter(
+      (s) => s.state === "detached" && s.wiring === "convenience",
+    );
+    const unverifiable = wiring.filter((s) => s.state === "unknown");
+    const conflicts = boundaries.filter((b) => b.disposition === "conflict");
+    const removable = boundaries.filter((b) => b.disposition === "removable");
     const details = {
       mode,
       files: rows,
       ...(wiring.length > 0 ? { config_wiring: wiring } : {}),
+      ...(boundaries.length > 0 ? { boundary_conflicts: boundaries } : {}),
     };
 
     const failures: string[] = [];
@@ -91,6 +102,11 @@ export class ManagedFilesCheck implements SanityCheck {
           .join(", ")}`,
       );
     }
+    for (const conflict of conflicts) {
+      failures.push(
+        `conflicting request boundaries: ${conflict.retired} is user-modified while the current templates use ${conflict.current} — migrate your changes and remove one of them manually`,
+      );
+    }
     if (failures.length > 0) {
       return { name: this.name, status: "fail", message: failures.join("; "), details };
     }
@@ -102,6 +118,18 @@ export class ManagedFilesCheck implements SanityCheck {
     if (detachedConvenience.length > 0) {
       warnings.push(
         `unapplied managed config edit(s): ${detachedConvenience.map((s) => s.path).join(", ")}`,
+      );
+    }
+    if (unverifiable.length > 0) {
+      warnings.push(
+        `unverifiable managed config wiring (restructured config?): ${unverifiable
+          .map((s) => s.path)
+          .join(", ")}`,
+      );
+    }
+    for (const leftover of removable) {
+      warnings.push(
+        `retired boundary ${leftover.retired} left over from a template migration (doctor --fix removes it and installs ${leftover.current})`,
       );
     }
     if (warnings.length > 0) {
@@ -134,11 +162,36 @@ export class ManagedFilesCheck implements SanityCheck {
     const missingBefore = manifest ? await missingManifestPaths(ctx.cwd, manifest) : [];
     const patchCtx = await loadPatchContext(ctx.cwd, ctx.orca, ctx.cliVersion);
     const patcher = ctx.orca.patcherFor(patchCtx.framework.id);
+    const actions = patcher.artifacts({
+      framework: patchCtx.framework,
+      rendererId: patchCtx.rendererId,
+    });
+    // Boundary migration: a *pristine* retired alternate (hash-proven CLI
+    // bytes, e.g. Next 15's middleware.ts after an upgrade) is removed so the
+    // current boundary can be installed without the framework rejecting the
+    // pair. A user-modified or adopted alternate is a conflict: it stays, and
+    // the current boundary is excluded from the repair — creating proxy.ts
+    // beside an edited middleware.ts would break the build outright. Dry-run
+    // deletes nothing and keeps the exclusion, so the preview stays safe.
+    const boundaries = await detectBoundaryConflicts(actions, ctx.cwd, manifest);
+    const excludePaths = boundaries
+      .filter((b) => b.disposition === "conflict")
+      .map((b) => b.current);
+    const removed: string[] = [];
+    if (!ctx.dryRun) {
+      for (const boundary of boundaries) {
+        if (boundary.disposition === "removable") {
+          await rm(join(ctx.cwd, boundary.retired), { force: true });
+          removed.push(boundary.retired);
+        }
+      }
+    }
     await patcher.repair(patchCtx, {
       cwd: ctx.cwd,
       dryRun: ctx.dryRun,
       force: false,
       missingOnly: true,
+      ...(excludePaths.length > 0 ? { excludePaths } : {}),
     });
     if (ctx.dryRun) {
       return;
@@ -147,7 +200,7 @@ export class ManagedFilesCheck implements SanityCheck {
       await materializeManifest(ctx, patchCtx);
       return;
     }
-    if (missingBefore.length === 0) {
+    if (missingBefore.length === 0 && removed.length === 0) {
       return;
     }
     // Reconcile the manifest with the current template set before rewriting
@@ -157,10 +210,6 @@ export class ManagedFilesCheck implements SanityCheck {
     // dropped — keeping it would fail doctor forever, since setup skips
     // initialized projects. Paths the repair newly introduced are adopted
     // with their class and on-disk hash.
-    const actions = patcher.artifacts({
-      framework: patchCtx.framework,
-      rendererId: patchCtx.rendererId,
-    });
     const current = new Set(actions.markedFiles);
     const conditional = new Set(actions.conditionalFiles ?? []);
     const files: ScaffoldManifest["files"] = {};
@@ -188,6 +237,43 @@ export class ManagedFilesCheck implements SanityCheck {
     }
     await updateScaffold(ctx.cwd, { ...manifest, files });
   }
+}
+
+/**
+ * A retired template alternate (an old boundary filename) that still exists
+ * beside — or instead of — the file the current templates write.
+ * `removable`: hash-proven pristine CLI bytes per the manifest, safe for
+ * `--fix` to delete during migration. `conflict`: user-modified, adopted, or
+ * simply unhashable (template mode) — never deleted, and the current
+ * counterpart must not be created next to it.
+ */
+type BoundaryConflict = {
+  current: string;
+  retired: string;
+  disposition: "removable" | "conflict";
+};
+
+async function detectBoundaryConflicts(
+  actions: EjectActions,
+  cwd: string,
+  manifest: ScaffoldManifest | undefined,
+): Promise<BoundaryConflict[]> {
+  const conflicts: BoundaryConflict[] = [];
+  for (const [current, retiredPaths] of Object.entries(actions.retiredAlternates ?? {})) {
+    for (const retired of retiredPaths) {
+      const contents = await readIfExists(join(cwd, retired));
+      if (contents === undefined) {
+        continue;
+      }
+      const entry = manifest?.files[retired];
+      const pristine =
+        entry !== undefined &&
+        contents.includes(MANAGED_MARKER) &&
+        hashScaffoldFile(contents) === entry.hash;
+      conflicts.push({ current, retired, disposition: pristine ? "removable" : "conflict" });
+    }
+  }
+  return conflicts;
 }
 
 /**
