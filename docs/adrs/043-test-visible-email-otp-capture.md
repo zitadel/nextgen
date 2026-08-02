@@ -1,4 +1,4 @@
-# ADR 042: Test-Visible Email and OTP Capture
+# ADR 043: Test-Visible Email and OTP Capture
 
 > **Status:** Proposed
 > **Date:** 2026-08-02

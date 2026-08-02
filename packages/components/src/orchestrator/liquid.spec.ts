@@ -728,9 +728,9 @@ describe("localiseFlowErrorKeys", () => {
     // field the inline outlet doesn't exist — without the downgrade the
     // error would render nowhere.
     // The label resolves through the step's catalog entry
-    // (`register.field.email` → "Work email"), not the bare field name.
+    // (`register.field.email` → "Email"), not the bare field name.
     expect(localiseFlowErrorKeys("error.email_required", { ...ctx, fields: ["password"] })).toEqual(
-      [{ message: "Work email is required." }],
+      [{ message: "Email is required." }],
     );
     // Inline key without a recognised rule suffix: its catalog copy
     // becomes the banner message verbatim.

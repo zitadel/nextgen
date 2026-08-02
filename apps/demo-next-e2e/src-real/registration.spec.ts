@@ -1,32 +1,17 @@
 import type { Page } from "@playwright/test";
 
-import { expect, test } from "@zitadel/testing/playwright";
-
-import { clickAction, clickActionIfVisible, fillIfVisible } from "./flow-actions";
+import { expect, registerWithPassword, test } from "@zitadel/testing/playwright";
 
 /**
  * Registration through the real flow with a kit-minted unused identity:
  * `seed.identity()` creates nothing, so the flow itself must create the user —
- * verified through the API afterwards. Locators follow the journey suite's
- * resilient pattern (testid first, role fallback) because registration spans
- * more steps than login.
+ * verified through the API afterwards.
  */
 test("a fresh identity registers through the real flow", async ({ page, seed, zitadel }) => {
   const who = seed.identity();
 
   await page.goto("/login");
-  await page.getByLabel(/email/i).fill(who.email);
-  // Submitting an unknown identifier routes into registration (the journey
-  // suite's proven entry) — there is no separate register button to hunt for.
-  await clickAction(page, /continue|sign in/i, ["submit"]);
-  await expect(
-    page.getByRole("heading", { name: /create|register|sign up|no-account/i }),
-  ).toBeVisible({ timeout: 30_000 });
-
-  await fillIfVisible(page, /email/i, who.email);
-  await clickActionIfVisible(page, /continue.*password|password/i, ["submit"]);
-  await page.getByLabel(/password/i).first().fill(who.password);
-  await clickAction(page, /continue|sign up|create account|register/i, ["submit"]);
+  await registerWithPassword(page, { email: who.email, password: who.password });
   await skipPasskeyUpsellIfVisible(page);
 
   await page.waitForURL(/\/admin(?:[/?#]|$)/, { timeout: 30_000 });

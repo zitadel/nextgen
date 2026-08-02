@@ -99,6 +99,7 @@ const ZitadelSession = dynamic(
     return function ZitadelSessionElement() {
       return (
         <zitadel-session
+          variant="page"
           project={project}
           post-sign-out-url="/login"
         />
@@ -121,33 +122,10 @@ export default function ProfilePage() {
     customElementsDts() {
       return {
         contents: `${MANAGED_MARKER}
-import type React from "react";
-import type { ZitadelProject } from "@zitadel/sdk-next/client";
-
-declare module "react" {
-  namespace JSX {
-    interface IntrinsicElements {
-      "zitadel-login": React.HTMLAttributes<HTMLElement> & {
-        project?: ZitadelProject;
-        "session-exchange-path"?: string;
-        "post-sign-in-url"?: string;
-        purpose?: string;
-        "flow-name"?: string;
-        variant?: "widget" | "page";
-      };
-      "zitadel-logout": React.HTMLAttributes<HTMLElement> & {
-        project?: ZitadelProject;
-        "post-sign-out-url"?: string;
-      };
-      "zitadel-session": React.HTMLAttributes<HTMLElement> & {
-        project?: ZitadelProject;
-        "post-sign-out-url"?: string;
-        heading?: string;
-        "logout-label"?: string;
-      };
-    }
-  }
-}
+// React JSX declarations for the <zitadel-*> custom elements ship with the
+// SDK, so the scaffold stays aligned with the real element surface instead
+// of carrying a hand-maintained copy that drifts.
+/// <reference types="@zitadel/sdk-next/jsx" />
 `,
       };
     },

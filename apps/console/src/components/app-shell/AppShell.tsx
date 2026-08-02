@@ -1,13 +1,6 @@
 import { Link, useMatchRoute } from "@tanstack/react-router";
-import {
-  BookOpen,
-  ChevronsUpDown,
-  LogOut,
-  Monitor,
-  Moon,
-  Search,
-  Sun,
-} from "lucide-react";
+// `BookOpen` / `Search` return with the parked footer items below.
+import { ChevronsUpDown, LogOut, Monitor, Moon, Sun } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useRef } from "react";
 
 import {
@@ -138,18 +131,27 @@ function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => v
 
       <SidebarFooter>
         <SidebarMenu className="gap-2">
-          <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Search" className="font-serif">
-              <Search aria-hidden />
-              <span>Search</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Documentation" className="font-serif">
-              <BookOpen aria-hidden />
-              <span>Documentation</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {/* Search and Documentation are parked: both rendered as ordinary
+              enabled buttons with no handler, so clicking them did nothing at
+              all — the worst of the three states, since they looked live.
+
+              Search needs a cross-resource query endpoint; ADR 031's
+              `POST /{resource}/query` exists only for projects today, so there
+              is nothing to search across. Documentation needs a published URL
+              for the docs site to point at.
+
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Search" className="font-serif">
+                  <Search aria-hidden />
+                  <span>Search</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Documentation" className="font-serif">
+                  <BookOpen aria-hidden />
+                  <span>Documentation</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem> */}
           <UserMenuItem user={user} onSignOut={onSignOut} />
         </SidebarMenu>
       </SidebarFooter>

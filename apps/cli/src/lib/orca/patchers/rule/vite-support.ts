@@ -113,5 +113,12 @@ export interface ViteSupport {
 
 /** Builds the shared Vite-config proxy {@link FileOp} for a {@link ViteSupport} patcher. */
 export function buildViteProxyOp(devPort: number, server: string): FileOp {
-  return { kind: "edit", path: [...VITE_CONFIG_PATHS], edit: viteProxyEdit(devPort, server) };
+  return {
+    kind: "edit",
+    path: [...VITE_CONFIG_PATHS],
+    edit: viteProxyEdit(devPort, server),
+    // The dev proxy is the auth request path — the doctor managed-files
+    // check fails when this merge is no longer applied.
+    wiring: "infrastructure",
+  };
 }

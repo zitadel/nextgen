@@ -156,6 +156,15 @@ describe("ZitadelSession", () => {
     expect(el!.proxyPath).toBe("/__nextgen");
   });
 
+  it("forwards the surface variant/theme", () => {
+    const { container } = render(ZitadelSession, {
+      props: { project, variant: "page", theme: "light" },
+    });
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session");
+    expect(el!.variant).toBe("page");
+    expect(el!.theme).toBe("light");
+  });
+
   it.each(Object.entries(ZITADEL_SESSION_EVENT_HANDLERS))(
     "forwards %s to its callback",
     (eventName, handlerProp) => {

@@ -67,7 +67,7 @@
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run --passWithNoTests",
     "lint": "oxlint ."
   },

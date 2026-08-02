@@ -44,6 +44,7 @@ describe("Next setup integration", () => {
       data: {
         install: { status: string; package_manager: string; command: string };
         files_written: string[];
+        files: Array<{ path: string; kind: string; action: string }>;
         next_actions: string[];
         next_commands: string[];
       };
@@ -67,6 +68,36 @@ describe("Next setup integration", () => {
     expect(setupJson.data.next_actions.join("\n")).toContain("See your changes before they go live");
     expect(setupJson.data.files_written).toContain(".zitadel/schemas/default-human-user.json");
     expect(setupJson.data.files_written).toContain(".zitadel/flows/default-login.json");
+    // files_written carries deduplicated file paths only: no directories,
+    // and a path touched by several plan ops (both env files are) once.
+    expect(new Set(setupJson.data.files_written).size).toBe(setupJson.data.files_written.length);
+    expect(setupJson.data.files_written).not.toContain(".zitadel");
+    expect(setupJson.data.files_written.filter((path) => path === ".env.local")).toHaveLength(1);
+    // The typed rows label each scaffolded artifact with kind and action;
+    // the fixture is a pre-existing app, so its package.json is an update
+    // while the boundary is a create.
+    expect(setupJson.data.files).toContainEqual({
+      path: "proxy.ts",
+      kind: "file",
+      action: "create",
+    });
+    expect(setupJson.data.files).toContainEqual({
+      path: "package.json",
+      kind: "file",
+      action: "update",
+    });
+    expect(setupJson.data.files).toContainEqual({
+      path: ".zitadel",
+      kind: "dir",
+      action: "create",
+    });
+    // package.json stays the user's file: top-level key order and formatting
+    // survive the dependency splice (the fixture starts with name/private).
+    const pkgText = await readFile(join(cwd, "package.json"), "utf8");
+    expect(Object.keys(JSON.parse(pkgText) as Record<string, unknown>).slice(0, 2)).toEqual([
+      "name",
+      "private",
+    ]);
 
     // Scaffolded guidance: AGENTS.md for agents, a README section for
     // humans, and the dialect meta-schemas the flow files' $schema points at.
@@ -133,6 +164,27 @@ describe("Next setup integration", () => {
       id: schemaId,
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
+    // Setup also records the scaffold manifest: exactly the app files it
+    // wrote, with content hashes and ownership classes, so `doctor` can later
+    // tell missing from edited from user-adopted. This fixture is a
+    // pre-existing app, so the framework home page is absent from the record.
+    const scaffold = (
+      state as unknown as {
+        scaffold: {
+          files: Record<string, { hash: string; class: string }>;
+          scaffolded_framework?: boolean;
+        };
+      }
+    ).scaffold;
+    // The fixture declares next ^16, so the boundary is proxy.ts.
+    expect(scaffold.files["proxy.ts"]).toMatchObject({
+      class: "infrastructure",
+      hash: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(scaffold.files["custom-elements.d.ts"]?.class).toBe("infrastructure");
+    expect(scaffold.files["app/login/page.tsx"]?.class).toBe("presentation");
+    expect(scaffold.files).not.toHaveProperty("app/page.tsx");
+    expect(scaffold.scaffolded_framework).toBeUndefined();
     expect(state.resources[".zitadel/flows/default-login.json"]).toMatchObject({
       id: expect.stringMatching(/^flow_/),
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),
@@ -162,9 +214,16 @@ describe("Next setup integration", () => {
     const profilePage = await readFile(join(cwd, "app/profile/page.tsx"), "utf8");
     expect(profilePage).toContain("zitadel-cli: managed-file v1");
     expect(profilePage).toContain("<zitadel-session");
+    // The session card is widget-first; the dedicated /profile route must opt
+    // into the full-page surface explicitly.
+    expect(profilePage).toContain('variant="page"');
     expect(profilePage).toContain("configureZitadel");
     expect(profilePage).toContain("project={project}");
     expect(profilePage).toContain('post-sign-out-url="/login"');
+    const customElements = await readFile(join(cwd, "custom-elements.d.ts"), "utf8");
+    // The JSX declarations ship with the SDK — the scaffold references them
+    // instead of carrying a hand-maintained copy that drifts.
+    expect(customElements).toContain('/// <reference types="@zitadel/sdk-next/jsx" />');
     const proxy = await readFile(join(cwd, "proxy.ts"), "utf8");
     expect(proxy).toContain("zitadel-cli: managed-file v1");
     expect(proxy).toContain("nextgenMiddleware");

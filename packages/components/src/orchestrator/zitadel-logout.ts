@@ -3,8 +3,9 @@ import { customElement, property, state } from "lit/decorators.js";
 import { type ZitadelProject } from "@zitadel/api/config";
 
 import { getSession, revokeSession } from "./api-client.js";
-import { applyBaseTokens } from "./branding-to-tokens.js";
+import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
+import { ThemeController, type ThemeMode } from "./theme-controller.js";
 import { emit } from "../internal/emit.js";
 import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
 
@@ -221,6 +222,15 @@ export class ZitadelLogout extends LitElement {
    */
   @property({ type: String, attribute: "client-id" }) accessor clientId = "";
 
+  /**
+   * Colour mode: `light`, `dark`, or `auto` (follow `prefers-color-scheme`).
+   * Empty means "not stated" and defaults to `auto` — the control lives
+   * inside the app's own chrome, so it follows the visitor's preference
+   * rather than forcing the dark login surface. Set it explicitly when the
+   * surrounding app surface is fixed: `<zitadel-logout theme="dark">`.
+   */
+  @property({ type: String }) accessor theme: "" | ThemeMode = "";
+
   @state() private accessor displayName = "";
 
   @state() private accessor displayEmail = "";
@@ -250,9 +260,10 @@ export class ZitadelLogout extends LitElement {
   // after a framework assigns the `project` property post-mount.
   private identityRequested = false;
 
+  private readonly themeController = new ThemeController(this);
+
   override connectedCallback(): void {
     super.connectedCallback();
-    this.dataset.theme = "dark";
 
     const tmpl = this.querySelector("template");
     if (tmpl instanceof HTMLTemplateElement) {
@@ -275,11 +286,21 @@ export class ZitadelLogout extends LitElement {
     document.removeEventListener("keydown", this.handleDocumentKeydown);
   }
 
-  override updated(): void {
+  override willUpdate(): void {
+    // No branding payload reaches this element (yet); the empty overrides
+    // call keeps the token pipeline identical to the other orchestrator
+    // surfaces so a future branding input only has to change the argument.
+    this.themeController.setModePreference(this.theme === "" ? undefined : this.theme, "auto");
     const root = this.shadowRoot;
     if (root && !this.templateMode) {
       applyBaseTokens(root);
+      applyBrandingTokens(root, undefined, this.themeController.theme);
     }
+    this.dataset.theme = this.themeController.theme;
+    this.toggleAttribute("data-theme-dark", this.themeController.theme === "dark");
+  }
+
+  override updated(): void {
     // Retry once config becomes resolvable (e.g. a framework set `project`
     // after mount). No-ops after the first successful request.
     this.maybeLoadIdentity();
