@@ -30,7 +30,7 @@ export class ReactPatcher extends AbstractRulePatcher implements ViteSupport {
 
   protected routeOps(ctx: PatchContext): FileOp[] {
     return [
-      { kind: "write", path: "src/App.tsx", contents: appTemplate() },
+      { kind: "write", path: "src/App.tsx", contents: appTemplate(ctx) },
       this.viteProxyOp(ctx.framework.devPort, ctx.server),
       // Vite only exposes VITE_-prefixed vars to client code (import.meta.env).
       { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },

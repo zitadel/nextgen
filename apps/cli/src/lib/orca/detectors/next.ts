@@ -2,7 +2,12 @@ import { stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "../../errors";
-import { dependencyVersionMajor, hasDependency, readPackageJson } from "./package-json";
+import {
+  dependencySpecProvablyBelowMajor,
+  dependencyVersionMajor,
+  hasDependency,
+  readPackageJson,
+} from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
 
@@ -29,15 +34,15 @@ export class NextDetector implements Detector {
     }
 
     // Supported floor (ADR 043): the scaffolded templates target Next 15+
-    // (React 19 property binding, current boundary conventions). The floor is
+    // (current App Router and request-boundary conventions). The floor is
     // enforced here so setup and doctor share one loud gate instead of
-    // degrading silently; an unparseable version spec passes (cannot prove a
-    // violation), matching this detector's other tolerances.
-    const versionMajor = dependencyVersionMajor(pkg, "next");
-    if (versionMajor !== undefined && versionMajor < 15) {
+    // degrading silently; only a spec that provably cannot resolve to 15+
+    // is rejected — protocol specs and dist-tags pass.
+    const belowFloor = dependencySpecProvablyBelowMajor(pkg, "next", 15);
+    if (belowFloor !== undefined) {
       throw new ZitadelError(
         "E_UNSUPPORTED_PROJECT_SHAPE",
-        `Next.js ${versionMajor} is below the supported floor — the CLI integrates Next.js 15 and newer`,
+        `Next.js "${belowFloor}" is below the supported floor — the CLI integrates Next.js 15 and newer`,
         { hint: "Upgrade the app to Next 15+ (e.g. `npx @next/codemod@latest upgrade`) and rerun." },
       );
     }
@@ -56,6 +61,7 @@ export class NextDetector implements Detector {
     }
 
     const devPort = await detectDevPort(cwd, pkg);
+    const versionMajor = dependencyVersionMajor(pkg, "next");
     return {
       id: "next",
       appDir,

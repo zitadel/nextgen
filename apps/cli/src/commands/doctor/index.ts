@@ -139,7 +139,13 @@ export default class Doctor extends BaseCommand {
 
     if (failed.length > 0) {
       const advice = failureAdvice(failed, image, port, this.meta.cliVersion);
-      const code = failed.some((check) => check.name === "port") ? "E_PORT_IN_USE" : "E_VALIDATION";
+      // A check that failed with a typed CLI error advertises its own
+      // category (e.g. the framework floor's E_UNSUPPORTED_PROJECT_SHAPE) —
+      // surface that instead of the generic validation class so agents can
+      // branch on it. The port check keeps its dedicated code first.
+      const code = failed.some((check) => check.name === "port")
+        ? "E_PORT_IN_USE"
+        : (failed.find((check) => check.code !== undefined)?.code ?? "E_VALIDATION");
       throw new ZitadelError(code, "Zitadel doctor found issues", {
         hint: advice.hint,
         nextCommands: advice.nextCommands,
@@ -217,6 +223,14 @@ function failureAdvice(
         publicCliCommand("reset --force", cliVersion),
       ],
     };
+  }
+
+  // A failure that surfaced as a typed CLI error carries its own remedy —
+  // e.g. the framework floor's upgrade hint. That beats the generic --fix
+  // advice below, which cannot repair an unsupported version.
+  const typed = failed.find((check) => check.code !== undefined && check.hint !== undefined);
+  if (typed?.hint !== undefined) {
+    return { hint: typed.hint, nextCommands: [publicCliCommand("doctor", cliVersion)] };
   }
 
   const hasProjectFailure = failed.some((check) => !LOCAL_RUNTIME_CHECK_NAMES.has(check.name));

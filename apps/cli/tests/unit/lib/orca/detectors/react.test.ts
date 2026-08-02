@@ -66,4 +66,16 @@ describe("ReactDetector", () => {
     expect(facts?.id).toBe("react");
     expect(facts).not.toHaveProperty("versionMajor");
   });
+
+  it("judges the floor by range semantics, not by digits in the spec", async () => {
+    // "<18" contains the digits 18 yet admits only versions below the floor.
+    await expect(
+      new ReactDetector().detect(await project({ react: "<18", vite: "^5" })),
+    ).rejects.toThrow("below the supported floor");
+    // A path spec carries digits but no provable version — it must pass.
+    const patched = await new ReactDetector().detect(
+      await project({ react: "file:../react-17-patched", vite: "^5" }),
+    );
+    expect(patched?.id).toBe("react");
+  });
 });
