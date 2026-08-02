@@ -51,6 +51,11 @@ Each invocation prints one JSON object:
   delete). Plan rows preview; apply rows report, with the resulting platform
   ids. Use it to verify an edit did what you intended — `apply`'s
   `files_updated` lists only local write-backs, not platform changes.
+- `setup` emits `data.files`: one typed row per scaffolded artifact
+  (`{path, kind: file|dir, action: create|update}`), deduplicated. Use it to
+  see what setup created versus merged into (your `package.json` is an
+  `update`). `data.files_written` remains the flat list — deduplicated file
+  paths only, covering both scaffolded and `.zitadel/` resource files.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime with
   `npx @zitadel/cli@alpha start`, then retry with `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 from the target server. With the platform's

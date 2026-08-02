@@ -1,5 +1,5 @@
 import { ZitadelError } from "../../../../errors";
-import { isObject, parseJsonObject, stableStringify } from "../../../../json";
+import { isObject, parseJsonObject, setTopLevelJsonKey } from "../../../../json";
 import { npmDistTagForCliVersion } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
@@ -30,8 +30,12 @@ function ensureDevScript(source: string | undefined): string {
   if (scripts?.dev !== undefined) {
     return source;
   }
-  pkg.scripts = { ...(scripts ?? {}), dev: "ng serve" };
-  return `${stableStringify(pkg)}\n`;
+  // package.json is user-owned: splice only the scripts value; every byte
+  // outside it stays untouched.
+  return setTopLevelJsonKey(source, "package.json", "scripts", {
+    ...(scripts ?? {}),
+    dev: "ng serve",
+  });
 }
 
 /**
