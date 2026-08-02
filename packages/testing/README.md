@@ -54,15 +54,12 @@ export default defineConfig({
 
 ```ts
 // my-login.spec.ts
-import { expect, test } from "@zitadel/testing/playwright";
+import { expect, loginWithPassword, test } from "@zitadel/testing/playwright";
 
 test("user signs in with password", async ({ page, seed }) => {
   const user = await seed.user(); // unique email + password, loginable now
   await page.goto("/login");
-  await page.getByLabel(/email/i).fill(user.email);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.getByLabel(/password/i).fill(user.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await loginWithPassword(page, user); // drives the identifier → password steps
   await expect(page).toHaveURL(/\/admin/);
 });
 ```
@@ -96,6 +93,34 @@ log in through the UI for those. `seed.identity()` complements registration
 specs: an unused email+password that creates nothing, so the flow under test
 must create the user.
 
+### Drive the login flow
+
+Four ceremony helpers complete whole auth journeys against the
+`<zitadel-login>` widget. They are built on the widget's documented
+automation hooks (`zitadel-action-*`, `zitadel-field-*` / `zitadel-input-*`),
+not on translated button texts, so they survive locale and copy changes:
+
+```ts
+import {
+  loginWithPassword, // identifier → password (handles combined steps too)
+  loginWithPasskey, // identifier-first; or one-tap without an email
+  registerWithPassword, // unknown identifier → registration → password path
+  registerWithPasskey, // unknown identifier → registration → passkey ceremony
+} from "@zitadel/testing/playwright";
+
+await page.goto("/login");
+await registerWithPassword(page, { email, password });
+// assert your app's signed-in surface — the helpers never assert app state
+```
+
+They assume the default flow vocabulary (`submit` / `passkey` /
+`passkey_register` actions, `email` and password fields) and branch only on
+what the flow renders: flows that require extra registration fields get them
+via `profile: [{ field, value }]`, filled when present. For custom flows or
+single steps, `flowAction(page, name)` / `flowField(page, name)` return plain
+locators for the same hooks, with `clickFlowAction` / `fillFlowField` as
+one-line wrappers.
+
 ### Test passkey flows
 
 `enableVirtualPasskey(page)` — also available as the on-demand `passkey`
@@ -106,7 +131,8 @@ the real registration and login ceremonies complete without an OS dialog:
 ```ts
 test("registers and signs in with a passkey", async ({ page, seed, passkey }) => {
   const who = seed.identity();
-  // drive /login → registration choice → "Register with passkey" …
+  await page.goto("/login");
+  await registerWithPasskey(page, { email: who.email });
   await expect.poll(() => passkey.credentialCount()).toBe(1);
 });
 ```
@@ -169,10 +195,14 @@ what the Playwright fixtures use, and what a future remote-instance mode would
 build on.
 
 From `@zitadel/testing/playwright`: the `test`/`expect` fixtures (`seed.user()`
-per test, `zitadel` per worker, `passkey` on demand), plus `withZitadel(options)`
-returning `{ webServer }` for the config, `enableVirtualPasskey(page)` for
-non-fixture pages, and `nextAppEnv`/`applyAppEnvTemplate` for the env-template
-mechanism described above.
+per test, `zitadel` per worker, `passkey` on demand), the flow ceremonies
+(`loginWithPassword`, `loginWithPasskey`, `registerWithPassword`,
+`registerWithPasskey`) with their locator-level escape hatches
+(`flowAction`/`flowField`, `clickFlowAction`/`fillFlowField`), plus
+`withZitadel(options)` returning `{ webServer }` for the config,
+`enableVirtualPasskey(page)` for non-fixture pages, and
+`nextAppEnv`/`applyAppEnvTemplate` for the env-template mechanism described
+above.
 
 ## How it works
 
