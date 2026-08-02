@@ -366,6 +366,38 @@ describe("Next setup integration", () => {
     await expect(stat(join(cwd, "zitadel.json"))).rejects.toThrow();
   });
 
+  it("reports the floor through the doctor envelope on a downgraded app", async () => {
+    // Scaffold healthy, then downgrade next below the floor — the ADR 043
+    // story doctor must tell truthfully: the advertised machine code and the
+    // upgrade hint, not a generic validation error recommending --fix (which
+    // cannot repair an unsupported version).
+    const cwd = await createNextProject();
+    const setup = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
+    expect(setup.exitCode).toBe(0);
+    const pkgPath = join(cwd, "package.json");
+    const pkg = JSON.parse(await readFile(pkgPath, "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    pkg.dependencies.next = "^14.2.0";
+    await writeFile(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+
+    const fake = await fakeDocker();
+    const port = await freePort();
+    const doctor = await cli(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
+    expect(doctor.exitCode).toBe(3);
+    const envelope = parseJson(doctor.stdout) as {
+      code: string;
+      hint?: string;
+      next_commands?: string[];
+    };
+    expect(envelope.code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
+    expect(envelope.hint).toContain("Upgrade the app to Next 15+");
+    expect((envelope.next_commands ?? []).join(" ")).not.toContain("--fix");
+  });
+
   it("skips rerun setup without rewriting edited schema or flow config", async () => {
     const cwd = await createNextProject();
     const setup = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);

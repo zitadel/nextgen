@@ -37,9 +37,14 @@ This ADR records the floors and the enforcement point.
   the floor existed). The existing error code is reused deliberately: a
   below-floor version is the same family as "Pages Router not supported",
   and agents already branch on it.
-- **Unparseable versions pass.** A spec like `latest` or a workspace range
-  carries no provable major; blocking on it would be hostile guessing. The
-  floor fires only on a provable violation.
+- **Only provable violations reject.** The gate evaluates the declared spec
+  with semver range semantics: it rejects only when the range cannot resolve
+  to the floor major or newer (`^14.2.0` and `<15` reject; `>=14` and
+  `14 || 16` pass because a supported version satisfies them). Specs that
+  carry no provable version at all — protocol specs (`file:`, `link:`,
+  `workspace:`, git URLs) and dist-tags (`latest`, `canary`) — always pass;
+  blocking on them would be hostile guessing. Prereleases of the floor major
+  count as at-floor.
 - **Peer ranges follow the floor:** `@zitadel/sdk-next` declares `next >=15`
   (its `react >=18` was already correct). Other frameworks currently declare
   no floor; adding one later means extending its detector the same way and

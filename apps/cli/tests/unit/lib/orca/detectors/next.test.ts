@@ -122,4 +122,14 @@ describe("NextDetector", () => {
     expect(await detector.detect(dir)).toMatchObject({ id: "next" });
     expect(await detector.detect(dir)).not.toHaveProperty("versionMajor");
   });
+
+  it("judges the floor by range semantics, not by digits in the spec", async () => {
+    await mkdir(join(dir, "app"));
+    // "<15" contains the digits 15 yet admits only versions below the floor.
+    await writeNextPackageJson({ dependencies: { next: "<15" } });
+    await expect(detector.detect(dir)).rejects.toThrow("below the supported floor");
+    // A path spec carries digits but no provable version — it must pass.
+    await writeNextPackageJson({ dependencies: { next: "file:../next-14-patched" } });
+    expect(await detector.detect(dir)).toMatchObject({ id: "next" });
+  });
 });
