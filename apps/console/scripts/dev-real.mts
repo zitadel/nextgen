@@ -135,10 +135,15 @@ zitadel = await startLocalZitadel({
 const seeded: SeededUser[] = [];
 try {
   seeded.push(await zitadel.seedUser(DEV_USER));
-  for (const user of EXTRA_USERS) {
-    const { email, ...attributes } = user;
-    seeded.push(await zitadel.seedUser({ email, attributes }));
-  }
+  seeded.push(
+    ...(await zitadel.seedUsers(EXTRA_USERS.length, {
+      email: (index) => EXTRA_USERS[index]!.email,
+      attributes: (index) => {
+        const { email: _email, ...attributes } = EXTRA_USERS[index]!;
+        return attributes;
+      },
+    })),
+  );
 } catch (error) {
   console.error(`[console-dev-real] seeding failed: ${(error as Error).message}`);
   await shutdown(1);

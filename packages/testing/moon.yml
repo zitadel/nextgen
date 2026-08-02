@@ -31,6 +31,25 @@ tasks:
     outputs:
       - "dist/**/*"
 
+  build-release:
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
+    deps:
+      - "api:build-release"
+      - "config:build-release"
+    outputs:
+      - "dist/**/*"
+    options:
+      cache: false
+      # Release builds remove stale package output and rebuild dist inside one
+      # task. They stay out of `moon ci`; release:build-public-packages invokes
+      # them in the release step instead of the normal build/test graph. The
+      # deps read api/config release dist (tsdown bundles both into the CJS
+      # entries), and nothing in the release graph reads this package's dist,
+      # so task ordering alone is enough — no shared mutex needed here.
+      runInCI: false
+
   test:
     command: "corepack pnpm run test"
     deps:

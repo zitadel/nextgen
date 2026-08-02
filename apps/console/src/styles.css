@@ -62,6 +62,22 @@ body {
   color: var(--zl-foreground);
 }
 
+/* Tailwind v4 Preflight sets `border-color: currentColor`, so any shadcn
+   component that writes a bare `border` / `border-l` (sheet, popover, dialog,
+   command, tabs, badge…) draws its edge in the *text* colour — a near-white
+   1px line in dark mode. Registry components assume the canonical shadcn base
+   rule below, which points every unqualified border at the border token; only
+   utilities that name their own colour (`border-input`, `border-border`) are
+   unaffected. Without this, each newly installed component has to remember to
+   re-specify the colour. */
+@layer base {
+  *,
+  ::after,
+  ::before {
+    border-color: var(--color-border);
+  }
+}
+
 /* Tailwind v4 Preflight no longer forces `cursor: pointer` on interactive
    controls; restore it for genuinely interactive elements. */
 button:not(:disabled):not([aria-disabled="true"]),
@@ -69,4 +85,27 @@ button:not(:disabled):not([aria-disabled="true"]),
 [role="radio"]:not([aria-disabled="true"]),
 a[href] {
   cursor: pointer;
+}
+
+/* Chrome paints its own background on an autofilled field and ignores
+   `background-color`, so the input flashes a foreign colour until it loses focus.
+   `color-scheme` (above) only darkens that fill; it does not remove it.
+
+   Clipping the fill to the glyphs removes it while leaving the text painted, so
+   the field keeps whatever surface its own utilities gave it — important here
+   because console inputs are transparent or `input/30` over a sheet or card, so
+   overpainting an opaque colour (the usual `box-shadow` inset trick) would be
+   visibly wrong on anything that is not the page background.
+   `-webkit-text-fill-color` is needed because the autofill style overrides
+   `color`. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: var(--color-foreground);
+  caret-color: var(--color-foreground);
 }
