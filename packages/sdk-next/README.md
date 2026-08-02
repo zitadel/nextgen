@@ -141,13 +141,15 @@ so it works on every page and the answer is the server's:
 import { useEffect, useState } from 'react';
 import { getSession, type ClientAuthResult } from '@zitadel/sdk-next/session';
 
-const signedOut: ClientAuthResult = { isAuthenticated: false, session: null };
-
 export function HeaderNav() {
-  const [auth, setAuth] = useState<ClientAuthResult>(signedOut);
+  // undefined = not yet known — render neutral chrome, not "Sign in".
+  const [auth, setAuth] = useState<ClientAuthResult>();
+  const [error, setError] = useState<Error>();
   useEffect(() => {
-    getSession().then(setAuth, () => setAuth(signedOut));
+    getSession().then(setAuth, setError);
   }, []);
+  if (error) return <span role="alert">Session unavailable</span>;
+  if (!auth) return null;
   return auth.isAuthenticated ? (
     <a href="/profile">{auth.session.name ?? auth.session.email ?? 'Account'}</a>
   ) : (
@@ -156,10 +158,14 @@ export function HeaderNav() {
 }
 ```
 
+A rejected `getSession()` means the state is *unknown* (broken proxy, network,
+5xx) — render a neutral or error state, never the signed-out CTAs.
+
 A `200` with an authenticated user resolves to `{ isAuthenticated: true, session: { userId, email, name } }`
-(client-safe — no token); `401`, `404`, and anonymous sessions resolve to signed
-out; any other response throws so a broken proxy doesn't silently render as
-signed out. Sign-in and sign-out navigate (`post-sign-in-url` /
+(client-safe — no token); `401`, the backend's JSON `404`, and anonymous
+sessions resolve to signed out; any other response — including a framework's
+HTML 404 page from a misrouted proxy — throws so a broken proxy doesn't
+silently render as signed out. Sign-in and sign-out navigate (`post-sign-in-url` /
 `post-sign-out-url`), so chrome re-reads on the next page load without extra
 wiring; to react in place, listen for the widgets' `zitadel-signout` /
 `zitadel-flow-complete` events.

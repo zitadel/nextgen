@@ -103,7 +103,13 @@ describe("<zitadel-session> surface (chromium)", () => {
 
     const rect = element.getBoundingClientRect();
     expect(rect.height).toBeGreaterThan(0);
-    expect(rect.height).toBeLessThan(window.innerHeight * 0.9);
+
+    // No footer content on this surface, so content-sized is exact: the
+    // host box IS the card box. Shell padding leaking into widget mode
+    // (the 682px-host / 514px-card dead space) fails this directly.
+    const card = element.shadowRoot?.querySelector("zl-card") as HTMLElement;
+    expect(card).toBeTruthy();
+    expect(Math.abs(card.getBoundingClientRect().height - rect.height)).toBeLessThanOrEqual(1);
 
     // Outer host.
     expect(getComputedStyle(element).backgroundColor).toBe(TRANSPARENT);
@@ -115,6 +121,7 @@ describe("<zitadel-session> surface (chromium)", () => {
     const surface = shell.shadowRoot?.querySelector(".zr-page-shell") as HTMLElement;
     expect(surface).toBeTruthy();
     expect(getComputedStyle(surface).backgroundColor).toBe(TRANSPARENT);
+    expect(getComputedStyle(surface).padding).toBe("0px");
 
     // Widget mode injects no design-system font into the host document.
     expect(document.getElementById("zl-default-font-link")).toBeNull();

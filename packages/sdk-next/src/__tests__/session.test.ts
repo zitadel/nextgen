@@ -81,6 +81,27 @@ describe("getSession()", () => {
     await expect(getSession()).rejects.toThrow(/HTTP 502/);
   });
 
+  it("throws on a framework's HTML 404 — only the backend's JSON 404 means signed out", async () => {
+    // A misrouted proxy (e.g. matcher miss) yields the router's 404 page,
+    // not the backend's error details; that must be loud, not "signed out".
+    fetchMock.mockResolvedValue(
+      new Response("<!DOCTYPE html><h1>404</h1>", {
+        status: 404,
+        headers: { "content-type": "text/html" },
+      }),
+    );
+
+    await expect(getSession()).rejects.toThrow(/HTTP 404/);
+  });
+
+  it("strips trailing slashes from the proxy path before building the URL", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ user_id: "u" }));
+
+    await getSession({ proxyPath: "/__nextgen/" });
+
+    expect(fetchMock).toHaveBeenCalledWith("/__nextgen/sessions/me", expect.anything());
+  });
+
   it("prefers an explicit proxyPath over the configured one", async () => {
     configureZitadel({ projectId: "proj", proxyPath: "/configured" });
     fetchMock.mockResolvedValue(jsonResponse({ user_id: "u" }));

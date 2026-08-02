@@ -352,6 +352,52 @@ describe("Next setup integration", () => {
     expect((parseJson(planAfterApply.stdout) as { data: { total: number } }).data.total).toBe(0);
   });
 
+  it("refuses setup below the Next 15 floor with an explicit error", async () => {
+    const cwd = await createNextProject("^14.2.0");
+    const setup = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
+    // ADR 043: unsupported versions are a loud gate, never a silent
+    // narrowing — the envelope carries the machine code and the floor.
+    expect(setup.exitCode).toBe(3);
+    const envelope = parseJson(setup.stdout) as { status: string; code: string; message: string };
+    expect(envelope.status).toBe("error");
+    expect(envelope.code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
+    expect(envelope.message).toContain("below the supported floor");
+    // The gate fires at detection, before any project or file mutation.
+    await expect(stat(join(cwd, "zitadel.json"))).rejects.toThrow();
+  });
+
+  it("reports the floor through the doctor envelope on a downgraded app", async () => {
+    // Scaffold healthy, then downgrade next below the floor — the ADR 043
+    // story doctor must tell truthfully: the advertised machine code and the
+    // upgrade hint, not a generic validation error recommending --fix (which
+    // cannot repair an unsupported version).
+    const cwd = await createNextProject();
+    const setup = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
+    expect(setup.exitCode).toBe(0);
+    const pkgPath = join(cwd, "package.json");
+    const pkg = JSON.parse(await readFile(pkgPath, "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    pkg.dependencies.next = "^14.2.0";
+    await writeFile(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+
+    const fake = await fakeDocker();
+    const port = await freePort();
+    const doctor = await cli(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
+    expect(doctor.exitCode).toBe(3);
+    const envelope = parseJson(doctor.stdout) as {
+      code: string;
+      hint?: string;
+      next_commands?: string[];
+    };
+    expect(envelope.code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
+    expect(envelope.hint).toContain("Upgrade the app to Next 15+");
+    expect((envelope.next_commands ?? []).join(" ")).not.toContain("--fix");
+  });
+
   it("skips rerun setup without rewriting edited schema or flow config", async () => {
     const cwd = await createNextProject();
     const setup = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
@@ -589,7 +635,7 @@ describe("Next setup integration", () => {
 
 });
 
-async function createNextProject(): Promise<string> {
+async function createNextProject(nextVersion = "^16.0.0"): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-next-"));
   await mkdir(join(cwd, "app"), { recursive: true });
   await writeFile(
@@ -599,7 +645,7 @@ async function createNextProject(): Promise<string> {
         name: "demo-next-app",
         private: true,
         dependencies: {
-          next: "^16.0.0",
+          next: nextVersion,
           react: "^19.0.0",
           "react-dom": "^19.0.0",
         },
