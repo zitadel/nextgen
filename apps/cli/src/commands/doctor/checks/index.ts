@@ -12,6 +12,7 @@ import { GitignoreCheck } from "./gitignore";
 import { EnvExampleCheck } from "./env-example";
 import { FrameworkCheck } from "./framework";
 import { DependencyCheck } from "./dependency";
+import { ManagedFilesCheck } from "./managed-files";
 import { ProjectMatchCheck } from "./project-match";
 import { SchemaCheck } from "./schema";
 
@@ -25,6 +26,7 @@ export { EnvExampleCheck } from "./env-example";
 export { FrameworkCheck } from "./framework";
 export { SchemaCheck } from "./schema";
 export { DependencyCheck } from "./dependency";
+export { ManagedFilesCheck } from "./managed-files";
 export { ProjectMatchCheck } from "./project-match";
 
 /** Every diagnostic the `doctor` command runs, in display order. */
@@ -37,5 +39,6 @@ export const SANITY_CHECKS: ReadonlyArray<SanityCheck> = [
   new FrameworkCheck(),
   new SchemaCheck(),
   new DependencyCheck(),
+  new ManagedFilesCheck(),
   new ProjectMatchCheck(),
 ];
