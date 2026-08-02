@@ -1,6 +1,8 @@
-import type { Locator, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import { expect, test } from "@zitadel/testing/playwright";
+
+import { clickAction, clickActionIfVisible, fillIfVisible } from "./flow-actions";
 
 /**
  * Registration through the real flow with a kit-minted unused identity:
@@ -46,48 +48,5 @@ async function skipPasskeyUpsellIfVisible(page: Page): Promise<void> {
   ]);
   if (outcome === "upsell") {
     await skip.click();
-  }
-}
-
-async function clickAction(page: Page, name: RegExp, actionNames: string[]): Promise<void> {
-  const target = actionCandidates(page, name, actionNames).find(Boolean);
-  for (const candidate of actionCandidates(page, name, actionNames)) {
-    if (await candidate.first().isVisible({ timeout: 1_000 }).catch(() => false)) {
-      await candidate.first().click();
-      return;
-    }
-  }
-  await (target as Locator).first().click();
-}
-
-async function clickActionIfVisible(
-  page: Page,
-  name: RegExp,
-  actionNames: string[],
-): Promise<void> {
-  for (const candidate of actionCandidates(page, name, actionNames)) {
-    if (await candidate.first().isVisible({ timeout: 1_000 }).catch(() => false)) {
-      await candidate.first().click();
-      return;
-    }
-  }
-}
-
-function actionCandidates(page: Page, name: RegExp, actionNames: string[]): Locator[] {
-  return [
-    ...actionNames.flatMap((action) => [
-      page.getByTestId(`zitadel-action-${action}-button`),
-      page.getByTestId(`zitadel-action-${action}-link`),
-      page.locator(`zl-button[action="${action}"], [data-action="${action}"]`),
-    ]),
-    page.getByRole("button", { name }),
-    page.getByRole("link", { name }),
-  ];
-}
-
-async function fillIfVisible(page: Page, label: RegExp, value: string): Promise<void> {
-  const field = page.getByLabel(label).first();
-  if (await field.isVisible({ timeout: 1_000 }).catch(() => false)) {
-    await field.fill(value);
   }
 }

@@ -51,12 +51,27 @@ export type PatchExecOptions = Readonly<{
 }>;
 
 /**
+ * One filesystem artifact a patch touched, in a family-neutral shape: the
+ * resolved path, whether it is a file or a directory, and whether the run
+ * created it or updated existing content. Deduplicated — a path touched by
+ * several plan operations reports once, with the first (net) action.
+ */
+export type PatchedFile = Readonly<{
+  path: string;
+  kind: "file" | "dir";
+  action: "create" | "update";
+}>;
+
+/**
  * The outcome of a patch, reported in a family-neutral shape so the command
  * layer can summarize it without knowing how the patcher works (file ops vs
- * an LLM agent).
+ * an LLM agent). `files` carries the typed per-artifact rows; `filesWritten`
+ * remains the legacy flat list — deduplicated file paths only, directories
+ * excluded.
  */
 export type PatchResult = Readonly<{
   dryRun: boolean;
+  files: ReadonlyArray<PatchedFile>;
   filesWritten: ReadonlyArray<string>;
   filesSkipped: ReadonlyArray<string>;
   depsAdded: ReadonlyArray<string>;

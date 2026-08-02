@@ -51,6 +51,11 @@ Each invocation prints one JSON object:
   delete). Plan rows preview; apply rows report, with the resulting platform
   ids. Use it to verify an edit did what you intended — `apply`'s
   `files_updated` lists only local write-backs, not platform changes.
+- `setup` emits `data.files`: one typed row per scaffolded artifact
+  (`{path, kind: file|dir, action: create|update}`), deduplicated. Use it to
+  see what setup created versus merged into (your `package.json` is an
+  `update`). `data.files_written` remains the flat list — deduplicated file
+  paths only, covering both scaffolded and `.zitadel/` resource files.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime with
   `npx @zitadel/cli@alpha start`, then retry with `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 from the target server. With the platform's
@@ -82,9 +87,10 @@ the CLI's help layer, not the envelope.
   must pass `--framework` when scaffolding into a fresh directory; interactive
   humans can omit it and choose from the prompt. Flags:
   `--framework next|react|vue|angular|nuxt|solid|svelte|qwik`, `--renderer
-  react|web-component` (selects the Next.js auth-page renderer; accepted for any
-  framework and recorded in `zitadel.json` branding, but only Next varies its
-  generated templates by it), `--dev-port` (dev-server port, also the issuer
+  react` (selects the Next.js auth-page renderer; accepted for any framework
+  and recorded in `zitadel.json` branding, but only Next varies its generated
+  templates by it; the planned `web-component` renderer is not yet available
+  and is rejected if passed), `--dev-port` (dev-server port, also the issuer
   origin registered with Zitadel — use distinct ports to run several scaffolded
   apps side by side), `--preset password-first|passkey-first` (the sign-in
   experience the scaffold starts from: `password-first` is the default —
