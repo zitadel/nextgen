@@ -9,7 +9,10 @@ Scoped instructions for `packages/testing/`. Read together with the
 Zitadel": it boots a real local instance (`startLocalZitadel` /
 `connectZitadel`), orchestrates instance + app for Playwright
 (`withZitadel`), seeds users and sessions (`seed.*`, `authenticatedPage`),
-and completes passkey ceremonies headlessly (`enableVirtualPasskey`).
+completes passkey ceremonies headlessly (`enableVirtualPasskey`), and
+drives the `<zitadel-login>` widget through whole auth ceremonies
+(`loginWithPassword`, `registerWithPasskey`, …, with `flowAction` /
+`flowField` as escape hatches).
 
 In-repo consumers, which double as the dogfood proof:
 
@@ -69,6 +72,17 @@ fact changes:
   run on the same page; sign out via `context().clearCookies()`, never a
   fresh context. RP-ID rule: serve the app on HTTPS or `http://localhost`;
   raw IP origins are invalid.
+- **Flow ceremonies** (`src/flows.ts`): the locator ladders are the
+  widget's documented automation-hook contract
+  (`packages/components/README.md`), locked by descriptor-equality unit
+  tests. Ceremonies branch only on **widget-observable state** (which
+  fields/actions render), never on app state — customer flow configs
+  legitimately vary. Broad fallbacks (accessible names, labels, bare
+  `data-action`) stay scoped to the `<zitadel-login>` host: `.or()` unions
+  resolve in page-wide DOM order, so an unscoped candidate could match app
+  chrome; the host also exists for custom templates that emit no hooks.
+  Free-form action names are CSS-escaped before attribute-selector
+  interpolation.
 - **Session-mint driver** (`src/session.ts`): the flow is stateless via
   the sealed `_zflow` cookie (raw `fetch` + one-cookie jar — the typed
   client hides response headers), submits must send an `Origin` on the
