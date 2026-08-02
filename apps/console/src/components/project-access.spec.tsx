@@ -1,10 +1,16 @@
-// Parked with the Projects block in the Add user drawer, which is hidden until
-// the backend can grant access: roles need ADR 034's app-group catalog (epic
-// #419), and `queryProjects` is scope-pinned to a single project (ADR 0004).
+// Parked with the Projects block in the Add user drawer. Two reasons, and both
+// have to clear before it comes back:
+//
+//   1. Design removed the project selector from the MVP (design decisions log
+//      D6, 2026-07-31). It is expected to return in a future version, which is
+//      why this is parked rather than deleted.
+//   2. The backend cannot grant access anyway: roles need ADR 034's app-group
+//      catalog (epic #419), and `queryProjects` is scope-pinned to a single
+//      project (ADR 0004).
 //
 // The component and these specs are kept intact — un-comment this file, the
 // block in `add-user-sheet.tsx` and the parked cases in its spec together when
-// the endpoints land.
+// design reinstates the block and the endpoints exist.
 //
 // import { render, screen } from "@testing-library/react";
 // import userEvent from "@testing-library/user-event";

@@ -1,4 +1,3 @@
-import { ApiError } from "@zitadel/api/runtime/fetch";
 import { AlertCircle, Loader2, UserRoundCog, X } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useId, useState } from "react";
 
@@ -27,7 +26,8 @@ import {
 } from "@/components/ui/sheet";
 
 import { api } from "../api/zitadel";
-// Parked until the backend can grant roles — see the block below.
+import { describeError } from "../lib/api-error";
+// Parked — design decisions log D6, plus no grant endpoints. See the block below.
 // import {
 //   ProjectAccess,
 //   type ProjectAccessRow,
@@ -75,8 +75,10 @@ const FOOTER = "flex-row items-center justify-end gap-3 bg-background px-6 py-4"
  * email, a `business` one also asks for names and a company.
  *
  * The design also specifies a "Projects (optional)" block granting the new user
- * project roles. That needs endpoints which do not exist yet (project list #405,
- * grants/roles #419), so it is deliberately omitted rather than mocked — see
+ * project roles. It is deliberately omitted rather than mocked: design removed
+ * the project selector from the MVP (design decisions log D6, 2026-07-31) and
+ * the grant endpoints do not exist (#419). D6 expects it back in a future
+ * version, so the block and its component are parked, not deleted — see
  * issue #633.
  */
 export function AddUserSheet({
@@ -253,13 +255,22 @@ function AddUserForm({
             />
           ))}
         </div>
-        {/* Projects block — hidden until the backend can actually grant access.
-            It needs a role catalogue (ADR 034's app-group catalog, epic #419)
-            and a multi-project scope; today `queryProjects` returns only the
-            caller's own project (ADR 0004) and `POST /users` accepts no grants,
-            so the block could select things it could never save. The component,
-            its unit spec and its e2e coverage are kept intact alongside this —
-            restore all four together when the endpoints land. */}
+        {/* Projects block — out of the MVP for two independent reasons, both of
+            which must clear before it returns.
+
+            Design removed the project selector (design decisions log D6,
+            2026-07-31) and expects it back in a future version; the log's
+            "project access" open question — how project ↔ team ↔ access relate
+            — is what has to settle first.
+
+            The backend could not honour it anyway: granting needs a role
+            catalogue (ADR 034's app-group catalog, epic #419) and a
+            multi-project scope, but `queryProjects` returns only the caller's
+            own project (ADR 0004) and `POST /users` accepts no grants, so the
+            block could select things it could never save.
+
+            The component, its unit spec and its e2e coverage are kept intact
+            alongside this — restore all four together. */}
         {/* <Separator />
         <ProjectAccess projects={projects} rows={access} onChange={setAccess} /> */}
         {error && (
@@ -380,34 +391,3 @@ function SchemaInput({
   );
 }
 
-/**
- * The message to show for a failed request.
- *
- * **The API owns this copy.** ADR 030 defines the error payload's `message` as
- * the human-facing string, so it is rendered verbatim rather than mapped to
- * console-authored text — the console has no design source for error strings and
- * no i18n layer, so re-writing them would only fork the wording per client.
- *
- * The message lives in the response *body* (`error-details.yaml`).
- * `ApiError.message` is a transport-level string (`POST /users returned 409`,
- * built in `runtime/fetch.ts`) and must never reach an operator, so the body is
- * read explicitly. `fallback` covers the case where there is no payload at all —
- * a network failure or a non-JSON response.
- *
- * Attributing a `409` to a specific input is deliberately not attempted:
- * `ErrUserAlreadyExists()` carries no details and ADR 030 records that `details`
- * is never populated today, so the response cannot say which value collided.
- * Guessing from the schema's `x-unique` markers would put console-authored copy
- * under a field the server never named.
- */
-function describeError(cause: unknown, fallback: string): string {
-  if (cause instanceof ApiError) {
-    const body = cause.body;
-    if (body && typeof body === "object") {
-      const message = (body as Record<string, unknown>).message;
-      if (typeof message === "string" && message.trim() !== "") return message;
-    }
-    return fallback;
-  }
-  return cause instanceof Error ? cause.message : fallback;
-}
