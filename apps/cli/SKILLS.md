@@ -99,11 +99,9 @@ the CLI's help layer, not the envelope.
   recorded in `zitadel.json`), `--use-case minimal|consumer|business` (which
   profile fields the scaffolded schema collects: `minimal` is the default —
   email only; `consumer` adds given and family name; `business` also adds a
-  `companyName` attribute and — on Next scaffolds — overlays work-email copy
-  on the generated auth pages via the SDK's `businessLocales` (other
-  frameworks keep the neutral copy until their SDK packages re-export the
-  overlay); asked before `--preset` and recorded in `zitadel.json`),
-  `--skip-install`.
+  `companyName` attribute and overlays work-email copy on the generated auth
+  pages via the SDK's `businessLocales`; asked before `--preset` and recorded
+  in `zitadel.json`), `--skip-install`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `schemas list` — inspect the revision history of a user-schema, filtered by

@@ -56,6 +56,26 @@ describe("NuxtPatcher.plan", () => {
     expect(edit?.path).toContain("nuxt.config.ts");
   });
 
+  it("wires the business copy overlay for business-use-case projects", () => {
+    // Minimal scaffolds keep the widget's neutral built-in copy.
+    expect(writeContents(new NuxtPatcher().plan(ctx()), "app/pages/login.vue")).not.toContain(
+      "businessLocales",
+    );
+    const business = new NuxtPatcher().plan({ ...ctx(), useCase: "business" });
+    for (const path of ["app/pages/login.vue", "app/pages/register.vue"]) {
+      const page = writeContents(business, path);
+      // The overlay ships with the SDK: the page pulls it from the entry it
+      // already imports, and a plain :locales binding suffices even on the
+      // raw custom element — Vue sets bindings whose key exists on the
+      // element as DOM properties (no React-18 ref detour as in Next).
+      expect(page).toContain("businessLocales, useZitadelProject");
+      expect(page).toContain(':locales="businessLocales"');
+    }
+    // Consumer scaffolds keep the neutral built-ins, like minimal ones.
+    const consumer = new NuxtPatcher().plan({ ...ctx(), useCase: "consumer" });
+    expect(writeContents(consumer, "app/pages/login.vue")).not.toContain("businessLocales");
+  });
+
   it("leaves profile page chrome to the session card's page surface", () => {
     const plan = new NuxtPatcher().plan(ctx("app"));
     const profile = writeContents(plan, "app/pages/profile.vue");

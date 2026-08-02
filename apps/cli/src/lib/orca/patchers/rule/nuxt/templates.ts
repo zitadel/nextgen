@@ -1,4 +1,5 @@
 import { MANAGED_MARKER } from "../../../../paths";
+import type { PatchContext } from "../../types";
 
 /** `app.vue` — renders the page router. Marker in an HTML comment. */
 export function appVueTemplate(): string {
@@ -30,15 +31,33 @@ await navigateTo("/login", { replace: true });
 `;
 }
 
-/** A login/register page rendering `<zitadel-login>` inside `<ClientOnly>`. */
-function authPage(purpose: "login" | "register"): string {
+/**
+ * A login/register page rendering `<zitadel-login>` inside `<ClientOnly>`.
+ * Business-use-case projects additionally bind the SDK's `businessLocales`
+ * overlay, restoring work-email copy on top of the widget's neutral built-in
+ * dictionaries. A plain `:locales` binding suffices even on the raw custom
+ * element: Vue sets bindings whose key exists on the element as DOM
+ * properties (unlike React 18, which is why the Next template needs a ref).
+ */
+function authPage(purpose: "login" | "register", ctx: PatchContext): string {
+  const business = ctx.useCase === "business";
+  const importNames = business ? "businessLocales, useZitadelProject" : "useZitadelProject";
+  // The overlay ships with the SDK, so the generated page only wires it up
+  // (and stays plain otherwise).
+  const localesComment = business
+    ? `
+// Set up for a business audience: businessLocales overlays work-email copy on
+// the login widget's neutral built-in dictionaries. Remove the :locales
+// binding to fall back to the neutral wording.`
+    : "";
+  const localesAttr = business ? '\n        :locales="businessLocales"' : "";
   const purposeAttr = purpose === "register" ? '\n        purpose="register"' : "";
   // variant="page" makes the widget paint the full-page chrome itself
   // (viewport height, surface background) from design tokens; the <main>
   // wrapper only pins the color scheme.
   return `<script setup lang="ts">
 ${MANAGED_MARKER}
-import { useZitadelProject } from "@zitadel/sdk-nuxt";
+import { ${importNames} } from "@zitadel/sdk-nuxt";${localesComment}
 
 const project = useZitadelProject();
 </script>
@@ -50,7 +69,7 @@ const project = useZitadelProject();
            tokens; variant="widget" embeds the card inside a layout you own. -->
       <zitadel-login
         variant="page"
-        :project="project"${purposeAttr}
+        :project="project"${localesAttr}${purposeAttr}
         post-sign-in-url="/profile"
       />
     </ClientOnly>
@@ -59,12 +78,12 @@ const project = useZitadelProject();
 `;
 }
 
-export function loginPageTemplate(): string {
-  return authPage("login");
+export function loginPageTemplate(ctx: PatchContext): string {
+  return authPage("login", ctx);
 }
 
-export function registerPageTemplate(): string {
-  return authPage("register");
+export function registerPageTemplate(ctx: PatchContext): string {
+  return authPage("register", ctx);
 }
 
 /** `pages/profile.vue` — the post-sign-in "signed in as" session card. */
