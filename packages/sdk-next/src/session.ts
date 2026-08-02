@@ -32,22 +32,26 @@ export type GetSessionOptions = {
  *
  * - `200` with an authenticated user → `{ isAuthenticated: true, session }`
  *   with the client-safe identity (`userId`, `email`, `name` — no token).
- * - `200` for an anonymous session, `401`, or `404` → signed out.
- * - Any other response throws: a failing proxy is a misconfiguration and
- *   must not silently render as "signed out". Chrome that prefers a quiet
- *   fallback can `.catch()` to its signed-out state.
+ * - `200` for an anonymous session, `401`, or a JSON `404` (the backend's
+ *   "session gone") → signed out.
+ * - Any other response throws — including a framework's HTML 404 page from
+ *   a misrouted proxy: a failing proxy is a misconfiguration and must not
+ *   silently render as "signed out". Treat a rejection as "unknown" —
+ *   distinct from signed-out — as the example does.
  *
  * ```tsx
  * "use client";
  * import { getSession, type ClientAuthResult } from "@zitadel/sdk-next/session";
  *
- * const signedOut: ClientAuthResult = { isAuthenticated: false, session: null };
- *
  * export function HeaderNav() {
- *   const [auth, setAuth] = useState<ClientAuthResult>(signedOut);
+ *   // undefined = not yet known — render neutral chrome, not "Sign in".
+ *   const [auth, setAuth] = useState<ClientAuthResult>();
+ *   const [failed, setFailed] = useState(false);
  *   useEffect(() => {
- *     getSession().then(setAuth, () => setAuth(signedOut));
+ *     getSession().then(setAuth, () => setFailed(true));
  *   }, []);
+ *   if (failed) return <span role="alert">Session unavailable</span>;
+ *   if (!auth) return null;
  *   return auth.isAuthenticated
  *     ? <a href="/profile">{auth.session.name ?? auth.session.email ?? "Account"}</a>
  *     : <a href="/login">Sign in</a>;
@@ -70,15 +74,26 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
     );
   }
 
-  const proxyPath = options.proxyPath ?? getZitadelConfig()?.proxyPath ?? DEFAULT_PROXY_PATH;
+  // Strip trailing slashes so "/__nextgen/" doesn't produce a double-slash
+  // URL that misses the request-boundary matcher — same normalization the
+  // typed API client applies to its base URL.
+  let proxyPath = options.proxyPath ?? getZitadelConfig()?.proxyPath ?? DEFAULT_PROXY_PATH;
+  while (proxyPath.endsWith("/")) {
+    proxyPath = proxyPath.slice(0, -1);
+  }
+
   const response = await fetch(`${proxyPath}/sessions/me`, {
     credentials: "include",
     headers: { accept: "application/json" },
   });
 
-  // 401 = no/invalid session token, 404 = session gone (revoked/expired):
-  // both are the server's definitive "not signed in".
-  if (response.status === 401 || response.status === 404) {
+  // 401 = no/invalid session token; 404 = session gone (revoked/expired).
+  // Both are the server's definitive "not signed in" — but only when the
+  // answer came from the backend (JSON error details). A framework router's
+  // HTML 404 means the proxy never saw the request; that falls through to
+  // the throw below instead of silently rendering signed-out.
+  const isJson = (response.headers.get("content-type") ?? "").includes("application/json");
+  if (response.status === 401 || (response.status === 404 && isJson)) {
     return { isAuthenticated: false, session: null };
   }
 
