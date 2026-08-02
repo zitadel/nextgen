@@ -89,7 +89,8 @@ normative contract** (`schema_version`), not an indicative shape:
   "variables": { "displayName": "Ada", "code": "742913" },
   "rendered": { "subject": "Verify your email", "text": "…", "html": "…" },
   "created_at": "…",
-  "expires_at": "…"
+  "expires_at": "…",
+  "retained_until": "…"
 }
 ```
 
@@ -103,6 +104,16 @@ records the template's render inputs and is *not* an API: custom
 composition may rename or omit template variables freely without breaking
 `waitForCode()`. `channel` and `purpose` keep SMS and webhook-style
 messages behind the same contract later.
+
+The two timestamps answer different questions. `expires_at` is **artifact
+validity** — the underlying challenge's expiry, which composition
+guarantees is shared by every artifact on one record (code and link
+materialize the same challenge; a future purpose whose artifacts diverge
+in lifetime extends the versioned schema with per-artifact expiry rather
+than overloading this field). `retained_until` is **store retention** —
+when the record leaves the inbox. An agent checks `expires_at` to know
+whether a code is still usable; the UI shows both and renders the
+expired-but-retained state distinctly.
 
 **Delivery modes: explicit in the server, zero-config at the front doors.**
 The binary captures only when configured to — a released binary never
@@ -122,8 +133,15 @@ enforces instead: a `provider_required` policy on the environment record.
 Provisioning sets it (the claim flow marks production environments;
 operators can set it anywhere), and while it is set, deploying a release
 that enables email-dependent flows without a configured provider
-**fails** — a hard failure, not a warning. When env-classes arrive, they
-map classes to this policy's default. This is one deliberate divergence
+**fails** — a hard failure, not a warning. Deployment is not the only
+gate, because delivery mode and provider configuration are mutable
+environment state: **every provider or policy mutation validates the
+invariant** (removing the provider, or enabling `provider_required`
+without one, is rejected while email-dependent flows are deployed),
+startup re-validates against drift, and at send time a
+`provider_required` environment without a working provider **fails the
+send loudly — it never falls back to capture**. When env-classes arrive,
+they map classes to this policy's default. This is one deliberate divergence
 from the overview's current narrative (which lists "Dev Inbox (default)"
 for claimed production): customer-facing password-reset mail must not
 silently land in a developer inbox. The overview gets amended to match if
@@ -144,7 +162,8 @@ in-memory store is exempt.
 secrets: responses carry `Cache-Control: no-store`, values never enter
 request or access logs, and purge is a scoped operator/admin operation —
 never part of ordinary test flow. List responses are **metadata-only**
-(id, scope, channel, purpose, recipient, template, timestamps): masking
+(id, scope, channel, purpose, recipient, template, timestamps, artifact
+*keys*): masking
 the artifact fields alone would be theater, because `rendered.text`,
 `rendered.html`, and usually `variables` embed the same code and link.
 The full message — artifacts, variables, and rendered forms together —
@@ -160,15 +179,24 @@ credential and mints the browser a scoped, HTTP-only inbox session. A
 signed cookie only proves the server issued it, so minting is gated on an
 authenticated exchange: an authenticated human on a claimed surface
 (dashboard login), or a **project-secret-mediated one-time handoff**
-minted only by the explicit, human-facing `zitadel dev-inbox open` — it
-requests a single-use short-TTL handoff token, opens the browser, and the
-backend exchanges the token immediately and redirects to a clean URL, so
-the token rests neither in logs nor in the address bar. `zitadel start`
-never emits a bearer-bearing URL: its JSON stdout is the agent contract
-and lands in transcripts and CI logs, so it reports only non-secret
-capability metadata plus a `next_commands` pointer to `dev-inbox open`.
-The durable operator credential never appears in a URL or reaches the
-browser. The scratch dashboard's current
+minted only by the explicit, human-facing `zitadel dev-inbox open`. The
+transfer is specified, not just promised: the single-use short-TTL token
+travels in the opened URL's **fragment** (fragments never reach the
+server, so access logs cannot record them); the handoff page's script
+POSTs it to the exchange endpoint, receives the HTTP-only session cookie,
+and `history.replaceState`s the fragment away; inbox responses carry
+`Referrer-Policy: no-referrer`; and the exchange endpoint redacts token
+material from every log path as defense-in-depth. `zitadel start` never
+emits a bearer-bearing URL: its JSON stdout is the agent contract and
+lands in transcripts and CI logs. It reports capability state as data —
+`available` (the server supports capture) vs `configured` (this
+environment has it enabled) — and points at `dev-inbox open` only through
+a human-facing `next_actions` hint, never through `next_commands`: the
+CLI contract tells agents to prefer and *execute* `next_commands`, and
+`open` both spawns a browser and requires a configured environment secret
+that does not exist yet on the fresh golden path (`start` runs before
+`setup`). The durable operator credential never appears in a URL or
+reaches the browser. The scratch dashboard's current
 anonymous first-visit cookie (platform overview) is **not** sufficient
 authorization for inbox content — pre-claim, its inbox view rides the
 same secret-mediated handoff. That is a second overview amendment,
@@ -187,20 +215,25 @@ const message = await zitadel.email.waitForMessage({
   after: cursor,
   to: identity.email,
   purpose: "email_verification",
+  artifact: "code",
 });
 await fillFlowField(page, "code", message.artifacts.code);
 ```
 
-`waitForCode()` remains as sugar over `waitForMessage(...).artifacts.code`.
-No wall-clock timestamps, no cross-worker destruction, no global cleanup in
-tests.
+Filters select on recipient, purpose, and **artifact key** — a purpose
+may legitimately produce a link-only message, so `artifact: "code"` waits
+specifically for a code-bearing record instead of matching whatever
+arrives first. Artifact *keys* (never values) are part of list metadata,
+so the predicate runs server-side. `waitForCode()` is sugar for
+`waitForMessage({ …, artifact: "code" }).artifacts.code`. No wall-clock
+timestamps, no cross-worker destruction, no global cleanup in tests.
 
 Waits are **bounded and cancellable**: `waitForMessage` takes `timeoutMs`
 (with a kit default) and an `AbortSignal`, and on expiry throws a typed
 timeout error carrying the resolved scope and filters (project,
-environment, `after`, `to`, `purpose`) — a missing outbound message
-diagnoses itself instead of surfacing as an anonymous outer Playwright
-timeout. All email operations bind to an **explicit environment**:
+environment, `after`, `to`, `purpose`, `artifact`) — a missing outbound
+message diagnoses itself instead of surfacing as an anonymous outer
+Playwright timeout. All email operations bind to an **explicit environment**:
 `InstanceHandle` carries `environmentId` (a locally-booted instance has
 exactly one development environment; `connectZitadel` accepts it as an
 option for multi-environment projects), and cursors, waits, and reads
