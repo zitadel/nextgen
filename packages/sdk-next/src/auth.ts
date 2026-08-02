@@ -20,7 +20,13 @@ import { isJwtShaped, verifyJwt } from "./lib/jwt.js";
  */
 export type AuthOptions = Pick<
   NextgenMiddlewareOptions,
-  "url" | "allowedAlgorithms" | "clockSkewMs" | "audience" | "allowedTokenTypes" | "jwksTimeoutMs"
+  | "url"
+  | "allowedAlgorithms"
+  | "clockSkewMs"
+  | "audience"
+  | "allowedTokenTypes"
+  | "jwksTimeoutMs"
+  | "opaqueTokenTimeoutMs"
 >;
 
 /**
@@ -152,6 +158,7 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
     audience,
     allowedTokenTypes = ["JWT", "at+JWT"],
     jwksTimeoutMs,
+    opaqueTokenTimeoutMs = 5000,
   } = options;
 
   if (isJwtShaped(token)) {
@@ -191,7 +198,7 @@ export async function auth(options: AuthOptions = {}): Promise<AuthResult> {
     return { isAuthenticated: false, session: null };
   }
 
-  const session = await validateOpaqueSession(token, url, jwksTimeoutMs ?? 5000);
+  const session = await validateOpaqueSession(token, url, opaqueTokenTimeoutMs);
   if (session) {
     return { isAuthenticated: true, session: { ...session, token } };
   }

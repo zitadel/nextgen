@@ -286,6 +286,26 @@ describe("auth()", () => {
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("could not reach"));
   });
 
+  it("aborts opaque validation after opaqueTokenTimeoutMs and fails closed", async () => {
+    // A fetch that only settles when its AbortSignal fires — proves the
+    // timeout option actually reaches the request.
+    fetchMock.mockImplementation(
+      (_input, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject((init.signal as AbortSignal).reason as Error),
+          );
+        }),
+    );
+    mockHeadersMap.set("x-nextgen-auth-token", makeJweShapedToken());
+
+    const auth = await importAuth();
+    const result = await auth({ url: ISSUER, opaqueTokenTimeoutMs: 5 });
+
+    expect(result).toEqual({ isAuthenticated: false, session: null });
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("could not reach"));
+  });
+
   it("falls back to the ZITADEL_URL environment variable for the backend URL", async () => {
     vi.stubEnv("ZITADEL_URL", ISSUER);
     routeFetch(nextKid(), () =>

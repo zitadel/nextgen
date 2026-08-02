@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { ReactNode } from "react";
 
 import type {
@@ -26,8 +28,7 @@ function toClientSession(session: ClientSession | NextgenSession): ClientSession
  * pass the `auth()` result directly:
  *
  * ```tsx
- * import { auth } from "@zitadel/sdk-next/server";
- * import { NextgenProvider } from "@zitadel/sdk-next/react";
+ * import { auth, NextgenProvider } from "@zitadel/sdk-next/server";
  *
  * export default async function RootLayout({ children }) {
  *   const session = await auth();
@@ -41,14 +42,24 @@ function toClientSession(session: ClientSession | NextgenSession): ClientSession
  * }
  * ```
  *
- * This component is deliberately **not** marked `"use client"`. Rendered from
- * a Server Component it executes on the server, converts the input to the
- * client-safe {@link ClientAuthResult} — dropping the raw session token — and
- * only the stripped value is serialised across the server→client boundary.
- * Passing the full `auth()` result straight into a `"use client"` component
- * would embed the raw token in the RSC flight payload, readable by any script
- * running on the page. (sdk-nuxt strips the token before seeding client state
- * for the same reason.)
+ * Executed in a Server Component, it converts the input to the client-safe
+ * {@link ClientAuthResult} — dropping the raw session token — and only the
+ * stripped value is serialised across the server→client boundary. Passing the
+ * full `auth()` result straight into a `"use client"` component would embed
+ * the raw token in the RSC flight payload, readable by any script running on
+ * the page. (sdk-nuxt strips the token before seeding client state for the
+ * same reason.)
+ *
+ * This module is **server-only, on purpose**. The strip only protects the
+ * boundary when it runs on the server: if this component could be imported
+ * into a `"use client"` wrapper (the common `providers.tsx` pattern), the
+ * *wrapper* would become the boundary and its still-unstripped `session`
+ * prop — token included — would serialise into the flight payload before
+ * this code ever ran. The `server-only` import turns that wrapper into a
+ * build error instead of a silent leak. For a client-seeded tree (e.g. state
+ * from `getSession()`), use `AuthContextProvider` from
+ * `@zitadel/sdk-next/react`, which only accepts the token-less
+ * {@link ClientAuthResult}.
  *
  * Client components therefore only ever see `userId` / `email` / `name`. When
  * the raw token is needed server-side (e.g. to call an upstream API), read it

@@ -4,8 +4,13 @@ import { describe, it, expect } from "vitest";
 
 import type { AuthResult, ClientAuthResult, NextgenSession } from "../types";
 
-// Imported through the public client entry — the same path consumers use.
-import { NextgenProvider, useAuth } from "../react";
+// useAuth/AuthContextProvider come through the public client entry — the same
+// path consumers use. NextgenProvider is server-only (it accepts the
+// token-bearing auth() result), so its public homes are /server and the root;
+// tests import the defining module directly (the vitest alias stubs the
+// server-only guard).
+import { NextgenProvider } from "../provider";
+import { AuthContextProvider, useAuth } from "../react";
 
 function wrapper(initialSession: AuthResult) {
   let setSessionRef: ((s: AuthResult) => void) | null = null;
@@ -128,5 +133,20 @@ describe("NextgenProvider input shapes", () => {
       isAuthenticated: true,
       session: { userId: "u4", email: "d@d.com", name: "D" },
     });
+  });
+});
+
+describe("AuthContextProvider (client-side seeding)", () => {
+  it("feeds a client-safe value straight to useAuth()", () => {
+    const seeded: ClientAuthResult = {
+      isAuthenticated: true,
+      session: { userId: "u5", email: "e@e.com", name: null },
+    };
+    const { result } = renderHook(() => useAuth(), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <AuthContextProvider value={seeded}>{children}</AuthContextProvider>
+      ),
+    });
+    expect(result.current).toEqual(seeded);
   });
 });

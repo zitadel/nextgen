@@ -13,8 +13,8 @@ pnpm add @zitadel/sdk-next
 | Import                         | Runs in                          | Provides                                         |
 | ------------------------------ | -------------------------------- | ------------------------------------------------ |
 | `@zitadel/sdk-next/middleware` | Edge middleware                  | `nextgenMiddleware`, `createProxy`               |
-| `@zitadel/sdk-next/server`     | Server Components, Route Handlers | `auth()`                                         |
-| `@zitadel/sdk-next/react`      | Client Components                | `NextgenProvider`, `useAuth()`                   |
+| `@zitadel/sdk-next/server`     | Server Components, Route Handlers | `auth()`, `NextgenProvider`                      |
+| `@zitadel/sdk-next/react`      | Client Components                | `useAuth()`, `AuthContextProvider`               |
 | `@zitadel/sdk-next/session`    | Client Components                | `getSession()`                                   |
 | `@zitadel/sdk-next/client`     | Client boundary                  | Web-component registration, `configureZitadel()` |
 
@@ -22,7 +22,8 @@ The package root re-exports the server and client surfaces together for use
 in server modules. Do not import the root from a `"use client"` module: it
 pulls in the server-only `auth()`, which fails the build with an import trace
 (exactly how depends on the bundler's tree shaking — the supported client
-imports are `/react` and `/session`).
+imports are `/react` and `/session`). `NextgenProvider` is itself server-only
+because it accepts the token-bearing `auth()` result — see section 3.
 
 ## Setup
 
@@ -89,8 +90,7 @@ Seed the client tree once in your root layout (a Server Component), then
 read the state with `useAuth()` anywhere below it:
 
 ```tsx
-import { auth } from '@zitadel/sdk-next/server';
-import { NextgenProvider } from '@zitadel/sdk-next/react';
+import { auth, NextgenProvider } from '@zitadel/sdk-next/server';
 
 export default async function RootLayout({ children }) {
   const session = await auth();
@@ -108,6 +108,17 @@ export default async function RootLayout({ children }) {
 **before** it crosses the server→client boundary: client components receive
 `userId` / `email` / `name`, and the raw session token never enters the RSC
 flight payload, where any script on the page could read it.
+
+That strip only protects you while it runs on the server, which is why
+`NextgenProvider` is server-only and **must not be re-exported through a
+`"use client"` wrapper** (the common `providers.tsx` pattern): the wrapper
+would become the client boundary, and its still-unstripped `session` prop —
+token included — would serialise into the flight payload before the provider
+ever ran. The `server-only` guard turns that wrapper into a build error
+instead of a silent leak. To seed the context from client-side state (e.g. a
+`getSession()` read), render `AuthContextProvider` from
+`@zitadel/sdk-next/react` — it only accepts the token-less
+`ClientAuthResult`.
 
 Then in any client component:
 
@@ -226,6 +237,7 @@ export function LoginWidget() {
 | `allowedTokenTypes` | `string[]`           | `["JWT", "at+JWT"]`      | Accepted `typ` header values (case-insensitive). Set to `[]` to disable this check                                         |
 | `clockSkewMs`       | `number`             | `5000`                   | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                                                                         |
 | `jwksTimeoutMs`     | `number`             | `5000`                   | Timeout in ms for JWKS endpoint requests. Token is rejected if the fetch exceeds this window                               |
+| `opaqueTokenTimeoutMs` | `number`          | `5000`                   | Timeout in ms for opaque (non-JWT) session validation via `GET /sessions/me`. Also accepted by `auth()`                    |
 | `audience`          | `string \| string[]` | not validated            | Expected `aud` claim value(s). When omitted, audience is not checked                                                       |
 
 ## How JWT verification works

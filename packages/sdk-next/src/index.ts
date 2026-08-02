@@ -11,7 +11,7 @@ export type { ProxyOptions, ProxyHandler } from "./middleware.js";
 export { auth } from "./auth.js";
 export type { AuthOptions } from "./auth.js";
 export { NextgenProvider } from "./provider.js";
-export { useAuthContext } from "./context.js";
+export { AuthContextProvider, useAuthContext } from "./context.js";
 export { useAuth } from "./useAuth.js";
 export { getSession } from "./session.js";
 export type { GetSessionOptions } from "./session.js";

@@ -18,7 +18,8 @@
   "type": "module",
   "sideEffects": [
     "./dist/client.js",
-    "./dist/auth.js"
+    "./dist/auth.js",
+    "./dist/provider.js"
   ],
   "exports": {
     ".": {

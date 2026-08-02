@@ -86,6 +86,7 @@ export async function nextgenMiddleware(
     allowedTokenTypes = ["JWT", "at+JWT"],
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
+    opaqueTokenTimeoutMs = 5000,
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
@@ -122,6 +123,7 @@ export async function nextgenMiddleware(
     audience,
     allowedTokenTypes,
     jwksTimeoutMs,
+    opaqueTokenTimeoutMs,
     pathname,
   });
 }
@@ -274,6 +276,11 @@ interface AuthHandlerOptions {
    */
   readonly allowedTokenTypes: readonly string[];
   readonly jwksTimeoutMs: number | undefined;
+  /**
+   * Forwarded from {@link NextgenMiddlewareOptions.opaqueTokenTimeoutMs};
+   * governs the `GET /sessions/me` fallback for opaque (non-JWT) tokens.
+   */
+  readonly opaqueTokenTimeoutMs: number;
   readonly pathname: string;
 }
 
@@ -296,6 +303,7 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
     audience,
     allowedTokenTypes,
     jwksTimeoutMs,
+    opaqueTokenTimeoutMs,
     pathname,
   } = opts;
 
@@ -329,7 +337,7 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
   // failed verification (bad sig, wrong typ/alg) must be rejected — never
   // accepted by a backend call that doesn't re-check the JWT claims.
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const isValid = await validateOpaqueSessionToken(cookieToken, url, jwksTimeoutMs ?? 5000);
+    const isValid = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
     if (isValid) {
       const tunnelled = tunnelHeaders(req, {
         "x-nextgen-auth-token": cookieToken,

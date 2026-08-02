@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { NextgenProvider } from "@zitadel/sdk-next/react";
-import { auth } from "@zitadel/sdk-next/server";
+import { auth, NextgenProvider } from "@zitadel/sdk-next/server";
 
 export const metadata: Metadata = {
   title: "Nextgen Auth Demo",
