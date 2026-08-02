@@ -4,7 +4,6 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { AddUserSheet } from "@/components/add-user-sheet";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -25,7 +24,9 @@ import {
 
 import { api } from "../../../api/zitadel";
 import { field } from "../../../lib/record";
+import { type SchemaField, type UserSchema, schemaColumns } from "../../../lib/schema";
 import { userDisplayName } from "../../../lib/user";
+import { getConsoleProjectId } from "../../../runtime/runtime";
 
 export const Route = createFileRoute("/_authed/users/")({
   staticData: { nav: { label: "Users", order: 2, icon: Users } },
@@ -33,14 +34,70 @@ export const Route = createFileRoute("/_authed/users/")({
   // default 20. `GET /users` orders by creation ascending with no `Load more`
   // yet (#661), so the default silently hides the most recently created users —
   // the ones an operator has just added and is most likely looking for.
-  loader: () => api.listUsers({ limit: 100 }),
+  loader: async () => {
+    const projectId = getConsoleProjectId();
+    const users = await api.listUsers({ limit: 100 });
+
+    // Columns are the loaded users' own schemas, not every schema in the
+    // project: a schema nobody uses would add a column that is blank in every
+    // row. `listUsers` returns the attribute tree with `$schema` on it, so the
+    // set is known without a second list call.
+    const schemaIds = [...new Set(users.map((user) => field(user, "$schema")).filter(isPresent))];
+    const schemas = await Promise.all(
+      schemaIds.map(async (id) => {
+        try {
+          return (await api.getSchemaById(id, { project_id: projectId })) as UserSchema;
+        } catch {
+          // One unreadable schema costs its columns, not the screen. The rows
+          // still render from the fallback below.
+          return undefined;
+        }
+      }),
+    );
+
+    return { users, columns: columnsFor(users, schemas.filter(isPresent)) };
+  },
   component: UsersScreen,
 });
 
+function isPresent<T>(value: T | undefined | null): value is T {
+  return value !== undefined && value !== null;
+}
+
 interface UserRow {
   id: string;
+  /** Display name for the row menu and the delete dialog — not a column. */
   name: string;
-  email: string;
+  /** Rendered cell values, keyed by schema property. */
+  values: Record<string, string>;
+}
+
+/**
+ * Columns from the users' schemas, falling back to the keys the records
+ * themselves carry.
+ *
+ * The fallback matters because the schema fetch is best-effort and because a
+ * user may predate its schema. Without it an unreadable schema would render a
+ * table of rows with no columns — worse than showing the raw attributes.
+ */
+function columnsFor(users: Record<string, unknown>[], schemas: UserSchema[]): SchemaField[] {
+  const columns = schemaColumns(schemas);
+  if (columns.length > 0) return columns;
+
+  const keys = new Set<string>();
+  for (const user of users) {
+    for (const key of Object.keys(user)) {
+      // `id` gets its own column and `$schema` is machine metadata, not an
+      // attribute an operator reads.
+      if (key !== "id" && key !== "$schema") keys.add(key);
+    }
+  }
+  return [...keys].sort().map((key) => ({
+    key,
+    label: key,
+    required: false,
+    inputType: "text" as const,
+  }));
 }
 
 /** Platform-correct modifier for the search shortcut hint (⌘ on Apple, Ctrl elsewhere). */
@@ -53,7 +110,7 @@ function searchShortcutLabel(): string {
 }
 
 function UsersScreen() {
-  const users = Route.useLoaderData();
+  const { users, columns } = Route.useLoaderData();
   const router = useRouter();
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -81,17 +138,19 @@ function UsersScreen() {
   // Search narrows the rows already fetched. `GET /users` takes no filter (ADR
   // 031's query endpoint does not exist), so this cannot reach users outside the
   // loaded page — which is why the table says so beneath it.
+  //
+  // It matches every rendered column rather than a fixed name/email/id triple:
+  // the columns are schema-driven, so a hardcoded set would silently fail to
+  // search whatever the project's schema actually defines.
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return users.map(toUserRow).filter((user) => {
-      return (
-        needle === "" ||
-        user.name.toLowerCase().includes(needle) ||
-        user.email.toLowerCase().includes(needle) ||
-        user.id.toLowerCase().includes(needle)
+    return users.map((user, index) => toUserRow(user, index, columns)).filter((row) => {
+      if (needle === "") return true;
+      return [row.id, ...columns.map((column) => row.values[column.key] ?? "")].some((value) =>
+        value.toLowerCase().includes(needle),
       );
     });
-  }, [users, query]);
+  }, [users, query, columns]);
 
   return (
     <div className="px-4 pt-9 pb-8 sm:px-8">
@@ -127,49 +186,55 @@ function UsersScreen() {
         </div>
       </div>
 
-      <div className="border-sidebar-border bg-card mt-6 overflow-hidden rounded-2xl border">
-        <Table className="table-fixed text-xs">
-          <colgroup>
-            <col className="w-[240px]" />
-            <col className="w-[280px]" />
-            <col className="w-[280px]" />
-            <col className="w-[60px]" />
-          </colgroup>
+      {/* The column set is schema-driven and so has no fixed width; the design
+          scrolls the table horizontally rather than compressing cells (the
+          `Filled` variant shows a scrollbar under the rows). */}
+      <div className="border-sidebar-border bg-card mt-6 overflow-x-auto rounded-2xl border">
+        <Table className="text-xs">
           <TableHeader>
             <TableRow className="border-border border-b hover:bg-transparent">
-              <HeadCell>Name</HeadCell>
-              <HeadCell>Email</HeadCell>
+              {columns.map((column) => (
+                <HeadCell key={column.key}>{column.label}</HeadCell>
+              ))}
               <HeadCell>ID</HeadCell>
-              <TableHead className="h-14 px-2" />
+              <TableHead className="h-14 w-[60px] px-2" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
               <TableRow className="border-0 hover:bg-transparent">
-                <TableCell colSpan={4} className="text-muted-foreground h-24 text-center">
+                <TableCell
+                  colSpan={columns.length + 2}
+                  className="text-muted-foreground h-24 text-center"
+                >
                   {users.length === 0 ? "No users yet." : "No users match the current filters."}
                 </TableCell>
               </TableRow>
             ) : (
               rows.map((user) => (
                 <TableRow key={user.id} className="hover:bg-muted/40 border-0">
-                  <TableCell className="h-11 truncate px-4 py-0">
-                    <div className="flex items-center gap-2">
-                      <Avatar size="sm">
-                        <AvatarFallback>{initials(user.name)}</AvatarFallback>
-                      </Avatar>
-                      <Link
-                        to="/users/$userId"
-                        params={{ userId: user.id }}
-                        className="text-foreground truncate font-medium underline-offset-2 hover:underline"
-                      >
-                        {user.name}
-                      </Link>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground h-11 truncate px-2 py-0">
-                    {user.email}
-                  </TableCell>
+                  {columns.map((column, index) => (
+                    <TableCell
+                      key={column.key}
+                      className="text-muted-foreground h-11 max-w-[280px] truncate px-2 py-0 first:px-4"
+                    >
+                      {/* The first column carries the link to the detail screen.
+                          There is no separate name column to hang it on — the
+                          design's columns are the schema's own properties, and
+                          which one comes first depends on the schema. */}
+                      {index === 0 ? (
+                        <Link
+                          to="/users/$userId"
+                          params={{ userId: user.id }}
+                          className="text-foreground truncate font-medium underline-offset-2 hover:underline"
+                        >
+                          {user.values[column.key] || user.id}
+                        </Link>
+                      ) : (
+                        (user.values[column.key] ?? "—")
+                      )}
+                    </TableCell>
+                  ))}
                   <TableCell className="text-foreground h-11 truncate px-2 py-0">
                     {user.id}
                   </TableCell>
@@ -199,15 +264,27 @@ function UsersScreen() {
   );
 }
 
-function toUserRow(user: Record<string, unknown>, index: number): UserRow {
+function toUserRow(
+  user: Record<string, unknown>,
+  index: number,
+  columns: SchemaField[],
+): UserRow {
   const id = field(user, "id") ?? `unknown-user-${index}`;
-  const email = field(user, "email") ?? "—";
+  const values: Record<string, string> = {};
+  for (const column of columns) {
+    // Only scalars are read. A property whose value is an object or array has no
+    // one-line rendering, and `JSON.stringify` in a table cell is noise — the
+    // detail screen is where a structured attribute belongs.
+    const value = field(user, column.key);
+    if (value !== undefined) values[column.key] = value;
+  }
   return {
     id,
-    // Fall back to the email, then the id: a `minimal` user schema defines only
-    // `email`, so a name is genuinely absent rather than missing.
-    name: userDisplayName(user) ?? (email === "—" ? id : email),
-    email,
+    values,
+    // Used for the row menu's accessible name and the delete dialog's heading,
+    // not as a column. Falls back to the email and then the id: a `minimal`
+    // schema defines only `email`, so a name is genuinely absent, not missing.
+    name: userDisplayName(user) ?? field(user, "email") ?? id,
   };
 }
 
@@ -290,13 +367,4 @@ function RowActions({
       />
     </>
   );
-}
-
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 }
