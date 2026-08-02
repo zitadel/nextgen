@@ -61,11 +61,13 @@ export async function enableVirtualPasskey(page: Page): Promise<VirtualPasskey> 
     async dispose() {
       // Best-effort: the page (and with it the CDP target) may already be
       // gone when teardown runs after a failed test; never mask that failure.
+      // Detach even when the removal fails, so the session never outlives it.
       try {
         await client.send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
-        await client.detach();
       } catch {
         // ignore
+      } finally {
+        await client.detach().catch(() => undefined);
       }
     },
   };

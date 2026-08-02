@@ -87,7 +87,7 @@ describe("enableVirtualPasskey", () => {
     expect(fake.detached).toBe(true);
   });
 
-  it("swallows teardown errors from an already-closed page", async () => {
+  it("swallows teardown errors and still detaches the session", async () => {
     const fake = fakeCdpPage({
       failSend: (method) =>
         method === "WebAuthn.removeVirtualAuthenticator"
@@ -97,6 +97,7 @@ describe("enableVirtualPasskey", () => {
     const passkey = await enableVirtualPasskey(fake.page);
 
     await expect(passkey.dispose()).resolves.toBeUndefined();
+    expect(fake.detached).toBe(true);
   });
 
   it("explains the Chromium requirement when no CDP session is available", async () => {

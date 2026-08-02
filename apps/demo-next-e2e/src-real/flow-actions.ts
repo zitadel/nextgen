@@ -10,14 +10,16 @@ export async function clickAction(
   name: RegExp,
   actionNames: string[],
 ): Promise<void> {
-  const target = actionCandidates(page, name, actionNames).find(Boolean);
-  for (const candidate of actionCandidates(page, name, actionNames)) {
+  const candidates = actionCandidates(page, name, actionNames);
+  for (const candidate of candidates) {
     if (await candidate.first().isVisible({ timeout: 1_000 }).catch(() => false)) {
       await candidate.first().click();
       return;
     }
   }
-  await (target as Locator).first().click();
+  // Nothing was visible within the probes: fall back to an auto-waiting click
+  // on the first (most specific) candidate.
+  await candidates[0].first().click();
 }
 
 export async function clickActionIfVisible(
