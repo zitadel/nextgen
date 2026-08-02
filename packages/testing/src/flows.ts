@@ -31,11 +31,17 @@ export interface FlowFieldOptions {
   label?: RegExp;
 }
 
-/** One optional registration field, filled only when the flow renders it. */
+/**
+ * One optional registration field, filled only when the flow renders it.
+ * The value's type picks the control: a boolean drives a checkbox
+ * (`zl-checkbox`), a string first tries a select (`zl-select`) and falls
+ * back to filling a text-like input.
+ */
 export interface ProfileEntry {
   /** Normalised field hook token, e.g. `givenName`. */
   field: string;
-  value: string;
+  value: string | boolean;
+  /** Label fallback for text-like inputs on templates without hooks. */
   label?: RegExp;
 }
 
@@ -55,16 +61,23 @@ export interface PasswordRegistrationDetails extends RegistrationDetails {
 }
 
 /**
- * The default template marks its render root with `data-zl-template-root`.
  * A union locator resolves in DOM order across the whole page, so every
  * candidate built from a broad selector — accessible names, labels, the
- * generic `data-action` attribute — is scoped to this root; otherwise a
- * same-named control in the app's own chrome (header nav, footer forms)
- * could win the union. The `zitadel-*` testid hooks and the `zl-button`
- * atom are namespaced and stay page-global.
+ * generic `data-action` attribute — is scoped to the `<zitadel-login>`
+ * host; otherwise a same-named control in the app's own chrome (header
+ * nav, footer forms) could win the union. The host element exists no
+ * matter what the tenant's template renders, so these fallbacks keep
+ * working for custom templates that emit no automation hooks — the case
+ * they exist for. The `zitadel-*` testid hooks and the `zl-button` atom
+ * are namespaced and stay page-global.
  */
-function templateRoot(page: Page): Locator {
-  return page.locator("[data-zl-template-root]");
+function widgetRoot(page: Page): Locator {
+  return page.locator("zitadel-login");
+}
+
+/** Escape a value for use inside a double-quoted CSS attribute selector. */
+function cssAttributeValue(value: string): string {
+  return value.replace(/["\\]/g, "\\$&");
 }
 
 /**
@@ -74,16 +87,20 @@ function templateRoot(page: Page): Locator {
  * attributes (the recover link carries only `data-action`).
  */
 export function flowAction(page: Page, action: string, options: FlowActionOptions = {}): Locator {
+  // Action names are free-form in the flow schema; escape them before
+  // interpolating into attribute selectors so an exotic name cannot break
+  // the whole union's parsing.
+  const attributeSafe = cssAttributeValue(action);
   let candidates = page
     .getByTestId(`zitadel-action-${action}`)
     .or(page.getByTestId(`zitadel-action-${action}-button`))
     .or(page.getByTestId(`zitadel-action-${action}-link`))
-    .or(page.locator(`zl-button[action="${action}"]`))
-    .or(templateRoot(page).locator(`[data-action="${action}"]`));
+    .or(page.locator(`zl-button[action="${attributeSafe}"]`))
+    .or(widgetRoot(page).locator(`[data-action="${attributeSafe}"]`));
   if (options.name) {
     candidates = candidates
-      .or(templateRoot(page).getByRole("button", { name: options.name }))
-      .or(templateRoot(page).getByRole("link", { name: options.name }));
+      .or(widgetRoot(page).getByRole("button", { name: options.name }))
+      .or(widgetRoot(page).getByRole("link", { name: options.name }));
   }
   return candidates.first();
 }
@@ -97,7 +114,7 @@ export function flowField(page: Page, field: string, options: FlowFieldOptions =
     .getByTestId(`zitadel-input-${field}`)
     .or(page.getByTestId(`zitadel-field-${field}`).locator("input"));
   if (options.label) {
-    candidates = candidates.or(templateRoot(page).getByLabel(options.label));
+    candidates = candidates.or(widgetRoot(page).getByLabel(options.label));
   }
   return candidates.first();
 }
@@ -222,8 +239,33 @@ async function advanceToRegistration(
   // email field; refill defensively for flows that render it empty.
   await fillIfVisible(emailField(page), email);
   for (const entry of profile ?? []) {
-    await fillIfVisible(flowField(page, entry.field, { label: entry.label }), entry.value);
+    await fillProfileEntry(page, entry);
   }
+}
+
+/**
+ * Fill one registration field with the verb its control needs: booleans
+ * check the `zl-checkbox` native input, strings prefer the `zl-select`
+ * native select (option matched by value, falling back to label) and
+ * otherwise fill a text-like input. The select/checkbox natives carry the
+ * name-first testids the atoms document (`zitadel-select-*`,
+ * `zitadel-checkbox-*`); templates without those hooks drive such fields
+ * via their own locators.
+ */
+async function fillProfileEntry(page: Page, entry: ProfileEntry): Promise<void> {
+  if (typeof entry.value === "boolean") {
+    const checkbox = page.getByTestId(`zitadel-checkbox-${entry.field}`).first();
+    if (await checkbox.isVisible().catch(() => false)) {
+      await checkbox.setChecked(entry.value);
+    }
+    return;
+  }
+  const select = page.getByTestId(`zitadel-select-${entry.field}`).first();
+  if (await select.isVisible().catch(() => false)) {
+    await select.selectOption(entry.value);
+    return;
+  }
+  await fillIfVisible(flowField(page, entry.field, { label: entry.label }), entry.value);
 }
 
 /**
@@ -236,7 +278,7 @@ async function advanceToRegistration(
  */
 async function expectRegistrationStep(page: Page): Promise<void> {
   await flowAction(page, "passkey_register")
-    .or(templateRoot(page).getByRole("heading", { name: /create|register|sign up|no-account/i }))
+    .or(widgetRoot(page).getByRole("heading", { name: /create|register|sign up|no-account/i }))
     .first()
     .waitFor({ state: "visible", timeout: 30_000 });
 }

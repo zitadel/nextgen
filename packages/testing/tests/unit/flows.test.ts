@@ -11,9 +11,9 @@ import {
 } from "../../src/flows";
 
 interface Op {
-  op: "click" | "fill" | "waitFor";
+  op: "click" | "fill" | "waitFor" | "selectOption" | "setChecked";
   target: string;
-  value?: string;
+  value?: string | boolean;
 }
 
 interface Harness {
@@ -54,6 +54,12 @@ class FakeLocator {
   async fill(value: string): Promise<void> {
     this.harness.ops.push({ op: "fill", target: this.desc, value });
   }
+  async selectOption(value: string): Promise<void> {
+    this.harness.ops.push({ op: "selectOption", target: this.desc, value });
+  }
+  async setChecked(value: boolean): Promise<void> {
+    this.harness.ops.push({ op: "setChecked", target: this.desc, value });
+  }
   async isVisible(): Promise<boolean> {
     return this.harness.visible(this.desc);
   }
@@ -81,13 +87,15 @@ function desc(locator: Locator): string {
   return (locator as unknown as FakeLocator).desc;
 }
 
-// The default template marks its render root; broad fallback selectors are
-// scoped to it so they cannot match app chrome outside the widget.
-const ROOT = "css:[data-zl-template-root]";
+// Broad fallback selectors are scoped to the widget host element — it
+// exists no matter what the tenant's template renders, so the fallbacks
+// stay usable for hook-less custom templates while never matching app
+// chrome outside the widget.
+const ROOT = "css:zitadel-login";
 
 // The documented hook ladder per action name: host testid, native shadow
 // button/link testids, the zl-button atom, then the generic `data-action`
-// attribute scoped to the template root (the recover link carries only
+// attribute scoped to the widget host (the recover link carries only
 // `data-action`).
 const action = (name: string) =>
   `testid:zitadel-action-${name}|testid:zitadel-action-${name}-button|` +
@@ -116,6 +124,17 @@ describe("flowAction / flowField", () => {
     expect(desc(flowField(fake.page, "password", { label: /password/i }))).toBe(PASSWORD);
     expect(desc(flowField(fake.page, "givenName"))).toBe(
       "testid:zitadel-input-givenName|testid:zitadel-field-givenName>>input",
+    );
+  });
+
+  it("escapes free-form action names in the attribute selectors", () => {
+    // Action names come from the flow schema; a quote must not break the
+    // whole union's CSS parsing (the testid candidates are string-exact).
+    const fake = fakePage();
+    expect(desc(flowAction(fake.page, 'weird"name'))).toBe(
+      'testid:zitadel-action-weird"name|testid:zitadel-action-weird"name-button|' +
+        'testid:zitadel-action-weird"name-link|css:zl-button[action="weird\\"name"]|' +
+        `${ROOT}>>[data-action="weird\\"name"]`,
     );
   });
 });
@@ -162,8 +181,10 @@ describe("loginWithPasskey", () => {
 
 describe("registration ceremonies", () => {
   // Default flow: split steps, so no password field until the final step;
-  // the registration-step barrier and the optional email refill render.
-  const defaultFlowVisibility = (target: string) => !target.includes("zitadel-input-password");
+  // no select/checkbox controls; the registration-step barrier and the
+  // optional email refill render.
+  const defaultFlowVisibility = (target: string) =>
+    !target.includes("zitadel-input-password") && !target.includes("zitadel-select-");
 
   it("registerWithPassword walks the default registration path", async () => {
     const fake = fakePage(defaultFlowVisibility);
@@ -211,6 +232,39 @@ describe("registration ceremonies", () => {
       { op: "fill", target: EMAIL, value: "new@example.test" },
       { op: "click", target: action("register") },
       { op: "waitFor", target: REGISTRATION_STEP },
+      { op: "click", target: action("passkey_register") },
+    ]);
+  });
+
+  it("picks the profile control verb by value type and rendered control", async () => {
+    const visible = (target: string) =>
+      target.includes("passkey_register") ||
+      target.includes("zitadel-select-country") ||
+      target.includes("zitadel-checkbox-newsletter") ||
+      target.includes("zitadel-input-email") ||
+      target.includes("zitadel-input-givenName");
+    const fake = fakePage(visible);
+    await registerWithPasskey(fake.page, {
+      email: "new@example.test",
+      profile: [
+        { field: "country", value: "CH" },
+        { field: "givenName", value: "Ada" },
+        { field: "newsletter", value: true },
+      ],
+    });
+
+    expect(fake.ops).toEqual([
+      { op: "fill", target: EMAIL, value: "new@example.test" },
+      { op: "click", target: action("submit") },
+      { op: "waitFor", target: REGISTRATION_STEP },
+      { op: "fill", target: EMAIL, value: "new@example.test" },
+      { op: "selectOption", target: "testid:zitadel-select-country", value: "CH" },
+      {
+        op: "fill",
+        target: "testid:zitadel-input-givenName|testid:zitadel-field-givenName>>input",
+        value: "Ada",
+      },
+      { op: "setChecked", target: "testid:zitadel-checkbox-newsletter", value: true },
       { op: "click", target: action("passkey_register") },
     ]);
   });

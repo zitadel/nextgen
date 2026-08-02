@@ -116,13 +116,15 @@ await registerWithPassword(page, { email, password });
 They assume the default flow vocabulary (`submit` / `passkey` /
 `passkey_register` actions, `email` and password fields) and branch only on
 what the flow renders: flows that require extra registration fields get them
-via `profile: [{ field, value }]`, filled when present. For custom flows or
-single steps, `flowAction(page, name)` / `flowField(page, name)` return plain
-locators for the same hooks, with `clickFlowAction` / `fillFlowField` as
-one-line wrappers. Broad fallbacks (accessible names via `{ name }` /
-`{ label }`, the generic `data-action` attribute) are scoped to the widget's
-template root, so they never match same-named controls in your app's own
-chrome.
+via `profile: [{ field, value }]`, filled when present — a boolean value
+drives a checkbox, a string matches a select option or fills a text-like
+input. For custom flows or single steps, `flowAction(page, name)` /
+`flowField(page, name)` return plain locators for the same hooks, with
+`clickFlowAction` / `fillFlowField` as one-line wrappers. Broad fallbacks
+(accessible names via `{ name }` / `{ label }`, the generic `data-action`
+attribute) are scoped to the `<zitadel-login>` host element — so they never
+match same-named controls in your app's own chrome, and they keep working
+for custom templates that render no automation hooks.
 
 ### Test passkey flows
 
