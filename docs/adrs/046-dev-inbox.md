@@ -72,10 +72,12 @@ being a separate mail product.
 ## How
 
 **One message, two forms.** Composition produces a structured record; the
-transport call is a separate step. A captured record (indicative shape):
+transport call is a separate step. The captured record is a **versioned,
+normative contract** (`schema_version`), not an indicative shape:
 
 ```json
 {
+  "schema_version": 1,
   "id": "devmsg_01…",
   "project_id": "proj_…",
   "environment_id": "env_…",
@@ -83,16 +85,24 @@ transport call is a separate step. A captured record (indicative shape):
   "purpose": "email_verification",
   "to": "ada@example.test",
   "template": "verify-email",
-  "variables": { "code": "742913", "link": "https://…/verify?…" },
+  "artifacts": { "code": "742913", "link": "https://…/verify?…" },
+  "variables": { "displayName": "Ada", "code": "742913" },
   "rendered": { "subject": "Verify your email", "text": "…", "html": "…" },
   "created_at": "…",
   "expires_at": "…"
 }
 ```
 
-Humans inspect `rendered`; agents and tests read `variables.code` /
-`variables.link` — nobody regexes HTML for a code. `channel` and `purpose`
-keep SMS and webhook-style messages behind the same contract later.
+Humans inspect `rendered`; agents and tests read `artifacts.code` /
+`artifacts.link` — **typed, purpose-discriminated fields the composition
+layer populates from the flow engine's own state** (it generated the
+secret), never parsed back out of templates. Which artifacts a purpose
+requires is part of the versioned contract (`email_verification` carries a
+`code` and/or `link`; a magic-link purpose requires `link`). `variables`
+records the template's render inputs and is *not* an API: custom
+composition may rename or omit template variables freely without breaking
+`waitForCode()`. `channel` and `purpose` keep SMS and webhook-style
+messages behind the same contract later.
 
 **Delivery modes: explicit in the server, zero-config at the front doors.**
 The binary captures only when configured to — a released binary never
@@ -135,11 +145,12 @@ secrets: responses carry `Cache-Control: no-store`, values never enter
 request or access logs, and purge is a scoped operator/admin operation —
 never part of ordinary test flow. List responses are **metadata-only**
 (id, scope, channel, purpose, recipient, template, timestamps): masking
-`variables` alone would be theater, because `rendered.text` and
-`rendered.html` embed the same code and link. The full message —
-variables and rendered forms together — is a separately authorized
-single-message read (the operator credential today, a finer read-secret
-scope such as `dev_messages.read` once ADR 036's scopes land).
+the artifact fields alone would be theater, because `rendered.text`,
+`rendered.html`, and usually `variables` embed the same code and link.
+The full message — artifacts, variables, and rendered forms together —
+is a separately authorized single-message read (the operator credential
+today, a finer read-secret scope such as `dev_messages.read` once ADR
+036's scopes land).
 
 **Browser surfaces never hold the operator credential — and an inbox
 session must be earned.** ADR 036's litmus forbids the project secret in
@@ -148,11 +159,16 @@ follow the BFF pattern: the surface's backend holds the operator
 credential and mints the browser a scoped, HTTP-only inbox session. A
 signed cookie only proves the server issued it, so minting is gated on an
 authenticated exchange: an authenticated human on a claimed surface
-(dashboard login), or a **project-secret-mediated one-time handoff** —
-the CLI, which holds the secret, requests a single-use short-TTL handoff
-token and prints the inbox URL carrying that token; the backend exchanges
-it for the session on first open. The durable operator credential never
-appears in a URL or reaches the browser. The scratch dashboard's current
+(dashboard login), or a **project-secret-mediated one-time handoff**
+minted only by the explicit, human-facing `zitadel dev-inbox open` — it
+requests a single-use short-TTL handoff token, opens the browser, and the
+backend exchanges the token immediately and redirects to a clean URL, so
+the token rests neither in logs nor in the address bar. `zitadel start`
+never emits a bearer-bearing URL: its JSON stdout is the agent contract
+and lands in transcripts and CI logs, so it reports only non-secret
+capability metadata plus a `next_commands` pointer to `dev-inbox open`.
+The durable operator credential never appears in a URL or reaches the
+browser. The scratch dashboard's current
 anonymous first-visit cookie (platform overview) is **not** sufficient
 authorization for inbox content — pre-claim, its inbox view rides the
 same secret-mediated handoff. That is a second overview amendment,
@@ -172,12 +188,24 @@ const message = await zitadel.email.waitForMessage({
   to: identity.email,
   purpose: "email_verification",
 });
-await fillFlowField(page, "code", message.variables.code);
+await fillFlowField(page, "code", message.artifacts.code);
 ```
 
-`waitForCode()` remains as sugar over `waitForMessage(...).variables.code`.
+`waitForCode()` remains as sugar over `waitForMessage(...).artifacts.code`.
 No wall-clock timestamps, no cross-worker destruction, no global cleanup in
 tests.
+
+Waits are **bounded and cancellable**: `waitForMessage` takes `timeoutMs`
+(with a kit default) and an `AbortSignal`, and on expiry throws a typed
+timeout error carrying the resolved scope and filters (project,
+environment, `after`, `to`, `purpose`) — a missing outbound message
+diagnoses itself instead of surfacing as an anonymous outer Playwright
+timeout. All email operations bind to an **explicit environment**:
+`InstanceHandle` carries `environmentId` (a locally-booted instance has
+exactly one development environment; `connectZitadel` accepts it as an
+option for multi-environment projects), and cursors, waits, and reads
+resolve within it — a multi-environment project can never match a message
+from the wrong inbox.
 
 The cursor is a **high-water mark, not an ADR 027 page token**: ADR 027's
 tokens encode the position of an already-seen row and cannot express "end
@@ -188,23 +216,32 @@ sequence (the store serializes writes — on a multi-replica durable
 backend the ordering guarantee is the store's, never a wall clock), bound
 to its project/environment scope, and valid across retention and purge —
 it marks a position, not a row, so trimming history before the mark
-changes nothing. A malformed or foreign-scope token yields a distinct
-stale-cursor error, never a silent empty wait. Ordinary inbox *listing*
-pages with ADR 027 tokens as usual; the high-water token is the one
-additional type this ADR defines.
+changes nothing. Tokens also embed a **store epoch** — a generation
+minted when the store is created: retention and purge preserve the epoch,
+but a restart or loss of the in-memory store changes it, so a cursor from
+a previous process fails fast instead of sitting numerically ahead of
+every new message and hanging a wait. A malformed, foreign-scope, or
+epoch-mismatched token yields a distinct stale-cursor error, never a
+silent empty wait. Ordinary inbox *listing* pages with ADR 027 tokens as
+usual; the high-water token is the one additional type this ADR defines.
 
 **The CLI is the agent front door.** Same API, JSON envelope per the CLI's
 agent contract (`apps/cli/SKILLS.md`): `zitadel dev-inbox cursor` and
 `zitadel dev-inbox wait --after … --to … --purpose … --timeout 30s`, both
-`--non-interactive --json`, with the message under `data.message`.
-Capability-disabled errors carry `next_commands` pointing at the enabling
-configuration.
+`--non-interactive --json`, with the message under `data.message`. The
+environment resolves deterministically — explicit `--env` wins, else the
+local config's selected environment, else a hard error when ambiguous —
+and every envelope echoes the resolved environment. A timeout is its own
+error envelope (a distinct `code`, the resolved filters echoed for
+diagnosis) with a non-zero exit; capability-disabled errors carry
+`next_commands` pointing at the enabling configuration.
 
 **A real inbox for humans.** Locally the server serves an inbox UI —
 recipient/purpose/expiry at a glance, copy-code and open-link actions,
 rendered preview beside a structured-variables tab, explicit "Captured —
-not delivered" labeling, scoped purge — and `zitadel start` prints its URL
-next to the instance URL. The rendered preview treats message HTML as
+not delivered" labeling, scoped purge — announced by `zitadel start` as
+capability metadata and opened via `zitadel dev-inbox open` (see the
+session-handoff rule above; `start` never prints a tokenized URL). The rendered preview treats message HTML as
 untrusted (templates become tenant-authored): it renders only inside a
 sandboxed iframe — no scripts, no top navigation, restrictive CSP — per
 the flow-engine template-security guidance, which establishes that inline
