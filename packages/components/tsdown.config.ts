@@ -75,11 +75,12 @@ export default defineConfig([
     // `declare module "react"` block, which the dts bundler must not process
     // (see src/jsx.d.ts).
     copy: ["src/jsx.d.ts"],
-    // `clean: true` would wipe the .d.ts files tsgo emits during the
-    // `typecheck` target, breaking project-reference consumers
-    // (sdk-next, demo-next, demo-nuxt) whose tsgo --build expects those
-    // .d.ts files to exist. tsdown still overwrites its own .mjs/.d.mts
-    // outputs on each rebuild — stale files just accumulate harmlessly
+    // The tsc-emitted project-reference outputs now live in `out-tsc/lib`
+    // (tsconfig.lib.json outDir), so build and typecheck no longer share
+    // files. `clean: false` stays for a different reason: `clean: true`
+    // would also wipe the sibling standalone.mjs while the two build
+    // entries in this config race each other. tsdown still overwrites its
+    // own outputs on each rebuild — stale files just accumulate harmlessly
     // until a full `git clean`.
     clean: false,
     target: "es2022",
