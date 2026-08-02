@@ -137,4 +137,20 @@ describe("guidance content", () => {
     const passwordCtx = { ...ctx, preset: "password-first" } as PatchContext;
     expect(agentsGuidanceSection(passwordCtx)).not.toContain("passkey ceremonies");
   });
+
+  it("names the presentation knobs and, on Next, the shipped JSX types", () => {
+    const agents = agentsGuidanceSection(ctx);
+    expect(agents).toContain('variant="widget"');
+    expect(agents).toContain("(`light` | `dark` | `auto`)");
+    expect(agents).toContain("@zitadel/sdk-next/jsx");
+    // JSX typing is a Next/React concern — other frameworks type the
+    // elements through their own SDK wrappers, so the pointer stays out.
+    const nuxtCtx = {
+      ...ctx,
+      framework: { id: "nuxt", devPort: 3000, url: "http://localhost:3000" },
+    } as PatchContext;
+    const nuxtAgents = agentsGuidanceSection(nuxtCtx);
+    expect(nuxtAgents).toContain('variant="widget"');
+    expect(nuxtAgents).not.toContain("@zitadel/sdk-next/jsx");
+  });
 });

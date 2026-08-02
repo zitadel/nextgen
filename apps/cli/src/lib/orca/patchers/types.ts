@@ -37,9 +37,10 @@ export type PatchContext = PatchView &
     preset?: string;
     /**
      * Use case the scaffold starts from (`SETUP_USE_CASES` in @zitadel/config).
-     * Recorded in `zitadel.json` for guidance/status only — behavior comes
-     * entirely from the generated schema/flow files, never from this value.
-     * Absent means minimal.
+     * Recorded in `zitadel.json`. Auth behavior comes entirely from the
+     * generated schema/flow files, never from this value — it only flavors
+     * generated presentation (the business copy overlay in scaffolded auth
+     * pages) and guidance/status output. Absent means minimal.
      */
     useCase?: string;
   }>;

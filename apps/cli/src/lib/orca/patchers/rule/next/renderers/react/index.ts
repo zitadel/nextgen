@@ -23,6 +23,10 @@ import type { RendererSpec } from "../types";
  * forwards it to `ZITADEL_URL` server-side. `NEXT_PUBLIC_ZITADEL_PROJECT_ID` is
  * public — the project id is not sensitive and the widget needs it to start a
  * flow.
+ *
+ * Projects set up with the business use case additionally wire the SDK's
+ * `businessLocales` overlay onto the auth pages, restoring work-email copy on
+ * top of the widget's neutral built-in dictionaries.
  */
 export const reactRenderer: RendererSpec = {
   id: "react",
@@ -31,9 +35,21 @@ export const reactRenderer: RendererSpec = {
   frameworks: ["next"],
   dependency: { name: "@zitadel/sdk-next", version: "latest" },
   templates: {
-    authPage(mode) {
+    authPage(mode, context) {
       const componentName = mode === "login" ? "LoginPage" : "RegisterPage";
       const elementName = mode === "login" ? "ZitadelLogin" : "ZitadelRegister";
+      // The business use case restores the work-email framing the widget's
+      // neutral built-in copy dropped; the overlay ships with the SDK, so the
+      // generated page only wires it up (and stays plain otherwise).
+      const business = context.useCase === "business";
+      const importNames = business ? "businessLocales, configureZitadel" : "configureZitadel";
+      const localesComment = business
+        ? `
+      // Set up for a business audience: businessLocales overlays work-email
+      // copy on the widget's neutral built-in dictionaries. Drop the locales
+      // prop to fall back to the neutral wording.`
+        : "";
+      const localesAttr = business ? `\n          locales={businessLocales}` : "";
       return {
         mode,
         contents: `${MANAGED_MARKER}
@@ -43,7 +59,7 @@ import dynamic from "next/dynamic";
 
 const ${elementName} = dynamic(
   async () => {
-    const { configureZitadel } = await import("@zitadel/sdk-next/client");
+    const { ${importNames} } = await import("@zitadel/sdk-next/client");
     // Build the SDK project handle and pass it to the component via the
     // \`project\` prop. The component reads config from this prop directly, so
     // it works regardless of how the SDK packages are bundled. The backend URL
@@ -53,10 +69,10 @@ const ${elementName} = dynamic(
       projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID ?? "",
       proxyPath: "/__nextgen",
     });
-    return function ${elementName}Element() {
+    return function ${elementName}Element() {${localesComment}
       return (
         <zitadel-login
-          variant="page"
+          variant="page"${localesAttr}
           project={project}
           purpose="${mode}"
           post-sign-in-url="/profile"
@@ -69,7 +85,8 @@ const ${elementName} = dynamic(
 
 export default function ${componentName}() {
   // variant="page" makes the widget paint the full-page chrome itself
-  // (viewport height, surface background) from design tokens.
+  // (viewport height, surface background) from design tokens; switch to
+  // variant="widget" to embed the sign-in card inside a layout you own.
   return (
     <main style={{ colorScheme: "dark" }}>
       <${elementName} />
@@ -110,8 +127,11 @@ const ZitadelSession = dynamic(
 );
 
 export default function ProfilePage() {
+  // variant="page" makes the session card paint the full-page chrome itself
+  // (viewport height, surface background) from design tokens; switch to
+  // variant="widget" to embed the card inside a layout you own.
   return (
-    <main style={{ minHeight: "100vh", colorScheme: "dark", background: "#0f0f11" }}>
+    <main style={{ colorScheme: "dark" }}>
       <ZitadelSession />
     </main>
   );
