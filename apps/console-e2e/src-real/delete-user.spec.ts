@@ -1,6 +1,8 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@zitadel/testing/playwright";
 
+import { expectNoErrorBoundary, signIn } from "./support";
+
 /**
  * End-to-end coverage for the delete-user dialog (issue #632) against a real
  * instance.
@@ -13,18 +15,6 @@ import { expect, test } from "@zitadel/testing/playwright";
  */
 
 test.describe.configure({ mode: "parallel" });
-
-const ERROR_HEADINGS = ["Not authorized", "Something went wrong"];
-
-/** See `console-real.spec.ts` — the console's login screen (Console ADR 0003). */
-async function signIn(page: Page, user: { email: string; password: string }): Promise<void> {
-  await page.goto("/login");
-  await page.getByLabel("Work email").fill(user.email);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.getByLabel("Password").fill(user.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-}
 
 /** Signs in as `actor` and lands on the users list. */
 async function openList(page: Page, actor: { email: string; password: string }): Promise<void> {
@@ -42,11 +32,6 @@ async function openDeleteDialog(page: Page, name: string) {
   return dialog;
 }
 
-async function expectNoErrorBoundary(page: Page): Promise<void> {
-  for (const heading of ERROR_HEADINGS) {
-    await expect(page.getByText(heading, { exact: true })).toHaveCount(0);
-  }
-}
 
 test("deletes a user for real and drops it from the list", async ({ page, seed }) => {
   // Two users: one to sign in as, one to delete. Deleting the signed-in user

@@ -252,8 +252,8 @@ function UsersScreen() {
         </Table>
       </div>
       {/* D5: the list is one page and must not present itself as the whole set.
-          `GET /users` serves a fixed window (limit defaults to 20) with no
-          `Load more` yet — cursor pagination is #661. */}
+          The loader asks for the API maximum, but that is still a fixed window
+          with no `Load more` behind it — cursor pagination is #661. */}
       {users.length > 0 && (
         <p className="text-muted-foreground mt-3 text-xs">
           Showing {rows.length} of the {users.length} users loaded. This is the first page,
