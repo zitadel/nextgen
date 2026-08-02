@@ -40,7 +40,8 @@ Three facts shape the options:
 - **Greenfield:** the server currently has no SMTP client, no notification
   module, and no flow step that sends email. Nothing needs retrofitting —
   this is the cheapest moment to fix the contract.
-- **The kit's seed principle** (#709 codifies it as a kit invariant): every kit
+- **The kit's seed principle**
+  ([`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md)): every kit
   operation must stay meaningful against a remote dev instance
   (`connectZitadel`), not only a locally-booted one. A capture story that
   only works when the test controls the instance's network (an SMTP sink
@@ -131,19 +132,31 @@ in-memory store is exempt.
 
 **Read API on the operator plane** (ADR 036). Codes and links are bearer
 secrets: responses carry `Cache-Control: no-store`, values never enter
-request or access logs, list responses may mask `variables` by default with
-full values behind a read-secret scope (`dev_messages.read` once
-fine-grained operator scopes exist), and purge is a scoped operator/admin
-operation — never part of ordinary test flow.
+request or access logs, and purge is a scoped operator/admin operation —
+never part of ordinary test flow. List responses are **metadata-only**
+(id, scope, channel, purpose, recipient, template, timestamps): masking
+`variables` alone would be theater, because `rendered.text` and
+`rendered.html` embed the same code and link. The full message —
+variables and rendered forms together — is a separately authorized
+single-message read (the operator credential today, a finer read-secret
+scope such as `dev_messages.read` once ADR 036's scopes land).
 
-**Browser surfaces never hold the operator credential.** ADR 036's litmus
-forbids the project secret in anything browser-delivered, and both inbox
-UIs are browsers. They follow the BFF pattern: the surface's backend holds
-the operator credential and mints the browser a scoped, HTTP-only inbox
-session — the scratch dashboard's signed session cookie (platform
-overview) is exactly this shape, and the locally-served inbox does the
-same against the instance's own session issuance. The inbox URL that
-`zitadel start` prints carries no secret.
+**Browser surfaces never hold the operator credential — and an inbox
+session must be earned.** ADR 036's litmus forbids the project secret in
+anything browser-delivered, and both inbox UIs are browsers, so they
+follow the BFF pattern: the surface's backend holds the operator
+credential and mints the browser a scoped, HTTP-only inbox session. A
+signed cookie only proves the server issued it, so minting is gated on an
+authenticated exchange: an authenticated human on a claimed surface
+(dashboard login), or a **project-secret-mediated one-time handoff** —
+the CLI, which holds the secret, requests a single-use short-TTL handoff
+token and prints the inbox URL carrying that token; the backend exchanges
+it for the session on first open. The durable operator credential never
+appears in a URL or reaches the browser. The scratch dashboard's current
+anonymous first-visit cookie (platform overview) is **not** sufficient
+authorization for inbox content — pre-claim, its inbox view rides the
+same secret-mediated handoff. That is a second overview amendment,
+alongside the delivery-mode default.
 
 **Cursor semantics for consumers, not `clear()`.** With one shared instance
 and parallel workers, a test-level `clear()` destroys other workers'
@@ -166,6 +179,20 @@ await fillFlowField(page, "code", message.variables.code);
 No wall-clock timestamps, no cross-worker destruction, no global cleanup in
 tests.
 
+The cursor is a **high-water mark, not an ADR 027 page token**: ADR 027's
+tokens encode the position of an already-seen row and cannot express "end
+of stream" on an empty inbox. `cursor()` returns a server-minted token
+that is defined on an empty inbox (the store's current sequence
+position), ordered by a server-assigned monotonic per-environment
+sequence (the store serializes writes — on a multi-replica durable
+backend the ordering guarantee is the store's, never a wall clock), bound
+to its project/environment scope, and valid across retention and purge —
+it marks a position, not a row, so trimming history before the mark
+changes nothing. A malformed or foreign-scope token yields a distinct
+stale-cursor error, never a silent empty wait. Ordinary inbox *listing*
+pages with ADR 027 tokens as usual; the high-water token is the one
+additional type this ADR defines.
+
 **The CLI is the agent front door.** Same API, JSON envelope per the CLI's
 agent contract (`apps/cli/SKILLS.md`): `zitadel dev-inbox cursor` and
 `zitadel dev-inbox wait --after … --to … --purpose … --timeout 30s`, both
@@ -177,7 +204,12 @@ configuration.
 recipient/purpose/expiry at a glance, copy-code and open-link actions,
 rendered preview beside a structured-variables tab, explicit "Captured —
 not delivered" labeling, scoped purge — and `zitadel start` prints its URL
-next to the instance URL. In the cloud, the scratch dashboard's dev inbox
+next to the instance URL. The rendered preview treats message HTML as
+untrusted (templates become tenant-authored): it renders only inside a
+sandboxed iframe — no scripts, no top navigation, restrictive CSP — per
+the flow-engine template-security guidance, which establishes that inline
+handlers execute on naive injection and that every rendering consumer
+owns its own isolation. In the cloud, the scratch dashboard's dev inbox
 (platform overview) is the same API's pre-claim consumer.
 
 **Build order: contracts before surfaces.**
