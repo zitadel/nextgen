@@ -75,10 +75,15 @@ test("renders exactly the properties the API's schema defines", async ({ page, z
   const schema = await projectSchema(zitadel);
   const drawer = await openDrawer(page, await seed.user());
 
-  await expect(drawer.getByRole("combobox", { name: "User Schema" })).not.toContainText(
-    "Select schema",
-  );
-  expect(await renderedFields(drawer)).toEqual(schema.properties);
+  // While schemas load the trigger is disabled and reads "Loading schemas…" —
+  // which also satisfies the placeholder check below, so wait for the
+  // resolved state positively first (fast machines hit the loading window).
+  const picker = drawer.getByRole("combobox", { name: "User Schema" });
+  await expect(picker).not.toHaveAttribute("aria-disabled", "true");
+  await expect(picker).not.toContainText("Select schema");
+  // The fields mount after the auto-selection resolves; `evaluateAll` never
+  // waits, so poll the exact set instead of reading it once.
+  await expect.poll(() => renderedFields(drawer)).toEqual(schema.properties);
   await expectNoErrorBoundary(page);
 });
 
@@ -90,6 +95,9 @@ test("marks only the properties the schema does not require", async ({ page, zit
     const field = drawer
       .locator('[data-slot="field"]')
       .filter({ has: page.locator(`input[name="${property}"]`) });
+    // Without this, a required property would pass vacuously (count 0) while
+    // the schema-driven fields are still mounting.
+    await expect(field).toBeVisible();
     await expect(field.getByText("Optional")).toHaveCount(schema.required.has(property) ? 0 : 1);
   }
 });
