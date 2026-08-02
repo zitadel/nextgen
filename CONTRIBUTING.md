@@ -436,7 +436,7 @@ What these got wrong, from this repo's own history:
 
 | Shipped title | What it actually did | Should have been |
 | --- | --- | --- |
-| `feat: add withZitadel() Playwright orchestration to @zitadel/testing` (#680) | `@zitadel/testing` is journey-only and never published to npm | `test:` |
+| `feat: add withZitadel() Playwright orchestration to @zitadel/testing` (#680) | `@zitadel/testing` was journey-only and unpublished at the time (since #692 it ships on the release train, so kit API changes are `feat` today) | `test:` (then) |
 | `feat: add Figma export sync pipeline for design tokens` (#494) | A sync script and a workflow; nothing in a release | `build:` |
 | `chore: set argon2id as default password hashing algorithm` (#526) | Changed a shipped security default, with a `@zitadel/server` changeset | `feat:` |
 | `docs(config): improve schema README guidance` (#482) | Rewrote a README that `@zitadel/config` generates into the user's project | `feat(config):` |
