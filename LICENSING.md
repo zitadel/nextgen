@@ -61,8 +61,10 @@ apps/demo-next/
 apps/demo-nuxt/
 packages/api/
 packages/components/
+packages/config/
 packages/design-tokens/
 packages/shared-component-styles/
+packages/testing/
 packages/ui-react/
 packages/sdk-core/
 packages/sdk-next/
