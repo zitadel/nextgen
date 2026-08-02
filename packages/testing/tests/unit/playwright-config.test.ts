@@ -40,7 +40,7 @@ describe("withZitadel", () => {
   it("generates the boot and app entries with agreeing readiness URLs", () => {
     const { webServer } = withZitadel(options(), fakeResolve);
     expect(webServer).toHaveLength(2);
-    const [boot, app] = webServer;
+    const [boot, app] = [webServer[0]!, webServer[1]!];
     expect(boot.command).toBe('node "/kit/dist/supervisor.mjs"');
     expect(boot.url).toBe("http://localhost:8092/healthz");
     expect(boot.reuseExistingServer).toBe(false);
@@ -52,7 +52,7 @@ describe("withZitadel", () => {
 
   it("serializes configs the executables' own parsers accept", () => {
     const { webServer } = withZitadel(options(), fakeResolve);
-    const [boot, app] = webServer;
+    const [boot, app] = [webServer[0]!, webServer[1]!];
     const supervisor = parseSupervisorConfig(boot.env?.ZITADEL_TESTING_SUPERVISOR);
     expect(supervisor.port).toBe(8092);
     expect(supervisor.appOrigins).toEqual(["http://localhost:3002"]);
@@ -81,7 +81,7 @@ describe("withZitadel", () => {
     custom.app.readyTimeoutMs = 7_000;
     custom.app.gracefulShutdownMs = 1_000;
     const { webServer } = withZitadel(custom, fakeResolve);
-    const [boot, app] = webServer;
+    const [boot, app] = [webServer[0]!, webServer[1]!];
     expect(process.env.ZITADEL_TESTING_HANDSHAKE).toBe("/tmp/custom-handshake.json");
     expect(boot.timeout).toBe(5_000);
     expect(app.timeout).toBe(7_000);

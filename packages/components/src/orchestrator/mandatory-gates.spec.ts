@@ -14,7 +14,7 @@ const step: CreateFlow201Step = {
     { name: "email", type: "email", text_key: "identifier.field.email", required: true },
   ],
   actions: [
-    { name: "submit", text_key: "submit.continue", primary: true },
+    { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
   ],
   gates: {},
 };

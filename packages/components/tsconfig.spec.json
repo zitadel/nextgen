@@ -17,16 +17,15 @@
     "moduleResolution": "nodenext"
   },
   "include": [
-    "vitest.config.ts",
     "src/**/*.spec.ts",
     "src/**/*.d.ts"
+  ],
+  "exclude": [
+    "src/jsx.d.ts"
   ],
   "references": [
     {
       "path": "./tsconfig.lib.json"
     }
-  ],
-  "exclude": [
-    "src/jsx.d.ts"
   ]
 }

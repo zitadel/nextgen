@@ -358,7 +358,7 @@ describe("schema-dependent rules", () => {
 
   it("rejects x-auth-methods#password when the method is disabled", () => {
     const disabled = structuredClone(schema);
-    (disabled["x-auth-methods"] as Record<string, { enabled: boolean }>).password.enabled = false;
+    (disabled["x-auth-methods"] as Record<string, { enabled: boolean }>).password!.enabled = false;
     expect(messages(validateFlowDefinition(flow(), disabled))).toContain(
       'step "password": "password" is not an enabled authentication method',
     );
@@ -366,7 +366,7 @@ describe("schema-dependent rules", () => {
 
   it("rejects every step offering a passkey action when the schema disables passkey", () => {
     const disabled = structuredClone(schema);
-    (disabled["x-auth-methods"] as Record<string, { enabled: boolean }>).passkey.enabled = false;
+    (disabled["x-auth-methods"] as Record<string, { enabled: boolean }>).passkey!.enabled = false;
     const issues = validateFlowDefinition(flow(), disabled);
     const msgs = messages(issues);
     expect(msgs).toContain(
@@ -528,7 +528,7 @@ describe("drift audit (Go validator)", () => {
     const goFuncs = [...source.matchAll(/^func (\w+)\(/gm)].map((m) => m[1]).sort();
     const ported = Object.values(FLOW_VALIDATION_RULES)
       .map((rule) => rule.goRef)
-      .filter((ref): ref is string => ref !== null);
+      .filter((ref) => ref !== null);
     // Traversal/aggregation helpers of already-ported rules, plus the
     // orchestrator itself. NOT a place to park an unported rule: the
     // "still exists" check above is one-directional and can never
