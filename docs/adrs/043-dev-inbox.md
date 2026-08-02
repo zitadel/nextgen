@@ -16,9 +16,9 @@ project/environment-scoped **Dev Inbox** instead of delivering it.
 The Dev Inbox is a product capability, not an internal test hook: one
 operator-authenticated, cursor-paginated API with three consumers that see
 the same messages — a human inbox UI, CLI JSON commands, and
-`@zitadel/testing`. Production-class environments never capture: enabling
-email-dependent flows there without a configured provider fails loudly at
-deploy time.
+`@zitadel/testing`. Environments carrying the `provider_required` policy
+never capture: deploying email-dependent flows there without a configured
+provider fails outright.
 
 The platform overview already narrates this capability (the scratch
 dashboard's dev inbox; the "Dev Inbox / Bring Your Own / Managed" delivery
@@ -40,7 +40,7 @@ Three facts shape the options:
 - **Greenfield:** the server currently has no SMTP client, no notification
   module, and no flow step that sends email. Nothing needs retrofitting —
   this is the cheapest moment to fix the contract.
-- **The kit's seed principle** (see `packages/testing/AGENTS.md`, added by #709): every kit
+- **The kit's seed principle** (#709 codifies it as a kit invariant): every kit
   operation must stay meaningful against a remote dev instance
   (`connectZitadel`), not only a locally-booted one. A capture story that
   only works when the test controls the instance's network (an SMTP sink
@@ -58,7 +58,7 @@ No single product has a great end-to-end answer; each contributes one piece:
 |---|---|---|
 | Supabase | Local stack bundles a [Mailpit](https://mailpit.axllent.org/docs/api-v1/) sink (browser-first inbox); the [Send Email Hook](https://supabase.com/docs/guides/auth/auth-hooks/send-email-hook) can replace delivery with a structured, signed webhook; [`admin.generateLink`](https://supabase.com/docs/reference/javascript/auth-admin-generatelink) mints artifacts with no delivery | Three layers, because no single one suffices; the sink is the weakest (rendered-only content, local-only, a second product to understand) |
 | Firebase Auth emulator | [Emulator REST endpoints](https://firebase.google.com/docs/emulator-suite/connect_auth) return pending OOB codes/links structured (`email`, `oobCode`, `oobLink`, `requestType`) | Closest precedent for an agent-readable capture API; local-emulator-only and unauthenticated |
-| Resend | [`GET /emails/{id}`](https://resend.com/docs/api-reference/emails/retrieve-email) returns the full sent message (html/text/subject/`last_event`); the dashboard is its UI; `*@resend.dev` simulator recipients drive event webhooks safely | Capture as a *production* surface: read-back API and human UI over the same data |
+| Resend | [`GET /emails/{id}`](https://resend.com/docs/api-reference/emails/retrieve-email) returns the full sent message (html/text/subject/`last_event`); the dashboard is its UI; the [documented simulator recipients](https://resend.com/docs/dashboard/emails/send-test-emails) (`delivered@`/`bounced@`/`complained@resend.dev`) drive event webhooks safely | Capture as a *production* surface: read-back API and human UI over the same data |
 | Clerk | [`+clerk_test` addresses](https://clerk.com/docs/guides/development/testing/test-emails-and-phones) accept the fixed code `424242`; nothing is composed or sent | Zero-config and trivially automatable — but proves nothing about recipient selection, templates, generated codes, or expiry |
 | Stytch | Sandbox values (fixed test tokens) for direct API calls | Explicitly not end-to-end: unsupported through frontend SDKs |
 | Better Auth | The app supplies the send callback and receives structured `url`/`token` | In-process capture is easy, but provider, templates, and fixtures are wholly DIY |
@@ -103,21 +103,31 @@ surfaced through `zitadel status --json` and on `InstanceHandle` — rather
 than guessing. Capture replaces delivery, with no capture-and-deliver tee
 mode: a captured message is provably one that was not sent.
 
-**Production-class environments require a provider.** One deliberate
-divergence from the overview's current narrative (which lists "Dev Inbox
-(default)" for claimed production): customer-facing password-reset mail
-must not silently land in a developer inbox. When email-dependent flows are
-enabled in a production-class environment (ADR 035 slots) without a
-configured provider, deployment fails or warns decisively. The overview
-gets amended to match if this ADR is accepted.
+**Production-class environments require a provider — enforced by one
+policy bit.** ADR 035 deliberately defers defining which environments are
+production-class ("follow-up once env-classes are defined"), so this ADR
+does not classify environments either. It defines the signal the server
+enforces instead: a `provider_required` policy on the environment record.
+Provisioning sets it (the claim flow marks production environments;
+operators can set it anywhere), and while it is set, deploying a release
+that enables email-dependent flows without a configured provider
+**fails** — a hard failure, not a warning. When env-classes arrive, they
+map classes to this policy's default. This is one deliberate divergence
+from the overview's current narrative (which lists "Dev Inbox (default)"
+for claimed production): customer-facing password-reset mail must not
+silently land in a developer inbox. The overview gets amended to match if
+this ADR is accepted.
 
 **A scoped, cursor-paginated store.** The API contract: records are scoped
 to project/environment (ADR 035), listed with cursor pagination, bounded by
 retention (count cap plus TTL), and purged with their project/environment.
 The contract is cursor-based from day one so the first implementation (an
-in-memory store in the single-process local instance — the kit's 80% case)
-and the eventual durable store for shared/cloud dev environments
-(multi-replica; encrypted at rest) are interchangeable behind it.
+in-memory store in the single-process local instance) and the eventual
+durable store for shared/cloud dev environments (multi-replica) are
+interchangeable behind it. **Any durable backend encrypts message content
+at rest** — captured codes and links are exactly the class of retrievable
+secret ADR 029 mandates AES-GCM encryption for; only the ephemeral
+in-memory store is exempt.
 
 **Read API on the operator plane** (ADR 036). Codes and links are bearer
 secrets: responses carry `Cache-Control: no-store`, values never enter
@@ -125,6 +135,15 @@ request or access logs, list responses may mask `variables` by default with
 full values behind a read-secret scope (`dev_messages.read` once
 fine-grained operator scopes exist), and purge is a scoped operator/admin
 operation — never part of ordinary test flow.
+
+**Browser surfaces never hold the operator credential.** ADR 036's litmus
+forbids the project secret in anything browser-delivered, and both inbox
+UIs are browsers. They follow the BFF pattern: the surface's backend holds
+the operator credential and mints the browser a scoped, HTTP-only inbox
+session — the scratch dashboard's signed session cookie (platform
+overview) is exactly this shape, and the locally-served inbox does the
+same against the instance's own session issuance. The inbox URL that
+`zitadel start` prints carries no secret.
 
 **Cursor semantics for consumers, not `clear()`.** With one shared instance
 and parallel workers, a test-level `clear()` destroys other workers'
@@ -212,7 +231,7 @@ second contract later.
   recovery) become testable in the kit and the CLI on the day they land;
   both ship thin clients over the one API.
 - Dev and preview environments knowingly trade delivery for capture;
-  production-class environments get a decisive deploy-time signal instead
+  `provider_required` environments get a hard deploy-time failure instead
   of silent capture — which requires one amendment to the platform
   overview's delivery-mode default.
 - The scratch dashboard's inbox, the local inbox UI, the CLI, and the kit
@@ -224,8 +243,7 @@ second contract later.
   service consuming events (and how that aligns with the wide-events
   direction)?
 - Durable-store trigger: at what point (shared cloud dev instances,
-  multi-replica) the in-memory store must be replaced, and whether
-  encryption at rest is required from its first durable version.
+  multi-replica) the in-memory store must be replaced.
 - Support-access overlap: a support agent reading a tenant's dev inbox
   reads user secrets — same policy surface as the support-access model
   discussion.
