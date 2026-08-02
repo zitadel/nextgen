@@ -43,6 +43,20 @@ tasks:
       cache: false
       runInCI: false
 
+  check-typecheck:
+    command: "node scripts/check-typecheck-programs.mjs"
+    inputs:
+      - "scripts/check-typecheck-programs.mjs"
+      - "apps/*/moon.yml"
+      - "packages/*/moon.yml"
+      - "apps/*/package.json"
+      - "packages/*/package.json"
+      - "apps/*/tsconfig*.json"
+      - "packages/*/tsconfig*.json"
+    options:
+      cache: true
+      runInCI: true
+
   check-adrs:
     command: "node scripts/check-adrs-index.mjs"
     inputs:

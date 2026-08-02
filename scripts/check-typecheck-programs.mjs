@@ -1,0 +1,120 @@
+/**
+ * Guards every project's `typecheck` task against the vacuous-program trap.
+ *
+ * A solution-style tsconfig (`"files": []` + `"references"`, no `include`)
+ * describes no inputs of its own, and NON-BUILD `tsc --noEmit` ignores
+ * project references entirely — so `tsc --noEmit -p <solution.json>` checks
+ * an empty program and exits green no matter what the code says. Eleven
+ * package typechecks shipped that way before 2026-08-02 (probe-verified:
+ * a file with a hard type error passed). Build mode (`tsc --build`) is the
+ * form that actually walks the references.
+ *
+ * This check re-derives the audit statically: for every moon `typecheck`
+ * task it resolves the command (inlined or via the package's `typecheck`
+ * script), finds the tsconfig the command loads, and fails when a
+ * solution-style config is checked without `--build`. Tools that own their
+ * own program discovery (`vue-tsc` behind `nuxt prepare`, `svelte-check`)
+ * pass, as do commands pointed at real configs with `include`/`files`.
+ *
+ * KNOWN_VACUOUS lists the projects still carrying the trap on purpose —
+ * their real programs do not compile yet (latent errors plus the
+ * `@zitadel/source`-condition/module-settings mismatch described in the
+ * follow-up issue). Shrink this list; never grow it.
+ */
+import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { join, dirname } from "node:path";
+
+/** Projects whose typecheck is known-vacuous, pending the follow-up fix. */
+const KNOWN_VACUOUS = new Set(["apps/cli", "packages/sdk-core"]);
+
+function stripJsonComments(text) {
+  return text.replace(/^\s*\/\/.*$/gm, "");
+}
+
+function readJson(path) {
+  return JSON.parse(stripJsonComments(readFileSync(path, "utf8")));
+}
+
+function projectDirs() {
+  const dirs = [];
+  for (const root of ["apps", "packages"]) {
+    for (const entry of readdirSync(root, { withFileTypes: true })) {
+      if (entry.isDirectory() && existsSync(join(root, entry.name, "moon.yml"))) {
+        dirs.push(join(root, entry.name));
+      }
+    }
+  }
+  return dirs;
+}
+
+/** The command moon's `typecheck` task runs, with `pnpm run typecheck` resolved. */
+function typecheckCommand(dir) {
+  const moon = readFileSync(join(dir, "moon.yml"), "utf8");
+  const match = moon.match(/^ {2}typecheck:\n(?: {4}.*\n)*/m);
+  if (!match) return null;
+  const command = match[0].match(/^ {4}command: "([^"]+)"/m)?.[1];
+  if (!command) return null;
+  if (!/pnpm run typecheck/.test(command)) return command;
+  const pkg = readJson(join(dir, "package.json"));
+  return pkg.scripts?.typecheck ?? null;
+}
+
+function isSolutionStyle(configPath) {
+  if (!existsSync(configPath)) return false;
+  const config = readJson(configPath);
+  const noInputs =
+    Array.isArray(config.files) &&
+    config.files.length === 0 &&
+    (config.include === undefined || config.include.length === 0);
+  return noInputs && Array.isArray(config.references) && config.references.length > 0;
+}
+
+const failures = [];
+const staleAllowlist = [];
+
+for (const dir of projectDirs()) {
+  const command = typecheckCommand(dir);
+  if (!command) continue;
+
+  // Tools that discover their own program are not `tsc -p` programs.
+  if (/vue-tsc|svelte-check/.test(command)) continue;
+  // Build mode walks project references — the correct form for solutions.
+  if (/--build|\s-b\b/.test(command)) {
+    if (KNOWN_VACUOUS.has(dir)) staleAllowlist.push(dir);
+    continue;
+  }
+
+  // Plain tsc: find the config it loads (last `-p <path>` wins; default
+  // ./tsconfig.json). Only the final tsc segment of `a && b` chains matters
+  // for commands that end in a bare tsc run.
+  const segments = command.split("&&").map((segment) => segment.trim());
+  const tscSegments = segments.filter((segment) => /(^|\s)tsc(\s|$)/.test(segment));
+  if (tscSegments.length === 0) continue;
+  const vacuousTargets = tscSegments
+    .map((segment) => segment.match(/-p\s+(\S+)/)?.[1] ?? "tsconfig.json")
+    .filter((target) => isSolutionStyle(join(dir, target)));
+
+  if (vacuousTargets.length === 0) {
+    if (KNOWN_VACUOUS.has(dir)) staleAllowlist.push(dir);
+    continue;
+  }
+  if (KNOWN_VACUOUS.has(dir)) continue;
+  failures.push(
+    `${dir}: typecheck runs "${command}" against solution-style ${vacuousTargets.join(", ")} — ` +
+      `non-build tsc ignores references, so this checks NOTHING. Use "tsc --build tsconfig.json".`,
+  );
+}
+
+if (staleAllowlist.length > 0) {
+  failures.push(
+    `KNOWN_VACUOUS is stale — these projects now check a real program; remove them from the ` +
+      `allowlist in scripts/check-typecheck-programs.mjs: ${staleAllowlist.join(", ")}`,
+  );
+}
+
+if (failures.length > 0) {
+  console.error("Vacuous typecheck programs detected:\n");
+  for (const failure of failures) console.error(`  - ${failure}`);
+  process.exit(1);
+}
+console.log("All typecheck tasks target real programs (allowlisted: %s).", [...KNOWN_VACUOUS].join(", ") || "none");
