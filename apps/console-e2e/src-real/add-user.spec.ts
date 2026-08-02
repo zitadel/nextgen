@@ -1,6 +1,8 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@zitadel/testing/playwright";
 
+import { expectNoErrorBoundary, signIn } from "./support";
+
 /**
  * End-to-end coverage for the Add user drawer (issue #633) against a real
  * instance, so the schema-driven form is exercised over the actual
@@ -14,22 +16,12 @@ import { expect, test } from "@zitadel/testing/playwright";
 
 test.describe.configure({ mode: "parallel" });
 
-// The Projects block is hidden until the backend can grant access — roles need
-// ADR 034's app-group catalog (epic #419) and `queryProjects` is single-project
-// (ADR 0004). Its cases below are parked with it, not deleted; restore them
-// alongside the block and the unit specs when the endpoints land.
-
-const ERROR_HEADINGS = ["Not authorized", "Something went wrong"];
-
-/** See `console-real.spec.ts` — the console's login screen (Console ADR 0003). */
-async function signIn(page: Page, user: { email: string; password: string }): Promise<void> {
-  await page.goto("/login");
-  await page.getByLabel("Work email").fill(user.email);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.getByLabel("Password").fill(user.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-}
+// The Projects block is out of the MVP: design removed the project selector
+// (design decisions log D6, 2026-07-31), and the backend could not grant access
+// regardless — roles need ADR 034's app-group catalog (epic #419) and
+// `queryProjects` is single-project (ADR 0004). D6 expects it back in a future
+// version, so the cases below are parked with the block, not deleted; restore
+// them alongside the block and the unit specs when both reasons clear.
 
 /** Signs in, lands on /users and opens the drawer. */
 async function openDrawer(page: Page, user: { email: string; password: string }) {
@@ -39,6 +31,12 @@ async function openDrawer(page: Page, user: { email: string; password: string })
   await page.getByRole("button", { name: "Add", exact: true }).click();
   const drawer = page.getByRole("dialog", { name: "Add user" });
   await expect(drawer).toBeVisible();
+  // Two fetches gate the form: the drawer shows "Loading schemas…" until the
+  // list resolves, and fields mount only once the selected schema's definition
+  // arrives. Locator actions auto-wait through both, but one-shot reads
+  // (`renderedFields`) and raw key presses don't — so only hand tests a drawer
+  // whose form is actually on screen.
+  await expect(drawer.locator('input[data-slot="input"]').first()).toBeVisible();
   return drawer;
 }
 
@@ -75,10 +73,17 @@ test("renders exactly the properties the API's schema defines", async ({ page, z
   const schema = await projectSchema(zitadel);
   const drawer = await openDrawer(page, await seed.user());
 
-  await expect(drawer.getByRole("combobox", { name: "User Schema" })).not.toContainText(
-    "Select schema",
-  );
-  expect(await renderedFields(drawer)).toEqual(schema.properties);
+  // Both loading labels are excluded, not just the empty one: "Loading schemas…"
+  // is also `not "Select schema"`, so waiting on that alone let the assertion
+  // below run mid-fetch and compare against an empty field set.
+  const picker = drawer.getByRole("combobox", { name: "User Schema" });
+  await expect(picker).not.toContainText("Select schema");
+  await expect(picker).not.toContainText("Loading schemas");
+
+  // Polled rather than read once: `evaluateAll` takes a single snapshot and does
+  // not retry, so it can land between the schema resolving and its fields
+  // rendering.
+  await expect.poll(() => renderedFields(drawer)).toEqual(schema.properties);
   await expectNoErrorBoundary(page);
 });
 
@@ -279,6 +284,9 @@ test("can be completed with the keyboard alone", async ({ page, zitadel, seed })
   await page.getByRole("button", { name: "Add", exact: true }).press("Enter");
   const drawer = page.getByRole("dialog", { name: "Add user" });
   await expect(drawer).toBeVisible();
+  // Same readiness gate as `openDrawer`: a raw Tab loop never auto-waits, so
+  // the schema-driven form must be on screen before traversal starts.
+  await expect(drawer.locator('input[data-slot="input"]').first()).toBeVisible();
 
   const email = uniqueEmail("keyboard");
   for (const property of schema.required) {
@@ -360,8 +368,3 @@ test("Escape closes the open list first, then the drawer", async ({ page, seed }
   await expect(drawer).toBeHidden();
 });
 
-async function expectNoErrorBoundary(page: Page): Promise<void> {
-  for (const heading of ERROR_HEADINGS) {
-    await expect(page.getByText(heading, { exact: true })).toHaveCount(0);
-  }
-}

@@ -95,6 +95,8 @@ describe("isNonShippingFile", () => {
     // The console and login UI ship inside the server container.
     "apps/console/src/routes/users.tsx",
     "apps/login-ui/src/app.ts",
+    // On the release train since #692 — customers install it from npm.
+    "packages/testing/src/passkey.ts",
   ])("treats %s as shipping", async (file) => {
     const { isNonShippingFile } = await load();
     expect(isNonShippingFile(file)).toBe(false);
@@ -114,7 +116,6 @@ describe("isNonShippingFile", () => {
     "apps/console-e2e/tests/users.spec.ts",
     "apps/demo-next/next-env.d.ts",
     "apps/storybook/main.ts",
-    "packages/testing/src/orchestration.ts",
     "packages/api-mock/src/handlers.ts",
     "packages/components/moon.yml",
     "internal/domain/user_test.go",
@@ -135,13 +136,12 @@ describe("isNonShippingFile", () => {
 });
 
 describe("checkPrTitle", () => {
-  it("fails feat when nothing in the diff reaches a user (#680)", async () => {
+  it("fails feat when nothing in the diff reaches a user", async () => {
     const { checkPrTitle } = await load();
     const report = checkPrTitle({
-      title: "feat: add withZitadel() Playwright orchestration to @zitadel/testing",
+      title: "feat: extend the api-mock flow fixtures",
       files: [
-        "packages/testing/src/orchestration.ts",
-        "packages/testing/tests/unit/orchestration.test.ts",
+        "packages/api-mock/src/handlers.ts",
         "apps/console-e2e/playwright.real.config.mts",
         "apps/demo-next/next-env.d.ts",
       ],
@@ -151,6 +151,21 @@ describe("checkPrTitle", () => {
     expect(report.ok).toBe(false);
     expect(report.errors.map((error) => error.code)).toContain("non-shipping-customer-type");
     expect(report.errors[0]?.message).toContain('Use "test:"');
+  });
+
+  it("allows feat for kit API changes now that @zitadel/testing ships (#692)", async () => {
+    const { checkPrTitle } = await load();
+    const report = checkPrTitle({
+      title: "feat: add a virtual-passkey helper to @zitadel/testing",
+      files: [
+        "packages/testing/src/passkey.ts",
+        "packages/testing/tests/unit/passkey.test.ts",
+        "apps/demo-next-e2e/src-real/passkey.spec.ts",
+      ],
+      config,
+    });
+
+    expect(report.ok).toBe(true);
   });
 
   it("fails feat on a build pipeline (#494)", async () => {
@@ -306,7 +321,7 @@ describe("checkPrTitle", () => {
 
 describe("suggestType", () => {
   it.each([
-    [["packages/testing/src/x.ts", "apps/console-e2e/a.spec.ts"], "test"],
+    [["packages/api-mock/src/x.ts", "apps/console-e2e/a.spec.ts"], "test"],
     [[".github/workflows/ci.yml"], "ci"],
     [["docs/adrs/030.md", "AGENTS.md"], "docs"],
     [["packages/design-tokens/scripts/build.ts", ".github/workflows/sync.yml"], "build"],
@@ -338,7 +353,7 @@ describe("renderStepSummary", () => {
   it("names the failure and the next action", async () => {
     const { checkPrTitle, renderStepSummary } = await load();
     const summary = renderStepSummary(
-      checkPrTitle({ title: "feat: add a harness", files: ["packages/testing/src/x.ts"], config }),
+      checkPrTitle({ title: "feat: add a harness", files: ["packages/api-mock/src/x.ts"], config }),
     );
 
     expect(summary).toContain("# PR title");

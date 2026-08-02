@@ -43,8 +43,9 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
  *
  * Runs every registered {@link SANITY_CHECKS} entry and emits the aggregate
  * result; if any check fails it throws `E_VALIDATION` carrying the full check
- * details. With `--fix`, each failing check first attempts its own repair (a
- * no-op for checks with no safe automatic remedy), then the battery re-runs.
+ * details. With `--fix`, each check that did not pass — failed or warned —
+ * first attempts its own repair (a no-op for checks with no safe automatic
+ * remedy), then the battery re-runs.
  *
  * The `--fix` loop is best-effort: a repair that throws (e.g. a missing
  * prerequisite file the check itself would also flag) is logged at debug
@@ -86,7 +87,9 @@ export default class Doctor extends BaseCommand {
     if (hasConfig && flags.fix) {
       const before = await Promise.all(SANITY_CHECKS.map((check) => check.run(ctx)));
       for (const [index, check] of SANITY_CHECKS.entries()) {
-        if (before[index]?.status !== "fail") {
+        // Repair warn-level drift too (e.g. a deleted presentation page):
+        // fixes are restore-missing-only, so running one on a warning is safe.
+        if (before[index]?.status === "pass") {
           continue;
         }
         try {
