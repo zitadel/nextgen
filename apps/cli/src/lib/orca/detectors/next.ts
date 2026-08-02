@@ -28,6 +28,20 @@ export class NextDetector implements Detector {
       return null;
     }
 
+    // Supported floor (ADR 043): the scaffolded templates target Next 15+
+    // (React 19 property binding, current boundary conventions). The floor is
+    // enforced here so setup and doctor share one loud gate instead of
+    // degrading silently; an unparseable version spec passes (cannot prove a
+    // violation), matching this detector's other tolerances.
+    const versionMajor = dependencyVersionMajor(pkg, "next");
+    if (versionMajor !== undefined && versionMajor < 15) {
+      throw new ZitadelError(
+        "E_UNSUPPORTED_PROJECT_SHAPE",
+        `Next.js ${versionMajor} is below the supported floor — the CLI integrates Next.js 15 and newer`,
+        { hint: "Upgrade the app to Next 15+ (e.g. `npx @next/codemod@latest upgrade`) and rerun." },
+      );
+    }
+
     const appDir = (await dirExists(join(cwd, "app")))
       ? "app"
       : (await dirExists(join(cwd, "src/app")))
@@ -47,7 +61,7 @@ export class NextDetector implements Detector {
       appDir,
       devPort,
       url: issuerFromPort(devPort),
-      versionMajor: dependencyVersionMajor(pkg, "next"),
+      ...(versionMajor === undefined ? {} : { versionMajor }),
     };
   }
 }

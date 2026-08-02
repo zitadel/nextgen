@@ -307,6 +307,20 @@ describe("FrameworkCheck", () => {
     );
     expect((await new FrameworkCheck().run(ctxFor(cwd))).status).toBe("fail");
   });
+
+  it("fails with the version floor when the app dropped below Next 15", async () => {
+    // A scaffolded app later downgraded (or a pre-floor scaffold): doctor
+    // must say why the integration is unsupported, not crash or pass.
+    const cwd = await makeProject();
+    const pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    pkg.dependencies.next = "^14.2.0";
+    await writeFile(join(cwd, "package.json"), JSON.stringify(pkg));
+    const outcome = await new FrameworkCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("below the supported floor");
+  });
 });
 
 describe("SchemaCheck", () => {

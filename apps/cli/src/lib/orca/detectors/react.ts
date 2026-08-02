@@ -1,4 +1,5 @@
-import { hasDependency, readPackageJson } from "./package-json";
+import { ZitadelError } from "../../errors";
+import { dependencyVersionMajor, hasDependency, readPackageJson } from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
 
@@ -25,7 +26,25 @@ export class ReactDetector implements Detector {
       return null;
     }
 
+    // Supported floor (ADR 043): the SDK wrappers and scaffolded templates
+    // target React 18+. Enforced here so setup and doctor share one loud
+    // gate; an unparseable version spec passes (cannot prove a violation).
+    const versionMajor = dependencyVersionMajor(pkg, "react");
+    if (versionMajor !== undefined && versionMajor < 18) {
+      throw new ZitadelError(
+        "E_UNSUPPORTED_PROJECT_SHAPE",
+        `React ${versionMajor} is below the supported floor — the CLI integrates React 18 and newer`,
+        { hint: "Upgrade the app to React 18+ and rerun." },
+      );
+    }
+
     const devPort = await detectDevPort(cwd, pkg);
-    return { id: "react", appDir: "src", devPort, url: issuerFromPort(devPort) };
+    return {
+      id: "react",
+      appDir: "src",
+      devPort,
+      url: issuerFromPort(devPort),
+      ...(versionMajor === undefined ? {} : { versionMajor }),
+    };
   }
 }
