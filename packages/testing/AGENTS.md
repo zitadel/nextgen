@@ -85,10 +85,9 @@ fact changes:
   `data-action`) stay scoped to the `<zitadel-login>` host: `.or()` unions
   resolve in page-wide DOM order, so an unscoped candidate could match app
   chrome; the host also exists for custom templates that emit no hooks.
-  Quotes and backslashes in free-form action names are escaped before
-  attribute-selector interpolation — that is not full CSS-string escaping
-  (control characters remain unhandled), so keep action names
-  identifier-shaped.
+  Free-form action names are escaped per the CSSOM string-serialization
+  rules before attribute-selector interpolation (#715), so an exotic name
+  cannot break the union's parsing.
 - **Session-mint driver** (`src/session.ts`): the flow is stateless via
   the sealed `_zflow` cookie (raw `fetch` + one-cookie jar — the typed
   client hides response headers), submits must send an `Origin` on the
