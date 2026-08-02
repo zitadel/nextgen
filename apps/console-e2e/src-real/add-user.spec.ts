@@ -14,10 +14,12 @@ import { expect, test } from "@zitadel/testing/playwright";
 
 test.describe.configure({ mode: "parallel" });
 
-// The Projects block is hidden until the backend can grant access — roles need
-// ADR 034's app-group catalog (epic #419) and `queryProjects` is single-project
-// (ADR 0004). Its cases below are parked with it, not deleted; restore them
-// alongside the block and the unit specs when the endpoints land.
+// The Projects block is out of the MVP: design removed the project selector
+// (design decisions log D6, 2026-07-31), and the backend could not grant access
+// regardless — roles need ADR 034's app-group catalog (epic #419) and
+// `queryProjects` is single-project (ADR 0004). D6 expects it back in a future
+// version, so the cases below are parked with the block, not deleted; restore
+// them alongside the block and the unit specs when both reasons clear.
 
 const ERROR_HEADINGS = ["Not authorized", "Something went wrong"];
 
@@ -75,10 +77,17 @@ test("renders exactly the properties the API's schema defines", async ({ page, z
   const schema = await projectSchema(zitadel);
   const drawer = await openDrawer(page, await seed.user());
 
-  await expect(drawer.getByRole("combobox", { name: "User Schema" })).not.toContainText(
-    "Select schema",
-  );
-  expect(await renderedFields(drawer)).toEqual(schema.properties);
+  // Both loading labels are excluded, not just the empty one: "Loading schemas…"
+  // is also `not "Select schema"`, so waiting on that alone let the assertion
+  // below run mid-fetch and compare against an empty field set.
+  const picker = drawer.getByRole("combobox", { name: "User Schema" });
+  await expect(picker).not.toContainText("Select schema");
+  await expect(picker).not.toContainText("Loading schemas");
+
+  // Polled rather than read once: `evaluateAll` takes a single snapshot and does
+  // not retry, so it can land between the schema resolving and its fields
+  // rendering.
+  await expect.poll(() => renderedFields(drawer)).toEqual(schema.properties);
   await expectNoErrorBoundary(page);
 });
 

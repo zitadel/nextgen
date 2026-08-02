@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { ArrowUpDown, MoreVertical, Plus, Search, Users } from "lucide-react";
+import { MoreVertical, Plus, Search, Users } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { AddUserSheet } from "@/components/add-user-sheet";
+import { DeleteUserDialog } from "@/components/delete-user-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,7 +29,11 @@ import { userDisplayName } from "../../../lib/user";
 
 export const Route = createFileRoute("/_authed/users/")({
   staticData: { nav: { label: "Users", order: 2, icon: Users } },
-  loader: () => api.listUsers(),
+  // `limit` is asked for explicitly at the API's maximum rather than left at the
+  // default 20. `GET /users` orders by creation ascending with no `Load more`
+  // yet (#661), so the default silently hides the most recently created users —
+  // the ones an operator has just added and is most likely looking for.
+  loader: () => api.listUsers({ limit: 100 }),
   component: UsersScreen,
 });
 
@@ -51,7 +56,6 @@ function UsersScreen() {
   const users = Route.useLoaderData();
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [sortAsc, setSortAsc] = useState<boolean | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // ⌘F / Ctrl+F focuses the table search instead of the browser find bar —
@@ -74,9 +78,12 @@ function UsersScreen() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  // Search narrows the rows already fetched. `GET /users` takes no filter (ADR
+  // 031's query endpoint does not exist), so this cannot reach users outside the
+  // loaded page — which is why the table says so beneath it.
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    let next = users.map(toUserRow).filter((user) => {
+    return users.map(toUserRow).filter((user) => {
       return (
         needle === "" ||
         user.name.toLowerCase().includes(needle) ||
@@ -84,13 +91,7 @@ function UsersScreen() {
         user.id.toLowerCase().includes(needle)
       );
     });
-    if (sortAsc !== null) {
-      next = [...next].sort((a, b) =>
-        sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name),
-      );
-    }
-    return next;
-  }, [users, query, sortAsc]);
+  }, [users, query]);
 
   return (
     <div className="px-4 pt-9 pb-8 sm:px-8">
@@ -136,13 +137,7 @@ function UsersScreen() {
           </colgroup>
           <TableHeader>
             <TableRow className="border-border border-b hover:bg-transparent">
-              <HeadCell
-                sortable
-                ariaSort={sortAsc === null ? "none" : sortAsc ? "ascending" : "descending"}
-                onSort={() => setSortAsc((value) => (value === null ? true : !value))}
-              >
-                Name
-              </HeadCell>
+              <HeadCell>Name</HeadCell>
               <HeadCell>Email</HeadCell>
               <HeadCell>ID</HeadCell>
               <TableHead className="h-14 px-2" />
@@ -179,7 +174,11 @@ function UsersScreen() {
                     {user.id}
                   </TableCell>
                   <TableCell className="h-11 px-2 py-0">
-                    <RowActions name={user.name} />
+                    <RowActions
+                      userId={user.id}
+                      name={user.name}
+                      onDeleted={() => router.invalidate()}
+                    />
                   </TableCell>
                 </TableRow>
               ))
@@ -187,6 +186,15 @@ function UsersScreen() {
           </TableBody>
         </Table>
       </div>
+      {/* D5: the list is one page and must not present itself as the whole set.
+          `GET /users` serves a fixed window (limit defaults to 20) with no
+          `Load more` yet — cursor pagination is #661. */}
+      {users.length > 0 && (
+        <p className="text-muted-foreground mt-3 text-xs">
+          Showing {rows.length} of the {users.length} users loaded. This is the first page,
+          not the full list, and search only matches what is loaded.
+        </p>
+      )}
     </div>
   );
 }
@@ -203,55 +211,84 @@ function toUserRow(user: Record<string, unknown>, index: number): UserRow {
   };
 }
 
-function HeadCell({
-  children,
-  sortable = false,
-  ariaSort,
-  onSort,
-}: {
-  children: ReactNode;
-  sortable?: boolean;
-  /** Current sort state for assistive tech; only set on sortable columns. */
-  ariaSort?: "none" | "ascending" | "descending";
-  onSort?: () => void;
-}) {
+/**
+ * Column header.
+ *
+ * Sorting was removed rather than left in place. The design decisions log (D5)
+ * rules out filtering and sorting for the MVP, and the affordance was misleading
+ * on its own terms: `GET /users` serves one page, so a client-side sort ordered
+ * only the rows already fetched while presenting itself as a total order. It
+ * comes back with the query endpoint that can sort the whole set (ADR 031).
+ */
+function HeadCell({ children }: { children: ReactNode }) {
   // Figma header labels use the display face (`font-serif` → APK Futural),
   // uppercase 12px with 0.96px tracking, inset by a ghost-button (h-9, px-2.5).
-  const label = (
-    <span className="text-muted-foreground inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 py-2 font-serif text-xs tracking-[0.96px] uppercase">
-      {children}
-      {sortable && <ArrowUpDown className="size-4" aria-hidden />}
-    </span>
-  );
   return (
-    <TableHead className="h-14 px-2 align-middle" aria-sort={sortable ? ariaSort : undefined}>
-      {sortable ? (
-        <button type="button" onClick={onSort} className="hover:[&>span]:text-foreground">
-          {label}
-        </button>
-      ) : (
-        label
-      )}
+    <TableHead className="h-14 px-2 align-middle">
+      <span className="text-muted-foreground inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 py-2 font-serif text-xs tracking-[0.96px] uppercase">
+        {children}
+      </span>
     </TableHead>
   );
 }
 
-function RowActions({ name }: { name: string }) {
+/**
+ * The row menu carries only actions that reach the API.
+ *
+ * The design's fuller menu is not buildable yet, and the entries were rendering
+ * as live controls that did nothing:
+ *
+ *   - `Edit user` — no `PATCH`/`PUT /users/{user_id}` endpoint (#693)
+ *   - `Deactivate` — no `status` field and no lifecycle endpoint (#553)
+ *   - `Reset password` — `PUT /users/{user_id}/password` exists, but the screen
+ *     that would collect the new password does not; the menu item alone had
+ *     nothing behind it
+ *
+ * They are left out rather than disabled so the menu is a list of things that
+ * work. Add each one back with the change that makes it real.
+ */
+function RowActions({
+  userId,
+  name,
+  onDeleted,
+}: {
+  userId: string;
+  name: string;
+  onDeleted: () => void | Promise<void>;
+}) {
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={`Actions for ${name}`}>
-          <MoreVertical aria-hidden />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
-        <DropdownMenuItem>View details</DropdownMenuItem>
-        <DropdownMenuItem>Edit user</DropdownMenuItem>
-        <DropdownMenuItem>Reset password</DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive">Deactivate</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" aria-label={`Actions for ${name}`}>
+            <MoreVertical aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuItem asChild>
+            <Link to="/users/$userId" params={{ userId }}>
+              View details
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" onSelect={() => setDeleteOpen(true)}>
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {/* Outside the menu, and opened by state rather than a trigger, so the
+          menu closes on select. Nested inside, the still-open menu keeps the
+          rest of the page `aria-hidden` after the dialog is dismissed. */}
+      <DeleteUserDialog
+        userId={userId}
+        name={name}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onDeleted={onDeleted}
+      />
+    </>
   );
 }
 
