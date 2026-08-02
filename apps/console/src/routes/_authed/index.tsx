@@ -34,7 +34,7 @@ function Home() {
   return (
     <ComingSoon
       title="Home"
-      description="The overview screen needs aggregate counts and a multi-project list, neither of which the API exposes yet. Users, Sessions and Projects show real data today."
+      description="The overview screen needs aggregate counts and a multi-project list, neither of which the API exposes yet. Users is the screen that has been designed and built."
       icon={LayoutDashboard}
     />
   );
