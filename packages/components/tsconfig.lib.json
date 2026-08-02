@@ -2,13 +2,19 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist",
-    "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo",
+    "outDir": "out-tsc/lib",
+    "tsBuildInfoFile": "out-tsc/lib/tsconfig.lib.tsbuildinfo",
     "emitDeclarationOnly": false,
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "lib": ["ES2022", "dom", "DOM.Iterable"],
-    "types": ["node"],
+    "lib": [
+      "ES2022",
+      "dom",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "node"
+    ],
     "experimentalDecorators": true,
     "plugins": [
       {
@@ -16,8 +22,15 @@
       }
     ]
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/css-inline.d.ts"],
-  "exclude": ["src/**/*.spec.ts"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.d.ts",
+    "src/css-inline.d.ts"
+  ],
+  "exclude": [
+    "src/**/*.spec.ts",
+    "src/jsx.d.ts"
+  ],
   "references": [
     {
       "path": "../shared-component-styles/tsconfig.lib.json"
