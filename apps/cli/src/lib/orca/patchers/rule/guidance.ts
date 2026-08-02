@@ -61,6 +61,12 @@ export function agentsGuidanceSection(ctx: PatchContext): string {
     ctx.preset === "passkey-first"
       ? " Agents: automated browsers can't complete passkey ceremonies — verify the loop via the email/password fallback actions, or attach a CDP WebAuthn virtual authenticator."
       : "";
+  // JSX typing is a Next/React concern; other frameworks type the elements
+  // through their own SDK wrappers, so the pointer would be misleading there.
+  const jsxTypesNote =
+    ctx.framework.id === "next"
+      ? " React JSX types for the `<zitadel-*>` elements ship with the SDK — `custom-elements.d.ts` references `@zitadel/sdk-next/jsx`."
+      : "";
   return `## Authentication (Zitadel)
 
 This app's login is managed by Zitadel. Local config is the source of truth; never change auth behavior by editing generated route files.
@@ -76,6 +82,8 @@ The golden path:
    - \`${plan}\`
    - \`${apply}\`
    - Agents: append \`--non-interactive --json\` to both. \`plan\` validates flow invariants with the server's own rules **before** anything uploads — fix what it reports and re-run.
+
+Presentation, by contrast, is edited in the generated pages: they pin the sign-in widgets to \`variant="page"\` (full-page chrome); switch to \`variant="widget"\` to embed a card inside your own layout, and set \`theme\` (\`light\` | \`dark\` | \`auto\`) to pick the color scheme.${jsxTypesNote}
 
 Machine-readable dialect (read these before authoring flow or schema edits):
 

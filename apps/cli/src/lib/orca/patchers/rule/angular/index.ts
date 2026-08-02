@@ -63,14 +63,29 @@ export class AngularPatcher extends AbstractRulePatcher {
         contents: appComponentTemplate(ctx.project.id),
       },
       { kind: "write", path: "src/app/app.html", contents: appTemplateHtml() },
-      { kind: "edit", path: "src/app/app.routes.ts", edit: angularRoutesEdit() },
+      {
+        kind: "edit",
+        path: "src/app/app.routes.ts",
+        edit: angularRoutesEdit(),
+        // Without the auth routes the router bounces /login back to /.
+        wiring: "infrastructure",
+      },
       { kind: "write", path: "proxy.conf.cjs", contents: proxyConfTemplate() },
       {
         kind: "edit",
         path: "angular.json",
         edit: angularProxyEdit({ proxyConfig: "proxy.conf.cjs", port: ctx.framework.devPort }),
+        // The serve target's proxyConfig is what attaches proxy.conf.cjs —
+        // without it the proxy file is inert and auth requests fail.
+        wiring: "infrastructure",
       },
-      { kind: "edit", path: "package.json", edit: ensureDevScript },
+      {
+        kind: "edit",
+        path: "package.json",
+        edit: ensureDevScript,
+        // Golden-path convenience (`npm run dev`); its absence only warns.
+        wiring: "convenience",
+      },
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
@@ -81,6 +96,12 @@ export class AngularPatcher extends AbstractRulePatcher {
 
   protected routeFiles(_view: PatchView): ReadonlyArray<string> {
     return ["src/app/app.ts", "src/app/app.html", "proxy.conf.cjs"];
+  }
+
+  protected override infrastructureFiles(_view: PatchView): ReadonlyArray<string> {
+    // The dev proxy is the auth request path (it also attaches the project
+    // secret); the root component pair is the user's customization surface.
+    return ["proxy.conf.cjs"];
   }
 
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {

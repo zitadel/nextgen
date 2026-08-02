@@ -99,8 +99,11 @@ the CLI's help layer, not the envelope.
   recorded in `zitadel.json`), `--use-case minimal|consumer|business` (which
   profile fields the scaffolded schema collects: `minimal` is the default —
   email only; `consumer` adds given and family name; `business` also adds a
-  `companyName` attribute; asked before `--preset` and recorded in
-  `zitadel.json`), `--skip-install`.
+  `companyName` attribute and — on Next scaffolds — overlays work-email copy
+  on the generated auth pages via the SDK's `businessLocales` (other
+  frameworks keep the neutral copy until their SDK packages re-export the
+  overlay); asked before `--preset` and recorded in `zitadel.json`),
+  `--skip-install`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
@@ -108,9 +111,24 @@ the CLI's help layer, not the envelope.
   per revision (newest first); interactive adds a picker that fetches and
   pretty-prints the selected revision body.
 - `doctor` — verify generated app files and local state once `zitadel.json`
-  exists. The default local runtime is the `@zitadel/server` npm binary;
-  Docker checks apply only when using `--runtime docker` or `--image`.
-  `--fix` re-applies missing managed files.
+  exists. The `managed-files` check compares the scaffolded app files against
+  the manifest setup recorded in `.zitadel/state.json`: a missing
+  infrastructure file (the request boundary, `custom-elements.d.ts`) fails,
+  a missing generated page warns, and files you edited (marker kept) or
+  replaced (marker removed) pass as `edited`/`adopted`. It also verifies the
+  managed config wirings (Vite/Nuxt proxy merges, Angular's `angular.json`
+  proxy and auth routes) through the patchers' idempotent transforms — a
+  detached or missing wiring config fails, an unverifiable one warns, and
+  `--fix` re-applies it. Boundary migrations converge: a pristine leftover
+  `middleware.ts` from a Next 15→16 upgrade is swapped for `proxy.ts`, while
+  an edited one is reported as a conflict instead of creating both (Next
+  rejects the pair). The default local
+  runtime is the `@zitadel/server` npm binary; Docker checks apply only when
+  using `--runtime docker` or `--image`. `--fix` restores missing managed
+  files and never replaces an existing scaffolded app file; additive repairs
+  (missing `.gitignore` entries, `.env.example` keys) still append to their
+  targets, and the SDK dependency is re-added only when absent — an existing
+  version pin is never rewritten.
 - `status` — summarize the local runtime and project state.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.

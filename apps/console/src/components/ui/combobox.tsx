@@ -221,7 +221,7 @@ export function ComboboxContent({
     <PopoverContent align="start" className={LIST}>
       <Command
         onPointerMove={() => setNavigating(true)}
-        onKeyDown={(event) => {
+        onKeyDown={(event: React.KeyboardEvent) => {
           if (event.key.startsWith("Arrow")) setNavigating(true)
         }}
       >

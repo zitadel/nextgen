@@ -33,6 +33,7 @@ import {
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
+import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import {
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
@@ -337,6 +338,28 @@ export default class Setup extends BaseCommand {
       step: "files_patched",
       files_written_count: allFilesWritten.length,
     });
+
+    if (!dryRun) {
+      // Record what was actually scaffolded so `doctor` can later verify the
+      // app files without guessing from current templates (missing vs edited
+      // vs user-adopted) and `doctor --fix` can restore exactly the missing
+      // ones. Best-effort: a failure here only degrades doctor to its
+      // template-derived fallback, it never breaks setup.
+      try {
+        await writeScaffoldManifest({
+          cwd,
+          actions: orca.patcherFor(framework.id).artifacts({
+            framework,
+            rendererId: ctx.rendererId,
+          }),
+          written: [...result.filesWritten, ...result.filesSkipped],
+          scaffoldedFramework,
+          devPort: answers.devPort,
+        });
+      } catch (error) {
+        consola.debug("Failed to record the scaffold manifest", error);
+      }
+    }
 
     const installOutcome = await installDependenciesForSetup({
       cliVersion: this.meta.cliVersion,

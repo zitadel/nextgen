@@ -45,6 +45,8 @@ describe("NuxtPatcher.plan", () => {
     expect(writeContents(plan, "app/pages/login.vue")).toContain("color-scheme: dark");
     expect(writeContents(plan, "app/pages/login.vue")).not.toContain("background: #f3f4f6");
     expect(writeContents(plan, "app/pages/login.vue")).not.toContain("align-items: center");
+    // The embedding alternative is named where a developer will see it.
+    expect(writeContents(plan, "app/pages/login.vue")).toContain('variant="widget"');
     expect(writeContents(plan, "app/plugins/auth.server.ts")).toContain(MANAGED_MARKER);
     const edit = plan.ops.find(
       (op): op is Extract<FileOp, { kind: "edit" }> =>
@@ -52,6 +54,18 @@ describe("NuxtPatcher.plan", () => {
     );
     // nuxt.config stays at the project root, not under app/.
     expect(edit?.path).toContain("nuxt.config.ts");
+  });
+
+  it("leaves profile page chrome to the session card's page surface", () => {
+    const plan = new NuxtPatcher().plan(ctx("app"));
+    const profile = writeContents(plan, "app/pages/profile.vue");
+    expect(profile).toContain('variant="page"');
+    // The card paints its own full-page chrome from design tokens — no
+    // duplicated token hex or forced viewport height in generated markup.
+    expect(profile).not.toContain("#0f0f11");
+    expect(profile).not.toContain("min-height: 100vh");
+    expect(profile).toContain("color-scheme: dark");
+    expect(profile).toContain('variant="widget"');
   });
 
   it("writes at the root for a Nuxt 3 project (appDir '.')", () => {
