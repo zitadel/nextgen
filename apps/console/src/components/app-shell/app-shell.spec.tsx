@@ -18,23 +18,17 @@ vi.mock("@/auth/session", async (importOriginal) => {
 
 
 /**
- * The sidebar reproduces the Figma `Sidebar 08.` mock: a flat list of 7 items.
- * Built screens come from `staticData.nav` on the route tree (Console ADR 0001)
- * and render as links; the remaining design-only entries (screens not built yet)
- * come from `DESIGN_ONLY_NAV` and render as non-navigable items so the sidebar
- * matches the design pixel-for-pixel. Also covers the theme toggle writing
- * `data-theme` + persisting the preference.
+ * The sidebar lists only screens that exist. Entries come from `staticData.nav`
+ * on the route tree (Console ADR 0001) and every one is a link.
+ *
+ * It used to render the Figma mock's full 7 items, with the 4 unbuilt ones as
+ * `aria-disabled` rows. That is what this spec now guards against: a disabled
+ * row advertises a feature and reads as "you cannot do this" rather than "this
+ * does not exist". Also covers the theme toggle writing `data-theme` and
+ * persisting the preference.
  */
-const NAV_ORDER = [
-  "Projects",
-  "Users",
-  "App groups",
-  "Applications",
-  "Analytics",
-  "Sessions",
-  "Activity Log",
-];
-const BUILT_ITEMS = ["Projects", "Users", "Sessions"];
+const NAV_ORDER = ["Projects", "Users", "Sessions"];
+const NEVER_SHOWN = ["App groups", "Applications", "Analytics", "Activity Log"];
 
 // A path pattern rather than an absolute URL: this spec imports the router
 // statically, so `api/zitadel.ts` evaluates its base URL before `vi.stubEnv`
@@ -54,7 +48,7 @@ function renderShell() {
 }
 
 describe("app shell navigation", () => {
-  it("renders the 7 design items in order, linking only the built screens", async () => {
+  it("lists only built screens, every one of them a link", async () => {
     renderShell();
     await screen.findByRole("link", { name: /^Projects/ });
     const nav = within(screen.getByRole("navigation", { name: "Primary" }));
@@ -62,16 +56,19 @@ describe("app shell navigation", () => {
     const items = nav.getAllByRole("listitem");
     expect(items.map((li) => li.textContent?.trim())).toEqual(NAV_ORDER);
 
-    for (const label of BUILT_ITEMS) {
-      expect(nav.getByRole("link", { name: new RegExp(`^${label}`) })).toBeInTheDocument();
-    }
-    // Built rows are links; design-only rows are focusable buttons marked
-    // aria-disabled (the logo is a separate Home link outside the list).
+    // Every row navigates somewhere (the logo is a separate Home link outside
+    // the list), so there is no row that looks like a destination but is not.
     const linkedRows = items.filter((li) => within(li).queryByRole("link"));
-    expect(linkedRows).toHaveLength(BUILT_ITEMS.length);
-    const designOnly = NAV_ORDER.filter((label) => !BUILT_ITEMS.includes(label));
-    for (const label of designOnly) {
-      expect(nav.getByRole("button", { name: label })).toHaveAttribute("aria-disabled", "true");
+    expect(linkedRows).toHaveLength(NAV_ORDER.length);
+  });
+
+  it("does not advertise screens that have no endpoint behind them", async () => {
+    renderShell();
+    await screen.findByRole("link", { name: /^Projects/ });
+    const nav = within(screen.getByRole("navigation", { name: "Primary" }));
+
+    for (const label of NEVER_SHOWN) {
+      expect(nav.queryByText(label)).not.toBeInTheDocument();
     }
   });
 });
