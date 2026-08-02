@@ -40,7 +40,7 @@ Three facts shape the options:
 - **Greenfield:** the server currently has no SMTP client, no notification
   module, and no flow step that sends email. Nothing needs retrofitting —
   this is the cheapest moment to fix the contract.
-- **The kit's seed principle** (see `packages/testing/AGENTS.md`): every kit
+- **The kit's seed principle** (see `packages/testing/AGENTS.md`, added by #709): every kit
   operation must stay meaningful against a remote dev instance
   (`connectZitadel`), not only a locally-booted one. A capture story that
   only works when the test controls the instance's network (an SMTP sink
