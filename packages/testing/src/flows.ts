@@ -77,10 +77,12 @@ function widgetRoot(page: Page): Locator {
 
 /**
  * Escape a value for use inside a double-quoted CSS attribute selector,
- * per the CSSOM "serialize a string" rules: NUL becomes U+FFFD, other
- * control characters become hex code-point escapes, quote and backslash
- * are backslash-escaped. Anything the flow schema accepts as an action
- * name yields a parseable selector.
+ * per the CSSOM "serialize a string" rules: NUL becomes U+FFFD, control
+ * characters become hex code-point escapes, quote and backslash are
+ * backslash-escaped. C1 controls (U+0080–U+009F) are escaped too — CSSOM
+ * itself leaves them literal, but the escaped form is equivalent and
+ * survives stricter-than-spec selector parsers. Anything the flow schema
+ * accepts as an action name yields a parseable selector.
  */
 function cssAttributeValue(value: string): string {
   let out = "";
@@ -88,7 +90,7 @@ function cssAttributeValue(value: string): string {
     const code = ch.codePointAt(0) ?? 0;
     if (code === 0) {
       out += "�";
-    } else if (code <= 0x1f || code === 0x7f) {
+    } else if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) {
       out += `\\${code.toString(16)} `;
     } else if (ch === '"' || ch === "\\") {
       out += `\\${ch}`;
