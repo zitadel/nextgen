@@ -513,12 +513,13 @@ describe("Next setup integration", () => {
     ]);
     expect(setup.exitCode).toBe(0);
 
-    // The overlay ships with the SDK; the generated pages wire it up so the
-    // widget shows work-email wording while its built-in copy stays neutral.
+    // The overlay ships with the SDK; the generated pages wire it up (via the
+    // ref — React 18 safe) so the widget shows work-email wording while its
+    // built-in copy stays neutral.
     const loginPage = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
-    expect(loginPage).toContain("locales={businessLocales}");
+    expect(loginPage).toContain("element.locales = businessLocales");
     const registerPage = await readFile(join(cwd, "app/register/page.tsx"), "utf8");
-    expect(registerPage).toContain("locales={businessLocales}");
+    expect(registerPage).toContain("element.locales = businessLocales");
     // The choice is recorded so later tooling can regenerate the same markup.
     const zitadelJson = JSON.parse(await readFile(join(cwd, "zitadel.json"), "utf8")) as {
       useCase?: string;
@@ -537,7 +538,7 @@ describe("Next setup integration", () => {
     });
     expect(fix.exitCode).toBe(0);
     const restored = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
-    expect(restored).toContain("locales={businessLocales}");
+    expect(restored).toContain("element.locales = businessLocales");
   });
 
   it("catches server-side flow invariants at plan time, before any mutation", async () => {

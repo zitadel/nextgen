@@ -26,7 +26,12 @@ import type { RendererSpec } from "../types";
  *
  * Projects set up with the business use case additionally wire the SDK's
  * `businessLocales` overlay onto the auth pages, restoring work-email copy on
- * top of the widget's neutral built-in dictionaries.
+ * top of the widget's neutral built-in dictionaries. The overlay is assigned
+ * via a ref callback, not a JSX prop: sdk-next supports React >=18, and only
+ * React 19 binds non-primitive custom-element props as properties — on 18 a
+ * `locales={...}` prop would decay to a useless attribute and silently keep
+ * the neutral copy (the `project` prop tolerates this because
+ * `configureZitadel()` registers a global fallback; `locales` has none).
  */
 export const reactRenderer: RendererSpec = {
   id: "react",
@@ -46,10 +51,19 @@ export const reactRenderer: RendererSpec = {
       const localesComment = business
         ? `
       // Set up for a business audience: businessLocales overlays work-email
-      // copy on the widget's neutral built-in dictionaries. Drop the locales
-      // prop to fall back to the neutral wording.`
+      // copy on the widget's neutral built-in dictionaries. It is assigned
+      // through the ref because React binds non-primitive custom-element
+      // props as properties only from v19 — the ref works on React 18 too.
+      // Remove the assignment to fall back to the neutral wording.`
         : "";
-      const localesAttr = business ? `\n          locales={businessLocales}` : "";
+      const localesAttr = business
+        ? `
+          ref={(element) => {
+            if (element) {
+              element.locales = businessLocales;
+            }
+          }}`
+        : "";
       return {
         mode,
         contents: `${MANAGED_MARKER}

@@ -82,9 +82,12 @@ describe("NextPatcher.plan", () => {
     for (const path of ["app/login/page.tsx", "app/register/page.tsx"]) {
       const page = writeContents(plan, path);
       // The overlay ships with the SDK: the page pulls it from the client
-      // entry it already imports and passes it as the locales property.
+      // entry it already imports and assigns it through the ref — a JSX
+      // locales prop would decay to an attribute on React 18 (sdk-next's
+      // floor) and silently keep the neutral copy.
       expect(page).toContain("businessLocales, configureZitadel");
-      expect(page).toContain("locales={businessLocales}");
+      expect(page).toContain("element.locales = businessLocales");
+      expect(page).not.toContain("locales={businessLocales}");
     }
     // Consumer scaffolds keep the neutral built-ins, like minimal ones.
     const consumer = new NextPatcher().plan({ ...ctxFor("app"), useCase: "consumer" });
