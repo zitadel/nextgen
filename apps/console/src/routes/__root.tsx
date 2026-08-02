@@ -18,8 +18,11 @@ function RootComponent() {
     <>
       <Outlet />
       {import.meta.env.DEV && import.meta.env.MODE !== "test" && (
+        // Bottom-left: right-anchored surfaces (the Add user drawer, and any
+        // sheet after it) put their primary action in the bottom-right corner,
+        // where the launcher badge sat directly on top of it.
         <TanStackDevtools
-          config={{ position: "bottom-right" }}
+          config={{ position: "bottom-left" }}
           plugins={[{ name: "TanStack Router", render: <TanStackRouterDevtoolsPanel /> }]}
         />
       )}

@@ -113,12 +113,11 @@ func TestFlowAuthAttemptAdapter_SubmitIdentifier_HappyPath(t *testing.T) {
 
 	assert.Equal(t, "proj-1", fake.issueIn.ProjectID)
 	assert.Equal(t, "att-1", fake.issueIn.AttemptID)
-	_, isUserChallenge := fake.issueIn.Challenge.(service.UserChallenge)
-	assert.True(t, isUserChallenge, "expected a UserChallenge")
+	assert.IsType(t, service.UserChallenge{}, fake.issueIn.Challenge, "expected a UserChallenge")
 
 	require.Equal(t, "ch-user", fake.verifyIn.ChallengeID)
-	proof, ok := fake.verifyIn.Proof.(service.UserProof)
-	require.True(t, ok, "expected a UserProof")
+	require.IsType(t, service.UserProof{}, fake.verifyIn.Proof, "expected a UserProof")
+	proof := fake.verifyIn.Proof.(service.UserProof)
 	assert.Equal(t, "email", proof.AttributeName)
 	assert.Equal(t, "alice@example.com", proof.LoginName)
 }
@@ -153,12 +152,11 @@ func TestFlowAuthAttemptAdapter_SubmitPassword_HappyPath(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, isPasswordChallenge := fake.issueIn.Challenge.(service.PasswordChallenge)
-	assert.True(t, isPasswordChallenge, "expected a PasswordChallenge")
+	assert.IsType(t, service.PasswordChallenge{}, fake.issueIn.Challenge, "expected a PasswordChallenge")
 
 	require.Equal(t, "ch-pw", fake.verifyIn.ChallengeID)
-	proof, ok := fake.verifyIn.Proof.(service.PasswordProof)
-	require.True(t, ok, "expected a PasswordProof")
+	require.IsType(t, service.PasswordProof{}, fake.verifyIn.Proof, "expected a PasswordProof")
+	proof := fake.verifyIn.Proof.(service.PasswordProof)
 	assert.Equal(t, "correct-horse-battery-staple", proof.Password)
 }
 
