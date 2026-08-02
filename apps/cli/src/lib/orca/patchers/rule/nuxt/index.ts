@@ -52,6 +52,8 @@ export class NuxtPatcher extends AbstractRulePatcher {
         kind: "edit",
         path: [...NUXT_CONFIG_PATHS],
         edit: nuxtConfigEdit({ projectId: ctx.project.id, server: ctx.server }),
+        // Runtime config + proxy wiring: auth breaks without it.
+        wiring: "infrastructure",
       },
       { kind: "merge-env", path: ".env.example", entries: { NUXT_PUBLIC_ZITADEL_PROJECT_ID: "" } },
       {
@@ -78,6 +80,14 @@ export class NuxtPatcher extends AbstractRulePatcher {
       src("plugins/zitadel-components.client.ts"),
       src("plugins/auth.server.ts"),
     ];
+  }
+
+  protected override infrastructureFiles(view: PatchView): ReadonlyArray<string> {
+    const src = (rel: string) => join(view.framework.appDir, rel);
+    // The plugins are the auth plumbing: component registration on the
+    // client and the server-side auth/session hook. The pages and app shell
+    // are the user's customization surface.
+    return [src("plugins/zitadel-components.client.ts"), src("plugins/auth.server.ts")];
   }
 
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {
