@@ -47,7 +47,7 @@ Users/teams/projects are resources; schemas are configuration, not resources —
 
 <!-- New decision: copy this, bump the ID.
 
-### D7 · <decision> — YYYY-MM-DD
+### D8 · <decision> — YYYY-MM-DD
 <one line on why>
 → <next step, who>
 
