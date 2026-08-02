@@ -2,6 +2,7 @@ import { test as base, type Page } from "@playwright/test";
 
 import { readHandshakeSync } from "./handshake";
 import { connectZitadel } from "./index";
+import { enableVirtualPasskey, type VirtualPasskey } from "./passkey";
 import type {
   ConnectedZitadel,
   Identity,
@@ -36,6 +37,12 @@ export interface ZitadelTestFixtures {
    * `use.baseURL` (every withZitadel consumer sets it).
    */
   authenticatedPage: AuthenticatedPage;
+  /**
+   * Virtual passkey authenticator attached to the default `page`, disposed on
+   * teardown. On-demand: tests that don't request it pay nothing. Chromium
+   * only — see `enableVirtualPasskey` for the constraints.
+   */
+  passkey: VirtualPasskey;
 }
 
 export interface ZitadelWorkerFixtures {
@@ -69,6 +76,11 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
       session: (input) => zitadel.seedSession({ origin: baseURL, ...input }),
     });
   },
+  passkey: async ({ page }, use) => {
+    const passkey = await enableVirtualPasskey(page);
+    await use(passkey);
+    await passkey.dispose();
+  },
   authenticatedPage: async ({ browser, zitadel, baseURL }, use) => {
     if (!baseURL) {
       throw new Error(
@@ -90,6 +102,8 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
 export { expect } from "@playwright/test";
 export { applyAppEnvTemplate, nextAppEnv } from "./app-env";
 export type { AppEnvTemplate } from "./app-env";
+export { enableVirtualPasskey } from "./passkey";
+export type { VirtualPasskey } from "./passkey";
 export { withZitadel } from "./playwright-config";
 export type { WithZitadelOptions } from "./playwright-config";
 export type {
