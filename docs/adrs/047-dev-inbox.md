@@ -1,4 +1,4 @@
-# ADR 046: The Dev Inbox — Captured Outbound Messages
+# ADR 047: The Dev Inbox — Captured Outbound Messages
 
 > **Status:** Proposed
 > **Date:** 2026-08-02

@@ -19,6 +19,7 @@ import {
 } from "../../../../src/commands/doctor/checks";
 import { loadPatchContext } from "../../../../src/commands/doctor/patch-context";
 import { createOrca } from "../../../../src/lib/orca";
+import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angular/templates";
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
 import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
 import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
@@ -161,7 +162,7 @@ async function makeAngularProject(): Promise<string> {
   );
   await writeFile(join(cwd, "src/app/app.ts"), `${MANAGED_MARKER}\nexport class App {}\n`);
   await writeFile(join(cwd, "src/app/app.html"), `<!-- ${MANAGED_MARKER} -->\n<main></main>\n`);
-  await writeFile(join(cwd, "proxy.conf.cjs"), `${MANAGED_MARKER}\nmodule.exports = {};\n`);
+  await writeFile(join(cwd, "proxy.conf.cjs"), proxyConfTemplate());
   return cwd;
 }
 
@@ -674,6 +675,37 @@ describe("ManagedFilesCheck", () => {
     expect(outcome.status).toBe("warn");
     expect(outcome.message).toContain("unverifiable managed config wiring");
     expect(outcome.message).toContain("angular.json");
+  });
+
+  it("warns when an unrecognized legacy proxy may still over-forward the project secret", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    const unsafe = (await readFile(proxyPath, "utf8")).replace(
+      `/* zitadel:proxy:v2 */
+function setBearer(proxyReq) {
+  const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
+  if (
+    proxyReq.method === "POST" &&
+    pathname === "/sessions/exchange" &&
+    !proxyReq.getHeader("authorization")
+  ) {
+    proxyReq.setHeader("authorization", bearer);
+  }
+}`,
+      `function setBearer(proxyReq) {
+  proxyReq
+    .setHeader("authorization", bearer);
+}`,
+    );
+    await writeFile(proxyPath, unsafe);
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("proxy.conf.cjs");
+    expect(outcome.message).toContain(
+      "may forward ZITADEL_PROJECT_SECRET outside POST /sessions/exchange",
+    );
   });
 
   it("migrates a pristine retired boundary: --fix removes middleware.ts and installs proxy.ts", async () => {

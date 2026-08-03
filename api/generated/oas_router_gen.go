@@ -107,7 +107,8 @@ var (
 		"POST": "Authorization,Content-Type",
 	}
 	rn46AllowedHeaders = map[string]string{
-		"GET": "Authorization",
+		"GET":   "Authorization",
+		"PATCH": "Authorization,Content-Type",
 	}
 	rn21AllowedHeaders = map[string]string{
 		"GET":  "Authorization",
@@ -1373,12 +1374,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							s.handleGetTeamRequest([1]string{
 								args[0],
 							}, elemIsEscaped, w, r)
+						case "PATCH":
+							s.handleUpdateTeamRequest([1]string{
+								args[0],
+							}, elemIsEscaped, w, r)
 						default:
 							s.notAllowed(w, r, notAllowedParams{
-								allowedMethods: "GET",
+								allowedMethods: "GET,PATCH",
 								allowedHeaders: rn46AllowedHeaders,
 								acceptPost:     "",
-								acceptPatch:    "",
+								acceptPatch:    "application/json",
 							})
 						}
 
@@ -2878,6 +2883,15 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 							r.name = GetTeamOperation
 							r.summary = "Get team"
 							r.operationID = "getTeam"
+							r.operationGroup = ""
+							r.pathPattern = "/teams/{team_id}"
+							r.args = args
+							r.count = 1
+							return r, true
+						case "PATCH":
+							r.name = UpdateTeamOperation
+							r.summary = "Update team"
+							r.operationID = "updateTeam"
 							r.operationGroup = ""
 							r.pathPattern = "/teams/{team_id}"
 							r.args = args

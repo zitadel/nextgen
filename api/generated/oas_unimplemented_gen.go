@@ -149,8 +149,15 @@ func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaRe
 // - Pre-allocate a `session_id` before the user is known, so device/telemetry signals
 // can be correlated with the eventual authenticated session from the start.
 // - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
-// The returned `session_token` authorises GET and DELETE on this session.
-// It is superseded when a handoff exchange completes — clients must replace it at that point.
+// Creating a session is an app-plane operation on the project credential
+// (`session.write`). The returned `session_token` is a session credential for the
+// end-user client, not a management scope: it is delivered as the
+// `__nextgen_session` cookie and authorises the self-service operations
+// `GET /sessions/me` and `DELETE /sessions/me` (`nextgenSession` scheme). The
+// by-id operations `GET /sessions/{session_id}` and `DELETE /sessions/{session_id}`
+// are operator endpoints and require `session.read` / `session.delete` instead.
+// The `session_token` is superseded when a handoff exchange completes — clients must
+// replace it at that point.
 // Anonymous sessions expire aggressively (10-minute TTL). The TTL resets to the configured
 // full session TTL when the first authentication factor is written via a completing `auth_attempt`.
 //
@@ -384,7 +391,7 @@ func (UnimplementedHandler) GetSession(ctx context.Context, params GetSessionPar
 
 // GetTeam implements getTeam operation.
 //
-// Returns the current state of a team.
+// Returns a Team by its id.
 //
 // GET /teams/{team_id}
 func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (r GetTeamRes, _ error) {
@@ -609,6 +616,15 @@ func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitR
 //
 // PUT /flow_definitions/{id}
 func (UnimplementedHandler) UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (r UpdateFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// UpdateTeam implements updateTeam operation.
+//
+// Update team. Only active teams can be updated.
+//
+// PATCH /teams/{team_id}
+func (UnimplementedHandler) UpdateTeam(ctx context.Context, req *UpdateTeamRequest, params UpdateTeamParams) (r UpdateTeamRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

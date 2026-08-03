@@ -6,7 +6,7 @@ get:
     - Flow Definitions
   security:
     - oauth2:
-        - flow_definitions.read
+        - flow_definition.read
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
     - name: project_id
@@ -39,7 +39,7 @@ put:
     - Flow Definitions
   security:
     - oauth2:
-        - flow_definitions.write
+        - flow_definition.write
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
     - name: project_id
@@ -91,7 +91,7 @@ delete:
     - Flow Definitions
   security:
     - oauth2:
-        - flow_definitions.delete
+        - flow_definition.delete
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
     - name: project_id

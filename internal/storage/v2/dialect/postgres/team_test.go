@@ -149,6 +149,101 @@ func TestTeamStatements_Get(t *testing.T) {
 	})
 }
 
+func TestTeamStatements_UpdateTeam(t *testing.T) {
+	t.Run("updates team", func(t *testing.T) {
+		projectID, teamID := uniqueTeamIDs(t)
+		ensureTestProject(t, projectID)
+		team := newTestTeam(projectID, teamID)
+		require.NoError(t, testPool.CreateTeam(t.Context(), team))
+		createdAt, updatedAt := team.CreatedAt, team.UpdatedAt
+
+		team.Name = "updated name"
+		require.NoError(t, testPool.UpdateTeam(t.Context(), team))
+		assert.Equal(t, "updated name", team.Name)
+		assert.Equal(t, projectID, team.ProjectID)
+		assert.Equal(t, teamID, team.ID)
+		assert.Equal(t, domain.TeamStatusActive, team.Status)
+		assert.Equal(t, createdAt, team.CreatedAt)
+		assert.True(t, team.UpdatedAt.After(updatedAt))
+	})
+
+	t.Run("team not found returns NoRowFoundError", func(t *testing.T) {
+		projectID, _ := uniqueTeamIDs(t)
+		ensureTestProject(t, projectID)
+		team := newTestTeam(projectID, "nonexistent")
+		assert.ErrorIs(t,
+			testPool.UpdateTeam(t.Context(), team),
+			new(database.NoRowFoundError),
+		)
+	})
+
+	t.Run("deactivated team returns NoRowFoundError", func(t *testing.T) {
+		projectID, teamID := uniqueTeamIDs(t)
+		ensureTestProject(t, projectID)
+		team := newTestTeam(projectID, teamID)
+		require.NoError(t, testPool.CreateTeam(t.Context(), team))
+		require.NoError(t, testPool.DeactivateTeam(t.Context(), projectID, teamID))
+
+		team.Name = "updated name"
+		assert.ErrorIs(t,
+			testPool.UpdateTeam(t.Context(), team),
+			new(database.NoRowFoundError),
+		)
+	})
+
+	t.Run("name violates uniqueness constraint", func(t *testing.T) {
+		projectID, teamID := uniqueTeamIDs(t)
+		ensureTestProject(t, projectID)
+		team := newTestTeam(projectID, teamID)
+		require.NoError(t, testPool.CreateTeam(t.Context(), team))
+
+		taken := newTestTeam(projectID, teamID+"-taken")
+		require.NoError(t, testPool.CreateTeam(t.Context(), taken))
+
+		team.Name = taken.Name
+		assert.ErrorIs(t,
+			testPool.UpdateTeam(t.Context(), team),
+			new(database.UniqueError),
+		)
+
+		// a case-only difference still collides.
+		team.Name = strings.ToUpper(taken.Name)
+		assert.ErrorIs(t,
+			testPool.UpdateTeam(t.Context(), team),
+			new(database.UniqueError),
+		)
+	})
+
+	t.Run("unchanged name", func(t *testing.T) {
+		projectID, teamID := uniqueTeamIDs(t)
+		ensureTestProject(t, projectID)
+		team := newTestTeam(projectID, teamID)
+		require.NoError(t, testPool.CreateTeam(t.Context(), team))
+		name := team.Name
+
+		// The row already holds the name it is updated to, so the unique index
+		// must not read it as a collision.
+		require.NoError(t, testPool.UpdateTeam(t.Context(), team))
+		assert.Equal(t, name, team.Name)
+	})
+
+	t.Run("same name in another project", func(t *testing.T) {
+		projectID, teamID := uniqueTeamIDs(t)
+		ensureTestProject(t, projectID)
+		team := newTestTeam(projectID, teamID)
+		require.NoError(t, testPool.CreateTeam(t.Context(), team))
+
+		otherProjectID, otherTeamID := uniqueTeamIDs(t)
+		ensureTestProject(t, otherProjectID)
+		other := newTestTeam(otherProjectID, otherTeamID)
+		require.NoError(t, testPool.CreateTeam(t.Context(), other))
+
+		other.Name = team.Name
+		require.NoError(t, testPool.UpdateTeam(t.Context(), other))
+		assert.Equal(t, team.Name, other.Name)
+	})
+}
+
 func TestTeamStatements_Deactivate(t *testing.T) {
 	projectID, teamID := uniqueTeamIDs(t)
 	ensureTestProject(t, projectID)
