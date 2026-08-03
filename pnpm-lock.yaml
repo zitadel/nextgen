@@ -28,8 +28,8 @@ catalogs:
       specifier: ^0.6.2
       version: 0.6.2
     '@moonrepo/cli':
-      specifier: ^2.3.3
-      version: 2.3.3
+      specifier: ^2.4.6
+      version: 2.4.6
     '@mswjs/http-middleware':
       specifier: ^0.10.3
       version: 0.10.3
@@ -123,6 +123,9 @@ catalogs:
     '@types/react-dom':
       specifier: ^19.2.3
       version: 19.2.3
+    '@types/semver':
+      specifier: ^7.7.1
+      version: 7.8.0
     '@typescript/native-preview':
       specifier: 7.0.0-dev.20260421.2
       version: 7.0.0-dev.20260421.2
@@ -144,6 +147,9 @@ catalogs:
     clsx:
       specifier: ^2.1.1
       version: 2.1.1
+    cmdk:
+      specifier: ^1.1.1
+      version: 1.1.1
     cookie-parser:
       specifier: ^1.4.7
       version: 1.4.7
@@ -252,12 +258,18 @@ catalogs:
     safe-stable-stringify:
       specifier: ^2.5.0
       version: 2.5.0
+    semver:
+      specifier: ^7.7.3
+      version: 7.8.5
     sharp:
       specifier: ^0.35.3
       version: 0.35.3
     shiki:
       specifier: ^4.2.0
       version: 4.2.0
+    sonner:
+      specifier: ^2.0.7
+      version: 2.0.7
     storybook:
       specifier: ^10.3.6
       version: 10.4.6
@@ -351,7 +363,7 @@ importers:
         version: 2.31.0(@types/node@25.6.0)
       '@moonrepo/cli':
         specifier: 'catalog:'
-        version: 2.3.3
+        version: 2.4.6
       '@types/node':
         specifier: 'catalog:'
         version: 25.6.0
@@ -436,6 +448,9 @@ importers:
       safe-stable-stringify:
         specifier: 'catalog:'
         version: 2.5.0
+      semver:
+        specifier: 'catalog:'
+        version: 7.8.5
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -443,6 +458,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 25.6.0
+      '@types/semver':
+        specifier: 'catalog:'
+        version: 7.8.0
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../../packages/api-mock
@@ -467,6 +485,9 @@ importers:
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.60.0
+      '@zitadel/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
       eslint-plugin-playwright:
         specifier: 'catalog:'
         version: 2.10.2(eslint@10.2.1(jiti@2.7.0))
@@ -503,6 +524,9 @@ importers:
       clsx:
         specifier: 'catalog:'
         version: 2.1.1
+      cmdk:
+        specifier: 'catalog:'
+        version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       lucide-react:
         specifier: 'catalog:'
         version: 1.20.0(react@19.2.8)
@@ -515,6 +539,9 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.2.8(react@19.2.8)
+      sonner:
+        specifier: 'catalog:'
+        version: 2.0.7(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       tailwind-merge:
         specifier: 'catalog:'
         version: 3.6.0
@@ -1057,6 +1084,9 @@ importers:
       '@tsdown/css':
         specifier: 'catalog:'
         version: 0.21.10(jiti@2.7.0)(postcss-modules@6.0.1(postcss@8.5.25))(postcss@8.5.25)(sass@1.100.0)(tsdown@0.21.10)(tsx@4.21.0)(yaml@2.9.0)
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.14
       '@vitest/browser':
         specifier: 'catalog:'
         version: 4.1.10(msw@2.14.6(@types/node@26.1.1)(typescript@6.0.3))(vite@8.0.16(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass@1.100.0)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0))(vitest@4.1.10)
@@ -1355,9 +1385,6 @@ importers:
       prettier:
         specifier: 'catalog:'
         version: 3.8.3
-      tsup:
-        specifier: 'catalog:'
-        version: 8.5.1(@microsoft/api-extractor@7.58.9(@types/node@26.1.1))(@swc/core@1.15.8(@swc/helpers@0.5.18))(jiti@2.7.0)(postcss@8.5.25)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.9.0)
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -3685,46 +3712,46 @@ packages:
       '@cfworker/json-schema':
         optional: true
 
-  '@moonrepo/cli@2.3.3':
-    resolution: {integrity: sha512-TmHbQFJH1+vqIsXn7WpPXQtPlgwgyfWUjUBWWQCR2dj3UHg/0IGD4KDlqNg1VPmcyXnuDmlcHtqZ2bkxZx+RhQ==}
+  '@moonrepo/cli@2.4.6':
+    resolution: {integrity: sha512-HtkRuq+ACiIVP9VCjSoFb4+eAqPRm2LHP+O4w6BV3vBe1l5L0tsiqiu5kBOQXjQLY8amcg9YHRdi2eAnt9nUgA==}
     hasBin: true
 
-  '@moonrepo/core-linux-arm64-gnu@2.3.3':
-    resolution: {integrity: sha512-AzovoQPizmwGe5nLd9s0UnN/IUnol81la2vNH+U7vSyh24NzVirT1iOLEcajwtbNvJpl3aXzbhbjrXp35fKVWg==}
+  '@moonrepo/core-linux-arm64-gnu@2.4.6':
+    resolution: {integrity: sha512-0ebdsO6QphnWNIkDcr/G9utPQzWCHzvhekAf5W4F5/UlzemhFkeHgPzPMeq00IBfRBr2HKgfVrbxdT3dq2mSWQ==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@moonrepo/core-linux-arm64-musl@2.3.3':
-    resolution: {integrity: sha512-2jJLXAIUiqdFdw3hxuMefGB3DenQN/CC2mbqL44jC4uZNH6pX1mvjlguubBwUvGHfGbACjh9W9JjavpSMKY9cw==}
+  '@moonrepo/core-linux-arm64-musl@2.4.6':
+    resolution: {integrity: sha512-I92xgOYIjKud4O/R+jiw2owDRZ0ZJdNy6VKpZ+hrq7bFmw2I7mPNRUCz0f6k/Khdr0MhrpD1T320qNk4mbkUaA==}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@moonrepo/core-linux-x64-gnu@2.3.3':
-    resolution: {integrity: sha512-17WZG59QUJhw8wepo1Oe5lmh/q0ax0EQzVk7/EbRe2uBRFsN24oR+R6MyVvuEqmG71x5EFwfPbuH/R48dcRROQ==}
+  '@moonrepo/core-linux-x64-gnu@2.4.6':
+    resolution: {integrity: sha512-6ADpz7l/mVra6enk7ktfL5Mhe6m6byOGZ2UD3RO+K++sURnP72G51WcRsw5TceMyPJYQ1h/21f1F/CGf18oZ8Q==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@moonrepo/core-linux-x64-musl@2.3.3':
-    resolution: {integrity: sha512-IaE5qN/QOi85SMdhpTtwrDVmIu1MHKznQZxB+jl8dUbQj5iWKyY/DusXXNs9zRR45jBNUlyE4FhrY9rwf2SqtQ==}
+  '@moonrepo/core-linux-x64-musl@2.4.6':
+    resolution: {integrity: sha512-irQGyg4aMDNp5vBtel6bijTAujchNZjw3RJDWQtDREnd/6HHpHlq0MRhFgQvx9ddU7QaZDAsiXdF5zWgxb6Uew==}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@moonrepo/core-macos-arm64@2.3.3':
-    resolution: {integrity: sha512-UiO8QuICnxD1XglNDCjkTBwL0YOHvfcj37m5yeIrBjyvkytlWNek4Us7jqr15gbYT+z9pU02Um8k+S1p7y+BkA==}
+  '@moonrepo/core-macos-arm64@2.4.6':
+    resolution: {integrity: sha512-JOpEN4cyZK6RjrheCXS2iYUeeyi58xRcoE0pi22Q7nMqB55BHQ2VDDXas/XXA32M143IaQQrLu8+fcH0ypmeQw==}
     cpu: [arm64]
     os: [darwin]
 
-  '@moonrepo/core-macos-x64@2.3.3':
-    resolution: {integrity: sha512-FteLklMxJ4cUuZnhrt5lFsYnQMqdzMiAaTFOQDVpUkd6llgrwxIJbUMnPOFHZe4jVJCjpmacEsG7j9/Oxg7HqQ==}
+  '@moonrepo/core-macos-x64@2.4.6':
+    resolution: {integrity: sha512-6Nxlc3KRGpRleTui2a7hiDnlnA2Er3ZYUHlxbQyJottTSRVl4iroo9c0WPcPTRM0j8Kgrkk0plskkZfcTQhbCQ==}
     cpu: [x64]
     os: [darwin]
 
-  '@moonrepo/core-windows-x64-msvc@2.3.3':
-    resolution: {integrity: sha512-qxXvgnqkE4yu6m0vcgDNmRBLnxfAVXq7F7ebaHAOmj7cK0DNnQpZBaxNB3LrIuxhyFdviKVTsUT7F7CpLsVjlw==}
+  '@moonrepo/core-windows-x64-msvc@2.4.6':
+    resolution: {integrity: sha512-bIyOiXQT7Pk8hOxLPHmJTVQL1CD4ZkSmQmv/l597fgiYbC9O1AzVzMi83LfZwxf9l/Czg5RgjhXMzgCLxeGXzg==}
     cpu: [x64]
     os: [win32]
 
@@ -8062,6 +8089,9 @@ packages:
   '@types/responselike@1.0.0':
     resolution: {integrity: sha512-85Y2BjiufFzaMIlvJDvTTB8Fxl2xfLo4HgmHzVBz08w4wDePCTjYw66PdrolO0kzli3yam/YCgRufyo1DdQVTA==}
 
+  '@types/semver@7.8.0':
+    resolution: {integrity: sha512-1mAINjtQCXXeLkJ9ehXkwOcBpqtLxiVtKhpUf83DdRNdQKV0iXZpaHYqRr7nj+wvxuJzoAmAwXI+sCNMv1CzLQ==}
+
   '@types/send@0.17.6':
     resolution: {integrity: sha512-Uqt8rPBE8SY0RK8JB1EzVOIZ32uqy8HwdxCnoCOsYrvnswqmFZ/k+9Ikidlk/ImhsdvBsloHbAlewb2IEBV/Og==}
 
@@ -9440,6 +9470,12 @@ packages:
   cluster-key-slot@1.1.1:
     resolution: {integrity: sha512-rwHwUfXL40Chm1r08yrhU3qpUvdVlgkKNeyeGPOxnW8/SyVDvgRaed/Uz54AqWNaTCAThlj6QAs3TZcKI0xDEw==}
     engines: {node: '>=0.10.0'}
+
+  cmdk@1.1.1:
+    resolution: {integrity: sha512-Vsv7kFaXm+ptHDMZ7izaRsP70GgrW9NBNGswt9OZaVBLlE0SNpDq8eu/VGXyF9r7M0azK3Wy7OlYXsuyYLFzHg==}
+    peerDependencies:
+      react: ^18 || ^19 || ^19.0.0-rc
+      react-dom: ^18 || ^19 || ^19.0.0-rc
 
   code-block-writer@12.0.0:
     resolution: {integrity: sha512-q4dMFMlXtKR3XNBHyMHt/3pwYNA69EDk00lloMOaaUMKPUXBw6lpXtbu3MMVG6/uOihGnRDOlkyqsONEUj60+w==}
@@ -14187,6 +14223,12 @@ packages:
   sonic-boom@4.2.1:
     resolution: {integrity: sha512-w6AxtubXa2wTXAUsZMMWERrsIRAdrK0Sc+FUytWvYAhBJLyuI4llrMIC1DtlNSdI99EI86KZum2MMq3EAZlF9Q==}
 
+  sonner@2.0.7:
+    resolution: {integrity: sha512-W6ZN4p58k8aDKA4XPcx2hpIQXBRAgyiWVkYhT7CvK6D3iAu7xjvVyhQHg2/iaKJZ1XVJ4r7XuwGL+WGEK37i9w==}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
+      react-dom: ^18.0.0 || ^19.0.0 || ^19.0.0-rc
+
   sort-object-keys@1.1.3:
     resolution: {integrity: sha512-855pvK+VkU7PaKYPc+Jjnmt4EzejQHyhhF33q31qG8x7maDzkeFhAAThdCYay11CISO+qAMwjOBP+fPZe0IPyg==}
 
@@ -15979,7 +16021,7 @@ snapshots:
       chokidar: 5.0.0
       convert-source-map: 1.9.0
       reflect-metadata: 0.2.2
-      semver: 7.8.2
+      semver: 7.8.5
       tslib: 2.8.1
       yargs: 18.0.0
     optionalDependencies:
@@ -16609,7 +16651,7 @@ snapshots:
       outdent: 0.5.0
       prettier: 2.8.8
       resolve-from: 5.0.0
-      semver: 7.8.2
+      semver: 7.8.5
 
   '@changesets/assemble-release-plan@6.0.10':
     dependencies:
@@ -16618,7 +16660,7 @@ snapshots:
       '@changesets/should-skip-package': 0.1.2
       '@changesets/types': 6.1.0
       '@manypkg/get-packages': 1.1.3
-      semver: 7.8.2
+      semver: 7.8.5
 
   '@changesets/changelog-git@0.2.1':
     dependencies:
@@ -16683,7 +16725,7 @@ snapshots:
       '@changesets/types': 6.1.0
       '@manypkg/get-packages': 1.1.3
       picocolors: 1.1.1
-      semver: 7.8.2
+      semver: 7.8.5
 
   '@changesets/get-github-info@0.8.0(encoding@0.1.13)':
     dependencies:
@@ -18027,37 +18069,37 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@moonrepo/cli@2.3.3':
+  '@moonrepo/cli@2.4.6':
     dependencies:
       detect-libc: 2.1.2
     optionalDependencies:
-      '@moonrepo/core-linux-arm64-gnu': 2.3.3
-      '@moonrepo/core-linux-arm64-musl': 2.3.3
-      '@moonrepo/core-linux-x64-gnu': 2.3.3
-      '@moonrepo/core-linux-x64-musl': 2.3.3
-      '@moonrepo/core-macos-arm64': 2.3.3
-      '@moonrepo/core-macos-x64': 2.3.3
-      '@moonrepo/core-windows-x64-msvc': 2.3.3
+      '@moonrepo/core-linux-arm64-gnu': 2.4.6
+      '@moonrepo/core-linux-arm64-musl': 2.4.6
+      '@moonrepo/core-linux-x64-gnu': 2.4.6
+      '@moonrepo/core-linux-x64-musl': 2.4.6
+      '@moonrepo/core-macos-arm64': 2.4.6
+      '@moonrepo/core-macos-x64': 2.4.6
+      '@moonrepo/core-windows-x64-msvc': 2.4.6
 
-  '@moonrepo/core-linux-arm64-gnu@2.3.3':
+  '@moonrepo/core-linux-arm64-gnu@2.4.6':
     optional: true
 
-  '@moonrepo/core-linux-arm64-musl@2.3.3':
+  '@moonrepo/core-linux-arm64-musl@2.4.6':
     optional: true
 
-  '@moonrepo/core-linux-x64-gnu@2.3.3':
+  '@moonrepo/core-linux-x64-gnu@2.4.6':
     optional: true
 
-  '@moonrepo/core-linux-x64-musl@2.3.3':
+  '@moonrepo/core-linux-x64-musl@2.4.6':
     optional: true
 
-  '@moonrepo/core-macos-arm64@2.3.3':
+  '@moonrepo/core-macos-arm64@2.4.6':
     optional: true
 
-  '@moonrepo/core-macos-x64@2.3.3':
+  '@moonrepo/core-macos-x64@2.4.6':
     optional: true
 
-  '@moonrepo/core-windows-x64-msvc@2.3.3':
+  '@moonrepo/core-windows-x64-msvc@2.4.6':
     optional: true
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4':
@@ -18260,7 +18302,7 @@ snapshots:
       perfect-debounce: 2.1.0
       pkg-types: 2.3.1
       scule: 1.3.0
-      semver: 7.8.2
+      semver: 7.8.5
       srvx: 0.11.16
       std-env: 4.1.0
       tinyclip: 0.1.13
@@ -18294,7 +18336,7 @@ snapshots:
       magicast: 0.5.3
       pathe: 2.0.3
       pkg-types: 2.3.1
-      semver: 7.8.2
+      semver: 7.8.5
 
   '@nuxt/devtools@3.2.4(vite@8.0.16(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass@1.100.0)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0))(vue@3.5.35(typescript@5.9.3))':
     dependencies:
@@ -18321,7 +18363,7 @@ snapshots:
       pathe: 2.0.3
       perfect-debounce: 2.1.0
       pkg-types: 2.3.1
-      semver: 7.8.2
+      semver: 7.8.5
       simple-git: 3.36.0
       sirv: 3.0.2
       structured-clone-es: 2.0.0
@@ -18363,7 +18405,7 @@ snapshots:
       pkg-types: 2.3.1
       rc9: 3.0.1
       scule: 1.3.0
-      semver: 7.8.2
+      semver: 7.8.5
       tinyglobby: 0.2.17
       ufo: 1.6.4
       unctx: 2.5.0
@@ -18665,7 +18707,7 @@ snapshots:
       is-wsl: 2.2.0
       lilconfig: 3.1.3
       minimatch: 10.2.5
-      semver: 7.8.2
+      semver: 7.8.5
       string-width: 4.2.3
       supports-color: 8.1.1
       tinyglobby: 0.2.17
@@ -22295,6 +22337,8 @@ snapshots:
     dependencies:
       '@types/node': 22.19.19
 
+  '@types/semver@7.8.0': {}
+
   '@types/send@0.17.6':
     dependencies:
       '@types/mime': 1.3.5
@@ -22449,7 +22493,7 @@ snapshots:
       '@typescript-eslint/visitor-keys': 8.59.3
       debug: 4.4.3(supports-color@8.1.1)
       minimatch: 10.2.5
-      semver: 7.8.2
+      semver: 7.8.5
       tinyglobby: 0.2.17
       ts-api-utils: 2.5.0(typescript@5.9.3)
       typescript: 5.9.3
@@ -22464,7 +22508,7 @@ snapshots:
       '@typescript-eslint/visitor-keys': 8.59.3
       debug: 4.4.3(supports-color@8.1.1)
       minimatch: 10.2.5
-      semver: 7.8.2
+      semver: 7.8.5
       tinyglobby: 0.2.17
       ts-api-utils: 2.5.0(typescript@6.0.3)
       typescript: 6.0.3
@@ -24081,6 +24125,18 @@ snapshots:
 
   cluster-key-slot@1.1.1: {}
 
+  cmdk@1.1.1(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+    dependencies:
+      '@radix-ui/react-compose-refs': 1.1.3(@types/react@19.2.14)(react@19.2.8)
+      '@radix-ui/react-dialog': 1.1.20(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-id': 1.1.2(@types/react@19.2.14)(react@19.2.8)
+      '@radix-ui/react-primitive': 2.1.7(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+    transitivePeerDependencies:
+      - '@types/react'
+      - '@types/react-dom'
+
   code-block-writer@12.0.0: {}
 
   code-excerpt@4.0.0:
@@ -25008,7 +25064,7 @@ snapshots:
       postcss: 8.5.25
       postcss-load-config: 3.1.4(postcss@8.5.25)
       postcss-safe-parser: 7.0.1(postcss@8.5.25)
-      semver: 7.8.2
+      semver: 7.8.5
       svelte-eslint-parser: 1.8.0(svelte@5.56.3(@typescript-eslint/types@8.59.3))
     optionalDependencies:
       svelte: 5.56.3(@typescript-eslint/types@8.59.3)
@@ -26507,7 +26563,7 @@ snapshots:
 
   is-bun-module@2.0.0:
     dependencies:
-      semver: 7.8.2
+      semver: 7.8.5
 
   is-callable@1.2.7: {}
 
@@ -26845,7 +26901,7 @@ snapshots:
       lodash.isstring: 4.0.1
       lodash.once: 4.1.1
       ms: 2.1.3
-      semver: 7.8.2
+      semver: 7.8.5
 
   jsprim@2.0.2:
     dependencies:
@@ -28103,7 +28159,7 @@ snapshots:
       rollup: 4.60.4
       rollup-plugin-visualizer: 7.0.1(rolldown@1.0.3)(rollup@4.60.4)
       scule: 1.3.0
-      semver: 7.8.2
+      semver: 7.8.5
       serve-placeholder: 2.0.2
       serve-static: 2.2.1
       source-map: 0.7.6
@@ -28210,7 +28266,7 @@ snapshots:
   normalize-package-data@6.0.2:
     dependencies:
       hosted-git-info: 7.0.2
-      semver: 7.8.2
+      semver: 7.8.5
       validate-npm-package-license: 3.0.4
 
   normalize-path@3.0.0: {}
@@ -28276,7 +28332,7 @@ snapshots:
       pkg-types: 2.3.1
       rou3: 0.8.1
       scule: 1.3.0
-      semver: 7.8.2
+      semver: 7.8.5
       std-env: 4.1.0
       tinyglobby: 0.2.17
       ufo: 1.6.4
@@ -28405,7 +28461,7 @@ snapshots:
       pkg-types: 2.3.1
       rou3: 0.8.1
       scule: 1.3.0
-      semver: 7.8.2
+      semver: 7.8.5
       std-env: 4.1.0
       tinyglobby: 0.2.17
       ufo: 1.6.4
@@ -28571,7 +28627,7 @@ snapshots:
       got: 13.0.0
       lodash: 4.18.1
       normalize-package-data: 6.0.2
-      semver: 7.8.2
+      semver: 7.8.5
       sort-package-json: 2.15.1
       tiny-jsonc: 1.0.2
       validate-npm-package-name: 5.0.1
@@ -30526,6 +30582,11 @@ snapshots:
     dependencies:
       atomic-sleep: 1.0.0
 
+  sonner@2.0.7(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+    dependencies:
+      react: 19.2.8
+      react-dom: 19.2.8(react@19.2.8)
+
   sort-object-keys@1.1.3: {}
 
   sort-package-json@2.15.1:
@@ -30535,7 +30596,7 @@ snapshots:
       get-stdin: 9.0.0
       git-hooks-list: 3.2.0
       is-plain-obj: 4.1.0
-      semver: 7.8.2
+      semver: 7.8.5
       sort-object-keys: 1.1.3
       tinyglobby: 0.2.17
 
@@ -30630,7 +30691,7 @@ snapshots:
       oxc-parser: 0.127.0
       oxc-resolver: 11.20.0
       recast: 0.23.11
-      semver: 7.8.2
+      semver: 7.8.5
       use-sync-external-store: 1.6.0(react@19.2.8)
       ws: 8.21.0
     optionalDependencies:
@@ -30867,7 +30928,7 @@ snapshots:
       postcss: 8.5.25
       postcss-scss: 4.0.9(postcss@8.5.25)
       postcss-selector-parser: 7.1.1
-      semver: 7.8.2
+      semver: 7.8.5
     optionalDependencies:
       svelte: 5.56.3(@typescript-eslint/types@8.59.3)
 
@@ -31153,7 +31214,7 @@ snapshots:
       picomatch: 4.0.4
       rolldown: 1.0.0-rc.17
       rolldown-plugin-dts: 0.23.2(@typescript/native-preview@7.0.0-dev.20260421.2)(oxc-resolver@11.20.0)(rolldown@1.0.0-rc.17)(typescript@6.0.3)(vue-tsc@3.2.8(typescript@6.0.3))
-      semver: 7.8.2
+      semver: 7.8.5
       tinyexec: 1.2.4
       tinyglobby: 0.2.17
       tree-kill: 1.2.2

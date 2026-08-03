@@ -17,26 +17,28 @@ import (
 type KeyService interface {
 	GetEncryptionKey(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (*domain.EncryptionKey, error)
 	GetCrypter(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Crypto, error)
-	GetProjectDEK(ctx context.Context, projectID string) (*domain.EncryptionKey, error)
-	GetProjectDEKCrypter(ctx context.Context, projectID string) (op.Crypto, error)
-	GetKekCrypter(ctx context.Context) (op.Crypto, error)
-	MigrateToLatestRootKEK(ctx context.Context) error
+	GetProjectEncryptionKey(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (*domain.EncryptionKey, error)
+	GetProjectCrypter(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (op.Crypto, error)
+	GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (*domain.SigningKey, error)
+	GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (jose.Signer, error)
+	GetMasterKeyCrypter(ctx context.Context) (op.Crypto, error)
+	MigrateToLatestMasterKey(ctx context.Context) error
 }
 
 // ---- Implementation -------------------------------------------------------------
 
 type keyService struct {
-	db   *DB
-	keks domain.RootKEKs
+	db         *DB
+	masterKeys domain.MasterKeys
 }
 
 func NewKeyService(
 	db *DB,
-	keks domain.RootKEKs,
+	masterKeys domain.MasterKeys,
 ) KeyService {
 	return &keyService{
-		db:   db,
-		keks: keks,
+		db:         db,
+		masterKeys: masterKeys,
 	}
 }
 
@@ -49,7 +51,7 @@ func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorit
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrEncryptionKeyNotFound()
 		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to get DEK from the database")
+		return nil, domain.ErrInternal(err).WithMessage("failed to get encryption key from the database")
 	}
 	return key, nil
 }
@@ -67,27 +69,27 @@ func (s *keyService) GetCrypter(ctx context.Context, keyID string, algorithm jos
 	return s.getCrypterOfKey(ctx, key)
 }
 
-func (s *keyService) GetProjectDEK(ctx context.Context, projectID string) (*domain.EncryptionKey, error) {
-	dek, err := s.db.Statements().GetEncryptionKey(ctx, database.And(
+func (s *keyService) GetProjectEncryptionKey(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (*domain.EncryptionKey, error) {
+	key, err := s.db.Statements().GetEncryptionKey(ctx, database.And(
 		database.Equal(database.Col(domain.EncryptionKeyFieldProjectID), projectID),
 		database.Equal(database.Col(domain.EncryptionKeyFieldState), domain.KeyStateActive),
-		database.Equal(database.Col(domain.EncryptionKeyFieldPurpose), domain.EncryptionKeyPurposeDEK),
+		database.Equal(database.Col(domain.EncryptionKeyFieldPurpose), purpose),
 	))
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrEncryptionKeyNotFound()
 		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to get DEK from the database")
+		return nil, domain.ErrInternal(err).WithMessage("failed to get encryption key from the database")
 	}
-	return dek, nil
+	return key, nil
 }
 
-func (s *keyService) GetProjectDEKCrypter(ctx context.Context, projectID string) (op.Crypto, error) {
-	dek, err := s.GetProjectDEK(ctx, projectID)
+func (s *keyService) GetProjectCrypter(ctx context.Context, projectID string, purpose domain.EncryptionKeyPurpose) (op.Crypto, error) {
+	key, err := s.GetProjectEncryptionKey(ctx, projectID, purpose)
 	if err != nil {
 		return nil, err
 	}
-	return s.getCrypterOfKey(ctx, dek)
+	return s.getCrypterOfKey(ctx, key)
 }
 
 func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.EncryptionKey) (op.Crypto, error) {
@@ -96,10 +98,15 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 		return nil, domain.ErrInternal(err).WithMessage("failed to decode decryption key")
 	}
 
-	if kek := s.keks.GetByKeyID(jweHeader.KeyID); kek != nil {
-		return key.Crypter(kek)
+	// A key wrapped directly by a master key carries that master key's ID; every
+	// other key is wrapped by the project KEK and resolved recursively below.
+	if masterKey := s.masterKeys.GetByKeyID(jweHeader.KeyID); masterKey != nil {
+		return key.Crypter(masterKey)
 	}
 
+	// This call does a database call to fetch the key with the given id and
+	// recurses. This can be a performance hit. Maybe caching or a better
+	// database query is required in the future?
 	kek, err := s.GetCrypter(ctx, jweHeader.KeyID, jweHeader.EncryptionAlgorithm)
 	if err != nil {
 		return nil, err
@@ -107,11 +114,43 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 	return key.Crypter(kek)
 }
 
-func (s *keyService) GetKekCrypter(ctx context.Context) (op.Crypto, error) {
-	return s.keks, nil
+func (s *keyService) GetProjectSigningKey(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (*domain.SigningKey, error) {
+	key, err := s.db.Statements().GetSigningKey(ctx, database.And(
+		database.Equal(database.Col(domain.SigningKeyFieldProjectID), projectID),
+		database.Equal(database.Col(domain.SigningKeyFieldState), domain.KeyStateActive),
+		database.Equal(database.Col(domain.SigningKeyFieldPurpose), purpose),
+	))
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, domain.ErrSigningKeyNotFound()
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to get signing key from the database")
+	}
+	return key, nil
 }
 
-func (s *keyService) MigrateToLatestRootKEK(ctx context.Context) error {
+func (s *keyService) GetProjectSigner(ctx context.Context, projectID string, purpose domain.SigningKeyPurpose) (jose.Signer, error) {
+	key, err := s.GetProjectSigningKey(ctx, projectID, purpose)
+	if err != nil {
+		return nil, err
+	}
+	jweHeader, err := domain.DecodeJWEHeader(key.Key)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to decode signing key")
+	}
+
+	kek, err := s.GetCrypter(ctx, jweHeader.KeyID, jweHeader.EncryptionAlgorithm)
+	if err != nil {
+		return nil, err
+	}
+	return key.Signer(kek)
+}
+
+func (s *keyService) GetMasterKeyCrypter(context.Context) (op.Crypto, error) {
+	return s.masterKeys, nil
+}
+
+func (s *keyService) MigrateToLatestMasterKey(ctx context.Context) error {
 	opts := &database.ListOptions[domain.EncryptionKeyField]{
 		Pagination: database.Page[domain.EncryptionKeyField]{
 			Limit: 100,
@@ -147,18 +186,19 @@ func (s *keyService) MigrateToLatestRootKEK(ctx context.Context) error {
 			continue
 		}
 
-		kek := s.keks.GetByKeyID(jweHeader.KeyID)
-		if kek == nil {
-			// if no key is encrypted by another key than the kek, we don't need to migrate
+		masterKey := s.masterKeys.GetByKeyID(jweHeader.KeyID)
+		if masterKey == nil {
+			// the key is wrapped by a project KEK rather than a master key, so
+			// master key rotation does not touch it
 			continue
 		}
 
-		if kek.ID == s.keks.EncryptionKey.ID {
-			// if key already the latest kek, we don't need to migrate
+		if masterKey.ID == s.masterKeys.EncryptionKey.ID {
+			// already wrapped by the latest master key, nothing to migrate
 			continue
 		}
 
-		if err = key.MigrateToNewKEK(kek, new(s.keks.EncryptionKey)); err != nil {
+		if err = key.MigrateToNewMasterKey(masterKey, new(s.masterKeys.EncryptionKey)); err != nil {
 			errs = append(errs, domain.ErrInternal(err).
 				WithMessage("failed to migrate key").
 				WithDetails(map[string]any{"keyID": key.ID}))

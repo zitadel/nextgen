@@ -207,6 +207,7 @@ export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
         text_key: "register-password.action.submit",
         primary: true,
       },
+      { name: "back", kind: "back", text_key: "action.back" },
     ],
     gates: {},
   });

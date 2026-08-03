@@ -104,9 +104,7 @@ func TestTeamStatements_NameColumnConstraints(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		team := newTestTeam(project.ID, "team_v2_name_empty")
 		team.Name = ""
-		// Spanner reports a violated CHECK as OutOfRange, which wrapError does
-		// not translate, so the write is only asserted to be rejected.
-		require.Error(t, stmts.CreateTeam(ctx, team))
+		assert.ErrorIs(t, stmts.CreateTeam(ctx, team), new(database.CheckError))
 	})
 
 	t.Run("over the length limit", func(t *testing.T) {

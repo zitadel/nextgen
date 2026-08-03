@@ -685,6 +685,89 @@ func (s *AuthMethods) SetOtp(val OptAuthMethod) {
 	s.Otp = val
 }
 
+// Merged schema.
+// Ref: #
+type AuthUnauthorized struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAuthUnauthorizedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AuthUnauthorized) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AuthUnauthorized) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AuthUnauthorized) GetDetails() OptAuthUnauthorizedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AuthUnauthorized) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AuthUnauthorized) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
+	s.Details = val
+}
+
+func (*AuthUnauthorized) revokeMySessionRes() {}
+
+// Additional error-specific context.
+type AuthUnauthorizedDetails map[string]jx.Raw
+
+func (s *AuthUnauthorizedDetails) init() AuthUnauthorizedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// AuthUnauthorizedHeaders wraps AuthUnauthorized with response headers.
+type AuthUnauthorizedHeaders struct {
+	CacheControl OptString
+	Response     AuthUnauthorized
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *AuthUnauthorizedHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *AuthUnauthorizedHeaders) GetResponse() AuthUnauthorized {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *AuthUnauthorizedHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *AuthUnauthorizedHeaders) SetResponse(val AuthUnauthorized) {
+	s.Response = val
+}
+
+func (*AuthUnauthorizedHeaders) getMySessionRes() {}
+
 // AuthorizeGetFound is response for AuthorizeGet operation.
 type AuthorizeGetFound struct{}
 
@@ -2223,6 +2306,19 @@ type DeleteFlowDefinitionNoContent struct{}
 
 func (*DeleteFlowDefinitionNoContent) deleteFlowDefinitionRes() {}
 
+// DeleteUserByIDNoContent is response for DeleteUserByID operation.
+type DeleteUserByIDNoContent struct{}
+
+func (*DeleteUserByIDNoContent) deleteUserByIDRes() {}
+
+type DeleteUserByIDNotFound ErrorDetails
+
+func (*DeleteUserByIDNotFound) deleteUserByIDRes() {}
+
+type DeleteUserByIDUnauthorized ErrorDetails
+
+func (*DeleteUserByIDUnauthorized) deleteUserByIDRes() {}
+
 // Ref: #
 type DeviceAuthorizationResponse struct {
 	// The device code that the client will use to poll for authorization.
@@ -2416,6 +2512,7 @@ func (*ErrorDetailsStatusCode) createTeamRes()               {}
 func (*ErrorDetailsStatusCode) createUserRes()               {}
 func (*ErrorDetailsStatusCode) deactivateFlowDefinitionRes() {}
 func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) deleteUserByIDRes()           {}
 func (*ErrorDetailsStatusCode) endSessionRes()               {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()          {}
 func (*ErrorDetailsStatusCode) getBrandingByIdRes()          {}
@@ -2438,6 +2535,7 @@ func (*ErrorDetailsStatusCode) listBrandingRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
 func (*ErrorDetailsStatusCode) listSchemasRes()              {}
 func (*ErrorDetailsStatusCode) listSessionsRes()             {}
+func (*ErrorDetailsStatusCode) listUserPasskeysRes()         {}
 func (*ErrorDetailsStatusCode) listUsersRes()                {}
 func (*ErrorDetailsStatusCode) patchProjectRes()             {}
 func (*ErrorDetailsStatusCode) queryProjectsRes()            {}
@@ -4898,14 +4996,6 @@ func (s *GetMySessionErrorResponseStatusCode) SetResponse(val GetMySessionErrorR
 
 func (*GetMySessionErrorResponseStatusCode) getMySessionRes() {}
 
-type GetMySessionNotFound ErrorDetails
-
-func (*GetMySessionNotFound) getMySessionRes() {}
-
-type GetMySessionUnauthorized ErrorDetails
-
-func (*GetMySessionUnauthorized) getMySessionRes() {}
-
 type GetMyUserOK map[string]jx.Raw
 
 func (s *GetMyUserOK) init() GetMyUserOK {
@@ -5084,6 +5174,10 @@ func (s *GetSessionErrorResponseStatusCode) SetResponse(val GetSessionErrorRespo
 }
 
 func (*GetSessionErrorResponseStatusCode) getSessionRes() {}
+
+type GetSessionForbidden ErrorDetails
+
+func (*GetSessionForbidden) getSessionRes() {}
 
 type GetSessionNotFound ErrorDetails
 
@@ -6316,6 +6410,96 @@ type ListSessionsUnauthorized ErrorDetails
 
 func (*ListSessionsUnauthorized) listSessionsRes() {}
 
+type ListUserPasskeysBadRequest ErrorDetails
+
+func (*ListUserPasskeysBadRequest) listUserPasskeysRes() {}
+
+type ListUserPasskeysForbidden ErrorDetails
+
+func (*ListUserPasskeysForbidden) listUserPasskeysRes() {}
+
+type ListUserPasskeysInternalServerError ErrorDetails
+
+func (*ListUserPasskeysInternalServerError) listUserPasskeysRes() {}
+
+type ListUserPasskeysNotFound ErrorDetails
+
+func (*ListUserPasskeysNotFound) listUserPasskeysRes() {}
+
+// Response containing the user's passkeys.
+// Ref: #
+type ListUserPasskeysResponse struct {
+	Passkeys []ListUserPasskeysResponsePasskeysItem `json:"passkeys"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetPasskeys returns the value of Passkeys.
+func (s *ListUserPasskeysResponse) GetPasskeys() []ListUserPasskeysResponsePasskeysItem {
+	return s.Passkeys
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListUserPasskeysResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetPasskeys sets the value of Passkeys.
+func (s *ListUserPasskeysResponse) SetPasskeys(val []ListUserPasskeysResponsePasskeysItem) {
+	s.Passkeys = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListUserPasskeysResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListUserPasskeysResponse) listUserPasskeysRes() {}
+
+type ListUserPasskeysResponsePasskeysItem struct {
+	// The unique identifier of the passkey.
+	ID string `json:"id"`
+	// The name of the passkey.
+	Name string `json:"name"`
+	// The timestamp when the passkey was created.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetID returns the value of ID.
+func (s *ListUserPasskeysResponsePasskeysItem) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *ListUserPasskeysResponsePasskeysItem) GetName() string {
+	return s.Name
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ListUserPasskeysResponsePasskeysItem) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ListUserPasskeysResponsePasskeysItem) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *ListUserPasskeysResponsePasskeysItem) SetName(val string) {
+	s.Name = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ListUserPasskeysResponsePasskeysItem) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+type ListUserPasskeysUnauthorized ErrorDetails
+
+func (*ListUserPasskeysUnauthorized) listUserPasskeysRes() {}
+
 type ListUsersBadRequest ErrorDetails
 
 func (*ListUsersBadRequest) listUsersRes() {}
@@ -7406,6 +7590,52 @@ func (o OptAuthMethod) Get() (v AuthMethod, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAuthMethod) Or(d AuthMethod) AuthMethod {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAuthUnauthorizedDetails returns new OptAuthUnauthorizedDetails with value set to v.
+func NewOptAuthUnauthorizedDetails(v AuthUnauthorizedDetails) OptAuthUnauthorizedDetails {
+	return OptAuthUnauthorizedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAuthUnauthorizedDetails is optional AuthUnauthorizedDetails.
+type OptAuthUnauthorizedDetails struct {
+	Value AuthUnauthorizedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAuthUnauthorizedDetails was set.
+func (o OptAuthUnauthorizedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAuthUnauthorizedDetails) Reset() {
+	var v AuthUnauthorizedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAuthUnauthorizedDetails) SetTo(v AuthUnauthorizedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAuthUnauthorizedDetails) Get() (v AuthUnauthorizedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAuthUnauthorizedDetails) Or(d AuthUnauthorizedDetails) AuthUnauthorizedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -11131,10 +11361,6 @@ type RevokeMySessionNotFound ErrorDetails
 
 func (*RevokeMySessionNotFound) revokeMySessionRes() {}
 
-type RevokeMySessionUnauthorized ErrorDetails
-
-func (*RevokeMySessionUnauthorized) revokeMySessionRes() {}
-
 // Ref: #
 type RevokeRequest struct {
 	// The token to revoke (access token or refresh token).
@@ -11166,6 +11392,10 @@ func (s *RevokeRequest) SetTokenTypeHint(val OptString) {
 type RevokeSessionConflict ErrorDetails
 
 func (*RevokeSessionConflict) revokeSessionRes() {}
+
+type RevokeSessionForbidden ErrorDetails
+
+func (*RevokeSessionForbidden) revokeSessionRes() {}
 
 // RevokeSessionNoContent is response for RevokeSession operation.
 type RevokeSessionNoContent struct{}
@@ -11310,6 +11540,34 @@ func (s *SessNotFoundDetails) init() SessNotFoundDetails {
 	}
 	return m
 }
+
+// SessNotFoundHeaders wraps SessNotFound with response headers.
+type SessNotFoundHeaders struct {
+	CacheControl OptString
+	Response     SessNotFound
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *SessNotFoundHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *SessNotFoundHeaders) GetResponse() SessNotFound {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *SessNotFoundHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SessNotFoundHeaders) SetResponse(val SessNotFound) {
+	s.Response = val
+}
+
+func (*SessNotFoundHeaders) getMySessionRes() {}
 
 type SessionID string
 
@@ -11519,8 +11777,35 @@ func (s *SessionResponse) SetExpiresAt(val time.Time) {
 	s.ExpiresAt = val
 }
 
-func (*SessionResponse) getMySessionRes() {}
-func (*SessionResponse) getSessionRes()   {}
+func (*SessionResponse) getSessionRes() {}
+
+// SessionResponseHeaders wraps SessionResponse with response headers.
+type SessionResponseHeaders struct {
+	CacheControl OptString
+	Response     SessionResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *SessionResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *SessionResponseHeaders) GetResponse() SessionResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *SessionResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SessionResponseHeaders) SetResponse(val SessionResponse) {
+	s.Response = val
+}
+
+func (*SessionResponseHeaders) getMySessionRes() {}
 
 type SessionResponseMetadata map[string]jx.Raw
 

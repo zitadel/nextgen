@@ -46,10 +46,22 @@ type ListUsersInput struct {
 	Limit  uint32
 }
 
+type ListPasskeysInput struct {
+	ProjectID string
+	UserID    string
+	PageToken string
+	Limit     int
+}
+
 type GetMyUserInput struct {
 	// SessionToken is the parsed session token, already verified at the API
 	// security boundary.
 	SessionToken *domain.Token
+}
+
+type DeleteUserInput struct {
+	ProjectID string
+	UserID    string
 }
 
 // ---- Implementation -------------------------------------------------------------
@@ -105,6 +117,11 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 	return action.User, nil
 }
 
+func (s *UserService) DeleteUser(ctx context.Context, input DeleteUserInput) error {
+	action := NewDeleteUserAction(input)
+	return s.ApplyActions(ctx, action)
+}
+
 // ListUsers returns the project's users as attribute trees (the same
 // shape CreateUser returns and GET /users/{id} serves), ordered by
 // creation time so pagination windows are stable.
@@ -149,6 +166,43 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]ma
 		users = append(users, user)
 	}
 	return users, nil
+}
+
+func (s *UserService) ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error) {
+	dbpasskeys, err := s.v2Pool.Statements().ListUserPasskeys(
+		ctx, &database.ListOptions[domain.UserPasskeyField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.UserPasskeyFieldProjectID), input.ProjectID),
+				database.Equal(database.Col(domain.UserPasskeyFieldUserID), input.UserID),
+			),
+			Pagination: database.Page[domain.UserPasskeyField]{
+				Limit:  uint32(normalizeLimit(input.Limit)),
+				Cursor: []byte(input.PageToken),
+				OrderBy: database.OrderBy[domain.UserPasskeyField]{
+					Columns: []database.Column[domain.UserPasskeyField]{
+						database.Col(domain.UserPasskeyFieldCreatedAt),
+					},
+					Direction: database.OrderDesc,
+				},
+			},
+		},
+	)
+	if err != nil {
+		return nil, "", domain.ErrInternal(err).WithMessage("failed to get user passkeys from database")
+	}
+
+	// Distinguish "user not found" from "user has no passkeys".
+	if len(dbpasskeys.Items) == 0 {
+		exists, err := s.v2Pool.Statements().UserExists(ctx, input.ProjectID, input.UserID)
+		if err != nil {
+			return nil, "", domain.ErrInternal(err).WithMessage("failed to get user from database")
+		}
+		if !exists {
+			return nil, "", domain.ErrUserNotFound()
+		}
+	}
+
+	return dbpasskeys.Items, string(dbpasskeys.NextCursor), nil
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {
@@ -297,6 +351,33 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) 
 			return domain.ErrUserNotFound()
 		}
 		return domain.ErrInternal(err).WithMessage("failed to set password")
+	}
+	return nil
+}
+
+// ---- Delete ACTION -------------------------------------------------------------
+
+type DeleteUserAction struct {
+	DeleteUserInput
+}
+
+func NewDeleteUserAction(input DeleteUserInput) *DeleteUserAction {
+	return &DeleteUserAction{
+		DeleteUserInput: input,
+	}
+}
+
+func (o *DeleteUserAction) Prepare(_ context.Context) error {
+	return nil
+}
+
+func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	err := stmts.DeleteUserByID(ctx, o.ProjectID, o.UserID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil
+		}
+		return domain.ErrInternal(err).WithMessage("failed to delete user")
 	}
 	return nil
 }

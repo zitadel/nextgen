@@ -79,8 +79,10 @@ type CryptoKeyStatements interface {
 	Statements
 	GetEncryptionKey(ctx context.Context, filter database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error)
 	ListEncryptionKeys(ctx context.Context, opts *database.ListOptions[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error)
-	CreateEncryptionKey(ctx context.Context, dek *domain.EncryptionKey) error
+	CreateEncryptionKey(ctx context.Context, key *domain.EncryptionKey) error
 	UpdateKey(ctx context.Context, id string, key string) error
+	GetSigningKey(ctx context.Context, filter database.Filter[domain.SigningKeyField]) (*domain.SigningKey, error)
+	CreateSigningKey(ctx context.Context, key *domain.SigningKey) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -217,6 +219,7 @@ type UserStatements interface {
 	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error
 	DeleteUserByID(ctx context.Context, projectID, userID string) error
+	UserExists(ctx context.Context, projectID, userID string) (bool, error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

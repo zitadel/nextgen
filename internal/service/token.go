@@ -32,11 +32,11 @@ func NewTokenService(
 }
 
 func (s *tokenService) GenerateJWE(ctx context.Context, data *domain.Token) (string, error) {
-	dek, err := s.keys.GetProjectDEKCrypter(ctx, data.ProjectID)
+	tokenCrypter, err := s.keys.GetProjectCrypter(ctx, data.ProjectID, domain.EncryptionKeyPurposeToken)
 	if err != nil {
 		return "", err
 	}
-	return data.JWE(dek)
+	return data.JWE(tokenCrypter)
 }
 
 func (s *tokenService) VerifyToken(ctx context.Context, token string) (*domain.Token, error) {

@@ -18,6 +18,11 @@ jobs:
     # which inject DEPOT_CACHE_TOKEN independently of GitHub secret filtering.
     runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'depot-ubuntu-24.04-16' }}
     timeout-minutes: 120
+    permissions:
+      contents: read
+      # Required to mint the OIDC token for Workload Identity Federation when
+      # authenticating to the Spanner test instance (trusted runs only).
+      id-token: write
     env:
       # Moon marks failed tasks by color alone, so a failed `moon ci` can end at
       # "Tasks: 1 failed" with no named target. The summary names them in plain
@@ -28,8 +33,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
-      - uses: moonrepo/setup-toolchain@v0
 
       - uses: actions/setup-go@v6
         with:
@@ -47,6 +50,20 @@ jobs:
 
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
+
+      # Bare `moon` below is the workspace's own pinned @moonrepo/cli, so CI
+      # runs the exact version the lockfile resolves — same as local dev.
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      # A PR title is attacker-controlled text on a public repo, so it reaches the
+      # script through the environment — never interpolated into the shell body.
+      - name: Check PR title
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/check-pr-title.mjs --title "$PR_TITLE" --base "$BASE_SHA" --summary
 
       - name: Detect CI mode
         id: ci-mode
@@ -70,7 +87,7 @@ jobs:
       - name: Run Moon build and test graph
         id: moon-ci
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: moon ci :lint :typecheck :build :test :test-browser
+        run: moon ci :lint :typecheck :build :test :test-browser :check-adrs
 
       - name: Report Moon CI failures
         if: ${{ failure() && steps.moon-ci.conclusion == 'failure' }}
@@ -84,8 +101,25 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: moon run server:test-postgres
 
-      - name: Run Go integration tests (spanner)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+      # Auth when SPANNER_TEST_INSTANCE is set (trusted runs). Vars are safe in
+      # if:; secrets stay only in with:. Unset var / forks → emulator step.
+      # Auth hard-fails if the var is set but WIF is broken (no silent fallback).
+      - name: Authenticate to Google Cloud (Spanner test instance)
+        id: spanner-auth
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && vars.SPANNER_TEST_INSTANCE != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Run Go integration tests (spanner emulator)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.spanner-auth.outcome != 'success' }}
+        run: moon run server:test-spanner
+
+      - name: Run Go integration tests (spanner test instance)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.spanner-auth.outcome == 'success' }}
+        env:
+          ZITADEL_TEST_SPANNER_INSTANCE: ${{ vars.SPANNER_TEST_INSTANCE }}
         run: moon run server:test-spanner
 
       - name: Build release snapshot without container
@@ -113,6 +147,18 @@ jobs:
             --framework next \
             --preset passkey-first \
             --work-dir "${RUNNER_TEMP}/ci-journey-passkey-first" \
+            --tarballs-dir "dist/release/${version}/npm"
+
+      # Customer-configuration proof for @zitadel/testing: a fresh app
+      # installs the kit from the journey registry and runs its withZitadel()
+      # suite against the published binary — embedded UIs, no repo env
+      # overrides (unlike the in-repo e2e-real lanes below).
+      - name: Run test-kit consumer journey
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: |
+          version="$(node -p "require('./apps/server/package.json').version")"
+          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-testkit -- \
+            --work-dir "${RUNNER_TEMP}/ci-journey-testkit" \
             --tarballs-dir "dist/release/${version}/npm"
 
       # Gates the test-kit's central promise: boot a real seeded instance,
@@ -159,6 +205,7 @@ jobs:
           path: |
             ${{ runner.temp }}/ci-journey/diagnostics
             ${{ runner.temp }}/ci-journey-passkey-first/diagnostics
+            ${{ runner.temp }}/ci-journey-testkit/diagnostics
           if-no-files-found: ignore
           retention-days: 7
 

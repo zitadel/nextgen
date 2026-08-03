@@ -40,6 +40,22 @@ by re-applying an earlier template.
   `zl-split--right` on the wrapper mirrors the panes. Knob reference:
   `docs/design/branding/templates.md` in the Zitadel repo.
 - The "Secured with Zitadel" attribution is licence-gated and on by default.
+- Back-navigation: the engine injects a `kind: "back"` action on steps
+  that can return to their predecessor, and the browser's back gesture
+  submits it automatically — the shipped designs deliberately render **no
+  visible back control**. Your template may render one if you want it;
+  select the action by kind (never by name) and submit it like any other
+  action:
+
+  ```liquid
+  {% assign back = actions | where: "kind", "back" | first %}
+  {% if back %}
+    <a href="#" class="zl-card-nav__link" data-action="{{ back.name }}">{{ back.text_key | t }}</a>
+  {% endif %}
+  ```
+
+  If you list actions generically, exclude `a.kind == 'back'` from button
+  loops so the injected action doesn't render as a stray secondary button.
 
 Start over anytime with `zitadel branding eject --design <name>` (designs:
 `centered`, `split`, `split-right`, `hero`, `minimal`; add `--force` to

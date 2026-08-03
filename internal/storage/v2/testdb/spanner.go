@@ -7,10 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
-	database_admin "cloud.google.com/go/spanner/admin/database/apiv1"
-	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	instance_admin "cloud.google.com/go/spanner/admin/instance/apiv1"
 	"cloud.google.com/go/spanner/admin/instance/apiv1/instancepb"
 	"github.com/testcontainers/testcontainers-go"
@@ -26,11 +25,17 @@ const (
 	testDatabase = "test-database"
 )
 
-// SpannerDSN starts the Cloud Spanner GoogleSQL emulator (unless
-// ZITADEL_TEST_SPANNER_URL is set), creates the test instance/database, sets
-// SPANNER_EMULATOR_HOST, and returns the database DSN plus a stop func that
-// clears the env var and terminates the container.
+// SpannerDSN returns a Spanner database DSN for integration tests. Precedence:
+// if ZITADEL_TEST_SPANNER_INSTANCE is set it provisions a fresh, uniquely named
+// database on that shared instance (the returned stop drops it); else if
+// ZITADEL_TEST_SPANNER_URL is set it returns that DSN; otherwise it starts a
+// Cloud Spanner emulator testcontainer, creates the test instance/database,
+// sets SPANNER_EMULATOR_HOST, and returns the database DSN plus a stop func
+// that clears the env var and terminates the container.
 func SpannerDSN(ctx context.Context) (string, func(), error) {
+	if strings.TrimSpace(os.Getenv(instanceEnv)) != "" {
+		return provision(ctx)
+	}
 	if url := os.Getenv("ZITADEL_TEST_SPANNER_URL"); url != "" {
 		return url, func() {}, nil
 	}
@@ -130,22 +135,5 @@ func tryCreateInstanceAndDatabase(ctx context.Context, opts []option.ClientOptio
 		return fmt.Errorf("wait for instance: %w", err)
 	}
 
-	dbClient, err := database_admin.NewDatabaseAdminClient(ctx, opts...)
-	if err != nil {
-		return fmt.Errorf("database admin client: %w", err)
-	}
-	defer dbClient.Close()
-
-	dbOp, err := dbClient.CreateDatabase(ctx, &databasepb.CreateDatabaseRequest{
-		Parent:          "projects/" + testProject + "/instances/" + testInstance,
-		CreateStatement: "CREATE DATABASE `" + testDatabase + "`",
-	})
-	if err != nil {
-		return fmt.Errorf("create database: %w", err)
-	}
-	if _, err = dbOp.Wait(ctx); err != nil {
-		return fmt.Errorf("wait for database: %w", err)
-	}
-
-	return nil
+	return createDatabase(ctx, testProject, testInstance, testDatabase, opts...)
 }
