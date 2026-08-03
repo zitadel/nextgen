@@ -94,8 +94,9 @@ var userAccess = resourceAccess{
 
 var teamAccess = resourceAccess{
 	scopes: map[accessOp][]string{
-		opRead:  {"team.read", "team.write"},
-		opWrite: {"team.write"},
+		opRead:   {"team.read", "team.write"},
+		opWrite:  {"team.write"},
+		opDelete: {"team.delete"},
 	},
 	legacyProjectWriteUmbrella: true,
 	readMiss:                   domain.ErrTeamNotFound,

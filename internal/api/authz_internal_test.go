@@ -71,6 +71,11 @@ func TestResourceAccessScopes(t *testing.T) {
 		{"team.write writes", teamAccess, opWrite, "team.write", true},
 		{"team.read reads", teamAccess, opRead, "team.read", true},
 		{"team.read cannot write", teamAccess, opWrite, "team.read", false},
+		{"team.delete deletes", teamAccess, opDelete, "team.delete", true},
+		{"team.write does not imply delete", teamAccess, opDelete, "team.write", false},
+		{"team.read does not imply delete", teamAccess, opDelete, "team.read", false},
+		{"team.delete cannot write", teamAccess, opWrite, "team.delete", false},
+		{"team.delete cannot read", teamAccess, opRead, "team.delete", false},
 
 		{"session.read reads", sessionAccess, opRead, "session.read", true},
 		{"sessions.read reads", sessionAccess, opRead, "sessions.read", true},
