@@ -28,7 +28,7 @@ func recoveryCodesByIDFilter(id string) database.Filter[domain.UserRecoveryCodes
 func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-		userID := "usr_rc"
+		userID := "user_rc"
 
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "rc@example.com", "RC User")))
 
@@ -76,7 +76,7 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 func TestUserRecoveryCodesStatements_CreateEmptyRejected(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-		userID := "usr_rc_empty"
+		userID := "user_rc_empty"
 
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "rc-empty@example.com", "RC Empty")))
 
@@ -99,7 +99,7 @@ func TestUserRecoveryCodesStatements_CreateEmptyRejected(t *testing.T) {
 func TestUserRecoveryCodesStatements_Update(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-		userID := "usr_rc_upd"
+		userID := "user_rc_upd"
 
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "rc-upd@example.com", "RC Update")))
 		require.NoError(t, d.stmts.CreateUserRecoveryCodes(t.Context(), &domain.CreateRecoveryCodes{

@@ -30,7 +30,7 @@ WITH seeded AS (
     SELECT
         t.project_id,
         t.id AS team_id,
-        'usr_' || substr(md5(random()::text || clock_timestamp()::text), 1, 8) AS user_id
+        'user_' || substr(md5(random()::text || clock_timestamp()::text), 1, 8) AS user_id
     FROM zitadel_nextgen.teams t
 )
 INSERT INTO zitadel_nextgen.users (project_id, id, schema_url, lifecycle_owner_team_id, status)

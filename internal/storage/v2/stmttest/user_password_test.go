@@ -28,7 +28,7 @@ func userPasswordByID(id string) database.Filter[domain.UserPasswordField] {
 func TestUserPasswordStatements_SetGetDelete(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-		userID := "usr_pw"
+		userID := "user_pw"
 
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "pw@example.com", "PW User")))
 
@@ -84,7 +84,7 @@ func TestUserPasswordStatements_SetGetDelete(t *testing.T) {
 func TestUserPasswordStatements_SetUpsert(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-		userID := "usr_pw_upsert"
+		userID := "user_pw_upsert"
 
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "pw-upsert@example.com", "PW Upsert")))
 
@@ -139,7 +139,7 @@ func TestUserPasswordStatements_SetMissingUser(t *testing.T) {
 func TestUserPasswordStatements_Update(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-		userID := "usr_pw_upd"
+		userID := "user_pw_upd"
 
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "pw-upd@example.com", "PW Update")))
 		require.NoError(t, d.stmts.SetUserPassword(t.Context(), &domain.SetUserPassword{

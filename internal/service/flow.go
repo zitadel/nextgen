@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // FlowService is the flow engine's use-case surface. The API handler
@@ -92,17 +92,17 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (*dom
 }
 
 func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
-	filters := []v2database.Filter[domain.FlowDefinitionField]{
-		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
-		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldName), *req.Name),
-		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
+	filters := []database.Filter[domain.FlowDefinitionField]{
+		database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
+		database.Equal(database.Col(domain.FlowDefinitionFieldName), *req.Name),
+		database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
 	}
 	if req.SchemaVersion != nil {
-		filters = append(filters, v2database.Equal(v2database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
+		filters = append(filters, database.Equal(database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
 	}
 
-	result, err := s.v2Pool.Statements().ListFlowDefinitions(ctx, &v2database.ListOptions[domain.FlowDefinitionField]{
-		Filter: v2database.And(filters...),
+	result, err := s.v2Pool.Statements().ListFlowDefinitions(ctx, &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.And(filters...),
 	})
 	if err != nil {
 		return nil, err
@@ -131,17 +131,17 @@ func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest)
 // Ties break newest-first (created_at, then id, so one bulk apply with
 // colliding timestamps still yields a stable pick).
 func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
-	filters := []v2database.Filter[domain.FlowDefinitionField]{
-		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
-		v2database.Equal(v2database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
-		v2database.ArrayContains(v2database.Col(domain.FlowDefinitionFieldPurposes), req.Purpose.String()),
+	filters := []database.Filter[domain.FlowDefinitionField]{
+		database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
+		database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
+		database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), req.Purpose.String()),
 	}
 	if req.SchemaVersion != nil {
-		filters = append(filters, v2database.Equal(v2database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
+		filters = append(filters, database.Equal(database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
 	}
 
-	result, err := s.v2Pool.Statements().ListFlowDefinitions(ctx, &v2database.ListOptions[domain.FlowDefinitionField]{
-		Filter: v2database.And(filters...),
+	result, err := s.v2Pool.Statements().ListFlowDefinitions(ctx, &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: database.And(filters...),
 	})
 	if err != nil {
 		return nil, err
