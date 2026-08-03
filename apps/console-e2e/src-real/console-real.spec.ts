@@ -77,3 +77,15 @@ test("keeps the project credential out of browser requests and resources", async
   expect(leakedResources).toEqual([]);
   expect((await page.content()).includes(zitadel.handle.projectSecret)).toBe(false);
 });
+
+test("shows the status the API stamped on a seeded user", async ({ page, seed }) => {
+  // The Status column reads `metadata.status`, which the API only started
+  // returning recently. Asserted against a real instance rather than a stub so
+  // the column is proven against the shape the server actually sends.
+  const user = await seed.user();
+  await signIn(page, user);
+
+  await page.goto("/users");
+  const row = page.getByRole("row").filter({ hasText: user.email });
+  await expect(row.getByText("active", { exact: true })).toBeVisible();
+});

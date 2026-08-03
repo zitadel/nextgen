@@ -69,9 +69,6 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 		}
 
 		for _, a := range user.Attributes {
-			if a == nil {
-				return fmt.Errorf("nil attribute")
-			}
 			raw, err := json.Marshal(a.Value)
 			if err != nil {
 				return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
@@ -287,7 +284,7 @@ func (us userStatements) hydrateUserGroup(ctx context.Context, group v2user.Proj
 		if !ok {
 			continue
 		}
-		user.Attributes = append(user.Attributes, domain.Attribute{Key: key, Value: val})
+		user.Attributes = append(user.Attributes, domain.Attribute{Key: domain.AttributeKey(key), Value: val})
 	}
 	return wrapError(rows.Err())
 }
@@ -314,9 +311,9 @@ func scanUserHeader(rows *sql.Rows) (*domain.User, error) {
 		v := lifecycleOwner.String
 		user.LifecycleOwnerTeamID = &v
 	}
-	user.Status = domain.UserStatus(status)
-	user.CreatedAt = timeFromUnixNano(createdNano)
-	user.UpdatedAt = timeFromUnixNano(updNano)
+	user.Metadata.Status = domain.UserStatus(status)
+	user.Metadata.CreatedAt = timeFromUnixNano(createdNano)
+	user.Metadata.UpdatedAt = timeFromUnixNano(updNano)
 	return user, nil
 }
 
