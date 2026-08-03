@@ -1,13 +1,18 @@
 import { MANAGED_MARKER } from "../../../../paths";
 import type { PatchContext } from "../../types";
 import { PROXY_PATH } from "../proxy";
+import {
+  assertNoUnreviewedProjectSecretProxy,
+  PROXY_CREDENTIAL_POLICY_MARKER,
+} from "../proxy-credential-policy";
 
 /**
  * The managed root component `src/app/app.ts`: a standalone component that
  * renders the `@zitadel/sdk-angular` widgets based on the current path. The
  * project id (public, not secret) is inlined; the dev proxy in `proxy.conf.cjs`
- * attaches the project service-key secret as the bearer server-side (read from
- * `.env.local`), and no secret reaches the browser.
+ * attaches the project service-key secret as the bearer server-side only to
+ * `POST /sessions/exchange` (read from `.env.local`), and no secret reaches
+ * the browser.
  *
  * Projects set up with the business use case additionally expose the SDK's
  * `businessLocales` overlay as a class property, which `app.html` binds to the
@@ -101,8 +106,9 @@ export function appTemplateHtml(ctx: PatchContext): string {
 
 /**
  * The managed `proxy.conf.cjs` for `ng serve`: forwards `/__nextgen/*` to the
- * backend and attaches the project's service-key secret as the bearer on every
- * proxied request. Both the backend URL (`ZITADEL_URL`) and the secret
+ * backend and attaches the project's service-key secret only to the current
+ * app-plane `POST /sessions/exchange` request. Both the backend URL
+ * (`ZITADEL_URL`) and the secret
  * (`ZITADEL_PROJECT_SECRET`) are read from `.env.local`, which `zitadel setup`
  * writes and `.gitignore` excludes — Angular's CLI does not auto-load env files
  * into the dev-server process, so this file does it itself with a small inline
@@ -140,9 +146,7 @@ if (!secret) {
 }
 const bearer = \`Bearer \${secret}\`;
 
-function setBearer(proxyReq) {
-  proxyReq.setHeader("authorization", bearer);
-}
+${EXCHANGE_ONLY_BEARER}
 
 function stripPrefix(path) {
   return path.replace(/^\\${PROXY_PATH}/, "").replace(/^(?!\\/)/, "/");
@@ -159,4 +163,39 @@ module.exports = {
   },
 };
 `;
+}
+
+const LEGACY_UNCONDITIONAL_BEARER = `function setBearer(proxyReq) {
+  proxyReq.setHeader("authorization", bearer);
+}`;
+
+const EXCHANGE_ONLY_BEARER = `/* ${PROXY_CREDENTIAL_POLICY_MARKER} */
+function setBearer(proxyReq) {
+  const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
+  if (
+    proxyReq.method === "POST" &&
+    pathname === "/sessions/exchange" &&
+    !proxyReq.getHeader("authorization")
+  ) {
+    proxyReq.setHeader("authorization", bearer);
+  }
+}`;
+
+/**
+ * Creates the managed Angular proxy and upgrades the exact insecure hook the
+ * CLI emitted before the exchange-only policy. Other edits are preserved; a
+ * safe custom proxy is left untouched, while an unrecognized proxy that may
+ * still over-forward the project secret is surfaced for manual review.
+ */
+export function proxyConfEdit(): (source: string | undefined) => string {
+  return (source) => {
+    if (source === undefined) {
+      return proxyConfTemplate();
+    }
+    if (source.includes(MANAGED_MARKER) && source.includes(LEGACY_UNCONDITIONAL_BEARER)) {
+      return source.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER);
+    }
+    assertNoUnreviewedProjectSecretProxy(source, "proxy.conf.cjs");
+    return source;
+  };
 }
