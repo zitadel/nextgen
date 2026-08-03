@@ -98,11 +98,16 @@ func (ts tokenStatements) DeleteTokenByID(ctx context.Context, projectID, tokenI
 
 // GetTokenByID implements [service.TokenStatements].
 func (ts tokenStatements) GetTokenByID(ctx context.Context, projectID, tokenID string) (*domain.Token, error) {
-	id, err := parseIdentity(tokenID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid token_id %q: %w", tokenID, err)
+	var compiler statementCompiler
+	if err := compileRead(&compiler, tokenQuery, &database.ListOptions[domain.TokenField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.TokenFieldProjectID), projectID),
+			database.Equal(database.Col(domain.TokenFieldTokenID), database.Identity(tokenID)),
+		),
+	}, tokenSchema); err != nil {
+		return nil, err
 	}
-	rows, err := ts.client.Query(ctx, tokenQuery+" WHERE project_id = ? AND token_id = ?", projectID, id)
+	rows, err := ts.client.Query(ctx, compiler.String(), compiler.args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}

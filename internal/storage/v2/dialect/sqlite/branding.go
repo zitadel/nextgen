@@ -44,7 +44,16 @@ func (b brandingStatements) CreateBranding(ctx context.Context, entity *domain.B
 
 // GetBrandingByID implements [service.BrandingStatements].
 func (b brandingStatements) GetBrandingByID(ctx context.Context, projectID, id string) (*domain.Branding, error) {
-	rows, err := b.client.Query(ctx, brandingQuery+" WHERE project_id = ? AND id = ?", projectID, id)
+	var compiler statementCompiler
+	if err := compileRead(&compiler, brandingQuery, &database.ListOptions[domain.BrandingField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.BrandingFieldProjectID), projectID),
+			database.Equal(database.Col(domain.BrandingFieldID), id),
+		),
+	}, branding.Schema); err != nil {
+		return nil, err
+	}
+	rows, err := b.client.Query(ctx, compiler.String(), compiler.args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}

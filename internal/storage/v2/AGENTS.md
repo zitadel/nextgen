@@ -43,6 +43,21 @@ Multi-write nesting uses the dialect `withTransaction` helpers above
 [`dialect/spanner/with_transaction.go`](dialect/spanner/with_transaction.go),
 [`dialect/sqlite/with_transaction.go`](dialect/sqlite/with_transaction.go)).
 
+### No call-site SQL concatenation
+
+Do not assemble statement SQL at the call site with `+` or `fmt.Sprintf`
+(for example `baseQuery + " WHERE …"`). Attach filters and bind arguments only
+through `statementCompiler`:
+
+- Prefer `compileRead` when a field schema exists (Get-by-ID and List).
+- For JOIN selects without a matching schema (auth-attempt gets), use
+  `WriteString` for the static base and `WriteArg` for each bound value.
+
+Package-level `const` values that are one complete static statement remain
+allowed (including adjacent string literals / `+` only for line wrapping).
+Compiler-internal `WriteString(" WHERE ")` on a `statementCompiler` is the
+supported path for dynamic filters.
+
 ## Statement contract tests
 
 Behavioral statement parity across dialects lives in

@@ -44,8 +44,17 @@ func (s teamMembershipStatements) CreateTeamMembership(ctx context.Context, memb
 
 // GetTeamMembership implements [service.TeamMembershipStatements].
 func (s teamMembershipStatements) GetTeamMembership(ctx context.Context, projectID, teamID, userID string) (*domain.TeamMembership, error) {
-	rows, err := s.client.Query(ctx, teamMembershipQuery+` WHERE project_id = ? AND team_id = ? AND user_id = ?`,
-		projectID, teamID, userID)
+	var compiler statementCompiler
+	if err := compileRead(&compiler, teamMembershipQuery, &database.ListOptions[domain.TeamMembershipField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.TeamMembershipFieldProjectID), projectID),
+			database.Equal(database.Col(domain.TeamMembershipFieldTeamID), teamID),
+			database.Equal(database.Col(domain.TeamMembershipFieldUserID), userID),
+		),
+	}, teammembership.Schema); err != nil {
+		return nil, err
+	}
+	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}

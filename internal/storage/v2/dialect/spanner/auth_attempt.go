@@ -159,12 +159,24 @@ func (as authAttemptStatements) GetAuthAttemptByID(ctx context.Context, projectI
 	if err != nil {
 		return nil, err
 	}
-	return as.get(ctx, authAttemptGetSelect+` WHERE aa.project_id = @p1 AND aa.id = @p2`, projectID, id)
+	var c statementCompiler
+	c.WriteString(authAttemptGetSelect)
+	c.WriteString(" WHERE aa.project_id = ")
+	c.WriteArg(projectID)
+	c.WriteString(" AND aa.id = ")
+	c.WriteArg(id)
+	return as.get(ctx, c.String(), c.args...)
 }
 
 // GetAuthAttemptByHandoffToken implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffToken []byte) (*domain.AuthAttempt, error) {
-	return as.get(ctx, authAttemptGetSelect+` WHERE aa.project_id = @p1 AND aa.handoff_token = @p2`, projectID, handoffToken)
+	var c statementCompiler
+	c.WriteString(authAttemptGetSelect)
+	c.WriteString(" WHERE aa.project_id = ")
+	c.WriteArg(projectID)
+	c.WriteString(" AND aa.handoff_token = ")
+	c.WriteArg(handoffToken)
+	return as.get(ctx, c.String(), c.args...)
 }
 
 func (as authAttemptStatements) get(ctx context.Context, query string, args ...any) (*domain.AuthAttempt, error) {

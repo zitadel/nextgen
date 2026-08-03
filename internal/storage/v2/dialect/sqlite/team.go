@@ -7,6 +7,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 const (
@@ -46,7 +47,16 @@ func (ts teamStatements) CreateTeam(ctx context.Context, team *domain.Team) erro
 
 // GetTeamByID implements [service.TeamStatements].
 func (ts teamStatements) GetTeamByID(ctx context.Context, projectID, id string) (*domain.Team, error) {
-	rows, err := ts.client.Query(ctx, getTeamQuery+` WHERE project_id = ? AND id = ?`, projectID, id)
+	var compiler statementCompiler
+	if err := compileRead(&compiler, getTeamQuery, &database.ListOptions[domain.TeamField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.TeamFieldProjectID), projectID),
+			database.Equal(database.Col(domain.TeamFieldID), id),
+		),
+	}, teamSchema); err != nil {
+		return nil, err
+	}
+	rows, err := ts.client.Query(ctx, compiler.String(), compiler.args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -113,3 +123,36 @@ func scanTeam(rows *sql.Rows) (*domain.Team, error) {
 }
 
 var _ service.TeamStatements = (*teamStatements)(nil)
+
+var teamSchema = database.NewSchema(map[domain.TeamField]database.FieldBinding[domain.Team]{
+	domain.TeamFieldProjectID: {
+		SQLName:  "project_id",
+		Accessor: func(t *domain.Team) any { return t.ProjectID },
+		Coerce:   database.CoerceString,
+	},
+	domain.TeamFieldID: {
+		SQLName:  "id",
+		Accessor: func(t *domain.Team) any { return t.ID },
+		Coerce:   database.CoerceString,
+	},
+	domain.TeamFieldName: {
+		SQLName:  "name",
+		Accessor: func(t *domain.Team) any { return t.Name },
+		Coerce:   database.CoerceString,
+	},
+	domain.TeamFieldStatus: {
+		SQLName:  "status",
+		Accessor: func(t *domain.Team) any { return string(t.Status) },
+		Coerce:   database.CoerceString,
+	},
+	domain.TeamFieldCreatedAt: {
+		SQLName:  "created_at",
+		Accessor: func(t *domain.Team) any { return t.CreatedAt },
+		Coerce:   database.CoerceTime,
+	},
+	domain.TeamFieldUpdatedAt: {
+		SQLName:  "updated_at",
+		Accessor: func(t *domain.Team) any { return t.UpdatedAt },
+		Coerce:   database.CoerceTime,
+	},
+})
