@@ -1440,52 +1440,18 @@ describe("<zitadel-login> against the typed Flow API", () => {
       await waitFor(() => element.shadowRoot?.querySelector('zl-field[type="password"]'));
     }
 
-    it("renders the title back chevron for the kind: back action", async () => {
+    it("renders no visible control for the kind: back action (gesture-only)", async () => {
       const element = await mount(host);
       await navigateToRegisterPassword(element);
 
-      const title = element.shadowRoot?.querySelector("zl-title");
-      expect(title?.getAttribute("back-action")).toBe("back");
-      const button = await waitFor(() =>
-        title?.shadowRoot?.querySelector('button[part="back"]'),
-      );
-      expect(button?.getAttribute("aria-label")).toBeTruthy();
-      // The kind-based exclusion keeps back out of the secondary-button loop.
+      // The step carries a kind: "back" action on the wire, but the template
+      // renders nothing for it — the browser's back gesture is the affordance
+      // (ADR 022). The kind-based exclusion also keeps it out of the generic
+      // secondary-button loop.
+      expect(element.shadowRoot?.querySelector('[data-action="back"]')).toBeNull();
       expect(
         element.shadowRoot?.querySelector('[data-testid="zitadel-action-back"]'),
       ).toBeNull();
-    });
-
-    it("the identifier step title carries no back chevron", async () => {
-      const element = await mount(host);
-      const title = element.shadowRoot?.querySelector("zl-title");
-      expect(title).toBeTruthy();
-      expect(title?.hasAttribute("back-action")).toBe(false);
-    });
-
-    it("clicking the title chevron submits the back action", async () => {
-      const element = await mount(host);
-      await navigateToRegisterPassword(element);
-
-      const button = await waitFor(() =>
-        element.shadowRoot
-          ?.querySelector("zl-title")
-          ?.shadowRoot?.querySelector<HTMLButtonElement>('button[part="back"]'),
-      );
-      button?.click();
-
-      await waitFor(() => {
-        const pw = element.shadowRoot?.querySelector('zl-field[type="password"]');
-        return pw === null ? true : null;
-      });
-      const backSubmit = mock
-        .getCaptured()
-        .filter(
-          (req): req is Extract<CapturedRequest, { kind: "submitFlowStep" }> =>
-            req.kind === "submitFlowStep",
-        )
-        .find((s) => s.body.action === "back");
-      expect(backSubmit).toBeDefined();
     });
 
     it("pushes a single sentinel entry without touching the URL", async () => {

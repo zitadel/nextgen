@@ -139,28 +139,29 @@ sentinel makes those states unrepresentable:
 
 ### Template rendering
 
-The back action is deliberately **excluded from the generic
-secondary-action loop** — templates filter it by kind (`a.kind == 'back'`),
-never by name, so it cannot surface as an off-design secondary button.
+Templates render **no visible control** for the back action — the
+browser's native back gesture (mapped to the wire action by the History
+API integration above) is the affordance. This mirrors modern auth flows:
+back splits into *data correction* (served contextually where needed) and
+*step traversal* (served by the gesture); a generic "Back" control serves
+both poorly and adds card noise.
 
-The visible affordance lives in the card heading: the `<zl-title>` atom.
-Templates forward the wire action — and encode no flow topology — with a
-kind-based lookup:
+The back action is deliberately **excluded from the generic
+secondary-action loop** — templates filter it by kind, never by name, so
+an engine-injected back can never surface as an off-design secondary
+button:
 
 ```liquid
-{% assign back = actions | where: "kind", "back" | first %}
-<zl-title slot="header" class="zl-card-title"
-  {% if back %}back-action="{{ back.name }}" back-label="{{ back.text_key | t }}"{% endif %}
->{{ step.texts.title_key | t: identity.display_name }}</zl-title>
+{% unless a.primary or a.kind == 'back' or ... %}
+  <zl-button ... ></zl-button>
+{% endunless %}
 ```
 
-Without `back-action` the atom renders a plain `<h1>`. With it, hovering
-the title (or focusing the control) slides the heading and reveals a back
-chevron — a labelled `<button>` that dispatches the standard `zl-submit`
-CustomEvent, so the chevron and the browser gesture share one submit path.
-The default template and every shipped branding design render the title
-this way; tenant templates may additionally render an explicit control
-from the same wire action.
+The default template and every shipped branding design carry this
+exclusion. Tenant templates remain free to render an explicit control
+from the wire action (`kind: "back"` and its `text_key` stay on the
+response); the contract encodes no flow topology client-side, and neither
+must any template that renders it.
 
 ### Mock server changes
 
@@ -230,9 +231,9 @@ increases flow abandonment.
   of the actions it executes.
 - **`zitadel-login.ts`** — gains the sentinel arm/retire logic in
   `applyResponse` and the `popstate` handler described above.
-- **`@zitadel/components`** — gains the `<zl-title>` atom (heading +
-  optional back chevron); the default template and the branding design
-  catalog render it.
+- **Templates** — the default template and the branding design catalog
+  exclude `kind: "back"` from the generic secondary-action loop and
+  render no control for it.
 - **Locale files** — gain `action.back` translation key.
 - **Mock server** — `flow-machine.ts` carries explicit guarded `back`
   edges and the fixtures advertise the action, approximating the

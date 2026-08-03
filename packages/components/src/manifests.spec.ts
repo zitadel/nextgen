@@ -16,7 +16,6 @@ describe("manifest registry", () => {
         "zl-passkey",
         "zl-pill",
         "zl-select",
-      "zl-title",
       ].sort(),
     );
   });

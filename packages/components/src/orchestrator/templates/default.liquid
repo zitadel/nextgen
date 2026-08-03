@@ -3,10 +3,7 @@
     <img slot="header" class="zl-card-logo" src="{{ branding.logo_url }}" alt="" />
   {% endif %}
   <zl-card>
-    {% assign back = actions | where: "kind", "back" | first %}
-    <zl-title slot="header" class="zl-card-title"
-      {% if back %}back-action="{{ back.name }}" back-label="{{ back.text_key | t }}"{% endif %}
-    >{{ step.texts.title_key | t: identity.display_name }}</zl-title>
+    <h1 slot="header" class="zl-card-title">{{ step.texts.title_key | t: identity.display_name }}</h1>
     {% if step.texts.description_key %}
       {% assign card_subtitle = step.texts.description_key | t: identity.display_name %}
       {% if card_subtitle != "" %}
