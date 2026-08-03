@@ -60,6 +60,14 @@ func ensureTeam(ctx context.Context, stmts service.AllStatements, projectID, tea
 		ID:        teamID,
 		Name:      "team-" + teamID,
 	}); err != nil {
+		// Another replica may have created the team since the read above. A
+		// violation of the name index leaves it missing, so read again instead
+		// of reading the constraint name, which not every dialect reports.
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			if _, getErr := stmts.GetTeamByID(ctx, projectID, teamID); getErr == nil {
+				return nil
+			}
+		}
 		return fmt.Errorf("ensure team %q: %w", teamID, err)
 	}
 	return nil

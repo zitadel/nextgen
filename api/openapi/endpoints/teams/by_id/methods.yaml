@@ -91,7 +91,7 @@ patch:
           schema:
             $ref: ../../../components/error-details.yaml
     '404':
-      description: Team not found, or not active.
+      description: Team not found or not active, or the project does not exist.
       content:
         application/json:
           schema:

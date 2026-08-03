@@ -39,6 +39,12 @@ post:
         application/json:
           schema:
             $ref: ../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
     '409':
       description: |
         A team with the given name already exists in this project.

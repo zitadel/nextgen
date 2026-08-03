@@ -13,6 +13,7 @@ import (
 
 func TestEnsureTeam(t *testing.T) {
 	readErr := errors.New("connection refused")
+	uniqueErr := database.NewUniqueError("teams", "uq_teams_project_name", nil)
 
 	tests := []struct {
 		name string
@@ -47,6 +48,32 @@ func TestEnsureTeam(t *testing.T) {
 					Return(nil, readErr)
 			},
 			wantErr: readErr,
+		},
+		{
+			name: "team created concurrently is accepted",
+			expect: func(stmts *servicemocks.MockAllStatements) {
+				gomock.InOrder(
+					stmts.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").
+						Return(nil, database.NewNoRowFoundError(errors.New("no rows"))),
+					stmts.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).Return(uniqueErr),
+					stmts.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").
+						Return(&domain.Team{ProjectID: "proj_1", ID: "team_1"}, nil),
+				)
+			},
+		},
+		{
+			// The name index fired, so the team is still missing.
+			name: "unique violation leaving the team missing is returned",
+			expect: func(stmts *servicemocks.MockAllStatements) {
+				gomock.InOrder(
+					stmts.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").
+						Return(nil, database.NewNoRowFoundError(errors.New("no rows"))),
+					stmts.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).Return(uniqueErr),
+					stmts.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").
+						Return(nil, database.NewNoRowFoundError(errors.New("no rows"))),
+				)
+			},
+			wantErr: uniqueErr,
 		},
 	}
 

@@ -2085,6 +2085,10 @@ type CreateTeamForbidden ErrorDetails
 
 func (*CreateTeamForbidden) createTeamRes() {}
 
+type CreateTeamNotFound ErrorDetails
+
+func (*CreateTeamNotFound) createTeamRes() {}
+
 // Ref: #
 type CreateTeamRequest struct {
 	// The name of the team. Must be unique within the project.
