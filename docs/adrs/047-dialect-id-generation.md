@@ -27,12 +27,15 @@ forced two Go bind paths, ADR 012’s unprefixed decimal strings, and Spanner
 | Dialect | Opaque body | Why |
 |---|---|---|
 | PostgreSQL | ULID | Time-sortable; fine under hash / `(project_id, id)` keys |
+| SQLite | ULID | Same as Postgres: lexicographic time order keeps inserts near the B-tree right edge and avoids the page-split cost of random UUID v4 PKs on a local file DB |
 | Spanner | UUID v4 | Spreads writes under `(project_id, id)` without bit-reversed ints |
 
-Both expose the same Go surface: `idgen.Generator`, `idgen.Ensure` (assign if
+All three expose the same Go surface: `idgen.Generator`, `idgen.Ensure` (assign if
 empty; keep non-empty for ceremony / schema `$id` / fixtures), and
 `NewManagedID` on statements. SQL columns are `TEXT` / `STRING(MAX)` with
-**no** identity or uuid default — the INSERT always supplies the PK.
+**no** identity or uuid default — the INSERT always supplies the PK. The
+zero-config local default dialect is SQLite ([ADR 028](028-storage-v2-statements-and-dialects.md));
+ID rules are identical zero-exception across dialects.
 
 ### 2. Prefix registry (domain constants)
 
@@ -81,7 +84,7 @@ as insert-time `Ensure`.
 ## Consequences
 
 - One ownership story and one OpenAPI shape (prefixed opaque strings).
-- Spanner and Postgres may diverge on opaque body (UUID vs ULID); clients must
-  not assume Crockford ULID.
+- Spanner, Postgres, and SQLite may diverge on opaque body (UUID vs ULID);
+  clients must not assume Crockford ULID.
 - `database.Identity` is a string pass-through for these columns (no int bind).
 - Alpha migrations are rewritten in place; no dual-write of BIGINT PKs.

@@ -161,7 +161,7 @@ are produced for the identifier classes in [ADR 011](011-resource-identifiers.md
 
 | Class | Storage responsibility | Dialect may use |
 |---|---|---|
-| **All resource PKs** (users, sessions, auth attempts, tokens, credential rows, …) | Generate on create when ID is empty; HTTP create does not accept client PKs ([ADR 047](047-dialect-id-generation.md)) | Dialect `idgen` (Postgres ULID; Spanner UUID v4); SQL supplies no DEFAULT/IDENTITY |
+| **All resource PKs** (users, sessions, auth attempts, tokens, credential rows, …) | Generate on create when ID is empty; HTTP create does not accept client PKs ([ADR 047](047-dialect-id-generation.md)) | Dialect `idgen` (Postgres/SQLite ULID; Spanner UUID v4); SQL supplies no DEFAULT/IDENTITY |
 
 The **dialect** owns the generation strategy per class — not
 domain or service code. Domain keeps prefix rules and
@@ -314,7 +314,7 @@ items off as work lands; remove completed entries when no longer useful.
 - [x] Move migrations from v1 to v2 dialect packages (postgres + spanner)
 - [x] Retire in-process embedded Postgres; local default is SQLite; Postgres/Spanner integration uses testcontainers (or env / real Spanner instance)
 - [x] Move `database.Identity` bind/scan to v2 core
-- [x] Move ID generation into v2 dialects (all resource PKs via dialect-chosen Go package; Postgres ULID / Spanner UUID v4); retire domain-layer `idgen` and SQL IDENTITY — see [ADR 047](047-dialect-id-generation.md)
+- [x] Move ID generation into v2 dialects (all resource PKs via dialect-chosen Go package; Postgres/SQLite ULID / Spanner UUID v4); retire domain-layer `idgen` and SQL IDENTITY — see [ADR 047](047-dialect-id-generation.md)
 - [x] Add `internal/storage/v2/AGENTS.md` with v2 conventions (including multi-write `withTransaction` rules)
 - [x] Port remaining entities and remove v1 entity repository package
 - [x] Drop QueryExecutor bridge from app callers and v2 transactions

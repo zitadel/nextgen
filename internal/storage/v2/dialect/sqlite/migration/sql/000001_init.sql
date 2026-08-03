@@ -142,14 +142,16 @@ CREATE INDEX idx_flow_definitions_project_status ON flow_definitions (project_id
 
 -- +goose StatementBegin
 CREATE TABLE auth_attempts (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id      TEXT    NOT NULL,
+    id              TEXT    NOT NULL,
     handoff_token   BLOB,
     handed_off_at   INTEGER,
-    session_id      INTEGER,
+    session_id      TEXT,
     required_checks TEXT    NOT NULL DEFAULT ('[]'),
     created_at      INTEGER NOT NULL,
     time_to_live    INTEGER,
+    PRIMARY KEY (project_id, id),
+    CONSTRAINT chk_auth_attempts_id CHECK (id <> ''),
     CONSTRAINT fk_auth_attempts_project
         FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
 );
@@ -163,29 +165,32 @@ CREATE UNIQUE INDEX idx_auth_attempts_handoff_token
 
 -- +goose StatementBegin
 CREATE TABLE user_agents (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id  TEXT    NOT NULL,
+    id          TEXT    NOT NULL,
     info        TEXT    NOT NULL DEFAULT ('{}'),
     created_at  INTEGER,
     updated_at  INTEGER,
+    PRIMARY KEY (project_id, id),
+    CONSTRAINT chk_user_agents_id CHECK (id <> ''),
     CONSTRAINT fk_user_agents_project
-        FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
-    CONSTRAINT uq_user_agents_project_id UNIQUE (project_id, id)
+        FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
 );
 -- +goose StatementEnd
 
 -- +goose StatementBegin
 CREATE TABLE tokens (
-    token_id        INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id      TEXT    NOT NULL,
+    token_id        TEXT    NOT NULL,
     user_id         TEXT,
     token_type      TEXT    NOT NULL,
-    session_id      INTEGER,
-    oidc_session_id INTEGER,
-    saml_session_id INTEGER,
+    session_id      TEXT,
+    oidc_session_id TEXT,
+    saml_session_id TEXT,
     scope           TEXT    NOT NULL DEFAULT ('[]'),
     expires_at      INTEGER,
     created_at      INTEGER NOT NULL,
+    PRIMARY KEY (project_id, token_id),
+    CONSTRAINT chk_tokens_token_id CHECK (token_id <> ''),
     CONSTRAINT fk_tokens_project
         FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
     CONSTRAINT fk_tokens_user
@@ -208,15 +213,17 @@ CREATE TABLE tokens (
 
 -- +goose StatementBegin
 CREATE TABLE sessions (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id    TEXT    NOT NULL,
+    id            TEXT    NOT NULL,
     created_at    INTEGER NOT NULL,
     updated_at    INTEGER NOT NULL,
     time_to_live  INTEGER NOT NULL DEFAULT (600000000000),
     expires_at    INTEGER GENERATED ALWAYS AS (updated_at + time_to_live) STORED,
-    token_id      INTEGER NOT NULL DEFAULT (0),
+    token_id      TEXT    NOT NULL DEFAULT ('0'),
     user_id       TEXT,
-    user_agent_id INTEGER,
+    user_agent_id TEXT,
+    PRIMARY KEY (project_id, id),
+    CONSTRAINT chk_sessions_id CHECK (id <> ''),
     CONSTRAINT fk_sessions_project
         FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
     CONSTRAINT fk_sessions_user
@@ -229,15 +236,15 @@ CREATE TABLE sessions (
 -- +goose StatementBegin
 CREATE UNIQUE INDEX idx_sessions_token
     ON sessions (project_id, token_id)
-    WHERE token_id != 0;
+    WHERE token_id != '0';
 -- +goose StatementEnd
 
 -- +goose StatementBegin
 CREATE TABLE checks (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id          TEXT    NOT NULL,
-    auth_attempt_id     INTEGER,
-    session_id          INTEGER,
+    id                  TEXT    NOT NULL,
+    auth_attempt_id     TEXT,
+    session_id          TEXT,
     type                INTEGER NOT NULL,
     last_challenged_at  INTEGER,
     last_verified_at    INTEGER,
@@ -245,10 +252,12 @@ CREATE TABLE checks (
     failure_count       INTEGER NOT NULL DEFAULT (0),
     challenge_payload   TEXT,
     factor_payload      TEXT,
+    PRIMARY KEY (project_id, id),
+    CONSTRAINT chk_checks_id CHECK (id <> ''),
     CONSTRAINT fk_checks_auth_attempt
-        FOREIGN KEY (auth_attempt_id) REFERENCES auth_attempts (id) ON DELETE CASCADE,
+        FOREIGN KEY (project_id, auth_attempt_id) REFERENCES auth_attempts (project_id, id) ON DELETE CASCADE,
     CONSTRAINT fk_checks_session
-        FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
+        FOREIGN KEY (project_id, session_id) REFERENCES sessions (project_id, id) ON DELETE CASCADE
 );
 -- +goose StatementEnd
 
@@ -390,8 +399,8 @@ CREATE INDEX idx_passkey_registrations_expires_at ON passkey_registrations (expi
 
 -- +goose StatementBegin
 CREATE TABLE user_passwords (
-    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id            TEXT    NOT NULL,
+    id                    TEXT    NOT NULL,
     user_id               TEXT    NOT NULL,
     encoded_hash          TEXT    NOT NULL,
     change_required       INTEGER NOT NULL DEFAULT (0),
@@ -401,6 +410,8 @@ CREATE TABLE user_passwords (
     failed_attempts       INTEGER NOT NULL DEFAULT (0),
     created_at            INTEGER NOT NULL,
     updated_at            INTEGER NOT NULL,
+    PRIMARY KEY (project_id, id),
+    CONSTRAINT chk_user_passwords_id CHECK (id <> ''),
     CONSTRAINT chk_user_passwords_encoded_hash CHECK (encoded_hash <> ''),
     CONSTRAINT chk_user_passwords_failed_attempts CHECK (failed_attempts >= 0),
     CONSTRAINT fk_user_passwords_user
@@ -414,8 +425,8 @@ CREATE UNIQUE INDEX idx_user_passwords_user ON user_passwords (project_id, user_
 
 -- +goose StatementBegin
 CREATE TABLE user_totp (
-    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id            TEXT    NOT NULL,
+    id                    TEXT    NOT NULL,
     user_id               TEXT    NOT NULL,
     secret                BLOB    NOT NULL,
     verified_at           INTEGER,
@@ -423,6 +434,8 @@ CREATE TABLE user_totp (
     failed_attempts       INTEGER NOT NULL DEFAULT (0),
     created_at            INTEGER NOT NULL,
     updated_at            INTEGER NOT NULL,
+    PRIMARY KEY (project_id, id),
+    CONSTRAINT chk_user_totp_id CHECK (id <> ''),
     CONSTRAINT chk_user_totp_failed_attempts CHECK (failed_attempts >= 0),
     CONSTRAINT fk_user_totp_user
         FOREIGN KEY (project_id, user_id) REFERENCES users (project_id, id) ON DELETE CASCADE
@@ -435,14 +448,16 @@ CREATE UNIQUE INDEX idx_user_totp_user ON user_totp (project_id, user_id);
 
 -- +goose StatementBegin
 CREATE TABLE user_recovery_codes (
-    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id            TEXT    NOT NULL,
+    id                    TEXT    NOT NULL,
     user_id               TEXT    NOT NULL,
     recovery_codes        TEXT    NOT NULL DEFAULT ('[]'),
     last_successful_check INTEGER,
     failed_attempts       INTEGER NOT NULL DEFAULT (0),
     created_at            INTEGER NOT NULL,
     updated_at            INTEGER NOT NULL,
+    PRIMARY KEY (project_id, id),
+    CONSTRAINT chk_user_recovery_codes_id CHECK (id <> ''),
     CONSTRAINT fk_user_recovery_codes_user
         FOREIGN KEY (project_id, user_id) REFERENCES users (project_id, id) ON DELETE CASCADE
 );
@@ -454,8 +469,8 @@ CREATE UNIQUE INDEX idx_user_recovery_codes_user ON user_recovery_codes (project
 
 -- +goose StatementBegin
 CREATE TABLE user_passkeys (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id       TEXT    NOT NULL,
+    id               TEXT    NOT NULL,
     user_id          TEXT    NOT NULL,
     credential_id    TEXT    NOT NULL,
     public_key       BLOB    NOT NULL,
@@ -470,6 +485,8 @@ CREATE TABLE user_passkeys (
     last_used_at     INTEGER,
     created_at       INTEGER NOT NULL,
     updated_at       INTEGER NOT NULL,
+    PRIMARY KEY (project_id, id),
+    CONSTRAINT chk_user_passkeys_id CHECK (id <> ''),
     CONSTRAINT chk_user_passkeys_credential_id CHECK (credential_id <> ''),
     CONSTRAINT chk_user_passkeys_sign_count    CHECK (sign_count >= 0),
     CONSTRAINT fk_user_passkeys_user
