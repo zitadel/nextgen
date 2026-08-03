@@ -1,6 +1,4 @@
 type: object
-required:
-  - name
 properties:
   name:
     description: The name of the team. Must be unique within the project.
