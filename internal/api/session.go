@@ -90,7 +90,7 @@ func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (a
 func (h Handler) GetMySession(ctx context.Context) (api.GetMySessionRes, error) {
 	sessionToken, ok := sessionTokenFromContext(ctx)
 	if !ok {
-		return nil, domain.ErrSessionTokenInvalid()
+		return nil, invalidSessionCredential(domain.ErrSessionTokenInvalid())
 	}
 	input := service.GetSessionInput{
 		ProjectID:        sessionToken.ProjectID,
@@ -103,9 +103,12 @@ func (h Handler) GetMySession(ctx context.Context) (api.GetMySessionRes, error) 
 		return nil, err
 	}
 	if err := validateSessionToken(session, sessionToken); err != nil {
-		return nil, err
+		return nil, invalidSessionCredential(err)
 	}
-	return sessionToAPI(session), nil
+	return &api.SessionResponseHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     *sessionToAPI(session),
+	}, nil
 }
 
 func (h Handler) ListSessions(ctx context.Context, params api.ListSessionsParams) (api.ListSessionsRes, error) {
@@ -146,7 +149,7 @@ func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionPara
 func (h Handler) RevokeMySession(ctx context.Context) (api.RevokeMySessionRes, error) {
 	sessionToken, ok := sessionTokenFromContext(ctx)
 	if !ok {
-		return nil, domain.ErrSessionTokenInvalid()
+		return nil, invalidSessionCredential(domain.ErrSessionTokenInvalid())
 	}
 	input := service.DeleteSessionInput{
 		ProjectID: sessionToken.ProjectID,
@@ -161,7 +164,7 @@ func (h Handler) RevokeMySession(ctx context.Context) (api.RevokeMySessionRes, e
 		return nil, err
 	}
 	if err := validateSessionToken(session, sessionToken); err != nil {
-		return nil, err
+		return nil, invalidSessionCredential(err)
 	}
 
 	err = h.sessionService.Delete(ctx, input)
@@ -171,6 +174,16 @@ func (h Handler) RevokeMySession(ctx context.Context) (api.RevokeMySessionRes, e
 	return &api.RevokeMySessionNoContent{
 		SetCookie: deleteSessionCookie(),
 	}, nil
+}
+
+// invalidSessionCredential normalizes a cookie that decrypted successfully but
+// no longer names the current live session token (expired or rotated) to the
+// same public verdict as a missing or undecryptable cookie. Self-session
+// endpoints must not expose token lifecycle details, and their OpenAPI 401
+// contract promises auth.unauthorized rather than the internal
+// sess.token_invalid diagnostic.
+func invalidSessionCredential(err error) domain.Error {
+	return domain.ErrAuthUnauthorized(err).WithMessage(sessionUnauthorizedMessage)
 }
 
 func validateSessionToken(session *domain.Session, token *domain.Token) error {

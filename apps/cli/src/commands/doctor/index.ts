@@ -55,7 +55,7 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
 export default class Doctor extends BaseCommand {
   static override description = "Verify local runtime and project state.";
   static override flags = {
-    fix: Flags.boolean({ description: "Re-apply missing managed files." }),
+    fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
     image: Flags.string({ description: "Container image to check." }),
     port: Flags.integer({ description: "Local HTTP port.", default: DEFAULT_LOCAL_SERVER_PORT }),
     runtime: Flags.string({

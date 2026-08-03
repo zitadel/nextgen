@@ -158,13 +158,14 @@ export type EjectActions = Readonly<{
  *   the wiring is definitionally gone, not unknowable).
  * - `unknown` — the transform cannot evaluate the current content (thrown:
  *   restructured or unparsable config, e.g. a multi-project `angular.json`
- *   without `defaultProject`). Surfaced as a warning, never silently
- *   dropped.
+ *   without `defaultProject`, or an unrecognized legacy proxy that may still
+ *   over-forward a credential). Surfaced as a warning, never silently dropped.
  */
 export type ConfigWiringStatus = Readonly<{
   path: string;
   wiring: "infrastructure" | "convenience";
   state: "applied" | "detached" | "unknown";
+  reason?: string;
 }>;
 
 /**
