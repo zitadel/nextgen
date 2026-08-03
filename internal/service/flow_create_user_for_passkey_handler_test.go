@@ -133,14 +133,17 @@ func TestFlowCreateUserForPasskey_PersistsAllCollectedSchemaFields(t *testing.T)
 	require.NoError(t, err)
 	require.NotNil(t, captured)
 
-	emailAttr, _ := captured.Attributes.Get("email")
+	emailAttr, ok := captured.Attributes.Get("email")
+	assert.True(t, ok, "attributes must contain email key")
 	assert.Equal(t, "alice@example.com", emailAttr.Value)
 	assert.Equal(t, domain.AttributeUniquenessProject, emailAttr.UniqueScope, "x-unique on the schema must carry through")
 
-	givenAttr, _ := captured.Attributes.Get("givenName")
+	givenAttr, ok := captured.Attributes.Get("givenName")
+	assert.True(t, ok, "attributes must contain givenName key")
 	assert.Equal(t, "Alice", givenAttr.Value)
 
-	familyAttr, _ := captured.Attributes.Get("familyName")
+	familyAttr, ok := captured.Attributes.Get("familyName")
+	assert.True(t, ok, "attributes must contain familyName key")
 	assert.Equal(t, "Doe", familyAttr.Value)
 }
 

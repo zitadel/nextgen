@@ -3,7 +3,6 @@ package domain
 import (
 	"crypto/sha256"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -96,7 +95,7 @@ func (attrs Attributes) ToMap() (map[string]any, error) {
 				m = make(map[string]any)
 			} else if m, ok = v.(map[string]any); !ok {
 				// if the key overlaps with another value which is not an object, error to be sure
-				return nil, errors.New("the given key already exists in the map with a value which is not a map")
+				return nil, fmt.Errorf("the given key already exists in the map with a value which is not a map (%s)", keyNodes[0])
 			}
 
 			subTree[keyNodes[0]] = m
