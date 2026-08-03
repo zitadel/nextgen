@@ -1,7 +1,7 @@
 # ADR 022: Flow Back-Navigation
 
-> **Status:** Proposed
-> **Date:** 2026-05-21
+> **Status:** Accepted
+> **Date:** 2026-05-21 (revised 2026-07-29 to match the shipped implementation)
 > **Context:** Flow engine step traversal, browser History API, `<zitadel-login>` orchestrator
 
 ## Decision
@@ -68,81 +68,120 @@ single source of truth.
 
 ### Browser History API integration
 
-The orchestrator uses opaque, fragment-based `pushState` entries to give the
-browser a history stack that mirrors the flow's step progression. This makes
-the native back gesture work without page reloads.
+The orchestrator keeps **at most one** same-document history entry — the
+*sentinel* — on the stack while the current step carries a `kind: "back"`
+action. The sentinel is pushed with
+`history.pushState({ ...history.state, zl: true }, "")`, reusing the
+current URL and spreading the host's existing state — SPA routers
+(e.g. vue-router's `position`/`back`/`forward`) keep reading a
+consistent sequence, and the sentinel stays transparent to them. No
+fragments, no visible URL change, no interaction with hash-router
+host apps. Its only job is to make the
+browser's native back gesture fire `popstate` instead of leaving the page.
 
 #### Lifecycle
 
-1. **On each submit response** (after `applyResponse`):
-   - New step has a `kind: "back"` action and the step name changed →
-     `history.pushState(null, '', '#s' + this.stepSeq++)`.
-   - Otherwise → no history call.
+1. **On each applied step response:**
+   - Step has a `kind: "back"` action and the widget is not armed →
+     push the sentinel, mark armed.
+   - Step has no back action and the widget is armed → mark disarmed and
+     retire the sentinel with a self-initiated `history.back()` (flagged,
+     so the resulting `popstate` is ignored) — but **only while the
+     sentinel is still the top entry** (`history.state.zl`). If the host
+     pushed its own entry after arming, traversing would pop the host's
+     entry and trigger a navigation the user never asked for; the
+     sentinel leaks instead (the same tradeoff as disconnect) and the
+     `popstate` handler skips stale sentinels in one extra hop from
+     either direction. The next back press then navigates the host page —
+     the flow is transparent to history once back is unavailable.
+   - Arming only on the unarmed → armed transition means consecutive
+     back-capable steps — and re-renders of the *same* step, e.g. after a
+     failed submit — never grow the stack.
 
-2. **On `popstate` event** (browser back button):
-   - If the current step has a `kind: "back"` action →
-     submit `{ action: <that action's name> }` to the API, apply the
-     response.
-   - Else → call `history.forward()` to restore the consumed entry
-     without growing the stack, and surface a brief visual indicator
-     that going back is not available. This avoids trapping the user
-     in an ever-growing back loop — the history stack stays fixed and
-     the host page remains reachable once the flow's entries are
-     exhausted.
+2. **On `popstate`:**
+   - Self-initiated (retire in progress) → ignore.
+   - Armed, and the landing state **is** the sentinel → the host page had
+     pushed an entry above ours (e.g. an in-page `#anchor` click) and the
+     user backed out of it. Position is as expected; the gesture was aimed
+     at the host entry, not the flow. Do nothing.
+   - Armed, otherwise → the browser consumed the sentinel: **re-arm it
+     immediately**, then submit the step's back action. Re-arming first
+     keeps the stack shape identical at every flow depth, so repeated
+     presses behave the same no matter how deep the user is.
+   - Disarmed, landing on a retired sentinel (it survives as a *forward*
+     entry after retirement) → bounce with `history.back()`. Flow state is
+     server-authoritative; the browser cannot skip ahead.
+   - Anything else is host-page traversal — leave the browser alone.
 
-3. **On `disconnectedCallback`** (widget removed):
-   - Remove the `popstate` listener — clean up
+3. **`connectedCallback` / `disconnectedCallback`** add and remove the
+   `popstate` listener. A sentinel left on the stack by a disconnect is a
+   harmless no-op entry; it is deliberately *not* cleaned up on
+   disconnect, because Lit disconnects also fire on DOM moves and touching
+   history there could fight a host router mid-navigation.
 
-#### Why fragments?
+#### Why a single re-armed entry?
 
-Fragment-only URL changes (`#s1` → `#s2`) are **same-document
-navigation**. The browser:
+An earlier draft of this ADR used one fragment entry per step (`#s1`,
+`#s2`, …) with a `stepSeq` counter. Review killed it: the per-step stack
+drifts from the flow position on every back-submit, which produced
+unreachable forward-detection logic, a back-button trap once stale
+entries accumulated, and stack growth on same-step re-renders. The single
+sentinel makes those states unrepresentable:
 
-- Does **not** reload the page
-- Does **not** unmount the DOM
-- Does **not** clear JavaScript state
-- Only fires a `popstate` event
-
-The `<zitadel-login>` element stays connected with all in-memory state
-(`response`, `formValues`, `loading`) intact. The orchestrator simply catches
-`popstate`, submits the `back` action, and re-renders with the API response —
-identical to clicking an in-UI back button.
+- The stack never grows, so there is nothing to drain and no trap.
+- The URL never changes, so hash-router hosts are unaffected.
+- There is no counter to reset between flows.
+- It is the standard intercept pattern browsers and users already know
+  from modals and wizards.
 
 #### Edge cases
 
 | Scenario | Behavior |
 |---|---|
-| User presses back on the initial step | No `kind: "back"` action → browser navigates the host page (leaves the flow) — correct behavior |
-| User presses forward after going back | `popstate` fires with a forward state — orchestrator calls `history.back()` to undo the traversal and keep the URL aligned with the displayed step. The flow state is server-authoritative; the browser cannot skip ahead. |
-| Multiple rapid back presses | Each `popstate` triggers a sequential `submit("back")` — the session token rotation prevents race conditions |
-| Embedded in a SPA with its own router | The host router and the flow's fragment entries coexist — fragments are scoped and don't conflict with path-based routing |
+| Back press on the initial step | Never armed → browser navigates the host page (leaves the flow) — correct |
+| Back press on a back-capable step | Sentinel consumed → re-armed, back action submitted |
+| Back press after returning to a step without back | Sentinel already retired → browser navigates the host page |
+| Forward press onto a retired sentinel | Bounced with `history.back()` — flow state is server-authoritative |
+| Host pushes an entry above the sentinel (e.g. `#anchor`) | Backing out of it lands on the sentinel → no-op, widget stays armed |
+| Multiple rapid back presses | Each `popstate` re-arms; submits are serialized by the loading guard, so presses during an in-flight submit are absorbed |
+| Embedded in a SPA with its own router | Router navigation via `pushState`/`replaceState` fires no `popstate`; when disarmed the handler only reacts to its own tagged (`zl`) entries |
 
 ### Template rendering
 
-The `default.liquid` template already iterates all non-primary actions and
-renders them. A `kind: "back"` action renders automatically as a secondary
-button or link — no template changes required.
+Templates render **no visible control** for the back action — the
+browser's native back gesture (mapped to the wire action by the History
+API integration above) is the affordance. This mirrors modern auth flows:
+back splits into *data correction* (served contextually where needed) and
+*step traversal* (served by the gesture); a generic "Back" control serves
+both poorly and adds card noise.
 
-For visual consistency, the back action can be rendered as a left-arrow
-link above the card (matching common auth UI patterns) by selecting it
-by kind in the template:
+The back action is deliberately **excluded from the generic
+secondary-action loop** — templates filter it by kind, never by name, so
+an engine-injected back can never surface as an off-design secondary
+button:
 
 ```liquid
-{% assign back = actions | where: "kind", "back" | first %}
-{% if back %}
-  <a class="zl-card-nav__link" data-action="{{ back.name }}">
-    {{ back.text_key | t }}
-  </a>
-{% endif %}
+{% unless a.primary or a.kind == 'back' or ... %}
+  <zl-button ... ></zl-button>
+{% endunless %}
 ```
+
+The default template and every shipped branding design carry this
+exclusion. Tenant templates remain free to render an explicit control
+from the wire action (`kind: "back"` and its `text_key` stay on the
+response); the contract encodes no flow topology client-side, and neither
+must any template that renders it.
 
 ### Mock server changes
 
-No per-step `back` transitions in the xstate machine — the mock engine
-derives back from its runtime history, same as production. The mock
-classifies the same action semantics as irreversible (e.g., the action
-that creates the user) so `back` is automatically omitted on the
-following step.
+The xstate mock approximates the production injection rules rather than
+deriving them from a runtime history: fixtures advertise a `kind: "back"`
+action on steps whose real counterparts have a reversible predecessor
+(`password`, `register-password`), and the machine carries explicit
+guarded `back` transitions for those states. Initial steps (`identifier`,
+`register`) and states unreachable in the default flow advertise no back
+action — an unreachable state must not encode a predecessor relationship
+that no path produces.
 
 ## Context
 
@@ -199,11 +238,15 @@ increases flow abandonment.
   reversibility metadata; the engine derives back from the runtime
   `history` array (see `flow-engine-storage.md`) and from the semantics
   of the actions it executes.
-- **`zitadel-login.ts`** — gains `pushState` calls on step transitions and a
-  `popstate` listener.
+- **`zitadel-login.ts`** — gains the sentinel arm/retire logic in
+  `applyResponse` and the `popstate` handler described above.
+- **Templates** — the default template and the branding design catalog
+  exclude `kind: "back"` from the generic secondary-action loop and
+  render no control for it.
 - **Locale files** — gain `action.back` translation key.
-- **Mock server** — no `back` edges added to `flow-machine.ts`; the mock
-  engine applies the same back-injection rules as production.
+- **Mock server** — `flow-machine.ts` carries explicit guarded `back`
+  edges and the fixtures advertise the action, approximating the
+  production injection rules (see §Mock server changes).
 
 [storage]: ../design/flowengine/flow-engine-storage.md
 [submit]: ../../api/openapi/components/flows/flow-submit-request.yaml
