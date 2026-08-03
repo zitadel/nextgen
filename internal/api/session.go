@@ -72,6 +72,9 @@ func exchangeInputFromRequest(req *api.ExchangeRequest, params api.ExchangeHando
 }
 
 func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (api.GetSessionRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opRead); err != nil {
+		return nil, err
+	}
 	input := service.GetSessionInput{
 		ProjectID: string(params.ProjectID),
 		SessionID: string(params.SessionID),
@@ -109,6 +112,9 @@ func (h Handler) GetMySession(ctx context.Context) (api.GetMySessionRes, error) 
 }
 
 func (h Handler) ListSessions(ctx context.Context, params api.ListSessionsParams) (api.ListSessionsRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opRead); err != nil {
+		return nil, err
+	}
 	input := service.ListSessionInput{
 		ProjectID: string(params.ProjectID),
 		// TODO: handle params
@@ -121,6 +127,9 @@ func (h Handler) ListSessions(ctx context.Context, params api.ListSessionsParams
 }
 
 func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionParams) (api.RevokeSessionRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opDelete); err != nil {
+		return nil, err
+	}
 	input := service.DeleteSessionInput{
 		ProjectID: string(params.ProjectID),
 		SessionID: string(params.SessionID),
@@ -309,6 +318,8 @@ func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrSessionTokenInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
+	case domain.ErrSessionPermissionDenied().Code:
+		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	case domain.ErrNotImplemented().Code:
 		return errorResponseWithStatusCode(http.StatusNotImplemented, err)
 	case domain.ErrSessionInvalidTTL().Code:
