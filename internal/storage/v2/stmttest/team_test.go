@@ -256,3 +256,52 @@ func TestTeamStatements_Deactivate(t *testing.T) {
 		assert.Equal(t, domain.TeamStatusDeactivated, stored.Status)
 	})
 }
+
+func TestTeamStatements_Deactivate_CascadesMembershipsAndOwnedUsers(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+
+		ownerTeamID, otherTeamID := uniqueTeamID(t), uniqueTeamID(t)
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, ownerTeamID)))
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, otherTeamID)))
+
+		selfOwned := newTestUser(t, projectID, schemaURL, "usr-self-"+ownerTeamID, "self@example.com", "Self")
+		require.NoError(t, d.stmts.CreateUser(t.Context(), selfOwned))
+		teamOwned := newTestUser(t, projectID, schemaURL, "usr-owned-"+ownerTeamID, "owned@example.com", "Owned")
+		teamOwned.LifecycleOwnerTeamID = &ownerTeamID
+		require.NoError(t, d.stmts.CreateUser(t.Context(), teamOwned))
+
+		memberships := []*domain.TeamMembership{
+			{ProjectID: projectID, TeamID: ownerTeamID, UserID: selfOwned.ID, Status: domain.MembershipStatusActive},
+			{ProjectID: projectID, TeamID: ownerTeamID, UserID: teamOwned.ID, Status: domain.MembershipStatusActive},
+			// Deactivating the owner team reaches this one through the user, not the team.
+			{ProjectID: projectID, TeamID: otherTeamID, UserID: teamOwned.ID, Status: domain.MembershipStatusActive},
+		}
+		for _, membership := range memberships {
+			require.NoError(t, d.stmts.CreateTeamMembership(t.Context(), membership))
+		}
+
+		require.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, ownerTeamID))
+
+		userStatus := func(userID string) domain.UserStatus {
+			user, err := d.stmts.GetUser(t.Context(),
+				database.And(
+					database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+					database.Equal(database.Col(domain.UserFieldID), userID),
+				),
+				service.UserQueryOptions{},
+			)
+			require.NoError(t, err)
+			return user.Status
+		}
+		assert.Equal(t, domain.UserStatusActive, userStatus(selfOwned.ID))
+		assert.Equal(t, domain.UserStatusDeactivated, userStatus(teamOwned.ID))
+
+		for _, membership := range memberships {
+			stored, err := d.stmts.GetTeamMembership(t.Context(), projectID, membership.TeamID, membership.UserID)
+			require.NoError(t, err)
+			assert.Equal(t, domain.MembershipStatusRemoved, stored.Status,
+				"membership team=%s user=%s", membership.TeamID, membership.UserID)
+		}
+	})
+}
