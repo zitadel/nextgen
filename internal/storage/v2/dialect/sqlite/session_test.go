@@ -37,6 +37,26 @@ func handoffCompletedAttempt(t *testing.T, projectID string, mutate func(*domain
 	return plainToken, attempt
 }
 
+func ensureTestUser(t *testing.T, projectID, userID string) {
+	t.Helper()
+	schemaURL := "https://example.com/schemas/session-test"
+	_ = testPool.CreateJSONSchema(t.Context(), &domain.JSONSchema{
+		ProjectID: projectID,
+		URL:       schemaURL,
+		Schema:    []byte(`{"type":"object"}`),
+	})
+	emailAttr, err := domain.NewCreateAttribute("email", userID+"@example.com", domain.AttributeUniquenessProject)
+	require.NoError(t, err)
+	nameAttr, err := domain.NewCreateAttribute("name", userID, domain.AttributeUniquenessUnspecified)
+	require.NoError(t, err)
+	require.NoError(t, testPool.CreateUser(t.Context(), &domain.CreateUser{
+		ProjectID:  projectID,
+		SchemaURL:  schemaURL,
+		ID:         userID,
+		Attributes: []*domain.CreateAttribute{emailAttr, nameAttr},
+	}))
+}
+
 func TestSessionStatements_Exchange_basic(t *testing.T) {
 	projectID := "proj-sess-ex-" + t.Name()
 	require.NoError(t, testPool.CreateProject(t.Context(), &domain.Project{ID: projectID, Name: "s"}))
@@ -61,6 +81,7 @@ func TestSessionStatements_Exchange_withUserAndPassword(t *testing.T) {
 	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 
 	userID := "user_1"
+	ensureTestUser(t, projectID, userID)
 	plain, _ := handoffCompletedAttempt(t, projectID, func(a *domain.AuthAttempt) {
 		a.RequiredChecks = []domain.AuthCheckType{domain.AuthCheckTypeUser, domain.AuthCheckTypePassword}
 		userFactor := domain.SetAuthFactorUser(time.Now().UTC())
@@ -87,10 +108,12 @@ func TestSessionStatements_Exchange_concurrent(t *testing.T) {
 	const n = 8
 	plains := make([]string, n)
 	for i := 0; i < n; i++ {
+		userID := fmt.Sprintf("user_%d", i)
+		ensureTestUser(t, projectID, userID)
 		plain, _ := handoffCompletedAttempt(t, projectID, func(a *domain.AuthAttempt) {
 			a.RequiredChecks = []domain.AuthCheckType{domain.AuthCheckTypeUser, domain.AuthCheckTypePassword}
 			uf := domain.SetAuthFactorUser(time.Now().UTC())
-			uf.UserID = fmt.Sprintf("user_%d", i)
+			uf.UserID = userID
 			a.Checks = []domain.AuthCheck{uf, domain.SetAuthFactorPassword(time.Now().UTC())}
 		})
 		plains[i] = plain

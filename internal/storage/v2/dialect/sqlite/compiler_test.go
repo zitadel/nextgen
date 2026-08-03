@@ -82,3 +82,13 @@ func TestCompileStringFilterIgnoreCase(t *testing.T) {
 	require.Len(t, c.args, 1)
 	assert.Equal(t, "Acme", c.args[0])
 }
+
+func TestCompileStringFilterLikeUsesEscape(t *testing.T) {
+	t.Parallel()
+
+	var c statementCompiler
+	compileFilter(&c, database.StringContains(database.Col(domain.ProjectFieldName), `100%_a\b`), projectSchema)
+	assert.Equal(t, `name LIKE '%' || ? || '%' ESCAPE '\'`, c.String())
+	require.Len(t, c.args, 1)
+	assert.Equal(t, `100\%\_a\\b`, c.args[0])
+}

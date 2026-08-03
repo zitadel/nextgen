@@ -44,6 +44,8 @@ export NEXTGEN_DATABASE_POSTGRES='postgres://zitadel:zitadel@localhost:5432/next
 
 SQLite is intended for local development and small single-node deployments
 (single-writer limits apply). Use PostgreSQL or Spanner for production.
+`IgnoreCase` string filters use SQLite's `LOWER()`, which only folds ASCII —
+non-ASCII case folding (for example `Ü`/`ü`) can diverge from Postgres.
 
 Migrations run automatically when the server starts.
 

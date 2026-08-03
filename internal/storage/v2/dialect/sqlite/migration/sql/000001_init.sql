@@ -165,7 +165,8 @@ CREATE TABLE user_agents (
     created_at  INTEGER,
     updated_at  INTEGER,
     CONSTRAINT fk_user_agents_project
-        FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+        FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+    CONSTRAINT uq_user_agents_project_id UNIQUE (project_id, id)
 );
 -- +goose StatementEnd
 
@@ -182,7 +183,22 @@ CREATE TABLE tokens (
     expires_at      INTEGER,
     created_at      INTEGER NOT NULL,
     CONSTRAINT fk_tokens_project
-        FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+        FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+    CONSTRAINT fk_tokens_user
+        FOREIGN KEY (project_id, user_id) REFERENCES users (project_id, id) ON DELETE CASCADE,
+    CONSTRAINT chk_tokens_type_identifiers CHECK (
+        (token_type = 'session_token'
+            AND session_id IS NOT NULL
+            AND oidc_session_id IS NULL AND saml_session_id IS NULL)
+        OR (token_type = 'oidc_access_token'
+            AND oidc_session_id IS NOT NULL
+            AND session_id IS NULL AND saml_session_id IS NULL)
+        OR (token_type = 'saml_assertion'
+            AND saml_session_id IS NOT NULL
+            AND session_id IS NULL AND oidc_session_id IS NULL)
+        OR (token_type = 'personal_access_token'
+            AND session_id IS NULL AND oidc_session_id IS NULL AND saml_session_id IS NULL)
+    )
 );
 -- +goose StatementEnd
 
@@ -198,7 +214,11 @@ CREATE TABLE sessions (
     user_id       TEXT,
     user_agent_id INTEGER,
     CONSTRAINT fk_sessions_project
-        FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+        FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+    CONSTRAINT fk_sessions_user
+        FOREIGN KEY (project_id, user_id) REFERENCES users (project_id, id) ON DELETE CASCADE,
+    CONSTRAINT fk_sessions_user_agent
+        FOREIGN KEY (project_id, user_agent_id) REFERENCES user_agents (project_id, id)
 );
 -- +goose StatementEnd
 

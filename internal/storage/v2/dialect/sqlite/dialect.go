@@ -77,7 +77,7 @@ func (c Config) dsn() (string, error) {
 // transactions cannot upgrade into SQLITE_BUSY_SNAPSHOT after another writer
 // commits. busy_timeout covers remaining lock waits if MaxOpenConns is raised.
 // Pragmas are applied via DSN so every opened connection gets them.
-const sqlitePragmaQuery = "_txlock=immediate&_pragma=busy_timeout(30000)&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)"
+const sqlitePragmaQuery = "_txlock=immediate&_pragma=busy_timeout(30000)&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=case_sensitive_like(1)"
 
 // Name implements [database.Dialect].
 func (c Config) Name() string {

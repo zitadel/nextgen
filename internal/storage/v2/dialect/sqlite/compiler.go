@@ -200,6 +200,9 @@ func compileStringFilter[F ~uint8, T any](c *statementCompiler, filter *database
 		}
 		c.WriteString(" LIKE ")
 		pattern.CompileLikePattern(c, filter.Match, value)
+		// SQLite has no default LIKE escape character; EscapeLikePattern uses
+		// backslash, so ESCAPE must be stated explicitly.
+		c.WriteString(` ESCAPE '\'`)
 	default:
 		panic("unknown string match")
 	}
@@ -237,6 +240,9 @@ func (c *statementCompiler) WriteArg(arg any) {
 
 // writeArg appends a ? placeholder and converts time.Time / time.Duration to
 // the integer representations used by SQLite (Unix nanoseconds).
+// INTEGER Unix-nanos cover roughly years 1678–2262; a zero time.Time{} passed
+// by value stores an overflowed number that round-trips near year 1754 rather
+// than a zero instant. Prefer now or *time.Time (nil → SQL NULL).
 func writeArg(c *statementCompiler, arg any) {
 	switch v := arg.(type) {
 	case time.Time:

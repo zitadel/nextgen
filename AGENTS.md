@@ -360,15 +360,6 @@ The repo requires the Node.js version from `.nvmrc`; sandbox images often
 ship an older default. Ensure the `.nvmrc` version is first on `$PATH` (for
 example via nvm) before running any `corepack` or `pnpm` command.
 
-### System dependencies for Go tests
-
-`libicu-dev` and `libssl-dev` are required at runtime by `embedded-postgres`
-when intentionally running Postgres-backed tests or an explicit
-`database.postgres:` / embedded Postgres path. The default local runtime uses
-SQLite and does not need them. If Go tests fail with missing-library errors
-while using embedded Postgres, install them once with
-`sudo apt-get install -y -qq libicu-dev libssl-dev`.
-
 ### Playwright browser install gotcha
 
 The standard `playwright install --with-deps chromium` may hang during zip

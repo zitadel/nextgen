@@ -30,7 +30,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, 0) RETURNING id`
 
 	deleteAuthAttemptByIDStmt = `DELETE FROM auth_attempts WHERE project_id = ? AND id = ?`
 
-	handoffAuthAttemptStmt = `UPDATE auth_attempts SET handoff_token = ?, handed_off_at = ? WHERE project_id = ? AND id = ?`
+	handoffAuthAttemptStmt = `UPDATE auth_attempts SET handoff_token = ?, handed_off_at = ? WHERE project_id = ? AND id = ? RETURNING handed_off_at`
 
 	setAuthAttemptChallengeStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload, failure_count, last_failed_at)` +
 		` VALUES (?, ?, ?, ?, ?, 0, NULL) ON CONFLICT (project_id, auth_attempt_id, type)` +
@@ -287,12 +287,15 @@ func (as authAttemptStatements) HandoffAuthAttempt(ctx context.Context, attempt 
 		return err
 	}
 	now := time.Now().UTC()
-	if _, err := as.client.Exec(ctx, handoffAuthAttemptStmt,
+	var handedOffNano int64
+	err = as.client.QueryRow(ctx, handoffAuthAttemptStmt,
 		attempt.HandoffToken.TokenHash, now.UnixNano(), attempt.ProjectID, id,
-	); err != nil {
+	).Scan(&handedOffNano)
+	if err != nil {
 		return fmt.Errorf("failed to handoff auth attempt: %w", wrapError(err))
 	}
-	attempt.HandedOffAt = &now
+	handedOffAt := timeFromUnixNano(handedOffNano)
+	attempt.HandedOffAt = &handedOffAt
 	return nil
 }
 

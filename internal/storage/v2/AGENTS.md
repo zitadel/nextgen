@@ -51,8 +51,21 @@ Behavioral statement parity across dialects lives in
 and/or sqlite, and `forEachDialect` loops dialects. CI still runs one tag per
 job; multiple tags are supported in one process for local parity checks.
 
+**When you add or fix dialect statement or schema behavior** under
+`dialect/{postgres,spanner,sqlite}/`, you **must** add or extend a portable
+`forEachDialect` suite in [`stmttest/`](stmttest/) for any domain-visible
+change: new statement methods, corrected error semantics (for example
+`NoRowFoundError`), and filter / cascade / uniqueness contracts that statements
+rely on. Assert through `service.AllStatements` only — no dialect SQL.
+
+Dialect packages keep **engine-specific** tests only: compiler SQL shape, error
+wrapping, `withTransaction` nesting, and migration/DDL smoke. Do not duplicate
+upward: if `stmttest` can assert the behavior, put it there — not a per-dialect
+copy of the same scenario.
+
+Bring-up tags: `postgres_integration`, `spanner_integration`,
+`sqlite_integration`.
+
 [`dbtest.Pool`](dbtest/dbtest.go) is the migrated bring-up type
-(`database.Pool` + `service.Pool`). Dialect packages keep engine-specific
-tests (compiler SQL shape, error wrapping, `withTransaction` nesting,
-migrations). Cursor-tie project seeding uses dialect
+(`database.Pool` + `service.Pool`). Cursor-tie project seeding uses dialect
 `SeedProjectsTiedAt` helpers under the integration build tags.
