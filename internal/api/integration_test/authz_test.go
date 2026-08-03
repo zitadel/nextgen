@@ -191,7 +191,7 @@ func TestManagementAuthz(t *testing.T) {
 
 			getResp, err := ownClient.GetUserByID(t.Context(), api.GetUserByIDParams{ProjectID: victimID, UserID: victimUserID})
 			require.NoError(t, err)
-			assert.IsType(t, &api.GetUserByIDOK{}, getResp, helpers.MustMarshal(t, getResp))
+			assert.IsType(t, &api.User{}, getResp, helpers.MustMarshal(t, getResp))
 
 			// The owner's secret does reach the delete: project.write implies
 			// user.delete, so the rejection above was the binding, not the op.
@@ -234,6 +234,10 @@ func TestManagementAuthz(t *testing.T) {
 			getResp, err := foreign.GetTeam(t.Context(), api.GetTeamParams{ProjectID: victimID, TeamID: "team_irrelevant"})
 			require.NoError(t, err)
 			assertAuthzError(t, getResp, "team.team_not_found")
+
+			updateResp, err := foreign.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, api.UpdateTeamParams{ProjectID: victimID, TeamID: "team_irrelevant"})
+			require.NoError(t, err)
+			assertAuthzError(t, updateResp, "team.project_not_found")
 		})
 
 		t.Run("preview secret rejected", func(t *testing.T) {
@@ -241,7 +245,13 @@ func TestManagementAuthz(t *testing.T) {
 
 			resp, err := preview.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: helpers.TeamName()}, api.CreateTeamParams{ProjectID: victimID})
 			require.NoError(t, err)
-			assertAuthzStatus(t, resp, 403, "team.permission_denied")
+			require.IsType(t, &api.CreateTeamForbidden{}, resp, helpers.MustMarshal(t, resp))
+			assertAuthzError(t, resp, "team.permission_denied")
+
+			updateResp, err := preview.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, api.UpdateTeamParams{ProjectID: victimID, TeamID: "team_irrelevant"})
+			require.NoError(t, err)
+			require.IsType(t, &api.UpdateTeamForbidden{}, updateResp, helpers.MustMarshal(t, updateResp))
+			assertAuthzError(t, updateResp, "team.permission_denied")
 		})
 
 		t.Run("unauthenticated create is a 401", func(t *testing.T) {

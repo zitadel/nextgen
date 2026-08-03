@@ -65,7 +65,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 
 	// --- Seed user + passkey into DB ------------------------------------------
 	// user_attributes is partitioned by team; a team is required.
-	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
 		Name:      helpers.TeamName(),
 	})
@@ -82,7 +82,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	decoyProject, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	harness.CreateUserSchema(t, decoyProject, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
-	decoyTeam, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+	decoyTeam, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: decoyProject.ID,
 		Name:      helpers.TeamName(),
 	})
@@ -94,7 +94,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		SchemaURL:               userSchemaURL,
 		ID:                      userID,
 		InitialMembershipTeamID: &decoyTeam.ID,
-		Attributes:              []*domain.CreateAttribute{decoyEmailAttr},
+		Attributes:              domain.CreateAttributes{*decoyEmailAttr},
 	}))
 	decoyCred := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
 	require.NoError(t, passkeys.Create(t.Context(), &domain.CreateUserPasskey{
@@ -115,7 +115,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		SchemaURL:               userSchemaURL,
 		ID:                      userID,
 		InitialMembershipTeamID: &team.ID,
-		Attributes:              []*domain.CreateAttribute{emailAttr},
+		Attributes:              domain.CreateAttributes{*emailAttr},
 	}))
 
 	require.NoError(t, passkeys.Create(t.Context(), &domain.CreateUserPasskey{

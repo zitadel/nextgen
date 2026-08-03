@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, readFile, realpath, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -164,6 +164,27 @@ describe("Next setup integration", () => {
       id: schemaId,
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
+    // Setup also records the scaffold manifest: exactly the app files it
+    // wrote, with content hashes and ownership classes, so `doctor` can later
+    // tell missing from edited from user-adopted. This fixture is a
+    // pre-existing app, so the framework home page is absent from the record.
+    const scaffold = (
+      state as unknown as {
+        scaffold: {
+          files: Record<string, { hash: string; class: string }>;
+          scaffolded_framework?: boolean;
+        };
+      }
+    ).scaffold;
+    // The fixture declares next ^16, so the boundary is proxy.ts.
+    expect(scaffold.files["proxy.ts"]).toMatchObject({
+      class: "infrastructure",
+      hash: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(scaffold.files["custom-elements.d.ts"]?.class).toBe("infrastructure");
+    expect(scaffold.files["app/login/page.tsx"]?.class).toBe("presentation");
+    expect(scaffold.files).not.toHaveProperty("app/page.tsx");
+    expect(scaffold.scaffolded_framework).toBeUndefined();
     expect(state.resources[".zitadel/flows/default-login.json"]).toMatchObject({
       id: expect.stringMatching(/^flow_/),
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),
@@ -186,6 +207,8 @@ describe("Next setup integration", () => {
     expect(loginPage).not.toContain('href="/register"');
     expect(loginPage).not.toContain("next/link");
     expect(loginPage).not.toContain('href="/profile"');
+    // The default (minimal) use case keeps the widget's neutral built-in copy.
+    expect(loginPage).not.toContain("businessLocales");
     const registerPage = await readFile(join(cwd, "app/register/page.tsx"), "utf8");
     expect(registerPage).toContain('purpose="register"');
     expect(registerPage).not.toContain('href="/login"');
@@ -193,9 +216,16 @@ describe("Next setup integration", () => {
     const profilePage = await readFile(join(cwd, "app/profile/page.tsx"), "utf8");
     expect(profilePage).toContain("zitadel-cli: managed-file v1");
     expect(profilePage).toContain("<zitadel-session");
+    // The session card is widget-first; the dedicated /profile route must opt
+    // into the full-page surface explicitly.
+    expect(profilePage).toContain('variant="page"');
     expect(profilePage).toContain("configureZitadel");
     expect(profilePage).toContain("project={project}");
     expect(profilePage).toContain('post-sign-out-url="/login"');
+    const customElements = await readFile(join(cwd, "custom-elements.d.ts"), "utf8");
+    // The JSX declarations ship with the SDK — the scaffold references them
+    // instead of carrying a hand-maintained copy that drifts.
+    expect(customElements).toContain('/// <reference types="@zitadel/sdk-next/jsx" />');
     const proxy = await readFile(join(cwd, "proxy.ts"), "utf8");
     expect(proxy).toContain("zitadel-cli: managed-file v1");
     expect(proxy).toContain("nextgenMiddleware");
@@ -320,6 +350,52 @@ describe("Next setup integration", () => {
     const planAfterApply = await cli(["plan", "--cwd", cwd, "--json"]);
     expect(planAfterApply.exitCode).toBe(0);
     expect((parseJson(planAfterApply.stdout) as { data: { total: number } }).data.total).toBe(0);
+  });
+
+  it("refuses setup below the Next 15 floor with an explicit error", async () => {
+    const cwd = await createNextProject("^14.2.0");
+    const setup = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
+    // ADR 043: unsupported versions are a loud gate, never a silent
+    // narrowing — the envelope carries the machine code and the floor.
+    expect(setup.exitCode).toBe(3);
+    const envelope = parseJson(setup.stdout) as { status: string; code: string; message: string };
+    expect(envelope.status).toBe("error");
+    expect(envelope.code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
+    expect(envelope.message).toContain("below the supported floor");
+    // The gate fires at detection, before any project or file mutation.
+    await expect(stat(join(cwd, "zitadel.json"))).rejects.toThrow();
+  });
+
+  it("reports the floor through the doctor envelope on a downgraded app", async () => {
+    // Scaffold healthy, then downgrade next below the floor — the ADR 043
+    // story doctor must tell truthfully: the advertised machine code and the
+    // upgrade hint, not a generic validation error recommending --fix (which
+    // cannot repair an unsupported version).
+    const cwd = await createNextProject();
+    const setup = await cli(["setup", "--cwd", cwd, "--non-interactive", "--json", "--skip-install"]);
+    expect(setup.exitCode).toBe(0);
+    const pkgPath = join(cwd, "package.json");
+    const pkg = JSON.parse(await readFile(pkgPath, "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    pkg.dependencies.next = "^14.2.0";
+    await writeFile(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+
+    const fake = await fakeDocker();
+    const port = await freePort();
+    const doctor = await cli(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
+    expect(doctor.exitCode).toBe(3);
+    const envelope = parseJson(doctor.stdout) as {
+      code: string;
+      hint?: string;
+      next_commands?: string[];
+    };
+    expect(envelope.code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
+    expect(envelope.hint).toContain("Upgrade the app to Next 15+");
+    expect((envelope.next_commands ?? []).join(" ")).not.toContain("--fix");
   });
 
   it("skips rerun setup without rewriting edited schema or flow config", async () => {
@@ -469,6 +545,48 @@ describe("Next setup integration", () => {
     expect(planJson.data.total).toBe(0);
   });
 
+  it("scaffolds business-use-case pages with the copy overlay and restores them alike", async () => {
+    const cwd = await createNextProject();
+    const setup = await cli([
+      "setup",
+      "--cwd",
+      cwd,
+      "--use-case",
+      "business",
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
+    expect(setup.exitCode).toBe(0);
+
+    // The overlay ships with the SDK; the generated pages wire it up (via the
+    // ref — React 18 safe) so the widget shows work-email wording while its
+    // built-in copy stays neutral.
+    const loginPage = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
+    expect(loginPage).toContain("element.locales = businessLocales");
+    const registerPage = await readFile(join(cwd, "app/register/page.tsx"), "utf8");
+    expect(registerPage).toContain("element.locales = businessLocales");
+    // The choice is recorded so later tooling can regenerate the same markup.
+    const zitadelJson = JSON.parse(await readFile(join(cwd, "zitadel.json"), "utf8")) as {
+      useCase?: string;
+    };
+    expect(zitadelJson.useCase).toBe("business");
+
+    // The A1×B2 seam: a repair regenerates the business-flavored markup, not
+    // the neutral default — doctor restores the renderer context from
+    // zitadel.json rather than assuming setup defaults.
+    await rm(join(cwd, "app/login/page.tsx"));
+    const fake = await fakeDocker();
+    const port = await freePort();
+    const fix = await cli(["doctor", "--cwd", cwd, "--json", "--fix", "--port", String(port)], {
+      PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+      DOCKER_LOG: fake.logPath,
+    });
+    expect(fix.exitCode).toBe(0);
+    const restored = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
+    expect(restored).toContain("element.locales = businessLocales");
+  });
+
   it("catches server-side flow invariants at plan time, before any mutation", async () => {
     const cwd = await createNextProject();
     const fakeNpm = await fakePackageManager("npm");
@@ -517,7 +635,7 @@ describe("Next setup integration", () => {
 
 });
 
-async function createNextProject(): Promise<string> {
+async function createNextProject(nextVersion = "^16.0.0"): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-next-"));
   await mkdir(join(cwd, "app"), { recursive: true });
   await writeFile(
@@ -527,7 +645,7 @@ async function createNextProject(): Promise<string> {
         name: "demo-next-app",
         private: true,
         dependencies: {
-          next: "^16.0.0",
+          next: nextVersion,
           react: "^19.0.0",
           "react-dom": "^19.0.0",
         },

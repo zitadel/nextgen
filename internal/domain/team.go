@@ -58,21 +58,30 @@ type Team struct {
 }
 
 func NewTeam(projectID, name string) (*Team, error) {
-	name = strings.TrimSpace(name)
-	if name == "" || utf8.RuneCountInString(name) > TeamNameMaxLength {
-		return nil, ErrTeamNameInvalid()
+	name, err := ValidateTeamName(name)
+	if err != nil {
+		return nil, err
 	}
 
 	id, err := newID(PrefixTeam)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create team id")
 	}
-
 	return &Team{
 		ProjectID: projectID,
 		ID:        id,
 		Name:      name,
 	}, nil
+}
+
+// ValidateTeamName returns the trimmed name, or ErrTeamNameInvalid when it is
+// empty or longer than TeamNameMaxLength.
+func ValidateTeamName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" || utf8.RuneCountInString(name) > TeamNameMaxLength {
+		return "", ErrTeamNameInvalid()
+	}
+	return name, nil
 }
 
 // TeamField enumerates the fields of Team which can be used for filtering and ordering.

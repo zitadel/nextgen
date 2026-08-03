@@ -1,7 +1,7 @@
 # @zitadel/testing
 
 Test-kit for **seeded ephemeral local Zitadel instances**: boot the real server
-(binary runtime + embedded Postgres, no Docker) from test code, create a
+(binary runtime + SQLite by default, no Docker) from test code, create a
 project with the default login flow, and mint password users that can complete
 the real login journey immediately.
 
@@ -54,15 +54,12 @@ export default defineConfig({
 
 ```ts
 // my-login.spec.ts
-import { expect, test } from "@zitadel/testing/playwright";
+import { expect, loginWithPassword, test } from "@zitadel/testing/playwright";
 
 test("user signs in with password", async ({ page, seed }) => {
   const user = await seed.user(); // unique email + password, loginable now
   await page.goto("/login");
-  await page.getByLabel(/email/i).fill(user.email);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.getByLabel(/password/i).fill(user.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await loginWithPassword(page, user); // drives the identifier → password steps
   await expect(page).toHaveURL(/\/admin/);
 });
 ```
@@ -96,6 +93,39 @@ log in through the UI for those. `seed.identity()` complements registration
 specs: an unused email+password that creates nothing, so the flow under test
 must create the user.
 
+### Drive the login flow
+
+Four ceremony helpers complete whole auth journeys against the
+`<zitadel-login>` widget. They are built on the widget's documented
+automation hooks (`zitadel-action-*`, `zitadel-field-*` / `zitadel-input-*`),
+not on translated button texts, so they survive locale and copy changes:
+
+```ts
+import {
+  loginWithPassword, // identifier → password (handles combined steps too)
+  loginWithPasskey, // identifier-first; or one-tap without an email
+  registerWithPassword, // unknown identifier → registration → password path
+  registerWithPasskey, // unknown identifier → registration → passkey ceremony
+} from "@zitadel/testing/playwright";
+
+await page.goto("/login");
+await registerWithPassword(page, { email, password });
+// assert your app's signed-in surface — the helpers never assert app state
+```
+
+They assume the default flow vocabulary (`submit` / `passkey` /
+`passkey_register` actions, `email` and password fields) and branch only on
+what the flow renders: flows that require extra registration fields get them
+via `profile: [{ field, value }]`, filled when present — a boolean value
+drives a checkbox, a string matches a select option or fills a text-like
+input. For custom flows or single steps, `flowAction(page, name)` /
+`flowField(page, name)` return plain locators for the same hooks, with
+`clickFlowAction` / `fillFlowField` as one-line wrappers. Broad fallbacks
+(accessible names via `{ name }` / `{ label }`, the generic `data-action`
+attribute) are scoped to the `<zitadel-login>` host element — so they never
+match same-named controls in your app's own chrome, and they keep working
+for custom templates that render no automation hooks.
+
 ### Test passkey flows
 
 `enableVirtualPasskey(page)` — also available as the on-demand `passkey`
@@ -106,7 +136,8 @@ the real registration and login ceremonies complete without an OS dialog:
 ```ts
 test("registers and signs in with a passkey", async ({ page, seed, passkey }) => {
   const who = seed.identity();
-  // drive /login → registration choice → "Register with passkey" …
+  await page.goto("/login");
+  await registerWithPasskey(page, { email: who.email });
   await expect.poll(() => passkey.credentialCount()).toBe(1);
 });
 ```
@@ -161,7 +192,7 @@ await z.seedUser({ email?, password?, attributes? }); // → { id, email, passwo
 await z.seedUsers(8, { email?, password?, attributes? }); // per-index templates
 z.identity(); // unused { email, password } — creates nothing
 await z.seedSession({ user? }); // → { user, sessionToken, expiresAt, cookie }
-await z.stop(); // stop server, reap embedded Postgres, remove owned temp dir
+await z.stop(); // stop server and remove owned temp dir
 ```
 
 `connectZitadel(handle)` returns the same surface minus lifecycle — this is
@@ -169,17 +200,20 @@ what the Playwright fixtures use, and what a future remote-instance mode would
 build on.
 
 From `@zitadel/testing/playwright`: the `test`/`expect` fixtures (`seed.user()`
-per test, `zitadel` per worker, `passkey` on demand), plus `withZitadel(options)`
-returning `{ webServer }` for the config, `enableVirtualPasskey(page)` for
-non-fixture pages, and `nextAppEnv`/`applyAppEnvTemplate` for the env-template
-mechanism described above.
+per test, `zitadel` per worker, `passkey` on demand), the flow ceremonies
+(`loginWithPassword`, `loginWithPasskey`, `registerWithPassword`,
+`registerWithPasskey`) with their locator-level escape hatches
+(`flowAction`/`flowField`, `clickFlowAction`/`fillFlowField`), plus
+`withZitadel(options)` returning `{ webServer }` for the config,
+`enableVirtualPasskey(page)` for non-fixture pages, and
+`nextAppEnv`/`applyAppEnvTemplate` for the env-template mechanism described
+above.
 
 ## How it works
 
 - **Lifecycle** shells out to `zitadel start/stop --json` (the CLI owns port
-  preflight, the health wait, process-group stop, and embedded-Postgres
-  reaping). Swapping this for direct library calls later will not change the
-  public API.
+  preflight, the health wait, and process-group stop). Swapping this for direct
+  library calls later will not change the public API.
 - **Bootstrap** is the server-side half of `zitadel setup`, no files:
   `POST /projects` (unauthenticated; returns the `projectSecret` used as
   bearer for everything else) → `POST /schemas` (server assigns the schema id)
@@ -195,13 +229,13 @@ project, so per-test `seed.user()` calls are isolation enough for login-flow
 tests, and tests run fully parallel against the shared instance
 (demonstrated by `demo-next-e2e:e2e-real`, 2 workers).
 
-Measured on an arm64 macBook (dev build, July 2026):
+Typical timings with the SQLite local default (dev build, July 2026 — estimates, not a fresh remeasure):
 
 | Operation | Time |
 | --- | --- |
-| Cold boot (fresh data dir: initdb + migrations + health) | ~20–27s |
-| Warm restart (existing data dir) | ~15s |
-| Stop incl. embedded-Postgres reap | ~12s |
+| Cold boot (fresh data dir: SQLite migrate + health) | typically under a few seconds |
+| Warm restart (existing data dir) | typically under a second |
+| Stop | typically under a second |
 | Bootstrap (project + schema + flow) | ~100ms |
 | Seed one user (create + password) | ~50ms |
 | Full `e2e-real` suite (boot + Next dev + 2 browser tests) | ~25s |
@@ -237,8 +271,8 @@ Customer installs need none of this.
   processes (Playwright workers) are unaffected.
 - macOS/Linux only for now. Not because of the port preflight (it degrades
   gracefully where `lsof` is missing) — the untested surface on Windows is the
-  process-group stop and embedded-Postgres lifecycle. Revisit once the local
-  runtime's SQLite default removes the Postgres component.
+  process-group stop for the local binary runtime. Revisit when Windows local
+  runtime support is a goal.
 
 ## Roadmap
 
@@ -264,18 +298,17 @@ on top, in intended order:
    `bootstrapProject({ baseUrl })` + `connectZitadel(handle)` already compose
    into this today; formalizing it means cleanup semantics and docs.
 5. **Vercel Sandbox runtime.** A publicly reachable ephemeral instance per
-   preview deployment (e.g. `@zitadel/testing/vercel`), returning the same
-   `InstanceHandle` so fixtures don't change. Gated on a spike: embedded
-   Postgres on the Sandbox image, forwarded proto/host handling, secure
-   cookies + issuer + handoff verification through `sandbox.domain()`,
-   registering the preview URL as an allowed origin post-deploy
-   (`PATCH /projects`), and cleanup that survives failed runs.
+  preview deployment (e.g. `@zitadel/testing/vercel`), returning the same
+  `InstanceHandle` so fixtures don't change. Gated on a spike: SQLite (or
+  another Sandbox-friendly store) on the Sandbox image, forwarded proto/host
+  handling, secure cookies + issuer + handoff verification through
+  `sandbox.domain()`, registering the preview URL as an allowed origin
+  post-deploy (`PATCH /projects`), and cleanup that survives failed runs.
 6. **Publishing.** Landed: the consumer journey installs the kit the way a
-   customer would in CI, and the kit ships on the release train (release
-   manifest + changeset `fixed` group), versioned in lockstep with
-   `@zitadel/cli`. Remaining: the Windows decision (deferred until the SQLite
-   local default removes the embedded-Postgres lifecycle) and the stability
-   commitment when the train leaves alpha.
+  customer would in CI, and the kit ships on the release train (release
+  manifest + changeset `fixed` group), versioned in lockstep with
+  `@zitadel/cli`. Remaining: the Windows decision for the local binary
+  runtime and the stability commitment when the train leaves alpha.
 
 Parked until server support exists: passkey *seeding* (pre-registered WebAuthn
 credentials) — UI-driven passkey ceremonies are covered today by

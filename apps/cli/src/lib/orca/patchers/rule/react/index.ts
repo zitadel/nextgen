@@ -12,7 +12,7 @@ const SDK_DEPENDENCY = "@zitadel/sdk-react";
  * `.zitadel/` base files from {@link AbstractRulePatcher} and contributes the
  * managed `src/App.tsx` auth entry, a non-destructive `vite.config.*` merge
  * that adds the `/__nextgen` dev proxy (attaching the project secret from
- * `ZITADEL_PROJECT_SECRET` to every proxied request), the `VITE_`-prefixed
+ * `ZITADEL_PROJECT_SECRET` only to `POST /sessions/exchange`), the `VITE_`-prefixed
  * project id, and the SDK dep.
  *
  * Unlike Next.js — whose middleware runs the proxy and token exchange
@@ -30,7 +30,7 @@ export class ReactPatcher extends AbstractRulePatcher implements ViteSupport {
 
   protected routeOps(ctx: PatchContext): FileOp[] {
     return [
-      { kind: "write", path: "src/App.tsx", contents: appTemplate() },
+      { kind: "write", path: "src/App.tsx", contents: appTemplate(ctx) },
       this.viteProxyOp(ctx.framework.devPort, ctx.server),
       // Vite only exposes VITE_-prefixed vars to client code (import.meta.env).
       { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },

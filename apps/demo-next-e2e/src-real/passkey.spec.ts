@@ -1,6 +1,9 @@
-import { expect, test } from "@zitadel/testing/playwright";
-
-import { clickAction, fillIfVisible } from "./flow-actions";
+import {
+  expect,
+  loginWithPasskey,
+  registerWithPasskey,
+  test,
+} from "@zitadel/testing/playwright";
 
 /**
  * Passkey round-trip through the real flow with the kit's virtual
@@ -18,16 +21,7 @@ test("a fresh identity registers with a passkey and signs back in with it", asyn
   const who = seed.identity();
 
   await page.goto("/login");
-  await page.getByLabel(/email/i).fill(who.email);
-  await clickAction(page, /continue|sign in/i, ["submit"]);
-  await expect(
-    page.getByRole("heading", { name: /create|register|sign up|no-account/i }),
-  ).toBeVisible({ timeout: 30_000 });
-
-  await fillIfVisible(page, /email/i, who.email);
-  await clickAction(page, /register.*passkey|passkey.*register|passkey_register/i, [
-    "passkey_register",
-  ]);
+  await registerWithPasskey(page, { email: who.email });
   await page.waitForURL(/\/admin(?:[/?#]|$)/, { timeout: 30_000 });
   await expect.poll(() => passkey.credentialCount()).toBe(1);
 
@@ -36,8 +30,7 @@ test("a fresh identity registers with a passkey and signs back in with it", asyn
   // The login surface re-hydrates after the navigation; wait for the field
   // before driving it (the journey documents this race after redirects).
   await expect(page.getByLabel(/email/i)).toBeVisible({ timeout: 30_000 });
-  await page.getByLabel(/email/i).fill(who.email);
-  await clickAction(page, /sign in with.*passkey|passkey/i, ["passkey"]);
+  await loginWithPasskey(page, { email: who.email });
   await page.waitForURL(/\/admin(?:[/?#]|$)/, { timeout: 30_000 });
 
   // Login must reuse the registered credential, not mint another.

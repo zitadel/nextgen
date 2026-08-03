@@ -1,12 +1,7 @@
 import { Flags } from "@oclif/core";
 
 import { ZitadelError } from "../lib/errors";
-import {
-  reapEmbeddedPostgres,
-  stopBinaryRuntime,
-  type ReapEmbeddedPostgresResult,
-  type StopBinaryRuntimeResult,
-} from "../lib/local-server/binary";
+import { stopBinaryRuntime, type StopBinaryRuntimeResult } from "../lib/local-server/binary";
 import { stopAndRemoveContainer } from "../lib/local-server/docker";
 import {
   discoverManagedRuntimeProcesses,
@@ -63,7 +58,6 @@ export default class Stop extends BaseCommand {
     }
 
     let stopResult: StopBinaryRuntimeResult | undefined;
-    let postgresResult: ReapEmbeddedPostgresResult | undefined;
     if (runtime?.backend === "binary") {
       stopResult = await stopBinaryRuntime(runtime.pid);
       if (stopResult.status === "failed") {
@@ -71,19 +65,6 @@ export default class Stop extends BaseCommand {
           hint: "Inspect the local runtime process and stop it manually, then rerun `zitadel stop`.",
           details: { runtime, stop_result: stopResult },
         });
-      }
-      // The server binary's embedded Postgres escapes its process group, so the
-      // stop above cannot reach it; reap it directly so the next start is clean.
-      postgresResult = await reapEmbeddedPostgres(runtime.data_dir);
-      if (postgresResult.status === "failed") {
-        throw new ZitadelError(
-          "E_VALIDATION",
-          "The local server's embedded Postgres did not stop",
-          {
-            hint: "Stop the lingering postgres process manually, then rerun `zitadel stop`.",
-            details: { runtime, stop_result: stopResult, postgres_result: postgresResult },
-          },
-        );
       }
     } else {
       await stopAndRemoveContainer(containerName);
@@ -103,7 +84,6 @@ export default class Stop extends BaseCommand {
                 pid: runtime.pid,
                 log_path: runtime.log_path,
                 stop_result: stopResult,
-                embedded_postgres: postgresResult,
               }
             : { container_name: containerName }),
           data_preserved: true,
