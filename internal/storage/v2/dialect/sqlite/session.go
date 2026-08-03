@@ -138,6 +138,7 @@ func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.S
 	if session.TimeToLive <= 0 {
 		session.TimeToLive = domain.SessionAnonymousTTL
 	}
+	now := nowUnixNano()
 	var userAgentID any
 	if session.UserAgent != nil {
 		info := session.UserAgent.Info
@@ -156,15 +157,14 @@ func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.S
 		}
 		var uaID int64
 		if err := ss.client.QueryRow(ctx,
-			`INSERT INTO user_agents (project_id, info) VALUES (?, ?) RETURNING id`,
-			session.ProjectID, string(raw),
+			`INSERT INTO user_agents (project_id, info, created_at, updated_at) VALUES (?, ?, ?, ?) RETURNING id`,
+			session.ProjectID, string(raw), now, now,
 		).Scan(&uaID); err != nil {
 			return fmt.Errorf("failed to insert user agent: %w", wrapError(err))
 		}
 		userAgentID = uaID
 	}
 
-	now := nowUnixNano()
 	var sessionID int64
 	var createdNano, updatedNano, expiresNano int64
 	err := ss.client.QueryRow(ctx,

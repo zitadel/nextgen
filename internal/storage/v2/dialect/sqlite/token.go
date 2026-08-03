@@ -310,7 +310,7 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 		SQLName: "expires_at",
 		Accessor: func(t *domain.Token) any {
 			if t.ExpiresAt == nil {
-				return time.Time{}
+				return (*time.Time)(nil)
 			}
 			return *t.ExpiresAt
 		},

@@ -189,17 +189,23 @@ func compileStringFilter[F ~uint8, T any](c *statementCompiler, filter *database
 			writeArg(c, filter.Value)
 		}
 	case database.StringMatchStartsWith, database.StringMatchContains, database.StringMatchEndsWith:
-		value := filter.Value
+		// Fold both sides with SQL LOWER so ASCII-only SQLite LOWER agrees
+		// with itself (Go strings.ToLower is Unicode-aware and can diverge).
 		if filter.IgnoreCase {
 			c.WriteString("LOWER(")
 			c.WriteString(col)
 			c.WriteString(")")
-			value = strings.ToLower(filter.Value)
 		} else {
 			c.WriteString(col)
 		}
 		c.WriteString(" LIKE ")
-		pattern.CompileLikePattern(c, filter.Match, value)
+		if filter.IgnoreCase {
+			c.WriteString("LOWER(")
+		}
+		pattern.CompileLikePattern(c, filter.Match, filter.Value)
+		if filter.IgnoreCase {
+			c.WriteString(")")
+		}
 		// SQLite has no default LIKE escape character; EscapeLikePattern uses
 		// backslash, so ESCAPE must be stated explicitly.
 		c.WriteString(` ESCAPE '\'`)

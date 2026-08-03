@@ -83,6 +83,16 @@ func TestCompileStringFilterIgnoreCase(t *testing.T) {
 	assert.Equal(t, "Acme", c.args[0])
 }
 
+func TestCompileStringFilterContainsFoldUsesSQLLower(t *testing.T) {
+	t.Parallel()
+
+	var c statementCompiler
+	compileFilter(&c, database.StringContainsFold(database.Col(domain.ProjectFieldName), "Übung"), projectSchema)
+	assert.Equal(t, `LOWER(name) LIKE LOWER('%' || ? || '%') ESCAPE '\'`, c.String())
+	require.Len(t, c.args, 1)
+	assert.Equal(t, "Übung", c.args[0])
+}
+
 func TestCompileStringFilterLikeUsesEscape(t *testing.T) {
 	t.Parallel()
 

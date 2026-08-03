@@ -75,5 +75,28 @@ func TestProjectStatements_StringFilters(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, []string{cased.ID}, projectIDs(res.Items))
 		})
+
+		t.Run("non-ascii same-case contains fold matches", func(t *testing.T) {
+			// Pins SQLite ASCII LOWER parity: Go ToLower("Übung") diverges from
+			// SQLite LOWER, so ignore-case LIKE must fold the needle in SQL too.
+			uebung := &domain.Project{ID: uniqueProjectID(t), Name: "Übung", PreviewOrigins: []string{}}
+			require.NoError(t, d.stmts.CreateProject(t.Context(), uebung))
+			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), uebung.ID) })
+
+			only := database.Equal(idCol, uebung.ID)
+			res, err := d.stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
+				Filter:     database.And(only, database.StringEqualFold(nameCol, "Übung")),
+				Pagination: orderByID,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, []string{uebung.ID}, projectIDs(res.Items))
+
+			res, err = d.stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
+				Filter:     database.And(only, database.StringContainsFold(nameCol, "Übung")),
+				Pagination: orderByID,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, []string{uebung.ID}, projectIDs(res.Items))
+		})
 	})
 }

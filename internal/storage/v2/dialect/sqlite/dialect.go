@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	_ "modernc.org/sqlite" // register "sqlite" driver
 
@@ -17,18 +19,28 @@ func init() {
 	database.MustRegisterDialect("sqlite", DecodeConfig)
 }
 
+// memoryDBSeq gives each :memory: Connect a unique shared-cache name so
+// independently opened pools in one process do not share a single database.
+var memoryDBSeq atomic.Uint64
+
 // Config holds the SQLite database path (or DSN).
 type Config struct {
-	// Path is a filesystem path to the database file. Directories are created
-	// on Connect. Prefer this for zero-config / config YAML.
+	// Path is a filesystem path to the database file, or ":memory:" for an
+	// in-memory database. Directories are created on Connect (0o700); the DB
+	// file and WAL/SHM siblings are tightened to 0o600 after open.
+	// ":memory:" is process-local: each Connect gets an isolated shared-cache
+	// database (unique URI name), not a process-wide singleton.
 	Path string
-	// DSN is a full modernc.org/sqlite DSN. When set, it takes precedence over Path.
+	// DSN is a full modernc.org/sqlite DSN. When set, it takes precedence over
+	// Path. Required pragmas from Path mode (_txlock, foreign_keys,
+	// case_sensitive_like, …) are merged into the DSN when missing so callers
+	// do not silently get SQLite defaults (FK off, case-insensitive LIKE).
 	DSN string
 }
 
 // Connect implements [database.Dialect].
 func (c Config) Connect(ctx context.Context) (database.Pool, error) {
-	dsn, err := c.dsn()
+	dsn, filePath, err := c.dsn()
 	if err != nil {
 		return nil, err
 	}
@@ -44,33 +56,103 @@ func (c Config) Connect(ctx context.Context) (database.Pool, error) {
 		_ = sqlDB.Close()
 		return nil, err
 	}
+	if filePath != "" {
+		tightenDBFilePerms(filePath)
+	}
 	return newPool(sqlDB), nil
 }
 
-func (c Config) dsn() (string, error) {
+func (c Config) dsn() (dsn string, filePath string, err error) {
 	if c.DSN != "" {
-		return c.DSN, nil
+		merged, err := mergeSQLitePragmas(c.DSN)
+		if err != nil {
+			return "", "", err
+		}
+		return merged, "", nil
 	}
 	if c.Path == "" {
-		return "", fmt.Errorf("sqlite: path or dsn is required")
+		return "", "", fmt.Errorf("sqlite: path or dsn is required")
 	}
 	if c.Path == ":memory:" {
-		// Shared cache so multiple pool connections see the same in-memory DB.
-		return "file:zitadel?mode=memory&cache=shared&" + sqlitePragmaQuery, nil
+		// Shared cache so multiple pool connections see the same in-memory DB;
+		// unique name so separate Connect calls stay isolated.
+		name := fmt.Sprintf("zitadel-%d", memoryDBSeq.Add(1))
+		return "file:" + name + "?mode=memory&cache=shared&" + sqlitePragmaQuery, "", nil
 	}
 	dir := filepath.Dir(c.Path)
 	if dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
-			return "", fmt.Errorf("sqlite: create data directory: %w", err)
+			return "", "", fmt.Errorf("sqlite: create data directory: %w", err)
 		}
 	}
 	// Absolute path in URI form; query params apply on every new connection
 	// (connection-scoped pragmas like foreign_keys default OFF otherwise).
 	abs, err := filepath.Abs(c.Path)
 	if err != nil {
-		return "", fmt.Errorf("sqlite: resolve path: %w", err)
+		return "", "", fmt.Errorf("sqlite: resolve path: %w", err)
 	}
-	return "file:" + filepath.ToSlash(abs) + "?" + sqlitePragmaQuery, nil
+	return "file:" + filepath.ToSlash(abs) + "?" + sqlitePragmaQuery, abs, nil
+}
+
+// mergeSQLitePragmas appends default pragma query params that are not already
+// present on the caller DSN. Non-_pragma keys are matched by name; _pragma
+// values are matched by pragma name (text before '(') so a caller can override
+// one pragma without dropping the rest. Defaults are appended in their raw
+// form (no re-encoding) so modernc.org/sqlite keeps accepting them.
+func mergeSQLitePragmas(dsn string) (string, error) {
+	base, queryPart, hasQuery := strings.Cut(dsn, "?")
+	existing := url.Values{}
+	if hasQuery && queryPart != "" {
+		var err error
+		existing, err = url.ParseQuery(queryPart)
+		if err != nil {
+			return "", fmt.Errorf("sqlite: parse dsn query: %w", err)
+		}
+	}
+
+	existingPragmaNames := make(map[string]struct{}, len(existing["_pragma"]))
+	for _, v := range existing["_pragma"] {
+		name, _, _ := strings.Cut(v, "(")
+		existingPragmaNames[name] = struct{}{}
+	}
+
+	var missing []string
+	for _, pair := range strings.Split(sqlitePragmaQuery, "&") {
+		key, val, ok := strings.Cut(pair, "=")
+		if !ok {
+			continue
+		}
+		if key == "_pragma" {
+			name, _, _ := strings.Cut(val, "(")
+			if _, ok := existingPragmaNames[name]; ok {
+				continue
+			}
+			missing = append(missing, pair)
+			continue
+		}
+		if existing.Has(key) {
+			continue
+		}
+		missing = append(missing, pair)
+	}
+	if len(missing) == 0 {
+		return dsn, nil
+	}
+	added := strings.Join(missing, "&")
+	if !hasQuery {
+		return base + "?" + added, nil
+	}
+	if queryPart == "" {
+		return base + "?" + added, nil
+	}
+	return base + "?" + queryPart + "&" + added, nil
+}
+
+func tightenDBFilePerms(path string) {
+	_ = os.Chmod(path, 0o600)
+	for _, suffix := range []string{"-wal", "-shm"} {
+		_ = os.Chmod(path+suffix, 0o600)
+	}
 }
 
 // _txlock=immediate acquires the write lock at BEGIN so deferred read
