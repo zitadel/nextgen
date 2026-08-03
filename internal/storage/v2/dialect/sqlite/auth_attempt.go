@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -22,19 +21,19 @@ const (
 		` FROM auth_attempts aa` +
 		` LEFT JOIN checks c ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id`
 
-	createAuthAttemptStmt = `INSERT INTO auth_attempts (project_id, required_checks, time_to_live, session_id, created_at)
-VALUES (?, ?, ?, ?, ?) RETURNING id`
+	createAuthAttemptStmt = `INSERT INTO auth_attempts (project_id, id, required_checks, time_to_live, session_id, created_at)
+VALUES (?, ?, ?, ?, ?, ?)`
 
-	createAuthCheckStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count)
-VALUES (?, ?, ?, ?, ?, ?, ?, 0) RETURNING id`
+	createAuthCheckStmt = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 
 	deleteAuthAttemptByIDStmt = `DELETE FROM auth_attempts WHERE project_id = ? AND id = ?`
 
 	handoffAuthAttemptStmt = `UPDATE auth_attempts SET handoff_token = ?, handed_off_at = ? WHERE project_id = ? AND id = ? RETURNING handed_off_at`
 
-	setAuthAttemptChallengeStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload, failure_count, last_failed_at)` +
-		` VALUES (?, ?, ?, ?, ?, 0, NULL) ON CONFLICT (project_id, auth_attempt_id, type)` +
-		` DO UPDATE SET last_challenged_at = EXCLUDED.last_challenged_at, challenge_payload = EXCLUDED.challenge_payload, failure_count = 0, last_failed_at = NULL` +
+	setAuthAttemptChallengeStmt = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_challenged_at, challenge_payload, failure_count, last_failed_at)` +
+		` VALUES (?, ?, ?, ?, ?, ?, 0, NULL) ON CONFLICT (project_id, auth_attempt_id, type)` +
+		` DO UPDATE SET id = excluded.id, last_challenged_at = EXCLUDED.last_challenged_at, challenge_payload = EXCLUDED.challenge_payload, failure_count = 0, last_failed_at = NULL` +
 		` RETURNING id`
 
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = ?, factor_payload = ?, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
@@ -53,6 +52,9 @@ func newAuthAttemptStatements(client queryExecutor) authAttemptStatements {
 
 // CreateAuthAttempt implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *domain.AuthAttempt) error {
+	if err := ensureManagedID(&attempt.ID, domain.PrefixAuthAttempt); err != nil {
+		return err
+	}
 	now := time.Now().UTC()
 
 	req, err := json.Marshal(func() []int64 {
@@ -73,24 +75,25 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 
 	var sessionID any
 	if attempt.SessionID != nil && *attempt.SessionID != "" {
-		id, err := parseIdentity(*attempt.SessionID)
-		if err != nil {
+		sessionID = *attempt.SessionID
+	}
+
+	checkIDs := make([]string, len(attempt.Checks))
+	for i := range attempt.Checks {
+		if err := ensureManagedID(&checkIDs[i], domain.PrefixChallenge); err != nil {
 			return err
 		}
-		sessionID = id
 	}
 
 	return withTransaction(ctx, as.client, func(ctx context.Context, tx queryExecutor) error {
-		var attemptID int64
-		if err := tx.QueryRow(ctx, createAuthAttemptStmt,
-			attempt.ProjectID, string(req), ttlNanos, sessionID, now.UnixNano(),
-		).Scan(&attemptID); err != nil {
+		if _, err := tx.Exec(ctx, createAuthAttemptStmt,
+			attempt.ProjectID, attempt.ID, string(req), ttlNanos, sessionID, now.UnixNano(),
+		); err != nil {
 			return fmt.Errorf("failed to create auth attempt: %w", wrapError(err))
 		}
-		attempt.ID = strconv.FormatInt(attemptID, 10)
 		attempt.CreatedAt = now
 
-		for _, check := range attempt.Checks {
+		for i, check := range attempt.Checks {
 			challenge, isChallenge := check.(domain.AuthChallenge)
 			factor, isFactor := check.(domain.AuthFactor)
 
@@ -100,6 +103,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 			if isChallenge {
 				challengedAtNano = now.UnixNano()
 				challenge.SetLastChallengedAt(now)
+				challenge.SetID(checkIDs[i])
 				p, err := authattempt.MarshalPayloadString(challenge.Payload())
 				if err != nil {
 					return fmt.Errorf("failed to marshal challenge payload: %w", err)
@@ -122,15 +126,11 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 				}
 			}
 
-			var checkID int64
-			if err := tx.QueryRow(ctx, createAuthCheckStmt,
-				attempt.ProjectID, attemptID, int64(check.Type()),
+			if _, err := tx.Exec(ctx, createAuthCheckStmt,
+				attempt.ProjectID, attempt.ID, checkIDs[i], int64(check.Type()),
 				challengedAtNano, verifiedAtNano, challengePayload, factorPayload,
-			).Scan(&checkID); err != nil {
+			); err != nil {
 				return fmt.Errorf("failed to create auth attempt check: %w", wrapError(err))
-			}
-			if isChallenge {
-				challenge.SetID(strconv.FormatInt(checkID, 10))
 			}
 		}
 		return nil
@@ -139,16 +139,12 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 
 // GetAuthAttemptByID implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) GetAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) (*domain.AuthAttempt, error) {
-	id, err := parseIdentity(authAttemptID)
-	if err != nil {
-		return nil, err
-	}
 	var c statementCompiler
 	c.WriteString(authAttemptGetSelect)
 	c.WriteString(" WHERE aa.project_id = ")
 	c.WriteArg(projectID)
 	c.WriteString(" AND aa.id = ")
-	c.WriteArg(id)
+	c.WriteArg(authAttemptID)
 	return as.getAttempt(ctx, c.String(), c.args...)
 }
 
@@ -181,14 +177,14 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 	for rows.Next() {
 		found = true
 		var (
-			attemptID          int64
+			attemptID          string
 			handoffToken       []byte
 			handedOffAtNano    sql.NullInt64
-			sessionIDVal       sql.NullInt64
+			sessionIDVal       sql.NullString
 			requiredChecksJSON string
 			checkType          sql.NullInt64
 			timeToLiveNano     sql.NullInt64
-			checkID            sql.NullInt64
+			checkID            sql.NullString
 			lastChallengedNano sql.NullInt64
 			verifiedAtNano     sql.NullInt64
 			lastFailedAtNano   sql.NullInt64
@@ -205,7 +201,7 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 		); err != nil {
 			return fmt.Errorf("failed to scan auth attempt: %w", err)
 		}
-		attempt.ID = strconv.FormatInt(attemptID, 10)
+		attempt.ID = attemptID
 		attempt.CreatedAt = timeFromUnixNano(createdNano)
 
 		if attempt.RequiredChecks == nil {
@@ -227,7 +223,7 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 			attempt.HandedOffAt = &t
 		}
 		if sessionIDVal.Valid {
-			s := strconv.FormatInt(sessionIDVal.Int64, 10)
+			s := sessionIDVal.String
 			attempt.SessionID = &s
 		}
 		if timeToLiveNano.Valid {
@@ -235,7 +231,7 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 			attempt.TimeToLive = &d
 		}
 
-		if !checkType.Valid || !checkID.Valid {
+		if !checkType.Valid || !checkID.Valid || checkID.String == "" {
 			continue
 		}
 		var (
@@ -258,7 +254,7 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 		}
 		checks, err := v2session.DecodeAuthChecks(
 			domain.AuthCheckType(checkType.Int64),
-			strconv.FormatInt(checkID.Int64, 10),
+			checkID.String,
 			lastChallengedAt, lastFailedAt, verifiedAt, fc,
 			json.RawMessage(nullJSONBytes(challengePayload)),
 			json.RawMessage(nullJSONBytes(factorPayload)),
@@ -281,11 +277,7 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 
 // DeleteAuthAttemptByID implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) DeleteAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) error {
-	id, err := parseIdentity(authAttemptID)
-	if err != nil {
-		return err
-	}
-	_, err = as.client.Exec(ctx, deleteAuthAttemptByIDStmt, projectID, id)
+	_, err := as.client.Exec(ctx, deleteAuthAttemptByIDStmt, projectID, authAttemptID)
 	return wrapError(err)
 }
 
@@ -294,14 +286,10 @@ func (as authAttemptStatements) HandoffAuthAttempt(ctx context.Context, attempt 
 	if attempt.HandoffToken == nil {
 		return fmt.Errorf("failed to handoff auth attempt: handoff token is required")
 	}
-	id, err := parseIdentity(attempt.ID)
-	if err != nil {
-		return err
-	}
 	now := time.Now().UTC()
 	var handedOffNano int64
-	err = as.client.QueryRow(ctx, handoffAuthAttemptStmt,
-		attempt.HandoffToken.TokenHash, now.UnixNano(), attempt.ProjectID, id,
+	err := as.client.QueryRow(ctx, handoffAuthAttemptStmt,
+		attempt.HandoffToken.TokenHash, now.UnixNano(), attempt.ProjectID, attempt.ID,
 	).Scan(&handedOffNano)
 	if err != nil {
 		return fmt.Errorf("failed to handoff auth attempt: %w", wrapError(err))
@@ -318,21 +306,21 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 	if err != nil {
 		return fmt.Errorf("failed to marshal challenge payload: %w", err)
 	}
-	id, err := parseIdentity(authAttemptID)
-	if err != nil {
+	checkID := ""
+	if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
 		return err
 	}
 	var payloadArg any
 	if payloadStr != nil {
 		payloadArg = *payloadStr
 	}
-	var checkID int64
+	var returnedID string
 	if err := as.client.QueryRow(ctx, setAuthAttemptChallengeStmt,
-		projectID, id, int64(challenge.Type()), now.UnixNano(), payloadArg,
-	).Scan(&checkID); err != nil {
+		projectID, authAttemptID, checkID, int64(challenge.Type()), now.UnixNano(), payloadArg,
+	).Scan(&returnedID); err != nil {
 		return fmt.Errorf("failed to set challenge: %w", wrapError(err))
 	}
-	challenge.SetID(strconv.FormatInt(checkID, 10))
+	challenge.SetID(returnedID)
 	challenge.SetLastChallengedAt(now)
 	challenge.SetFailureCount(0)
 	challenge.SetLastFailedAt(time.Time{})
@@ -346,20 +334,12 @@ func (as authAttemptStatements) AuthAttemptChallengeSucceeded(ctx context.Contex
 	if err != nil {
 		return fmt.Errorf("failed to marshal factor payload: %w", err)
 	}
-	attemptID, err := parseIdentity(authAttemptID)
-	if err != nil {
-		return err
-	}
-	checkID, err := parseIdentity(challengeID)
-	if err != nil {
-		return err
-	}
 	var factorArg any
 	if factorStr != nil {
 		factorArg = *factorStr
 	}
 	n, err := execAffected(ctx, as.client, authAttemptChallengeSucceededStmt,
-		now.UnixNano(), factorArg, projectID, attemptID, int64(factor.Type()), checkID)
+		now.UnixNano(), factorArg, projectID, authAttemptID, int64(factor.Type()), challengeID)
 	if err != nil {
 		return fmt.Errorf("failed to set challenge succeeded: %w", err)
 	}
@@ -373,20 +353,12 @@ func (as authAttemptStatements) AuthAttemptChallengeSucceeded(ctx context.Contex
 // AuthAttemptChallengeFailed implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
 	now := time.Now().UTC()
-	attemptID, err := parseIdentity(authAttemptID)
-	if err != nil {
-		return err
-	}
-	checkID, err := parseIdentity(challenge.GetID())
-	if err != nil {
-		return err
-	}
 	var (
 		failureCount   int64
 		lastFailedNano int64
 	)
-	err = as.client.QueryRow(ctx, authAttemptChallengeFailedStmt,
-		now.UnixNano(), projectID, attemptID, int64(challenge.Type()), checkID,
+	err := as.client.QueryRow(ctx, authAttemptChallengeFailedStmt,
+		now.UnixNano(), projectID, authAttemptID, int64(challenge.Type()), challenge.GetID(),
 	).Scan(&failureCount, &lastFailedNano)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

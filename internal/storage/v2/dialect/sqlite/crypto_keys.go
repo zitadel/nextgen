@@ -38,6 +38,9 @@ func newCryptoKeyStatements(client queryExecutor) cryptoKeyStatements {
 
 // CreateEncryptionKey implements [service.CryptoKeyStatements].
 func (s cryptoKeyStatements) CreateEncryptionKey(ctx context.Context, key *domain.EncryptionKey) error {
+	if err := ensureManagedID(&key.ID, domain.PrefixEncryptionKey); err != nil {
+		return err
+	}
 	now := nowUnixNano()
 	var createdNano int64
 	err := s.client.QueryRow(ctx, createEncryptionKeyStmt,
@@ -106,6 +109,9 @@ func (s cryptoKeyStatements) UpdateKey(ctx context.Context, id string, key strin
 
 // CreateSigningKey implements [service.CryptoKeyStatements].
 func (s cryptoKeyStatements) CreateSigningKey(ctx context.Context, key *domain.SigningKey) error {
+	if err := ensureManagedID(&key.ID, domain.PrefixSigningKey); err != nil {
+		return err
+	}
 	now := nowUnixNano()
 	var createdNano int64
 	err := s.client.QueryRow(ctx, createSigningKeyStmt,
