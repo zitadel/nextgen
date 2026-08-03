@@ -2,8 +2,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { runCli, tail } from "./cli";
-import { parseCliEnvelope, type CliEnvelope, type StartEnvelopeData } from "./envelope";
+import { runCli, tail, type RunCliResult } from "./cli";
+import {
+  describeEnvelopeError,
+  parseCliEnvelope,
+  type CliEnvelope,
+  type StartEnvelopeData,
+} from "./envelope";
 import { getFreePort } from "./ports";
 import type { LocalZitadelRuntime } from "./types";
 
@@ -56,8 +61,7 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
     // Keep the dir on failure: server.log inside it is the diagnostic.
     throw new Error(
       `zitadel start exited with code ${result.exitCode}.\n` +
-        `stdout: ${tail(result.stdout) || "(empty)"}\n` +
-        `stderr: ${tail(result.stderr) || "(empty)"}\n` +
+        `${failureDetail(result)}\n` +
         `state dir kept for inspection: ${dir}`,
     );
   }
@@ -71,8 +75,7 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
     if (stopResult.exitCode !== 0) {
       throw new Error(
         `zitadel stop exited with code ${stopResult.exitCode}.\n` +
-          `stdout: ${tail(stopResult.stdout) || "(empty)"}\n` +
-          `stderr: ${tail(stopResult.stderr) || "(empty)"}\n` +
+          `${failureDetail(stopResult)}\n` +
           `state dir kept for inspection: ${dir}`,
       );
     }
@@ -83,7 +86,8 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
     envelope = parseCliEnvelope<StartEnvelopeData>(result.stdout, "zitadel start");
     if (envelope.status !== "ok") {
       throw new Error(
-        `zitadel start reported status "${envelope.status}":\n${tail(result.stdout)}`,
+        `zitadel start reported status "${envelope.status}":\n` +
+          `${describeEnvelopeError(envelope) ?? tail(result.stdout)}`,
       );
     }
   } catch (error) {
@@ -142,4 +146,21 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
     },
     stop,
   };
+}
+
+/**
+ * A failed CLI run usually still prints an error envelope; its
+ * message/hint/next_commands beat raw output tails (e.g. a fresh install
+ * missing @zitadel/server gets "Reinstall @zitadel/cli" instead of a stack).
+ */
+function failureDetail(result: RunCliResult): string {
+  try {
+    const described = describeEnvelopeError(parseCliEnvelope<unknown>(result.stdout, "zitadel"));
+    if (described) {
+      return described;
+    }
+  } catch {
+    // stdout carried no envelope; fall back to the raw tails.
+  }
+  return `stdout: ${tail(result.stdout) || "(empty)"}\nstderr: ${tail(result.stderr) || "(empty)"}`;
 }

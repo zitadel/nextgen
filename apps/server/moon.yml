@@ -152,8 +152,20 @@ tasks:
     command: "go build -trimpath -o dist/server/nextgen ."
     deps:
       - "check-generate"
+      # The binary embeds both UI dists (//go:embed all:dist in
+      # internal/staticui/*/embed.go). These deps order the UI builds before
+      # the Go compile, so a batched invocation can never embed a half-written
+      # dist.
+      - "console:build"
+      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
+      # The embedded dist bytes participate in the hash directly, so staticui
+      # changes made outside this task's deps still invalidate the cached
+      # binary. Scoped to build rather than serverInputs: only the binary
+      # artifact depends on dist content — test/vet/format must not re-run on
+      # UI-only changes.
+      - "/internal/staticui/**"
     outputs:
       - "/dist/server/nextgen"
     options:

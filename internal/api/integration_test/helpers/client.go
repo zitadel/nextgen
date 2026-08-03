@@ -74,6 +74,9 @@ func NewApiClient(
 func (c *ApiClient) SetToken(token string) {
 	c.securitySource.Token = token
 }
+func (c *ApiClient) Token() string {
+	return c.securitySource.Token
+}
 func (c *ApiClient) SetScopes(scopes []string) {
 	c.securitySource.Scopes = scopes
 }

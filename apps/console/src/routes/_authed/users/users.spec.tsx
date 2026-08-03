@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -15,6 +15,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const USERS_URL = "http://localhost/api/users";
+const SCHEMAS_URL = "http://localhost/api/schemas";
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
@@ -49,8 +50,70 @@ describe("users screen", () => {
     );
     await renderUsers();
     expect(await screen.findByRole("heading", { name: "Users" })).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: "Maya Patel" })).toBeInTheDocument();
-    expect(screen.getByText("maya.patel@acme.com")).toBeInTheDocument();
+    // Columns are the schema's properties (design `277:288291`, decisions log
+    // D4), so there is no combined "Name" column — the first property carries
+    // the link to the detail screen.
+    expect(await screen.findByRole("link", { name: "maya.patel@acme.com" })).toBeInTheDocument();
+    expect(screen.getByText("Maya")).toBeInTheDocument();
+    expect(screen.getByText("Patel")).toBeInTheDocument();
+  });
+
+  it("builds the columns from the schema the users reference", async () => {
+    server.use(
+      http.get(USERS_URL, () =>
+        HttpResponse.json([
+          { id: "user_1", $schema: "sch_business", email: "maya@acme.com", companyName: "Acme" },
+        ]),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({
+          title: "Business",
+          required: ["email"],
+          properties: {
+            email: { type: "string", format: "email" },
+            companyName: { type: "string", title: "Company name" },
+          },
+        }),
+      ),
+    );
+    await renderUsers();
+
+    // The header comes from the schema's own `title`, not from the record keys.
+    expect(await screen.findByText("Company name")).toBeInTheDocument();
+    // Scoped to the table: the app shell's organisation switcher also renders an
+    // "Acme" label.
+    const table = within(screen.getByRole("table"));
+    expect(table.getByText("Acme")).toBeInTheDocument();
+    expect(table.getByText("maya@acme.com")).toBeInTheDocument();
+  });
+
+  it("renders a placeholder where a user's schema does not define a column", async () => {
+    // Columns union across schemas (D4), so a minimal user sits in a table that
+    // also has business columns. The cell must read as empty, not as missing.
+    server.use(
+      http.get(USERS_URL, () =>
+        HttpResponse.json([
+          { id: "user_1", $schema: "sch_business", email: "maya@acme.com", companyName: "Acme" },
+          { id: "user_2", $schema: "sch_business", email: "min@acme.com" },
+        ]),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({
+          properties: {
+            email: { type: "string", format: "email" },
+            companyName: { type: "string", title: "Company name" },
+          },
+        }),
+      ),
+    );
+    await renderUsers();
+
+    // `schemaFields` orders properties by key, so `companyName` is the first
+    // column and therefore the linked one. The user without a company falls back
+    // to its id rather than rendering an empty link.
+    expect(await screen.findByRole("link", { name: "Acme" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "user_2" })).toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getByText("min@acme.com")).toBeInTheDocument();
   });
 
   it("derives the display name the way the platform does", async () => {
@@ -73,9 +136,11 @@ describe("users screen", () => {
       ),
     );
     await renderUsers();
-    expect(await screen.findByRole("link", { name: "Ada L." })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Grace Hopper" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Radia" })).toBeInTheDocument();
+    // The derived name is no longer a column; it names the row's actions and
+    // titles the delete dialog, which is where a wrong derivation would show.
+    expect(await screen.findByRole("button", { name: "Actions for Ada L." })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Actions for Grace Hopper" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Actions for Radia" })).toBeInTheDocument();
   });
 
   it("ignores non-identity attributes when deriving the name", async () => {
@@ -88,11 +153,12 @@ describe("users screen", () => {
       ),
     );
     await renderUsers();
-    expect(await screen.findByRole("link", { name: "kenji@acme.com" })).toBeInTheDocument();
-    expect(screen.queryByText("nope")).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Actions for kenji@acme.com" }),
+    ).toBeInTheDocument();
   });
 
-  it("uses schema-defined email as the display name and shows the user id", async () => {
+  it("shows the user id alongside the schema's own attributes", async () => {
     server.use(
       http.get(USERS_URL, () =>
         HttpResponse.json([{ id: "user_1", email: "kenji@acme.com", status: "Blocked" }]),
@@ -101,7 +167,11 @@ describe("users screen", () => {
     await renderUsers();
     expect(await screen.findByRole("link", { name: "kenji@acme.com" })).toBeInTheDocument();
     expect(screen.getByText("user_1")).toBeInTheDocument();
-    expect(screen.queryByText("Blocked")).not.toBeInTheDocument();
+    // `status` renders because this record carries it — the table shows what the
+    // data has (D4). What is still absent is a *base-model* status the console
+    // could count on for every user (#553); nothing is invented for records
+    // without one.
+    expect(screen.getByText("Blocked")).toBeInTheDocument();
   });
 
   it("renders the not-authorized state on a 401 with a live session (no redirect loop)", async () => {
@@ -133,7 +203,7 @@ describe("users screen", () => {
     }
   });
 
-  it("filters live users by name, email, or id", async () => {
+  it("filters live users across every rendered column, and by id", async () => {
     server.use(
       http.get(USERS_URL, () =>
         HttpResponse.json([
@@ -143,11 +213,19 @@ describe("users screen", () => {
       ),
     );
     await renderUsers();
-    expect(await screen.findByText("Maya Patel")).toBeInTheDocument();
+    const table = () => within(screen.getByRole("table"));
+    expect(await screen.findByText("Maya")).toBeInTheDocument();
 
+    // By id — not a column an operator reads off, but the one they paste.
     await userEvent.type(screen.getByRole("searchbox", { name: "Search users" }), "user_2");
+    expect(await screen.findByText("Sasha")).toBeInTheDocument();
+    expect(table().queryByText("Maya")).not.toBeInTheDocument();
 
-    expect(await screen.findByText("Sasha Kim")).toBeInTheDocument();
-    expect(screen.queryByText("Maya Patel")).not.toBeInTheDocument();
+    // By a schema property that is not the first column: search covers whatever
+    // the schema defines rather than a fixed name/email pair.
+    await userEvent.clear(screen.getByRole("searchbox", { name: "Search users" }));
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search users" }), "Patel");
+    expect(await screen.findByText("Maya")).toBeInTheDocument();
+    expect(table().queryByText("Sasha")).not.toBeInTheDocument();
   });
 });
