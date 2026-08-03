@@ -2,7 +2,7 @@ import type { GetMySession200 } from "@zitadel/api/generated/model";
 
 import { getZitadelConfig } from "@zitadel/api/config";
 
-import type { ClientAuthResult } from "./types";
+import type { ClientAuthResult } from "./types.js";
 
 /** Matches the `configureZitadel()` default so zero-config apps agree with the scaffold. */
 const DEFAULT_PROXY_PATH = "/__nextgen";
@@ -26,8 +26,8 @@ export type GetSessionOptions = {
  * `cache: "no-store"` — the same read the `<zitadel-session>` card performs —
  * so the answer is the server's, not a client-side guess. Works on any page:
  * unlike server-side `auth()`, it does not require the route to be covered by
- * the middleware `matcher` (only the proxy path itself must be matched, which the
- * scaffolded request boundary always does), and it does not require
+ * the middleware `matcher` (only the proxy path itself must be matched, which
+ * the scaffolded request boundary always does), and it does not require
  * `configureZitadel()` to have run.
  *
  * - `200` with an authenticated user → `{ isAuthenticated: true, session }`
@@ -125,7 +125,7 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
   };
 }
 
-export type { ClientAuthResult, ClientAuthState, ClientSession } from "./types";
+export type { ClientAuthResult, ClientAuthState, ClientSession } from "./types.js";
 
 type ErrorEnvelope = { code: string; message: string };
 
