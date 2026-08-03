@@ -24,7 +24,7 @@ import (
 
 // accessOp classifies a management operation for scope checking. Delete is
 // distinct from write because the contract declares *.delete scopes
-// separately (flow_definitions.delete); write does not imply delete.
+// separately (flow_definition.delete); write does not imply delete.
 type accessOp int
 
 const (
@@ -65,9 +65,9 @@ var schemaAccess = resourceAccess{
 
 var flowDefinitionAccess = resourceAccess{
 	scopes: map[accessOp][]string{
-		opRead:   {"flow_definitions.read", "flow_definitions.write"},
-		opWrite:  {"flow_definitions.write"},
-		opDelete: {"flow_definitions.delete"},
+		opRead:   {"flow_definition.read", "flow_definition.write"},
+		opWrite:  {"flow_definition.write"},
+		opDelete: {"flow_definition.delete"},
 	},
 	readMiss:  domain.ErrFlowDefinitionNotFound,
 	writeMiss: func() domain.Error { return domain.ErrFlowDefinitionInvalid("project does not exist", nil) },
