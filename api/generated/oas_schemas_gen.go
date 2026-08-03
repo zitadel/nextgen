@@ -5087,6 +5087,10 @@ func (s *GetSessionErrorResponseStatusCode) SetResponse(val GetSessionErrorRespo
 
 func (*GetSessionErrorResponseStatusCode) getSessionRes() {}
 
+type GetSessionForbidden ErrorDetails
+
+func (*GetSessionForbidden) getSessionRes() {}
+
 type GetSessionNotFound ErrorDetails
 
 func (*GetSessionNotFound) getSessionRes() {}
@@ -11307,6 +11311,10 @@ func (s *RevokeRequest) SetTokenTypeHint(val OptString) {
 type RevokeSessionConflict ErrorDetails
 
 func (*RevokeSessionConflict) revokeSessionRes() {}
+
+type RevokeSessionForbidden ErrorDetails
+
+func (*RevokeSessionForbidden) revokeSessionRes() {}
 
 // RevokeSessionNoContent is response for RevokeSession operation.
 type RevokeSessionNoContent struct{}

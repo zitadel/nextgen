@@ -21,8 +21,8 @@ export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
   "identifier.title": "Sign in",
   "identifier.description": "Enter your email to continue",
-  "identifier.field.email": "Work email",
-  "identifier.field.email.placeholder": "you@company.com",
+  "identifier.field.email": "Email",
+  "identifier.field.email.placeholder": "you@example.com",
   "identifier.field.password": "Password",
   "identifier.action.submit": "Sign in",
   "identifier.action.continue": "Sign in",
@@ -51,8 +51,8 @@ export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
   "collect-credentials.title": "Create your account",
   "collect-credentials.description": "Set up your email and password",
-  "collect-credentials.field.email": "Work email",
-  "collect-credentials.field.email.placeholder": "you@company.com",
+  "collect-credentials.field.email": "Email",
+  "collect-credentials.field.email.placeholder": "you@example.com",
   "collect-credentials.field.password": "Password",
   // No static password rule hint: the only enforced rule is the schema's
   // minLength, and "symbol + number" was never enforced. The client will build
@@ -87,8 +87,8 @@ export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
   "collect-passkey-email.title": "Create your account",
   "collect-passkey-email.description": "Enter your email to set up a passkey",
-  "collect-passkey-email.field.email": "Work email",
-  "collect-passkey-email.field.email.placeholder": "you@company.com",
+  "collect-passkey-email.field.email": "Email",
+  "collect-passkey-email.field.email.placeholder": "you@example.com",
   "collect-passkey-email.action.submit": "Continue",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -118,8 +118,8 @@ export const en: Record<string, string> = {
   "register.title": "Create your account",
   // Empty by design — the sign-up card has no subheadline (Figma 6593:141743).
   "register.description": "",
-  "register.field.email": "Work email",
-  "register.field.email.placeholder": "you@company.com",
+  "register.field.email": "Email",
+  "register.field.email.placeholder": "you@example.com",
   "register.field.password": "Password",
   "register.field.givenName": "Given name",
   "register.field.familyName": "Family name",

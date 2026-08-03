@@ -9,6 +9,7 @@
     projectId,
     proxyPath,
     postSignOutUrl,
+    theme,
     onSignout,
   }: ZitadelLogoutProps = $props();
 
@@ -43,4 +44,5 @@
   project-id={projectId}
   proxy-path={proxyPath}
   post-sign-out-url={postSignOutUrl}
+  {theme}
 ></zitadel-logout>

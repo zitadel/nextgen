@@ -4,6 +4,7 @@ layer: "automation"
 stack: "frontend"
 dependsOn:
   - "cli"
+  - "testing"
 
 tasks:
   lint:
@@ -21,6 +22,8 @@ tasks:
       ZITADEL_TELEMETRY: "0"
     deps:
       - "cli:build"
+      # The journey spec imports the kit's virtual-passkey helper.
+      - "testing:build"
     options:
       runInCI: false
 
@@ -30,5 +33,19 @@ tasks:
       ZITADEL_TELEMETRY: "0"
     deps:
       - "cli:build"
+      - "testing:build"
+    options:
+      runInCI: false
+
+  # Customer-configuration proof for @zitadel/testing: scaffold a fresh next
+  # app, install the kit from the journey registry, and run its withZitadel()
+  # suite against the published binary (embedded UIs, no env overrides).
+  e2e-testkit:
+    command: "corepack pnpm run e2e-local --suite testkit"
+    env:
+      ZITADEL_TELEMETRY: "0"
+    deps:
+      - "cli:build"
+      - "testing:build"
     options:
       runInCI: false

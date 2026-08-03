@@ -47,6 +47,25 @@ function packageJsonEdit(): (source: string | undefined) => string {
 }
 
 describe("AngularPatcher.plan", () => {
+  it("wires the business copy overlay for business-use-case projects", () => {
+    // Minimal scaffolds keep the widget's neutral built-in copy.
+    const minimal = new AngularPatcher().plan(ctx());
+    expect(writeContents(minimal, "src/app/app.ts")).not.toContain("businessLocales");
+    expect(writeContents(minimal, "src/app/app.html")).not.toContain("[locales]");
+    const business = new AngularPatcher().plan({ ...ctx(), useCase: "business" });
+    // The overlay ships with the SDK; the component exposes it as a class
+    // property and the template binds it, and the wrapper component assigns
+    // the input as a DOM property internally.
+    expect(writeContents(business, "src/app/app.ts")).toContain("businessLocales,");
+    expect(writeContents(business, "src/app/app.ts")).toContain(
+      "protected readonly locales = businessLocales;",
+    );
+    expect(writeContents(business, "src/app/app.html")).toContain('[locales]="locales"');
+    // Consumer scaffolds keep the neutral built-ins, like minimal ones.
+    const consumer = new AngularPatcher().plan({ ...ctx(), useCase: "consumer" });
+    expect(writeContents(consumer, "src/app/app.ts")).not.toContain("businessLocales");
+  });
+
   it("writes the managed root component, template, and proxy config", () => {
     const plan = new AngularPatcher().plan(ctx());
     expect(writeContents(plan, "src/app/app.ts")).toContain(MANAGED_MARKER);
