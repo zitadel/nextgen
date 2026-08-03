@@ -20,7 +20,7 @@ post:
       content:
         application/json:
           schema:
-            $ref: create-team-response.yaml
+            $ref: team-response.yaml
     '400':
       description: The provided parameters were not acceptable
       content:
@@ -29,6 +29,18 @@ post:
             $ref: ../../components/error-details.yaml
     '401':
       description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '404':
+      description: Project not found.
       content:
         application/json:
           schema:

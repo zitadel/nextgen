@@ -13,6 +13,7 @@ import (
 const (
 	teamsTable     = "teams"
 	createTeamStmt = `INSERT INTO teams (project_id, id, name) VALUES (@p1, @p2, @p3) THEN RETURN project_id, id, name, status, created_at, updated_at`
+	updateTeamStmt = `UPDATE teams SET name = @p3, updated_at = CURRENT_TIMESTAMP() WHERE project_id = @p1 AND id = @p2 AND status = @p4 THEN RETURN project_id, id, name, status, created_at, updated_at`
 
 	deactivateTeamStmt = `
 UPDATE teams
@@ -79,6 +80,22 @@ func (ts teamStatements) GetTeamByID(ctx context.Context, projectID, id string) 
 		return nil, err
 	}
 	return ts.scanTeam(row)
+}
+
+// UpdateTeam implements [service.TeamStatements].
+// The whole team is returned after the update.
+// Only active teams are updated.
+// Update of a deactivated or a non-existent team returns [database.NoRowFoundError].
+func (ts teamStatements) UpdateTeam(ctx context.Context, team *domain.Team) error {
+	stmt := buildStatement(updateTeamStmt, team.ProjectID, team.ID, team.Name, domain.TeamStatusActive.String()).statement()
+	return ts.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+		updated, err := collectOneRow(iter, ts.scanTeam)
+		if err != nil {
+			return err
+		}
+		*team = *updated
+		return nil
+	})
 }
 
 // DeactivateTeam implements [service.TeamStatements].

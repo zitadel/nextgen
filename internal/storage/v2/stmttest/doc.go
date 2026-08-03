@@ -7,5 +7,6 @@
 //
 //	go test -tags postgres_integration ./internal/storage/v2/stmttest/
 //	go test -tags spanner_integration ./internal/storage/v2/stmttest/
-//	go test -tags 'postgres_integration,spanner_integration' ./internal/storage/v2/stmttest/
+//	go test -tags sqlite_integration ./internal/storage/v2/stmttest/
+//	go test -tags 'postgres_integration,spanner_integration,sqlite_integration' ./internal/storage/v2/stmttest/
 package stmttest
