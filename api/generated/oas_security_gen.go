@@ -162,6 +162,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	QueryProjectsOperation: []string{
 		"project.write",
 	},
+	QueryTeamsOperation: []string{
+		"team.read",
+	},
 	RevokeSessionOperation: []string{
 		"session.delete",
 	},
@@ -171,6 +174,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	UpdateFlowDefinitionOperation: []string{
 		"flow_definition.write",
+	},
+	UpdateTeamOperation: []string{
+		"team.write",
 	},
 	VerifyChallengeProofOperation: []string{
 		"auth_attempt.write",

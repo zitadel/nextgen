@@ -1,0 +1,7 @@
+type: object
+properties:
+  name:
+    description: The name of the team. Must be unique within the project.
+    type: string
+    minLength: 1
+    maxLength: 200

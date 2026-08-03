@@ -38,7 +38,7 @@ import (
 	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
-	postgresembedded "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/embedded"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/sqlite"
 )
 
 func NewCommand() *cobra.Command {
@@ -457,7 +457,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Ha
 	mux.Handle("/",
 		middleware.WithRequestIdentification(reqIdGen,
 			middleware.WithLogging(
-				api.WithRequestHostMiddleware(apiHandler),
+				api.WithRequestHostMiddleware(api.WithSessionStateNoStore(apiHandler)),
 			),
 		),
 	)
@@ -483,9 +483,9 @@ func startDatabase(ctx context.Context, cfg Config) (database.Pool, error) {
 
 func buildDatabaseDialect(cfg Config) (database.Dialect, error) {
 	if len(cfg.Database.Raw) == 0 {
-		options := embeddedPostgresOptions(cfg.Server.DataDir)
-		slog.Info("no database dialect configured, starting embedded postgres", slog.String("filePath", filepath.Dir(options.DataPath)))
-		return postgresembedded.NewDialect(options), nil
+		path := defaultSQLitePath(cfg.Server.DataDir)
+		slog.Info("no database dialect configured, using sqlite", slog.String("path", path))
+		return sqlite.Config{Path: path}, nil
 	}
 
 	dialect, err := cfg.Database.Build()
@@ -495,15 +495,8 @@ func buildDatabaseDialect(cfg Config) (database.Dialect, error) {
 	return dialect, nil
 }
 
-func embeddedPostgresOptions(dataDir string) postgresembedded.Options {
-	root := filepath.Join(dataDir, "embedded-postgres")
-	return postgresembedded.Options{
-		RuntimePath: filepath.Join(root, "runtime"),
-		DataPath:    filepath.Join(root, "data"),
-		CachePath:   filepath.Join(root, "cache"),
-		LogPath:     filepath.Join(root, "postgres.log"),
-		Logger:      os.Stdout,
-	}
+func defaultSQLitePath(dataDir string) string {
+	return filepath.Join(dataDir, "zitadel.db")
 }
 
 // ----------------------------- CRYPTO --------------------------------------

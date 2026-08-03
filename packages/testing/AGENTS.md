@@ -109,7 +109,7 @@ a `testing:build` task dep.
 
 - `moon run testing:test testing:lint testing:typecheck` — unit gate.
 - `moon run testing:test-integration` — boots real instances
-  (binary + embedded Postgres).
+  (binary + SQLite local default).
 - Dogfood: `moon run demo-next-e2e:e2e-real`, `moon run console-e2e:e2e-real`,
   `env -u CI moon run cli-journey-e2e:e2e-testkit` (customer install path).
 

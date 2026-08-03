@@ -8,11 +8,15 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
 
 const (
 	teamsTable     = "teams"
 	createTeamStmt = `INSERT INTO teams (project_id, id, name) VALUES (@p1, @p2, @p3) THEN RETURN project_id, id, name, status, created_at, updated_at`
+	teamQuery      = `SELECT project_id, id, name, status, created_at, updated_at FROM teams`
+	updateTeamStmt = `UPDATE teams SET name = @p3, updated_at = CURRENT_TIMESTAMP() WHERE project_id = @p1 AND id = @p2 AND status = @p4 THEN RETURN project_id, id, name, status, created_at, updated_at`
 
 	deactivateTeamStmt = `
 UPDATE teams
@@ -81,6 +85,54 @@ func (ts teamStatements) GetTeamByID(ctx context.Context, projectID, id string) 
 	return ts.scanTeam(row)
 }
 
+// UpdateTeam implements [service.TeamStatements].
+// The whole team is returned after the update.
+// Only active teams are updated.
+// Update of a deactivated or a non-existent team returns [database.NoRowFoundError].
+func (ts teamStatements) UpdateTeam(ctx context.Context, team *domain.Team) error {
+	stmt := buildStatement(updateTeamStmt, team.ProjectID, team.ID, team.Name, domain.TeamStatusActive.String()).statement()
+	return ts.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+		updated, err := collectOneRow(iter, ts.scanTeam)
+		if err != nil {
+			return err
+		}
+		*team = *updated
+		return nil
+	})
+}
+
+// ListTeams implements [service.TeamStatements].
+func (ts teamStatements) ListTeams(ctx context.Context, filter *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error) {
+	var compiler statementCompiler
+	if err := compileRead(&compiler, teamQuery, filter, teamSchema); err != nil {
+		return nil, err
+	}
+
+	var teams []*domain.Team
+	err := ts.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		teams, err = collectRows(iter, ts.scanTeam)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var nextCursor []byte
+	if filter.Pagination.Limit > 0 && len(teams) == int(filter.Pagination.Limit) {
+		cursor := &pagination.Cursor[domain.TeamField]{
+			Columns: filter.Pagination.OrderBy.Columns,
+			Values:  teamSchema.ValuesFrom(teams[len(teams)-1], filter.Pagination.OrderBy.Columns),
+		}
+		nextCursor = cursor.Marshal()
+	}
+
+	return &database.ListResult[*domain.Team]{
+		Items:      teams,
+		NextCursor: nextCursor,
+	}, nil
+}
+
 // DeactivateTeam implements [service.TeamStatements].
 func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id string) error {
 	membershipRemoved := domain.MembershipStatusRemoved.String()
@@ -116,3 +168,36 @@ func (ts teamStatements) scanTeam(row *spanner.Row) (*domain.Team, error) {
 }
 
 var _ service.TeamStatements = (*teamStatements)(nil)
+
+var teamSchema = database.NewSchema(map[domain.TeamField]database.FieldBinding[domain.Team]{
+	domain.TeamFieldProjectID: {
+		SQLName:  "project_id",
+		Accessor: func(t *domain.Team) any { return t.ProjectID },
+		Coerce:   database.CoerceString,
+	},
+	domain.TeamFieldID: {
+		SQLName:  "id",
+		Accessor: func(t *domain.Team) any { return t.ID },
+		Coerce:   database.CoerceString,
+	},
+	domain.TeamFieldName: {
+		SQLName:  "name",
+		Accessor: func(t *domain.Team) any { return t.Name },
+		Coerce:   database.CoerceString,
+	},
+	domain.TeamFieldStatus: {
+		SQLName:  "status",
+		Accessor: func(t *domain.Team) any { return string(t.Status) },
+		Coerce:   database.CoerceString,
+	},
+	domain.TeamFieldCreatedAt: {
+		SQLName:  "created_at",
+		Accessor: func(t *domain.Team) any { return t.CreatedAt },
+		Coerce:   database.CoerceTime,
+	},
+	domain.TeamFieldUpdatedAt: {
+		SQLName:  "updated_at",
+		Accessor: func(t *domain.Team) any { return t.UpdatedAt },
+		Coerce:   database.CoerceTime,
+	},
+})

@@ -10,7 +10,7 @@ import { PROXY_PATH } from "../proxy";
  * The project id comes from `VITE_ZITADEL_PROJECT_ID` (Vite only exposes
  * `VITE_`-prefixed env to the client). No secret reaches the browser: the dev
  * proxy in `vite.config.*` attaches the project service-key secret (from
- * `ZITADEL_PROJECT_SECRET`) server-side.
+ * `ZITADEL_PROJECT_SECRET`) server-side only to `POST /sessions/exchange`.
  *
  * Projects set up with the business use case additionally pass the SDK's
  * `businessLocales` overlay to the login widgets, restoring work-email copy on

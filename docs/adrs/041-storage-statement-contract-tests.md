@@ -2,7 +2,7 @@
 
 > **Status:** Accepted
 > **Date:** 2026-07-30
-> **Context:** Multi-dialect SQL storage (PostgreSQL and Spanner)
+> **Context:** Multi-dialect SQL storage (PostgreSQL, Spanner, and SQLite)
 > **Relates to:** [ADR 028](028-storage-v2-statements-and-dialects.md)
 
 ## Decision
@@ -14,22 +14,23 @@ not dialect SQL strings.
 
 ## Context
 
-Per-dialect statement packages under `internal/storage/v2/dialect/{postgres,spanner}`
+Per-dialect statement packages under `internal/storage/v2/dialect/{postgres,spanner,sqlite}`
 naturally grow near-duplicate integration tests. Those copies drift (coverage
-gaps, fixture style), and they do not prove that both engines honor the same
+gaps, fixture style), and they do not prove that every engine honors the same
 service contract. Higher layers (services, API) cannot substitute for this
 boundary without pulling in unrelated orchestration.
 
 ## How
 
 - **Build-tag registration:** each dialect appends an opener under
-  `postgres_integration` and/or `spanner_integration`. `TestMain` brings up
-  every registered dialect.
+  `postgres_integration`, `spanner_integration`, and/or `sqlite_integration`.
+  `TestMain` brings up every registered dialect.
 - **`forEachDialect`:** suite cases call `forEachDialect(t, fn)` so the body
-  runs once per dialect as a subtest (`postgres`, `spanner`); use normal
-  `t.Run` for case names inside.
+  runs once per dialect as a subtest (`postgres`, `spanner`, `sqlite`); use
+  normal `t.Run` for case names inside.
 - **CI:** still one tag per job (`server:test-postgres` /
-  `server:test-spanner`). Locally, both tags may be set in one process.
+  `server:test-spanner` / `server:test-sqlite`). Locally, multiple tags may be
+  set in one process.
 - **Assertions:** domain fields, list/filter/cursor behavior, and typed
   integrity errors (`database.ForeignKeyError`, etc.). No live cross-dialect
   `cmp` of rows and no SQL string equality.

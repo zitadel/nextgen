@@ -25,10 +25,10 @@ been named, and one operation contradicts it:
   handoff token into a session — requires a project service key. It is the only
   secret-requiring operation in the SPA browser path.
 
-Because of that one operation, every framework scaffold proxies `/__nextgen/*`
-and stamps `ZITADEL_PROJECT_SECRET` onto **every** proxied request (#310;
-previously the scaffolds sent a placeholder bearer synthesized from the public
-project id). In
+Because of that one operation, every framework scaffold proxies `/__nextgen/*`.
+Before the transitional hardening below, those proxies stamped
+`ZITADEL_PROJECT_SECRET` onto **every** proxied request (#310; previously the
+scaffolds sent a placeholder bearer synthesized from the public project id). In
 production this forces secret-holding edge compute on every hosting platform
 (PR #56), because a static rewrite cannot inject a header from a secret store.
 
@@ -44,6 +44,13 @@ identifier plus origin restrictions, with secrets reserved for server-side
 surfaces. The domain model already contains that credential class:
 `PreviewSecret` is an origin-scoped bearer with a `PreviewOrigins` allowlist —
 quarantined under a preview/testing label.
+
+**Implementation note (2026-08-02):** until the publishable-key path in this
+ADR lands, framework proxies attach the project secret only to the exact
+`POST /sessions/exchange` operation that still requires it. Public-plane and
+management operations receive no infrastructure-supplied bearer. This closes
+the operator-capable open relay immediately while keeping the current handoff
+exchange working; it is an interim step, not completion of this ADR.
 
 ## Decision
 
@@ -238,9 +245,10 @@ publishable-key wiring only.
   an app-plane channel. SPA deployments without edge compute fall back to the
   in-flow captcha gate and server-side signals; SSR deployments keep the
   authenticated verdict channel.
-- **#310 is partially reverted in spirit:** proxied SPA traffic stops carrying
-  the project secret once the publishable-key path lands; SSR middlewares keep
-  the secret for app-plane calls.
+- **#310 is partially reverted in spirit:** proxies now restrict the project
+  secret to `POST /sessions/exchange`; once the publishable-key path lands,
+  proxied SPA traffic stops carrying it entirely. SSR middlewares keep the
+  secret for app-plane calls.
 - Public-plane hardening (rate limits, enumeration-safe errors, bot gates)
   is the assumed baseline for flow traffic and is unchanged by this ADR.
 - **The tunnel-spoof class disappears structurally.** With no
