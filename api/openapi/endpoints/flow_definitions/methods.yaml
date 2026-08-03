@@ -11,7 +11,7 @@ post:
     - Flow Definitions
   security:
     - oauth2:
-        - flow_definitions.write
+        - flow_definition.write
   requestBody:
     required: true
     content:
@@ -76,7 +76,7 @@ get:
     - Flow Definitions
   security:
     - oauth2:
-        - flow_definitions.read
+        - flow_definition.read
   parameters:
     - $ref: ../../components/parameters/limit.yaml
     - $ref: ../../components/parameters/page-token.yaml
