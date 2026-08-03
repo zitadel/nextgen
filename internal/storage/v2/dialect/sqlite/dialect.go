@@ -99,11 +99,9 @@ func (c Config) dsn() (dsn string, filePath string, err error) {
 	return u.String(), abs, nil
 }
 
-// mergeSQLitePragmas appends default pragma query params that are not already
-// present on the caller DSN. Non-_pragma keys are matched by name; _pragma
-// values are matched by pragma name (text before '(') so a caller can override
-// one pragma without dropping the rest. Defaults are appended in their raw
-// form (no re-encoding) so modernc.org/sqlite keeps accepting them.
+// mergeSQLitePragmas appends missing default pragma query params.
+// Non-_pragma keys match by name; _pragma values match by pragma name
+// (text before '(') so callers can override one without dropping the rest.
 func mergeSQLitePragmas(dsn string) (string, error) {
 	base, queryPart, hasQuery := strings.Cut(dsn, "?")
 	existing := url.Values{}

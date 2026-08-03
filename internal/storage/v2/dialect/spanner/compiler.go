@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/compare"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pattern"
 )
@@ -121,8 +122,10 @@ func compileOrFilter[F ~uint8, T any](c *statementCompiler, filter database.OrFi
 }
 
 func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *database.CompareFilter[F], schema database.Schema[F, T]) {
-	if hasNilCompareValue(filter.Terms) {
-		compileNullAwareCompareFilter(c, filter, schema)
+	if compare.HasNilValue(filter.Terms) {
+		compare.CompileNullAware(c, filter, schema, func(_ compare.Writer, arg any, _ database.Column[F]) {
+			writeArg(c, arg)
+		})
 		return
 	}
 
@@ -162,97 +165,6 @@ func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *databas
 		c.WriteString(")")
 	}
 	c.WriteString(")")
-}
-
-func hasNilCompareValue[F ~uint8](terms []database.CompareTerm[F]) bool {
-	for _, term := range terms {
-		if term.Value == nil {
-			return true
-		}
-	}
-	return false
-}
-
-func compileNullAwareCompareFilter[F ~uint8, T any](
-	c *statementCompiler,
-	filter *database.CompareFilter[F],
-	schema database.Schema[F, T],
-) {
-	switch filter.Op {
-	case database.OpEqual:
-		c.WriteString("(")
-		for i, term := range filter.Terms {
-			if i > 0 {
-				c.WriteString(" AND ")
-			}
-			writeNullSafeEqual(c, term, schema)
-		}
-		c.WriteString(")")
-	case database.OpGreater, database.OpLess:
-		c.WriteString("(")
-		for i := range filter.Terms {
-			if i > 0 {
-				c.WriteString(" OR ")
-			}
-			c.WriteString("(")
-			for j := 0; j < i; j++ {
-				writeNullSafeEqual(c, filter.Terms[j], schema)
-				c.WriteString(" AND ")
-			}
-			writeNullSafeOrdered(c, filter.Terms[i], filter.Op, schema)
-			c.WriteString(")")
-		}
-		c.WriteString(")")
-	default:
-		panic("unknown compare op")
-	}
-}
-
-func writeNullSafeEqual[F ~uint8, T any](
-	c *statementCompiler,
-	term database.CompareTerm[F],
-	schema database.Schema[F, T],
-) {
-	col := schema.SQLName(term.Column)
-	if term.Value == nil {
-		c.WriteString(col)
-		c.WriteString(" IS NULL")
-		return
-	}
-	c.WriteString(col)
-	c.WriteString(" = ")
-	writeArg(c, term.Value)
-}
-
-func writeNullSafeOrdered[F ~uint8, T any](
-	c *statementCompiler,
-	term database.CompareTerm[F],
-	op database.CompareOp,
-	schema database.Schema[F, T],
-) {
-	col := schema.SQLName(term.Column)
-	if term.Value == nil {
-		if op == database.OpGreater {
-			c.WriteString(col)
-			c.WriteString(" IS NOT NULL")
-			return
-		}
-		c.WriteString("FALSE")
-		return
-	}
-	if op == database.OpLess {
-		c.WriteString("(")
-		c.WriteString(col)
-		c.WriteString(" < ")
-		writeArg(c, term.Value)
-		c.WriteString(" OR ")
-		c.WriteString(col)
-		c.WriteString(" IS NULL)")
-		return
-	}
-	c.WriteString(col)
-	c.WriteString(" > ")
-	writeArg(c, term.Value)
 }
 
 func writeCompareTerm[F ~uint8, T any](c *statementCompiler, term database.CompareTerm[F], op string, schema database.Schema[F, T]) {

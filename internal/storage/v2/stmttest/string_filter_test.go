@@ -77,8 +77,7 @@ func TestProjectStatements_StringFilters(t *testing.T) {
 		})
 
 		t.Run("non-ascii same-case contains fold matches", func(t *testing.T) {
-			// Pins SQLite ASCII LOWER parity: Go ToLower("Übung") diverges from
-			// SQLite LOWER, so ignore-case LIKE must fold the needle in SQL too.
+			// SQLite LOWER is ASCII-only; ignore-case LIKE must fold in SQL too.
 			uebung := &domain.Project{ID: uniqueProjectID(t), Name: "Übung", PreviewOrigins: []string{}}
 			require.NoError(t, d.stmts.CreateProject(t.Context(), uebung))
 			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), uebung.ID) })
