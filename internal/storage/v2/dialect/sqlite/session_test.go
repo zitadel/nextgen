@@ -4,8 +4,10 @@ package sqlite
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -16,9 +18,14 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
+func uniqueSuffix(t *testing.T) string {
+	t.Helper()
+	return strings.ReplaceAll(t.Name(), "/", "_") + "-" + rand.Text()
+}
+
 func handoffCompletedAttempt(t *testing.T, projectID string, mutate func(*domain.AuthAttempt)) (plainToken string, attempt *domain.AuthAttempt) {
 	t.Helper()
-	plainToken = "handoff_" + projectID + "_" + time.Now().Format("150405.000000000")
+	plainToken = "handoff_" + uniqueSuffix(t)
 	attempt = &domain.AuthAttempt{
 		ProjectID:      projectID,
 		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypePassword},
@@ -39,12 +46,12 @@ func handoffCompletedAttempt(t *testing.T, projectID string, mutate func(*domain
 
 func ensureTestUser(t *testing.T, projectID, userID string) {
 	t.Helper()
-	schemaURL := "https://example.com/schemas/session-test"
-	_ = testPool.CreateJSONSchema(t.Context(), &domain.JSONSchema{
+	schemaURL := "https://example.com/schemas/session-test-" + uniqueSuffix(t)
+	require.NoError(t, testPool.CreateJSONSchema(t.Context(), &domain.JSONSchema{
 		ProjectID: projectID,
 		URL:       schemaURL,
 		Schema:    []byte(`{"type":"object"}`),
-	})
+	}))
 	emailAttr, err := domain.NewCreateAttribute("email", userID+"@example.com", domain.AttributeUniquenessProject)
 	require.NoError(t, err)
 	nameAttr, err := domain.NewCreateAttribute("name", userID, domain.AttributeUniquenessUnspecified)
