@@ -1,4 +1,4 @@
-# ADR 046: Dialect-Owned Identifier Generation
+# ADR 047: Dialect-Owned Identifier Generation
 
 > **Status:** Accepted
 > **Date:** 2026-07-30

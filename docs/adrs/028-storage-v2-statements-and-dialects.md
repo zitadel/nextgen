@@ -161,7 +161,7 @@ are produced for the identifier classes in [ADR 011](011-resource-identifiers.md
 
 | Class | Storage responsibility | Dialect may use |
 |---|---|---|
-| **All resource PKs** (users, sessions, auth attempts, tokens, credential rows, …) | Generate on create when ID is empty; HTTP create does not accept client PKs ([ADR 046](046-dialect-id-generation.md)) | Dialect `idgen` (Postgres ULID; Spanner UUID v4); SQL supplies no DEFAULT/IDENTITY |
+| **All resource PKs** (users, sessions, auth attempts, tokens, credential rows, …) | Generate on create when ID is empty; HTTP create does not accept client PKs ([ADR 047](047-dialect-id-generation.md)) | Dialect `idgen` (Postgres ULID; Spanner UUID v4); SQL supplies no DEFAULT/IDENTITY |
 
 The **dialect** owns the generation strategy per class — not
 domain or service code. Domain keeps prefix rules and
@@ -175,7 +175,7 @@ dialect avoids leaking engine-specific choices into domain or repository layers.
 This ADR refines [ADR 011](011-resource-identifiers.md) § Package roles:
 managed ID generation lives under `internal/storage/v2/dialect/idgen` (or is
 inlined into v2 dialect packages), not a domain-layer concern at call sites.
-Concrete mechanisms are recorded in [ADR 046](046-dialect-id-generation.md).
+Concrete mechanisms are recorded in [ADR 047](047-dialect-id-generation.md).
 
 ```mermaid
 flowchart LR
@@ -208,7 +208,7 @@ These previously lived under v1 and are now owned by v2 (C3–C6):
 - Retire leftover v1 query-builder / aliases package — **done** (C6)
 
 ID generation (ephemeral + managed) per dialect is complete — see
-[ADR 046](046-dialect-id-generation.md).
+[ADR 047](047-dialect-id-generation.md).
 
 **Specialized storage that may keep distinct patterns:** EAV user storage (ADR
 008) — ported to v2 statements but may retain EAV-specific SQL structure.
@@ -306,7 +306,7 @@ items off as work lands; remove completed entries when no longer useful.
 - [x] Move migrations from v1 to v2 dialect packages (postgres + spanner)
 - [x] Move embedded postgres startup to v2 postgres dialect
 - [x] Move `database.Identity` bind/scan to v2 core
-- [x] Move ID generation into v2 dialects (all resource PKs via dialect-chosen Go package; Postgres ULID / Spanner UUID v4); retire domain-layer `idgen` and SQL IDENTITY — see [ADR 046](046-dialect-id-generation.md)
+- [x] Move ID generation into v2 dialects (all resource PKs via dialect-chosen Go package; Postgres ULID / Spanner UUID v4); retire domain-layer `idgen` and SQL IDENTITY — see [ADR 047](047-dialect-id-generation.md)
 - [x] Add `internal/storage/v2/AGENTS.md` with v2 conventions (including multi-write `withTransaction` rules)
 - [x] Port remaining entities and remove v1 entity repository package
 - [x] Drop QueryExecutor bridge from app callers and v2 transactions
@@ -342,4 +342,4 @@ items off as work lands; remove completed entries when no longer useful.
 Pre-merge checklist items (compiler gaps, migrations, Identity, ID generation,
 v1 dialect removal) are blockers for completing the v2 dialect takeover, not
 permanent architectural debt. ID generation ownership is recorded in
-[ADR 046](046-dialect-id-generation.md).
+[ADR 047](047-dialect-id-generation.md).

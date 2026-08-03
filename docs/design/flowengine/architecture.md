@@ -262,7 +262,7 @@ Backs the schema-driven `FlowFieldResolver` implementation. Reads the user schem
 
 ### ID generator
 
-Dialect-owned `NewManagedID` on the storage pool (ADR 046). `FlowService`
+Dialect-owned `NewManagedID` on the storage pool (ADR 047). `FlowService`
 mints `flow_*` / provisional `session_*` ids at `Start`; passkey registration
 mints provisional `user_*` ids in `PasskeyRegistrationService.Begin` when the
 caller has none; create inserts mint managed resource IDs in the dialect.

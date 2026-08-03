@@ -4,11 +4,11 @@
 > **Date:** 2026-05-20  
 > **Updated:** 2026-08-03  
 > **Context:** HTTP/OpenAPI surface for nextgen  
-> **Depends on:** [ADR 011](011-resource-identifiers.md), [ADR 046](046-dialect-id-generation.md)
+> **Depends on:** [ADR 011](011-resource-identifiers.md), [ADR 047](047-dialect-id-generation.md)
 
 ## Context
 
-[ADR 011](011-resource-identifiers.md) / [ADR 046](046-dialect-id-generation.md)
+[ADR 011](011-resource-identifiers.md) / [ADR 047](047-dialect-id-generation.md)
 store **all** resource primary keys as dialect-minted prefixed opaque strings.
 “Ephemeral” resources (sessions, auth attempts, checks) still have short
 lifetimes, but their IDs use the same prefix rule as durable resources.

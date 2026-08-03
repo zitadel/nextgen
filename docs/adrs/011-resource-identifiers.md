@@ -4,7 +4,7 @@
 > **Date:** 2026-05-15  
 > **Updated:** 2026-08-03  
 > **Context:** Multi-dialect storage (PostgreSQL and Spanner) for nextgen  
-> **Amended by:** [ADR 046](046-dialect-id-generation.md) (dialect ownership, generators)
+> **Amended by:** [ADR 047](047-dialect-id-generation.md) (dialect ownership, generators)
 
 ## Context
 
@@ -15,7 +15,7 @@ primary key: a dialect-minted prefixed opaque string. There is no integer
 
 [ADR 010](010-session-auth-attempt-check-model.md) entity relationships remain;
 this ADR owns identifier typing only. HTTP shape details live in
-[ADR 012](012-ephemeral-id-api-representation.md) and [ADR 046](046-dialect-id-generation.md).
+[ADR 012](012-ephemeral-id-api-representation.md) and [ADR 047](047-dialect-id-generation.md).
 
 ## Decision
 
@@ -40,7 +40,7 @@ flowchart LR
 
 - Domain defines **prefix constants** only (no minting).
 - Dialects mint `prefix_<opaque>` on create when the ID is empty.
-- HTTP create does not accept client resource PKs ([ADR 046](046-dialect-id-generation.md)).
+- HTTP create does not accept client resource PKs ([ADR 047](047-dialect-id-generation.md)).
 - “Ephemeral” means short-lived **lifecycle**, not a different ID mechanism.
 
 ### 2. Dialect DDL

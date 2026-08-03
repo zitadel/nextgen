@@ -7,7 +7,7 @@ import (
 )
 
 // Identity is the canonical string form of a resource identifier in Go.
-// All resource primary keys are dialect-minted prefixed opaque strings (ADR 046)
+// All resource primary keys are dialect-minted prefixed opaque strings (ADR 047)
 // persisted as TEXT / STRING(MAX).
 type Identity string
 
