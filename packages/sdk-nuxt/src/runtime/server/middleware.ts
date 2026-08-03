@@ -185,12 +185,11 @@ async function proxyRequest(
 
   const upstreamHeaders = buildUpstreamHeaders(event);
 
-  // Attach the project service-key secret as the bearer on every proxied
-  // request. The module's setup() puts the secret into Nuxt's server-only
-  // runtimeConfig (read from `process.env.ZITADEL_PROJECT_SECRET`; falls back
-  // to a `.env.local` parse when Nuxt's dev runtime didn't auto-load it).
-  // runtimeConfig is server-side only — never exposed to the client bundle.
-  if (!upstreamHeaders.has("authorization")) {
+  // ADR 036: the current browser flow needs the confidential project secret
+  // only for the handoff exchange. Never make the public proxy an
+  // operator-capable relay, and preserve an explicit caller credential for
+  // the future publishable-key exchange path.
+  if (requiresProjectSecret(method, suffix) && !upstreamHeaders.has("authorization")) {
     const config = useRuntimeConfig();
     const projectSecret = (config.nextgen as { projectSecret?: string } | undefined)?.projectSecret;
     if (projectSecret) {
@@ -233,6 +232,10 @@ async function proxyRequest(
   }
 
   return response.body;
+}
+
+function requiresProjectSecret(method: string, pathname: string): boolean {
+  return method.toUpperCase() === "POST" && pathname === "/sessions/exchange";
 }
 
 const DECODER = new TextDecoder();

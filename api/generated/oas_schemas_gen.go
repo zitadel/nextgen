@@ -685,6 +685,89 @@ func (s *AuthMethods) SetOtp(val OptAuthMethod) {
 	s.Otp = val
 }
 
+// Merged schema.
+// Ref: #
+type AuthUnauthorized struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAuthUnauthorizedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AuthUnauthorized) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AuthUnauthorized) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AuthUnauthorized) GetDetails() OptAuthUnauthorizedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AuthUnauthorized) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AuthUnauthorized) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
+	s.Details = val
+}
+
+func (*AuthUnauthorized) revokeMySessionRes() {}
+
+// Additional error-specific context.
+type AuthUnauthorizedDetails map[string]jx.Raw
+
+func (s *AuthUnauthorizedDetails) init() AuthUnauthorizedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// AuthUnauthorizedHeaders wraps AuthUnauthorized with response headers.
+type AuthUnauthorizedHeaders struct {
+	CacheControl OptString
+	Response     AuthUnauthorized
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *AuthUnauthorizedHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *AuthUnauthorizedHeaders) GetResponse() AuthUnauthorized {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *AuthUnauthorizedHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *AuthUnauthorizedHeaders) SetResponse(val AuthUnauthorized) {
+	s.Response = val
+}
+
+func (*AuthUnauthorizedHeaders) getMySessionRes() {}
+
 // AuthorizeGetFound is response for AuthorizeGet operation.
 type AuthorizeGetFound struct{}
 
@@ -2081,6 +2164,14 @@ type CreateTeamConflict ErrorDetails
 
 func (*CreateTeamConflict) createTeamRes() {}
 
+type CreateTeamForbidden ErrorDetails
+
+func (*CreateTeamForbidden) createTeamRes() {}
+
+type CreateTeamNotFound ErrorDetails
+
+func (*CreateTeamNotFound) createTeamRes() {}
+
 // Ref: #
 type CreateTeamRequest struct {
 	// The name of the team. Must be unique within the project.
@@ -2096,48 +2187,6 @@ func (s *CreateTeamRequest) GetName() string {
 func (s *CreateTeamRequest) SetName(val string) {
 	s.Name = val
 }
-
-// Ref: #
-type CreateTeamResponse struct {
-	// The unique identifier of the team.
-	ID string `json:"id"`
-	// The name of the team.
-	Name string `json:"name"`
-	// The time when the team was created.
-	CreatedAt time.Time `json:"createdAt"`
-}
-
-// GetID returns the value of ID.
-func (s *CreateTeamResponse) GetID() string {
-	return s.ID
-}
-
-// GetName returns the value of Name.
-func (s *CreateTeamResponse) GetName() string {
-	return s.Name
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *CreateTeamResponse) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// SetID sets the value of ID.
-func (s *CreateTeamResponse) SetID(val string) {
-	s.ID = val
-}
-
-// SetName sets the value of Name.
-func (s *CreateTeamResponse) SetName(val string) {
-	s.Name = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *CreateTeamResponse) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-func (*CreateTeamResponse) createTeamRes() {}
 
 type CreateTeamTooManyRequests ErrorDetails
 
@@ -2463,6 +2512,7 @@ func (*ErrorDetailsStatusCode) setUserPasswordRes()          {}
 func (*ErrorDetailsStatusCode) submitFlowEventRes()          {}
 func (*ErrorDetailsStatusCode) submitFlowStepRes()           {}
 func (*ErrorDetailsStatusCode) updateFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) updateTeamRes()               {}
 
 type ExchangeHandoffBadRequest ErrorDetails
 
@@ -4913,14 +4963,6 @@ func (s *GetMySessionErrorResponseStatusCode) SetResponse(val GetMySessionErrorR
 
 func (*GetMySessionErrorResponseStatusCode) getMySessionRes() {}
 
-type GetMySessionNotFound ErrorDetails
-
-func (*GetMySessionNotFound) getMySessionRes() {}
-
-type GetMySessionUnauthorized ErrorDetails
-
-func (*GetMySessionUnauthorized) getMySessionRes() {}
-
 type GetMyUserOK map[string]jx.Raw
 
 func (s *GetMyUserOK) init() GetMyUserOK {
@@ -5115,61 +5157,6 @@ func (*GetSessionUnauthorized) getSessionRes() {}
 type GetTeamNotFound ErrorDetails
 
 func (*GetTeamNotFound) getTeamRes() {}
-
-// The current state of a team.
-// Ref: #
-type GetTeamResponse struct {
-	// The unique identifier of the team.
-	ID string `json:"id"`
-	// The name of the team.
-	Name string `json:"name"`
-	// The time when the team was created.
-	CreatedAt time.Time `json:"createdAt"`
-	// The time when the team was last updated.
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-// GetID returns the value of ID.
-func (s *GetTeamResponse) GetID() string {
-	return s.ID
-}
-
-// GetName returns the value of Name.
-func (s *GetTeamResponse) GetName() string {
-	return s.Name
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *GetTeamResponse) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// GetUpdatedAt returns the value of UpdatedAt.
-func (s *GetTeamResponse) GetUpdatedAt() time.Time {
-	return s.UpdatedAt
-}
-
-// SetID sets the value of ID.
-func (s *GetTeamResponse) SetID(val string) {
-	s.ID = val
-}
-
-// SetName sets the value of Name.
-func (s *GetTeamResponse) SetName(val string) {
-	s.Name = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *GetTeamResponse) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-// SetUpdatedAt sets the value of UpdatedAt.
-func (s *GetTeamResponse) SetUpdatedAt(val time.Time) {
-	s.UpdatedAt = val
-}
-
-func (*GetTeamResponse) getTeamRes() {}
 
 type GetTeamUnauthorized ErrorDetails
 
@@ -7515,6 +7502,52 @@ func (o OptAuthMethod) Get() (v AuthMethod, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAuthMethod) Or(d AuthMethod) AuthMethod {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAuthUnauthorizedDetails returns new OptAuthUnauthorizedDetails with value set to v.
+func NewOptAuthUnauthorizedDetails(v AuthUnauthorizedDetails) OptAuthUnauthorizedDetails {
+	return OptAuthUnauthorizedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAuthUnauthorizedDetails is optional AuthUnauthorizedDetails.
+type OptAuthUnauthorizedDetails struct {
+	Value AuthUnauthorizedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAuthUnauthorizedDetails was set.
+func (o OptAuthUnauthorizedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAuthUnauthorizedDetails) Reset() {
+	var v AuthUnauthorizedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAuthUnauthorizedDetails) SetTo(v AuthUnauthorizedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAuthUnauthorizedDetails) Get() (v AuthUnauthorizedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAuthUnauthorizedDetails) Or(d AuthUnauthorizedDetails) AuthUnauthorizedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -11240,10 +11273,6 @@ type RevokeMySessionNotFound ErrorDetails
 
 func (*RevokeMySessionNotFound) revokeMySessionRes() {}
 
-type RevokeMySessionUnauthorized ErrorDetails
-
-func (*RevokeMySessionUnauthorized) revokeMySessionRes() {}
-
 // Ref: #
 type RevokeRequest struct {
 	// The token to revoke (access token or refresh token).
@@ -11423,6 +11452,34 @@ func (s *SessNotFoundDetails) init() SessNotFoundDetails {
 	}
 	return m
 }
+
+// SessNotFoundHeaders wraps SessNotFound with response headers.
+type SessNotFoundHeaders struct {
+	CacheControl OptString
+	Response     SessNotFound
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *SessNotFoundHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *SessNotFoundHeaders) GetResponse() SessNotFound {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *SessNotFoundHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SessNotFoundHeaders) SetResponse(val SessNotFound) {
+	s.Response = val
+}
+
+func (*SessNotFoundHeaders) getMySessionRes() {}
 
 type SessionID string
 
@@ -11632,8 +11689,35 @@ func (s *SessionResponse) SetExpiresAt(val time.Time) {
 	s.ExpiresAt = val
 }
 
-func (*SessionResponse) getMySessionRes() {}
-func (*SessionResponse) getSessionRes()   {}
+func (*SessionResponse) getSessionRes() {}
+
+// SessionResponseHeaders wraps SessionResponse with response headers.
+type SessionResponseHeaders struct {
+	CacheControl OptString
+	Response     SessionResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *SessionResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *SessionResponseHeaders) GetResponse() SessionResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *SessionResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SessionResponseHeaders) SetResponse(val SessionResponse) {
+	s.Response = val
+}
+
+func (*SessionResponseHeaders) getMySessionRes() {}
 
 type SessionResponseMetadata map[string]jx.Raw
 
@@ -12099,6 +12183,119 @@ func (*SubmitFlowStepOK) submitFlowStepRes() {}
 
 type TeamID string
 
+// Details of a team.
+// Ref: #
+type TeamResponse struct {
+	// The unique identifier of the team.
+	ID string `json:"id"`
+	// The name of the team.
+	Name   string     `json:"name"`
+	Status TeamStatus `json:"status"`
+	// The time when the team was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the team was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// GetID returns the value of ID.
+func (s *TeamResponse) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *TeamResponse) GetName() string {
+	return s.Name
+}
+
+// GetStatus returns the value of Status.
+func (s *TeamResponse) GetStatus() TeamStatus {
+	return s.Status
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *TeamResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *TeamResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *TeamResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *TeamResponse) SetName(val string) {
+	s.Name = val
+}
+
+// SetStatus sets the value of Status.
+func (s *TeamResponse) SetStatus(val TeamStatus) {
+	s.Status = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *TeamResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *TeamResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*TeamResponse) createTeamRes() {}
+func (*TeamResponse) getTeamRes()    {}
+func (*TeamResponse) updateTeamRes() {}
+
+// The lifecycle state of a team.
+// active: The team is available for use.
+// deactivated: The team is no longer active but is retained for historical and audit purposes.
+// Ref: #
+type TeamStatus string
+
+const (
+	TeamStatusActive      TeamStatus = "active"
+	TeamStatusDeactivated TeamStatus = "deactivated"
+)
+
+// AllValues returns all TeamStatus values.
+func (TeamStatus) AllValues() []TeamStatus {
+	return []TeamStatus{
+		TeamStatusActive,
+		TeamStatusDeactivated,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s TeamStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case TeamStatusActive:
+		return []byte(s), nil
+	case TeamStatusDeactivated:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *TeamStatus) UnmarshalText(data []byte) error {
+	switch TeamStatus(data) {
+	case TeamStatusActive:
+		*s = TeamStatusActive
+		return nil
+	case TeamStatusDeactivated:
+		*s = TeamStatusDeactivated
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Ref: #
 type TokenResponse struct {
 	// The access token issued by the authorization server.
@@ -12160,6 +12357,42 @@ func (*UpdateFlowDefinitionBadRequest) updateFlowDefinitionRes() {}
 type UpdateFlowDefinitionNotFound ErrorDetails
 
 func (*UpdateFlowDefinitionNotFound) updateFlowDefinitionRes() {}
+
+type UpdateTeamBadRequest ErrorDetails
+
+func (*UpdateTeamBadRequest) updateTeamRes() {}
+
+type UpdateTeamConflict ErrorDetails
+
+func (*UpdateTeamConflict) updateTeamRes() {}
+
+type UpdateTeamForbidden ErrorDetails
+
+func (*UpdateTeamForbidden) updateTeamRes() {}
+
+type UpdateTeamNotFound ErrorDetails
+
+func (*UpdateTeamNotFound) updateTeamRes() {}
+
+// Ref: #
+type UpdateTeamRequest struct {
+	// The name of the team. Must be unique within the project.
+	Name OptString `json:"name"`
+}
+
+// GetName returns the value of Name.
+func (s *UpdateTeamRequest) GetName() OptString {
+	return s.Name
+}
+
+// SetName sets the value of Name.
+func (s *UpdateTeamRequest) SetName(val OptString) {
+	s.Name = val
+}
+
+type UpdateTeamUnauthorized ErrorDetails
+
+func (*UpdateTeamUnauthorized) updateTeamRes() {}
 
 // A user represents an individual identity in the system. It can be used to
 // represent a human user, but also a service account or any other type of
