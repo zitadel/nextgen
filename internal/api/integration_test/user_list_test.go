@@ -1,4 +1,4 @@
-//go:build postgres_integration
+//go:build postgres_integration || spanner_integration
 
 package integration_test
 
@@ -28,6 +28,7 @@ func TestListUsers(t *testing.T) {
 	require.NoError(t, err)
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
@@ -40,8 +41,8 @@ func TestListUsers(t *testing.T) {
 		t.Helper()
 		res, err := client.ListUsers(t.Context(), params)
 		require.NoError(t, err)
-		items, ok := res.(*api.ListUsersOKApplicationJSON)
-		require.True(t, ok, "unexpected response type %T", res)
+		require.IsType(t, &api.ListUsersOKApplicationJSON{}, res, helpers.MustMarshal(t, res))
+		items := res.(*api.ListUsersOKApplicationJSON)
 		ids := make([]string, 0, len(*items))
 		for _, item := range *items {
 			raw, ok := item["id"]
@@ -57,13 +58,12 @@ func TestListUsers(t *testing.T) {
 	assert.Empty(t, listIDs(t, api.ListUsersParams{}))
 
 	// Seed two users in creation order.
-	db := harness.EnsureDBPool(t)
-	userRepo := harness.EnsureUserRepo(t)
+	users := harness.EnsureUserFixture(t)
 	for i, id := range []string{"list-user-01", "list-user-02"} {
 		emailAttr, err := domain.NewCreateAttribute(
 			"email", fmt.Sprintf("list-%d@example.com", i), domain.AttributeUniquenessProject)
 		require.NoError(t, err)
-		require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
+		require.NoError(t, users.Create(t.Context(), &domain.CreateUser{
 			ProjectID:               project.ID,
 			SchemaURL:               schemaURL,
 			ID:                      id,
@@ -75,8 +75,8 @@ func TestListUsers(t *testing.T) {
 	// Full list, creation-ordered, attributes hydrated.
 	res, err := client.ListUsers(t.Context(), api.ListUsersParams{})
 	require.NoError(t, err)
-	items, ok := res.(*api.ListUsersOKApplicationJSON)
-	require.True(t, ok, "unexpected response type %T", res)
+	require.IsType(t, &api.ListUsersOKApplicationJSON{}, res, helpers.MustMarshal(t, res))
+	items := res.(*api.ListUsersOKApplicationJSON)
 	require.Len(t, *items, 2)
 	var email string
 	require.NoError(t, json.Unmarshal((*items)[0]["email"], &email))

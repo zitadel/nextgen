@@ -332,6 +332,36 @@ export function decodeJwt(token: string): DecodedJwt {
   };
 }
 
+// ─── JWT shape detection ──────────────────────────────────────────────────────
+
+/**
+ * Returns `true` when `token` looks structurally like a signed JWT (JWS) —
+ * NOT an encrypted token (JWE).
+ *
+ * JWS compact: 3 dot-separated segments; header has `alg` but NOT `enc`.
+ * JWE compact: 5 dot-separated segments; header has BOTH `alg` and `enc`.
+ *
+ * The Zitadel backend issues JWE tokens (AES-256-GCM via go-jose
+ * `A256GCMKW/A256GCM`), whose compact form is
+ * `header.encrypted_key.iv.ciphertext.tag`. The header decodes to JSON with
+ * `"alg":"A256GCMKW","enc":"A256GCM"`. Checking for the absence of `enc`
+ * correctly identifies signed JWTs without false-positives on JWE tokens.
+ *
+ * This is a structural check only — not a security check. Use it to route a
+ * token to the correct validation path ({@link verifyJwt} for JWS, a backend
+ * session lookup for everything else), never to trust one.
+ */
+export function isJwtShaped(token: string): boolean {
+  const parts = token.split(".");
+  if (parts.length < 3 || !parts[0]) return false;
+  try {
+    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
+    return typeof header?.alg === "string" && !("enc" in header);
+  } catch {
+    return false;
+  }
+}
+
 // ─── Algorithm helpers ────────────────────────────────────────────────────────
 
 /**

@@ -8,11 +8,14 @@ import (
 
 func (h *Harness) EnsureKeyService(t *testing.T) service.KeyService {
 	t.Helper()
-	if h.KeyService == nil {
-		h.KeyService = service.NewKeyService(
+	h.keyService.mutex.Lock()
+	defer h.keyService.mutex.Unlock()
+
+	if h.keyService.value == nil {
+		h.keyService.value = service.NewKeyService(
 			h.EnsureServiceDB(t),
-			h.EnsureKekCrypter(t),
+			*(h.EnsureMasterKey(t)),
 		)
 	}
-	return h.KeyService
+	return h.keyService.value
 }

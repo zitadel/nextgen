@@ -5,13 +5,14 @@ import (
 	"errors"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // ---- Input types -------------------------------------------------------------
 
 type CreateTeamInput struct {
 	ProjectID string
+	Name      string
 }
 
 // ---- Secondary ports -------------------------------------------------------------
@@ -27,12 +28,18 @@ func NewTeamService(v2Pool *DB) *TeamService {
 }
 
 func (s *TeamService) CreateTeam(ctx context.Context, input CreateTeamInput) (*domain.Team, error) {
-	model, err := domain.NewTeam(input.ProjectID)
+	model, err := domain.NewTeam(input.ProjectID, input.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	if err := s.v2Pool.Statements().CreateTeam(ctx, model); err != nil {
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			// Also catches a (project_id, id) primary key collision, which is
+			// unreachable with generated IDs. Discriminating on the constraint
+			// name would need Spanner to report one; today it returns "".
+			return nil, domain.ErrTeamAlreadyExists().WithParent(err)
+		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create team in database")
 	}
 	return model, nil

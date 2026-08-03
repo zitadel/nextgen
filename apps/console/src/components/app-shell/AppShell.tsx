@@ -1,14 +1,14 @@
 import { Link, useMatchRoute } from "@tanstack/react-router";
-import {
-  BookOpen,
-  ChevronsUpDown,
-  Monitor,
-  Moon,
-  Search,
-  Sun,
-} from "lucide-react";
+// `BookOpen` / `Search` return with the parked footer items below.
+import { ChevronsUpDown, LogOut, Monitor, Moon, Sun } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useRef } from "react";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -38,16 +38,33 @@ import { useNavItems } from "./use-nav-items";
  * from `@zitadel/design-tokens` via the shadcn utility names; the sidebar
  * surface uses `background` per the design (see `ui/sidebar.tsx`).
  */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  user,
+  onSignOut,
+}: {
+  children: ReactNode;
+  /** Signed-in identity shown in the sidebar footer (Console ADR 0003). */
+  user?: ShellUser;
+  /** Sign-out action for the footer user menu. */
+  onSignOut?: () => void;
+}) {
   return (
     <SidebarProvider defaultOpen={readSidebarOpen()}>
-      <AppSidebar />
+      <AppSidebar user={user} onSignOut={onSignOut} />
       <SidebarInset>
         <ContextBar />
         {children}
       </SidebarInset>
     </SidebarProvider>
   );
+}
+
+/** The signed-in identity as the shell renders it. */
+export interface ShellUser {
+  name?: string;
+  email?: string;
+  userId?: string;
 }
 
 /** Restore the collapse state shadcn persists in the `sidebar_state` cookie. */
@@ -57,7 +74,7 @@ function readSidebarOpen(): boolean {
   return match ? match[1] === "true" : true;
 }
 
-function AppSidebar() {
+function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
   const items = useNavItems();
   const matchRoute = useMatchRoute();
 
@@ -114,36 +131,79 @@ function AppSidebar() {
 
       <SidebarFooter>
         <SidebarMenu className="gap-2">
-          <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Search" className="font-serif">
-              <Search aria-hidden />
-              <span>Search</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Documentation" className="font-serif">
-              <BookOpen aria-hidden />
-              <span>Documentation</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" tooltip="Florian" className="font-serif">
-              <span
-                aria-hidden
-                className="size-8 shrink-0 rounded-lg bg-[linear-gradient(232deg,#f25543_17%,#0f0f11_75%)]"
-              />
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-none">
-                <span className="truncate text-[14px] text-sidebar-foreground">Florian</span>
-                <span className="truncate text-[12px] text-muted-foreground">flo@domain.com</span>
-              </span>
-              <ChevronsUpDown className="ml-auto text-muted-foreground" aria-hidden />
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {/* Search and Documentation are parked: both rendered as ordinary
+              enabled buttons with no handler, so clicking them did nothing at
+              all — the worst of the three states, since they looked live.
+
+              Search needs a cross-resource query endpoint; ADR 031's
+              `POST /{resource}/query` exists only for projects today, so there
+              is nothing to search across. Documentation needs a published URL
+              for the docs site to point at.
+
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Search" className="font-serif">
+                  <Search aria-hidden />
+                  <span>Search</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip="Documentation" className="font-serif">
+                  <BookOpen aria-hidden />
+                  <span>Documentation</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem> */}
+          <UserMenuItem user={user} onSignOut={onSignOut} />
         </SidebarMenu>
       </SidebarFooter>
 
       <SidebarRail />
     </Sidebar>
+  );
+}
+
+/**
+ * Footer user entry: the signed-in identity from `GET /sessions/me`
+ * (name → email → user id fallback, per the API's identity-hydration
+ * contract) with a menu carrying the sign-out action (Console ADR 0003).
+ * Console-local chrome by design — the dark-only `<zitadel-session>` pair is
+ * not theme-portable yet (root AGENTS.md bucket rule).
+ */
+function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
+  const displayName = user?.name ?? user?.email ?? user?.userId ?? "Signed in";
+  // Show the email as the secondary line only when the name is the primary.
+  const secondary = user?.name ? user.email : undefined;
+
+  return (
+    <SidebarMenuItem>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <SidebarMenuButton
+            size="lg"
+            tooltip={displayName}
+            className="font-serif"
+            aria-label={`Account: ${displayName}`}
+          >
+            <span
+              aria-hidden
+              className="size-8 shrink-0 rounded-lg bg-[linear-gradient(232deg,#f25543_17%,#0f0f11_75%)]"
+            />
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-none">
+              <span className="truncate text-[14px] text-sidebar-foreground">{displayName}</span>
+              {secondary && (
+                <span className="truncate text-[12px] text-muted-foreground">{secondary}</span>
+              )}
+            </span>
+            <ChevronsUpDown className="ml-auto text-muted-foreground" aria-hidden />
+          </SidebarMenuButton>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="top" align="start" className="w-56">
+          <DropdownMenuItem onSelect={() => onSignOut?.()} disabled={!onSignOut}>
+            <LogOut aria-hidden />
+            Sign out
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </SidebarMenuItem>
   );
 }
 

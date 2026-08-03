@@ -23,9 +23,8 @@ import {
 } from "./api-client.js";
 import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
 import type { Branding } from "./branding.js";
-import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { validateBranding } from "./branding-validator.js";
-import { applyDefaultFont, applyFontUrl } from "./font-loader.js";
+import { stampExportparts } from "./exportparts.js";
 import { emit } from "../internal/emit.js";
 import { escapeHtml } from "../internal/escape-html.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
@@ -34,9 +33,9 @@ import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { zitadelAttributionPillInnerHtml } from "@zitadel/shared-component-styles/attribution-markup";
 import { createSanitiser } from "./sanitiser.js";
+import { ZitadelSurface } from "./surface.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
 import layoutChromeCss from "./templates/layout-chrome.css?inline";
-import { ThemeController } from "./theme-controller.js";
 
 /**
  * The uniform value contract every input atom exposes (`<zl-field>`,
@@ -85,7 +84,7 @@ function isFieldAtom(el: Element): el is FieldAtom {
  * - `docs/design/flowengine/template-security.md`
  */
 @customElement("zitadel-login")
-export class ZitadelLogin extends LitElement {
+export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
     ...LitElement.shadowRootOptions,
     delegatesFocus: true,
@@ -100,9 +99,12 @@ export class ZitadelLogin extends LitElement {
     :host {
       display: block;
       width: 100%;
-      min-height: 100vh;
     }
   `;
+
+  // `variant` and `theme` come from `ZitadelSurface`. Login adds one
+  // variant-specific behavior on top of the shared surface polarity: `page`
+  // focuses the first field on load, `widget` never steals focus.
 
   @property({ type: String }) accessor purpose: CreateFlowBodyPurpose = "login";
 
@@ -166,18 +168,21 @@ export class ZitadelLogin extends LitElement {
   @property({ type: String }) override accessor lang = "";
 
   /**
-   * Custom locale dictionaries keyed by language code. When set, these take
-   * precedence over the built-in dictionaries for matching language codes.
+   * Custom locale dictionaries keyed by language code. Entries may be
+   * partial — each is merged over the built-in dictionary for its language,
+   * so a preset like {@link businessLocales} (or a hand-written subset) is
+   * directly assignable:
    *
    * ```ts
-   * import { en } from "@zitadel/components";
-   * const locales = {
-   *   en: { ...en, "identifier.title": "Welcome" },
-   *   de: myGermanDict,
-   * };
+   * import { businessLocales } from "@zitadel/components";
+   * loginElement.locales = businessLocales;
+   * // or override individual keys:
+   * loginElement.locales = { en: { "identifier.title": "Welcome" } };
    * ```
    */
-  @property({ attribute: false }) accessor locales: Record<string, Locale> | undefined;
+  @property({ attribute: false }) accessor locales:
+    | Readonly<Record<string, Partial<Locale>>>
+    | undefined;
 
   @state() private accessor response: CreateFlow201 | null = null;
 
@@ -188,8 +193,6 @@ export class ZitadelLogin extends LitElement {
   @state() private accessor startupError: string | null = null;
 
   @state() private accessor formValues: Record<string, string> = {};
-
-  private readonly themeController = new ThemeController(this);
 
   private engine: Liquid | null = null;
 
@@ -274,33 +277,46 @@ export class ZitadelLogin extends LitElement {
     const primary = (code.split("-")[0] ?? "").toLowerCase();
     const builtin = builtinLocales[primary] ?? en;
     const custom = this.locales?.[primary];
+    if (!custom) return builtin;
 
-    return custom ? { ...builtin, ...custom } : builtin;
+    // Entries are Partial — merge key-by-key and skip explicit `undefined`
+    // values, which a plain spread would let shadow the built-in copy.
+    const merged: Locale = { ...builtin };
+    for (const [key, value] of Object.entries(custom)) {
+      if (value !== undefined) merged[key] = value;
+    }
+    return merged;
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
     if (!this.engine || changed.has("locales") || changed.has("lang")) {
       this.engine = createLiquidEngine({ locale: this.resolveLocale() });
     }
-    const root = this.shadowRoot;
-    if (root) {
-      applyBaseTokens(root);
-      applyBrandingTokens(root, this.branding, this.themeController.theme);
-      // Ship the design-system brand face by default; drop it when a tenant
-      // font takes over so we don't fire a redundant request.
-      const tenantFontUrl = this.branding?.font_url ?? null;
-      applyDefaultFont(root, tenantFontUrl ? null : undefined);
-      applyFontUrl(root, tenantFontUrl);
-    }
-    this.dataset.theme = this.themeController.theme;
-    this.toggleAttribute("data-theme-dark", this.themeController.theme === "dark");
+    this.applySurfaceTheme(this.branding);
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
   }
 
   override updated(changed: PropertyValues<this>): void {
+    // Re-stamp part forwarding and widget-mode chrome on every commit:
+    // `unsafeHTML` re-parses whenever the rendered string changes (step
+    // swap, loading toggle, error dismiss), replacing previously stamped
+    // nodes. The template's `zl-page-shell` sits in a different shadow
+    // scope, so the variant reaches it as a stamped attribute, not a
+    // `:host([variant])` selector.
+    if (this.shadowRoot) {
+      stampExportparts(this.shadowRoot);
+      const widget = this.variant !== "page";
+      for (const shell of this.shadowRoot.querySelectorAll("zl-page-shell")) {
+        shell.toggleAttribute("data-widget", widget);
+      }
+    }
     const props = changed as Map<string, unknown>;
     if (!props.has("response")) return;
-    void this.hydrateStepAfterRender();
+    // `changed` holds the OLD value: nullish (`null` initializer, or
+    // undefined when the property never changed before) means this commit
+    // applied the first response — the initial paint, not a user-driven
+    // step swap.
+    void this.hydrateStepAfterRender(props.get("response") == null);
   }
 
   /**
@@ -309,15 +325,22 @@ export class ZitadelLogin extends LitElement {
    * but those render their own shadow DOM on a later microtask — so await
    * this element's update *and* the child atoms' first render before touching
    * them, rather than guessing a frame with `requestAnimationFrame`.
+   *
+   * Focus on the *initial* response is page-mode-only: a dedicated login
+   * route should focus its first field, but a widget embedded further down
+   * an arbitrary page must not steal focus and scroll-jump on load. Step
+   * swaps are user-initiated, so focus moves in both modes.
    */
-  private async hydrateStepAfterRender(): Promise<void> {
+  private async hydrateStepAfterRender(initial = false): Promise<void> {
     await this.updateComplete;
     const atoms = this.shadowRoot?.querySelectorAll<LitElement>("zl-field, zl-button");
     if (atoms) {
       await Promise.all(Array.from(atoms).map((atom) => atom.updateComplete));
     }
     this.applyValuesToFields();
-    this.moveFocusToFirstField();
+    if (!initial || this.variant === "page") {
+      this.moveFocusToFirstField();
+    }
   }
 
   override render() {
@@ -413,6 +436,11 @@ export class ZitadelLogin extends LitElement {
         });
       }
       this.applyResponse(wire);
+      // Symmetric with `submit()`: every applied step announces itself, the
+      // first one included. A host app driving its own chrome from the step
+      // (progress, headings, analytics) would otherwise see nothing until
+      // after the visitor's first submit.
+      emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
       this.handleTransportError(this.describeFlowSelectionError(error));
     } finally {

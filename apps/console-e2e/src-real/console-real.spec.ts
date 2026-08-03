@@ -1,11 +1,12 @@
-import type { Page } from "@playwright/test";
 import { expect, test } from "@zitadel/testing/playwright";
 
-const ERROR_HEADINGS = ["Not authorized", "Something went wrong"];
+import { expectNoErrorBoundary, signIn } from "./support";
 
 test.describe.configure({ mode: "parallel" });
 
-test("shows the bootstrapped project", async ({ page, zitadel }) => {
+test("shows the bootstrapped project", async ({ page, zitadel, seed }) => {
+  await signIn(page, await seed.user());
+
   await page.goto("/projects");
 
   await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
@@ -15,6 +16,7 @@ test("shows the bootstrapped project", async ({ page, zitadel }) => {
 
 test("shows a seeded user in the list and detail views", async ({ page, seed }) => {
   const user = await seed.user();
+  await signIn(page, user);
 
   await page.goto("/users");
   await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible();
@@ -32,7 +34,13 @@ test("shows a seeded user in the list and detail views", async ({ page, seed }) 
 test("keeps the project credential out of browser requests and resources", async ({
   page,
   zitadel,
+  seed,
 }) => {
+  // Sign in first (Console ADR 0003): the resource pages sit behind the auth
+  // guard, and the login exchange itself must not leak the project secret
+  // either — the listener below starts before any navigation under test.
+  await signIn(page, await seed.user());
+
   const inspectedResponses: Array<Promise<string | undefined>> = [];
   page.on("response", (response) => {
     const contentType = response.headers()["content-type"] ?? "";
@@ -69,9 +77,3 @@ test("keeps the project credential out of browser requests and resources", async
   expect(leakedResources).toEqual([]);
   expect((await page.content()).includes(zitadel.handle.projectSecret)).toBe(false);
 });
-
-async function expectNoErrorBoundary(page: Page): Promise<void> {
-  for (const heading of ERROR_HEADINGS) {
-    await expect(page.getByText(heading, { exact: true })).toHaveCount(0);
-  }
-}

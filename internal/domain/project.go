@@ -1,8 +1,11 @@
 package domain
 
 import (
+	"strings"
 	"time"
 
+	"github.com/go-jose/go-jose/v4"
+	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
@@ -12,6 +15,10 @@ const (
 
 func ErrProjectNameInvalid() Error {
 	return newError(PrefixProject.ErrorCodePrefix("name_invalid"), "The project name is invalid. Expected a non-empty string.", nil, nil)
+}
+
+func ErrProjectMissingID() Error {
+	return newError(PrefixProject.ErrorCodePrefix("missing_id"), "project: missing id", nil, nil)
 }
 
 func ErrProjectNotFound() Error {
@@ -40,6 +47,7 @@ func NewProject(name string, previewOrigins []string) (*Project, error) {
 		return nil, ErrInternal(err).WithMessage("failed to create project id")
 	}
 
+	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, ErrProjectNameInvalid()
 	}
@@ -77,6 +85,48 @@ func (p *Project) PreviewSecret(encrypter op.Encrypter) (string, error) {
 	return previewSecret, nil
 }
 
+// GenerateNewKeySet creates the project's key encryption key, wrapped by the
+// deployment's master key, and the purpose-scoped keys wrapped by that KEK.
+func (p *Project) GenerateNewKeySet(masterKey crypto.Crypter) (*ProjectKeySet, error) {
+	kek, err := NewEncryptionKey(p.ID, EncryptionKeyPurposeKEK, jose.A256GCM, masterKey)
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to create project key encryption key")
+	}
+
+	kekCrypter, err := kek.Crypter(masterKey)
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to decrypt project key encryption key")
+	}
+
+	tek, err := NewEncryptionKey(p.ID, EncryptionKeyPurposeToken, jose.A256GCM, kekCrypter)
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to create project token encryption key")
+	}
+
+	sek, err := NewEncryptionKey(p.ID, EncryptionKeyPurposeSecret, jose.A256GCM, kekCrypter)
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to create project secret encryption key")
+	}
+
+	cek, err := NewEncryptionKey(p.ID, EncryptionKeyPurposeCookie, jose.A256GCM, kekCrypter)
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to create project cookie encryption key")
+	}
+
+	tsk, err := NewSigningKey(p.ID, SigningKeyPurposeToken, jose.EdDSA, kekCrypter)
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to create project token signing key")
+	}
+
+	return &ProjectKeySet{
+		KeyEncryptionKey:    kek,
+		TokenEncryptionKey:  tek,
+		SecretEncryptionKey: sek,
+		CookieEncryptionKey: cek,
+		TokenSigningKey:     tsk,
+	}, nil
+}
+
 // ProjectField enumerates the fields of Project which can be used for ordering in list operations.
 type ProjectField uint8
 
@@ -88,3 +138,27 @@ const (
 	ProjectFieldUpdatedAt
 	ProjectFieldPreviewOrigins
 )
+
+type ProjectKeySet struct {
+	KeyEncryptionKey    *EncryptionKey
+	TokenEncryptionKey  *EncryptionKey
+	SecretEncryptionKey *EncryptionKey
+	CookieEncryptionKey *EncryptionKey
+	TokenSigningKey     *SigningKey
+}
+
+func (s *ProjectKeySet) Activate(oldKeys *ProjectKeySet) {
+	if oldKeys != nil {
+		s.KeyEncryptionKey.Activate(oldKeys.KeyEncryptionKey)
+		s.TokenEncryptionKey.Activate(oldKeys.TokenEncryptionKey)
+		s.SecretEncryptionKey.Activate(oldKeys.SecretEncryptionKey)
+		s.CookieEncryptionKey.Activate(oldKeys.CookieEncryptionKey)
+		s.TokenSigningKey.Activate(oldKeys.TokenSigningKey)
+	} else {
+		s.KeyEncryptionKey.Activate(nil)
+		s.TokenEncryptionKey.Activate(nil)
+		s.SecretEncryptionKey.Activate(nil)
+		s.CookieEncryptionKey.Activate(nil)
+		s.TokenSigningKey.Activate(nil)
+	}
+}

@@ -1,4 +1,4 @@
-//go:build postgres_integration
+//go:build postgres_integration || spanner_integration
 
 package integration_test
 
@@ -27,15 +27,13 @@ func TestGetMySession_Identity(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
-	dek, err := harness.EnsureKeyService(t).GetProjectDEKCrypter(t.Context(), project.ID)
+	tokenCrypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
 	require.NoError(t, err)
-	projectSecret, err := project.ProjectSecret(dek)
+	projectSecret, err := project.ProjectSecret(tokenCrypter)
 	require.NoError(t, err)
 
-	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 	userSchemaURL := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
-
-	db := harness.EnsureDBPool(t)
 
 	// The user-id schema (components/schemas/user-id.yaml) requires the
 	// `user_` prefix; ogen response validation enforces it.
@@ -53,7 +51,7 @@ func TestGetMySession_Identity(t *testing.T) {
 		require.NoError(t, err)
 		attrs = append(attrs, attr)
 	}
-	require.NoError(t, harness.EnsureUserRepo(t).Create(t.Context(), db, &domain.CreateUser{
+	require.NoError(t, harness.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
 		ProjectID:  project.ID,
 		SchemaURL:  userSchemaURL,
 		ID:         userID,
@@ -67,12 +65,12 @@ func TestGetMySession_Identity(t *testing.T) {
 		RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
 		Checks:         []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}},
 	}
-	attemptRepo := harness.EnsureAuthAttemptRepo(t)
-	require.NoError(t, attemptRepo.Create(t.Context(), db, attempt))
+	stmts := harness.EnsureServiceDB(t)
+	require.NoError(t, stmts.Statements().CreateAuthAttempt(t.Context(), attempt))
 	const plainToken = "handoff_session_me_test"
 	sum := sha256.Sum256([]byte(plainToken))
 	attempt.HandoffToken = &domain.HandoffToken{TokenHash: sum[:]}
-	require.NoError(t, attemptRepo.Handoff(t.Context(), db, attempt))
+	require.NoError(t, stmts.Statements().HandoffAuthAttempt(t.Context(), attempt))
 
 	exchangeBody, err := json.Marshal(map[string]string{"handoff_token": plainToken})
 	require.NoError(t, err)
