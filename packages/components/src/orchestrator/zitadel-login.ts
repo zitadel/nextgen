@@ -204,6 +204,28 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private tenantTemplateCache: { source: string; template: Template[] } | null = null;
 
+  /**
+   * Whether the widget currently owns a same-document history entry (the
+   * "sentinel"). The sentinel exists so the browser's back gesture fires
+   * `popstate` instead of leaving the page. Exactly one sentinel is on
+   * the stack at a time: it is pushed when a step with a `kind: "back"`
+   * action renders, re-armed by `onPopState` after the browser consumes
+   * it, and retired by `applyResponse` when a step without a back action
+   * renders. The entry reuses the current URL, so the host page's
+   * location (including any hash-router fragment) is never modified.
+   */
+  private armed = false;
+
+  /**
+   * Set immediately before a self-initiated `history.back()` so the
+   * resulting `popstate` is ignored instead of being interpreted as a
+   * user back gesture.
+   */
+  private ignoreNextPop = false;
+
+  /** Bound `popstate` handler stored for cleanup in `disconnectedCallback`. */
+  private readonly handlePopState = this.onPopState.bind(this);
+
   override createRenderRoot(): HTMLElement | DocumentFragment {
     const root = super.createRenderRoot();
     if (root instanceof ShadowRoot) {
@@ -242,6 +264,20 @@ export class ZitadelLogin extends ZitadelSurface {
       root.addEventListener("zl-passkey-error", this.handlePasskeyError as EventListener);
     }
     return root;
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    if (typeof window !== "undefined") {
+      window.addEventListener("popstate", this.handlePopState);
+    }
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    if (typeof window !== "undefined") {
+      window.removeEventListener("popstate", this.handlePopState);
+    }
   }
 
   /**
@@ -489,6 +525,39 @@ export class ZitadelLogin extends ZitadelSurface {
     // Defaults seed every declared field; existing entries (typed input,
     // carry-over from prior steps) win on conflict.
     this.formValues = { ...collectInitialValues(wire.step), ...this.formValues };
+
+    // History API (ADR 022): keep exactly one same-document entry — the
+    // sentinel — on the stack while the current step supports
+    // back-navigation, so the browser's back gesture fires `popstate`
+    // (handled in `onPopState`) instead of leaving the page. Arming only
+    // on the unarmed → armed transition means consecutive back-capable
+    // steps (and re-renders of the same step, e.g. after a failed submit)
+    // never grow the stack. Steps without a `kind: "back"` action retire
+    // the sentinel — the next back press then navigates the host page
+    // (leaves the flow), which is correct.
+    if (typeof window !== "undefined") {
+      const hasBack = Boolean(wire.step.actions?.some((a) => a.kind === "back"));
+      if (hasBack && !this.armed) {
+        // Spread the host's state: vue-router (Nuxt) keeps `position` /
+        // `back` / `forward` here and reads them on popstate. Replacing it
+        // wholesale leaves the sentinel opaque to the host router.
+        history.pushState({ ...history.state, zl: true }, "");
+        this.armed = true;
+      } else if (!hasBack && this.armed) {
+        this.armed = false;
+        // Only traverse while we still own the current entry. If the host
+        // pushed its own entry after we armed, `history.back()` would pop
+        // *that* one and trigger a host back-navigation the user never
+        // asked for. Leaving a stale sentinel behind is the lesser evil —
+        // same tradeoff as disconnect; the popstate handler skips stale
+        // sentinels in one extra hop from either direction.
+        if ((history.state as { zl?: boolean } | null)?.zl === true) {
+          this.ignoreNextPop = true;
+          history.back();
+        }
+      }
+    }
+
     void this.maybeCompleteFlow(wire);
   }
 
@@ -971,6 +1040,56 @@ export class ZitadelLogin extends ZitadelSurface {
       this.handleTransportError(error);
     } finally {
       this.loading = false;
+    }
+  }
+
+  /**
+   * Handle the browser's back/forward gesture (ADR 022). When `popstate`
+   * fires:
+   *
+   * - **Self-initiated** (`ignoreNextPop`) → `applyResponse` is retiring
+   *   the sentinel; ignore.
+   * - **Back press while armed** → the browser consumed the sentinel.
+   *   Re-arm it immediately — so the stack shape is identical on every
+   *   step and repeated presses behave the same at any flow depth — then
+   *   submit the step's `kind: "back"` action.
+   * - **Landing on the sentinel while armed** → the host page pushed an
+   *   entry above the sentinel (e.g. an in-page `#anchor` click) and the
+   *   user backed out of it. They are back where the widget expects them
+   *   — not asking the flow to go back; do nothing.
+   * - **Forward press onto a retired sentinel** (it survives as a forward
+   *   entry after `history.back()`) → bounce back: flow state is
+   *   server-authoritative, the browser cannot skip ahead
+   *   (ADR 022 §Edge cases).
+   * - Anything else is host-page traversal — leave the browser alone.
+   */
+  private onPopState(event: PopStateEvent): void {
+    if (this.ignoreNextPop) {
+      this.ignoreNextPop = false;
+      return;
+    }
+
+    if (this.armed) {
+      if ((event.state as { zl?: boolean } | null)?.zl === true) {
+        // Traversal landed ON the sentinel from an entry above it that the
+        // host page created after we armed. Position is as expected; the
+        // gesture was aimed at the host entry, not the flow.
+        return;
+      }
+      // Back press: the browser popped the sentinel.
+      this.armed = false;
+      const backAction = this.response?.step?.actions?.find((a) => a.kind === "back");
+      if (backAction) {
+        history.pushState({ zl: true }, "");
+        this.armed = true;
+        void this.submit(backAction.name);
+      }
+      return;
+    }
+
+    if ((event.state as { zl?: boolean } | null)?.zl === true) {
+      this.ignoreNextPop = true;
+      history.back();
     }
   }
 
