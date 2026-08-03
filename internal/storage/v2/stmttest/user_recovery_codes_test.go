@@ -3,6 +3,7 @@
 package stmttest
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -20,7 +21,7 @@ func recoveryCodesByUserFilter(projectID, userID string) database.Filter[domain.
 	)
 }
 
-func recoveryCodesByIDFilter(id int64) database.Filter[domain.UserRecoveryCodesField] {
+func recoveryCodesByIDFilter(id string) database.Filter[domain.UserRecoveryCodesField] {
 	return database.Equal(database.Col(domain.UserRecoveryCodesFieldID), id)
 }
 
@@ -40,7 +41,8 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 
 		got, err := d.stmts.GetUserRecoveryCodes(t.Context(), recoveryCodesByUserFilter(projectID, userID))
 		require.NoError(t, err)
-		require.Positive(t, got.ID)
+		require.NotEmpty(t, got.ID)
+		assert.True(t, strings.HasPrefix(got.ID, string(domain.PrefixUserRecoveryCodes)+"_"))
 		require.Equal(t, codes, got.RecoveryCodes)
 
 		byID, err := d.stmts.GetUserRecoveryCodes(t.Context(), recoveryCodesByIDFilter(got.ID))
@@ -64,7 +66,7 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 		}))
 		got2, err := d.stmts.GetUserRecoveryCodes(t.Context(), recoveryCodesByUserFilter(projectID, userID))
 		require.NoError(t, err)
-		require.Positive(t, got2.ID)
+		require.NotEmpty(t, got2.ID)
 		require.NoError(t, d.stmts.DeleteUserRecoveryCodes(t.Context(), recoveryCodesByUserFilter(projectID, userID)))
 		_, err = d.stmts.GetUserRecoveryCodes(t.Context(), recoveryCodesByUserFilter(projectID, userID))
 		require.ErrorIs(t, err, new(database.NoRowFoundError))

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniqueTokenFixtureIDs(t *testing.T) (projectID, schemaURL, userID string) {
