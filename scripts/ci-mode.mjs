@@ -110,8 +110,13 @@ export function queryAffectedTargets(base, spawn = spawnSync) {
     return null;
   }
   try {
-    const parsed = JSON.parse(result.stdout);
-    const tasks = parsed?.tasks ?? {};
+    const tasks = JSON.parse(result.stdout)?.tasks;
+    // An empty `tasks` object is a legitimate answer (a diff no task claims,
+    // e.g. a runbook edit) and gates everything off. A missing or non-object
+    // `tasks` key means the output schema changed under us — fail open.
+    if (typeof tasks !== "object" || tasks === null || Array.isArray(tasks)) {
+      return null;
+    }
     return Object.entries(tasks).flatMap(([project, projectTasks]) =>
       Object.keys(projectTasks).map((task) => `${project}:${task}`),
     );

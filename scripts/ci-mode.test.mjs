@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { computeMode, forceFullReason, resolveGates } from "./ci-mode.mjs";
+import { computeMode, forceFullReason, queryAffectedTargets, resolveGates } from "./ci-mode.mjs";
 
 // Affected sets below are real `moon query tasks --affected --downstream deep`
 // results captured on 2026-08-03 (post-#665 main) for one representative
@@ -135,4 +135,39 @@ test("a failed affected query fails open", () => {
   });
   assert.ok(allTrue(gates));
   assert.equal(reason, "affected query failed");
+});
+
+test("an empty affected set from a valid query legitimately gates everything off", () => {
+  // e.g. a runbook edit: claimed by no task, and inert by construction —
+  // the force-full globs are what bound the dangerous unclaimed families.
+  const { gates, reason } = resolveGates({
+    mode: "full",
+    files: ["docs/runbooks/manual-release.md"],
+    targets: [],
+  });
+  assert.equal(reason, null);
+  assert.ok(allFalse(gates));
+});
+
+function fakeSpawn(result) {
+  return () => ({ status: 0, stdout: "", stderr: "", ...result });
+}
+
+test("queryAffectedTargets parses the grouped task map", () => {
+  const targets = queryAffectedTargets(
+    "HEAD",
+    fakeSpawn({ stdout: '{"tasks":{"server":{"test":{},"build":{}},"release":{"snapshot":{}}}}' }),
+  );
+  assert.deepEqual(targets?.sort(), ["release:snapshot", "server:build", "server:test"]);
+});
+
+test("queryAffectedTargets returns an empty set for an empty tasks map", () => {
+  assert.deepEqual(queryAffectedTargets("HEAD", fakeSpawn({ stdout: '{"tasks":{}}' })), []);
+});
+
+test("queryAffectedTargets fails open on schema drift, garbage output, and nonzero exits", () => {
+  assert.equal(queryAffectedTargets("HEAD", fakeSpawn({ stdout: '{"unexpected":true}' })), null);
+  assert.equal(queryAffectedTargets("HEAD", fakeSpawn({ stdout: '{"tasks":[1,2]}' })), null);
+  assert.equal(queryAffectedTargets("HEAD", fakeSpawn({ stdout: "not json" })), null);
+  assert.equal(queryAffectedTargets("HEAD", fakeSpawn({ status: 1, stderr: "boom" })), null);
 });
