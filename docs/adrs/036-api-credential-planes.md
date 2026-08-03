@@ -99,15 +99,20 @@ key for attribution plus the user's session cookie as the principal. It does
 not need — and must not use — the project secret, which preserves the
 zero-platform-secrets endgame for SSR deployments.
 
-The origin allowlist does not apply to these calls. Origin enforcement is an
-honest-browser control (CSRF, embedding, WebAuthn RP-ID derivation) for
-operations that *establish or advance* credentials — the flow ops and the
-public-plane handoff exchange, which keep it. A cookie-principal read
-authenticates by the cookie, a strictly stronger credential than an
-attacker-settable `Origin` header, and server-originated calls carry no
-browser-attested `Origin` at all. The verifier therefore scopes origin checks
-by operation class: credential-establishing ops enforce the allowlist;
-cookie-principal reads skip it.
+The origin allowlist does not blanket these calls. Origin enforcement is an
+honest-browser control (CSRF, embedding, WebAuthn RP-ID derivation), so the
+verifier scopes it by operation class:
+
+- **Credential-establishing ops** (flow ops, the public-plane handoff
+  exchange) always enforce the allowlist.
+- **Cookie-principal mutations** (`revokeMySession`) enforce it when a
+  browser-attested `Origin` is present — a cross-site page's forced-logout
+  attempt arrives with the attacker's `Origin` and is rejected — while
+  server-originated calls, which carry no `Origin`, pass on the cookie.
+- **Cookie-principal reads** (`getMySession`, `getMyUser`) skip it: the
+  cookie is a strictly stronger credential than an attacker-settable
+  `Origin` header, and cross-origin browser reads are already unreadable
+  under CORS without a matching `Access-Control-Allow-Origin`.
 
 ### The handoff exchange
 
@@ -145,7 +150,7 @@ bundle" but "which surfaces may this value ever appear on".
 | Credential | May appear in | Must never appear in |
 |---|---|---|
 | Publishable key | Committed `zitadel.json`, browser bundles, request headers | — (safe to publish is its definition) |
-| Project secret | Server env, platform secret stores, `.zitadel/secret` | Browser-readable content, committed files, requests attached by infrastructure to browser-originated traffic |
+| Project secret | Server env, platform secret stores, `.zitadel/secret`; server memory and the `Authorization` header of the app- and operator-plane calls it authenticates | Browser-readable content, committed files, blind attachment to browser-originated traffic (the stamped proxy this ADR removes) |
 | Session token | The `__nextgen_session` HttpOnly cookie; server memory while handling the request | Anything script-readable: HTML/DOM, serialised SSR/RSC payloads, client-side state, non-HttpOnly cookies, URLs, logs |
 | Handoff token | Flow-completion response body (same-origin, one-time, short-TTL) | URLs, unless exchanged with the proof binding above |
 
@@ -155,11 +160,13 @@ browser-readable content.** OIDC access and refresh tokens keep their
 contracts in ADR 037. Wired enforcement today: `@zitadel/sdk-nuxt` strips the
 token before seeding its SSR payload; `@zitadel/sdk-next`'s `NextgenProvider`
 converts to the client-safe shape on the server and is `server-only`, so a
-client-side wrapper cannot move the boundary above the strip; the demo-next
-e2e asserts the raw token appears nowhere in a rendered response (PR #718).
-Exposure contracts are testable that way — response bodies and serialised
+client-side wrapper cannot move the boundary above the strip. A demo-next
+e2e assertion additionally checks the raw token appears nowhere in a
+rendered response (PR #718) — today that lane is opt-in, not CI enforcement;
+promoting it into the CI-run e2e lane is remaining work below. Exposure
+contracts are testable exactly that way — response bodies and serialised
 payloads are assertable surfaces — and new SDK integrations are expected to
-carry the equivalent leak guard.
+carry the equivalent leak guard in a lane CI runs.
 
 ### Proxies become credential-free
 
@@ -180,11 +187,19 @@ exists only on matcher-covered routes and is spoofable wherever the
 middleware does not run. PR #718 closed the spoof by re-verifying the header;
 this ADR removes the channel instead:
 
-- **`auth()` reads the session cookie (and, in Route Handlers, the
-  `Authorization` bearer) directly** and validates it — opaque tokens via the
-  server-originated `getMySession` read above, JWTs via JWKS. It works on
-  every route; the middleware `matcher` constrains only redirects, aligning
-  server-side reads with `getSession()`.
+- **`auth()` reads the session cookie directly** and validates it as the
+  session class: ADR 037 session tokens are opaque and server-authoritative,
+  so the check is the server-originated `getMySession` read above. It works
+  on every route; the middleware `matcher` constrains only redirects,
+  aligning server-side reads with `getSession()`.
+- **The `Authorization` bearer in Route Handlers is a different credential
+  class with different rules**: an ADR 037 access token (`typ: at+JWT`),
+  verified via JWKS **with a mandatory audience** naming this app. With no
+  audience configured, the bearer path is off and such requests are
+  unauthenticated — never "any token this issuer ever signed": without the
+  audience bind, a token minted for a different client would authenticate
+  here. (The shipped verifier still defaults to no audience check and also
+  accepts `typ: JWT`; tightening those defaults is remaining work below.)
 - **Middleware keeps two jobs**: the credential-free proxy hop and redirect
   gating for `protectedRoutes`, where it retains full validation — a
   structural-only check there would render signed-out content instead of
@@ -202,9 +217,12 @@ is the server half, shipped behind the old header transport. The remaining
 work is the transport swap: read `cookies()`/`Authorization` in `auth()`,
 delete the tunnel plumbing, attach the publishable key once it exists, and
 sweep the matcher-precondition prose (SDK docstrings, READMEs, scaffold
-guidance, the `getSession()` server-side error text). `@zitadel/sdk-nuxt`
-already validates on every request (no matcher concept); its remaining
-change is publishable-key wiring only.
+guidance, the `getSession()` server-side error text). Two items ride along:
+tightening the bearer defaults (mandatory audience, `at+JWT` only) per the
+bullet above, and promoting the session-leak assertion into the CI-run e2e
+lane. `@zitadel/sdk-nuxt` already validates every non-proxy, non-ignored
+request — there is no matcher concept to outgrow; its remaining change is
+publishable-key wiring only.
 
 ## Consequences
 
@@ -230,8 +248,9 @@ change is publishable-key wiring only.
   uncovered routes; PR #718's verification engine remains as the validation
   path, no longer as a trust patch on the transport.
 - The exposure contracts give every SDK a testable invariant; the demo-next
-  e2e leak guard (raw token absent from the full rendered response) is the
-  template for other framework integrations.
+  leak assertion (raw token absent from the full rendered response) is the
+  template for other framework integrations once it moves into a CI-run
+  lane.
 
 ## Out of scope
 
