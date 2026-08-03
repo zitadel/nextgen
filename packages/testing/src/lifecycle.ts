@@ -38,9 +38,8 @@ export interface BootedServer {
 /**
  * Boot an ephemeral local server by shelling out to `zitadel start` and parse
  * its JSON envelope. The CLI owns the subtle parts (port preflight, health
- * wait, process-group stop, embedded-Postgres reaping), so this module stays a
- * thin adapter; swapping it for direct library calls later must not change the
- * shape returned here.
+ * wait, process-group stop), so this module stays a thin adapter; swapping it
+ * for direct library calls later must not change the shape returned here.
  */
 export async function bootLocalServer(options: BootServerOptions = {}): Promise<BootedServer> {
   const ownsDir = options.dir === undefined;
@@ -100,7 +99,7 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
       { cause: error },
     );
     // start exited 0, so a server may well be running despite the unusable
-    // output — stop it instead of orphaning it and its embedded Postgres.
+    // output — stop it instead of orphaning it.
     try {
       await stopViaCli();
     } catch (stopError) {
@@ -126,7 +125,7 @@ export async function bootLocalServer(options: BootServerOptions = {}): Promise<
   };
   // Memoize the in-flight stop so concurrent callers await the same cleanup,
   // and reset on failure so a failed stop can be retried instead of silently
-  // leaving the server and embedded Postgres behind.
+  // leaving the server behind.
   let stopPromise: Promise<void> | undefined;
   const stop = (): Promise<void> => {
     stopPromise ??= runStop().catch((error: unknown) => {
