@@ -15,13 +15,49 @@ export type ResourceEntry = {
 };
 
 /**
+ * Ownership class of one scaffolded app file, recorded in the scaffold
+ * manifest. `infrastructure` files (the request boundary, the provider, the
+ * custom-elements declarations) are load-bearing for the auth integration —
+ * a missing one fails `doctor`. `presentation` files (the generated pages)
+ * are released to the user as a starting point — a missing one only warns.
+ */
+export type ScaffoldFileClass = "infrastructure" | "presentation";
+
+/**
+ * One scaffolded app file as recorded at `zitadel setup` time: the sha256 of
+ * the bytes the CLI wrote (or found already matching), plus its ownership
+ * class. Keys of the containing record are project-root-relative posix paths.
+ */
+export type ScaffoldFileEntry = {
+  hash: string;
+  class: ScaffoldFileClass;
+};
+
+/**
+ * The scaffold manifest: which app files `zitadel setup` actually wrote, so
+ * `doctor` can distinguish missing/edited/adopted files without guessing from
+ * current templates. `scaffolded_framework` records whether setup created the
+ * app skeleton itself (fresh directory) — repair needs it to know whether the
+ * framework home page is CLI-managed. `dev_port` preserves the issuer port for
+ * context reconstruction. Absent on apps scaffolded by older CLI versions;
+ * consumers fall back to template-derived expectations.
+ */
+export type ScaffoldManifest = {
+  files: Record<string, ScaffoldFileEntry>;
+  scaffolded_framework?: boolean;
+  dev_port?: number;
+};
+
+/**
  * The persisted contents of `.zitadel/state.json`. Maps each managed file path
  * (relative to the project root) to its sync entry, plus the framework id
- * captured during `zitadel setup`.
+ * captured during `zitadel setup` and, since the manifest was introduced, the
+ * scaffold manifest of generated app files.
  */
 export type ZitadelState = {
   framework: string;
   resources: Record<string, ResourceEntry>;
+  scaffold?: ScaffoldManifest;
 };
 
 /**
@@ -40,6 +76,14 @@ export interface ResourceSyncer {
   readonly directory: string;
   readonly mutable: boolean;
   readonly revisioned: boolean;
+  /**
+   * When set, this syncer owns exactly one descriptor file with this
+   * basename inside `directory`, and the scan fails (`E_VALIDATION`) on any
+   * other `*.json` found there. For a revisioned singleton like branding, a
+   * stray descriptor copy would otherwise be treated as one more resource
+   * and published as its own revision — last upload wins the live slot.
+   */
+  readonly singletonFile?: string;
   /**
    * Assert that a single on-disk file body is valid for this resource.
    * Throws `E_VALIDATION` (a `ZitadelError`) on the first invalid input.

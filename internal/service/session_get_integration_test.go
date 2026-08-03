@@ -9,22 +9,21 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 // seedIdentityUser creates a schema row and a user carrying the conventional
 // identity attributes, returning the user ID.
-func seedIdentityUser(t *testing.T, pool database.QueryExecutor, projectID string) string {
+func seedIdentityUser(t *testing.T, projectID string) string {
 	t.Helper()
-	ensureProject(t, pool, projectID)
+	ensureProject(t, projectID)
 
 	schemaURL := "https://example.com/schemas/human-user"
-	_, err := pool.Exec(t.Context(),
-		`INSERT INTO zitadel_nextgen.json_schemas (project_id, url, payload) VALUES ($1, $2, '{}') ON CONFLICT DO NOTHING`,
-		projectID, schemaURL,
-	)
-	require.NoError(t, err)
+	stmts := integrationPoolOrFail(t).Statements()
+	require.NoError(t, stmts.CreateJSONSchema(t.Context(), &domain.JSONSchema{
+		ProjectID: projectID,
+		URL:       schemaURL,
+		Schema:    []byte(`{}`),
+	}))
 
 	// camelCase name parts: the shape the shipped presets actually collect
 	// (packages/config/defaults/*.json).
@@ -40,7 +39,7 @@ func seedIdentityUser(t *testing.T, pool database.QueryExecutor, projectID strin
 	}
 
 	userID := "user_ident-" + time.Now().Format("150405.000000")
-	require.NoError(t, repository.NewUserRepository().Create(t.Context(), pool, &domain.CreateUser{
+	require.NoError(t, stmts.CreateUser(t.Context(), &domain.CreateUser{
 		ProjectID:  projectID,
 		SchemaURL:  schemaURL,
 		ID:         userID,
@@ -50,20 +49,25 @@ func seedIdentityUser(t *testing.T, pool database.QueryExecutor, projectID strin
 }
 
 func TestSessionService_Get_UserIdentity_integration(t *testing.T) {
-	pool := integrationPoolOrFail(t)
 	svc, _ := newSessionServiceForIntegration(t)
 
 	projectID := "p-svc-get-ident-" + time.Now().Format("150405.000000")
-	userID := seedIdentityUser(t, pool, projectID)
+	userID := seedIdentityUser(t, projectID)
 
-	session, err := domain.NewSession(projectID, nil)
+	plain, _ := handoffCompletedAttempt(t, projectID, func(a *domain.AuthAttempt) {
+		now := time.Now()
+		userFactor := domain.SetAuthFactorUser(now)
+		userFactor.UserID = userID
+		a.RequiredChecks = []domain.AuthCheckType{domain.AuthCheckTypeUser, domain.AuthCheckTypePassword}
+		a.Checks = []domain.AuthCheck{userFactor, domain.SetAuthFactorPassword(now)}
+	})
+	session, err := svc.Exchange(t.Context(), service.ExchangeInput{
+		ProjectID:    projectID,
+		HandoffToken: plain,
+	})
 	require.NoError(t, err)
-	require.NoError(t, repository.NewSessionRepository(pool).Create(t.Context(), pool, session))
-	_, err = pool.Exec(t.Context(),
-		`UPDATE zitadel_nextgen.sessions SET user_id = $1 WHERE project_id = $2 AND id = $3`,
-		userID, projectID, session.ID,
-	)
-	require.NoError(t, err)
+	require.NotNil(t, session.UserID)
+	require.Equal(t, userID, *session.UserID)
 
 	t.Run("hydrates identity when requested", func(t *testing.T) {
 		got, err := svc.Get(t.Context(), service.GetSessionInput{

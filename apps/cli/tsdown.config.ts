@@ -32,6 +32,7 @@ export default defineConfig({
     "commands/eject": "src/commands/eject.ts",
     "commands/status": "src/commands/status.ts",
     "commands/schemas/list": "src/commands/schemas/list.ts",
+    "commands/branding/eject": "src/commands/branding/eject.ts",
   },
   outDir: "dist",
   format: ["esm"],

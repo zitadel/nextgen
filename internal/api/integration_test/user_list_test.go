@@ -24,24 +24,25 @@ import (
 func TestListUsers(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	listIDs := func(t *testing.T, params api.ListUsersParams) []string {
 		t.Helper()
 		res, err := client.ListUsers(t.Context(), params)
 		require.NoError(t, err)
-		items, ok := res.(*api.ListUsersOKApplicationJSON)
-		require.True(t, ok, "unexpected response type %T", res)
+		require.IsType(t, &api.ListUsersOKApplicationJSON{}, res, helpers.MustMarshal(t, res))
+		items := res.(*api.ListUsersOKApplicationJSON)
 		ids := make([]string, 0, len(*items))
 		for _, item := range *items {
 			raw, ok := item["id"]
@@ -57,26 +58,25 @@ func TestListUsers(t *testing.T) {
 	assert.Empty(t, listIDs(t, api.ListUsersParams{}))
 
 	// Seed two users in creation order.
-	db := harness.EnsureDBPool(t)
-	userRepo := harness.EnsureUserRepo(t)
+	users := harness.EnsureUserFixture(t)
 	for i, id := range []string{"list-user-01", "list-user-02"} {
 		emailAttr, err := domain.NewCreateAttribute(
 			"email", fmt.Sprintf("list-%d@example.com", i), domain.AttributeUniquenessProject)
 		require.NoError(t, err)
-		require.NoError(t, userRepo.Create(t.Context(), db, &domain.CreateUser{
-			ProjectID:  project.ID,
-			SchemaURL:  schemaURL,
-			ID:         id,
-			TeamID:     &team.ID,
-			Attributes: []*domain.CreateAttribute{emailAttr},
+		require.NoError(t, users.Create(t.Context(), &domain.CreateUser{
+			ProjectID:               project.ID,
+			SchemaURL:               schemaURL,
+			ID:                      id,
+			InitialMembershipTeamID: &team.ID,
+			Attributes:              []*domain.CreateAttribute{emailAttr},
 		}))
 	}
 
 	// Full list, creation-ordered, attributes hydrated.
 	res, err := client.ListUsers(t.Context(), api.ListUsersParams{})
 	require.NoError(t, err)
-	items, ok := res.(*api.ListUsersOKApplicationJSON)
-	require.True(t, ok, "unexpected response type %T", res)
+	require.IsType(t, &api.ListUsersOKApplicationJSON{}, res, helpers.MustMarshal(t, res))
+	items := res.(*api.ListUsersOKApplicationJSON)
 	require.Len(t, *items, 2)
 	var email string
 	require.NoError(t, json.Unmarshal((*items)[0]["email"], &email))
@@ -93,14 +93,15 @@ func TestListUsers(t *testing.T) {
 	}))
 
 	// Another project's bearer sees nothing: scope comes from the token.
-	other, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	otherClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	otherClient.SetToken(other.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, otherClient, other)
 	otherRes, err := otherClient.ListUsers(t.Context(), api.ListUsersParams{})
 	require.NoError(t, err)
-	otherItems, ok := otherRes.(*api.ListUsersOKApplicationJSON)
-	require.True(t, ok, "unexpected response type %T", otherRes)
-	assert.Empty(t, *otherItems)
+	if assert.IsType(t, &api.ListUsersOKApplicationJSON{}, otherRes, helpers.MustMarshal(t, otherRes)) {
+		otherItems := otherRes.(*api.ListUsersOKApplicationJSON)
+		assert.Empty(t, *otherItems)
+	}
 }

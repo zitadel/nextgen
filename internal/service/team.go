@@ -5,64 +5,48 @@ import (
 	"errors"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // ---- Input types -------------------------------------------------------------
 
 type CreateTeamInput struct {
 	ProjectID string
+	Name      string
 }
 
 // ---- Secondary ports -------------------------------------------------------------
 
 type TeamService struct {
-	pool     database.Pool
-	teamRepo domain.TeamRepository
+	v2Pool *DB
 }
 
-func NewTeamService(
-	pool database.Pool,
-	teamRepo domain.TeamRepository,
-) *TeamService {
+func NewTeamService(v2Pool *DB) *TeamService {
 	return &TeamService{
-		pool:     pool,
-		teamRepo: teamRepo,
+		v2Pool: v2Pool,
 	}
 }
 
-func (s *TeamService) CreateTeam(ctx context.Context, input CreateTeamInput) (team *domain.Team, err error) {
-	tx, txErr := s.pool.Begin(ctx, nil)
-	if txErr != nil {
-		return nil, domain.ErrInternal(txErr).WithMessage("failed to start transaction")
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback(ctx)
-		}
-	}()
-
-	model, err := domain.NewTeam(input.ProjectID)
+func (s *TeamService) CreateTeam(ctx context.Context, input CreateTeamInput) (*domain.Team, error) {
+	model, err := domain.NewTeam(input.ProjectID, input.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	err = s.teamRepo.Create(ctx, tx, model)
-	if err != nil {
-		// TODO handle specific error cases
+	if err := s.v2Pool.Statements().CreateTeam(ctx, model); err != nil {
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			// Also catches a (project_id, id) primary key collision, which is
+			// unreachable with generated IDs. Discriminating on the constraint
+			// name would need Spanner to report one; today it returns "".
+			return nil, domain.ErrTeamAlreadyExists().WithParent(err)
+		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create team in database")
 	}
-
-	err = tx.Commit(ctx)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to commit transaction")
-	}
-
 	return model, nil
 }
 
 func (s *TeamService) GetTeam(ctx context.Context, projectID string, teamID string) (*domain.Team, error) {
-	team, err := s.teamRepo.Get(ctx, s.pool, projectID, teamID)
+	team, err := s.v2Pool.Statements().GetTeamByID(ctx, projectID, teamID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrTeamNotFound()

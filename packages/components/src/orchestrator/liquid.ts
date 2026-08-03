@@ -13,6 +13,7 @@
  *   escapes (Layer 1 of the security pipeline).
  * - Partials are loaded from an in-memory map; no filesystem access.
  */
+import { MANDATORY_GATES_TAG } from "@zitadel/config/template";
 import { Liquid } from "liquidjs";
 
 import type { FlowError } from "./template-context.js";
@@ -82,15 +83,28 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
   //
   //   {{ "password.title" | t: identity.display_name }}
   //   -> "Welcome back, Alice"
+  //
+  // A key that misses the dictionary AND both fallbacks renders as the raw
+  // key (graceful degradation) — with a warn-once console signal so template
+  // authors see the miss instead of shipping `action.recover` to users.
+  const warnedMissingKeys = new Set<string>();
   engine.registerFilter(
     "t",
     function tFilter(this: { context: unknown }, key: unknown, ...args: unknown[]) {
       const lookupKey = stringify(key);
-      const template =
+      let template =
         options.locale[lookupKey] ??
         injectedKeyFallback(options.locale, lookupKey) ??
-        fieldLabelFallback(lookupKey) ??
-        lookupKey;
+        fieldLabelFallback(lookupKey);
+      if (template === undefined) {
+        template = lookupKey;
+        if (lookupKey !== "" && !warnedMissingKeys.has(lookupKey)) {
+          warnedMissingKeys.add(lookupKey);
+          console.warn(
+            `[zitadel-login] missing text key "${lookupKey}" — rendering the raw key`,
+          );
+        }
+      }
       return interpolate(template, args.map(stringify));
     },
   );
@@ -167,8 +181,10 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
   });
 
   // `{% mandatory_gates %}` — emits a unique marker comment that the
-  // orchestrator post-processes via `patchMandatoryGates`.
-  engine.registerTag("mandatory_gates", {
+  // orchestrator post-processes via `patchMandatoryGates`. The tag name is
+  // owned by @zitadel/config so the authoring validator registers the same
+  // dialect this engine renders.
+  engine.registerTag(MANDATORY_GATES_TAG, {
     parse() {
       // No body, no args — nothing to consume.
     },

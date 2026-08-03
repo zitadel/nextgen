@@ -4,111 +4,142 @@ How we style the console. Read this before adding a component or a CSS rule.
 
 ## TL;DR
 
-- **Design tokens are the source of truth.** `@zitadel/design-tokens` owns every
-  colour, spacing step, radius, font, etc.
-- **Tailwind is the convenience layer, not a parallel design system.** The token
-  package generates a Tailwind `@theme` from the tokens, so the tokens show up as
-  utilities (e.g. `bg-zl-surface-default-black`). Using a `zl-*` utility and using
-  the underlying CSS variable are the same value.
-- **The styling approach is decided by *where the component lives*, not by a
-  prediction about future reuse:**
-  - Anything under **`apps/console/**` → Tailwind utilities.**
-  - The shared design-system primitives (`packages/components` + `packages/ui-react`,
-    styled via **`@zitadel/shared-component-styles`) → token CSS, not utilities.**
-- `src/styles.css` holds only the Tailwind entry, the token imports, and global
-  page theming. It must not grow component-scoped class rules.
+- **shadcn/ui is the component library.** Install from the registry into
+  `src/components/ui/` (`components.json`). Prefer a real shadcn component over
+  hand-rolled markup whenever the Figma design system documents one
+  (`ui.shadcn.com` links on every library node).
+- **Design tokens are the colour/type/shape source of truth.**
+  `@zitadel/design-tokens/css/shadcn.css` maps standard shadcn utility names
+  (`bg-background`, `text-muted-foreground`, `rounded-md`, `font-serif`) onto
+  `--zl-*` variables. Author against those unprefixed names — components
+  re-theme for free via `data-theme` on `<html>`.
+- **Tailwind is the convenience layer**, not a parallel design system.
+- `src/styles.css` holds only the Tailwind entry, the token/shadcn imports,
+  fonts, and global page theming. It must not grow component-scoped class rules.
 
 ## Which styling approach do I use?
 
-Answer one question — **where does this file live?** — and you're done:
-
 ```
 Where does the component live?
-├── apps/console/**  (the console app: shell, pages, layout, app widgets)
-│     → Tailwind utilities, colours via the zl-* theme.
+├── apps/console/**  (shell, pages, layout, app widgets)
+│     → shadcn components + Tailwind utilities (bg-background, …).
 │       Do NOT author a bespoke CSS file or add rules to styles.css.
 │
-└── packages/components + packages/ui-react  (shared design-system primitives,
-    e.g. Button, Card, TextField — each has a Lit + React twin)
-      → style in @zitadel/shared-component-styles, keyed to --zl-* variables.
-        Utilities live in JSX className and cannot reach a custom element's
-        shadow DOM, so they are not an option for these.
+└── packages/components + packages/ui-react  (paired Lit + React atoms for login)
+      → style in @zitadel/shared-component-styles, keyed to legacy --zl-color-*
+        variables. The console rewrite does not compose these for new UI.
 ```
 
-You almost never hit a fork inside the console: the console doesn't emit web
-components, so everything authored here is React-only and uses utilities. The
-only adjacent question is the *architectural* one — "should this be a shared
-primitive instead of a console-local component?" — which is decided on reuse and
-review, not styling. If a console component is later promoted to a shared
-primitive, you move it into the package and convert its styling **then**; don't
-pre-build for a web-component twin that may never exist.
+## Token contract
 
-> Why the split exists (it's a constraint, not a preference): a design-system
-> primitive is **two implementations of one atom** — a Lit element (`zl-button`)
-> and a React component (`Button`) — that must render identically. They do that
-> by sharing a single stylesheet (`@zitadel/shared-component-styles`): the Lit
-> twin pulls it into its shadow DOM, the React twin renders the same `zr-*`
-> classes in light DOM. Styling the React twin with Tailwind utilities would fork
-> it from its Lit twin. App composition has no twin, so utilities are free.
-
-## Where components live
-
-There are two homes, and that is the whole decision:
-
-| Component kind | Lives in | Styling |
+| Layer | What you write | Resolves to |
 | --- | --- | --- |
-| Design-system **atom** (paired Lit + React twin: `Button`, `Card`, `Alert`, `Pill`, `Icon`, `Select`, `TextField`, `Checkbox`, …) | `packages/components` (Lit) + `packages/ui-react` (React) | shared `zr-*` CSS in `@zitadel/shared-component-styles` |
-| **Everything else** — console organisms/molecules and any reusable React piece (`AppShell`, `PageHeader`, `DataTable`, `KeyValueTable`, `boundaries`, …) | `apps/console/src/components` (cross-route) or co-located with the route (route-specific) | Tailwind utilities |
+| Utility | `bg-background`, `text-card-foreground` | `--color-*` from `@theme inline` in `shadcn.css` |
+| CSS var | `--zl-background`, `--zl-card` | Generated from `figma-export/` (dark `:root`, light `[data-theme="light"]`) |
 
-There is deliberately **no third "shared React component" package**. We have no
-other React app on the horizon, so a React component that several console routes
-share simply lives in `apps/console/src/components`. If a genuine second consumer
-ever appears, extracting a package is a later, explicit step — don't pre-build
-for it.
+Do **not** hardcode hex values. Do **not** reintroduce the retired console
+semantic names (`bg-zl-surface-base`, `text-zl-text-primary`, …). Legacy
+`--zl-color-*` tokens remain for the login atoms only.
 
-Default to building in `apps/console`. You only leave it when the login /
-web-component surface needs the *same* primitive, which makes it a paired atom in
-the design-system packages.
+Light canvas is `#fafafa` (`background`); elevated surfaces (`card`, `popover`)
+are `#ffffff`. Dark canvas is `#050505`; cards are `#121212`.
 
-## Token utilities
+## Component resolution (design → code)
 
-The token `@theme` (`@zitadel/design-tokens/css/tailwind.css`) exposes these
-namespaces. **Always use these for design-meaningful properties — never raw hex,
-and never Tailwind's default colour palette (`bg-gray-800`, etc.).**
+**Inventory before building.** List every component a design uses and find where
+each one comes from, before writing markup. Skipping this is how you end up with
+several hand-rolled copies of a component the library already defines.
 
-| Token namespace      | Example variable                       | Example utility                         |
-| -------------------- | -------------------------------------- | --------------------------------------- |
-| Colour (surface)     | `--zl-color-surface-default-black`     | `bg-zl-surface-default-black`           |
-| Colour (text)        | `--zl-color-text-secondary-gray`       | `text-zl-text-secondary-gray`           |
-| Colour (border)      | `--zl-color-border-default-gray-100`   | `border-zl-border-default-gray-100`     |
-| Radius               | `--zl-radius-m`                         | `rounded-zl-m`                          |
-| Font family          | `--zl-font-family-sans`                 | `font-zl-sans`                          |
+Work from the design's **component names**, not from what the screenshot looks
+like — the names are the component identities. Map the full screen frame
+(sidebar + main), not a content crop.
 
-For **layout spacing** (`p-*`, `gap-*`, `w-*`, flex/grid), use Tailwind's default
-numeric scale — it is finer-grained and idiomatic. Spacing is layout glue, not a
-brand decision, so it does not need a token. (Token spacing utilities such as
-`p-zl-04` exist if you want to pin to the scale, but they are not required.)
+Resolve each name to a source, in this order:
 
-## Conventions
+1. Already in `src/components/ui/`? Use it.
+2. In the shadcn registry? **Check before writing anything.** `combobox`, `field`,
+   `input-group`, `alert` and `command` all exist.
+3. Neither? Add it to `src/components/ui/` — once, shared. Never inline a
+   library component inside a feature file.
 
-- **Long / repeated utility strings → a named `const`** in the same module, e.g.
-  the table cell styles in `src/components/resource-page.tsx`. Keep the full class
-  string as a literal so Tailwind's scanner still sees it; do not build class
-  names by concatenating fragments at runtime.
-- **Stateful / structural selectors → arbitrary variants**, not a CSS file. The
-  off-canvas sidebar uses `group/shell` + `group-data-[nav-open=true]/shell:…`
-  (see `src/components/app-shell/AppShell.tsx`), and the table "no border on the
-  last row" rule uses `[&_tbody_tr:last-child_td]:border-0`.
-- **Reuse layout primitives** instead of re-hand-rolling markup. `PageHeader`,
-  `DataTable`, `KeyValueTable`, and `TableLink` in `resource-page.tsx` are the
-  shared, utility-styled building blocks for resource pages.
-- **Responsive:** mobile-first. Default classes target small screens; add `md:`
-  for ≥ desktop. `md` is 48rem, matching `--zl-breakpoint-md`.
+**Mind which shadcn track a registry item belongs to.** `components.json` pins
+`"style": "new-york"`, so the reference is `registry/new-york-v4/**` (Radix). The
+registry also ships a newer track built on `@base-ui/react`, and the CLI will
+install it without comment — pulling a second headless library alongside the
+Radix components already here. `Combobox` is exactly this case: for `new-york` it
+is the documented `Popover` + `Command` composition, which is what
+`src/components/ui/combobox.tsx` implements. Adopting the Base UI track is a
+deliberate, separate decision, not a side effect of a ticket.
 
-## What not to do
+### Specs come from the design system, not from screen mocks
 
-- Do not add component-scoped class rules to `styles.css`.
-- Do not use raw hex colours or Tailwind's stock palette — go through `zl-*`.
-- Do not reach for shared CSS / a new stylesheet for a React-only component.
-- Do not try to style a dual-target primitive with utilities — it has a web
-  component twin that cannot consume them.
+Read geometry from the design-system library, not from a component instance placed
+on a screen mock. Mock instances *are* library instances, so their resting
+geometry is correct — which makes them convincing while hiding:
+
+- the state matrix (hover, focus, **invalid**, disabled)
+- size variants
+- optional slots (leading icons, inline addons)
+- appearance variants
+
+Screen mocks are also not always internally consistent — the Add-user drawer wires
+`Select`-shaped triggers to `Combobox` menus. Build from the component the design
+*means*, and record which one you used.
+
+`Select` = one option, no search. `Combobox` = searchable, with a single and a
+multiple type. "Pick one, but searchable" is a Combobox — Radix `Select` offers
+typeahead only, not filtering.
+
+### Verify
+
+Check computed values against the spec, not just a screenshot, and confirm both
+themes and each breakpoint the design defines in a real browser. Leave dev
+overlays visible for at least one click-through: the TanStack devtools badge sits
+bottom-right, exactly where right-anchored sheets put their primary action.
+
+Canonical examples:
+
+| Region | Component |
+| --- | --- |
+| Nav chrome | `Sidebar` (`collapsible="icon"`; mobile = persistent icon rail) |
+| Org/project picker | `Popover` + `Badge` |
+| Users filters | `Tabs` |
+| Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button` |
+| Any searchable picker | `Combobox` (`src/components/ui/combobox.tsx`) |
+| Labelled form control | `Field` + `FieldLabel` (+ `FieldError` for invalid) |
+
+## Traps that have already cost time
+
+- **Bare `border` is `currentColor`.** Tailwind v4 Preflight sets it, so a
+  registry component writing `border-l` draws a near-white edge in dark mode. The
+  base rule in `styles.css` points unqualified borders at the border token — and
+  it **must** stay inside `@layer base`, or it out-ranks every `border-input` /
+  `border-foreground/10` utility.
+- **Variant specificity.** `Button`'s `has-[>svg]:px-3` out-specifies a plain
+  `pl-*`/`pr-*`; use the `!` suffix or size the parent. When an override "won't
+  take", suspect specificity, not a typo.
+- **`asChild` needs prop forwarding.** `PopoverTrigger asChild` clones its child
+  and injects `onClick`/ref/`data-state`. A custom trigger that does not spread
+  rest props onto its root element is inert.
+- **cmdk auto-highlights its first item** on mount, painting a filled row the
+  design never shows. Gate the fill on real interaction.
+- **Do not add a focus ring to an auto-focused input.** cmdk focuses the search
+  field whenever the popover opens, so the ring would be permanently on — a state,
+  not an affordance.
+- **Error copy belongs to the API.** ADR 030 makes the payload's `message` the
+  human-facing string; render it verbatim. Read it from the response **body** —
+  `ApiError.message` is a transport string (`POST /users returned 409`).
+
+## Theming (dark / light)
+
+`data-theme` on `<html>` selects the token mode. Preference is `system` |
+`light` | `dark` (`src/theme.ts`, toggle in the context bar). Prefer semantic
+tokens over `dark:` utilities so surfaces re-theme automatically.
+
+## Don't
+
+- Don't hand-roll a pill/table/tab/sidebar that shadcn already provides.
+- Don't paste CLI-generated HSL blocks into `styles.css` — the token pipeline
+  owns colours.
+- Don't import `@zitadel/ui-react` atoms into new console UI; migrate remaining
+  call sites as screens are rewritten.

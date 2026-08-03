@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { metaSchemaFiles, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
 import { stableStringify } from "../../../json";
@@ -12,6 +15,7 @@ import {
   upsertGuidanceSection,
 } from "./guidance";
 import type {
+  ConfigWiringStatus,
   EjectActions,
   Patcher,
   PatchContext,
@@ -19,7 +23,7 @@ import type {
   PatchResult,
   PatchView,
 } from "../types";
-import { reclaimableOps } from "./reclaim";
+import { reclaimableOps, withoutExistingTargets } from "./reclaim";
 
 /**
  * Base for rule-based (deterministic, template-driven) patchers, as opposed to
@@ -41,24 +45,142 @@ export abstract class AbstractRulePatcher implements Patcher {
   /**
    * Re-apply only the reclaimable subset — env files, gitignore, the SDK
    * dependency, and marker-bearing routes — leaving the user-editable
-   * `.zitadel/` resources untouched. Backs `doctor --fix`.
+   * `.zitadel/` resources untouched. Backs `doctor --fix`. With
+   * `opts.missingOnly` the content ops are further narrowed to files that do
+   * not exist (see {@link withoutExistingTargets}) and the writer runs without
+   * `force`, so the repair restores deleted managed files and can never
+   * overwrite an edited or user-adopted one.
    */
   async repair(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
     const plan = this.plan(ctx);
-    return scaffold({ ops: reclaimableOps(plan), summary: plan.summary }, opts);
+    let ops = opts.missingOnly
+      ? await withoutExistingTargets(reclaimableOps(plan), opts.cwd)
+      : reclaimableOps(plan);
+    const excluded = new Set(opts.excludePaths ?? []);
+    if (excluded.size > 0) {
+      ops = ops.filter((op) => {
+        if (op.kind === "write") {
+          return !excluded.has(op.path);
+        }
+        if (op.kind === "edit" && op.overwrites) {
+          const candidates = typeof op.path === "string" ? [op.path] : op.path;
+          return !candidates.some((candidate) => excluded.has(candidate));
+        }
+        return true;
+      });
+    }
+    const execOpts = opts.missingOnly ? { ...opts, force: false } : opts;
+    return scaffold({ ops, summary: plan.summary }, execOpts);
+  }
+
+  /**
+   * Probe whether the labelled config wirings are still applied, using each
+   * merge transform's own idempotency: the transforms only add what is
+   * missing and return the source unchanged when everything they manage is
+   * present, so a changed output means the wiring is absent from the user's
+   * config. Every labelled wiring gets a verdict: a missing host file is
+   * `detached` (the wiring cannot be applied in a file that does not exist),
+   * and a transform that throws on restructured content yields `unknown` —
+   * surfaced rather than silently dropped, so a deleted `angular.json` can
+   * never read as healthy. Read-only.
+   */
+  async verify(
+    ctx: PatchContext,
+    opts: { cwd: string },
+  ): Promise<ReadonlyArray<ConfigWiringStatus>> {
+    const statuses: ConfigWiringStatus[] = [];
+    for (const op of this.plan(ctx).ops) {
+      if (op.kind !== "edit" || !op.wiring) {
+        continue;
+      }
+      const candidates = typeof op.path === "string" ? [op.path] : op.path;
+      let path = candidates[0]!;
+      let source: string | undefined;
+      for (const candidate of candidates) {
+        const contents = await readTextIfExists(join(opts.cwd, candidate));
+        if (contents !== undefined) {
+          path = candidate;
+          source = contents;
+          break;
+        }
+      }
+      if (source === undefined) {
+        statuses.push({ path, wiring: op.wiring, state: "detached" });
+        continue;
+      }
+      try {
+        statuses.push({
+          path,
+          wiring: op.wiring,
+          state: op.edit(source) === source ? "applied" : "detached",
+        });
+      } catch (error) {
+        statuses.push({
+          path,
+          wiring: op.wiring,
+          state: "unknown",
+          reason: error instanceof Error ? error.message : "verification failed",
+        });
+      }
+    }
+    return statuses;
   }
 
   /** Shared base artifacts plus the subclass's marker-bearing route files. */
   artifacts(view: PatchView): EjectActions {
+    const infrastructure = new Set(this.infrastructureFiles(view));
+    const markedFiles = this.routeFiles(view);
     return {
-      markedFiles: this.routeFiles(view),
+      markedFiles,
       rootConfigFiles: ["zitadel.json"],
       directories: [".zitadel"],
       envBackups: [".env.local"],
       dependencies: this.routeDeps(view),
       configEdits: this.routeConfigEdits(view),
       guidanceFiles: ["AGENTS.md", "README.md"],
+      fileClasses: Object.fromEntries(
+        markedFiles.map((path) => [path, infrastructure.has(path) ? "infrastructure" : "presentation"]),
+      ),
+      conditionalFiles: this.conditionallyScaffoldedFiles(view),
+      retiredAlternates: this.retiredAlternateFiles(view),
     };
+  }
+
+  /**
+   * Current marked files mapped to sibling paths that older templates wrote
+   * in their place and the framework rejects alongside them. Drives the
+   * managed-files boundary migration. Defaults to none; Next overrides it
+   * for the `middleware.ts`/`proxy.ts` pair.
+   */
+  protected retiredAlternateFiles(
+    _view: PatchView,
+  ): Readonly<Record<string, ReadonlyArray<string>>> {
+    return {};
+  }
+
+  /**
+   * The subset of {@link routeFiles} that is load-bearing for the integration
+   * (request boundary, proxies, plugins, type declarations). The `doctor`
+   * managed-files check fails when one is missing; everything else is a
+   * presentation starting point and only warns. Every patcher whose marked
+   * files include plumbing must override this — Next (boundary/provider/dts),
+   * Angular (proxy.conf.cjs), and Nuxt (plugins) do. The Vite SPAs' only
+   * marked file is the root component (presentation); their plumbing lives in
+   * `vite.config.*`, which is a config-edit merge into a user file and out of
+   * the file check's reach. Defaults to none.
+   */
+  protected infrastructureFiles(_view: PatchView): ReadonlyArray<string> {
+    return [];
+  }
+
+  /**
+   * Marked files only written on some scaffolds (e.g. a framework home page
+   * that setup replaces only when it created the app skeleton itself). The
+   * managed-files check excludes them when no scaffold manifest recorded what
+   * was actually written. Defaults to none.
+   */
+  protected conditionallyScaffoldedFiles(_view: PatchView): ReadonlyArray<string> {
+    return [];
   }
 
   /**
@@ -175,6 +297,15 @@ export abstract class AbstractRulePatcher implements Patcher {
   protected abstract routeDeps(view: PatchView): ReadonlyArray<string>;
   /** One-line summary of what the integration scaffolded. */
   protected abstract summary(ctx: PatchContext): { title: string; detail: string };
+}
+
+/** Reads a text file, mapping every failure to `undefined`. */
+async function readTextIfExists(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, "utf8");
+  } catch {
+    return undefined;
+  }
 }
 
 /** Builds the `zitadel.json` body persisted at the project root. */

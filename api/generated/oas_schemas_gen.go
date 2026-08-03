@@ -685,19 +685,107 @@ func (s *AuthMethods) SetOtp(val OptAuthMethod) {
 	s.Otp = val
 }
 
+// Merged schema.
+// Ref: #
+type AuthUnauthorized struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAuthUnauthorizedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AuthUnauthorized) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AuthUnauthorized) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AuthUnauthorized) GetDetails() OptAuthUnauthorizedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AuthUnauthorized) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AuthUnauthorized) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
+	s.Details = val
+}
+
+func (*AuthUnauthorized) revokeMySessionRes() {}
+
+// Additional error-specific context.
+type AuthUnauthorizedDetails map[string]jx.Raw
+
+func (s *AuthUnauthorizedDetails) init() AuthUnauthorizedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// AuthUnauthorizedHeaders wraps AuthUnauthorized with response headers.
+type AuthUnauthorizedHeaders struct {
+	CacheControl OptString
+	Response     AuthUnauthorized
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *AuthUnauthorizedHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *AuthUnauthorizedHeaders) GetResponse() AuthUnauthorized {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *AuthUnauthorizedHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *AuthUnauthorizedHeaders) SetResponse(val AuthUnauthorized) {
+	s.Response = val
+}
+
+func (*AuthUnauthorizedHeaders) getMySessionRes() {}
+
 // AuthorizeGetFound is response for AuthorizeGet operation.
 type AuthorizeGetFound struct{}
 
 func (*AuthorizeGetFound) authorizeGetRes() {}
 
-// Resolved branding configuration. Inherited from the app → team → project
-// hierarchy at flow creation time (most specific wins). Read-only projection —
-// branding is configured via the Team/App Branding API, not the Flow API.
+// Branding configuration. Appears in two places with one shape:
+// - On flow responses as a read-only projection: the server resolves the
+// latest branding revision for the project per step response (falling
+// back to built-in defaults when none is stored). Branding is configured
+// via the Branding API / `zitadel apply`, not the Flow API.
+// - As the request body of `POST /branding`, which publishes the same
+// shape as a new immutable revision (see ADR 040).
 // Ref: #
 type Branding struct {
 	// Layout preset selector. The default.liquid master template uses this
 	// to branch into layout variants. Customers who eject the template
-	// can ignore this field entirely.
+	// can ignore this field entirely; it also serves as the degrade target
+	// when a custom template fails component-side validation.
 	Layout OptBrandingLayout `json:"layout"`
 	// The LiquidJS template string for rendering this step. The orchestrator
 	// parses this template, injects the capability dictionaries as context,
@@ -705,7 +793,13 @@ type Branding struct {
 	LiquidTemplate OptString `json:"liquid_template"`
 	// Team logo URL.
 	LogoURL OptURI `json:"logo_url"`
-	// Custom font URL (e.g., Google Fonts CSS).
+	// Custom font stylesheet URL (e.g., Google Fonts CSS). Read-only in
+	// v1: `POST /branding` rejects a non-empty value, because the login
+	// component loads this stylesheet at document level (shadow-scoped
+	// `@font-face` rules never register faces) and an arbitrary URL would
+	// grant `branding.write` page-wide CSS control over the embedding
+	// application. Safe tenant font delivery is an ADR 040 follow-up;
+	// until then, load fonts from the embedding page.
 	FontURL OptURI `json:"font_url"`
 	// Hero/background image URL (used by split layout).
 	HeroURL OptURI `json:"hero_url"`
@@ -763,7 +857,8 @@ func (s *Branding) SetHeroURL(val OptURI) {
 
 // Layout preset selector. The default.liquid master template uses this
 // to branch into layout variants. Customers who eject the template
-// can ignore this field entirely.
+// can ignore this field entirely; it also serves as the degrade target
+// when a custom template fails component-side validation.
 type BrandingLayout string
 
 const (
@@ -804,6 +899,51 @@ func (s *BrandingLayout) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// A stored branding revision. `branding` echoes the canonical stored
+// configuration so clients (e.g. the CLI sync engine) can reconcile local
+// files with the server's stored state.
+// Ref: #
+type BrandingRevisionResponse struct {
+	// The unique identifier of this branding revision.
+	ID string `json:"id"`
+	// When this revision was published.
+	CreatedAt time.Time `json:"created_at"`
+	Branding  Branding  `json:"branding"`
+}
+
+// GetID returns the value of ID.
+func (s *BrandingRevisionResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *BrandingRevisionResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetBranding returns the value of Branding.
+func (s *BrandingRevisionResponse) GetBranding() Branding {
+	return s.Branding
+}
+
+// SetID sets the value of ID.
+func (s *BrandingRevisionResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *BrandingRevisionResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetBranding sets the value of Branding.
+func (s *BrandingRevisionResponse) SetBranding(val Branding) {
+	s.Branding = val
+}
+
+func (*BrandingRevisionResponse) createBrandingRes()  {}
+func (*BrandingRevisionResponse) getBrandingByIdRes() {}
 
 type ChallengeID string
 
@@ -2020,13 +2160,32 @@ type CreateTeamBadRequest ErrorDetails
 
 func (*CreateTeamBadRequest) createTeamRes() {}
 
+type CreateTeamConflict ErrorDetails
+
+func (*CreateTeamConflict) createTeamRes() {}
+
 // Ref: #
-type CreateTeamRequest struct{}
+type CreateTeamRequest struct {
+	// The name of the team. Must be unique within the project.
+	Name string `json:"name"`
+}
+
+// GetName returns the value of Name.
+func (s *CreateTeamRequest) GetName() string {
+	return s.Name
+}
+
+// SetName sets the value of Name.
+func (s *CreateTeamRequest) SetName(val string) {
+	s.Name = val
+}
 
 // Ref: #
 type CreateTeamResponse struct {
 	// The unique identifier of the team.
 	ID string `json:"id"`
+	// The name of the team.
+	Name string `json:"name"`
 	// The time when the team was created.
 	CreatedAt time.Time `json:"createdAt"`
 }
@@ -2034,6 +2193,11 @@ type CreateTeamResponse struct {
 // GetID returns the value of ID.
 func (s *CreateTeamResponse) GetID() string {
 	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *CreateTeamResponse) GetName() string {
+	return s.Name
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -2046,6 +2210,11 @@ func (s *CreateTeamResponse) SetID(val string) {
 	s.ID = val
 }
 
+// SetName sets the value of Name.
+func (s *CreateTeamResponse) SetName(val string) {
+	s.Name = val
+}
+
 // SetCreatedAt sets the value of CreatedAt.
 func (s *CreateTeamResponse) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
@@ -2056,6 +2225,10 @@ func (*CreateTeamResponse) createTeamRes() {}
 type CreateTeamTooManyRequests ErrorDetails
 
 func (*CreateTeamTooManyRequests) createTeamRes() {}
+
+type CreateTeamUnauthorized ErrorDetails
+
+func (*CreateTeamUnauthorized) createTeamRes() {}
 
 type CreateUserBadRequest ErrorDetails
 
@@ -2132,6 +2305,19 @@ func (*DeactivateFlowDefinitionNoContent) deactivateFlowDefinitionRes() {}
 type DeleteFlowDefinitionNoContent struct{}
 
 func (*DeleteFlowDefinitionNoContent) deleteFlowDefinitionRes() {}
+
+// DeleteUserByIDNoContent is response for DeleteUserByID operation.
+type DeleteUserByIDNoContent struct{}
+
+func (*DeleteUserByIDNoContent) deleteUserByIDRes() {}
+
+type DeleteUserByIDNotFound ErrorDetails
+
+func (*DeleteUserByIDNotFound) deleteUserByIDRes() {}
+
+type DeleteUserByIDUnauthorized ErrorDetails
+
+func (*DeleteUserByIDUnauthorized) deleteUserByIDRes() {}
 
 // Ref: #
 type DeviceAuthorizationResponse struct {
@@ -2263,11 +2449,13 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 func (*ErrorDetails) activateFlowDefinitionRes() {}
 func (*ErrorDetails) authorizeDeviceRes()        {}
 func (*ErrorDetails) authorizeGetRes()           {}
+func (*ErrorDetails) createBrandingRes()         {}
 func (*ErrorDetails) createFlowRes()             {}
 func (*ErrorDetails) createProjectRes()          {}
 func (*ErrorDetails) createSessionRes()          {}
 func (*ErrorDetails) deleteFlowDefinitionRes()   {}
 func (*ErrorDetails) endSessionRes()             {}
+func (*ErrorDetails) getBrandingByIdRes()        {}
 func (*ErrorDetails) getMyUserRes()              {}
 func (*ErrorDetails) introspectRes()             {}
 func (*ErrorDetails) listFlowDefinitionsRes()    {}
@@ -2314,6 +2502,7 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 func (*ErrorDetailsStatusCode) activateFlowDefinitionRes()   {}
 func (*ErrorDetailsStatusCode) authorizeDeviceRes()          {}
 func (*ErrorDetailsStatusCode) authorizeGetRes()             {}
+func (*ErrorDetailsStatusCode) createBrandingRes()           {}
 func (*ErrorDetailsStatusCode) createFlowDefinitionRes()     {}
 func (*ErrorDetailsStatusCode) createFlowRes()               {}
 func (*ErrorDetailsStatusCode) createProjectRes()            {}
@@ -2323,8 +2512,10 @@ func (*ErrorDetailsStatusCode) createTeamRes()               {}
 func (*ErrorDetailsStatusCode) createUserRes()               {}
 func (*ErrorDetailsStatusCode) deactivateFlowDefinitionRes() {}
 func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) deleteUserByIDRes()           {}
 func (*ErrorDetailsStatusCode) endSessionRes()               {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()          {}
+func (*ErrorDetailsStatusCode) getBrandingByIdRes()          {}
 func (*ErrorDetailsStatusCode) getFlowDefinitionRes()        {}
 func (*ErrorDetailsStatusCode) getFlowStepRes()              {}
 func (*ErrorDetailsStatusCode) getHealthRes()                {}
@@ -2340,9 +2531,11 @@ func (*ErrorDetailsStatusCode) getTokenRes()                 {}
 func (*ErrorDetailsStatusCode) getUserByIDRes()              {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()              {}
 func (*ErrorDetailsStatusCode) introspectRes()               {}
+func (*ErrorDetailsStatusCode) listBrandingRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
 func (*ErrorDetailsStatusCode) listSchemasRes()              {}
 func (*ErrorDetailsStatusCode) listSessionsRes()             {}
+func (*ErrorDetailsStatusCode) listUserPasskeysRes()         {}
 func (*ErrorDetailsStatusCode) listUsersRes()                {}
 func (*ErrorDetailsStatusCode) patchProjectRes()             {}
 func (*ErrorDetailsStatusCode) queryProjectsRes()            {}
@@ -2768,14 +2961,12 @@ func (s *FieldValidationFormat) UnmarshalText(data []byte) error {
 type FilterField string
 
 const (
-	FilterFieldName      FilterField = "name"
 	FilterFieldCreatedAt FilterField = "createdAt"
 )
 
 // AllValues returns all FilterField values.
 func (FilterField) AllValues() []FilterField {
 	return []FilterField{
-		FilterFieldName,
 		FilterFieldCreatedAt,
 	}
 }
@@ -2783,8 +2974,6 @@ func (FilterField) AllValues() []FilterField {
 // MarshalText implements encoding.TextMarshaler.
 func (s FilterField) MarshalText() ([]byte, error) {
 	switch s {
-	case FilterFieldName:
-		return []byte(s), nil
 	case FilterFieldCreatedAt:
 		return []byte(s), nil
 	default:
@@ -2795,9 +2984,6 @@ func (s FilterField) MarshalText() ([]byte, error) {
 // UnmarshalText implements encoding.TextUnmarshaler.
 func (s *FilterField) UnmarshalText(data []byte) error {
 	switch FilterField(data) {
-	case FilterFieldName:
-		*s = FilterFieldName
-		return nil
 	case FilterFieldCreatedAt:
 		*s = FilterFieldCreatedAt
 		return nil
@@ -4810,14 +4996,6 @@ func (s *GetMySessionErrorResponseStatusCode) SetResponse(val GetMySessionErrorR
 
 func (*GetMySessionErrorResponseStatusCode) getMySessionRes() {}
 
-type GetMySessionNotFound ErrorDetails
-
-func (*GetMySessionNotFound) getMySessionRes() {}
-
-type GetMySessionUnauthorized ErrorDetails
-
-func (*GetMySessionUnauthorized) getMySessionRes() {}
-
 type GetMyUserOK map[string]jx.Raw
 
 func (s *GetMyUserOK) init() GetMyUserOK {
@@ -4834,74 +5012,6 @@ func (*GetMyUserOK) getMyUserRes() {}
 type GetProjectNotFound ErrorDetails
 
 func (*GetProjectNotFound) getProjectRes() {}
-
-// The current state of a project.
-// Ref: #
-type GetProjectResponse struct {
-	// The unique identifier of the project.
-	ID string `json:"id"`
-	// The name of the project.
-	Name string `json:"name"`
-	// Origins which are allowed for previewing and testing the project.
-	PreviewOrigins []string `json:"previewOrigins"`
-	// The time when the project was created.
-	CreatedAt time.Time `json:"createdAt"`
-	// The time when the project was last updated.
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-// GetID returns the value of ID.
-func (s *GetProjectResponse) GetID() string {
-	return s.ID
-}
-
-// GetName returns the value of Name.
-func (s *GetProjectResponse) GetName() string {
-	return s.Name
-}
-
-// GetPreviewOrigins returns the value of PreviewOrigins.
-func (s *GetProjectResponse) GetPreviewOrigins() []string {
-	return s.PreviewOrigins
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *GetProjectResponse) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// GetUpdatedAt returns the value of UpdatedAt.
-func (s *GetProjectResponse) GetUpdatedAt() time.Time {
-	return s.UpdatedAt
-}
-
-// SetID sets the value of ID.
-func (s *GetProjectResponse) SetID(val string) {
-	s.ID = val
-}
-
-// SetName sets the value of Name.
-func (s *GetProjectResponse) SetName(val string) {
-	s.Name = val
-}
-
-// SetPreviewOrigins sets the value of PreviewOrigins.
-func (s *GetProjectResponse) SetPreviewOrigins(val []string) {
-	s.PreviewOrigins = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *GetProjectResponse) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-// SetUpdatedAt sets the value of UpdatedAt.
-func (s *GetProjectResponse) SetUpdatedAt(val time.Time) {
-	s.UpdatedAt = val
-}
-
-func (*GetProjectResponse) getProjectRes()   {}
-func (*GetProjectResponse) patchProjectRes() {}
 
 type GetProjectUnauthorized ErrorDetails
 
@@ -5065,6 +5175,10 @@ func (s *GetSessionErrorResponseStatusCode) SetResponse(val GetSessionErrorRespo
 
 func (*GetSessionErrorResponseStatusCode) getSessionRes() {}
 
+type GetSessionForbidden ErrorDetails
+
+func (*GetSessionForbidden) getSessionRes() {}
+
 type GetSessionNotFound ErrorDetails
 
 func (*GetSessionNotFound) getSessionRes() {}
@@ -5082,6 +5196,8 @@ func (*GetTeamNotFound) getTeamRes() {}
 type GetTeamResponse struct {
 	// The unique identifier of the team.
 	ID string `json:"id"`
+	// The name of the team.
+	Name string `json:"name"`
 	// The time when the team was created.
 	CreatedAt time.Time `json:"createdAt"`
 	// The time when the team was last updated.
@@ -5091,6 +5207,11 @@ type GetTeamResponse struct {
 // GetID returns the value of ID.
 func (s *GetTeamResponse) GetID() string {
 	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *GetTeamResponse) GetName() string {
+	return s.Name
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -5106,6 +5227,11 @@ func (s *GetTeamResponse) GetUpdatedAt() time.Time {
 // SetID sets the value of ID.
 func (s *GetTeamResponse) SetID(val string) {
 	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *GetTeamResponse) SetName(val string) {
+	s.Name = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.
@@ -6087,6 +6213,37 @@ func (s *KeysResponseKeysItem) SetX5tS256(val OptString) {
 
 type Limit int
 
+type ListBrandingResponse []ListBrandingResponseItem
+
+func (*ListBrandingResponse) listBrandingRes() {}
+
+type ListBrandingResponseItem struct {
+	// The unique identifier of this branding revision.
+	ID string `json:"id"`
+	// When this revision was published.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetID returns the value of ID.
+func (s *ListBrandingResponseItem) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ListBrandingResponseItem) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ListBrandingResponseItem) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ListBrandingResponseItem) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
 type ListFlowDefinitionsPurpose string
 
 const (
@@ -6252,6 +6409,96 @@ func (s *ListSessionsState) UnmarshalText(data []byte) error {
 type ListSessionsUnauthorized ErrorDetails
 
 func (*ListSessionsUnauthorized) listSessionsRes() {}
+
+type ListUserPasskeysBadRequest ErrorDetails
+
+func (*ListUserPasskeysBadRequest) listUserPasskeysRes() {}
+
+type ListUserPasskeysForbidden ErrorDetails
+
+func (*ListUserPasskeysForbidden) listUserPasskeysRes() {}
+
+type ListUserPasskeysInternalServerError ErrorDetails
+
+func (*ListUserPasskeysInternalServerError) listUserPasskeysRes() {}
+
+type ListUserPasskeysNotFound ErrorDetails
+
+func (*ListUserPasskeysNotFound) listUserPasskeysRes() {}
+
+// Response containing the user's passkeys.
+// Ref: #
+type ListUserPasskeysResponse struct {
+	Passkeys []ListUserPasskeysResponsePasskeysItem `json:"passkeys"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetPasskeys returns the value of Passkeys.
+func (s *ListUserPasskeysResponse) GetPasskeys() []ListUserPasskeysResponsePasskeysItem {
+	return s.Passkeys
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListUserPasskeysResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetPasskeys sets the value of Passkeys.
+func (s *ListUserPasskeysResponse) SetPasskeys(val []ListUserPasskeysResponsePasskeysItem) {
+	s.Passkeys = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListUserPasskeysResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListUserPasskeysResponse) listUserPasskeysRes() {}
+
+type ListUserPasskeysResponsePasskeysItem struct {
+	// The unique identifier of the passkey.
+	ID string `json:"id"`
+	// The name of the passkey.
+	Name string `json:"name"`
+	// The timestamp when the passkey was created.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetID returns the value of ID.
+func (s *ListUserPasskeysResponsePasskeysItem) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *ListUserPasskeysResponsePasskeysItem) GetName() string {
+	return s.Name
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ListUserPasskeysResponsePasskeysItem) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ListUserPasskeysResponsePasskeysItem) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *ListUserPasskeysResponsePasskeysItem) SetName(val string) {
+	s.Name = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ListUserPasskeysResponsePasskeysItem) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+type ListUserPasskeysUnauthorized ErrorDetails
+
+func (*ListUserPasskeysUnauthorized) listUserPasskeysRes() {}
 
 type ListUsersBadRequest ErrorDetails
 
@@ -7343,6 +7590,52 @@ func (o OptAuthMethod) Get() (v AuthMethod, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAuthMethod) Or(d AuthMethod) AuthMethod {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAuthUnauthorizedDetails returns new OptAuthUnauthorizedDetails with value set to v.
+func NewOptAuthUnauthorizedDetails(v AuthUnauthorizedDetails) OptAuthUnauthorizedDetails {
+	return OptAuthUnauthorizedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAuthUnauthorizedDetails is optional AuthUnauthorizedDetails.
+type OptAuthUnauthorizedDetails struct {
+	Value AuthUnauthorizedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAuthUnauthorizedDetails was set.
+func (o OptAuthUnauthorizedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAuthUnauthorizedDetails) Reset() {
+	var v AuthUnauthorizedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAuthUnauthorizedDetails) SetTo(v AuthUnauthorizedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAuthUnauthorizedDetails) Get() (v AuthUnauthorizedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAuthUnauthorizedDetails) Or(d AuthUnauthorizedDetails) AuthUnauthorizedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -10813,6 +11106,74 @@ func (s *PostTokenRequestGrantType) UnmarshalText(data []byte) error {
 
 type ProjectID string
 
+// The current state of a project.
+// Ref: #
+type ProjectResponse struct {
+	// The unique identifier of the project.
+	ID string `json:"id"`
+	// The name of the project.
+	Name string `json:"name"`
+	// Origins which are allowed for previewing and testing the project.
+	PreviewOrigins []string `json:"previewOrigins"`
+	// The time when the project was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the project was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// GetID returns the value of ID.
+func (s *ProjectResponse) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *ProjectResponse) GetName() string {
+	return s.Name
+}
+
+// GetPreviewOrigins returns the value of PreviewOrigins.
+func (s *ProjectResponse) GetPreviewOrigins() []string {
+	return s.PreviewOrigins
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ProjectResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *ProjectResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ProjectResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *ProjectResponse) SetName(val string) {
+	s.Name = val
+}
+
+// SetPreviewOrigins sets the value of PreviewOrigins.
+func (s *ProjectResponse) SetPreviewOrigins(val []string) {
+	s.PreviewOrigins = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ProjectResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *ProjectResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*ProjectResponse) getProjectRes()   {}
+func (*ProjectResponse) patchProjectRes() {}
+
 type QueryProjectsBadRequest ErrorDetails
 
 func (*QueryProjectsBadRequest) queryProjectsRes() {}
@@ -10939,14 +11300,14 @@ func (s *QueryProjectsRequestSorting) SetDirection(val SortDirection) {
 // Paginated list of projects.
 // Ref: #
 type QueryProjectsResponse struct {
-	Projects []GetProjectResponse `json:"projects"`
+	Projects []ProjectResponse `json:"projects"`
 	// Token to pass as `page_token` in the next request to fetch the following page.
 	// Absent when there are no more results.
 	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
 
 // GetProjects returns the value of Projects.
-func (s *QueryProjectsResponse) GetProjects() []GetProjectResponse {
+func (s *QueryProjectsResponse) GetProjects() []ProjectResponse {
 	return s.Projects
 }
 
@@ -10956,7 +11317,7 @@ func (s *QueryProjectsResponse) GetNextPageToken() OptNilPageToken {
 }
 
 // SetProjects sets the value of Projects.
-func (s *QueryProjectsResponse) SetProjects(val []GetProjectResponse) {
+func (s *QueryProjectsResponse) SetProjects(val []ProjectResponse) {
 	s.Projects = val
 }
 
@@ -11000,10 +11361,6 @@ type RevokeMySessionNotFound ErrorDetails
 
 func (*RevokeMySessionNotFound) revokeMySessionRes() {}
 
-type RevokeMySessionUnauthorized ErrorDetails
-
-func (*RevokeMySessionUnauthorized) revokeMySessionRes() {}
-
 // Ref: #
 type RevokeRequest struct {
 	// The token to revoke (access token or refresh token).
@@ -11036,20 +11393,12 @@ type RevokeSessionConflict ErrorDetails
 
 func (*RevokeSessionConflict) revokeSessionRes() {}
 
+type RevokeSessionForbidden ErrorDetails
+
+func (*RevokeSessionForbidden) revokeSessionRes() {}
+
 // RevokeSessionNoContent is response for RevokeSession operation.
-type RevokeSessionNoContent struct {
-	SetCookie string
-}
-
-// GetSetCookie returns the value of SetCookie.
-func (s *RevokeSessionNoContent) GetSetCookie() string {
-	return s.SetCookie
-}
-
-// SetSetCookie sets the value of SetCookie.
-func (s *RevokeSessionNoContent) SetSetCookie(val string) {
-	s.SetCookie = val
-}
+type RevokeSessionNoContent struct{}
 
 func (*RevokeSessionNoContent) revokeSessionRes() {}
 
@@ -11191,6 +11540,34 @@ func (s *SessNotFoundDetails) init() SessNotFoundDetails {
 	}
 	return m
 }
+
+// SessNotFoundHeaders wraps SessNotFound with response headers.
+type SessNotFoundHeaders struct {
+	CacheControl OptString
+	Response     SessNotFound
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *SessNotFoundHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *SessNotFoundHeaders) GetResponse() SessNotFound {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *SessNotFoundHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SessNotFoundHeaders) SetResponse(val SessNotFound) {
+	s.Response = val
+}
+
+func (*SessNotFoundHeaders) getMySessionRes() {}
 
 type SessionID string
 
@@ -11400,8 +11777,35 @@ func (s *SessionResponse) SetExpiresAt(val time.Time) {
 	s.ExpiresAt = val
 }
 
-func (*SessionResponse) getMySessionRes() {}
-func (*SessionResponse) getSessionRes()   {}
+func (*SessionResponse) getSessionRes() {}
+
+// SessionResponseHeaders wraps SessionResponse with response headers.
+type SessionResponseHeaders struct {
+	CacheControl OptString
+	Response     SessionResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *SessionResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *SessionResponseHeaders) GetResponse() SessionResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *SessionResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SessionResponseHeaders) SetResponse(val SessionResponse) {
+	s.Response = val
+}
+
+func (*SessionResponseHeaders) getMySessionRes() {}
 
 type SessionResponseMetadata map[string]jx.Raw
 

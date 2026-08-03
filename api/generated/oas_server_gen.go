@@ -39,6 +39,19 @@ type Handler interface {
 	//
 	// POST /auth_attempts
 	CreateAuthAttempt(ctx context.Context, req *CreateAuthAttemptRequest) (CreateAuthAttemptRes, error)
+	// CreateBranding implements createBranding operation.
+	//
+	// Publishes a new immutable branding revision for the project. Branding
+	// revisions cannot be updated or deleted; every edit publishes a new
+	// revision, and flow responses resolve the latest revision per project
+	// (see ADR 040).
+	// The `liquid_template` is validated lexically on save (size, encoding,
+	// banned patterns such as `<script>` tags, inline event handlers, and the
+	// `| raw` filter). Authoritative LiquidJS validation runs at authoring
+	// time via `zitadel plan` / `zitadel apply`.
+	//
+	// POST /branding
+	CreateBranding(ctx context.Context, req *Branding, params CreateBrandingParams) (CreateBrandingRes, error)
 	// CreateFlow implements createFlow operation.
 	//
 	// Resolves a flow definition based on purpose + audience context and returns
@@ -101,8 +114,15 @@ type Handler interface {
 	// - Pre-allocate a `session_id` before the user is known, so device/telemetry signals
 	// can be correlated with the eventual authenticated session from the start.
 	// - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
-	// The returned `session_token` authorises GET and DELETE on this session.
-	// It is superseded when a handoff exchange completes — clients must replace it at that point.
+	// Creating a session is an app-plane operation on the project credential
+	// (`session.write`). The returned `session_token` is a session credential for the
+	// end-user client, not a management scope: it is delivered as the
+	// `__nextgen_session` cookie and authorises the self-service operations
+	// `GET /sessions/me` and `DELETE /sessions/me` (`nextgenSession` scheme). The
+	// by-id operations `GET /sessions/{session_id}` and `DELETE /sessions/{session_id}`
+	// are operator endpoints and require `session.read` / `session.delete` instead.
+	// The `session_token` is superseded when a handoff exchange completes — clients must
+	// replace it at that point.
 	// Anonymous sessions expire aggressively (10-minute TTL). The TTL resets to the configured
 	// full session TTL when the first authentication factor is written via a completing `auth_attempt`.
 	//
@@ -140,6 +160,12 @@ type Handler interface {
 	//
 	// DELETE /flow_definitions/{id}
 	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
+	// DeleteUserByID implements DeleteUserByID operation.
+	//
+	// Delete user by ID.
+	//
+	// DELETE /users/{user_id}
+	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
 	// EndSession implements endSession operation.
 	//
 	// End a session.
@@ -175,6 +201,12 @@ type Handler interface {
 	//
 	// GET /auth_attempts/{attempt_id}
 	GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (GetAuthAttemptRes, error)
+	// GetBrandingById implements getBrandingById operation.
+	//
+	// Retrieves a single branding revision, including its stored configuration.
+	//
+	// GET /branding/{id}
+	GetBrandingById(ctx context.Context, params GetBrandingByIdParams) (GetBrandingByIdRes, error)
 	// GetFlowDefinition implements getFlowDefinition operation.
 	//
 	// Get a flow definition by id.
@@ -296,6 +328,16 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/challenges
 	IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
+	// ListBranding implements listBranding operation.
+	//
+	// Lists branding revisions for the project, newest first, capped at the
+	// 100 most recent. The first entry is the revision flow responses
+	// currently resolve. Deliberately unpaginated in v1 — list endpoints
+	// gain a real query mechanism together (ADR 031); advertising pagination
+	// parameters the server ignores would be worse than none.
+	//
+	// GET /branding
+	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
 	// ListFlowDefinitions implements listFlowDefinitions operation.
 	//
 	// Retrieves a list of all flow definitions.
@@ -317,6 +359,12 @@ type Handler interface {
 	//
 	// GET /sessions
 	ListSessions(ctx context.Context, params ListSessionsParams) (ListSessionsRes, error)
+	// ListUserPasskeys implements listUserPasskeys operation.
+	//
+	// List user passkeys.
+	//
+	// GET /users/{user_id}/passkeys
+	ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (ListUserPasskeysRes, error)
 	// ListUsers implements listUsers operation.
 	//
 	// List users.
@@ -346,8 +394,10 @@ type Handler interface {
 	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
 	// RevokeSession implements revokeSession operation.
 	//
-	// Revokes the session immediately (`state: revoked`). This is the logout operation.
-	// The session_token issued at creation (or superseded by a handoff exchange) is required.
+	// Revokes the session immediately (`state: revoked`).
+	// This is the operator revoke path and requires the `session.delete` scope on a
+	// project-bound credential. End-user logout with the `__nextgen_session` cookie is
+	// `DELETE /sessions/me` (`nextgenSession` scheme).
 	// After revocation, any tokens derived from this session are invalidated.
 	//
 	// DELETE /sessions/{session_id}

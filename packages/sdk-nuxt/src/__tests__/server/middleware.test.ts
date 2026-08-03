@@ -3,6 +3,7 @@ import { generateKeyPairSync, createSign } from "node:crypto";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import { createNextgenMiddleware } from "../../runtime/server/middleware";
+import { setRuntimeConfig } from "../stubs/nuxt-imports";
 
 function base64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -53,16 +54,22 @@ function makeJwt(
   return `${signing}.${base64url(sig)}`;
 }
 
-function makeWebRequest(url: string, cookie?: string, authorization?: string): Request {
+function makeWebRequest(
+  url: string,
+  cookie?: string,
+  authorization?: string,
+  method = "GET",
+): Request {
   const headers: Record<string, string> = {};
   if (cookie) headers["cookie"] = cookie;
   if (authorization) headers["authorization"] = authorization;
-  return new Request(url, { headers });
+  return new Request(url, { headers, method });
 }
 
 describe("createNextgenMiddleware (H3)", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    setRuntimeConfig({ nextgen: {} });
   });
 
   it("public route with no token sets nextgenAuth to unauthenticated", async () => {
@@ -566,6 +573,105 @@ describe("createNextgenMiddleware (H3)", () => {
 
       const setCookie = res.headers.get("set-cookie") ?? "";
       expect(setCookie).toBe("__nextgen_session=abc; HttpOnly; SameSite=Lax");
+    });
+  });
+
+  describe("proxy: credential planes", () => {
+    it.each([
+      ["GET", "/__nextgen/sessions/me"],
+      ["DELETE", "/__nextgen/sessions/me"],
+      ["POST", "/__nextgen/flow"],
+      ["GET", "/__nextgen/projects"],
+      ["GET", "/__nextgen/sessions/exchange"],
+      ["POST", "/__nextgen/sessions/exchange/extra"],
+    ])("does not attach the project secret to %s %s", async (method, pathname) => {
+      setRuntimeConfig({ nextgen: { projectSecret: "project-secret" } });
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response("{}", { status: 200 }));
+        }),
+      );
+      const app = createApp();
+      app.use(createNextgenMiddleware({ url: "http://localhost:4000" }));
+
+      await toWebHandler(app)(
+        makeWebRequest(`http://localhost:3000${pathname}`, undefined, undefined, method),
+      );
+
+      expect((capturedHeaders as Headers).has("authorization")).toBe(false);
+    });
+
+    it("attaches the project secret only to POST /sessions/exchange, ignoring the query", async () => {
+      setRuntimeConfig({ nextgen: { projectSecret: "project-secret" } });
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response("{}", { status: 200 }));
+        }),
+      );
+      const app = createApp();
+      app.use(createNextgenMiddleware({ url: "http://localhost:4000" }));
+
+      await toWebHandler(app)(
+        makeWebRequest(
+          "http://localhost:3000/__nextgen/sessions/exchange?source=browser",
+          undefined,
+          undefined,
+          "POST",
+        ),
+      );
+
+      expect((capturedHeaders as Headers).get("authorization")).toBe("Bearer project-secret");
+    });
+
+    it("preserves an explicit caller credential on the exchange", async () => {
+      setRuntimeConfig({ nextgen: { projectSecret: "project-secret" } });
+      let capturedHeaders: Headers | undefined;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+          capturedHeaders = init.headers as Headers;
+          return Promise.resolve(new Response("{}", { status: 200 }));
+        }),
+      );
+      const app = createApp();
+      app.use(createNextgenMiddleware({ url: "http://localhost:4000" }));
+
+      await toWebHandler(app)(
+        makeWebRequest(
+          "http://localhost:3000/__nextgen/sessions/exchange",
+          undefined,
+          "Bearer caller-key",
+          "POST",
+        ),
+      );
+
+      expect((capturedHeaders as Headers).get("authorization")).toBe("Bearer caller-key");
+    });
+
+    it("preserves the upstream session cache policy", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(
+          new Response("{}", {
+            status: 200,
+            headers: { "cache-control": "private, no-store" },
+          }),
+        ),
+      );
+      const app = createApp();
+      app.use(createNextgenMiddleware({ url: "http://localhost:4000" }));
+
+      const response = await toWebHandler(app)(
+        makeWebRequest("http://localhost:3000/__nextgen/sessions/me"),
+      );
+
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
     });
   });
 

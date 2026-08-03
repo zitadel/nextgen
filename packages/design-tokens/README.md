@@ -9,13 +9,30 @@ widths), and emits three artifacts consumers can rely on:
 | Surface              | Path                                          | Consumer                                                |
 | -------------------- | --------------------------------------------- | ------------------------------------------------------- |
 | CSS variables        | `@zitadel/design-tokens/css/tokens.css` | Lit atoms, orchestrator chrome, tenant CSS              |
-| Tailwind v4 `@theme` | `@zitadel/design-tokens/css/tailwind.css` | `apps/console`, any React/Vue consumer using Tailwind v4 |
+| Tailwind v4 `@theme` | `@zitadel/design-tokens/css/tailwind.css` | Consumers that want the `--*-zl-*` / `bg-zl-*` utilities |
+| shadcn bridge        | `@zitadel/design-tokens/css/shadcn.css` | `apps/console` (unprefixed `bg-background`, …)          |
 | Typed TS constants   | `@zitadel/design-tokens`              | Paired React components in `packages/ui-react`, any TS consumer |
 
 Every token is namespaced with `--zl-*` (and `--*-zl-*` in the Tailwind
 block) so it never collides with consumer tokens.
 
 [figma]: https://www.figma.com/design/8UjCXw8yemgljmbkWGrSfE/Zitadel---Design-System---External
+
+## Two token systems, side by side
+
+The package currently emits **two** colour surfaces so consumers can migrate
+incrementally rather than in one breaking change:
+
+| System | Var shape | Source | Status |
+| --- | --- | --- | --- |
+| Legacy | `--zl-color-surface-*`, `--zl-color-text-*`, `--zl-color-gray-*`, `--zl-spacing-*`, `--zl-radius-*` | `src/legacy.tokens.json` (frozen) | being migrated away from |
+| shadcn | `--zl-background`, `--zl-foreground`, `--zl-primary`, `--zl-card`, `--zl-border`, `--zl-sidebar-*`, `--zl-chart-*` | designer DTCG export (`figma-export/`) | the target surface |
+
+Both are themed: dark values live on `:root` / `[data-theme="dark"]`, light
+overrides on `[data-theme="light"]`. The new shadcn names never collide with the
+legacy `--zl-color-*` namespace, so a file can reference either (or both) during
+migration. In the typed export, legacy colours stay under `tokens.color.*` and the
+new surface lives under `tokens.theme.*`.
 
 ## Why a separate package?
 
@@ -37,8 +54,21 @@ A Figma Community sync plugin pushes DTCG JSON to GitHub. Plugin settings:
 | Token path | `packages/design-tokens/figma-export` |
 
 CI ([`.github/workflows/sync-design-tokens.yml`](../../.github/workflows/sync-design-tokens.yml))
-runs on push to that branch under `figma-export/**` → `:sync-export` →
-`:generate` → `:test` → opens or **updates one PR**.
+runs on push to that branch under `figma-export/**` → **merges `main` into
+`design-tokens/figma-sync`** (so the long-lived branch cannot go stale) →
+`:sync-export` → `:generate` → commits generated artifacts **on top of** the
+plugin's `figma-export` commits (no rebase/force-push) → opens or **updates
+one PR** titled `chore: sync tokens from Figma` → `:test` as a **hard gate**.
+The snapshot test runs after the PR is opened (so a legitimate rename still
+surfaces its diff for review) but is no longer `continue-on-error`, so a name
+change turns the PR check red instead of merging silently.
+
+`:sync-export` is intentionally **file-name agnostic**: it reads every `*.json`
+under `figma-export/`, builds one registry of leaf values, resolves every
+`{alias}` (cross-collection and per-mode) to a concrete value, and **fails loud**
+if any reference is unresolved or the themed colour surface comes out empty.
+Silently dropping a designer's variables (the old filename-coupled behaviour) is
+treated as a bug, not a warning.
 
 ### Engineering path (Enterprise only)
 
@@ -57,13 +87,21 @@ Sync **never** commits to `main` directly.
 - **Pinned library version.** Designers can edit Figma freely; production
   only sees changes when the lockfile is bumped in a PR.
 - **Snapshot test.** `src/tokens.snapshot.spec.ts` locks every public
-  token name. A rename or deletion fails CI before consumers break.
+  token name (both legacy `tokens.color.*` and new `tokens.theme.*`). A
+  rename or deletion fails CI before consumers break.
+- **Resolver unit test.** `src/sync-from-export.spec.ts` covers alias
+  resolution, base-group flattening, concrete-wins conflicts, and fail-loud
+  behaviour, and re-runs the resolver against the real checked-in exports.
+- **Fail-loud ingest.** `:sync-export` throws on any unresolved reference or
+  an empty colour surface, so a broken designer push stops the workflow before
+  it can open a PR with silently-dropped tokens.
 - **Deterministic build.** Same JSON in, byte-identical artifacts out.
   Reviewers diff `src/generated/*` directly.
-- **Two-layer model.** Figma's `Primitives` collection holds raw hex /
-  px values; the `Tokens` collection holds semantic aliases (`color/
-  border/error → color.pink.500`). Atoms only ever reach for semantic
-  names, so a primitive ramp change cascades automatically.
+- **Alias resolution.** The designer's export layers primitives (`tailwind
+  colors.*`) → named theme pairs (`colors.<name>-light/dark`) → semantic
+  `base.*` per Light/Dark mode. The resolver walks that whole chain so a
+  primitive change cascades automatically; consumers only ever see the
+  resolved semantic `--zl-*` names.
 
 ## File map
 
@@ -72,22 +110,28 @@ packages/design-tokens/
 ├── figma-tokens.lock                 ← pinned library version (committed)
 ├── figma-export/                     ← DTCG JSON from Figma plugin push
 ├── scripts/
-│   ├── sync-from-export.ts           ← figma-export/*.json → figma.tokens.json
+│   ├── sync-from-export.ts           ← figma-export/*.json → figma.tokens.json (generic resolver)
 │   ├── sync-from-figma.ts            ← Figma REST → figma.tokens.json
-│   └── build.ts                      ← figma.tokens.json + overrides → outputs
+│   └── build.ts                      ← legacy.tokens.json + figma.tokens.json + overrides → outputs
 ├── src/
+│   ├── legacy.tokens.json            ← frozen legacy colour source (committed)
 │   ├── overrides.ts                  ← typography, motion, focus, breakpoints,
 │   │                                   container widths (committed)
-│   ├── tokens.snapshot.spec.ts       ← public-name guard
+│   ├── tokens.snapshot.spec.ts       ← public-name guard (both surfaces)
+│   ├── sync-from-export.spec.ts      ← resolver unit + real-export test
 │   └── generated/                    ← all committed; built by `:generate`
-│       ├── figma.tokens.json
+│       ├── figma.tokens.json         ← resolved shadcn surface (written by :sync-export)
 │       ├── tokens.css
 │       ├── tokens.ts
-│       └── tailwind.css
+│       ├── tailwind.css
+│       └── shadcn.css                ← shadcn utility bridge for apps/console
 └── dist/                             ← gitignored; built by tsdown for npm
 ```
 
-Export files: `primitives.json`, `semantic---light-dark.json`, `layout.json`.
+The export currently contains five collections (Tailwind primitives, named
+theme colours, Light/Dark modes, viewport typography, and an icon-library flag),
+but the resolver does not care about their file names — add, rename, or split
+export files freely.
 
 ## Adding a new token
 
@@ -96,8 +140,8 @@ Export files: `primitives.json`, `semantic---light-dark.json`, `layout.json`.
    have a committed export under `figma-export/`).
 3. Run `moon run design-tokens:generate` and `moon run design-tokens:test`.
    Update the snapshot if the new name is intentional.
-4. Commit `figma.tokens.json`, `tokens.{css,ts}`, and `tailwind.css` together
-   in the sync PR.
+4. Commit `figma.tokens.json`, `tokens.{css,ts}`, `tailwind.css`, and
+   `shadcn.css` together in the sync PR.
 
 For Enterprise REST sync instead: bump `figma-tokens.lock.version`, run
 `:sync`, then `:generate` and `:test`.

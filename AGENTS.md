@@ -125,7 +125,10 @@ against local `@zitadel/*` tarballs instead of public npm (details in
 [CONTRIBUTING.md](CONTRIBUTING.md#testing-the-cli-from-source)). Set
 `ZITADEL_CLI_USE_PUBLIC_PACKAGES=1` only when intentionally testing published
 packages; pass `--runtime docker`, `--image`, or `ZITADEL_LOCAL_IMAGE` when
-intentionally testing the Docker backend.
+intentionally testing the Docker backend. Invoking `apps/cli/bin/run.js`
+directly runs the last-built `dist/` — in a fresh checkout or after source
+changes, run `pnpm install` and `moon run cli:build` first (the wrapper above
+does this for you).
 
 ## Local Checks
 
@@ -239,6 +242,44 @@ automatically before each run — be aware of this when iterating with a
 long-running dev server: stale `dist/` will silently mask orchestrator
 changes.
 
+## Building UI (console and design system)
+
+Console screens and shared UI are driven by the Figma **Design System** file
+(`Zitadel - Design System - External`), not by flattened app mocks. Before
+building any UI under `apps/console/**` or
+`packages/{components,ui-react,shared-component-styles,design-tokens}/**`,
+**classify the component first** (see
+[`apps/console/docs/styling.md`](apps/console/docs/styling.md)):
+
+1. **Existing pair** (`Button`, `Card`, `Pill`, `Icon`, `TextField`, `Select`,
+   `Checkbox`, `Alert`) — compose it from `@zitadel/ui-react`.
+2. **Console-only chrome** (shell, page layout, tables, app widgets) — build in
+   `apps/console` with `zl-*` Tailwind utilities. Most console UI is this; do
+   not pre-build a Lit twin for it.
+3. **A new primitive the login / web-component surface also needs** — build it
+   as a Lit + React pair via the Storybook recipe
+   ([`apps/storybook/AGENTS.md`](apps/storybook/AGENTS.md)) and iterate there
+   behind the parity + a11y gates, not on a console mock.
+
+**Caveat — the pairs are not theme-portable yet.** Every pair's surface CSS in
+`packages/shared-component-styles/src/*.css` still uses the **legacy dark-only
+login tokens** (`--zl-color-surface-default-*`, `--zl-color-text-button-*`,
+`--zl-color-gray-*`), which do **not** flip with `data-theme`. The login surface
+is dark-only for v1 (ADR-014 §5). So composing a pair into the light/dark console
+renders the login treatment in both themes — wrong in light. Until the pairs'
+surface CSS migrates to the current semantic taxonomy (`surface/*`, `text/*`,
+`border/*`), **bucket 1 is dormant for the console**: build console screens
+console-local (bucket 2) with theme-flipping `zl-*` utilities even where a pair
+nominally exists, and swap to the pair after it migrates. (`Icon` is the
+exception — it renders a glyph with `currentColor` and is theme-safe.)
+
+Where the component lives decides the iteration tool: console-local UI iterates
+on the console dev server, verified at light/dark and each breakpoint; pairs
+iterate in Storybook. A missing visual value is a **new token** in
+`@zitadel/design-tokens`, never a magic value — except licensed brand assets
+(e.g. display fonts), which stay in the consuming app because
+`@zitadel/design-tokens` ships as a public npm package.
+
 ## Generated Files
 
 - Do not hand-edit `api/generated/**`; update `api/openapi/**` and run
@@ -268,10 +309,15 @@ For customer-local runtime workflows, agents should prefer
 
 ## Release, Licensing, And Secrets
 
-- PR titles must pass the Semantic PR check: use the conventional format
-  `<type>(optional-scope): <summary>`, with `.github/semantic.yml` as the
-  source of truth for allowed types and scopes. Omit the scope when unsure;
-  do not invent scopes.
+- PR titles use `<type>(optional-scope): <summary>`, with
+  [`.github/semantic.yml`](.github/semantic.yml) as the source of truth for
+  allowed types and scopes. Omit the scope when unsure; do not invent scopes.
+- Pick the type by **who the change reaches, not how much work it was**. If the
+  change needs no changeset it is not `feat` or `fix`; if it changes what a user
+  receives it is not `docs` or `chore`. CI enforces the first of those. Ladder,
+  worked examples, and summary voice:
+  [CONTRIBUTING.md](CONTRIBUTING.md#title-format). Self-check before opening:
+  `node scripts/check-pr-title.mjs --title "<title>"`.
 - Agent-created or agent-updated PRs must include a concise description with
   `Summary`, `Validation`, `Release notes / changeset`, and `Notes` sections
   before handoff. In **Release notes / changeset**, state the outcome from

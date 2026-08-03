@@ -29,7 +29,6 @@ func TestCompareGreaterRestrictsAllTerms(t *testing.T) {
 	assert.True(t, filter.Restricts(database.Col(domain.ProjectFieldCreatedAt)))
 	assert.True(t, filter.Restricts(database.Col(domain.ProjectFieldID)))
 	assert.True(t, filter.Restricts(database.Col(domain.ProjectFieldUpdatedAt)))
-	assert.False(t, filter.Restricts(database.Col(domain.ProjectFieldProjectSecret)))
 	assert.Equal(t, database.OpGreater, filter.Op)
 }
 
@@ -99,6 +98,17 @@ func TestStringFilterRestricts(t *testing.T) {
 
 	col := database.Col(domain.FlowDefinitionFieldName)
 	filter := database.StringContains(col, "login")
+	assert.True(t, filter.Restricts(col))
+	assert.False(t, filter.Restricts(database.Col(domain.FlowDefinitionFieldID)))
+}
+
+func TestArrayContainsFilter(t *testing.T) {
+	t.Parallel()
+
+	col := database.Col(domain.FlowDefinitionFieldPurposes)
+	filter := database.ArrayContains(col, "login")
+	assert.Equal(t, col, filter.Column)
+	assert.Equal(t, "login", filter.Value)
 	assert.True(t, filter.Restricts(col))
 	assert.False(t, filter.Restricts(database.Col(domain.FlowDefinitionFieldID)))
 }

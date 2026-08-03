@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
@@ -49,9 +50,9 @@ func TestCreateFlowDefinitionUnauthenticated(t *testing.T) {
 func TestCreateFlowDefinition(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 
 	userSchemaURI := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
@@ -59,7 +60,7 @@ func TestCreateFlowDefinition(t *testing.T) {
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	_, err = client.CreateFlowDefinition(
 		t.Context(),
@@ -300,13 +301,13 @@ func TestUpdateFlowDefinitionUnauthenticated(t *testing.T) {
 func TestUpdateFlowDefinition(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	userSchemaURI := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
@@ -317,8 +318,8 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		newCreateFlowDefinitionRequest(api.ProjectID(project.ID), newFlowDefinitionFixture("login-flow", userSchemaURI)),
 	)
 	require.NoError(t, err)
-	loginFlowDef, ok := createResp.(*api.FlowDefinitionDetailResponse)
-	require.True(t, ok)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, createResp, helpers.MustMarshal(t, createResp))
+	loginFlowDef := createResp.(*api.FlowDefinitionDetailResponse)
 
 	multiPurposeResp, err := client.CreateFlowDefinition(
 		t.Context(),
@@ -332,8 +333,8 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		}()),
 	)
 	require.NoError(t, err)
-	loginRegisterFlowDef, ok := multiPurposeResp.(*api.FlowDefinitionDetailResponse)
-	require.True(t, ok)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, multiPurposeResp, helpers.MustMarshal(t, multiPurposeResp))
+	loginRegisterFlowDef := multiPurposeResp.(*api.FlowDefinitionDetailResponse)
 
 	tests := []struct {
 		name     string
@@ -537,55 +538,43 @@ func assertFlowDefinitionResponse(t *testing.T, want, got any) {
 		return
 	}
 
-	switch want.(type) {
+	switch expected := want.(type) {
 	case *api.FlowDefinitionDetailResponse:
-		expected, ok := want.(*api.FlowDefinitionDetailResponse)
-		require.True(t, ok)
-		actual, ok := got.(*api.FlowDefinitionDetailResponse)
-		require.True(t, ok)
+		require.IsType(t, &api.FlowDefinitionDetailResponse{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.FlowDefinitionDetailResponse)
 
 		assert.NotEmpty(t, actual.ID)
 		assert.Equal(t, expected.ProjectID, actual.ProjectID)
 		assert.Equal(t, expected.FlowDefinition, actual.FlowDefinition)
 	case *api.CreateFlowDefinitionBadRequest:
-		expected, ok := want.(*api.CreateFlowDefinitionBadRequest)
-		require.True(t, ok)
-		actual, ok := got.(*api.CreateFlowDefinitionBadRequest)
-		require.True(t, ok)
+		require.IsType(t, &api.CreateFlowDefinitionBadRequest{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.CreateFlowDefinitionBadRequest)
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)
 		assert.Equal(t, expected.Details, actual.Details)
 	case *api.CreateFlowDefinitionConflict:
-		expected, ok := want.(*api.CreateFlowDefinitionConflict)
-		require.True(t, ok)
-		actual, ok := got.(*api.CreateFlowDefinitionConflict)
-		require.True(t, ok)
+		require.IsType(t, &api.CreateFlowDefinitionConflict{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.CreateFlowDefinitionConflict)
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)
 	case *api.UpdateFlowDefinitionBadRequest:
-		expected, ok := want.(*api.UpdateFlowDefinitionBadRequest)
-		require.True(t, ok)
-		actual, ok := got.(*api.UpdateFlowDefinitionBadRequest)
-		require.True(t, ok)
+		require.IsType(t, &api.UpdateFlowDefinitionBadRequest{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.UpdateFlowDefinitionBadRequest)
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)
 		assert.Equal(t, expected.Details, actual.Details)
 	case *api.UpdateFlowDefinitionNotFound:
-		expected, ok := want.(*api.UpdateFlowDefinitionNotFound)
-		require.True(t, ok)
-		actual, ok := got.(*api.UpdateFlowDefinitionNotFound)
-		require.True(t, ok)
+		require.IsType(t, &api.UpdateFlowDefinitionNotFound{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.UpdateFlowDefinitionNotFound)
 
 		assert.Equal(t, expected.Code, actual.Code)
 		assert.Equal(t, expected.Message, actual.Message)
 	case *api.ErrorDetailsStatusCode:
-		expected, ok := want.(*api.ErrorDetailsStatusCode)
-		require.True(t, ok)
-		actual, ok := got.(*api.ErrorDetailsStatusCode)
-		require.True(t, ok)
+		require.IsType(t, &api.ErrorDetailsStatusCode{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.ErrorDetailsStatusCode)
 
 		assert.Equal(t, expected.StatusCode, actual.StatusCode)
 		assert.Equal(t, expected.Response.Code, actual.Response.Code)
@@ -639,15 +628,15 @@ func TestGetFlowDefinitionUnauthenticated(t *testing.T) {
 func TestGetFlowDefinition(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
-	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 	userSchemaURI := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	createResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project.ID),
@@ -666,8 +655,8 @@ func TestGetFlowDefinition(t *testing.T) {
 			Steps: validSteps(),
 		},
 	})
-	flowDef, ok := createResp.(*api.FlowDefinitionDetailResponse)
-	require.True(t, ok)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, createResp, helpers.MustMarshal(t, createResp))
+	flowDef := createResp.(*api.FlowDefinitionDetailResponse)
 
 	tests := []struct {
 		name     string
@@ -730,15 +719,15 @@ func TestListFlowDefinitionsUnauthenticated(t *testing.T) {
 func TestListFlowDefinitions(t *testing.T) {
 	t.Parallel()
 
-	project1, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project1, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	harness.CreateUserSchema(t, project1, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project1, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 
-	project2, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project2, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	harness.CreateUserSchema(t, project2, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project2, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 
-	project3, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project3, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	userSchemaURI := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
@@ -746,7 +735,7 @@ func TestListFlowDefinitions(t *testing.T) {
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 
-	client.SetToken(project1.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project1)
 	resp1, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project1.ID),
 		FlowDefinition: api.FlowDefinition{
@@ -764,10 +753,10 @@ func TestListFlowDefinitions(t *testing.T) {
 			Steps: validSteps(),
 		},
 	})
-	flowDef1, ok := resp1.(*api.FlowDefinitionDetailResponse)
-	require.True(t, ok)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, resp1, helpers.MustMarshal(t, resp1))
+	flowDef1 := resp1.(*api.FlowDefinitionDetailResponse)
 
-	client.SetToken(project2.ProjectSecret)
+	//harness.SetProjectSecretOnApiClient(t, client, project2) // TODO CHECK
 	resp2, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project1.ID),
 		FlowDefinition: api.FlowDefinition{
@@ -785,10 +774,10 @@ func TestListFlowDefinitions(t *testing.T) {
 			Steps: validSteps(),
 		},
 	})
-	flowDef2, ok := resp2.(*api.FlowDefinitionDetailResponse)
-	require.True(t, ok)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, resp2, helpers.MustMarshal(t, resp2))
+	flowDef2 := resp2.(*api.FlowDefinitionDetailResponse)
 
-	client.SetToken(project2.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project2)
 	resp3, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID: api.ProjectID(project2.ID),
 		FlowDefinition: api.FlowDefinition{
@@ -806,16 +795,18 @@ func TestListFlowDefinitions(t *testing.T) {
 			Steps: validSteps(),
 		},
 	})
-	flowDef3, ok := resp3.(*api.FlowDefinitionDetailResponse)
-	require.True(t, ok)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, resp3, helpers.MustMarshal(t, resp3))
+	flowDef3 := resp3.(*api.FlowDefinitionDetailResponse)
 
 	tests := []struct {
 		name     string
+		project  *domain.Project
 		req      api.ListFlowDefinitionsParams
 		wantResp api.ListFlowDefinitionsRes
 	}{
 		{
-			name: "list all flow definitions in a project",
+			name:    "list all flow definitions in a project",
+			project: project1,
 			req: api.ListFlowDefinitionsParams{
 				ProjectID: api.ProjectID(project1.ID),
 			},
@@ -845,7 +836,8 @@ func TestListFlowDefinitions(t *testing.T) {
 			},
 		},
 		{
-			name: "list all flow definitions in project 2",
+			name:    "list all flow definitions in project 2",
+			project: project2,
 			req: api.ListFlowDefinitionsParams{
 				ProjectID: api.ProjectID(project2.ID),
 			},
@@ -867,7 +859,8 @@ func TestListFlowDefinitions(t *testing.T) {
 			},
 		},
 		{
-			name: "list all flow definitions by purpose register",
+			name:    "list all flow definitions by purpose register",
+			project: project1,
 			req: api.ListFlowDefinitionsParams{
 				ProjectID: api.ProjectID(project1.ID),
 				Purpose: api.OptListFlowDefinitionsPurpose{
@@ -889,7 +882,8 @@ func TestListFlowDefinitions(t *testing.T) {
 			},
 		},
 		{
-			name: "list all flow definitions by purpose login",
+			name:    "list all flow definitions by purpose login",
+			project: project1,
 			req: api.ListFlowDefinitionsParams{
 				ProjectID: api.ProjectID(project1.ID),
 				Purpose: api.OptListFlowDefinitionsPurpose{
@@ -915,7 +909,8 @@ func TestListFlowDefinitions(t *testing.T) {
 			},
 		},
 		{
-			name: "only default flow definition",
+			name:    "only default flow definition",
+			project: project3,
 			req: api.ListFlowDefinitionsParams{
 				ProjectID: api.ProjectID(project3.ID),
 			},
@@ -932,14 +927,22 @@ func TestListFlowDefinitions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			client.SetToken(project1.ProjectSecret)
+			// Fresh client per subtest: the management API is bound to the
+			// token's project, and mutating a shared client's token inside
+			// parallel subtests would race.
+			client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+			require.NoError(t, err)
+			harness.SetProjectSecretOnApiClient(t, client, tt.project)
 
 			resp, err := client.ListFlowDefinitions(t.Context(), tt.req)
 			assert.NoError(t, err)
-			expected, ok := tt.wantResp.(*api.FlowDefinitionListResponse)
-			require.True(t, ok)
-			actual, ok := resp.(*api.FlowDefinitionListResponse)
-			require.True(t, ok)
+
+			require.IsType(t, &api.FlowDefinitionListResponse{}, tt.wantResp, helpers.MustMarshal(t, tt.wantResp))
+			expected := tt.wantResp.(*api.FlowDefinitionListResponse)
+
+			require.IsType(t, &api.FlowDefinitionListResponse{}, resp, helpers.MustMarshal(t, resp))
+			actual := resp.(*api.FlowDefinitionListResponse)
+
 			assert.Equal(t, len(expected.FlowDefinitions), len(actual.FlowDefinitions))
 			expectedFlowDefsMap := make(map[string]api.FlowDefinitionResponse, len(expected.FlowDefinitions))
 			for _, flowDef := range expected.FlowDefinitions {
@@ -993,12 +996,12 @@ func TestDeleteFlowDefinition(t *testing.T) {
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil, true)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 	userSchemaURI := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
 	createResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
@@ -1020,8 +1023,8 @@ func TestDeleteFlowDefinition(t *testing.T) {
 	})
 	assert.IsType(t, &api.FlowDefinitionDetailResponse{}, createResp, helpers.MustMarshal(t, createResp))
 
-	flowDef, ok := createResp.(*api.FlowDefinitionDetailResponse)
-	require.True(t, ok)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, createResp, helpers.MustMarshal(t, createResp))
+	flowDef := createResp.(*api.FlowDefinitionDetailResponse)
 
 	tests := []struct {
 		name     string
@@ -1045,12 +1048,21 @@ func TestDeleteFlowDefinition(t *testing.T) {
 			wantResp: &api.DeleteFlowDefinitionNoContent{},
 		},
 		{
+			// A project the token is not bound to — existing or not — answers
+			// like a nonexistent flow definition (anti-oracle), instead of the
+			// blind 204 the unguarded handler used to return.
 			name: "invalid project id",
 			req: api.DeleteFlowDefinitionParams{
 				ID:        "non-existing-id",
 				ProjectID: "invalid-project-id",
 			},
-			wantResp: &api.DeleteFlowDefinitionNoContent{},
+			wantResp: &api.ErrorDetailsStatusCode{
+				StatusCode: http.StatusNotFound,
+				Response: api.ErrorDetails{
+					Code:    "flowdef.not_found",
+					Message: "flow definition: not found",
+				},
+			},
 		},
 	}
 	for _, tt := range tests {

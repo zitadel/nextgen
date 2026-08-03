@@ -1,0 +1,158 @@
+package postgres
+
+import (
+	"context"
+	"errors"
+
+	"github.com/jackc/pgx/v5"
+
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
+)
+
+const (
+	createTeamStmt = `INSERT INTO zitadel_nextgen.teams (project_id, id, name) VALUES ($1, $2, $3) RETURNING project_id, id, name, status, created_at, updated_at`
+	teamQuery      = `SELECT project_id, id, name, status, created_at, updated_at FROM zitadel_nextgen.teams`
+
+	deactivateTeamStmt = `
+UPDATE zitadel_nextgen.teams
+SET status = $1, updated_at = now()
+WHERE project_id = $2 AND id = $3`
+
+	deactivateTeamMembershipsStmt = `
+UPDATE zitadel_nextgen.team_memberships
+SET status = $1, updated_at = now()
+WHERE project_id = $2 AND team_id = $3 AND status <> $1`
+
+	deactivateTeamOwnedUsersStmt = `
+UPDATE zitadel_nextgen.users
+SET status = $1, updated_at = now()
+WHERE project_id = $2 AND lifecycle_owner_team_id = $3 AND status <> $1`
+
+	deactivateOwnedUsersMembershipsStmt = `
+UPDATE zitadel_nextgen.team_memberships
+SET status = $1, updated_at = now()
+WHERE project_id = $2 AND status <> $1
+  AND user_id IN (
+    SELECT id FROM zitadel_nextgen.users
+    WHERE project_id = $3 AND lifecycle_owner_team_id = $4
+  )`
+)
+
+type teamStatements struct{ statement }
+
+func newTeamStatements(client queryExecutor) teamStatements {
+	return teamStatements{
+		statement: statement{
+			client: client,
+		},
+	}
+}
+
+// CreateTeam implements [service.TeamStatements].
+func (ts teamStatements) CreateTeam(ctx context.Context, team *domain.Team) error {
+	if team.ID == "" {
+		return errors.New("team ID must not be empty")
+	}
+	var status string
+	err := ts.client.QueryRow(ctx, createTeamStmt, team.ProjectID, team.ID, team.Name).
+		Scan(&team.ProjectID, &team.ID, &team.Name, &status, &team.CreatedAt, &team.UpdatedAt)
+	if err != nil {
+		return wrapError(err)
+	}
+	team.Status = domain.TeamStatus(status)
+	return nil
+}
+
+// GetTeamByID implements [service.TeamStatements].
+func (ts teamStatements) GetTeamByID(ctx context.Context, projectID, id string) (*domain.Team, error) {
+	var compiler statementCompiler
+	if err := compileRead(&compiler, teamQuery, &database.ListOptions[domain.TeamField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.TeamFieldProjectID), projectID),
+			database.Equal(database.Col(domain.TeamFieldID), id),
+		),
+	}, teamSchema); err != nil {
+		return nil, err
+	}
+
+	rows, err := ts.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	team, err := pgx.CollectExactlyOneRow(rows, ts.scanTeam)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return team, nil
+}
+
+// DeactivateTeam implements [service.TeamStatements].
+func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id string) error {
+	membershipRemoved := domain.MembershipStatusRemoved.String()
+	userDeactivated := domain.UserStatusDeactivated.String()
+	teamDeactivated := domain.TeamStatusDeactivated.String()
+
+	return withTransaction(ctx, ts.client, func(ctx context.Context, tx queryExecutor) error {
+		for _, step := range []struct {
+			sql  string
+			args []any
+		}{
+			{deactivateTeamStmt, []any{teamDeactivated, projectID, id}},
+			{deactivateTeamMembershipsStmt, []any{membershipRemoved, projectID, id}},
+			{deactivateTeamOwnedUsersStmt, []any{userDeactivated, projectID, id}},
+			{deactivateOwnedUsersMembershipsStmt, []any{membershipRemoved, projectID, projectID, id}},
+		} {
+			if _, err := tx.Exec(ctx, step.sql, step.args...); err != nil {
+				return wrapError(err)
+			}
+		}
+		return nil
+	})
+}
+
+func (ts teamStatements) scanTeam(row pgx.CollectableRow) (*domain.Team, error) {
+	team := new(domain.Team)
+	var status string
+	if err := row.Scan(&team.ProjectID, &team.ID, &team.Name, &status, &team.CreatedAt, &team.UpdatedAt); err != nil {
+		return nil, err
+	}
+	team.Status = domain.TeamStatus(status)
+	return team, nil
+}
+
+var _ service.TeamStatements = (*teamStatements)(nil)
+
+var teamSchema = database.NewSchema(map[domain.TeamField]database.FieldBinding[domain.Team]{
+	domain.TeamFieldProjectID: {
+		SQLName:  "project_id",
+		Accessor: func(t *domain.Team) any { return t.ProjectID },
+		Coerce:   database.CoerceString,
+	},
+	domain.TeamFieldID: {
+		SQLName:  "id",
+		Accessor: func(t *domain.Team) any { return t.ID },
+		Coerce:   database.CoerceString,
+	},
+	domain.TeamFieldName: {
+		SQLName:  "name",
+		Accessor: func(t *domain.Team) any { return t.Name },
+		Coerce:   database.CoerceString,
+	},
+	domain.TeamFieldStatus: {
+		SQLName:  "status",
+		Accessor: func(t *domain.Team) any { return string(t.Status) },
+		Coerce:   database.CoerceString,
+	},
+	domain.TeamFieldCreatedAt: {
+		SQLName:  "created_at",
+		Accessor: func(t *domain.Team) any { return t.CreatedAt },
+		Coerce:   database.CoerceTime,
+	},
+	domain.TeamFieldUpdatedAt: {
+		SQLName:  "updated_at",
+		Accessor: func(t *domain.Team) any { return t.UpdatedAt },
+		Coerce:   database.CoerceTime,
+	},
+})

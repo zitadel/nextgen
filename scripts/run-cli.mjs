@@ -207,11 +207,8 @@ export function buildCli({ env = process.env } = {}) {
 }
 
 export async function buildLocalServerBinary({ env = process.env } = {}) {
-  await runMoonToStderr(
-    ["run", "console:build", "login-ui:build"],
-    "moon run console:build login-ui:build",
-    env,
-  );
+  // server:build deps console:build and login-ui:build, so one invocation
+  // produces the fully embedded binary in graph order.
   await runMoonToStderr(["run", "server:build"], "moon run server:build", env);
   return localServerBinary;
 }

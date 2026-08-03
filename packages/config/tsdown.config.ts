@@ -7,6 +7,7 @@ export default defineConfig({
     "meta-schemas": "src/meta-schemas.ts",
     normalize: "src/normalize.ts",
     schemas: "src/schemas.ts",
+    template: "src/template.ts",
     validate: "src/validate.ts",
   },
   outDir: "dist",

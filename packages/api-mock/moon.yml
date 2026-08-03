@@ -14,7 +14,7 @@ tasks:
       - "config:build"
 
   typecheck:
-    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
+    command: "corepack pnpm exec tsc --build tsconfig.json"
     deps:
       - "api:build"
       - "config:build"

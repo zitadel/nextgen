@@ -1,6 +1,8 @@
 package service
 
-import "context"
+import (
+	"context"
+)
 
 //go:generate go tool mockgen -typed -package mocks -destination ./mocks/database.mock.go . Pool,Transactioner,Statementer
 type Pool interface {

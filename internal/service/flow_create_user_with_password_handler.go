@@ -7,32 +7,25 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // FlowCreateUserWithPasswordHandler implements the `create_user` on_success:
 // persist a new user from validated identifier + password fields.
 type FlowCreateUserWithPasswordHandler struct {
-	userRepo     domain.UserRepository
-	passwordRepo domain.UserPasswordRepository
-	hasher       crypto.Hasher
-	userService  *UserService
-	schemaRepo   domain.JSONSchemaRepository
+	hasher      crypto.Hasher
+	userService *UserService
+	schemaStore domain.JSONSchemaStore
 }
 
 func NewFlowCreateUserHandler(
-	userRepo domain.UserRepository,
-	passwordRepo domain.UserPasswordRepository,
 	hasher crypto.Hasher,
 	userService *UserService,
-	schemaRepo domain.JSONSchemaRepository,
+	schemaStore domain.JSONSchemaStore,
 ) *FlowCreateUserWithPasswordHandler {
 	return &FlowCreateUserWithPasswordHandler{
-		userService:  userService,
-		userRepo:     userRepo,
-		schemaRepo:   schemaRepo,
-		hasher:       hasher,
-		passwordRepo: passwordRepo,
+		userService: userService,
+		schemaStore: schemaStore,
+		hasher:      hasher,
 	}
 }
 
@@ -45,15 +38,14 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 			ProjectID: in.ProjectID,
 			User:      in.State.CollectedData.UserData,
 		},
-		h.userRepo,
-		h.schemaRepo,
+		h.schemaStore,
 	)
 
 	if in.State.CollectedData.AuthMethods.Password == "" {
-		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrIntegrity)
+		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
 	}
 
-	setPasswordAction := NewLazyUserAction(func(ctx context.Context, db database.QueryExecutor) (UserAction, error) {
+	setPasswordAction := NewLazyUserAction(func(ctx context.Context) (UserAction, error) {
 		return NewSetUserPasswordAction(
 			SetPasswordInput{
 				ProjectID: in.ProjectID,
@@ -61,7 +53,6 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 				Password:  in.State.CollectedData.AuthMethods.Password,
 			},
 			h.hasher,
-			h.passwordRepo,
 		), nil
 	})
 

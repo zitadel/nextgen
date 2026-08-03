@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 
 	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -15,9 +13,6 @@ type Handler struct {
 	// responses for all endpoints, so only implemented methods need to be defined.
 	api.UnimplementedHandler
 
-	crypter               crypto.Crypter
-	sessionTokenVerifier  domain.TokenVerifier
-	sessionTokenGenerator domain.TokenGenerator
 	flowService           service.FlowService
 	authAttemptService    service.AuthAttemptService
 	sessionService        service.SessionService
@@ -26,12 +21,12 @@ type Handler struct {
 	schemaService         *service.SchemaService
 	flowDefinitionService service.FlowDefinitionService
 	teamService           *service.TeamService
+	brandingService       *service.BrandingService
+	tokenService          service.TokenService
+	keyService            service.KeyService
 }
 
 func NewHandler(
-	crypter crypto.Crypter,
-	sessionTokenVerifier domain.TokenVerifier,
-	sessionTokenGenerator domain.TokenGenerator,
 	flowService service.FlowService,
 	authAttemptService service.AuthAttemptService,
 	sessionService service.SessionService,
@@ -40,11 +35,11 @@ func NewHandler(
 	schemaService *service.SchemaService,
 	flowDefinitionService service.FlowDefinitionService,
 	teamService *service.TeamService,
+	brandingService *service.BrandingService,
+	tokenService service.TokenService,
+	keyService service.KeyService,
 ) *Handler {
 	return &Handler{
-		crypter:               crypter,
-		sessionTokenVerifier:  sessionTokenVerifier,
-		sessionTokenGenerator: sessionTokenGenerator,
 		flowService:           flowService,
 		authAttemptService:    authAttemptService,
 		sessionService:        sessionService,
@@ -53,6 +48,9 @@ func NewHandler(
 		schemaService:         schemaService,
 		flowDefinitionService: flowDefinitionService,
 		teamService:           teamService,
+		brandingService:       brandingService,
+		tokenService:          tokenService,
+		keyService:            keyService,
 	}
 }
 

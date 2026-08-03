@@ -46,20 +46,30 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return internalErrorResponse(err)
 	}
 	switch {
+	case e.Code == domain.ErrAuthUnauthorized(nil).Code:
+		return errorResponseWithStatusCode(http.StatusUnauthorized, e)
 	case strings.HasPrefix(e.Code, domain.PrefixAuthAttempt.ErrorCodePrefix("")):
 		return authAttemptErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixFlow.ErrorCodePrefix("")):
+		return flowErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixFlowDefinition.ErrorCodePrefix("")):
 		return flowDefinitionErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixSession.ErrorCodePrefix("")):
 		return sessionErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixJSONSchema.ErrorCodePrefix("")):
 		return schemaErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixBranding.ErrorCodePrefix("")):
+		return brandingErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixUser.ErrorCodePrefix("")):
 		return userErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixTeam.ErrorCodePrefix("")):
 		return teamErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixProject.ErrorCodePrefix("")):
+		return projectErrorResponse(e)
 	case e.Code == domain.ErrNotImplemented().Code:
 		return errorResponseWithStatusCode(http.StatusNotImplemented, e)
+	case e.Code == domain.ErrRequestInvalid().Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, e)
 	default:
 		return internalErrorResponse(err)
 	}
@@ -95,9 +105,9 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 
 	case isDecodeError(err):
 		status = http.StatusBadRequest
-		d := domainErrorDetails(domain.ErrRequestInvalid())
-		d.Message = err.Error()
-		details = d
+		// Use the stable domain message — do not echo ogen/framework
+		// decode text into the client envelope (ADR 030).
+		details = domainErrorDetails(domain.ErrRequestInvalid())
 
 	default:
 		resp := errorResponse(err)
