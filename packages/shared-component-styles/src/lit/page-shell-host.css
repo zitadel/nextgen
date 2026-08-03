@@ -17,8 +17,11 @@
   min-height: 100%;
 }
 /* Widget mode — stamped by the <zitadel-login> orchestrator when its
-   `variant` is `widget` (the default): content-sized, paints nothing.
-   Distinct from [data-embedded], which means "parent sets the height". */
+   `variant` is `widget` (the default): content-sized, paints nothing, and
+   pads nothing — the page padding is page chrome, and the embedding app
+   owns spacing around the card. Distinct from [data-embedded], which means
+   "parent sets the height". Mirror of `.zr-page-shell[data-widget]` in
+   page-shell.css (the React renderer stamps the div, Lit stamps the host). */
 :host([data-widget]) {
   min-height: auto;
   background: transparent;
@@ -26,6 +29,7 @@
 :host([data-widget]) .zr-page-shell {
   min-height: var(--zl-page-min-height, auto);
   background: transparent;
+  padding: 0;
 }
 .zr-page-shell ::slotted([slot="header"]),
 .zr-page-shell ::slotted([slot="footer"]) {

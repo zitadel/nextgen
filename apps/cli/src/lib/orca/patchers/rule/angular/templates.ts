@@ -1,4 +1,5 @@
 import { MANAGED_MARKER } from "../../../../paths";
+import type { PatchContext } from "../../types";
 import { PROXY_PATH } from "../proxy";
 
 /**
@@ -7,15 +8,38 @@ import { PROXY_PATH } from "../proxy";
  * project id (public, not secret) is inlined; the dev proxy in `proxy.conf.cjs`
  * attaches the project service-key secret as the bearer server-side (read from
  * `.env.local`), and no secret reaches the browser.
+ *
+ * Projects set up with the business use case additionally expose the SDK's
+ * `businessLocales` overlay as a class property, which `app.html` binds to the
+ * login widgets via `[locales]` — restoring work-email copy on top of the
+ * widget's neutral built-in dictionaries.
  */
-export function appComponentTemplate(projectId: string): string {
-  return `${MANAGED_MARKER}
-import { Component, OnInit } from "@angular/core";
-import {
+export function appComponentTemplate(ctx: PatchContext): string {
+  const business = ctx.useCase === "business";
+  const importNames = business
+    ? `
+  ZitadelLoginComponent,
+  ZitadelSessionComponent,
+  businessLocales,
+  configureZitadel,
+`
+    : `
   ZitadelLoginComponent,
   ZitadelSessionComponent,
   configureZitadel,
-} from "@zitadel/sdk-angular";
+`;
+  // The overlay ships with the SDK, so the generated app only wires it up
+  // (and stays plain otherwise).
+  const localesProperty = business
+    ? `
+  // Set up for a business audience: businessLocales overlays work-email copy
+  // on the login widget's neutral built-in dictionaries. Remove it (and the
+  // [locales] binding in app.html) to fall back to the neutral wording.
+  protected readonly locales = businessLocales;`
+    : "";
+  return `${MANAGED_MARKER}
+import { Component, OnInit } from "@angular/core";
+import {${importNames}} from "@zitadel/sdk-angular";
 
 @Component({
   selector: "app-root",
@@ -25,10 +49,10 @@ import {
 })
 export class App implements OnInit {
   protected readonly project = configureZitadel({
-    projectId: ${JSON.stringify(projectId)},
+    projectId: ${JSON.stringify(ctx.project.id)},
     proxyPath: "${PROXY_PATH}",
   });
-  protected readonly path = window.location.pathname;
+  protected readonly path = window.location.pathname;${localesProperty}
 
   ngOnInit(): void {
     if (this.path === "/") {
@@ -42,8 +66,11 @@ export class App implements OnInit {
 /**
  * The managed `src/app/app.html`. The marker lives in an HTML comment that still
  * contains the literal managed-marker text, so eject/doctor stay marker-aware.
+ * Business-use-case scaffolds bind the component's `locales` overlay property
+ * onto the login widgets.
  */
-export function appTemplateHtml(): string {
+export function appTemplateHtml(ctx: PatchContext): string {
+  const localesBinding = ctx.useCase === "business" ? `\n      [locales]="locales"` : "";
   return `<!-- ${MANAGED_MARKER} -->
 @if (path.startsWith('/profile')) {
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
@@ -55,7 +82,7 @@ export function appTemplateHtml(): string {
 } @else if (path.startsWith('/register')) {
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-login
-      [project]="project"
+      [project]="project"${localesBinding}
       purpose="register"
       [postSignInUrl]="'/profile'"
     ></zitadel-auth-login>
@@ -63,7 +90,7 @@ export function appTemplateHtml(): string {
 } @else {
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-login
-      [project]="project"
+      [project]="project"${localesBinding}
       purpose="login"
       [postSignInUrl]="'/profile'"
     ></zitadel-auth-login>

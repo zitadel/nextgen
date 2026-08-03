@@ -44,15 +44,58 @@ semantic names (`bg-zl-surface-base`, `text-zl-text-primary`, …). Legacy
 Light canvas is `#fafafa` (`background`); elevated surfaces (`card`, `popover`)
 are `#ffffff`. Dark canvas is `#050505`; cards are `#121212`.
 
-## Component resolution (Figma → code)
+## Component resolution (design → code)
 
-1. Map the **full screen frame** (sidebar + main), not just a content crop.
-2. Resolve each region to a shadcn component + variant via the Design System
-   library (`HToNyqKwShDmqVurU7Xbld`), not by inventing markup from a screenshot.
-3. Install missing components with the shadcn CLI / MCP; keep them under
-   `src/components/ui/`.
-4. Verify light + dark with a full-frame pixel diff in a real browser
-   (chrome-devtools), matching the Figma screen frame — not a content-only crop.
+**Inventory before building.** List every component a design uses and find where
+each one comes from, before writing markup. Skipping this is how you end up with
+several hand-rolled copies of a component the library already defines.
+
+Work from the design's **component names**, not from what the screenshot looks
+like — the names are the component identities. Map the full screen frame
+(sidebar + main), not a content crop.
+
+Resolve each name to a source, in this order:
+
+1. Already in `src/components/ui/`? Use it.
+2. In the shadcn registry? **Check before writing anything.** `combobox`, `field`,
+   `input-group`, `alert` and `command` all exist.
+3. Neither? Add it to `src/components/ui/` — once, shared. Never inline a
+   library component inside a feature file.
+
+**Mind which shadcn track a registry item belongs to.** `components.json` pins
+`"style": "new-york"`, so the reference is `registry/new-york-v4/**` (Radix). The
+registry also ships a newer track built on `@base-ui/react`, and the CLI will
+install it without comment — pulling a second headless library alongside the
+Radix components already here. `Combobox` is exactly this case: for `new-york` it
+is the documented `Popover` + `Command` composition, which is what
+`src/components/ui/combobox.tsx` implements. Adopting the Base UI track is a
+deliberate, separate decision, not a side effect of a ticket.
+
+### Specs come from the design system, not from screen mocks
+
+Read geometry from the design-system library, not from a component instance placed
+on a screen mock. Mock instances *are* library instances, so their resting
+geometry is correct — which makes them convincing while hiding:
+
+- the state matrix (hover, focus, **invalid**, disabled)
+- size variants
+- optional slots (leading icons, inline addons)
+- appearance variants
+
+Screen mocks are also not always internally consistent — the Add-user drawer wires
+`Select`-shaped triggers to `Combobox` menus. Build from the component the design
+*means*, and record which one you used.
+
+`Select` = one option, no search. `Combobox` = searchable, with a single and a
+multiple type. "Pick one, but searchable" is a Combobox — Radix `Select` offers
+typeahead only, not filtering.
+
+### Verify
+
+Check computed values against the spec, not just a screenshot, and confirm both
+themes and each breakpoint the design defines in a real browser. Leave dev
+overlays visible for at least one click-through: the TanStack devtools badge sits
+bottom-right, exactly where right-anchored sheets put their primary action.
 
 Canonical examples:
 
@@ -62,6 +105,30 @@ Canonical examples:
 | Org/project picker | `Popover` + `Badge` |
 | Users filters | `Tabs` |
 | Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button` |
+| Any searchable picker | `Combobox` (`src/components/ui/combobox.tsx`) |
+| Labelled form control | `Field` + `FieldLabel` (+ `FieldError` for invalid) |
+
+## Traps that have already cost time
+
+- **Bare `border` is `currentColor`.** Tailwind v4 Preflight sets it, so a
+  registry component writing `border-l` draws a near-white edge in dark mode. The
+  base rule in `styles.css` points unqualified borders at the border token — and
+  it **must** stay inside `@layer base`, or it out-ranks every `border-input` /
+  `border-foreground/10` utility.
+- **Variant specificity.** `Button`'s `has-[>svg]:px-3` out-specifies a plain
+  `pl-*`/`pr-*`; use the `!` suffix or size the parent. When an override "won't
+  take", suspect specificity, not a typo.
+- **`asChild` needs prop forwarding.** `PopoverTrigger asChild` clones its child
+  and injects `onClick`/ref/`data-state`. A custom trigger that does not spread
+  rest props onto its root element is inert.
+- **cmdk auto-highlights its first item** on mount, painting a filled row the
+  design never shows. Gate the fill on real interaction.
+- **Do not add a focus ring to an auto-focused input.** cmdk focuses the search
+  field whenever the popover opens, so the ring would be permanently on — a state,
+  not an affordance.
+- **Error copy belongs to the API.** ADR 030 makes the payload's `message` the
+  human-facing string; render it verbatim. Read it from the response **body** —
+  `ApiError.message` is a transport string (`POST /users returned 409`).
 
 ## Theming (dark / light)
 

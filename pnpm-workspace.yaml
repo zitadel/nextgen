@@ -10,7 +10,7 @@ catalog:
   "@faker-js/faker": ^10.4.0
   '@fontsource/arimo': ^5.2.8
   "@fumapress/ai": ^0.6.2
-  "@moonrepo/cli": ^2.3.3
+  "@moonrepo/cli": ^2.4.6
   "@mswjs/http-middleware": ^0.10.3
   '@oclif/core': ^4.11.4
   '@oclif/plugin-autocomplete': ^3.2.50
@@ -43,6 +43,7 @@ catalog:
   "@types/node": ^25.6.0
   "@types/react": ^19.2.14
   "@types/react-dom": ^19.2.3
+  "@types/semver": ^7.7.1
   "@typescript/native-preview": 7.0.0-dev.20260421.2
   "@vitejs/plugin-react": ^6.0.1
   "@vitest/browser": ^4.1.9
@@ -50,6 +51,7 @@ catalog:
   ajv: ^8.20.0
   class-variance-authority: ^0.7.1
   clsx: ^2.1.1
+  cmdk: ^1.1.1
   cookie-parser: ^1.4.7
   dompurify: ^3.4.12
   eslint: ^9.0.0
@@ -86,8 +88,10 @@ catalog:
   react-dom: ^19.2.8
   react-server-dom-webpack: 19.2.8
   safe-stable-stringify: ^2.5.0
+  semver: ^7.7.3
   sharp: ^0.35.3
   shiki: ^4.2.0
+  sonner: ^2.0.7
   storybook: ^10.3.6
   tailwind-merge: ^3.6.0
   tailwindcss: ^4.2.4
