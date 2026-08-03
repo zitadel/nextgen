@@ -277,10 +277,6 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 	if err != nil {
 		return fmt.Errorf("failed to marshal challenge payload: %w", err)
 	}
-	checkID := ""
-	if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
-		return err
-	}
 
 	var returnedID string
 	scanCheckID := func(iter *spanner.RowIterator) error {
@@ -298,6 +294,10 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 		}
 		var noRow *database.NoRowFoundError
 		if !errors.As(err, &noRow) {
+			return err
+		}
+		checkID := ""
+		if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
 			return err
 		}
 		insert := buildStatement(insertAuthAttemptChallengeStmt,

@@ -39,7 +39,6 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
 	}
 
-	// Pre-mint so create + set-password share one user id (same as passkey).
 	userID, err := h.userService.v2Pool.Statements().NewManagedID(string(domain.PrefixUser))
 	if err != nil {
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("create_user: mint user id: %w", err)

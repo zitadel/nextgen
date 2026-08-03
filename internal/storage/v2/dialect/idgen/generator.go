@@ -1,5 +1,5 @@
 // Package idgen provides managed resource ID generation for v2 dialects.
-// IDs are prefixed, opaque, and time-sortable (e.g. "user_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C").
+// IDs are prefixed opaque strings (e.g. "user_<ulid>" or "user_<uuid>").
 // Ownership and dialect strategies are recorded in ADR 047.
 package idgen
 
@@ -10,6 +10,5 @@ package idgen
 type Generator interface {
 	// New returns a new unique ID for the given prefix (e.g. "user", "team").
 	// The prefix must not include the trailing underscore separator.
-	// Returns an error if the ID could not be generated.
 	New(prefix string) (string, error)
 }

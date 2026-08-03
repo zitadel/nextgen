@@ -98,9 +98,6 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 			return domain.ErrInternal(err).WithMessage("failed to create project in the database")
 		}
 
-		// Dialect assigns project.ID on create; keyset construction needs it.
-		// The KEK ID must be minted before wrapping purpose keys so JWE "kid"
-		// resolves on GetProjectCrypter.
 		keyset, err := project.GenerateNewKeySet(masterKey, func(prefix domain.ResourcePrefix) (string, error) {
 			return tx.Statements().NewManagedID(string(prefix))
 		})

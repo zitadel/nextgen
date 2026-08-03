@@ -210,10 +210,6 @@ func coerceTokenType(v any) (any, error) {
 	}
 }
 
-func coerceTokenIdentity(v any) (any, error) {
-	return database.CoerceStringValue(v)
-}
-
 var _ service.TokenStatements = (*tokenStatements)(nil)
 
 var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding[domain.Token]{
@@ -225,7 +221,7 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 	domain.TokenFieldTokenID: {
 		SQLName:  "token_id",
 		Accessor: func(t *domain.Token) any { return t.TokenID },
-		Coerce:   coerceTokenIdentity,
+		Coerce:   database.CoerceString,
 	},
 	domain.TokenFieldUserID: {
 		SQLName:  "user_id",
@@ -240,17 +236,17 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 	domain.TokenFieldSessionID: {
 		SQLName:  "session_id",
 		Accessor: func(t *domain.Token) any { return tokenOptionalString(t.SessionID) },
-		Coerce:   coerceTokenIdentity,
+		Coerce:   database.CoerceString,
 	},
 	domain.TokenFieldOIDCSessionID: {
 		SQLName:  "oidc_session_id",
 		Accessor: func(t *domain.Token) any { return tokenOptionalString(t.OIDCSessionID) },
-		Coerce:   coerceTokenIdentity,
+		Coerce:   database.CoerceString,
 	},
 	domain.TokenFieldSAMLSessionID: {
 		SQLName:  "saml_session_id",
 		Accessor: func(t *domain.Token) any { return tokenOptionalString(t.SAMLSessionID) },
-		Coerce:   coerceTokenIdentity,
+		Coerce:   database.CoerceString,
 	},
 	domain.TokenFieldScope: {
 		SQLName:  "scope",

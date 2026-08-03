@@ -53,7 +53,6 @@ func NewSigningKey(
 		return nil, ErrInternal(err).WithMessage("failed to encrypt signing key")
 	}
 
-	// createdAt and ID are set by the dialect on create
 	return &SigningKey{
 		ProjectID: projectID,
 		Key:       encryptedKey,

@@ -385,9 +385,6 @@ func encodeSpannerJSON(b []byte) any {
 	}
 	return spanner.NullJSON{Value: v, Valid: true}
 }
-func coerceSessionIdentity(v any) (any, error) {
-	return database.CoerceStringValue(v)
-}
 func coerceSessionDuration(v any) (any, error) {
 	switch d := v.(type) {
 	case time.Duration:
@@ -412,12 +409,12 @@ var _ v2session.ExchangeStore = sessionExchangeStore{}
 
 var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBinding[domain.Session]{
 	domain.SessionFieldProjectID:  {SQLName: "s.project_id", Accessor: func(s *domain.Session) any { return s.ProjectID }, Coerce: database.CoerceString},
-	domain.SessionFieldID:         {SQLName: "s.id", Accessor: func(s *domain.Session) any { return s.ID }, Coerce: coerceSessionIdentity},
+	domain.SessionFieldID:         {SQLName: "s.id", Accessor: func(s *domain.Session) any { return s.ID }, Coerce: database.CoerceString},
 	domain.SessionFieldCreatedAt:  {SQLName: "s.created_at", Accessor: func(s *domain.Session) any { return s.CreatedAt }, Coerce: database.CoerceTime},
 	domain.SessionFieldUpdatedAt:  {SQLName: "s.updated_at", Accessor: func(s *domain.Session) any { return s.UpdatedAt }, Coerce: database.CoerceTime},
 	domain.SessionFieldExpiresAt:  {SQLName: "s.expires_at", Accessor: func(s *domain.Session) any { return s.ExpiresAt }, Coerce: database.CoerceTime},
 	domain.SessionFieldTimeToLive: {SQLName: "s.time_to_live", Accessor: func(s *domain.Session) any { return s.TimeToLive.Nanoseconds() }, Coerce: coerceSessionDuration},
-	domain.SessionFieldTokenID:    {SQLName: "s.token_id", Accessor: func(s *domain.Session) any { return s.TokenID }, Coerce: coerceSessionIdentity},
+	domain.SessionFieldTokenID:    {SQLName: "s.token_id", Accessor: func(s *domain.Session) any { return s.TokenID }, Coerce: database.CoerceString},
 	domain.SessionFieldUserID: {SQLName: "s.user_id", Accessor: func(s *domain.Session) any {
 		if s.UserID == nil {
 			return ""

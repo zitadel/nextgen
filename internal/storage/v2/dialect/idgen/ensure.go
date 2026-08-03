@@ -10,9 +10,6 @@ func Ensure(id *string, prefix string, g Generator) error {
 	if *id != "" {
 		return nil
 	}
-	if prefix == "" {
-		return fmt.Errorf("managed id prefix must not be empty")
-	}
 	generated, err := g.New(prefix)
 	if err != nil {
 		return fmt.Errorf("generate %s id: %w", prefix, err)
