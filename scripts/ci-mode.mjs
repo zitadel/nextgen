@@ -15,13 +15,19 @@ import { isDirectRun } from "./dev-process.mjs";
 //    suites) select correctly — `moon ci`'s own selection only marks direct
 //    dependents, which is not enough here.
 //
-// The gates fail open: files no task claims (workflow definitions, scripts/,
-// moon config, root manifests) force a full run, an empty diff forces a full
-// run, and a failing or unparsable query forces a full run. A gate may only
-// ever skip work that provably cannot be affected.
+// The gates fail open: known repo-wide files no task claims (workflow
+// definitions, scripts/, moon config, root manifests and compiler/release
+// inputs) force a full run, an empty diff forces a full run, a failing or
+// unparsable query forces a full run, and an empty affected set forces a
+// full run unless every changed file is on the explicit inert allowlist —
+// unclaimed files are not assumed inert. A gate may only ever skip work
+// that provably cannot be affected.
 
-// Files whose effects moon cannot see (nothing lists them as task inputs).
-// Any touched file matching here disables all gating for the run.
+// Files whose effects moon cannot see (nothing lists them as task inputs)
+// but which reach builds, tests, or release artifacts anyway. Any touched
+// file matching here disables all gating for the run — even when the rest
+// of the diff produced a non-empty affected set, because moon's answer says
+// nothing about these files.
 const FORCE_FULL_PREFIXES = [".github/", ".moon/", "scripts/"];
 const FORCE_FULL_FILES = new Set([
   "package.json",
@@ -29,7 +35,29 @@ const FORCE_FULL_FILES = new Set([
   "pnpm-workspace.yaml",
   ".nvmrc",
   ".changeset/config.json",
+  // Repo-wide compiler/release inputs no task claims: nearly every workspace
+  // tsconfig extends the base, and the release archives ship the root
+  // README/LICENSE files.
+  "tsconfig.base.json",
+  "LICENSE",
+  "LICENSING.md",
+  "README.md",
 ]);
+
+// The ONLY files allowed to produce a skip when moon claims nothing in the
+// diff. Unclaimed ≠ inert (tsconfig.base.json is unclaimed and breaks every
+// typecheck), so an empty affected set fails open unless every changed file
+// is on this list. Keep it narrow; growing it requires proving the file
+// reaches no build, test, or shipped artifact.
+const INERT_UNCLAIMED_PREFIXES = ["docs/"];
+const INERT_UNCLAIMED_FILES = new Set(["AGENTS.md", "CLAUDE.md"]);
+
+function isInertWhenUnclaimed(file) {
+  return (
+    INERT_UNCLAIMED_PREFIXES.some((prefix) => file.startsWith(prefix)) ||
+    INERT_UNCLAIMED_FILES.has(file)
+  );
+}
 
 // Workflow steps run fixed targets, so gates are membership checks on the
 // affected set. Journeys and the snapshot are coupled both ways: the journeys
@@ -75,7 +103,12 @@ export function resolveGates({ mode, files, targets }) {
   if (mode === "version-only") {
     return { gates: Object.fromEntries(ALL_GATES.map((g) => [g, false])), reason: "version-only" };
   }
-  const forced = forceFullReason(files) ?? (targets === null ? "affected query failed" : null);
+  const forced =
+    forceFullReason(files) ??
+    (targets === null ? "affected query failed" : null) ??
+    (targets.length === 0 && !files.every(isInertWhenUnclaimed)
+      ? "empty affected set for files outside the inert allowlist"
+      : null);
   if (forced) {
     return { gates: Object.fromEntries(ALL_GATES.map((g) => [g, true])), reason: forced };
   }
@@ -111,9 +144,10 @@ export function queryAffectedTargets(base, spawn = spawnSync) {
   }
   try {
     const tasks = JSON.parse(result.stdout)?.tasks;
-    // An empty `tasks` object is a legitimate answer (a diff no task claims,
-    // e.g. a runbook edit) and gates everything off. A missing or non-object
-    // `tasks` key means the output schema changed under us — fail open.
+    // An empty `tasks` object is a valid query answer, but resolveGates only
+    // accepts it as a skip when every changed file is on the inert
+    // allowlist — unclaimed is not the same as inert. A missing or
+    // non-object `tasks` key means the output schema changed — fail open.
     if (typeof tasks !== "object" || tasks === null || Array.isArray(tasks)) {
       return null;
     }

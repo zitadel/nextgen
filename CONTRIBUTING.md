@@ -277,10 +277,14 @@ Within full mode, the steps after the `moon ci` graph are additionally gated
 by moon's affected task selection (`moon query tasks --affected --downstream
 deep`, computed in `scripts/ci-mode.mjs`): a lane is skipped when the diff
 provably cannot reach its tasks — a docs-only PR runs almost nothing, a
-frontend-only PR skips the Go suites. The gates fail open: files no moon task
-claims (workflow definitions, `scripts/`, moon config, root manifests), an
-empty diff, or a failed query all force the complete run. The journeys and
-the snapshot share one gate because the tarball handoff between them is a
+frontend-only PR skips the Go suites. The gates fail open: known repo-wide
+files no moon task claims (workflow definitions, `scripts/`, moon config,
+root manifests and compiler/release inputs such as `tsconfig.base.json`), an
+empty diff, or a failed query all force the complete run — and when the
+query returns an empty affected set, the run is only skipped if every
+changed file is on a narrow explicitly-inert allowlist (`docs/`, root agent
+notes), because unclaimed files are not assumed inert. The journeys and the
+snapshot share one gate because the tarball handoff between them is a
 filesystem contract moon cannot see.
 
 **Version-only mode** (Changesets version PRs) runs `release:version`,

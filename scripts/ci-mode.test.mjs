@@ -137,16 +137,33 @@ test("a failed affected query fails open", () => {
   assert.equal(reason, "affected query failed");
 });
 
-test("an empty affected set from a valid query legitimately gates everything off", () => {
-  // e.g. a runbook edit: claimed by no task, and inert by construction —
-  // the force-full globs are what bound the dangerous unclaimed families.
+test("an empty affected set skips only for allowlisted-inert files", () => {
+  for (const file of ["docs/runbooks/manual-release.md", "docs/design/notes.md", "AGENTS.md"]) {
+    const { gates, reason } = resolveGates({ mode: "full", files: [file], targets: [] });
+    assert.equal(reason, null, file);
+    assert.ok(allFalse(gates), file);
+  }
+});
+
+test("an empty affected set for unallowlisted files fails open (tsconfig.base.json repro)", () => {
+  // moon's input graph does not claim these, yet they reach typechecks and
+  // release archives — unclaimed is not inert.
+  for (const file of ["tsconfig.base.json", "LICENSE", "README.md", "VISION.md"]) {
+    const { gates } = resolveGates({ mode: "full", files: [file], targets: [] });
+    assert.ok(allTrue(gates), `${file} must force a full run on an empty set`);
+  }
+});
+
+test("known repo-wide inputs force full even when the rest of the diff is claimed", () => {
+  // Mixed diff: an ADR (claimed, selects check-adrs) plus tsconfig.base.json.
+  // The non-empty set must not mask the unclaimed dangerous file.
   const { gates, reason } = resolveGates({
     mode: "full",
-    files: ["docs/runbooks/manual-release.md"],
-    targets: [],
+    files: ["docs/adrs/001-server-cli-cobra-viper.md", "tsconfig.base.json"],
+    targets: DOCS_CLASS,
   });
-  assert.equal(reason, null);
-  assert.ok(allFalse(gates));
+  assert.ok(allTrue(gates));
+  assert.match(reason, /tsconfig\.base\.json/);
 });
 
 function fakeSpawn(result) {
