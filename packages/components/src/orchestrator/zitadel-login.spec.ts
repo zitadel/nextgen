@@ -1564,6 +1564,33 @@ describe("<zitadel-login> against the typed Flow API", () => {
       expect(backSubmit).toBeDefined();
     });
 
+    it("does not pop a host-pushed entry when retiring the sentinel", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      await settleHistory();
+
+      // The host app pushes its own entry after the widget armed — the
+      // sentinel is no longer the top entry.
+      history.pushState({ host: true }, "");
+      const back = vi.spyOn(history, "back");
+      try {
+        // Completing the step renders a step without a back action, which
+        // disarms the widget. It must NOT traverse: history.back() here
+        // would pop the host's entry and trigger a host navigation. The
+        // sentinel leaks instead (skipped later by the popstate handler).
+        type(element, PASSWORD_FIELD, "hunter2secure");
+        submit(element);
+        await waitFor(() => {
+          const pw = element.shadowRoot?.querySelector('zl-field[type="password"]');
+          return pw === null ? true : null;
+        });
+
+        expect(back).not.toHaveBeenCalled();
+      } finally {
+        back.mockRestore();
+      }
+    });
+
     it("back gesture on a step without a back action leaves history alone", async () => {
       await mount(host);
       await settleHistory();

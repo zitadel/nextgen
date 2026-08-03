@@ -572,12 +572,23 @@ export class ZitadelLogin extends LitElement {
     if (typeof window !== "undefined") {
       const hasBack = Boolean(wire.step.actions?.some((a) => a.kind === "back"));
       if (hasBack && !this.armed) {
-        history.pushState({ zl: true }, "");
+        // Spread the host's state: vue-router (Nuxt) keeps `position` /
+        // `back` / `forward` here and reads them on popstate. Replacing it
+        // wholesale leaves the sentinel opaque to the host router.
+        history.pushState({ ...history.state, zl: true }, "");
         this.armed = true;
       } else if (!hasBack && this.armed) {
         this.armed = false;
-        this.ignoreNextPop = true;
-        history.back();
+        // Only traverse while we still own the current entry. If the host
+        // pushed its own entry after we armed, `history.back()` would pop
+        // *that* one and trigger a host back-navigation the user never
+        // asked for. Leaving a stale sentinel behind is the lesser evil —
+        // same tradeoff as disconnect; the popstate handler skips stale
+        // sentinels in one extra hop from either direction.
+        if ((history.state as { zl?: boolean } | null)?.zl === true) {
+          this.ignoreNextPop = true;
+          history.back();
+        }
       }
     }
 

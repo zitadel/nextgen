@@ -70,9 +70,13 @@ single source of truth.
 
 The orchestrator keeps **at most one** same-document history entry — the
 *sentinel* — on the stack while the current step carries a `kind: "back"`
-action. The sentinel is pushed with `history.pushState({ zl: true }, "")`,
-reusing the current URL: no fragments, no visible URL change, and no
-interaction with hash-router host apps. Its only job is to make the
+action. The sentinel is pushed with
+`history.pushState({ ...history.state, zl: true }, "")`, reusing the
+current URL and spreading the host's existing state — SPA routers
+(e.g. vue-router's `position`/`back`/`forward`) keep reading a
+consistent sequence, and the sentinel stays transparent to them. No
+fragments, no visible URL change, no interaction with hash-router
+host apps. Its only job is to make the
 browser's native back gesture fire `popstate` instead of leaving the page.
 
 #### Lifecycle
@@ -82,9 +86,14 @@ browser's native back gesture fire `popstate` instead of leaving the page.
      push the sentinel, mark armed.
    - Step has no back action and the widget is armed → mark disarmed and
      retire the sentinel with a self-initiated `history.back()` (flagged,
-     so the resulting `popstate` is ignored). The next back press then
-     navigates the host page — the flow is transparent to history once
-     back is unavailable.
+     so the resulting `popstate` is ignored) — but **only while the
+     sentinel is still the top entry** (`history.state.zl`). If the host
+     pushed its own entry after arming, traversing would pop the host's
+     entry and trigger a navigation the user never asked for; the
+     sentinel leaks instead (the same tradeoff as disconnect) and the
+     `popstate` handler skips stale sentinels in one extra hop from
+     either direction. The next back press then navigates the host page —
+     the flow is transparent to history once back is unavailable.
    - Arming only on the unarmed → armed transition means consecutive
      back-capable steps — and re-renders of the *same* step, e.g. after a
      failed submit — never grow the stack.
