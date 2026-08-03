@@ -5801,7 +5801,7 @@ func (s *Server) handleGetSessionRequest(args [1]string, argsEscaped bool, w htt
 
 // handleGetTeamRequest handles getTeam operation.
 //
-// Returns the current state of a team.
+// Returns a Team by its id.
 //
 // GET /teams/{team_id}
 func (s *Server) handleGetTeamRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
