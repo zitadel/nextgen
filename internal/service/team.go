@@ -211,3 +211,26 @@ func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (*domai
 	}
 	return team, nil
 }
+
+// Delete deactivates the team and cascades to its memberships and the users
+// whose lifecycle it owns (ADR 024). The team is tombstoned, not erased, so it
+// stays readable through [TeamService.Get] with status deactivated.
+//
+// Delete is idempotent: an unknown or already-deactivated team reports success.
+func (s *TeamService) Delete(ctx context.Context, projectID, teamID string) error {
+	stmts := s.v2Pool.Statements()
+	team, err := stmts.GetTeamByID(ctx, projectID, teamID)
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil
+		}
+		return domain.ErrInternal(err).WithMessage("failed to delete team")
+	}
+	if team.Status != domain.TeamStatusActive {
+		return nil
+	}
+	if err := stmts.DeactivateTeam(ctx, projectID, teamID); err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to delete team")
+	}
+	return nil
+}

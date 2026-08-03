@@ -240,6 +240,88 @@ func TestTeamService_Update(t *testing.T) {
 	}
 }
 
+func TestTeamService_Delete(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		teamID    string
+		setupStmt func(*servicemocks.MockAllStatements)
+		wantErr   error
+	}{
+		{
+			name:   "ok",
+			teamID: "team_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").
+					Return(&domain.Team{ProjectID: "proj_1", ID: "team_1", Status: domain.TeamStatusActive}, nil)
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(nil)
+			},
+		},
+		// The absent DeactivateTeam expectation is the assertion: a repeat delete
+		// must not write, so the tombstone keeps its original updated_at.
+		{
+			name:   "already deactivated",
+			teamID: "team_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").
+					Return(&domain.Team{ProjectID: "proj_1", ID: "team_1", Status: domain.TeamStatusDeactivated}, nil)
+			},
+		},
+		{
+			name:   "pending purge is not active either",
+			teamID: "team_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").
+					Return(&domain.Team{ProjectID: "proj_1", ID: "team_1", Status: domain.TeamStatusPendingPurge}, nil)
+			},
+		},
+		// Delete must not report a missing team: the 404 would let a caller
+		// holding team.delete without a read scope enumerate team ids.
+		{
+			name:   "unknown team",
+			teamID: "missing",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "missing").
+					Return(nil, database.NewNoRowFoundError(nil))
+			},
+		},
+		{
+			name:   "get fails",
+			teamID: "team_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").Return(nil, assert.AnError)
+			},
+			wantErr: domain.ErrInternal(assert.AnError),
+		},
+		{
+			name:   "deactivate fails",
+			teamID: "team_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").
+					Return(&domain.Team{ProjectID: "proj_1", ID: "team_1", Status: domain.TeamStatusActive}, nil)
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(assert.AnError)
+			},
+			wantErr: domain.ErrInternal(assert.AnError),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc := newMockedTeamService(t, tc.setupStmt)
+
+			err := svc.Delete(t.Context(), "proj_1", tc.teamID)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestTeamService_List(t *testing.T) {
 	t.Parallel()
 
