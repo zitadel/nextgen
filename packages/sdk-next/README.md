@@ -172,14 +172,16 @@ export function HeaderNav() {
 A rejected `getSession()` means the state is *unknown* (broken proxy, network,
 5xx) — render a neutral or error state, never the signed-out CTAs.
 
-A `200` with an authenticated user resolves to `{ isAuthenticated: true, session: { userId, email, name } }`
-(client-safe — no token); `401`, the backend's JSON `404`, and anonymous
-sessions resolve to signed out; any other response — including a framework's
-HTML 404 page from a misrouted proxy — throws so a broken proxy doesn't
-silently render as signed out. Sign-in and sign-out navigate (`post-sign-in-url` /
-`post-sign-out-url`), so chrome re-reads on the next page load without extra
-wiring; to react in place, listen for the widgets' `zitadel-signout` /
-`zitadel-flow-complete` events.
+A `200` with a non-empty `user_id` resolves to
+`{ isAuthenticated: true, session: { userId, email, name } }` (client-safe —
+no token); the canonical `401/auth.unauthorized`,
+`404/sess.not_found`, and anonymous sessions resolve to signed out. The request
+and response are both marked no-store. Any other response — including malformed
+JSON or a framework's HTML 404 page from a misrouted proxy — throws so a broken
+proxy doesn't silently render as signed out. Sign-in and sign-out navigate
+(`post-sign-in-url` / `post-sign-out-url`), so chrome re-reads on the next page
+load without extra wiring; to react in place, listen for the widgets'
+`zitadel-signout` / `zitadel-flow-complete` events.
 
 ### 5. Login page
 
