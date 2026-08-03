@@ -37,7 +37,13 @@ const BUSINESS = {
 };
 
 function stub({
-  user = { id: USER_ID, $schema: "sch_business", email: "maya@acme.com", companyName: "Acme" },
+  user = {
+    id: USER_ID,
+    $schema: "sch_business",
+    email: "maya@acme.com",
+    companyName: "Acme",
+    metadata: { status: "active", createdAt: "2026-07-12T09:00:00Z", updatedAt: "2026-07-12T09:00:00Z" },
+  },
   passkeys = [{ id: "pk_1", name: "MacBook", created_at: "2026-07-01T00:00:00Z" }],
   passkeysStatus = 200,
 }: {
@@ -91,16 +97,40 @@ describe("user detail", () => {
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });
 
-  it("omits the fields the API does not serve", async () => {
-    // Status, Created and Last sign-in are in the design but not in the
-    // response (#703); Last sign-in has no field at all. None is faked.
+  it("shows the status and created date the server stamped", async () => {
     stub();
     await renderDetail();
     await screen.findByRole("heading", { name: "maya@acme.com" });
 
+    expect(screen.getByText("active")).toBeInTheDocument();
+    expect(screen.getByText("Created")).toBeInTheDocument();
+    // Derived rather than hardcoded: the screen renders the viewer's locale, so
+    // asserting one locale's output would pass only on machines set to it.
+    const expected = new Date("2026-07-12T09:00:00Z").toLocaleDateString(undefined, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    expect(screen.getByText(expected)).toBeInTheDocument();
+  });
+
+  it("omits status and created on a record the server has not stamped", async () => {
+    // `metadata` sits on an otherwise open record, so a user written before it
+    // existed simply has none. Nothing is invented for it.
+    stub({ user: { id: USER_ID, $schema: "sch_business", email: "maya@acme.com" } });
+    await renderDetail();
+    await screen.findByRole("heading", { name: "maya@acme.com" });
+
     expect(screen.queryByText("Created")).not.toBeInTheDocument();
+    expect(screen.queryByText("active")).not.toBeInTheDocument();
+  });
+
+  it("does not show a last sign-in — no field carries it", async () => {
+    stub();
+    await renderDetail();
+    await screen.findByRole("heading", { name: "maya@acme.com" });
+
     expect(screen.queryByText(/Last sign-in/i)).not.toBeInTheDocument();
-    expect(screen.queryByText("Active")).not.toBeInTheDocument();
   });
 
   it("reports the real passkey count on the Authentication tab", async () => {

@@ -24,9 +24,6 @@ import { getConsoleProjectId } from "../../../runtime/runtime";
  * markup. Rather than render labels with nothing behind them, each is left out
  * and recorded here:
  *
- *   - the **status badge** beside the name, and **Created** in the meta strip:
- *     `domain.User` carries `Status` and `CreatedAt`, but the response is the
- *     schema attribute tree plus `id` and drops them (#703)
  *   - **Last sign-in**: no such field anywhere on the user
  *   - **Save** on the profile form: no `PATCH`/`PUT /users/{user_id}` (#693), so
  *     the fields render read-only rather than offering an edit that cannot land
@@ -80,14 +77,28 @@ function UserDetail() {
   const router = useRouter();
   const name = userDisplayName(user) ?? field(user, "email") ?? userId;
   const fields = schema ? schemaFields(schema) : [];
+  const metadata = userMetadata(user);
 
   return (
     <div className={PAGE}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <h1 className={HEADING}>{name}</h1>
-        <Card className="gap-0 rounded-xl py-0 lg:min-w-[280px]">
-          <CardContent className="px-5 py-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className={HEADING}>{name}</h1>
+          {metadata.status && (
+            <Badge
+              variant={metadata.status === "active" ? "secondary" : "outline"}
+              className="capitalize"
+            >
+              {metadata.status.replace(/_/g, " ")}
+            </Badge>
+          )}
+        </div>
+        <Card className="gap-0 rounded-xl py-0">
+          <CardContent className="flex flex-wrap gap-x-8 gap-y-3 px-5 py-3">
             <MetaItem label="User ID" value={userId} copyable />
+            {metadata.createdAt && (
+              <MetaItem label="Created" value={formatDate(metadata.createdAt)} />
+            )}
           </CardContent>
         </Card>
       </div>
@@ -217,6 +228,39 @@ function ProfileField({ label, value }: { label: string; value: string }) {
       />
     </Field>
   );
+}
+
+/**
+ * The server-owned `metadata` block. Read defensively: it sits on an otherwise
+ * open record, so a user written before it existed simply has none.
+ */
+function userMetadata(user: Record<string, unknown>): { status?: string; createdAt?: string } {
+  const metadata = user.metadata;
+  if (!metadata || typeof metadata !== "object") return {};
+  const record = metadata as Record<string, unknown>;
+  return { status: field(record, "status"), createdAt: field(record, "createdAt") };
+}
+
+/**
+ * A created date, in the viewer's own locale.
+ *
+ * The design renders `12 Jul 2026`, which is how this reads in a British locale
+ * — that is the mock's locale, not a format the product should impose. Day,
+ * short month and year are requested; the order and separators are the
+ * viewer's. Tests derive the expected string the same way rather than hardcoding
+ * one locale's output.
+ *
+ * Falls back to the raw value rather than rendering `Invalid Date` if the server
+ * sends something unparseable.
+ */
+function formatDate(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 /** One labelled value in the header card, optionally copyable. */
