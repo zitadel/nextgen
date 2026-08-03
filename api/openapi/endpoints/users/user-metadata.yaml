@@ -1,0 +1,23 @@
+title: UserMetadata
+type: object
+required:
+  - createdAt
+  - updatedAt
+  - status
+properties:
+  createdAt:
+    type: string
+    format: date-time
+    description: The time when the user was created.
+  updatedAt:
+    type: string
+    format: date-time
+    description: The time when the user was last updated.
+  status:
+    type: string
+    description: The status of the user.
+    enum:
+      - active
+      - suspended
+      - deactivated
+      - pending_purge

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // Validate checks a parsed document and password hash encoding.
@@ -42,7 +43,7 @@ func validateHeader(h Header) error {
 	return nil
 }
 
-func validateAttributes(attrs map[string]json.RawMessage) error {
+func validateAttributes(attrs map[domain.AttributeKey]json.RawMessage) error {
 	if len(attrs) == 0 {
 		return fmt.Errorf("attributes must not be empty")
 	}
@@ -90,12 +91,12 @@ func validateAttributes(attrs map[string]json.RawMessage) error {
 	return nil
 }
 
-func parsePasswordAuthenticator(auths map[string]json.RawMessage) (*PasswordAuthenticator, error) {
+func parsePasswordAuthenticator(auths map[domain.AttributeKey]json.RawMessage) (*PasswordAuthenticator, error) {
 	if len(auths) == 0 {
 		return nil, fmt.Errorf("at least one authenticator is required")
 	}
 	if len(auths) != 1 {
-		keys := make([]string, 0, len(auths))
+		keys := make([]domain.AttributeKey, 0, len(auths))
 		for k := range auths {
 			keys = append(keys, k)
 		}
@@ -115,7 +116,7 @@ func parsePasswordAuthenticator(auths map[string]json.RawMessage) (*PasswordAuth
 	return &pw, nil
 }
 
-func decodeScalarString(raw json.RawMessage, key string) (string, error) {
+func decodeScalarString(raw json.RawMessage, key domain.AttributeKey) (string, error) {
 	v, err := decodeScalar(raw, key)
 	if err != nil {
 		return "", err
@@ -127,7 +128,7 @@ func decodeScalarString(raw json.RawMessage, key string) (string, error) {
 	return s, nil
 }
 
-func decodeScalar(raw json.RawMessage, key string) (any, error) {
+func decodeScalar(raw json.RawMessage, key domain.AttributeKey) (any, error) {
 	var v any
 	if err := json.Unmarshal(raw, &v); err != nil {
 		return nil, fmt.Errorf("%q: %w", key, err)
