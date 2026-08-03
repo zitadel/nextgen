@@ -73,6 +73,34 @@ func TestSchemaCoerceCursorValues(t *testing.T) {
 	assert.Equal(t, "proj_1", values[1])
 }
 
+func TestSchemaCoerceCursorValues_nilTime(t *testing.T) {
+	t.Parallel()
+	schema := database.NewSchema(map[domain.ProjectField]database.FieldBinding[domain.Project]{
+		domain.ProjectFieldCreatedAt: {
+			SQLName:  "created_at",
+			Accessor: func(p *domain.Project) any { return p.CreatedAt },
+			Coerce:   database.CoerceTime,
+		},
+		domain.ProjectFieldID: {
+			SQLName:  "id",
+			Accessor: func(p *domain.Project) any { return p.ID },
+			Coerce:   database.CoerceString,
+		},
+	})
+
+	values, err := schema.CoerceCursorValues(
+		[]database.Column[domain.ProjectField]{
+			database.Col(domain.ProjectFieldCreatedAt),
+			database.Col(domain.ProjectFieldID),
+		},
+		[]any{nil, "proj_1"},
+	)
+	require.NoError(t, err)
+	require.Len(t, values, 2)
+	assert.Nil(t, values[0])
+	assert.Equal(t, "proj_1", values[1])
+}
+
 func TestSchemaCoerceCursorValues_invalidTime(t *testing.T) {
 	t.Parallel()
 	schema := database.NewSchema(map[domain.ProjectField]database.FieldBinding[domain.Project]{
