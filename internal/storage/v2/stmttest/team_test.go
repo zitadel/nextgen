@@ -12,29 +12,126 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-func TestTeamStatements_GetByID(t *testing.T) {
+func uniqueTeamID(t *testing.T) string {
+	t.Helper()
+	return "team-" + uniqueSuffix(t)
+}
+
+func TestTeamStatements_Create(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
-		t.Run("returns_created_team", func(t *testing.T) {
+		t.Run("creates team and timestamps are set", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
-			teamID := "team-" + uniqueSuffix(t)
+			teamID := uniqueTeamID(t)
+
 			team := newTestTeam(projectID, teamID)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
 			assert.Equal(t, domain.TeamStatusActive, team.Status)
+			assert.False(t, team.CreatedAt.IsZero())
+			assert.False(t, team.UpdatedAt.IsZero())
+			assert.WithinDuration(t, time.Now(), team.CreatedAt, 5*time.Second)
 
-			got, err := d.stmts.GetTeamByID(t.Context(), projectID, teamID)
+			stored, err := d.stmts.GetTeamByID(t.Context(), projectID, teamID)
 			require.NoError(t, err)
-			assert.Equal(t, projectID, got.ProjectID)
-			assert.Equal(t, teamID, got.ID)
-			assert.Equal(t, team.Name, got.Name)
-			assert.Equal(t, domain.TeamStatusActive, got.Status)
-			assert.False(t, got.CreatedAt.IsZero())
-			assert.False(t, got.UpdatedAt.IsZero())
+			assert.Equal(t, projectID, stored.ProjectID)
+			assert.Equal(t, teamID, stored.ID)
+			assert.Equal(t, team.Name, stored.Name)
+			assert.Equal(t, domain.TeamStatusActive, stored.Status)
 		})
 
-		t.Run("missing_returns_NoRowFoundError", func(t *testing.T) {
+		// Every dialect rejects this in Go, before the statement is built.
+		t.Run("empty id returns error", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+
+			assert.Error(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, "")))
+		})
+
+		t.Run("empty name returns error", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+
+			team := newTestTeam(projectID, uniqueTeamID(t))
+			team.Name = ""
+			assert.ErrorIs(t, d.stmts.CreateTeam(t.Context(), team), new(database.CheckError))
+		})
+
+		t.Run("name over the length limit returns error", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+
+			team := newTestTeam(projectID, uniqueTeamID(t))
+			team.Name = strings.Repeat("a", domain.TeamNameMaxLength+1)
+			assert.ErrorIs(t, d.stmts.CreateTeam(t.Context(), team), new(database.CheckError))
+		})
+
+		t.Run("duplicate (project_id, id) returns error", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			teamID := uniqueTeamID(t)
+
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
+
+			err := d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID))
+			assert.ErrorIs(t, err, new(database.UniqueError))
+		})
+
+		t.Run("duplicate name in the same project returns error", func(t *testing.T) {
+			for _, tc := range []struct {
+				name    string
+				nameFor func(string) string
+			}{
+				{"exact match", func(name string) string { return name }},
+				{"differing only in case", strings.ToUpper},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					projectID := ensureProject(t, d.stmts)
+					teamID := uniqueTeamID(t)
+
+					team := newTestTeam(projectID, teamID)
+					require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
+
+					duplicate := newTestTeam(projectID, teamID+"-2")
+					duplicate.Name = tc.nameFor(team.Name)
+					err := d.stmts.CreateTeam(t.Context(), duplicate)
+					assert.ErrorIs(t, err, new(database.UniqueError))
+				})
+			}
+		})
+
+		t.Run("same name in different projects is allowed", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			otherProjectID := ensureProject(t, d.stmts)
+			teamID := uniqueTeamID(t)
+
+			team := newTestTeam(projectID, teamID)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
+
+			other := newTestTeam(otherProjectID, teamID)
+			other.Name = team.Name
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), other))
+		})
+	})
+}
+
+func TestTeamStatements_GetByID(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		t.Run("returns team by project_id and id", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			teamID := uniqueTeamID(t)
+			team := newTestTeam(projectID, teamID)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
+
+			stored, err := d.stmts.GetTeamByID(t.Context(), projectID, teamID)
+			require.NoError(t, err)
+			assert.Equal(t, projectID, stored.ProjectID)
+			assert.Equal(t, teamID, stored.ID)
+			assert.Equal(t, team.Name, stored.Name)
+			assert.Equal(t, domain.TeamStatusActive, stored.Status)
+			assert.False(t, stored.CreatedAt.IsZero())
+			assert.False(t, stored.UpdatedAt.IsZero())
+		})
+
+		t.Run("not found returns NoRowFoundError", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
 			_, err := d.stmts.GetTeamByID(t.Context(), projectID, "missing-team")
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
@@ -44,74 +141,158 @@ func TestTeamStatements_GetByID(t *testing.T) {
 
 func TestTeamStatements_UpdateTeam(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
-		t.Run("updates_name_and_timestamps", func(t *testing.T) {
+		t.Run("updates team", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
-			team := newTestTeam(projectID, "team-"+uniqueSuffix(t))
+			teamID := uniqueTeamID(t)
+			team := newTestTeam(projectID, teamID)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
 			createdAt, updatedAt := team.CreatedAt, team.UpdatedAt
 
-			team.Name = "updated name " + uniqueSuffix(t)
+			team.Name = "updated name"
 			require.NoError(t, d.stmts.UpdateTeam(t.Context(), team))
+			assert.Equal(t, "updated name", team.Name)
 			assert.Equal(t, projectID, team.ProjectID)
+			assert.Equal(t, teamID, team.ID)
 			assert.Equal(t, domain.TeamStatusActive, team.Status)
 			assert.Equal(t, createdAt, team.CreatedAt)
-			assert.True(t, team.UpdatedAt.After(updatedAt) || team.UpdatedAt.Equal(updatedAt))
+			assert.True(t, team.UpdatedAt.After(updatedAt))
 		})
 
-		t.Run("missing_returns_NoRowFoundError", func(t *testing.T) {
+		t.Run("team not found returns NoRowFoundError", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
-			team := newTestTeam(projectID, "missing-"+uniqueSuffix(t))
-			assert.ErrorIs(t, d.stmts.UpdateTeam(t.Context(), team), new(database.NoRowFoundError))
+			team := newTestTeam(projectID, "nonexistent")
+			assert.ErrorIs(t,
+				d.stmts.UpdateTeam(t.Context(), team),
+				new(database.NoRowFoundError),
+			)
 		})
 
-		t.Run("deactivated_returns_NoRowFoundError", func(t *testing.T) {
+		t.Run("deactivated team returns NoRowFoundError", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
-			teamID := "team-" + uniqueSuffix(t)
+			teamID := uniqueTeamID(t)
 			team := newTestTeam(projectID, teamID)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
 			require.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, teamID))
 
 			team.Name = "updated name"
-			assert.ErrorIs(t, d.stmts.UpdateTeam(t.Context(), team), new(database.NoRowFoundError))
+			assert.ErrorIs(t,
+				d.stmts.UpdateTeam(t.Context(), team),
+				new(database.NoRowFoundError),
+			)
 		})
 
-		t.Run("duplicate_name_returns_UniqueError", func(t *testing.T) {
+		t.Run("name violates uniqueness constraint", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
-			team := newTestTeam(projectID, "team-"+uniqueSuffix(t))
+			teamID := uniqueTeamID(t)
+			team := newTestTeam(projectID, teamID)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
 
-			taken := newTestTeam(projectID, "team-"+uniqueSuffix(t))
+			taken := newTestTeam(projectID, teamID+"-taken")
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), taken))
 
 			team.Name = taken.Name
-			assert.ErrorIs(t, d.stmts.UpdateTeam(t.Context(), team), new(database.UniqueError))
+			assert.ErrorIs(t,
+				d.stmts.UpdateTeam(t.Context(), team),
+				new(database.UniqueError),
+			)
 
+			// a case-only difference still collides.
 			team.Name = strings.ToUpper(taken.Name)
-			assert.ErrorIs(t, d.stmts.UpdateTeam(t.Context(), team), new(database.UniqueError))
+			assert.ErrorIs(t,
+				d.stmts.UpdateTeam(t.Context(), team),
+				new(database.UniqueError),
+			)
 		})
 
-		t.Run("unchanged_name_ok", func(t *testing.T) {
+		t.Run("unchanged name", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
-			team := newTestTeam(projectID, "team-"+uniqueSuffix(t))
+			team := newTestTeam(projectID, uniqueTeamID(t))
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
 			name := team.Name
+
+			// The row already holds the name it is updated to, so the unique index
+			// must not read it as a collision.
 			require.NoError(t, d.stmts.UpdateTeam(t.Context(), team))
 			assert.Equal(t, name, team.Name)
 		})
 
-		t.Run("same_name_other_project_ok", func(t *testing.T) {
+		t.Run("same name in another project", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
-			team := newTestTeam(projectID, "team-"+uniqueSuffix(t))
+			team := newTestTeam(projectID, uniqueTeamID(t))
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
 
 			otherProjectID := ensureProject(t, d.stmts)
-			other := newTestTeam(otherProjectID, "team-"+uniqueSuffix(t))
+			other := newTestTeam(otherProjectID, uniqueTeamID(t))
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), other))
 
 			other.Name = team.Name
 			require.NoError(t, d.stmts.UpdateTeam(t.Context(), other))
 			assert.Equal(t, team.Name, other.Name)
 		})
+	})
+}
+
+func TestTeamStatements_Deactivate(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		teamID := uniqueTeamID(t)
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
+
+		// DeactivateTeam opens its own withTransaction when called via pool.Statements().
+		require.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, teamID))
+
+		stored, err := d.stmts.GetTeamByID(t.Context(), projectID, teamID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.TeamStatusDeactivated, stored.Status)
+	})
+}
+
+func TestTeamStatements_Deactivate_CascadesMembershipsAndOwnedUsers(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+
+		ownerTeamID, otherTeamID := uniqueTeamID(t), uniqueTeamID(t)
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, ownerTeamID)))
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, otherTeamID)))
+
+		selfOwned := newTestUser(t, projectID, schemaURL, "usr-self-"+ownerTeamID, "self@example.com", "Self")
+		require.NoError(t, d.stmts.CreateUser(t.Context(), selfOwned))
+		teamOwned := newTestUser(t, projectID, schemaURL, "usr-owned-"+ownerTeamID, "owned@example.com", "Owned")
+		teamOwned.LifecycleOwnerTeamID = &ownerTeamID
+		require.NoError(t, d.stmts.CreateUser(t.Context(), teamOwned))
+
+		memberships := []*domain.TeamMembership{
+			{ProjectID: projectID, TeamID: ownerTeamID, UserID: selfOwned.ID, Status: domain.MembershipStatusActive},
+			{ProjectID: projectID, TeamID: ownerTeamID, UserID: teamOwned.ID, Status: domain.MembershipStatusActive},
+			// Deactivating the owner team reaches this one through the user, not the team.
+			{ProjectID: projectID, TeamID: otherTeamID, UserID: teamOwned.ID, Status: domain.MembershipStatusActive},
+		}
+		for _, membership := range memberships {
+			require.NoError(t, d.stmts.CreateTeamMembership(t.Context(), membership))
+		}
+
+		require.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, ownerTeamID))
+
+		userStatus := func(userID string) domain.UserStatus {
+			user, err := d.stmts.GetUser(t.Context(),
+				database.And(
+					database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+					database.Equal(database.Col(domain.UserFieldID), userID),
+				),
+				service.UserQueryOptions{},
+			)
+			require.NoError(t, err)
+			return user.Status
+		}
+		assert.Equal(t, domain.UserStatusActive, userStatus(selfOwned.ID))
+		assert.Equal(t, domain.UserStatusDeactivated, userStatus(teamOwned.ID))
+
+		for _, membership := range memberships {
+			stored, err := d.stmts.GetTeamMembership(t.Context(), projectID, membership.TeamID, membership.UserID)
+			require.NoError(t, err)
+			assert.Equal(t, domain.MembershipStatusRemoved, stored.Status,
+				"membership team=%s user=%s", membership.TeamID, membership.UserID)
+		}
 	})
 }
 
