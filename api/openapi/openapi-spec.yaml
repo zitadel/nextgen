@@ -123,6 +123,8 @@ paths:
     $ref: endpoints/flow_definitions/lifecycle/deactivate/method.yaml
   /teams:
     $ref: endpoints/teams/methods.yaml
+  /teams/query:
+    $ref: endpoints/teams/query/methods.yaml
   /teams/{team_id}:
     $ref: endpoints/teams/by_id/methods.yaml
   /branding:

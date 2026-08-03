@@ -2508,6 +2508,45 @@ func (c *MockAllStatementsListTeamMembershipsCall) DoAndReturn(f func(context.Co
 	return c
 }
 
+// ListTeams mocks base method.
+func (m *MockAllStatements) ListTeams(ctx context.Context, filter *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListTeams", ctx, filter)
+	ret0, _ := ret[0].(*database.ListResult[*domain.Team])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListTeams indicates an expected call of ListTeams.
+func (mr *MockAllStatementsMockRecorder) ListTeams(ctx, filter any) *MockAllStatementsListTeamsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTeams", reflect.TypeOf((*MockAllStatements)(nil).ListTeams), ctx, filter)
+	return &MockAllStatementsListTeamsCall{Call: call}
+}
+
+// MockAllStatementsListTeamsCall wrap *gomock.Call
+type MockAllStatementsListTeamsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListTeamsCall) Return(arg0 *database.ListResult[*domain.Team], arg1 error) *MockAllStatementsListTeamsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListTeamsCall) Do(f func(context.Context, *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error)) *MockAllStatementsListTeamsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListTeamsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error)) *MockAllStatementsListTeamsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListTokens mocks base method.
 func (m *MockAllStatements) ListTokens(ctx context.Context, filter *database.ListOptions[domain.TokenField]) (*database.ListResult[*domain.Token], error) {
 	m.ctrl.T.Helper()
@@ -4438,6 +4477,45 @@ func (c *MockTeamStatementsIsStatementsCall) Do(f func()) *MockTeamStatementsIsS
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockTeamStatementsIsStatementsCall) DoAndReturn(f func()) *MockTeamStatementsIsStatementsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListTeams mocks base method.
+func (m *MockTeamStatements) ListTeams(ctx context.Context, filter *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListTeams", ctx, filter)
+	ret0, _ := ret[0].(*database.ListResult[*domain.Team])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListTeams indicates an expected call of ListTeams.
+func (mr *MockTeamStatementsMockRecorder) ListTeams(ctx, filter any) *MockTeamStatementsListTeamsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTeams", reflect.TypeOf((*MockTeamStatements)(nil).ListTeams), ctx, filter)
+	return &MockTeamStatementsListTeamsCall{Call: call}
+}
+
+// MockTeamStatementsListTeamsCall wrap *gomock.Call
+type MockTeamStatementsListTeamsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockTeamStatementsListTeamsCall) Return(arg0 *database.ListResult[*domain.Team], arg1 error) *MockTeamStatementsListTeamsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockTeamStatementsListTeamsCall) Do(f func(context.Context, *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error)) *MockTeamStatementsListTeamsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockTeamStatementsListTeamsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error)) *MockTeamStatementsListTeamsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

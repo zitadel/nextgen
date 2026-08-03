@@ -70,6 +70,11 @@ interface ShadcnTokensFile {
   fontWeight: Record<string, number>;
   /** Figma's `container/*` max-width scale in px (`sm`=384 … `7xl`=1280). */
   container: Record<string, Px>;
+  /**
+   * Light/Dark collections beyond the semantic surface — `syntax`, `gradient` —
+   * namespaced by group. Emitted as `--zl-<group>-<name>` with a light override.
+   */
+  themed: Record<string, Record<string, { dark: Hex; light: Hex }>>;
   typography: Record<string, Record<string, unknown>>;
 }
 
@@ -152,6 +157,13 @@ function build(): BuildResult {
 
   /** `--zl-<shadcn-name>` vars, tracked separately so Tailwind can alias them as colours. */
   const shadcnColorVars: string[] = [];
+  /**
+   * `--zl-<group>-<name>` vars from the extra themed collections. Aliased as
+   * Tailwind colours (`bg-zl-gradient-red-start`) but deliberately kept out of
+   * `shadcn.css`: that file owns the *unprefixed* shadcn contract the console
+   * authors against, and `syntax`/`gradient` are not shadcn role names.
+   */
+  const themedColorVars: string[] = [];
 
   // ---- legacy semantic colours (mode-aware: single value = mode-independent, {dark,light} = themed) ----
   for (const [group, members] of Object.entries(figma.tokens.color)) {
@@ -228,11 +240,22 @@ function build(): BuildResult {
     push(cssVarName("layout", name), cssValue, ["layout", name]);
   }
 
+  // ---- themed groups (syntax, gradient): themed like the shadcn colours, but
+  // namespaced by group so they stay clear of both `--zl-color-*` and the flat
+  // shadcn names. Emitted last so a new group appends to the generated diff.
+  for (const [group, members] of Object.entries(shadcn.themed ?? {})) {
+    for (const [name, { dark, light }] of Object.entries(members)) {
+      const cssVar = cssVarName(group, name);
+      themedColorVars.push(cssVar);
+      push(cssVar, dark, [group, toCamel(name)], light);
+    }
+  }
+
   const css = emitCss(cssVars, lightVars);
   return {
     css,
     ts: emitTs(tsTree, refTree, css),
-    tailwind: emitTailwind(cssVars, shadcnColorVars),
+    tailwind: emitTailwind(cssVars, [...shadcnColorVars, ...themedColorVars]),
     shadcn: emitShadcn(shadcnColorVars),
   };
 }
@@ -322,7 +345,7 @@ function emitTs(values: Record<string, unknown>, refs: Record<string, unknown>, 
  * code reviewer can tell which classes come from the design system at a
  * glance (`bg-zl-surface-black` vs `bg-slate-900`).
  */
-function emitTailwind(vars: Array<[string, string]>, shadcnColorVars: string[]): string {
+function emitTailwind(vars: Array<[string, string]>, colorVars: string[]): string {
   const lines: string[] = [];
   for (const [cssVar] of vars) {
     const utilityName = cssVar.replace(/^--zl-/, "");
@@ -330,9 +353,10 @@ function emitTailwind(vars: Array<[string, string]>, shadcnColorVars: string[]):
     if (!mapped) continue;
     lines.push(`  --${mapped.prefix}-zl-${mapped.suffix}: var(${cssVar});`);
   }
-  // New shadcn colours: `--zl-background` -> `--color-zl-background`, so
-  // consumers can write `bg-zl-background`, `text-zl-foreground`, `border-zl-border`.
-  for (const cssVar of shadcnColorVars) {
+  // Themed colours that carry no `--zl-<category>-` prefix of their own: the
+  // shadcn roles (`--zl-background` -> `bg-zl-background`) and the themed
+  // groups (`--zl-syntax-key` -> `text-zl-syntax-key`).
+  for (const cssVar of colorVars) {
     const suffix = cssVar.replace(/^--zl-/, "");
     lines.push(`  --color-zl-${suffix}: var(${cssVar});`);
   }

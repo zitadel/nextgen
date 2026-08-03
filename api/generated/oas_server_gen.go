@@ -385,6 +385,13 @@ type Handler interface {
 	//
 	// POST /projects/query
 	QueryProjects(ctx context.Context, req *QueryProjectsRequest) (QueryProjectsRes, error)
+	// QueryTeams implements queryTeams operation.
+	//
+	// Returns the teams of a project, paginated with a cursor.
+	// Teams of every lifecycle status are returned; each carries its `status`.
+	//
+	// POST /teams/query
+	QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Revokes the session immediately (`state: revoked`). This is the logout operation.
