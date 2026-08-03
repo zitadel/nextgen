@@ -161,8 +161,7 @@ are produced for the identifier classes in [ADR 011](011-resource-identifiers.md
 
 | Class | Storage responsibility | Dialect may use |
 |---|---|---|
-| **Ephemeral** (sessions, auth attempts, checks, tokens, …) | Generate on insert; read back via `RETURNING` or equivalent | Database `IDENTITY` / `BIT_REVERSED_POSITIVE` (current ADR 011 DDL), or a dialect-specific DB function |
-| **Managed** (users, teams, apps, …) | Generate on create when ID is empty; HTTP create does not accept client PKs ([ADR 046](046-dialect-id-generation.md)) | Go package (e.g. ULID via dialect `idgen`), database function, or hybrid |
+| **All resource PKs** (users, sessions, auth attempts, tokens, credential rows, …) | Generate on create when ID is empty; HTTP create does not accept client PKs ([ADR 046](046-dialect-id-generation.md)) | Dialect `idgen` (Postgres ULID; Spanner UUID v4); SQL supplies no DEFAULT/IDENTITY |
 
 The **dialect** owns the generation strategy per class — not
 domain or service code. Domain keeps prefix rules and
@@ -307,7 +306,7 @@ items off as work lands; remove completed entries when no longer useful.
 - [x] Move migrations from v1 to v2 dialect packages (postgres + spanner)
 - [x] Move embedded postgres startup to v2 postgres dialect
 - [x] Move `database.Identity` bind/scan to v2 core
-- [x] Move ID generation into v2 dialects (ephemeral via DB identity/function; managed via dialect-chosen Go package); retire domain-layer `idgen` call sites at storage boundary — see [ADR 046](046-dialect-id-generation.md)
+- [x] Move ID generation into v2 dialects (all resource PKs via dialect-chosen Go package; Postgres ULID / Spanner UUID v4); retire domain-layer `idgen` and SQL IDENTITY — see [ADR 046](046-dialect-id-generation.md)
 - [x] Add `internal/storage/v2/AGENTS.md` with v2 conventions (including multi-write `withTransaction` rules)
 - [x] Port remaining entities and remove v1 entity repository package
 - [x] Drop QueryExecutor bridge from app callers and v2 transactions

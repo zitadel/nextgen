@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -117,7 +116,7 @@ func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPassk
 
 	for i, key := range passkeys {
 		res.Passkeys[i] = api.ListUserPasskeysResponsePasskeysItem{
-			ID:        strconv.FormatInt(key.ID, 10),
+			ID:        key.ID,
 			Name:      key.Name,
 			CreatedAt: key.CreatedAt,
 		}

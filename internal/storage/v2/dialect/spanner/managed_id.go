@@ -5,7 +5,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/idgen"
 )
 
-var managedIDs idgen.Generator = idgen.NewULID()
+var managedIDs idgen.Generator = idgen.NewUUID()
 
 func ensureManagedID(id *string, prefix domain.ResourcePrefix) error {
 	return idgen.Ensure(id, string(prefix), managedIDs)

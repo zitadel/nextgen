@@ -2,4 +2,4 @@
 "@zitadel/server": minor
 ---
 
-Server assigns resource IDs in storage dialects; create APIs no longer accept client primary keys.
+Server assigns every resource primary key in storage dialects as a prefixed opaque string (Postgres ULID, Spanner UUID v4); SQL no longer uses IDENTITY defaults, and create APIs do not accept client primary keys.

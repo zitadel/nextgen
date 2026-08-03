@@ -1,7 +1,7 @@
 -- +goose Up
 CREATE TABLE zitadel_nextgen.user_agents (
-    project_id      TEXT        NOT NULL
-    , id            BIGINT      GENERATED ALWAYS AS IDENTITY
+    project_id      TEXT COLLATE "C" NOT NULL
+    , id            TEXT COLLATE "C" NOT NULL CHECK (id <> '')
     , info          JSONB       NOT NULL DEFAULT '{}'::JSONB
     , created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     , updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -11,15 +11,15 @@ CREATE TABLE zitadel_nextgen.user_agents (
 );
 
 CREATE TABLE zitadel_nextgen.sessions (
-    project_id      TEXT        NOT NULL
-    , id            BIGINT      GENERATED ALWAYS AS IDENTITY
+    project_id      TEXT COLLATE "C" NOT NULL
+    , id            TEXT COLLATE "C" NOT NULL CHECK (id <> '')
     , created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     , updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     , time_to_live  INTERVAL NOT NULL DEFAULT '10 minutes'::INTERVAL
     , expires_at    TIMESTAMPTZ NOT NULL
-    , token_id      BIGINT      NOT NULL -- TODO: reference to the token table
-    , user_id       TEXT
-    , user_agent_id BIGINT
+    , token_id      TEXT COLLATE "C" NOT NULL -- placeholder until session token row is minted
+    , user_id       TEXT COLLATE "C"
+    , user_agent_id TEXT COLLATE "C"
 
     , PRIMARY KEY (project_id, id)
     , UNIQUE (project_id, token_id)

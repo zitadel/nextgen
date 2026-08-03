@@ -4,6 +4,7 @@ package postgres
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniqueTokenFixtureIDs(t *testing.T) (projectID, schemaURL, userID string) {
@@ -52,7 +52,7 @@ func ensureTokenTestUser(t *testing.T, projectID, schemaURL, userID string) {
 func requireGeneratedTokenID(t *testing.T, tokenID string) {
 	t.Helper()
 	require.NotEmpty(t, tokenID)
-	require.True(t, database.Identity(tokenID).IsNumeric())
+	require.True(t, strings.HasPrefix(tokenID, string(domain.TokenPrefix)+"_"))
 }
 
 func TestTokenStatements_CRUD_OIDCAccessToken(t *testing.T) {

@@ -7,7 +7,8 @@ import (
 )
 
 // Identity is the canonical string form of a resource identifier in Go.
-// Storage may persist it as BIGINT (ephemeral, database-generated) or TEXT/STRING (managed).
+// All resource primary keys are dialect-minted prefixed opaque strings (ADR 046)
+// persisted as TEXT / STRING(MAX).
 type Identity string
 
 // String implements fmt.Stringer.
@@ -15,7 +16,8 @@ func (id Identity) String() string {
 	return string(id)
 }
 
-// IsNumeric reports whether id is a non-empty signed integer decimal suitable for BIGINT binding.
+// IsNumeric reports whether id is a non-empty signed integer decimal.
+// Retained for tests and legacy fixtures; resource PKs are no longer numeric.
 func (id Identity) IsNumeric() bool {
 	if id == "" {
 		return false
@@ -69,13 +71,10 @@ func (id *Identity) DecodeSpanner(input any) error {
 	return nil
 }
 
-// Value implements driver.Valuer.
+// Value implements driver.Valuer. Always binds as a string (TEXT / STRING).
 func (id Identity) Value() (driver.Value, error) {
 	if id == "" {
 		return nil, nil
-	}
-	if id.IsNumeric() {
-		return strconv.ParseInt(string(id), 10, 64)
 	}
 	return string(id), nil
 }
