@@ -150,7 +150,7 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) (*Lis
 		},
 	}, UserQueryOptions{})
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to list users from database")
+		return nil, mapListError(err, "failed to list users from database")
 	}
 
 	return &ListUsersOutput{
