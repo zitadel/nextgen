@@ -157,7 +157,7 @@ func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.S
 		userAgentID = uaID
 	}
 	stmt := buildStatement(`INSERT INTO sessions (project_id, id, user_agent_id, time_to_live, token_id, created_at, updated_at) VALUES (@p1, @p2, @p3, @p4, @p5, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()) THEN RETURN created_at, updated_at, expires_at`,
-		session.ProjectID, session.ID, userAgentID, session.TimeToLive.Nanoseconds(), v2session.UnsetSessionTokenID).statement()
+		session.ProjectID, session.ID, userAgentID, session.TimeToLive.Nanoseconds(), nil).statement()
 	err := ss.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			return struct{}{}, row.Columns(&session.CreatedAt, &session.UpdatedAt, &session.ExpiresAt)
@@ -299,7 +299,8 @@ func scanSessions(iter *spanner.RowIterator) ([]*domain.Session, error) {
 	err := iter.Do(func(row *spanner.Row) error {
 		var (
 			projectID                                      string
-			sessionID, tokenID                             string
+			sessionID                                      string
+			tokenID                                        spanner.NullString
 			createdAt, updatedAt, expiresAt                time.Time
 			timeToLiveNanos                                int64
 			userID                                         spanner.NullString
@@ -315,7 +316,11 @@ func scanSessions(iter *spanner.RowIterator) ([]*domain.Session, error) {
 		id := sessionID
 		session, ok := byID[id]
 		if !ok {
-			session = &domain.Session{ProjectID: projectID, ID: id, CreatedAt: createdAt, UpdatedAt: updatedAt, ExpiresAt: expiresAt, TimeToLive: time.Duration(timeToLiveNanos), TokenID: tokenID}
+			tok := ""
+			if tokenID.Valid {
+				tok = tokenID.StringVal
+			}
+			session = &domain.Session{ProjectID: projectID, ID: id, CreatedAt: createdAt, UpdatedAt: updatedAt, ExpiresAt: expiresAt, TimeToLive: time.Duration(timeToLiveNanos), TokenID: tok}
 			if userID.Valid {
 				session.UserID = &userID.StringVal
 			}

@@ -9,10 +9,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// UnsetSessionTokenID is the placeholder written at session insert before the
-// real session token row exists (SQL token_id = 0).
-const UnsetSessionTokenID = "0"
-
 // ExchangeStore is the dialect IO surface used by [RunExchange].
 type ExchangeStore interface {
 	GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffTokenHash []byte) (*domain.AuthAttempt, error)
@@ -94,9 +90,10 @@ func RunExchange(ctx context.Context, store ExchangeStore, projectID, handoffTok
 }
 
 // HasRealSessionToken reports whether previousTokenID names a persisted token
-// that should be revoked after rotation.
+// that should be revoked after rotation. Empty means the session has no token
+// yet (sessions.token_id is NULL until CreateSessionToken links one).
 func HasRealSessionToken(previousTokenID string) bool {
-	return previousTokenID != "" && previousTokenID != UnsetSessionTokenID
+	return previousTokenID != ""
 }
 
 func exchangeConflict(err error) error {

@@ -181,7 +181,7 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 			handoffToken       []byte
 			handedOffAtNano    sql.NullInt64
 			sessionIDVal       sql.NullString
-			requiredChecksJSON string
+			requiredChecksJSON sql.NullString
 			checkType          sql.NullInt64
 			timeToLiveNano     sql.NullInt64
 			checkID            sql.NullString
@@ -204,9 +204,9 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 		attempt.ID = attemptID
 		attempt.CreatedAt = timeFromUnixNano(createdNano)
 
-		if attempt.RequiredChecks == nil {
+		if attempt.RequiredChecks == nil && requiredChecksJSON.Valid {
 			var reqInts []int64
-			if err := json.Unmarshal([]byte(requiredChecksJSON), &reqInts); err != nil {
+			if err := json.Unmarshal([]byte(requiredChecksJSON.String), &reqInts); err != nil {
 				return fmt.Errorf("failed to unmarshal required_checks: %w", err)
 			}
 			attempt.RequiredChecks = make([]domain.AuthCheckType, len(reqInts))

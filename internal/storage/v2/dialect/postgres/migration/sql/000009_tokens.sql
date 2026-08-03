@@ -16,7 +16,7 @@ CREATE TABLE zitadel_nextgen.tokens (
     , session_id  TEXT COLLATE "C"
     , oidc_session_id TEXT COLLATE "C"
     , saml_session_id TEXT COLLATE "C"
-    , scope       TEXT[] NOT NULL DEFAULT '{}'
+    , scope       TEXT[] NOT NULL
     , created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
     , expires_at  TIMESTAMPTZ NULL
 

@@ -7,7 +7,7 @@ CREATE TABLE flow_definitions (
     name            STRING(MAX) NOT NULL,
     schema_version  STRING(MAX) NOT NULL,
     status          STRING(MAX) NOT NULL DEFAULT ('draft'),
-    purposes        ARRAY<STRING(MAX)>,
+    purposes        ARRAY<STRING(MAX)> NOT NULL,
     definition      JSON        NOT NULL,
     created_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     updated_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),

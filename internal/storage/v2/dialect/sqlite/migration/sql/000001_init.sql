@@ -6,9 +6,7 @@ CREATE TABLE projects (
     name            TEXT    NOT NULL,
     created_at      INTEGER NOT NULL,
     updated_at      INTEGER NOT NULL,
-    project_secret  TEXT    NOT NULL DEFAULT (''),
-    preview_secret  TEXT    NOT NULL DEFAULT (''),
-    preview_origins TEXT    NOT NULL DEFAULT ('[]'),
+    preview_origins TEXT    NOT NULL,
     PRIMARY KEY (id)
 );
 -- +goose StatementEnd
@@ -64,7 +62,7 @@ CREATE TABLE users (
 -- +goose StatementBegin
 CREATE TABLE user_attributes (
     project_id  TEXT NOT NULL,
-    team_id     TEXT NOT NULL DEFAULT (''),
+    team_id     TEXT NOT NULL,
     user_id     TEXT NOT NULL,
     key         TEXT NOT NULL,
     value       TEXT NOT NULL,
@@ -86,7 +84,7 @@ CREATE INDEX idx_user_attributes_team_id ON user_attributes (team_id);
 CREATE TABLE user_unique_attributes (
     project_id  TEXT NOT NULL,
     user_id     TEXT NOT NULL,
-    team_id     TEXT NOT NULL DEFAULT (''),
+    team_id     TEXT NOT NULL,
     key         TEXT NOT NULL,
     value_hash  BLOB NOT NULL,
     PRIMARY KEY (project_id, team_id, key, value_hash),
@@ -126,7 +124,7 @@ CREATE TABLE flow_definitions (
     name            TEXT    NOT NULL,
     schema_version  TEXT    NOT NULL,
     status          TEXT    NOT NULL DEFAULT ('draft'),
-    purposes        TEXT    NOT NULL DEFAULT ('[]'),
+    purposes        TEXT    NOT NULL,
     definition      TEXT    NOT NULL,
     created_at      INTEGER NOT NULL,
     updated_at      INTEGER NOT NULL,
@@ -147,7 +145,7 @@ CREATE TABLE auth_attempts (
     handoff_token   BLOB,
     handed_off_at   INTEGER,
     session_id      TEXT,
-    required_checks TEXT    NOT NULL DEFAULT ('[]'),
+    required_checks TEXT,
     created_at      INTEGER NOT NULL,
     time_to_live    INTEGER,
     PRIMARY KEY (project_id, id),
@@ -167,7 +165,7 @@ CREATE UNIQUE INDEX idx_auth_attempts_handoff_token
 CREATE TABLE user_agents (
     project_id  TEXT    NOT NULL,
     id          TEXT    NOT NULL,
-    info        TEXT    NOT NULL DEFAULT ('{}'),
+    info        TEXT    NOT NULL,
     created_at  INTEGER,
     updated_at  INTEGER,
     PRIMARY KEY (project_id, id),
@@ -186,7 +184,7 @@ CREATE TABLE tokens (
     session_id      TEXT,
     oidc_session_id TEXT,
     saml_session_id TEXT,
-    scope           TEXT    NOT NULL DEFAULT ('[]'),
+    scope           TEXT    NOT NULL,
     expires_at      INTEGER,
     created_at      INTEGER NOT NULL,
     PRIMARY KEY (project_id, token_id),
@@ -217,9 +215,9 @@ CREATE TABLE sessions (
     id            TEXT    NOT NULL,
     created_at    INTEGER NOT NULL,
     updated_at    INTEGER NOT NULL,
-    time_to_live  INTEGER NOT NULL DEFAULT (600000000000),
+    time_to_live  INTEGER NOT NULL,
     expires_at    INTEGER GENERATED ALWAYS AS (updated_at + time_to_live) STORED,
-    token_id      TEXT    NOT NULL DEFAULT ('0'),
+    token_id      TEXT,
     user_id       TEXT,
     user_agent_id TEXT,
     PRIMARY KEY (project_id, id),
@@ -236,7 +234,7 @@ CREATE TABLE sessions (
 -- +goose StatementBegin
 CREATE UNIQUE INDEX idx_sessions_token
     ON sessions (project_id, token_id)
-    WHERE token_id != '0';
+    WHERE token_id IS NOT NULL;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -451,13 +449,14 @@ CREATE TABLE user_recovery_codes (
     project_id            TEXT    NOT NULL,
     id                    TEXT    NOT NULL,
     user_id               TEXT    NOT NULL,
-    recovery_codes        TEXT    NOT NULL DEFAULT ('[]'),
+    recovery_codes        TEXT    NOT NULL,
     last_successful_check INTEGER,
     failed_attempts       INTEGER NOT NULL DEFAULT (0),
     created_at            INTEGER NOT NULL,
     updated_at            INTEGER NOT NULL,
     PRIMARY KEY (project_id, id),
     CONSTRAINT chk_user_recovery_codes_id CHECK (id <> ''),
+    CONSTRAINT chk_user_recovery_codes_nonempty CHECK (json_array_length(recovery_codes) > 0),
     CONSTRAINT fk_user_recovery_codes_user
         FOREIGN KEY (project_id, user_id) REFERENCES users (project_id, id) ON DELETE CASCADE
 );
@@ -476,7 +475,7 @@ CREATE TABLE user_passkeys (
     public_key       BLOB    NOT NULL,
     aaguid           BLOB,
     attestation_type TEXT,
-    transports       TEXT    NOT NULL DEFAULT ('[]'),
+    transports       TEXT    NOT NULL,
     sign_count       INTEGER NOT NULL DEFAULT (0),
     backup_eligible  INTEGER NOT NULL DEFAULT (0),
     backup_state     INTEGER NOT NULL DEFAULT (0),

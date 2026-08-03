@@ -84,7 +84,7 @@ CREATE TABLE user_passkeys (
     public_key        BYTES(MAX)  NOT NULL,
     aaguid            BYTES(MAX),
     attestation_type  STRING(MAX),
-    transports        ARRAY<STRING(MAX)> NOT NULL DEFAULT ([]),
+    transports        ARRAY<STRING(MAX)> NOT NULL,
     sign_count        INT64       NOT NULL DEFAULT (0),
     backup_eligible   BOOL        NOT NULL DEFAULT (FALSE),
     backup_state      BOOL        NOT NULL DEFAULT (FALSE),

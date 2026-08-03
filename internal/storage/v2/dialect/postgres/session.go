@@ -178,7 +178,7 @@ func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.S
 		}
 		userAgentID = &uaID
 	}
-	err := ss.client.QueryRow(ctx, insertSessionStmt, session.ProjectID, session.ID, userAgentID, session.TimeToLive, v2session.UnsetSessionTokenID).
+	err := ss.client.QueryRow(ctx, insertSessionStmt, session.ProjectID, session.ID, userAgentID, session.TimeToLive, nil).
 		Scan(&session.CreatedAt, &session.UpdatedAt, &session.ExpiresAt)
 	if err != nil {
 		return fmt.Errorf("failed to insert session: %w", wrapError(err))
@@ -310,7 +310,8 @@ func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
 	for rows.Next() {
 		var (
 			projectID                                      string
-			sessionID, tokenID                             string
+			sessionID                                      string
+			tokenID                                        *string
 			checkID                                        *string
 			createdAt, updatedAt, expiresAt                time.Time
 			timeToLive                                     time.Duration
@@ -329,7 +330,11 @@ func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
 		id := sessionID
 		session, ok := byID[id]
 		if !ok {
-			session = &domain.Session{ProjectID: projectID, ID: id, CreatedAt: createdAt, UpdatedAt: updatedAt, ExpiresAt: expiresAt, TimeToLive: timeToLive, TokenID: tokenID, UserID: userID}
+			tok := ""
+			if tokenID != nil {
+				tok = *tokenID
+			}
+			session = &domain.Session{ProjectID: projectID, ID: id, CreatedAt: createdAt, UpdatedAt: updatedAt, ExpiresAt: expiresAt, TimeToLive: timeToLive, TokenID: tok, UserID: userID}
 			if userAgentID != nil {
 				info := map[string]any{}
 				if len(userAgentInfo) > 0 {

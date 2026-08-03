@@ -155,7 +155,7 @@ CREATE TABLE zitadel_nextgen.user_passkeys (
     , public_key BYTEA NOT NULL
     , aaguid BYTEA
     , attestation_type TEXT
-    , transports TEXT[] NOT NULL DEFAULT '{}'
+    , transports TEXT[] NOT NULL
     , sign_count BIGINT NOT NULL DEFAULT 0 CHECK (sign_count >= 0)
     , backup_eligible BOOLEAN NOT NULL DEFAULT FALSE
     , backup_state BOOLEAN NOT NULL DEFAULT FALSE

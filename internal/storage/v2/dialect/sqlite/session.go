@@ -165,7 +165,7 @@ func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.S
 	var createdNano, updatedNano, expiresNano int64
 	err := ss.client.QueryRow(ctx,
 		`INSERT INTO sessions (project_id, id, user_agent_id, time_to_live, token_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING created_at, updated_at, expires_at`,
-		session.ProjectID, session.ID, userAgentID, session.TimeToLive.Nanoseconds(), v2session.UnsetSessionTokenID, now, now,
+		session.ProjectID, session.ID, userAgentID, session.TimeToLive.Nanoseconds(), nil, now, now,
 	).Scan(&createdNano, &updatedNano, &expiresNano)
 	if err != nil {
 		return fmt.Errorf("failed to insert session: %w", wrapError(err))
@@ -328,7 +328,8 @@ func scanSessions(rows *sql.Rows) ([]*domain.Session, error) {
 	for rows.Next() {
 		var (
 			projectID                                            string
-			sessionID, tokenID                                   string
+			sessionID                                            string
+			tokenID                                              sql.NullString
 			createdNano, updatedNano, expiresNano                int64
 			timeToLiveNanos                                      int64
 			userID                                               sql.NullString
@@ -349,6 +350,10 @@ func scanSessions(rows *sql.Rows) ([]*domain.Session, error) {
 		}
 		session, ok := byID[sessionID]
 		if !ok {
+			tok := ""
+			if tokenID.Valid {
+				tok = tokenID.String
+			}
 			session = &domain.Session{
 				ProjectID:  projectID,
 				ID:         sessionID,
@@ -356,7 +361,7 @@ func scanSessions(rows *sql.Rows) ([]*domain.Session, error) {
 				UpdatedAt:  timeFromUnixNano(updatedNano),
 				ExpiresAt:  timeFromUnixNano(expiresNano),
 				TimeToLive: time.Duration(timeToLiveNanos),
-				TokenID:    tokenID,
+				TokenID:    tok,
 			}
 			if userID.Valid {
 				v := userID.String

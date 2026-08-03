@@ -28,7 +28,11 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 	if err := ensureManagedID(&project.ID, domain.PrefixProject); err != nil {
 		return err
 	}
-	return wrapError(ps.client.QueryRow(ctx, createProjectStmt, project.ID, project.Name, project.PreviewOrigins).
+	origins := project.PreviewOrigins
+	if origins == nil {
+		origins = []string{}
+	}
+	return wrapError(ps.client.QueryRow(ctx, createProjectStmt, project.ID, project.Name, origins).
 		Scan(&project.ID, &project.CreatedAt, &project.UpdatedAt))
 }
 
