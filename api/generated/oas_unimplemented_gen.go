@@ -526,6 +526,16 @@ func (UnimplementedHandler) QueryProjects(ctx context.Context, req *QueryProject
 	return r, ht.ErrNotImplemented
 }
 
+// QueryTeams implements queryTeams operation.
+//
+// Returns the teams of a project, paginated with a cursor.
+// Teams of every lifecycle status are returned; each carries its `status`.
+//
+// POST /teams/query
+func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (r QueryTeamsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // RevokeMySession implements revokeMySession operation.
 //
 // Revokes the session immediately (`state: revoked`). This is the logout operation.

@@ -52,6 +52,7 @@ const (
 	ListUsersOperation                OperationName = "ListUsers"
 	PatchProjectOperation             OperationName = "PatchProject"
 	QueryProjectsOperation            OperationName = "QueryProjects"
+	QueryTeamsOperation               OperationName = "QueryTeams"
 	RevokeMySessionOperation          OperationName = "RevokeMySession"
 	RevokeSessionOperation            OperationName = "RevokeSession"
 	RevokeTokenOperation              OperationName = "RevokeToken"
