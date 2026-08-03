@@ -3,10 +3,10 @@
 package integration_test
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
-	"context"
 	"strings"
 	"testing"
 
@@ -489,4 +489,59 @@ func TestUpdateTeam(t *testing.T) {
 			})
 		}
 	})
+}
+
+// TestUpdateTeamRawRequest sends raw bodies (e.g., from a curl request or from a
+// non-generated SDK), which is the only way to reach the server-side length
+// checks: the generated client rejects these bodies before sending them.
+func TestUpdateTeamRawRequest(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
+	})
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
+	})
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name     string
+		teamName string
+	}{
+		{"empty name", ""},
+		{"name over the length limit", strings.Repeat("a", domain.TeamNameMaxLength+1)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			body := helpers.MustMarshal(t, api.UpdateTeamRequest{Name: api.NewOptString(tc.teamName)})
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPatch,
+				harness.EnsureTestServer(t).URL+"/teams/"+url.PathEscape(team.ID)+"?project_id="+url.QueryEscape(project.ID),
+				strings.NewReader(body),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+client.Token())
+
+			resp, err := harness.EnsureHttpClient(t).Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			raw, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(raw))
+			details := helpers.MustUnmarshal[api.ErrorDetails](t, raw)
+			assert.Equal(t, api.ErrorCode("req.invalid"), details.Code)
+		})
+	}
 }
