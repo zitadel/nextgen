@@ -259,7 +259,7 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 
 - `moon run server:check-generate` — Go generated-file drift check.
 - Playwright Chromium install for `@zitadel/components`.
-- `moon ci :lint :typecheck :build :test :test-browser`.
+- `moon ci :lint :typecheck :build :test :test-browser :check-adrs`.
 - `moon run server:test`, then `moon run server:test-postgres`,
   `moon run server:test-spanner` (Spanner emulator testcontainer, or a
   real instance when `SPANNER_TEST_INSTANCE` is set), and
@@ -267,8 +267,21 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 - `moon run release:snapshot -- --skip-container` — a non-publishing release
   snapshot.
 - The fresh-app consumer journey (`cli-journey-e2e:e2e-local`) with the npm
-  binary runtime against the snapshot's packed tarballs, plus one
-  passkey-first preset journey run.
+  binary runtime against the snapshot's packed tarballs, one passkey-first
+  preset journey run, and the test-kit consumer journey
+  (`cli-journey-e2e:e2e-testkit`).
+- The real-instance suites: `testing:test-integration` with
+  `demo-next-e2e:e2e-real`, then `console-e2e:e2e-real`.
+
+Within full mode, the steps after the `moon ci` graph are additionally gated
+by moon's affected task selection (`moon query tasks --affected --downstream
+deep`, computed in `scripts/ci-mode.mjs`): a lane is skipped when the diff
+provably cannot reach its tasks — a docs-only PR runs almost nothing, a
+frontend-only PR skips the Go suites. The gates fail open: files no moon task
+claims (workflow definitions, `scripts/`, moon config, root manifests), an
+empty diff, or a failed query all force the complete run. The journeys and
+the snapshot share one gate because the tarball handoff between them is a
+filesystem contract moon cannot see.
 
 **Version-only mode** (Changesets version PRs) runs `release:version`,
 `release:pack`, and tarball verification instead.
