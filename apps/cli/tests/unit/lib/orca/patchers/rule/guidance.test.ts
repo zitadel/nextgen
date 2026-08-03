@@ -144,6 +144,10 @@ describe("guidance content", () => {
     const agents = agentsGuidanceSection(ctx);
     expect(agents).toContain("@zitadel/sdk-next/session");
     expect(agents).toContain("`matcher`");
+    expect(agents).toContain("no-store");
+    expect(agents).toContain("401/auth.unauthorized");
+    expect(agents).toContain("404/sess.not_found");
+    expect(agents).toContain("non-empty `user_id`");
 
     // Nuxt: the composable the scaffolded auth plugin seeds — no Next helper.
     const nuxtCtx = {
@@ -162,6 +166,10 @@ describe("guidance content", () => {
     } as PatchContext;
     const reactAgents = agentsGuidanceSection(reactCtx);
     expect(reactAgents).toContain("/__nextgen/sessions/me");
+    expect(reactAgents).toContain('cache: "no-store"');
+    expect(reactAgents).toContain("401/auth.unauthorized");
+    expect(reactAgents).toContain("404/sess.not_found");
+    expect(reactAgents).toContain("unknown/error, never signed-out");
     expect(reactAgents).not.toContain("@zitadel/sdk-next/session");
     expect(reactAgents).not.toContain("useAuth()");
   });
