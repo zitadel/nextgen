@@ -2932,6 +2932,44 @@ func (c *MockAllStatementsUpdateProjectCall) DoAndReturn(f func(context.Context,
 	return c
 }
 
+// UpdateTeam mocks base method.
+func (m *MockAllStatements) UpdateTeam(ctx context.Context, entity *domain.Team) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateTeam", ctx, entity)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateTeam indicates an expected call of UpdateTeam.
+func (mr *MockAllStatementsMockRecorder) UpdateTeam(ctx, entity any) *MockAllStatementsUpdateTeamCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateTeam", reflect.TypeOf((*MockAllStatements)(nil).UpdateTeam), ctx, entity)
+	return &MockAllStatementsUpdateTeamCall{Call: call}
+}
+
+// MockAllStatementsUpdateTeamCall wrap *gomock.Call
+type MockAllStatementsUpdateTeamCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsUpdateTeamCall) Return(arg0 error) *MockAllStatementsUpdateTeamCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsUpdateTeamCall) Do(f func(context.Context, *domain.Team) error) *MockAllStatementsUpdateTeamCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsUpdateTeamCall) DoAndReturn(f func(context.Context, *domain.Team) error) *MockAllStatementsUpdateTeamCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // UpdateTeamMembershipStatus mocks base method.
 func (m *MockAllStatements) UpdateTeamMembershipStatus(ctx context.Context, projectID, teamID, userID string, status domain.MembershipStatus) error {
 	m.ctrl.T.Helper()
@@ -4361,6 +4399,44 @@ func (c *MockTeamStatementsIsStatementsCall) Do(f func()) *MockTeamStatementsIsS
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockTeamStatementsIsStatementsCall) DoAndReturn(f func()) *MockTeamStatementsIsStatementsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// UpdateTeam mocks base method.
+func (m *MockTeamStatements) UpdateTeam(ctx context.Context, entity *domain.Team) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateTeam", ctx, entity)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateTeam indicates an expected call of UpdateTeam.
+func (mr *MockTeamStatementsMockRecorder) UpdateTeam(ctx, entity any) *MockTeamStatementsUpdateTeamCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateTeam", reflect.TypeOf((*MockTeamStatements)(nil).UpdateTeam), ctx, entity)
+	return &MockTeamStatementsUpdateTeamCall{Call: call}
+}
+
+// MockTeamStatementsUpdateTeamCall wrap *gomock.Call
+type MockTeamStatementsUpdateTeamCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockTeamStatementsUpdateTeamCall) Return(arg0 error) *MockTeamStatementsUpdateTeamCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockTeamStatementsUpdateTeamCall) Do(f func(context.Context, *domain.Team) error) *MockTeamStatementsUpdateTeamCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockTeamStatementsUpdateTeamCall) DoAndReturn(f func(context.Context, *domain.Team) error) *MockTeamStatementsUpdateTeamCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
