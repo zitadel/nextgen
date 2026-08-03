@@ -240,6 +240,272 @@ func TestTeamService_Update(t *testing.T) {
 	}
 }
 
+func TestTeamService_List(t *testing.T) {
+	t.Parallel()
+
+	createdAt := time.Now().UTC().Truncate(time.Second)
+	inProject := database.Equal(database.Col(domain.TeamFieldProjectID), "proj_1")
+
+	tests := []struct {
+		name         string
+		req          service.ListTeamsRequest
+		result       *database.ListResult[*domain.Team]
+		statementErr error
+		wantErr      error
+		checkOpts    func(t *testing.T, opts *database.ListOptions[domain.TeamField])
+		checkResp    func(t *testing.T, resp *service.ListTeamsResponse)
+	}{
+		{
+			name: "defaults",
+			req:  service.ListTeamsRequest{ProjectID: "proj_1"},
+			result: &database.ListResult[*domain.Team]{
+				Items:      []*domain.Team{{ID: "team_1"}, {ID: "team_2"}},
+				NextCursor: []byte("next"),
+			},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
+				assert.Equal(t, uint32(20), opts.Pagination.Limit)
+				assert.Nil(t, opts.Pagination.Cursor)
+				assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
+				assert.Equal(t, []database.Column[domain.TeamField]{
+					database.Col(domain.TeamFieldCreatedAt),
+					database.Col(domain.TeamFieldID),
+				}, opts.Pagination.OrderBy.Columns)
+				assert.Equal(t, database.And(inProject), opts.Filter)
+			},
+			checkResp: func(t *testing.T, resp *service.ListTeamsResponse) {
+				assert.Len(t, resp.Teams, 2)
+				assert.Equal(t, "next", resp.NextPageToken)
+			},
+		},
+		{
+			name:   "limit clamped to max",
+			req:    service.ListTeamsRequest{ProjectID: "proj_1", Limit: 500},
+			result: &database.ListResult[*domain.Team]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
+				assert.Equal(t, uint32(100), opts.Pagination.Limit)
+			},
+		},
+		{
+			name:   "negative limit uses default",
+			req:    service.ListTeamsRequest{ProjectID: "proj_1", Limit: -5},
+			result: &database.ListResult[*domain.Team]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
+				assert.Equal(t, uint32(20), opts.Pagination.Limit)
+			},
+		},
+		{
+			name:   "zero limit uses default, not storage's no-limit",
+			req:    service.ListTeamsRequest{ProjectID: "proj_1", Limit: 0},
+			result: &database.ListResult[*domain.Team]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
+				assert.Equal(t, uint32(20), opts.Pagination.Limit)
+			},
+		},
+		{
+			name: "caller filters are ANDed onto the project scope",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "createdAt", Operation: "equals", Value: createdAt.Format(time.RFC3339)}},
+			},
+			result: &database.ListResult[*domain.Team]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
+				assert.Equal(t, database.And(
+					inProject,
+					database.Equal(database.Col(domain.TeamFieldCreatedAt), createdAt),
+				), opts.Filter)
+			},
+		},
+		{
+			name: "filter greater_than createdAt parses RFC3339",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "createdAt", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)}},
+			},
+			result: &database.ListResult[*domain.Team]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
+				assert.Equal(t, database.And(
+					inProject,
+					database.GreaterThan(database.Col(domain.TeamFieldCreatedAt), createdAt),
+				), opts.Filter)
+			},
+		},
+		{
+			name: "createdAt range filter ANDs both bounds",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters: []service.Filter{
+					{Field: "createdAt", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)},
+					{Field: "createdAt", Operation: "less_than", Value: createdAt.Add(time.Hour).Format(time.RFC3339)},
+				},
+			},
+			result: &database.ListResult[*domain.Team]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
+				assert.Equal(t, database.And(
+					inProject,
+					database.GreaterThan(database.Col(domain.TeamFieldCreatedAt), createdAt),
+					database.LessThan(database.Col(domain.TeamFieldCreatedAt), createdAt.Add(time.Hour)),
+				), opts.Filter)
+			},
+		},
+		{
+			name: "sort by createdAt desc keeps the id tiebreaker",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Sorting:   &service.Sorting{Field: "createdAt", Direction: "desc"},
+			},
+			result: &database.ListResult[*domain.Team]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
+				assert.Equal(t, database.OrderDesc, opts.Pagination.OrderBy.Direction)
+				assert.Equal(t, []database.Column[domain.TeamField]{
+					database.Col(domain.TeamFieldCreatedAt),
+					database.Col(domain.TeamFieldID),
+				}, opts.Pagination.OrderBy.Columns)
+			},
+		},
+		{
+			name:   "page token passed through as cursor",
+			req:    service.ListTeamsRequest{ProjectID: "proj_1", PageToken: "tok"},
+			result: &database.ListResult[*domain.Team]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
+				assert.Equal(t, []byte("tok"), opts.Pagination.Cursor)
+			},
+		},
+		{
+			name:         "statement error is wrapped",
+			req:          service.ListTeamsRequest{ProjectID: "proj_1"},
+			statementErr: assert.AnError,
+			wantErr:      domain.ErrInternal(assert.AnError),
+		},
+		{
+			name:         "invalid cursor maps to request invalid",
+			req:          service.ListTeamsRequest{ProjectID: "proj_1", PageToken: "bad"},
+			statementErr: database.ErrInvalidCursor(),
+			wantErr:      domain.ErrRequestInvalid(),
+		},
+		{
+			name:         "cursor order mismatch maps to request invalid",
+			req:          service.ListTeamsRequest{ProjectID: "proj_1", PageToken: "bad"},
+			statementErr: database.ErrCursorOrderMismatch(),
+			wantErr:      domain.ErrRequestInvalid(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var gotOpts *database.ListOptions[domain.TeamField]
+			svc := newMockedTeamService(t, func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().ListTeams(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, opts *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error) {
+						gotOpts = opts
+						return tc.result, tc.statementErr
+					})
+			})
+
+			resp, err := svc.List(t.Context(), tc.req)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				assert.Nil(t, resp)
+				return
+			}
+			require.NoError(t, err)
+			if tc.checkOpts != nil {
+				tc.checkOpts(t, gotOpts)
+			}
+			if tc.checkResp != nil {
+				tc.checkResp(t, resp)
+			}
+		})
+	}
+}
+
+func TestTeamService_List_ValidationErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		req     service.ListTeamsRequest
+		wantErr error
+	}{
+		{
+			name:    "missing project id is refused",
+			req:     service.ListTeamsRequest{},
+			wantErr: domain.ErrTeamProjectNotFound(),
+		},
+		{
+			name: "unsupported operation not implemented",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "createdAt", Operation: "not_equals", Value: time.Now().UTC().Format(time.RFC3339)}},
+			},
+			wantErr: domain.ErrNotImplemented(),
+		},
+		{
+			name: "unknown filter field is invalid",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "name", Operation: "equals", Value: "x"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "status is not filterable yet",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "status", Operation: "equals", Value: "active"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unknown sort field is invalid",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Sorting:   &service.Sorting{Field: "name", Direction: "asc"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unknown sort direction is invalid",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Sorting:   &service.Sorting{Field: "createdAt", Direction: "sideways"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "non-string createdAt value is invalid",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "createdAt", Operation: "equals", Value: 42}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unparseable createdAt value is invalid",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "createdAt", Operation: "equals", Value: "not-a-time"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Validation fails before storage is reached, so no ListTeams
+			// expectation is set and gomock would flag an unexpected call.
+			svc := newMockedTeamService(t, nil)
+
+			resp, err := svc.List(t.Context(), tc.req)
+			require.ErrorIs(t, err, tc.wantErr)
+			assert.Nil(t, resp)
+		})
+	}
+}
+
 func newMockedTeamService(t *testing.T, setupStmt func(*servicemocks.MockAllStatements)) *service.TeamService {
 	t.Helper()
 

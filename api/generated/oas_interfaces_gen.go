@@ -185,6 +185,10 @@ type QueryProjectsRes interface {
 	queryProjectsRes()
 }
 
+type QueryTeamsRes interface {
+	queryTeamsRes()
+}
+
 type RevokeMySessionRes interface {
 	revokeMySessionRes()
 }
