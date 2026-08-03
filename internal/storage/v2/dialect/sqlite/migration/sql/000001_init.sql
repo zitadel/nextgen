@@ -23,7 +23,7 @@ CREATE TABLE teams (
     status      TEXT    NOT NULL DEFAULT ('active'),
     name_lower  TEXT    GENERATED ALWAYS AS (LOWER(name)) STORED,
     PRIMARY KEY (project_id, id),
-    CONSTRAINT chk_teams_name CHECK (name <> ''),
+    CONSTRAINT chk_teams_name CHECK (name <> '' AND length(name) <= 200),
     CONSTRAINT fk_teams_project
         FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
 );

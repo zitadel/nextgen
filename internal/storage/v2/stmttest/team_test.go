@@ -57,12 +57,6 @@ func TestTeamStatements_Create(t *testing.T) {
 		})
 
 		t.Run("name over the length limit returns error", func(t *testing.T) {
-			// sqlite declares teams.name as plain TEXT and accepts the row, where
-			// postgres CHECKs length(name) and Spanner caps it with STRING(200).
-			// domain.ValidateTeamName still enforces the limit above storage.
-			if d.name == "sqlite" {
-				t.Skip("sqlite does not constrain the name length")
-			}
 			projectID := ensureProject(t, d.stmts)
 
 			team := newTestTeam(projectID, uniqueTeamID(t))
