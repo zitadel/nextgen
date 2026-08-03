@@ -8,7 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserPasskeyStatements,UserRecoveryCodesStatements,BrandingStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserPasskeyStatements,UserRecoveryCodesStatements,BrandingStatements,ClaimStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -36,6 +36,7 @@ type AllStatements interface {
 	UserPasskeyStatements
 	UserRecoveryCodesStatements
 	BrandingStatements
+	ClaimStatements
 	Statements
 }
 
@@ -283,4 +284,24 @@ type BrandingStatements interface {
 	CreateBranding(ctx context.Context, entity *domain.Branding) error
 	GetBrandingByID(ctx context.Context, projectID, id string) (*domain.Branding, error)
 	ListBrandings(ctx context.Context, filter *database.ListOptions[domain.BrandingField]) (*database.ListResult[*domain.Branding], error)
+}
+
+// TODO(IAM-marco): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type ClaimPool interface {
+// 	Statementer[ClaimStatements]
+// 	Transactioner[ClaimStatements]
+// }
+
+type ClaimStatements interface {
+	Statements
+	// CreateChallenge inserts a pending claim challenge; entity.ID is the
+	// SHA-256 hash of the challenge token, minted by the caller.
+	CreateChallenge(ctx context.Context, entity *domain.ClaimChallenge) error
+	GetChallengeByID(ctx context.Context, projectID, id string) (*domain.ClaimChallenge, error)
+	// MarkChallengeCompleted flips pending -> completed; a challenge that is
+	// absent, in another project, or already completed returns NoRowFoundError.
+	MarkChallengeCompleted(ctx context.Context, projectID, id string) error
+	// GetPersonalTeamForUser resolves the user's personal team: the earliest
+	// active team membership joined to an active team.
+	GetPersonalTeamForUser(ctx context.Context, projectID, userID string) (*domain.Team, error)
 }
