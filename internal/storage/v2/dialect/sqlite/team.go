@@ -8,6 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
 
 const (
@@ -88,6 +89,32 @@ func (ts teamStatements) UpdateTeam(ctx context.Context, team *domain.Team) erro
 		domain.TeamStatusActive.String(),
 	)
 	return wrapError(scanTeamRow(row, team))
+}
+
+// ListTeams implements [service.TeamStatements].
+func (ts teamStatements) ListTeams(ctx context.Context, filter *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error) {
+	var compiler statementCompiler
+	if err := compileRead(&compiler, getTeamQuery, filter, teamSchema); err != nil {
+		return nil, err
+	}
+	rows, err := ts.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	teams, err := collectRows(rows, scanTeam)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	var nextCursor []byte
+	if filter.Pagination.Limit > 0 && len(teams) == int(filter.Pagination.Limit) {
+		cursor := &pagination.Cursor[domain.TeamField]{
+			Columns: filter.Pagination.OrderBy.Columns,
+			Values:  teamSchema.ValuesFrom(teams[len(teams)-1], filter.Pagination.OrderBy.Columns),
+		}
+		nextCursor = cursor.Marshal()
+	}
+	return &database.ListResult[*domain.Team]{Items: teams, NextCursor: nextCursor}, nil
 }
 
 // DeactivateTeam implements [service.TeamStatements].
