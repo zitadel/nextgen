@@ -5,7 +5,7 @@
 >
 > **Current implementation note:** This document is the fuller *target* design.
 > The MVP claim being built is a deliberately narrower slice, specified in
-> **[ADR 041: Claim Lifecycle v2](../../adrs/041-claim-lifecycle-v2.md)**
+> **[ADR 046: Claim Lifecycle v2](../../adrs/046-claim-lifecycle-v2.md)**
 > (which supersedes the Withdrawn ADR 003). In the MVP, claim is
 > **association-only**: it writes a project→team **grant** in the permission
 > engine, authenticated on completion by the platform **session cookie**, and
@@ -15,7 +15,7 @@
 > on **what authenticates the claim (the GitHub/Google OAuth authenticators)**,
 > **secret rotation at claim**, **domain-based team matching / team
 > resolution**, and **team creation at claim** describe the future target and
-> are **not part of MVP claim**; see ADR 041 for what ships and the accepted
+> are **not part of MVP claim**; see ADR 046 for what ships and the accepted
 > risks. The checked-in CLI and server
 > do not yet expose these endpoints or a `zitadel claim` command.
 

@@ -5,7 +5,7 @@
 >
 > **Current implementation note:** This document describes the fuller *target*
 > platform design. The MVP claim being built is narrower, specified in
-> **[ADR 041: Claim Lifecycle v2](../../adrs/041-claim-lifecycle-v2.md)**
+> **[ADR 046: Claim Lifecycle v2](../../adrs/046-claim-lifecycle-v2.md)**
 > (which supersedes the Withdrawn ADR 003). Crucially, **secret rotation at
 > claim is descoped for the MVP**: the pre-claim `sk_proj_` secret **stays valid
 > after claim** (an accepted, ADR-documented risk until a dedicated rotation
