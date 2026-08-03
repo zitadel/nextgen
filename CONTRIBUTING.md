@@ -261,8 +261,9 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 - Playwright Chromium install for `@zitadel/components`.
 - `moon ci :lint :typecheck :build :test :test-browser`.
 - `moon run server:test`, then `moon run server:test-postgres`,
-  `moon run server:test-spanner` (emulator, or a real instance when
-  `SPANNER_TEST_INSTANCE` is set), and `moon run server:test-sqlite`.
+  `moon run server:test-spanner` (Spanner emulator testcontainer, or a
+  real instance when `SPANNER_TEST_INSTANCE` is set), and
+  `moon run server:test-sqlite`.
 - `moon run release:snapshot -- --skip-container` — a non-publishing release
   snapshot.
 - The fresh-app consumer journey (`cli-journey-e2e:e2e-local`) with the npm
@@ -292,17 +293,18 @@ moon run server:test-sqlite
 
 Postgres and Spanner integration tests use
 [testcontainers](https://golang.testcontainers.org/) to start their databases
-(a Postgres container and the Cloud Spanner emulator), so a running Docker
-daemon is required — see
+(a Postgres container and the Cloud Spanner **emulator** image), so a running
+Docker daemon is required — see
 [Using the devcontainer](#using-the-devcontainer) for the
-Docker-outside-of-Docker setup:
+Docker-outside-of-Docker setup. Local zero-config runs use SQLite and need no
+Docker.
 
 ```sh
-# Postgres
+# Postgres (testcontainer, or ZITADEL_TEST_POSTGRES_URL)
 moon run server:test-postgres
 # or: go test -v -tags postgres_integration -timeout=10m ./...
 
-# Spanner (prefer the Moon task — see emulator note below)
+# Spanner (prefer the Moon task — see emulator-testcontainer note below)
 moon run server:test-spanner
 ```
 
@@ -316,17 +318,18 @@ create the `zitadel_nextgen` schema.
 The Spanner emulator only supports one transaction at a time, so concurrent
 integration tests are flaky against it. `moon run server:test-spanner`
 therefore passes `-parallel 1 -p 1` whenever `ZITADEL_TEST_SPANNER_INSTANCE`
-is unset (the default for local/OSS contributors). To run against a real,
-long-lived Spanner test instance instead, set `ZITADEL_TEST_SPANNER_INSTANCE`
-to an instance path (`projects/<project>/instances/<instance>`). The suites
-then provision a uniquely named database on that instance before the run and
-drop it afterwards, and the Moon task keeps normal go test parallelism.
+is unset (the default for local/OSS contributors, which starts the emulator
+via testcontainers). To run against a real, long-lived Spanner test instance
+instead, set `ZITADEL_TEST_SPANNER_INSTANCE` to an instance path
+(`projects/<project>/instances/<instance>`). The suites then provision a
+uniquely named database on that instance before the run and drop it
+afterwards, and the Moon task keeps normal go test parallelism.
 Authentication uses Application Default Credentials — locally run
 `gcloud auth application-default login`. CI authenticates via Workload
 Identity Federation when `SPANNER_TEST_INSTANCE` is set, and labels the job
 step as emulator vs test instance accordingly. Precedence when multiple are
 set: `ZITADEL_TEST_SPANNER_INSTANCE` > `ZITADEL_TEST_SPANNER_URL` > emulator
-container.
+testcontainer.
 
 ### Demo end-to-end suites
 

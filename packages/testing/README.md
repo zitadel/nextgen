@@ -212,9 +212,8 @@ above.
 ## How it works
 
 - **Lifecycle** shells out to `zitadel start/stop --json` (the CLI owns port
-  preflight, the health wait, process-group stop, and optional embedded-Postgres
-  reaping for older runtimes). Swapping this for direct library calls later will
-  not change the public API.
+  preflight, the health wait, and process-group stop). Swapping this for direct
+  library calls later will not change the public API.
 - **Bootstrap** is the server-side half of `zitadel setup`, no files:
   `POST /projects` (unauthenticated; returns the `projectSecret` used as
   bearer for everything else) → `POST /schemas` (server assigns the schema id)
@@ -272,8 +271,8 @@ Customer installs need none of this.
   processes (Playwright workers) are unaffected.
 - macOS/Linux only for now. Not because of the port preflight (it degrades
   gracefully where `lsof` is missing) — the untested surface on Windows is the
-  process-group stop and embedded-Postgres lifecycle. Revisit once the local
-  runtime's SQLite default removes the Postgres component.
+  process-group stop for the local binary runtime. Revisit when Windows local
+  runtime support is a goal.
 
 ## Roadmap
 
@@ -299,18 +298,17 @@ on top, in intended order:
    `bootstrapProject({ baseUrl })` + `connectZitadel(handle)` already compose
    into this today; formalizing it means cleanup semantics and docs.
 5. **Vercel Sandbox runtime.** A publicly reachable ephemeral instance per
-   preview deployment (e.g. `@zitadel/testing/vercel`), returning the same
-   `InstanceHandle` so fixtures don't change. Gated on a spike: embedded
-   Postgres on the Sandbox image, forwarded proto/host handling, secure
-   cookies + issuer + handoff verification through `sandbox.domain()`,
-   registering the preview URL as an allowed origin post-deploy
-   (`PATCH /projects`), and cleanup that survives failed runs.
+  preview deployment (e.g. `@zitadel/testing/vercel`), returning the same
+  `InstanceHandle` so fixtures don't change. Gated on a spike: SQLite (or
+  another Sandbox-friendly store) on the Sandbox image, forwarded proto/host
+  handling, secure cookies + issuer + handoff verification through
+  `sandbox.domain()`, registering the preview URL as an allowed origin
+  post-deploy (`PATCH /projects`), and cleanup that survives failed runs.
 6. **Publishing.** Landed: the consumer journey installs the kit the way a
-   customer would in CI, and the kit ships on the release train (release
-   manifest + changeset `fixed` group), versioned in lockstep with
-   `@zitadel/cli`. Remaining: the Windows decision (deferred until the SQLite
-   local default removes the embedded-Postgres lifecycle) and the stability
-   commitment when the train leaves alpha.
+  customer would in CI, and the kit ships on the release train (release
+  manifest + changeset `fixed` group), versioned in lockstep with
+  `@zitadel/cli`. Remaining: the Windows decision for the local binary
+  runtime and the stability commitment when the train leaves alpha.
 
 Parked until server support exists: passkey *seeding* (pre-registered WebAuthn
 credentials) — UI-driven passkey ceremonies are covered today by

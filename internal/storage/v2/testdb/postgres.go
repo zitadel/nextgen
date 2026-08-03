@@ -19,8 +19,8 @@ import (
 )
 
 // containerImage pins Postgres to the rate-limit-free public ECR mirror of the
-// official image, matching embedded-postgres's PG 18.3 version. Docker Hub
-// throttles anonymous pulls per-IP and GitHub runners share IPs.
+// official postgres:18.3 image. Docker Hub throttles anonymous pulls per-IP
+// and GitHub runners share IPs.
 const containerImage = "public.ecr.aws/docker/library/postgres:18.3"
 
 const containerStartAttempts = 3

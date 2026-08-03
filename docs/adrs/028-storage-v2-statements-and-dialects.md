@@ -199,8 +199,8 @@ flowchart LR
 These previously lived under v1 and are now owned by v2 (C3–C6):
 
 - Migrations (postgres + spanner DDL) — **done**
-- Embedded postgres startup — **done** (`v2/dialect/postgres/embedded`)
-- Test DSN bring-up — **done** (`v2/testdb` + `v2/dbtest`)
+- Test DSN bring-up — **done** (`v2/testdb` + `v2/dbtest`; Postgres/Spanner emulator via testcontainers, or env-provided DSNs / real Spanner instance)
+- Zero-config local SQLite — **done** (`v2/dialect/sqlite`; file under `server.data_dir`)
 - [`database.Identity`](../../internal/storage/v2/database/identity.go) (ADR 011) — **done**
 - Dialect-specific integrity error types — **done** (`v2/database/integrity_errors.go`)
 - Single pool at production startup — **done** (C5)
@@ -288,7 +288,8 @@ compiler.compileRead(projectQuery, &database.ListOptions{
 5. **Retire v1 dialect layer and leftover v1 package** — **done (C6).** Deleted
    `internal/storage/database/` (dialects, dbtest, query-builder, mocks, and
    Identity/error aliases) after v2 dialects satisfied pool, migrations,
-   embedded bring-up, Identity, and errors.
+   Identity, and errors. Local zero-config uses SQLite; integration bring-up
+   uses testcontainers (or env DSNs), not an in-process embedded Postgres.
 6. **Single pool at startup** — **done (C5).** Server connects through v2
    dialect only; no second pool.
 
@@ -297,8 +298,11 @@ compiler.compileRead(projectQuery, &database.ListOptions{
 Identity binding, ID generation, and all entity statements. PostgreSQL and
 Spanner remain production targets; **SQLite** is the zero-config local/homelab
 default (`dialect/sqlite`, file under `server.data_dir`) and is not a Spanner
-production peer. Embedded Postgres remains available for tests that need a real
-Postgres engine.
+production peer. Postgres/Spanner integration tests bring up a **Postgres
+testcontainer** or a **Spanner emulator testcontainer** by default
+(`v2/testdb`); override with `ZITADEL_TEST_POSTGRES_URL` /
+`ZITADEL_TEST_SPANNER_URL`, or a real Spanner instance via
+`ZITADEL_TEST_SPANNER_INSTANCE`.
 
 ## Pre-merge checklist
 
@@ -307,9 +311,9 @@ items off as work lands; remove completed entries when no longer useful.
 
 - [x] `compileColumnName()` is no longer a required implementation: v2 compilers derive SQL column names from the schema `SQLName` bindings.
 - [x] `AndFilter`/`OrFilter` value vs pointer handling in the postgres compiler is already implemented and covered by compiler tests.
-- [x] Spanner statement execution and dialect registration are in place; remaining Spanner work is migrate/embedded/dbtest parity under v2.
+- [x] Spanner statement execution and dialect registration are in place; remaining Spanner work is migrate/dbtest parity under v2.
 - [x] Move migrations from v1 to v2 dialect packages (postgres + spanner)
-- [x] Move embedded postgres startup to v2 postgres dialect
+- [x] Retire in-process embedded Postgres; local default is SQLite; Postgres/Spanner integration uses testcontainers (or env / real Spanner instance)
 - [x] Move `database.Identity` bind/scan to v2 core
 - [ ] Move ID generation into v2 dialects (ephemeral via DB identity/function; managed fallback via dialect-chosen Go package or DB function); retire domain-layer `idgen` call sites at storage boundary
 - [x] Add `internal/storage/v2/AGENTS.md` with v2 conventions (including multi-write `withTransaction` rules)

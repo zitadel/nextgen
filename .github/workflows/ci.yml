@@ -173,7 +173,7 @@ jobs:
         run: env -u CI -u GITHUB_ACTIONS moon run testing:test-integration demo-next-e2e:e2e-real
 
       # Dogfoods @zitadel/testing through a second consumer. Keep this separate
-      # from the demo suite so two embedded-Postgres instances do not contend.
+      # from the demo suite so two local-server instances do not contend.
       - name: Run console real-instance suite
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-real
