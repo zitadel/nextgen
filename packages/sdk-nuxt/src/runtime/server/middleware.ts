@@ -398,11 +398,14 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
   // accepted by a backend call that doesn't re-check the JWT claims.
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
     const opaqueResult = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
-    if (opaqueResult) {
+    // A session without a user id is an anonymous session — the flow has not
+    // verified a user factor yet. Treat it as unauthenticated rather than
+    // inventing a placeholder identity that no route handler can resolve.
+    if (opaqueResult?.userId) {
       event.context.nextgenAuth = {
         isAuthenticated: true,
         session: {
-          userId: opaqueResult.userId ?? "unknown",
+          userId: opaqueResult.userId,
           email: null,
           name: null,
           token: cookieToken,

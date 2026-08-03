@@ -54,6 +54,20 @@ function makeJwt(
   return `${signing}.${base64url(sig)}`;
 }
 
+/**
+ * Stubs the opaque-token fallback path: `/sessions/me` answers 200 with the
+ * given body, anything else (a JWKS lookup) 404s so the JWT path cannot
+ * accidentally succeed.
+ */
+function mockSessionsMe(body: Record<string, unknown>): ReturnType<typeof vi.fn> {
+  return vi.fn().mockImplementation((url: string) => {
+    const res = String(url).endsWith("/sessions/me")
+      ? new Response(JSON.stringify(body), { status: 200 })
+      : new Response("{}", { status: 404 });
+    return Promise.resolve(res);
+  });
+}
+
 function makeWebRequest(
   url: string,
   cookie?: string,
@@ -525,6 +539,58 @@ describe("createNextgenMiddleware (H3)", () => {
     );
     expect(res.status).toBe(302);
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+
+  it("opaque session token with a user id authenticates as that user", async () => {
+    vi.stubGlobal("fetch", mockSessionsMe({ user_id: "user-opaque" }));
+
+    const app = createApp();
+    app.use(
+      createNextgenMiddleware({
+        url: "http://localhost:4000",
+        protectedRoutes: ["/admin"],
+        loginPath: "/login",
+      }),
+    );
+
+    let capturedAuth: unknown = undefined;
+    app.use("/", (event) => {
+      capturedAuth = event.context.nextgenAuth;
+      return { ok: true };
+    });
+
+    const handler = toWebHandler(app);
+    await handler(makeWebRequest("http://localhost:3000/", "__nextgen_session=opaque-token"));
+    expect(capturedAuth).toEqual({
+      isAuthenticated: true,
+      session: { userId: "user-opaque", email: null, name: null, token: "opaque-token" },
+    });
+  });
+
+  it("opaque session token without a user id stays unauthenticated", async () => {
+    // An anonymous session: the flow has not verified a user factor yet, so
+    // `/sessions/me` answers 200 with no `user_id`. Authenticating here would
+    // hand route handlers a placeholder identity matching no real user.
+    vi.stubGlobal("fetch", mockSessionsMe({}));
+
+    const app = createApp();
+    app.use(
+      createNextgenMiddleware({
+        url: "http://localhost:4000",
+        protectedRoutes: ["/admin"],
+        loginPath: "/login",
+      }),
+    );
+
+    let capturedAuth: unknown = undefined;
+    app.use("/", (event) => {
+      capturedAuth = event.context.nextgenAuth;
+      return { ok: true };
+    });
+
+    const handler = toWebHandler(app);
+    await handler(makeWebRequest("http://localhost:3000/", "__nextgen_session=opaque-token"));
+    expect(capturedAuth).toEqual({ isAuthenticated: false, session: null });
   });
 
   it("strips x-nextgen-auth-token from proxied requests", async () => {
