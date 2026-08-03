@@ -1,9 +1,8 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package stmttest
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -21,21 +20,10 @@ func uniqueTeamID(t *testing.T) string {
 	return "team-" + uniqueSuffix(t)
 }
 
-// ensureTeamTestProject creates the project teams hang off. Teams need no
-// cleanup of their own: both dialects declare the project FK ON DELETE CASCADE.
-func ensureTeamTestProject(t *testing.T, stmts service.AllStatements) (projectID string) {
-	t.Helper()
-
-	project := newTestProject(uniqueProjectID(t))
-	require.NoError(t, stmts.CreateProject(t.Context(), project))
-	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
-	return project.ID
-}
-
 func TestTeamStatements_Create(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("creates team and timestamps are set", func(t *testing.T) {
-			projectID := ensureTeamTestProject(t, d.stmts)
+			projectID := ensureProject(t, d.stmts)
 			teamID := uniqueTeamID(t)
 
 			team := newTestTeam(projectID, teamID)
@@ -53,33 +41,37 @@ func TestTeamStatements_Create(t *testing.T) {
 			assert.Equal(t, domain.TeamStatusActive, stored.Status)
 		})
 
-		// Both dialects reject this in Go, before the statement is built.
+		// Every dialect rejects this in Go, before the statement is built.
 		t.Run("empty id returns error", func(t *testing.T) {
-			projectID := ensureTeamTestProject(t, d.stmts)
+			projectID := ensureProject(t, d.stmts)
 
 			assert.Error(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, "")))
 		})
 
-		t.Run("name violating the column check returns error", func(t *testing.T) {
-			for _, tc := range []struct {
-				name     string
-				teamName string
-			}{
-				{"empty", ""},
-				{"over the length limit", strings.Repeat("a", domain.TeamNameMaxLength+1)},
-			} {
-				t.Run(tc.name, func(t *testing.T) {
-					projectID := ensureTeamTestProject(t, d.stmts)
+		t.Run("empty name returns error", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
 
-					team := newTestTeam(projectID, uniqueTeamID(t))
-					team.Name = tc.teamName
-					assert.ErrorIs(t, d.stmts.CreateTeam(t.Context(), team), new(database.CheckError))
-				})
+			team := newTestTeam(projectID, uniqueTeamID(t))
+			team.Name = ""
+			assert.ErrorIs(t, d.stmts.CreateTeam(t.Context(), team), new(database.CheckError))
+		})
+
+		t.Run("name over the length limit returns error", func(t *testing.T) {
+			// sqlite declares teams.name as plain TEXT and accepts the row, where
+			// postgres CHECKs length(name) and Spanner caps it with STRING(200).
+			// domain.ValidateTeamName still enforces the limit above storage.
+			if d.name == "sqlite" {
+				t.Skip("sqlite does not constrain the name length")
 			}
+			projectID := ensureProject(t, d.stmts)
+
+			team := newTestTeam(projectID, uniqueTeamID(t))
+			team.Name = strings.Repeat("a", domain.TeamNameMaxLength+1)
+			assert.ErrorIs(t, d.stmts.CreateTeam(t.Context(), team), new(database.CheckError))
 		})
 
 		t.Run("duplicate (project_id, id) returns error", func(t *testing.T) {
-			projectID := ensureTeamTestProject(t, d.stmts)
+			projectID := ensureProject(t, d.stmts)
 			teamID := uniqueTeamID(t)
 
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
@@ -97,7 +89,7 @@ func TestTeamStatements_Create(t *testing.T) {
 				{"differing only in case", strings.ToUpper},
 			} {
 				t.Run(tc.name, func(t *testing.T) {
-					projectID := ensureTeamTestProject(t, d.stmts)
+					projectID := ensureProject(t, d.stmts)
 					teamID := uniqueTeamID(t)
 
 					team := newTestTeam(projectID, teamID)
@@ -112,8 +104,8 @@ func TestTeamStatements_Create(t *testing.T) {
 		})
 
 		t.Run("same name in different projects is allowed", func(t *testing.T) {
-			projectID := ensureTeamTestProject(t, d.stmts)
-			otherProjectID := ensureTeamTestProject(t, d.stmts)
+			projectID := ensureProject(t, d.stmts)
+			otherProjectID := ensureProject(t, d.stmts)
 			teamID := uniqueTeamID(t)
 
 			team := newTestTeam(projectID, teamID)
@@ -126,10 +118,10 @@ func TestTeamStatements_Create(t *testing.T) {
 	})
 }
 
-func TestTeamStatements_Get(t *testing.T) {
+func TestTeamStatements_GetByID(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("returns team by project_id and id", func(t *testing.T) {
-			projectID := ensureTeamTestProject(t, d.stmts)
+			projectID := ensureProject(t, d.stmts)
 			teamID := uniqueTeamID(t)
 			team := newTestTeam(projectID, teamID)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
@@ -139,11 +131,14 @@ func TestTeamStatements_Get(t *testing.T) {
 			assert.Equal(t, projectID, stored.ProjectID)
 			assert.Equal(t, teamID, stored.ID)
 			assert.Equal(t, team.Name, stored.Name)
+			assert.Equal(t, domain.TeamStatusActive, stored.Status)
 			assert.False(t, stored.CreatedAt.IsZero())
+			assert.False(t, stored.UpdatedAt.IsZero())
 		})
 
 		t.Run("not found returns NoRowFoundError", func(t *testing.T) {
-			_, err := d.stmts.GetTeamByID(t.Context(), "proj-nonexistent", "team-nonexistent")
+			projectID := ensureProject(t, d.stmts)
+			_, err := d.stmts.GetTeamByID(t.Context(), projectID, "missing-team")
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		})
 	})
@@ -152,7 +147,7 @@ func TestTeamStatements_Get(t *testing.T) {
 func TestTeamStatements_UpdateTeam(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("updates team", func(t *testing.T) {
-			projectID := ensureTeamTestProject(t, d.stmts)
+			projectID := ensureProject(t, d.stmts)
 			teamID := uniqueTeamID(t)
 			team := newTestTeam(projectID, teamID)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
@@ -169,7 +164,7 @@ func TestTeamStatements_UpdateTeam(t *testing.T) {
 		})
 
 		t.Run("team not found returns NoRowFoundError", func(t *testing.T) {
-			projectID := ensureTeamTestProject(t, d.stmts)
+			projectID := ensureProject(t, d.stmts)
 			team := newTestTeam(projectID, "nonexistent")
 			assert.ErrorIs(t,
 				d.stmts.UpdateTeam(t.Context(), team),
@@ -178,7 +173,7 @@ func TestTeamStatements_UpdateTeam(t *testing.T) {
 		})
 
 		t.Run("deactivated team returns NoRowFoundError", func(t *testing.T) {
-			projectID := ensureTeamTestProject(t, d.stmts)
+			projectID := ensureProject(t, d.stmts)
 			teamID := uniqueTeamID(t)
 			team := newTestTeam(projectID, teamID)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
@@ -192,7 +187,7 @@ func TestTeamStatements_UpdateTeam(t *testing.T) {
 		})
 
 		t.Run("name violates uniqueness constraint", func(t *testing.T) {
-			projectID := ensureTeamTestProject(t, d.stmts)
+			projectID := ensureProject(t, d.stmts)
 			teamID := uniqueTeamID(t)
 			team := newTestTeam(projectID, teamID)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
@@ -215,7 +210,7 @@ func TestTeamStatements_UpdateTeam(t *testing.T) {
 		})
 
 		t.Run("unchanged name", func(t *testing.T) {
-			projectID := ensureTeamTestProject(t, d.stmts)
+			projectID := ensureProject(t, d.stmts)
 			team := newTestTeam(projectID, uniqueTeamID(t))
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
 			name := team.Name
@@ -227,11 +222,11 @@ func TestTeamStatements_UpdateTeam(t *testing.T) {
 		})
 
 		t.Run("same name in another project", func(t *testing.T) {
-			projectID := ensureTeamTestProject(t, d.stmts)
+			projectID := ensureProject(t, d.stmts)
 			team := newTestTeam(projectID, uniqueTeamID(t))
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
 
-			otherProjectID := ensureTeamTestProject(t, d.stmts)
+			otherProjectID := ensureProject(t, d.stmts)
 			other := newTestTeam(otherProjectID, uniqueTeamID(t))
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), other))
 
@@ -244,7 +239,7 @@ func TestTeamStatements_UpdateTeam(t *testing.T) {
 
 func TestTeamStatements_Deactivate(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureTeamTestProject(t, d.stmts)
+		projectID := ensureProject(t, d.stmts)
 		teamID := uniqueTeamID(t)
 		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
 
