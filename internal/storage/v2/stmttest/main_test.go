@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package stmttest
 
@@ -21,7 +21,7 @@ type dialectOpener struct {
 	seed func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error
 }
 
-// dialectOpeners is filled by build-tagged register files (postgres and/or spanner).
+// dialectOpeners is filled by build-tagged register files (postgres, spanner, and/or sqlite).
 var dialectOpeners []dialectOpener
 
 func registerDialect(
@@ -48,7 +48,7 @@ func TestMain(m *testing.M) {
 func run(m *testing.M) int {
 	ctx := context.Background()
 	if len(dialectOpeners) == 0 {
-		slog.Error("no dialects registered; build with postgres_integration and/or spanner_integration")
+		slog.Error("no dialects registered; build with postgres_integration, spanner_integration, and/or sqlite_integration")
 		return 1
 	}
 

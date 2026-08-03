@@ -10,6 +10,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/authattempt"
 	"github.com/zitadel/nextgen/internal/storage/v2/session"
 )
@@ -157,17 +158,29 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, authAttem
 
 // GetAuthAttemptByID implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) GetAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) (*domain.AuthAttempt, error) {
-	return as.get(ctx, authAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.id = $2`, projectID, authAttemptID)
+	var c statementCompiler
+	c.WriteString(authAttemptGetSelect)
+	c.WriteString(" WHERE aa.project_id = ")
+	c.WriteArg(projectID)
+	c.WriteString(" AND aa.id = ")
+	c.WriteArg(database.Identity(authAttemptID))
+	return as.get(ctx, c.String(), c.args...)
 }
 
 // GetAuthAttemptByHandoffToken implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffToken []byte) (*domain.AuthAttempt, error) {
-	return as.get(ctx, authAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.handoff_token = $2`, projectID, handoffToken)
+	var c statementCompiler
+	c.WriteString(authAttemptGetSelect)
+	c.WriteString(" WHERE aa.project_id = ")
+	c.WriteArg(projectID)
+	c.WriteString(" AND aa.handoff_token = ")
+	c.WriteArg(handoffToken)
+	return as.get(ctx, c.String(), c.args...)
 }
 
-func (as authAttemptStatements) get(ctx context.Context, query, projectID string, matcher any) (*domain.AuthAttempt, error) {
+func (as authAttemptStatements) get(ctx context.Context, query string, args ...any) (*domain.AuthAttempt, error) {
 	attempt := new(domain.AuthAttempt)
-	rows, err := as.client.Query(ctx, query, projectID, matcher)
+	rows, err := as.client.Query(ctx, query, args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
