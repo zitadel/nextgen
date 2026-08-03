@@ -5,7 +5,10 @@
  *   - every export file is read (no silent filename filtering);
  *   - cross-collection and per-mode `{alias}` chains resolve to concrete values;
  *   - a concrete value wins over a same-path re-export alias;
- *   - unresolved references and empty colour surfaces fail loud.
+ *   - unresolved references and empty colour surfaces fail loud;
+ *   - roles come from `src/collections.ts`, never from a collection's shape. An
+ *     unclassified export, a manifest entry with no export, and two collections
+ *     reaching for the same output slot all stop the sync.
  *
  * It also runs the resolver against the real checked-in `figma-export/` files so
  * a future designer push that breaks resolution is caught here, not silently.
@@ -16,63 +19,85 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { syncTokens } from "../scripts/sync-from-export.js";
+import { collectionRoles } from "./collections.js";
 
 const leaf = (value: unknown, type = "color"): unknown => ({ $type: type, $value: value });
 
+/** A minimal `semantic` collection, so tests can focus on one behaviour each. */
+const mode = {
+  name: "mode.json",
+  data: {
+    $metadata: { collection: "Mode", modes: ["Light", "Dark"] },
+    Light: { base: { primary: leaf("#171717") } },
+    Dark: { base: { primary: leaf("#e5e5e5") } },
+  },
+};
+
 describe("syncTokens resolver", () => {
   it("resolves cross-collection and per-mode alias chains to concrete hex", () => {
-    const out = syncTokens([
-      {
-        name: "palette.json",
-        data: { "tailwind colors": { neutral: { 900: leaf("#171717"), 200: leaf("#e5e5e5") } } },
-      },
-      {
-        name: "theme.json",
-        data: { colors: { "primary-light": leaf("{tailwind colors.neutral.900}"), "primary-dark": leaf("{tailwind colors.neutral.200}") } },
-      },
-      {
-        name: "mode.json",
-        data: {
-          $metadata: { collection: "Mode", modes: ["Light", "Dark"] },
-          Light: { base: { primary: leaf("{colors.primary-light}") } },
-          Dark: { base: { primary: leaf("{colors.primary-dark}") } },
+    const out = syncTokens(
+      [
+        {
+          name: "palette.json",
+          data: { "tailwind colors": { neutral: { 900: leaf("#171717"), 200: leaf("#e5e5e5") } } },
         },
-      },
-    ]);
+        {
+          name: "theme.json",
+          data: { colors: { "primary-light": leaf("{tailwind colors.neutral.900}"), "primary-dark": leaf("{tailwind colors.neutral.200}") } },
+        },
+        {
+          name: "mode.json",
+          data: {
+            $metadata: { collection: "Mode", modes: ["Light", "Dark"] },
+            Light: { base: { primary: leaf("{colors.primary-light}") } },
+            Dark: { base: { primary: leaf("{colors.primary-dark}") } },
+          },
+        },
+      ],
+      // Registry-only collections still feed the alias chain — role controls
+      // what a collection *surfaces*, not whether it can be referenced.
+      { palette: "registry-only", theme: "registry-only", Mode: "semantic" },
+    );
 
     expect(out.color.primary).toEqual({ dark: "#e5e5e5", light: "#171717" });
     expect(out.$source.themeModes).toEqual(["dark", "light"]);
   });
 
   it("flattens the base group and skips non-hex leaves", () => {
-    const out = syncTokens([
-      {
-        name: "mode.json",
-        data: {
-          $metadata: { collection: "Mode", modes: ["Light", "Dark"] },
-          Light: { base: { "sidebar-accent": leaf("#ffffff"), enabled: leaf(true, "boolean") } },
-          Dark: { base: { "sidebar-accent": leaf("#000000"), enabled: leaf(true, "boolean") } },
+    const out = syncTokens(
+      [
+        {
+          name: "mode.json",
+          data: {
+            $metadata: { collection: "Mode", modes: ["Light", "Dark"] },
+            Light: { base: { "sidebar-accent": leaf("#ffffff"), enabled: leaf(true, "boolean") } },
+            Dark: { base: { "sidebar-accent": leaf("#000000"), enabled: leaf(true, "boolean") } },
+          },
         },
-      },
-    ]);
+      ],
+      { Mode: "semantic" },
+    );
 
     expect(Object.keys(out.color)).toEqual(["sidebar-accent"]);
     expect(out.color["sidebar-accent"]).toEqual({ dark: "#000000", light: "#ffffff" });
   });
 
   it("lets a concrete value win over a same-path re-export alias", () => {
-    const out = syncTokens([
-      { name: "1-primitive.json", data: { breakpoint: { sm: leaf(640, "number") } } },
-      {
-        name: "2-theme.json",
-        data: {
-          breakpoint: { sm: leaf("{breakpoint.sm}", "number") },
-          $metadata: { collection: "Mode", modes: ["Light", "Dark"] },
-          Light: { base: { ring: leaf("#a3a3a3") } },
-          Dark: { base: { ring: leaf("#737373") } },
+    const out = syncTokens(
+      [
+        { name: "1-primitive.json", data: { breakpoint: { sm: leaf(640, "number") } } },
+        {
+          name: "2-theme.json",
+          data: {
+            breakpoint: { sm: leaf("{breakpoint.sm}", "number") },
+            $metadata: { collection: "Mode", modes: ["Light", "Dark"] },
+            Light: { base: { ring: leaf("#a3a3a3") } },
+            Dark: { base: { ring: leaf("#737373") } },
+          },
         },
-      },
-    ]);
+      ],
+      { "1-primitive": "primitives", Mode: "semantic" },
+    );
 
     // No cycle thrown; the concrete 640 wins, and the surface still builds.
     expect(out.color.ring).toEqual({ dark: "#737373", light: "#a3a3a3" });
@@ -80,23 +105,139 @@ describe("syncTokens resolver", () => {
 
   it("throws on an unresolved reference", () => {
     expect(() =>
-      syncTokens([
-        {
-          name: "mode.json",
-          data: {
-            $metadata: { collection: "Mode", modes: ["Light", "Dark"] },
-            Light: { base: { primary: leaf("{colors.missing}") } },
-            Dark: { base: { primary: leaf("#000000") } },
+      syncTokens(
+        [
+          {
+            name: "mode.json",
+            data: {
+              $metadata: { collection: "Mode", modes: ["Light", "Dark"] },
+              Light: { base: { primary: leaf("{colors.missing}") } },
+              Dark: { base: { primary: leaf("#000000") } },
+            },
           },
-        },
-      ]),
+        ],
+        { Mode: "semantic" },
+      ),
     ).toThrow(/Unresolved reference/);
   });
 
-  it("throws when no Light/Dark themed collection exists", () => {
-    expect(() => syncTokens([{ name: "only-primitives.json", data: { spacing: { 1: leaf(4, "number") } } }])).toThrow(
-      /No Light\/Dark themed collection/,
+  it("refuses to classify an export the manifest does not name", () => {
+    expect(() => syncTokens([mode, { name: "surprise.json", data: { thing: leaf("#ffffff") } }], { Mode: "semantic" })).toThrow(
+      /Unclassified collection\(s\): surprise \(surprise\.json\)/,
     );
+  });
+
+  it("flags a manifest entry whose collection no longer exists", () => {
+    expect(() => syncTokens([mode], { Mode: "semantic", Renamed: "themed" })).toThrow(
+      /classifies Renamed, but no export declares that collection/,
+    );
+  });
+
+  it("requires exactly one semantic collection", () => {
+    expect(() => syncTokens([mode], { Mode: "themed" })).toThrow(/Exactly one collection must have role "semantic"/);
+    expect(() =>
+      syncTokens(
+        [
+          mode,
+          {
+            name: "impostor.json",
+            data: {
+              $metadata: { collection: "Impostor", modes: ["Light", "Dark"] },
+              Light: { base: { secondary: leaf("#ffffff") } },
+              Dark: { base: { secondary: leaf("#000000") } },
+            },
+          },
+        ],
+        { Mode: "semantic", Impostor: "semantic" },
+      ),
+    ).toThrow(/Exactly one collection must have role "semantic" \(found 2/);
+  });
+
+  it("keeps every themed collection, namespaced by its own group", () => {
+    const out = syncTokens(
+      [
+        mode,
+        {
+          name: "gradient-colors.json",
+          data: {
+            $metadata: { collection: "Gradient Colors", modes: ["Light", "Dark"] },
+            Light: { gradient: { red: { start: leaf("#f25543") } } },
+            Dark: { gradient: { red: { start: leaf("#e84331") } } },
+          },
+        },
+        {
+          name: "syntax.json",
+          data: {
+            $metadata: { collection: "Syntax", modes: ["Dark", "Light"] },
+            Dark: { syntax: { key: leaf("#9066da") } },
+            Light: { syntax: { key: leaf("#401889") } },
+          },
+        },
+      ],
+      { Mode: "semantic", "Gradient Colors": "themed", Syntax: "themed" },
+    );
+
+    // Both survive. When the role was inferred from "has Light/Dark modes",
+    // these two shared the viewport bucket keyed by mode name, and whichever
+    // file sorted last replaced the other outright.
+    expect(out.themed.gradient).toEqual({ "red-start": { dark: "#e84331", light: "#f25543" } });
+    expect(out.themed.syntax).toEqual({ key: { dark: "#9066da", light: "#401889" } });
+    expect(out.typography).toEqual({});
+    expect(out.color.primary).toEqual({ dark: "#e5e5e5", light: "#171717" });
+  });
+
+  it("throws when two themed collections project the same group", () => {
+    expect(() =>
+      syncTokens(
+        [
+          mode,
+          {
+            name: "a.json",
+            data: {
+              $metadata: { collection: "Syntax A", modes: ["Light", "Dark"] },
+              Light: { syntax: { key: leaf("#401889") } },
+              Dark: { syntax: { key: leaf("#9066da") } },
+            },
+          },
+          {
+            name: "b.json",
+            data: {
+              $metadata: { collection: "Syntax B", modes: ["Light", "Dark"] },
+              Light: { syntax: { string: leaf("#bd2514") } },
+              Dark: { syntax: { string: leaf("#f25543") } },
+            },
+          },
+        ],
+        { Mode: "semantic", "Syntax A": "themed", "Syntax B": "themed" },
+      ),
+    ).toThrow(/both project themed\.syntax/);
+  });
+
+  it("throws when two viewport collections project the same mode", () => {
+    expect(() =>
+      syncTokens(
+        [
+          mode,
+          {
+            name: "a.json",
+            data: {
+              $metadata: { collection: "Custom A", modes: ["Desktop", "Mobile"] },
+              Desktop: { "heading-xl": { "font-size": leaf(60, "number") } },
+              Mobile: { "heading-xl": { "font-size": leaf(36, "number") } },
+            },
+          },
+          {
+            name: "b.json",
+            data: {
+              $metadata: { collection: "Custom B", modes: ["Desktop", "Mobile"] },
+              Desktop: { "heading-lg": { "font-size": leaf(48, "number") } },
+              Mobile: { "heading-lg": { "font-size": leaf(30, "number") } },
+            },
+          },
+        ],
+        { Mode: "semantic", "Custom A": "viewport", "Custom B": "viewport" },
+      ),
+    ).toThrow(/both project typography\.desktop/);
   });
 });
 
@@ -118,5 +259,31 @@ describe("syncTokens against real figma-export/", () => {
       expect(dark, name).toMatch(/^#[0-9a-f]{3,8}$/i);
       expect(light, name).toMatch(/^#[0-9a-f]{3,8}$/i);
     }
+  });
+
+  it("surfaces every themed collection the designer pushed", () => {
+    const out = syncTokens(files);
+
+    expect(Object.keys(out.themed).sort()).toEqual(["gradient", "syntax"]);
+    expect(Object.keys(out.themed.gradient!)).toHaveLength(6);
+    expect(Object.keys(out.themed.syntax!)).toHaveLength(6);
+
+    // The gradient stops that back the hand-written gradients in apps/console
+    // AppShell, shared-component-styles/pill.css and layout-chrome.css.
+    expect(out.themed.gradient!["red-start"]).toEqual({ dark: "#f25543", light: "#f25543" });
+    expect(out.themed.gradient!["base-end"]).toEqual({ dark: "#0f0f11", light: "#fafafa" });
+    expect(out.themed.gradient!["lavender-start"]).toEqual({ dark: "#bba5e4", light: "#bba5e4" });
+
+    expect(out.themed.syntax!.key).toEqual({ dark: "#9066da", light: "#401889" });
+  });
+
+  it("keeps typography to the viewport axis", () => {
+    expect(Object.keys(syncTokens(files).typography).sort()).toEqual(["desktop", "mobile"]);
+  });
+
+  it("classifies exactly the collections the export ships", () => {
+    // `syncTokens` throws on either mismatch; asserting the sets directly makes
+    // the failure legible when a designer adds or renames a collection.
+    expect(Object.keys(collectionRoles).sort()).toEqual([...syncTokens(files).$source.collections].sort());
   });
 });

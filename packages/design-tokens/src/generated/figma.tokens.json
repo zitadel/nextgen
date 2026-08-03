@@ -248,6 +248,60 @@
     "6xl": 1152,
     "7xl": 1280
   },
+  "themed": {
+    "gradient": {
+      "purple-start": {
+        "dark": "#401889",
+        "light": "#401889"
+      },
+      "red-start": {
+        "dark": "#f25543",
+        "light": "#f25543"
+      },
+      "neutral-start": {
+        "dark": "#484a57",
+        "light": "#bfbfcf"
+      },
+      "base-end": {
+        "dark": "#0f0f11",
+        "light": "#fafafa"
+      },
+      "lavender-start": {
+        "dark": "#bba5e4",
+        "light": "#bba5e4"
+      },
+      "rose-start": {
+        "dark": "#ea8aa0",
+        "light": "#ea8aa0"
+      }
+    },
+    "syntax": {
+      "key": {
+        "dark": "#9066da",
+        "light": "#401889"
+      },
+      "string": {
+        "dark": "#f25543",
+        "light": "#bd2514"
+      },
+      "number": {
+        "dark": "#e25f7d",
+        "light": "#c52247"
+      },
+      "boolean": {
+        "dark": "#bba5e4",
+        "light": "#5a23bd"
+      },
+      "punctuation": {
+        "dark": "#82829c",
+        "light": "#686883"
+      },
+      "comment": {
+        "dark": "#686883",
+        "light": "#82829c"
+      }
+    }
+  },
   "typography": {
     "desktop": {
       "headingXl": {
@@ -320,26 +374,6 @@
       "sectionTitleGapLg": 16,
       "sectionTitleGapMd": 16,
       "sectionTitleGapSm": 16
-    },
-    "light": {
-      "syntax": {
-        "key": "#401889",
-        "string": "#bd2514",
-        "number": "#c52247",
-        "boolean": "#5a23bd",
-        "punctuation": "#686883",
-        "comment": "#82829c"
-      }
-    },
-    "dark": {
-      "syntax": {
-        "key": "#9066da",
-        "string": "#f25543",
-        "number": "#e25f7d",
-        "boolean": "#bba5e4",
-        "punctuation": "#82829c",
-        "comment": "#686883"
-      }
     }
   }
 }

@@ -37,6 +37,38 @@ add it to `overrides.ts` with a doc comment explaining why.
 
 After any sync, run `:generate` and review the snapshot diff.
 
+### How a collection is classified
+
+Roles are **declared** in [`src/collections.ts`](src/collections.ts), keyed by
+Figma collection name (`$metadata.collection`, falling back to the file stem) —
+never inferred from a collection's shape:
+
+| Role | Lands in | Emitted as |
+| --- | --- | --- |
+| `semantic` | `color.<name>` (from its `base/*` group) | `--zl-<name>` (shadcn roles) |
+| `themed` | `themed.<group>.<name>` | `--zl-<group>-<name>` |
+| `viewport` | `typography.<mode>` | not emitted |
+| `primitives` | `radius`/`text`/`font`/`font-weight`/`container` | per category |
+| `registry-only` | nothing | nothing |
+
+Every collection feeds the alias registry regardless of role, so a
+`registry-only` collection is still referenceable as `{brand.purple.500}` — the
+role controls what a collection *surfaces*, not whether it can be resolved
+through.
+
+**Adding a collection in Figma is a decision, so the sync makes you make it.**
+An export the manifest doesn't name throws; so does a manifest entry with no
+matching export (a rename or deletion in Figma). Exactly one collection may
+hold `semantic`.
+
+This replaced shape inference ("the Light/Dark collection is the semantic
+surface, anything else multi-mode is viewport typography"), which silently
+mis-routed `Syntax` and `Gradient Colors` into one bucket where the
+later-sorting file replaced the earlier one outright. Within a role, `claim()`
+still guards two collections landing on the same key. Neither failure is
+catchable downstream: the snapshot test only sees names that already reached
+`build.ts`.
+
 ## Coexistence: legacy vs shadcn
 
 Two colour systems ship at once so consumers migrate incrementally:
@@ -48,6 +80,11 @@ Two colour systems ship at once so consumers migrate incrementally:
 - **shadcn** (`--zl-background`, `--zl-foreground`, `--zl-primary`, `--zl-card`,
   `--zl-border`, `--zl-sidebar-*`, `--zl-chart-*`) comes from the designer export
   and lives under `tokens.theme.*`. This is the target surface.
+- **Themed groups** (`--zl-syntax-*`, `--zl-gradient-*`) are the designer's
+  other Light/Dark collections, under `tokens.<group>.*`. They theme like the
+  shadcn colours but are deliberately kept out of `css/shadcn.css`: that file
+  owns the *unprefixed* shadcn contract, and `syntax`/`gradient` are not shadcn
+  role names. Reach them as `--zl-*` or `bg-zl-gradient-red-start`.
 
 When migrating a consumer, replace legacy `--zl-color-*` references with the new
 `--zl-*` names (or `bg-zl-*` / `text-zl-*` Tailwind utilities) and verify light +
@@ -66,6 +103,9 @@ not reintroduce `bg-zl-*` there — the bridge file owns the mapping.
 - `scripts/sync-from-export.ts` + `figma-export/` — offline DTCG sync and its
   committed export provenance. Re-export from Figma and re-run `:sync-export`
   to refresh values.
+- `src/collections.ts` — the role each Figma collection plays. Edit it when the
+  designer adds, renames, or repurposes a collection; the sync fails loudly
+  until it matches the export.
 - `scripts/build.ts` — emitter. Output must remain deterministic for
   the snapshot test to be meaningful.
 - `src/tokens.snapshot.spec.ts` — snapshot. Update intentionally when
@@ -86,9 +126,11 @@ not reintroduce `bg-zl-*` there — the bridge file owns the mapping.
 
 `scripts/build.ts` emits legacy semantic colours, then the new shadcn colours
 (`theme.*`), then the remaining categories in a fixed order (spacing → radius →
-font → motion → focus → breakpoint → container → layout). Spacing keys are
-numeric-sorted. Keep new categories appended at the end so existing diffs stay
-small.
+font → motion → focus → breakpoint → container → layout → themed groups).
+Spacing keys are numeric-sorted. Themed groups emit last, in export order, so a
+new Light/Dark collection from Figma appends to the diff rather than shifting
+every existing line. Keep new categories appended at the end for the same
+reason.
 
 ## Tests
 
