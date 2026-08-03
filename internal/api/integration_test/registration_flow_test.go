@@ -65,7 +65,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	credNew := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
 
 	// Seed team + user + existing passkey.
-	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
 		Name:      helpers.TeamName(),
 	})

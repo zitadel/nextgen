@@ -2164,6 +2164,14 @@ type CreateTeamConflict ErrorDetails
 
 func (*CreateTeamConflict) createTeamRes() {}
 
+type CreateTeamForbidden ErrorDetails
+
+func (*CreateTeamForbidden) createTeamRes() {}
+
+type CreateTeamNotFound ErrorDetails
+
+func (*CreateTeamNotFound) createTeamRes() {}
+
 // Ref: #
 type CreateTeamRequest struct {
 	// The name of the team. Must be unique within the project.
@@ -2179,48 +2187,6 @@ func (s *CreateTeamRequest) GetName() string {
 func (s *CreateTeamRequest) SetName(val string) {
 	s.Name = val
 }
-
-// Ref: #
-type CreateTeamResponse struct {
-	// The unique identifier of the team.
-	ID string `json:"id"`
-	// The name of the team.
-	Name string `json:"name"`
-	// The time when the team was created.
-	CreatedAt time.Time `json:"createdAt"`
-}
-
-// GetID returns the value of ID.
-func (s *CreateTeamResponse) GetID() string {
-	return s.ID
-}
-
-// GetName returns the value of Name.
-func (s *CreateTeamResponse) GetName() string {
-	return s.Name
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *CreateTeamResponse) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// SetID sets the value of ID.
-func (s *CreateTeamResponse) SetID(val string) {
-	s.ID = val
-}
-
-// SetName sets the value of Name.
-func (s *CreateTeamResponse) SetName(val string) {
-	s.Name = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *CreateTeamResponse) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-func (*CreateTeamResponse) createTeamRes() {}
 
 type CreateTeamTooManyRequests ErrorDetails
 
@@ -2546,6 +2512,7 @@ func (*ErrorDetailsStatusCode) setUserPasswordRes()          {}
 func (*ErrorDetailsStatusCode) submitFlowEventRes()          {}
 func (*ErrorDetailsStatusCode) submitFlowStepRes()           {}
 func (*ErrorDetailsStatusCode) updateFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) updateTeamRes()               {}
 
 type ExchangeHandoffBadRequest ErrorDetails
 
@@ -5177,61 +5144,6 @@ func (*GetSessionUnauthorized) getSessionRes() {}
 type GetTeamNotFound ErrorDetails
 
 func (*GetTeamNotFound) getTeamRes() {}
-
-// The current state of a team.
-// Ref: #
-type GetTeamResponse struct {
-	// The unique identifier of the team.
-	ID string `json:"id"`
-	// The name of the team.
-	Name string `json:"name"`
-	// The time when the team was created.
-	CreatedAt time.Time `json:"createdAt"`
-	// The time when the team was last updated.
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-// GetID returns the value of ID.
-func (s *GetTeamResponse) GetID() string {
-	return s.ID
-}
-
-// GetName returns the value of Name.
-func (s *GetTeamResponse) GetName() string {
-	return s.Name
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *GetTeamResponse) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// GetUpdatedAt returns the value of UpdatedAt.
-func (s *GetTeamResponse) GetUpdatedAt() time.Time {
-	return s.UpdatedAt
-}
-
-// SetID sets the value of ID.
-func (s *GetTeamResponse) SetID(val string) {
-	s.ID = val
-}
-
-// SetName sets the value of Name.
-func (s *GetTeamResponse) SetName(val string) {
-	s.Name = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *GetTeamResponse) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-// SetUpdatedAt sets the value of UpdatedAt.
-func (s *GetTeamResponse) SetUpdatedAt(val time.Time) {
-	s.UpdatedAt = val
-}
-
-func (*GetTeamResponse) getTeamRes() {}
 
 type GetTeamUnauthorized ErrorDetails
 
@@ -12307,6 +12219,119 @@ func (*SubmitFlowStepOK) submitFlowStepRes() {}
 
 type TeamID string
 
+// Details of a team.
+// Ref: #
+type TeamResponse struct {
+	// The unique identifier of the team.
+	ID string `json:"id"`
+	// The name of the team.
+	Name   string     `json:"name"`
+	Status TeamStatus `json:"status"`
+	// The time when the team was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the team was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// GetID returns the value of ID.
+func (s *TeamResponse) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *TeamResponse) GetName() string {
+	return s.Name
+}
+
+// GetStatus returns the value of Status.
+func (s *TeamResponse) GetStatus() TeamStatus {
+	return s.Status
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *TeamResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *TeamResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *TeamResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *TeamResponse) SetName(val string) {
+	s.Name = val
+}
+
+// SetStatus sets the value of Status.
+func (s *TeamResponse) SetStatus(val TeamStatus) {
+	s.Status = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *TeamResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *TeamResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*TeamResponse) createTeamRes() {}
+func (*TeamResponse) getTeamRes()    {}
+func (*TeamResponse) updateTeamRes() {}
+
+// The lifecycle state of a team.
+// active: The team is available for use.
+// deactivated: The team is no longer active but is retained for historical and audit purposes.
+// Ref: #
+type TeamStatus string
+
+const (
+	TeamStatusActive      TeamStatus = "active"
+	TeamStatusDeactivated TeamStatus = "deactivated"
+)
+
+// AllValues returns all TeamStatus values.
+func (TeamStatus) AllValues() []TeamStatus {
+	return []TeamStatus{
+		TeamStatusActive,
+		TeamStatusDeactivated,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s TeamStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case TeamStatusActive:
+		return []byte(s), nil
+	case TeamStatusDeactivated:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *TeamStatus) UnmarshalText(data []byte) error {
+	switch TeamStatus(data) {
+	case TeamStatusActive:
+		*s = TeamStatusActive
+		return nil
+	case TeamStatusDeactivated:
+		*s = TeamStatusDeactivated
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Ref: #
 type TokenResponse struct {
 	// The access token issued by the authorization server.
@@ -12368,6 +12393,42 @@ func (*UpdateFlowDefinitionBadRequest) updateFlowDefinitionRes() {}
 type UpdateFlowDefinitionNotFound ErrorDetails
 
 func (*UpdateFlowDefinitionNotFound) updateFlowDefinitionRes() {}
+
+type UpdateTeamBadRequest ErrorDetails
+
+func (*UpdateTeamBadRequest) updateTeamRes() {}
+
+type UpdateTeamConflict ErrorDetails
+
+func (*UpdateTeamConflict) updateTeamRes() {}
+
+type UpdateTeamForbidden ErrorDetails
+
+func (*UpdateTeamForbidden) updateTeamRes() {}
+
+type UpdateTeamNotFound ErrorDetails
+
+func (*UpdateTeamNotFound) updateTeamRes() {}
+
+// Ref: #
+type UpdateTeamRequest struct {
+	// The name of the team. Must be unique within the project.
+	Name OptString `json:"name"`
+}
+
+// GetName returns the value of Name.
+func (s *UpdateTeamRequest) GetName() OptString {
+	return s.Name
+}
+
+// SetName sets the value of Name.
+func (s *UpdateTeamRequest) SetName(val OptString) {
+	s.Name = val
+}
+
+type UpdateTeamUnauthorized ErrorDetails
+
+func (*UpdateTeamUnauthorized) updateTeamRes() {}
 
 // A user represents an individual identity in the system. It can be used to
 // represent a human user, but also a service account or any other type of

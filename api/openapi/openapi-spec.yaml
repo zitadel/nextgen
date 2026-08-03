@@ -32,9 +32,9 @@ tags:
   - name: Sessions
     description: Session creation, lookup, exchange, and teardown endpoints.
   - name: Projects
-    description: Project creation and lookup endpoints.
+    description: Project management endpoints.
   - name: Teams
-    description: Team creation and lookup endpoints.
+    description: Team management endpoints.
   - name: Users
     description: User creation, lookup, current-user, and password endpoints.
   - name: Schemas

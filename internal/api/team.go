@@ -13,34 +13,61 @@ func (h *Handler) CreateTeam(ctx context.Context, req *api.CreateTeamRequest, pa
 	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opWrite); err != nil {
 		return nil, err
 	}
-	team, err := h.teamService.CreateTeam(ctx, service.CreateTeamInput{
+	team, err := h.teamService.Create(ctx, service.CreateTeamInput{
 		ProjectID: string(params.ProjectID),
 		Name:      req.Name,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &api.CreateTeamResponse{
-		ID:        team.ID,
-		Name:      team.Name,
-		CreatedAt: team.CreatedAt,
-	}, nil
+	return teamResponse(team), nil
 }
 
 func (h *Handler) GetTeam(ctx context.Context, params api.GetTeamParams) (api.GetTeamRes, error) {
 	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opRead); err != nil {
 		return nil, err
 	}
-	team, err := h.teamService.GetTeam(ctx, string(params.ProjectID), string(params.TeamID))
+	team, err := h.teamService.Get(ctx, string(params.ProjectID), string(params.TeamID))
 	if err != nil {
 		return nil, err
 	}
-	return &api.GetTeamResponse{
+	return teamResponse(team), nil
+}
+
+func (h *Handler) UpdateTeam(ctx context.Context, req *api.UpdateTeamRequest, params api.UpdateTeamParams) (api.UpdateTeamRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opWrite); err != nil {
+		return nil, err
+	}
+	input := service.UpdateTeamInput{
+		ProjectID: string(params.ProjectID),
+		TeamID:    string(params.TeamID),
+	}
+	if name, ok := req.Name.Get(); ok {
+		input.Name = &name
+	}
+	team, err := h.teamService.Update(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	return teamResponse(team), nil
+}
+
+func teamResponse(team *domain.Team) *api.TeamResponse {
+	return &api.TeamResponse{
 		ID:        team.ID,
 		Name:      team.Name,
+		Status:    teamStatus(team.Status),
 		CreatedAt: team.CreatedAt,
 		UpdatedAt: team.UpdatedAt,
-	}, nil
+	}
+}
+
+func teamStatus(status domain.TeamStatus) api.TeamStatus {
+	if status == domain.TeamStatusActive {
+		return api.TeamStatusActive
+	}
+	// pending_purge is not part of the contract, such a team is no longer usable.
+	return api.TeamStatusDeactivated
 }
 
 // ------------------ Errors ---------------

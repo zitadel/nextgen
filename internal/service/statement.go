@@ -103,6 +103,7 @@ type TeamStatements interface {
 	Statements
 	CreateTeam(ctx context.Context, entity *domain.Team) error
 	GetTeamByID(ctx context.Context, projectID, id string) (*domain.Team, error)
+	UpdateTeam(ctx context.Context, entity *domain.Team) error
 	// DeactivateTeam tombs the team and cascades membership/user lifecycle
 	// updates. It wraps the multi-write steps in withTransaction (opens a tx
 	// via Statements(), joins an outer pool.Transaction when already nested).
