@@ -67,7 +67,7 @@ catalog:
   fumadocs-openapi: ^11.0.2
   fumadocs-ui: ^16.10.3
   fumapress: ^0.6.2
-  hono: ^4.12.31
+  hono: ^4.12.34
   jsdom: ^29.0.2
   json-schema-typed: ^8.0.2
   lightningcss: ^1.30.1

@@ -196,8 +196,8 @@ catalogs:
       specifier: ^0.6.2
       version: 0.6.2
     hono:
-      specifier: ^4.12.31
-      version: 4.12.31
+      specifier: ^4.12.34
+      version: 4.12.34
     jsdom:
       specifier: ^29.0.2
       version: 29.0.2
@@ -721,7 +721,7 @@ importers:
     dependencies:
       '@fumapress/ai':
         specifier: 'catalog:'
-        version: 0.6.2(e98336de804696fbbc6e7a0b6c3083ec)
+        version: 0.6.2(b01a5cefaf1862a59e2fcad78c9b77d6)
       '@scalar/api-client-react':
         specifier: 'catalog:'
         version: 2.0.26(change-case@5.4.4)(react@19.2.8)(tailwindcss@4.2.4)(typescript@6.0.3)
@@ -742,10 +742,10 @@ importers:
         version: 16.10.3(a2723167a0eaebcad6365387053f992b)
       fumapress:
         specifier: 'catalog:'
-        version: 0.6.2(e60dbb3a9a3d0facb564cf021ced48b4)
+        version: 0.6.2(41893b74bf41a81eb991bc0509d164c8)
       hono:
         specifier: 'catalog:'
-        version: 4.12.31
+        version: 4.12.34
       json-schema-typed:
         specifier: 'catalog:'
         version: 8.0.2
@@ -11175,8 +11175,8 @@ packages:
     resolution: {integrity: sha512-Xwwo44whKBVCYoliBQwaPvtd/2tYFkRQtXDWj1nackaV2JPXx3L0+Jvd8/qCJ2p+ML0/XVkJ2q+Mr+UVdpJK5w==}
     engines: {node: '>=12.0.0'}
 
-  hono@4.12.31:
-    resolution: {integrity: sha512-zJIHFrl6bq3RDd2YusFNCDlM8qUprxKswyi/OPzPyzKDdyBXDqWx8bZlZ7R+saTdSTatUmb3O7K4SspGPaEOQg==}
+  hono@4.12.34:
+    resolution: {integrity: sha512-GqXJqY/xJkJmuloTrnV1ZEXG3fqte+VjkUqoRNZXcrUidiUOP4fMSIHHY4tsqZBK++kVyWmt/AAfSUuy57/eSA==}
     engines: {node: '>=16.9.0'}
 
   hookable@5.5.3:
@@ -17280,7 +17280,7 @@ snapshots:
       '@tailwindcss/oxide': 4.2.4
       tailwindcss: 4.2.4
 
-  '@fumapress/ai@0.6.2(e98336de804696fbbc6e7a0b6c3083ec)':
+  '@fumapress/ai@0.6.2(b01a5cefaf1862a59e2fcad78c9b77d6)':
     dependencies:
       '@ai-sdk/react': 3.0.209(react@19.2.8)(zod@4.4.3)
       '@fuma-translate/react': 1.0.2(@types/react@19.2.14)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -17290,7 +17290,7 @@ snapshots:
       flexsearch: 0.8.212
       fumadocs-core: 16.10.3(@mdx-js/mdx@3.1.1)(@tanstack/react-router@1.168.23(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@types/estree-jsx@1.0.5)(@types/hast@3.0.4)(@types/mdast@4.0.4)(@types/react@19.2.14)(flexsearch@0.8.212)(lucide-react@1.20.0(react@19.2.8))(next@16.2.12(@opentelemetry/api@1.9.1)(@playwright/test@1.60.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(sass@1.100.0))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(waku@1.0.0-beta.3(@types/node@25.6.0)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.106.2(esbuild@0.28.1)))(react@19.2.8)(sass@1.100.0)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0))(zod@4.4.3)
       fumadocs-ui: 16.10.3(a2723167a0eaebcad6365387053f992b)
-      fumapress: 0.6.2(e60dbb3a9a3d0facb564cf021ced48b4)
+      fumapress: 0.6.2(41893b74bf41a81eb991bc0509d164c8)
       lucide-react: 1.20.0(react@19.2.8)
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
@@ -17358,9 +17358,9 @@ snapshots:
       '@tanstack/vue-virtual': 3.13.29(vue@3.5.35(typescript@6.0.3))
       vue: 3.5.35(typescript@6.0.3)
 
-  '@hono/node-server@2.0.12(hono@4.12.31)':
+  '@hono/node-server@2.0.12(hono@4.12.34)':
     dependencies:
-      hono: 4.12.31
+      hono: 4.12.34
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -18049,7 +18049,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.30.0(zod@4.4.3)':
     dependencies:
-      '@hono/node-server': 2.0.12(hono@4.12.31)
+      '@hono/node-server': 2.0.12(hono@4.12.34)
       ajv: 8.20.0
       ajv-formats: 3.0.1(ajv@8.20.0)
       content-type: 1.0.5
@@ -18059,7 +18059,7 @@ snapshots:
       eventsource-parser: 3.1.0
       express: 5.2.1
       express-rate-limit: 8.5.2(express@5.2.1)
-      hono: 4.12.31
+      hono: 4.12.34
       jose: 6.2.3
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
@@ -25796,7 +25796,7 @@ snapshots:
       - '@types/react-dom'
       - tailwindcss
 
-  fumapress@0.6.2(e60dbb3a9a3d0facb564cf021ced48b4):
+  fumapress@0.6.2(41893b74bf41a81eb991bc0509d164c8):
     dependencies:
       '@fuma-translate/react': 1.0.2(@types/react@19.2.14)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@orama/orama': 3.1.18
@@ -25818,7 +25818,7 @@ snapshots:
       '@types/react': 19.2.14
       fumadocs-mdx: 15.0.12(95dd1c6f812427836b16157787240f41)
       fumadocs-openapi: 11.0.2(483ad338d07e9a9c5b6f91ff9b41d2ea)
-      hono: 4.12.31
+      hono: 4.12.34
       sharp: 0.34.5
     transitivePeerDependencies:
       - '@types/node'
@@ -26280,7 +26280,7 @@ snapshots:
 
   highlight.js@11.11.1: {}
 
-  hono@4.12.31: {}
+  hono@4.12.34: {}
 
   hookable@5.5.3: {}
 
@@ -32391,11 +32391,11 @@ snapshots:
 
   waku@1.0.0-beta.3(@types/node@25.6.0)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.106.2(esbuild@0.28.1)))(react@19.2.8)(sass@1.100.0)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0):
     dependencies:
-      '@hono/node-server': 2.0.12(hono@4.12.31)
+      '@hono/node-server': 2.0.12(hono@4.12.34)
       '@vitejs/plugin-react': 6.0.1(vite@8.0.16(@types/node@25.6.0)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass@1.100.0)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0))
       '@vitejs/plugin-rsc': 0.5.27(react-dom@19.2.8(react@19.2.8))(react-server-dom-webpack@19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.106.2(esbuild@0.28.1)))(react@19.2.8)(vite@8.0.16(@types/node@25.6.0)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass@1.100.0)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.0))
       dotenv: 17.4.2
-      hono: 4.12.31
+      hono: 4.12.34
       magic-string: 0.30.21
       picocolors: 1.1.1
       react: 19.2.8
