@@ -166,10 +166,8 @@ export const it: Locale = {
   // --- Errori passkey ---
   "error.passkey_cancelled": "La richiesta della passkey è stata chiusa prima del completamento.",
   "error.passkey_timeout": "La richiesta della passkey è scaduta. Riprova.",
-  "error.passkey_not_registered":
-    "Questa passkey non è registrata. Accedi con e-mail e password.",
-  "error.passkey_setup_failed":
-    "La registrazione della passkey non è stata completata. Riprova.",
+  "error.passkey_not_registered": "Questa passkey non è registrata. Accedi con e-mail e password.",
+  "error.passkey_setup_failed": "La registrazione della passkey non è stata completata. Riprova.",
   "error.passkey_unsupported": "Questo dispositivo non supporta le passkey",
   "error.passkey_failed": "Qualcosa è andato storto. Riprova.",
   "error.passkey_invalid": "Non è stato possibile verificare questa passkey. Riprova.",

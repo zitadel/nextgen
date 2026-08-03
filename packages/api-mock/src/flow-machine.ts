@@ -194,7 +194,14 @@ export const flowMachine = createMachine({
     },
     "register-password": {
       on: {
-        SUBMIT: { target: "done", actions: [captureFields, rotateToken] },
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "back",
+            target: "register",
+            actions: [rotateToken],
+          },
+          { target: "done", actions: [captureFields, rotateToken] },
+        ],
       },
     },
     recover: {
