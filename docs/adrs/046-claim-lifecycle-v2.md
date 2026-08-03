@@ -105,6 +105,14 @@ server storing only the SHA-256 hash. It is not a managed prefixed resource ID,
 and it is not an encrypted opaque token: the challenge row exists regardless for
 single-use and state, so encryption would only save a lookup that happens anyway.
 
+A fast cryptographic hash (SHA-256), not a password KDF, is deliberate.
+`challenge_id` carries 128 bits of `crypto/rand` entropy, so it is a generated
+token rather than a low-entropy secret, and [ADR 029](029-cryptography-secrets-and-key-lifecycle.md)
+accordingly hashes generated tokens with a plain cryptographic hash while
+reserving argon2id for passwords. A slow KDF would add per-request cost without
+raising the brute-force bar against a 128-bit random value, and its per-row salt
+would break the deterministic hash-as-lookup-key the challenge row relies on.
+
 Its role differs across the three endpoints (an RFC 8628-shaped init/poll/complete
 dance):
 
