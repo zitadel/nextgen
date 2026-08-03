@@ -162,6 +162,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	QueryProjectsOperation: []string{
 		"project.write",
 	},
+	QueryTeamsOperation: []string{
+		"team.read",
+	},
 	RevokeSessionOperation: []string{
 		"session.delete",
 	},
