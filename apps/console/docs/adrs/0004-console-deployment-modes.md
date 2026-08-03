@@ -11,7 +11,10 @@
 > **publishable key**), and the console's runtime discovery
 > (`src/runtime/runtime.ts`, wired into `main.tsx`, the login screen —
 > including its no-project setup hint and the publishable-key-bearing
-> widget handle — and every loader's project id). Platform mode, the portal
+> widget handle — and every loader's project id). The flag-gated #605 slice
+> is also implemented: `platform.bootstrap_project` (default false) makes the
+> server ensure the pinned `platform.project_id` row exists at startup;
+> standalone default semantics are unchanged. Platform mode, the portal
 > config keys, and effective-permission exposure (§4) remain future work.
 > **Scope:** `apps/console` (with recorded server dependencies). See
 > [`apps/console/AGENTS.md`](../../AGENTS.md).
@@ -60,9 +63,13 @@ Facts that constrain the design:
    (`VITE_CONSOLE_PROJECT_ID`, `CONSOLE_PROJECT_SECRET`) holds hand-minted
    values from such a call. (`--user-file` bootstrap inserts a bare project
    *row* to satisfy FKs — `internal/bootstrap/users/ensure.go` — but that is
-   not a provisioned project: no keys, no schemas, no flows.) #527's
-   platform-project provisioning question remains open **for platform
-   mode**; standalone answers it with "don't provision — resolve".
+   not a provisioned project: no keys, no schemas, no flows.) The one explicit
+   opt-in exception is platform-mode provisioning (#605): setting
+   `platform.bootstrap_project` (off by default) makes the server idempotently
+   ensure the pinned `platform.project_id` row exists at startup — deliberate
+   and configured, never silent. #527's platform-project provisioning question
+   remains open **for platform mode**; standalone answers it with "don't
+   provision — resolve".
 4. **Permissions are the authoritative gate.** The permission catalogs
    (root ADRs [032](../../../../docs/adrs/032-permission-catalogs.md)/
    [033](../../../../docs/adrs/033-internal-permission-management.md)) are the
