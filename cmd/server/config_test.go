@@ -31,3 +31,24 @@ func TestServiceSessionConfigValidate(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func TestPlatformConfigValidate(t *testing.T) {
+	t.Run("zero value validates (bootstrap off by default)", func(t *testing.T) {
+		require.NoError(t, PlatformConfig{}.Validate())
+	})
+
+	t.Run("bootstrap enabled without project id errors", func(t *testing.T) {
+		err := PlatformConfig{BootstrapProject: true}.Validate()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "platform.bootstrap_project")
+		assert.Contains(t, err.Error(), "platform.project_id")
+	})
+
+	t.Run("bootstrap enabled with project id validates", func(t *testing.T) {
+		require.NoError(t, PlatformConfig{BootstrapProject: true, ProjectID: "proj_platform"}.Validate())
+	})
+
+	t.Run("project id without bootstrap validates", func(t *testing.T) {
+		require.NoError(t, PlatformConfig{ProjectID: "proj_platform"}.Validate())
+	})
+}

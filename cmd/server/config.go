@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -29,14 +30,28 @@ type PlatformConfig struct {
 	// ProjectID pins the deployment's default project to an existing
 	// project. When empty (the default), a standalone deployment tracks its
 	// first-created project — the one the customer's `zitadel setup`
-	// creates. The server never creates a project itself; a configured id
-	// that does not exist is a startup error.
+	// creates. The server never creates a project itself, unless
+	// BootstrapProject explicitly opts in (#605); a configured id that does
+	// not exist is otherwise a startup error.
 	ProjectID string `mapstructure:"project_id"`
+
+	// BootstrapProject, when true, ensures the project pinned by ProjectID
+	// exists at startup (idempotent insert). Off by default: no environment
+	// gets a platform project created silently. Requires ProjectID. (#605)
+	BootstrapProject bool `mapstructure:"bootstrap_project"`
+}
+
+func (c PlatformConfig) Validate() error {
+	if c.BootstrapProject && c.ProjectID == "" {
+		return errors.New("platform.bootstrap_project requires platform.project_id")
+	}
+	return nil
 }
 
 func (c Config) Validate() error {
 	for _, validate := range []func() error{
 		c.Session.Validate,
+		c.Platform.Validate,
 	} {
 		if err := validate(); err != nil {
 			return err
