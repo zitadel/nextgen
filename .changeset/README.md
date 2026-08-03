@@ -21,6 +21,12 @@ server or API change needs one (list `@zitadel/server`) — even from `internal/
 or `api/generated/**` — because it ships new server and SDK versions that belong
 in the release notes.
 
+The console (`apps/console/**`) and login UI (`apps/login-ui/**`) are embedded in
+the server container, so a user-visible change there ships too and needs a
+changeset listing `@zitadel/server`. They publish no npm package of their own —
+that is why they sit in the `ignore` list — but a customer still receives the
+change.
+
 Skip a changeset **only** when the change is *exclusively*:
 
 - tests (`*_test.go`, `*.spec.ts`, …)
@@ -31,11 +37,19 @@ Skip a changeset **only** when the change is *exclusively*:
 
 ## Decision table
 
-| If the PR… | Add `.changeset/*.md`? | **Release notes / changeset** |
-| --- | --- | --- |
-| Changes shipped product behavior (any path) | **Yes** — real changeset | Name the file; summarize the note. List `@zitadel/server` for server changes |
-| Is *exclusively* tests, generated mocks, docs, CI, or a no-op refactor | **No** | `No changeset required — no shipped behavior changed.` |
-| Touches a publishable path but ships nothing (rare) | **Empty changeset** | Say why the path changed but nothing ships |
+The same answer picks the changeset **and** the PR title type — both ask whether
+a customer gets something. Full title rule:
+[`CONTRIBUTING.md#title-format`](../CONTRIBUTING.md#title-format).
+
+| If the PR… | Add `.changeset/*.md`? | **Release notes / changeset** | PR title type |
+| --- | --- | --- | --- |
+| Changes shipped product behavior (any path) | **Yes** — real changeset | Name the file; summarize the note. List `@zitadel/server` for server changes | `feat` / `fix` — never `docs` or `chore` |
+| Changes what the console or login UI does for a user | **Yes** — list `@zitadel/server` | Name the file; summarize the note | `feat(console)` / `fix(login)` |
+| Is *exclusively* tests, generated mocks, docs, CI, or a no-op refactor | **No** | `No changeset required — no shipped behavior changed.` | `test` / `docs` / `ci` / `build` / `chore` / `refactor` — never `feat` or `fix` |
+| Touches a publishable path but ships nothing (rare) | **Empty changeset** | Say why the path changed but nothing ships | Not `feat` or `fix` |
+
+A changeset does not by itself justify `feat` or `fix`: an internal restructure
+under `internal/` still ships a server version, and stays `refactor`.
 
 ## How to add a changeset
 
@@ -54,6 +68,30 @@ One-line, user-facing summary.
 Use [public package names](#publishable-npm-packages) and `patch` / `minor` /
 `major`. For the rare empty changeset (publishable path, nothing ships):
 `corepack pnpm changeset --empty`.
+
+### The summary is the release note
+
+`@changesets/changelog-github` renders that summary **verbatim** into
+`CHANGELOG.md` and the `v<version>` GitHub Release. The PR title never appears
+there — only a link. So the summary is the copy a customer actually reads, and it
+has to stand on its own for someone with no access to this repo.
+
+- Lead with what the reader can now do, or what stopped being broken.
+- Name the surface they touch: `zitadel setup`, `<zitadel-login>`,
+  `@zitadel/sdk-react`, the console.
+- No ADR numbers, PR numbers, internal file paths, or words like "foundation",
+  "wiring", or "POC". Those belong in the PR description.
+- Say what a reader must do differently when behavior changes.
+
+```md
+<!-- bad: names our internals, means nothing to a reader -->
+Implement ADR 030 errreport foundation in internal/errreport.
+
+<!-- good: outcome first, then the action it implies -->
+Default password hashing is now `argon2id` instead of bcrypt. Existing hashes
+keep validating and are rehashed on the next successful sign-in; set
+`password_hasher.hasher.algorithm` to `bcrypt` to keep the previous behavior.
+```
 
 ## Verify locally
 

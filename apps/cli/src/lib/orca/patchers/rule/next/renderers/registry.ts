@@ -29,6 +29,18 @@ export const RENDERERS: Record<RendererId, RendererSpec> = {
 };
 
 /**
+ * The subset of {@link RENDERER_IDS} that {@link getRenderer} resolves rather
+ * than rejects (`status: "available"`). Anything advertising renderer choices
+ * — flag options, error hints — must derive from this list, not
+ * {@link RENDERER_IDS}: a declared-but-unpublished renderer (ADR 006) keeps
+ * its registry entry to reserve the id, but must never be offered as a usable
+ * value.
+ */
+export const AVAILABLE_RENDERER_IDS: RendererId[] = RENDERER_IDS.filter(
+  (id) => RENDERERS[id].status === "available",
+);
+
+/**
  * Resolves a renderer id (an untrusted string from config) to its spec,
  * throwing a typed {@link ZitadelError} rather than returning `undefined`
  * so callers get an actionable message. Rejects ids that are unknown
@@ -38,7 +50,7 @@ export const RENDERERS: Record<RendererId, RendererSpec> = {
 export function getRenderer(id: string): RendererSpec {
   if (!isRendererId(id)) {
     throw new ZitadelError("E_VALIDATION", `Unknown renderer "${id}"`, {
-      hint: `Available renderers: ${Object.keys(RENDERERS).join(", ")}`,
+      hint: `Available renderers: ${AVAILABLE_RENDERER_IDS.join(", ")}`,
     });
   }
   const renderer = RENDERERS[id];

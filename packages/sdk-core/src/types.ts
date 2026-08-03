@@ -151,15 +151,17 @@ export interface ZitadelLoginConfig {
   readonly postSignInUrl?: string;
   /**
    * Copy overrides merged over the builtin locale dictionaries, keyed by
-   * primary language subtag. This is how custom flow steps and actions get
-   * labels (keys follow `<step>.title`, `<step>.action.<name>`,
-   * `<step>.field.<field>`):
+   * primary language subtag. Each dictionary may be partial — the widget
+   * merges it over the builtin copy — so presets like the components'
+   * `businessLocales` overlay are directly assignable. This is how custom
+   * flow steps and actions get labels (keys follow `<step>.title`,
+   * `<step>.action.<name>`, `<step>.field.<field>`):
    *
    * ```tsx
    * <ZitadelLogin locales={{ en: { "identifier.title": "Welcome back" } }} />
    * ```
    */
-  readonly locales?: Record<string, Record<string, string>>;
+  readonly locales?: Record<string, Partial<Record<string, string>>>;
   /** BCP-47 language override; defaults to the browser language. */
   readonly lang?: string;
 }
@@ -174,6 +176,12 @@ export interface ZitadelLogoutConfig {
   readonly proxyPath?: string;
   /** Where to navigate after sign-out. */
   readonly postSignOutUrl?: string;
+  /**
+   * Colour mode. Unset defaults to `auto` (follow `prefers-color-scheme`) —
+   * the control lives inside the app's own chrome. Set it when the
+   * surrounding surface is fixed.
+   */
+  readonly theme?: "light" | "dark" | "auto";
 }
 
 /** Configuration props shared by every `ZitadelSession` wrapper. */
@@ -190,6 +198,20 @@ export interface ZitadelSessionConfig {
   readonly heading?: string;
   /** Logout action label override. */
   readonly logoutLabel?: string;
+  /**
+   * Sizing/chrome mode. `widget` (default) is content-sized and paints no
+   * page chrome — for embedding the signed-in card inside an existing
+   * layout. `page` claims the viewport and paints the surface background —
+   * for dedicated signed-in routes.
+   * @default "widget"
+   */
+  readonly variant?: "widget" | "page";
+  /**
+   * Colour mode. Unset defers to the variant default — `dark` for `page`,
+   * `auto` (follow `prefers-color-scheme`) for `widget`. Set it when your
+   * app's surface is fixed so the card doesn't render dark on a light page.
+   */
+  readonly theme?: "light" | "dark" | "auto";
 }
 
 /**

@@ -35,7 +35,7 @@ const identifierStep: CreateFlow201 = {
     fields: [
       { name: "email", type: "email", text_key: "identifier.field.email", required: true },
     ],
-    actions: [{ name: "submit", text_key: "submit.continue", primary: true }],
+    actions: [{ name: "submit", kind: "submit", text_key: "submit.continue", primary: true }],
     gates: {},
   },
 };

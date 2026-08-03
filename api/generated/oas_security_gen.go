@@ -71,25 +71,25 @@ func GetRolesForNextgenSession(operation string) []string {
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
 	ActivateFlowDefinitionOperation: []string{
-		"flow_definitions.write",
+		"flow_definition.write",
 	},
 	CreateAuthAttemptOperation: []string{
-		"auth_attempts.write",
+		"auth_attempt.write",
 	},
 	CreateBrandingOperation: []string{
 		"branding.write",
 	},
 	CreateFlowDefinitionOperation: []string{
-		"flow_definitions.write",
+		"flow_definition.write",
 	},
 	CreateHandoffOperation: []string{
-		"auth_attempts.write",
+		"auth_attempt.write",
 	},
 	CreateSchemaOperation: []string{
 		"schema.write",
 	},
 	CreateSessionOperation: []string{
-		"sessions.write",
+		"session.write",
 	},
 	CreateTeamOperation: []string{
 		"team.write",
@@ -98,25 +98,25 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"user.write",
 	},
 	DeactivateFlowDefinitionOperation: []string{
-		"flow_definitions.write",
+		"flow_definition.write",
 	},
 	DeleteFlowDefinitionOperation: []string{
-		"flow_definitions.delete",
+		"flow_definition.delete",
 	},
 	DeleteUserByIDOperation: []string{
 		"user.delete",
 	},
 	ExchangeHandoffOperation: []string{
-		"sessions.write",
+		"session.write",
 	},
 	GetAuthAttemptOperation: []string{
-		"auth_attempts.read",
+		"auth_attempt.read",
 	},
 	GetBrandingByIdOperation: []string{
 		"branding.read",
 	},
 	GetFlowDefinitionOperation: []string{
-		"flow_definitions.read",
+		"flow_definition.read",
 	},
 	GetProjectOperation: []string{
 		"project.write",
@@ -136,19 +136,19 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetUserInfoOperation: []string{},
 	IntrospectOperation:  []string{},
 	IssueChallengeOperation: []string{
-		"auth_attempts.write",
+		"auth_attempt.write",
 	},
 	ListBrandingOperation: []string{
 		"branding.read",
 	},
 	ListFlowDefinitionsOperation: []string{
-		"flow_definitions.read",
+		"flow_definition.read",
 	},
 	ListSchemasOperation: []string{
 		"schema.read",
 	},
 	ListSessionsOperation: []string{
-		"sessions.read",
+		"session.read",
 	},
 	ListUserPasskeysOperation: []string{
 		"user.read",
@@ -170,13 +170,13 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"user.write",
 	},
 	UpdateFlowDefinitionOperation: []string{
-		"flow_definitions.write",
+		"flow_definition.write",
 	},
 	UpdateTeamOperation: []string{
 		"team.write",
 	},
 	VerifyChallengeProofOperation: []string{
-		"auth_attempts.write",
+		"auth_attempt.write",
 	},
 }
 

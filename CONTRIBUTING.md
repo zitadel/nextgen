@@ -397,15 +397,68 @@ relevant architecture decision records:
 
 ### Title format
 
-Pull request titles are checked by Semantic PR. Use the conventional format
-`<type>(optional-scope): <summary>`.
+Use the conventional format `<type>(optional-scope): <summary>`. Allowed types
+and scopes live in [`.github/semantic.yml`](.github/semantic.yml) — that file is
+the source of truth for the lists, and CI rejects a title that does not match it.
+Scopes are optional; omit the scope instead of inventing one.
 
-Allowed types and scopes live in [`.github/semantic.yml`](.github/semantic.yml).
-Scopes are optional; omit the scope instead of inventing one. For
-documentation-only changes, use the `docs` type, for example:
+#### Pick the type by audience, not by effort
 
-```text
-docs: add preview status disclaimer
+The type is the first thing that decides whether a change reaches our release
+notes, and those notes are read by people who want to use our SDKs and products
+— not by people who work on this repo. A large, hard PR that only moves the
+build graph is still `build`. Work through the ladder in order:
+
+1. Can someone **using** Zitadel — the SDKs, the CLI, the API, the console — do
+   something new because of this PR? → `feat`
+2. Could that person have hit the broken behavior this PR corrects? → `fix`
+3. Neither, but the change reaches shipped code (server, SDKs, CLI, console,
+   login UI)? → `refactor` / `perf`
+4. The change only touches this repo — CI, build wiring, tests, docs, scripts,
+   tooling? → `ci` / `build` / `test` / `docs` / `chore`
+
+Two invariants follow, and CI enforces the first:
+
+- **Needs no changeset ⇒ not `feat`, not `fix`.** If nothing ships, it is not a
+  customer feature or a customer bug fix. The
+  [changeset decision table](.changeset/README.md#decision-table) answers this
+  question already — the type follows from the same answer.
+- **Changes what a user receives ⇒ not `docs`, not `chore`.** `docs` means
+  documentation *in this repo*. Content generated into a customer's project, or
+  shipped inside a package, is product.
+
+The reverse of the first invariant does **not** hold: a changeset does not force
+`feat` or `fix`. The Go server ships as one bundle, so an internal restructure
+under `internal/` correctly carries a `@zitadel/server` changeset while staying
+`refactor`.
+
+What these got wrong, from this repo's own history:
+
+| Shipped title | What it actually did | Should have been |
+| --- | --- | --- |
+| `feat: add withZitadel() Playwright orchestration to @zitadel/testing` (#680) | `@zitadel/testing` was journey-only and unpublished at the time (since #692 it ships on the release train, so kit API changes are `feat` today) | `test:` (then) |
+| `feat: add Figma export sync pipeline for design tokens` (#494) | A sync script and a workflow; nothing in a release | `build:` |
+| `chore: set argon2id as default password hashing algorithm` (#526) | Changed a shipped security default, with a `@zitadel/server` changeset | `feat:` |
+| `docs(config): improve schema README guidance` (#482) | Rewrote a README that `@zitadel/config` generates into the user's project | `feat(config):` |
+
+#### Write the summary for the reader
+
+- Imperative present tense — `add`, not `added` or `implemented`.
+- Name the surface the reader touches (`zitadel setup`, `<zitadel-login>`,
+  `@zitadel/sdk-react`, the console), not the layer that changed. `feat: project
+  storage` and `feat: add name to project domain model` name our internals;
+  neither tells a reader what they can now do.
+- Keep internal references — ADR numbers, PR numbers, file paths, "foundation",
+  "POC" — in the description, not the title.
+
+The same rules apply to the changeset summary, which matters more: that text is
+rendered verbatim into `CHANGELOG.md` and the GitHub Release, while the title
+never appears there. See [`.changeset/README.md`](.changeset/README.md#how-to-add-a-changeset).
+
+Check a title before opening the PR:
+
+```bash
+node scripts/check-pr-title.mjs --title "fix(login): keep the passkey prompt after a failed attempt"
 ```
 
 ### Description
