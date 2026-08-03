@@ -114,8 +114,13 @@ export abstract class AbstractRulePatcher implements Patcher {
           wiring: op.wiring,
           state: op.edit(source) === source ? "applied" : "detached",
         });
-      } catch {
-        statuses.push({ path, wiring: op.wiring, state: "unknown" });
+      } catch (error) {
+        statuses.push({
+          path,
+          wiring: op.wiring,
+          state: "unknown",
+          reason: error instanceof Error ? error.message : "verification failed",
+        });
       }
     }
     return statuses;

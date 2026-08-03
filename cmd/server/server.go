@@ -457,7 +457,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Ha
 	mux.Handle("/",
 		middleware.WithRequestIdentification(reqIdGen,
 			middleware.WithLogging(
-				api.WithRequestHostMiddleware(apiHandler),
+				api.WithRequestHostMiddleware(api.WithSessionStateNoStore(apiHandler)),
 			),
 		),
 	)

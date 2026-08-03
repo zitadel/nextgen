@@ -6,7 +6,7 @@ import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
 import { angularProxyEdit } from "./angular-json";
 import { angularRoutesEdit } from "./angular-routes";
-import { appComponentTemplate, appTemplateHtml, proxyConfTemplate } from "./templates";
+import { appComponentTemplate, appTemplateHtml, proxyConfEdit } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-angular";
 
@@ -43,7 +43,7 @@ function ensureDevScript(source: string | undefined): string {
  * files from {@link AbstractRulePatcher} and contributes the managed root
  * component (`app.ts`/`app.html`) that renders the `@zitadel/sdk-angular`
  * widgets, a `proxy.conf.cjs` dev proxy (attaching the project secret from
- * `ZITADEL_PROJECT_SECRET` to every proxied request) wired into `angular.json`,
+ * `ZITADEL_PROJECT_SECRET` only to `POST /sessions/exchange`) wired into `angular.json`,
  * and the SDK dep.
  *
  * Unlike React/Vue (whose dev proxy lives in `vite.config.ts`), Angular owns its
@@ -70,7 +70,14 @@ export class AngularPatcher extends AbstractRulePatcher {
         // Without the auth routes the router bounces /login back to /.
         wiring: "infrastructure",
       },
-      { kind: "write", path: "proxy.conf.cjs", contents: proxyConfTemplate() },
+      {
+        kind: "edit",
+        path: "proxy.conf.cjs",
+        edit: proxyConfEdit(),
+        // The transform creates the managed proxy when absent and safely
+        // migrates the exact unconditional bearer hook emitted by older CLIs.
+        wiring: "infrastructure",
+      },
       {
         kind: "edit",
         path: "angular.json",

@@ -22,18 +22,18 @@ export type GetSessionOptions = {
  * an app's own UI (header navigation, account menus) to know whether a user
  * is signed in and who they are.
  *
- * Fetches the same-origin `{proxyPath}/sessions/me` with credentials — the
- * same read the `<zitadel-session>` card performs — so the answer is the
- * server's, not a client-side guess. Works on any page: unlike server-side
- * `auth()`, it does not require the route to be covered by the middleware
- * `matcher` (only the proxy path itself must be matched, which the
- * scaffolded request boundary always does), and it does not require
+ * Fetches the same-origin `{proxyPath}/sessions/me` with credentials and
+ * `cache: "no-store"` — the same read the `<zitadel-session>` card performs —
+ * so the answer is the server's, not a client-side guess. Works on any page:
+ * unlike server-side `auth()`, it does not require the route to be covered by
+ * the middleware `matcher` (only the proxy path itself must be matched, which
+ * the scaffolded request boundary always does), and it does not require
  * `configureZitadel()` to have run.
  *
  * - `200` with an authenticated user → `{ isAuthenticated: true, session }`
  *   with the client-safe identity (`userId`, `email`, `name` — no token).
- * - `200` for an anonymous session, `401`, or a JSON `404` (the backend's
- *   "session gone") → signed out.
+ * - `200` for an anonymous session, `401` with `auth.unauthorized`, or `404`
+ *   with `sess.not_found` → signed out.
  * - Any other response throws — including a framework's HTML 404 page from
  *   a misrouted proxy: a failing proxy is a misconfiguration and must not
  *   silently render as "signed out". Treat a rejection as "unknown" —
@@ -83,18 +83,22 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
   }
 
   const response = await fetch(`${proxyPath}/sessions/me`, {
+    cache: "no-store",
     credentials: "include",
     headers: { accept: "application/json" },
   });
 
-  // 401 = no/invalid session token; 404 = session gone (revoked/expired).
-  // Both are the server's definitive "not signed in" — but only when the
-  // answer came from the backend (JSON error details). A framework router's
-  // HTML 404 means the proxy never saw the request; that falls through to
-  // the throw below instead of silently rendering signed-out.
-  const isJson = (response.headers.get("content-type") ?? "").includes("application/json");
-  if (response.status === 401 || (response.status === 404 && isJson)) {
-    return { isAuthenticated: false, session: null };
+  // Only the backend's canonical error envelope is definitive signed-out.
+  // A framework route, gateway, or WAF can also return 401/404; accepting the
+  // status or content type alone would turn a broken proxy into signed-out.
+  if (response.status === 401 || response.status === 404) {
+    const error = await readErrorEnvelope(response);
+    const isSignedOut =
+      (response.status === 401 && error?.code === "auth.unauthorized") ||
+      (response.status === 404 && error?.code === "sess.not_found");
+    if (isSignedOut) {
+      return { isAuthenticated: false, session: null };
+    }
   }
 
   if (!response.ok) {
@@ -122,3 +126,24 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
 }
 
 export type { ClientAuthResult, ClientAuthState, ClientSession } from "./types.js";
+
+type ErrorEnvelope = { code: string; message: string };
+
+async function readErrorEnvelope(response: Response): Promise<ErrorEnvelope | undefined> {
+  try {
+    const body = (await response.json()) as unknown;
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "code" in body &&
+      typeof body.code === "string" &&
+      "message" in body &&
+      typeof body.message === "string"
+    ) {
+      return { code: body.code, message: body.message };
+    }
+  } catch {
+    // The caller reports the HTTP failure below; parsing details are untrusted.
+  }
+  return undefined;
+}

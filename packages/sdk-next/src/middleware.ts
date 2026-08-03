@@ -207,13 +207,12 @@ async function proxyRequest(
 
   const hasBody = !["GET", "HEAD"].includes(req.method);
 
-  // Attach the project service-key secret as the bearer on every proxied
-  // request. The server's security handler verifies it cryptographically; the
-  // browser never sees the secret because this middleware runs in Next.js's
-  // Edge runtime and reads `process.env.ZITADEL_PROJECT_SECRET`. Next auto-
-  // loads `.env.local` at dev time (which is gitignored) and inlines env vars
-  // referenced here into the Edge bundle at build time for production.
-  if (!upstreamHeaders.has("authorization")) {
+  // ADR 036: the current browser flow needs the confidential project secret
+  // only for the handoff exchange. Stamping it onto every proxied operation
+  // turns this public request boundary into an operator-capable open relay.
+  // Preserve an explicit caller credential so the exchange can use the future
+  // publishable-key plane without being overwritten.
+  if (requiresProjectSecret(req.method, suffix) && !upstreamHeaders.has("authorization")) {
     const secret = process.env.ZITADEL_PROJECT_SECRET;
     if (secret) {
       upstreamHeaders.set("authorization", `Bearer ${secret}`);
@@ -244,6 +243,10 @@ async function proxyRequest(
     status: upstream.status,
     headers: responseHeaders,
   });
+}
+
+function requiresProjectSecret(method: string, pathname: string): boolean {
+  return method.toUpperCase() === "POST" && pathname === "/sessions/exchange";
 }
 
 /**
