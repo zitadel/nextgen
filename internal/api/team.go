@@ -52,6 +52,53 @@ func (h *Handler) UpdateTeam(ctx context.Context, req *api.UpdateTeamRequest, pa
 	return teamResponse(team), nil
 }
 
+func (h *Handler) QueryTeams(ctx context.Context, req *api.QueryTeamsRequest, params api.QueryTeamsParams) (api.QueryTeamsRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opRead); err != nil {
+		return nil, err
+	}
+
+	listed, err := h.teamService.List(ctx, mapQueryTeamsToService(string(params.ProjectID), req))
+	if err != nil {
+		return nil, err
+	}
+
+	teams := make([]api.TeamResponse, 0, len(listed.Teams))
+	for _, team := range listed.Teams {
+		teams = append(teams, *teamResponse(team))
+	}
+	resp := &api.QueryTeamsResponse{Teams: teams}
+	if listed.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
+	}
+	return resp, nil
+}
+
+// ------------------ Converters ---------------
+
+func mapQueryTeamsToService(projectID string, req *api.QueryTeamsRequest) service.ListTeamsRequest {
+	svcReq := service.ListTeamsRequest{
+		ProjectID: projectID,
+		Limit:     int(req.Limit.Or(0)), // if not defined, set to default value in the service layer
+		PageToken: string(req.PageToken.Or("")),
+	}
+	if sorting, ok := req.Sorting.Get(); ok {
+		svcReq.Sorting = &service.Sorting{
+			Field:     string(sorting.Field),
+			Direction: string(sorting.Direction),
+		}
+	}
+	for _, filter := range req.Filter {
+		svcReq.Filters = append(svcReq.Filters, service.Filter{
+			Field:     string(filter.Field),
+			Operation: string(filter.Operation),
+			Value:     filterValue(filter.Value),
+		})
+	}
+	return svcReq
+}
+
+// teamResponse is the shared team body: createTeam, getTeam, updateTeam, and
+// every item in queryTeams answer with it.
 func teamResponse(team *domain.Team) *api.TeamResponse {
 	return &api.TeamResponse{
 		ID:        team.ID,
