@@ -15,8 +15,16 @@
   line-height: 1.25rem;
   letter-spacing: 0;
   text-transform: none;
+  /* Gradient stops come from Figma's `Gradient Colors` collection, which is
+     themed — so the pill's sheen now follows light mode instead of staying on
+     the dark values. `color-mix` applies the 0.6 alpha the design calls for,
+     which `rgb()` cannot do against a hex custom property. */
   background:
-    linear-gradient(182deg, rgb(72 74 87 / 0.6) 28.65%, rgb(15 15 17 / 0.6) 81.82%),
+    linear-gradient(
+      182deg,
+      color-mix(in srgb, var(--zl-gradient-neutral-start, #484a57) 60%, transparent) 28.65%,
+      color-mix(in srgb, var(--zl-gradient-base-end, #0f0f11) 60%, transparent) 81.82%
+    ),
     var(--zl-color-surface-default-primary-gray, #252528);
   color: var(--zl-color-text-primary-white, #f4f4f6);
   border: 1px solid var(--zl-color-border-default-gray-200, #484a57);

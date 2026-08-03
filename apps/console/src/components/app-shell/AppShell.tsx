@@ -185,7 +185,7 @@ function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () =>
           >
             <span
               aria-hidden
-              className="size-8 shrink-0 rounded-lg bg-[linear-gradient(232deg,#f25543_17%,#0f0f11_75%)]"
+              className="size-8 shrink-0 rounded-lg bg-[linear-gradient(232deg,var(--zl-gradient-red-start)_17%,var(--zl-gradient-base-end)_75%)]"
             />
             <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-none">
               <span className="truncate text-[14px] text-sidebar-foreground">{displayName}</span>
