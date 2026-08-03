@@ -114,9 +114,10 @@ a `testing:build` task dep.
   `env -u CI moon run cli-journey-e2e:e2e-testkit` (customer install path).
 
 The real-instance lanes carry `runInCI: false`, but that only keeps them
-out of moon's automatic CI selection — `full-pr` runs all of them through
-explicit `env -u CI` workflow steps (`.github/workflows/ci.yml`). Locally,
-use the same `env -u CI` incantation.
+out of moon's automatic CI selection — the ci workflow's shard jobs run all
+of them through explicit `env -u CI` steps, aggregated by the required
+`full-pr` check (`.github/workflows/ci.yml`). Locally, use the same
+`env -u CI` incantation.
 
 Serialize moon invocations — two concurrent graphs produce spurious
 failures. Orphaned runtimes from aborted e2e runs squat fixed ports;

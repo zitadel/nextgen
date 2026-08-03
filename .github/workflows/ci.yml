@@ -12,23 +12,31 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+env:
+  # Moon marks failed tasks by color alone, so a failed `moon ci` can end at
+  # "Tasks: 1 failed" with no named target. The summary names them in plain
+  # text and replays each failed task's own output. Green runs pay only a
+  # pass/fail list; the replay section is empty when nothing failed.
+  MOON_SUMMARY: detailed
+
+# The work is split into shard jobs by resource conflict, not by category:
+# the moon graph and Go suites share one machine, the release snapshot feeds
+# the journey shards through an artifact, and the real-instance browser
+# suites get machines of their own so their embedded-Postgres instances
+# cannot contend with anything else. Branch protection requires the single
+# context `full-pr`; that job aggregates the shard results, so the required
+# check's name survives the split.
 jobs:
-  full-pr:
+  graph:
     # Fork PRs execute untrusted repository code. Keep them off Depot runners,
     # which inject DEPOT_CACHE_TOKEN independently of GitHub secret filtering.
     runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'depot-ubuntu-24.04-16' }}
-    timeout-minutes: 120
+    timeout-minutes: 60
     permissions:
       contents: read
       # Required to mint the OIDC token for Workload Identity Federation when
       # authenticating to the Spanner test instance (trusted runs only).
       id-token: write
-    env:
-      # Moon marks failed tasks by color alone, so a failed `moon ci` can end at
-      # "Tasks: 1 failed" with no named target. The summary names them in plain
-      # text and replays each failed task's own output. Green runs pay only a
-      # pass/fail list; the replay section is empty when nothing failed.
-      MOON_SUMMARY: detailed
     steps:
       - uses: actions/checkout@v6
         with:
@@ -122,57 +130,48 @@ jobs:
           ZITADEL_TEST_SPANNER_INSTANCE: ${{ vars.SPANNER_TEST_INSTANCE }}
         run: moon run server:test-spanner
 
+  snapshot:
+    # Fork note: see the `graph` job.
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'depot-ubuntu-24.04-16' }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    # The journey shards gate on this mode instead of detecting their own:
+    # they consume this job's artifact, so its mode is the one that counts.
+    outputs:
+      mode: ${{ steps.ci-mode.outputs.mode }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Detect CI mode
+        id: ci-mode
+        run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
+
       - name: Build release snapshot without container
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
         run: env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container
-
-      - name: Run binary fresh-app journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
-            --runtime binary \
-            --concurrency 5 \
-            --work-dir "${RUNNER_TEMP}/ci-journey" \
-            --tarballs-dir "dist/release/${version}/npm"
-
-      # One framework is enough here: the preset decides the scaffolded
-      # flow shape, not the SDK — the matrix above already covers SDKs.
-      - name: Run passkey-first preset journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
-            --runtime binary \
-            --framework next \
-            --preset passkey-first \
-            --work-dir "${RUNNER_TEMP}/ci-journey-passkey-first" \
-            --tarballs-dir "dist/release/${version}/npm"
-
-      # Customer-configuration proof for @zitadel/testing: a fresh app
-      # installs the kit from the journey registry and runs its withZitadel()
-      # suite against the published binary — embedded UIs, no repo env
-      # overrides (unlike the in-repo e2e-real lanes below).
-      - name: Run test-kit consumer journey
-        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: |
-          version="$(node -p "require('./apps/server/package.json').version")"
-          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-testkit -- \
-            --work-dir "${RUNNER_TEMP}/ci-journey-testkit" \
-            --tarballs-dir "dist/release/${version}/npm"
-
-      # Gates the test-kit's central promise: boot a real seeded instance,
-      # then drive the real browser login with per-test users. Reuses the Go
-      # build cache and Playwright Chromium installed above.
-      - name: Run @zitadel/testing real-instance suites
-        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run testing:test-integration demo-next-e2e:e2e-real
-
-      # Dogfoods @zitadel/testing through a second consumer. Keep this separate
-      # from the demo suite so two embedded-Postgres instances do not contend.
-      - name: Run console real-instance suite
-        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-real
 
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
@@ -197,17 +196,219 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  journey-fresh-app:
+    needs: snapshot
+    if: ${{ needs.snapshot.outputs.mode == 'full' }}
+    # Fork note: see the `graph` job.
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'depot-ubuntu-24.04-16' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        run: corepack pnpm --filter @zitadel/components exec playwright install chromium
+
+      # The journey tasks depend only on cli:build and testing:build; the
+      # release tarballs they consume come from the snapshot shard's artifact,
+      # so nothing rebuilds the release here.
+      - name: Download release snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: release-snapshot
+          path: dist/release
+
+      - name: Run binary fresh-app journey
+        run: |
+          version="$(node -p "require('./apps/server/package.json').version")"
+          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
+            --runtime binary \
+            --concurrency 5 \
+            --work-dir "${RUNNER_TEMP}/ci-journey" \
+            --tarballs-dir "dist/release/${version}/npm"
+
       - name: Upload journey diagnostics
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: journey-diagnostics
+          name: journey-diagnostics-fresh-app
+          path: ${{ runner.temp }}/ci-journey/diagnostics
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Carries the passkey-first preset journey and the test-kit consumer
+  # journey: two more scaffold-a-fresh-app paths over the same tarballs,
+  # paired here because together they balance the fresh-app shard's runtime.
+  journey-presets:
+    needs: snapshot
+    if: ${{ needs.snapshot.outputs.mode == 'full' }}
+    # Fork note: see the `graph` job.
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'depot-ubuntu-24.04-16' }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        run: corepack pnpm --filter @zitadel/components exec playwright install chromium
+
+      - name: Download release snapshot
+        uses: actions/download-artifact@v4
+        with:
+          name: release-snapshot
+          path: dist/release
+
+      # One framework is enough here: the preset decides the scaffolded
+      # flow shape, not the SDK — the fresh-app shard's matrix already
+      # covers SDKs.
+      - name: Run passkey-first preset journey
+        run: |
+          version="$(node -p "require('./apps/server/package.json').version")"
+          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-local -- \
+            --runtime binary \
+            --framework next \
+            --preset passkey-first \
+            --work-dir "${RUNNER_TEMP}/ci-journey-passkey-first" \
+            --tarballs-dir "dist/release/${version}/npm"
+
+      # Customer-configuration proof for @zitadel/testing: a fresh app
+      # installs the kit from the journey registry and runs its withZitadel()
+      # suite against the published binary — embedded UIs, no repo env
+      # overrides (unlike the in-repo e2e-real lanes in the browser-e2e job).
+      - name: Run test-kit consumer journey
+        run: |
+          version="$(node -p "require('./apps/server/package.json').version")"
+          env -u CI -u GITHUB_ACTIONS moon run cli-journey-e2e:e2e-testkit -- \
+            --work-dir "${RUNNER_TEMP}/ci-journey-testkit" \
+            --tarballs-dir "dist/release/${version}/npm"
+
+      - name: Upload journey diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: journey-diagnostics-presets
           path: |
-            ${{ runner.temp }}/ci-journey/diagnostics
             ${{ runner.temp }}/ci-journey-passkey-first/diagnostics
             ${{ runner.temp }}/ci-journey-testkit/diagnostics
           if-no-files-found: ignore
           retention-days: 7
+
+  browser-e2e:
+    # Fork note: see the `graph` job.
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'depot-ubuntu-24.04-16' }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Detect CI mode
+        id: ci-mode
+        run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
+
+      - name: Cache Playwright browsers
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: corepack pnpm --filter @zitadel/components exec playwright install chromium
+
+      # Gates the test-kit's central promise: boot a real seeded instance,
+      # then drive the real browser login with per-test users.
+      - name: Run @zitadel/testing real-instance suites
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run testing:test-integration demo-next-e2e:e2e-real
+
+      # Dogfoods @zitadel/testing through a second consumer. Still a separate
+      # step after the demo suite so two embedded-Postgres instances do not
+      # contend on this machine; the other shards run on machines of their own.
+      - name: Run console real-instance suite
+        if: ${{ steps.ci-mode.outputs.mode == 'full' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-real
 
       # The handshake is deliberately excluded: it carries the project secret.
       - name: Upload console e2e diagnostics
@@ -220,3 +421,23 @@ jobs:
             apps/console-e2e/playwright-report
           if-no-files-found: ignore
           retention-days: 7
+
+  # The one required branch-protection context. It carries no work of its
+  # own: it fails unless every shard reports the result the detected CI mode
+  # expects (journey shards skip on version-only PRs, everything else must
+  # succeed). `always()` keeps it reporting when a shard fails or is skipped —
+  # a bare `needs` would leave the required check pending forever.
+  full-pr:
+    needs: [graph, snapshot, journey-fresh-app, journey-presets, browser-e2e]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify shard results
+        env:
+          SHARD_RESULTS: ${{ toJSON(needs) }}
+        run: node scripts/verify-shard-results.mjs

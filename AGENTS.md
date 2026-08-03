@@ -188,8 +188,9 @@ deterministic CI-style proof of the fresh-app path, and
 against the same local package train.
 
 In CI the branch-protection check is the GitHub Actions context `full-pr`,
-shown in the pull request UI as `ci / full-pr`; it consumes the workflow's
-packed npm tarballs instead of public Zitadel packages. Changesets PR comments
+shown in the pull request UI as `ci / full-pr`; it aggregates parallel shard
+jobs, and the journey shards consume the workflow's packed npm tarballs
+instead of public Zitadel packages. Changesets PR comments
 are informational release-intent feedback and are not branch-protection
 requirements. Mirror the gate locally with
 `moon run workspace:check -- --full`; the full step list is in

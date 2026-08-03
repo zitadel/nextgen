@@ -249,24 +249,32 @@ the Moon tasks below. To re-run a single failing task, use
 
 Branch protection requires the GitHub Actions context `full-pr`, shown in the
 pull request UI as `ci / full-pr` and defined in
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml). The job installs
-dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml). `full-pr` runs no
+checks of its own: the work runs in parallel shard jobs split by resource
+conflict, and `full-pr` fails unless every shard reports the result the
+detected CI mode expects (`scripts/verify-shard-results.mjs`). Each shard
+installs dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 
-**Full mode** (normal PRs) runs, in order:
+**Full mode** (normal PRs) runs, per shard:
 
-- `moon run server:check-generate` — Go generated-file drift check.
-- Playwright Chromium install for `@zitadel/components`.
-- `moon ci :lint :typecheck :build :test :test-browser`.
-- `moon run server:test`, then `moon run server:test-postgres` (Spanner
-  integration is not run in CI yet; see the note in the workflow).
-- `moon run release:snapshot -- --skip-container` — a non-publishing release
-  snapshot.
-- The fresh-app consumer journey (`cli-journey-e2e:e2e-local`) with the npm
-  binary runtime against the snapshot's packed tarballs, plus one
-  passkey-first preset journey run.
+- `graph` — `moon run server:check-generate` (Go generated-file drift check),
+  Playwright Chromium install for `@zitadel/components`,
+  `moon ci :lint :typecheck :build :test :test-browser :check-adrs`, then
+  `moon run server:test`, `server:test-postgres`, and `server:test-spanner`
+  (emulator, or the Spanner test instance on trusted runs).
+- `snapshot` — `moon run release:snapshot -- --skip-container`, a
+  non-publishing release snapshot uploaded as the `release-snapshot`
+  artifact.
+- `journey-fresh-app` and `journey-presets` — download that artifact and run
+  the fresh-app consumer journey (`cli-journey-e2e:e2e-local`) with the npm
+  binary runtime against the packed tarballs, one passkey-first preset
+  journey, and the test-kit consumer journey (`cli-journey-e2e:e2e-testkit`).
+- `browser-e2e` — the real-instance suites: `testing:test-integration` with
+  `demo-next-e2e:e2e-real`, then `console-e2e:e2e-real`.
 
-**Version-only mode** (Changesets version PRs) runs `release:version`,
-`release:pack`, and tarball verification instead.
+**Version-only mode** (Changesets version PRs): the `snapshot` shard runs
+`release:version`, `release:pack`, and tarball verification instead; the
+other shards skip their steps and the journey shards do not start.
 
 CI consumes the workflow's packed npm tarballs, not public Zitadel packages.
 Changesets PR comments are informational release-intent feedback, not a
