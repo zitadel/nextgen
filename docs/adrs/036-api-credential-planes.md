@@ -2,6 +2,8 @@
 
 > **Status:** Proposed
 > **Date:** 2026-07-17
+> **Amended:** 2026-08-03 — credential exposure contracts; server-originated
+> me-ops; SSR session validation at the render layer
 > **Context:** Which APIs are callable from a browser, with which credential, and where each credential lives
 
 ## Context
@@ -88,6 +90,25 @@ key**: an origin-scoped bearer carried on all public-plane calls.
 - Rotation and revocation work like the project secret's; the verifier accepts
   it only on public-plane operations.
 
+### Server-originated me-ops
+
+An SSR app reading a cookie-principal operation (`getMySession`) on behalf of
+its user — the framework middlewares' and `auth()`'s session validation — is
+**public-plane software acting for the human**: it presents the publishable
+key for attribution plus the user's session cookie as the principal. It does
+not need — and must not use — the project secret, which preserves the
+zero-platform-secrets endgame for SSR deployments.
+
+The origin allowlist does not apply to these calls. Origin enforcement is an
+honest-browser control (CSRF, embedding, WebAuthn RP-ID derivation) for
+operations that *establish or advance* credentials — the flow ops and the
+public-plane handoff exchange, which keep it. A cookie-principal read
+authenticates by the cookie, a strictly stronger credential than an
+attacker-settable `Origin` header, and server-originated calls carry no
+browser-attested `Origin` at all. The verifier therefore scopes origin checks
+by operation class: credential-establishing ops enforce the allowlist;
+cookie-principal reads skip it.
+
 ### The handoff exchange
 
 `exchangeHandoff` becomes dual-plane:
@@ -114,6 +135,32 @@ key**: an origin-scoped bearer carried on all public-plane calls.
 - **Platform secret stores**: needed only by app-plane deployments (SSR).
   The SPA golden path ships zero platform secrets.
 
+### Credential exposure contracts
+
+The litmus test generalises: every credential class carries an **exposure
+contract**, and every new endpoint or SDK surface is checked against the
+contract of each credential it touches — not only "may this live in a browser
+bundle" but "which surfaces may this value ever appear on".
+
+| Credential | May appear in | Must never appear in |
+|---|---|---|
+| Publishable key | Committed `zitadel.json`, browser bundles, request headers | — (safe to publish is its definition) |
+| Project secret | Server env, platform secret stores, `.zitadel/secret` | Browser-readable content, committed files, requests attached by infrastructure to browser-originated traffic |
+| Session token | The `__nextgen_session` httpOnly cookie; server memory while handling the request | Anything script-readable: HTML/DOM, serialised SSR/RSC payloads, client-side state, non-httpOnly cookies, URLs, logs |
+| Handoff token | Flow-completion response body (same-origin, one-time, short-TTL) | URLs, unless exchanged with the proof binding above |
+
+The session-token row makes explicit what the httpOnly cookie already
+implies: **no server-side surface may re-materialise the token into
+browser-readable content.** OIDC access and refresh tokens keep their
+contracts in ADR 037. Wired enforcement today: `@zitadel/sdk-nuxt` strips the
+token before seeding its SSR payload; `@zitadel/sdk-next`'s `NextgenProvider`
+converts to the client-safe shape on the server and is `server-only`, so a
+client-side wrapper cannot move the boundary above the strip; the demo-next
+e2e asserts the raw token appears nowhere in a rendered response (PR #718).
+Exposure contracts are testable that way — response bodies and serialised
+payloads are assertable surfaces — and new SDK integrations are expected to
+carry the equivalent leak guard.
+
 ### Proxies become credential-free
 
 With no secret to inject, the same-origin `/__nextgen/*` hop exists only for
@@ -124,6 +171,40 @@ CORS and first-party cookies:
 - **Production SPA:** a `vercel.json` rewrite or `netlify.toml` redirect; a
   minimal worker only on Cloudflare (its redirects cannot proxy external
   origins). No published proxy package is required.
+
+### SSR session validation happens at the render layer
+
+The framework middlewares' header tunnel (`x-nextgen-auth-token`) was an
+unnamed intra-app credential channel: a trusted transport for a bearer that
+exists only on matcher-covered routes and is spoofable wherever the
+middleware does not run. PR #718 closed the spoof by re-verifying the header;
+this ADR removes the channel instead:
+
+- **`auth()` reads the session cookie (and, in Route Handlers, the
+  `Authorization` bearer) directly** and validates it — opaque tokens via the
+  server-originated `getMySession` read above, JWTs via JWKS. It works on
+  every route; the middleware `matcher` constrains only redirects, aligning
+  server-side reads with `getSession()`.
+- **Middleware keeps two jobs**: the credential-free proxy hop and redirect
+  gating for `protectedRoutes`, where it retains full validation — a
+  structural-only check there would render signed-out content instead of
+  redirecting. Validation cost is ADR 037's authoritative-session read, once
+  per render, doubled only on protected routes.
+- **No attestation channel replaces the tunnel.** An HMAC handshake between
+  middleware and render layer would need a durable shared secret in exactly
+  the layer this ADR empties of secrets; the option is foreclosed, not
+  deferred.
+
+Specced vs wired: `getSession()` (PR #717) is this model's client half,
+shipped. PR #718's verification core — `verifyJwt` with middleware-parity
+options, opaque validation with identity mapping, the client-safe boundary —
+is the server half, shipped behind the old header transport. The remaining
+work is the transport swap: read `cookies()`/`Authorization` in `auth()`,
+delete the tunnel plumbing, attach the publishable key once it exists, and
+sweep the matcher-precondition prose (SDK docstrings, READMEs, scaffold
+guidance, the `getSession()` server-side error text). `@zitadel/sdk-nuxt`
+already validates on every request (no matcher concept); its remaining
+change is publishable-key wiring only.
 
 ## Consequences
 
@@ -144,6 +225,13 @@ CORS and first-party cookies:
   the secret for app-plane calls.
 - Public-plane hardening (rate limits, enumeration-safe errors, bot gates)
   is the assumed baseline for flow traffic and is unchanged by this ADR.
+- **The tunnel-spoof class disappears structurally.** With no
+  `x-nextgen-auth-token` channel there is nothing for a client to forge on
+  uncovered routes; PR #718's verification engine remains as the validation
+  path, no longer as a trust patch on the transport.
+- The exposure contracts give every SDK a testable invariant; the demo-next
+  e2e leak guard (raw token absent from the full rendered response) is the
+  template for other framework integrations.
 
 ## Out of scope
 
