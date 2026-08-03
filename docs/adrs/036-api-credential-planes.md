@@ -146,10 +146,10 @@ bundle" but "which surfaces may this value ever appear on".
 |---|---|---|
 | Publishable key | Committed `zitadel.json`, browser bundles, request headers | — (safe to publish is its definition) |
 | Project secret | Server env, platform secret stores, `.zitadel/secret` | Browser-readable content, committed files, requests attached by infrastructure to browser-originated traffic |
-| Session token | The `__nextgen_session` httpOnly cookie; server memory while handling the request | Anything script-readable: HTML/DOM, serialised SSR/RSC payloads, client-side state, non-httpOnly cookies, URLs, logs |
+| Session token | The `__nextgen_session` HttpOnly cookie; server memory while handling the request | Anything script-readable: HTML/DOM, serialised SSR/RSC payloads, client-side state, non-HttpOnly cookies, URLs, logs |
 | Handoff token | Flow-completion response body (same-origin, one-time, short-TTL) | URLs, unless exchanged with the proof binding above |
 
-The session-token row makes explicit what the httpOnly cookie already
+The session-token row makes explicit what the HttpOnly cookie already
 implies: **no server-side surface may re-materialise the token into
 browser-readable content.** OIDC access and refresh tokens keep their
 contracts in ADR 037. Wired enforcement today: `@zitadel/sdk-nuxt` strips the
