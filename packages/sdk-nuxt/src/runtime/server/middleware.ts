@@ -396,6 +396,7 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
   // not a JWT (non-JSON segments). A token with a valid JWT structure that
   // failed verification (bad sig, wrong typ/alg) must be rejected — never
   // accepted by a backend call that doesn't re-check the JWT claims.
+  let liveAnonymousSession = false;
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
     const opaqueResult = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
     // A session without a user id is an anonymous session — the flow has not
@@ -413,13 +414,19 @@ async function handleAuth(event: H3Event, opts: AuthHandlerOptions): Promise<voi
       };
       return;
     }
+    liveAnonymousSession = opaqueResult !== null;
   }
 
   event.context.nextgenAuth = { isAuthenticated: false, session: null };
 
-  for (const name of Object.keys(parseCookies(event))) {
-    if (name.startsWith("__nextgen")) {
-      deleteCookie(event, name);
+  // Clearing cookies stops the browser from replaying dead credentials. A
+  // live anonymous session is not dead — the backend confirmed it above, and
+  // an in-progress login flow may still complete it — so its cookie stays.
+  if (!liveAnonymousSession) {
+    for (const name of Object.keys(parseCookies(event))) {
+      if (name.startsWith("__nextgen")) {
+        deleteCookie(event, name);
+      }
     }
   }
 

@@ -55,14 +55,14 @@ function makeJwt(
 }
 
 /**
- * Stubs the opaque-token fallback path: `/sessions/me` answers 200 with the
- * given body, anything else (a JWKS lookup) 404s so the JWT path cannot
+ * Stubs the opaque-token fallback path: `/sessions/me` answers `status` with
+ * the given body, anything else (a JWKS lookup) 404s so the JWT path cannot
  * accidentally succeed.
  */
-function mockSessionsMe(body: Record<string, unknown>): ReturnType<typeof vi.fn> {
+function mockSessionsMe(body: Record<string, unknown>, status = 200): ReturnType<typeof vi.fn> {
   return vi.fn().mockImplementation((url: string) => {
     const res = String(url).endsWith("/sessions/me")
-      ? new Response(JSON.stringify(body), { status: 200 })
+      ? new Response(JSON.stringify(body), { status })
       : new Response("{}", { status: 404 });
     return Promise.resolve(res);
   });
@@ -567,10 +567,12 @@ describe("createNextgenMiddleware (H3)", () => {
     });
   });
 
-  it("opaque session token without a user id stays unauthenticated", async () => {
+  it("opaque session token without a user id stays unauthenticated but keeps its cookie", async () => {
     // An anonymous session: the flow has not verified a user factor yet, so
     // `/sessions/me` answers 200 with no `user_id`. Authenticating here would
-    // hand route handlers a placeholder identity matching no real user.
+    // hand route handlers a placeholder identity matching no real user — but
+    // the session is live, so clearing its cookie would orphan the login flow
+    // that is still completing it.
     vi.stubGlobal("fetch", mockSessionsMe({}));
 
     const app = createApp();
@@ -589,8 +591,41 @@ describe("createNextgenMiddleware (H3)", () => {
     });
 
     const handler = toWebHandler(app);
-    await handler(makeWebRequest("http://localhost:3000/", "__nextgen_session=opaque-token"));
+    const res = await handler(
+      makeWebRequest("http://localhost:3000/", "__nextgen_session=opaque-token"),
+    );
     expect(capturedAuth).toEqual({ isAuthenticated: false, session: null });
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("dead opaque session token is cleared from the browser", async () => {
+    // The backend no longer knows the session (revoked or expired), so the
+    // sweep must clear the cookie to stop the browser from replaying it.
+    vi.stubGlobal("fetch", mockSessionsMe({}, 401));
+
+    const app = createApp();
+    app.use(
+      createNextgenMiddleware({
+        url: "http://localhost:4000",
+        protectedRoutes: ["/admin"],
+        loginPath: "/login",
+      }),
+    );
+
+    let capturedAuth: unknown = undefined;
+    app.use("/", (event) => {
+      capturedAuth = event.context.nextgenAuth;
+      return { ok: true };
+    });
+
+    const handler = toWebHandler(app);
+    const res = await handler(
+      makeWebRequest("http://localhost:3000/", "__nextgen_session=dead-token"),
+    );
+    expect(capturedAuth).toEqual({ isAuthenticated: false, session: null });
+    const setCookie = res.headers.get("set-cookie") ?? "";
+    expect(setCookie).toMatch(/__nextgen_session=/);
+    expect(setCookie).toMatch(/Max-Age=0|expires=.*1970/i);
   });
 
   it("strips x-nextgen-auth-token from proxied requests", async () => {
