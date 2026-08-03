@@ -336,9 +336,6 @@ func userIDs(users []*domain.User) []string {
 	return ids
 }
 
-// assertUserAttributes asserts the user's hydrated attributes are exactly want:
-// hydration is meant to return the requested keys and nothing else, so a
-// presence-only check would not test it.
 func assertUserAttributes(t *testing.T, user *domain.User, want map[string]any) {
 	t.Helper()
 
