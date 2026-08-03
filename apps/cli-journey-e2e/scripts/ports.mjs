@@ -10,15 +10,12 @@ import { randomInt } from "node:crypto";
  * loopback traffic draws outbound *source* ports from the same range, and one
  * of those connections held the reserved port exactly when its owner tried to
  * bind (2026-08-01, full-pr runs 30697929038 and 30699241416 — vite "Port
- * 43785 is already in use", embedded postgres dying at bind on 40805).
+ * 43785 is already in use").
  *
  * Ports below the ephemeral floor (Linux 32768, macOS/Windows 49152) are never
  * handed out as outbound source ports, so the only remaining collider is
  * another explicit listener, which the listen probe catches at reservation
- * time. The embedded-postgres dialect (internal/storage/v2/dialect/postgres/
- * embedded/dialect.go) allocates from 24000-31999 for the same reason; keep
- * the two blocks disjoint so a journey reservation can never race a postgres
- * bind.
+ * time.
  */
 export const JOURNEY_PORT_BLOCK_START = 22000;
 export const JOURNEY_PORT_BLOCK_SIZE = 2000;
