@@ -14,6 +14,10 @@ const (
 	createTeamStmt = `INSERT INTO teams (project_id, id, name, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?) RETURNING project_id, id, name, status, created_at, updated_at`
 
+	updateTeamStmt = `UPDATE teams SET name = ?, updated_at = ?
+WHERE project_id = ? AND id = ? AND status = ?
+RETURNING project_id, id, name, status, created_at, updated_at`
+
 	deactivateTeamStmt = `UPDATE teams SET status = ?, updated_at = ? WHERE project_id = ? AND id = ?`
 
 	deactivateTeamMembershipsStmt = `UPDATE team_memberships SET status = ?, updated_at = ?
@@ -66,6 +70,24 @@ func (ts teamStatements) GetTeamByID(ctx context.Context, projectID, id string) 
 		return nil, wrapError(err)
 	}
 	return team, nil
+}
+
+// UpdateTeam implements [service.TeamStatements].
+// The whole team is returned after the update.
+// Only active teams are updated.
+// Update of a deactivated or a non-existent team returns [database.NoRowFoundError].
+func (ts teamStatements) UpdateTeam(ctx context.Context, team *domain.Team) error {
+	now := nowUnixNano()
+	row := ts.client.QueryRow(
+		ctx,
+		updateTeamStmt,
+		team.Name,
+		now,
+		team.ProjectID,
+		team.ID,
+		domain.TeamStatusActive.String(),
+	)
+	return wrapError(scanTeamRow(row, team))
 }
 
 // DeactivateTeam implements [service.TeamStatements].
