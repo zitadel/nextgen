@@ -185,6 +185,10 @@ type QueryProjectsRes interface {
 	queryProjectsRes()
 }
 
+type QueryTeamsRes interface {
+	queryTeamsRes()
+}
+
 type RevokeMySessionRes interface {
 	revokeMySessionRes()
 }
@@ -211,6 +215,10 @@ type SubmitFlowStepRes interface {
 
 type UpdateFlowDefinitionRes interface {
 	updateFlowDefinitionRes()
+}
+
+type UpdateTeamRes interface {
+	updateTeamRes()
 }
 
 type VerifyChallengeProofRes interface {

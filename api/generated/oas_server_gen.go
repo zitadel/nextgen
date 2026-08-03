@@ -290,7 +290,7 @@ type Handler interface {
 	GetSession(ctx context.Context, params GetSessionParams) (GetSessionRes, error)
 	// GetTeam implements getTeam operation.
 	//
-	// Returns the current state of a team.
+	// Returns a Team by its id.
 	//
 	// GET /teams/{team_id}
 	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
@@ -383,6 +383,13 @@ type Handler interface {
 	//
 	// POST /projects/query
 	QueryProjects(ctx context.Context, req *QueryProjectsRequest) (QueryProjectsRes, error)
+	// QueryTeams implements queryTeams operation.
+	//
+	// Returns the teams of a project, paginated with a cursor.
+	// Teams of every lifecycle status are returned; each carries its `status`.
+	//
+	// POST /teams/query
+	QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Revokes the session immediately (`state: revoked`). This is the logout operation.
@@ -454,6 +461,12 @@ type Handler interface {
 	//
 	// PUT /flow_definitions/{id}
 	UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
+	// UpdateTeam implements updateTeam operation.
+	//
+	// Update team. Only active teams can be updated.
+	//
+	// PATCH /teams/{team_id}
+	UpdateTeam(ctx context.Context, req *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
 	// VerifyChallengeProof implements verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.

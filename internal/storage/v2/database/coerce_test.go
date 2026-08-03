@@ -64,6 +64,13 @@ func TestCoerceTimeValue(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestCoerceTime_nil(t *testing.T) {
+	t.Parallel()
+	got, err := database.CoerceTime(nil)
+	require.NoError(t, err)
+	assert.Nil(t, got)
+}
+
 func TestCoerceNumberValue(t *testing.T) {
 	t.Parallel()
 	got, err := database.CoerceNumberValue[domain.FlowDefinitionStatus](float64(domain.FlowDefinitionStatusActive))
