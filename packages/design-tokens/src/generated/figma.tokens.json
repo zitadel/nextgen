@@ -7,13 +7,17 @@
       "2--theme",
       "3. Mode",
       "4. Custom",
-      "5--icon-library"
+      "5--icon-library",
+      "brand",
+      "Gradient Colors",
+      "heading-typography",
+      "Syntax"
     ],
     "themeModes": [
       "dark",
       "light"
     ],
-    "resolvedLeaves": 944
+    "resolvedLeaves": 1006
   },
   "color": {
     "accent": {
@@ -316,6 +320,26 @@
       "sectionTitleGapLg": 16,
       "sectionTitleGapMd": 16,
       "sectionTitleGapSm": 16
+    },
+    "light": {
+      "syntax": {
+        "key": "#401889",
+        "string": "#bd2514",
+        "number": "#c52247",
+        "boolean": "#5a23bd",
+        "punctuation": "#686883",
+        "comment": "#82829c"
+      }
+    },
+    "dark": {
+      "syntax": {
+        "key": "#9066da",
+        "string": "#f25543",
+        "number": "#e25f7d",
+        "boolean": "#bba5e4",
+        "punctuation": "#82829c",
+        "comment": "#686883"
+      }
     }
   }
 }
