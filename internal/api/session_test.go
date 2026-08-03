@@ -34,6 +34,16 @@ func TestValidateSessionToken(t *testing.T) {
 	require.ErrorIs(t, validateSessionToken(session, token), domain.ErrSessionTokenInvalid())
 }
 
+func TestInvalidSessionCredential(t *testing.T) {
+	t.Parallel()
+
+	err := invalidSessionCredential(domain.ErrSessionTokenInvalid())
+	require.ErrorIs(t, err, domain.ErrAuthUnauthorized(nil))
+	require.ErrorIs(t, err, domain.ErrSessionTokenInvalid())
+	require.Equal(t, "auth.unauthorized", err.Code)
+	require.Equal(t, sessionUnauthorizedMessage, err.Message)
+}
+
 func TestUserAgentToAPI(t *testing.T) {
 	t.Parallel()
 

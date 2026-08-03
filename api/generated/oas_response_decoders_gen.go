@@ -6690,7 +6690,7 @@ func decodeRevokeMySessionResponse(resp *http.Response) (res RevokeMySessionRes,
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response RevokeMySessionUnauthorized
+			var response AuthUnauthorized
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err

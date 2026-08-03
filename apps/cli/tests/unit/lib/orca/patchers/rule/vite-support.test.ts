@@ -58,6 +58,7 @@ export default defineConfig({
       "/__nextgen": {
         target: "http://old.example",
         changeOrigin: false,
+        secure: false,
         rewrite: (path) => path.slice("/__nextgen".length),
         configure: (proxy) => {
           const secret = loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET;
@@ -72,14 +73,50 @@ export default defineConfig({
       },
     },
   },
-});`;
+});
+// preserved user note`;
 
     const out = edit(legacy);
 
     expect(out).toContain("zitadel:proxy:v2");
     expect(out).toContain('pathname === "/sessions/exchange"');
-    expect(out).toContain("http://127.0.0.1:8099");
-    expect(out).not.toContain("http://old.example");
+    expect(out).toContain("http://old.example");
+    expect(out).toContain("secure: false");
+    expect(out).toContain("// preserved user note");
+    expect(out).not.toContain("http://127.0.0.1:8099");
+  });
+
+  it("flags an unguarded write even when a v2 marker and decoy guard remain", () => {
+    const reformattedLegacy = `import { defineConfig, loadEnv } from "vite";
+export default defineConfig({
+  server: {
+    proxy: {
+      "/__nextgen": {
+        target: "http://old.example",
+        configure(proxy) {
+          const secret = loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET;
+          const bearer = \`Bearer \${secret}\`;
+          /* zitadel:proxy:v2 */
+          proxy.on("proxyReq", (proxyReq) => {
+            const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
+            if (
+              proxyReq.method === "POST" &&
+              pathname === "/sessions/exchange" &&
+              !proxyReq.getHeader("authorization")
+            ) {
+              console.debug("exchange request");
+            }
+            proxyReq.setHeader("Authorization", bearer);
+          });
+        },
+      },
+    },
+  },
+});`;
+
+    expect(() => edit(reformattedLegacy)).toThrowError(
+      /may forward ZITADEL_PROJECT_SECRET outside POST \/sessions\/exchange/,
+    );
   });
 
   it("preserves a custom existing /__nextgen proxy", () => {

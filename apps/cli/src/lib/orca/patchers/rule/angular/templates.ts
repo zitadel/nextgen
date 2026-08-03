@@ -1,6 +1,10 @@
 import { MANAGED_MARKER } from "../../../../paths";
 import type { PatchContext } from "../../types";
 import { PROXY_PATH } from "../proxy";
+import {
+  assertNoUnreviewedProjectSecretProxy,
+  PROXY_CREDENTIAL_POLICY_MARKER,
+} from "../proxy-credential-policy";
 
 /**
  * The managed root component `src/app/app.ts`: a standalone component that
@@ -165,7 +169,8 @@ const LEGACY_UNCONDITIONAL_BEARER = `function setBearer(proxyReq) {
   proxyReq.setHeader("authorization", bearer);
 }`;
 
-const EXCHANGE_ONLY_BEARER = `function setBearer(proxyReq) {
+const EXCHANGE_ONLY_BEARER = `/* ${PROXY_CREDENTIAL_POLICY_MARKER} */
+function setBearer(proxyReq) {
   const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
   if (
     proxyReq.method === "POST" &&
@@ -179,16 +184,18 @@ const EXCHANGE_ONLY_BEARER = `function setBearer(proxyReq) {
 /**
  * Creates the managed Angular proxy and upgrades the exact insecure hook the
  * CLI emitted before the exchange-only policy. Other edits are preserved; a
- * marker-less or otherwise custom proxy is left untouched.
+ * safe custom proxy is left untouched, while an unrecognized proxy that may
+ * still over-forward the project secret is surfaced for manual review.
  */
 export function proxyConfEdit(): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
       return proxyConfTemplate();
     }
-    if (!source.includes(MANAGED_MARKER) || !source.includes(LEGACY_UNCONDITIONAL_BEARER)) {
-      return source;
+    if (source.includes(MANAGED_MARKER) && source.includes(LEGACY_UNCONDITIONAL_BEARER)) {
+      return source.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER);
     }
-    return source.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER);
+    assertNoUnreviewedProjectSecretProxy(source, "proxy.conf.cjs");
+    return source;
   };
 }

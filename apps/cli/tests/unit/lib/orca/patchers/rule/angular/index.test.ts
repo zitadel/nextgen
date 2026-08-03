@@ -100,7 +100,8 @@ describe("AngularPatcher.plan", () => {
   it("migrates only the legacy managed proxy bearer hook", () => {
     const edit = proxyConfigEdit();
     const legacy = edit(undefined).replace(
-      `function setBearer(proxyReq) {
+      `/* zitadel:proxy:v2 */
+function setBearer(proxyReq) {
   const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
   if (
     proxyReq.method === "POST" &&
@@ -121,6 +122,31 @@ describe("AngularPatcher.plan", () => {
 
     const custom = `// user-owned\nfunction setBearer(proxyReq) {\n  proxyReq.setHeader("authorization", bearer);\n}\n`;
     expect(edit(custom)).toBe(custom);
+  });
+
+  it("flags a reformatted unsafe legacy proxy for manual review", () => {
+    const edit = proxyConfigEdit();
+    const unsafe = edit(undefined).replace(
+      `/* zitadel:proxy:v2 */
+function setBearer(proxyReq) {
+  const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
+  if (
+    proxyReq.method === "POST" &&
+    pathname === "/sessions/exchange" &&
+    !proxyReq.getHeader("authorization")
+  ) {
+    proxyReq.setHeader("authorization", bearer);
+  }
+}`,
+      `function setBearer(proxyReq) {
+  proxyReq
+    .setHeader("authorization", bearer);
+}`,
+    );
+
+    expect(() => edit(unsafe)).toThrowError(
+      /may forward ZITADEL_PROJECT_SECRET outside POST \/sessions\/exchange/,
+    );
   });
 
   it("adds a `dev` npm script so `npm run dev` works like the other frameworks", () => {

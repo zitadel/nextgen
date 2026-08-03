@@ -122,8 +122,8 @@ export class ManagedFilesCheck implements SanityCheck {
     }
     if (unverifiable.length > 0) {
       warnings.push(
-        `unverifiable managed config wiring (restructured config?): ${unverifiable
-          .map((s) => s.path)
+        `unverifiable managed config wiring (manual review required): ${unverifiable
+          .map((s) => (s.reason ? `${s.path} (${s.reason})` : s.path))
           .join(", ")}`,
       );
     }

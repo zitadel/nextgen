@@ -726,6 +726,8 @@ func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
 	s.Details = val
 }
 
+func (*AuthUnauthorized) revokeMySessionRes() {}
+
 // Additional error-specific context.
 type AuthUnauthorizedDetails map[string]jx.Raw
 
@@ -11358,10 +11360,6 @@ func (*RevokeMySessionNoContent) revokeMySessionRes() {}
 type RevokeMySessionNotFound ErrorDetails
 
 func (*RevokeMySessionNotFound) revokeMySessionRes() {}
-
-type RevokeMySessionUnauthorized ErrorDetails
-
-func (*RevokeMySessionUnauthorized) revokeMySessionRes() {}
 
 // Ref: #
 type RevokeRequest struct {

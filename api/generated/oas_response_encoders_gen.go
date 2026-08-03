@@ -3222,7 +3222,7 @@ func encodeRevokeMySessionResponse(response RevokeMySessionRes, w http.ResponseW
 
 		return nil
 
-	case *RevokeMySessionUnauthorized:
+	case *AuthUnauthorized:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(401)
 		span.SetStatus(codes.Error, http.StatusText(401))

@@ -46,6 +46,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return internalErrorResponse(err)
 	}
 	switch {
+	case e.Code == domain.ErrAuthUnauthorized(nil).Code:
+		return errorResponseWithStatusCode(http.StatusUnauthorized, e)
 	case strings.HasPrefix(e.Code, domain.PrefixAuthAttempt.ErrorCodePrefix("")):
 		return authAttemptErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixFlow.ErrorCodePrefix("")):
