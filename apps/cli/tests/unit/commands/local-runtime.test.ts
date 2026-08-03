@@ -419,83 +419,6 @@ describe("local runtime commands", () => {
     expect(envelope.message).toContain("process exited before becoming healthy");
   });
 
-  it("stop reaps the embedded postgres so a subsequent start is not blocked", async () => {
-    const cwd = await tempProject("zitadel-start-stop-start-");
-    const fake = await fakeServerBinaryWithEmbeddedPostgres();
-    const port = await freePort();
-    const pidFile = join(
-      localRuntimePaths(cwd).dataDir,
-      "embedded-postgres",
-      "data",
-      "postmaster.pid",
-    );
-
-    const start = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
-      ZITADEL_SERVER_BINARY: fake.binPath,
-    });
-    expect(start.exitCode).toBe(0);
-    binaryPids.push(runtimePidOf(start.stdout));
-
-    // The server spawned a detached postmaster that owns the data-dir lock, just
-    // like pg_ctl's daemonized postgres.
-    const orphanPid = await postmasterPidFrom(pidFile);
-    expect(isProcessAlive(orphanPid)).toBe(true);
-
-    const stop = await runCliForTest(["stop", "--cwd", cwd, "--json"], {
-      ZITADEL_SERVER_BINARY: fake.binPath,
-    });
-    expect(stop.exitCode).toBe(0);
-    const stopEnvelope = parseJson(stop.stdout) as {
-      data: { runtime: { embedded_postgres?: { status: string; pid?: number } } };
-    };
-    expect(stopEnvelope.data.runtime.embedded_postgres).toMatchObject({
-      status: "stopped",
-      pid: orphanPid,
-    });
-    await waitForProcessExit(orphanPid);
-    await expect(stat(pidFile)).rejects.toMatchObject({ code: "ENOENT" });
-
-    // The orphaned postmaster would otherwise fail this start with a stale lock.
-    const restart = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
-      ZITADEL_SERVER_BINARY: fake.binPath,
-    });
-    expect(restart.exitCode).toBe(0);
-    binaryPids.push(runtimePidOf(restart.stdout));
-  });
-
-  it("start self-heals an embedded postgres orphaned by an unclean server exit", async () => {
-    const cwd = await tempProject("zitadel-start-selfheal-");
-    const fake = await fakeServerBinaryWithEmbeddedPostgres();
-    const port = await freePort();
-    const pidFile = join(
-      localRuntimePaths(cwd).dataDir,
-      "embedded-postgres",
-      "data",
-      "postmaster.pid",
-    );
-
-    const start = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
-      ZITADEL_SERVER_BINARY: fake.binPath,
-    });
-    expect(start.exitCode).toBe(0);
-    const serverPid = runtimePidOf(start.stdout);
-    const orphanPid = await postmasterPidFrom(pidFile);
-
-    // Simulate a crash/SIGKILL: the tracked server dies without reaping postgres,
-    // leaving runtime.json and a live orphaned postmaster holding the lock.
-    process.kill(serverPid, "SIGKILL");
-    await waitForProcessExit(serverPid);
-    expect(isProcessAlive(orphanPid)).toBe(true);
-
-    const restart = await runCliForTest(["start", "--cwd", cwd, "--json", "--port", String(port)], {
-      ZITADEL_SERVER_BINARY: fake.binPath,
-    });
-    expect(restart.exitCode).toBe(0);
-    binaryPids.push(runtimePidOf(restart.stdout));
-    // start reaped the orphan before launching the fresh server.
-    await waitForProcessExit(orphanPid);
-  });
-
   it("start --json starts the single-container runtime and writes metadata", async () => {
     const cwd = await tempProject("zitadel-start-");
     const fake = await fakeDocker();
@@ -964,72 +887,6 @@ process.exit(0);
   return { binPath };
 }
 
-// A fake server binary that mirrors the real embedded-postgres lifecycle: it
-// spawns a detached "postmaster" in its own session (so a process-group SIGTERM
-// to the server never reaches it, exactly like pg_ctl's daemonized postgres),
-// records it in the data-dir lock file, and — like pg_ctl — refuses to start if a
-// live postmaster already owns that lock. Crucially it exits on SIGTERM WITHOUT
-// reaping the postmaster, modelling every shutdown path the server cannot cover
-// (SIGKILL, crash, startup-window signal); reaping is then the CLI's job.
-async function fakeServerBinaryWithEmbeddedPostgres(): Promise<{ binPath: string }> {
-  const binDir = await mkdtemp(join(tmpdir(), "zitadel-fake-server-pg-"));
-  tempDirs.push(binDir);
-  const postmasterPidLog = join(binDir, "postmaster-pids.log");
-  dockerHealthPidLogs.push(postmasterPidLog);
-  const binPath = join(binDir, "zitadel-server");
-  await writeFile(
-    binPath,
-    `#!/usr/bin/env node
-const http = require("node:http");
-const fs = require("node:fs");
-const path = require("node:path");
-const childProcess = require("node:child_process");
-
-const address = process.env.NEXTGEN_SERVER_ADDRESS || ":8080";
-const port = Number(address.split(":").at(-1));
-const dataDir = process.env.NEXTGEN_SERVER_DATA_DIR;
-const pidFile = path.join(dataDir, "embedded-postgres", "data", "postmaster.pid");
-
-if (fs.existsSync(pidFile)) {
-  const existing = Number.parseInt(fs.readFileSync(pidFile, "utf8").split("\\n")[0], 10);
-  let alive = false;
-  try { process.kill(existing, 0); alive = true; } catch (error) { alive = error.code === "EPERM"; }
-  if (alive) {
-    console.error("pg_ctl: another server might be running; trying to start anyway");
-    console.error('FATAL:  lock file "postmaster.pid" already exists');
-    process.exit(1);
-  }
-  fs.rmSync(pidFile, { force: true });
-}
-
-fs.mkdirSync(path.dirname(pidFile), { recursive: true });
-// Ignores SIGTERM (Postgres treats that as a wait-for-clients smart shutdown) but
-// exits on the default SIGINT — so only a reaper that uses SIGINT/SIGKILL stops it.
-const postmaster = childProcess.spawn(
-  process.execPath,
-  ["-e", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1 << 30);"],
-  { detached: true, stdio: "ignore" },
-);
-postmaster.unref();
-fs.appendFileSync(${JSON.stringify(postmasterPidLog)}, String(postmaster.pid) + "\\n");
-fs.writeFileSync(pidFile, String(postmaster.pid) + "\\n" + dataDir + "\\n");
-
-const server = http.createServer((req, res) => {
-  if (req.url === "/healthz") { res.writeHead(200).end("ok"); return; }
-  res.writeHead(404).end();
-});
-server.listen(port, "localhost", () => {
-  console.log("fake zitadel server listening " + port);
-});
-// Exit without reaping the postmaster — the CLI must do it.
-process.on("SIGTERM", () => { server.close(() => process.exit(0)); });
-process.on("SIGINT", () => { server.close(() => process.exit(0)); });
-`,
-  );
-  await chmod(binPath, 0o755);
-  return { binPath };
-}
-
 async function fakeProcessTable(
   rows: Array<{ command: string; pid: number; ppid: number }>,
 ): Promise<{ binDir: string }> {
@@ -1113,35 +970,6 @@ function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
 
 function runtimePidOf(stdout: string): number {
   return (parseJson(stdout) as { data: { runtime: { pid: number } } }).data.runtime.pid;
-}
-
-async function postmasterPidFrom(pidFile: string): Promise<number> {
-  const [firstLine] = (await readFile(pidFile, "utf8")).split(/\r?\n/, 1);
-  const pid = Number.parseInt(firstLine ?? "", 10);
-  if (!Number.isInteger(pid) || pid <= 0) {
-    throw new Error(`postmaster.pid did not contain a pid: ${firstLine ?? "<empty>"}`);
-  }
-  return pid;
-}
-
-function isProcessAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === "EPERM";
-  }
-}
-
-async function waitForProcessExit(pid: number, timeoutMs = 10_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (!isProcessAlive(pid)) {
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
-  throw new Error(`process ${String(pid)} did not exit within ${String(timeoutMs)}ms`);
 }
 
 async function expectedDefaultImage(): Promise<string> {

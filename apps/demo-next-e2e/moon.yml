@@ -20,7 +20,7 @@ tasks:
       runInCI: false
 
   # Same sign-in journey against a real ephemeral instance seeded via
-  # @zitadel/testing instead of api-mock. Boots a server + embedded Postgres.
+  # @zitadel/testing instead of api-mock. Boots a server + SQLite local default.
   e2e-real:
     command: "corepack pnpm exec playwright test --config playwright.real.config.mts"
     deps:
