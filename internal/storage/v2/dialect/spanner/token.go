@@ -2,6 +2,7 @@ package spanner
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -50,6 +51,9 @@ func newTokenStatements(db queryExecutor) tokenStatements {
 func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) error {
 	if err := token.ValidatePersisted(); err != nil {
 		return err
+	}
+	if token.TokenID != "" {
+		return fmt.Errorf("token_id must not be set on create")
 	}
 	if err := ensureManagedID(&token.TokenID, domain.TokenPrefix); err != nil {
 		return err

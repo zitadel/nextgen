@@ -146,6 +146,9 @@ func (s cryptoKeyStatements) scanEncryptionKey(row *spanner.Row) (*domain.Encryp
 
 // CreateSigningKey implements [service.CryptoKeyStatements].
 func (s cryptoKeyStatements) CreateSigningKey(ctx context.Context, key *domain.SigningKey) error {
+	if err := ensureManagedID(&key.ID, domain.PrefixSigningKey); err != nil {
+		return err
+	}
 	stmt := buildStatement(createSigningKeyStmt,
 		key.ID, key.ProjectID, key.Key, key.Algorithm, key.State, key.ActivatedAt, key.RetiredAt, key.Purpose,
 	).statement()

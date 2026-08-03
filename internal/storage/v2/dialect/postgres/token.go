@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -43,6 +44,9 @@ func newTokenStatements(client queryExecutor) tokenStatements {
 func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) error {
 	if err := token.ValidatePersisted(); err != nil {
 		return err
+	}
+	if token.TokenID != "" {
+		return fmt.Errorf("token_id must not be set on create")
 	}
 	if err := ensureManagedID(&token.TokenID, domain.TokenPrefix); err != nil {
 		return err

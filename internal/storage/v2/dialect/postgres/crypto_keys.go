@@ -76,6 +76,9 @@ func (s cryptoKeyStatements) GetEncryptionKey(ctx context.Context, filter databa
 }
 
 func (s cryptoKeyStatements) CreateSigningKey(ctx context.Context, key *domain.SigningKey) error {
+	if err := ensureManagedID(&key.ID, domain.PrefixSigningKey); err != nil {
+		return err
+	}
 	return s.client.QueryRow(ctx, createSigningKeyStmt,
 		key.ID, key.ProjectID, key.Key, key.Algorithm, key.State, key.ActivatedAt, key.RetiredAt, key.Purpose,
 	).Scan(&key.ID, &key.CreatedAt)
