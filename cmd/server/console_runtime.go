@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -50,7 +51,7 @@ type runtimeResolver func(ctx context.Context) (consoleRuntime, error)
 
 // standaloneRuntimeResolver resolves the standalone runtime document from
 // the deployment's default project (configured pin or first-created),
-// including the project's publishable key derived from its DEK.
+// including the project's publishable key derived from its token encryption key.
 func standaloneRuntimeResolver(projects service.ProjectService, keys service.KeyService, cfgProjectID string) runtimeResolver {
 	return func(ctx context.Context) (consoleRuntime, error) {
 		project, err := projects.DefaultProject(ctx, cfgProjectID)
@@ -63,11 +64,11 @@ func standaloneRuntimeResolver(projects service.ProjectService, keys service.Key
 		}
 		meta.ConsoleProjectID = project.ID
 
-		dek, err := keys.GetProjectDEKCrypter(ctx, project.ID)
+		tokenCrypter, err := keys.GetProjectCrypter(ctx, project.ID, domain.EncryptionKeyPurposeToken)
 		if err != nil {
 			return consoleRuntime{}, err
 		}
-		publishableKey, err := project.PreviewSecret(dek)
+		publishableKey, err := project.PreviewSecret(tokenCrypter)
 		if err != nil {
 			return consoleRuntime{}, err
 		}
@@ -89,7 +90,7 @@ func newConsoleRuntimeHandler(resolve runtimeResolver) http.Handler {
 		if err != nil {
 			// This endpoint bootstraps the console: a failure here surfaces in
 			// the browser as a blank sign-in screen with nothing to explain it,
-			// and the causes are all server-side (default-project lookup, DEK
+			// and the causes are all server-side (default-project lookup, key
 			// access, key derivation). Without this line the only signal is a
 			// bare 500 in the access log.
 			runtimeLogger(ctx).Error(

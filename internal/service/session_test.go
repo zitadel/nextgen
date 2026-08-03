@@ -12,7 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // userReaderStub implements service.UserIdentityReader and records the
@@ -43,7 +43,7 @@ func newMockedSessionService(t *testing.T, users service.UserIdentityReader, cfg
 	pool := servicemocks.NewMockStatementPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
-	return service.NewSessionService(stubPool(), pool, users, cfg), statements
+	return service.NewSessionService(pool, users, cfg), statements
 }
 
 func TestSessionService_Create(t *testing.T) {

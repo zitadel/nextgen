@@ -123,29 +123,46 @@ func compileOrFilter[F ~uint8, T any](c *statementCompiler, filter database.OrFi
 func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *database.CompareFilter[F], schema database.Schema[F, T]) {
 	op := compareOpSQL(filter.Op)
 	if len(filter.Terms) == 1 {
-		c.WriteString(schema.SQLName(filter.Terms[0].Column))
-		c.WriteString(op)
-		writeArg(c, filter.Terms[0].Value)
+		writeCompareTerm(c, filter.Terms[0], op, schema)
+		return
+	}
+
+	// GoogleSQL defines no ordering over structs, so the row-value comparison
+	// postgres uses is expanded: equality into a conjunction, and an ordered
+	// comparison into its lexicographic form,
+	// "(a > x) OR (a = x AND b > y)".
+	if filter.Op == database.OpEqual {
+		c.WriteString("(")
+		for i, term := range filter.Terms {
+			if i > 0 {
+				c.WriteString(" AND ")
+			}
+			writeCompareTerm(c, term, op, schema)
+		}
+		c.WriteString(")")
 		return
 	}
 
 	c.WriteString("(")
 	for i, term := range filter.Terms {
 		if i > 0 {
-			c.WriteString(", ")
+			c.WriteString(" OR ")
 		}
-		c.WriteString(schema.SQLName(term.Column))
+		c.WriteString("(")
+		for _, prefix := range filter.Terms[:i] {
+			writeCompareTerm(c, prefix, " = ", schema)
+			c.WriteString(" AND ")
+		}
+		writeCompareTerm(c, term, op, schema)
+		c.WriteString(")")
 	}
 	c.WriteString(")")
+}
+
+func writeCompareTerm[F ~uint8, T any](c *statementCompiler, term database.CompareTerm[F], op string, schema database.Schema[F, T]) {
+	c.WriteString(schema.SQLName(term.Column))
 	c.WriteString(op)
-	c.WriteString("(")
-	for i, term := range filter.Terms {
-		if i > 0 {
-			c.WriteString(", ")
-		}
-		writeArg(c, term.Value)
-	}
-	c.WriteString(")")
+	writeArg(c, term.Value)
 }
 
 func compileArrayContainsFilter[F ~uint8, T any](c *statementCompiler, filter *database.ArrayContainsFilter[F], schema database.Schema[F, T]) {
@@ -242,13 +259,6 @@ func buildStatement(sql string, args ...any) spannerStatement {
 		params[paramName(i+1)] = arg
 	}
 	return spannerStatement{SQL: sql, Params: params}
-}
-
-// buildStatementFromPostgresSQL builds a Spanner statement from a PostgreSQL-style SQL string and its arguments.
-// This function is used for backwards compatibility with existing code in the old database package.
-// TODO(adlerhurst): remove this function once the old database package is removed.
-func buildStatementFromPostgresSQL(sql string, args ...any) spannerStatement {
-	return buildStatement(convertPlaceholders(sql), args...)
 }
 
 func paramName(index int) string {

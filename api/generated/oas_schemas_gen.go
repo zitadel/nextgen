@@ -2077,13 +2077,32 @@ type CreateTeamBadRequest ErrorDetails
 
 func (*CreateTeamBadRequest) createTeamRes() {}
 
+type CreateTeamConflict ErrorDetails
+
+func (*CreateTeamConflict) createTeamRes() {}
+
 // Ref: #
-type CreateTeamRequest struct{}
+type CreateTeamRequest struct {
+	// The name of the team. Must be unique within the project.
+	Name string `json:"name"`
+}
+
+// GetName returns the value of Name.
+func (s *CreateTeamRequest) GetName() string {
+	return s.Name
+}
+
+// SetName sets the value of Name.
+func (s *CreateTeamRequest) SetName(val string) {
+	s.Name = val
+}
 
 // Ref: #
 type CreateTeamResponse struct {
 	// The unique identifier of the team.
 	ID string `json:"id"`
+	// The name of the team.
+	Name string `json:"name"`
 	// The time when the team was created.
 	CreatedAt time.Time `json:"createdAt"`
 }
@@ -2091,6 +2110,11 @@ type CreateTeamResponse struct {
 // GetID returns the value of ID.
 func (s *CreateTeamResponse) GetID() string {
 	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *CreateTeamResponse) GetName() string {
+	return s.Name
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -2101,6 +2125,11 @@ func (s *CreateTeamResponse) GetCreatedAt() time.Time {
 // SetID sets the value of ID.
 func (s *CreateTeamResponse) SetID(val string) {
 	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *CreateTeamResponse) SetName(val string) {
+	s.Name = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.
@@ -2193,6 +2222,19 @@ func (*DeactivateFlowDefinitionNoContent) deactivateFlowDefinitionRes() {}
 type DeleteFlowDefinitionNoContent struct{}
 
 func (*DeleteFlowDefinitionNoContent) deleteFlowDefinitionRes() {}
+
+// DeleteUserByIDNoContent is response for DeleteUserByID operation.
+type DeleteUserByIDNoContent struct{}
+
+func (*DeleteUserByIDNoContent) deleteUserByIDRes() {}
+
+type DeleteUserByIDNotFound ErrorDetails
+
+func (*DeleteUserByIDNotFound) deleteUserByIDRes() {}
+
+type DeleteUserByIDUnauthorized ErrorDetails
+
+func (*DeleteUserByIDUnauthorized) deleteUserByIDRes() {}
 
 // Ref: #
 type DeviceAuthorizationResponse struct {
@@ -2387,6 +2429,7 @@ func (*ErrorDetailsStatusCode) createTeamRes()               {}
 func (*ErrorDetailsStatusCode) createUserRes()               {}
 func (*ErrorDetailsStatusCode) deactivateFlowDefinitionRes() {}
 func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) deleteUserByIDRes()           {}
 func (*ErrorDetailsStatusCode) endSessionRes()               {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()          {}
 func (*ErrorDetailsStatusCode) getBrandingByIdRes()          {}
@@ -2409,6 +2452,7 @@ func (*ErrorDetailsStatusCode) listBrandingRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
 func (*ErrorDetailsStatusCode) listSchemasRes()              {}
 func (*ErrorDetailsStatusCode) listSessionsRes()             {}
+func (*ErrorDetailsStatusCode) listUserPasskeysRes()         {}
 func (*ErrorDetailsStatusCode) listUsersRes()                {}
 func (*ErrorDetailsStatusCode) patchProjectRes()             {}
 func (*ErrorDetailsStatusCode) queryProjectsRes()            {}
@@ -4894,74 +4938,6 @@ type GetProjectNotFound ErrorDetails
 
 func (*GetProjectNotFound) getProjectRes() {}
 
-// The current state of a project.
-// Ref: #
-type GetProjectResponse struct {
-	// The unique identifier of the project.
-	ID string `json:"id"`
-	// The name of the project.
-	Name string `json:"name"`
-	// Origins which are allowed for previewing and testing the project.
-	PreviewOrigins []string `json:"previewOrigins"`
-	// The time when the project was created.
-	CreatedAt time.Time `json:"createdAt"`
-	// The time when the project was last updated.
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-// GetID returns the value of ID.
-func (s *GetProjectResponse) GetID() string {
-	return s.ID
-}
-
-// GetName returns the value of Name.
-func (s *GetProjectResponse) GetName() string {
-	return s.Name
-}
-
-// GetPreviewOrigins returns the value of PreviewOrigins.
-func (s *GetProjectResponse) GetPreviewOrigins() []string {
-	return s.PreviewOrigins
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *GetProjectResponse) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// GetUpdatedAt returns the value of UpdatedAt.
-func (s *GetProjectResponse) GetUpdatedAt() time.Time {
-	return s.UpdatedAt
-}
-
-// SetID sets the value of ID.
-func (s *GetProjectResponse) SetID(val string) {
-	s.ID = val
-}
-
-// SetName sets the value of Name.
-func (s *GetProjectResponse) SetName(val string) {
-	s.Name = val
-}
-
-// SetPreviewOrigins sets the value of PreviewOrigins.
-func (s *GetProjectResponse) SetPreviewOrigins(val []string) {
-	s.PreviewOrigins = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *GetProjectResponse) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-// SetUpdatedAt sets the value of UpdatedAt.
-func (s *GetProjectResponse) SetUpdatedAt(val time.Time) {
-	s.UpdatedAt = val
-}
-
-func (*GetProjectResponse) getProjectRes()   {}
-func (*GetProjectResponse) patchProjectRes() {}
-
 type GetProjectUnauthorized ErrorDetails
 
 func (*GetProjectUnauthorized) getProjectRes() {}
@@ -5124,6 +5100,10 @@ func (s *GetSessionErrorResponseStatusCode) SetResponse(val GetSessionErrorRespo
 
 func (*GetSessionErrorResponseStatusCode) getSessionRes() {}
 
+type GetSessionForbidden ErrorDetails
+
+func (*GetSessionForbidden) getSessionRes() {}
+
 type GetSessionNotFound ErrorDetails
 
 func (*GetSessionNotFound) getSessionRes() {}
@@ -5141,6 +5121,8 @@ func (*GetTeamNotFound) getTeamRes() {}
 type GetTeamResponse struct {
 	// The unique identifier of the team.
 	ID string `json:"id"`
+	// The name of the team.
+	Name string `json:"name"`
 	// The time when the team was created.
 	CreatedAt time.Time `json:"createdAt"`
 	// The time when the team was last updated.
@@ -5150,6 +5132,11 @@ type GetTeamResponse struct {
 // GetID returns the value of ID.
 func (s *GetTeamResponse) GetID() string {
 	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *GetTeamResponse) GetName() string {
+	return s.Name
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -5165,6 +5152,11 @@ func (s *GetTeamResponse) GetUpdatedAt() time.Time {
 // SetID sets the value of ID.
 func (s *GetTeamResponse) SetID(val string) {
 	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *GetTeamResponse) SetName(val string) {
+	s.Name = val
 }
 
 // SetCreatedAt sets the value of CreatedAt.
@@ -6342,6 +6334,96 @@ func (s *ListSessionsState) UnmarshalText(data []byte) error {
 type ListSessionsUnauthorized ErrorDetails
 
 func (*ListSessionsUnauthorized) listSessionsRes() {}
+
+type ListUserPasskeysBadRequest ErrorDetails
+
+func (*ListUserPasskeysBadRequest) listUserPasskeysRes() {}
+
+type ListUserPasskeysForbidden ErrorDetails
+
+func (*ListUserPasskeysForbidden) listUserPasskeysRes() {}
+
+type ListUserPasskeysInternalServerError ErrorDetails
+
+func (*ListUserPasskeysInternalServerError) listUserPasskeysRes() {}
+
+type ListUserPasskeysNotFound ErrorDetails
+
+func (*ListUserPasskeysNotFound) listUserPasskeysRes() {}
+
+// Response containing the user's passkeys.
+// Ref: #
+type ListUserPasskeysResponse struct {
+	Passkeys []ListUserPasskeysResponsePasskeysItem `json:"passkeys"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetPasskeys returns the value of Passkeys.
+func (s *ListUserPasskeysResponse) GetPasskeys() []ListUserPasskeysResponsePasskeysItem {
+	return s.Passkeys
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListUserPasskeysResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetPasskeys sets the value of Passkeys.
+func (s *ListUserPasskeysResponse) SetPasskeys(val []ListUserPasskeysResponsePasskeysItem) {
+	s.Passkeys = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListUserPasskeysResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListUserPasskeysResponse) listUserPasskeysRes() {}
+
+type ListUserPasskeysResponsePasskeysItem struct {
+	// The unique identifier of the passkey.
+	ID string `json:"id"`
+	// The name of the passkey.
+	Name string `json:"name"`
+	// The timestamp when the passkey was created.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetID returns the value of ID.
+func (s *ListUserPasskeysResponsePasskeysItem) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *ListUserPasskeysResponsePasskeysItem) GetName() string {
+	return s.Name
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ListUserPasskeysResponsePasskeysItem) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ListUserPasskeysResponsePasskeysItem) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *ListUserPasskeysResponsePasskeysItem) SetName(val string) {
+	s.Name = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ListUserPasskeysResponsePasskeysItem) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+type ListUserPasskeysUnauthorized ErrorDetails
+
+func (*ListUserPasskeysUnauthorized) listUserPasskeysRes() {}
 
 type ListUsersBadRequest ErrorDetails
 
@@ -10903,6 +10985,74 @@ func (s *PostTokenRequestGrantType) UnmarshalText(data []byte) error {
 
 type ProjectID string
 
+// The current state of a project.
+// Ref: #
+type ProjectResponse struct {
+	// The unique identifier of the project.
+	ID string `json:"id"`
+	// The name of the project.
+	Name string `json:"name"`
+	// Origins which are allowed for previewing and testing the project.
+	PreviewOrigins []string `json:"previewOrigins"`
+	// The time when the project was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the project was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// GetID returns the value of ID.
+func (s *ProjectResponse) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *ProjectResponse) GetName() string {
+	return s.Name
+}
+
+// GetPreviewOrigins returns the value of PreviewOrigins.
+func (s *ProjectResponse) GetPreviewOrigins() []string {
+	return s.PreviewOrigins
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ProjectResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *ProjectResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ProjectResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *ProjectResponse) SetName(val string) {
+	s.Name = val
+}
+
+// SetPreviewOrigins sets the value of PreviewOrigins.
+func (s *ProjectResponse) SetPreviewOrigins(val []string) {
+	s.PreviewOrigins = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ProjectResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *ProjectResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*ProjectResponse) getProjectRes()   {}
+func (*ProjectResponse) patchProjectRes() {}
+
 type QueryProjectsBadRequest ErrorDetails
 
 func (*QueryProjectsBadRequest) queryProjectsRes() {}
@@ -11029,14 +11179,14 @@ func (s *QueryProjectsRequestSorting) SetDirection(val SortDirection) {
 // Paginated list of projects.
 // Ref: #
 type QueryProjectsResponse struct {
-	Projects []GetProjectResponse `json:"projects"`
+	Projects []ProjectResponse `json:"projects"`
 	// Token to pass as `page_token` in the next request to fetch the following page.
 	// Absent when there are no more results.
 	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
 
 // GetProjects returns the value of Projects.
-func (s *QueryProjectsResponse) GetProjects() []GetProjectResponse {
+func (s *QueryProjectsResponse) GetProjects() []ProjectResponse {
 	return s.Projects
 }
 
@@ -11046,7 +11196,7 @@ func (s *QueryProjectsResponse) GetNextPageToken() OptNilPageToken {
 }
 
 // SetProjects sets the value of Projects.
-func (s *QueryProjectsResponse) SetProjects(val []GetProjectResponse) {
+func (s *QueryProjectsResponse) SetProjects(val []ProjectResponse) {
 	s.Projects = val
 }
 
@@ -11126,20 +11276,12 @@ type RevokeSessionConflict ErrorDetails
 
 func (*RevokeSessionConflict) revokeSessionRes() {}
 
+type RevokeSessionForbidden ErrorDetails
+
+func (*RevokeSessionForbidden) revokeSessionRes() {}
+
 // RevokeSessionNoContent is response for RevokeSession operation.
-type RevokeSessionNoContent struct {
-	SetCookie string
-}
-
-// GetSetCookie returns the value of SetCookie.
-func (s *RevokeSessionNoContent) GetSetCookie() string {
-	return s.SetCookie
-}
-
-// SetSetCookie sets the value of SetCookie.
-func (s *RevokeSessionNoContent) SetSetCookie(val string) {
-	s.SetCookie = val
-}
+type RevokeSessionNoContent struct{}
 
 func (*RevokeSessionNoContent) revokeSessionRes() {}
 

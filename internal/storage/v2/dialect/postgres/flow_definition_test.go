@@ -4,21 +4,18 @@ package postgres
 
 import (
 	"context"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
-	legacydb "github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniqueFlowDefinitionID(t *testing.T) string {
 	t.Helper()
-	return "flow-" + strings.ReplaceAll(t.Name(), "/", "_") + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	return "flow-" + uniqueSuffix(t)
 }
 
 func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
@@ -77,7 +74,7 @@ func TestFlowDefinitionStatements_CreateAndGet(t *testing.T) {
 
 func TestFlowDefinitionStatements_GetNotFound(t *testing.T) {
 	_, err := testPool.GetFlowDefinitionByID(t.Context(), uniqueProjectID(t), uniqueFlowDefinitionID(t))
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestFlowDefinitionStatements_ListAndDelete(t *testing.T) {
@@ -100,7 +97,7 @@ func TestFlowDefinitionStatements_ListAndDelete(t *testing.T) {
 
 	require.NoError(t, testPool.DeleteFlowDefinitionByID(t.Context(), projectID, def.ID))
 	_, err = testPool.GetFlowDefinitionByID(t.Context(), projectID, def.ID)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestFlowDefinitionStatements_Update(t *testing.T) {
@@ -190,5 +187,5 @@ func TestFlowDefinitionStatements_DeleteProjectCascades(t *testing.T) {
 	require.NoError(t, testPool.DeleteProjectByID(t.Context(), projectID))
 
 	_, err := testPool.GetFlowDefinitionByID(t.Context(), projectID, def.ID)
-	assert.ErrorIs(t, err, new(legacydb.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }

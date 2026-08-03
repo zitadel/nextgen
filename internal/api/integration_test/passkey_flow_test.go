@@ -1,4 +1,4 @@
-//go:build postgres_integration
+//go:build postgres_integration || spanner_integration
 
 package integration_test
 
@@ -36,7 +36,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 
 	// Create the user schema so the resolver can look it up from the DB.  The
 	// schema's $id becomes the URL that the flow definition references.
-	harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 
 	userSchemaURL := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
 
@@ -67,12 +67,12 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	// user_attributes is partitioned by team; a team is required.
 	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 
-	db := harness.EnsureDBPool(t)
 	users := harness.EnsureUserFixture(t)
-	passkeyRepo := harness.EnsureUserPasskeyRepo(t)
+	passkeys := harness.EnsureUserPasskeyFixture(t)
 
 	// Decoy: another project holding the SAME user id and credential id but a
 	// different key pair. Credential resolution must stay project-scoped —
@@ -81,9 +81,10 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	// fail against its foreign public key.
 	decoyProject, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	harness.CreateUserSchema(t, decoyProject, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+	harness.CreateUserSchema(t, decoyProject, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 	decoyTeam, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
 		ProjectID: decoyProject.ID,
+		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 	decoyEmailAttr, err := domain.NewCreateAttribute("email", "pk-flow-test@example.com", domain.AttributeUniquenessUnspecified)
@@ -96,7 +97,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Attributes:              []*domain.CreateAttribute{decoyEmailAttr},
 	}))
 	decoyCred := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
-	require.NoError(t, passkeyRepo.Create(t.Context(), db, &domain.CreateUserPasskey{
+	require.NoError(t, passkeys.Create(t.Context(), &domain.CreateUserPasskey{
 		ProjectID:    decoyProject.ID,
 		UserID:       userID,
 		CredentialID: base64.RawURLEncoding.EncodeToString(cred.ID),
@@ -117,7 +118,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Attributes:              []*domain.CreateAttribute{emailAttr},
 	}))
 
-	require.NoError(t, passkeyRepo.Create(t.Context(), db, &domain.CreateUserPasskey{
+	require.NoError(t, passkeys.Create(t.Context(), &domain.CreateUserPasskey{
 		ProjectID:    project.ID,
 		UserID:       userID,
 		CredentialID: base64.RawURLEncoding.EncodeToString(cred.ID),
@@ -158,7 +159,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition failed: %+v", defResp)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition failed: %s", helpers.MustMarshal(t, defResp))
 
 	// --- Start flow -----------------------------------------------------------
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
@@ -166,8 +167,8 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Purpose:   api.CreateFlowRequestPurposeLogin,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "expected FlowResponseHeaders, got %T", createResp)
+	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 
 	flowID := flowHeaders.Response.ID
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
@@ -181,8 +182,8 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Origin: api.NewOptURI(*rpOriginURL),
 	})
 	require.NoError(t, err)
-	issueOK, ok := issueResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK, got %T: %+v", issueResp, issueResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, issueResp, helpers.MustMarshal(t, issueResp))
+	issueOK := issueResp.(*api.SubmitFlowStepOK)
 	zflow = mustExtractZflow(t, issueOK.SetCookie.Value)
 
 	require.True(t, issueOK.Response.Step.Challenge.Set, "expected step.challenge after passkey issue")
@@ -216,8 +217,8 @@ func TestPasskeyFlowLogin(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	verifyOK, ok := verifyResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK on verify, got %T: %+v", verifyResp, verifyResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, verifyResp, helpers.MustMarshal(t, verifyResp))
+	verifyOK := verifyResp.(*api.SubmitFlowStepOK)
 
 	handoffToken, hasToken := verifyOK.Response.HandoffToken.Get()
 	require.True(t, hasToken, "expected handoff token after successful passkey login")

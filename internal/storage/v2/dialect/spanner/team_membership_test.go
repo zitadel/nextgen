@@ -11,8 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func TestTeamMembershipStatements_CRUD(t *testing.T) {
@@ -33,9 +32,9 @@ func TestTeamMembershipStatements_CRUD(t *testing.T) {
 		URL:       schemaURL,
 		Schema:    []byte("{}"),
 	}))
-	require.NoError(t, stmts.CreateTeam(ctx, &domain.Team{ProjectID: project.ID, ID: teamID}))
+	require.NoError(t, stmts.CreateTeam(ctx, newTestTeam(project.ID, teamID)))
 
-	// Users are still on the v1 repository; seed the parent row via DML.
+	// Seed the parent user row via DML (integration fixture).
 	_, err := db.Update(ctx, buildStatement(
 		`INSERT INTO users (project_id, schema_url, id, status, created_at, updated_at) VALUES (@p1, @p2, @p3, @p4, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
 		project.ID, schemaURL, userID, domain.UserStatusActive.String(),
@@ -61,28 +60,28 @@ func TestTeamMembershipStatements_CRUD(t *testing.T) {
 	assert.Equal(t, domain.MembershipStatusActive, got.Status)
 	assert.WithinDuration(t, membership.CreatedAt, got.CreatedAt, time.Second)
 
-	listedByUser, err := stmts.ListTeamMemberships(ctx, &v2database.ListOptions[domain.TeamMembershipField]{
-		Filter: v2database.And(
-			v2database.Equal(v2database.Col(domain.TeamMembershipFieldProjectID), project.ID),
-			v2database.Equal(v2database.Col(domain.TeamMembershipFieldUserID), userID),
+	listedByUser, err := stmts.ListTeamMemberships(ctx, &database.ListOptions[domain.TeamMembershipField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.TeamMembershipFieldProjectID), project.ID),
+			database.Equal(database.Col(domain.TeamMembershipFieldUserID), userID),
 		),
 	})
 	require.NoError(t, err)
 	require.Len(t, listedByUser.Items, 1)
 
-	listedByTeam, err := stmts.ListTeamMemberships(ctx, &v2database.ListOptions[domain.TeamMembershipField]{
-		Filter: v2database.And(
-			v2database.Equal(v2database.Col(domain.TeamMembershipFieldProjectID), project.ID),
-			v2database.Equal(v2database.Col(domain.TeamMembershipFieldTeamID), teamID),
+	listedByTeam, err := stmts.ListTeamMemberships(ctx, &database.ListOptions[domain.TeamMembershipField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.TeamMembershipFieldProjectID), project.ID),
+			database.Equal(database.Col(domain.TeamMembershipFieldTeamID), teamID),
 		),
 	})
 	require.NoError(t, err)
 	require.Len(t, listedByTeam.Items, 1)
 
-	empty, err := stmts.ListTeamMemberships(ctx, &v2database.ListOptions[domain.TeamMembershipField]{
-		Filter: v2database.And(
-			v2database.Equal(v2database.Col(domain.TeamMembershipFieldProjectID), project.ID),
-			v2database.Equal(v2database.Col(domain.TeamMembershipFieldUserID), "missing-user"),
+	empty, err := stmts.ListTeamMemberships(ctx, &database.ListOptions[domain.TeamMembershipField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.TeamMembershipFieldProjectID), project.ID),
+			database.Equal(database.Col(domain.TeamMembershipFieldUserID), "missing-user"),
 		),
 	})
 	require.NoError(t, err)

@@ -31,9 +31,9 @@ const step: CreateFlow201Step = {
     { name: "remember", type: "checkbox", text_key: "identifier.field.remember" },
   ],
   actions: [
-    { name: "submit", text_key: "submit.continue", primary: true },
-    { name: "register", text_key: "identifier.action.register.link" },
-    { name: "recover", text_key: "action.recover" },
+    { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
+    { name: "register", kind: "navigate", text_key: "identifier.action.register.link" },
+    { name: "recover", kind: "navigate", text_key: "action.recover" },
   ],
   gates: {},
 };

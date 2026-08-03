@@ -32,14 +32,21 @@
     "./middleware": {
       "types": "./dist/middleware.d.ts",
       "import": "./dist/middleware.js"
+    },
+    "./jsx": {
+      "types": "./dist/jsx.d.ts"
+    },
+    "./session": {
+      "types": "./dist/session.d.ts",
+      "import": "./dist/session.js"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/middleware.ts src/auth.ts src/context.tsx src/useAuth.ts src/types.ts src/index.ts src/server.ts src/client.ts --format esm --dts --clean --tsconfig tsconfig.build.json",
-    "typecheck": "tsc --noEmit",
+    "build": "tsup src/middleware.ts src/auth.ts src/context.tsx src/useAuth.ts src/types.ts src/session.ts src/index.ts src/server.ts src/client.ts --format esm --dts --clean --tsconfig tsconfig.build.json && node -e \"require('node:fs').copyFileSync('src/jsx.d.ts', 'dist/jsx.d.ts')\"",
+    "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run --passWithNoTests",
     "lint": "eslint ."
   },
@@ -50,7 +57,7 @@
     "server-only": "^0.0.1"
   },
   "peerDependencies": {
-    "next": ">=14",
+    "next": ">=15",
     "react": ">=18",
     "react-dom": ">=18"
   },
