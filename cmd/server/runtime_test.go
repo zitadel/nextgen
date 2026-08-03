@@ -86,18 +86,9 @@ server:
 	assert.Empty(t, entries, "no key file should be generated when a key is configured")
 }
 
-func TestEmbeddedPostgresOptionsUseDataDir(t *testing.T) {
+func TestDefaultSQLitePathUsesDataDir(t *testing.T) {
 	dataDir := t.TempDir()
-
-	options := embeddedPostgresOptions(dataDir)
-
-	root := filepath.Join(dataDir, "embedded-postgres")
-	assert.Equal(t, filepath.Join(root, "runtime"), options.RuntimePath)
-	assert.Equal(t, filepath.Join(root, "data"), options.DataPath)
-	assert.Equal(t, filepath.Join(root, "cache"), options.CachePath)
-	assert.Equal(t, filepath.Join(root, "postgres.log"), options.LogPath)
-	assert.NotEqual(t, options.RuntimePath, filepath.Dir(options.DataPath))
-	assert.NotEqual(t, options.RuntimePath, options.CachePath)
+	assert.Equal(t, filepath.Join(dataDir, "zitadel.db"), defaultSQLitePath(dataDir))
 }
 
 // writeMasterKeyFile writes a master key file with a specific modification time
