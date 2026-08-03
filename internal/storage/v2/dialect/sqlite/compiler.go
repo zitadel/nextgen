@@ -121,6 +121,11 @@ func compileOrFilter[F ~uint8, T any](c *statementCompiler, filter database.OrFi
 }
 
 func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *database.CompareFilter[F], schema database.Schema[F, T]) {
+	if hasNilCompareValue(filter.Terms) {
+		compileNullAwareCompareFilter(c, filter, schema)
+		return
+	}
+
 	op := compareOpSQL(filter.Op)
 	if len(filter.Terms) == 1 {
 		c.WriteString(schema.SQLName(filter.Terms[0].Column))
@@ -148,6 +153,101 @@ func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *databas
 		writeArg(c, term.Value)
 	}
 	c.WriteString(")")
+}
+
+func hasNilCompareValue[F ~uint8](terms []database.CompareTerm[F]) bool {
+	for _, term := range terms {
+		if term.Value == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// compileNullAwareCompareFilter expands keyset compares when any cursor value is
+// SQL NULL. Assumes ASC NULLS FIRST / DESC NULLS LAST (SQLite defaults; also
+// correct for all-NULL order columns on Postgres/Spanner).
+func compileNullAwareCompareFilter[F ~uint8, T any](
+	c *statementCompiler,
+	filter *database.CompareFilter[F],
+	schema database.Schema[F, T],
+) {
+	switch filter.Op {
+	case database.OpEqual:
+		c.WriteString("(")
+		for i, term := range filter.Terms {
+			if i > 0 {
+				c.WriteString(" AND ")
+			}
+			writeNullSafeEqual(c, term, schema)
+		}
+		c.WriteString(")")
+	case database.OpGreater, database.OpLess:
+		c.WriteString("(")
+		for i := range filter.Terms {
+			if i > 0 {
+				c.WriteString(" OR ")
+			}
+			c.WriteString("(")
+			for j := 0; j < i; j++ {
+				writeNullSafeEqual(c, filter.Terms[j], schema)
+				c.WriteString(" AND ")
+			}
+			writeNullSafeOrdered(c, filter.Terms[i], filter.Op, schema)
+			c.WriteString(")")
+		}
+		c.WriteString(")")
+	default:
+		panic("unknown compare op")
+	}
+}
+
+func writeNullSafeEqual[F ~uint8, T any](
+	c *statementCompiler,
+	term database.CompareTerm[F],
+	schema database.Schema[F, T],
+) {
+	col := schema.SQLName(term.Column)
+	if term.Value == nil {
+		c.WriteString(col)
+		c.WriteString(" IS NULL")
+		return
+	}
+	c.WriteString(col)
+	c.WriteString(" = ")
+	writeArg(c, term.Value)
+}
+
+func writeNullSafeOrdered[F ~uint8, T any](
+	c *statementCompiler,
+	term database.CompareTerm[F],
+	op database.CompareOp,
+	schema database.Schema[F, T],
+) {
+	col := schema.SQLName(term.Column)
+	if term.Value == nil {
+		if op == database.OpGreater {
+			c.WriteString(col)
+			c.WriteString(" IS NOT NULL")
+			return
+		}
+		// DESC NULLS LAST: nothing sorts after NULL.
+		c.WriteString("0 = 1")
+		return
+	}
+	if op == database.OpLess {
+		c.WriteString("(")
+		c.WriteString(col)
+		c.WriteString(" < ")
+		writeArg(c, term.Value)
+		c.WriteString(" OR ")
+		c.WriteString(col)
+		c.WriteString(" IS NULL)")
+		return
+	}
+	c.WriteString(col)
+	c.WriteString(" > ")
+	writeArg(c, term.Value)
 }
 
 // compileArrayContainsFilter for SQLite uses json_each on the stored JSON TEXT column.

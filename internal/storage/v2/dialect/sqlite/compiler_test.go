@@ -93,6 +93,22 @@ func TestCompileStringFilterContainsFoldUsesSQLLower(t *testing.T) {
 	assert.Equal(t, "Übung", c.args[0])
 }
 
+func TestCompileCompareFilterNilLeadingValue(t *testing.T) {
+	t.Parallel()
+
+	var c statementCompiler
+	compileFilter(&c, database.CompareGreater(
+		database.Term(database.Col(domain.TokenFieldExpiresAt), nil),
+		database.Term(database.Col(domain.TokenFieldTokenID), "10"),
+	), tokenSchema)
+	assert.Equal(t,
+		"((expires_at IS NOT NULL) OR (expires_at IS NULL AND token_id > ?))",
+		c.String(),
+	)
+	require.Len(t, c.args, 1)
+	assert.Equal(t, "10", c.args[0])
+}
+
 func TestCompileStringFilterLikeUsesEscape(t *testing.T) {
 	t.Parallel()
 

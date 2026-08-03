@@ -75,7 +75,12 @@ func CoerceTimeValue(v any) (time.Time, error) {
 }
 
 // CoerceTime coerces a JSON-decoded value into a time.Time for SQL binding.
+// A JSON null (Go nil) is preserved as nil so nullable timestamp columns bind
+// as SQL NULL in keyset cursors.
 func CoerceTime(v any) (any, error) {
+	if v == nil {
+		return nil, nil
+	}
 	return CoerceTimeValue(v)
 }
 

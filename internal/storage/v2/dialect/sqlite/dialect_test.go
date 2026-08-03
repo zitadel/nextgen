@@ -75,3 +75,38 @@ func TestConnectTightensFilePermissions(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 }
+
+func TestConfigPathURIEscapesMetacharacters(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name string
+		dir  string
+	}{
+		{name: "question_mark", dir: "nested?mark"},
+		{name: "hash", dir: "nested#hash"},
+		{name: "percent", dir: "nested%25pct"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			dir := filepath.Join(root, tc.dir)
+			require.NoError(t, os.MkdirAll(dir, 0o700))
+			dbPath := filepath.Join(dir, "zitadel.db")
+
+			dsn, abs, err := Config{Path: dbPath}.dsn()
+			require.NoError(t, err)
+			assert.Equal(t, dbPath, abs)
+			assert.NotContains(t, strings.SplitN(dsn, "?", 2)[0], "?mark")
+			assert.Contains(t, dsn, "_txlock=immediate")
+
+			pool, err := Config{Path: dbPath}.Connect(context.Background())
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = pool.Close(context.Background()) })
+
+			info, err := os.Stat(dbPath)
+			require.NoError(t, err)
+			assert.True(t, info.Mode().IsRegular())
+		})
+	}
+}

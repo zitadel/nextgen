@@ -58,3 +58,62 @@ func TestTokenStatements_GetByID(t *testing.T) {
 		})
 	})
 }
+
+func TestTokenStatements_List_CursorNilExpiresAt(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		userID := "usr-tok-cur-" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Cursor User")))
+
+		ids := make([]string, 0, 3)
+		for range 3 {
+			tok := &domain.Token{
+				ProjectID: projectID,
+				UserID:    userID,
+				Type:      domain.TokenTypePersonalAccessToken,
+				ExpiresAt: nil,
+			}
+			require.NoError(t, d.stmts.CreateToken(t.Context(), tok))
+			require.NotEmpty(t, tok.TokenID)
+			ids = append(ids, tok.TokenID)
+			tokenID := tok.TokenID
+			t.Cleanup(func() {
+				_ = d.stmts.DeleteTokenByID(context.Background(), projectID, tokenID)
+			})
+		}
+
+		page := database.Page[domain.TokenField]{
+			Limit: 1,
+			OrderBy: database.OrderBy[domain.TokenField]{
+				Columns: []database.Column[domain.TokenField]{
+					database.Col(domain.TokenFieldExpiresAt),
+					database.Col(domain.TokenFieldTokenID),
+				},
+				Direction: database.OrderAsc,
+			},
+		}
+		filter := database.And(
+			database.Equal(database.Col(domain.TokenFieldProjectID), projectID),
+			database.Equal(database.Col(domain.TokenFieldUserID), userID),
+		)
+
+		first, err := d.stmts.ListTokens(t.Context(), &database.ListOptions[domain.TokenField]{
+			Filter:     filter,
+			Pagination: page,
+		})
+		require.NoError(t, err)
+		require.Len(t, first.Items, 1)
+		require.NotEmpty(t, first.NextCursor)
+		assert.Contains(t, ids, first.Items[0].TokenID)
+
+		page.Cursor = first.NextCursor
+		second, err := d.stmts.ListTokens(t.Context(), &database.ListOptions[domain.TokenField]{
+			Filter:     filter,
+			Pagination: page,
+		})
+		require.NoError(t, err)
+		require.Len(t, second.Items, 1)
+		assert.NotEqual(t, first.Items[0].TokenID, second.Items[0].TokenID)
+		assert.Contains(t, ids, second.Items[0].TokenID)
+	})
+}

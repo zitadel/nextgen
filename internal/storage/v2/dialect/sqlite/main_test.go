@@ -17,6 +17,10 @@ import (
 var testPool *Pool
 
 func TestMain(m *testing.M) {
+	os.Exit(runTests(m))
+}
+
+func runTests(m *testing.M) int {
 	dir, err := os.MkdirTemp("", "zitadel-sqlite-integration-*")
 	if err != nil {
 		panic(err)
@@ -30,13 +34,12 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	p := pool.(*Pool)
+	defer func() { _ = p.Close(context.Background()) }()
 	if err := p.Migrate(context.Background()); err != nil {
 		panic(err)
 	}
 	testPool = p
-	code := m.Run()
-	_ = p.Close(context.Background())
-	os.Exit(code)
+	return m.Run()
 }
 
 func TestProjectCRUD(t *testing.T) {

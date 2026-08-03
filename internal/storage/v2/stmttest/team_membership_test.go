@@ -45,5 +45,19 @@ func TestTeamMembershipStatements_Get(t *testing.T) {
 			_, err := d.stmts.GetTeamMembership(t.Context(), projectID, "missing-team", "missing-user")
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		})
+
+		t.Run("missing_user_returns_ForeignKeyError", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			teamID := "team-tm-fk-" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
+
+			err := d.stmts.CreateTeamMembership(t.Context(), &domain.TeamMembership{
+				ProjectID: projectID,
+				TeamID:    teamID,
+				UserID:    "missing-user-" + uniqueSuffix(t),
+				Status:    domain.MembershipStatusActive,
+			})
+			assert.ErrorIs(t, err, new(database.ForeignKeyError))
+		})
 	})
 }

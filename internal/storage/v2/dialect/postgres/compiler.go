@@ -121,6 +121,13 @@ func compileOrFilter[F ~uint8, T any](c *statementCompiler, filter database.OrFi
 }
 
 func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *database.CompareFilter[F], schema database.Schema[F, T]) {
+	if hasNilCompareValue(filter.Terms) {
+		compileNullAwareCompareFilter(c, filter, schema, func(c *statementCompiler, arg any, col database.Column[F]) {
+			writeArgWithParamCast(c, arg, schema, col)
+		})
+		return
+	}
+
 	op := compareOpSQL(filter.Op)
 	if len(filter.Terms) == 1 {
 		c.WriteString(schema.SQLName(filter.Terms[0].Column))
@@ -146,6 +153,100 @@ func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *databas
 		writeArgWithParamCast(c, term.Value, schema, term.Column)
 	}
 	c.WriteString(")")
+}
+
+func hasNilCompareValue[F ~uint8](terms []database.CompareTerm[F]) bool {
+	for _, term := range terms {
+		if term.Value == nil {
+			return true
+		}
+	}
+	return false
+}
+
+func compileNullAwareCompareFilter[F ~uint8, T any](
+	c *statementCompiler,
+	filter *database.CompareFilter[F],
+	schema database.Schema[F, T],
+	writeValue func(*statementCompiler, any, database.Column[F]),
+) {
+	switch filter.Op {
+	case database.OpEqual:
+		c.WriteString("(")
+		for i, term := range filter.Terms {
+			if i > 0 {
+				c.WriteString(" AND ")
+			}
+			writeNullSafeEqual(c, term, schema, writeValue)
+		}
+		c.WriteString(")")
+	case database.OpGreater, database.OpLess:
+		c.WriteString("(")
+		for i := range filter.Terms {
+			if i > 0 {
+				c.WriteString(" OR ")
+			}
+			c.WriteString("(")
+			for j := 0; j < i; j++ {
+				writeNullSafeEqual(c, filter.Terms[j], schema, writeValue)
+				c.WriteString(" AND ")
+			}
+			writeNullSafeOrdered(c, filter.Terms[i], filter.Op, schema, writeValue)
+			c.WriteString(")")
+		}
+		c.WriteString(")")
+	default:
+		panic("unknown compare op")
+	}
+}
+
+func writeNullSafeEqual[F ~uint8, T any](
+	c *statementCompiler,
+	term database.CompareTerm[F],
+	schema database.Schema[F, T],
+	writeValue func(*statementCompiler, any, database.Column[F]),
+) {
+	col := schema.SQLName(term.Column)
+	if term.Value == nil {
+		c.WriteString(col)
+		c.WriteString(" IS NULL")
+		return
+	}
+	c.WriteString(col)
+	c.WriteString(" = ")
+	writeValue(c, term.Value, term.Column)
+}
+
+func writeNullSafeOrdered[F ~uint8, T any](
+	c *statementCompiler,
+	term database.CompareTerm[F],
+	op database.CompareOp,
+	schema database.Schema[F, T],
+	writeValue func(*statementCompiler, any, database.Column[F]),
+) {
+	col := schema.SQLName(term.Column)
+	if term.Value == nil {
+		if op == database.OpGreater {
+			c.WriteString(col)
+			c.WriteString(" IS NOT NULL")
+			return
+		}
+		c.WriteString("FALSE")
+		return
+	}
+	if op == database.OpLess {
+		c.WriteString("(")
+		c.WriteString(col)
+		c.WriteString(" < ")
+		writeValue(c, term.Value, term.Column)
+		c.WriteString(" OR ")
+		c.WriteString(col)
+		c.WriteString(" IS NULL)")
+		return
+	}
+	c.WriteString(col)
+	c.WriteString(" > ")
+	writeValue(c, term.Value, term.Column)
 }
 
 func compileArrayContainsFilter[F ~uint8, T any](c *statementCompiler, filter *database.ArrayContainsFilter[F], schema database.Schema[F, T]) {

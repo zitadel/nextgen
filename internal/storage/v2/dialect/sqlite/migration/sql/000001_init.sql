@@ -106,8 +106,12 @@ CREATE TABLE team_memberships (
     PRIMARY KEY (project_id, team_id, user_id),
     CONSTRAINT fk_team_memberships_project
         FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+    -- teams/users stay RESTRICT (ADR 024: team/user deletion goes through a
+    -- lifecycle service, not a raw cascade); project deletion gets its own path.
     CONSTRAINT fk_team_memberships_team
-        FOREIGN KEY (project_id, team_id) REFERENCES teams (project_id, id) ON DELETE CASCADE
+        FOREIGN KEY (project_id, team_id) REFERENCES teams (project_id, id) ON DELETE RESTRICT,
+    CONSTRAINT fk_team_memberships_user
+        FOREIGN KEY (project_id, user_id) REFERENCES users (project_id, id) ON DELETE RESTRICT
 );
 -- +goose StatementEnd
 

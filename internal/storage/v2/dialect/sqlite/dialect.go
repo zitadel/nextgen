@@ -91,7 +91,12 @@ func (c Config) dsn() (dsn string, filePath string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("sqlite: resolve path: %w", err)
 	}
-	return "file:" + filepath.ToSlash(abs) + "?" + sqlitePragmaQuery, abs, nil
+	u := &url.URL{
+		Scheme:   "file",
+		Path:     filepath.ToSlash(abs),
+		RawQuery: sqlitePragmaQuery,
+	}
+	return u.String(), abs, nil
 }
 
 // mergeSQLitePragmas appends default pragma query params that are not already
