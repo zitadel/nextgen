@@ -13,7 +13,7 @@ import testingLibraryPlugin from "eslint-plugin-testing-library";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist/**", "node_modules/**"] },
+  { ignores: ["dist/**", "out-tsc/**", "node_modules/**"] },
   {
     ...eslint.configs.recommended,
     files: ["**/*.{ts,tsx,js,jsx,mjs,cjs}"],

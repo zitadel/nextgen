@@ -9,6 +9,7 @@ import type { ZitadelLogin } from "./zitadel-login.js";
 // files with node:fs at call time, which cannot run inside Chromium.
 import splitTemplate from "../../../config/defaults/branding/split/login.liquid";
 import heroTemplate from "../../../config/defaults/branding/hero/login.liquid";
+import minimalTemplate from "../../../config/defaults/branding/minimal/login.liquid";
 
 /**
  * Real-browser checks for the widget-first embedding contract.
@@ -36,7 +37,7 @@ const identifierStep: CreateFlow201 = {
     fields: [
       { name: "email", type: "email", text_key: "identifier.field.email", required: true },
     ],
-    actions: [{ name: "submit", text_key: "submit.continue", primary: true }],
+    actions: [{ name: "submit", kind: "submit", text_key: "submit.continue", primary: true }],
     gates: {},
   },
 };
@@ -67,6 +68,17 @@ const heroNoLogoStep: CreateFlow201 = {
   branding: {
     layout: "split",
     liquid_template: heroTemplate,
+  },
+} as unknown as CreateFlow201;
+
+/** The shipped minimal design: fields straight on the page, no card. The
+ * wire `layout` enum is `centered | split` (ADR 040) — richer designs ride
+ * in `liquid_template` and declare the layout they degrade to. */
+const minimalStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    layout: "centered",
+    liquid_template: minimalTemplate,
   },
 } as unknown as CreateFlow201;
 
@@ -146,7 +158,20 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
 
     const rect = element.getBoundingClientRect();
     expect(rect.height).toBeGreaterThan(0);
-    expect(rect.height).toBeLessThan(window.innerHeight * 0.9);
+
+    // Content-sized means the shell contributes no padding of its own: the
+    // card sits flush with the host's top edge and nothing but real content
+    // (the attribution pill) sits below it. A 682px host around a 514px
+    // card — page padding surviving into widget mode — is the double-card
+    // dead space this pins against.
+    const card = element.shadowRoot?.querySelector("zl-card") as HTMLElement;
+    expect(card).toBeTruthy();
+    expect(Math.abs(card.getBoundingClientRect().top - rect.top)).toBeLessThanOrEqual(1);
+    const attribution = element.shadowRoot?.querySelector(".zl-attribution") as HTMLElement;
+    expect(attribution).toBeTruthy();
+    expect(Math.abs(attribution.getBoundingClientRect().bottom - rect.bottom)).toBeLessThanOrEqual(
+      1,
+    );
 
     // Outer host.
     expect(getComputedStyle(element).backgroundColor).toBe(TRANSPARENT);
@@ -158,6 +183,9 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     const surface = shell.shadowRoot?.querySelector(".zr-page-shell") as HTMLElement;
     expect(surface).toBeTruthy();
     expect(getComputedStyle(surface).backgroundColor).toBe(TRANSPARENT);
+    // The padded 48rem branch is live in this viewport, so this pins the
+    // widget override beating the media query, not just the narrow default.
+    expect(getComputedStyle(surface).padding).toBe("0px");
   });
 
   it("widget default: no design-system font is injected into the host document", async () => {
@@ -191,6 +219,46 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     });
     const mountNode = element.shadowRoot?.querySelector(".zl-mount") as HTMLElement;
     expect(getComputedStyle(mountNode).minHeight).toBe("640px");
+  });
+
+  it("minimal design in widget mode sheds its page padding too", async () => {
+    // The minimal design has no card, so its pane padding IS the page
+    // chrome — in widget mode it must collapse exactly like the shell's
+    // padding did, or a minimal-layout tenant gets 52px dead space above
+    // and below the fields inside an embedder's own container.
+    const element = await mount(minimalStep);
+    const rect = element.getBoundingClientRect();
+    const minimal = element.shadowRoot?.querySelector(".zl-minimal") as HTMLElement;
+    expect(minimal).toBeTruthy();
+    expect(getComputedStyle(minimal).padding).toBe("0px");
+    expect(Math.abs(minimal.getBoundingClientRect().top - rect.top)).toBeLessThanOrEqual(1);
+    const attribution = element.shadowRoot?.querySelector(".zl-attribution") as HTMLElement;
+    expect(attribution).toBeTruthy();
+    expect(Math.abs(attribution.getBoundingClientRect().bottom - rect.bottom)).toBeLessThanOrEqual(
+      1,
+    );
+  });
+
+  it("minimal design keeps its page padding in page mode", async () => {
+    const element = await mount(minimalStep, (el) => {
+      el.variant = "page";
+    });
+    const minimal = element.shadowRoot?.querySelector(".zl-minimal") as HTMLElement;
+    expect(getComputedStyle(minimal).padding).toBe("52px 16px");
+  });
+
+  it("split pane padding is composition, not page chrome — it survives widget mode", async () => {
+    // Deliberate asymmetry with the minimal design: the split panes' padding
+    // separates the two panes' content (brand from form), so zeroing it in
+    // widget mode would smash the design against the widget edge with no
+    // host-CSS recourse — it lives inside the shadow chrome. Pinned so a
+    // future "widgets never pad" sweep has to argue with this test first.
+    const element = await mount(splitHeroOnlyStep);
+    const form = element.shadowRoot?.querySelector(".zl-split__form") as HTMLElement;
+    expect(form).toBeTruthy();
+    expect(getComputedStyle(form).padding).toBe("16px");
+    const brand = element.shadowRoot?.querySelector(".zl-split__brand") as HTMLElement;
+    expect(getComputedStyle(brand).padding).toBe("52px 16px");
   });
 
   it("split chrome collapses to the widget's width, not the viewport's", async () => {

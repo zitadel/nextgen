@@ -35,6 +35,7 @@ tasks:
       - "sdk-solid:build-release"
       - "sdk-svelte:build-release"
       - "sdk-qwik:build-release"
+      - "testing:build-release"
     options:
       cache: false
       runDepsInParallel: false

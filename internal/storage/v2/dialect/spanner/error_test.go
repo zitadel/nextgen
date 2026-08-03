@@ -48,8 +48,8 @@ func TestWrapError(t *testing.T) {
 			want: new(database.UniqueError),
 		},
 		{
-			name: "grpc failed precondition check",
-			err:  status.Error(codes.FailedPrecondition, "check failed"),
+			name: "grpc failed precondition column width",
+			err:  status.Error(codes.FailedPrecondition, "New value exceeds the maximum size limit for this column: teams.name, size: 201, limit: 200."),
 			want: new(database.CheckError),
 		},
 		{
@@ -68,9 +68,29 @@ func TestWrapError(t *testing.T) {
 			want: new(database.NotNullError),
 		},
 		{
+			name: "grpc failed precondition null value",
+			err:  status.Error(codes.FailedPrecondition, "Cannot specify a null value for column: teams.name in table: teams"),
+			want: new(database.NotNullError),
+		},
+		{
 			name: "grpc invalid argument foreign key",
 			err:  status.Error(codes.InvalidArgument, "foreign key constraint violation"),
 			want: new(database.ForeignKeyError),
+		},
+		{
+			name: "grpc invalid argument syntax error",
+			err:  status.Error(codes.InvalidArgument, `Syntax error: Unexpected identifier "SELCT" [at 1:1]`),
+			want: new(database.UnknownError),
+		},
+		{
+			name: "grpc out of range check",
+			err:  status.Error(codes.OutOfRange, "Check constraint `teams`.`chk_teams_name` is violated for key {String(\"proj_1\"), String(\"team_1\")}"),
+			want: new(database.CheckError),
+		},
+		{
+			name: "grpc out of range division by zero",
+			err:  status.Error(codes.OutOfRange, "division by zero: 1 / 0"),
+			want: new(database.UnknownError),
 		},
 		{
 			name: "unknown error",

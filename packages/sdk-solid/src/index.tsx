@@ -33,13 +33,15 @@ declare module "solid-js" {
       "zitadel-login": Omit<HTMLAttributes<HTMLElement>, "ref"> & {
         ref?: ZitadelLoginElement | ((el: ZitadelLoginElement) => void);
         "prop:project"?: ZitadelProject;
-        "prop:locales"?: Record<string, Record<string, string>>;
+        "prop:locales"?: Record<string, Partial<Record<string, string>>>;
         "prop:lang"?: string;
         "project-id"?: string;
         "proxy-path"?: string;
         purpose?: string;
         "flow-name"?: string;
         "post-sign-in-url"?: string;
+        variant?: "widget" | "page";
+        theme?: "light" | "dark" | "auto";
         "on:zitadel-flow-step"?: (event: CustomEvent<ZitadelFlowStepDetail>) => void;
         "on:zitadel-flow-input"?: (event: CustomEvent<ZitadelFlowInputDetail>) => void;
         "on:zitadel-flow-complete"?: (event: CustomEvent<ZitadelFlowCompleteDetail>) => void;
@@ -51,6 +53,7 @@ declare module "solid-js" {
         "project-id"?: string;
         "proxy-path"?: string;
         "post-sign-out-url"?: string;
+        theme?: "light" | "dark" | "auto";
         "on:zitadel-signout"?: (event: CustomEvent<ZitadelSignoutDetail>) => void;
       };
       "zitadel-session": Omit<HTMLAttributes<HTMLElement>, "ref"> & {
@@ -61,6 +64,8 @@ declare module "solid-js" {
         "post-sign-out-url"?: string;
         heading?: string;
         "logout-label"?: string;
+        variant?: "widget" | "page";
+        theme?: "light" | "dark" | "auto";
         "on:zitadel-signout"?: (event: CustomEvent<ZitadelSignoutDetail>) => void;
       };
     }
@@ -70,6 +75,10 @@ declare module "solid-js" {
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export * from "./types";
+
+// Re-exported so scaffolded apps can wire the business copy overlay without a
+// direct @zitadel/components dependency (strict package managers reject those).
+export { businessLocales } from "@zitadel/components";
 
 /**
  * Solid component wrapping the `<zitadel-login>` web component. Binds the
@@ -96,6 +105,8 @@ export function ZitadelLogin(
       purpose={props.purpose ?? "login"}
       flow-name={props.flowName}
       post-sign-in-url={props.postSignInUrl}
+      variant={props.variant}
+      theme={props.theme}
       on:zitadel-flow-step={(event) => props.onFlowStep?.(event.detail)}
       on:zitadel-flow-input={(event) => props.onFlowInput?.(event.detail)}
       on:zitadel-flow-complete={(event) => props.onFlowComplete?.(event.detail)}
@@ -125,6 +136,7 @@ export function ZitadelLogout(
       project-id={props.projectId}
       proxy-path={props.proxyPath}
       post-sign-out-url={props.postSignOutUrl}
+      theme={props.theme}
       on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
     />
   );
@@ -152,6 +164,8 @@ export function ZitadelSession(
       post-sign-out-url={props.postSignOutUrl}
       heading={props.heading}
       logout-label={props.logoutLabel}
+      variant={props.variant}
+      theme={props.theme}
       on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
     />
   );

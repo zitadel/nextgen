@@ -186,6 +186,23 @@ test("passes the sign-in preset through to setup and records it", async () => {
         calls.push({ command, args });
         if (args.includes("setup")) {
           await writeGeneratedApp(options.cwd, registryUrl, "@zitadel/sdk-next");
+          await writeBoundaryFile(options.cwd);
+        }
+        // The Next suite runs the managed-file drift probe after setup:
+        // the doctor call against the deleted boundary must fail, and
+        // `doctor --fix` must restore the file before the probe re-reads it.
+        if (args.includes("doctor") && !args.includes("--fix")) {
+          const boundaryExists = await fileExists(join(options.cwd, "proxy.ts"));
+          if (!boundaryExists && calls.some((call) => call.args.includes("setup"))) {
+            return {
+              code: 3,
+              stdout: `${JSON.stringify(driftEnvelope())}\n`,
+              stderr: "",
+            };
+          }
+        }
+        if (args.includes("doctor") && args.includes("--fix")) {
+          await writeBoundaryFile(options.cwd);
         }
         return {
           code: 0,
@@ -202,6 +219,16 @@ test("passes the sign-in preset through to setup and records it", async () => {
 
     const doctorCall = calls.find((call) => call.args.includes("doctor"));
     assert.ok(!doctorCall.args.includes("--preset"), "only setup takes the preset");
+
+    // The drift probe ran: a failing doctor snapshot, a --fix invocation,
+    // and the restored boundary file.
+    const drift = JSON.parse(await readFile(join(workDir, "doctor-drift.json"), "utf8"));
+    assert.equal(drift.status, "error");
+    const fixCall = calls.find((call) => call.args.includes("--fix"));
+    assert.ok(fixCall, "doctor --fix step ran");
+    assert.ok(JSON.parse(await readFile(join(workDir, "doctor-fix.json"), "utf8")));
+    const boundary = await readFile(join(workDir, "myapp", "proxy.ts"), "utf8");
+    assert.ok(boundary.includes("zitadel-cli: managed-file"));
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
@@ -334,4 +361,32 @@ function okEnvelope(args) {
     return { status: "ok", data: { server: `http://localhost:${port}` } };
   }
   return { status: "ok", data: { ok: true } };
+}
+
+/** The doctor failure envelope the drift probe expects for a deleted boundary. */
+function driftEnvelope() {
+  return {
+    status: "error",
+    code: "E_VALIDATION",
+    message: "1 of 10 checks failed",
+    details: {
+      checks: [{ name: "managed-files", status: "fail", message: "missing scaffolded infrastructure file(s): proxy.ts" }],
+    },
+  };
+}
+
+async function writeBoundaryFile(appDir) {
+  await writeFile(
+    join(appDir, "proxy.ts"),
+    "// zitadel-cli: managed-file v1\nexport function proxy() {}\n",
+  );
+}
+
+async function fileExists(path) {
+  try {
+    await readFile(path, "utf8");
+    return true;
+  } catch {
+    return false;
+  }
 }

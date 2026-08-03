@@ -34,7 +34,7 @@ func TestScopeAllowed(t *testing.T) {
 
 // TestResourceAccessScopes pins the per-resource scope tables: which finer
 // scopes reach which operation, write-implies-read, and the two deliberate
-// asymmetries (flow_definitions.write does not imply delete; project reads
+// asymmetries (flow_definition.write does not imply delete; project reads
 // admit no finer scope because project.read is the preview secret's).
 func TestResourceAccessScopes(t *testing.T) {
 	tests := []struct {
@@ -49,11 +49,11 @@ func TestResourceAccessScopes(t *testing.T) {
 		{"schema.read reads", schemaAccess, opRead, "schema.read", true},
 		{"schema.read cannot write", schemaAccess, opWrite, "schema.read", false},
 
-		{"flow_definitions.write writes", flowDefinitionAccess, opWrite, "flow_definitions.write", true},
-		{"flow_definitions.write implies read", flowDefinitionAccess, opRead, "flow_definitions.write", true},
-		{"flow_definitions.write does not imply delete", flowDefinitionAccess, opDelete, "flow_definitions.write", false},
-		{"flow_definitions.delete deletes", flowDefinitionAccess, opDelete, "flow_definitions.delete", true},
-		{"flow_definitions.read cannot write", flowDefinitionAccess, opWrite, "flow_definitions.read", false},
+		{"flow_definition.write writes", flowDefinitionAccess, opWrite, "flow_definition.write", true},
+		{"flow_definition.write implies read", flowDefinitionAccess, opRead, "flow_definition.write", true},
+		{"flow_definition.write does not imply delete", flowDefinitionAccess, opDelete, "flow_definition.write", false},
+		{"flow_definition.delete deletes", flowDefinitionAccess, opDelete, "flow_definition.delete", true},
+		{"flow_definition.read cannot write", flowDefinitionAccess, opWrite, "flow_definition.read", false},
 
 		{"user.write writes", userAccess, opWrite, "user.write", true},
 		{"user.read reads", userAccess, opRead, "user.read", true},
@@ -189,7 +189,7 @@ func TestRequireProjectAccess(t *testing.T) {
 	}{
 		{
 			name: "flow definition", res: flowDefinitionAccess,
-			writeScope: "flow_definitions.write", deleteScope: "flow_definitions.delete",
+			writeScope: "flow_definition.write", deleteScope: "flow_definition.delete",
 			denied:   domain.ErrFlowDefinitionPermissionDenied().Code,
 			readMiss: domain.ErrFlowDefinitionNotFound().Code,
 		},
