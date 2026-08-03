@@ -29,6 +29,12 @@ get:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
     '404':
       description: Session not found.
       content:
@@ -62,6 +68,12 @@ delete:
       description: Session revoked successfully.
     '401':
       description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
       content:
         application/json:
           schema:

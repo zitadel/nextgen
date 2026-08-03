@@ -72,6 +72,16 @@ func TestResourceAccessScopes(t *testing.T) {
 		{"team.read reads", teamAccess, opRead, "team.read", true},
 		{"team.read cannot write", teamAccess, opWrite, "team.read", false},
 
+		{"session.read reads", sessionAccess, opRead, "session.read", true},
+		{"sessions.read reads", sessionAccess, opRead, "sessions.read", true},
+		{"session.write implies read", sessionAccess, opRead, "session.write", true},
+		{"session.read cannot delete", sessionAccess, opDelete, "session.read", false},
+		{"session.delete deletes", sessionAccess, opDelete, "session.delete", true},
+		{"sessions.delete deletes", sessionAccess, opDelete, "sessions.delete", true},
+		// Strict is the default: sessions do not opt into the legacy umbrella.
+		{"project.write does not read sessions", sessionAccess, opRead, "project.write", false},
+		{"project.write does not revoke sessions", sessionAccess, opDelete, "project.write", false},
+
 		{"project.read does not read project management state", projectAccess, opRead, "project.read", false},
 		{"project.read cannot write project state", projectAccess, opWrite, "project.read", false},
 		{"project.write reaches patchProject", projectAccess, opWrite, "project.write", true},
@@ -81,7 +91,7 @@ func TestResourceAccessScopes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := scopeAllowed([]string{tt.scope}, tt.res.scopes[tt.op]); got != tt.want {
+			if got := tt.res.allows([]string{tt.scope}, tt.op); got != tt.want {
 				t.Fatalf("scope %q for op %d = %v, want %v", tt.scope, tt.op, got, tt.want)
 			}
 		})
@@ -128,6 +138,9 @@ func TestRequireProjectAccess(t *testing.T) {
 			readMiss: domain.ErrTeamNotFound().Code, writeMiss: domain.ErrTeamProjectNotFound().Code,
 			denied: domain.ErrTeamPermissionDenied().Code,
 		},
+		// sessionAccess is deliberately absent: it does not opt into the
+		// legacy umbrella, so the project secret does not reach it. See the
+		// dedicated subtest.
 		{
 			name:     "project",
 			res:      projectAccess,
@@ -166,7 +179,8 @@ func TestRequireProjectAccess(t *testing.T) {
 
 	// Every resource that declares a *.delete scope gates deletes on it alone:
 	// deleteUserByID and deleteFlowDefinition are the two operations reached
-	// this way.
+	// this way. Sessions are covered separately below because they refuse the
+	// project.write umbrella.
 	deletable := []struct {
 		name                    string
 		res                     resourceAccess
@@ -227,6 +241,42 @@ func TestRequireProjectAccess(t *testing.T) {
 			assertDomainCode(t, err, res.readMiss)
 		})
 	}
+
+	// Sessions keep the strict default rather than opting into the legacy
+	// project.write umbrella: revoking sessions logs people out, which is not
+	// project administration.
+	t.Run("session management refuses the project.write umbrella", func(t *testing.T) {
+		err := requireProjectAccess(operator, "proj_a", sessionAccess, opRead)
+		assertDomainCode(t, err, domain.ErrSessionPermissionDenied().Code)
+		err = requireProjectAccess(operator, "proj_a", sessionAccess, opDelete)
+		assertDomainCode(t, err, domain.ErrSessionPermissionDenied().Code)
+		err = requireProjectAccess(preview, "proj_a", sessionAccess, opRead)
+		assertDomainCode(t, err, domain.ErrSessionPermissionDenied().Code)
+
+		reader := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"session.read"},
+		})
+		if err := requireProjectAccess(reader, "proj_a", sessionAccess, opRead); err != nil {
+			t.Fatalf("session.read should reach an own-project read: %v", err)
+		}
+		err = requireProjectAccess(reader, "proj_a", sessionAccess, opDelete)
+		assertDomainCode(t, err, domain.ErrSessionPermissionDenied().Code)
+
+		deleter := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"session.delete"},
+		})
+		if err := requireProjectAccess(deleter, "proj_a", sessionAccess, opDelete); err != nil {
+			t.Fatalf("session.delete should reach an own-project revoke: %v", err)
+		}
+
+		// Binding is checked before scopes, so a foreign project still misses
+		// rather than denying — the anti-oracle answer holds under strict
+		// matching too.
+		err = requireProjectAccess(deleter, "proj_b", sessionAccess, opDelete)
+		assertDomainCode(t, err, domain.ErrSessionNotFound().Code)
+	})
 }
 
 func assertDomainCode(t *testing.T, err error, want string) {
