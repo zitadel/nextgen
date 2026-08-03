@@ -20,8 +20,13 @@
  * What each collection *is* is declared in `src/collections.ts`, not inferred
  * from its shape. Inference is what let `Gradient Colors` and `Syntax` — two
  * collections that merely happen to share Light/Dark modes — land in the same
- * bucket, where one silently replaced the other. An export the manifest does
- * not classify stops the sync; so does a manifest entry with no export.
+ * bucket, where one silently replaced the other.
+ *
+ * An unclassified export defaults to `registry-only` and is reported in
+ * `$source.unclassifiedCollections`; a stale manifest entry lands in
+ * `$source.staleCollectionRoles`. Both are caught by `sync-from-export.spec.ts`,
+ * i.e. by a red check on the sync PR — *not* by throwing here, which would kill
+ * the workflow before it ever opens a PR to put a check on.
  */
 import { access, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -182,39 +187,33 @@ function kebab(segments: string[]): string {
 }
 
 /**
- * Bind every parsed collection to its declared role, and refuse to guess.
+ * Bind every parsed collection to its declared role.
  *
- * A collection missing from the manifest stops the sync — that is the point.
- * Figma adding a collection is a decision (is it semantic? a themed group?
- * alias scaffolding?) and the resolver has no basis for making it. An entry
- * with no matching export is equally loud: it means a collection was renamed
- * or removed in Figma and the manifest is now lying.
+ * A collection the manifest does not name falls back to `registry-only` — the
+ * conservative role, surfacing nothing — and is reported in `$source`. It is
+ * deliberately *not* a throw: `:sync-export` runs before the workflow opens or
+ * updates the sync PR, so throwing here kills the run without ever producing a
+ * red check, and the only trace is a workflow log nobody reads. Failing soft
+ * lets the exports land as a reviewable PR; `sync-from-export.spec.ts` then
+ * fails `full-pr` until someone classifies them, which is a signal that shows
+ * up where the work actually is.
+ *
+ * A manifest entry with no matching export is reported the same way — it means
+ * a collection was renamed or removed in Figma and the manifest is now stale.
  */
 function assignRoles(
   collections: ParsedCollection[],
   roles: Record<string, CollectionRole>,
-): Map<ParsedCollection, CollectionRole> {
+): { assigned: Map<ParsedCollection, CollectionRole>; unclassified: string[]; stale: string[] } {
   const assigned = new Map<ParsedCollection, CollectionRole>();
   const unclassified: string[] = [];
   for (const c of collections) {
     const role = roles[c.name];
-    if (role === undefined) unclassified.push(`${c.name} (${c.file})`);
-    else assigned.set(c, role);
+    if (role === undefined) unclassified.push(c.name);
+    assigned.set(c, role ?? "registry-only");
   }
-  if (unclassified.length > 0) {
-    throw new Error(
-      `Unclassified collection(s): ${unclassified.join(", ")}. ` +
-        `Add each to src/collections.ts with a role (semantic | themed | viewport | primitives | registry-only).`,
-    );
-  }
-  const missing = Object.keys(roles).filter((name) => !collections.some((c) => c.name === name));
-  if (missing.length > 0) {
-    throw new Error(
-      `src/collections.ts classifies ${missing.join(", ")}, but no export declares that collection. ` +
-        `Renamed or removed in Figma? Update the manifest deliberately.`,
-    );
-  }
-  return assigned;
+  const stale = Object.keys(roles).filter((name) => !collections.some((c) => c.name === name));
+  return { assigned, unclassified, stale };
 }
 
 /** The collections holding a given role, in export order. */
@@ -383,6 +382,14 @@ export interface SyncedTokens {
     collections: string[];
     themeModes: string[];
     resolvedLeaves: number;
+    /**
+     * Exports `src/collections.ts` does not classify. Defaulted to
+     * `registry-only` so the sync still produces a reviewable PR; the resolver
+     * spec fails until they are classified. Must be empty on a merged sync.
+     */
+    unclassifiedCollections: string[];
+    /** Manifest entries with no matching export — renamed or removed in Figma. */
+    staleCollectionRoles: string[];
   };
   color: Record<string, ThemedColor>;
   radius: Record<string, unknown>;
@@ -433,7 +440,7 @@ export function syncTokens(
   }
   if (resolvedLeaves === 0) throw new Error("No token leaves ingested from exports");
 
-  const assigned = assignRoles(collections, roles);
+  const { assigned, unclassified, stale } = assignRoles(collections, roles);
 
   const semantic = semanticCollection(assigned);
   const color = buildColorSurface(semantic, registry);
@@ -486,6 +493,8 @@ export function syncTokens(
       collections: collections.map((c) => c.name),
       themeModes: ["dark", "light"],
       resolvedLeaves,
+      unclassifiedCollections: unclassified,
+      staleCollectionRoles: stale,
     },
     color,
     radius: buildGroup("radius", singleMode, registry),
@@ -527,6 +536,21 @@ async function main(): Promise<void> {
       (themedGroups.length > 0 ? ` + themed groups ${themedGroups.join(", ")}` : "") +
       ` -> ${TOKENS_FILE}`,
   );
+  const { unclassifiedCollections, staleCollectionRoles } = out.$source;
+  if (unclassifiedCollections.length > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `WARNING: ${unclassifiedCollections.join(", ")} not classified in src/collections.ts — ` +
+        `defaulted to registry-only, so they surface nothing. design-tokens:test will fail until classified.`,
+    );
+  }
+  if (staleCollectionRoles.length > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `WARNING: src/collections.ts classifies ${staleCollectionRoles.join(", ")}, but no export declares them. ` +
+        `Renamed or removed in Figma?`,
+    );
+  }
   // eslint-disable-next-line no-console
   console.warn("Now run `moon run design-tokens:generate` and review the tokens.snapshot.spec.ts diff.");
 }

@@ -56,10 +56,19 @@ Every collection feeds the alias registry regardless of role, so a
 role controls what a collection *surfaces*, not whether it can be resolved
 through.
 
-**Adding a collection in Figma is a decision, so the sync makes you make it.**
-An export the manifest doesn't name throws; so does a manifest entry with no
-matching export (a rename or deletion in Figma). Exactly one collection may
-hold `semantic`.
+**Adding a collection in Figma is a decision, so the sync makes you make it —
+but as a red check, not a dead workflow.** An export the manifest doesn't name
+falls back to `registry-only` (surfacing nothing) and is reported in
+`$source.unclassifiedCollections`; a stale manifest entry lands in
+`$source.staleCollectionRoles`. `sync-from-export.spec.ts` asserts both are
+empty, so `full-pr` goes red on the sync PR until someone classifies it.
+
+Do **not** turn these back into throws. `:sync-export` runs *before* the
+workflow opens or updates the sync PR, so a throw kills the run with no PR and
+therefore no check — the only trace is a workflow log nobody reads. Failing
+soft lands a reviewable PR and puts the signal where the work is. Exactly one
+collection may hold `semantic`; that one does still throw, because there is no
+safe default.
 
 This replaced shape inference ("the Light/Dark collection is the semantic
 surface, anything else multi-mode is viewport typography"), which silently

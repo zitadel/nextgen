@@ -7,8 +7,9 @@
  *   - a concrete value wins over a same-path re-export alias;
  *   - unresolved references and empty colour surfaces fail loud;
  *   - roles come from `src/collections.ts`, never from a collection's shape. An
- *     unclassified export, a manifest entry with no export, and two collections
- *     reaching for the same output slot all stop the sync.
+ *     unclassified export and a stale manifest entry are reported and caught
+ *     here (a red check on the sync PR), not thrown during ingest; two
+ *     collections reaching for the same output slot do still throw.
  *
  * It also runs the resolver against the real checked-in `figma-export/` files so
  * a future designer push that breaks resolution is caught here, not silently.
@@ -121,16 +122,21 @@ describe("syncTokens resolver", () => {
     ).toThrow(/Unresolved reference/);
   });
 
-  it("refuses to classify an export the manifest does not name", () => {
-    expect(() => syncTokens([mode, { name: "surprise.json", data: { thing: leaf("#ffffff") } }], { Mode: "semantic" })).toThrow(
-      /Unclassified collection\(s\): surprise \(surprise\.json\)/,
-    );
+  // Reported, not thrown: `:sync-export` runs before the workflow opens the
+  // sync PR, so throwing would kill the run with no check to go red. Failing
+  // soft lands a reviewable PR; the assertions at the bottom of this file then
+  // fail `full-pr` until someone classifies the collection.
+  it("defaults an unclassified export to registry-only and reports it", () => {
+    const out = syncTokens([mode, { name: "surprise.json", data: { thing: leaf("#ffffff") } }], { Mode: "semantic" });
+
+    expect(out.$source.unclassifiedCollections).toEqual(["surprise"]);
+    // registry-only: still resolvable as an alias, but surfaces nothing.
+    expect(out.color.primary).toEqual({ dark: "#e5e5e5", light: "#171717" });
+    expect(out.themed).toEqual({});
   });
 
-  it("flags a manifest entry whose collection no longer exists", () => {
-    expect(() => syncTokens([mode], { Mode: "semantic", Renamed: "themed" })).toThrow(
-      /classifies Renamed, but no export declares that collection/,
-    );
+  it("reports a manifest entry whose collection no longer exists", () => {
+    expect(syncTokens([mode], { Mode: "semantic", Renamed: "themed" }).$source.staleCollectionRoles).toEqual(["Renamed"]);
   });
 
   it("requires exactly one semantic collection", () => {
@@ -281,9 +287,14 @@ describe("syncTokens against real figma-export/", () => {
     expect(Object.keys(syncTokens(files).typography).sort()).toEqual(["desktop", "mobile"]);
   });
 
+  // This is the gate. `:sync-export` reports rather than throws, so that a new
+  // Figma collection still produces a reviewable PR — which means this test is
+  // the only thing standing between an unclassified collection and a merge.
   it("classifies exactly the collections the export ships", () => {
-    // `syncTokens` throws on either mismatch; asserting the sets directly makes
-    // the failure legible when a designer adds or renames a collection.
-    expect(Object.keys(collectionRoles).sort()).toEqual([...syncTokens(files).$source.collections].sort());
+    const { collections, unclassifiedCollections, staleCollectionRoles } = syncTokens(files).$source;
+
+    expect(unclassifiedCollections, "add these to src/collections.ts").toEqual([]);
+    expect(staleCollectionRoles, "renamed or removed in Figma; update src/collections.ts").toEqual([]);
+    expect(Object.keys(collectionRoles).sort()).toEqual([...collections].sort());
   });
 });

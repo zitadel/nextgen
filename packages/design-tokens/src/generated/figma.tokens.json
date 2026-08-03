@@ -17,7 +17,9 @@
       "dark",
       "light"
     ],
-    "resolvedLeaves": 1006
+    "resolvedLeaves": 1006,
+    "unclassifiedCollections": [],
+    "staleCollectionRoles": []
   },
   "color": {
     "accent": {

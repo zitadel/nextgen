@@ -103,13 +103,14 @@ Sync **never** commits to `main` directly.
   an empty colour surface, so a broken designer push stops the workflow before
   it can open a PR with silently-dropped tokens.
 - **Declared roles.** `src/collections.ts` says what each Figma collection is
-  (`semantic`, `themed`, `viewport`, `primitives`, `registry-only`). An export
-  the manifest doesn't name stops the sync, as does a manifest entry whose
-  collection no longer exists — so adding or renaming a collection in Figma is
-  a decision someone makes, not one the resolver guesses. Within a role, two
-  collections landing on the same key throws rather than one overwriting the
-  other. The snapshot test cannot catch either, because it only sees names that
-  already reached `build.ts`.
+  (`semantic`, `themed`, `viewport`, `primitives`, `registry-only`), so adding
+  or renaming a collection in Figma is a decision someone makes rather than one
+  the resolver guesses. An unclassified export defaults to `registry-only` and
+  is reported in `$source.unclassifiedCollections`, where the resolver spec
+  fails on it — a red check on the sync PR, rather than a throw that would kill
+  the workflow before any PR exists. Within a role, two collections landing on
+  the same key throws. The snapshot test cannot catch any of this, because it
+  only sees names that already reached `build.ts`.
 - **Deterministic build.** Same JSON in, byte-identical artifacts out.
   Reviewers diff `src/generated/*` directly.
 - **Alias resolution.** The designer's export layers primitives (`tailwind
