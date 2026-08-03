@@ -23,28 +23,36 @@
 import { randomUUID } from "node:crypto";
 
 import type {
+  CompleteClaim200,
   CreateFlowDefinition201,
   CreateProject201,
   CreateSchema201,
+  GetClaimStatus200,
   GetFlowDefinition200,
   GetProject200,
   GetSchemaById200,
+  InitClaim201,
   ListFlowDefinitions200,
   ListFlowDefinitions200FlowDefinitionsItem,
   UpdateFlowDefinition200,
 } from "@zitadel/api/generated/model";
 import {
+  CompleteClaimResponse,
   CreateFlowDefinitionBody,
   CreateProjectBody,
   CreateSchemaBody,
   CreateSchemaQueryParams,
   DeleteFlowDefinitionParams,
+  GetClaimStatusParams,
+  GetClaimStatusQueryParams,
+  GetClaimStatusResponse,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
   GetProjectParams,
   GetProjectResponse,
   GetSchemaByIdParams,
   GetSchemaByIdQueryParams,
+  InitClaimParams,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
   ListUsersQueryParams,
@@ -179,10 +187,36 @@ type SchemaRecord = {
   body: GetSchemaById200;
 };
 
+/**
+ * The ephemeral claim challenge (ADR 046): minted by `claim/init`, polled by
+ * `claim/status`, and spent by `claim/complete`. `initiatingSecret` records the
+ * project secret that started the challenge so `status` can 403 a foreign secret.
+ */
+type ClaimChallengeRecord = {
+  challengeId: string;
+  projectId: string;
+  initiatingSecret: string;
+  status: "pending" | "completed";
+  expiresAt: string;
+};
+
+/**
+ * The grant a completed claim writes. Keyed by project id (a project belongs to
+ * exactly one team), mirroring the permission-engine grant ADR 046 describes —
+ * there is no `claimed` status field on the project itself.
+ */
+type ClaimRecord = {
+  teamId: string;
+  claimedAt: string;
+  dashboardUrl: string;
+};
+
 type Store = {
   projects: Map<string, ProjectRecord>;
   schemas: Map<string, SchemaRecord>;
   flowDefinitions: Map<string, FlowDefinitionRecord>;
+  claimChallenges: Map<string, ClaimChallengeRecord>;
+  claims: Map<string, ClaimRecord>;
 };
 
 function makeStore(): Store {
@@ -190,7 +224,16 @@ function makeStore(): Store {
     projects: new Map(),
     schemas: new Map(),
     flowDefinitions: new Map(),
+    claimChallenges: new Map(),
+    claims: new Map(),
   };
+}
+
+const CLAIM_CHALLENGE_TTL_MS = 10 * 60 * 1000;
+
+/** Extract a bearer token from the Authorization header, or "" when absent. */
+function bearerToken(request: Request): string {
+  return (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
 }
 
 /**
@@ -293,6 +336,8 @@ export type PlatformStoreSnapshot = {
   projects: number;
   schemas: number;
   flowDefinitions: number;
+  claimChallenges: number;
+  claims: number;
   projectIds: string[];
   schemaIds: string[];
   flowDefinitionIds: string[];
@@ -303,10 +348,70 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
     projects: store.projects.size,
     schemas: store.schemas.size,
     flowDefinitions: store.flowDefinitions.size,
+    claimChallenges: store.claimChallenges.size,
+    claims: store.claims.size,
     projectIds: [...store.projects.keys()],
     schemaIds: [...store.schemas.keys()],
     flowDefinitionIds: [...store.flowDefinitions.keys()],
   };
+}
+
+/**
+ * Test/server mutators for the claim challenge lifecycle. Exported so the
+ * conformance suite can force expiry and the Express `claim/complete` route
+ * (which needs the module-scoped session store) can spend a challenge.
+ */
+export function expireClaimChallenge(challengeId: string): void {
+  const challenge = store.claimChallenges.get(challengeId);
+  if (challenge) {
+    challenge.expiresAt = new Date(Date.now() - 1000).toISOString();
+  }
+}
+
+export function completeClaimChallenge(
+  challengeId: string,
+): { status: number; body: CompleteClaim200 | ErrorBody } {
+  const challenge = store.claimChallenges.get(challengeId);
+  if (!challenge) {
+    return { status: 404, body: errorBody("not_found", "claim challenge not found") };
+  }
+  if (
+    challenge.status !== "completed" &&
+    new Date(challenge.expiresAt).getTime() < Date.now()
+  ) {
+    return {
+      status: 410,
+      body: errorBody("proj.claim_expired", "the claim challenge has expired"),
+    };
+  }
+
+  let claim = store.claims.get(challenge.projectId);
+  if (!claim) {
+    const teamId = `team-${shortId()}`;
+    claim = {
+      teamId,
+      claimedAt: nowIso(),
+      dashboardUrl: `https://dashboard.example.com/teams/${teamId}`,
+    };
+    store.claims.set(challenge.projectId, claim);
+  }
+  challenge.status = "completed";
+
+  const responseBody: CompleteClaim200 = {
+    project_id: challenge.projectId,
+    team_id: claim.teamId,
+    claimed_at: claim.claimedAt,
+  };
+  const out = CompleteClaimResponse.safeParse(responseBody);
+  if (!out.success) {
+    return {
+      status: 500,
+      body: errorBody("mock_response_invalid", "mock response does not conform to spec", {
+        issues: out.error.issues,
+      }),
+    };
+  }
+  return { status: 200, body: out.data as CompleteClaim200 };
 }
 
 /**
@@ -399,6 +504,106 @@ export function setupPlatformHandlers() {
         updatedAt: project.updatedAt,
       };
       const out = parse(GetProjectResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    // POST /projects/:project_id/claim/init — mint a claim challenge. Auth
+    // mirrors the real server: the project secret is the bearer (as in GET
+    // /users). First-claim-wins is a 409 derived from the existing claim.
+    http.post("*/projects/:project_id/claim/init", ({ params, request }) => {
+      const path = parse(InitClaimParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const token = bearerToken(request);
+      const authed = [...store.projects.values()].find((p) => p.projectSecret === token);
+      if (!authed) {
+        return HttpResponse.json(errorBody("auth.unauthorized", "missing or invalid credentials"), {
+          status: 401,
+        });
+      }
+      const project = store.projects.get(path.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("proj.not_found", "project not found"), { status: 404 });
+      }
+      const claim = store.claims.get(project.id);
+      if (claim) {
+        return HttpResponse.json(
+          errorBody("proj.already_claimed", "the project is already claimed by a team", {
+            team_id: claim.teamId,
+            dashboard_url: claim.dashboardUrl,
+          }),
+          { status: 409 },
+        );
+      }
+
+      const challengeId = shortId();
+      store.claimChallenges.set(challengeId, {
+        challengeId,
+        projectId: project.id,
+        initiatingSecret: token,
+        status: "pending",
+        expiresAt: new Date(Date.now() + CLAIM_CHALLENGE_TTL_MS).toISOString(),
+      });
+      const responseBody: InitClaim201 = {
+        claim_url: `${new URL(request.url).origin}/claim/${challengeId}`,
+        challenge_id: challengeId,
+        expires_at: store.claimChallenges.get(challengeId)!.expiresAt,
+      };
+      return HttpResponse.json(responseBody, { status: 201 });
+    }),
+
+    // GET /projects/:project_id/claim/status — poll a challenge. Authorized by
+    // the initiating project secret (403 otherwise). Outbound-validated like
+    // GET /projects/:id so the mock cannot lie about its own output.
+    http.get("*/projects/:project_id/claim/status", ({ params, request }) => {
+      const path = parse(GetClaimStatusParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetClaimStatusQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+
+      const challenge = store.claimChallenges.get(query.data.challenge_id);
+      if (!challenge || challenge.projectId !== path.data.project_id) {
+        return HttpResponse.json(errorBody("not_found", "claim challenge not found"), {
+          status: 404,
+        });
+      }
+      if (challenge.initiatingSecret !== bearerToken(request)) {
+        return HttpResponse.json(
+          errorBody("proj.permission_denied", "the presented project secret did not initiate this challenge"),
+          { status: 403 },
+        );
+      }
+      if (
+        challenge.status !== "completed" &&
+        new Date(challenge.expiresAt).getTime() < Date.now()
+      ) {
+        return HttpResponse.json(
+          errorBody("proj.claim_expired", "the claim challenge has expired"),
+          { status: 410 },
+        );
+      }
+
+      let responseBody: GetClaimStatus200;
+      if (challenge.status === "completed") {
+        const claim = store.claims.get(challenge.projectId)!;
+        responseBody = {
+          status: "completed",
+          team_id: claim.teamId,
+          claimed_at: claim.claimedAt,
+          dashboard_url: claim.dashboardUrl,
+        };
+      } else {
+        responseBody = { status: "pending" };
+      }
+      const out = parse(GetClaimStatusResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }

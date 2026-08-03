@@ -34,7 +34,9 @@
 import type { Server } from "node:http";
 
 import {
+  CompleteClaimResponse,
   ExchangeHandoffResponse,
+  GetClaimStatusResponse,
   GetFlowDefinitionResponse,
   GetProjectResponse,
   ListFlowDefinitionsResponse,
@@ -43,6 +45,7 @@ import {
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { signHandoffToken } from "./crypto.js";
+import { expireClaimChallenge } from "./platform-handlers.js";
 import { startMockServer } from "./server.js";
 
 const PORT = 4456;
@@ -381,5 +384,196 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => UpdateFlowDefinitionResponse.parse(body)).not.toThrow();
+  });
+});
+
+describe("api-mock claim lifecycle — init / status / complete conformance", () => {
+  async function createProject(name: string): Promise<{ id: string; projectSecret: string }> {
+    const res = await fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const body = (await res.json()) as { id: string; projectSecret: string };
+    return { id: body.id, projectSecret: body.projectSecret };
+  }
+
+  async function initClaim(projectId: string, secret: string): Promise<Response> {
+    return fetch(`${BASE}/projects/${projectId}/claim/init`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${secret}` },
+    });
+  }
+
+  async function claimStatus(
+    projectId: string,
+    challengeId: string,
+    secret: string,
+  ): Promise<Response> {
+    return fetch(
+      `${BASE}/projects/${projectId}/claim/status?challenge_id=${encodeURIComponent(challengeId)}`,
+      { headers: { authorization: `Bearer ${secret}` } },
+    );
+  }
+
+  async function sessionCookie(project: string): Promise<string> {
+    const handoff = await signHandoffToken({ sub: project, iss: BASE });
+    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=${project}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ handoff_token: handoff }),
+    });
+    const setCookie = exchange.headers
+      .getSetCookie()
+      .find((c) => c.startsWith("__nextgen_session="));
+    return setCookie?.split(";")[0] ?? "";
+  }
+
+  test("POST /projects/:id/claim/init returns 201 with a claim challenge", async () => {
+    const project = await createProject("claim-init");
+    const res = await initClaim(project.id, project.projectSecret);
+    expect(res.status).toBe(201);
+    // orval emits no `*Response` zod for a 201 body — validate structurally,
+    // mirroring the POST /projects test above.
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(typeof body.challenge_id).toBe("string");
+    expect(() => new URL(body.claim_url as string)).not.toThrow();
+    expect(new Date(body.expires_at as string).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  test("GET /projects/:id/claim/status is pending before completion", async () => {
+    const project = await createProject("claim-status-pending");
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+
+    const res = await claimStatus(project.id, challenge_id, project.projectSecret);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(() => GetClaimStatusResponse.parse(body)).not.toThrow();
+    const parsed = body as Record<string, unknown>;
+    expect(parsed.status).toBe("pending");
+    expect(parsed.team_id).toBeUndefined();
+    expect(parsed.claimed_at).toBeUndefined();
+    expect(parsed.dashboard_url).toBeUndefined();
+  });
+
+  test("GET /projects/:id/claim/status with a foreign project secret returns 403", async () => {
+    const project = await createProject("claim-status-owner");
+    const other = await createProject("claim-status-foreign");
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+
+    const res = await claimStatus(project.id, challenge_id, other.projectSecret);
+    expect(res.status).toBe(403);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.code).toBe("proj.permission_denied");
+  });
+
+  test("full flow: init → complete with session cookie → status completed", async () => {
+    const project = await createProject("claim-full-flow");
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+
+    const cookie = await sessionCookie(project.id);
+    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id }),
+    });
+    expect(complete.status).toBe(200);
+    const completeBody = await complete.json();
+    expect(() => CompleteClaimResponse.parse(completeBody)).not.toThrow();
+    const completed = completeBody as Record<string, unknown>;
+    expect(completed.project_id).toBe(project.id);
+    expect(typeof completed.team_id).toBe("string");
+    expect(typeof completed.claimed_at).toBe("string");
+
+    const status = await claimStatus(project.id, challenge_id, project.projectSecret);
+    expect(status.status).toBe(200);
+    const statusBody = await status.json();
+    expect(() => GetClaimStatusResponse.parse(statusBody)).not.toThrow();
+    const parsed = statusBody as Record<string, unknown>;
+    expect(parsed.status).toBe("completed");
+    expect(typeof parsed.team_id).toBe("string");
+    expect(typeof parsed.claimed_at).toBe("string");
+    expect(() => new URL(parsed.dashboard_url as string)).not.toThrow();
+  });
+
+  test("POST /projects/:id/claim/init returns 409 once the project is claimed", async () => {
+    const project = await createProject("claim-already-claimed");
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+    const cookie = await sessionCookie(project.id);
+    await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id }),
+    });
+
+    const res = await initClaim(project.id, project.projectSecret);
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code: string; details: Record<string, unknown> };
+    expect(body.code).toBe("proj.already_claimed");
+    expect(typeof body.details.team_id).toBe("string");
+    expect(() => new URL(body.details.dashboard_url as string)).not.toThrow();
+  });
+
+  test("an expired challenge makes status and complete return 410", async () => {
+    const project = await createProject("claim-expired");
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+    expireClaimChallenge(challenge_id);
+
+    const status = await claimStatus(project.id, challenge_id, project.projectSecret);
+    expect(status.status).toBe(410);
+    const statusBody = (await status.json()) as Record<string, unknown>;
+    expect(statusBody.code).toBe("proj.claim_expired");
+
+    const cookie = await sessionCookie(project.id);
+    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id }),
+    });
+    expect(complete.status).toBe(410);
+    const completeBody = (await complete.json()) as Record<string, unknown>;
+    expect(completeBody.code).toBe("proj.claim_expired");
+  });
+
+  test("POST /projects/:id/claim/complete without a session cookie returns 401", async () => {
+    const project = await createProject("claim-complete-no-cookie");
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+
+    const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ challenge_id }),
+    });
+    expect(res.status).toBe(401);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.code).toBe("auth.unauthorized");
+  });
+
+  test("POST /projects/:id/claim/complete with an unknown challenge returns 404", async () => {
+    const project = await createProject("claim-complete-unknown");
+    const cookie = await sessionCookie(project.id);
+    const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id: "does-not-exist" }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  test("POST /projects/:id/claim/complete without challenge_id returns 400", async () => {
+    const project = await createProject("claim-complete-missing-id");
+    const cookie = await sessionCookie(project.id);
+    const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
   });
 });
