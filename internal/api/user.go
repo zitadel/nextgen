@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"net/http"
-	"strconv"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -22,6 +21,9 @@ func (h *Handler) CreateUser(ctx context.Context, req *api.User, params api.Crea
 	user, err := convertUsingJson[map[string]any](req)
 	if err != nil {
 		return nil, err
+	}
+	if _, hasID := (*user)["id"]; hasID {
+		return nil, domain.ErrUserInvalid().WithDetails("id is server-assigned and must not be set on create")
 	}
 
 	u, err := h.userService.CreateUser(ctx, service.CreateUserInput{
@@ -114,7 +116,7 @@ func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPassk
 
 	for i, key := range passkeys {
 		res.Passkeys[i] = api.ListUserPasskeysResponsePasskeysItem{
-			ID:        strconv.FormatInt(key.ID, 10),
+			ID:        key.ID,
 			Name:      key.Name,
 			CreatedAt: key.CreatedAt,
 		}

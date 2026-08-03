@@ -30,7 +30,7 @@ func TestNewTeam(t *testing.T) {
 			check: func(t *testing.T, got *domain.Team) {
 				assert.Equal(t, "proj_1", got.ProjectID)
 				assert.Equal(t, "my-team", got.Name)
-				assert.NotEmpty(t, got.ID)
+				assert.Empty(t, got.ID)
 			},
 			wantErr: nil,
 		},

@@ -42,11 +42,18 @@ func TestTeamStatements_Create(t *testing.T) {
 			assert.Equal(t, domain.TeamStatusActive, stored.Status)
 		})
 
-		// Every dialect rejects this in Go, before the statement is built.
-		t.Run("empty id returns error", func(t *testing.T) {
+		t.Run("empty id is assigned by dialect", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
 
-			assert.Error(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, "")))
+			team := newTestTeam(projectID, "")
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
+
+			require.NotEmpty(t, team.ID)
+			assert.True(t, strings.HasPrefix(team.ID, string(domain.PrefixTeam)+"_"))
+
+			stored, err := d.stmts.GetTeamByID(t.Context(), projectID, team.ID)
+			require.NoError(t, err)
+			assert.Equal(t, team.ID, stored.ID)
 		})
 
 		t.Run("empty name returns error", func(t *testing.T) {

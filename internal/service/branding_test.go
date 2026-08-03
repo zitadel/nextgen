@@ -32,6 +32,7 @@ func TestBrandingServiceCreate(t *testing.T) {
 	statements.EXPECT().
 		CreateBranding(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, b *domain.Branding) error {
+			b.ID = "brnd_test01"
 			stored = b
 			return nil
 		})

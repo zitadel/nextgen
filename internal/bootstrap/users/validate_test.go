@@ -33,7 +33,7 @@ func validDocument() *users.Document {
 			ProjectID: "proj_demo",
 			TeamID:    "team_demo",
 			SchemaURL: "https://schemas.test/demo.json",
-			ID:        "usr_demo",
+			ID:        "user_demo",
 		},
 		Attributes: map[string]json.RawMessage{
 			"username":             json.RawMessage(`"admin"`),

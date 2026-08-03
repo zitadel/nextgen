@@ -111,19 +111,9 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
 	action := NewCreateUserAction(input, s.schemaStore)
-	err = action.Prepare(ctx)
-	if err != nil {
+	if err := s.ApplyActions(ctx, action); err != nil {
 		return nil, err
 	}
-
-	err = applyCreateUser(ctx, s.v2Pool.Statements(), action.CreateUser)
-	if err != nil {
-		if de, ok := errors.AsType[domain.Error](err); ok {
-			return nil, de
-		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to create user")
-	}
-
 	return action.User, nil
 }
 
@@ -305,12 +295,15 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 		return err
 	}
 
-	o.User["id"] = o.CreateUser.ID
 	return nil
 }
 
 func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error {
-	return applyCreateUser(ctx, stmts, o.CreateUser)
+	if err := applyCreateUser(ctx, stmts, o.CreateUser); err != nil {
+		return err
+	}
+	o.User["id"] = o.CreateUser.ID
+	return nil
 }
 
 func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.CreateUser) error {
@@ -387,55 +380,6 @@ func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		return domain.ErrInternal(err).WithMessage("failed to delete user")
 	}
 	return nil
-}
-
-// ---- Lazy ACTION -------------------------------------------------------------
-
-type UserActionFactory = func(ctx context.Context) (UserAction, error)
-
-// LazyUserAction allows for lazy initialization of a user-action. It forwards
-// the `Prepare` and `Apply` methods to the generated action. The UserAction is
-// created right before it is used in those functions.
-//
-// This action can be wrapped around an action when the wrapped action requires
-// an output of a previous action. It can then use a closure to get the data
-// from the other action.
-type LazyUserAction struct {
-	factory UserActionFactory
-	action  UserAction
-}
-
-func NewLazyUserAction(factory UserActionFactory) *LazyUserAction {
-	return &LazyUserAction{
-		factory: factory,
-	}
-}
-
-func (o *LazyUserAction) Prepare(ctx context.Context) (err error) {
-	action, err := o.Action(ctx)
-	if err != nil {
-		return err
-	}
-	return action.Prepare(ctx)
-}
-
-func (o *LazyUserAction) Apply(ctx context.Context, stmts AllStatements) error {
-	action, err := o.Action(ctx)
-	if err != nil {
-		return err
-	}
-	return action.Apply(ctx, stmts)
-}
-
-func (o *LazyUserAction) Action(ctx context.Context) (UserAction, error) {
-	if o.action == nil {
-		action, err := o.factory(ctx)
-		if err != nil {
-			return nil, err
-		}
-		o.action = action
-	}
-	return o.action, nil
 }
 
 // UserStatementsLookup adapts [UserStatements] to [UserLookup] for AuthAttemptService.

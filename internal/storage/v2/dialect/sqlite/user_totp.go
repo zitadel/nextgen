@@ -14,8 +14,8 @@ import (
 
 const (
 	createUserTOTPStmt = `INSERT INTO user_totp (
-	project_id, user_id, secret, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?)`
+	project_id, id, user_id, secret, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?)`
 
 	userTOTPQuery = `SELECT id, project_id, user_id, secret, verified_at,
 	last_successful_check, failed_attempts, created_at, updated_at
@@ -30,9 +30,13 @@ func newUserTOTPStatements(client queryExecutor) userTOTPStatements {
 
 // CreateUserTOTP implements [service.UserTOTPStatements].
 func (us userTOTPStatements) CreateUserTOTP(ctx context.Context, totp *domain.CreateUserTOTP) error {
+	if err := ensureManagedID(&totp.ID, domain.PrefixUserTOTP); err != nil {
+		return err
+	}
 	now := nowUnixNano()
 	_, err := us.client.Exec(ctx, createUserTOTPStmt,
 		totp.ProjectID,
+		totp.ID,
 		totp.UserID,
 		append([]byte(nil), totp.Secret...),
 		now,

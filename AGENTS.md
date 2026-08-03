@@ -280,6 +280,16 @@ iterate in Storybook. A missing visual value is a **new token** in
 (e.g. display fonts), which stay in the consuming app because
 `@zitadel/design-tokens` ships as a public npm package.
 
+## Resource identifiers
+
+Resource primary keys are dialect-owned `prefix_<opaque>` strings
+([ADR 047](docs/adrs/047-dialect-id-generation.md)). **Always** mint them
+through the storage statements surface: create paths use dialect `Ensure`;
+pre-persist ceremony IDs use `Statements().NewManagedID`. Never add custom
+ULID/UUID generation in domain, service, API, or other packages, and do not
+call `idgen` outside dialect packages. Full minting contract:
+[`internal/storage/v2/AGENTS.md`](internal/storage/v2/AGENTS.md).
+
 ## Generated Files
 
 - Do not hand-edit `api/generated/**`; update `api/openapi/**` and run

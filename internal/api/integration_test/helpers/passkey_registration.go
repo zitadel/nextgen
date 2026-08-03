@@ -5,7 +5,6 @@ import (
 
 	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -13,7 +12,6 @@ func (h *Harness) EnsurePasskeyRegistrationService(t *testing.T) *service.Passke
 	t.Helper()
 	return service.NewPasskeyRegistrationService(
 		h.EnsureServiceDB(t),
-		idgen.NewULID(),
 	)
 }
 

@@ -12,6 +12,7 @@ require (
 	github.com/go-faster/jx v1.2.0
 	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/go-webauthn/webauthn v0.17.3
+	github.com/google/uuid v1.6.0
 	github.com/googleapis/go-sql-spanner v1.25.1
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/ianlancetaylor/jsonschema v0.0.0-20251021232724-46ecbf32a0a5
@@ -122,7 +123,6 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.15 // indirect
 	github.com/googleapis/gax-go/v2 v2.22.0 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
