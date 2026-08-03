@@ -97,9 +97,19 @@ normative contract** (`schema_version`), not an indicative shape:
 Humans inspect `rendered`; agents and tests read `artifacts.code` /
 `artifacts.link` — **typed, purpose-discriminated fields the composition
 layer populates from the flow engine's own state** (it generated the
-secret), never parsed back out of templates. Which artifacts a purpose
-requires is part of the versioned contract (`email_verification` carries a
-`code` and/or `link`; a magic-link purpose requires `link`). `variables`
+secret), never parsed back out of templates. Which artifact keys a
+purpose carries is itself normative — kit types and `artifact:` filters
+freeze against this table, not prose:
+
+| `purpose` | `code` | `link` | Invariant |
+|---|---|---|---|
+| `email_verification` | optional | optional | at least one present |
+| `email_otp` | required | never | — |
+| `password_recovery` | optional | optional | at least one present |
+
+The table is part of the versioned contract: a new purpose lands with its
+row (a magic-link login purpose would require `link`), and a new artifact
+key extends the schema under `schema_version`. `variables`
 records the template's render inputs and is *not* an API: custom
 composition may rename or omit template variables freely without breaking
 `waitForCode()`. `channel` and `purpose` keep SMS and webhook-style
@@ -133,7 +143,12 @@ enforces instead: a `provider_required` policy on the environment record.
 Provisioning sets it (the claim flow marks production environments;
 operators can set it anywhere), and while it is set, deploying a release
 that enables email-dependent flows without a configured provider
-**fails** — a hard failure, not a warning. Deployment is not the only
+**fails** — a hard failure, not a warning. Email-dependence is read
+statically from the release's pinned flow definitions: a step whose
+declared kind emits an outbound message (the same declaration the
+composition layer consumes at runtime) marks the release
+email-dependent — no separate capability bit that could drift from the
+flows. Deployment is not the only
 gate, because delivery mode and provider configuration are mutable
 environment state: **every provider or policy mutation validates the
 invariant** (removing the provider, or enabling `provider_required`
@@ -339,17 +354,46 @@ second contract later.
 - The scratch dashboard's inbox, the local inbox UI, the CLI, and the kit
   stay one contract; none can drift into a private side channel.
 
+On acceptance, so the narrative and this contract never disagree:
+
+- [ ] Amend the platform overview's claimed-production delivery default
+      ("Dev Inbox (default)" → provider required, per `provider_required`).
+- [ ] Amend the platform overview's scratch-inbox session story (anonymous
+      first-visit cookie → the secret-mediated handoff above).
+
 ## Open questions
 
-- Composition locus: a `send` effect in the flow engine, or a notification
-  service consuming events (and how that aligns with the wide-events
-  direction)?
-- Durable-store trigger: at what point (shared cloud dev instances,
-  multi-replica) the in-memory store must be replaced.
-- Support-access overlap: a support agent reading a tenant's dev inbox
-  reads user secrets — same policy surface as the support-access model
-  discussion.
-- Consumed-state: should verifying a code mark the message consumed in the
-  inbox (needs flow cooperation), or is expiry display enough?
-- Does the read API belong on the existing operator port or a separate
-  debug listener that deployments can firewall wholesale?
+Review (2026-08-03) recorded a lean on each; the leans harden into
+decisions when this ADR moves to Accepted.
+
+- **Composition locus** — lean: the flow emits a typed notification
+  intent, and an async notification boundary composes and then captures
+  or delivers (v4-shaped: enqueue → compose → capture|deliver). The flow
+  never owns SMTP or HTML; artifacts still come from flow/challenge
+  state as specified above. Wide-events/River fit naturally as that bus;
+  the exact event shape stays open.
+- **Durable-store trigger** — lean: in-memory for the local
+  single-process instance (`zitadel start` / `startLocalZitadel()`);
+  switch to a durable store when any of multi-replica, a shared
+  cloud/scratch inbox, or unread-messages-must-survive-restart applies.
+  ADR 029 at-rest encryption applies from that point — the same bar
+  whether the durable home is the inbox store or an async job-queue
+  payload.
+- **Support-access overlap** — lean: default **deny** for staff/support
+  until the cross-project identity / support-access model (#333) exists.
+  Inbox content is bearer-secret class — break-glass plus audit, never a
+  normal grant. The policy design lives there, not in this ADR.
+- **Consumed-state** — lean: expiry display (`expires_at`) is enough for
+  v1; kit waits stay cursor/filter-based and never depend on consumed
+  state. If marking arrives, it is an explicit, idempotent
+  operator-plane `consumed_at` (the message stays readable until
+  `retained_until`) — never auto-consume on successful verify, which
+  couples inbox writes to the check path and gets messy under resend
+  and parallel workers. A later read-only `challenge_status` derived
+  from auth-attempt state is observation, not an inbox write.
+- **Operator port vs separate listener** — lean: same operator port and
+  API; no second debug listener. Optionally later, a runtime config
+  flag or gateway rule can reject the inbox path prefix wholesale —
+  discovery (`available` vs `configured`) and the three consumers stay
+  on one contract, and network isolation stays a deploy/config concern,
+  not a second surface.
