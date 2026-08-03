@@ -62,3 +62,4 @@ In ZITADEL we started supporting native environment variables. For example the s
 
 1. We should ensure support for `OTEL_` variables in Nextgen.
 2. We should document support for `PG*` variables, which are consumed by [`pgconn.ParseConfig()`](http://pkg.go.dev/github.com/jackc/pgx/v5@v5.9.2/pgconn#ParseConfig), mimicking libpq behavior.
+
