@@ -93,6 +93,7 @@ func TestProjectService_Create(t *testing.T) {
 				)
 				masterKey.EXPECT().Encrypt(gomock.Any())
 				masterKey.EXPECT().Decrypt(gomock.Any()).Return("thiskeyis32byteslongforsurerealy", nil)
+				statements.EXPECT().NewManagedID(string(domain.PrefixEncryptionKey)).Return("enc_key_minted", nil)
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 				statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
@@ -114,6 +115,7 @@ func TestProjectService_Create(t *testing.T) {
 				)
 				masterKey.EXPECT().Encrypt(gomock.Any())
 				masterKey.EXPECT().Decrypt(gomock.Any()).Return("thiskeyis32byteslongforsurerealy", nil)
+				statements.EXPECT().NewManagedID(string(domain.PrefixEncryptionKey)).Return("enc_key_minted", nil)
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 				statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
@@ -134,6 +136,7 @@ func TestProjectService_Create(t *testing.T) {
 				)
 				masterKey.EXPECT().Encrypt(gomock.Any())
 				masterKey.EXPECT().Decrypt(gomock.Any()).Return("thiskeyis32byteslongforsurerealy", nil)
+				statements.EXPECT().NewManagedID(string(domain.PrefixEncryptionKey)).Return("enc_key_minted", nil)
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 				statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 				// No schema/flow-definition seeding when seedDefaults is false.
