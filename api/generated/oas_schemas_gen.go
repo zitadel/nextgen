@@ -2272,6 +2272,23 @@ type DeleteFlowDefinitionNoContent struct{}
 
 func (*DeleteFlowDefinitionNoContent) deleteFlowDefinitionRes() {}
 
+type DeleteTeamForbidden ErrorDetails
+
+func (*DeleteTeamForbidden) deleteTeamRes() {}
+
+// DeleteTeamNoContent is response for DeleteTeam operation.
+type DeleteTeamNoContent struct{}
+
+func (*DeleteTeamNoContent) deleteTeamRes() {}
+
+type DeleteTeamNotFound ErrorDetails
+
+func (*DeleteTeamNotFound) deleteTeamRes() {}
+
+type DeleteTeamUnauthorized ErrorDetails
+
+func (*DeleteTeamUnauthorized) deleteTeamRes() {}
+
 // DeleteUserByIDNoContent is response for DeleteUserByID operation.
 type DeleteUserByIDNoContent struct{}
 
@@ -2478,6 +2495,7 @@ func (*ErrorDetailsStatusCode) createTeamRes()               {}
 func (*ErrorDetailsStatusCode) createUserRes()               {}
 func (*ErrorDetailsStatusCode) deactivateFlowDefinitionRes() {}
 func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) deleteTeamRes()               {}
 func (*ErrorDetailsStatusCode) deleteUserByIDRes()           {}
 func (*ErrorDetailsStatusCode) endSessionRes()               {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()          {}

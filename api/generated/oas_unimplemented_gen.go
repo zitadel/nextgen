@@ -210,6 +210,20 @@ func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params Del
 	return r, ht.ErrNotImplemented
 }
 
+// DeleteTeam implements deleteTeam operation.
+//
+// Deactivates the team.
+// The team is tombstoned rather than erased: it stays readable through
+// getTeam with status `deactivated`. Its memberships are removed and the
+// users whose lifecycle it owns are deactivated with it.
+// The request is idempotent. Deleting a team that is already deactivated
+// or doesn't exist succeeds without changing anything.
+//
+// DELETE /teams/{team_id}
+func (UnimplementedHandler) DeleteTeam(ctx context.Context, params DeleteTeamParams) (r DeleteTeamRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // DeleteUserByID implements DeleteUserByID operation.
 //
 // Delete user by ID.

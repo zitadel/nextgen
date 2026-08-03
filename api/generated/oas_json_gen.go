@@ -5629,6 +5629,120 @@ func (s *DeactivateFlowDefinitionConflict) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes DeleteTeamForbidden as json.
+func (s *DeleteTeamForbidden) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes DeleteTeamForbidden from json.
+func (s *DeleteTeamForbidden) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeleteTeamForbidden to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = DeleteTeamForbidden(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *DeleteTeamForbidden) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeleteTeamForbidden) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes DeleteTeamNotFound as json.
+func (s *DeleteTeamNotFound) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes DeleteTeamNotFound from json.
+func (s *DeleteTeamNotFound) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeleteTeamNotFound to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = DeleteTeamNotFound(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *DeleteTeamNotFound) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeleteTeamNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes DeleteTeamUnauthorized as json.
+func (s *DeleteTeamUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes DeleteTeamUnauthorized from json.
+func (s *DeleteTeamUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeleteTeamUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = DeleteTeamUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *DeleteTeamUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeleteTeamUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes DeleteUserByIDNotFound as json.
 func (s *DeleteUserByIDNotFound) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
