@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/zitadel/nextgen/internal/domain/idgen"
 )
 
 // Step error text keys the state machine emits when an auth-attempt
@@ -211,7 +209,6 @@ type FlowStateMachineRuntime struct {
 	userForPasskeyCreater FlowPasskeyUserCreater
 	authAttempts          FlowAuthAttemptService
 	passkeyRegistration   FlowPasskeyRegistrationService
-	ids                   idgen.Generator
 	now                   func() time.Time
 }
 
@@ -225,7 +222,6 @@ func NewFlowStateMachine(
 	userForPasskeyCreater FlowPasskeyUserCreater,
 	authAttempts FlowAuthAttemptService,
 	passkeyRegistration FlowPasskeyRegistrationService,
-	ids idgen.Generator,
 	now func() time.Time,
 ) *FlowStateMachineRuntime {
 	if now == nil {
@@ -239,7 +235,6 @@ func NewFlowStateMachine(
 		userForPasskeyCreater: userForPasskeyCreater,
 		authAttempts:          authAttempts,
 		passkeyRegistration:   passkeyRegistration,
-		ids:                   ids,
 		now:                   now,
 	}
 }
@@ -737,8 +732,8 @@ type passkeyPhaseResult struct {
 //     mint an assertion challenge; discoverable login allowed when no user is
 //     yet identified.
 //   - issue leg (register): step offers a `passkey_register` action and it
-//     was selected → use the resolved user id or mint a provisional one, then
-//     issue a creation challenge.
+//     was selected → use the collected user id (or let the registration
+//     service mint a provisional one), then issue a creation challenge.
 func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowResolvedFields, passkeyResolved FlowResolvedFields, actionKind FlowActionKind) (passkeyPhaseResult, error) {
 	ctx, state, step, in := pc.ctx, pc.state, pc.currentStep, pc.in
 	switch {
@@ -870,18 +865,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey registration service not wired", ErrFlowIntegrity())
 		}
 		userID := state.CollectedData.UserID
-		if userID == "" {
-			// TODO: only domain should generate user ids
-			newID, err := r.ids.New("user")
-			if err != nil {
-				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: generate user id: %w", err)
-			}
-			userID = newID
-			state.CollectedData.UserID = userID
-			// Mark as provisional: user doesn't exist in the DB yet.
-			// The verify leg will call CreateProvisionalUser + RegisterCreatedUser.
-			state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey = true
-		}
+		provisional := userID == ""
 		username, displayName := passkeyRegistrationDisplay(passkeyResolved, state.CollectedData.UserData)
 		out, err := r.passkeyRegistration.IssuePasskeyRegistrationChallenge(ctx, FlowIssuePasskeyRegistrationChallengeInput{
 			ProjectID:   state.ProjectID,
@@ -893,6 +877,10 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 		})
 		if err != nil {
 			return passkeyPhaseResult{}, fmt.Errorf("flow state machine: issue passkey registration: %w", err)
+		}
+		state.CollectedData.UserID = out.UserID
+		if provisional {
+			state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey = true
 		}
 		state.PendingChallenge = &FlowPendingChallenge{
 			ID:       out.ChallengeID,

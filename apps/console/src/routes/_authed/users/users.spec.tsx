@@ -43,10 +43,10 @@ describe("users screen", () => {
       http.get(USERS_URL, () =>
         HttpResponse.json({
           users: [
-          // The shipped `consumer`/`business` presets spell the name parts
-          // camelCase; `listUsers` returns the schema's attribute tree verbatim.
-          { id: "user_1", givenName: "Maya", familyName: "Patel", email: "maya.patel@acme.com" },
-        ],
+            // The shipped `consumer`/`business` presets spell the name parts
+            // camelCase; `listUsers` returns the schema's attribute tree verbatim.
+            { id: "user_1", givenName: "Maya", familyName: "Patel", email: "maya.patel@acme.com" },
+          ],
         }),
       ),
     );
@@ -65,8 +65,8 @@ describe("users screen", () => {
       http.get(USERS_URL, () =>
         HttpResponse.json({
           users: [
-          { id: "user_1", $schema: "sch_business", email: "maya@acme.com", companyName: "Acme" },
-        ],
+            { id: "user_1", $schema: "sch_business", email: "maya@acme.com", companyName: "Acme" },
+          ],
         }),
       ),
       http.get(`${SCHEMAS_URL}/sch_business`, () =>
@@ -98,9 +98,9 @@ describe("users screen", () => {
       http.get(USERS_URL, () =>
         HttpResponse.json({
           users: [
-          { id: "user_1", $schema: "sch_business", email: "maya@acme.com", companyName: "Acme" },
-          { id: "user_2", $schema: "sch_business", email: "min@acme.com" },
-        ],
+            { id: "user_1", $schema: "sch_business", email: "maya@acme.com", companyName: "Acme" },
+            { id: "user_2", $schema: "sch_business", email: "min@acme.com" },
+          ],
         }),
       ),
       http.get(`${SCHEMAS_URL}/sch_business`, () =>
@@ -130,16 +130,16 @@ describe("users screen", () => {
       http.get(USERS_URL, () =>
         HttpResponse.json({
           users: [
-          {
-            id: "user_1",
-            name: "Ada L.",
-            givenName: "Ada",
-            familyName: "Lovelace",
-            email: "a@x.com",
-          },
-          { id: "user_2", given_name: "Grace", family_name: "Hopper", email: "g@x.com" },
-          { id: "user_3", givenName: "Radia", email: "r@x.com" },
-        ],
+            {
+              id: "user_1",
+              name: "Ada L.",
+              givenName: "Ada",
+              familyName: "Lovelace",
+              email: "a@x.com",
+            },
+            { id: "user_2", given_name: "Grace", family_name: "Hopper", email: "g@x.com" },
+            { id: "user_3", givenName: "Radia", email: "r@x.com" },
+          ],
         }),
       ),
     );
@@ -157,9 +157,7 @@ describe("users screen", () => {
     // unrelated attribute as the name is worse than having none.
     server.use(
       http.get(USERS_URL, () =>
-        HttpResponse.json({
-          users: [{ id: "user_1", username: "nope", email: "kenji@acme.com" }],
-        }),
+        HttpResponse.json({ users: [{ id: "user_1", username: "nope", email: "kenji@acme.com" }] }),
       ),
     );
     await renderUsers();
@@ -171,9 +169,7 @@ describe("users screen", () => {
   it("shows the user id alongside the schema's own attributes", async () => {
     server.use(
       http.get(USERS_URL, () =>
-        HttpResponse.json({
-          users: [{ id: "user_1", email: "kenji@acme.com", status: "Blocked" }],
-        }),
+        HttpResponse.json({ users: [{ id: "user_1", email: "kenji@acme.com", status: "Blocked" }] }),
       ),
     );
     await renderUsers();
@@ -220,9 +216,9 @@ describe("users screen", () => {
       http.get(USERS_URL, () =>
         HttpResponse.json({
           users: [
-          { id: "user_1", givenName: "Maya", familyName: "Patel", email: "maya@acme.com" },
-          { id: "user_2", givenName: "Sasha", familyName: "Kim", email: "sasha@acme.com" },
-        ],
+            { id: "user_1", givenName: "Maya", familyName: "Patel", email: "maya@acme.com" },
+            { id: "user_2", givenName: "Sasha", familyName: "Kim", email: "sasha@acme.com" },
+          ],
         }),
       ),
     );

@@ -411,11 +411,11 @@ export function setupPlatformHandlers() {
     // guidance on. Auth mirrors the real server: the project secret is the
     // bearer and scopes the (empty) result.
     http.get("*/users", ({ request }) => {
-      // Both spec'd query params (offset, limit) are numeric, but URLs carry
-      // strings and the generated zod does not coerce — convert before parsing.
-      const raw = Object.fromEntries(
-        Object.entries(queryRecord(request)).map(([key, value]) => [key, Number(value)]),
-      );
+      // `limit` is numeric but URLs carry strings and the generated zod does not
+      // coerce, so convert it before parsing. `page_token` is an opaque string —
+      // coercing it too would parse every real cursor to NaN and 400 the request.
+      const { limit, ...rest } = queryRecord(request);
+      const raw = { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) };
       const query = parse(ListUsersQueryParams, raw, "invalid_query");
       if (!query.ok) {
         return query.response;
@@ -427,7 +427,7 @@ export function setupPlatformHandlers() {
           status: 401,
         });
       }
-      return HttpResponse.json([]);
+      return HttpResponse.json({ users: [] });
     }),
 
     http.post("*/schemas", async ({ request }) => {
