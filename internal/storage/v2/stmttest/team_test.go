@@ -286,6 +286,23 @@ func TestTeamStatements_Deactivate_UnknownTeamIsNoOp(t *testing.T) {
 	})
 }
 
+// The project_id predicate is the tenant boundary: delete returns success for a
+// team id belonging to another project, and must leave that team alone.
+func TestTeamStatements_Deactivate_OtherProjectIsNoOp(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		ownerProjectID := ensureProject(t, d.stmts)
+		teamID := uniqueTeamID(t)
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(ownerProjectID, teamID)))
+
+		otherProjectID := ensureProject(t, d.stmts)
+		require.NoError(t, d.stmts.DeactivateTeam(t.Context(), otherProjectID, teamID))
+
+		stored, err := d.stmts.GetTeamByID(t.Context(), ownerProjectID, teamID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.TeamStatusActive, stored.Status)
+	})
+}
+
 func TestTeamStatements_Deactivate_CascadesMembershipsAndOwnedUsers(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
