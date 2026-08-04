@@ -254,6 +254,55 @@ func TestTeamStatements_Deactivate(t *testing.T) {
 	})
 }
 
+// Deactivation is idempotent: the team UPDATE is guarded on the active status,
+// so a repeat leaves updated_at recording when the team was deactivated rather
+// than when the last call arrived. Two concurrent deletes rely on the same
+// predicate, which the loser re-evaluates after the winner commits.
+func TestTeamStatements_Deactivate_RepeatDoesNotTouchUpdatedAt(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		teamID := uniqueTeamID(t)
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
+
+		require.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, teamID))
+		deactivated, err := d.stmts.GetTeamByID(t.Context(), projectID, teamID)
+		require.NoError(t, err)
+
+		require.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, teamID))
+		again, err := d.stmts.GetTeamByID(t.Context(), projectID, teamID)
+		require.NoError(t, err)
+
+		assert.Equal(t, domain.TeamStatusDeactivated, again.Status)
+		assert.Equal(t, deactivated.UpdatedAt, again.UpdatedAt)
+	})
+}
+
+// An id that names no team is not an error: delete reports success either way so
+// it cannot be used to probe which team ids exist.
+func TestTeamStatements_Deactivate_UnknownTeamIsNoOp(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		assert.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, "nonexistent"))
+	})
+}
+
+// The project_id predicate is the tenant boundary: delete returns success for a
+// team id belonging to another project, and must leave that team alone.
+func TestTeamStatements_Deactivate_OtherProjectIsNoOp(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		ownerProjectID := ensureProject(t, d.stmts)
+		teamID := uniqueTeamID(t)
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(ownerProjectID, teamID)))
+
+		otherProjectID := ensureProject(t, d.stmts)
+		require.NoError(t, d.stmts.DeactivateTeam(t.Context(), otherProjectID, teamID))
+
+		stored, err := d.stmts.GetTeamByID(t.Context(), ownerProjectID, teamID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.TeamStatusActive, stored.Status)
+	})
+}
+
 func TestTeamStatements_Deactivate_CascadesMembershipsAndOwnedUsers(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)

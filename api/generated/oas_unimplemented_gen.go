@@ -43,6 +43,18 @@ func (UnimplementedHandler) AuthorizeGet(ctx context.Context, params AuthorizeGe
 	return r, ht.ErrNotImplemented
 }
 
+// CompleteClaim implements completeClaim operation.
+//
+// Called by the browser after the developer authenticates on the claim page.
+// Authenticated by the `__nextgen_session` cookie, it attaches the project to
+// the developer's personal team using the `challenge_id` from the claim URL as
+// its single-use, browser-safe authorization.
+//
+// POST /projects/{project_id}/claim/complete
+func (UnimplementedHandler) CompleteClaim(ctx context.Context, req *CompleteClaimRequest, params CompleteClaimParams) (r CompleteClaimRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateAuthAttempt implements createAuthAttempt operation.
 //
 // Starts a new authentication attempt. This is the entry point for the auth_attempts state machine.
@@ -212,6 +224,20 @@ func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params Del
 	return r, ht.ErrNotImplemented
 }
 
+// DeleteTeam implements deleteTeam operation.
+//
+// Deactivates the team.
+// The team is tombstoned rather than erased: it stays readable through
+// getTeam with status `deactivated`. Its memberships are removed and the
+// users whose lifecycle it owns are deactivated with it.
+// The request is idempotent. Deleting a team that is already deactivated
+// or doesn't exist succeeds without changing anything.
+//
+// DELETE /teams/{team_id}
+func (UnimplementedHandler) DeleteTeam(ctx context.Context, params DeleteTeamParams) (r DeleteTeamRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // DeleteUserByID implements DeleteUserByID operation.
 //
 // Delete user by ID.
@@ -271,6 +297,18 @@ func (UnimplementedHandler) GetAuthAttempt(ctx context.Context, params GetAuthAt
 //
 // GET /branding/{id}
 func (UnimplementedHandler) GetBrandingById(ctx context.Context, params GetBrandingByIdParams) (r GetBrandingByIdRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetClaimStatus implements getClaimStatus operation.
+//
+// Polled by the CLI while a browser completes the claim. Authorized by the
+// project secret that initiated the challenge. Returns `pending`, or
+// `completed` with the owning team, the claim timestamp, and the dashboard
+// URL once the browser leg has finished.
+//
+// GET /projects/{project_id}/claim/status
+func (UnimplementedHandler) GetClaimStatus(ctx context.Context, params GetClaimStatusParams) (r GetClaimStatusRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -424,6 +462,19 @@ func (UnimplementedHandler) GetUserByID(ctx context.Context, params GetUserByIDP
 //
 // GET /auth/userinfo
 func (UnimplementedHandler) GetUserInfo(ctx context.Context) (r GetUserInfoRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// InitClaim implements initClaim operation.
+//
+// Starts a claim challenge for an unclaimed project. Authenticated by the
+// project secret, this mints a single-use, short-lived challenge and returns
+// the `claim_url` the developer opens in a browser to complete the claim,
+// together with the `challenge_id` the CLI polls with. The exact expiry is
+// carried by `expires_at` on the response.
+//
+// POST /projects/{project_id}/claim/init
+func (UnimplementedHandler) InitClaim(ctx context.Context, params InitClaimParams) (r InitClaimRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

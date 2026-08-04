@@ -1,0 +1,7 @@
+type: object
+description: The request to complete a project claim.
+required:
+  - challenge_id
+properties:
+  challenge_id:
+    $ref: ../../../../../components/schemas/challenge-id.yaml

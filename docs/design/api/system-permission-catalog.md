@@ -152,9 +152,9 @@ the corresponding resource permission.
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `team.create` | `POST /teams` | |
-| `team.read` | `GET /teams/{id}` | Team resource only. Does **not** imply `team_membership.*` or `user.*`. Collection list (`GET /teams`) is **not yet exposed**. |
-| `team.write` | `PATCH /teams/{id}` | Team attributes only. Does **not** imply `team_membership.*`, invitations, or billing. **Not yet exposed**. |
-| `team.delete` | `DELETE /teams/{id}` | **Not yet exposed**. |
+| `team.read` | `POST /teams/query`, `GET /teams/{id}` | Team resource only. Does **not** imply `team_membership.*` or `user.*`. |
+| `team.write` | `PATCH /teams/{id}` | Team attributes only. Does **not** imply `team_membership.*`, invitations, or billing. |
+| `team.delete` | `DELETE /teams/{id}` | Deactivates and tombstones the team, cascading to memberships and lifecycle-owned users (ADR 024). |
 
 ### Users
 

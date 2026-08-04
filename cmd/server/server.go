@@ -25,6 +25,7 @@ import (
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -121,6 +122,10 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	schemaStore := serviceDBPool.Statements()
 	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
 
+	if err := platform.Ensure(ctx, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
+		return fmt.Errorf("failed to bootstrap platform project: %w", err)
+	}
+
 	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
 		return fmt.Errorf("failed to bootstrap users: %w", err)
 	}
@@ -214,7 +219,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	// project — the one the customer's integration (`zitadel setup`) created
 	// first. The server never creates it; it validates an explicitly pinned
 	// id up front and otherwise reports the current state for operators.
-	defaultProject, err := projectService.DefaultProject(ctx, cfg.Platform.ProjectID)
+	defaultProject, err := projectService.DefaultProject(ctx, cfg.Platform.ResolvedProjectID())
 	if err != nil {
 		return fmt.Errorf("failed to resolve the default project: %w", err)
 	}
@@ -242,6 +247,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			brandingService,
 			tokenService,
 			keyService,
+			cfg.Platform.ProjectID,
 		),
 		api.NewSecurityHandler(tokenService),
 		oasapi.WithMiddleware(
@@ -256,7 +262,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
-		standaloneRuntimeResolver(projectService, keyService, cfg.Platform.ProjectID))
+		standaloneRuntimeResolver(projectService, keyService, cfg.Platform.ResolvedProjectID()))
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -358,8 +364,10 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("session.max_ttl", 720*time.Hour)
 	// Empty means "the deployment's first-created project is the default"
 	// (Console ADR 0004 §3); set NEXTGEN_PLATFORM_PROJECT_ID to pin an
-	// existing project instead. The server never creates a project itself.
+	// existing project instead. The server never creates a project itself,
+	// unless platform.bootstrap_project explicitly opts in (#605).
 	v.SetDefault("platform.project_id", "")
+	v.SetDefault("platform.bootstrap_project", false)
 	v.SetDefault("instrumentation.service_name", "Zitadel")
 	v.SetDefault("instrumentation.log.level", zlog.LevelInfo)
 	v.SetDefault("instrumentation.log.streams", []zlog.Stream{

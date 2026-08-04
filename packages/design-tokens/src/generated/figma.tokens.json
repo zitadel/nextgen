@@ -17,7 +17,7 @@
       "dark",
       "light"
     ],
-    "resolvedLeaves": 1006,
+    "resolvedLeaves": 1089,
     "unclassifiedCollections": [],
     "staleCollectionRoles": []
   },
@@ -153,6 +153,10 @@
     "sidebar-ring": {
       "dark": "#525252",
       "light": "#a3a3a3"
+    },
+    "success": {
+      "dark": "#22c55e",
+      "light": "#22c55e"
     }
   },
   "radius": {
@@ -299,8 +303,8 @@
         "light": "#686883"
       },
       "comment": {
-        "dark": "#686883",
-        "light": "#82829c"
+        "dark": "#7c7c95",
+        "light": "#71718b"
       }
     }
   },
