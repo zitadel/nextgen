@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -303,5 +303,56 @@ describe("users screen", () => {
     expect(asked).toBe("tok_2");
     // No token came back, so there is nothing left to offer.
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("drops a page that lands after the list was invalidated underneath it", async () => {
+    // Deleting or creating invalidates the route, which resets to a fresh first
+    // page. A `Load more` still in flight is answering a question about the list
+    // that has just been replaced — appending it would re-add rows the server no
+    // longer returns, including the one just deleted.
+    let releaseSecondPage!: () => void;
+    const secondPageSent = new Promise<void>((resolve) => {
+      releaseSecondPage = resolve;
+    });
+    let firstPageCalls = 0;
+
+    server.use(
+      http.get(USERS_URL, async ({ request }) => {
+        const token = new URL(request.url).searchParams.get("page_token");
+        if (token) {
+          await secondPageSent;
+          return HttpResponse.json({ users: [{ id: "user_stale", email: "stale@x.com" }] });
+        }
+        firstPageCalls += 1;
+        return HttpResponse.json({
+          users: [{ id: "user_1", email: `page1-${firstPageCalls}@x.com` }],
+          next_page_token: "tok_2",
+        });
+      }),
+    );
+
+    const router = await renderUsers();
+    expect(await screen.findByText("page1-1@x.com")).toBeInTheDocument();
+
+    // Start the fetch, then invalidate before letting it answer.
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+    // `act` so the router's own state settles inside the test rather than
+    // warning about an unwrapped update.
+    await act(async () => {
+      await router.invalidate();
+    });
+    await screen.findByText("page1-2@x.com");
+
+    releaseSecondPage();
+
+    // Wait for a positive signal that the in-flight page was handled — the
+    // button re-enables in `loadMore`'s `finally`. Asserting the stale row is
+    // absent without this passes before the response has even landed, which
+    // makes the test green with the guard removed.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Load more" })).toBeEnabled());
+
+    // The in-flight page is discarded rather than appended to the new list.
+    expect(screen.queryByText("stale@x.com")).not.toBeInTheDocument();
+    expect(screen.getByText("page1-2@x.com")).toBeInTheDocument();
   });
 });

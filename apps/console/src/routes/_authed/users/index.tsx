@@ -149,18 +149,34 @@ function UsersScreen() {
     setColumns(loaded.columns);
   }, [loaded]);
 
+  // The loader hands back a new object on every invalidation, so its identity is
+  // the generation of the list currently on screen. `loadMore` reads it after
+  // awaiting to tell whether the page it fetched still belongs to the set it was
+  // asked for.
+  const loadedRef = useRef(loaded);
+  useEffect(() => {
+    loadedRef.current = loaded;
+  }, [loaded]);
+
   const users = useMemo(() => [...loaded.users, ...extra], [loaded.users, extra]);
 
   async function loadMore() {
     if (!nextPageToken || loadingMore) return;
+    const generation = loaded;
     setLoadingMore(true);
     try {
       const page = await api.listUsers({ limit: PAGE_SIZE, page_token: nextPageToken });
-      setExtra((current) => [...current, ...page.users]);
-      setNextPageToken(page.next_page_token ?? undefined);
       // A later page can carry a schema the first page never referenced, which
       // would otherwise render its users with every cell blank.
-      setColumns(await columnsForUsers([...users, ...page.users]));
+      const nextColumns = await columnsForUsers([...users, ...page.users]);
+      // A delete or a create while this was in flight has already reset the list
+      // to a fresh first page. This page answers a question about the previous
+      // one — appending it would re-add rows the server no longer returns — so
+      // it is dropped, and the button is left ready to fetch the current page 2.
+      if (loadedRef.current !== generation) return;
+      setExtra((current) => [...current, ...page.users]);
+      setNextPageToken(page.next_page_token ?? undefined);
+      setColumns(nextColumns);
     } finally {
       setLoadingMore(false);
     }
