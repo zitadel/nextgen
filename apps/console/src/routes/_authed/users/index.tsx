@@ -4,7 +4,6 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { AddUserSheet } from "@/components/add-user-sheet";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -22,9 +21,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { UserStatusBadge } from "@/components/user-status-badge";
 
 import { api } from "../../../api/zitadel";
-import { field } from "../../../lib/record";
+import { displayValue, field } from "../../../lib/record";
 import { type SchemaField, type UserSchema, schemaColumns } from "../../../lib/schema";
 import { userDisplayName } from "../../../lib/user";
 import { getConsoleProjectId } from "../../../runtime/runtime";
@@ -304,7 +304,7 @@ function UsersScreen() {
                     </TableCell>
                   ))}
                   <TableCell className="h-11 px-2 py-0">
-                    <UserStatus status={user.status} />
+                    <UserStatusBadge status={user.status} />
                   </TableCell>
                   <TableCell className="text-foreground h-11 truncate px-2 py-0">
                     {user.id}
@@ -354,7 +354,7 @@ function toUserRow(
     // Only scalars are read. A property whose value is an object or array has no
     // one-line rendering, and `JSON.stringify` in a table cell is noise — the
     // detail screen is where a structured attribute belongs.
-    const value = field(user, column.key);
+    const value = displayValue(user, column.key);
     if (value !== undefined) values[column.key] = value;
   }
   return {
@@ -377,16 +377,6 @@ function userStatus(user: Record<string, unknown>): string | undefined {
   const metadata = user.metadata;
   if (!metadata || typeof metadata !== "object") return undefined;
   return field(metadata as Record<string, unknown>, "status");
-}
-
-/** Status pill. Unknown values render verbatim rather than being coerced. */
-function UserStatus({ status }: { status?: string }) {
-  if (!status) return <span className="text-muted-foreground">—</span>;
-  return (
-    <Badge variant={status === "active" ? "secondary" : "outline"} className="capitalize">
-      {status.replace(/_/g, " ")}
-    </Badge>
-  );
 }
 
 /**
