@@ -13,7 +13,8 @@
 > including its no-project setup hint and the publishable-key-bearing
 > widget handle — and every loader's project id). The flag-gated #605 slice
 > is also implemented: `platform.bootstrap_project` (default false) makes the
-> server ensure the pinned `platform.project_id` row exists at startup;
+> server ensure the built-in platform project (`proj_platform`) exists at
+> startup and resolve it as the default (no `platform.project_id` required);
 > standalone default semantics are unchanged. Platform mode, the portal
 > config keys, and effective-permission exposure (§4) remain future work.
 > **Scope:** `apps/console` (with recorded server dependencies). See
@@ -66,8 +67,8 @@ Facts that constrain the design:
    not a provisioned project: no keys, no schemas, no flows.) The one explicit
    opt-in exception is platform-mode provisioning (#605): setting
    `platform.bootstrap_project` (off by default) makes the server idempotently
-   ensure the pinned `platform.project_id` row exists at startup — deliberate
-   and configured, never silent. #527's platform-project provisioning question
+   ensure the built-in platform project (`proj_platform`, a server-owned id)
+   exists at startup — deliberate and configured, never silent. #527's platform-project provisioning question
    remains open **for platform mode**; standalone answers it with "don't
    provision — resolve".
 4. **Permissions are the authoritative gate.** The permission catalogs
