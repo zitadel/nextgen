@@ -428,7 +428,7 @@ type Invoker interface {
 	ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (ListUserPasskeysRes, error)
 	// ListUserTeams invokes listUserTeams operation.
 	//
-	// The user's team roster, newest membership first. Each entry carries the
+	// The user's team roster, ordered by team name. Each entry carries the
 	// team's name, so a client renders a page without resolving ids one by one.
 	// This is the N:N roster and it is not lifecycle ownership: the single team
 	// that owns the user's lifecycle is reported as `metadata.lifecycleOwnerTeamId`
@@ -7224,7 +7224,7 @@ func (c *Client) sendListUserPasskeys(ctx context.Context, params ListUserPasske
 
 // ListUserTeams invokes listUserTeams operation.
 //
-// The user's team roster, newest membership first. Each entry carries the
+// The user's team roster, ordered by team name. Each entry carries the
 // team's name, so a client renders a page without resolving ids one by one.
 // This is the N:N roster and it is not lifecycle ownership: the single team
 // that owns the user's lifecycle is reported as `metadata.lifecycleOwnerTeamId`

@@ -8,8 +8,8 @@ client can finally get from a user to the teams they belong to.
 
 Each entry is `{ id, name, membership_status, created_at, updated_at }`. The
 team's **name** travels with the entry, so a page of the roster renders without
-a follow-up `POST /teams/query` per row. Entries come back newest membership
-first and page with `limit` / `page_token` like the other list endpoints;
+a follow-up `POST /teams/query` per row. Entries come back ordered by team name
+and page with `limit` / `page_token` like the other list endpoints;
 memberships the user was removed from are not returned. An unknown user is a
 404, which is a different answer from a user with an empty roster.
 
