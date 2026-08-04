@@ -24,7 +24,7 @@ func ErrClaimSessionExpired() Error {
 }
 
 func ErrClaimSessionNotActive() Error {
-	return newError(PrefixClaim.ErrorCodePrefix("session_not_active"), "The session is not active: it has no verified factor.", nil, nil)
+	return newError(PrefixClaim.ErrorCodePrefix("session_not_active"), "The session is not active: it has no verified factor or no resolved user.", nil, nil)
 }
 
 // ClaimChallengeStatus is the lifecycle state of a claim challenge. It mirrors
