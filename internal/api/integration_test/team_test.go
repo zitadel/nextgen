@@ -608,8 +608,7 @@ func TestDeleteTeam(t *testing.T) {
 	t.Run("cascades to lifecycle-owned users", func(t *testing.T) {
 		t.Parallel()
 
-		harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
-		userSchemaURL := "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/examples/user-schema-example.yaml"
+		userSchemaURL := harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 
 		team := createTeam(t)
 		attr, err := domain.NewCreateAttribute("email", helpers.RandString(8)+"@example.com", domain.AttributeUniquenessUnspecified)
