@@ -162,7 +162,7 @@ func (c *CreateUser) AttributeTeamScope() string {
 }
 
 // NewCreateUser builds a [CreateUser] from a schema-validated user map.
-// id passes through when non-empty; otherwise a fresh one is minted.
+// Empty id is filled by the dialect on create; non-empty id is for ceremony only.
 func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
 	schemaURL, err := SchemaFromUserMap(muser)
 	if err != nil {
@@ -184,13 +184,6 @@ func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte,
 	err = json.Unmarshal(schemabs, &mschema)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal schema map")
-	}
-
-	if id == "" {
-		id, err = newID(PrefixUser)
-		if err != nil {
-			return nil, ErrInternal(err).WithMessage("failed to create user id")
-		}
 	}
 
 	attrs, err := FlattenMapToCreateAttributes(muser, mschema, "")

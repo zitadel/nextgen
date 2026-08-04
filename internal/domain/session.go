@@ -9,6 +9,7 @@ import (
 
 const (
 	PrefixSession       ResourcePrefix = "sess"
+	PrefixUserAgent     ResourcePrefix = "ua"
 	SessionAnonymousTTL                = 10 * time.Minute
 )
 

@@ -15,11 +15,11 @@ import (
 
 const (
 	createUserPasskeyStmt = `INSERT INTO user_passkeys (
-	project_id, user_id, credential_id, public_key, aaguid, attestation_type, transports, sign_count,
+	id, project_id, user_id, credential_id, public_key, aaguid, attestation_type, transports, sign_count,
 	backup_eligible, backup_state, name, verified_at
 ) VALUES (
 	@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8,
-	@p9, @p10, @p11, @p12
+	@p9, @p10, @p11, @p12, @p13
 )`
 	userPasskeyQuery = `SELECT id, project_id, user_id, credential_id, public_key, aaguid, attestation_type, transports,
 	sign_count, backup_eligible, backup_state, name, verified_at, last_used_at, created_at, updated_at
@@ -38,11 +38,15 @@ func newUserPasskeyStatements(db queryExecutor) userPasskeyStatements {
 
 // CreateUserPasskey implements [service.UserPasskeyStatements].
 func (ps userPasskeyStatements) CreateUserPasskey(ctx context.Context, p *domain.CreateUserPasskey) error {
+	if err := ensureManagedID(&p.ID, domain.PrefixUserPasskey); err != nil {
+		return err
+	}
 	transports := p.Transports
 	if transports == nil {
 		transports = []string{}
 	}
 	_, err := ps.db.Update(ctx, buildStatement(createUserPasskeyStmt,
+		p.ID,
 		p.ProjectID,
 		p.UserID,
 		p.CredentialID,

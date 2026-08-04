@@ -14,9 +14,9 @@ import (
 
 const (
 	createUserPasskeyStmt = `INSERT INTO user_passkeys (
-	project_id, user_id, credential_id, public_key, aaguid, attestation_type, transports, sign_count,
+	project_id, id, user_id, credential_id, public_key, aaguid, attestation_type, transports, sign_count,
 	backup_eligible, backup_state, name, verified_at, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	userPasskeyQuery = `SELECT id, project_id, user_id, credential_id, public_key, aaguid, attestation_type, transports,
 	sign_count, backup_eligible, backup_state, name, verified_at, last_used_at, created_at, updated_at
@@ -31,6 +31,10 @@ func newUserPasskeyStatements(client queryExecutor) userPasskeyStatements {
 
 // CreateUserPasskey implements [service.UserPasskeyStatements].
 func (ps userPasskeyStatements) CreateUserPasskey(ctx context.Context, p *domain.CreateUserPasskey) error {
+	id := ""
+	if err := ensureManagedID(&id, domain.PrefixUserPasskey); err != nil {
+		return err
+	}
 	transports := p.Transports
 	if transports == nil {
 		transports = []string{}
@@ -42,6 +46,7 @@ func (ps userPasskeyStatements) CreateUserPasskey(ctx context.Context, p *domain
 	now := nowUnixNano()
 	_, err = ps.client.Exec(ctx, createUserPasskeyStmt,
 		p.ProjectID,
+		id,
 		p.UserID,
 		p.CredentialID,
 		p.PublicKey,

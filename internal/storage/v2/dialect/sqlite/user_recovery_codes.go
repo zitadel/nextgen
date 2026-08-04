@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	createUserRecoveryCodesStmt = `INSERT INTO user_recovery_codes (project_id, user_id, recovery_codes, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?)`
+	createUserRecoveryCodesStmt = `INSERT INTO user_recovery_codes (project_id, id, user_id, recovery_codes, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?)`
 
 	userRecoveryCodesQuery = `SELECT id, project_id, user_id, recovery_codes,
 	last_successful_check, failed_attempts, created_at, updated_at
@@ -32,13 +32,17 @@ func (s userRecoveryCodesStatements) CreateUserRecoveryCodes(ctx context.Context
 	if err := domain.RequireNonEmptyRecoveryCodes(codes.RecoveryCodes); err != nil {
 		return err
 	}
+	id := ""
+	if err := ensureManagedID(&id, domain.PrefixUserRecoveryCodes); err != nil {
+		return err
+	}
 	codesJSON, err := encodeJSON(append([]string(nil), codes.RecoveryCodes...))
 	if err != nil {
 		return wrapError(err)
 	}
 	now := nowUnixNano()
 	_, err = s.client.Exec(ctx, createUserRecoveryCodesStmt,
-		codes.ProjectID, codes.UserID, codesJSON, now, now,
+		codes.ProjectID, id, codes.UserID, codesJSON, now, now,
 	)
 	return wrapError(err)
 }

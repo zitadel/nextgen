@@ -161,11 +161,10 @@ are produced for the identifier classes in [ADR 011](011-resource-identifiers.md
 
 | Class | Storage responsibility | Dialect may use |
 |---|---|---|
-| **Ephemeral** (sessions, auth attempts, checks, tokens, …) | Generate on insert; read back via `RETURNING` or equivalent | Database `IDENTITY` / `BIT_REVERSED_POSITIVE` (current ADR 011 DDL), or a dialect-specific DB function |
-| **Managed** (users, teams, apps, …) | Generate fallback when API omits `id`; validate client-provided ids | Go package (e.g. ULID via `idgen`), database function, or hybrid |
+| **All resource PKs** (users, sessions, auth attempts, tokens, credential rows, …) | Generate on create when ID is empty; HTTP create does not accept client PKs ([ADR 047](047-dialect-id-generation.md)) | Dialect `idgen` (Postgres/SQLite ULID; Spanner UUID v4); SQL supplies no DEFAULT/IDENTITY |
 
 The **dialect** owns the generation strategy per class — not
-`internal/domain/idgen` or service code. Domain keeps prefix rules and
+domain or service code. Domain keeps prefix rules and
 validation; storage executes generation and returns
 [`Identity`](../../internal/storage/v2/database/identity.go).
 
@@ -174,8 +173,9 @@ identity vs bit-reversed identity per ADR 011). Colocating generation with the
 dialect avoids leaking engine-specific choices into domain or repository layers.
 
 This ADR refines [ADR 011](011-resource-identifiers.md) § Package roles:
-`internal/domain/idgen` becomes a dialect implementation detail (or is inlined
-into v2 dialect packages), not a domain-layer concern at call sites.
+managed ID generation lives under `internal/storage/v2/dialect/idgen` (or is
+inlined into v2 dialect packages), not a domain-layer concern at call sites.
+Concrete mechanisms are recorded in [ADR 047](047-dialect-id-generation.md).
 
 ```mermaid
 flowchart LR
@@ -207,9 +207,8 @@ These previously lived under v1 and are now owned by v2 (C3–C6):
 - Retire v1 dialect tree — **done** (C6)
 - Retire leftover v1 query-builder / aliases package — **done** (C6)
 
-Still open:
-
-- ID generation (ephemeral + managed fallback) per dialect
+ID generation (ephemeral + managed) per dialect is complete — see
+[ADR 047](047-dialect-id-generation.md).
 
 **Specialized storage that may keep distinct patterns:** EAV user storage (ADR
 008) — ported to v2 statements but may retain EAV-specific SQL structure.
@@ -315,7 +314,7 @@ items off as work lands; remove completed entries when no longer useful.
 - [x] Move migrations from v1 to v2 dialect packages (postgres + spanner)
 - [x] Retire in-process embedded Postgres; local default is SQLite; Postgres/Spanner integration uses testcontainers (or env / real Spanner instance)
 - [x] Move `database.Identity` bind/scan to v2 core
-- [ ] Move ID generation into v2 dialects (ephemeral via DB identity/function; managed fallback via dialect-chosen Go package or DB function); retire domain-layer `idgen` call sites at storage boundary
+- [x] Move ID generation into v2 dialects (all resource PKs via dialect-chosen Go package; Postgres/SQLite ULID / Spanner UUID v4); retire domain-layer `idgen` and SQL IDENTITY — see [ADR 047](047-dialect-id-generation.md)
 - [x] Add `internal/storage/v2/AGENTS.md` with v2 conventions (including multi-write `withTransaction` rules)
 - [x] Port remaining entities and remove v1 entity repository package
 - [x] Drop QueryExecutor bridge from app callers and v2 transactions
@@ -345,10 +344,10 @@ items off as work lands; remove completed entries when no longer useful.
 ### Negative / Risks (during transition only)
 
 - Spanner still needs per-entity hand-written SQL alongside the shared compiler; acceptable trade-off for dialect clarity
-- ID generation still pending full move into v2 dialects (see checklist)
 
 ### Resolved at merge
 
 Pre-merge checklist items (compiler gaps, migrations, Identity, ID generation,
 v1 dialect removal) are blockers for completing the v2 dialect takeover, not
-permanent architectural debt.
+permanent architectural debt. ID generation ownership is recorded in
+[ADR 047](047-dialect-id-generation.md).

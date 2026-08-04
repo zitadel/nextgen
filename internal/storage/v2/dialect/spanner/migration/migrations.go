@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/pressly/goose/v3"
-	"github.com/zitadel/nextgen/internal/domain/idgen"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/idgen"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
