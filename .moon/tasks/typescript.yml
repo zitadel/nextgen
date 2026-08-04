@@ -1,0 +1,28 @@
+# Inherited task config for every `language: "typescript"` project. The
+# filename is a label; the scoping is the inheritedBy condition below.
+inheritedBy:
+  language: "typescript"
+
+# These are root-anchored workspace configs that project-local configs pull in
+# at run time. They live outside every project root, so without this file no
+# task input covers them and `moon ci` selects zero targets when one changes.
+# Listing them per project would drift as projects are added; implicitInputs
+# appends them to every task of every TypeScript project instead. Tasks that
+# declare no `inputs` keep their default project-scoped `**/*`.
+#
+# The trade-off is deliberate breadth: a change to any file below re-runs all
+# TypeScript tasks, including ones it cannot influence (for example lint after
+# a tsconfig edit). These files change rarely; under-selection here previously
+# let such changes land with zero CI coverage.
+implicitInputs:
+  # Moon's automatic config input only covers `.moon/*.yml`, not this
+  # directory — without this self-reference, edits to scoped task configs are
+  # themselves invisible to `moon ci` selection.
+  - "/.moon/tasks/**/*.yml"
+  # Extended by every {apps,packages}/*/tsconfig*.json.
+  - "/tsconfig.base.json"
+  # Extended by every project-local .oxlintrc.json (oxlint lint tasks).
+  - "/.oxlintrc.json"
+  # Resolved upward from each linted file by prettier; enforced in the sdk-*
+  # eslint lint tasks via eslint-plugin-prettier.
+  - "/.prettierrc.json"
