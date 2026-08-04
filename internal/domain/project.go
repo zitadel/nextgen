@@ -13,6 +13,12 @@ const (
 	PrefixProject ResourcePrefix = "proj"
 )
 
+// PlatformProjectID is the well-known id of the deployment's platform project.
+// The server owns it: bootstrap (platform.bootstrap_project) creates this row
+// and default-project resolution pins to it. Readable body per ADR 047 §3.3;
+// operators never author it.
+var PlatformProjectID = PrefixProject.IDPrefix("platform") // "proj_platform"
+
 func ErrProjectNameInvalid() Error {
 	return newError(PrefixProject.ErrorCodePrefix("name_invalid"), "The project name is invalid. Expected a non-empty string.", nil, nil)
 }
@@ -27,6 +33,14 @@ func ErrProjectNotFound() Error {
 
 func ErrProjectPermissionDenied() Error {
 	return newError(PrefixProject.ErrorCodePrefix("permission_denied"), "the project management API requires the project secret", nil, nil)
+}
+
+func ErrProjectAlreadyClaimed() Error {
+	return newError(PrefixProject.ErrorCodePrefix("already_claimed"), "the project is already claimed by a team", nil, nil)
+}
+
+func ErrProjectClaimExpired() Error {
+	return newError(PrefixProject.ErrorCodePrefix("claim_expired"), "the claim challenge has expired", nil, nil)
 }
 
 // Project is a minimal representation of the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#projects)

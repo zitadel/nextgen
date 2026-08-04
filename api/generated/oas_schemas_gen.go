@@ -19,6 +19,99 @@ func (*ActivateFlowDefinitionNoContent) activateFlowDefinitionRes() {}
 
 // Merged schema.
 // Ref: #
+type AlreadyClaimedResponse struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Merged property.
+	Details AlreadyClaimedResponseDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AlreadyClaimedResponse) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AlreadyClaimedResponse) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AlreadyClaimedResponse) GetDetails() AlreadyClaimedResponseDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AlreadyClaimedResponse) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AlreadyClaimedResponse) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AlreadyClaimedResponse) SetDetails(val AlreadyClaimedResponseDetails) {
+	s.Details = val
+}
+
+func (*AlreadyClaimedResponse) completeClaimRes() {}
+func (*AlreadyClaimedResponse) initClaimRes()     {}
+
+// Merged schema.
+type AlreadyClaimedResponseDetails struct {
+	TeamID TeamID `json:"team_id"`
+	// The dashboard URL for the team that owns the project.
+	DashboardURL    url.URL `json:"dashboard_url"`
+	AdditionalProps AlreadyClaimedResponseDetailsAdditional
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *AlreadyClaimedResponseDetails) GetTeamID() TeamID {
+	return s.TeamID
+}
+
+// GetDashboardURL returns the value of DashboardURL.
+func (s *AlreadyClaimedResponseDetails) GetDashboardURL() url.URL {
+	return s.DashboardURL
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *AlreadyClaimedResponseDetails) GetAdditionalProps() AlreadyClaimedResponseDetailsAdditional {
+	return s.AdditionalProps
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *AlreadyClaimedResponseDetails) SetTeamID(val TeamID) {
+	s.TeamID = val
+}
+
+// SetDashboardURL sets the value of DashboardURL.
+func (s *AlreadyClaimedResponseDetails) SetDashboardURL(val url.URL) {
+	s.DashboardURL = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *AlreadyClaimedResponseDetails) SetAdditionalProps(val AlreadyClaimedResponseDetailsAdditional) {
+	s.AdditionalProps = val
+}
+
+type AlreadyClaimedResponseDetailsAdditional map[string]jx.Raw
+
+func (s *AlreadyClaimedResponseDetailsAdditional) init() AlreadyClaimedResponseDetailsAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type AttAlreadyCompleted struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -726,6 +819,7 @@ func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
 	s.Details = val
 }
 
+func (*AuthUnauthorized) completeClaimRes()   {}
 func (*AuthUnauthorized) revokeMySessionRes() {}
 
 // Additional error-specific context.
@@ -1188,6 +1282,292 @@ func (s *ChallengeResponseState) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// A completed claim. Carries the owning team, when the claim landed, and the
+// dashboard where it can be managed, so a generated client can rely on those
+// fields being present whenever `status` is `completed`.
+// Ref: #
+type ClaimStatusCompleted struct {
+	// The claim has completed.
+	Status ClaimStatusCompletedStatus `json:"status"`
+	TeamID TeamID                     `json:"team_id"`
+	// The time when the project was claimed.
+	ClaimedAt time.Time `json:"claimed_at"`
+	// The dashboard URL for the owning team.
+	DashboardURL url.URL `json:"dashboard_url"`
+}
+
+// GetStatus returns the value of Status.
+func (s *ClaimStatusCompleted) GetStatus() ClaimStatusCompletedStatus {
+	return s.Status
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *ClaimStatusCompleted) GetTeamID() TeamID {
+	return s.TeamID
+}
+
+// GetClaimedAt returns the value of ClaimedAt.
+func (s *ClaimStatusCompleted) GetClaimedAt() time.Time {
+	return s.ClaimedAt
+}
+
+// GetDashboardURL returns the value of DashboardURL.
+func (s *ClaimStatusCompleted) GetDashboardURL() url.URL {
+	return s.DashboardURL
+}
+
+// SetStatus sets the value of Status.
+func (s *ClaimStatusCompleted) SetStatus(val ClaimStatusCompletedStatus) {
+	s.Status = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *ClaimStatusCompleted) SetTeamID(val TeamID) {
+	s.TeamID = val
+}
+
+// SetClaimedAt sets the value of ClaimedAt.
+func (s *ClaimStatusCompleted) SetClaimedAt(val time.Time) {
+	s.ClaimedAt = val
+}
+
+// SetDashboardURL sets the value of DashboardURL.
+func (s *ClaimStatusCompleted) SetDashboardURL(val url.URL) {
+	s.DashboardURL = val
+}
+
+// The claim has completed.
+type ClaimStatusCompletedStatus string
+
+const (
+	ClaimStatusCompletedStatusCompleted ClaimStatusCompletedStatus = "completed"
+)
+
+// AllValues returns all ClaimStatusCompletedStatus values.
+func (ClaimStatusCompletedStatus) AllValues() []ClaimStatusCompletedStatus {
+	return []ClaimStatusCompletedStatus{
+		ClaimStatusCompletedStatusCompleted,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClaimStatusCompletedStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case ClaimStatusCompletedStatusCompleted:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClaimStatusCompletedStatus) UnmarshalText(data []byte) error {
+	switch ClaimStatusCompletedStatus(data) {
+	case ClaimStatusCompletedStatusCompleted:
+		*s = ClaimStatusCompletedStatusCompleted
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// A claim challenge that is still awaiting the browser leg.
+// Ref: #
+type ClaimStatusPending struct {
+	// The claim has not completed yet.
+	Status ClaimStatusPendingStatus `json:"status"`
+}
+
+// GetStatus returns the value of Status.
+func (s *ClaimStatusPending) GetStatus() ClaimStatusPendingStatus {
+	return s.Status
+}
+
+// SetStatus sets the value of Status.
+func (s *ClaimStatusPending) SetStatus(val ClaimStatusPendingStatus) {
+	s.Status = val
+}
+
+// The claim has not completed yet.
+type ClaimStatusPendingStatus string
+
+const (
+	ClaimStatusPendingStatusPending ClaimStatusPendingStatus = "pending"
+)
+
+// AllValues returns all ClaimStatusPendingStatus values.
+func (ClaimStatusPendingStatus) AllValues() []ClaimStatusPendingStatus {
+	return []ClaimStatusPendingStatus{
+		ClaimStatusPendingStatusPending,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClaimStatusPendingStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case ClaimStatusPendingStatusPending:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClaimStatusPendingStatus) UnmarshalText(data []byte) error {
+	switch ClaimStatusPendingStatus(data) {
+	case ClaimStatusPendingStatusPending:
+		*s = ClaimStatusPendingStatusPending
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The state of a claim challenge. While pending it carries only `status`; once
+// completed it also carries the owning team, the claim timestamp, and the
+// dashboard URL. Modelled as discriminated variants so a `pending` response can
+// never carry stale completion fields and a `completed` response always carries
+// them.
+// Ref: #
+// ClaimStatusResponse represents sum type.
+type ClaimStatusResponse struct {
+	Type                 ClaimStatusResponseType // switch on this field
+	ClaimStatusPending   ClaimStatusPending
+	ClaimStatusCompleted ClaimStatusCompleted
+}
+
+// ClaimStatusResponseType is oneOf type of ClaimStatusResponse.
+type ClaimStatusResponseType string
+
+// Possible values for ClaimStatusResponseType.
+const (
+	ClaimStatusPendingClaimStatusResponse   ClaimStatusResponseType = "pending"
+	ClaimStatusCompletedClaimStatusResponse ClaimStatusResponseType = "completed"
+)
+
+// IsClaimStatusPending reports whether ClaimStatusResponse is ClaimStatusPending.
+func (s ClaimStatusResponse) IsClaimStatusPending() bool {
+	return s.Type == ClaimStatusPendingClaimStatusResponse
+}
+
+// IsClaimStatusCompleted reports whether ClaimStatusResponse is ClaimStatusCompleted.
+func (s ClaimStatusResponse) IsClaimStatusCompleted() bool {
+	return s.Type == ClaimStatusCompletedClaimStatusResponse
+}
+
+// SetClaimStatusPending sets ClaimStatusResponse to ClaimStatusPending.
+func (s *ClaimStatusResponse) SetClaimStatusPending(v ClaimStatusPending) {
+	s.Type = ClaimStatusPendingClaimStatusResponse
+	s.ClaimStatusPending = v
+}
+
+// GetClaimStatusPending returns ClaimStatusPending and true boolean if ClaimStatusResponse is ClaimStatusPending.
+func (s ClaimStatusResponse) GetClaimStatusPending() (v ClaimStatusPending, ok bool) {
+	if !s.IsClaimStatusPending() {
+		return v, false
+	}
+	return s.ClaimStatusPending, true
+}
+
+// NewClaimStatusPendingClaimStatusResponse returns new ClaimStatusResponse from ClaimStatusPending.
+func NewClaimStatusPendingClaimStatusResponse(v ClaimStatusPending) ClaimStatusResponse {
+	var s ClaimStatusResponse
+	s.SetClaimStatusPending(v)
+	return s
+}
+
+// SetClaimStatusCompleted sets ClaimStatusResponse to ClaimStatusCompleted.
+func (s *ClaimStatusResponse) SetClaimStatusCompleted(v ClaimStatusCompleted) {
+	s.Type = ClaimStatusCompletedClaimStatusResponse
+	s.ClaimStatusCompleted = v
+}
+
+// GetClaimStatusCompleted returns ClaimStatusCompleted and true boolean if ClaimStatusResponse is ClaimStatusCompleted.
+func (s ClaimStatusResponse) GetClaimStatusCompleted() (v ClaimStatusCompleted, ok bool) {
+	if !s.IsClaimStatusCompleted() {
+		return v, false
+	}
+	return s.ClaimStatusCompleted, true
+}
+
+// NewClaimStatusCompletedClaimStatusResponse returns new ClaimStatusResponse from ClaimStatusCompleted.
+func NewClaimStatusCompletedClaimStatusResponse(v ClaimStatusCompleted) ClaimStatusResponse {
+	var s ClaimStatusResponse
+	s.SetClaimStatusCompleted(v)
+	return s
+}
+
+func (*ClaimStatusResponse) getClaimStatusRes() {}
+
+type CompleteClaimBadRequest ErrorDetails
+
+func (*CompleteClaimBadRequest) completeClaimRes() {}
+
+type CompleteClaimNotFound ErrorDetails
+
+func (*CompleteClaimNotFound) completeClaimRes() {}
+
+// The request to complete a project claim.
+// Ref: #
+type CompleteClaimRequest struct {
+	ChallengeID ChallengeID `json:"challenge_id"`
+}
+
+// GetChallengeID returns the value of ChallengeID.
+func (s *CompleteClaimRequest) GetChallengeID() ChallengeID {
+	return s.ChallengeID
+}
+
+// SetChallengeID sets the value of ChallengeID.
+func (s *CompleteClaimRequest) SetChallengeID(val ChallengeID) {
+	s.ChallengeID = val
+}
+
+// The result of a completed project claim.
+// Ref: #
+type CompleteClaimResponse struct {
+	ProjectID ProjectID `json:"project_id"`
+	TeamID    TeamID    `json:"team_id"`
+	// The time when the project was claimed.
+	ClaimedAt time.Time `json:"claimed_at"`
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *CompleteClaimResponse) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *CompleteClaimResponse) GetTeamID() TeamID {
+	return s.TeamID
+}
+
+// GetClaimedAt returns the value of ClaimedAt.
+func (s *CompleteClaimResponse) GetClaimedAt() time.Time {
+	return s.ClaimedAt
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *CompleteClaimResponse) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *CompleteClaimResponse) SetTeamID(val TeamID) {
+	s.TeamID = val
+}
+
+// SetClaimedAt sets the value of ClaimedAt.
+func (s *CompleteClaimResponse) SetClaimedAt(val time.Time) {
+	s.ClaimedAt = val
+}
+
+func (*CompleteClaimResponse) completeClaimRes() {}
+
+type CompleteClaimTooManyRequests ErrorDetails
+
+func (*CompleteClaimTooManyRequests) completeClaimRes() {}
 
 // A successfully verified authentication factor with verification metadata.
 // Method-specific details are included in the `payload` field.
@@ -2272,6 +2652,23 @@ type DeleteFlowDefinitionNoContent struct{}
 
 func (*DeleteFlowDefinitionNoContent) deleteFlowDefinitionRes() {}
 
+type DeleteTeamBadRequest ErrorDetails
+
+func (*DeleteTeamBadRequest) deleteTeamRes() {}
+
+type DeleteTeamForbidden ErrorDetails
+
+func (*DeleteTeamForbidden) deleteTeamRes() {}
+
+// DeleteTeamNoContent is response for DeleteTeam operation.
+type DeleteTeamNoContent struct{}
+
+func (*DeleteTeamNoContent) deleteTeamRes() {}
+
+type DeleteTeamUnauthorized ErrorDetails
+
+func (*DeleteTeamUnauthorized) deleteTeamRes() {}
+
 // DeleteUserByIDNoContent is response for DeleteUserByID operation.
 type DeleteUserByIDNoContent struct{}
 
@@ -2423,6 +2820,7 @@ func (*ErrorDetails) deleteFlowDefinitionRes()   {}
 func (*ErrorDetails) endSessionRes()             {}
 func (*ErrorDetails) getBrandingByIdRes()        {}
 func (*ErrorDetails) getMyUserRes()              {}
+func (*ErrorDetails) initClaimRes()              {}
 func (*ErrorDetails) introspectRes()             {}
 func (*ErrorDetails) listFlowDefinitionsRes()    {}
 func (*ErrorDetails) submitFlowStepRes()         {}
@@ -2468,6 +2866,7 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 func (*ErrorDetailsStatusCode) activateFlowDefinitionRes()   {}
 func (*ErrorDetailsStatusCode) authorizeDeviceRes()          {}
 func (*ErrorDetailsStatusCode) authorizeGetRes()             {}
+func (*ErrorDetailsStatusCode) completeClaimRes()            {}
 func (*ErrorDetailsStatusCode) createBrandingRes()           {}
 func (*ErrorDetailsStatusCode) createFlowDefinitionRes()     {}
 func (*ErrorDetailsStatusCode) createFlowRes()               {}
@@ -2478,10 +2877,12 @@ func (*ErrorDetailsStatusCode) createTeamRes()               {}
 func (*ErrorDetailsStatusCode) createUserRes()               {}
 func (*ErrorDetailsStatusCode) deactivateFlowDefinitionRes() {}
 func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) deleteTeamRes()               {}
 func (*ErrorDetailsStatusCode) deleteUserByIDRes()           {}
 func (*ErrorDetailsStatusCode) endSessionRes()               {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()          {}
 func (*ErrorDetailsStatusCode) getBrandingByIdRes()          {}
+func (*ErrorDetailsStatusCode) getClaimStatusRes()           {}
 func (*ErrorDetailsStatusCode) getFlowDefinitionRes()        {}
 func (*ErrorDetailsStatusCode) getFlowStepRes()              {}
 func (*ErrorDetailsStatusCode) getHealthRes()                {}
@@ -2496,6 +2897,7 @@ func (*ErrorDetailsStatusCode) getTeamRes()                  {}
 func (*ErrorDetailsStatusCode) getTokenRes()                 {}
 func (*ErrorDetailsStatusCode) getUserByIDRes()              {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()              {}
+func (*ErrorDetailsStatusCode) initClaimRes()                {}
 func (*ErrorDetailsStatusCode) introspectRes()               {}
 func (*ErrorDetailsStatusCode) listBrandingRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
@@ -4828,6 +5230,18 @@ func (s *GetAuthAttemptErrorResponseStatusCode) SetResponse(val GetAuthAttemptEr
 
 func (*GetAuthAttemptErrorResponseStatusCode) getAuthAttemptRes() {}
 
+type GetClaimStatusNotFound ErrorDetails
+
+func (*GetClaimStatusNotFound) getClaimStatusRes() {}
+
+type GetClaimStatusTooManyRequests ErrorDetails
+
+func (*GetClaimStatusTooManyRequests) getClaimStatusRes() {}
+
+type GetClaimStatusUnauthorized ErrorDetails
+
+func (*GetClaimStatusUnauthorized) getClaimStatusRes() {}
+
 type GetFlowStepGone ErrorDetails
 
 func (*GetFlowStepGone) getFlowStepRes() {}
@@ -5324,6 +5738,49 @@ func (s *IdentifierProof) GetLoginName() string {
 func (s *IdentifierProof) SetLoginName(val string) {
 	s.LoginName = val
 }
+
+// The claim challenge minted for a project.
+// Ref: #
+type InitClaimResponse struct {
+	// The browser URL a developer opens to complete the claim. It embeds the
+	// `challenge_id` so the browser leg does not need the project secret.
+	ClaimURL    url.URL     `json:"claim_url"`
+	ChallengeID ChallengeID `json:"challenge_id"`
+	// The time when the claim challenge expires.
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// GetClaimURL returns the value of ClaimURL.
+func (s *InitClaimResponse) GetClaimURL() url.URL {
+	return s.ClaimURL
+}
+
+// GetChallengeID returns the value of ChallengeID.
+func (s *InitClaimResponse) GetChallengeID() ChallengeID {
+	return s.ChallengeID
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *InitClaimResponse) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// SetClaimURL sets the value of ClaimURL.
+func (s *InitClaimResponse) SetClaimURL(val url.URL) {
+	s.ClaimURL = val
+}
+
+// SetChallengeID sets the value of ChallengeID.
+func (s *InitClaimResponse) SetChallengeID(val ChallengeID) {
+	s.ChallengeID = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *InitClaimResponse) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+func (*InitClaimResponse) initClaimRes() {}
 
 // Merged schema.
 // Ref: #
@@ -9952,6 +10409,144 @@ func (o OptPostTokenRequestGrantType) Or(d PostTokenRequestGrantType) PostTokenR
 	return d
 }
 
+// NewOptProjClaimExpiredDetails returns new OptProjClaimExpiredDetails with value set to v.
+func NewOptProjClaimExpiredDetails(v ProjClaimExpiredDetails) OptProjClaimExpiredDetails {
+	return OptProjClaimExpiredDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjClaimExpiredDetails is optional ProjClaimExpiredDetails.
+type OptProjClaimExpiredDetails struct {
+	Value ProjClaimExpiredDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjClaimExpiredDetails was set.
+func (o OptProjClaimExpiredDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjClaimExpiredDetails) Reset() {
+	var v ProjClaimExpiredDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjClaimExpiredDetails) SetTo(v ProjClaimExpiredDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjClaimExpiredDetails) Get() (v ProjClaimExpiredDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjClaimExpiredDetails) Or(d ProjClaimExpiredDetails) ProjClaimExpiredDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptProjNotFoundDetails returns new OptProjNotFoundDetails with value set to v.
+func NewOptProjNotFoundDetails(v ProjNotFoundDetails) OptProjNotFoundDetails {
+	return OptProjNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjNotFoundDetails is optional ProjNotFoundDetails.
+type OptProjNotFoundDetails struct {
+	Value ProjNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjNotFoundDetails was set.
+func (o OptProjNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjNotFoundDetails) Reset() {
+	var v ProjNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjNotFoundDetails) SetTo(v ProjNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjNotFoundDetails) Get() (v ProjNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjNotFoundDetails) Or(d ProjNotFoundDetails) ProjNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptProjPermissionDeniedDetails returns new OptProjPermissionDeniedDetails with value set to v.
+func NewOptProjPermissionDeniedDetails(v ProjPermissionDeniedDetails) OptProjPermissionDeniedDetails {
+	return OptProjPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjPermissionDeniedDetails is optional ProjPermissionDeniedDetails.
+type OptProjPermissionDeniedDetails struct {
+	Value ProjPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjPermissionDeniedDetails was set.
+func (o OptProjPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjPermissionDeniedDetails) Reset() {
+	var v ProjPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjPermissionDeniedDetails) SetTo(v ProjPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjPermissionDeniedDetails) Get() (v ProjPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjPermissionDeniedDetails) Or(d ProjPermissionDeniedDetails) ProjPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptQueryProjectsRequestSorting returns new OptQueryProjectsRequestSorting with value set to v.
 func NewOptQueryProjectsRequestSorting(v QueryProjectsRequestSorting) OptQueryProjectsRequestSorting {
 	return OptQueryProjectsRequestSorting{
@@ -11097,6 +11692,172 @@ func (s *PostTokenRequestGrantType) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// Merged schema.
+// Ref: #
+type ProjClaimExpired struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjClaimExpiredDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjClaimExpired) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjClaimExpired) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjClaimExpired) GetDetails() OptProjClaimExpiredDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjClaimExpired) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjClaimExpired) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjClaimExpired) SetDetails(val OptProjClaimExpiredDetails) {
+	s.Details = val
+}
+
+func (*ProjClaimExpired) completeClaimRes()  {}
+func (*ProjClaimExpired) getClaimStatusRes() {}
+
+// Additional error-specific context.
+type ProjClaimExpiredDetails map[string]jx.Raw
+
+func (s *ProjClaimExpiredDetails) init() ProjClaimExpiredDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjNotFound) GetDetails() OptProjNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjNotFound) SetDetails(val OptProjNotFoundDetails) {
+	s.Details = val
+}
+
+func (*ProjNotFound) initClaimRes() {}
+
+// Additional error-specific context.
+type ProjNotFoundDetails map[string]jx.Raw
+
+func (s *ProjNotFoundDetails) init() ProjNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjPermissionDenied) GetDetails() OptProjPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjPermissionDenied) SetDetails(val OptProjPermissionDeniedDetails) {
+	s.Details = val
+}
+
+func (*ProjPermissionDenied) getClaimStatusRes() {}
+
+// Additional error-specific context.
+type ProjPermissionDeniedDetails map[string]jx.Raw
+
+func (s *ProjPermissionDeniedDetails) init() ProjPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 type ProjectID string
