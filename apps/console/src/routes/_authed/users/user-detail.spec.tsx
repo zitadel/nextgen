@@ -86,14 +86,15 @@ describe("user detail", () => {
     expect(screen.getByLabelText("Email")).toHaveValue("maya@acme.com");
   });
 
-  it("renders the profile read-only and says why", async () => {
+  it("renders the profile read-only", async () => {
     // There is no update endpoint (#693). An editable field with no Save would
-    // promise an edit the console cannot make.
+    // promise an edit the console cannot make, so the fields are inert and the
+    // design's Save is absent rather than disabled.
     stub();
     await renderDetail();
 
     expect(await screen.findByLabelText("Company name")).toHaveAttribute("readonly");
-    expect(screen.getByText(/read-only/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toHaveAttribute("readonly");
     expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
   });
 
@@ -167,7 +168,11 @@ describe("user detail", () => {
         deleted = true;
         return new HttpResponse(null, { status: 204 });
       }),
-      http.get(USERS_URL, () => HttpResponse.json([])),
+      // The shape `list-users-response.yaml` requires — `users` is a required
+      // property, not an optional one. A bare array sent the list loader into
+      // the error boundary on the redirect below, which the assertions could
+      // not see because the boundary swallowed it.
+      http.get(USERS_URL, () => HttpResponse.json({ users: [] })),
     );
     const router = await renderDetail();
 
