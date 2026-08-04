@@ -242,6 +242,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			brandingService,
 			tokenService,
 			keyService,
+			cfg.Platform.ProjectID,
 		),
 		api.NewSecurityHandler(tokenService),
 		oasapi.WithMiddleware(

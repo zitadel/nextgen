@@ -57,6 +57,7 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 			h.EnsureBrandingService(t),
 			h.EnsureTokenService(t),
 			h.EnsureKeyService(t),
+			"",
 		)
 	}
 	return h.handler.value
