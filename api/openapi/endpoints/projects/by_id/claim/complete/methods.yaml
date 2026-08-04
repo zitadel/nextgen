@@ -47,12 +47,28 @@ post:
         application/json:
           schema:
             $ref: ../../../../../components/error-details.yaml
+    '409':
+      description: |
+        The project is already claimed by a team, so this challenge cannot be
+        spent again (claims are single-use and first-claim-wins).
+      content:
+        application/json:
+          schema:
+            $ref: ../init/already-claimed-response.yaml
     '410':
       description: The claim challenge has expired.
       content:
         application/json:
           schema:
             $ref: ../../../../../components/schemas/errors/proj-claim_expired.yaml
+    '429':
+      description: |
+        Too many requests. Completion is rate-limited so a guessed
+        `challenge_id` cannot be brute-forced (ADR 046).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
     default:
       description: Unexpected error response.
       content:

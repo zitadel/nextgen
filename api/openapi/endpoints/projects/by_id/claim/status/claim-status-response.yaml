@@ -1,23 +1,14 @@
-type: object
-description: The state of a claim challenge.
-required:
-  - status
-properties:
-  status:
-    type: string
-    enum:
-      - pending
-      - completed
-    description: Whether the claim has completed.
-  team_id:
-    # Present only once `status` is `completed`. Absent (not null) while
-    # pending, avoiding the ogen `type: [X, 'null']` bug (see readme.md).
-    $ref: ../../../../../components/schemas/team-id.yaml
-  claimed_at:
-    type: string
-    format: date-time
-    description: The time when the project was claimed. Present once completed.
-  dashboard_url:
-    type: string
-    format: uri
-    description: The dashboard URL for the owning team. Present once completed.
+description: |
+  The state of a claim challenge. While pending it carries only `status`; once
+  completed it also carries the owning team, the claim timestamp, and the
+  dashboard URL. Modelled as discriminated variants so a `pending` response can
+  never carry stale completion fields and a `completed` response always carries
+  them.
+oneOf:
+  - $ref: ./claim-status-pending.yaml
+  - $ref: ./claim-status-completed.yaml
+discriminator:
+  propertyName: status
+  mapping:
+    pending: ./claim-status-pending.yaml
+    completed: ./claim-status-completed.yaml

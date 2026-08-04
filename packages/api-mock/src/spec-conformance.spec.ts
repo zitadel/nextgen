@@ -46,7 +46,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { signHandoffToken } from "./crypto.js";
 import { expireClaimChallenge } from "./platform-handlers.js";
-import { startMockServer } from "./server.js";
+import { PLATFORM_PROJECT_ID, startMockServer } from "./server.js";
 
 const PORT = 4456;
 const BASE = `http://localhost:${PORT}`;
@@ -416,6 +416,9 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     );
   }
 
+  // A session belonging to `project`, active with a verified factor. The claim
+  // page runs in the platform project, so an eligible claim session uses
+  // PLATFORM_PROJECT_ID; passing a customer project yields an ineligible one.
   async function sessionCookie(project: string): Promise<string> {
     const handoff = await signHandoffToken({ sub: project, iss: BASE });
     const exchange = await fetch(`${BASE}/sessions/exchange?project_id=${project}`, {
@@ -428,6 +431,8 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
       .find((c) => c.startsWith("__nextgen_session="));
     return setCookie?.split(";")[0] ?? "";
   }
+
+  const platformSessionCookie = () => sessionCookie(PLATFORM_PROJECT_ID);
 
   test("POST /projects/:id/claim/init returns 201 with a claim challenge", async () => {
     const project = await createProject("claim-init");
@@ -474,7 +479,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const init = await initClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
 
-    const cookie = await sessionCookie(project.id);
+    const cookie = await platformSessionCookie();
     const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
@@ -503,7 +508,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const project = await createProject("claim-already-claimed");
     const init = await initClaim(project.id, project.projectSecret);
     const { challenge_id } = (await init.json()) as { challenge_id: string };
-    const cookie = await sessionCookie(project.id);
+    const cookie = await platformSessionCookie();
     await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
@@ -529,7 +534,7 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     const statusBody = (await status.json()) as Record<string, unknown>;
     expect(statusBody.code).toBe("proj.claim_expired");
 
-    const cookie = await sessionCookie(project.id);
+    const cookie = await platformSessionCookie();
     const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
@@ -557,23 +562,124 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 
   test("POST /projects/:id/claim/complete with an unknown challenge returns 404", async () => {
     const project = await createProject("claim-complete-unknown");
-    const cookie = await sessionCookie(project.id);
+    const cookie = await platformSessionCookie();
     const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({ challenge_id: "does-not-exist" }),
+      body: JSON.stringify({ challenge_id: "ch_doesnotexist" }),
     });
     expect(res.status).toBe(404);
   });
 
   test("POST /projects/:id/claim/complete without challenge_id returns 400", async () => {
     const project = await createProject("claim-complete-missing-id");
-    const cookie = await sessionCookie(project.id);
+    const cookie = await platformSessionCookie();
     const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(400);
+  });
+
+  test("POST /projects/:id/claim/init with another project's secret returns 404", async () => {
+    const project = await createProject("claim-init-owner");
+    const other = await createProject("claim-init-foreign");
+    const res = await initClaim(project.id, other.projectSecret);
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.code).toBe("proj.not_found");
+  });
+
+  test("GET /projects/:id/claim/status without a bearer token returns 401", async () => {
+    const project = await createProject("claim-status-no-bearer");
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+
+    const res = await fetch(
+      `${BASE}/projects/${project.id}/claim/status?challenge_id=${encodeURIComponent(challenge_id)}`,
+    );
+    expect(res.status).toBe(401);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.code).toBe("auth.unauthorized");
+  });
+
+  test("POST /projects/:id/claim/complete with a customer-project session returns 401", async () => {
+    const project = await createProject("claim-complete-ineligible");
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+
+    // A session for the customer project, not the platform project, must not
+    // be able to claim (ADR 046 §2).
+    const cookie = await sessionCookie(project.id);
+    const res = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id }),
+    });
+    expect(res.status).toBe(401);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.code).toBe("auth.unauthorized");
+  });
+
+  test("POST /projects/:id/claim/complete on a mismatched project returns 404", async () => {
+    const project = await createProject("claim-complete-path-a");
+    const other = await createProject("claim-complete-path-b");
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+
+    const cookie = await platformSessionCookie();
+    const res = await fetch(`${BASE}/projects/${other.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  test("a claim challenge is single-use: a second completion returns 409", async () => {
+    const project = await createProject("claim-single-use");
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+    const cookie = await platformSessionCookie();
+    const url = `${BASE}/projects/${project.id}/claim/complete`;
+    const body = JSON.stringify({ challenge_id });
+
+    const first = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body,
+    });
+    expect(first.status).toBe(200);
+
+    const second = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body,
+    });
+    expect(second.status).toBe(409);
+    const secondBody = (await second.json()) as { code: string; details: Record<string, unknown> };
+    expect(secondBody.code).toBe("proj.already_claimed");
+    expect(typeof secondBody.details.team_id).toBe("string");
+    expect(() => new URL(secondBody.details.dashboard_url as string)).not.toThrow();
+  });
+
+  test("a completed challenge still returns 410 from status once expired", async () => {
+    const project = await createProject("claim-completed-expired");
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+    const cookie = await platformSessionCookie();
+    const complete = await fetch(`${BASE}/projects/${project.id}/claim/complete`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ challenge_id }),
+    });
+    expect(complete.status).toBe(200);
+
+    expireClaimChallenge(challenge_id);
+    const status = await claimStatus(project.id, challenge_id, project.projectSecret);
+    expect(status.status).toBe(410);
+    const statusBody = (await status.json()) as Record<string, unknown>;
+    expect(statusBody.code).toBe("proj.claim_expired");
   });
 });

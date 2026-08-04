@@ -47,6 +47,11 @@ import { completeClaimChallenge, errorBody, setupPlatformHandlers } from "./plat
 
 const SESSION_TTL_SECONDS = 3600;
 
+// The claiming human's account lives in Zitadel's own platform project (ADR
+// 046 §2), so only a session belonging to it may complete a claim. Exported so
+// conformance and downstream tests can mint an eligible session.
+export const PLATFORM_PROJECT_ID = "platform";
+
 /**
  * Tracks handoff tokens (by `jti`) we've already consumed so a replay
  * surfaces as 410 Gone. Per the spec a handoff is single-use — a real
@@ -231,12 +236,17 @@ export function createMockApp(options: { issuer: string }): express.Express {
       // Store the session data for GET /sessions/me lookups.
       // The `email` field is kept alongside the spec-typed fields for
       // client display purposes (same as the Go server's response).
+      // A handoff is issued only after a login completes, so the exchanged
+      // session carries a verified factor. The contract now defines `active`
+      // as "has at least one verified authentication factor", so an empty
+      // factor list would contradict the state we report.
+      const verifiedFactors = [{ method: "password" as const, verified_at: createdAt.toISOString() }];
       const sessionData: StoredSession = {
         session_id: sessionId,
         project_id: projectId,
         state: "active",
         user_id: userId,
-        factors: [],
+        factors: verifiedFactors,
         assurance_levels: [],
         created_at: createdAt.toISOString(),
         expires_at: expiresAt.toISOString(),
@@ -255,7 +265,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
           project_id: projectId,
           state: "active",
           user_id: userId,
-          factors: [],
+          factors: verifiedFactors,
           assurance_levels: [],
           created_at: createdAt.toISOString(),
           expires_at: expiresAt.toISOString(),
@@ -335,6 +345,19 @@ export function createMockApp(options: { issuer: string }): express.Express {
         res.status(401).json(errorBody("auth.unauthorized", "missing or invalid session token"));
         return;
       }
+      // ADR 046 §2: only a platform-project session that is active and carries a
+      // verified factor may claim. A customer-project session, an inactive one,
+      // or an anonymous pre-login session must never complete a claim.
+      const eligible =
+        session.project_id === PLATFORM_PROJECT_ID &&
+        session.state === "active" &&
+        (session.factors?.length ?? 0) > 0;
+      if (!eligible) {
+        res
+          .status(401)
+          .json(errorBody("auth.unauthorized", "session is not eligible to claim a project"));
+        return;
+      }
       const parsed = CompleteClaimBody.safeParse(req.body);
       if (!parsed.success) {
         res
@@ -346,7 +369,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
           );
         return;
       }
-      const result = completeClaimChallenge(parsed.data.challenge_id);
+      const result = completeClaimChallenge(parsed.data.challenge_id, req.params.project_id ?? "");
       res.status(result.status).json(result.body);
     },
   );

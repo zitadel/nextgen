@@ -587,7 +587,7 @@ func (s ChallengeResponseState) Validate() error {
 	}
 }
 
-func (s *ClaimStatusResponse) Validate() error {
+func (s *ClaimStatusCompleted) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
 	}
@@ -605,15 +605,8 @@ func (s *ClaimStatusResponse) Validate() error {
 		})
 	}
 	if err := func() error {
-		if value, ok := s.TeamID.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
+		if err := s.TeamID.Validate(); err != nil {
+			return err
 		}
 		return nil
 	}(); err != nil {
@@ -628,14 +621,61 @@ func (s *ClaimStatusResponse) Validate() error {
 	return nil
 }
 
-func (s ClaimStatusResponseStatus) Validate() error {
+func (s ClaimStatusCompletedStatus) Validate() error {
 	switch s {
-	case "pending":
-		return nil
 	case "completed":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s *ClaimStatusPending) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Status.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "status",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s ClaimStatusPendingStatus) Validate() error {
+	switch s {
+	case "pending":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s ClaimStatusResponse) Validate() error {
+	switch s.Type {
+	case ClaimStatusPendingClaimStatusResponse:
+		if err := s.ClaimStatusPending.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ClaimStatusCompletedClaimStatusResponse:
+		if err := s.ClaimStatusCompleted.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
 	}
 }
 

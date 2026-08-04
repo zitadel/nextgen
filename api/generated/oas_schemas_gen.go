@@ -58,7 +58,8 @@ func (s *AlreadyClaimedResponse) SetDetails(val AlreadyClaimedResponseDetails) {
 	s.Details = val
 }
 
-func (*AlreadyClaimedResponse) initClaimRes() {}
+func (*AlreadyClaimedResponse) completeClaimRes() {}
+func (*AlreadyClaimedResponse) initClaimRes()     {}
 
 // Merged schema.
 type AlreadyClaimedResponseDetails struct {
@@ -1282,82 +1283,78 @@ func (s *ChallengeResponseState) UnmarshalText(data []byte) error {
 	}
 }
 
-// The state of a claim challenge.
+// A completed claim. Carries the owning team, when the claim landed, and the
+// dashboard where it can be managed, so a generated client can rely on those
+// fields being present whenever `status` is `completed`.
 // Ref: #
-type ClaimStatusResponse struct {
-	// Whether the claim has completed.
-	Status ClaimStatusResponseStatus `json:"status"`
-	TeamID OptTeamID                 `json:"team_id"`
-	// The time when the project was claimed. Present once completed.
-	ClaimedAt OptDateTime `json:"claimed_at"`
-	// The dashboard URL for the owning team. Present once completed.
-	DashboardURL OptURI `json:"dashboard_url"`
+type ClaimStatusCompleted struct {
+	// The claim has completed.
+	Status ClaimStatusCompletedStatus `json:"status"`
+	TeamID TeamID                     `json:"team_id"`
+	// The time when the project was claimed.
+	ClaimedAt time.Time `json:"claimed_at"`
+	// The dashboard URL for the owning team.
+	DashboardURL url.URL `json:"dashboard_url"`
 }
 
 // GetStatus returns the value of Status.
-func (s *ClaimStatusResponse) GetStatus() ClaimStatusResponseStatus {
+func (s *ClaimStatusCompleted) GetStatus() ClaimStatusCompletedStatus {
 	return s.Status
 }
 
 // GetTeamID returns the value of TeamID.
-func (s *ClaimStatusResponse) GetTeamID() OptTeamID {
+func (s *ClaimStatusCompleted) GetTeamID() TeamID {
 	return s.TeamID
 }
 
 // GetClaimedAt returns the value of ClaimedAt.
-func (s *ClaimStatusResponse) GetClaimedAt() OptDateTime {
+func (s *ClaimStatusCompleted) GetClaimedAt() time.Time {
 	return s.ClaimedAt
 }
 
 // GetDashboardURL returns the value of DashboardURL.
-func (s *ClaimStatusResponse) GetDashboardURL() OptURI {
+func (s *ClaimStatusCompleted) GetDashboardURL() url.URL {
 	return s.DashboardURL
 }
 
 // SetStatus sets the value of Status.
-func (s *ClaimStatusResponse) SetStatus(val ClaimStatusResponseStatus) {
+func (s *ClaimStatusCompleted) SetStatus(val ClaimStatusCompletedStatus) {
 	s.Status = val
 }
 
 // SetTeamID sets the value of TeamID.
-func (s *ClaimStatusResponse) SetTeamID(val OptTeamID) {
+func (s *ClaimStatusCompleted) SetTeamID(val TeamID) {
 	s.TeamID = val
 }
 
 // SetClaimedAt sets the value of ClaimedAt.
-func (s *ClaimStatusResponse) SetClaimedAt(val OptDateTime) {
+func (s *ClaimStatusCompleted) SetClaimedAt(val time.Time) {
 	s.ClaimedAt = val
 }
 
 // SetDashboardURL sets the value of DashboardURL.
-func (s *ClaimStatusResponse) SetDashboardURL(val OptURI) {
+func (s *ClaimStatusCompleted) SetDashboardURL(val url.URL) {
 	s.DashboardURL = val
 }
 
-func (*ClaimStatusResponse) getClaimStatusRes() {}
-
-// Whether the claim has completed.
-type ClaimStatusResponseStatus string
+// The claim has completed.
+type ClaimStatusCompletedStatus string
 
 const (
-	ClaimStatusResponseStatusPending   ClaimStatusResponseStatus = "pending"
-	ClaimStatusResponseStatusCompleted ClaimStatusResponseStatus = "completed"
+	ClaimStatusCompletedStatusCompleted ClaimStatusCompletedStatus = "completed"
 )
 
-// AllValues returns all ClaimStatusResponseStatus values.
-func (ClaimStatusResponseStatus) AllValues() []ClaimStatusResponseStatus {
-	return []ClaimStatusResponseStatus{
-		ClaimStatusResponseStatusPending,
-		ClaimStatusResponseStatusCompleted,
+// AllValues returns all ClaimStatusCompletedStatus values.
+func (ClaimStatusCompletedStatus) AllValues() []ClaimStatusCompletedStatus {
+	return []ClaimStatusCompletedStatus{
+		ClaimStatusCompletedStatusCompleted,
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
-func (s ClaimStatusResponseStatus) MarshalText() ([]byte, error) {
+func (s ClaimStatusCompletedStatus) MarshalText() ([]byte, error) {
 	switch s {
-	case ClaimStatusResponseStatusPending:
-		return []byte(s), nil
-	case ClaimStatusResponseStatusCompleted:
+	case ClaimStatusCompletedStatusCompleted:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -1365,18 +1362,143 @@ func (s ClaimStatusResponseStatus) MarshalText() ([]byte, error) {
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-func (s *ClaimStatusResponseStatus) UnmarshalText(data []byte) error {
-	switch ClaimStatusResponseStatus(data) {
-	case ClaimStatusResponseStatusPending:
-		*s = ClaimStatusResponseStatusPending
-		return nil
-	case ClaimStatusResponseStatusCompleted:
-		*s = ClaimStatusResponseStatusCompleted
+func (s *ClaimStatusCompletedStatus) UnmarshalText(data []byte) error {
+	switch ClaimStatusCompletedStatus(data) {
+	case ClaimStatusCompletedStatusCompleted:
+		*s = ClaimStatusCompletedStatusCompleted
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// A claim challenge that is still awaiting the browser leg.
+// Ref: #
+type ClaimStatusPending struct {
+	// The claim has not completed yet.
+	Status ClaimStatusPendingStatus `json:"status"`
+}
+
+// GetStatus returns the value of Status.
+func (s *ClaimStatusPending) GetStatus() ClaimStatusPendingStatus {
+	return s.Status
+}
+
+// SetStatus sets the value of Status.
+func (s *ClaimStatusPending) SetStatus(val ClaimStatusPendingStatus) {
+	s.Status = val
+}
+
+// The claim has not completed yet.
+type ClaimStatusPendingStatus string
+
+const (
+	ClaimStatusPendingStatusPending ClaimStatusPendingStatus = "pending"
+)
+
+// AllValues returns all ClaimStatusPendingStatus values.
+func (ClaimStatusPendingStatus) AllValues() []ClaimStatusPendingStatus {
+	return []ClaimStatusPendingStatus{
+		ClaimStatusPendingStatusPending,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClaimStatusPendingStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case ClaimStatusPendingStatusPending:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClaimStatusPendingStatus) UnmarshalText(data []byte) error {
+	switch ClaimStatusPendingStatus(data) {
+	case ClaimStatusPendingStatusPending:
+		*s = ClaimStatusPendingStatusPending
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The state of a claim challenge. While pending it carries only `status`; once
+// completed it also carries the owning team, the claim timestamp, and the
+// dashboard URL. Modelled as discriminated variants so a `pending` response can
+// never carry stale completion fields and a `completed` response always carries
+// them.
+// Ref: #
+// ClaimStatusResponse represents sum type.
+type ClaimStatusResponse struct {
+	Type                 ClaimStatusResponseType // switch on this field
+	ClaimStatusPending   ClaimStatusPending
+	ClaimStatusCompleted ClaimStatusCompleted
+}
+
+// ClaimStatusResponseType is oneOf type of ClaimStatusResponse.
+type ClaimStatusResponseType string
+
+// Possible values for ClaimStatusResponseType.
+const (
+	ClaimStatusPendingClaimStatusResponse   ClaimStatusResponseType = "pending"
+	ClaimStatusCompletedClaimStatusResponse ClaimStatusResponseType = "completed"
+)
+
+// IsClaimStatusPending reports whether ClaimStatusResponse is ClaimStatusPending.
+func (s ClaimStatusResponse) IsClaimStatusPending() bool {
+	return s.Type == ClaimStatusPendingClaimStatusResponse
+}
+
+// IsClaimStatusCompleted reports whether ClaimStatusResponse is ClaimStatusCompleted.
+func (s ClaimStatusResponse) IsClaimStatusCompleted() bool {
+	return s.Type == ClaimStatusCompletedClaimStatusResponse
+}
+
+// SetClaimStatusPending sets ClaimStatusResponse to ClaimStatusPending.
+func (s *ClaimStatusResponse) SetClaimStatusPending(v ClaimStatusPending) {
+	s.Type = ClaimStatusPendingClaimStatusResponse
+	s.ClaimStatusPending = v
+}
+
+// GetClaimStatusPending returns ClaimStatusPending and true boolean if ClaimStatusResponse is ClaimStatusPending.
+func (s ClaimStatusResponse) GetClaimStatusPending() (v ClaimStatusPending, ok bool) {
+	if !s.IsClaimStatusPending() {
+		return v, false
+	}
+	return s.ClaimStatusPending, true
+}
+
+// NewClaimStatusPendingClaimStatusResponse returns new ClaimStatusResponse from ClaimStatusPending.
+func NewClaimStatusPendingClaimStatusResponse(v ClaimStatusPending) ClaimStatusResponse {
+	var s ClaimStatusResponse
+	s.SetClaimStatusPending(v)
+	return s
+}
+
+// SetClaimStatusCompleted sets ClaimStatusResponse to ClaimStatusCompleted.
+func (s *ClaimStatusResponse) SetClaimStatusCompleted(v ClaimStatusCompleted) {
+	s.Type = ClaimStatusCompletedClaimStatusResponse
+	s.ClaimStatusCompleted = v
+}
+
+// GetClaimStatusCompleted returns ClaimStatusCompleted and true boolean if ClaimStatusResponse is ClaimStatusCompleted.
+func (s ClaimStatusResponse) GetClaimStatusCompleted() (v ClaimStatusCompleted, ok bool) {
+	if !s.IsClaimStatusCompleted() {
+		return v, false
+	}
+	return s.ClaimStatusCompleted, true
+}
+
+// NewClaimStatusCompletedClaimStatusResponse returns new ClaimStatusResponse from ClaimStatusCompleted.
+func NewClaimStatusCompletedClaimStatusResponse(v ClaimStatusCompleted) ClaimStatusResponse {
+	var s ClaimStatusResponse
+	s.SetClaimStatusCompleted(v)
+	return s
+}
+
+func (*ClaimStatusResponse) getClaimStatusRes() {}
 
 type CompleteClaimBadRequest ErrorDetails
 
@@ -1442,6 +1564,10 @@ func (s *CompleteClaimResponse) SetClaimedAt(val time.Time) {
 }
 
 func (*CompleteClaimResponse) completeClaimRes() {}
+
+type CompleteClaimTooManyRequests ErrorDetails
+
+func (*CompleteClaimTooManyRequests) completeClaimRes() {}
 
 // A successfully verified authentication factor with verification metadata.
 // Method-specific details are included in the `payload` field.
@@ -5089,6 +5215,10 @@ func (*GetAuthAttemptErrorResponseStatusCode) getAuthAttemptRes() {}
 type GetClaimStatusNotFound ErrorDetails
 
 func (*GetClaimStatusNotFound) getClaimStatusRes() {}
+
+type GetClaimStatusTooManyRequests ErrorDetails
+
+func (*GetClaimStatusTooManyRequests) getClaimStatusRes() {}
 
 type GetClaimStatusUnauthorized ErrorDetails
 

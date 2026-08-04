@@ -20,7 +20,7 @@
  *   afterAll(() => server.close());
  *   afterEach(() => { server.resetHandlers(); resetPlatformStore(); });
  */
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
 import type {
   CompleteClaim200,
@@ -72,6 +72,14 @@ import type { z } from "zod";
 
 function shortId(): string {
   return randomUUID().replaceAll("-", "").slice(0, 12);
+}
+
+// Claim challenge id. Matches the `ch_`-prefixed opaque contract in
+// `components/schemas/challenge-id.yaml` and mints the 128 bits of
+// cryptographic randomness ADR 046 requires, since this value authorizes
+// a project claim from the browser.
+function challengeId(): string {
+  return `ch_${randomBytes(16).toString("base64url")}`;
 }
 
 function nowIso(): string {
@@ -370,35 +378,46 @@ export function expireClaimChallenge(challengeId: string): void {
 
 export function completeClaimChallenge(
   challengeId: string,
+  projectId: string,
 ): { status: number; body: CompleteClaim200 | ErrorBody } {
   const challenge = store.claimChallenges.get(challengeId);
-  if (!challenge) {
+  if (!challenge || challenge.projectId !== projectId) {
     return { status: 404, body: errorBody("not_found", "claim challenge not found") };
   }
-  if (
-    challenge.status !== "completed" &&
-    new Date(challenge.expiresAt).getTime() < Date.now()
-  ) {
+  // The TTL is enforced regardless of status: an expired challenge is gone even
+  // if it was already spent, so a completed-but-expired challenge still 410s.
+  if (new Date(challenge.expiresAt).getTime() < Date.now()) {
     return {
       status: 410,
       body: errorBody("proj.claim_expired", "the claim challenge has expired"),
     };
   }
-
-  let claim = store.claims.get(challenge.projectId);
-  if (!claim) {
-    const teamId = `team-${shortId()}`;
-    claim = {
-      teamId,
-      claimedAt: nowIso(),
-      dashboardUrl: `https://dashboard.example.com/teams/${teamId}`,
+  // First-claim-wins and single-use: once the project has a grant — whether
+  // from this challenge on an earlier call or from another challenge entirely —
+  // completion reports it as already claimed instead of minting a second grant
+  // or silently succeeding again.
+  const existing = store.claims.get(projectId);
+  if (existing) {
+    return {
+      status: 409,
+      body: errorBody("proj.already_claimed", "the project is already claimed by a team", {
+        team_id: existing.teamId,
+        dashboard_url: existing.dashboardUrl,
+      }),
     };
-    store.claims.set(challenge.projectId, claim);
   }
+
+  const teamId = `team-${shortId()}`;
+  const claim: ClaimRecord = {
+    teamId,
+    claimedAt: nowIso(),
+    dashboardUrl: `https://dashboard.example.com/teams/${teamId}`,
+  };
+  store.claims.set(projectId, claim);
   challenge.status = "completed";
 
   const responseBody: CompleteClaim200 = {
-    project_id: challenge.projectId,
+    project_id: projectId,
     team_id: claim.teamId,
     claimed_at: claim.claimedAt,
   };
@@ -525,10 +544,13 @@ export function setupPlatformHandlers() {
           status: 401,
         });
       }
-      const project = store.projects.get(path.data.project_id);
-      if (!project) {
+      // The project secret is project-scoped: it may only initiate a claim for
+      // its own project. A secret belonging to a different project cannot reach
+      // this project, so it is treated as not found rather than authorized.
+      if (authed.id !== path.data.project_id) {
         return HttpResponse.json(errorBody("proj.not_found", "project not found"), { status: 404 });
       }
+      const project = authed;
       const claim = store.claims.get(project.id);
       if (claim) {
         return HttpResponse.json(
@@ -540,24 +562,26 @@ export function setupPlatformHandlers() {
         );
       }
 
-      const challengeId = shortId();
-      store.claimChallenges.set(challengeId, {
-        challengeId,
+      const id = challengeId();
+      const expiresAt = new Date(Date.now() + CLAIM_CHALLENGE_TTL_MS).toISOString();
+      store.claimChallenges.set(id, {
+        challengeId: id,
         projectId: project.id,
         initiatingSecret: token,
         status: "pending",
-        expiresAt: new Date(Date.now() + CLAIM_CHALLENGE_TTL_MS).toISOString(),
+        expiresAt,
       });
       const responseBody: InitClaim201 = {
-        claim_url: `${new URL(request.url).origin}/claim/${challengeId}`,
-        challenge_id: challengeId,
-        expires_at: store.claimChallenges.get(challengeId)!.expiresAt,
+        claim_url: `${new URL(request.url).origin}/claim/${id}`,
+        challenge_id: id,
+        expires_at: expiresAt,
       };
       return HttpResponse.json(responseBody, { status: 201 });
     }),
 
-    // GET /projects/:project_id/claim/status — poll a challenge. Authorized by
-    // the initiating project secret (403 otherwise). Outbound-validated like
+    // GET /projects/:project_id/claim/status — poll a challenge. The bearer
+    // must be a valid project secret (401 otherwise) and specifically the one
+    // that initiated the challenge (403 otherwise). Outbound-validated like
     // GET /projects/:id so the mock cannot lie about its own output.
     http.get("*/projects/:project_id/claim/status", ({ params, request }) => {
       const path = parse(GetClaimStatusParams, params, "invalid_request");
@@ -569,22 +593,33 @@ export function setupPlatformHandlers() {
         return query.response;
       }
 
+      // A missing, malformed, or unknown bearer is unauthenticated (401),
+      // distinct from a valid secret that simply did not initiate this
+      // challenge (403 below).
+      const token = bearerToken(request);
+      const authed = [...store.projects.values()].find((p) => p.projectSecret === token);
+      if (!authed) {
+        return HttpResponse.json(errorBody("auth.unauthorized", "missing or invalid credentials"), {
+          status: 401,
+        });
+      }
+
       const challenge = store.claimChallenges.get(query.data.challenge_id);
       if (!challenge || challenge.projectId !== path.data.project_id) {
         return HttpResponse.json(errorBody("not_found", "claim challenge not found"), {
           status: 404,
         });
       }
-      if (challenge.initiatingSecret !== bearerToken(request)) {
+      if (challenge.initiatingSecret !== token) {
         return HttpResponse.json(
           errorBody("proj.permission_denied", "the presented project secret did not initiate this challenge"),
           { status: 403 },
         );
       }
-      if (
-        challenge.status !== "completed" &&
-        new Date(challenge.expiresAt).getTime() < Date.now()
-      ) {
+      // The TTL is enforced regardless of status: an ephemeral challenge is
+      // gone once expired, so status stops being readable even after it
+      // completed. The durable grant lives in `store.claims`, not here.
+      if (new Date(challenge.expiresAt).getTime() < Date.now()) {
         return HttpResponse.json(
           errorBody("proj.claim_expired", "the claim challenge has expired"),
           { status: 410 },

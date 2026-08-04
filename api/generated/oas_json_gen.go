@@ -3154,49 +3154,43 @@ func (s *ChallengeResponseState) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
-func (s *ClaimStatusResponse) Encode(e *jx.Encoder) {
+func (s *ClaimStatusCompleted) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-func (s *ClaimStatusResponse) encodeFields(e *jx.Encoder) {
+func (s *ClaimStatusCompleted) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("status")
 		s.Status.Encode(e)
 	}
 	{
-		if s.TeamID.Set {
-			e.FieldStart("team_id")
-			s.TeamID.Encode(e)
-		}
+		e.FieldStart("team_id")
+		s.TeamID.Encode(e)
 	}
 	{
-		if s.ClaimedAt.Set {
-			e.FieldStart("claimed_at")
-			s.ClaimedAt.Encode(e, json.EncodeDateTime)
-		}
+		e.FieldStart("claimed_at")
+		json.EncodeDateTime(e, s.ClaimedAt)
 	}
 	{
-		if s.DashboardURL.Set {
-			e.FieldStart("dashboard_url")
-			s.DashboardURL.Encode(e)
-		}
+		e.FieldStart("dashboard_url")
+		json.EncodeURI(e, s.DashboardURL)
 	}
 }
 
-var jsonFieldsNameOfClaimStatusResponse = [4]string{
+var jsonFieldsNameOfClaimStatusCompleted = [4]string{
 	0: "status",
 	1: "team_id",
 	2: "claimed_at",
 	3: "dashboard_url",
 }
 
-// Decode decodes ClaimStatusResponse from json.
-func (s *ClaimStatusResponse) Decode(d *jx.Decoder) error {
+// Decode decodes ClaimStatusCompleted from json.
+func (s *ClaimStatusCompleted) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode ClaimStatusResponse to nil")
+		return errors.New("invalid: unable to decode ClaimStatusCompleted to nil")
 	}
 	var requiredBitSet [1]uint8
 
@@ -3213,8 +3207,8 @@ func (s *ClaimStatusResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"status\"")
 			}
 		case "team_id":
+			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
-				s.TeamID.Reset()
 				if err := s.TeamID.Decode(d); err != nil {
 					return err
 				}
@@ -3223,9 +3217,11 @@ func (s *ClaimStatusResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"team_id\"")
 			}
 		case "claimed_at":
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
-				s.ClaimedAt.Reset()
-				if err := s.ClaimedAt.Decode(d, json.DecodeDateTime); err != nil {
+				v, err := json.DecodeDateTime(d)
+				s.ClaimedAt = v
+				if err != nil {
 					return err
 				}
 				return nil
@@ -3233,9 +3229,11 @@ func (s *ClaimStatusResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"claimed_at\"")
 			}
 		case "dashboard_url":
+			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
-				s.DashboardURL.Reset()
-				if err := s.DashboardURL.Decode(d); err != nil {
+				v, err := json.DecodeURI(d)
+				s.DashboardURL = v
+				if err != nil {
 					return err
 				}
 				return nil
@@ -3247,12 +3245,12 @@ func (s *ClaimStatusResponse) Decode(d *jx.Decoder) error {
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode ClaimStatusResponse")
+		return errors.Wrap(err, "decode ClaimStatusCompleted")
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000001,
+		0b00001111,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -3264,8 +3262,8 @@ func (s *ClaimStatusResponse) Decode(d *jx.Decoder) error {
 				bitIdx := bits.TrailingZeros8(result)
 				fieldIdx := i*8 + bitIdx
 				var name string
-				if fieldIdx < len(jsonFieldsNameOfClaimStatusResponse) {
-					name = jsonFieldsNameOfClaimStatusResponse[fieldIdx]
+				if fieldIdx < len(jsonFieldsNameOfClaimStatusCompleted) {
+					name = jsonFieldsNameOfClaimStatusCompleted[fieldIdx]
 				} else {
 					name = strconv.Itoa(fieldIdx)
 				}
@@ -3286,7 +3284,280 @@ func (s *ClaimStatusResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *ClaimStatusResponse) MarshalJSON() ([]byte, error) {
+func (s *ClaimStatusCompleted) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ClaimStatusCompleted) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ClaimStatusCompletedStatus as json.
+func (s ClaimStatusCompletedStatus) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ClaimStatusCompletedStatus from json.
+func (s *ClaimStatusCompletedStatus) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ClaimStatusCompletedStatus to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ClaimStatusCompletedStatus(v) {
+	case ClaimStatusCompletedStatusCompleted:
+		*s = ClaimStatusCompletedStatusCompleted
+	default:
+		*s = ClaimStatusCompletedStatus(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ClaimStatusCompletedStatus) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ClaimStatusCompletedStatus) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ClaimStatusPending) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ClaimStatusPending) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("status")
+		s.Status.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfClaimStatusPending = [1]string{
+	0: "status",
+}
+
+// Decode decodes ClaimStatusPending from json.
+func (s *ClaimStatusPending) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ClaimStatusPending to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "status":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Status.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"status\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ClaimStatusPending")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfClaimStatusPending) {
+					name = jsonFieldsNameOfClaimStatusPending[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ClaimStatusPending) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ClaimStatusPending) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ClaimStatusPendingStatus as json.
+func (s ClaimStatusPendingStatus) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes ClaimStatusPendingStatus from json.
+func (s *ClaimStatusPendingStatus) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ClaimStatusPendingStatus to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch ClaimStatusPendingStatus(v) {
+	case ClaimStatusPendingStatusPending:
+		*s = ClaimStatusPendingStatusPending
+	default:
+		*s = ClaimStatusPendingStatus(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ClaimStatusPendingStatus) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ClaimStatusPendingStatus) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ClaimStatusResponse as json.
+func (s ClaimStatusResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s ClaimStatusResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case ClaimStatusPendingClaimStatusResponse:
+		e.FieldStart("status")
+		e.Str("pending")
+	case ClaimStatusCompletedClaimStatusResponse:
+		e.FieldStart("status")
+		e.Str("completed")
+		{
+			s := s.ClaimStatusCompleted
+			{
+				e.FieldStart("team_id")
+				s.TeamID.Encode(e)
+			}
+			{
+				e.FieldStart("claimed_at")
+				json.EncodeDateTime(e, s.ClaimedAt)
+			}
+			{
+				e.FieldStart("dashboard_url")
+				json.EncodeURI(e, s.DashboardURL)
+			}
+		}
+	}
+}
+
+// Decode decodes ClaimStatusResponse from json.
+func (s *ClaimStatusResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ClaimStatusResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "status":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "pending":
+					s.Type = ClaimStatusPendingClaimStatusResponse
+					found = true
+				case "completed":
+					s.Type = ClaimStatusCompletedClaimStatusResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case ClaimStatusPendingClaimStatusResponse:
+		if err := s.ClaimStatusPending.Decode(d); err != nil {
+			return err
+		}
+	case ClaimStatusCompletedClaimStatusResponse:
+		if err := s.ClaimStatusCompleted.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ClaimStatusResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
@@ -3294,46 +3565,6 @@ func (s *ClaimStatusResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *ClaimStatusResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes ClaimStatusResponseStatus as json.
-func (s ClaimStatusResponseStatus) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes ClaimStatusResponseStatus from json.
-func (s *ClaimStatusResponseStatus) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode ClaimStatusResponseStatus to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch ClaimStatusResponseStatus(v) {
-	case ClaimStatusResponseStatusPending:
-		*s = ClaimStatusResponseStatusPending
-	case ClaimStatusResponseStatusCompleted:
-		*s = ClaimStatusResponseStatusCompleted
-	default:
-		*s = ClaimStatusResponseStatus(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s ClaimStatusResponseStatus) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ClaimStatusResponseStatus) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -3630,6 +3861,44 @@ func (s *CompleteClaimResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *CompleteClaimResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes CompleteClaimTooManyRequests as json.
+func (s *CompleteClaimTooManyRequests) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes CompleteClaimTooManyRequests from json.
+func (s *CompleteClaimTooManyRequests) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode CompleteClaimTooManyRequests to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = CompleteClaimTooManyRequests(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *CompleteClaimTooManyRequests) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *CompleteClaimTooManyRequests) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -11234,6 +11503,44 @@ func (s *GetClaimStatusNotFound) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *GetClaimStatusNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes GetClaimStatusTooManyRequests as json.
+func (s *GetClaimStatusTooManyRequests) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes GetClaimStatusTooManyRequests from json.
+func (s *GetClaimStatusTooManyRequests) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetClaimStatusTooManyRequests to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = GetClaimStatusTooManyRequests(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *GetClaimStatusTooManyRequests) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetClaimStatusTooManyRequests) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

@@ -57,6 +57,14 @@ get:
         application/json:
           schema:
             $ref: ../../../../../components/schemas/errors/proj-claim_expired.yaml
+    '429':
+      description: |
+        Too many requests, the client has polled too many times in a given
+        amount of time.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
     default:
       description: Unexpected error response.
       content:

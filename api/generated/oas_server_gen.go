@@ -335,9 +335,10 @@ type Handler interface {
 	// InitClaim implements initClaim operation.
 	//
 	// Starts a claim challenge for an unclaimed project. Authenticated by the
-	// project secret, this mints a single-use, 10-minute challenge and returns
+	// project secret, this mints a single-use, short-lived challenge and returns
 	// the `claim_url` the developer opens in a browser to complete the claim,
-	// together with the `challenge_id` the CLI polls with.
+	// together with the `challenge_id` the CLI polls with. The exact expiry is
+	// carried by `expires_at` on the response.
 	//
 	// POST /projects/{project_id}/claim/init
 	InitClaim(ctx context.Context, params InitClaimParams) (InitClaimRes, error)
