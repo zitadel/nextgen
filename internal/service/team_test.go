@@ -31,6 +31,7 @@ func TestTeamService_Create(t *testing.T) {
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, team *domain.Team) error {
+						team.ID = "team_test01"
 						team.CreatedAt = time.Now()
 						team.UpdatedAt = team.CreatedAt
 						team.Status = domain.TeamStatusActive

@@ -3,6 +3,22 @@
 These instructions apply to `internal/storage/v2/` and may be refined by nearer
 scoped `AGENTS.md` files.
 
+## Identifier minting
+
+Resource PKs are dialect-owned `prefix_<opaque>` values
+([ADR 047](../../../docs/adrs/047-dialect-id-generation.md)).
+
+- **Create paths:** assign empty IDs with dialect `Ensure` /
+  `ensureManagedID` before INSERT. Do not invent IDs in domain, service, or
+  handlers.
+- **Pre-persist ceremony** (provisional user handle, passkey registration,
+  in-memory flow/session handles): mint with `Statements().NewManagedID(prefix)`
+  (same generator as `Ensure`).
+- **Empty → assign; non-empty → keep** (ceremony / schema `$id` / fixtures).
+  HTTP create must not accept a client-chosen resource PK.
+- Do **not** call `idgen` from outside `internal/storage/v2/dialect/`.
+- Prefix registry and selection rules for new prefixes live in ADR 047.
+
 ## Statements And Transactions
 
 Statement methods are tx-passive: they run on whatever `queryExecutor` they were

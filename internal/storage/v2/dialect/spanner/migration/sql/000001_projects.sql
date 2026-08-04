@@ -6,9 +6,7 @@ CREATE TABLE projects (
     name            STRING(MAX) NOT NULL,
     created_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     updated_at      TIMESTAMP   NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
-    project_secret  STRING(MAX) NOT NULL DEFAULT (''),
-    preview_secret  STRING(MAX) NOT NULL DEFAULT (''),
-    preview_origins STRING(MAX) NOT NULL DEFAULT ('[]'),
+    preview_origins STRING(MAX) NOT NULL,
 ) PRIMARY KEY (id)
 -- +goose StatementEnd
 

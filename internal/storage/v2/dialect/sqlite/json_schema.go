@@ -27,6 +27,9 @@ func newJSONSchemaStatements(client queryExecutor) jsonSchemaStatements {
 
 // CreateJSONSchema implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *domain.JSONSchema) error {
+	if err := ensureManagedID(&schema.URL, domain.PrefixJSONSchema); err != nil {
+		return err
+	}
 	now := nowUnixNano()
 	payload := string(schema.Schema)
 	if payload == "" {
