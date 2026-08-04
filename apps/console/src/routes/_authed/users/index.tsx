@@ -31,12 +31,13 @@ import { getConsoleProjectId } from "../../../runtime/runtime";
 export const Route = createFileRoute("/_authed/users/")({
   staticData: { nav: { label: "Users", order: 2, icon: Users } },
   // `limit` is asked for explicitly at the API's maximum rather than left at the
-  // default 20. `GET /users` orders by creation ascending with no `Load more`
-  // yet (#661), so the default silently hides the most recently created users —
-  // the ones an operator has just added and is most likely looking for.
+  // default 20, because there is still no `Load more` (#661) and the first page
+  // is all an operator gets. `GET /users` now orders newest-first, so what the
+  // page does drop is the oldest users rather than the just-created ones.
+  // `next_page_token` is ignored until that button exists.
   loader: async () => {
     const projectId = getConsoleProjectId();
-    const users = await api.listUsers({ limit: 100 });
+    const { users } = await api.listUsers({ limit: 100 });
 
     // Columns are the loaded users' own schemas, not every schema in the
     // project: a schema nobody uses would add a column that is blank in every

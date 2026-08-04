@@ -6,7 +6,7 @@
 
 | Area | Convention |
 |---|---|
-| **IDs** | Generally prefixed, opaque, ULID-shaped. Prefix is part of the ID (e.g. `user_01H…`). No scope hints encoded — the resource-scope index resolves them. **Exception:** `project_id` is a dictionary slug (for example `river-8421`) in the platform and claim/config surfaces that use that field. |
+| **IDs** | Prefixed, opaque, dialect-minted (`prefix_<opaque>`). Prefix is part of the ID (e.g. `user_01H…`, `proj_01H…`). No scope hints encoded — the resource-scope index resolves them. Project IDs are `proj_*` ([ADR 047](../../adrs/047-dialect-id-generation.md)); the older dictionary-slug form is retired. |
 | **Verbs** | `POST`, `GET`, `PATCH`, `DELETE`. Never `PUT`. |
 | **Timestamps** | RFC3339 UTC strings. Never epoch millis. |
 | **Response shape** | `{ object, id, … }` for single resources. `{ object: "list", data: […], pagination: {…} }` for lists. |
@@ -84,7 +84,7 @@ Split response accordingly:
   "version": "2026-04-21",
   "features": { ... },
   "defaults": {
-    "project_id": "river-8421",
+    "project_id": "proj_01HEXAMPLE",
     "team_id": "team_default"
   },
   "limits": { "users_per_project": 100000, ... }

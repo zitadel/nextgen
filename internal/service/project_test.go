@@ -85,9 +85,15 @@ func TestProjectService_Create(t *testing.T) {
 			previewOrigins: nil,
 			seedDefaults:   true,
 			setupMocks: func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
+				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, p *domain.Project) error {
+						p.ID = "proj_generated"
+						return nil
+					},
+				)
 				masterKey.EXPECT().Encrypt(gomock.Any())
 				masterKey.EXPECT().Decrypt(gomock.Any()).Return("thiskeyis32byteslongforsurerealy", nil)
-				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
+				statements.EXPECT().NewManagedID(string(domain.PrefixEncryptionKey)).Return("enc_key_minted", nil)
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 				statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
@@ -101,9 +107,15 @@ func TestProjectService_Create(t *testing.T) {
 			previewOrigins: []string{"*.vercel.app", "*.netlify.app"},
 			seedDefaults:   true,
 			setupMocks: func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
+				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, p *domain.Project) error {
+						p.ID = "proj_generated"
+						return nil
+					},
+				)
 				masterKey.EXPECT().Encrypt(gomock.Any())
 				masterKey.EXPECT().Decrypt(gomock.Any()).Return("thiskeyis32byteslongforsurerealy", nil)
-				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
+				statements.EXPECT().NewManagedID(string(domain.PrefixEncryptionKey)).Return("enc_key_minted", nil)
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 				statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
@@ -116,9 +128,15 @@ func TestProjectService_Create(t *testing.T) {
 			projectName:  "test",
 			seedDefaults: false,
 			setupMocks: func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
+				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, p *domain.Project) error {
+						p.ID = "proj_generated"
+						return nil
+					},
+				)
 				masterKey.EXPECT().Encrypt(gomock.Any())
 				masterKey.EXPECT().Decrypt(gomock.Any()).Return("thiskeyis32byteslongforsurerealy", nil)
-				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
+				statements.EXPECT().NewManagedID(string(domain.PrefixEncryptionKey)).Return("enc_key_minted", nil)
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 				statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 				// No schema/flow-definition seeding when seedDefaults is false.
@@ -131,8 +149,6 @@ func TestProjectService_Create(t *testing.T) {
 			name:        "project creation error should bubble up",
 			projectName: "test",
 			setupMocks: func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
-				masterKey.EXPECT().Encrypt(gomock.Any())
-				masterKey.EXPECT().Decrypt(gomock.Any()).Return("thiskeyis32byteslongforsurerealy", nil)
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).Return(assert.AnError)
 			},
 			wantErr: domain.ErrInternal(assert.AnError),

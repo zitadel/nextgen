@@ -15,11 +15,11 @@ import (
 )
 
 const createUserPasskeyStmt = `INSERT INTO zitadel_nextgen.user_passkeys (
-	project_id, user_id, credential_id, public_key, aaguid, attestation_type, transports, sign_count,
+	id, project_id, user_id, credential_id, public_key, aaguid, attestation_type, transports, sign_count,
 	backup_eligible, backup_state, name, verified_at
 ) VALUES (
 	$1, $2, $3, $4, $5, $6, $7, $8,
-	$9, $10, $11, $12
+	$9, $10, $11, $12, $13
 )`
 
 const userPasskeyQuery = `SELECT id, project_id, user_id, credential_id, public_key, aaguid, attestation_type, transports,
@@ -38,11 +38,15 @@ func newUserPasskeyStatements(client queryExecutor) userPasskeyStatements {
 
 // CreateUserPasskey implements [service.UserPasskeyStatements].
 func (ps userPasskeyStatements) CreateUserPasskey(ctx context.Context, p *domain.CreateUserPasskey) error {
+	if err := ensureManagedID(&p.ID, domain.PrefixUserPasskey); err != nil {
+		return err
+	}
 	transports := p.Transports
 	if transports == nil {
 		transports = []string{}
 	}
 	_, err := ps.client.Exec(ctx, createUserPasskeyStmt,
+		p.ID,
 		p.ProjectID,
 		p.UserID,
 		p.CredentialID,

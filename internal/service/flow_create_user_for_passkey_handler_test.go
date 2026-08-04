@@ -91,17 +91,6 @@ func expectCreateUserTx(f *passkeyHandlerFixture, createFn func(context.Context,
 		})
 }
 
-func attributeByKey(t *testing.T, attrs []*domain.CreateAttribute, key string) *domain.CreateAttribute {
-	t.Helper()
-	for _, a := range attrs {
-		if a.Key == key {
-			return a
-		}
-	}
-	t.Fatalf("attribute %q not present in %d attributes", key, len(attrs))
-	return nil
-}
-
 func TestFlowCreateUserForPasskey_HonorsPreAssignedUserID(t *testing.T) {
 	f := newPasskeyHandlerFixture(t)
 	expectSchemaLookup(f)
@@ -144,14 +133,17 @@ func TestFlowCreateUserForPasskey_PersistsAllCollectedSchemaFields(t *testing.T)
 	require.NoError(t, err)
 	require.NotNil(t, captured)
 
-	emailAttr := attributeByKey(t, captured.Attributes, "email")
+	emailAttr, ok := captured.Attributes.Get("email")
+	assert.True(t, ok, "attributes must contain email key")
 	assert.Equal(t, "alice@example.com", emailAttr.Value)
 	assert.Equal(t, domain.AttributeUniquenessProject, emailAttr.UniqueScope, "x-unique on the schema must carry through")
 
-	givenAttr := attributeByKey(t, captured.Attributes, "givenName")
+	givenAttr, ok := captured.Attributes.Get("givenName")
+	assert.True(t, ok, "attributes must contain givenName key")
 	assert.Equal(t, "Alice", givenAttr.Value)
 
-	familyAttr := attributeByKey(t, captured.Attributes, "familyName")
+	familyAttr, ok := captured.Attributes.Get("familyName")
+	assert.True(t, ok, "attributes must contain familyName key")
 	assert.Equal(t, "Doe", familyAttr.Value)
 }
 
