@@ -191,12 +191,12 @@ func TestClaimStatements_GetPersonalTeamForUser(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, teamA, got.ID)
 
-			// Deactivating the earliest team excludes it (deactivated team + removed
-			// membership), so the next active team is returned.
+			// Deactivating the earliest team must NOT fall back to the next active
+			// team: the earliest membership is selected unconditionally, so once its
+			// team is inactive the resolve returns not-found rather than teamB.
 			require.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, teamA))
-			got, err = d.stmts.GetPersonalTeamForUser(t.Context(), projectID, userID)
-			require.NoError(t, err)
-			assert.Equal(t, teamB, got.ID)
+			_, err = d.stmts.GetPersonalTeamForUser(t.Context(), projectID, userID)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		})
 
 		t.Run("non_active_membership_excluded", func(t *testing.T) {
@@ -207,6 +207,34 @@ func TestClaimStatements_GetPersonalTeamForUser(t *testing.T) {
 			// Flip the (only) membership to removed while its team stays active: the
 			// m.status = 'active' filter must now exclude it.
 			require.NoError(t, d.stmts.UpdateTeamMembershipStatus(t.Context(), projectID, teamID, userID, domain.MembershipStatusRemoved))
+
+			_, err := d.stmts.GetPersonalTeamForUser(t.Context(), projectID, userID)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		})
+
+		t.Run("removed_earliest_membership_does_not_fall_back", func(t *testing.T) {
+			projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+			userID := "usr-pt-nofallback-" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "NoFallback")))
+
+			// team-a is joined first (earliest membership); team-b is a later
+			// membership on another team that stays fully active.
+			teamA := "team-a-" + uniqueSuffix(t)
+			teamB := "team-b-" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamA)))
+			require.NoError(t, d.stmts.CreateTeamMembership(t.Context(), &domain.TeamMembership{
+				ProjectID: projectID, TeamID: teamA, UserID: userID, Status: domain.MembershipStatusActive,
+			}))
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamB)))
+			require.NoError(t, d.stmts.CreateTeamMembership(t.Context(), &domain.TeamMembership{
+				ProjectID: projectID, TeamID: teamB, UserID: userID, Status: domain.MembershipStatusActive,
+			}))
+
+			// Flip only the earliest membership to removed; team-a itself stays
+			// active and team-b's membership stays active. The earliest membership
+			// is still the one selected, so an inactive membership alone (with no
+			// team deactivation) yields not-found without falling back to team-b.
+			require.NoError(t, d.stmts.UpdateTeamMembershipStatus(t.Context(), projectID, teamA, userID, domain.MembershipStatusRemoved))
 
 			_, err := d.stmts.GetPersonalTeamForUser(t.Context(), projectID, userID)
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))

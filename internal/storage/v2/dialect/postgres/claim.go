@@ -17,13 +17,18 @@ const (
 
 	markClaimChallengeCompletedStmt = `UPDATE zitadel_nextgen.claim_challenges SET status = 'completed' WHERE id = $1 AND project_id = $2 AND status = 'pending'`
 
-	// personalTeamForUserStmt resolves the user's personal team: the earliest
-	// active membership joined to an active team (ORDER BY m.created_at, m.team_id).
+	// personalTeamForUserStmt resolves the user's personal team without any
+	// membership fallback: it picks the user's earliest membership
+	// unconditionally (ORDER BY created_at, team_id LIMIT 1) and returns it only
+	// when both that membership and its team are active. A deactivated earliest
+	// team never falls through to a later membership; zero rows flow to
+	// NoRowFoundError.
 	personalTeamForUserStmt = `SELECT t.project_id, t.id, t.name, t.status, t.created_at, t.updated_at` +
-		` FROM zitadel_nextgen.teams t` +
-		` JOIN zitadel_nextgen.team_memberships m ON m.project_id = t.project_id AND m.team_id = t.id` +
-		` WHERE m.project_id = $1 AND m.user_id = $2 AND m.status = 'active' AND t.status = 'active'` +
-		` ORDER BY m.created_at, m.team_id LIMIT 1`
+		` FROM (SELECT project_id, team_id, status FROM zitadel_nextgen.team_memberships` +
+		` WHERE project_id = $1 AND user_id = $2` +
+		` ORDER BY created_at, team_id LIMIT 1) m` +
+		` JOIN zitadel_nextgen.teams t ON t.project_id = m.project_id AND t.id = m.team_id` +
+		` WHERE m.status = 'active' AND t.status = 'active'`
 )
 
 type claimStatements struct{ statement }

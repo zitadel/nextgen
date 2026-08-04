@@ -19,13 +19,18 @@ FROM claim_challenges WHERE id = ? AND project_id = ?`
 	markClaimChallengeCompletedStmt = `UPDATE claim_challenges SET status = 'completed'
 WHERE id = ? AND project_id = ? AND status = 'pending'`
 
-	// personalTeamForUserStmt resolves the user's personal team: the earliest
-	// active membership joined to an active team (ORDER BY m.created_at, m.team_id).
+	// personalTeamForUserStmt resolves the user's personal team without any
+	// membership fallback: it picks the user's earliest membership
+	// unconditionally (ORDER BY created_at, team_id LIMIT 1) and returns it only
+	// when both that membership and its team are active. A deactivated earliest
+	// team never falls through to a later membership; zero rows flow to
+	// NoRowFoundError.
 	personalTeamForUserStmt = `SELECT t.project_id, t.id, t.name, t.status, t.created_at, t.updated_at
-FROM teams t
-JOIN team_memberships m ON m.project_id = t.project_id AND m.team_id = t.id
-WHERE m.project_id = ? AND m.user_id = ? AND m.status = 'active' AND t.status = 'active'
-ORDER BY m.created_at, m.team_id LIMIT 1`
+FROM (SELECT project_id, team_id, status FROM team_memberships
+      WHERE project_id = ? AND user_id = ?
+      ORDER BY created_at, team_id LIMIT 1) m
+JOIN teams t ON t.project_id = m.project_id AND t.id = m.team_id
+WHERE m.status = 'active' AND t.status = 'active'`
 )
 
 type claimStatements struct{ statement }

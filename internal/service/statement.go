@@ -307,7 +307,9 @@ type ClaimStatements interface {
 	// MarkChallengeCompleted flips pending -> completed; a challenge that is
 	// absent, in another project, or already completed returns NoRowFoundError.
 	MarkChallengeCompleted(ctx context.Context, projectID, id string) error
-	// GetPersonalTeamForUser resolves the user's personal team: the earliest
-	// active team membership joined to an active team.
+	// GetPersonalTeamForUser resolves the user's earliest membership as the
+	// personal team and returns NoRowFoundError when that membership or its team
+	// is not active. It never falls back to a later membership: a deactivated
+	// personal team is not silently replaced by another team the user belongs to.
 	GetPersonalTeamForUser(ctx context.Context, projectID, userID string) (*domain.Team, error)
 }
