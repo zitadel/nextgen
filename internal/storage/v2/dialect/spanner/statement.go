@@ -21,6 +21,7 @@ type statements struct {
 	userPasskeyStatements
 	userRecoveryCodesStatements
 	brandingStatements
+	claimStatements
 }
 
 func (s statements) Statements() service.AllStatements {
@@ -48,6 +49,7 @@ func newStatements(db queryExecutor) statements {
 		userPasskeyStatements:         newUserPasskeyStatements(db),
 		userRecoveryCodesStatements:   newUserRecoveryCodesStatements(db),
 		brandingStatements:            newBrandingStatements(db),
+		claimStatements:               newClaimStatements(db),
 	}
 }
 

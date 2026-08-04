@@ -73,6 +73,7 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.GetMySessionOperation:    true,
 	api.RevokeMySessionOperation: true,
 	api.GetMyUserOperation:       true,
+	api.CompleteClaimOperation:   true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the
