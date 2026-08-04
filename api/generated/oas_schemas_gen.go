@@ -12903,6 +12903,10 @@ func (s *UserNotFoundDetails) init() UserNotFoundDetails {
 
 // This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`.
 // This is done because a lot of code generators cannot handle that.
+// A few properties are reserved:
+// - id: is used to return the id of the user
+// - metadata: is used to embed metadata of the user, like creation date,
+// status,... in a return object.
 // Ref: #
 type UserProperty struct {
 	// The verification method for this property, if applicable.
@@ -12917,8 +12921,8 @@ type UserProperty struct {
 	XMinusSensitive OptBool `json:"x-sensitive"`
 	// Whether this property is used for multi-factor authentication or not.
 	XMinusMfa OptBool `json:"x-mfa"`
-	// A map of additional properties for the user definition, where the key is the property name and the
-	// value is the property schema.
+	// A map of additional properties for the user definition, where the key is
+	// the property name and the value is the property schema.
 	Properties      OptUserPropertyProperties `json:"properties"`
 	AdditionalProps UserPropertyAdditional
 }
@@ -13014,8 +13018,8 @@ func (s *UserPropertyAdditional) init() UserPropertyAdditional {
 	return m
 }
 
-// A map of additional properties for the user definition, where the key is the property name and the
-// value is the property schema.
+// A map of additional properties for the user definition, where the key is
+// the property name and the value is the property schema.
 type UserPropertyProperties map[string]jx.Raw
 
 func (s *UserPropertyProperties) init() UserPropertyProperties {

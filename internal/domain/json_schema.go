@@ -78,6 +78,15 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 		}
 	}
 
+	if props, ok := maputil.Get[map[string]any](schema, "properties"); ok {
+		if _, ok := maputil.Get[any](props, "id"); ok {
+			return nil, ErrJSONSchemaInvalid().WithMessage("schema cannot have property id")
+		}
+		if _, ok := maputil.Get[any](props, "metadata"); ok {
+			return nil, ErrJSONSchemaInvalid().WithMessage("schema cannot have property metadata")
+		}
+	}
+
 	var objectType *string
 	if ot, ok := maputil.Get[string](schema, "objectType"); ok {
 		objectType = &ot
