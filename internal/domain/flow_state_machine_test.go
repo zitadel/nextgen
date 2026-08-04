@@ -16,15 +16,6 @@ import (
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 )
 
-func findAttribute(attrs []*domain.CreateAttribute, key string) *domain.CreateAttribute {
-	for _, a := range attrs {
-		if a.Key == key {
-			return a
-		}
-	}
-	return nil
-}
-
 func containsFieldName(fields []domain.FlowField, name string) bool {
 	for _, f := range fields {
 		if f.Name == name {
