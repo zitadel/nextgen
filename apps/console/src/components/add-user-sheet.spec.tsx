@@ -53,7 +53,7 @@ function stubSchemas(
   projects: { id: string; name: string }[] = [],
 ) {
   server.use(
-    http.get(USERS_URL, () => HttpResponse.json([])),
+    http.get(USERS_URL, () => HttpResponse.json({ users: [] })),
     http.post(PROJECTS_QUERY_URL, () => HttpResponse.json({ projects })),
     http.get(SCHEMAS_URL, () =>
       HttpResponse.json(

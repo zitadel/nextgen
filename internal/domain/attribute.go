@@ -9,12 +9,23 @@ import (
 	"github.com/zitadel/nextgen/internal/maputil"
 )
 
-type Attribute struct {
-	Key   string `json:"key"`
-	Value any    `json:"value"`
+type AttributeKey string
+
+func (k AttributeKey) Nodes() []string {
+	return strings.Split(string(k), ".")
 }
 
-type Attributes []Attribute
+func (k AttributeKey) AppendNode(node string) AttributeKey {
+	if len(k) == 0 {
+		return AttributeKey(node)
+	}
+	return AttributeKey(string(k) + "." + node)
+}
+
+type Attribute struct {
+	Key   AttributeKey `json:"key"`
+	Value any          `json:"value"`
+}
 
 type AttributeUniqueness int
 
@@ -24,14 +35,96 @@ const (
 	AttributeUniquenessProject
 )
 
+type Attributes []Attribute
+
+func AttributesFromMap(m map[string]any) Attributes {
+	attrs := make(Attributes, 0, len(m))
+	attrs.fromMap(m, "")
+	return attrs
+}
+
+// Get returns the value for the given key.
+//
+// TODO(go v27): make this method generic
+func (attrs Attributes) Get(key AttributeKey) (value any, ok bool) {
+	for _, attr := range attrs {
+		if attr.Key == key {
+			return attr.Value, true
+		}
+	}
+
+	return nil, false
+}
+
+func (attrs *Attributes) fromMap(m map[string]any, keyPrefix AttributeKey) {
+	for key, value := range m {
+		fullKey := keyPrefix.AppendNode(key)
+
+		switch tp := value.(type) {
+		case map[string]any:
+			attrs.fromMap(tp, fullKey)
+		default:
+			*attrs = append(*attrs, Attribute{Key: fullKey, Value: value})
+		}
+	}
+}
+
+func (attrs *Attributes) UnmarshalJSON(data []byte) error {
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		return fmt.Errorf("attribute: %w", err)
+	}
+
+	*attrs = AttributesFromMap(m)
+	return nil
+}
+
+func (attrs Attributes) ToMap() (map[string]any, error) {
+	tree := make(map[string]any)
+	for _, attr := range attrs {
+		keyNodes := attr.Key.Nodes()
+
+		subTree := tree
+		for len(keyNodes) > 1 {
+			// not a leaf node, traverse down the tree
+
+			var m map[string]any
+			v, ok := subTree[keyNodes[0]]
+			if !ok {
+				// nested map does not yet exist, create a new one
+				m = make(map[string]any)
+			} else if m, ok = v.(map[string]any); !ok {
+				// if the key overlaps with another value which is not an object, error to be sure
+				return nil, fmt.Errorf("the given key already exists in the map with a value which is not a map (%s)", keyNodes[0])
+			}
+
+			subTree[keyNodes[0]] = m
+			subTree = m
+			keyNodes = keyNodes[1:]
+		}
+
+		subTree[keyNodes[0]] = attr.Value
+
+	}
+	return tree, nil
+}
+
+func (attrs Attributes) MarshalJSON() ([]byte, error) {
+	m, err := attrs.ToMap()
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(m)
+}
+
 type CreateAttribute struct {
-	Key         string              `json:"key"`
+	Key         AttributeKey        `json:"key"`
 	Value       any                 `json:"value"`
 	UniqueScope AttributeUniqueness `json:"unique_scope"`
 	ValueHash   [sha256.Size]byte   `json:"value_hash"`
 }
 
-func NewCreateAttribute(key string, value any, unique AttributeUniqueness) (*CreateAttribute, error) {
+func NewCreateAttribute(key AttributeKey, value any, unique AttributeUniqueness) (*CreateAttribute, error) {
 	raw, err := json.Marshal(value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal attribute value: %w", err)
@@ -47,57 +140,41 @@ func NewCreateAttribute(key string, value any, unique AttributeUniqueness) (*Cre
 	return attr, nil
 }
 
-func BuildAttributeTree(attributes []Attribute) (map[string]any, error) {
-	tree := make(map[string]any)
-	for i, a := range attributes {
-		keyNodes := strings.Split(a.Key, ".")
+type CreateAttributes []CreateAttribute
 
-		// empty keys are prevented in the DB schema,
-		// this is just a safety check to prevent panics in case of invalid data
-		if keyNodes[0] == "" {
-			return nil, fmt.Errorf("illegal empty key for attribute at index %d", i)
-		}
-
-		setAttribute(keyNodes, a.Value, tree)
+func CreateAttributesFromMap(m map[string]any, schema map[string]any) (CreateAttributes, error) {
+	attrs := make(CreateAttributes, 0, len(m))
+	err := attrs.fromMap(m, schema, "")
+	if err != nil {
+		return nil, err
 	}
-	return tree, nil
+	return attrs, nil
 }
 
-func setAttribute(keyNodes []string, value any, tree map[string]any) {
-	// leaf node, set the value
-	if len(keyNodes) == 1 {
-		tree[keyNodes[0]] = value
-		return
+// Get returns the value for the given key.
+//
+// TODO(go v27): make this method generic
+func (attrs CreateAttributes) Get(key AttributeKey) (value *CreateAttribute, ok bool) {
+	for _, attr := range attrs {
+		if attr.Key == key {
+			return new(attr), true
+		}
 	}
 
-	// not a leaf node, traverse down the tree
-	subTree, ok := tree[keyNodes[0]].(map[string]any)
-	if !ok {
-		subTree = make(map[string]any)
-		tree[keyNodes[0]] = subTree
-	}
-	setAttribute(keyNodes[1:], value, subTree)
+	return nil, false
 }
 
-func FlattenMapToCreateAttributes(m map[string]any, schema map[string]any, namePrefix string) ([]*CreateAttribute, error) {
-	attrs := make([]*CreateAttribute, 0, len(m))
-	for key, v := range m {
-		var fullKey string
-		if namePrefix != "" {
-			fullKey = namePrefix + "." + key
-		} else {
-			fullKey = key
-		}
+func (attrs *CreateAttributes) fromMap(m map[string]any, schema map[string]any, keyPrefix AttributeKey) error {
+	for key, value := range m {
+		fullKey := keyPrefix.AppendNode(key)
 
-		switch vv := v.(type) {
+		switch tp := value.(type) {
 		case map[string]any:
 			props, _ := maputil.GetNested[map[string]any](schema, "properties."+key)
-			newAttrs, err := FlattenMapToCreateAttributes(vv, props, fullKey)
+			err := attrs.fromMap(tp, props, fullKey)
 			if err != nil {
-				return nil, err
+				return err
 			}
-			attrs = append(attrs, newAttrs...)
-
 		default:
 			var unique AttributeUniqueness
 			strUnique, _ := maputil.GetNested[string](schema, "properties."+key+".x-unique")
@@ -107,13 +184,12 @@ func FlattenMapToCreateAttributes(m map[string]any, schema map[string]any, nameP
 			case "team":
 				unique = AttributeUniquenessTeam
 			}
-
-			attr, err := NewCreateAttribute(fullKey, v, unique)
+			attr, err := NewCreateAttribute(fullKey, value, unique)
 			if err != nil {
-				return nil, err
+				return err
 			}
-			attrs = append(attrs, attr)
+			*attrs = append(*attrs, *attr)
 		}
 	}
-	return attrs, nil
+	return nil
 }

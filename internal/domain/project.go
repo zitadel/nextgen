@@ -35,6 +35,14 @@ func ErrProjectPermissionDenied() Error {
 	return newError(PrefixProject.ErrorCodePrefix("permission_denied"), "the project management API requires the project secret", nil, nil)
 }
 
+func ErrProjectAlreadyClaimed() Error {
+	return newError(PrefixProject.ErrorCodePrefix("already_claimed"), "the project is already claimed by a team", nil, nil)
+}
+
+func ErrProjectClaimExpired() Error {
+	return newError(PrefixProject.ErrorCodePrefix("claim_expired"), "the claim challenge has expired", nil, nil)
+}
+
 // Project is a minimal representation of the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#projects)
 // It is hardly ever modified but read a lot therefore it should be stored in global tables.
 type Project struct {
