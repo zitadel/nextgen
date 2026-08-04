@@ -289,7 +289,7 @@ func TestTeamStatements_Deactivate_CascadesMembershipsAndOwnedUsers(t *testing.T
 				service.UserQueryOptions{},
 			)
 			require.NoError(t, err)
-			return user.Status
+			return user.Metadata.Status
 		}
 		assert.Equal(t, domain.UserStatusActive, userStatus(selfOwned.ID))
 		assert.Equal(t, domain.UserStatusDeactivated, userStatus(teamOwned.ID))

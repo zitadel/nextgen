@@ -122,15 +122,12 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 	if len(user.Attributes) == 0 {
 		return fmt.Errorf("user create requires attributes")
 	}
-	keys := make([]string, len(user.Attributes))
+	keys := make([]domain.AttributeKey, len(user.Attributes))
 	values := make([][]byte, len(user.Attributes))
 	hashes := make([][]byte, len(user.Attributes))
 	scopes := make([]string, len(user.Attributes))
 
 	for i, a := range user.Attributes {
-		if a == nil {
-			return fmt.Errorf("nil attribute at index %d", i)
-		}
 		raw, err := json.Marshal(a.Value)
 		if err != nil {
 			return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
@@ -311,7 +308,8 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 			return wrapError(err)
 		}
 		_, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (struct{}, error) {
-			var userID, key string
+			var userID string
+			var key domain.AttributeKey
 			var value []byte
 			if err := row.Scan(&userID, &key, &value); err != nil {
 				return struct{}{}, err
@@ -346,12 +344,12 @@ func scanUserHeader(row pgx.CollectableRow) (*domain.User, error) {
 		&u.ID,
 		&lifecycleOwnerTeamID,
 		&status,
-		&u.CreatedAt,
-		&u.UpdatedAt,
+		&u.Metadata.CreatedAt,
+		&u.Metadata.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
-	u.Status = domain.UserStatus(status)
+	u.Metadata.Status = domain.UserStatus(status)
 	u.LifecycleOwnerTeamID = lifecycleOwnerTeamID
 	return u, nil
 }

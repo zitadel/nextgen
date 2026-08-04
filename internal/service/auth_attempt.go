@@ -368,7 +368,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			return nil, nil, err
 		}
 		user, err := s.users.GetByAttributes(ctx, attempt.ProjectID, []domain.Attribute{{
-			Key:   p.AttributeName,
+			Key:   domain.AttributeKey(p.AttributeName),
 			Value: p.LoginName,
 		}})
 		if err != nil {

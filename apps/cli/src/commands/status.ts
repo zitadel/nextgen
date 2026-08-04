@@ -186,7 +186,7 @@ async function detectUserPresence(cwd: string, source: string): Promise<UserPres
     });
     const probe = client
       .listUsers({ limit: 1 }, { signal: AbortSignal.timeout(PRESENCE_PROBE_TIMEOUT_MS) })
-      .then((users): UserPresence => (users.length > 0 ? "some" : "none"))
+      .then(({ users }): UserPresence => (users.length > 0 ? "some" : "none"))
       .catch((): UserPresence => "unknown");
     // The abort signal alone is not enough: DNS resolution can outlive it
     // (getaddrinfo runs on the threadpool and some environments take many
