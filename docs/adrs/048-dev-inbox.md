@@ -1,4 +1,4 @@
-# ADR 047: The Dev Inbox — Captured Outbound Messages
+# ADR 048: The Dev Inbox — Captured Outbound Messages
 
 > **Status:** Proposed
 > **Date:** 2026-08-02
@@ -201,7 +201,17 @@ server, so access logs cannot record them); the handoff page's script
 POSTs it to the exchange endpoint, receives the HTTP-only session cookie,
 and `history.replaceState`s the fragment away; inbox responses carry
 `Referrer-Policy: no-referrer`; and the exchange endpoint redacts token
-material from every log path as defense-in-depth. `zitadel start` never
+material from every log path as defense-in-depth. This token is the
+handoff-token class ADR 036's exposure contract governs (amended
+2026-08-03), and URL delivery is inherent here — a CLI cannot hand a
+response body to the browser it spawns — so the exchange behaves as a
+credential-establishing operation under that contract: it enforces the
+browser-attested `Origin` (the handoff page is same-origin by
+construction, so a token exfiltrated into a foreign context cannot be
+exchanged from it), the minted session is inbox-scoped and can never
+become a login session, and the endpoint adopts ADR 036's PKCE-style
+proof binding for URL-transiting handoffs once that machinery ships.
+`zitadel start` never
 emits a bearer-bearing URL: its JSON stdout is the agent contract and
 lands in transcripts and CI logs. It reports capability state as data —
 `available` (the server supports capture) vs `configured` (this

@@ -14,8 +14,8 @@ import (
 
 const (
 	setUserPasswordStmt = `INSERT INTO user_passwords (
-	project_id, user_id, encoded_hash, change_required, verification_id, changed_at, failed_attempts, last_successful_check, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)
+	project_id, id, user_id, encoded_hash, change_required, verification_id, changed_at, failed_attempts, last_successful_check, created_at, updated_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)
 ON CONFLICT (project_id, user_id) DO UPDATE SET
 	encoded_hash = EXCLUDED.encoded_hash,
 	change_required = EXCLUDED.change_required,
@@ -38,9 +38,14 @@ func newUserPasswordStatements(client queryExecutor) userPasswordStatements {
 
 // SetUserPassword implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error {
+	id := ""
+	if err := ensureManagedID(&id, domain.PrefixUserPassword); err != nil {
+		return err
+	}
 	now := nowUnixNano()
 	_, err := ps.client.Exec(ctx, setUserPasswordStmt,
 		pw.ProjectID,
+		id,
 		pw.UserID,
 		pw.EncodedHash,
 		pw.ChangeRequired,

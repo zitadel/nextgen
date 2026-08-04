@@ -59,7 +59,7 @@ func (f *fakeExchangeStore) InsertSession(_ context.Context, s *domain.Session) 
 		return f.insertErr
 	}
 	s.ID = "sess-new"
-	s.TokenID = session.UnsetSessionTokenID
+	s.TokenID = ""
 	s.CreatedAt = time.Now()
 	s.UpdatedAt = s.CreatedAt
 	s.ExpiresAt = s.CreatedAt.Add(s.TimeToLive)
@@ -137,7 +137,7 @@ func TestRunExchange_newSession(t *testing.T) {
 	assert.Equal(t, "attempt-1", store.deletedAttempt)
 	assert.Equal(t, "sess-new", store.appliedOn)
 	assert.Equal(t, time.Hour, store.updatedTTL)
-	assert.Equal(t, session.UnsetSessionTokenID, store.tokenPrev)
+	assert.Equal(t, "", store.tokenPrev)
 	assert.Equal(t, time.Hour, store.inserted.TimeToLive)
 }
 
@@ -188,6 +188,5 @@ func TestRunExchange_applyConflict(t *testing.T) {
 func TestHasRealSessionToken(t *testing.T) {
 	t.Parallel()
 	assert.False(t, session.HasRealSessionToken(""))
-	assert.False(t, session.HasRealSessionToken(session.UnsetSessionTokenID))
-	assert.True(t, session.HasRealSessionToken("42"))
+	assert.True(t, session.HasRealSessionToken("tkn_42"))
 }
