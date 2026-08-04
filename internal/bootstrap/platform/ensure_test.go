@@ -13,43 +13,38 @@ import (
 
 func TestEnsure(t *testing.T) {
 	t.Parallel()
-	const projectID = "proj_platform"
 	storageErr := errors.New("connection refused")
 
 	wantProject := &domain.Project{
-		ID:             projectID,
+		ID:             domain.PlatformProjectID,
 		Name:           "Platform",
 		PreviewOrigins: []string{},
 	}
 
 	tests := []struct {
-		name      string
-		enabled   bool
-		projectID string
+		name    string
+		enabled bool
 		// expect declares the reads and writes the case allows; an unexpected
 		// CreateProject fails the test on its own.
 		expect  func(*servicemocks.MockStatementPool, *servicemocks.MockAllStatements)
 		wantErr error
 	}{
 		{
-			name:      "disabled is a no-op with no statement calls",
-			enabled:   false,
-			projectID: projectID,
-			expect:    func(*servicemocks.MockStatementPool, *servicemocks.MockAllStatements) {},
+			name:    "disabled is a no-op with no statement calls",
+			enabled: false,
+			expect:  func(*servicemocks.MockStatementPool, *servicemocks.MockAllStatements) {},
 		},
 		{
-			name:      "enabled creates the platform project",
-			enabled:   true,
-			projectID: projectID,
+			name:    "enabled creates the platform project",
+			enabled: true,
 			expect: func(pool *servicemocks.MockStatementPool, stmts *servicemocks.MockAllStatements) {
 				pool.EXPECT().Statements().Return(stmts)
 				stmts.EXPECT().CreateProject(gomock.Any(), wantProject).Return(nil)
 			},
 		},
 		{
-			name:      "existing platform project is accepted",
-			enabled:   true,
-			projectID: projectID,
+			name:    "existing platform project is accepted",
+			enabled: true,
 			expect: func(pool *servicemocks.MockStatementPool, stmts *servicemocks.MockAllStatements) {
 				pool.EXPECT().Statements().Return(stmts)
 				stmts.EXPECT().CreateProject(gomock.Any(), wantProject).
@@ -57,16 +52,8 @@ func TestEnsure(t *testing.T) {
 			},
 		},
 		{
-			name:      "enabled without project id is an error and skips statements",
-			enabled:   true,
-			projectID: "",
-			expect:    func(*servicemocks.MockStatementPool, *servicemocks.MockAllStatements) {},
-			wantErr:   errMissingProjectID,
-		},
-		{
-			name:      "other storage error is propagated wrapped",
-			enabled:   true,
-			projectID: projectID,
+			name:    "other storage error is propagated wrapped",
+			enabled: true,
 			expect: func(pool *servicemocks.MockStatementPool, stmts *servicemocks.MockAllStatements) {
 				pool.EXPECT().Statements().Return(stmts)
 				stmts.EXPECT().CreateProject(gomock.Any(), wantProject).Return(storageErr)
@@ -83,7 +70,7 @@ func TestEnsure(t *testing.T) {
 			stmts := servicemocks.NewMockAllStatements(ctrl)
 			tt.expect(pool, stmts)
 
-			err := Ensure(t.Context(), pool, tt.enabled, tt.projectID)
+			err := Ensure(t.Context(), pool, tt.enabled)
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				return
@@ -98,13 +85,12 @@ func TestEnsure(t *testing.T) {
 // key. Both calls must succeed and carry the configured id and "Platform" name.
 func TestEnsureIdempotentAcrossRuns(t *testing.T) {
 	t.Parallel()
-	const projectID = "proj_platform"
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockStatementPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 
 	wantProject := &domain.Project{
-		ID:             projectID,
+		ID:             domain.PlatformProjectID,
 		Name:           "Platform",
 		PreviewOrigins: []string{},
 	}
@@ -116,6 +102,6 @@ func TestEnsureIdempotentAcrossRuns(t *testing.T) {
 			Return(database.NewUniqueError("projects", "projects_pkey", nil)),
 	)
 
-	require.NoError(t, Ensure(t.Context(), pool, true, projectID))
-	require.NoError(t, Ensure(t.Context(), pool, true, projectID))
+	require.NoError(t, Ensure(t.Context(), pool, true))
+	require.NoError(t, Ensure(t.Context(), pool, true))
 }

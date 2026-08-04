@@ -1,10 +1,11 @@
 package server
 
 import (
-	"errors"
+	"fmt"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
@@ -27,25 +28,41 @@ type Config struct {
 // intentionally absent until platform mode is implemented; this deployment
 // always reports mode "standalone" for now.
 type PlatformConfig struct {
-	// ProjectID pins the deployment's default project to an existing
-	// project. When empty (the default), a standalone deployment tracks its
-	// first-created project — the one the customer's `zitadel setup`
-	// creates. The server never creates a project itself, unless
-	// BootstrapProject explicitly opts in (#605); a configured id that does
-	// not exist is otherwise a startup error.
+	// ProjectID pins a standalone deployment's default project to an existing
+	// project (an id of the form "proj_<...>"). When empty (the default), the
+	// deployment tracks its first-created project — the one the customer's
+	// `zitadel setup` creates. The server never creates that project itself; a
+	// configured id that does not exist is a startup error. Leave empty when
+	// BootstrapProject is set — the platform project's id is server-owned
+	// (domain.PlatformProjectID), not operator-authored. (#605)
 	ProjectID string `mapstructure:"project_id"`
 
-	// BootstrapProject, when true, ensures the project pinned by ProjectID
-	// exists at startup (idempotent insert). Off by default: no environment
-	// gets a platform project created silently. Requires ProjectID. (#605)
+	// BootstrapProject, when true, ensures the well-known platform project
+	// (domain.PlatformProjectID) exists at startup (idempotent insert) and
+	// resolves it as the default. Off by default: no environment gets a
+	// platform project created silently. Needs no ProjectID. (#605)
 	BootstrapProject bool `mapstructure:"bootstrap_project"`
 }
 
 func (c PlatformConfig) Validate() error {
-	if c.BootstrapProject && c.ProjectID == "" {
-		return errors.New("platform.bootstrap_project requires platform.project_id")
+	if c.ProjectID != "" && !domain.PrefixProject.Matches(c.ProjectID) {
+		return fmt.Errorf("platform.project_id %q must be a project id of the form %q",
+			c.ProjectID, domain.PrefixProject.IDPrefix("<id>"))
+	}
+	if c.BootstrapProject && c.ProjectID != "" && c.ProjectID != domain.PlatformProjectID {
+		return fmt.Errorf("platform.bootstrap_project uses the built-in id %q; leave platform.project_id empty or set it to that value",
+			domain.PlatformProjectID)
 	}
 	return nil
+}
+
+// ResolvedProjectID is the id the deployment pins its default project to: the
+// built-in platform id when bootstrapping, else the operator's pin.
+func (c PlatformConfig) ResolvedProjectID() string {
+	if c.BootstrapProject {
+		return domain.PlatformProjectID
+	}
+	return c.ProjectID
 }
 
 func (c Config) Validate() error {

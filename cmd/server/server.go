@@ -122,7 +122,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	schemaStore := serviceDBPool.Statements()
 	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
 
-	if err := platform.Ensure(ctx, serviceDBPool, cfg.Platform.BootstrapProject, cfg.Platform.ProjectID); err != nil {
+	if err := platform.Ensure(ctx, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
 		return fmt.Errorf("failed to bootstrap platform project: %w", err)
 	}
 
@@ -219,7 +219,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	// project — the one the customer's integration (`zitadel setup`) created
 	// first. The server never creates it; it validates an explicitly pinned
 	// id up front and otherwise reports the current state for operators.
-	defaultProject, err := projectService.DefaultProject(ctx, cfg.Platform.ProjectID)
+	defaultProject, err := projectService.DefaultProject(ctx, cfg.Platform.ResolvedProjectID())
 	if err != nil {
 		return fmt.Errorf("failed to resolve the default project: %w", err)
 	}
@@ -261,7 +261,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
-		standaloneRuntimeResolver(projectService, keyService, cfg.Platform.ProjectID))
+		standaloneRuntimeResolver(projectService, keyService, cfg.Platform.ResolvedProjectID()))
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}

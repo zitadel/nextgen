@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/dbtest"
 )
@@ -20,11 +21,11 @@ func TestEnsureSQLiteIdempotent(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(stop)
 
-	const projectID = "proj_platform"
+	projectID := domain.PlatformProjectID
 	pool := service.NewPool(dbPool)
 
 	// First run creates the row.
-	require.NoError(t, Ensure(ctx, pool, true, projectID))
+	require.NoError(t, Ensure(ctx, pool, true))
 
 	created, err := pool.Statements().GetProjectByID(ctx, projectID)
 	require.NoError(t, err)
@@ -32,7 +33,7 @@ func TestEnsureSQLiteIdempotent(t *testing.T) {
 	require.Equal(t, "Platform", created.Name)
 
 	// Second run is a no-op success; the row is unchanged.
-	require.NoError(t, Ensure(ctx, pool, true, projectID))
+	require.NoError(t, Ensure(ctx, pool, true))
 
 	after, err := pool.Statements().GetProjectByID(ctx, projectID)
 	require.NoError(t, err)
