@@ -72,15 +72,12 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 		}
 
 		for _, a := range user.Attributes {
-			if a == nil {
-				return fmt.Errorf("nil attribute")
-			}
 			raw, err := json.Marshal(a.Value)
 			if err != nil {
 				return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
 			}
 			if _, err := tx.Exec(ctx, createUserAttributeStmt,
-				user.ProjectID, teamScope, user.ID, a.Key, string(raw),
+				user.ProjectID, teamScope, user.ID, string(a.Key), string(raw),
 			); err != nil {
 				return wrapError(err)
 			}
@@ -93,7 +90,7 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 			}
 			sum := a.ValueHash
 			if _, err := tx.Exec(ctx, createUserUniqueAttrStmt,
-				user.ProjectID, user.ID, scopeTeamID, a.Key, sum[:],
+				user.ProjectID, user.ID, scopeTeamID, string(a.Key), sum[:],
 			); err != nil {
 				return wrapError(err)
 			}
@@ -151,7 +148,7 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		}
 		writeConjunct(&compiler, &hasWhere)
 		compiler.WriteString("EXISTS (SELECT 1 FROM user_attributes a WHERE a.project_id = users.project_id AND a.user_id = users.id AND a.key = ")
-		compiler.WriteArg(a.Key)
+		compiler.WriteArg(string(a.Key))
 		compiler.WriteString(" AND a.value = ")
 		compiler.WriteArg(string(raw))
 		compiler.WriteString(")")
@@ -290,7 +287,7 @@ func (us userStatements) hydrateUserGroup(ctx context.Context, group v2user.Proj
 		if !ok {
 			continue
 		}
-		user.Attributes = append(user.Attributes, domain.Attribute{Key: key, Value: val})
+		user.Attributes = append(user.Attributes, domain.Attribute{Key: domain.AttributeKey(key), Value: val})
 	}
 	return wrapError(rows.Err())
 }
@@ -317,9 +314,9 @@ func scanUserHeader(rows *sql.Rows) (*domain.User, error) {
 		v := lifecycleOwner.String
 		user.LifecycleOwnerTeamID = &v
 	}
-	user.Status = domain.UserStatus(status)
-	user.CreatedAt = timeFromUnixNano(createdNano)
-	user.UpdatedAt = timeFromUnixNano(updNano)
+	user.Metadata.Status = domain.UserStatus(status)
+	user.Metadata.CreatedAt = timeFromUnixNano(createdNano)
+	user.Metadata.UpdatedAt = timeFromUnixNano(updNano)
 	return user, nil
 }
 

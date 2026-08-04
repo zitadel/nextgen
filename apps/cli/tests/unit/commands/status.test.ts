@@ -186,7 +186,7 @@ describe("status command", () => {
 
   it("stages verify-login guidance while the project has no users", async () => {
     const cwd = await configuredProject();
-    server.use(http.get("*/users", () => HttpResponse.json([])));
+    server.use(http.get("*/users", () => HttpResponse.json({ users: [] })));
 
     const res = await status(cwd);
 
@@ -206,7 +206,7 @@ describe("status command", () => {
 
   it("switches to customize/publish guidance once users exist", async () => {
     const cwd = await configuredProject();
-    server.use(http.get("*/users", () => HttpResponse.json([{ id: "usr_1" }])));
+    server.use(http.get("*/users", () => HttpResponse.json({ users: [{ id: "usr_1" }] })));
 
     const res = await status(cwd);
 
