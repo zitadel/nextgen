@@ -1,0 +1,77 @@
+post:
+  operationId: completeClaim
+  summary: Complete a project claim
+  description: |
+    Called by the browser after the developer authenticates on the claim page.
+    Authenticated by the `__nextgen_session` cookie, it attaches the project to
+    the developer's personal team using the `challenge_id` from the claim URL as
+    its single-use, browser-safe authorization.
+  tags:
+    - Projects
+  parameters:
+    - name: project_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../../../components/schemas/project-id.yaml
+  security:
+    - nextgenSession: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: complete-claim-request.yaml
+  responses:
+    '200':
+      description: Project claimed.
+      content:
+        application/json:
+          schema:
+            $ref: complete-claim-response.yaml
+    '400':
+      description: Invalid request body.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid session token.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/schemas/errors/auth-unauthorized.yaml
+    '404':
+      description: Challenge not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    '409':
+      description: |
+        The project is already claimed by a team, so this challenge cannot be
+        spent again (claims are single-use and first-claim-wins).
+      content:
+        application/json:
+          schema:
+            $ref: ../init/already-claimed-response.yaml
+    '410':
+      description: The claim challenge has expired.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/schemas/errors/proj-claim_expired.yaml
+    '429':
+      description: |
+        Too many requests. Completion is rate-limited so a guessed
+        `challenge_id` cannot be brute-forced (ADR 046).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
