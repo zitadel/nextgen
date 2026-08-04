@@ -153,6 +153,7 @@ since `started` fires before the command body runs):
 - **plan / apply** — `creates`, `updates`, `deletes`, `total` (diff *counts* only).
 - **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (failing check **names**, never messages).
 - **start** — `runtime` (`binary` / `docker`).
+- **claim** — `claim_outcome` (`completed` / `already_claimed` / `expired` / `timeout`), `poll_count`, `browser_opened`. Deliberately *not* recorded: `challenge_id`, `team_id`, `claim_url`, `dashboard_url` — every one of them is an id or a URL.
 
 ### Naming conventions
 
