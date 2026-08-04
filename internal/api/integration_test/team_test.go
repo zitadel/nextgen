@@ -603,6 +603,43 @@ func TestDeleteTeam(t *testing.T) {
 		deleteTeam(t, "does-not-exist")
 	})
 
+	// An id that fails the contract's pattern never reaches the handler, so it
+	// keeps its 400 rather than joining the ids that answer 204. The generated
+	// client validates team_id before it sends, so only a raw request gets there.
+	t.Run("malformed team id", func(t *testing.T) {
+		t.Parallel()
+
+		for _, tc := range []struct {
+			name   string
+			teamID string
+		}{
+			{"disallowed character", "team.1"},
+			{"escaped space", "team%20id"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete,
+					harness.EnsureTestServer(t).URL+"/teams/"+tc.teamID+"?project_id="+url.QueryEscape(project.ID),
+					nil,
+				)
+				require.NoError(t, err)
+				req.Header.Set("Authorization", "Bearer "+client.Token())
+
+				resp, err := harness.EnsureHttpClient(t).Do(req)
+				require.NoError(t, err)
+				defer resp.Body.Close()
+
+				raw, err := io.ReadAll(resp.Body)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(raw))
+				details := helpers.MustUnmarshal[api.ErrorDetails](t, raw)
+				assert.Equal(t, api.ErrorCode("req.invalid"), details.Code)
+			})
+		}
+	})
+
 	// A project the credentials are not bound to returns a permission denied error.
 	t.Run("foreign project is denied", func(t *testing.T) {
 		t.Parallel()
