@@ -93,7 +93,7 @@ func normalizeType(definition *openfgav1.TypeDefinition) (authz.Type, error) {
 			Rewrite: normalizedRewrite,
 		}
 		// Direct type restrictions live in relation metadata, not in the
-		// This userset rewrite itself.
+		// DirectUserset ("this") rewrite itself.
 		if metadata := definition.GetMetadata().GetRelations()[name]; metadata != nil {
 			relation.DirectlyRelatedTypes = normalizeRelationReferences(metadata.GetDirectlyRelatedUserTypes())
 		}
@@ -175,7 +175,7 @@ func normalizeRewrite(rewrite *openfgav1.Userset) (authz.Rewrite, error) {
 			Children: []authz.Rewrite{base, subtract},
 		}, nil
 	default:
-		return authz.Rewrite{}, fmt.Errorf("unsupported userset rewrite")
+		return authz.Rewrite{}, fmt.Errorf("unsupported userset rewrite type %T", rewrite.GetUserset())
 	}
 }
 

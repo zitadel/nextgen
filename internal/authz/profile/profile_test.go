@@ -97,7 +97,7 @@ type project
 				Code:     profile.CodeUnsupportedWildcard,
 				Type:     "project",
 				Relation: "viewer",
-				Message:  `wildcard restriction "user":* cannot be planned for list endpoints`,
+				Message:  `wildcard restriction "user:*" cannot be planned for list endpoints`,
 			},
 		},
 		{
@@ -159,7 +159,7 @@ type document
 				Code:     profile.CodeUnboundedTupleToUserset,
 				Type:     "document",
 				Relation: "viewer",
-				Message:  `type "folder" is not a known hierarchy edge [app app_group project team user]`,
+				Message:  `type "folder" is not a known hierarchy edge: "app", "app_group", "project", "team", "user"`,
 			},
 		},
 		{
@@ -184,6 +184,75 @@ type project
 				Type:     "project",
 				Relation: "viewer",
 				Message:  `tupleset relation "owning_team" must be a direct assignment`,
+			},
+		},
+		{
+			name: "undefined tupleset relation",
+			model: `model
+  schema 1.1
+
+type user
+
+type team
+  relations
+    define member: [user]
+
+type project
+  relations
+    define viewer: member from team
+`,
+			want: profile.Diagnostic{
+				Code:     profile.CodeRelationNotFound,
+				Type:     "project",
+				Relation: "viewer",
+				Message:  `tupleset references undefined relation "team"`,
+			},
+		},
+		{
+			name: "tupleset must restrict to plain types",
+			model: `model
+  schema 1.1
+
+type user
+
+type team
+  relations
+    define member: [user]
+    define viewer: [user]
+
+type project
+  relations
+    define parent: [team#member]
+    define viewer: viewer from parent
+`,
+			want: profile.Diagnostic{
+				Code:     profile.CodeUnboundedTupleToUserset,
+				Type:     "project",
+				Relation: "viewer",
+				Message:  `tupleset relation "parent" must restrict to plain types`,
+			},
+		},
+		{
+			name: "computed relation missing on tupleset target type",
+			model: `model
+  schema 1.1
+
+type user
+
+type team
+  relations
+    define member: [user]
+
+type project
+  relations
+    define team: [team]
+    define viewer: viewer from team
+`,
+			want: profile.Diagnostic{
+				Code:     profile.CodeRelationNotFound,
+				Type:     "project",
+				Relation: "viewer",
+				Message:  `type "team" does not define relation "viewer"`,
 			},
 		},
 	}
@@ -243,6 +312,60 @@ type project
 	assert.Equal(t, []profile.Code{profile.CodeUnsupportedOperator, profile.CodeUnsupportedWildcard}, codes(diagnostics))
 }
 
+func TestValidateRejectsEmptyUnion(t *testing.T) {
+	t.Parallel()
+
+	model, err := openfga.ParseJSON(`{
+  "schema_version": "1.1",
+  "type_definitions": [
+    {"type": "user"},
+    {
+      "type": "document",
+      "relations": {
+        "viewer": {"union": {"child": []}}
+      }
+    }
+  ]
+}`)
+	require.NoError(t, err)
+
+	err = profile.Validate(model)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, profile.Diagnostic{
+		Code:     profile.CodeEmptyRelationDefinition,
+		Type:     "document",
+		Relation: "viewer",
+		Message:  "union has no children",
+	})
+}
+
+func TestValidateRejectsMissingTypeRestriction(t *testing.T) {
+	t.Parallel()
+
+	// Reachable only via crafted JSON / IR: the DSL cannot write a direct
+	// relation without a bracket list.
+	err := profile.Validate(authz.Model{
+		SchemaVersion: profile.SupportedSchemaVersion,
+		Types: []authz.Type{
+			{Name: "user"},
+			{
+				Name: "document",
+				Relations: []authz.Relation{{
+					Name:    "viewer",
+					Rewrite: authz.Rewrite{Kind: authz.RewriteDirect},
+				}},
+			},
+		},
+	})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, profile.Diagnostic{
+		Code:     profile.CodeMissingTypeRestriction,
+		Type:     "document",
+		Relation: "viewer",
+		Message:  "direct assignment declares no type restrictions",
+	})
+}
+
 func TestValidateRejectsDanglingReferences(t *testing.T) {
 	t.Parallel()
 
@@ -295,6 +418,16 @@ type document
 
 	validator := profile.Validator{HierarchyTypes: []string{"folder", "user"}}
 	require.NoError(t, validator.Validate(model))
+
+	denyAll := profile.Validator{HierarchyTypes: []string{}}
+	err := denyAll.Validate(model)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, profile.Diagnostic{
+		Code:     profile.CodeUnboundedTupleToUserset,
+		Type:     "document",
+		Relation: "viewer",
+		Message:  `type "folder" is not a known hierarchy edge: (none)`,
+	})
 }
 
 func TestDiagnosticsUnwrapExposesEachDiagnostic(t *testing.T) {

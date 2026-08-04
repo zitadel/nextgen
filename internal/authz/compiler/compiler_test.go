@@ -211,8 +211,46 @@ type project
 		Code:     profile.CodeUnsupportedWildcard,
 		Type:     "project",
 		Relation: "viewer",
-		Message:  `wildcard restriction "user":* cannot be planned for list endpoints`,
+		Message:  `wildcard restriction "user:*" cannot be planned for list endpoints`,
 	})
+}
+
+func TestCompileDedupesIdenticalUnionTerms(t *testing.T) {
+	t.Parallel()
+
+	model, err := openfga.ParseJSON(`{
+  "schema_version": "1.1",
+  "type_definitions": [
+    {"type": "user"},
+    {
+      "type": "document",
+      "relations": {
+        "viewer": {
+          "union": {
+            "child": [{"this": {}}, {"this": {}}]
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "viewer": {
+            "directly_related_user_types": [{"type": "user"}]
+          }
+        }
+      }
+    }
+  ]
+}`)
+	require.NoError(t, err)
+
+	output, err := compiler.Compile(model)
+	require.NoError(t, err)
+
+	assert.Equal(t, []compiler.QueryTerm{{
+		Kind:             compiler.TermDirect,
+		DirectReferences: []authz.RelationReference{{Type: "user"}},
+	}}, plan(t, output, relation("document", "viewer")).Terms)
+	assert.Len(t, output.Catalog.ExpressionEdges, 1)
 }
 
 func TestCompilerUsesConfiguredHierarchyTypes(t *testing.T) {

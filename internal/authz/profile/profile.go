@@ -14,6 +14,7 @@ package profile
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/zitadel/nextgen/internal/authz"
 )
@@ -29,8 +30,10 @@ var DefaultHierarchyTypes = []string{"app", "app_group", "project", "team", "use
 
 // Validator checks a model against the supported profile.
 type Validator struct {
-	// HierarchyTypes bounds tuple-to-userset traversal. Empty means
-	// [DefaultHierarchyTypes].
+	// HierarchyTypes bounds tuple-to-userset traversal.
+	//   - nil: use [DefaultHierarchyTypes]
+	//   - non-nil empty: allow no TTU edges (deny all hierarchy traversal)
+	//   - non-empty: allow only the listed types
 	HierarchyTypes []string
 }
 
@@ -90,7 +93,7 @@ func (v Validator) validateTypeRestrictions(index modelIndex, objectType string,
 		switch {
 		case reference.Wildcard:
 			diagnostic.Code = CodeUnsupportedWildcard
-			diagnostic.Message = fmt.Sprintf("wildcard restriction %q:* cannot be planned for list endpoints", reference.Type)
+			diagnostic.Message = fmt.Sprintf("wildcard restriction %q cannot be planned for list endpoints", reference.Type+":*")
 		case reference.Condition != "":
 			diagnostic.Code = CodeUnsupportedCondition
 			diagnostic.Condition = reference.Condition
@@ -135,8 +138,25 @@ func (v Validator) validateRewrite(index modelIndex, objectType string, relation
 	case authz.RewriteTupleToUserset:
 		diagnostics = append(diagnostics, v.validateTupleToUserset(index, objectType, relation, rewrite)...)
 	case authz.RewriteUnion:
+		if len(rewrite.Children) == 0 {
+			diagnostics = append(diagnostics, Diagnostic{
+				Code:     CodeEmptyRelationDefinition,
+				Type:     objectType,
+				Relation: relation.Name,
+				Message:  "union has no children",
+			})
+			break
+		}
 		for _, child := range rewrite.Children {
 			diagnostics = append(diagnostics, v.validateRewrite(index, objectType, relation, child)...)
+		}
+		if !rewriteHasAssignableLeaf(rewrite) {
+			diagnostics = append(diagnostics, Diagnostic{
+				Code:     CodeEmptyRelationDefinition,
+				Type:     objectType,
+				Relation: relation.Name,
+				Message:  "relation has no assignable leaves",
+			})
 		}
 	case authz.RewriteIntersection, authz.RewriteDifference:
 		diagnostics = append(diagnostics, Diagnostic{
@@ -198,7 +218,7 @@ func (v Validator) validateTupleToUserset(index modelIndex, objectType string, r
 				Code:     CodeUnboundedTupleToUserset,
 				Type:     objectType,
 				Relation: relation.Name,
-				Message:  fmt.Sprintf("type %q is not a known hierarchy edge %v", reference.Type, v.hierarchyTypes()),
+				Message:  fmt.Sprintf("type %q is not a known hierarchy edge: %s", reference.Type, formatHierarchy(v.hierarchyTypes())),
 			})
 			continue
 		}
@@ -216,10 +236,37 @@ func (v Validator) validateTupleToUserset(index modelIndex, objectType string, r
 }
 
 func (v Validator) hierarchyTypes() []string {
-	if len(v.HierarchyTypes) == 0 {
+	if v.HierarchyTypes == nil {
 		return DefaultHierarchyTypes
 	}
 	return v.HierarchyTypes
+}
+
+func rewriteHasAssignableLeaf(rewrite authz.Rewrite) bool {
+	switch rewrite.Kind {
+	case authz.RewriteDirect, authz.RewriteComputedUserset, authz.RewriteTupleToUserset:
+		return true
+	case authz.RewriteUnion:
+		for _, child := range rewrite.Children {
+			if rewriteHasAssignableLeaf(child) {
+				return true
+			}
+		}
+		return false
+	default:
+		return false
+	}
+}
+
+func formatHierarchy(types []string) string {
+	if len(types) == 0 {
+		return "(none)"
+	}
+	quoted := make([]string, len(types))
+	for i, objectType := range types {
+		quoted[i] = fmt.Sprintf("%q", objectType)
+	}
+	return strings.Join(quoted, ", ")
 }
 
 func operatorName(kind authz.RewriteKind) string {

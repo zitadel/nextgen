@@ -57,6 +57,10 @@ const (
 	// Distinct from OpenFGA's empty_relation_definition (2023), which is about a
 	// relation carrying no definition at all.
 	CodeMissingTypeRestriction Code = "missing_type_restriction"
+	// CodeEmptyRelationDefinition: a union (or nested union) with no assignable
+	// leaves — present in the catalog but never satisfiable. Crafted JSON can
+	// produce this; the DSL grammar cannot.
+	CodeEmptyRelationDefinition Code = "empty_relation_definition"
 )
 
 // Diagnostic is a single profile violation. Type, Relation, and Condition are

@@ -120,11 +120,38 @@ func flattenRewrite(
 		for _, child := range rewrite.Children {
 			terms = append(terms, flattenRewrite(model, target, directReferences, child)...)
 		}
-		return terms
+		return dedupeTerms(terms)
 	default:
 		// Unreachable after profile validation.
 		return nil
 	}
+}
+
+func dedupeTerms(terms []QueryTerm) []QueryTerm {
+	out := make([]QueryTerm, 0, len(terms))
+	for _, term := range terms {
+		if containsTerm(out, term) {
+			continue
+		}
+		out = append(out, term)
+	}
+	return out
+}
+
+func containsTerm(terms []QueryTerm, want QueryTerm) bool {
+	for _, candidate := range terms {
+		if queryTermsEqual(candidate, want) {
+			return true
+		}
+	}
+	return false
+}
+
+func queryTermsEqual(left, right QueryTerm) bool {
+	return left.Kind == right.Kind &&
+		left.Source == right.Source &&
+		left.Tupleset == right.Tupleset &&
+		slices.Equal(left.DirectReferences, right.DirectReferences)
 }
 
 func lookupRelation(model authz.Model, objectType, relationName string) authz.Relation {
