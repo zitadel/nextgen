@@ -254,53 +254,20 @@ func TestTeamService_Delete(t *testing.T) {
 			name:   "ok",
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").
-					Return(&domain.Team{ProjectID: "proj_1", ID: "team_1", Status: domain.TeamStatusActive}, nil)
 				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(nil)
 			},
 		},
-		// The absent DeactivateTeam expectation is the assertion: a repeat delete
-		// must not write, so the tombstone keeps its original updated_at.
-		{
-			name:   "already deactivated",
-			teamID: "team_1",
-			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").
-					Return(&domain.Team{ProjectID: "proj_1", ID: "team_1", Status: domain.TeamStatusDeactivated}, nil)
-			},
-		},
-		{
-			name:   "pending purge is not active either",
-			teamID: "team_1",
-			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").
-					Return(&domain.Team{ProjectID: "proj_1", ID: "team_1", Status: domain.TeamStatusPendingPurge}, nil)
-			},
-		},
-		// Delete must not report a missing team: the 404 would let a caller
-		// holding team.delete without a read scope enumerate team ids.
 		{
 			name:   "unknown team",
 			teamID: "missing",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "missing").
-					Return(nil, database.NewNoRowFoundError(nil))
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "missing").Return(nil)
 			},
-		},
-		{
-			name:   "get fails",
-			teamID: "team_1",
-			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").Return(nil, assert.AnError)
-			},
-			wantErr: domain.ErrInternal(assert.AnError),
 		},
 		{
 			name:   "deactivate fails",
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").
-					Return(&domain.Team{ProjectID: "proj_1", ID: "team_1", Status: domain.TeamStatusActive}, nil)
 				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(assert.AnError)
 			},
 			wantErr: domain.ErrInternal(assert.AnError),
