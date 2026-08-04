@@ -114,6 +114,11 @@ type TeamStatements interface {
 	// DeactivateTeam tombs the team and cascades membership/user lifecycle
 	// updates. It wraps the multi-write steps in withTransaction (opens a tx
 	// via Statements(), joins an outer pool.Transaction when already nested).
+	//
+	// Only an active team is deactivated: the team UPDATE is guarded on the status,
+	// and a zero-row result skips the cascade and reports success. An unknown or
+	// already-deactivated team is therefore a no-op;
+	// updated_at records when the team was first deactivated.
 	DeactivateTeam(ctx context.Context, projectID, id string) error
 }
 
