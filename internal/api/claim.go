@@ -21,8 +21,12 @@ func (h Handler) verifyClaimSession(ctx context.Context) (string, error) {
 		return "", invalidSessionCredential(domain.ErrSessionTokenInvalid())
 	}
 
-	// Load by the token's own project so a foreign-project session surfaces as
-	// the distinct wrong-project verdict below, not as a lookup miss.
+	// The token already names its project, so a foreign-project session is
+	// rejected before it is even loaded and its caller learns nothing about it.
+	if h.platformProjectID == "" || sessionToken.ProjectID != h.platformProjectID {
+		return "", invalidSessionCredential(domain.ErrClaimSessionWrongProject())
+	}
+
 	session, err := h.sessionService.Get(ctx, service.GetSessionInput{
 		ProjectID: sessionToken.ProjectID,
 		SessionID: gu.Value(sessionToken.SessionID),
@@ -36,11 +40,6 @@ func (h Handler) verifyClaimSession(ctx context.Context) (string, error) {
 
 	if session.TokenID != sessionToken.TokenID {
 		return "", invalidSessionCredential(domain.ErrSessionTokenInvalid())
-	}
-	// Checked before the lifecycle so a foreign caller learns nothing about the
-	// platform session's state.
-	if h.platformProjectID == "" || session.ProjectID != h.platformProjectID {
-		return "", invalidSessionCredential(domain.ErrClaimSessionWrongProject())
 	}
 	// Explicit expiry check before State(), which reports a factor-less expired
 	// session as Building.

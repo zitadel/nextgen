@@ -45,7 +45,8 @@ func TestVerifyClaimSession(t *testing.T) {
 		// token is stashed in the context when non-nil.
 		token *domain.Token
 		// session/getErr are the mocked SessionService.Get outcome; the
-		// expectation is only registered when a token reaches the lookup.
+		// expectation is only registered when either is set, so cases rejected
+		// before the lookup prove no Get happens.
 		session *domain.Session
 		getErr  error
 		// platformProjectID overrides the handler pin when set.
@@ -87,16 +88,14 @@ func TestVerifyClaimSession(t *testing.T) {
 			wantUnauthorized: true,
 		},
 		{
-			name:             "session of a foreign project",
+			name:             "token of a foreign project",
 			token:            sessionToken("proj_other"),
-			session:          activeSession("proj_other"),
 			wantSentinel:     domain.ErrClaimSessionWrongProject(),
 			wantUnauthorized: true,
 		},
 		{
 			name:             "unresolved platform project",
 			token:            sessionToken(platformProjectID),
-			session:          activeSession(platformProjectID),
 			handlerProjectID: new(""),
 			wantSentinel:     domain.ErrClaimSessionWrongProject(),
 			wantUnauthorized: true,
@@ -162,6 +161,8 @@ func TestVerifyClaimSession(t *testing.T) {
 			ctx := t.Context()
 			if tt.token != nil {
 				ctx = context.WithValue(ctx, sessionTokenKey{}, tt.token)
+			}
+			if tt.session != nil || tt.getErr != nil {
 				svc.EXPECT().
 					Get(gomock.Any(), service.GetSessionInput{
 						ProjectID: tt.token.ProjectID,
