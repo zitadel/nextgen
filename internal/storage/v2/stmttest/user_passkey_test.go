@@ -1,9 +1,10 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package stmttest
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -59,7 +60,8 @@ func TestUserPasskeyStatements_CreateGetListDelete(t *testing.T) {
 
 		got, err := d.stmts.GetUserPasskey(t.Context(), byKey)
 		require.NoError(t, err)
-		require.Positive(t, got.ID)
+		require.NotEmpty(t, got.ID)
+		assert.True(t, strings.HasPrefix(got.ID, string(domain.PrefixUserPasskey)+"_"))
 		assert.Equal(t, projectID, got.ProjectID)
 		assert.Equal(t, userID, got.UserID)
 		assert.Equal(t, credentialID, got.CredentialID)

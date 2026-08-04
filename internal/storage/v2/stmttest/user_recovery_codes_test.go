@@ -1,8 +1,9 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package stmttest
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -20,14 +21,14 @@ func recoveryCodesByUserFilter(projectID, userID string) database.Filter[domain.
 	)
 }
 
-func recoveryCodesByIDFilter(id int64) database.Filter[domain.UserRecoveryCodesField] {
+func recoveryCodesByIDFilter(id string) database.Filter[domain.UserRecoveryCodesField] {
 	return database.Equal(database.Col(domain.UserRecoveryCodesFieldID), id)
 }
 
 func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-		userID := "usr_rc"
+		userID := "user_rc"
 
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "rc@example.com", "RC User")))
 
@@ -40,7 +41,8 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 
 		got, err := d.stmts.GetUserRecoveryCodes(t.Context(), recoveryCodesByUserFilter(projectID, userID))
 		require.NoError(t, err)
-		require.Positive(t, got.ID)
+		require.NotEmpty(t, got.ID)
+		assert.True(t, strings.HasPrefix(got.ID, string(domain.PrefixUserRecoveryCodes)+"_"))
 		require.Equal(t, codes, got.RecoveryCodes)
 
 		byID, err := d.stmts.GetUserRecoveryCodes(t.Context(), recoveryCodesByIDFilter(got.ID))
@@ -64,7 +66,7 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 		}))
 		got2, err := d.stmts.GetUserRecoveryCodes(t.Context(), recoveryCodesByUserFilter(projectID, userID))
 		require.NoError(t, err)
-		require.Positive(t, got2.ID)
+		require.NotEmpty(t, got2.ID)
 		require.NoError(t, d.stmts.DeleteUserRecoveryCodes(t.Context(), recoveryCodesByUserFilter(projectID, userID)))
 		_, err = d.stmts.GetUserRecoveryCodes(t.Context(), recoveryCodesByUserFilter(projectID, userID))
 		require.ErrorIs(t, err, new(database.NoRowFoundError))
@@ -74,7 +76,7 @@ func TestUserRecoveryCodesStatements_CRUD(t *testing.T) {
 func TestUserRecoveryCodesStatements_CreateEmptyRejected(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-		userID := "usr_rc_empty"
+		userID := "user_rc_empty"
 
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "rc-empty@example.com", "RC Empty")))
 
@@ -97,7 +99,7 @@ func TestUserRecoveryCodesStatements_CreateEmptyRejected(t *testing.T) {
 func TestUserRecoveryCodesStatements_Update(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-		userID := "usr_rc_upd"
+		userID := "user_rc_upd"
 
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "rc-upd@example.com", "RC Update")))
 		require.NoError(t, d.stmts.CreateUserRecoveryCodes(t.Context(), &domain.CreateRecoveryCodes{

@@ -1,4 +1,4 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package stmttest
 
@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +34,19 @@ func TestProjectStatements_Create(t *testing.T) {
 			assert.Equal(t, project.Name, stored.Name)
 			assert.False(t, stored.CreatedAt.IsZero())
 			assert.False(t, stored.UpdatedAt.IsZero())
+		})
+
+		t.Run("empty id is assigned by dialect", func(t *testing.T) {
+			project := &domain.Project{Name: "project-" + uniqueSuffix(t), PreviewOrigins: []string{}}
+			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
+			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+
+			require.NotEmpty(t, project.ID)
+			assert.True(t, strings.HasPrefix(project.ID, string(domain.PrefixProject)+"_"))
+
+			stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
+			require.NoError(t, err)
+			assert.Equal(t, project.ID, stored.ID)
 		})
 
 		t.Run("duplicate ID returns error", func(t *testing.T) {

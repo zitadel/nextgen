@@ -13,34 +13,118 @@ func (h *Handler) CreateTeam(ctx context.Context, req *api.CreateTeamRequest, pa
 	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opWrite); err != nil {
 		return nil, err
 	}
-	team, err := h.teamService.CreateTeam(ctx, service.CreateTeamInput{
+	team, err := h.teamService.Create(ctx, service.CreateTeamInput{
 		ProjectID: string(params.ProjectID),
 		Name:      req.Name,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &api.CreateTeamResponse{
-		ID:        team.ID,
-		Name:      team.Name,
-		CreatedAt: team.CreatedAt,
-	}, nil
+	return teamResponse(team), nil
 }
 
 func (h *Handler) GetTeam(ctx context.Context, params api.GetTeamParams) (api.GetTeamRes, error) {
 	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opRead); err != nil {
 		return nil, err
 	}
-	team, err := h.teamService.GetTeam(ctx, string(params.ProjectID), string(params.TeamID))
+	team, err := h.teamService.Get(ctx, string(params.ProjectID), string(params.TeamID))
 	if err != nil {
 		return nil, err
 	}
-	return &api.GetTeamResponse{
+	return teamResponse(team), nil
+}
+
+func (h *Handler) UpdateTeam(ctx context.Context, req *api.UpdateTeamRequest, params api.UpdateTeamParams) (api.UpdateTeamRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opWrite); err != nil {
+		return nil, err
+	}
+	input := service.UpdateTeamInput{
+		ProjectID: string(params.ProjectID),
+		TeamID:    string(params.TeamID),
+	}
+	if name, ok := req.Name.Get(); ok {
+		input.Name = &name
+	}
+	team, err := h.teamService.Update(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	return teamResponse(team), nil
+}
+
+func (h *Handler) DeleteTeam(ctx context.Context, params api.DeleteTeamParams) (api.DeleteTeamRes, error) {
+	if err := requireTeamDelete(ctx, string(params.ProjectID)); err != nil {
+		return nil, err
+	}
+	if err := h.teamService.Delete(ctx, string(params.ProjectID), string(params.TeamID)); err != nil {
+		return nil, err
+	}
+	return &api.DeleteTeamNoContent{}, nil
+}
+
+func (h *Handler) QueryTeams(ctx context.Context, req *api.QueryTeamsRequest, params api.QueryTeamsParams) (api.QueryTeamsRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opRead); err != nil {
+		return nil, err
+	}
+
+	listed, err := h.teamService.List(ctx, mapQueryTeamsToService(string(params.ProjectID), req))
+	if err != nil {
+		return nil, err
+	}
+
+	teams := make([]api.TeamResponse, 0, len(listed.Teams))
+	for _, team := range listed.Teams {
+		teams = append(teams, *teamResponse(team))
+	}
+	resp := &api.QueryTeamsResponse{Teams: teams}
+	if listed.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
+	}
+	return resp, nil
+}
+
+// ------------------ Converters ---------------
+
+func mapQueryTeamsToService(projectID string, req *api.QueryTeamsRequest) service.ListTeamsRequest {
+	svcReq := service.ListTeamsRequest{
+		ProjectID: projectID,
+		Limit:     int(req.Limit.Or(0)), // if not defined, set to default value in the service layer
+		PageToken: string(req.PageToken.Or("")),
+	}
+	if sorting, ok := req.Sorting.Get(); ok {
+		svcReq.Sorting = &service.Sorting{
+			Field:     string(sorting.Field),
+			Direction: string(sorting.Direction),
+		}
+	}
+	for _, filter := range req.Filter {
+		svcReq.Filters = append(svcReq.Filters, service.Filter{
+			Field:     string(filter.Field),
+			Operation: string(filter.Operation),
+			Value:     filterValue(filter.Value),
+		})
+	}
+	return svcReq
+}
+
+// teamResponse is the shared team body: createTeam, getTeam, updateTeam, and
+// every item in queryTeams answer with it.
+func teamResponse(team *domain.Team) *api.TeamResponse {
+	return &api.TeamResponse{
 		ID:        team.ID,
 		Name:      team.Name,
+		Status:    teamStatus(team.Status),
 		CreatedAt: team.CreatedAt,
 		UpdatedAt: team.UpdatedAt,
-	}, nil
+	}
+}
+
+func teamStatus(status domain.TeamStatus) api.TeamStatus {
+	if status == domain.TeamStatusActive {
+		return api.TeamStatusActive
+	}
+	// pending_purge is not part of the contract, such a team is no longer usable.
+	return api.TeamStatusDeactivated
 }
 
 // ------------------ Errors ---------------

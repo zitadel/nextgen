@@ -161,11 +161,10 @@ are produced for the identifier classes in [ADR 011](011-resource-identifiers.md
 
 | Class | Storage responsibility | Dialect may use |
 |---|---|---|
-| **Ephemeral** (sessions, auth attempts, checks, tokens, …) | Generate on insert; read back via `RETURNING` or equivalent | Database `IDENTITY` / `BIT_REVERSED_POSITIVE` (current ADR 011 DDL), or a dialect-specific DB function |
-| **Managed** (users, teams, apps, …) | Generate fallback when API omits `id`; validate client-provided ids | Go package (e.g. ULID via `idgen`), database function, or hybrid |
+| **All resource PKs** (users, sessions, auth attempts, tokens, credential rows, …) | Generate on create when ID is empty; HTTP create does not accept client PKs ([ADR 047](047-dialect-id-generation.md)) | Dialect `idgen` (Postgres/SQLite ULID; Spanner UUID v4); SQL supplies no DEFAULT/IDENTITY |
 
 The **dialect** owns the generation strategy per class — not
-`internal/domain/idgen` or service code. Domain keeps prefix rules and
+domain or service code. Domain keeps prefix rules and
 validation; storage executes generation and returns
 [`Identity`](../../internal/storage/v2/database/identity.go).
 
@@ -174,8 +173,9 @@ identity vs bit-reversed identity per ADR 011). Colocating generation with the
 dialect avoids leaking engine-specific choices into domain or repository layers.
 
 This ADR refines [ADR 011](011-resource-identifiers.md) § Package roles:
-`internal/domain/idgen` becomes a dialect implementation detail (or is inlined
-into v2 dialect packages), not a domain-layer concern at call sites.
+managed ID generation lives under `internal/storage/v2/dialect/idgen` (or is
+inlined into v2 dialect packages), not a domain-layer concern at call sites.
+Concrete mechanisms are recorded in [ADR 047](047-dialect-id-generation.md).
 
 ```mermaid
 flowchart LR
@@ -199,17 +199,16 @@ flowchart LR
 These previously lived under v1 and are now owned by v2 (C3–C6):
 
 - Migrations (postgres + spanner DDL) — **done**
-- Embedded postgres startup — **done** (`v2/dialect/postgres/embedded`)
-- Test DSN bring-up — **done** (`v2/testdb` + `v2/dbtest`)
+- Test DSN bring-up — **done** (`v2/testdb` + `v2/dbtest`; Postgres/Spanner emulator via testcontainers, or env-provided DSNs / real Spanner instance)
+- Zero-config local SQLite — **done** (`v2/dialect/sqlite`; file under `server.data_dir`)
 - [`database.Identity`](../../internal/storage/v2/database/identity.go) (ADR 011) — **done**
 - Dialect-specific integrity error types — **done** (`v2/database/integrity_errors.go`)
 - Single pool at production startup — **done** (C5)
 - Retire v1 dialect tree — **done** (C6)
 - Retire leftover v1 query-builder / aliases package — **done** (C6)
 
-Still open:
-
-- ID generation (ephemeral + managed fallback) per dialect
+ID generation (ephemeral + managed) per dialect is complete — see
+[ADR 047](047-dialect-id-generation.md).
 
 **Specialized storage that may keep distinct patterns:** EAV user storage (ADR
 008) — ported to v2 statements but may retain EAV-specific SQL structure.
@@ -288,13 +287,21 @@ compiler.compileRead(projectQuery, &database.ListOptions{
 5. **Retire v1 dialect layer and leftover v1 package** — **done (C6).** Deleted
    `internal/storage/database/` (dialects, dbtest, query-builder, mocks, and
    Identity/error aliases) after v2 dialects satisfied pool, migrations,
-   embedded bring-up, Identity, and errors.
+   Identity, and errors. Local zero-config uses SQLite; integration bring-up
+   uses testcontainers (or env DSNs), not an in-process embedded Postgres.
 6. **Single pool at startup** — **done (C5).** Server connects through v2
    dialect only; no second pool.
 
 **End state:** one dialect implementation per engine under
 `internal/storage/v2/dialect/`, owning connections, transactions, migrations,
-embedded postgres, Identity binding, ID generation, and all entity statements.
+Identity binding, ID generation, and all entity statements. PostgreSQL and
+Spanner remain production targets; **SQLite** is the zero-config local/homelab
+default (`dialect/sqlite`, file under `server.data_dir`) and is not a Spanner
+production peer. Postgres/Spanner integration tests bring up a **Postgres
+testcontainer** or a **Spanner emulator testcontainer** by default
+(`v2/testdb`); override with `ZITADEL_TEST_POSTGRES_URL` /
+`ZITADEL_TEST_SPANNER_URL`, or a real Spanner instance via
+`ZITADEL_TEST_SPANNER_INSTANCE`.
 
 ## Pre-merge checklist
 
@@ -303,11 +310,11 @@ items off as work lands; remove completed entries when no longer useful.
 
 - [x] `compileColumnName()` is no longer a required implementation: v2 compilers derive SQL column names from the schema `SQLName` bindings.
 - [x] `AndFilter`/`OrFilter` value vs pointer handling in the postgres compiler is already implemented and covered by compiler tests.
-- [x] Spanner statement execution and dialect registration are in place; remaining Spanner work is migrate/embedded/dbtest parity under v2.
+- [x] Spanner statement execution and dialect registration are in place; remaining Spanner work is migrate/dbtest parity under v2.
 - [x] Move migrations from v1 to v2 dialect packages (postgres + spanner)
-- [x] Move embedded postgres startup to v2 postgres dialect
+- [x] Retire in-process embedded Postgres; local default is SQLite; Postgres/Spanner integration uses testcontainers (or env / real Spanner instance)
 - [x] Move `database.Identity` bind/scan to v2 core
-- [ ] Move ID generation into v2 dialects (ephemeral via DB identity/function; managed fallback via dialect-chosen Go package or DB function); retire domain-layer `idgen` call sites at storage boundary
+- [x] Move ID generation into v2 dialects (all resource PKs via dialect-chosen Go package; Postgres/SQLite ULID / Spanner UUID v4); retire domain-layer `idgen` and SQL IDENTITY — see [ADR 047](047-dialect-id-generation.md)
 - [x] Add `internal/storage/v2/AGENTS.md` with v2 conventions (including multi-write `withTransaction` rules)
 - [x] Port remaining entities and remove v1 entity repository package
 - [x] Drop QueryExecutor bridge from app callers and v2 transactions
@@ -337,10 +344,10 @@ items off as work lands; remove completed entries when no longer useful.
 ### Negative / Risks (during transition only)
 
 - Spanner still needs per-entity hand-written SQL alongside the shared compiler; acceptable trade-off for dialect clarity
-- ID generation still pending full move into v2 dialects (see checklist)
 
 ### Resolved at merge
 
 Pre-merge checklist items (compiler gaps, migrations, Identity, ID generation,
 v1 dialect removal) are blockers for completing the v2 dialect takeover, not
-permanent architectural debt.
+permanent architectural debt. ID generation ownership is recorded in
+[ADR 047](047-dialect-id-generation.md).

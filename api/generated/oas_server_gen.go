@@ -29,6 +29,15 @@ type Handler interface {
 	//
 	// GET /auth/authorize
 	AuthorizeGet(ctx context.Context, params AuthorizeGetParams) (AuthorizeGetRes, error)
+	// CompleteClaim implements completeClaim operation.
+	//
+	// Called by the browser after the developer authenticates on the claim page.
+	// Authenticated by the `__nextgen_session` cookie, it attaches the project to
+	// the developer's personal team using the `challenge_id` from the claim URL as
+	// its single-use, browser-safe authorization.
+	//
+	// POST /projects/{project_id}/claim/complete
+	CompleteClaim(ctx context.Context, req *CompleteClaimRequest, params CompleteClaimParams) (CompleteClaimRes, error)
 	// CreateAuthAttempt implements createAuthAttempt operation.
 	//
 	// Starts a new authentication attempt. This is the entry point for the auth_attempts state machine.
@@ -97,10 +106,12 @@ type Handler interface {
 	CreateProject(ctx context.Context, req *CreateProjectRequest) (CreateProjectRes, error)
 	// CreateSchema implements createSchema operation.
 	//
-	// Create a new schema. The schema definition must include a unique $id field,
-	// which will be used to identify the schema in future requests. The $id must
-	// be a valid URI and should ideally point to the location where the schema
-	// can be accessed.
+	// Create a new schema. The optional `$id` field is the JSON Schema document
+	// URI used to identify the schema in future requests (GitOps-stable identity,
+	// not a free-form resource primary key). When `$id` is omitted, the server
+	// generates a `sch_*` URL. When provided, `$id` must be unique within the
+	// project and should ideally be a valid URI pointing at where the schema can
+	// be accessed.
 	// The schema can either be a concrete schema, e.g. a user schema, or a
 	// schema-url which will be resolved by the server.
 	//
@@ -160,6 +171,17 @@ type Handler interface {
 	//
 	// DELETE /flow_definitions/{id}
 	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
+	// DeleteTeam implements deleteTeam operation.
+	//
+	// Deactivates the team.
+	// The team is tombstoned rather than erased: it stays readable through
+	// getTeam with status `deactivated`. Its memberships are removed and the
+	// users whose lifecycle it owns are deactivated with it.
+	// The request is idempotent. Deleting a team that is already deactivated
+	// or doesn't exist succeeds without changing anything.
+	//
+	// DELETE /teams/{team_id}
+	DeleteTeam(ctx context.Context, params DeleteTeamParams) (DeleteTeamRes, error)
 	// DeleteUserByID implements DeleteUserByID operation.
 	//
 	// Delete user by ID.
@@ -207,6 +229,15 @@ type Handler interface {
 	//
 	// GET /branding/{id}
 	GetBrandingById(ctx context.Context, params GetBrandingByIdParams) (GetBrandingByIdRes, error)
+	// GetClaimStatus implements getClaimStatus operation.
+	//
+	// Polled by the CLI while a browser completes the claim. Authorized by the
+	// project secret that initiated the challenge. Returns `pending`, or
+	// `completed` with the owning team, the claim timestamp, and the dashboard
+	// URL once the browser leg has finished.
+	//
+	// GET /projects/{project_id}/claim/status
+	GetClaimStatus(ctx context.Context, params GetClaimStatusParams) (GetClaimStatusRes, error)
 	// GetFlowDefinition implements getFlowDefinition operation.
 	//
 	// Get a flow definition by id.
@@ -290,7 +321,7 @@ type Handler interface {
 	GetSession(ctx context.Context, params GetSessionParams) (GetSessionRes, error)
 	// GetTeam implements getTeam operation.
 	//
-	// Returns the current state of a team.
+	// Returns a Team by its id.
 	//
 	// GET /teams/{team_id}
 	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
@@ -312,6 +343,16 @@ type Handler interface {
 	//
 	// GET /auth/userinfo
 	GetUserInfo(ctx context.Context) (GetUserInfoRes, error)
+	// InitClaim implements initClaim operation.
+	//
+	// Starts a claim challenge for an unclaimed project. Authenticated by the
+	// project secret, this mints a single-use, short-lived challenge and returns
+	// the `claim_url` the developer opens in a browser to complete the claim,
+	// together with the `challenge_id` the CLI polls with. The exact expiry is
+	// carried by `expires_at` on the response.
+	//
+	// POST /projects/{project_id}/claim/init
+	InitClaim(ctx context.Context, params InitClaimParams) (InitClaimRes, error)
 	// Introspect implements introspect operation.
 	//
 	// Introspect a token.
@@ -383,6 +424,13 @@ type Handler interface {
 	//
 	// POST /projects/query
 	QueryProjects(ctx context.Context, req *QueryProjectsRequest) (QueryProjectsRes, error)
+	// QueryTeams implements queryTeams operation.
+	//
+	// Returns the teams of a project, paginated with a cursor.
+	// Teams of every lifecycle status are returned; each carries its `status`.
+	//
+	// POST /teams/query
+	QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Revokes the session immediately (`state: revoked`). This is the logout operation.
@@ -454,6 +502,12 @@ type Handler interface {
 	//
 	// PUT /flow_definitions/{id}
 	UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (UpdateFlowDefinitionRes, error)
+	// UpdateTeam implements updateTeam operation.
+	//
+	// Update team. Only active teams can be updated.
+	//
+	// PATCH /teams/{team_id}
+	UpdateTeam(ctx context.Context, req *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
 	// VerifyChallengeProof implements verifyChallengeProof operation.
 	//
 	// Submits a proof (credential, code, assertion) to verify a factor challenge.

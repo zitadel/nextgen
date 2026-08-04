@@ -45,17 +45,17 @@ var Schema = database.NewSchema(map[domain.UserField]database.FieldBinding[domai
 	},
 	domain.UserFieldStatus: {
 		SQLName:  "status",
-		Accessor: func(u *domain.User) any { return u.Status.String() },
+		Accessor: func(u *domain.User) any { return u.Metadata.Status.String() },
 		Coerce:   coerceUserStatus,
 	},
 	domain.UserFieldCreatedAt: {
 		SQLName:  "created_at",
-		Accessor: func(u *domain.User) any { return u.CreatedAt },
+		Accessor: func(u *domain.User) any { return u.Metadata.CreatedAt },
 		Coerce:   database.CoerceTime,
 	},
 	domain.UserFieldUpdatedAt: {
 		SQLName:  "updated_at",
-		Accessor: func(u *domain.User) any { return u.UpdatedAt },
+		Accessor: func(u *domain.User) any { return u.Metadata.UpdatedAt },
 		Coerce:   database.CoerceTime,
 	},
 })

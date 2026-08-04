@@ -4,8 +4,10 @@ import (
 	"time"
 )
 
+const PrefixUserTOTP ResourcePrefix = "utotp"
+
 type UserTOTP struct {
-	ID                  int64
+	ID                  string
 	ProjectID           string
 	UserID              string
 	Secret              []byte
@@ -17,6 +19,7 @@ type UserTOTP struct {
 }
 
 type CreateUserTOTP struct {
+	ID        string
 	ProjectID string
 	UserID    string
 	Secret    []byte

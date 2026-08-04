@@ -5,6 +5,7 @@
 package integration_test
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"testing"
@@ -24,7 +25,7 @@ func TestCreateUser(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
-	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
 		Name:      helpers.TeamName(),
 	})
@@ -156,6 +157,15 @@ func TestCreateUser(t *testing.T) {
 						"password":   "my-strong-password",
 					}),
 				},
+				{
+					name: "client-supplied resource id",
+					userjson: helpers.MustMarshal(t, map[string]any{
+						"$schema":  "https://test.example.schemas.com/schemas/default-human-user.json",
+						"id":       "user_client_supplied",
+						"email":    "john.doe.clientsuppliedid@example.com",
+						"password": "my-strong-password",
+					}),
+				},
 			}
 
 			for _, tc := range tcs {
@@ -172,6 +182,24 @@ func TestCreateUser(t *testing.T) {
 					assert.IsType(t, &api.CreateUserBadRequest{}, resp, helpers.MustMarshal(t, resp))
 				})
 			}
+		})
+
+		t.Run("a caller-supplied id does not shadow the minted one", func(t *testing.T) {
+			t.Parallel()
+
+			// `id` is served as a field of api.User and would be served a second
+			// time if it were also stored as an attribute — and on decode the
+			// second one wins. So a body carrying `id` must not reach the
+			// attributes: the reads below must report the id the platform minted.
+			usermap := harness.EnsureTestData(t).Generator.GenerateUser(t, "testcreateuser.suppliedid@example.com")
+			usermap["id"] = "user_supplied_by_the_caller"
+
+			user := &api.User{}
+			require.NoError(t, user.UnmarshalJSON([]byte(helpers.MustMarshal(t, usermap))))
+
+			resp, err := client.CreateUser(t.Context(), user, params)
+			require.NoError(t, err)
+			require.IsType(t, &api.CreateUserBadRequest{}, resp, helpers.MustMarshal(t, resp))
 		})
 
 		t.Run("duplicate mail address", func(t *testing.T) {
@@ -453,7 +481,7 @@ func TestGetUser(t *testing.T) {
 	resp, err := client.GetUserByID(t.Context(), params)
 	assert.NoError(t, err)
 
-	assert.IsType(t, &api.GetUserByIDOK{}, resp, helpers.MustMarshal(t, resp))
+	assert.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 }
 
 func TestGetMyUser(t *testing.T) {
@@ -510,7 +538,7 @@ func TestGetMyUser(t *testing.T) {
 		resp, err := client.GetMyUser(t.Context())
 		assert.NoError(t, err)
 
-		assert.IsType(t, &api.GetMyUserOK{}, resp, helpers.MustMarshal(t, resp))
+		assert.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("missing session cookie", func(t *testing.T) {
@@ -529,10 +557,17 @@ func TestGetMyUser(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
-		assert.JSONEq(t,
-			`{"code":"auth.unauthorized","message":"Missing or invalid session token."}`,
-			string(body),
-		)
+
+		// Only the client-facing code and message are pinned: these tests run
+		// with api.FullErrorInResponse on, which attaches the unwrapped cause
+		// under `details` (never present in production responses).
+		var answer struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		}
+		require.NoError(t, json.Unmarshal(body, &answer))
+		assert.Equal(t, "auth.unauthorized", answer.Code)
+		assert.Equal(t, "Missing or invalid session token.", answer.Message)
 	})
 }
 

@@ -26,7 +26,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
-	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
 		Name:      helpers.TeamName(),
 	})
@@ -49,7 +49,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 		SchemaURL:               schemaURL,
 		ID:                      userID,
 		InitialMembershipTeamID: &team.ID,
-		Attributes:              []*domain.CreateAttribute{emailAttr},
+		Attributes:              domain.CreateAttributes{*emailAttr},
 	}))
 
 	hasher := harness.EnsureHasher(t)
@@ -251,7 +251,7 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
-	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
 		Name:      helpers.TeamName(),
 	})
@@ -266,7 +266,7 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 		SchemaURL:               schemaURL,
 		ID:                      "pwregister-conflict-seed",
 		InitialMembershipTeamID: &team.ID,
-		Attributes:              []*domain.CreateAttribute{emailAttr},
+		Attributes:              domain.CreateAttributes{*emailAttr},
 	}))
 
 	server := harness.EnsureTestServer(t)

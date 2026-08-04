@@ -2,8 +2,10 @@ package domain
 
 import "time"
 
+const PrefixUserPasskey ResourcePrefix = "upk"
+
 type UserPasskey struct {
-	ID              int64
+	ID              string
 	ProjectID       string
 	UserID          string
 	CredentialID    string
@@ -22,6 +24,7 @@ type UserPasskey struct {
 }
 
 type CreateUserPasskey struct {
+	ID              string
 	ProjectID       string
 	UserID          string
 	CredentialID    string

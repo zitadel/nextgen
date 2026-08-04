@@ -94,8 +94,9 @@ var userAccess = resourceAccess{
 
 var teamAccess = resourceAccess{
 	scopes: map[accessOp][]string{
-		opRead:  {"team.read", "team.write"},
-		opWrite: {"team.write"},
+		opRead:   {"team.read", "team.write"},
+		opWrite:  {"team.write"},
+		opDelete: {"team.delete"},
 	},
 	legacyProjectWriteUmbrella: true,
 	readMiss:                   domain.ErrTeamNotFound,
@@ -173,6 +174,16 @@ func requireProjectAccess(ctx context.Context, projectID string, res resourceAcc
 	}
 	if !res.allows(scope.Scope, op) {
 		return res.denied()
+	}
+	return nil
+}
+
+// requireTeamDelete gates deleteTeam. Deleting an unknown team answers 204, so
+// the endpoint has no not-found to report: a project the credentials are not
+// bound to is refused as the permission failure it is.
+func requireTeamDelete(ctx context.Context, projectID string) error {
+	if err := requireProjectAccess(ctx, projectID, teamAccess, opDelete); err != nil {
+		return domain.ErrTeamPermissionDenied().WithParent(err)
 	}
 	return nil
 }

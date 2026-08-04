@@ -25,10 +25,10 @@ import (
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
@@ -38,7 +38,8 @@ import (
 	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
-	postgresembedded "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres/embedded"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/idgen"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/sqlite"
 )
 
 func NewCommand() *cobra.Command {
@@ -121,6 +122,10 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	schemaStore := serviceDBPool.Statements()
 	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
 
+	if err := platform.Ensure(ctx, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
+		return fmt.Errorf("failed to bootstrap platform project: %w", err)
+	}
+
 	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
 		return fmt.Errorf("failed to bootstrap users: %w", err)
 	}
@@ -185,7 +190,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	)
 
 	// ── Flow engine ──────────────────
-	ids := idgen.NewULID()
 	fields := domain.NewSchemaFieldResolver()
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
 	createUserHandler := service.NewFlowCreateUserHandler(
@@ -194,7 +198,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		schemaStore,
 	)
 	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaStore)
-	passkeyRegSvc := service.NewPasskeyRegistrationService(serviceDBPool, ids)
+	passkeyRegSvc := service.NewPasskeyRegistrationService(serviceDBPool)
 	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
@@ -204,11 +208,10 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		createUserForPasskeyHandler,
 		flowAuth,
 		passkeyRegAdapter,
-		ids,
 		time.Now,
 	)
 
-	flowService := service.NewFlowService(serviceDBPool, stateMachine, ids)
+	flowService := service.NewFlowService(serviceDBPool, stateMachine)
 	tokenService := service.NewTokenService(keyService)
 
 	// ── Default project resolution ──
@@ -216,7 +219,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	// project — the one the customer's integration (`zitadel setup`) created
 	// first. The server never creates it; it validates an explicitly pinned
 	// id up front and otherwise reports the current state for operators.
-	defaultProject, err := projectService.DefaultProject(ctx, cfg.Platform.ProjectID)
+	defaultProject, err := projectService.DefaultProject(ctx, cfg.Platform.ResolvedProjectID())
 	if err != nil {
 		return fmt.Errorf("failed to resolve the default project: %w", err)
 	}
@@ -258,7 +261,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
-		standaloneRuntimeResolver(projectService, keyService, cfg.Platform.ProjectID))
+		standaloneRuntimeResolver(projectService, keyService, cfg.Platform.ResolvedProjectID()))
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -360,8 +363,10 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("session.max_ttl", 720*time.Hour)
 	// Empty means "the deployment's first-created project is the default"
 	// (Console ADR 0004 §3); set NEXTGEN_PLATFORM_PROJECT_ID to pin an
-	// existing project instead. The server never creates a project itself.
+	// existing project instead. The server never creates a project itself,
+	// unless platform.bootstrap_project explicitly opts in (#605).
 	v.SetDefault("platform.project_id", "")
+	v.SetDefault("platform.bootstrap_project", false)
 	v.SetDefault("instrumentation.service_name", "Zitadel")
 	v.SetDefault("instrumentation.log.level", zlog.LevelInfo)
 	v.SetDefault("instrumentation.log.streams", []zlog.Stream{
@@ -422,7 +427,7 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 // ----------------------------- HTTP --------------------------------------
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Handler, runtime runtimeResolver) (*http.ServeMux, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler http.Handler, runtime runtimeResolver) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	if cfg.LoginEnabled {
@@ -457,7 +462,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Ha
 	mux.Handle("/",
 		middleware.WithRequestIdentification(reqIdGen,
 			middleware.WithLogging(
-				api.WithRequestHostMiddleware(apiHandler),
+				api.WithRequestHostMiddleware(api.WithSessionStateNoStore(apiHandler)),
 			),
 		),
 	)
@@ -483,9 +488,9 @@ func startDatabase(ctx context.Context, cfg Config) (database.Pool, error) {
 
 func buildDatabaseDialect(cfg Config) (database.Dialect, error) {
 	if len(cfg.Database.Raw) == 0 {
-		options := embeddedPostgresOptions(cfg.Server.DataDir)
-		slog.Info("no database dialect configured, starting embedded postgres", slog.String("filePath", filepath.Dir(options.DataPath)))
-		return postgresembedded.NewDialect(options), nil
+		path := defaultSQLitePath(cfg.Server.DataDir)
+		slog.Info("no database dialect configured, using sqlite", slog.String("path", path))
+		return sqlite.Config{Path: path}, nil
 	}
 
 	dialect, err := cfg.Database.Build()
@@ -495,15 +500,8 @@ func buildDatabaseDialect(cfg Config) (database.Dialect, error) {
 	return dialect, nil
 }
 
-func embeddedPostgresOptions(dataDir string) postgresembedded.Options {
-	root := filepath.Join(dataDir, "embedded-postgres")
-	return postgresembedded.Options{
-		RuntimePath: filepath.Join(root, "runtime"),
-		DataPath:    filepath.Join(root, "data"),
-		CachePath:   filepath.Join(root, "cache"),
-		LogPath:     filepath.Join(root, "postgres.log"),
-		Logger:      os.Stdout,
-	}
+func defaultSQLitePath(dataDir string) string {
+	return filepath.Join(dataDir, "zitadel.db")
 }
 
 // ----------------------------- CRYPTO --------------------------------------

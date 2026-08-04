@@ -1,9 +1,10 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package stmttest
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -62,6 +63,22 @@ func TestBrandingStatements_CreateAndGet(t *testing.T) {
 		assert.Equal(t, entity.FontURL, got.FontURL)
 		assert.Equal(t, entity.HeroURL, got.HeroURL)
 		assert.WithinDuration(t, time.Now(), got.CreatedAt, 5*time.Second)
+	})
+}
+
+func TestBrandingStatements_Create_EmptyIDAssigned(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, _ := uniqueBrandingIDs(t)
+		ensureBrandingProject(t, d.stmts, projectID)
+
+		entity := sampleBranding(projectID, "")
+		require.NoError(t, d.stmts.CreateBranding(t.Context(), entity))
+		require.NotEmpty(t, entity.ID)
+		assert.True(t, strings.HasPrefix(entity.ID, string(domain.PrefixBranding)+"_"))
+
+		got, err := d.stmts.GetBrandingByID(t.Context(), projectID, entity.ID)
+		require.NoError(t, err)
+		assert.Equal(t, entity.ID, got.ID)
 	})
 }
 

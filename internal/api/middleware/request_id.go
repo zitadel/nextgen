@@ -6,10 +6,14 @@ import (
 	"net/http"
 
 	slogctx "github.com/veqryn/slog-context"
-	"github.com/zitadel/nextgen/internal/domain/idgen"
 )
 
-func WithRequestIdentification(generator idgen.Generator, next http.Handler) http.Handler {
+// RequestIDGenerator mints correlation ids for HTTP requests (not resource PKs).
+type RequestIDGenerator interface {
+	New(prefix string) (string, error)
+}
+
+func WithRequestIdentification(generator RequestIDGenerator, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, err := generator.New("req")
 		if err != nil {

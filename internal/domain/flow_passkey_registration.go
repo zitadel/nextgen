@@ -36,10 +36,11 @@ type FlowIssuePasskeyRegistrationChallengeInput struct {
 }
 
 // FlowPasskeyRegistrationChallengeOutput is the issued challenge.
-// Options is the PublicKeyCredentialCreationOptions JSON the client hands
-// to navigator.credentials.create().
+// UserID is the WebAuthn user handle (minted by the registration service when
+// the issue input had none).
 type FlowPasskeyRegistrationChallengeOutput struct {
 	ChallengeID string
+	UserID      string
 	Options     []byte
 }
 

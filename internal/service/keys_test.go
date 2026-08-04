@@ -52,6 +52,7 @@ func newActiveKEK(t *testing.T, projectID string, masterKey op.Crypto) *domain.E
 	t.Helper()
 	kek, err := domain.NewEncryptionKey(projectID, domain.EncryptionKeyPurposeKEK, jose.A256GCM, masterKey)
 	require.NoError(t, err)
+	kek.ID = "encryption_key_test"
 	kek.Activate(nil)
 	return kek
 }
@@ -87,6 +88,7 @@ func TestKeyService_GetCrypter(t *testing.T) {
 
 			kek, err := domain.NewEncryptionKey("project-1", domain.EncryptionKeyPurposeKEK, jose.A256GCM, masterKey)
 			require.NoError(t, err)
+			kek.ID = "encryption_key_test"
 			kekCrypter, err := kek.Crypter(masterKey)
 			require.NoError(t, err)
 

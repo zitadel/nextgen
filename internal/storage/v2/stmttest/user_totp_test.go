@@ -1,9 +1,10 @@
-//go:build postgres_integration || spanner_integration
+//go:build postgres_integration || spanner_integration || sqlite_integration
 
 package stmttest
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,7 +22,7 @@ func totpByUserFilter(projectID, userID string) database.Filter[domain.UserTOTPF
 	)
 }
 
-func totpByIDFilter(id int64) database.Filter[domain.UserTOTPField] {
+func totpByIDFilter(id string) database.Filter[domain.UserTOTPField] {
 	return database.Equal(database.Col(domain.UserTOTPFieldID), id)
 }
 
@@ -45,6 +46,8 @@ func TestUserTOTPStatements_CRUD(t *testing.T) {
 
 		got, err := d.stmts.GetUserTOTP(t.Context(), byUser)
 		require.NoError(t, err)
+		require.NotEmpty(t, got.ID)
+		assert.True(t, strings.HasPrefix(got.ID, string(domain.PrefixUserTOTP)+"_"))
 		assert.Equal(t, projectID, got.ProjectID)
 		assert.Equal(t, userID, got.UserID)
 		assert.Equal(t, secret, got.Secret)
@@ -80,7 +83,7 @@ func TestUserTOTPStatements_CRUD(t *testing.T) {
 		}))
 		got2, err := d.stmts.GetUserTOTP(t.Context(), byUser)
 		require.NoError(t, err)
-		require.Positive(t, got2.ID)
+		require.NotEmpty(t, got2.ID)
 		require.NoError(t, d.stmts.DeleteUserTOTP(t.Context(), byUser))
 		_, err = d.stmts.GetUserTOTP(t.Context(), byUser)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))

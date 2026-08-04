@@ -600,12 +600,6 @@ async function collectDiagnostics(context) {
     join(context.appDir, ".zitadel/local/server.log"),
     join(context.diagnosticsDir, "server.log"),
   );
-  // The postmaster's own startup error lands only here (logging_collector
-  // redirects it away from server.log); without it a failed boot is opaque.
-  await copyIfExists(
-    join(context.appDir, ".zitadel/local/nextgen-data/embedded-postgres/postgres.log"),
-    join(context.diagnosticsDir, "postgres.log"),
-  );
   await mkdir(join(context.diagnosticsDir, "generated-app"), { recursive: true });
   await copyIfExists(
     join(context.appDir, "package.json"),
