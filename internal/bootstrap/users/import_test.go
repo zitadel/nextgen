@@ -47,7 +47,7 @@ func TestImport_loadAndSkip(t *testing.T) {
 
 	suffix := rand.Text()
 	projectID := "proj_" + suffix
-	userID := "usr_" + suffix
+	userID := "user_" + suffix
 	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), projectID) })
 
 	path := writeUserFile(t, projectID, "team_"+suffix, userID)
@@ -103,7 +103,7 @@ func TestImport_teamPlaceholderNameTaken(t *testing.T) {
 		Name:      "team-" + teamID,
 	}))
 
-	path := writeUserFile(t, projectID, teamID, "usr_"+suffix)
+	path := writeUserFile(t, projectID, teamID, "user_"+suffix)
 
 	// The import fails either way; what matters is that it names the team it
 	// could not create, rather than a later team_memberships insert tripping

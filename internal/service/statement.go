@@ -19,7 +19,13 @@ type Statements interface {
 	IsStatements()
 }
 
+// ManagedIDGenerator mints prefixed managed resource IDs.
+type ManagedIDGenerator interface {
+	NewManagedID(prefix string) (string, error)
+}
+
 type AllStatements interface {
+	ManagedIDGenerator
 	ProjectStatements
 	FlowDefinitionStatements
 	CryptoKeyStatements

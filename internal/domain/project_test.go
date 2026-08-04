@@ -3,6 +3,8 @@ package domain_test
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -77,6 +79,15 @@ func TestNewProject(t *testing.T) {
 	}
 }
 
+func testMintID(t *testing.T) func(domain.ResourcePrefix) (string, error) {
+	t.Helper()
+	n := 0
+	return func(prefix domain.ResourcePrefix) (string, error) {
+		n++
+		return string(prefix) + "_test" + strconv.Itoa(n), nil
+	}
+}
+
 func TestProject_GenerateNewKeySet(t *testing.T) {
 	t.Parallel()
 
@@ -85,7 +96,7 @@ func TestProject_GenerateNewKeySet(t *testing.T) {
 	t.Run("returns a full set of fresh keys", func(t *testing.T) {
 		t.Parallel()
 
-		keySet, err := project.GenerateNewKeySet(newTestMasterKey(t))
+		keySet, err := project.GenerateNewKeySet(newTestMasterKey(t), testMintID(t))
 		require.NoError(t, err)
 		require.NotNil(t, keySet)
 
@@ -105,21 +116,25 @@ func TestProject_GenerateNewKeySet(t *testing.T) {
 			assert.Equal(t, purpose, key.Purpose)
 			assert.Equal(t, jose.A256GCM, key.Algorithm)
 			assert.Equal(t, project.ID, key.ProjectID)
-			assert.NotEmpty(t, key.ID, purpose)
 			assert.NotEmpty(t, key.Key, purpose)
+			if purpose == domain.EncryptionKeyPurposeKEK {
+				assert.True(t, strings.HasPrefix(key.ID, string(domain.PrefixEncryptionKey)+"_"), "KEK ID is minted before wrap")
+			} else {
+				assert.Empty(t, key.ID, "purpose key ID is assigned by the dialect on create")
+			}
 		}
 
 		assert.Equal(t, domain.SigningKeyPurposeToken, keySet.TokenSigningKey.Purpose)
 		assert.Equal(t, jose.EdDSA, keySet.TokenSigningKey.Algorithm)
 		assert.Equal(t, project.ID, keySet.TokenSigningKey.ProjectID)
-		assert.NotEmpty(t, keySet.TokenSigningKey.ID)
+		assert.Empty(t, keySet.TokenSigningKey.ID, "ID is assigned by the dialect on create")
 		assert.NotEmpty(t, keySet.TokenSigningKey.Key)
 	})
 
 	t.Run("a generated key set is not active yet", func(t *testing.T) {
 		t.Parallel()
 
-		keySet, err := project.GenerateNewKeySet(newTestMasterKey(t))
+		keySet, err := project.GenerateNewKeySet(newTestMasterKey(t), testMintID(t))
 		require.NoError(t, err)
 
 		for _, key := range encryptionKeysOf(keySet) {
@@ -139,7 +154,7 @@ func TestProject_GenerateNewKeySet(t *testing.T) {
 		t.Parallel()
 
 		masterKey := newTestMasterKey(t)
-		keySet, err := project.GenerateNewKeySet(masterKey)
+		keySet, err := project.GenerateNewKeySet(masterKey, testMintID(t))
 		require.NoError(t, err)
 
 		material, err := keySet.KeyEncryptionKey.DecryptedKey(masterKey)
@@ -152,7 +167,7 @@ func TestProject_GenerateNewKeySet(t *testing.T) {
 		t.Parallel()
 
 		masterKey := newTestMasterKey(t)
-		keySet, err := project.GenerateNewKeySet(masterKey)
+		keySet, err := project.GenerateNewKeySet(masterKey, testMintID(t))
 		require.NoError(t, err)
 
 		kekCrypter, err := keySet.KeyEncryptionKey.Crypter(masterKey)
@@ -171,6 +186,10 @@ func TestProject_GenerateNewKeySet(t *testing.T) {
 			// the only thing standing between the two.
 			_, err = masterKey.Decrypt(key.Key)
 			assert.Error(t, err, "the %s key must not be unwrappable by the master key", key.Purpose)
+
+			header, err := domain.DecodeJWEHeader(key.Key)
+			require.NoError(t, err, key.Purpose)
+			assert.Equal(t, keySet.KeyEncryptionKey.ID, header.KeyID, key.Purpose)
 		}
 
 		// The signing key hangs off the same KEK, and its seed is usable.
@@ -180,20 +199,23 @@ func TestProject_GenerateNewKeySet(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("every key gets its own id and material", func(t *testing.T) {
+	t.Run("every key gets its own material", func(t *testing.T) {
 		t.Parallel()
 
-		keySet, err := project.GenerateNewKeySet(newTestMasterKey(t))
+		keySet, err := project.GenerateNewKeySet(newTestMasterKey(t), testMintID(t))
 		require.NoError(t, err)
 
-		ids := map[string]struct{}{keySet.TokenSigningKey.ID: {}}
 		wrapped := map[string]struct{}{keySet.TokenSigningKey.Key: {}}
 		for _, key := range encryptionKeysOf(keySet) {
-			ids[key.ID] = struct{}{}
+			if key.Purpose == domain.EncryptionKeyPurposeKEK {
+				assert.NotEmpty(t, key.ID)
+			} else {
+				assert.Empty(t, key.ID)
+			}
 			wrapped[key.Key] = struct{}{}
 		}
+		assert.Empty(t, keySet.TokenSigningKey.ID)
 
-		assert.Len(t, ids, 5, "all five keys must have distinct ids")
 		assert.Len(t, wrapped, 5, "all five keys must have distinct material")
 	})
 
@@ -202,9 +224,10 @@ func TestProject_GenerateNewKeySet(t *testing.T) {
 
 		masterKey := newTestMasterKey(t)
 
-		first, err := project.GenerateNewKeySet(masterKey)
+		mint := testMintID(t)
+		first, err := project.GenerateNewKeySet(masterKey, mint)
 		require.NoError(t, err)
-		second, err := project.GenerateNewKeySet(masterKey)
+		second, err := project.GenerateNewKeySet(masterKey, mint)
 		require.NoError(t, err)
 
 		firstKEK, err := first.KeyEncryptionKey.DecryptedKey(masterKey)
@@ -212,6 +235,8 @@ func TestProject_GenerateNewKeySet(t *testing.T) {
 		secondKEK, err := second.KeyEncryptionKey.DecryptedKey(masterKey)
 		require.NoError(t, err)
 
+		assert.NotEmpty(t, first.KeyEncryptionKey.ID)
+		assert.NotEmpty(t, second.KeyEncryptionKey.ID)
 		assert.NotEqual(t, first.KeyEncryptionKey.ID, second.KeyEncryptionKey.ID)
 		assert.NotEqual(t, firstKEK, secondKEK, "a rotation must generate new key material")
 	})
@@ -223,7 +248,7 @@ func TestProject_GenerateNewKeySet(t *testing.T) {
 		masterKey.EXPECT().Encrypt(gomock.Any()).Return("wrapped-kek", nil)
 		masterKey.EXPECT().Decrypt("wrapped-kek").Return("too short for AES-256", nil)
 
-		keySet, err := project.GenerateNewKeySet(masterKey)
+		keySet, err := project.GenerateNewKeySet(masterKey, testMintID(t))
 		assert.Nil(t, keySet)
 		require.Error(t, err)
 
@@ -298,11 +323,11 @@ func TestProjectKeySet_Activate(t *testing.T) {
 		masterKey := newTestMasterKey(t)
 		project := &domain.Project{ID: "proj-1", Name: "my-project"}
 
-		current, err := project.GenerateNewKeySet(masterKey)
+		current, err := project.GenerateNewKeySet(masterKey, testMintID(t))
 		require.NoError(t, err)
 		current.Activate(nil)
 
-		next, err := project.GenerateNewKeySet(masterKey)
+		next, err := project.GenerateNewKeySet(masterKey, testMintID(t))
 		require.NoError(t, err)
 		wrappedBefore := next.KeyEncryptionKey.Key
 

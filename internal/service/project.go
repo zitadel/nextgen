@@ -90,12 +90,6 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 		return nil, domain.ErrInternal(err).WithMessage("failed to get master key")
 	}
 
-	keyset, err := project.GenerateNewKeySet(masterKey)
-	if err != nil {
-		return nil, err
-	}
-	keyset.Activate(nil)
-
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().CreateProject(ctx, project); err != nil {
 			if mapped := mapStorageError(err); mapped != err {
@@ -103,6 +97,14 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 			}
 			return domain.ErrInternal(err).WithMessage("failed to create project in the database")
 		}
+
+		keyset, err := project.GenerateNewKeySet(masterKey, func(prefix domain.ResourcePrefix) (string, error) {
+			return tx.Statements().NewManagedID(string(prefix))
+		})
+		if err != nil {
+			return err
+		}
+		keyset.Activate(nil)
 
 		if err := tx.Statements().CreateEncryptionKey(ctx, keyset.KeyEncryptionKey); err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to create project key encryption key in the database")

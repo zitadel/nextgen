@@ -6,7 +6,6 @@ import (
 	"slices"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
@@ -71,19 +70,16 @@ type ResolveFlowHint struct {
 func NewFlowService(
 	v2Pool *DB,
 	stateMachine domain.FlowStateMachine,
-	ids idgen.Generator,
 ) FlowService {
 	return &flowService{
 		v2Pool:       v2Pool,
 		stateMachine: stateMachine,
-		ids:          ids,
 	}
 }
 
 type flowService struct {
 	v2Pool       *DB
 	stateMachine domain.FlowStateMachine
-	ids          idgen.Generator
 }
 
 var _ FlowService = (*flowService)(nil)
@@ -203,7 +199,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 	if req.SessionID != nil {
 		sessionID = *req.SessionID
 	} else {
-		id, err := s.ids.New("sess")
+		id, err := s.v2Pool.Statements().NewManagedID(string(domain.PrefixSession))
 		if err != nil {
 			return domain.FlowStepResult{}, fmt.Errorf("flow service: mint session id: %w", err)
 		}
@@ -226,7 +222,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 		return domain.FlowStepResult{}, err
 	}
 
-	flowID, err := s.ids.New("flow")
+	flowID, err := s.v2Pool.Statements().NewManagedID(string(domain.PrefixFlow))
 	if err != nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: mint flow id: %w", err)
 	}

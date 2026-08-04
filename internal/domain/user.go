@@ -161,7 +161,7 @@ func (c *CreateUser) AttributeTeamScope() string {
 }
 
 // NewCreateUser builds a [CreateUser] from a schema-validated user map.
-// id passes through when non-empty; otherwise a fresh one is minted.
+// Empty id is filled by the dialect on create; non-empty id is for ceremony only.
 func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
 	if _, ok := muser["id"]; ok {
 		return nil, ErrUserInvalid().WithDetails("client cannot choose user id")

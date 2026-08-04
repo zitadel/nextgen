@@ -3,7 +3,6 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	"errors"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -42,8 +41,8 @@ func newTeamStatements(client queryExecutor) teamStatements {
 
 // CreateTeam implements [service.TeamStatements].
 func (ts teamStatements) CreateTeam(ctx context.Context, team *domain.Team) error {
-	if team.ID == "" {
-		return errors.New("team ID must not be empty")
+	if err := ensureManagedID(&team.ID, domain.PrefixTeam); err != nil {
+		return err
 	}
 	now := nowUnixNano()
 	row := ts.client.QueryRow(ctx, createTeamStmt, team.ProjectID, team.ID, team.Name, now, now)

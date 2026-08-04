@@ -22,7 +22,7 @@ func TestNewSigningKey(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, key)
 
-		assert.NotEmpty(t, key.ID)
+		assert.Empty(t, key.ID, "ID is assigned by the dialect on create")
 		assert.Equal(t, projectID, key.ProjectID)
 		assert.Equal(t, SigningKeyPurposeToken, key.Purpose)
 		assert.Equal(t, jose.EdDSA, key.Algorithm)
@@ -43,7 +43,8 @@ func TestNewSigningKey(t *testing.T) {
 		b, err := NewSigningKey("proj", SigningKeyPurposeToken, jose.EdDSA, kek)
 		require.NoError(t, err)
 		assert.NotEqual(t, a.Key, b.Key)
-		assert.NotEqual(t, a.ID, b.ID)
+		assert.Empty(t, a.ID)
+		assert.Empty(t, b.ID)
 	})
 
 	t.Run("encrypt error is propagated", func(t *testing.T) {
@@ -93,6 +94,7 @@ func TestSigningKey_Signer(t *testing.T) {
 
 		key, err := NewSigningKey("proj", SigningKeyPurposeToken, jose.EdDSA, kek)
 		require.NoError(t, err)
+		key.ID = "sig_key_test"
 
 		signer, err := key.Signer(kek)
 		require.NoError(t, err)

@@ -16,20 +16,20 @@ func TestValidateSessionToken(t *testing.T) {
 
 	now := time.Now().UTC()
 	session := &domain.Session{
-		TokenID:   "100",
+		TokenID:   "tkn_100",
 		ExpiresAt: now.Add(time.Hour),
 	}
 	token := &domain.Token{
-		TokenID:   "100",
+		TokenID:   "tkn_100",
 		ExpiresAt: new(now.Add(time.Hour)),
 	}
 
 	require.NoError(t, validateSessionToken(session, token))
 
-	token.TokenID = "99"
+	token.TokenID = "tkn_99"
 	require.ErrorIs(t, validateSessionToken(session, token), domain.ErrSessionTokenInvalid())
 
-	token.TokenID = "100"
+	token.TokenID = "tkn_100"
 	session.ExpiresAt = now.Add(-time.Minute)
 	require.ErrorIs(t, validateSessionToken(session, token), domain.ErrSessionTokenInvalid())
 }

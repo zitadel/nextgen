@@ -25,7 +25,14 @@ func newProjectStatements(client queryExecutor) projectStatements {
 
 // CreateProject implements [service.ProjectStatements].
 func (ps projectStatements) CreateProject(ctx context.Context, project *domain.Project) error {
-	return wrapError(ps.client.QueryRow(ctx, createProjectStmt, project.ID, project.Name, project.PreviewOrigins).
+	if err := ensureManagedID(&project.ID, domain.PrefixProject); err != nil {
+		return err
+	}
+	origins := project.PreviewOrigins
+	if origins == nil {
+		origins = []string{}
+	}
+	return wrapError(ps.client.QueryRow(ctx, createProjectStmt, project.ID, project.Name, origins).
 		Scan(&project.ID, &project.CreatedAt, &project.UpdatedAt))
 }
 

@@ -54,6 +54,9 @@ func newUserStatements(client queryExecutor) userStatements {
 
 // CreateUser implements [service.UserStatements].
 func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser) error {
+	if err := ensureManagedID(&user.ID, domain.PrefixUser); err != nil {
+		return err
+	}
 	if len(user.Attributes) == 0 {
 		return fmt.Errorf("user create requires attributes")
 	}

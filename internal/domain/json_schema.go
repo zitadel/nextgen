@@ -71,12 +71,6 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 	}
 
 	schemaID, _ := maputil.Get[string](schema, "$id")
-	if schemaID == "" {
-		schemaID, err = newID(PrefixJSONSchema)
-		if err != nil {
-			return nil, ErrInternal(err).WithMessage("failed to generate schema id")
-		}
-	}
 
 	if props, ok := maputil.Get[map[string]any](schema, "properties"); ok {
 		if _, ok := maputil.Get[any](props, "id"); ok {
