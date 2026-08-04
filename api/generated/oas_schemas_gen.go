@@ -2285,10 +2285,6 @@ type DeleteTeamNoContent struct{}
 
 func (*DeleteTeamNoContent) deleteTeamRes() {}
 
-type DeleteTeamNotFound ErrorDetails
-
-func (*DeleteTeamNotFound) deleteTeamRes() {}
-
 type DeleteTeamUnauthorized ErrorDetails
 
 func (*DeleteTeamUnauthorized) deleteTeamRes() {}

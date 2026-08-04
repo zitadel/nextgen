@@ -81,14 +81,9 @@ delete:
           schema:
             $ref: ../../../components/error-details.yaml
     '403':
-      description: Insufficient permissions.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
-    '404':
       description: |
-        The project does not exist, or the credentials are not bound to it.
+        Insufficient permissions, or the credentials are not bound to the
+        project.
       content:
         application/json:
           schema:

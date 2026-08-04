@@ -53,7 +53,7 @@ func (h *Handler) UpdateTeam(ctx context.Context, req *api.UpdateTeamRequest, pa
 }
 
 func (h *Handler) DeleteTeam(ctx context.Context, params api.DeleteTeamParams) (api.DeleteTeamRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opDelete); err != nil {
+	if err := requireTeamDelete(ctx, string(params.ProjectID)); err != nil {
 		return nil, err
 	}
 	if err := h.teamService.Delete(ctx, string(params.ProjectID), string(params.TeamID)); err != nil {

@@ -247,6 +247,21 @@ func TestRequireProjectAccess(t *testing.T) {
 		})
 	}
 
+	t.Run("team deletes are denied rather than missed", func(t *testing.T) {
+		err := requireTeamDelete(operator, "proj_b")
+		assertDomainCode(t, err, domain.ErrTeamPermissionDenied().Code)
+
+		err = requireTeamDelete(context.Background(), "proj_a")
+		assertDomainCode(t, err, domain.ErrTeamPermissionDenied().Code)
+
+		err = requireTeamDelete(preview, "proj_a")
+		assertDomainCode(t, err, domain.ErrTeamPermissionDenied().Code)
+
+		if err := requireTeamDelete(operator, "proj_a"); err != nil {
+			t.Fatalf("project.write implies team.delete: %v", err)
+		}
+	})
+
 	// Sessions keep the strict default rather than opting into the legacy
 	// project.write umbrella: revoking sessions logs people out, which is not
 	// project administration.

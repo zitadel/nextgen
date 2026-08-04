@@ -603,6 +603,26 @@ func TestDeleteTeam(t *testing.T) {
 		deleteTeam(t, "does-not-exist")
 	})
 
+	// A project the credentials are not bound to returns a permission denied error.
+	t.Run("foreign project is denied", func(t *testing.T) {
+		t.Parallel()
+
+		other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), other.ID)
+		})
+
+		resp, err := client.DeleteTeam(t.Context(), api.DeleteTeamParams{
+			ProjectID: api.ProjectID(other.ID),
+			TeamID:    api.TeamID(createTeam(t).ID),
+		})
+		require.NoError(t, err)
+
+		require.IsType(t, &api.DeleteTeamForbidden{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("team.permission_denied"), resp.(*api.DeleteTeamForbidden).Code)
+	})
+
 	// The cascade itself is proven per dialect by the storage suite; this only
 	// shows the endpoint reaches it rather than writing the team status alone.
 	t.Run("cascades to lifecycle-owned users", func(t *testing.T) {

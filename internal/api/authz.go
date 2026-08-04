@@ -178,6 +178,16 @@ func requireProjectAccess(ctx context.Context, projectID string, res resourceAcc
 	return nil
 }
 
+// requireTeamDelete gates deleteTeam. Deleting an unknown team answers 204, so
+// the endpoint has no not-found to report: a project the credentials are not
+// bound to is refused as the permission failure it is.
+func requireTeamDelete(ctx context.Context, projectID string) error {
+	if err := requireProjectAccess(ctx, projectID, teamAccess, opDelete); err != nil {
+		return domain.ErrTeamPermissionDenied()
+	}
+	return nil
+}
+
 // allows reports whether the granted scopes reach op on this resource.
 // Matching is strict by default; only explicitly marked legacy rows admit the
 // project.write umbrella.
