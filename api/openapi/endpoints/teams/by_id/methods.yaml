@@ -68,6 +68,12 @@ delete:
   responses:
     '204':
       description: The team is deactivated.
+    '400':
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
     '401':
       description: Missing or invalid credentials.
       content:

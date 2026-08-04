@@ -2272,6 +2272,10 @@ type DeleteFlowDefinitionNoContent struct{}
 
 func (*DeleteFlowDefinitionNoContent) deleteFlowDefinitionRes() {}
 
+type DeleteTeamBadRequest ErrorDetails
+
+func (*DeleteTeamBadRequest) deleteTeamRes() {}
+
 type DeleteTeamForbidden ErrorDetails
 
 func (*DeleteTeamForbidden) deleteTeamRes() {}
