@@ -35,6 +35,9 @@ func newJSONSchemaStatements(db queryExecutor) jsonSchemaStatements {
 
 // CreateJSONSchema implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *domain.JSONSchema) error {
+	if err := ensureManagedID(&schema.URL, domain.PrefixJSONSchema); err != nil {
+		return err
+	}
 	stmt := buildStatement(createJSONSchemaStmt, schema.ProjectID, schema.URL, schema.ObjectType, encodeJSONSchemaPayload(schema.Schema)).statement()
 	return js.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {

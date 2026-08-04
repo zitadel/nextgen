@@ -29,7 +29,6 @@ import (
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
@@ -39,6 +38,7 @@ import (
 	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/idgen"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/sqlite"
 )
 
@@ -190,7 +190,6 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	)
 
 	// ── Flow engine ──────────────────
-	ids := idgen.NewULID()
 	fields := domain.NewSchemaFieldResolver()
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc)
 	createUserHandler := service.NewFlowCreateUserHandler(
@@ -199,7 +198,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		schemaStore,
 	)
 	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaStore)
-	passkeyRegSvc := service.NewPasskeyRegistrationService(serviceDBPool, ids)
+	passkeyRegSvc := service.NewPasskeyRegistrationService(serviceDBPool)
 	passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
@@ -209,11 +208,10 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		createUserForPasskeyHandler,
 		flowAuth,
 		passkeyRegAdapter,
-		ids,
 		time.Now,
 	)
 
-	flowService := service.NewFlowService(serviceDBPool, stateMachine, ids)
+	flowService := service.NewFlowService(serviceDBPool, stateMachine)
 	tokenService := service.NewTokenService(keyService)
 
 	// ── Default project resolution ──
@@ -429,7 +427,7 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 // ----------------------------- HTTP --------------------------------------
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen idgen.Generator, apiHandler http.Handler, runtime runtimeResolver) (*http.ServeMux, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler http.Handler, runtime runtimeResolver) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	if cfg.LoginEnabled {

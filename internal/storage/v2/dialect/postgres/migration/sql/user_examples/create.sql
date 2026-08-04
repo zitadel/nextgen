@@ -53,7 +53,7 @@ FROM _user_header u;
 EXECUTE insert_user(
     'proj_1'
     , './user.schema.json'
-    , 'usr_99999999'
+    , 'user_99999999'
     , 'team_0001'
 , ARRAY[
         ROW('username'::TEXT,           '"tester_alpha"'::JSONB,        digest('"tester_alpha"'::text, 'md5'),          'project'::TEXT)::zitadel_nextgen.incoming_user_attribute

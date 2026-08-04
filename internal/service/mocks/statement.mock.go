@@ -2781,6 +2781,45 @@ func (c *MockAllStatementsListUsersCall) DoAndReturn(f func(context.Context, *da
 	return c
 }
 
+// NewManagedID mocks base method.
+func (m *MockAllStatements) NewManagedID(prefix string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewManagedID", prefix)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewManagedID indicates an expected call of NewManagedID.
+func (mr *MockAllStatementsMockRecorder) NewManagedID(prefix any) *MockAllStatementsNewManagedIDCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewManagedID", reflect.TypeOf((*MockAllStatements)(nil).NewManagedID), prefix)
+	return &MockAllStatementsNewManagedIDCall{Call: call}
+}
+
+// MockAllStatementsNewManagedIDCall wrap *gomock.Call
+type MockAllStatementsNewManagedIDCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsNewManagedIDCall) Return(arg0 string, arg1 error) *MockAllStatementsNewManagedIDCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsNewManagedIDCall) Do(f func(string) (string, error)) *MockAllStatementsNewManagedIDCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsNewManagedIDCall) DoAndReturn(f func(string) (string, error)) *MockAllStatementsNewManagedIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // SetAuthAttemptChallenge mocks base method.
 func (m *MockAllStatements) SetAuthAttemptChallenge(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
 	m.ctrl.T.Helper()
