@@ -523,6 +523,177 @@ func TestUpdateTeam(t *testing.T) {
 	})
 }
 
+func TestDeleteTeam(t *testing.T) {
+	t.Parallel()
+
+	// Teams have no delete statement; they cascade with their project.
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
+	})
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	createTeam := func(t *testing.T) *domain.Team {
+		t.Helper()
+		team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+			ProjectID: project.ID,
+			Name:      helpers.TeamName(),
+		})
+		require.NoError(t, err)
+		return team
+	}
+
+	deleteTeam := func(t *testing.T, teamID string) {
+		t.Helper()
+		resp, err := client.DeleteTeam(t.Context(), api.DeleteTeamParams{
+			ProjectID: api.ProjectID(project.ID),
+			TeamID:    api.TeamID(teamID),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.DeleteTeamNoContent{}, resp, helpers.MustMarshal(t, resp))
+	}
+
+	teamStatus := func(t *testing.T, teamID string) api.TeamStatus {
+		t.Helper()
+		resp, err := client.GetTeam(t.Context(), api.GetTeamParams{
+			ProjectID: api.ProjectID(project.ID),
+			TeamID:    api.TeamID(teamID),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.TeamResponse{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.TeamResponse).Status
+	}
+
+	t.Run("ok", func(t *testing.T) {
+		t.Parallel()
+
+		team := createTeam(t)
+		deleteTeam(t, team.ID)
+		assert.Equal(t, api.TeamStatusDeactivated, teamStatus(t, team.ID))
+	})
+
+	// Re-deleting must not write, so the tombstone keeps recording when the team
+	// was deactivated rather than when delete was last called.
+	t.Run("idempotent", func(t *testing.T) {
+		t.Parallel()
+
+		team := createTeam(t)
+		deleteTeam(t, team.ID)
+
+		deactivated, err := harness.EnsureTeamService(t).Get(t.Context(), project.ID, team.ID)
+		require.NoError(t, err)
+
+		deleteTeam(t, team.ID)
+
+		again, err := harness.EnsureTeamService(t).Get(t.Context(), project.ID, team.ID)
+		require.NoError(t, err)
+		assert.Equal(t, deactivated.UpdatedAt, again.UpdatedAt)
+		assert.Equal(t, api.TeamStatusDeactivated, teamStatus(t, team.ID))
+	})
+
+	// Reporting a missing team would let a caller holding team.delete without a
+	// read scope enumerate team ids.
+	t.Run("unknown team id succeeds", func(t *testing.T) {
+		t.Parallel()
+
+		deleteTeam(t, "does-not-exist")
+	})
+
+	// An id that fails the contract's pattern never reaches the handler, so it
+	// keeps its 400 rather than joining the ids that answer 204. The generated
+	// client validates team_id before it sends, so only a raw request gets there.
+	t.Run("malformed team id", func(t *testing.T) {
+		t.Parallel()
+
+		for _, tc := range []struct {
+			name   string
+			teamID string
+		}{
+			{"disallowed character", "team.1"},
+			{"escaped space", "team%20id"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete,
+					harness.EnsureTestServer(t).URL+"/teams/"+tc.teamID+"?project_id="+url.QueryEscape(project.ID),
+					nil,
+				)
+				require.NoError(t, err)
+				req.Header.Set("Authorization", "Bearer "+client.Token())
+
+				resp, err := harness.EnsureHttpClient(t).Do(req)
+				require.NoError(t, err)
+				defer resp.Body.Close()
+
+				raw, err := io.ReadAll(resp.Body)
+				require.NoError(t, err)
+
+				assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(raw))
+				details := helpers.MustUnmarshal[api.ErrorDetails](t, raw)
+				assert.Equal(t, api.ErrorCode("req.invalid"), details.Code)
+			})
+		}
+	})
+
+	// A project the credentials are not bound to returns a permission denied error.
+	t.Run("foreign project is denied", func(t *testing.T) {
+		t.Parallel()
+
+		other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), other.ID)
+		})
+
+		resp, err := client.DeleteTeam(t.Context(), api.DeleteTeamParams{
+			ProjectID: api.ProjectID(other.ID),
+			TeamID:    api.TeamID(createTeam(t).ID),
+		})
+		require.NoError(t, err)
+
+		require.IsType(t, &api.DeleteTeamForbidden{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("team.permission_denied"), resp.(*api.DeleteTeamForbidden).Code)
+	})
+
+	// The cascade itself is proven per dialect by the storage suite; this only
+	// shows the endpoint reaches it rather than writing the team status alone.
+	t.Run("cascades to lifecycle-owned users", func(t *testing.T) {
+		t.Parallel()
+
+		userSchemaURL := harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
+
+		team := createTeam(t)
+		attr, err := domain.NewCreateAttribute("email", helpers.RandString(8)+"@example.com", domain.AttributeUniquenessUnspecified)
+		require.NoError(t, err)
+
+		userID := "user_" + helpers.RandString(8)
+		users := harness.EnsureUserFixture(t)
+		require.NoError(t, users.Create(t.Context(), &domain.CreateUser{
+			ProjectID:               project.ID,
+			SchemaURL:               userSchemaURL,
+			ID:                      userID,
+			LifecycleOwnerTeamID:    &team.ID,
+			InitialMembershipTeamID: &team.ID,
+			Attributes:              domain.CreateAttributes{*attr},
+		}))
+
+		deleteTeam(t, team.ID)
+
+		user, err := users.GetByID(t.Context(), project.ID, userID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.UserStatusDeactivated, user.Metadata.Status)
+
+		membership, err := harness.EnsureServiceDB(t).Statements().GetTeamMembership(t.Context(), project.ID, team.ID, userID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.MembershipStatusRemoved, membership.Status)
+	})
+}
+
 func TestQueryTeams(t *testing.T) {
 	t.Parallel()
 

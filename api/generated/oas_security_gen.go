@@ -104,6 +104,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	DeleteFlowDefinitionOperation: []string{
 		"flow_definition.delete",
 	},
+	DeleteTeamOperation: []string{
+		"team.delete",
+	},
 	DeleteUserByIDOperation: []string{
 		"user.delete",
 	},
