@@ -183,7 +183,7 @@ func requireProjectAccess(ctx context.Context, projectID string, res resourceAcc
 // bound to is refused as the permission failure it is.
 func requireTeamDelete(ctx context.Context, projectID string) error {
 	if err := requireProjectAccess(ctx, projectID, teamAccess, opDelete); err != nil {
-		return domain.ErrTeamPermissionDenied()
+		return domain.ErrTeamPermissionDenied().WithParent(err)
 	}
 	return nil
 }
