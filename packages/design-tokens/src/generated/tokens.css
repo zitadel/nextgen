@@ -69,6 +69,7 @@
   --zl-sidebar-accent-foreground: #fafafa;
   --zl-sidebar-border: #ffffff1a;
   --zl-sidebar-ring: #525252;
+  --zl-success: #22c55e;
   --zl-color-gray-50: #0f0f11;
   --zl-color-gray-75: #252528;
   --zl-color-gray-100: #37373a;
@@ -135,7 +136,7 @@
   --zl-syntax-number: #e25f7d;
   --zl-syntax-boolean: #bba5e4;
   --zl-syntax-punctuation: #82829c;
-  --zl-syntax-comment: #686883;
+  --zl-syntax-comment: #7c7c95;
 }
 
 [data-theme="light"] {
@@ -209,5 +210,5 @@
   --zl-syntax-number: #c52247;
   --zl-syntax-boolean: #5a23bd;
   --zl-syntax-punctuation: #686883;
-  --zl-syntax-comment: #82829c;
+  --zl-syntax-comment: #71718b;
 }
