@@ -349,6 +349,13 @@ export type PlatformStoreSnapshot = {
   projectIds: string[];
   schemaIds: string[];
   flowDefinitionIds: string[];
+  /**
+   * Ids of the live challenges. A caller that drove `claim/init` over HTTP
+   * (a CLI under test, say) never sees the response body, so this is the only
+   * way to learn the id it needs to hand to {@link completeClaimChallenge} or
+   * {@link expireClaimChallenge}.
+   */
+  claimChallengeIds: string[];
 };
 
 export function snapshotPlatformStore(): PlatformStoreSnapshot {
@@ -361,6 +368,7 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
     projectIds: [...store.projects.keys()],
     schemaIds: [...store.schemas.keys()],
     flowDefinitionIds: [...store.flowDefinitions.keys()],
+    claimChallengeIds: [...store.claimChallenges.keys()],
   };
 }
 
