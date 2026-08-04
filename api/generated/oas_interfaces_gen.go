@@ -65,6 +65,10 @@ type DeleteFlowDefinitionRes interface {
 	deleteFlowDefinitionRes()
 }
 
+type DeleteTeamRes interface {
+	deleteTeamRes()
+}
+
 type DeleteUserByIDRes interface {
 	deleteUserByIDRes()
 }

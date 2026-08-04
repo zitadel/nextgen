@@ -22,6 +22,7 @@ const (
 	CreateUserOperation               OperationName = "CreateUser"
 	DeactivateFlowDefinitionOperation OperationName = "DeactivateFlowDefinition"
 	DeleteFlowDefinitionOperation     OperationName = "DeleteFlowDefinition"
+	DeleteTeamOperation               OperationName = "DeleteTeam"
 	DeleteUserByIDOperation           OperationName = "DeleteUserByID"
 	EndSessionOperation               OperationName = "EndSession"
 	ExchangeHandoffOperation          OperationName = "ExchangeHandoff"
