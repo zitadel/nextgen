@@ -13,6 +13,10 @@ type AuthorizeGetRes interface {
 	authorizeGetRes()
 }
 
+type CompleteClaimRes interface {
+	completeClaimRes()
+}
+
 type CreateAuthAttemptRes interface {
 	createAuthAttemptRes()
 }
@@ -81,6 +85,10 @@ type GetBrandingByIdRes interface {
 	getBrandingByIdRes()
 }
 
+type GetClaimStatusRes interface {
+	getClaimStatusRes()
+}
+
 type GetFlowDefinitionRes interface {
 	getFlowDefinitionRes()
 }
@@ -145,6 +153,10 @@ type GetUserInfoRes interface {
 	getUserInfoRes()
 }
 
+type InitClaimRes interface {
+	initClaimRes()
+}
+
 type IntrospectRes interface {
 	introspectRes()
 }
@@ -183,6 +195,10 @@ type PatchProjectRes interface {
 
 type QueryProjectsRes interface {
 	queryProjectsRes()
+}
+
+type QueryTeamsRes interface {
+	queryTeamsRes()
 }
 
 type RevokeMySessionRes interface {

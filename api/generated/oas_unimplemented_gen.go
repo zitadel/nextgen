@@ -43,6 +43,18 @@ func (UnimplementedHandler) AuthorizeGet(ctx context.Context, params AuthorizeGe
 	return r, ht.ErrNotImplemented
 }
 
+// CompleteClaim implements completeClaim operation.
+//
+// Called by the browser after the developer authenticates on the claim page.
+// Authenticated by the `__nextgen_session` cookie, it attaches the project to
+// the developer's personal team using the `challenge_id` from the claim URL as
+// its single-use, browser-safe authorization.
+//
+// POST /projects/{project_id}/claim/complete
+func (UnimplementedHandler) CompleteClaim(ctx context.Context, req *CompleteClaimRequest, params CompleteClaimParams) (r CompleteClaimRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateAuthAttempt implements createAuthAttempt operation.
 //
 // Starts a new authentication attempt. This is the entry point for the auth_attempts state machine.
@@ -129,10 +141,12 @@ func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjec
 
 // CreateSchema implements createSchema operation.
 //
-// Create a new schema. The schema definition must include a unique $id field,
-// which will be used to identify the schema in future requests. The $id must
-// be a valid URI and should ideally point to the location where the schema
-// can be accessed.
+// Create a new schema. The optional `$id` field is the JSON Schema document
+// URI used to identify the schema in future requests (GitOps-stable identity,
+// not a free-form resource primary key). When `$id` is omitted, the server
+// generates a `sch_*` URL. When provided, `$id` must be unique within the
+// project and should ideally be a valid URI pointing at where the schema can
+// be accessed.
 // The schema can either be a concrete schema, e.g. a user schema, or a
 // schema-url which will be resolved by the server.
 //
@@ -269,6 +283,18 @@ func (UnimplementedHandler) GetAuthAttempt(ctx context.Context, params GetAuthAt
 //
 // GET /branding/{id}
 func (UnimplementedHandler) GetBrandingById(ctx context.Context, params GetBrandingByIdParams) (r GetBrandingByIdRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetClaimStatus implements getClaimStatus operation.
+//
+// Polled by the CLI while a browser completes the claim. Authorized by the
+// project secret that initiated the challenge. Returns `pending`, or
+// `completed` with the owning team, the claim timestamp, and the dashboard
+// URL once the browser leg has finished.
+//
+// GET /projects/{project_id}/claim/status
+func (UnimplementedHandler) GetClaimStatus(ctx context.Context, params GetClaimStatusParams) (r GetClaimStatusRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -425,6 +451,19 @@ func (UnimplementedHandler) GetUserInfo(ctx context.Context) (r GetUserInfoRes, 
 	return r, ht.ErrNotImplemented
 }
 
+// InitClaim implements initClaim operation.
+//
+// Starts a claim challenge for an unclaimed project. Authenticated by the
+// project secret, this mints a single-use, short-lived challenge and returns
+// the `claim_url` the developer opens in a browser to complete the claim,
+// together with the `challenge_id` the CLI polls with. The exact expiry is
+// carried by `expires_at` on the response.
+//
+// POST /projects/{project_id}/claim/init
+func (UnimplementedHandler) InitClaim(ctx context.Context, params InitClaimParams) (r InitClaimRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // Introspect implements introspect operation.
 //
 // Introspect a token.
@@ -523,6 +562,16 @@ func (UnimplementedHandler) PatchProject(ctx context.Context, req *PatchProjectR
 //
 // POST /projects/query
 func (UnimplementedHandler) QueryProjects(ctx context.Context, req *QueryProjectsRequest) (r QueryProjectsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// QueryTeams implements queryTeams operation.
+//
+// Returns the teams of a project, paginated with a cursor.
+// Teams of every lifecycle status are returned; each carries its `status`.
+//
+// POST /teams/query
+func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (r QueryTeamsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

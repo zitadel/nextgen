@@ -5,12 +5,12 @@ import { ZitadelError } from "../../../../src/lib/errors";
 
 describe("validateFlows", () => {
   it("returns the parsed flows on success", () => {
-    const flow = buildFlow("password", ["email"]);
+    const flow = buildFlow(["email"]);
     expect(validateFlows([flow])).toHaveLength(1);
   });
 
   it("throws E_VALIDATION when any input fails to parse", () => {
-    const flow = buildFlow("password", ["email"]);
+    const flow = buildFlow(["email"]);
     expect(() => validateFlows([flow, { name: "bad" }])).toThrow(ZitadelError);
   });
 

@@ -12,7 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/flowdefinition"
 )
 
-const testProjectQuery = "SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins FROM zitadel_nextgen.projects"
+const testProjectQuery = "SELECT id, created_at, updated_at, preview_origins FROM zitadel_nextgen.projects"
 
 const testFlowDefinitionQuery = "SELECT project_id, id, name FROM zitadel_nextgen.flow_definitions"
 

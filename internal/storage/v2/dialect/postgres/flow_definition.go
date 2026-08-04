@@ -43,6 +43,9 @@ func newFlowDefinitionStatements(client queryExecutor) flowDefinitionStatements 
 
 // CreateFlowDefinition implements [service.FlowDefinitionStatements].
 func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, entity *domain.FlowDefinition) error {
+	if err := ensureManagedID(&entity.ID, domain.FlowDefinitionPrefix); err != nil {
+		return err
+	}
 	content, err := flowdefinition.Marshal(entity)
 	if err != nil {
 		return err

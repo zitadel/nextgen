@@ -1,10 +1,10 @@
 -- +goose Up
 CREATE TABLE zitadel_nextgen.auth_attempts (
-    project_id      TEXT        NOT NULL
-    , id            BIGINT      GENERATED ALWAYS AS IDENTITY
+    project_id      TEXT COLLATE "C" NOT NULL
+    , id            TEXT COLLATE "C" NOT NULL CHECK (id <> '')
     , handoff_token BYTEA
     , handed_off_at TIMESTAMPTZ
-    , session_id    BIGINT
+    , session_id    TEXT COLLATE "C"
     , required_checks SMALLINT[]
     , created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
     , time_to_live  INTERVAL

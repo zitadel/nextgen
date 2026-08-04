@@ -117,8 +117,8 @@ func TestNewBrandingDefaultsLayout(t *testing.T) {
 	if b.Layout != BrandingLayoutCentered {
 		t.Errorf("layout = %q, want %q", b.Layout, BrandingLayoutCentered)
 	}
-	if !strings.HasPrefix(b.ID, "brnd_") {
-		t.Errorf("id = %q, want brnd_ prefix", b.ID)
+	if b.ID != "" {
+		t.Errorf("id = %q, want empty until dialect create", b.ID)
 	}
 }
 
