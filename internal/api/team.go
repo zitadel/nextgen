@@ -52,6 +52,16 @@ func (h *Handler) UpdateTeam(ctx context.Context, req *api.UpdateTeamRequest, pa
 	return teamResponse(team), nil
 }
 
+func (h *Handler) DeleteTeam(ctx context.Context, params api.DeleteTeamParams) (api.DeleteTeamRes, error) {
+	if err := requireTeamDelete(ctx, string(params.ProjectID)); err != nil {
+		return nil, err
+	}
+	if err := h.teamService.Delete(ctx, string(params.ProjectID), string(params.TeamID)); err != nil {
+		return nil, err
+	}
+	return &api.DeleteTeamNoContent{}, nil
+}
+
 func (h *Handler) QueryTeams(ctx context.Context, req *api.QueryTeamsRequest, params api.QueryTeamsParams) (api.QueryTeamsRes, error) {
 	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opRead); err != nil {
 		return nil, err

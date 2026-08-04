@@ -71,6 +71,11 @@ func TestResourceAccessScopes(t *testing.T) {
 		{"team.write writes", teamAccess, opWrite, "team.write", true},
 		{"team.read reads", teamAccess, opRead, "team.read", true},
 		{"team.read cannot write", teamAccess, opWrite, "team.read", false},
+		{"team.delete deletes", teamAccess, opDelete, "team.delete", true},
+		{"team.write does not imply delete", teamAccess, opDelete, "team.write", false},
+		{"team.read does not imply delete", teamAccess, opDelete, "team.read", false},
+		{"team.delete cannot write", teamAccess, opWrite, "team.delete", false},
+		{"team.delete cannot read", teamAccess, opRead, "team.delete", false},
 
 		{"session.read reads", sessionAccess, opRead, "session.read", true},
 		{"sessions.read reads", sessionAccess, opRead, "sessions.read", true},
@@ -241,6 +246,21 @@ func TestRequireProjectAccess(t *testing.T) {
 			assertDomainCode(t, err, res.readMiss)
 		})
 	}
+
+	t.Run("team deletes are denied rather than missed", func(t *testing.T) {
+		err := requireTeamDelete(operator, "proj_b")
+		assertDomainCode(t, err, domain.ErrTeamPermissionDenied().Code)
+
+		err = requireTeamDelete(context.Background(), "proj_a")
+		assertDomainCode(t, err, domain.ErrTeamPermissionDenied().Code)
+
+		err = requireTeamDelete(preview, "proj_a")
+		assertDomainCode(t, err, domain.ErrTeamPermissionDenied().Code)
+
+		if err := requireTeamDelete(operator, "proj_a"); err != nil {
+			t.Fatalf("project.write implies team.delete: %v", err)
+		}
+	})
 
 	// Sessions keep the strict default rather than opting into the legacy
 	// project.write umbrella: revoking sessions logs people out, which is not

@@ -1,0 +1,73 @@
+get:
+  operationId: getClaimStatus
+  summary: Get claim status
+  description: |
+    Polled by the CLI while a browser completes the claim. Authorized by the
+    project secret that initiated the challenge. Returns `pending`, or
+    `completed` with the owning team, the claim timestamp, and the dashboard
+    URL once the browser leg has finished.
+  tags:
+    - Projects
+  parameters:
+    - name: project_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../../../components/schemas/project-id.yaml
+    - name: challenge_id
+      in: query
+      required: true
+      description: The challenge minted by the matching claim init.
+      schema:
+        $ref: ../../../../../components/schemas/challenge-id.yaml
+  security:
+    - oauth2:
+        # project.write, not project.read: project.read is carried by the
+        # browser-plane preview secret, so it cannot gate an operator read
+        # until ADR 036 splits the credential planes into distinct schemes.
+        - project.write
+  responses:
+    '200':
+      description: Claim status.
+      content:
+        application/json:
+          schema:
+            $ref: claim-status-response.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    '403':
+      description: The presented project secret did not initiate this challenge.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/schemas/errors/proj-permission_denied.yaml
+    '404':
+      description: Challenge not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    '410':
+      description: The claim challenge has expired.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/schemas/errors/proj-claim_expired.yaml
+    '429':
+      description: |
+        Too many requests, the client has polled too many times in a given
+        amount of time.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
