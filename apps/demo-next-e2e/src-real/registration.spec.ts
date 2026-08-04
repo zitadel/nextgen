@@ -17,8 +17,10 @@ test("a fresh identity registers through the real flow", async ({ page, seed, zi
   await page.waitForURL(/\/admin(?:[/?#]|$)/, { timeout: 30_000 });
 
   // The flow, not the kit, must have created the user (the project secret
-  // scopes the list; the response is a plain array of user documents).
-  const users = (await zitadel.api.listUsers({ limit: 100 })) as Array<{ email?: string }>;
+  // scopes the list; the response pages the user documents under `users`).
+  const { users } = (await zitadel.api.listUsers({ limit: 100 })) as {
+    users: Array<{ email?: string }>;
+  };
   const created = users.find((user) => user.email === who.email);
   expect(created).toBeDefined();
 });

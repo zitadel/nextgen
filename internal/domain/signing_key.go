@@ -42,13 +42,8 @@ func NewSigningKey(
 	algorithm jose.SignatureAlgorithm,
 	kek crypto.Crypter,
 ) (*SigningKey, error) {
-	id, err := newID(PrefixSigningKey)
-	if err != nil {
-		return nil, err
-	}
-
 	seed := make([]byte, ed25519.SeedSize)
-	_, err = rand.Read(seed)
+	_, err := rand.Read(seed)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to generate new signing key")
 	}
@@ -58,9 +53,7 @@ func NewSigningKey(
 		return nil, ErrInternal(err).WithMessage("failed to encrypt signing key")
 	}
 
-	// createdAt is set by db
 	return &SigningKey{
-		ID:        id,
 		ProjectID: projectID,
 		Key:       encryptedKey,
 		Algorithm: algorithm,

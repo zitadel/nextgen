@@ -4,6 +4,7 @@ package postgres
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -52,7 +53,7 @@ func ensureTokenTestUser(t *testing.T, projectID, schemaURL, userID string) {
 func requireGeneratedTokenID(t *testing.T, tokenID string) {
 	t.Helper()
 	require.NotEmpty(t, tokenID)
-	require.True(t, database.Identity(tokenID).IsNumeric())
+	require.True(t, strings.HasPrefix(tokenID, string(domain.TokenPrefix)+"_"))
 }
 
 func TestTokenStatements_CRUD_OIDCAccessToken(t *testing.T) {

@@ -19,7 +19,13 @@ type Statements interface {
 	IsStatements()
 }
 
+// ManagedIDGenerator mints prefixed managed resource IDs.
+type ManagedIDGenerator interface {
+	NewManagedID(prefix string) (string, error)
+}
+
 type AllStatements interface {
+	ManagedIDGenerator
 	ProjectStatements
 	FlowDefinitionStatements
 	CryptoKeyStatements
@@ -104,6 +110,7 @@ type TeamStatements interface {
 	CreateTeam(ctx context.Context, entity *domain.Team) error
 	GetTeamByID(ctx context.Context, projectID, id string) (*domain.Team, error)
 	UpdateTeam(ctx context.Context, entity *domain.Team) error
+	ListTeams(ctx context.Context, filter *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error)
 	// DeactivateTeam tombs the team and cascades membership/user lifecycle
 	// updates. It wraps the multi-write steps in withTransaction (opens a tx
 	// via Statements(), joins an outer pool.Transaction when already nested).

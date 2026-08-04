@@ -4,6 +4,7 @@ package postgres
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniqueJSONSchemaIDs(t *testing.T) (projectID, schemaURL string) {
@@ -52,12 +53,12 @@ func TestJSONSchemaStatements_CRUD(t *testing.T) {
 	assert.Contains(t, string(got.Schema), `"type":"object"`)
 	assert.False(t, got.CreatedAt.IsZero())
 
-	listed, err := testPool.ListJSONSchemas(t.Context(), &database.ListOptions[domain.JSONSchemaField]{
-		Filter: database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
-		Pagination: database.Page[domain.JSONSchemaField]{
-			OrderBy: database.OrderBy[domain.JSONSchemaField]{
-				Columns:   []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldCreatedAt)},
-				Direction: database.OrderDesc,
+	listed, err := testPool.ListJSONSchemas(t.Context(), &v2database.ListOptions[domain.JSONSchemaField]{
+		Filter: v2database.Equal(v2database.Col(domain.JSONSchemaFieldProjectID), projectID),
+		Pagination: v2database.Page[domain.JSONSchemaField]{
+			OrderBy: v2database.OrderBy[domain.JSONSchemaField]{
+				Columns:   []v2database.Column[domain.JSONSchemaField]{v2database.Col(domain.JSONSchemaFieldCreatedAt)},
+				Direction: v2database.OrderDesc,
 			},
 		},
 	})
@@ -68,7 +69,26 @@ func TestJSONSchemaStatements_CRUD(t *testing.T) {
 	require.NoError(t, testPool.DeleteJSONSchemaByID(t.Context(), projectID, schemaURL))
 
 	_, err = testPool.GetJSONSchemaByID(t.Context(), projectID, schemaURL)
-	assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	assert.ErrorIs(t, err, new(v2database.NoRowFoundError))
+}
+
+func TestJSONSchemaStatements_Create_EmptyURLAssigned(t *testing.T) {
+	projectID, _ := uniqueJSONSchemaIDs(t)
+	ensureJSONSchemaProject(t, projectID)
+
+	schema := &domain.JSONSchema{
+		ProjectID: projectID,
+		Schema:    []byte(`{"type":"object"}`),
+	}
+	require.NoError(t, testPool.CreateJSONSchema(t.Context(), schema))
+	t.Cleanup(func() { _ = testPool.DeleteJSONSchemaByID(context.Background(), projectID, schema.URL) })
+
+	require.NotEmpty(t, schema.URL)
+	assert.True(t, strings.HasPrefix(schema.URL, string(domain.PrefixJSONSchema)+"_"))
+
+	got, err := testPool.GetJSONSchemaByID(t.Context(), projectID, schema.URL)
+	require.NoError(t, err)
+	assert.Equal(t, schema.URL, got.URL)
 }
 
 func TestJSONSchemaStatements_Get_NotFound(t *testing.T) {
@@ -76,7 +96,7 @@ func TestJSONSchemaStatements_Get_NotFound(t *testing.T) {
 	ensureJSONSchemaProject(t, projectID)
 
 	_, err := testPool.GetJSONSchemaByID(t.Context(), projectID, schemaURL)
-	assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	assert.ErrorIs(t, err, new(v2database.NoRowFoundError))
 }
 
 func TestJSONSchemaStatements_Create_Duplicate(t *testing.T) {
