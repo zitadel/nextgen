@@ -11,7 +11,7 @@ import (
 )
 
 // SeedProjectsTiedAt inserts projects that share created_at/updated_at.
-// CreateProject cannot do this (column defaults), so cursor-tie tests need DML.
+// CreateProject cannot do this (it always stamps "now"), so cursor-tie tests need DML.
 func SeedProjectsTiedAt(ctx context.Context, pool database.Pool, ids []string, createdAt time.Time) error {
 	c, ok := pool.(*Client)
 	if !ok {
@@ -20,8 +20,8 @@ func SeedProjectsTiedAt(ctx context.Context, pool database.Pool, ids []string, c
 	db := newClientDB(c.client)
 	for _, id := range ids {
 		_, err := db.Update(ctx, buildStatement(
-			`INSERT INTO projects (id, name, created_at, updated_at) VALUES (@p1, @p2, @p3, @p3)`,
-			id, "project-"+id, createdAt,
+			`INSERT INTO projects (id, name, preview_origins, created_at, updated_at) VALUES (@p1, @p2, @p3, @p4, @p4)`,
+			id, "project-"+id, "[]", createdAt,
 		).statement())
 		if err != nil {
 			return err

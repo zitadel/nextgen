@@ -50,11 +50,6 @@ type Project struct {
 }
 
 func NewProject(name string, previewOrigins []string) (*Project, error) {
-	id, err := newID(PrefixProject)
-	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to create project id")
-	}
-
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, ErrProjectNameInvalid()
@@ -65,7 +60,6 @@ func NewProject(name string, previewOrigins []string) (*Project, error) {
 	}
 
 	return &Project{
-		ID:             id,
 		Name:           name,
 		PreviewOrigins: previewOrigins,
 	}, nil
@@ -95,10 +89,16 @@ func (p *Project) PreviewSecret(encrypter op.Encrypter) (string, error) {
 
 // GenerateNewKeySet creates the project's key encryption key, wrapped by the
 // deployment's master key, and the purpose-scoped keys wrapped by that KEK.
-func (p *Project) GenerateNewKeySet(masterKey crypto.Crypter) (*ProjectKeySet, error) {
+// mintID must mint the KEK ID before wrapping — that ID is the JWE "kid" for
+// purpose keys. Other key IDs stay empty for Create* Ensure.
+func (p *Project) GenerateNewKeySet(masterKey crypto.Crypter, mintID func(ResourcePrefix) (string, error)) (*ProjectKeySet, error) {
 	kek, err := NewEncryptionKey(p.ID, EncryptionKeyPurposeKEK, jose.A256GCM, masterKey)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to create project key encryption key")
+	}
+	kek.ID, err = mintID(PrefixEncryptionKey)
+	if err != nil {
+		return nil, ErrInternal(err).WithMessage("failed to mint project key encryption key id")
 	}
 
 	kekCrypter, err := kek.Crypter(masterKey)

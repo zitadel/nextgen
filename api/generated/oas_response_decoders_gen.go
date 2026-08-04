@@ -4140,7 +4140,7 @@ func decodeGetMyUserResponse(resp *http.Response) (res GetMyUserRes, _ error) {
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response GetMyUserOK
+			var response User
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -4156,6 +4156,15 @@ func decodeGetMyUserResponse(resp *http.Response) (res GetMyUserRes, _ error) {
 					Err:         err,
 				}
 				return res, err
+			}
+			// Validate response.
+			if err := func() error {
+				if err := response.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return res, errors.Wrap(err, "validate")
 			}
 			return &response, nil
 		default:
@@ -5347,7 +5356,7 @@ func decodeGetUserByIDResponse(resp *http.Response) (res GetUserByIDRes, _ error
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response GetUserByIDOK
+			var response User
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5363,6 +5372,15 @@ func decodeGetUserByIDResponse(resp *http.Response) (res GetUserByIDRes, _ error
 					Err:         err,
 				}
 				return res, err
+			}
+			// Validate response.
+			if err := func() error {
+				if err := response.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return res, errors.Wrap(err, "validate")
 			}
 			return &response, nil
 		default:
@@ -6829,7 +6847,7 @@ func decodeListUsersResponse(resp *http.Response) (res ListUsersRes, _ error) {
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ListUsersOKApplicationJSON
+			var response ListUsersResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err

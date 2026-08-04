@@ -126,10 +126,12 @@ type Invoker interface {
 	CreateProject(ctx context.Context, request *CreateProjectRequest) (CreateProjectRes, error)
 	// CreateSchema invokes createSchema operation.
 	//
-	// Create a new schema. The schema definition must include a unique $id field,
-	// which will be used to identify the schema in future requests. The $id must
-	// be a valid URI and should ideally point to the location where the schema
-	// can be accessed.
+	// Create a new schema. The optional `$id` field is the JSON Schema document
+	// URI used to identify the schema in future requests (GitOps-stable identity,
+	// not a free-form resource primary key). When `$id` is omitted, the server
+	// generates a `sch_*` URL. When provided, `$id` must be unique within the
+	// project and should ideally be a valid URI pointing at where the schema can
+	// be accessed.
 	// The schema can either be a concrete schema, e.g. a user schema, or a
 	// schema-url which will be resolved by the server.
 	//
@@ -2069,10 +2071,12 @@ func (c *Client) sendCreateProject(ctx context.Context, request *CreateProjectRe
 
 // CreateSchema invokes createSchema operation.
 //
-// Create a new schema. The schema definition must include a unique $id field,
-// which will be used to identify the schema in future requests. The $id must
-// be a valid URI and should ideally point to the location where the schema
-// can be accessed.
+// Create a new schema. The optional `$id` field is the JSON Schema document
+// URI used to identify the schema in future requests (GitOps-stable identity,
+// not a free-form resource primary key). When `$id` is omitted, the server
+// generates a `sch_*` URL. When provided, `$id` must be unique within the
+// project and should ideally be a valid URI pointing at where the schema can
+// be accessed.
 // The schema can either be a concrete schema, e.g. a user schema, or a
 // schema-url which will be resolved by the server.
 //
@@ -2518,6 +2522,15 @@ func (c *Client) CreateUser(ctx context.Context, request *User, params CreateUse
 }
 
 func (c *Client) sendCreateUser(ctx context.Context, request *User, params CreateUserParams) (res CreateUserRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
 	otelAttrs := []attribute.KeyValue{
 		otelogen.OperationID("createUser"),
 		semconv.HTTPRequestMethodKey.String("POST"),
@@ -7085,23 +7098,6 @@ func (c *Client) sendListUsers(ctx context.Context, params ListUsersParams) (res
 	stage = "EncodeQueryParams"
 	q := uri.NewQueryEncoder()
 	{
-		// Encode "offset" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "offset",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.Offset.Get(); ok {
-				return e.EncodeValue(conv.IntToString(val))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	{
 		// Encode "limit" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
 			Name:    "limit",
@@ -7113,6 +7109,26 @@ func (c *Client) sendListUsers(ctx context.Context, params ListUsersParams) (res
 			if val, ok := params.Limit.Get(); ok {
 				if unwrapped := int(val); true {
 					return e.EncodeValue(conv.IntToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "page_token" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
 				}
 				return nil
 			}

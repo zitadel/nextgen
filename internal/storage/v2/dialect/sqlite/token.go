@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -15,10 +14,10 @@ import (
 
 const (
 	createTokenStmt = `INSERT INTO tokens (
-	project_id, user_id, token_type,
+	project_id, token_id, user_id, token_type,
 	session_id, oidc_session_id, saml_session_id,
 	scope, expires_at, created_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING token_id, created_at`
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING created_at`
 
 	deleteByIDTokenStmt = `DELETE FROM tokens WHERE project_id = ? AND token_id = ?`
 
@@ -42,6 +41,9 @@ func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) 
 	if token.TokenID != "" {
 		return fmt.Errorf("token_id must not be set on create")
 	}
+	if err := ensureManagedID(&token.TokenID, domain.TokenPrefix); err != nil {
+		return err
+	}
 
 	scope := token.Scope
 	if scope == nil {
@@ -52,47 +54,30 @@ func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) 
 		return wrapError(err)
 	}
 
-	sessionID, err := tokenSessionIDArg(token.SessionID)
-	if err != nil {
-		return err
-	}
-	oidcSessionID, err := tokenSessionIDArg(token.OIDCSessionID)
-	if err != nil {
-		return err
-	}
-	samlSessionID, err := tokenSessionIDArg(token.SAMLSessionID)
-	if err != nil {
-		return err
-	}
-
 	now := nowUnixNano()
-	var tokenID, createdNano int64
+	var createdNano int64
 	err = ts.client.QueryRow(ctx, createTokenStmt,
 		token.ProjectID,
+		token.TokenID,
 		tokenUserIDArg(token.UserID, token.Type),
 		token.Type.String(),
-		sessionID,
-		oidcSessionID,
-		samlSessionID,
+		tokenSessionIDArg(token.SessionID),
+		tokenSessionIDArg(token.OIDCSessionID),
+		tokenSessionIDArg(token.SAMLSessionID),
 		scopeJSON,
 		nullUnixNano(token.ExpiresAt),
 		now,
-	).Scan(&tokenID, &createdNano)
+	).Scan(&createdNano)
 	if err != nil {
 		return wrapError(err)
 	}
-	token.TokenID = strconv.FormatInt(tokenID, 10)
 	token.CreatedAt = timeFromUnixNano(createdNano)
 	return nil
 }
 
 // DeleteTokenByID implements [service.TokenStatements].
 func (ts tokenStatements) DeleteTokenByID(ctx context.Context, projectID, tokenID string) error {
-	id, err := parseIdentity(tokenID)
-	if err != nil {
-		return fmt.Errorf("invalid token_id %q: %w", tokenID, err)
-	}
-	_, err = ts.client.Exec(ctx, deleteByIDTokenStmt, projectID, id)
+	_, err := ts.client.Exec(ctx, deleteByIDTokenStmt, projectID, tokenID)
 	return wrapError(err)
 }
 
@@ -102,7 +87,7 @@ func (ts tokenStatements) GetTokenByID(ctx context.Context, projectID, tokenID s
 	if err := compileRead(&compiler, tokenQuery, &database.ListOptions[domain.TokenField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.TokenFieldProjectID), projectID),
-			database.Equal(database.Col(domain.TokenFieldTokenID), database.Identity(tokenID)),
+			database.Equal(database.Col(domain.TokenFieldTokenID), tokenID),
 		),
 	}, tokenSchema); err != nil {
 		return nil, err
@@ -148,9 +133,8 @@ func (ts tokenStatements) ListTokens(ctx context.Context, filter *database.ListO
 func scanToken(rows *sql.Rows) (*domain.Token, error) {
 	token := new(domain.Token)
 	var (
-		tokenID                          int64
 		userID                           sql.NullString
-		sessionID, oidcSessionID, samlID sql.NullInt64
+		sessionID, oidcSessionID, samlID sql.NullString
 		scopeStr                         string
 		expiresAtNano                    sql.NullInt64
 		tokenType                        string
@@ -158,7 +142,7 @@ func scanToken(rows *sql.Rows) (*domain.Token, error) {
 	)
 	if err := rows.Scan(
 		&token.ProjectID,
-		&tokenID,
+		&token.TokenID,
 		&userID,
 		&tokenType,
 		&sessionID,
@@ -170,23 +154,22 @@ func scanToken(rows *sql.Rows) (*domain.Token, error) {
 	); err != nil {
 		return nil, err
 	}
-	token.TokenID = strconv.FormatInt(tokenID, 10)
 	if err := token.Type.Scan(tokenType); err != nil {
 		return nil, err
 	}
 	if userID.Valid {
 		token.UserID = userID.String
 	}
-	if sessionID.Valid {
-		s := strconv.FormatInt(sessionID.Int64, 10)
+	if sessionID.Valid && sessionID.String != "" {
+		s := sessionID.String
 		token.SessionID = &s
 	}
-	if oidcSessionID.Valid {
-		s := strconv.FormatInt(oidcSessionID.Int64, 10)
+	if oidcSessionID.Valid && oidcSessionID.String != "" {
+		s := oidcSessionID.String
 		token.OIDCSessionID = &s
 	}
-	if samlID.Valid {
-		s := strconv.FormatInt(samlID.Int64, 10)
+	if samlID.Valid && samlID.String != "" {
+		s := samlID.String
 		token.SAMLSessionID = &s
 	}
 	scope, err := decodeJSONStrings(scopeStr)
@@ -213,15 +196,11 @@ func tokenUserIDArg(userID string, tokenType domain.TokenType) any {
 	return userID
 }
 
-func tokenSessionIDArg(sessionID *string) (any, error) {
+func tokenSessionIDArg(sessionID *string) any {
 	if sessionID == nil || *sessionID == "" {
-		return nil, nil
+		return nil
 	}
-	id, err := parseIdentity(*sessionID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid session id %q: %w", *sessionID, err)
-	}
-	return id, nil
+	return *sessionID
 }
 
 func tokenOptionalString(id *string) any {
@@ -246,23 +225,6 @@ func coerceTokenType(v any) (any, error) {
 	}
 }
 
-func coerceTokenInt64(v any) (any, error) {
-	switch id := v.(type) {
-	case int64:
-		return id, nil
-	case string:
-		return strconv.ParseInt(id, 10, 64)
-	case database.Identity:
-		return strconv.ParseInt(string(id), 10, 64)
-	default:
-		s, err := database.CoerceStringValue(v)
-		if err != nil {
-			return nil, err
-		}
-		return strconv.ParseInt(s, 10, 64)
-	}
-}
-
 var _ service.TokenStatements = (*tokenStatements)(nil)
 
 var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding[domain.Token]{
@@ -274,7 +236,7 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 	domain.TokenFieldTokenID: {
 		SQLName:  "token_id",
 		Accessor: func(t *domain.Token) any { return t.TokenID },
-		Coerce:   coerceTokenInt64,
+		Coerce:   database.CoerceString,
 	},
 	domain.TokenFieldUserID: {
 		SQLName:  "user_id",
@@ -289,17 +251,17 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 	domain.TokenFieldSessionID: {
 		SQLName:  "session_id",
 		Accessor: func(t *domain.Token) any { return tokenOptionalString(t.SessionID) },
-		Coerce:   coerceTokenInt64,
+		Coerce:   database.CoerceString,
 	},
 	domain.TokenFieldOIDCSessionID: {
 		SQLName:  "oidc_session_id",
 		Accessor: func(t *domain.Token) any { return tokenOptionalString(t.OIDCSessionID) },
-		Coerce:   coerceTokenInt64,
+		Coerce:   database.CoerceString,
 	},
 	domain.TokenFieldSAMLSessionID: {
 		SQLName:  "saml_session_id",
 		Accessor: func(t *domain.Token) any { return tokenOptionalString(t.SAMLSessionID) },
-		Coerce:   coerceTokenInt64,
+		Coerce:   database.CoerceString,
 	},
 	domain.TokenFieldScope: {
 		SQLName:  "scope",

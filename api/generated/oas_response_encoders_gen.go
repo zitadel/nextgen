@@ -2029,7 +2029,15 @@ func encodeGetMySessionResponse(response GetMySessionRes, w http.ResponseWriter,
 
 func encodeGetMyUserResponse(response GetMyUserRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *GetMyUserOK:
+	case *User:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
 		span.SetStatus(codes.Ok, http.StatusText(200))
@@ -2566,7 +2574,15 @@ func encodeGetTokenResponse(response GetTokenRes, w http.ResponseWriter, span tr
 
 func encodeGetUserByIDResponse(response GetUserByIDRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *GetUserByIDOK:
+	case *User:
+		if err := func() error {
+			if err := response.Validate(); err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrap(err, "validate")
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(200)
 		span.SetStatus(codes.Ok, http.StatusText(200))
@@ -3283,7 +3299,7 @@ func encodeListUserPasskeysResponse(response ListUserPasskeysRes, w http.Respons
 
 func encodeListUsersResponse(response ListUsersRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *ListUsersOKApplicationJSON:
+	case *ListUsersResponse:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err

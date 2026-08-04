@@ -21,4 +21,6 @@ scoped `AGENTS.md` files.
 
 Read the nearest scoped file before changing storage code:
 
-- `internal/storage/v2/AGENTS.md` — v2 statements, multi-write `withTransaction` rule
+- `internal/storage/v2/AGENTS.md` — v2 statements, multi-write
+  `withTransaction` rule, and identifier minting (`Ensure` /
+  `NewManagedID`)

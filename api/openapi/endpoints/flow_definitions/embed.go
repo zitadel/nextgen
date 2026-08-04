@@ -67,6 +67,9 @@ func DefaultLoginFlowDefinitions(serverURL string, projectID string, userSchemaU
 			steps,
 			status,
 		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return defs, nil
