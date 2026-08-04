@@ -129,10 +129,12 @@ func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjec
 
 // CreateSchema implements createSchema operation.
 //
-// Create a new schema. The schema definition must include a unique $id field,
-// which will be used to identify the schema in future requests. The $id must
-// be a valid URI and should ideally point to the location where the schema
-// can be accessed.
+// Create a new schema. The optional `$id` field is the JSON Schema document
+// URI used to identify the schema in future requests (GitOps-stable identity,
+// not a free-form resource primary key). When `$id` is omitted, the server
+// generates a `sch_*` URL. When provided, `$id` must be unique within the
+// project and should ideally be a valid URI pointing at where the schema can
+// be accessed.
 // The schema can either be a concrete schema, e.g. a user schema, or a
 // schema-url which will be resolved by the server.
 //
@@ -523,6 +525,16 @@ func (UnimplementedHandler) PatchProject(ctx context.Context, req *PatchProjectR
 //
 // POST /projects/query
 func (UnimplementedHandler) QueryProjects(ctx context.Context, req *QueryProjectsRequest) (r QueryProjectsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// QueryTeams implements queryTeams operation.
+//
+// Returns the teams of a project, paginated with a cursor.
+// Teams of every lifecycle status are returned; each carries its `status`.
+//
+// POST /teams/query
+func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (r QueryTeamsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

@@ -2505,6 +2505,7 @@ func (*ErrorDetailsStatusCode) listUserPasskeysRes()         {}
 func (*ErrorDetailsStatusCode) listUsersRes()                {}
 func (*ErrorDetailsStatusCode) patchProjectRes()             {}
 func (*ErrorDetailsStatusCode) queryProjectsRes()            {}
+func (*ErrorDetailsStatusCode) queryTeamsRes()               {}
 func (*ErrorDetailsStatusCode) revokeMySessionRes()          {}
 func (*ErrorDetailsStatusCode) revokeSessionRes()            {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()              {}
@@ -10007,6 +10008,52 @@ func (o OptQueryProjectsRequestSorting) Or(d QueryProjectsRequestSorting) QueryP
 	return d
 }
 
+// NewOptQueryTeamsRequestSorting returns new OptQueryTeamsRequestSorting with value set to v.
+func NewOptQueryTeamsRequestSorting(v QueryTeamsRequestSorting) OptQueryTeamsRequestSorting {
+	return OptQueryTeamsRequestSorting{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptQueryTeamsRequestSorting is optional QueryTeamsRequestSorting.
+type OptQueryTeamsRequestSorting struct {
+	Value QueryTeamsRequestSorting
+	Set   bool
+}
+
+// IsSet returns true if OptQueryTeamsRequestSorting was set.
+func (o OptQueryTeamsRequestSorting) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptQueryTeamsRequestSorting) Reset() {
+	var v QueryTeamsRequestSorting
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptQueryTeamsRequestSorting) SetTo(v QueryTeamsRequestSorting) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptQueryTeamsRequestSorting) Get() (v QueryTeamsRequestSorting, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptQueryTeamsRequestSorting) Or(d QueryTeamsRequestSorting) QueryTeamsRequestSorting {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSchemaURI returns new OptSchemaURI with value set to v.
 func NewOptSchemaURI(v SchemaURI) OptSchemaURI {
 	return OptSchemaURI{
@@ -11248,6 +11295,172 @@ type QueryProjectsUnauthorized ErrorDetails
 
 func (*QueryProjectsUnauthorized) queryProjectsRes() {}
 
+type QueryTeamsBadRequest ErrorDetails
+
+func (*QueryTeamsBadRequest) queryTeamsRes() {}
+
+type QueryTeamsForbidden ErrorDetails
+
+func (*QueryTeamsForbidden) queryTeamsRes() {}
+
+type QueryTeamsNotFound ErrorDetails
+
+func (*QueryTeamsNotFound) queryTeamsRes() {}
+
+// Request to query the teams of a project.
+// Ref: #
+type QueryTeamsRequest struct {
+	Limit OptLimit `json:"limit"`
+	// Token to retrieve the next page of results.
+	PageToken OptNilPageToken             `json:"page_token"`
+	Sorting   OptQueryTeamsRequestSorting `json:"sorting"`
+	// Filter criteria for querying teams.
+	Filter []QueryTeamsRequestFilterItem `json:"filter"`
+}
+
+// GetLimit returns the value of Limit.
+func (s *QueryTeamsRequest) GetLimit() OptLimit {
+	return s.Limit
+}
+
+// GetPageToken returns the value of PageToken.
+func (s *QueryTeamsRequest) GetPageToken() OptNilPageToken {
+	return s.PageToken
+}
+
+// GetSorting returns the value of Sorting.
+func (s *QueryTeamsRequest) GetSorting() OptQueryTeamsRequestSorting {
+	return s.Sorting
+}
+
+// GetFilter returns the value of Filter.
+func (s *QueryTeamsRequest) GetFilter() []QueryTeamsRequestFilterItem {
+	return s.Filter
+}
+
+// SetLimit sets the value of Limit.
+func (s *QueryTeamsRequest) SetLimit(val OptLimit) {
+	s.Limit = val
+}
+
+// SetPageToken sets the value of PageToken.
+func (s *QueryTeamsRequest) SetPageToken(val OptNilPageToken) {
+	s.PageToken = val
+}
+
+// SetSorting sets the value of Sorting.
+func (s *QueryTeamsRequest) SetSorting(val OptQueryTeamsRequestSorting) {
+	s.Sorting = val
+}
+
+// SetFilter sets the value of Filter.
+func (s *QueryTeamsRequest) SetFilter(val []QueryTeamsRequestFilterItem) {
+	s.Filter = val
+}
+
+type QueryTeamsRequestFilterItem struct {
+	// The field to filter by.
+	Field     TeamFilterField `json:"field"`
+	Value     OptFilterValue  `json:"value"`
+	Operation FilterOperation `json:"operation"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryTeamsRequestFilterItem) GetField() TeamFilterField {
+	return s.Field
+}
+
+// GetValue returns the value of Value.
+func (s *QueryTeamsRequestFilterItem) GetValue() OptFilterValue {
+	return s.Value
+}
+
+// GetOperation returns the value of Operation.
+func (s *QueryTeamsRequestFilterItem) GetOperation() FilterOperation {
+	return s.Operation
+}
+
+// SetField sets the value of Field.
+func (s *QueryTeamsRequestFilterItem) SetField(val TeamFilterField) {
+	s.Field = val
+}
+
+// SetValue sets the value of Value.
+func (s *QueryTeamsRequestFilterItem) SetValue(val OptFilterValue) {
+	s.Value = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *QueryTeamsRequestFilterItem) SetOperation(val FilterOperation) {
+	s.Operation = val
+}
+
+type QueryTeamsRequestSorting struct {
+	// The field to sort by.
+	Field TeamFilterField `json:"field"`
+	// The direction to sort by.
+	Direction SortDirection `json:"direction"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryTeamsRequestSorting) GetField() TeamFilterField {
+	return s.Field
+}
+
+// GetDirection returns the value of Direction.
+func (s *QueryTeamsRequestSorting) GetDirection() SortDirection {
+	return s.Direction
+}
+
+// SetField sets the value of Field.
+func (s *QueryTeamsRequestSorting) SetField(val TeamFilterField) {
+	s.Field = val
+}
+
+// SetDirection sets the value of Direction.
+func (s *QueryTeamsRequestSorting) SetDirection(val SortDirection) {
+	s.Direction = val
+}
+
+// Paginated list of teams.
+// Ref: #
+type QueryTeamsResponse struct {
+	Teams []TeamResponse `json:"teams"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetTeams returns the value of Teams.
+func (s *QueryTeamsResponse) GetTeams() []TeamResponse {
+	return s.Teams
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *QueryTeamsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetTeams sets the value of Teams.
+func (s *QueryTeamsResponse) SetTeams(val []TeamResponse) {
+	s.Teams = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *QueryTeamsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*QueryTeamsResponse) queryTeamsRes() {}
+
+type QueryTeamsTooManyRequests ErrorDetails
+
+func (*QueryTeamsTooManyRequests) queryTeamsRes() {}
+
+type QueryTeamsUnauthorized ErrorDetails
+
+func (*QueryTeamsUnauthorized) queryTeamsRes() {}
+
 type RevokeMySessionConflict ErrorDetails
 
 func (*RevokeMySessionConflict) revokeMySessionRes() {}
@@ -12181,6 +12394,41 @@ type SubmitFlowStepOK FlowResponseHeaders
 
 func (*SubmitFlowStepOK) submitFlowStepRes() {}
 
+// Ref: #
+type TeamFilterField string
+
+const (
+	TeamFilterFieldCreatedAt TeamFilterField = "createdAt"
+)
+
+// AllValues returns all TeamFilterField values.
+func (TeamFilterField) AllValues() []TeamFilterField {
+	return []TeamFilterField{
+		TeamFilterFieldCreatedAt,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s TeamFilterField) MarshalText() ([]byte, error) {
+	switch s {
+	case TeamFilterFieldCreatedAt:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *TeamFilterField) UnmarshalText(data []byte) error {
+	switch TeamFilterField(data) {
+	case TeamFilterFieldCreatedAt:
+		*s = TeamFilterFieldCreatedAt
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type TeamID string
 
 // Details of a team.
@@ -12394,10 +12642,6 @@ type UpdateTeamUnauthorized ErrorDetails
 
 func (*UpdateTeamUnauthorized) updateTeamRes() {}
 
-// A user represents an individual identity in the system. It can be used to
-// represent a human user, but also a service account or any other type of
-// identity. The content of a user is determined by the configured schema for
-// users, this is only a base schema.
 // Ref: #
 type User struct {
 	// The schema that defines the content of the user. These schemas can be

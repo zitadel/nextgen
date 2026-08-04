@@ -10,13 +10,13 @@ CREATE TABLE zitadel_nextgen.tokens (
     project_id  TEXT COLLATE "C" NOT NULL
         REFERENCES zitadel_nextgen.projects (id)
         ON DELETE CASCADE
-    , token_id    BIGINT      GENERATED ALWAYS AS IDENTITY
+    , token_id    TEXT COLLATE "C" NOT NULL CHECK (token_id <> '')
     , user_id     TEXT COLLATE "C"
     , token_type  zitadel_nextgen.token_types NOT NULL
-    , session_id  BIGINT
-    , oidc_session_id BIGINT
-    , saml_session_id BIGINT
-    , scope       TEXT[] NOT NULL DEFAULT '{}'
+    , session_id  TEXT COLLATE "C"
+    , oidc_session_id TEXT COLLATE "C"
+    , saml_session_id TEXT COLLATE "C"
+    , scope       TEXT[] NOT NULL
     , created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
     , expires_at  TIMESTAMPTZ NULL
 
