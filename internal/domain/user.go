@@ -192,13 +192,6 @@ func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte,
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal schema map")
 	}
 
-	if id == "" {
-		id, err = newID(PrefixUser)
-		if err != nil {
-			return nil, ErrInternal(err).WithMessage("failed to create user id")
-		}
-	}
-
 	attrs, err := CreateAttributesFromMap(muser, mschema)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to flatten user attributes")

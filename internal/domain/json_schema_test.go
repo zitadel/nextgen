@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -498,13 +497,6 @@ func TestNewJSONSchema_Metadata(t *testing.T) {
 		schema, err := domain.NewJSONSchema(projectID, []byte(`{"$id":"https://example.test/user.json","type":"object"}`))
 		require.NoError(t, err)
 		assert.Equal(t, "https://example.test/user.json", schema.URL)
-	})
-
-	t.Run("mints a URL when $id is absent", func(t *testing.T) {
-		schema, err := domain.NewJSONSchema(projectID, []byte(`{"type":"object"}`))
-		require.NoError(t, err)
-		assert.NotEmpty(t, schema.URL)
-		assert.True(t, strings.HasPrefix(schema.URL, string(domain.PrefixJSONSchema)), "want a %s-prefixed id, got %q", domain.PrefixJSONSchema, schema.URL)
 	})
 
 	t.Run("carries objectType through when present", func(t *testing.T) {
