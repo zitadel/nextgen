@@ -61,3 +61,135 @@ func TestTeamMembershipStatements_Get(t *testing.T) {
 		})
 	})
 }
+
+// TestTeamMembershipStatements_ListUserTeams pins the roster read every dialect
+// owes `GET /users/{user_id}/teams`: the membership joined to its team so the
+// name travels with the entry, filterable by status, and keyset-paginated.
+func TestTeamMembershipStatements_ListUserTeams(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		suffix := uniqueSuffix(t)
+
+		alphaTeam := newTestTeam(projectID, "team-alpha-"+suffix)
+		alphaTeam.Name = "Alpha " + suffix
+		betaTeam := newTestTeam(projectID, "team-beta-"+suffix)
+		betaTeam.Name = "Beta " + suffix
+		goneTeam := newTestTeam(projectID, "team-gone-"+suffix)
+		goneTeam.Name = "Gone " + suffix
+		for _, team := range []*domain.Team{alphaTeam, betaTeam, goneTeam} {
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
+		}
+
+		memberID := "user_roster-member-" + suffix
+		require.NoError(t, d.stmts.CreateUser(t.Context(),
+			newTestUser(t, projectID, schemaURL, memberID, "member-"+suffix+"@example.com", "Member")))
+		// A second user on the same teams: the roster must stay scoped to one.
+		otherID := "user_roster-other-" + suffix
+		require.NoError(t, d.stmts.CreateUser(t.Context(),
+			newTestUser(t, projectID, schemaURL, otherID, "other-"+suffix+"@example.com", "Other")))
+
+		// Created in a fixed order so created_at ordering is deterministic.
+		for _, membership := range []struct {
+			teamID string
+			userID string
+			status domain.MembershipStatus
+		}{
+			{alphaTeam.ID, memberID, domain.MembershipStatusActive},
+			{betaTeam.ID, memberID, domain.MembershipStatusPending},
+			{goneTeam.ID, memberID, domain.MembershipStatusRemoved},
+			{alphaTeam.ID, otherID, domain.MembershipStatusActive},
+		} {
+			require.NoError(t, d.stmts.CreateTeamMembership(t.Context(), &domain.TeamMembership{
+				ProjectID: projectID,
+				TeamID:    membership.teamID,
+				UserID:    membership.userID,
+				Status:    membership.status,
+			}))
+		}
+
+		memberFilter := database.And(
+			database.Equal(database.Col(domain.UserTeamFieldProjectID), projectID),
+			database.Equal(database.Col(domain.UserTeamFieldUserID), memberID),
+		)
+		byTeamID := database.OrderBy[domain.UserTeamField]{
+			Columns:   []database.Column[domain.UserTeamField]{database.Col(domain.UserTeamFieldTeamID)},
+			Direction: database.OrderAsc,
+		}
+
+		t.Run("joins_the_team_name_and_scopes_to_the_user", func(t *testing.T) {
+			list, err := d.stmts.ListUserTeams(t.Context(), &database.ListOptions[domain.UserTeamField]{
+				Filter:     memberFilter,
+				Pagination: database.Page[domain.UserTeamField]{OrderBy: byTeamID},
+			})
+			require.NoError(t, err)
+			require.Len(t, list.Items, 3, "every membership is readable; status filtering is the caller's call")
+
+			alpha := list.Items[0]
+			assert.Equal(t, projectID, alpha.ProjectID)
+			assert.Equal(t, memberID, alpha.UserID)
+			assert.Equal(t, alphaTeam.ID, alpha.TeamID)
+			assert.Equal(t, alphaTeam.Name, alpha.TeamName, "the team name travels with the roster entry")
+			assert.Equal(t, domain.MembershipStatusActive, alpha.Status)
+			assert.False(t, alpha.CreatedAt.IsZero())
+			assert.False(t, alpha.UpdatedAt.Before(alpha.CreatedAt))
+
+			assert.Equal(t, []string{alphaTeam.ID, betaTeam.ID, goneTeam.ID}, userTeamIDs(list.Items))
+		})
+
+		t.Run("filters_by_membership_status", func(t *testing.T) {
+			onRoster := make([]database.Filter[domain.UserTeamField], 0, len(domain.RosterMembershipStatuses))
+			for _, status := range domain.RosterMembershipStatuses {
+				onRoster = append(onRoster, database.Equal(database.Col(domain.UserTeamFieldStatus), status.String()))
+			}
+			list, err := d.stmts.ListUserTeams(t.Context(), &database.ListOptions[domain.UserTeamField]{
+				Filter:     database.And(memberFilter, database.Or(onRoster...)),
+				Pagination: database.Page[domain.UserTeamField]{OrderBy: byTeamID},
+			})
+			require.NoError(t, err)
+			assert.Equal(t, []string{alphaTeam.ID, betaTeam.ID}, userTeamIDs(list.Items),
+				"the removed membership is history, not roster")
+		})
+
+		t.Run("paginates_by_cursor", func(t *testing.T) {
+			page := database.Page[domain.UserTeamField]{Limit: 1, OrderBy: byTeamID}
+			first, err := d.stmts.ListUserTeams(t.Context(), &database.ListOptions[domain.UserTeamField]{
+				Filter:     memberFilter,
+				Pagination: page,
+			})
+			require.NoError(t, err)
+			require.Equal(t, []string{alphaTeam.ID}, userTeamIDs(first.Items))
+			require.NotEmpty(t, first.NextCursor, "a full page carries a cursor")
+
+			page.Cursor = first.NextCursor
+			second, err := d.stmts.ListUserTeams(t.Context(), &database.ListOptions[domain.UserTeamField]{
+				Filter:     memberFilter,
+				Pagination: page,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, []string{betaTeam.ID}, userTeamIDs(second.Items))
+		})
+
+		t.Run("empty_for_a_user_on_no_roster", func(t *testing.T) {
+			loneID := "user_roster-lone-" + suffix
+			require.NoError(t, d.stmts.CreateUser(t.Context(),
+				newTestUser(t, projectID, schemaURL, loneID, "lone-"+suffix+"@example.com", "Lone")))
+
+			list, err := d.stmts.ListUserTeams(t.Context(), &database.ListOptions[domain.UserTeamField]{
+				Filter: database.And(
+					database.Equal(database.Col(domain.UserTeamFieldProjectID), projectID),
+					database.Equal(database.Col(domain.UserTeamFieldUserID), loneID),
+				),
+			})
+			require.NoError(t, err)
+			assert.Empty(t, list.Items)
+		})
+	})
+}
+
+func userTeamIDs(teams []*domain.UserTeam) []string {
+	ids := make([]string, len(teams))
+	for i, team := range teams {
+		ids[i] = team.TeamID
+	}
+	return ids
+}
