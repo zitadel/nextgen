@@ -86,6 +86,39 @@ describe("user detail", () => {
     expect(screen.getByLabelText("Email")).toHaveValue("maya@acme.com");
   });
 
+  it("renders numeric and boolean attributes rather than leaving them blank", async () => {
+    // `schemaFields` surfaces `number`/`integer` properties, and a schema may
+    // define a boolean, so reading them as strings would render a real value as
+    // an empty field.
+    server.use(
+      http.get(`${USERS_URL}/${USER_ID}`, () =>
+        HttpResponse.json({
+          id: USER_ID,
+          $schema: "sch_business",
+          email: "maya@acme.com",
+          headcount: 42,
+          verified: false,
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({
+          title: "Business",
+          properties: {
+            email: { type: "string", format: "email" },
+            headcount: { type: "integer", title: "Headcount" },
+            verified: { type: "boolean", title: "Verified" },
+          },
+        }),
+      ),
+      http.get(`${USERS_URL}/${USER_ID}/passkeys`, () => HttpResponse.json({ passkeys: [] })),
+    );
+    await renderDetail();
+
+    expect(await screen.findByLabelText("Headcount")).toHaveValue("42");
+    // `false` is a value, not an absence — it must not render as empty.
+    expect(screen.getByLabelText("Verified")).toHaveValue("false");
+  });
+
   it("renders the profile read-only", async () => {
     // There is no update endpoint (#693). An editable field with no Save would
     // promise an edit the console cannot make, so the fields are inert and the

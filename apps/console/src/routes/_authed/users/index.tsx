@@ -24,7 +24,7 @@ import {
 import { UserStatusBadge } from "@/components/user-status-badge";
 
 import { api } from "../../../api/zitadel";
-import { field } from "../../../lib/record";
+import { displayValue, field } from "../../../lib/record";
 import { type SchemaField, type UserSchema, schemaColumns } from "../../../lib/schema";
 import { userDisplayName } from "../../../lib/user";
 import { getConsoleProjectId } from "../../../runtime/runtime";
@@ -354,7 +354,7 @@ function toUserRow(
     // Only scalars are read. A property whose value is an object or array has no
     // one-line rendering, and `JSON.stringify` in a table cell is noise — the
     // detail screen is where a structured attribute belongs.
-    const value = field(user, column.key);
+    const value = displayValue(user, column.key);
     if (value !== undefined) values[column.key] = value;
   }
   return {

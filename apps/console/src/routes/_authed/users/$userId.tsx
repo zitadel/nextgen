@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserStatusBadge } from "@/components/user-status-badge";
 
 import { api } from "../../../api/zitadel";
-import { field } from "../../../lib/record";
+import { displayValue, field } from "../../../lib/record";
 import { type UserSchema, schemaDisplayName, schemaFields } from "../../../lib/schema";
 import { userDisplayName } from "../../../lib/user";
 import { getConsoleProjectId } from "../../../runtime/runtime";
@@ -140,7 +140,7 @@ function UserDetail() {
                   <ProfileField
                     key={entry.key}
                     label={entry.label}
-                    value={field(user, entry.key) ?? ""}
+                    value={displayValue(user, entry.key) ?? ""}
                   />
                 ))}
               </div>
