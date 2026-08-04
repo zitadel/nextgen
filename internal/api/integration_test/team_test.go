@@ -622,14 +622,14 @@ func TestDeleteTeam(t *testing.T) {
 			ID:                      userID,
 			LifecycleOwnerTeamID:    &team.ID,
 			InitialMembershipTeamID: &team.ID,
-			Attributes:              []*domain.CreateAttribute{attr},
+			Attributes:              domain.CreateAttributes{*attr},
 		}))
 
 		deleteTeam(t, team.ID)
 
 		user, err := users.GetByID(t.Context(), project.ID, userID)
 		require.NoError(t, err)
-		assert.Equal(t, domain.UserStatusDeactivated, user.Status)
+		assert.Equal(t, domain.UserStatusDeactivated, user.Metadata.Status)
 
 		membership, err := harness.EnsureServiceDB(t).Statements().GetTeamMembership(t.Context(), project.ID, team.ID, userID)
 		require.NoError(t, err)
