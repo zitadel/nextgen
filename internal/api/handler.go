@@ -24,6 +24,11 @@ type Handler struct {
 	brandingService       *service.BrandingService
 	tokenService          service.TokenService
 	keyService            service.KeyService
+
+	// platformProjectID is the configured platform.project_id pin (ADR 046 §2).
+	// Empty means the platform project is unresolved, so claim/complete rejects
+	// every session.
+	platformProjectID string
 }
 
 func NewHandler(
@@ -38,6 +43,7 @@ func NewHandler(
 	brandingService *service.BrandingService,
 	tokenService service.TokenService,
 	keyService service.KeyService,
+	platformProjectID string,
 ) *Handler {
 	return &Handler{
 		flowService:           flowService,
@@ -51,6 +57,7 @@ func NewHandler(
 		brandingService:       brandingService,
 		tokenService:          tokenService,
 		keyService:            keyService,
+		platformProjectID:     platformProjectID,
 	}
 }
 

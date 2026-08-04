@@ -5,8 +5,27 @@ import (
 )
 
 const (
+	PrefixClaim          ResourcePrefix = "claim"
 	PrefixClaimChallenge ResourcePrefix = "claim_challenge"
 )
+
+// The claim session sentinels are internal diagnostics for the claim/complete
+// session precondition (ADR 046 §2). On the wire they are always wrapped in
+// auth.unauthorized (401): the caller learns only that the session credential
+// was rejected. They exist as distinct values so logs and Claim E2's tests can
+// tell the failure modes apart.
+
+func ErrClaimSessionWrongProject() Error {
+	return newError(PrefixClaim.ErrorCodePrefix("session_wrong_project"), "The session does not belong to the platform project.", nil, nil)
+}
+
+func ErrClaimSessionExpired() Error {
+	return newError(PrefixClaim.ErrorCodePrefix("session_expired"), "The session has expired.", nil, nil)
+}
+
+func ErrClaimSessionNotActive() Error {
+	return newError(PrefixClaim.ErrorCodePrefix("session_not_active"), "The session is not active: it has no verified factor or no resolved user.", nil, nil)
+}
 
 // ClaimChallengeStatus is the lifecycle state of a claim challenge. It mirrors
 // the DB CHECK on claim_challenges.status.
