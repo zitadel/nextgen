@@ -9,6 +9,7 @@
  * — it runs at the empty-directory scaffold branch, before the main wizard
  * starts.
  */
+import { DesignPrompt } from "./design";
 import { DevPortPrompt } from "./dev-port";
 import { FrameworkConfirmPrompt } from "./framework-confirm";
 import { ServerPrompt } from "./server";
@@ -18,6 +19,7 @@ import { UseCasePrompt } from "./use-case";
 
 export type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 export { bail } from "./cancel";
+export { DesignPrompt } from "./design";
 export { DevPortPrompt } from "./dev-port";
 export { FrameworkConfirmPrompt } from "./framework-confirm";
 export { ServerPrompt } from "./server";
@@ -32,4 +34,5 @@ export const SETUP_PROMPTS: ReadonlyArray<SetupPrompt> = [
   new DevPortPrompt(),
   new UseCasePrompt(),
   new SignInPresetPrompt(),
+  new DesignPrompt(),
 ];

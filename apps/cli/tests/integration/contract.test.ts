@@ -68,8 +68,15 @@ async function typescriptFiles(dir: string): Promise<string[]> {
 }
 
 function commandIdFromArgs(args: string): string | undefined {
-  const id = args.trim().split(/\s+/)[0];
-  return id && /^[a-z][\w:-]*$/.test(id) ? id : undefined;
+  // Leading bare words form the command id; topic commands are suggested with
+  // a space ("branding eject") but registered with oclif's colon id
+  // ("branding:eject"). Flags and free text end the id.
+  const words: string[] = [];
+  for (const token of args.trim().split(/\s+/)) {
+    if (!/^[a-z][\w-]*$/.test(token)) break;
+    words.push(token);
+  }
+  return words.length > 0 ? words.join(":") : undefined;
 }
 
 describe("envelope contract", () => {
