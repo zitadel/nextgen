@@ -1,0 +1,26 @@
+type: object
+description: |
+  A completed claim. Carries the owning team, when the claim landed, and the
+  dashboard where it can be managed, so a generated client can rely on those
+  fields being present whenever `status` is `completed`.
+required:
+  - status
+  - team_id
+  - claimed_at
+  - dashboard_url
+properties:
+  status:
+    type: string
+    enum:
+      - completed
+    description: The claim has completed.
+  team_id:
+    $ref: ../../../../../components/schemas/team-id.yaml
+  claimed_at:
+    type: string
+    format: date-time
+    description: The time when the project was claimed.
+  dashboard_url:
+    type: string
+    format: uri
+    description: The dashboard URL for the owning team.
