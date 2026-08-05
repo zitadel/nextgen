@@ -18,10 +18,10 @@ function ctxFor(
     rendererId: "react",
     project: {
       id: "proj-1",
-      projectSecret: "sk_proj_full",
-      previewSecret: "sk_proj_preview",
-      previewOrigins: [],
-      createdAt: "2026-01-01T00:00:00.000Z",
+      project_secret: "sk_proj_full",
+      preview_secret: "sk_proj_preview",
+      preview_origins: [],
+      created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
@@ -140,7 +140,7 @@ describe("NextPatcher.plan", () => {
     const base = ctxFor("app");
     const ctx = {
       ...base,
-      project: { ...base.project, previewOrigins: ["https://nextgen.dev.mrida.ng"] },
+      project: { ...base.project, preview_origins: ["https://nextgen.dev.mrida.ng"] },
     };
     const zitadelJson = JSON.parse(
       writeContents(new NextPatcher().plan(ctx), "zitadel.json") ?? "{}",

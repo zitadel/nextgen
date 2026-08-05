@@ -27,10 +27,10 @@ const server = setupServer(
       {
         id: "proj_1",
         name: "zitadel-testing",
-        projectSecret: "secret_1",
-        previewSecret: "preview_1",
-        previewOrigins: [],
-        createdAt: "2026-01-01T00:00:00Z",
+        project_secret: "secret_1",
+        preview_secret: "preview_1",
+        preview_origins: [],
+        created_at: "2026-01-01T00:00:00Z",
       },
       { status: 201 },
     );
@@ -73,8 +73,8 @@ describe("bootstrapProject", () => {
 
     expect(captured.projectBody).toMatchObject({
       name: "zitadel-testing",
-      previewOrigins: ["http://localhost:3002"],
-      seedDefaults: false,
+      preview_origins: ["http://localhost:3002"],
+      seed_defaults: false,
     });
 
     // Schema uploads without $id (the server assigns the opaque id) and with

@@ -52,9 +52,7 @@ export default class SchemasList extends BaseCommand {
       object_type: objectType,
     });
 
-    // Envelope rows are snake_case like every other command's data; the
-    // orval model's `createdAt` is not spread verbatim.
-    const revisionRows = revisions.map((r) => ({ id: r.id, created_at: r.createdAt }));
+    const revisionRows = revisions.map((r) => ({ id: r.id, created_at: r.created_at }));
 
     if (revisions.length === 0) {
       const message = `No revisions found for objectType "${objectType}".`;
@@ -83,7 +81,7 @@ export default class SchemasList extends BaseCommand {
       message: `Revisions of objectType "${objectType}" (newest first)`,
       options: revisions.map((r, idx) => ({
         value: r.id,
-        label: `${r.createdAt}   ${r.id}${idx === 0 ? "   (latest)" : ""}`,
+        label: `${r.created_at}   ${r.id}${idx === 0 ? "   (latest)" : ""}`,
       })),
     });
     if (isCancel(picked)) {
@@ -133,13 +131,13 @@ export async function fetchSchemaRevision(
 function renderTable(objectType: string, revisions: ReadonlyArray<ListSchemas200Item>): string {
   const header = `Revisions of objectType "${objectType}" (${revisions.length}, newest first)`;
   const idCol = Math.max("id".length, ...revisions.map((r) => r.id.length));
-  const createdCol = Math.max("createdAt".length, ...revisions.map((r) => r.createdAt.length));
+  const createdCol = Math.max("created_at".length, ...revisions.map((r) => r.created_at.length));
   const rows = revisions.map(
-    (r) => `${r.createdAt.padEnd(createdCol)}  ${r.id.padEnd(idCol)}`,
+    (r) => `${r.created_at.padEnd(createdCol)}  ${r.id.padEnd(idCol)}`,
   );
   return [
     header,
-    `${"createdAt".padEnd(createdCol)}  ${"id".padEnd(idCol)}`,
+    `${"created_at".padEnd(createdCol)}  ${"id".padEnd(idCol)}`,
     `${"-".repeat(createdCol)}  ${"-".repeat(idCol)}`,
     ...rows,
   ].join("\n");

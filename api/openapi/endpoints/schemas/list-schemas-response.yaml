@@ -3,11 +3,11 @@ items:
   type: object
   required:
     - id
-    - createdAt
+    - created_at
   properties:
     id:
       type: string
       description: The unique identifier for this schema.
-    createdAt:
+    created_at:
       type: string
       format: date-time
