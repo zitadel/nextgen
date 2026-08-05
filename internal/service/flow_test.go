@@ -609,15 +609,16 @@ func TestFlowService_Start_PersistsBuildingSession(t *testing.T) {
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	stmts.EXPECT().NewManagedID(gomock.Any()).Return("flow_1", nil).AnyTimes()
 	stmts.EXPECT().CreateSession(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, sess *domain.Session) error {
-		// A flow start with no supplied session persists an anonymous building shell.
+		// A flow start with no supplied session persists a new anonymous session
+		// in the building state.
 		if sess.ProjectID != def.ProjectID {
-			t.Errorf("shell ProjectID = %q, want %q", sess.ProjectID, def.ProjectID)
+			t.Errorf("session ProjectID = %q, want %q", sess.ProjectID, def.ProjectID)
 		}
 		if len(sess.Factors) != 0 || sess.UserID != nil {
-			t.Errorf("shell must be building: factors=%d userID=%v", len(sess.Factors), sess.UserID)
+			t.Errorf("session must be building: factors=%d userID=%v", len(sess.Factors), sess.UserID)
 		}
 		if got := sess.State(); got != domain.SessionStateBuilding {
-			t.Errorf("shell state = %v, want building", got)
+			t.Errorf("session state = %v, want building", got)
 		}
 		sess.ID = "sess_created"
 		return nil
@@ -633,7 +634,7 @@ func TestFlowService_Start_PersistsBuildingSession(t *testing.T) {
 		t.Fatalf("Start: %v", err)
 	}
 	if sm.gotStartInput.Session.ID != "sess_created" {
-		t.Errorf("Session.ID = %q, want the persisted shell id", sm.gotStartInput.Session.ID)
+		t.Errorf("Session.ID = %q, want the persisted session id", sm.gotStartInput.Session.ID)
 	}
 }
 

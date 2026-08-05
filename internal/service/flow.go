@@ -195,22 +195,22 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 	}
 
 	// Persist a session for the flow: reuse the one the client supplied (a
-	// pre-created shell, or an existing session for step-up), otherwise create
-	// an anonymous building shell. Linking the auth-attempt to this session lets
-	// exchange upgrade it in place (building -> active) instead of minting a
-	// second one.
+	// pre-created anonymous session, or an existing session for step-up),
+	// otherwise create a new anonymous session. Linking the auth-attempt to this
+	// session lets exchange upgrade it in place (building -> active) instead of
+	// minting a second one.
 	sessionID := ""
 	if req.SessionID != nil {
 		sessionID = *req.SessionID
 	} else {
-		shell, err := domain.NewSession(req.Definition.ProjectID, nil)
+		session, err := domain.NewSession(req.Definition.ProjectID, nil)
 		if err != nil {
-			return domain.FlowStepResult{}, fmt.Errorf("flow service: create session shell: %w", err)
+			return domain.FlowStepResult{}, fmt.Errorf("flow service: create anonymous session: %w", err)
 		}
-		if err := s.v2Pool.Statements().CreateSession(ctx, shell); err != nil {
-			return domain.FlowStepResult{}, fmt.Errorf("flow service: persist session shell: %w", err)
+		if err := s.v2Pool.Statements().CreateSession(ctx, session); err != nil {
+			return domain.FlowStepResult{}, fmt.Errorf("flow service: persist anonymous session: %w", err)
 		}
-		sessionID = shell.ID
+		sessionID = session.ID
 	}
 
 	in := domain.FlowStartInput{

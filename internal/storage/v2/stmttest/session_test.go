@@ -45,30 +45,30 @@ func TestUserStatements_DeleteCascadesSessionAndToken(t *testing.T) {
 	})
 }
 
-// TestSessionStatements_ExchangeUpgradesShellInPlace covers the #755 lifecycle:
-// a flow persists a building shell, its auth-attempt links to that shell, and
-// exchange upgrades the same row (building -> active) instead of creating a
-// second session.
-func TestSessionStatements_ExchangeUpgradesShellInPlace(t *testing.T) {
+// TestSessionStatements_ExchangeUpgradesSessionInPlace covers the #755 lifecycle:
+// a flow persists an anonymous building session, its auth-attempt links to that
+// session, and exchange upgrades the same row (building -> active) instead of
+// creating a second session.
+func TestSessionStatements_ExchangeUpgradesSessionInPlace(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 		user := newTestUser(t, projectID, schemaURL, "user-upgrade-"+uniqueSuffix(t), "upgrade@example.com", "Upgrade User")
 		require.NoError(t, d.stmts.CreateUser(t.Context(), user))
 
-		// The building shell persisted when the flow started.
-		shell, err := domain.NewSession(projectID, nil)
+		// The anonymous building session persisted when the flow started.
+		session, err := domain.NewSession(projectID, nil)
 		require.NoError(t, err)
-		require.NoError(t, d.stmts.CreateSession(t.Context(), shell))
-		require.NotEmpty(t, shell.ID)
-		require.Equal(t, domain.SessionStateBuilding, shell.State())
-		shellID := shell.ID
+		require.NoError(t, d.stmts.CreateSession(t.Context(), session))
+		require.NotEmpty(t, session.ID)
+		require.Equal(t, domain.SessionStateBuilding, session.State())
+		sessionID := session.ID
 		t.Cleanup(func() {
-			_ = d.stmts.DeleteSessionByID(context.Background(), projectID, shellID)
+			_ = d.stmts.DeleteSessionByID(context.Background(), projectID, sessionID)
 		})
 
-		// The flow's auth-attempt links to that shell.
+		// The flow's auth-attempt links to that session.
 		plain, _ := handoffCompletedAttempt(t, d.stmts, projectID, func(a *domain.AuthAttempt) {
-			a.SessionID = &shellID
+			a.SessionID = &sessionID
 			a.RequiredChecks = []domain.AuthCheckType{domain.AuthCheckTypeUser, domain.AuthCheckTypePassword}
 			a.Checks = []domain.AuthCheck{
 				&domain.AuthFactorUser{UserID: user.ID},
@@ -79,12 +79,12 @@ func TestSessionStatements_ExchangeUpgradesShellInPlace(t *testing.T) {
 		exchanged, err := d.stmts.ExchangeSession(t.Context(), projectID, plain, nil, time.Hour)
 		require.NoError(t, err)
 		// Same session, upgraded in place: no duplicate id.
-		require.Equal(t, shellID, exchanged.ID, "exchange must upgrade the shell, not mint a new session")
+		require.Equal(t, sessionID, exchanged.ID, "exchange must upgrade the existing session, not mint a new one")
 		require.NotNil(t, exchanged.UserID)
 		assert.Equal(t, user.ID, *exchanged.UserID)
 		assert.Equal(t, domain.SessionStateActive, exchanged.State())
 
-		got, err := d.stmts.GetSessionByID(t.Context(), projectID, shellID)
+		got, err := d.stmts.GetSessionByID(t.Context(), projectID, sessionID)
 		require.NoError(t, err)
 		assert.Equal(t, domain.SessionStateActive, got.State())
 		assert.NotEmpty(t, got.Factors, "verified factors promoted onto the upgraded session")

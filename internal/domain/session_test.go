@@ -20,17 +20,17 @@ func TestSession_State(t *testing.T) {
 		want    domain.SessionState
 	}{
 		{
-			name:    "building shell within ttl",
+			name:    "building session within ttl",
 			session: domain.Session{ExpiresAt: now.Add(time.Hour)},
 			want:    domain.SessionStateBuilding,
 		},
 		{
-			name:    "unpersisted shell with zero expiry is building",
+			name:    "unpersisted session with zero expiry is building",
 			session: domain.Session{},
 			want:    domain.SessionStateBuilding,
 		},
 		{
-			name:    "abandoned building shell past ttl is expired",
+			name:    "abandoned building session past ttl is expired",
 			session: domain.Session{ExpiresAt: now.Add(-time.Minute)},
 			want:    domain.SessionStateExpired,
 		},
