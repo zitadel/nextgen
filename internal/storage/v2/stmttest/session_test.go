@@ -46,7 +46,7 @@ func TestUserStatements_DeleteCascadesSessionAndToken(t *testing.T) {
 }
 
 // TestSessionStatements_ExchangeUpgradesShellInPlace covers the #755 lifecycle:
-// a login persists a building shell, its auth-attempt links to that shell, and
+// a flow persists a building shell, its auth-attempt links to that shell, and
 // exchange upgrades the same row (building -> active) instead of creating a
 // second session.
 func TestSessionStatements_ExchangeUpgradesShellInPlace(t *testing.T) {
@@ -55,7 +55,7 @@ func TestSessionStatements_ExchangeUpgradesShellInPlace(t *testing.T) {
 		user := newTestUser(t, projectID, schemaURL, "user-upgrade-"+uniqueSuffix(t), "upgrade@example.com", "Upgrade User")
 		require.NoError(t, d.stmts.CreateUser(t.Context(), user))
 
-		// The building shell persisted when the login started.
+		// The building shell persisted when the flow started.
 		shell, err := domain.NewSession(projectID, nil)
 		require.NoError(t, err)
 		require.NoError(t, d.stmts.CreateSession(t.Context(), shell))
@@ -66,7 +66,7 @@ func TestSessionStatements_ExchangeUpgradesShellInPlace(t *testing.T) {
 			_ = d.stmts.DeleteSessionByID(context.Background(), projectID, shellID)
 		})
 
-		// The login's auth-attempt links to that shell.
+		// The flow's auth-attempt links to that shell.
 		plain, _ := handoffCompletedAttempt(t, d.stmts, projectID, func(a *domain.AuthAttempt) {
 			a.SessionID = &shellID
 			a.RequiredChecks = []domain.AuthCheckType{domain.AuthCheckTypeUser, domain.AuthCheckTypePassword}

@@ -194,7 +194,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: start without definition")
 	}
 
-	// Persist a session for the login: reuse the one the client supplied (a
+	// Persist a session for the flow: reuse the one the client supplied (a
 	// pre-created shell, or an existing session for step-up), otherwise create
 	// an anonymous building shell. Linking the auth-attempt to this session lets
 	// exchange upgrade it in place (building -> active) instead of minting a

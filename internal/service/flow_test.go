@@ -609,7 +609,7 @@ func TestFlowService_Start_PersistsBuildingSession(t *testing.T) {
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	stmts.EXPECT().NewManagedID(gomock.Any()).Return("flow_1", nil).AnyTimes()
 	stmts.EXPECT().CreateSession(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, sess *domain.Session) error {
-		// A login with no supplied session persists an anonymous building shell.
+		// A flow start with no supplied session persists an anonymous building shell.
 		if sess.ProjectID != def.ProjectID {
 			t.Errorf("shell ProjectID = %q, want %q", sess.ProjectID, def.ProjectID)
 		}
