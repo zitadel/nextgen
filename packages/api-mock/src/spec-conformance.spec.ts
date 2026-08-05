@@ -22,7 +22,7 @@
  * Endpoints covered structurally (orval emits no `*Response` zod for these
  * because they have no static response schema — POSTs that return only an
  * `id`, or out-of-spec routes):
- *   - POST /projects                    → { id, projectSecret, … }
+ *   - POST /projects                    → { id, project_secret, … }
  *   - POST /schemas                     → { id }
  *   - POST /flow_definitions            → flow detail envelope
  *
@@ -178,8 +178,8 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         name: "conformance-app",
-        previewOrigins: ["http://localhost:3000"],
-        seedDefaults: false,
+        preview_origins: ["http://localhost:3000"],
+        seed_defaults: false,
       }),
     });
     expect(res.status).toBe(201);
@@ -188,10 +188,10 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // structurally against the fields create-project-response.yaml requires.
     expect(typeof body.id).toBe("string");
     expect(body.name).toBe("conformance-app");
-    expect(typeof body.projectSecret).toBe("string");
-    expect(typeof body.previewSecret).toBe("string");
-    expect(Array.isArray(body.previewOrigins)).toBe(true);
-    expect(typeof body.createdAt).toBe("string");
+    expect(typeof body.project_secret).toBe("string");
+    expect(typeof body.preview_secret).toBe("string");
+    expect(Array.isArray(body.preview_origins)).toBe(true);
+    expect(typeof body.created_at).toBe("string");
   });
 
   test("GET /projects/:id matches GetProjectResponse", async () => {
@@ -394,8 +394,8 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
     });
-    const body = (await res.json()) as { id: string; projectSecret: string };
-    return { id: body.id, projectSecret: body.projectSecret };
+    const body = (await res.json()) as { id: string; project_secret: string };
+    return { id: body.id, projectSecret: body.project_secret };
   }
 
   async function initClaim(projectId: string, secret: string): Promise<Response> {

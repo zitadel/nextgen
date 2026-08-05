@@ -13,3 +13,35 @@ rules:
   operation-4xx-response: off
   operation-operationId: error
   tag-description: error
+
+  # Wrong casing fails silently: an unknown property is dropped, not rejected.
+  # Allows JSON Schema keywords and x- extensions; one-offs are ignore-listed.
+  rule/wire-field-snake-case:
+    subject:
+      type: SchemaProperties
+    assertions:
+      pattern: /^(\$[a-zA-Z]+|x-[a-z0-9]+(-[a-z0-9]+)*|[a-z][a-z0-9]*(_[a-z0-9]+)*)$/
+    severity: error
+
+  # Covers query filter/sort field values, which the property rule can't see.
+  # Rejects camelCase rather than requiring lowercase: OAuth/OIDC enums are RFC
+  # vocabularies (`S256`, `Bearer`, the device_code grant URN). Unanchored so a
+  # hump past the first word still fails (`created_atUTC`).
+  rule/wire-enum-no-camel-case:
+    subject:
+      type: Schema
+      property: enum
+    assertions:
+      notPattern: /[a-z][A-Z]/
+    severity: error
+
+  # Covers parameter names, which are not schema properties either. Same
+  # camelCase test rather than snake_case, because header and cookie names are
+  # legitimately neither (`Idempotency-Key`, `Origin`, `_zflow`).
+  rule/wire-parameter-no-camel-case:
+    subject:
+      type: Parameter
+      property: name
+    assertions:
+      notPattern: /[a-z][A-Z]/
+    severity: error
