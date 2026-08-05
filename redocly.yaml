@@ -25,7 +25,7 @@ rules:
 
   # Covers query filter/sort field values, which the property rule can't see.
   # Rejects camelCase rather than requiring lowercase: OAuth/OIDC enums are RFC
-  # vocabularies (`S256`, `Bearer`, the device_code grant URN).s Unanchored so a
+  # vocabularies (`S256`, `Bearer`, the device_code grant URN). Unanchored so a
   # hump past the first word still fails (`created_atUTC`).
   rule/wire-enum-no-camel-case:
     subject:

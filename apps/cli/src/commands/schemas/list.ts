@@ -52,6 +52,8 @@ export default class SchemasList extends BaseCommand {
       object_type: objectType,
     });
 
+    // The envelope's row shape is a contract; project it explicitly so a field
+    // added to the API later cannot leak into stdout.
     const revisionRows = revisions.map((r) => ({ id: r.id, created_at: r.created_at }));
 
     if (revisions.length === 0) {
