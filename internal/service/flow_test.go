@@ -24,6 +24,12 @@ func stubDB(t *testing.T) *service.DB {
 	stmts.EXPECT().NewManagedID(gomock.Any()).DoAndReturn(func(prefix string) (string, error) {
 		return ids.New(prefix)
 	}).AnyTimes()
+	stmts.EXPECT().CreateSession(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, sess *domain.Session) error {
+		if sess.ID == "" {
+			sess.ID = "sess_1" // storage assigns the id; simulate it here
+		}
+		return nil
+	}).AnyTimes()
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	return service.NewPool(pool)
 }
@@ -570,7 +576,15 @@ func TestFlowService_Start_PreservesProvidedSessionID(t *testing.T) {
 	state := &domain.FlowState{ProjectID: def.ProjectID}
 	sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: state, Step: &domain.FlowStep{}}}
 
-	svc := service.NewFlowService(stubDB(t), sm)
+	// No CreateSession is wired: supplying a session must reuse it, so any call
+	// to CreateSession fails the test (proving no new session is created).
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().NewManagedID(gomock.Any()).Return("flow_1", nil).AnyTimes()
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+
+	svc := service.NewFlowService(service.NewPool(pool), sm)
 
 	sessionID := "sess_explicit"
 	if _, err := svc.Start(t.Context(), service.StartFlowRequest{
@@ -582,6 +596,44 @@ func TestFlowService_Start_PreservesProvidedSessionID(t *testing.T) {
 	}
 	if sm.gotStartInput.Session.ID != sessionID {
 		t.Errorf("Session.ID = %q, want %q", sm.gotStartInput.Session.ID, sessionID)
+	}
+}
+
+func TestFlowService_Start_PersistsBuildingSession(t *testing.T) {
+	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	state := &domain.FlowState{ProjectID: def.ProjectID}
+	sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: state, Step: &domain.FlowStep{}}}
+
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().NewManagedID(gomock.Any()).Return("flow_1", nil).AnyTimes()
+	stmts.EXPECT().CreateSession(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, sess *domain.Session) error {
+		// A login with no supplied session persists an anonymous building shell.
+		if sess.ProjectID != def.ProjectID {
+			t.Errorf("shell ProjectID = %q, want %q", sess.ProjectID, def.ProjectID)
+		}
+		if len(sess.Factors) != 0 || sess.UserID != nil {
+			t.Errorf("shell must be building: factors=%d userID=%v", len(sess.Factors), sess.UserID)
+		}
+		if got := sess.State(); got != domain.SessionStateBuilding {
+			t.Errorf("shell state = %v, want building", got)
+		}
+		sess.ID = "sess_created"
+		return nil
+	}).Times(1)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+
+	svc := service.NewFlowService(service.NewPool(pool), sm)
+
+	if _, err := svc.Start(t.Context(), service.StartFlowRequest{
+		Definition: def,
+		Purpose:    domain.FlowDefinitionPurposeLogin,
+	}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	if sm.gotStartInput.Session.ID != "sess_created" {
+		t.Errorf("Session.ID = %q, want the persisted shell id", sm.gotStartInput.Session.ID)
 	}
 }
 

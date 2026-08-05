@@ -194,16 +194,23 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: start without definition")
 	}
 
-	// TODO(wim): use SessionService to create sessions (#412)
+	// Persist a session for the login: reuse the one the client supplied (a
+	// pre-created shell, or an existing session for step-up), otherwise create
+	// an anonymous building shell. Linking the auth-attempt to this session lets
+	// exchange upgrade it in place (building -> active) instead of minting a
+	// second one.
 	sessionID := ""
 	if req.SessionID != nil {
 		sessionID = *req.SessionID
 	} else {
-		id, err := s.v2Pool.Statements().NewManagedID(string(domain.PrefixSession))
+		shell, err := domain.NewSession(req.Definition.ProjectID, nil)
 		if err != nil {
-			return domain.FlowStepResult{}, fmt.Errorf("flow service: mint session id: %w", err)
+			return domain.FlowStepResult{}, fmt.Errorf("flow service: create session shell: %w", err)
 		}
-		sessionID = id
+		if err := s.v2Pool.Statements().CreateSession(ctx, shell); err != nil {
+			return domain.FlowStepResult{}, fmt.Errorf("flow service: persist session shell: %w", err)
+		}
+		sessionID = shell.ID
 	}
 
 	in := domain.FlowStartInput{

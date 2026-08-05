@@ -276,7 +276,12 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) 
 	if r.authAttempts == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: auth-attempt service not wired", ErrFlowIntegrity())
 	}
-	attemptID, err := r.authAttempts.Start(ctx, FlowCreateAttemptInput{ProjectID: state.ProjectID})
+	attemptInput := FlowCreateAttemptInput{ProjectID: state.ProjectID}
+	if state.SessionID != "" {
+		sid := state.SessionID
+		attemptInput.SessionID = &sid
+	}
+	attemptID, err := r.authAttempts.Start(ctx, attemptInput)
 	if err != nil {
 		return FlowStepResult{}, fmt.Errorf("flow state machine: start auth attempt: %w", err)
 	}
