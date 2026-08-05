@@ -633,6 +633,23 @@ func TestFlowService_Start_PersistsSession(t *testing.T) {
 	}
 }
 
+func TestFlowService_Start_RejectsEmptySessionID(t *testing.T) {
+	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	sm := &fakeStateMachine{}
+
+	svc := service.NewFlowService(stubDB(t), sm)
+
+	empty := ""
+	_, err := svc.Start(t.Context(), service.StartFlowRequest{
+		Definition: def,
+		Purpose:    domain.FlowDefinitionPurposeLogin,
+		SessionID:  &empty,
+	})
+	if !errors.Is(err, domain.ErrRequestInvalid()) {
+		t.Fatalf("Start err = %v, want ErrRequestInvalid", err)
+	}
+}
+
 func TestFlowService_Start_PropagatesStateMachineError(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	sm := &fakeStateMachine{startErr: errors.New("boom")}

@@ -214,6 +214,11 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 	if req.Definition == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: start without definition")
 	}
+	// A supplied session id must name a real session; reject an empty value up
+	// front so it maps to 400 rather than silently producing an unlinked flow.
+	if req.SessionID != nil && *req.SessionID == "" {
+		return domain.FlowStepResult{}, domain.ErrRequestInvalid().WithMessage("session_id must not be empty")
+	}
 
 	sessionID, err := s.resolveFlowSession(ctx, req)
 	if err != nil {
