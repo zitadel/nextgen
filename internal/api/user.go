@@ -131,7 +131,7 @@ func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPassk
 // page without resolving ids one by one. Lifecycle ownership is a different
 // question and stays on the user itself (ADR 024).
 func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsParams) (api.ListUserTeamsRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opRead); err != nil {
+	if err := requireUserTeamsAccess(ctx, string(params.ProjectID)); err != nil {
 		return nil, err
 	}
 

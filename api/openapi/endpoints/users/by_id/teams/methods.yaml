@@ -23,6 +23,7 @@ get:
   security:
     - oauth2:
         - user.read
+        - team.read
   responses:
     '200':
       description: The teams of a user are returned
