@@ -393,8 +393,14 @@ describe("schema-dependent rules", () => {
     });
 
     it("covers a required object without its own required by any leaf beneath it", () => {
-      const withRequired = nested();
-      delete (withRequired.properties as Record<string, Record<string, unknown>>).address.required;
+      const withRequired = structuredClone(schema);
+      (withRequired.properties as Record<string, unknown>).address = {
+        type: "object",
+        properties: {
+          street: { type: "string" },
+          city: { type: "string" },
+        },
+      };
       withRequired.required = ["address"];
       const def = flow();
       step(def, "register").fields.push("address.city");

@@ -595,8 +595,8 @@ function resolveFieldChallenge(
   const segments = field.split(".");
   let property: unknown = undefined;
   let level: Record<string, unknown> | undefined = properties;
-  for (let i = 0; i < segments.length; i++) {
-    property = level?.[segments[i]];
+  for (const [i, segment] of segments.entries()) {
+    property = level?.[segment];
     if (property === undefined) {
       return { message: `flow field: not a property in the user schema: ${q(field)}` };
     }
