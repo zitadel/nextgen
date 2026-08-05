@@ -38,6 +38,7 @@
   --color-sidebar-accent-foreground: var(--zl-sidebar-accent-foreground);
   --color-sidebar-border: var(--zl-sidebar-border);
   --color-sidebar-ring: var(--zl-sidebar-ring);
+  --color-success: var(--zl-success);
 
   --radius-sm: 0.375rem;
   --radius-xs: 0.125rem;

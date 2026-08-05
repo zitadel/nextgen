@@ -9,6 +9,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/session.mock.go . SessionService
+
 type SessionService interface {
 	Create(ctx context.Context, input CreateSessionInput) (*domain.Session, error)
 	Exchange(ctx context.Context, input ExchangeInput) (*domain.Session, error)

@@ -163,6 +163,7 @@ describe("design-tokens public surface", () => {
         "theme.sidebarPrimary",
         "theme.sidebarPrimaryForeground",
         "theme.sidebarRing",
+        "theme.success",
       ]
     `);
   });
