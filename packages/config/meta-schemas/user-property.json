@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UserProperty",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "https://json-schema.org/draft/2020-12/schema"
+    }
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://json-schema.org/draft/2020-12/schema",
+      "description": "The JSON Schema version used for this schema."
+    },
+    "x-verify": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The verification method for this property, if applicable"
+    },
+    "x-unique": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "unspecified",
+            "project",
+            "team"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The level of uniqueness for this property, if applicable"
+    },
+    "x-claim": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The claim name for this property, if applicable"
+    },
+    "x-editable": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this property is editable by the user or not"
+    },
+    "x-sensitive": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this property contains sensitive information or not"
+    },
+    "x-mfa": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this property is used for multi-factor authentication or not"
+    },
+    "properties": {
+      "type": "object",
+      "description": "A map of additional properties for the user definition, where the key is the property name and the value is the property schema",
+      "additionalProperties": true
+    }
+  }
+}

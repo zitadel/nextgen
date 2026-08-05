@@ -37,6 +37,19 @@ export type RendererCustomElementsDts = {
 };
 
 /**
+ * Setup-time knobs `authPage` may branch on beyond the login/register mode.
+ * `useCase` mirrors `PatchContext.useCase` (`SETUP_USE_CASES` in
+ * @zitadel/config): `"business"` overlays work-email copy on the widget's
+ * neutral built-in dictionaries; any other value (or absence) keeps them.
+ * The field is required-but-optional-valued so every caller must state what
+ * it knows — a restoring `doctor --fix` then regenerates the same markup the
+ * original setup wrote.
+ */
+export type RendererAuthPageContext = {
+  readonly useCase: string | undefined;
+};
+
+/**
  * The file-generating templates a renderer exposes. `authPage` is required
  * (every renderer must scaffold login/register); the rest are optional
  * because not all renderers need a provider wrapper, profile page, or JSX
@@ -44,7 +57,7 @@ export type RendererCustomElementsDts = {
  */
 export type RendererTemplates = {
   provider?: { filename: string; contents: string };
-  authPage(mode: "login" | "register"): RendererAuthPage;
+  authPage(mode: "login" | "register", context: RendererAuthPageContext): RendererAuthPage;
   profilePage?(): RendererProfilePage;
   customElementsDts?(): RendererCustomElementsDts;
 };

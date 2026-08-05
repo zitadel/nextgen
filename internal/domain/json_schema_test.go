@@ -18,21 +18,8 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
-
-// stubCondition is a minimal [database.Condition] for mock expectations.
-type stubCondition struct{}
-
-func (stubCondition) Matches(any) bool { return true }
-
-func (stubCondition) String() string { return "stubCondition" }
-
-func (stubCondition) Write(*database.StatementBuilder) {}
-
-func (stubCondition) IsRestrictingColumn(database.Column) bool { return false }
-
-var pkCond stubCondition
 
 func mustJSONSchemaCache(t *testing.T, size int) *lru.TwoQueueCache[string, *jsonschema.Schema] {
 	t.Helper()
@@ -41,14 +28,14 @@ func mustJSONSchemaCache(t *testing.T, size int) *lru.TwoQueueCache[string, *jso
 	return cache
 }
 
-func newTestResolver(t *testing.T, repo domain.JSONSchemaRepository, httpClient *http.Client) *domain.JSONSchemaResolver {
+func newTestResolver(t *testing.T, httpClient *http.Client) *domain.JSONSchemaResolver {
 	t.Helper()
-	return domain.NewJSONSchemaResolver(repo, mustJSONSchemaCache(t, 128), 0, 0, httpClient, nil)
+	return domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, 0, httpClient, nil)
 }
 
-func newTestResolverWithDepth(t *testing.T, repo domain.JSONSchemaRepository, maxResolveDepth int, httpClient *http.Client) *domain.JSONSchemaResolver {
+func newTestResolverWithDepth(t *testing.T, maxResolveDepth int, httpClient *http.Client) *domain.JSONSchemaResolver {
 	t.Helper()
-	return domain.NewJSONSchemaResolver(repo, mustJSONSchemaCache(t, 128), maxResolveDepth, 0, httpClient, nil)
+	return domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), maxResolveDepth, 0, httpClient, nil)
 }
 
 func mustParseURL(t *testing.T, raw string) *url.URL {
@@ -59,17 +46,15 @@ func mustParseURL(t *testing.T, raw string) *url.URL {
 }
 
 func TestNewJSONSchemaResolver(t *testing.T) {
-	mockRepo := domainmock.NewMockJSONSchemaRepository(gomock.NewController(t))
-
 	t.Run("success", func(t *testing.T) {
 		cache := mustJSONSchemaCache(t, 128)
-		r := domain.NewJSONSchemaResolver(mockRepo, cache, 0, 0, nil, nil)
+		r := domain.NewJSONSchemaResolver(cache, 0, 0, nil, nil)
 		require.NotNil(t, r)
 	})
 
 	t.Run("nil cache panics", func(t *testing.T) {
 		assert.Panics(t, func() {
-			domain.NewJSONSchemaResolver(mockRepo, nil, 0, 0, nil, nil)
+			domain.NewJSONSchemaResolver(nil, 0, 0, nil, nil)
 		})
 	})
 }
@@ -89,19 +74,18 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 		{
 			name: "cache hit",
 			run: func(t *testing.T, ctrl *gomock.Controller) {
-				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-				mockRepo.EXPECT().PrimaryKeyCondition(projectID, simpleURL).Return(pkCond).Times(1)
-				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.JSONSchema{
+				store := domainmock.NewMockJSONSchemaStore(ctrl)
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, simpleURL).Return(&domain.JSONSchema{
 					Schema: []byte(simpleSchema),
 				}, nil).Times(1)
 
-				resolver := newTestResolver(t, mockRepo, nil)
+				resolver := newTestResolver(t, nil)
 
-				got1, err := resolver.Resolve(ctx, nil, projectID, simpleURL, nil)
+				got1, err := resolver.Resolve(ctx, store, projectID, simpleURL, nil)
 				require.NoError(t, err)
 				require.NotNil(t, got1)
 
-				got2, err := resolver.Resolve(ctx, nil, projectID, simpleURL, nil)
+				got2, err := resolver.Resolve(ctx, store, projectID, simpleURL, nil)
 				require.NoError(t, err)
 				require.NotNil(t, got2)
 				assert.Same(t, got1, got2)
@@ -110,15 +94,14 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 		{
 			name: "database hit without HTTP",
 			run: func(t *testing.T, ctrl *gomock.Controller) {
-				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-				mockRepo.EXPECT().PrimaryKeyCondition(projectID, simpleURL).Return(pkCond)
-				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.JSONSchema{
+				store := domainmock.NewMockJSONSchemaStore(ctrl)
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, simpleURL).Return(&domain.JSONSchema{
 					Schema: []byte(simpleSchema),
 				}, nil)
 
-				resolver := newTestResolver(t, mockRepo, nil)
+				resolver := newTestResolver(t, nil)
 
-				got, err := resolver.Resolve(ctx, nil, projectID, simpleURL, nil)
+				got, err := resolver.Resolve(ctx, store, projectID, simpleURL, nil)
 				require.NoError(t, err)
 				require.NotNil(t, got)
 			},
@@ -126,13 +109,12 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 		{
 			name: "database miss without HTTP client",
 			run: func(t *testing.T, ctrl *gomock.Controller) {
-				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-				mockRepo.EXPECT().PrimaryKeyCondition(projectID, simpleURL).Return(pkCond)
-				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+				store := domainmock.NewMockJSONSchemaStore(ctrl)
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, simpleURL).Return(nil, database.NewNoRowFoundError(nil))
 
-				resolver := newTestResolver(t, mockRepo, nil)
+				resolver := newTestResolver(t, nil)
 
-				_, err := resolver.Resolve(ctx, nil, projectID, simpleURL, nil)
+				_, err := resolver.Resolve(ctx, store, projectID, simpleURL, nil)
 				require.Error(t, err)
 				assert.ErrorContains(t, err, "schema not found")
 			},
@@ -147,20 +129,19 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				}))
 				t.Cleanup(srv.Close)
 
-				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-				mockRepo.EXPECT().PrimaryKeyCondition(projectID, srv.URL).Return(pkCond)
-				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
-				mockRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.AssignableToTypeOf(&domain.JSONSchema{})).
-					DoAndReturn(func(_ context.Context, _ database.QueryExecutor, schema *domain.JSONSchema) error {
+				store := domainmock.NewMockJSONSchemaStore(ctrl)
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, srv.URL).Return(nil, database.NewNoRowFoundError(nil))
+				store.EXPECT().CreateJSONSchema(gomock.Any(), gomock.AssignableToTypeOf(&domain.JSONSchema{})).
+					DoAndReturn(func(_ context.Context, schema *domain.JSONSchema) error {
 						assert.Equal(t, projectID, schema.ProjectID)
 						assert.Equal(t, srv.URL, schema.URL)
 						assert.NotNil(t, schema.Schema)
 						return nil
 					})
 
-				resolver := newTestResolver(t, mockRepo, srv.Client())
+				resolver := newTestResolver(t, srv.Client())
 
-				_, err := resolver.Resolve(ctx, nil, projectID, srv.URL, nil)
+				_, err := resolver.Resolve(ctx, store, projectID, srv.URL, nil)
 				require.NoError(t, err)
 			},
 		},
@@ -168,13 +149,12 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 			name: "Get returns non-not-found error",
 			run: func(t *testing.T, ctrl *gomock.Controller) {
 				dbErr := errors.New("db error")
-				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-				mockRepo.EXPECT().PrimaryKeyCondition(projectID, simpleURL).Return(pkCond)
-				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, dbErr)
+				store := domainmock.NewMockJSONSchemaStore(ctrl)
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, simpleURL).Return(nil, dbErr)
 
-				resolver := newTestResolver(t, mockRepo, nil)
+				resolver := newTestResolver(t, nil)
 
-				_, err := resolver.Resolve(ctx, nil, projectID, simpleURL, nil)
+				_, err := resolver.Resolve(ctx, store, projectID, simpleURL, nil)
 				require.Error(t, err)
 				assert.Equal(t, dbErr, err)
 			},
@@ -184,33 +164,32 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 			run: func(t *testing.T, ctrl *gomock.Controller) {
 				const (
 					urlA    = "https://example.test/a.json"
-					urlB    = "https://example.test/b.json"
 					schemaA = `{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/b.json"}`
 					schemaB = `{"$schema":"https://json-schema.org/draft/2020-12/schema","$ref":"https://example.test/c.json"}`
 				)
 
-				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-				mockRepo.EXPECT().PrimaryKeyCondition(gomock.Any(), gomock.Any()).Return(pkCond).AnyTimes()
+				store := domainmock.NewMockJSONSchemaStore(ctrl)
 
 				var getCalls int
-				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-					func(_ context.Context, _ database.QueryExecutor, _ ...database.QueryOption) (*domain.JSONSchema, error) {
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, gomock.Any()).DoAndReturn(
+					func(_ context.Context, _, schemaURL string) (*domain.JSONSchema, error) {
 						getCalls++
 						switch getCalls {
 						case 1:
+							assert.Equal(t, urlA, schemaURL)
 							return &domain.JSONSchema{Schema: []byte(schemaA)}, nil
 						case 2:
 							return &domain.JSONSchema{Schema: []byte(schemaB)}, nil
 						default:
-							t.Fatalf("unexpected Get call %d", getCalls)
+							t.Fatalf("unexpected GetJSONSchemaByID call %d", getCalls)
 							return nil, errors.New("unexpected")
 						}
 					},
 				).Times(2)
 
-				resolver := newTestResolverWithDepth(t, mockRepo, 1, nil)
+				resolver := newTestResolverWithDepth(t, 1, nil)
 
-				_, err := resolver.Resolve(ctx, nil, projectID, urlA, nil)
+				_, err := resolver.Resolve(ctx, store, projectID, urlA, nil)
 				require.Error(t, err)
 				assert.ErrorContains(t, err, "max resolve depth")
 				assert.Equal(t, 2, getCalls)
@@ -227,14 +206,13 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				}))
 				t.Cleanup(srv.Close)
 
-				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-				mockRepo.EXPECT().PrimaryKeyCondition(projectID, srv.URL).Return(pkCond)
-				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
-				mockRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any()).Return(persistErr)
+				store := domainmock.NewMockJSONSchemaStore(ctrl)
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, srv.URL).Return(nil, database.NewNoRowFoundError(nil))
+				store.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any()).Return(persistErr)
 
-				resolver := newTestResolver(t, mockRepo, srv.Client())
+				resolver := newTestResolver(t, srv.Client())
 
-				_, err := resolver.Resolve(ctx, nil, projectID, srv.URL, nil)
+				_, err := resolver.Resolve(ctx, store, projectID, srv.URL, nil)
 				require.Error(t, err)
 				assert.Equal(t, persistErr, err)
 			},
@@ -250,24 +228,23 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 				}))
 				t.Cleanup(srv.Close)
 
-				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-				mockRepo.EXPECT().PrimaryKeyCondition(projectID, srv.URL).Return(pkCond)
-				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
-				mockRepo.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.AssignableToTypeOf(&domain.JSONSchema{})).Return(nil)
+				store := domainmock.NewMockJSONSchemaStore(ctrl)
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, srv.URL).Return(nil, database.NewNoRowFoundError(nil))
+				store.EXPECT().CreateJSONSchema(gomock.Any(), gomock.AssignableToTypeOf(&domain.JSONSchema{})).Return(nil)
 
-				resolver := newTestResolver(t, mockRepo, srv.Client())
+				resolver := newTestResolver(t, srv.Client())
 
-				_, err := resolver.Resolve(ctx, nil, projectID, srv.URL, nil)
+				_, err := resolver.Resolve(ctx, store, projectID, srv.URL, nil)
 				require.Error(t, err)
 			},
 		},
 		{
 			name: "root schema bypasses initial repository lookup",
 			run: func(t *testing.T, ctrl *gomock.Controller) {
-				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-				resolver := newTestResolver(t, mockRepo, nil)
+				store := domainmock.NewMockJSONSchemaStore(ctrl)
+				resolver := newTestResolver(t, nil)
 
-				got, err := resolver.Resolve(ctx, nil, projectID, simpleURL, []byte(simpleSchema))
+				got, err := resolver.Resolve(ctx, store, projectID, simpleURL, []byte(simpleSchema))
 				require.NoError(t, err)
 				require.NotNil(t, got)
 			},
@@ -275,10 +252,10 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 		{
 			name: "invalid root schema payload returns error",
 			run: func(t *testing.T, ctrl *gomock.Controller) {
-				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-				resolver := newTestResolver(t, mockRepo, nil)
+				store := domainmock.NewMockJSONSchemaStore(ctrl)
+				resolver := newTestResolver(t, nil)
 
-				_, err := resolver.Resolve(ctx, nil, projectID, simpleURL, []byte(`{"type":`))
+				_, err := resolver.Resolve(ctx, store, projectID, simpleURL, []byte(`{"type":`))
 				require.Error(t, err)
 			},
 		},
@@ -292,15 +269,14 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 					refSchema  = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
 				)
 
-				mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-				mockRepo.EXPECT().PrimaryKeyCondition(projectID, refURL).Return(pkCond).Times(1)
-				mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.JSONSchema{
+				store := domainmock.NewMockJSONSchemaStore(ctrl)
+				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, refURL).Return(&domain.JSONSchema{
 					Schema: []byte(refSchema),
 				}, nil).Times(1)
 
-				resolver := newTestResolver(t, mockRepo, nil)
+				resolver := newTestResolver(t, nil)
 
-				got, err := resolver.Resolve(ctx, nil, projectID, rootURL, []byte(rootSchema))
+				got, err := resolver.Resolve(ctx, store, projectID, rootURL, []byte(rootSchema))
 				require.NoError(t, err)
 				require.NotNil(t, got)
 			},
@@ -349,40 +325,197 @@ func TestJSONSchemaResolver_BuiltinEmbedded(t *testing.T) {
 
 	t.Run("resolve skips repository", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-		r := domain.NewJSONSchemaResolver(mockRepo, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
-		schema, err := r.Resolve(ctx, nil, "proj-1", full, nil)
+		store := domainmock.NewMockJSONSchemaStore(ctrl)
+		r := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, 0, nil, base)
+		schema, err := r.Resolve(ctx, store, "proj-1", full, nil)
 		require.NoError(t, err)
 		require.NotNil(t, schema)
 	})
 	t.Run("URL under base but unknown path falls back to DB and errors when not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-		mockRepo.EXPECT().PrimaryKeyCondition("proj-1", "https://example.test/app/schemas/unknown/v.json").Return(pkCond)
-		mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
-		r := domain.NewJSONSchemaResolver(mockRepo, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
-		_, err := r.Resolve(ctx, nil, "proj-1", "https://example.test/app/schemas/unknown/v.json", nil)
+		store := domainmock.NewMockJSONSchemaStore(ctrl)
+		store.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj-1", "https://example.test/app/schemas/unknown/v.json").Return(nil, database.NewNoRowFoundError(nil))
+		r := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, 0, nil, base)
+		_, err := r.Resolve(ctx, store, "proj-1", "https://example.test/app/schemas/unknown/v.json", nil)
 		require.Error(t, err)
 	})
 	t.Run("schema URL equals base only falls back to DB and errors when not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-		mockRepo.EXPECT().PrimaryKeyCondition("proj-1", base.String()).Return(pkCond)
-		mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
-		r := domain.NewJSONSchemaResolver(mockRepo, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
-		_, err := r.Resolve(ctx, nil, "proj-1", base.String(), nil)
+		store := domainmock.NewMockJSONSchemaStore(ctrl)
+		store.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj-1", base.String()).Return(nil, database.NewNoRowFoundError(nil))
+		r := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, 0, nil, base)
+		_, err := r.Resolve(ctx, store, "proj-1", base.String(), nil)
 		require.Error(t, err)
 	})
 	t.Run("URL under base but unknown path resolves from DB when found", func(t *testing.T) {
 		const userSchemaURL = "https://example.test/app/schemas/user.json"
 		const userSchema = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
 		ctrl := gomock.NewController(t)
-		mockRepo := domainmock.NewMockJSONSchemaRepository(ctrl)
-		mockRepo.EXPECT().PrimaryKeyCondition("proj-1", userSchemaURL).Return(pkCond)
-		mockRepo.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.JSONSchema{Schema: []byte(userSchema)}, nil)
-		r := domain.NewJSONSchemaResolver(mockRepo, mustJSONSchemaCache(t, 128), 0, 0, nil, base)
-		schema, err := r.Resolve(ctx, nil, "proj-1", userSchemaURL, nil)
+		store := domainmock.NewMockJSONSchemaStore(ctrl)
+		store.EXPECT().GetJSONSchemaByID(gomock.Any(), "proj-1", userSchemaURL).Return(&domain.JSONSchema{Schema: []byte(userSchema)}, nil)
+		r := domain.NewJSONSchemaResolver(mustJSONSchemaCache(t, 128), 0, 0, nil, base)
+		schema, err := r.Resolve(ctx, store, "proj-1", userSchemaURL, nil)
 		require.NoError(t, err)
 		require.NotNil(t, schema)
+	})
+}
+
+func TestNewJSONSchema_ReservedProperties(t *testing.T) {
+	const projectID = "proj-1"
+
+	// The user object carries `id` and `metadata` as system-managed fields
+	// (see api/openapi/endpoints/users/user.yaml), so a tenant schema must not
+	// declare them itself.
+	t.Run("rejected", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			schema  string
+			message string
+		}{
+			{
+				name:    "id",
+				schema:  `{"type":"object","properties":{"id":{"type":"string"}}}`,
+				message: "schema cannot have property id",
+			},
+			{
+				name:    "metadata",
+				schema:  `{"type":"object","properties":{"metadata":{"type":"object"}}}`,
+				message: "schema cannot have property metadata",
+			},
+			{
+				name:    "id alongside legitimate properties",
+				schema:  `{"type":"object","properties":{"email":{"type":"string"},"id":{"type":"string"}}}`,
+				message: "schema cannot have property id",
+			},
+			{
+				name:    "metadata alongside legitimate properties",
+				schema:  `{"type":"object","properties":{"email":{"type":"string"},"metadata":{"type":"object"}}}`,
+				message: "schema cannot have property metadata",
+			},
+			{
+				// id is checked first, so it is the one reported.
+				name:    "both reserved properties reports id",
+				schema:  `{"type":"object","properties":{"id":{"type":"string"},"metadata":{"type":"object"}}}`,
+				message: "schema cannot have property id",
+			},
+			{
+				// The check tests for the key, not for a well-formed subschema.
+				name:    "id holding a non-schema value",
+				schema:  `{"type":"object","properties":{"id":true}}`,
+				message: "schema cannot have property id",
+			},
+			{
+				name:    "metadata holding a non-schema value",
+				schema:  `{"type":"object","properties":{"metadata":"reserved"}}`,
+				message: "schema cannot have property metadata",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				schema, err := domain.NewJSONSchema(projectID, []byte(tt.schema))
+				require.Error(t, err)
+				assert.Nil(t, schema)
+				assert.ErrorIs(t, err, domain.ErrJSONSchemaInvalid())
+				assert.EqualError(t, err, tt.message)
+			})
+		}
+	})
+
+	t.Run("accepted", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			schema string
+		}{
+			{
+				name:   "no properties at all",
+				schema: `{"type":"object"}`,
+			},
+			{
+				name:   "empty properties",
+				schema: `{"type":"object","properties":{}}`,
+			},
+			{
+				name:   "only customer-defined properties",
+				schema: `{"type":"object","properties":{"email":{"type":"string"},"givenName":{"type":"string"}}}`,
+			},
+			{
+				// Only the top level is reserved: a nested object may still
+				// carry its own id, e.g. an address with its own identifier.
+				name:   "id nested inside another property",
+				schema: `{"type":"object","properties":{"address":{"type":"object","properties":{"id":{"type":"string"},"metadata":{"type":"object"}}}}}`,
+			},
+			{
+				// The reserved keys are matched exactly, so differently-cased
+				// names remain available to customers.
+				name:   "differently cased names",
+				schema: `{"type":"object","properties":{"ID":{"type":"string"},"Id":{"type":"string"},"Metadata":{"type":"object"}}}`,
+			},
+			{
+				name:   "names merely containing the reserved words",
+				schema: `{"type":"object","properties":{"identifier":{"type":"string"},"metadataUrl":{"type":"string"}}}`,
+			},
+			{
+				// properties is not an object, so there are no keys to reserve;
+				// such a schema fails later, at JSON Schema compilation.
+				name:   "properties is not an object",
+				schema: `{"type":"object","properties":"nonsense"}`,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				schema, err := domain.NewJSONSchema(projectID, []byte(tt.schema))
+				require.NoError(t, err)
+				require.NotNil(t, schema)
+				assert.Equal(t, projectID, schema.ProjectID)
+				assert.Equal(t, []byte(tt.schema), schema.Schema)
+			})
+		}
+	})
+
+	t.Run("a reserved key with a null value is not rejected", func(t *testing.T) {
+		// Characterisation test, not an endorsement: maputil.Get[any] reports a
+		// JSON null as absent, because a type assertion on a nil interface
+		// fails. Switching the check to a plain `_, ok := props["id"]` lookup
+		// would close this gap — flip these to require.Error if that happens.
+		for _, schema := range []string{
+			`{"type":"object","properties":{"id":null}}`,
+			`{"type":"object","properties":{"metadata":null}}`,
+		} {
+			got, err := domain.NewJSONSchema(projectID, []byte(schema))
+			require.NoError(t, err)
+			require.NotNil(t, got)
+		}
+	})
+}
+
+func TestNewJSONSchema_Metadata(t *testing.T) {
+	const projectID = "proj-1"
+
+	t.Run("uses $id as the URL when present", func(t *testing.T) {
+		schema, err := domain.NewJSONSchema(projectID, []byte(`{"$id":"https://example.test/user.json","type":"object"}`))
+		require.NoError(t, err)
+		assert.Equal(t, "https://example.test/user.json", schema.URL)
+	})
+
+	t.Run("carries objectType through when present", func(t *testing.T) {
+		schema, err := domain.NewJSONSchema(projectID, []byte(`{"type":"object","objectType":"human-user"}`))
+		require.NoError(t, err)
+		require.NotNil(t, schema.ObjectType)
+		assert.Equal(t, "human-user", *schema.ObjectType)
+	})
+
+	t.Run("leaves objectType nil when absent", func(t *testing.T) {
+		schema, err := domain.NewJSONSchema(projectID, []byte(`{"type":"object"}`))
+		require.NoError(t, err)
+		assert.Nil(t, schema.ObjectType)
+	})
+
+	t.Run("rejects a payload that is not JSON", func(t *testing.T) {
+		schema, err := domain.NewJSONSchema(projectID, []byte(`{not json`))
+		require.Error(t, err)
+		assert.Nil(t, schema)
+		assert.ErrorIs(t, err, domain.ErrJSONSchemaInvalid())
 	})
 }

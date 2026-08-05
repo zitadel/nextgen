@@ -26,6 +26,10 @@ export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
 export * from "./types";
 
+// Re-exported so scaffolded apps can wire the business copy overlay without a
+// direct @zitadel/components dependency (strict package managers reject those).
+export { businessLocales } from "@zitadel/components";
+
 /**
  * Passes the project config as a spread because `@zitadel/components`' Qwik JSX
  * types omit these property-only members. Qwik binds object and string values to
@@ -38,6 +42,17 @@ function projectProp(
   proxyPath: string | undefined,
 ): Record<string, unknown> {
   return { project, projectId, proxyPath };
+}
+
+/**
+ * Login-only copy overrides, spread for the same reason as {@link projectProp}:
+ * `locales`/`lang` are property-only members the custom-element JSX types omit.
+ */
+function localeProps(
+  locales: Record<string, Partial<Record<string, string>>> | undefined,
+  lang: string | undefined,
+): Record<string, unknown> {
+  return { locales, lang };
 }
 
 function eventDetail<T>(event: Event): T {
@@ -116,8 +131,12 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
         }
       }}
       {...projectProp(props.project, props.projectId, props.proxyPath)}
+      {...localeProps(props.locales, props.lang)}
       purpose={props.purpose ?? "login"}
+      flow-name={props.flowName}
       post-sign-in-url={props.postSignInUrl}
+      variant={props.variant}
+      theme={props.theme}
     />
   );
 });
@@ -172,6 +191,7 @@ export const ZitadelLogout = component$<ZitadelLogoutProps>((props) => {
       }}
       {...projectProp(props.project, props.projectId, props.proxyPath)}
       post-sign-out-url={props.postSignOutUrl}
+      theme={props.theme}
     />
   );
 });
@@ -227,6 +247,8 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
       post-sign-out-url={props.postSignOutUrl}
       heading={props.heading}
       logout-label={props.logoutLabel}
+      variant={props.variant}
+      theme={props.theme}
     />
   );
 });

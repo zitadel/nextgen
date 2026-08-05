@@ -1,11 +1,8 @@
 package domain
 
 import (
-	"context"
 	"slices"
 	"time"
-
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const (
@@ -66,7 +63,7 @@ type AuthAttempt struct {
 	// ProjectID links to [Project].
 	ProjectID string
 	// ID is the unique identifier for the auth attempt within the project.
-	// The storage layer assigns this value on Create (database-generated identity).
+	// The storage layer assigns this value on Create (dialect-minted prefixed opaque string).
 	ID string
 
 	// HandoffToken is the single-use token minted explicitly with the handoff call after all required factors are verified, used by the client to exchange for a session.
@@ -108,14 +105,8 @@ func WithSession(sessionID *string, authFactors ...AuthFactor) AuthAttemptOption
 }
 
 func NewAuthAttempt(projectID string, requiredChecks []AuthCheckType, opts ...AuthAttemptOption) (*AuthAttempt, error) {
-	id, err := newID(PrefixAuthAttempt)
-	if err != nil {
-		return nil, err
-	}
-
 	attempt := &AuthAttempt{
 		ProjectID:      projectID,
-		ID:             id,
 		RequiredChecks: requiredChecks,
 		TimeToLive:     new(AuthAttemptTTL),
 	}
@@ -439,37 +430,4 @@ func (a *AuthAttempt) SetCheck(check AuthCheck) {
 		}
 	}
 	a.Checks = append(a.Checks, check)
-}
-
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/auth_attempt.mock.go . AuthAttemptRepository
-
-type AuthAttemptRepository interface {
-	// GetByID retrieves a single AuthAttempt by its ID and project ID.
-	GetByID(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) (*AuthAttempt, error)
-	// GetByHandoffToken retrieves a single AuthAttempt by its handoff token and project ID.
-	GetByHandoffToken(ctx context.Context, client database.QueryExecutor, projectID string, handoffToken []byte) (*AuthAttempt, error)
-	// Create stores an auth attempt including all defined fields (except read-only fields).
-	// The repository MUST set the [AuthAttempt.CreatedAt] field to the current time.
-	// The repository MUST store [AuthAttempts.Checks] following this recipe:
-	//  - If the check does implement [AuthFactor], it MUST SET `LastVerifiedAt`.
-	//  - If the check does implement [AuthChallenge], it MUST set `LastChallengedAt`.
-	Create(ctx context.Context, client database.QueryExecutor, authAttempt *AuthAttempt) error
-	// Delete an auth attempt by its ID and project ID.
-	Delete(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string) error
-
-	// Handoff stores the handoff token for an auth attempt and sets the handoff time to the current time.
-	Handoff(ctx context.Context, client database.QueryExecutor, attempt *AuthAttempt) error
-
-	// SetChallenge sets a check to challenged and sets the challenge payload.
-	// If the check is not stored yet, the method creates a new check with the given type and challenge payload, otherwise it updates the existing check with the new challenge payload and id.
-	// The repository MUST call [AuthChallenge.SetID] with the generated id, [AuthChallenge.SetLastChallengedAt] with the current time, reset the [AuthChallenge.SetLastFailedAt] to nil and reset the [AuthChallenge.SetFailureCount] to 0, and store the values accordingly.
-	SetChallenge(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenge AuthChallenge) error
-	// ChallengeSucceeded sets the [AuthFactor.SetLastVerifiedAt] to the current time and stores it accordingly and removes the challenge payload from the storage.
-	// The factor must be stored already as an [AuthChallenge], with the same ID.
-	// The factor's payload MUST be stored by the repository.
-	ChallengeSucceeded(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, factor AuthFactor, challengeID string) error
-	// ChallengeFailed sets a challenge to failed.
-	// The challenge must be stored already as an [AuthChallenge], with the same ID.
-	// The [AuthChallenge.SetLastFailedAt] must be called with the current time and the [AuthChallenge.SetFailureCount] increased by 1, and store the values accordingly.
-	ChallengeFailed(ctx context.Context, client database.QueryExecutor, projectID, authAttemptID string, challenge AuthChallenge) error
 }

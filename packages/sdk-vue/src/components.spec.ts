@@ -6,6 +6,7 @@ import type {
 } from "@zitadel/components";
 
 import { render } from "@testing-library/vue";
+import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
@@ -17,6 +18,7 @@ import { defineComponent, h, shallowRef, type Ref } from "vue";
 import ZitadelLogin from "./components/ZitadelLogin";
 import ZitadelLogout from "./components/ZitadelLogout";
 import ZitadelSession from "./components/ZitadelSession";
+import { businessLocales } from "./index";
 
 // A consumer's `ref` on these components resolves to the component instance,
 // whose `expose({ element })` surfaces the inner DOM node. Vue's exposed proxy
@@ -63,6 +65,17 @@ describe("ZitadelLogin", () => {
     const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
     expect(el!.projectId).toBe("proj-test");
     expect(el!.proxyPath).toBe("/__nextgen");
+  });
+
+  it("forwards locales and lang to the widget", () => {
+    const locales = { en: { "identifier.title": "Welcome back" } };
+    const { container } = render(ZitadelLogin, {
+      props: { project, locales, lang: "de" },
+    });
+    const el = container.querySelector<ZitadelLoginElement>("zitadel-login");
+    // `toRaw` hands the widget the plain dictionaries, not Vue's proxy.
+    expect(el!.locales).toEqual(locales);
+    expect(el!.lang).toBe("de");
   });
 
   it.each(Object.entries(ZITADEL_LOGIN_EVENT_HANDLERS))(
@@ -145,6 +158,15 @@ describe("ZitadelSession", () => {
     expect(el!.proxyPath).toBe("/__nextgen");
   });
 
+  it("forwards the surface variant/theme", () => {
+    const { container } = render(ZitadelSession, {
+      props: { project, variant: "page", theme: "light" },
+    });
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session");
+    expect(el!.variant).toBe("page");
+    expect(el!.theme).toBe("light");
+  });
+
   it.each(Object.entries(ZITADEL_SESSION_EVENT_HANDLERS))(
     "forwards %s to its callback",
     (eventName, handlerProp) => {
@@ -165,5 +187,11 @@ describe("ZitadelSession", () => {
     expect(element).not.toBeNull();
     expect(element!.tagName.toLowerCase()).toBe("zitadel-session");
     expect(element).toBe(container.querySelector("zitadel-session"));
+  });
+});
+
+describe("businessLocales", () => {
+  it("re-exports the business copy overlay from @zitadel/components", () => {
+    expect(businessLocales).toBe(componentsBusinessLocales);
   });
 });

@@ -172,6 +172,51 @@ describe("release artifact helpers", () => {
         version: "0.1.0-alpha.6",
         run: async () => undefined,
       }),
-    ).rejects.toThrow("requires apps/cli/dist before packing");
+    ).rejects.toThrow(/requires .+\/dist before packing/);
+  });
+
+  it("stamps CLI release packs with the production telemetry channel", async () => {
+    const { packPublicPackages } = await loadModule();
+    const manifest = (await import(
+      new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
+    )) as {
+      PUBLIC_RELEASE_PACKAGES: Array<{ name: string; dir: string; buildTarget?: string }>;
+    };
+    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-release-packages-"));
+    tempDirs.push(repoRoot);
+    const outDir = join(repoRoot, "dist/release/0.1.0-alpha.6");
+    for (const pkg of manifest.PUBLIC_RELEASE_PACKAGES) {
+      await mkdir(join(repoRoot, pkg.dir), { recursive: true });
+      if (pkg.buildTarget) {
+        await mkdir(join(repoRoot, pkg.dir, "dist"), { recursive: true });
+      }
+      await writeFile(
+        join(repoRoot, pkg.dir, "package.json"),
+        `${JSON.stringify({ license: "MIT", name: pkg.name, version: "0.1.0-alpha.6" }, null, 2)}\n`,
+      );
+    }
+
+    const originalChannel = process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL;
+    process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL = "development";
+    const calls: Array<{ args: string[]; env: NodeJS.ProcessEnv }> = [];
+    try {
+      await packPublicPackages({
+        repoRoot,
+        outDir,
+        version: "0.1.0-alpha.6",
+        run: async (_command, args, options) => {
+          calls.push({ args, env: options.env });
+        },
+      });
+    } finally {
+      if (originalChannel === undefined) {
+        delete process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL;
+      } else {
+        process.env.ZITADEL_TELEMETRY_BUILD_CHANNEL = originalChannel;
+      }
+    }
+
+    const cliPack = calls.find((call) => call.args.includes("apps/cli"));
+    expect(cliPack?.env.ZITADEL_TELEMETRY_BUILD_CHANNEL).toBe("production");
   });
 });

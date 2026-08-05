@@ -29,9 +29,9 @@ export default defineConfig({
   // first request. Direct pnpm filter commands keep these long-running
   // processes outside Moon's task graph; Playwright owns their lifecycle.
   //
-  // The api-mock listens on PORT 4001 here so this project can run in
-  // parallel with `apps/demo-next-e2e/` (which uses the default 4000)
-  // alongside demo-next-e2e. Both api-mock (`bin/start.ts` reads PORT) and
+  // The api-mock listens on PORT 8081 here so this project can run in
+  // parallel with `apps/demo-next-e2e/` (which uses the default 8080).
+  // Both api-mock (`bin/start.ts` reads PORT) and
   // the SDKs (ZITADEL_URL) already accept the override; no
   // application code changes.
   webServer: [

@@ -39,6 +39,8 @@ import "@zitadel/components";
     [attr.post-sign-out-url]="postSignOutUrl"
     [attr.heading]="heading"
     [attr.logout-label]="logoutLabel"
+    [attr.variant]="variant ?? null"
+    [attr.theme]="theme ?? null"
     (zitadel-signout)="onSignout($event)"
   ></zitadel-session>`,
 })
@@ -49,6 +51,8 @@ export class ZitadelSessionComponent {
   @Input() postSignOutUrl?: string;
   @Input() heading?: string;
   @Input() logoutLabel?: string;
+  @Input() variant?: "widget" | "page";
+  @Input() theme?: "light" | "dark" | "auto";
   @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
 
   @ViewChild("el") private elementRef?: ElementRef<ZitadelSessionElement>;

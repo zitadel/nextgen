@@ -12,6 +12,7 @@
       "@zitadel/server-darwin-arm64",
       "@zitadel/server-win32-x64",
       "@zitadel/api",
+      "@zitadel/config",
       "@zitadel/components",
       "@zitadel/sdk-core",
       "@zitadel/sdk-next",
@@ -21,7 +22,8 @@
       "@zitadel/sdk-angular",
       "@zitadel/sdk-solid",
       "@zitadel/sdk-svelte",
-      "@zitadel/sdk-qwik"
+      "@zitadel/sdk-qwik",
+      "@zitadel/testing"
     ]
   ],
   "linked": [],

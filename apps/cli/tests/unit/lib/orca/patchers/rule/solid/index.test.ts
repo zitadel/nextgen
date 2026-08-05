@@ -37,8 +37,29 @@ describe("SolidPatcher.plan", () => {
   it("writes the managed App.tsx and merges the Vite config", () => {
     const plan = new SolidPatcher().plan(ctx());
     expect(writeContents(plan, "src/App.tsx")).toContain(MANAGED_MARKER);
-    const edit = plan.ops.find((op): op is Extract<FileOp, { kind: "edit" }> => op.kind === "edit");
+    const edit = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "edit" }> =>
+        op.kind === "edit" && String(op.path).includes("vite.config"),
+    );
     expect(edit?.path).toContain("vite.config.ts");
+  });
+
+  it("wires the business copy overlay for business-use-case projects", () => {
+    // Minimal scaffolds keep the widget's neutral built-in copy.
+    expect(writeContents(new SolidPatcher().plan(ctx()), "src/App.tsx")).not.toContain(
+      "businessLocales",
+    );
+    const business = writeContents(
+      new SolidPatcher().plan({ ...ctx(), useCase: "business" }),
+      "src/App.tsx",
+    );
+    // The overlay ships with the SDK, and the wrapper component assigns the
+    // locales prop as a DOM property internally.
+    expect(business).toContain("businessLocales, configureZitadel");
+    expect(business).toContain("locales={businessLocales}");
+    // Consumer scaffolds keep the neutral built-ins, like minimal ones.
+    const consumer = new SolidPatcher().plan({ ...ctx(), useCase: "consumer" });
+    expect(writeContents(consumer, "src/App.tsx")).not.toContain("businessLocales");
   });
 
   it("adds the SDK dependency at the CLI's prerelease tag", () => {

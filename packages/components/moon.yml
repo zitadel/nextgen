@@ -5,6 +5,7 @@ stack: "frontend"
 dependsOn:
   - "api"
   - "api-mock"
+  - "config"
   - "design-tokens"
   - "shared-component-styles"
 
@@ -17,9 +18,10 @@ tasks:
       - "shared-component-styles:build"
 
   typecheck:
-    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
+    command: "corepack pnpm exec tsc --build tsconfig.json"
     deps:
       - "api:build"
+      - "config:build"
       - "design-tokens:build"
       - "shared-component-styles:build"
 
@@ -27,33 +29,53 @@ tasks:
     command: "corepack pnpm run build"
     deps:
       - "api:build"
+      # The standalone bundle inlines @zitadel/config/template (see
+      # tsdown.config.ts); without this edge the two builds race in the moon
+      # graph and rolldown silently leaves the unresolvable import external —
+      # a broken (and cached!) standalone.mjs.
+      - "config:build"
       - "design-tokens:build"
       - "shared-component-styles:build"
     outputs:
       - "dist/**/*"
 
   build-release:
-    command: "corepack pnpm run build"
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
+      node scripts/check-standalone-artifact.mjs
     deps:
       - "api:build-release"
+      # Same edge as the dev build: the standalone bundle inlines
+      # @zitadel/config/template, and without ordering the release builds
+      # race — rolldown leaves the unresolvable import external and the
+      # published standalone.mjs breaks in the browser. The check script
+      # above fails the build if that ever regresses.
+      - "config:build-release"
       - "design-tokens:build"
       - "shared-component-styles:build"
     outputs:
       - "dist/**/*"
     options:
       cache: false
+      # Release builds remove stale package output and rebuild dist in one
+      # task. They stay out of `moon ci`; release:snapshot invokes them in
+      # the later release step instead of the normal build/test graph.
+      runInCI: false
 
   test:
     command: "corepack pnpm run test"
     deps:
       - "api:build"
       - "api-mock:build"
+      - "config:build"
       - "design-tokens:build"
       - "shared-component-styles:build"
+      # standalone-artifact.spec.ts reads dist/standalone.mjs — the unit suite
+      # guards the built artifact, so the dev build must run first.
+      - "build"
 
   test-browser:
     command: "corepack pnpm run test:browser"
     deps:
       - "build"
-    options:
-      runInCI: false

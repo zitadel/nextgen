@@ -9,50 +9,292 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AuthedRouteImport } from './routes/_authed'
+import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
+import { Route as AuthedUsersIndexRouteImport } from './routes/_authed/users/index'
+import { Route as AuthedSystemIndexRouteImport } from './routes/_authed/system/index'
+import { Route as AuthedSessionsIndexRouteImport } from './routes/_authed/sessions/index'
+import { Route as AuthedSchemasIndexRouteImport } from './routes/_authed/schemas/index'
+import { Route as AuthedProjectsIndexRouteImport } from './routes/_authed/projects/index'
+import { Route as AuthedFlowDefinitionsIndexRouteImport } from './routes/_authed/flow-definitions/index'
+import { Route as AuthedUsersUserIdRouteImport } from './routes/_authed/users/$userId'
+import { Route as AuthedSchemasSchemaIdRouteImport } from './routes/_authed/schemas/$schemaId'
+import { Route as AuthedFlowDefinitionsDefinitionIdRouteImport } from './routes/_authed/flow-definitions/$definitionId'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthedRoute = AuthedRouteImport.update({
+  id: '/_authed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthedIndexRoute = AuthedIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedUsersIndexRoute = AuthedUsersIndexRouteImport.update({
+  id: '/users/',
+  path: '/users/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedSystemIndexRoute = AuthedSystemIndexRouteImport.update({
+  id: '/system/',
+  path: '/system/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedSessionsIndexRoute = AuthedSessionsIndexRouteImport.update({
+  id: '/sessions/',
+  path: '/sessions/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedSchemasIndexRoute = AuthedSchemasIndexRouteImport.update({
+  id: '/schemas/',
+  path: '/schemas/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedProjectsIndexRoute = AuthedProjectsIndexRouteImport.update({
+  id: '/projects/',
+  path: '/projects/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedFlowDefinitionsIndexRoute =
+  AuthedFlowDefinitionsIndexRouteImport.update({
+    id: '/flow-definitions/',
+    path: '/flow-definitions/',
+    getParentRoute: () => AuthedRoute,
+  } as any)
+const AuthedUsersUserIdRoute = AuthedUsersUserIdRouteImport.update({
+  id: '/users/$userId',
+  path: '/users/$userId',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedSchemasSchemaIdRoute = AuthedSchemasSchemaIdRouteImport.update({
+  id: '/schemas/$schemaId',
+  path: '/schemas/$schemaId',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedFlowDefinitionsDefinitionIdRoute =
+  AuthedFlowDefinitionsDefinitionIdRouteImport.update({
+    id: '/flow-definitions/$definitionId',
+    path: '/flow-definitions/$definitionId',
+    getParentRoute: () => AuthedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AuthedIndexRoute
+  '/login': typeof LoginRoute
+  '/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
+  '/schemas/$schemaId': typeof AuthedSchemasSchemaIdRoute
+  '/users/$userId': typeof AuthedUsersUserIdRoute
+  '/flow-definitions/': typeof AuthedFlowDefinitionsIndexRoute
+  '/projects/': typeof AuthedProjectsIndexRoute
+  '/schemas/': typeof AuthedSchemasIndexRoute
+  '/sessions/': typeof AuthedSessionsIndexRoute
+  '/system/': typeof AuthedSystemIndexRoute
+  '/users/': typeof AuthedUsersIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/': typeof AuthedIndexRoute
+  '/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
+  '/schemas/$schemaId': typeof AuthedSchemasSchemaIdRoute
+  '/users/$userId': typeof AuthedUsersUserIdRoute
+  '/flow-definitions': typeof AuthedFlowDefinitionsIndexRoute
+  '/projects': typeof AuthedProjectsIndexRoute
+  '/schemas': typeof AuthedSchemasIndexRoute
+  '/sessions': typeof AuthedSessionsIndexRoute
+  '/system': typeof AuthedSystemIndexRoute
+  '/users': typeof AuthedUsersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_authed': typeof AuthedRouteWithChildren
+  '/login': typeof LoginRoute
+  '/_authed/': typeof AuthedIndexRoute
+  '/_authed/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
+  '/_authed/schemas/$schemaId': typeof AuthedSchemasSchemaIdRoute
+  '/_authed/users/$userId': typeof AuthedUsersUserIdRoute
+  '/_authed/flow-definitions/': typeof AuthedFlowDefinitionsIndexRoute
+  '/_authed/projects/': typeof AuthedProjectsIndexRoute
+  '/_authed/schemas/': typeof AuthedSchemasIndexRoute
+  '/_authed/sessions/': typeof AuthedSessionsIndexRoute
+  '/_authed/system/': typeof AuthedSystemIndexRoute
+  '/_authed/users/': typeof AuthedUsersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/flow-definitions/$definitionId'
+    | '/schemas/$schemaId'
+    | '/users/$userId'
+    | '/flow-definitions/'
+    | '/projects/'
+    | '/schemas/'
+    | '/sessions/'
+    | '/system/'
+    | '/users/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/login'
+    | '/'
+    | '/flow-definitions/$definitionId'
+    | '/schemas/$schemaId'
+    | '/users/$userId'
+    | '/flow-definitions'
+    | '/projects'
+    | '/schemas'
+    | '/sessions'
+    | '/system'
+    | '/users'
+  id:
+    | '__root__'
+    | '/_authed'
+    | '/login'
+    | '/_authed/'
+    | '/_authed/flow-definitions/$definitionId'
+    | '/_authed/schemas/$schemaId'
+    | '/_authed/users/$userId'
+    | '/_authed/flow-definitions/'
+    | '/_authed/projects/'
+    | '/_authed/schemas/'
+    | '/_authed/sessions/'
+    | '/_authed/system/'
+    | '/_authed/users/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AuthedRoute: typeof AuthedRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authed': {
+      id: '/_authed'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authed/': {
+      id: '/_authed/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/users/': {
+      id: '/_authed/users/'
+      path: '/users'
+      fullPath: '/users/'
+      preLoaderRoute: typeof AuthedUsersIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/system/': {
+      id: '/_authed/system/'
+      path: '/system'
+      fullPath: '/system/'
+      preLoaderRoute: typeof AuthedSystemIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/sessions/': {
+      id: '/_authed/sessions/'
+      path: '/sessions'
+      fullPath: '/sessions/'
+      preLoaderRoute: typeof AuthedSessionsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/schemas/': {
+      id: '/_authed/schemas/'
+      path: '/schemas'
+      fullPath: '/schemas/'
+      preLoaderRoute: typeof AuthedSchemasIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/projects/': {
+      id: '/_authed/projects/'
+      path: '/projects'
+      fullPath: '/projects/'
+      preLoaderRoute: typeof AuthedProjectsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/flow-definitions/': {
+      id: '/_authed/flow-definitions/'
+      path: '/flow-definitions'
+      fullPath: '/flow-definitions/'
+      preLoaderRoute: typeof AuthedFlowDefinitionsIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/users/$userId': {
+      id: '/_authed/users/$userId'
+      path: '/users/$userId'
+      fullPath: '/users/$userId'
+      preLoaderRoute: typeof AuthedUsersUserIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/schemas/$schemaId': {
+      id: '/_authed/schemas/$schemaId'
+      path: '/schemas/$schemaId'
+      fullPath: '/schemas/$schemaId'
+      preLoaderRoute: typeof AuthedSchemasSchemaIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/flow-definitions/$definitionId': {
+      id: '/_authed/flow-definitions/$definitionId'
+      path: '/flow-definitions/$definitionId'
+      fullPath: '/flow-definitions/$definitionId'
+      preLoaderRoute: typeof AuthedFlowDefinitionsDefinitionIdRouteImport
+      parentRoute: typeof AuthedRoute
     }
   }
 }
 
+interface AuthedRouteChildren {
+  AuthedIndexRoute: typeof AuthedIndexRoute
+  AuthedFlowDefinitionsDefinitionIdRoute: typeof AuthedFlowDefinitionsDefinitionIdRoute
+  AuthedSchemasSchemaIdRoute: typeof AuthedSchemasSchemaIdRoute
+  AuthedUsersUserIdRoute: typeof AuthedUsersUserIdRoute
+  AuthedFlowDefinitionsIndexRoute: typeof AuthedFlowDefinitionsIndexRoute
+  AuthedProjectsIndexRoute: typeof AuthedProjectsIndexRoute
+  AuthedSchemasIndexRoute: typeof AuthedSchemasIndexRoute
+  AuthedSessionsIndexRoute: typeof AuthedSessionsIndexRoute
+  AuthedSystemIndexRoute: typeof AuthedSystemIndexRoute
+  AuthedUsersIndexRoute: typeof AuthedUsersIndexRoute
+}
+
+const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedIndexRoute: AuthedIndexRoute,
+  AuthedFlowDefinitionsDefinitionIdRoute:
+    AuthedFlowDefinitionsDefinitionIdRoute,
+  AuthedSchemasSchemaIdRoute: AuthedSchemasSchemaIdRoute,
+  AuthedUsersUserIdRoute: AuthedUsersUserIdRoute,
+  AuthedFlowDefinitionsIndexRoute: AuthedFlowDefinitionsIndexRoute,
+  AuthedProjectsIndexRoute: AuthedProjectsIndexRoute,
+  AuthedSchemasIndexRoute: AuthedSchemasIndexRoute,
+  AuthedSessionsIndexRoute: AuthedSessionsIndexRoute,
+  AuthedSystemIndexRoute: AuthedSystemIndexRoute,
+  AuthedUsersIndexRoute: AuthedUsersIndexRoute,
+}
+
+const AuthedRouteWithChildren =
+  AuthedRoute._addFileChildren(AuthedRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AuthedRoute: AuthedRouteWithChildren,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

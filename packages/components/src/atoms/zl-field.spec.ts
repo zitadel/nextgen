@@ -40,4 +40,23 @@ describe("<zl-field> aria wiring", () => {
     const describedBy = input.getAttribute("aria-describedby") ?? "";
     expect(describedBy).toMatch(/-error$/);
   });
+
+  it("reads formValue from the live input so autofill is captured", async () => {
+    const field = mount(`<zl-field name="email" value="typed@acme.com"></zl-field>`);
+    await field.updateComplete;
+    expect(field.formValue).toBe("typed@acme.com");
+    // Simulate autofill writing the native input directly, bypassing `value`.
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    input.value = "autofilled@acme.com";
+    expect(field.formValue).toBe("autofilled@acme.com");
+  });
+
+  it("syncs the native input when formValue is assigned", async () => {
+    const field = mount(`<zl-field name="email"></zl-field>`);
+    await field.updateComplete;
+    field.formValue = "restored@acme.com";
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    expect(field.value).toBe("restored@acme.com");
+    expect(input.value).toBe("restored@acme.com");
+  });
 });

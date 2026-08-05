@@ -19,6 +19,36 @@ for the typed `@zitadel/api` Flow API. Consumers:
 It is **not** published. There is no built artifact; consumers import
 the source directly via the workspace export map.
 
+## The flow shape must mirror the real default flow
+
+This mock is the substrate for the orchestrator's own test suite, the Storybook
+stories, and the demo e2e suites. When its flow shape diverges from the server's,
+every one of those consumers silently proves the wrong thing.
+
+The authority is
+[`packages/config/defaults/default-login.json`](../config/defaults/default-login.json),
+embedded into the server via `configdefaults.DefaultLoginFlowDefinition()`. Two
+properties it fixes, both of which this mock got wrong until they were corrected:
+
+- **Sign-in is split**: `identifier` (email) → `password` → `done`. It is not a
+  combined email+password card. The mock served a combined card for a long time,
+  so the orchestrator's tests, the Storybook story, and both demo e2e suites were
+  all walking a screen the server never emits.
+- **Credential fields are keyed by the schema pointer** `x-auth-methods#password`
+  (exported as `PASSWORD_FIELD`), on both `password` and `register-password`. The
+  server answers `req.invalid` to a submit keyed on plain `password`, so the short
+  name let the orchestrator send a key the real backend refuses — invisible to
+  every mock-backed test.
+
+Two knowing, documented exceptions: the `identifier` step keeps `register` and
+`recover` navigate actions (the real flow reaches register via the engine's
+`user_not_found` transition and has no recovery step yet) so those screens stay
+reachable, and the `passkey-upsell`/`passkey-setup` pair is retained for direct
+actor injection though the default flow no longer routes through it.
+
+**Before changing a step fixture, diff it against that JSON.** If a design or
+test needs a shape the server does not emit, the flow definition changes first.
+
 ## Architecture
 
 ```
@@ -123,3 +153,6 @@ routing, add a case to the unit spec first — that is what CI gates on.
   node.
 - Don't ship a build artifact. Consumers import source via the workspace
   export map; the Moon build task is intentionally a no-op.
+- Don't invent a step shape to make a test or a design convenient. The flow
+  definition is the authority — see the section above.
+- Don't hard-code `"password"` as a field name. Import `PASSWORD_FIELD`.

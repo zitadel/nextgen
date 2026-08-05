@@ -7,17 +7,18 @@
 
 ## Context
 
-nextgen storage is SQL-first and must work on PostgreSQL and Spanner. The current
-v1 stack under `internal/storage/database/` uses generic CRUD helpers
+nextgen storage is SQL-first and must work on PostgreSQL and Spanner. The
+historical v1 stack under `internal/storage/database/` used generic CRUD helpers
 (`getOne`, `updateOne`, `deleteOne`) with repository metadata structs, shared
 `Condition`/`QueryOpts` writers, and dialect type switches inside repository
-constructors. That pattern works but makes entity SQL hard to review and hides
-dialect differences across the codebase.
+constructors. That pattern made entity SQL hard to review and hid dialect
+differences across the codebase.
 
-The `new-repo` branch introduces `internal/storage/v2/` as the replacement storage
-architecture. It is partially implemented today: projects use v2 on PostgreSQL;
-most entities still use v1 repositories. This ADR records the v2 design,
-migration path, and pre-merge checklist for the `new-repo` branch.
+`internal/storage/v2/` is the replacement storage architecture. **Entity
+persistence is fully on v2 statements** (`AllStatements`); the entire v1
+package under `internal/storage/database/` (repositories, dialects,
+query-builder, aliases) has been removed. Remaining interim work is
+infrastructure tracked on the ADR 028 checklist (notably ID generation).
 
 See also:
 
@@ -107,20 +108,15 @@ token signing and opaqueness stay upstream of storage.
 
 v2 dialect implementations
 (`internal/storage/v2/dialect/postgres`, `internal/storage/v2/dialect/spanner`)
-must eventually satisfy **both**:
+must eventually own pool, migrations, Identity, and ID generation alongside
+statement execution. Entity and application paths already use statements only;
+v2 transactions are `Statementer`-only and no longer implement v1
+`database.QueryExecutor`.
 
-- v2 statement interfaces (`ProjectStatements`, …)
-- v1 `database.QueryExecutor` / pool contracts (during entity port)
-
-This allows `internal/storage/database/dialect/` to be deleted once all callers
-migrate. The goal is a **single v2 dialect layer**, not permanent dual dialect
-code.
-
-**Interim bridge:** v2 postgres [`transaction`](../../internal/storage/v2/dialect/postgres/tx.go)
-implements v1 `database.QueryExecutor` so unmigrated v1 repositories
-participate in the same transaction (for example
-[`ProjectService.Create`](../../internal/service/project.go)). This bridge is a
-migration aid, not the long-term architecture.
+Production startup connects a **single v2 pool** (connect → migrate → close).
+A v1 pool is no longer created for production, and the v1 dialect tree has been
+retired (C6). The goal is a **single v2 dialect layer**, not permanent dual
+dialect code.
 
 ```mermaid
 flowchart TB
@@ -137,9 +133,6 @@ flowchart TB
         pg["postgres: statement_*.go + compiler.go"]
         sp["spanner: statement_*.go partial"]
     end
-    subgraph interim [Interim during entity port]
-        v1Repos["repository via QueryExecutor bridge"]
-    end
     subgraph endState [End state on new-repo]
         v2Only["v2 dialects own pool tx migrations Identity ID gen"]
     end
@@ -150,7 +143,6 @@ flowchart TB
     StatementIfaces --> sp
     pg --> CoreTypes
     DialectReg --> pg
-    pg --> v1Repos
     pg -.-> endState
     sp -.-> endState
 ```
@@ -169,21 +161,21 @@ are produced for the identifier classes in [ADR 011](011-resource-identifiers.md
 
 | Class | Storage responsibility | Dialect may use |
 |---|---|---|
-| **Ephemeral** (sessions, auth attempts, checks, tokens, …) | Generate on insert; read back via `RETURNING` or equivalent | Database `IDENTITY` / `BIT_REVERSED_POSITIVE` (current ADR 011 DDL), or a dialect-specific DB function |
-| **Managed** (users, teams, apps, …) | Generate fallback when API omits `id`; validate client-provided ids | Go package (e.g. ULID via `idgen`), database function, or hybrid |
+| **All resource PKs** (users, sessions, auth attempts, tokens, credential rows, …) | Generate on create when ID is empty; HTTP create does not accept client PKs ([ADR 047](047-dialect-id-generation.md)) | Dialect `idgen` (Postgres/SQLite ULID; Spanner UUID v4); SQL supplies no DEFAULT/IDENTITY |
 
 The **dialect** owns the generation strategy per class — not
-`internal/domain/idgen` or service code. Domain keeps prefix rules and
+domain or service code. Domain keeps prefix rules and
 validation; storage executes generation and returns
-[`Identity`](../../internal/storage/database/identity.go) (moving to v2 core).
+[`Identity`](../../internal/storage/v2/database/identity.go).
 
 PostgreSQL and Spanner already diverge on ephemeral key generation (monotonic
 identity vs bit-reversed identity per ADR 011). Colocating generation with the
 dialect avoids leaking engine-specific choices into domain or repository layers.
 
 This ADR refines [ADR 011](011-resource-identifiers.md) § Package roles:
-`internal/domain/idgen` becomes a dialect implementation detail (or is inlined
-into v2 dialect packages), not a domain-layer concern at call sites.
+managed ID generation lives under `internal/storage/v2/dialect/idgen` (or is
+inlined into v2 dialect packages), not a domain-layer concern at call sites.
+Concrete mechanisms are recorded in [ADR 047](047-dialect-id-generation.md).
 
 ```mermaid
 flowchart LR
@@ -202,21 +194,26 @@ flowchart LR
     goPkg --> identity
 ```
 
-### 9. What moves to v2 before `new-repo` merge
+### 9. What moved to v2 before `new-repo` merge
 
-The following currently live under v1 but are **in scope for v2 dialect
-ownership**, not permanent v1 retention:
+These previously lived under v1 and are now owned by v2 (C3–C6):
 
-- Migrations (postgres + spanner DDL)
-- Embedded postgres startup
-- [`database.Identity`](../../internal/storage/database/identity.go) (ADR 011)
-- ID generation (ephemeral + managed fallback) per dialect
-- Dialect-specific error mapping (already partially in v2 postgres)
+- Migrations (postgres + spanner DDL) — **done**
+- Test DSN bring-up — **done** (`v2/testdb` + `v2/dbtest`; Postgres/Spanner emulator via testcontainers, or env-provided DSNs / real Spanner instance)
+- Zero-config local SQLite — **done** (`v2/dialect/sqlite`; file under `server.data_dir`)
+- [`database.Identity`](../../internal/storage/v2/database/identity.go) (ADR 011) — **done**
+- Dialect-specific integrity error types — **done** (`v2/database/integrity_errors.go`)
+- Single pool at production startup — **done** (C5)
+- Retire v1 dialect tree — **done** (C6)
+- Retire leftover v1 query-builder / aliases package — **done** (C6)
+
+ID generation (ephemeral + managed) per dialect is complete — see
+[ADR 047](047-dialect-id-generation.md).
 
 **Specialized storage that may keep distinct patterns:** EAV user storage (ADR
-008) — port to v2 statements but may retain EAV-specific SQL structure.
+008) — ported to v2 statements but may retain EAV-specific SQL structure.
 Permission checks and complex conditions (LIKE, JSON paths, EXISTS) are
-capabilities to add to the v2 filter/compiler, not reasons to keep v1 dialects.
+capabilities to add to the v2 filter/compiler.
 
 ### 10. Generics roadmap
 
@@ -244,16 +241,15 @@ Service wiring lives outside v2:
 - [`internal/service/statement.go`](../../internal/service/statement.go) — entity
   statement interfaces
 
-## Implementation status (current PR snapshot)
+## Implementation status
 
 | Area | Status |
 |---|---|
-| Dialect registry + config decode | Postgres registered; Spanner imported but not config-decodable |
-| Projects (Postgres) | Create, Get, List (compiler), Delete in [`statement_project.go`](../../internal/storage/v2/dialect/postgres/statement_project.go) |
-| Projects (Spanner) | Create/Delete SQL written; Get/List panic |
-| Flow definitions | Interface + stubs (`panic("unimplemented")`) in both dialects |
-| Production usage | `ProjectService.Create` + `Get` use v2; Create still calls v1 repos for default schemas/flows inside hybrid tx |
-| Tests | Service-layer mocks; integration harness builds v2 pool from v1 pgx pool |
+| Dialect registry + config decode | Postgres and Spanner registered for v2 connect paths |
+| Entity statements | All product entities on `AllStatements` (projects, flows, schemas, teams, sessions, users/auth factors, branding, …) in postgres + spanner |
+| v1 package (`internal/storage/database/`) | Removed (repositories, dialects, query-builder, aliases) |
+| Production usage | Services use `service.DB` / statements; startup owns a single v2 pool |
+| Tests | Service-layer mocks; dialect integration tests; API harness builds v2 pool |
 
 ## Worked example: Projects
 
@@ -277,42 +273,54 @@ compiler.compileRead(projectQuery, &database.ListOptions{
 })
 ```
 
-## Migration path (current → `new-repo` merge)
+## Migration path (current → single v2 dialect layer)
 
-1. **Interim dual pools** — same config drives v1 connector + v2 dialect
-   ([`buildDatabaseConnector`](../../cmd/server/server.go)) while entities are
-   ported.
+1. **Interim dual pools** — **done (C5).** Production startup builds and connects
+   only a v2 dialect/pool (`buildDatabaseDialect` → `Connect` → `Migrate`).
 2. **Expand v2 dialect surface** — each v2 dialect package grows to cover v1
    pool/tx/migration/Identity/ID generation alongside statement execution.
-3. **Entity-by-entity port** — add `statement_<entity>.go` per dialect; extend
-   `AllStatements`; switch service methods off v1 repositories.
-4. **Hybrid transactions (interim)** — v2 tx exposes v1 `QueryExecutor` until
-   all entities in a workflow are ported.
-5. **Retire v1 dialect + repository layers** — delete
-   `internal/storage/database/dialect/` and per-entity v1 repos once v2 dialects
-   satisfy all contracts.
-6. **Single pool at startup** — server connects through v2 dialect only; no
-   second pool.
+3. **Entity-by-entity port** — **done.** Entity SQL lives in per-dialect
+   statement files; `AllStatements` covers product entities; v1 entity
+   repository package removed.
+4. **Hybrid transactions** — **done.** App callers and bootstrap use statements
+   only; v2 tx no longer exposes v1 `QueryExecutor`.
+5. **Retire v1 dialect layer and leftover v1 package** — **done (C6).** Deleted
+   `internal/storage/database/` (dialects, dbtest, query-builder, mocks, and
+   Identity/error aliases) after v2 dialects satisfied pool, migrations,
+   Identity, and errors. Local zero-config uses SQLite; integration bring-up
+   uses testcontainers (or env DSNs), not an in-process embedded Postgres.
+6. **Single pool at startup** — **done (C5).** Server connects through v2
+   dialect only; no second pool.
 
 **End state:** one dialect implementation per engine under
 `internal/storage/v2/dialect/`, owning connections, transactions, migrations,
-embedded postgres, Identity binding, ID generation, and all entity statements.
+Identity binding, ID generation, and all entity statements. PostgreSQL and
+Spanner remain production targets; **SQLite** is the zero-config local/homelab
+default (`dialect/sqlite`, file under `server.data_dir`) and is not a Spanner
+production peer. Postgres/Spanner integration tests bring up a **Postgres
+testcontainer** or a **Spanner emulator testcontainer** by default
+(`v2/testdb`); override with `ZITADEL_TEST_POSTGRES_URL` /
+`ZITADEL_TEST_SPANNER_URL`, or a real Spanner instance via
+`ZITADEL_TEST_SPANNER_INSTANCE`.
 
 ## Pre-merge checklist
 
-These items reflect the current PR snapshot on `new-repo` and are expected to
-close before the branch merges. Check items off as work lands; remove completed
-entries when no longer useful.
+These items track remaining infrastructure work after the entity port. Check
+items off as work lands; remove completed entries when no longer useful.
 
-- [ ] Implement `compileColumnName()` mapping from domain field enums to SQL column names
-- [ ] Fix `AndFilter`/`OrFilter` value vs pointer mismatch in postgres compiler
-- [ ] Complete Spanner execution and dialect registration
-- [ ] Move migrations from v1 to v2 dialect packages (postgres + spanner)
-- [ ] Move embedded postgres startup to v2 postgres dialect
-- [ ] Move `database.Identity` bind/scan to v2 core
-- [ ] Move ID generation into v2 dialects (ephemeral via DB identity/function; managed fallback via dialect-chosen Go package or DB function); retire domain-layer `idgen` call sites at storage boundary
-- [ ] Add `internal/storage/v2/AGENTS.md` with v2 conventions (including ID generation rules per dialect)
-- [ ] Port remaining entities and retire v1 dialect implementations
+- [x] `compileColumnName()` is no longer a required implementation: v2 compilers derive SQL column names from the schema `SQLName` bindings.
+- [x] `AndFilter`/`OrFilter` value vs pointer handling in the postgres compiler is already implemented and covered by compiler tests.
+- [x] Spanner statement execution and dialect registration are in place; remaining Spanner work is migrate/dbtest parity under v2.
+- [x] Move migrations from v1 to v2 dialect packages (postgres + spanner)
+- [x] Retire in-process embedded Postgres; local default is SQLite; Postgres/Spanner integration uses testcontainers (or env / real Spanner instance)
+- [x] Move `database.Identity` bind/scan to v2 core
+- [x] Move ID generation into v2 dialects (all resource PKs via dialect-chosen Go package; Postgres/SQLite ULID / Spanner UUID v4); retire domain-layer `idgen` and SQL IDENTITY — see [ADR 047](047-dialect-id-generation.md)
+- [x] Add `internal/storage/v2/AGENTS.md` with v2 conventions (including multi-write `withTransaction` rules)
+- [x] Port remaining entities and remove v1 entity repository package
+- [x] Drop QueryExecutor bridge from app callers and v2 transactions
+- [x] Single v2 pool at production startup (C5)
+- [x] Retire v1 dialect implementations (`internal/storage/database/dialect/`) once no remaining consumers remain (C6)
+- [x] Delete leftover `internal/storage/database/` query-builder, mocks, and aliases (C6)
 
 ## Related ADRs
 
@@ -321,7 +329,7 @@ entries when no longer useful.
 | [027 Cursor-Based Pagination](027-cursor-based-pagination.md) | v2 `ListOptions`/`Page.Cursor` + `pagination.Cursor` is the storage implementation |
 | [011 Resource Identifiers](011-resource-identifiers.md) | ADR 027 refines § Package roles: `Identity` + ID generation move to v2 dialects |
 | [008 Users EAV Store](008-users-eav-store.md) | EAV SQL may remain specialized; port to v2 statements |
-| [010 Session/Auth Attempt](010-session-auth-attempt-check-model.md) | Future v2 port target |
+| [010 Session/Auth Attempt](010-session-auth-attempt-check-model.md) | Session/auth-attempt entity SQL lives in v2 statements; model still authoritative |
 | [029 Wide Events](029-wide-events-internal-audit-primitive.md) | Event emission on v2 statement mutations; `EventStatements.InsertEvent` |
 
 ## Consequences
@@ -336,12 +344,11 @@ entries when no longer useful.
 
 ### Negative / Risks (during transition only)
 
-- Temporary dual-stack complexity (two pools, hybrid tx bridge) until v2 dialects subsume v1
-- Service layer owns storage surface (`*Statements`) in addition to domain repos until entity port completes
-- Spanner parity requires per-entity hand-written SQL (no shared compiler yet); acceptable trade-off for dialect clarity
+- Spanner still needs per-entity hand-written SQL alongside the shared compiler; acceptable trade-off for dialect clarity
 
 ### Resolved at merge
 
 Pre-merge checklist items (compiler gaps, migrations, Identity, ID generation,
-v1 dialect removal) are blockers for `new-repo` merge, not permanent
-architectural debt.
+v1 dialect removal) are blockers for completing the v2 dialect takeover, not
+permanent architectural debt. ID generation ownership is recorded in
+[ADR 047](047-dialect-id-generation.md).

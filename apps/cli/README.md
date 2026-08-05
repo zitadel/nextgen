@@ -38,13 +38,16 @@ starting a local runtime. Use `--runtime docker`, `--image`, or
 framework to scaffold when the directory is fresh, writes the Next.js app into
 the current directory, scaffolds `app/login`, `app/register`, `app/profile`, and
 `proxy.ts` for Next 16+ or `middleware.ts` for older Next versions. Fresh
-scaffolds also replace the starter `app/page.tsx` with links to sign in, create
-an account, and profile. Setup writes `.env.local` and `.zitadel/`, and installs
+scaffolds also replace the starter `app/page.tsx` with a redirect to `/login`.
+Setup writes `.env.local` and `.zitadel/`, and installs
 dependencies with the detected package manager. Pass `--skip-install` to install
 them yourself. The project's default user schema and login flow are provisioned
-server-side at creation time, so the CLI does not scaffold or upload them. Open
-the dev server URL printed by your framework, register a user, log out, log back
-in, and end on the signed-in profile page.
+from versioned local defaults; setup writes editable copies into
+`.zitadel/schemas/default-human-user.json` and
+`.zitadel/flows/default-login.json`, uploads them through the schema and flow
+APIs, then seeds `.zitadel/state.json` so `zitadel plan` is immediately empty.
+Open the dev server URL printed by your framework, register a user, log out,
+log back in, and end on the signed-in profile page.
 
 For a reproducible tester report, use the exact alpha train from the GitHub
 Release:
@@ -59,6 +62,17 @@ The default project flow supports password registration/login, passkey
 registration/login, and optional passkey setup after password registration.
 Users who skip passkey setup can still sign in with password; users who add a
 passkey can sign in with either credential.
+
+Repo config is authoritative: edit `zitadel.json`, `.zitadel/schemas/*.json`,
+`.zitadel/flows/*.json`, or `.zitadel/branding/` (a `branding.json` descriptor
+plus a `login.liquid` LiquidJS template), then re-run `zitadel plan` and
+`zitadel apply`. Server-provisioned defaults remain a fallback for non-CLI
+project creation, but CLI-created projects are authored from local files first.
+Login templates are supported: scaffold them with the `branding eject` command
+(`--design centered|split|split-right|hero|minimal`) or `setup --design <name>`;
+every edit publishes a new immutable branding revision and the login serves
+the newest one. Flow create, read, list, update, and delete are available; the
+server enforces flow lifecycle rules such as draft-only edits.
 
 For agent scripts, pass `--non-interactive --json` and capture stdout and stderr
 separately. The CLI contract is one parseable JSON object on stdout; terminals
@@ -81,6 +95,7 @@ and agent UIs may display stderr package-manager progress together with stdout.
 <!-- commands -->
 * [`zitadel apply`](#zitadel-apply)
 * [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
+* [`zitadel branding eject`](#zitadel-branding-eject)
 * [`zitadel commands`](#zitadel-commands)
 * [`zitadel doctor`](#zitadel-doctor)
 * [`zitadel eject`](#zitadel-eject)
@@ -88,6 +103,7 @@ and agent UIs may display stderr package-manager progress together with stdout.
 * [`zitadel logs`](#zitadel-logs)
 * [`zitadel plan`](#zitadel-plan)
 * [`zitadel reset`](#zitadel-reset)
+* [`zitadel schemas list`](#zitadel-schemas-list)
 * [`zitadel search`](#zitadel-search)
 * [`zitadel setup`](#zitadel-setup)
 * [`zitadel start`](#zitadel-start)
@@ -155,6 +171,34 @@ EXAMPLES
 ```
 
 _See code: [@oclif/plugin-autocomplete](https://github.com/oclif/plugin-autocomplete/blob/v3.2.50/src/commands/autocomplete/index.ts)_
+
+## `zitadel branding eject`
+
+Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.
+
+```
+USAGE
+  $ zitadel branding eject [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+    [--telemetry] [--design centered|split|split-right|hero|minimal]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Overwrite protected files on conflict.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --design=<option>  Design to start from (default: centered).
+                         <options: centered|split|split-right|hero|minimal>
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
+      --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.
+```
 
 ## `zitadel commands`
 
@@ -347,6 +391,35 @@ DESCRIPTION
   Delete the local Zitadel server runtime and data.
 ```
 
+## `zitadel schemas list`
+
+List revisions of a user-schema by objectType.
+
+```
+USAGE
+  $ zitadel schemas list -t <value> [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+    [--telemetry] [-e development|preview|production]
+
+FLAGS
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --environment=<option>  Target environment (default: development).
+                              <options: development|preview|production>
+  -f, --force                 Overwrite protected files on conflict.
+  -n, --non-interactive       Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+  -t, --object-type=<value>   (required) Filter revisions by objectType (e.g. human-user).
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with --no-telemetry.
+      --verbose               Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List revisions of a user-schema by objectType.
+```
+
 ## `zitadel search`
 
 Search for a command.
@@ -371,7 +444,8 @@ Create a Zitadel project and scaffold local auth.
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
     [--telemetry] [--framework next|nuxt|react|vue|solid|svelte|qwik|angular] [--renderer react|web-component]
-    [--dev-port <value>] [--skip-install]
+    [--dev-port <value>] [--skip-install] [--preset password-first|passkey-first] [--use-case minimal|consumer|business]
+    [--design centered|split|split-right|hero|minimal]
 
 FLAGS
   -c, --cwd=<value>         Project directory to operate on.
@@ -379,15 +453,23 @@ FLAGS
   -n, --non-interactive     Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>      Override the resolved server URL.
       --debug               Debug logging.
+      --design=<option>     Login design to eject into .zitadel/branding/ and publish as branding revision 1. When
+                            omitted, the login uses the built-in template; run the `branding eject` command later to
+                            customize.
+                            <options: centered|split|split-right|hero|minimal>
       --dev-port=<value>    Dev-server port; also the issuer origin registered with Zitadel. Defaults to the detected
                             port. Use distinct ports to run several scaffolded apps side by side.
       --dry-run             Preview without mutating files or the platform.
       --framework=<option>  Framework to target.
                             <options: next|nuxt|react|vue|solid|svelte|qwik|angular>
+      --preset=<option>     Sign-in preset for the scaffolded schema and login flow (default: password-first).
+                            <options: password-first|passkey-first>
       --renderer=<option>   Renderer (default: react).
                             <options: react|web-component>
       --skip-install        Do not install dependencies after setup updates package.json.
       --[no-]telemetry      Send anonymous usage analytics. Disable with --no-telemetry.
+      --use-case=<option>   Use case for the scaffolded schema fields: who signs in to the app (default: minimal).
+                            <options: minimal|consumer|business>
       --verbose             Verbose logging.
 
 GLOBAL FLAGS

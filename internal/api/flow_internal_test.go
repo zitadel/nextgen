@@ -84,3 +84,68 @@ func TestToFlowField_EnumSurfaces(t *testing.T) {
 	require.True(t, got.Validation.Set, "validation block emitted when only enum is set")
 	require.Equal(t, []string{"Single", "Married", "Divorced", "Widowed"}, got.Validation.Value.Enum)
 }
+
+func TestValidateOriginAgainstProject(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		origin      string
+		allowed     []string
+		wantErr     bool
+		wantInError []string
+	}{
+		{
+			name:    "empty allowlist allows any origin",
+			origin:  "http://127.0.0.1:3000",
+			allowed: nil,
+		},
+		{
+			name:    "exact match allows",
+			origin:  "http://localhost:3000",
+			allowed: []string{"http://localhost:3000"},
+		},
+		{
+			name:    "loopback spellings are not aliased",
+			origin:  "http://127.0.0.1:3000",
+			allowed: []string{"http://localhost:3000", "https://app.example.com"},
+			wantErr: true,
+			wantInError: []string{
+				`"http://127.0.0.1:3000"`,
+				"http://localhost:3000, https://app.example.com",
+			},
+		},
+		{
+			name:    "ipv6 loopback is not aliased",
+			origin:  "http://[::1]:3000",
+			allowed: []string{"http://localhost:3000"},
+			wantErr: true,
+			wantInError: []string{
+				`"http://[::1]:3000"`,
+				"http://localhost:3000",
+			},
+		},
+		{
+			name:    "ipv6 exact match allows",
+			origin:  "http://[::1]:3000",
+			allowed: []string{"http://[::1]:3000"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validateOriginAgainstProject(tc.origin, &domain.Project{PreviewOrigins: tc.allowed})
+
+			if !tc.wantErr {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			for _, want := range tc.wantInError {
+				require.Contains(t, err.Error(), want, "message must name the offending origin and the allowlist")
+			}
+		})
+	}
+}

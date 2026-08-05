@@ -21,6 +21,9 @@ This default includes, without limitation:
 cmd/
 internal/
 apps/console/
+apps/login-ui/
+apps/server/
+apps/server-*/
 ```
 
 The private root workspace package (`package.json`) follows this default
@@ -58,8 +61,10 @@ apps/demo-next/
 apps/demo-nuxt/
 packages/api/
 packages/components/
+packages/config/
 packages/design-tokens/
 packages/shared-component-styles/
+packages/testing/
 packages/ui-react/
 packages/sdk-core/
 packages/sdk-next/

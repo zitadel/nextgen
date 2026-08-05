@@ -15,6 +15,9 @@ const projectId =
 const app = document.getElementById("app");
 if (app) {
   const login = document.createElement("zitadel-login");
+  // The hosted shell IS the page — opt into the full-page chrome the
+  // widget-first default no longer paints on its own.
+  login.setAttribute("variant", "page");
   login.setAttribute("purpose", "login");
   login.setAttribute("project-id", projectId);
   if (proxyPath) {

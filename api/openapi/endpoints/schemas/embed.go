@@ -4,6 +4,8 @@ package schemas
 import (
 	"embed"
 	"strings"
+
+	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
 )
 
 // FS holds the embedded JSON schema files from this directory.
@@ -11,11 +13,8 @@ import (
 //go:embed *.json
 var FS embed.FS
 
-//go:embed examples/default-human-user-schema.json
-var defaultHumanUserSchema []byte
-
 func DefaultHumanUserSchema(serverURL string) []byte {
-	json := string(defaultHumanUserSchema)
+	json := string(configdefaults.DefaultHumanUserSchema())
 	json = strings.ReplaceAll(json, "${SERVER_URL}", serverURL)
 	json = strings.ReplaceAll(json, "${USER_SCHEMA_URL}", DefaultHumanUserSchemaURL(serverURL))
 

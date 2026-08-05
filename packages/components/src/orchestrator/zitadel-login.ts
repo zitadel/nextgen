@@ -2,10 +2,13 @@ import { type ZitadelProject } from "@zitadel/api/config";
 import type {
   CreateFlow201,
   CreateFlow201Step,
+  CreateFlow201StepFieldsItem,
   CreateFlowBodyPurpose,
   SubmitFlowStepBody,
   SubmitFlowStepBodyChallengeResponse,
+  SubmitFlowStepBodyFields,
 } from "@zitadel/api/generated/model";
+import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
@@ -20,20 +23,33 @@ import {
 } from "./api-client.js";
 import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
 import type { Branding } from "./branding.js";
-import { applyBaseTokens, applyBrandingTokens } from "./branding-to-tokens.js";
 import { validateBranding } from "./branding-validator.js";
-import { applyDefaultFont, applyFontUrl } from "./font-loader.js";
+import { stampExportparts } from "./exportparts.js";
 import { emit } from "../internal/emit.js";
 import { escapeHtml } from "../internal/escape-html.js";
-import { createLiquidEngine } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { TEMPLATE_NAMES } from "./template-names.js";
 import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { zitadelAttributionPillInnerHtml } from "@zitadel/shared-component-styles/attribution-markup";
 import { createSanitiser } from "./sanitiser.js";
+import { ZitadelSurface } from "./surface.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
 import layoutChromeCss from "./templates/layout-chrome.css?inline";
-import { ThemeController } from "./theme-controller.js";
+
+/**
+ * The uniform value contract every input atom exposes (`<zl-field>`,
+ * `<zl-select>`, `<zl-checkbox>`, and any future field atom). The orchestrator
+ * reads and restores field values exclusively through `formValue`, so it never
+ * has to know an atom's tag or internal shape — a new field type works with no
+ * change here.
+ */
+type FieldAtom = HTMLElement & { formValue: string };
+
+/** Narrow a rendered named element to the `formValue` field-atom contract. */
+function isFieldAtom(el: Element): el is FieldAtom {
+  return typeof (el as Partial<FieldAtom>).formValue === "string";
+}
 
 /**
  * `<zitadel-login>` — the auth-UI orchestrator.
@@ -68,7 +84,7 @@ import { ThemeController } from "./theme-controller.js";
  * - `docs/design/flowengine/template-security.md`
  */
 @customElement("zitadel-login")
-export class ZitadelLogin extends LitElement {
+export class ZitadelLogin extends ZitadelSurface {
   static override shadowRootOptions: ShadowRootInit = {
     ...LitElement.shadowRootOptions,
     delegatesFocus: true,
@@ -83,11 +99,21 @@ export class ZitadelLogin extends LitElement {
     :host {
       display: block;
       width: 100%;
-      min-height: 100vh;
     }
   `;
 
+  // `variant` and `theme` come from `ZitadelSurface`. Login adds one
+  // variant-specific behavior on top of the shared surface polarity: `page`
+  // focuses the first field on load, `widget` never steals focus.
+
   @property({ type: String }) accessor purpose: CreateFlowBodyPurpose = "login";
+
+  /**
+   * Name of the flow definition to run, matching the `name` in its flow
+   * file. When set, the server resolves that definition directly instead
+   * of picking one by audience. Omit to run the project's default flow.
+   */
+  @property({ type: String, attribute: "flow-name" }) accessor flowName = "";
 
   /**
    * SDK project handle returned by `configureZitadel()`. Set from JS (or a
@@ -142,18 +168,21 @@ export class ZitadelLogin extends LitElement {
   @property({ type: String }) override accessor lang = "";
 
   /**
-   * Custom locale dictionaries keyed by language code. When set, these take
-   * precedence over the built-in dictionaries for matching language codes.
+   * Custom locale dictionaries keyed by language code. Entries may be
+   * partial — each is merged over the built-in dictionary for its language,
+   * so a preset like {@link businessLocales} (or a hand-written subset) is
+   * directly assignable:
    *
    * ```ts
-   * import { en } from "@zitadel/components";
-   * const locales = {
-   *   en: { ...en, "identifier.title": "Welcome" },
-   *   de: myGermanDict,
-   * };
+   * import { businessLocales } from "@zitadel/components";
+   * loginElement.locales = businessLocales;
+   * // or override individual keys:
+   * loginElement.locales = { en: { "identifier.title": "Welcome" } };
    * ```
    */
-  @property({ attribute: false }) accessor locales: Record<string, Locale> | undefined;
+  @property({ attribute: false }) accessor locales:
+    | Readonly<Record<string, Partial<Locale>>>
+    | undefined;
 
   @state() private accessor response: CreateFlow201 | null = null;
 
@@ -165,8 +194,6 @@ export class ZitadelLogin extends LitElement {
 
   @state() private accessor formValues: Record<string, string> = {};
 
-  private readonly themeController = new ThemeController(this);
-
   private engine: Liquid | null = null;
 
   private readonly sanitise = createSanitiser();
@@ -176,6 +203,28 @@ export class ZitadelLogin extends LitElement {
    * every `formValues` change otherwise re-parses the same template.
    */
   private tenantTemplateCache: { source: string; template: Template[] } | null = null;
+
+  /**
+   * Whether the widget currently owns a same-document history entry (the
+   * "sentinel"). The sentinel exists so the browser's back gesture fires
+   * `popstate` instead of leaving the page. Exactly one sentinel is on
+   * the stack at a time: it is pushed when a step with a `kind: "back"`
+   * action renders, re-armed by `onPopState` after the browser consumes
+   * it, and retired by `applyResponse` when a step without a back action
+   * renders. The entry reuses the current URL, so the host page's
+   * location (including any hash-router fragment) is never modified.
+   */
+  private armed = false;
+
+  /**
+   * Set immediately before a self-initiated `history.back()` so the
+   * resulting `popstate` is ignored instead of being interpreted as a
+   * user back gesture.
+   */
+  private ignoreNextPop = false;
+
+  /** Bound `popstate` handler stored for cleanup in `disconnectedCallback`. */
+  private readonly handlePopState = this.onPopState.bind(this);
 
   override createRenderRoot(): HTMLElement | DocumentFragment {
     const root = super.createRenderRoot();
@@ -190,6 +239,13 @@ export class ZitadelLogin extends LitElement {
       sheet.replaceSync(layoutChromeCss);
       root.adoptedStyleSheets = [...existing, sheet];
       root.addEventListener("zl-input", this.handleAtomInput as EventListener);
+      // Editing any control (or dismissing the alert) retires the current
+      // step error. `zl-change` covers <zl-checkbox>/<zl-select>, which
+      // don't emit `zl-input`; the clearing is imperative DOM surgery so
+      // the rendered step string stays byte-identical and the subtree
+      // (including any in-flight <zl-passkey>) is never rebuilt mid-edit.
+      root.addEventListener("zl-change", this.handleAtomEdited as EventListener);
+      root.addEventListener("zl-dismiss", this.handleAlertDismiss as EventListener);
       // <zl-button> dispatches `zl-submit` for both primary submits and
       // secondary actions; the orchestrator picks the right path based on
       // the button's `type` and `action`.
@@ -208,6 +264,20 @@ export class ZitadelLogin extends LitElement {
       root.addEventListener("zl-passkey-error", this.handlePasskeyError as EventListener);
     }
     return root;
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    if (typeof window !== "undefined") {
+      window.addEventListener("popstate", this.handlePopState);
+    }
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    if (typeof window !== "undefined") {
+      window.removeEventListener("popstate", this.handlePopState);
+    }
   }
 
   /**
@@ -243,33 +313,46 @@ export class ZitadelLogin extends LitElement {
     const primary = (code.split("-")[0] ?? "").toLowerCase();
     const builtin = builtinLocales[primary] ?? en;
     const custom = this.locales?.[primary];
+    if (!custom) return builtin;
 
-    return custom ? { ...builtin, ...custom } : builtin;
+    // Entries are Partial — merge key-by-key and skip explicit `undefined`
+    // values, which a plain spread would let shadow the built-in copy.
+    const merged: Locale = { ...builtin };
+    for (const [key, value] of Object.entries(custom)) {
+      if (value !== undefined) merged[key] = value;
+    }
+    return merged;
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
     if (!this.engine || changed.has("locales") || changed.has("lang")) {
       this.engine = createLiquidEngine({ locale: this.resolveLocale() });
     }
-    const root = this.shadowRoot;
-    if (root) {
-      applyBaseTokens(root);
-      applyBrandingTokens(root, this.branding, this.themeController.theme);
-      // Ship the design-system brand face by default; drop it when a tenant
-      // font takes over so we don't fire a redundant request.
-      const tenantFontUrl = this.branding?.font_url ?? null;
-      applyDefaultFont(root, tenantFontUrl ? null : undefined);
-      applyFontUrl(root, tenantFontUrl);
-    }
-    this.dataset.theme = this.themeController.theme;
-    this.toggleAttribute("data-theme-dark", this.themeController.theme === "dark");
+    this.applySurfaceTheme(this.branding);
     this.setAttribute("aria-busy", this.loading ? "true" : "false");
   }
 
   override updated(changed: PropertyValues<this>): void {
+    // Re-stamp part forwarding and widget-mode chrome on every commit:
+    // `unsafeHTML` re-parses whenever the rendered string changes (step
+    // swap, loading toggle, error dismiss), replacing previously stamped
+    // nodes. The template's `zl-page-shell` sits in a different shadow
+    // scope, so the variant reaches it as a stamped attribute, not a
+    // `:host([variant])` selector.
+    if (this.shadowRoot) {
+      stampExportparts(this.shadowRoot);
+      const widget = this.variant !== "page";
+      for (const shell of this.shadowRoot.querySelectorAll("zl-page-shell")) {
+        shell.toggleAttribute("data-widget", widget);
+      }
+    }
     const props = changed as Map<string, unknown>;
     if (!props.has("response")) return;
-    void this.hydrateStepAfterRender();
+    // `changed` holds the OLD value: nullish (`null` initializer, or
+    // undefined when the property never changed before) means this commit
+    // applied the first response — the initial paint, not a user-driven
+    // step swap.
+    void this.hydrateStepAfterRender(props.get("response") == null);
   }
 
   /**
@@ -278,15 +361,22 @@ export class ZitadelLogin extends LitElement {
    * but those render their own shadow DOM on a later microtask — so await
    * this element's update *and* the child atoms' first render before touching
    * them, rather than guessing a frame with `requestAnimationFrame`.
+   *
+   * Focus on the *initial* response is page-mode-only: a dedicated login
+   * route should focus its first field, but a widget embedded further down
+   * an arbitrary page must not steal focus and scroll-jump on load. Step
+   * swaps are user-initiated, so focus moves in both modes.
    */
-  private async hydrateStepAfterRender(): Promise<void> {
+  private async hydrateStepAfterRender(initial = false): Promise<void> {
     await this.updateComplete;
     const atoms = this.shadowRoot?.querySelectorAll<LitElement>("zl-field, zl-button");
     if (atoms) {
       await Promise.all(Array.from(atoms).map((atom) => atom.updateComplete));
     }
     this.applyValuesToFields();
-    this.moveFocusToFirstField();
+    if (!initial || this.variant === "page") {
+      this.moveFocusToFirstField();
+    }
   }
 
   override render() {
@@ -375,17 +465,56 @@ export class ZitadelLogin extends LitElement {
               "`configureZitadel({ projectId })`, or a `project` handle) to start a flow.",
           );
         }
-        wire = await apiStartFlow(api, { project_id: cfg.projectId, purpose: this.purpose });
+        wire = await apiStartFlow(api, {
+          project_id: cfg.projectId,
+          purpose: this.purpose,
+          ...(this.flowName ? { flow_definition_name: this.flowName } : {}),
+        });
       }
       this.applyResponse(wire);
+      // Symmetric with `submit()`: every applied step announces itself, the
+      // first one included. A host app driving its own chrome from the step
+      // (progress, headings, analytics) would otherwise see nothing until
+      // after the visitor's first submit.
+      emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
-      this.handleTransportError(error);
+      this.handleTransportError(this.describeFlowSelectionError(error));
     } finally {
       this.loading = false;
     }
   }
 
+  /**
+   * When a `flow-name` lookup fails, the server's envelope only says
+   * "not found" / "purpose mismatch" — it cannot know the name came from
+   * an attribute. Rewrap those two codes with the attribute and the fix;
+   * every other error passes through untouched.
+   */
+  private describeFlowSelectionError(error: unknown): unknown {
+    if (!this.flowName || !(error instanceof ApiError)) return error;
+    const code =
+      typeof error.body === "object" && error.body !== null && "code" in error.body
+        ? String((error.body as { code: unknown }).code)
+        : "";
+    if (code === "flowdef.not_found") {
+      return new Error(
+        `<zitadel-login> flow-name="${this.flowName}" does not match any active flow ` +
+          `definition in this project. Check the \`name\` in your flow file and that ` +
+          `it has been applied (\`zitadel apply\`).`,
+      );
+    }
+    if (code === "flowdef.purpose_mismatch") {
+      return new Error(
+        `<zitadel-login> flow-name="${this.flowName}" matched a flow definition that ` +
+          `does not serve purpose "${this.purpose}".`,
+      );
+    }
+    return error;
+  }
+
   private applyResponse(wire: CreateFlow201): void {
+    // A fresh response carries fresh (or no) errors — un-dismiss.
+    this.stepErrorDismissed = false;
     this.response = wire;
     const { branding, issues } = validateBranding(wire.branding);
     this.branding = branding;
@@ -396,6 +525,39 @@ export class ZitadelLogin extends LitElement {
     // Defaults seed every declared field; existing entries (typed input,
     // carry-over from prior steps) win on conflict.
     this.formValues = { ...collectInitialValues(wire.step), ...this.formValues };
+
+    // History API (ADR 022): keep exactly one same-document entry — the
+    // sentinel — on the stack while the current step supports
+    // back-navigation, so the browser's back gesture fires `popstate`
+    // (handled in `onPopState`) instead of leaving the page. Arming only
+    // on the unarmed → armed transition means consecutive back-capable
+    // steps (and re-renders of the same step, e.g. after a failed submit)
+    // never grow the stack. Steps without a `kind: "back"` action retire
+    // the sentinel — the next back press then navigates the host page
+    // (leaves the flow), which is correct.
+    if (typeof window !== "undefined") {
+      const hasBack = Boolean(wire.step.actions?.some((a) => a.kind === "back"));
+      if (hasBack && !this.armed) {
+        // Spread the host's state: vue-router (Nuxt) keeps `position` /
+        // `back` / `forward` here and reads them on popstate. Replacing it
+        // wholesale leaves the sentinel opaque to the host router.
+        history.pushState({ ...history.state, zl: true }, "");
+        this.armed = true;
+      } else if (!hasBack && this.armed) {
+        this.armed = false;
+        // Only traverse while we still own the current entry. If the host
+        // pushed its own entry after we armed, `history.back()` would pop
+        // *that* one and trigger a host back-navigation the user never
+        // asked for. Leaving a stale sentinel behind is the lesser evil —
+        // same tradeoff as disconnect; the popstate handler skips stale
+        // sentinels in one extra hop from either direction.
+        if ((history.state as { zl?: boolean } | null)?.zl === true) {
+          this.ignoreNextPop = true;
+          history.back();
+        }
+      }
+    }
+
     void this.maybeCompleteFlow(wire);
   }
 
@@ -453,11 +615,26 @@ export class ZitadelLogin extends LitElement {
         ? this.branding.liquid_template
         : null;
 
-    const errors: FlowError[] = step.error
-      ? step.error.startsWith("error.")
-        ? [{ text_key: step.error }]
-        : [{ message: step.error }]
+    // `error.*` keys — the server's validation dialect
+    // (`error.<field>_<rule>`, one key per violation, "; "-joined) —
+    // localise via the catalog with generic per-rule fallbacks; anything
+    // else (outcome names, diagnostics) stays verbatim.
+    const rawErrors: FlowError[] = step.error
+      ? (localiseFlowErrorKeys(step.error, {
+          locale: this.resolveLocale(),
+          stepName: step.name ?? "",
+          // Inline-routed keys downgrade to a banner message when the
+          // step doesn't render their field — the inline outlet is the
+          // only place the template shows them.
+          fields: (step.fields ?? []).map((field) => field.name),
+        }) ?? [{ message: step.error }])
       : [];
+    // A dismissed step error must not flicker back on the `loading`
+    // re-render (the only step re-render while the user stays on this
+    // step — it rebuilds the subtree anyway). While idle the array must
+    // stay as-is: keystroke re-renders have to produce a byte-identical
+    // string, and the imperatively removed alert stays removed.
+    const errors: FlowError[] = this.loading && this.stepErrorDismissed ? [] : rawErrors;
 
     const fields = step.fields ?? [];
     const actions = step.actions ?? [];
@@ -526,53 +703,123 @@ export class ZitadelLogin extends LitElement {
     };
   }
 
+  /** All rendered input atoms exposing the `formValue` contract. */
+  private fieldAtoms(): FieldAtom[] {
+    const root = this.shadowRoot;
+    if (!root) return [];
+    return Array.from(root.querySelectorAll<HTMLElement>("[name]")).filter(isFieldAtom);
+  }
+
   private applyValuesToFields(): void {
-    const root = this.shadowRoot;
-    if (!root) return;
-    const fields = root.querySelectorAll<HTMLElement & { value?: string }>("zl-field");
-    if (fields.length === 0) return;
-    for (const field of fields) {
-      const name = field.getAttribute("name");
-      if (!name || !(name in this.formValues)) continue;
+    for (const atom of this.fieldAtoms()) {
+      const name = atom.getAttribute("name");
+      if (!name) continue;
       const next = this.formValues[name];
-      if (field.value !== next) {
-        field.value = next;
+      if (next !== undefined && atom.formValue !== next) {
+        atom.formValue = next;
       }
     }
   }
 
-  private captureValuesFromFields(): Record<string, string> {
-    const root = this.shadowRoot;
-    if (!root) return this.formValues;
-    const fields = root.querySelectorAll<HTMLElement & { value?: string }>("zl-field");
-    if (fields.length === 0) return this.formValues;
-    const next = { ...this.formValues };
-    let changed = false;
-    for (const field of fields) {
-      const name = field.getAttribute("name");
-      const value = this.currentFieldValue(field);
-      if (!name || value === undefined) continue;
-      if (field.value !== value) {
-        field.value = value;
-      }
-      if (next[name] !== value) {
-        next[name] = value;
-        changed = true;
+  /**
+   * Names of the current step's `required` fields whose captured value is
+   * empty. Reads each atom's live `formValue` (the getter reflects the native
+   * control, so autofill that skipped `input` events is still seen), so this
+   * is browser-independent and does not rely on native constraint validation.
+   */
+  private missingRequiredFields(): string[] {
+    const values = new Map<string, string>();
+    for (const atom of this.fieldAtoms()) {
+      const name = atom.getAttribute("name");
+      if (name) values.set(name, atom.formValue);
+    }
+    const missing: string[] = [];
+    for (const field of this.response?.step.fields ?? []) {
+      // A checkbox always submits a real boolean (`false` when unticked), so it
+      // is never "missing"; a must-accept boolean is enforced by the schema
+      // (`const: true`), not this gate.
+      if (field.type === "checkbox") continue;
+      if (field.required && (values.get(field.name) ?? "") === "") {
+        missing.push(field.name);
       }
     }
-    if (changed) {
-      this.formValues = next;
-    }
-    return next;
+    return missing;
   }
 
-  private currentFieldValue(field: HTMLElement & { value?: string }): string | undefined {
-    const native = field.shadowRoot?.querySelector<HTMLInputElement>("input");
-    if (native && native.value !== field.value) {
-      return native.value;
-    }
-    return typeof field.value === "string" ? field.value : undefined;
+  /**
+   * Surface a client-side required-field error using the server's own
+   * validation dialect (`error.<field>_required`, "; "-joined), so it flows
+   * through the same localisation and inline/banner routing as a real
+   * backend rejection — no native browser bubble. Idempotent: re-running with
+   * the same keys (both submit entry points fire on one click) is a no-op.
+   */
+  private reportRequiredErrors(fields: readonly string[]): void {
+    if (!this.response) return;
+    const errorKey = fields.map((name) => `error.${name}_required`).join("; ");
+    if (this.response.step.error === errorKey) return;
+    this.stepErrorDismissed = false;
+    this.response = {
+      ...this.response,
+      step: { ...this.response.step, error: errorKey },
+    };
   }
+
+  /**
+   * Snapshot the current step's field values straight from the rendered input
+   * atoms through their uniform `formValue` contract. Tag-agnostic: every
+   * form-participating atom is read the same way, so a new field type needs no
+   * change here. Declared fields default to "" so the backend still runs its
+   * required-checks and challenge dispatch instead of silently advancing on a
+   * field-less payload. Captured values are folded into `formValues` for
+   * cross-step identity (the signed-in greeting) and post-error restoration.
+   */
+  private collectSubmitFields(): SubmitFlowStepBodyFields {
+    const current = new Map<string, string>();
+    for (const atom of this.fieldAtoms()) {
+      const name = atom.getAttribute("name");
+      if (name) current.set(name, atom.formValue);
+    }
+    if (current.size > 0) {
+      this.formValues = { ...this.formValues, ...Object.fromEntries(current) };
+    }
+    const fields: SubmitFlowStepBodyFields = {};
+    for (const f of this.response?.step.fields ?? []) {
+      const value = current.get(f.name) ?? "";
+      // A `checkbox` maps to a JSON `boolean` schema property. The atom carries
+      // its value token when checked and "" when unchecked (native-checkbox
+      // semantics), but the server validates the property as a real boolean and
+      // rejects a string, so submit `true`/`false` rather than the token.
+      if (f.type === "checkbox") {
+        fields[f.name] = value !== "";
+        continue;
+      }
+      // A `select` renders a closed `enum`. Its leading placeholder option
+      // submits "" when the user picks nothing, but "" is not a member of the
+      // enum, so sending it fails the server's enum validation (e.g.
+      // create_user rejects with "no enum value matched"). Omit the field
+      // unless the value is an actual enum member the schema allows — which
+      // includes "" only when the schema explicitly lists it, so an
+      // intentionally-allowed empty option is still sent. An omitted required
+      // select still fails the server's required-check, surfacing a clearer
+      // "required" error instead of an enum mismatch. Other fields keep the ""
+      // default so required-checks and challenge dispatch still run.
+      if (f.type === "select" && !isAllowedSelectValue(f, value)) continue;
+      fields[f.name] = value;
+    }
+    return fields;
+  }
+
+  /**
+   * True once the user retired the current step error by editing a field or
+   * dismissing the alert. Deliberately NON-reactive: consulting reactive
+   * state in `renderStep` would change its output string on the first
+   * post-dismiss keystroke, and `unsafeHTML` would rebuild the whole step
+   * subtree — wiping typed values (`hydrateStepAfterRender` only re-applies
+   * them on response changes) and reconnecting atoms. Reset on every new
+   * response; consulted only by the `loading` re-render, which rebuilds
+   * anyway.
+   */
+  private stepErrorDismissed = false;
 
   private handleAtomInput = (event: CustomEvent<{ name: string; value: string }>): void => {
     if (!event.detail) return;
@@ -580,21 +827,70 @@ export class ZitadelLogin extends LitElement {
     if (!name) return;
     this.formValues = { ...this.formValues, [name]: value };
     this.syncFieldElementValue(name, value);
+    this.clearStaleErrors(name);
     emit(this, "zitadel-flow-input", { name, value });
   };
 
-  private syncFieldElementValue(name: string, value: string): void {
+  /**
+   * `zl-change` from <zl-checkbox>/<zl-select>. Persist the atom's value into
+   * `formValues` — mirroring `handleAtomInput` for text fields — so a later
+   * step re-render (a validation error re-parses the template via `unsafeHTML`
+   * and rebuilds the atoms) restores the selection/checked state through
+   * `applyValuesToFields` instead of dropping back to the template default.
+   * Reads the live `formValue` off the atom rather than the event's `value`
+   * token, because an unchecked checkbox reports "" there but keeps its token
+   * in the detail. Also clears stale errors on the edited field.
+   */
+  private handleAtomEdited = (event: CustomEvent<{ name?: string }>): void => {
+    const name = event.detail?.name;
+    if (!name) return;
+    const atom = event.target;
+    if (atom instanceof HTMLElement && isFieldAtom(atom)) {
+      this.formValues = { ...this.formValues, [name]: atom.formValue };
+    }
+    this.clearStaleErrors(name);
+  };
+
+  /** Explicit dismiss of the step-error alert (it removes itself). */
+  private handleAlertDismiss = (event: Event): void => {
+    const target = event.target as Element | null;
+    if (target?.matches?.("zl-alert[data-zl-step-error]")) {
+      this.stepErrorDismissed = true;
+    }
+  };
+
+  /**
+   * Retire the current step error after the user edits `fieldName`:
+   * remove the form-level alert(s) and clear the edited field's inline
+   * error — other fields' inline errors stay until they are edited.
+   * Imperative on purpose; see {@link stepErrorDismissed}.
+   */
+  private clearStaleErrors(fieldName: string): void {
+    if (!this.response?.step.error) return;
     const root = this.shadowRoot;
     if (!root) return;
-    const fields = root.querySelectorAll<HTMLElement & { value?: string }>("zl-field");
-    for (const field of fields) {
-      if (field.getAttribute("name") !== name) continue;
-      if (field.value !== value) {
-        field.value = value;
+    if (!this.stepErrorDismissed) {
+      this.stepErrorDismissed = true;
+      for (const alert of root.querySelectorAll("zl-alert[data-zl-step-error]")) {
+        alert.remove();
       }
-      const native = field.shadowRoot?.querySelector<HTMLInputElement>("input");
-      if (native && native.value !== value) {
-        native.value = value;
+    }
+    // Schema field names are free-form (dots, quotes, `x-…#…`), so match by
+    // attribute value instead of interpolating into a CSS selector.
+    for (const field of root.querySelectorAll<HTMLElement & { invalid?: boolean; error?: string }>(
+      "zl-field",
+    )) {
+      if (field.getAttribute("name") !== fieldName || !field.invalid) continue;
+      field.invalid = false;
+      field.error = "";
+    }
+  }
+
+  /** Mirror a value onto the matching rendered atom (used after atom events). */
+  private syncFieldElementValue(name: string, value: string): void {
+    for (const atom of this.fieldAtoms()) {
+      if (atom.getAttribute("name") === name && atom.formValue !== value) {
+        atom.formValue = value;
       }
     }
   }
@@ -619,6 +915,18 @@ export class ZitadelLogin extends LitElement {
     // navigate to whatever `action` URL the form has (none) and lose state.
     event.preventDefault();
     if (this.loading) return;
+    // This is the sole submit path for the primary action (submit-type
+    // <zl-button> and Enter both drive `form.requestSubmit()`; the button no
+    // longer emits a parallel `zl-submit`). Enforce the step's required fields
+    // here and surface a styled, localised error instead of submitting an
+    // empty required value for the server to reject. Secondary actions (back,
+    // skip, passkey…) arrive via `zl-submit` → `handleAtomSubmit`, so they are
+    // never gated.
+    const missing = this.missingRequiredFields();
+    if (missing.length > 0) {
+      this.reportRequiredErrors(missing);
+      return;
+    }
     // `submitter` is the button that triggered the submit. When the user
     // pressed Enter inside a `<zl-field>`, the field calls
     // `form.requestSubmit()` with no submitter, so we fall back to the first
@@ -660,19 +968,31 @@ export class ZitadelLogin extends LitElement {
    * cancel would trigger a second ceremony (the guard prevents a third).
    */
   private handlePasskeyError = (
-    event: CustomEvent<{ challenge_id: string; error: string; aborted: boolean }>,
+    event: CustomEvent<{
+      challenge_id: string;
+      error: string;
+      aborted: boolean;
+      timed_out?: boolean;
+    }>,
   ): void => {
     if (!this.response) return;
-    const { error: message, aborted } = event.detail;
-    const errorKey = aborted ? "error.passkey_cancelled" : "error.passkey_failed";
+    const { error: message, aborted, timed_out: timedOut } = event.detail;
+    const errorKey = timedOut
+      ? "error.passkey_timeout"
+      : aborted
+        ? "error.passkey_cancelled"
+        : "error.passkey_failed";
     if (this.response.step.error === errorKey) return;
+    // This path replaces the response without going through applyResponse;
+    // the fresh error must not start life dismissed.
+    this.stepErrorDismissed = false;
     const { challenge: _dropped, ...stepWithoutChallenge } = this.response.step;
     this.response = {
       ...this.response,
       step: { ...stepWithoutChallenge, error: errorKey },
     };
     console.warn(
-      `[zitadel-login] passkey ceremony ${aborted ? "cancelled" : "failed"}: ${message}`,
+      `[zitadel-login] passkey ceremony ${timedOut ? "timed out" : aborted ? "cancelled" : "failed"}: ${message}`,
     );
   };
 
@@ -701,18 +1021,11 @@ export class ZitadelLogin extends LitElement {
     const { id, session_token } = this.response;
     this.loading = true;
     try {
-      // Only send field values that the current step defines. `formValues`
-      // carries state across steps (e.g. email for the signed-in greeting)
-      // but steps without fields should not leak prior values onto the wire.
-      const formValues = this.captureValuesFromFields();
-      const stepFields = this.response.step.fields ?? [];
-      const fields: Record<string, string> = {};
-      for (const f of stepFields) {
-        const value = formValues[f.name];
-        if (value !== undefined) {
-          fields[f.name] = value;
-        }
-      }
+      // Only send field values the current step defines. `formValues` carries
+      // state across steps (e.g. email for the signed-in greeting), but
+      // collectSubmitFields keys off the step's declared fields, so a step
+      // without fields yields an empty map and never leaks prior values.
+      const fields = this.collectSubmitFields();
       const body: SubmitFlowStepBody = {
         session_token,
         action: action ?? "submit",
@@ -730,13 +1043,80 @@ export class ZitadelLogin extends LitElement {
     }
   }
 
+  /**
+   * Handle the browser's back/forward gesture (ADR 022). When `popstate`
+   * fires:
+   *
+   * - **Self-initiated** (`ignoreNextPop`) → `applyResponse` is retiring
+   *   the sentinel; ignore.
+   * - **Back press while armed** → the browser consumed the sentinel.
+   *   Re-arm it immediately — so the stack shape is identical on every
+   *   step and repeated presses behave the same at any flow depth — then
+   *   submit the step's `kind: "back"` action.
+   * - **Landing on the sentinel while armed** → the host page pushed an
+   *   entry above the sentinel (e.g. an in-page `#anchor` click) and the
+   *   user backed out of it. They are back where the widget expects them
+   *   — not asking the flow to go back; do nothing.
+   * - **Forward press onto a retired sentinel** (it survives as a forward
+   *   entry after `history.back()`) → bounce back: flow state is
+   *   server-authoritative, the browser cannot skip ahead
+   *   (ADR 022 §Edge cases).
+   * - Anything else is host-page traversal — leave the browser alone.
+   */
+  private onPopState(event: PopStateEvent): void {
+    if (this.ignoreNextPop) {
+      this.ignoreNextPop = false;
+      return;
+    }
+
+    if (this.armed) {
+      if ((event.state as { zl?: boolean } | null)?.zl === true) {
+        // Traversal landed ON the sentinel from an entry above it that the
+        // host page created after we armed. Position is as expected; the
+        // gesture was aimed at the host entry, not the flow.
+        return;
+      }
+      // Back press: the browser popped the sentinel.
+      this.armed = false;
+      const backAction = this.response?.step?.actions?.find((a) => a.kind === "back");
+      if (backAction) {
+        history.pushState({ zl: true }, "");
+        this.armed = true;
+        void this.submit(backAction.name);
+      }
+      return;
+    }
+
+    if ((event.state as { zl?: boolean } | null)?.zl === true) {
+      this.ignoreNextPop = true;
+      history.back();
+    }
+  }
+
   private handleTransportError(error: unknown): void {
+    // For API rejections, prefer the server's error-envelope message (e.g.
+    // which origins a project allows) over the generic "POST … returned N".
     const message =
-      error instanceof Error ? error.message : "Unexpected error contacting the Flow API.";
+      error instanceof ApiError
+        ? apiErrorMessage(error)
+        : error instanceof Error
+          ? error.message
+          : "Unexpected error contacting the Flow API.";
     this.startupError = message;
     console.error("[zitadel-login]", error);
     emit(this, "zitadel-flow-error", { message });
   }
+}
+
+/**
+ * Whether `value` is a member of a select field's closed `enum`. A select
+ * with no explicit enum has no submittable value, so this returns `false`
+ * and the caller omits the field. Because the enum never contains "" unless
+ * the schema deliberately lists it, an untouched placeholder ("") is omitted
+ * rather than sent and rejected by the server's enum validation.
+ */
+function isAllowedSelectValue(field: CreateFlow201StepFieldsItem, value: string): boolean {
+  return field.validation?.enum?.includes(value) ?? false;
 }
 
 function collectInitialValues(step: CreateFlow201Step): Record<string, string> {

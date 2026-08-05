@@ -1,6 +1,7 @@
 import { consola } from "consola";
 
 import { ZitadelError } from "../../lib/errors";
+import { customizeAndPublishActions, verifyLoginAction } from "../../lib/journey-guidance";
 import {
   detectPackageManager,
   devCommandFor,
@@ -9,6 +10,7 @@ import {
   type PackageCommand,
   type PackageManager,
 } from "../../lib/package-manager";
+import { publicCliCommand } from "../../lib/public-cli";
 
 type InstallReason = "dry-run" | "skip-install" | "no-dependency-changes";
 
@@ -22,11 +24,19 @@ export type SetupInstall = {
 export type SetupInstallOutcome = {
   install: SetupInstall;
   devCommand: string;
+  /**
+   * Journey-staged subset for the human terminal box: the verify mission
+   * plus one breadcrumb to `status`/README. Customize/publish guidance stays
+   * out until login demonstrably works (Elina, alpha.15).
+   */
+  boxActions: string[];
+  /** Complete journey for the JSON envelope — agents consume all of it. */
   nextActions: string[];
   nextCommands: string[];
 };
 
 export type SetupInstallInput = {
+  cliVersion: string;
   cwd: string;
   depsAdded: ReadonlyArray<string>;
   dryRun: boolean;
@@ -55,6 +65,7 @@ export async function installDependenciesForSetup(
         reason: "no-dependency-changes",
       },
       devCommand: devCommand.display,
+      cliVersion: input.cliVersion,
       issuer: input.issuer,
       includeInstallCommand: false,
     });
@@ -69,6 +80,7 @@ export async function installDependenciesForSetup(
         reason: input.dryRun ? "dry-run" : "skip-install",
       },
       devCommand: devCommand.display,
+      cliVersion: input.cliVersion,
       issuer: input.issuer,
       includeInstallCommand: true,
     });
@@ -93,6 +105,7 @@ export async function installDependenciesForSetup(
       command: installCommand.display,
     },
     devCommand: devCommand.display,
+    cliVersion: input.cliVersion,
     issuer: input.issuer,
     includeInstallCommand: false,
   });
@@ -101,21 +114,26 @@ export async function installDependenciesForSetup(
 function outcome(input: {
   install: SetupInstall;
   devCommand: string;
+  cliVersion: string;
   issuer: string;
   includeInstallCommand: boolean;
 }): SetupInstallOutcome {
-  const startAction = `Start your project: ${input.devCommand} (then open ${input.issuer})`;
-  const verifyAction =
-    "Verify auth in the browser: register a user, log out, log in again with the same user, and confirm /profile shows Signed in.";
+  const planCommand = publicCliCommand("plan", input.cliVersion);
+  const statusCommand = publicCliCommand("status", input.cliVersion);
+  const verifyActions = [
+    ...(input.includeInstallCommand ? [`Install dependencies: ${input.install.command}`] : []),
+    `Start your project: ${input.devCommand} (then open ${input.issuer}/login)`,
+    verifyLoginAction(),
+  ];
+  const breadcrumb = `Once login works: ${statusCommand} shows your next steps; customizing is covered in your README's Zitadel section.`;
   return {
     install: input.install,
     devCommand: input.devCommand,
-    nextActions: input.includeInstallCommand
-      ? [`Install dependencies: ${input.install.command}`, startAction, verifyAction]
-      : [startAction, verifyAction],
+    boxActions: [...verifyActions, breadcrumb],
+    nextActions: [...verifyActions, ...customizeAndPublishActions(input.cliVersion)],
     nextCommands: input.includeInstallCommand
-      ? [input.install.command, input.devCommand]
-      : [input.devCommand],
+      ? [input.install.command, input.devCommand, planCommand]
+      : [input.devCommand, planCommand],
   };
 }
 

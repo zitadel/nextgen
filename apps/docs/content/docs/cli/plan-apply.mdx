@@ -1,7 +1,9 @@
 ---
 title: Plan and apply
-description: Validate local Zitadel configuration before uploading it.
+description: Edit local Zitadel configuration and sync it to the platform.
 ---
+
+`.zitadel/schemas/*.json` and `.zitadel/flows/*.json` are the source of truth for your project's user schemas and login flows. Edit them, preview with `plan`, publish with `apply`.
 
 `plan` previews the configuration sync diff without mutating files or platform state:
 
@@ -14,6 +16,64 @@ npx @zitadel/cli@alpha plan
 ```sh
 npx @zitadel/cli@alpha apply
 ```
+
+## Walkthrough: add a field to registration
+
+Add an optional `company` property to `.zitadel/schemas/default-human-user.json`:
+
+```json
+"properties": {
+  "company": { "type": "string", "description": "Company name" }
+}
+```
+
+(Leave `required` untouched to keep the field optional.)
+
+Then let users enter it during registration — add `"company"` to the `register` step's `fields` in `.zitadel/flows/default-login.json`.
+
+Preview and publish:
+
+```sh
+npx @zitadel/cli@alpha plan
+npx @zitadel/cli@alpha apply
+```
+
+## Walkthrough: a second flow, selected by name
+
+All files in `.zitadel/flows/` sync on `apply`, but the widget runs exactly one flow per sign-in — an extra flow needs a distinct `name` so the app can ask for it.
+
+Drop `.zitadel/flows/kiosk-login.json` next to the default flow. Same shape as `default-login.json` (start from a copy), with its own `name` and whatever steps the journey needs:
+
+```json
+{
+  "$schema": "../meta/flow-definition.json",
+  "name": "kiosk-login",
+  "status": "active",
+  "user_schema": "(same revision the default flow pins)",
+  "purposes": { "login": "identifier" },
+  "steps": [ "…copied from default-login.json, then edited…" ]
+}
+```
+
+Publish with `plan` / `apply`, then point the widget at it:
+
+```tsx
+<ZitadelLogin flowName="kiosk-login" />
+```
+
+(or `flow-name="kiosk-login"` on the plain `<zitadel-login>` element). An unknown name or a flow that doesn't serve the requested purpose surfaces as a startup error in the widget.
+
+Without `flowName`, the platform serves the newest active flow that has no `audience`. A flow scoped via `audience.app_ids` / `audience.team_ids` is selected only when the flow-start request's hints identify that app or team (app match beats team match) — it never captures the project default.
+
+## How syncing works
+
+- `.zitadel/state.json` maps each config file to its platform id and last-synced content hash. `plan` and `apply` compare against it to decide what changed; don't edit it by hand.
+- **Flows are validated at plan time** against the same rules the platform enforces on apply — transition wiring, step reachability, schema field references, and cross-purpose invariants (e.g. a login entry step must wire `user_not_found` when `register` is also a purpose). Violations fail `plan` and `apply` before anything is uploaded, with the same error text the server would return. Non-blocking product guidance shows up as `# warning:` lines in the plan. (If the pre-flight ever disagrees with your server version, set `ZITADEL_SKIP_FLOW_VALIDATION` to skip it and let the server decide.)
+- Schemas are **revisioned**: an edit publishes a new immutable revision instead of mutating the old one, so existing users and flows keep validating against the revision they were created with.
+- Flows are **mutable**: an edit updates the flow in place.
+- Flows pin one schema revision via `user_schema`. When a schema edit publishes a new revision, `apply` rewrites `user_schema` in the pinned flow files and updates the flows in the same run — the plan announces the re-pin, and the file rewrite shows up in your git diff.
+- Flow files carry `"$schema": "../meta/flow-definition.json"` — a pointer at the flow dialect spec setup copies into `.zitadel/meta/`, so editors validate and autocomplete flow edits offline. It is local-only: the platform ignores it, and syncing never treats it as a change.
+- Your local files stay as written — the CLI never rewrites them except to reconcile with a real server-side change. The platform stores a canonicalized form of what you upload: meta-schema defaults are spelled out (e.g. `"x-editable": true`), so every immutable revision is self-contained. Comparison is semantic, bridging the two: an edit that only spells out a default changes no behavior, so `plan` reports no change, and the platform's spelled-out defaults never show up as a diff against your leaner file.
 
 For agents:
 

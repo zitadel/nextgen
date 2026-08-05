@@ -2,20 +2,45 @@ import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promise
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../../../../errors";
-import { isObject, parseJsonObject, stableStringify } from "../../../../json";
+import {
+  isObject,
+  parseJsonObject,
+  setTopLevelJsonKey,
+  stableStringify,
+} from "../../../../json";
+import type { PatchedFile } from "../../types";
 import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./types";
 
 /**
- * The executor's private, mutable accumulator. Handlers push into it as each
- * op is applied; {@link scaffold} returns it as the readonly
- * {@link ScaffoldResult} so the public result stays immutable.
+ * The executor's private, mutable accumulator. Handlers record each touched
+ * artifact as a typed row; {@link scaffold} derives the readonly
+ * {@link ScaffoldResult} from it so the public result stays immutable.
  */
 type ScaffoldAccumulator = {
   dryRun: boolean;
-  filesWritten: string[];
+  files: PatchedFile[];
   filesSkipped: string[];
   depsAdded: string[];
 };
+
+/**
+ * Records one touched artifact, deduplicating by path: several plan ops can
+ * legitimately hit the same file (the base and framework op lists both merge
+ * into `.env.local`, for example), but the report should carry it once, with
+ * the first action as the net one — a file created and then extended in the
+ * same run was created by the run.
+ */
+function record(
+  result: ScaffoldAccumulator,
+  path: string,
+  kind: PatchedFile["kind"],
+  action: PatchedFile["action"],
+): void {
+  if (result.files.some((file) => file.path === path)) {
+    return;
+  }
+  result.files.push({ path, kind, action });
+}
 
 /**
  * Applies a {@link ScaffoldPlan} to disk, executing its operations in order.
@@ -33,7 +58,7 @@ export async function scaffold(
 ): Promise<ScaffoldResult> {
   const result: ScaffoldAccumulator = {
     dryRun: opts.dryRun,
-    filesWritten: [],
+    files: [],
     filesSkipped: [],
     depsAdded: [],
   };
@@ -42,7 +67,17 @@ export async function scaffold(
     await applyOp(op, opts, result);
   }
 
-  return result;
+  const written = new Set(result.files.map((file) => file.path));
+  return {
+    dryRun: result.dryRun,
+    files: result.files,
+    // Legacy flat list: deduplicated file paths only. Directories stay in
+    // `files` rows (kind "dir"); a path both written and later skipped as
+    // already-matching reports as written.
+    filesWritten: result.files.filter((file) => file.kind === "file").map((file) => file.path),
+    filesSkipped: [...new Set(result.filesSkipped)].filter((path) => !written.has(path)),
+    depsAdded: result.depsAdded,
+  };
 }
 
 async function applyOp(
@@ -124,8 +159,9 @@ async function editFile(
     result.filesSkipped.push(path);
     return;
   }
+  const action = source === undefined ? "create" : "update";
   if (dryRun) {
-    result.filesWritten.push(path);
+    record(result, path, "file", action);
     return;
   }
   await mkdir(dirname(path), { recursive: true });
@@ -135,7 +171,7 @@ async function editFile(
     await chmod(tmp, mode).catch(() => undefined);
   }
   await rename(tmp, path);
-  result.filesWritten.push(path);
+  record(result, path, "file", action);
 }
 
 async function ensureDir(
@@ -144,15 +180,40 @@ async function ensureDir(
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
+  // An already-existing directory is a skip — unless its permissions drifted
+  // from the requested mode, in which case the chmod below repairs them and
+  // the report says so (an "update" row, not a silent skip). Windows does not
+  // implement POSIX permission classes (only the write bit is changeable), so
+  // there the mode comparison is meaningless and healing is never reported —
+  // otherwise every rerun would flag `.zitadel` as an update forever.
+  const pre = await stat(path).catch(() => undefined);
+  const existed = pre?.isDirectory() ?? false;
+  const healsMode =
+    existed &&
+    mode !== undefined &&
+    process.platform !== "win32" &&
+    (pre!.mode & 0o777) !== mode;
   if (dryRun) {
-    result.filesWritten.push(path);
+    if (!existed) {
+      record(result, path, "dir", "create");
+    } else if (healsMode) {
+      record(result, path, "dir", "update");
+    } else {
+      result.filesSkipped.push(path);
+    }
     return;
   }
   await mkdir(path, { recursive: true, mode });
   if (mode) {
     await chmod(path, mode).catch(() => undefined);
   }
-  result.filesWritten.push(path);
+  if (!existed) {
+    record(result, path, "dir", "create");
+  } else if (healsMode) {
+    record(result, path, "dir", "update");
+  } else {
+    result.filesSkipped.push(path);
+  }
 }
 
 async function writeText(
@@ -174,8 +235,9 @@ async function writeText(
     });
   }
 
+  const action = existing === undefined ? "create" : "update";
   if (opts.dryRun) {
-    result.filesWritten.push(path);
+    record(result, path, "file", action);
     return;
   }
 
@@ -186,7 +248,7 @@ async function writeText(
     await chmod(tmp, opts.mode).catch(() => undefined);
   }
   await rename(tmp, path);
-  result.filesWritten.push(path);
+  record(result, path, "file", action);
 }
 
 async function appendText(
@@ -196,7 +258,8 @@ async function appendText(
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
-  const existing = (await readIfExists(path)) ?? "";
+  const raw = await readIfExists(path);
+  const existing = raw ?? "";
   if (ifMissing && existing.includes(ifMissing)) {
     result.filesSkipped.push(path);
     return;
@@ -208,13 +271,14 @@ async function appendText(
     return;
   }
 
+  const action = raw === undefined ? "create" : "update";
   if (dryRun) {
-    result.filesWritten.push(path);
+    record(result, path, "file", action);
     return;
   }
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, next);
-  result.filesWritten.push(path);
+  record(result, path, "file", action);
 }
 
 async function mergeEnv(
@@ -223,7 +287,8 @@ async function mergeEnv(
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
-  const existing = (await readIfExists(path)) ?? "";
+  const raw = await readIfExists(path);
+  const existing = raw ?? "";
   const present = new Set(
     existing
       .split(/\r?\n/g)
@@ -238,13 +303,14 @@ async function mergeEnv(
 
   const block = additions.map(([key, value]) => `${key}=${value}`).join("\n");
   const next = `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${block}\n`;
+  const action = raw === undefined ? "create" : "update";
   if (dryRun) {
-    result.filesWritten.push(path);
+    record(result, path, "file", action);
     return;
   }
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, next);
-  result.filesWritten.push(path);
+  record(result, path, "file", action);
 }
 
 async function mergeJson(
@@ -261,13 +327,14 @@ async function mergeJson(
     result.filesSkipped.push(path);
     return;
   }
+  const action = existing === undefined ? "create" : "update";
   if (dryRun) {
-    result.filesWritten.push(path);
+    record(result, path, "file", action);
     return;
   }
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, contents);
-  result.filesWritten.push(path);
+  record(result, path, "file", action);
 }
 
 async function appendGitignore(
@@ -276,7 +343,8 @@ async function appendGitignore(
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
-  const existing = (await readIfExists(path)) ?? "";
+  const raw = await readIfExists(path);
+  const existing = raw ?? "";
   const lines = new Set(existing.split(/\r?\n/g).map((line) => line.trim()));
   const missing = entries.filter((entry) => !lines.has(entry));
   if (missing.length === 0) {
@@ -284,12 +352,13 @@ async function appendGitignore(
     return;
   }
   const next = `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${missing.join("\n")}\n`;
+  const action = raw === undefined ? "create" : "update";
   if (dryRun) {
-    result.filesWritten.push(path);
+    record(result, path, "file", action);
     return;
   }
   await writeFile(path, next);
-  result.filesWritten.push(path);
+  record(result, path, "file", action);
 }
 
 async function addDependency(
@@ -309,16 +378,31 @@ async function addDependency(
     result.filesSkipped.push(path);
     return;
   }
-  current[key] = { ...deps, [op.name]: op.version };
-  const contents = `${stableStringify(current)}\n`;
+  // package.json is user-owned: splice only the dependency map's value into
+  // the document. Every byte outside it — key order, blank lines, inline
+  // objects, line endings — stays untouched; the touched map itself is
+  // name-sorted, matching what a package manager writes.
+  const contents = setTopLevelJsonKey(
+    existing,
+    path,
+    key,
+    sortByKey({ ...deps, [op.name]: op.version }),
+  );
   if (dryRun) {
-    result.filesWritten.push(path);
+    record(result, path, "file", "update");
     result.depsAdded.push(op.name);
     return;
   }
   await writeFile(path, contents);
-  result.filesWritten.push(path);
+  record(result, path, "file", "update");
   result.depsAdded.push(op.name);
+}
+
+/** Rebuilds an object with lexicographically sorted keys (dependency maps). */
+function sortByKey(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  );
 }
 
 async function readIfExists(path: string): Promise<string | undefined> {

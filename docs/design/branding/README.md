@@ -32,11 +32,11 @@ Liquid output uses `<zl-*>` tags, not raw form controls. User-facing strings use
 
 ## Rollout sketch
 
-Built-ins and tokens first, then a block editor that emits Liquid, then a free-text editor with tighter static checks.
+Built-ins and tokens shipped first; hand-written Liquid is live via the CLI eject workflow ([`templates.md`](templates.md), [ADR 040](../../adrs/040-tenant-login-templates-editable-config.md)); a block editor that emits Liquid layers on the same validator later.
 
 ## Open points
 
-Extra layout presets; how templates attach to flows; dark mode; optional untrusted CSS; i18n source; powered-by line.
+Dark mode; i18n source; powered-by line. Settled elsewhere: template attachment + grouping ([ADR 040](../../adrs/040-tenant-login-templates-editable-config.md)), extra designs via the catalog ([`templates.md`](templates.md)), untrusted CSS rejected ([`schema.md`](schema.md)).
 
 ## Files
 

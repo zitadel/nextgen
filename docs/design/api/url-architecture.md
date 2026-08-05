@@ -1,6 +1,6 @@
 # URL Architecture
 
-> **LOCKED: Flat-by-ID with pragmatic nesting.** Globally-unique IDs mean the URL doesn't have to carry scope. For vocabulary, [`../glossary.md`](../glossary.md). For the data layer stack, [`hierarchy.md`](hierarchy.md).
+> **LOCKED: Flat-by-ID with pragmatic nesting.** Globally-unique IDs mean the URL doesn't have to carry scope. For vocabulary, [`../glossary.md`](../glossary.md). For the data layer stack, [`hierarchy.md`](hierarchy.md). For permission names, [`system-permission-catalog.md`](system-permission-catalog.md).
 
 ## The rule
 
@@ -14,10 +14,10 @@
 Every endpoint declares internally:
 
 ```
-resource_kind   : users
+resource_kind   : user
 operation       : read | list | create | update | delete | <verb>
 scope_source    : path.id | query.project_id | body.project_id | credential
-required_perms  : users.read
+required_perms  : user.read
 ```
 
 This yields a testable matrix: `credential → requested resource → resolved scope → required permission → decision`.

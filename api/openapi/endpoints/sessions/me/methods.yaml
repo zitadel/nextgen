@@ -10,34 +10,38 @@ get:
     against the same `session_id`) to restore a dropped assurance level.
   tags:
     - Sessions
-  parameters:
-    - $ref: ../../../components/parameters/session-cookie.yaml
-  security: []
+  security:
+    - nextgenSession: []
   responses:
     '200':
       description: Session state.
+      headers:
+        Cache-Control:
+          $ref: ../../../components/headers/cache-control-private-no-store.yaml
       content:
         application/json:
           schema:
             $ref: ../session-response.yaml
     '401':
       description: Missing or invalid session token.
+      headers:
+        Cache-Control:
+          $ref: ../../../components/headers/cache-control-private-no-store.yaml
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../components/schemas/errors/auth-unauthorized.yaml
     '404':
       description: Session not found.
+      headers:
+        Cache-Control:
+          $ref: ../../../components/headers/cache-control-private-no-store.yaml
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../components/schemas/errors/sess-not_found.yaml
     default:
-      description: Unexpected error.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: getMySession-error-response.yaml
 
 delete:
   operationId: revokeMySession
@@ -49,9 +53,8 @@ delete:
     After revocation, any tokens derived from this session are invalidated including the cookie itself, which is cleared in the response.
   tags:
     - Sessions
-  parameters:
-    - $ref: ../../../components/parameters/session-cookie.yaml
-  security: []
+  security:
+    - nextgenSession: []
   responses:
     '204':
       description: Session revoked successfully.
@@ -63,7 +66,8 @@ delete:
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../components/schemas/errors/auth-unauthorized.yaml
+
     '404':
       description: Session not found.
       content:
@@ -82,4 +86,3 @@ delete:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
-

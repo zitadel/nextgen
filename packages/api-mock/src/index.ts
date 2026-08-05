@@ -54,11 +54,14 @@ export function getCapturedRequests(): readonly CapturedRequest[] {
   return _browserHandle?.getCaptured() ?? [];
 }
 
-export {
-  applyBranding,
-  clearBranding,
-  setupMockHandlers,
-};
+export { applyBranding, clearBranding, setupMockHandlers };
+
+/**
+ * The password step's field name — the schema pointer the real server emits.
+ * Exported so consumers submit the same key the backend accepts instead of
+ * hard-coding a short `password` the server would reject.
+ */
+export { PASSWORD_FIELD } from "./fixtures/login.js";
 
 export type { CapturedRequest, MockHandle };
 export type { MockBranding } from "./branding.js";

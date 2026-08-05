@@ -5,7 +5,14 @@ import { createZitadelClient } from "@zitadel/api/client";
 
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { environmentSchema } from "../lib/environment";
-import { buildSyncPlan, makeSyncers, renderPlan, summarizePlan } from "../lib/sync";
+import {
+  buildSyncPlan,
+  collectPlanWarnings,
+  enumeratePlanResources,
+  makeSyncers,
+  renderPlan,
+  summarizePlan,
+} from "../lib/sync";
 import { readZitadelSecret } from "../lib/project";
 
 /**
@@ -38,7 +45,12 @@ export default class Plan extends BaseCommand {
       baseUrl: source,
       token: secret.project_secret,
     });
-    const syncers = makeSyncers({ client, projectId: secret.project_id, env });
+    const syncers = makeSyncers({
+      client,
+      projectId: secret.project_id,
+      env,
+      cwd,
+    });
 
     consola.start("Building plan");
     const plan = await buildSyncPlan(cwd, syncers, true);
@@ -46,18 +58,24 @@ export default class Plan extends BaseCommand {
     this.recordTelemetry({
       creates: summary.creates,
       updates: summary.updates,
+      revisions: summary.revisions,
       deletes: summary.deletes,
       total: summary.total,
     });
     consola.success(
       `Plan: ${summary.creates} create${summary.creates === 1 ? "" : "s"}, ` +
         `${summary.updates} update${summary.updates === 1 ? "" : "s"}, ` +
+        `${summary.revisions} new revision${summary.revisions === 1 ? "" : "s"}, ` +
         `${summary.deletes} delete${summary.deletes === 1 ? "" : "s"}, ` +
-        `${summary.total - summary.creates - summary.updates - summary.deletes} unchanged`,
+        `${plan.length - summary.total} unchanged`,
     );
     return this.emit({
       status: "ok",
-      data: summary,
+      data: {
+        ...summary,
+        changes: enumeratePlanResources(plan),
+        warnings: collectPlanWarnings(plan),
+      },
       pretty: renderPlan(plan, isTTY),
     });
   }

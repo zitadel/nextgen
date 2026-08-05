@@ -1,0 +1,9 @@
+description: |
+  Filter-value specifies which values can be filtered by a query endpoint. This
+  is a union of types. When a value is specified which is not assignable to the
+  field which is being filtered, a 400 error will be returned.
+oneOf:
+  - type: string
+  - type: number
+  - type: boolean
+  - type: 'null'

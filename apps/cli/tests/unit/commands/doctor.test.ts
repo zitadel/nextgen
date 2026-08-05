@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -54,6 +54,7 @@ async function makeHealthyProject(): Promise<string> {
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
   await mkdir(join(cwd, "app/login"), { recursive: true });
   await mkdir(join(cwd, "app/register"), { recursive: true });
+  await mkdir(join(cwd, "app/profile"), { recursive: true });
 
   await writeFile(
     join(cwd, "package.json"),
@@ -100,9 +101,14 @@ async function makeHealthyProject(): Promise<string> {
     `${MANAGED_MARKER}\nexport default function R() {}\n`,
   );
   await writeFile(
+    join(cwd, "app/profile/page.tsx"),
+    `${MANAGED_MARKER}\nexport default function P() {}\n`,
+  );
+  await writeFile(
     join(cwd, "middleware.ts"),
     `${MANAGED_MARKER}\nexport function middleware() {}\n`,
   );
+  await writeFile(join(cwd, "custom-elements.d.ts"), `${MANAGED_MARKER}\nexport {};\n`);
   return cwd;
 }
 
@@ -142,6 +148,24 @@ describe("doctor command", () => {
     expect(names).not.toContain("managed-middleware");
   });
 
+  it("warns (but passes) when .zitadel/schemas is empty — legacy or interrupted projects", async () => {
+    const cwd = await makeHealthyProject();
+    await rm(join(cwd, ".zitadel/schemas/user.json"));
+
+    const res = await doctor(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
+    expect(json.status).toBe("ok");
+    expect(json.data.ok).toBe(true);
+    const schemaCheck = json.data.checks.find((check) => check.name === "schema");
+    expect(schemaCheck?.status).toBe("warn");
+    expect(schemaCheck?.message).toContain("No schema files found");
+  });
+
   it("fails the dependency check when no @zitadel package is present", async () => {
     const cwd = await makeHealthyProject();
     await writeFile(
@@ -170,6 +194,19 @@ describe("doctor command", () => {
     const occupiedPort = Number(new URL(occupiedUrl).port);
 
     const fake = await fakeDocker();
+    // The port probe shells out to `lsof` and degrades to "no listeners" on
+    // ANY failure by contract (ports.ts), so asserting through the real
+    // system lsof makes this test environment-dependent — the listener
+    // silently vanished on CI runners. Fake lsof on the PATH the test
+    // already owns so the occupied port is always visible.
+    const lsofPath = join(fake.binDir, "lsof");
+    await writeFile(
+      lsofPath,
+      `#!/usr/bin/env node
+console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].join("\\n"));
+`,
+    );
+    await chmod(lsofPath, 0o755);
     const res = await runCliForTest(
       [
         "doctor",
@@ -184,6 +221,7 @@ describe("doctor command", () => {
       {
         PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
         DOCKER_LOG: fake.logPath,
+        LSOF_FIXTURE_PORT: String(occupiedPort),
       },
     );
 
@@ -271,6 +309,61 @@ describe("doctor command", () => {
     expect(json.details.checks.find((check) => check.name === "project-match")?.status).toBe(
       "fail",
     );
+  });
+
+  it("fails when a scaffolded infrastructure file is missing and --fix restores it", async () => {
+    const cwd = await makeHealthyProject();
+    await rm(join(cwd, "middleware.ts"));
+
+    const broken = await doctor(cwd);
+    expect(broken.exitCode).toBe(3);
+    const brokenJson = parseJson(broken.stdout) as {
+      status: string;
+      code: string;
+      details: { checks: Check[] };
+    };
+    expect(brokenJson.status).toBe("error");
+    expect(brokenJson.code).toBe("E_VALIDATION");
+    const drift = brokenJson.details.checks.find((check) => check.name === "managed-files");
+    expect(drift?.status).toBe("fail");
+    expect(drift?.message).toContain("middleware.ts");
+
+    const fixed = await doctor(cwd, ["--fix"]);
+    expect(fixed.exitCode).toBe(0);
+    const fixedJson = parseJson(fixed.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
+    expect(fixedJson.status).toBe("ok");
+    expect(fixedJson.data.ok).toBe(true);
+    expect(
+      fixedJson.data.checks.find((check) => check.name === "managed-files")?.status,
+    ).toBe("pass");
+    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
+  });
+
+  it("warns on a missing scaffolded page and --fix restores it", async () => {
+    const cwd = await makeHealthyProject();
+    await rm(join(cwd, "app/login/page.tsx"));
+
+    const warned = await doctor(cwd);
+    expect(warned.exitCode).toBe(0);
+    const warnedJson = parseJson(warned.stdout) as {
+      status: string;
+      data: { ok: boolean; checks: Check[] };
+    };
+    expect(warnedJson.data.ok).toBe(true);
+    expect(
+      warnedJson.data.checks.find((check) => check.name === "managed-files")?.status,
+    ).toBe("warn");
+
+    const fixed = await doctor(cwd, ["--fix"]);
+    expect(fixed.exitCode).toBe(0);
+    const fixedJson = parseJson(fixed.stdout) as { data: { checks: Check[] } };
+    expect(
+      fixedJson.data.checks.find((check) => check.name === "managed-files")?.status,
+    ).toBe("pass");
+    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
   });
 
   it("re-applies a missing Zitadel dependency via --fix and then passes", async () => {

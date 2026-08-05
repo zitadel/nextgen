@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Branding",
+  "description": "Local branding descriptor for the login UI. Carries the layout preset, asset URLs, and the LiquidJS template (by file reference or inline). `zitadel apply` publishes this as an immutable branding revision; flow responses resolve the latest revision per project (ADR 040). This schema describes the local configuration shape only.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Editor affordance: path or URL of this meta-schema so editors validate and autocomplete the file (scaffolded branding files point at `.zitadel/meta/branding.json`). Ignored by the platform."
+    },
+    "layout": {
+      "type": "string",
+      "enum": [
+        "centered",
+        "split"
+      ],
+      "default": "centered",
+      "description": "Layout preset the bundled default template branches on. Custom templates may ignore it; it also serves as the degrade target when a template fails component-side validation."
+    },
+    "liquid_template_file": {
+      "type": "string",
+      "examples": [
+        "./login.liquid"
+      ],
+      "description": "Path to the LiquidJS template file, relative to this descriptor. The CLI inlines the file content into `liquid_template` when publishing, and writes server state back to the file. Mutually exclusive with `liquid_template`."
+    },
+    "liquid_template": {
+      "type": "string",
+      "maxLength": 131072,
+      "description": "Inline LiquidJS template string. Prefer `liquid_template_file` — a real `.liquid` file edits far better than a JSON-escaped string. Mutually exclusive with `liquid_template_file`."
+    },
+    "logo_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^[hH][tT][tT][pP][sS]://",
+      "description": "Logo URL (https required)."
+    },
+    "hero_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^[hH][tT][tT][pP][sS]://",
+      "description": "Hero/background image URL (https required), used by split designs."
+    }
+  },
+  "not": {
+    "required": [
+      "liquid_template",
+      "liquid_template_file"
+    ]
+  }
+}

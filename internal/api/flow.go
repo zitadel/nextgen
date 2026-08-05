@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-faster/jx"
@@ -20,21 +22,11 @@ const (
 	flowCookieMaxAgeSeconds = 600
 )
 
-var (
-	errFlowCookieMissing = errors.New("flow cookie missing")
-	errFlowCookieInvalid = errors.New("flow cookie invalid")
-	errFlowCookieExpired = errors.New("flow cookie expired")
-	errFlowIDMismatch    = errors.New("flow id does not match cookie")
-	errFlowCompleted     = errors.New("flow already completed")
-)
-
 func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (api.CreateFlowRes, error) {
 	purpose, err := domain.FlowDefinitionPurposeString(string(req.Purpose))
 	if err != nil {
-		return &api.ErrorDetails{
-			Code:    "invalid_purpose",
-			Message: fmt.Sprintf("unknown purpose %q", req.Purpose),
-		}, nil
+		return errorResponseWithStatusCode(http.StatusBadRequest,
+			domain.ErrFlowInvalidPurpose().WithMessage(fmt.Sprintf("unknown purpose %q", req.Purpose))), nil
 	}
 
 	resolveReq := service.ResolveFlowRequest{
@@ -78,12 +70,12 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 		return mapFlowErrorStatus(err), nil
 	}
 
-	cookieValue, err := h.sealState(result.State)
+	cookieValue, err := h.sealState(ctx, result.State)
 	if err != nil {
 		return internalErrorResponse(err), nil
 	}
 
-	resp := h.buildFlowResponse(result, false)
+	resp := h.buildFlowResponse(ctx, result, false)
 	return &api.FlowResponseHeaders{
 		SetCookie: api.NewOptString(flowSetCookie(cookieValue, false)),
 		Response:  resp,
@@ -91,12 +83,12 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 }
 
 func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest, params api.SubmitFlowStepParams) (api.SubmitFlowStepRes, error) {
-	state, err := h.openState(params.Zflow)
+	state, err := h.openState(ctx, params.Zflow)
 	if err != nil {
 		return mapFlowErrorStatus(err), nil
 	}
 	if state.ID != params.ID {
-		return mapFlowErrorStatus(errFlowIDMismatch), nil
+		return mapFlowErrorStatus(domain.ErrFlowNotFound()), nil
 	}
 
 	submitReq := service.SubmitFlowRequest{
@@ -106,7 +98,10 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	if fields, ok := req.Fields.Get(); ok {
 		decoded, err := decodeFlowFields(fields)
 		if err != nil {
-			return errorResponseWithStatusCode(http.StatusBadRequest, domain.ErrRequestInvalid().WithMessage(err.Error())), nil
+			// Safe client message; Parent keeps a log-safe wrapper that still Unwraps
+			// to the json.Unmarshal cause for diagnostics (ADR 030).
+			return errorResponseWithStatusCode(http.StatusBadRequest,
+				domain.ErrRequestInvalid().WithMessage(err.Error()).WithParent(err)), nil
 		}
 		submitReq.Fields = decoded
 	}
@@ -163,13 +158,13 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		return mapFlowErrorStatus(err), nil
 	}
 
-	cookieValue, err := h.sealState(result.State)
+	cookieValue, err := h.sealState(ctx, result.State)
 	if err != nil {
 		return internalErrorResponse(err), nil
 	}
 
 	terminal := result.Step != nil && result.Step.Complete != nil
-	flowResp := h.buildFlowResponse(result, terminal)
+	flowResp := h.buildFlowResponse(ctx, result, terminal)
 
 	// Validation error: state machine keeps the user on the step with Error set.
 	if result.Step != nil && result.Step.Error != nil {
@@ -186,12 +181,12 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 }
 
 func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams) (api.GetFlowStepRes, error) {
-	state, err := h.openState(params.Zflow)
+	state, err := h.openState(ctx, params.Zflow)
 	if err != nil {
 		return mapFlowGetError(err), nil
 	}
 	if state.ID != params.ID {
-		return mapFlowGetError(errFlowIDMismatch), nil
+		return mapFlowGetError(domain.ErrFlowNotFound()), nil
 	}
 
 	result, err := h.flowService.GetStep(ctx, service.GetFlowStepRequest{State: state})
@@ -199,37 +194,56 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 		return errorResponse(err), nil
 	}
 	if result.Step != nil && result.Step.Complete != nil {
-		return mapFlowGetError(errFlowCompleted), nil
+		return mapFlowGetError(domain.ErrFlowCompleted()), nil
 	}
 
-	resp := h.buildFlowResponse(result, false)
+	resp := h.buildFlowResponse(ctx, result, false)
 	return &resp, nil
 }
 
-func (h *Handler) openState(raw string) (*domain.FlowState, error) {
+func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState, error) {
 	if raw == "" {
-		return nil, errFlowCookieMissing
+		return nil, domain.ErrFlowCookieInvalid()
 	}
-	payload, err := h.crypter.Decrypt(raw)
+
+	header, err := domain.DecodeJWEHeader(raw)
 	if err != nil {
-		return nil, errFlowCookieInvalid
+		return nil, domain.ErrFlowCookieInvalid()
+	}
+
+	decrypter, err := h.keyService.GetCrypter(ctx, header.KeyID, header.EncryptionAlgorithm)
+	if err != nil {
+		var domainError domain.Error
+		if errors.As(err, &domainError) && domainError.Code != domain.ErrInternal(nil).Code {
+			return nil, domain.ErrFlowCookieInvalid()
+		}
+		return nil, err
+	}
+
+	payload, err := decrypter.Decrypt(raw)
+	if err != nil {
+		return nil, domain.ErrFlowCookieInvalid()
 	}
 	var state domain.FlowState
 	if err := json.Unmarshal([]byte(payload), &state); err != nil {
-		return nil, errFlowCookieInvalid
+		return nil, domain.ErrFlowCookieInvalid()
 	}
 	if time.Since(state.IssuedAt) > flowCookieMaxAgeSeconds*time.Second {
-		return nil, errFlowCookieExpired
+		return nil, domain.ErrFlowCookieExpired()
 	}
 	return &state, nil
 }
 
-func (h *Handler) sealState(state *domain.FlowState) (string, error) {
+func (h *Handler) sealState(ctx context.Context, state *domain.FlowState) (string, error) {
 	payload, err := json.Marshal(state)
 	if err != nil {
 		return "", fmt.Errorf("marshal flow state: %w", err)
 	}
-	return h.crypter.Encrypt(string(payload))
+	cookieCrypter, err := h.keyService.GetProjectCrypter(ctx, state.ProjectID, domain.EncryptionKeyPurposeCookie)
+	if err != nil {
+		return "", err
+	}
+	return cookieCrypter.Encrypt(string(payload))
 }
 
 func flowSetCookie(value string, clear bool) string {
@@ -253,12 +267,15 @@ func flowSetCookie(value string, clear bool) string {
 	return c.String()
 }
 
-func (h *Handler) buildFlowResponse(result domain.FlowStepResult, terminal bool) api.FlowResponse {
+// buildFlowResponse assembles the wire response for a flow step. Branding is
+// resolved per response (latest revision for the project, ADR 040) so a
+// published template change reaches in-flight flows on their next step.
+func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepResult, terminal bool) api.FlowResponse {
 	resp := api.FlowResponse{
 		ID:        result.State.ID,
 		SessionID: result.State.SessionID,
 		Step:      toFlowStep(result.Step),
-		Branding:  api.NewOptBranding(defaultBranding()),
+		Branding:  api.NewOptBranding(h.resolveBranding(ctx, result.State.ProjectID)),
 	}
 	if terminal && result.State.RedirectURI != nil {
 		if u, err := parseURI(*result.State.RedirectURI); err == nil {
@@ -328,6 +345,12 @@ func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 // validateOriginAgainstProject returns an error if the origin is not in the
 // project's PreviewOrigins allowlist. An empty allowlist means allow all
 // (development/test mode).
+//
+// Matching is deliberately exact — no loopback aliasing between localhost,
+// 127.0.0.1, and [::1]. The WebAuthn RP ID derives from the origin hostname
+// (passkeyRPFromOrigin), so a passkey registered under one loopback spelling
+// can never assert under another; aliasing here would replace this clear 400
+// with a confusing "no passkey found" during the ceremony.
 func validateOriginAgainstProject(originStr string, project *domain.Project) error {
 	if len(project.PreviewOrigins) == 0 {
 		return nil
@@ -337,7 +360,8 @@ func validateOriginAgainstProject(originStr string, project *domain.Project) err
 			return nil
 		}
 	}
-	return fmt.Errorf("origin %q is not allowed for this project", originStr)
+	return fmt.Errorf("origin %q is not allowed for this project (allowed: %s)",
+		originStr, strings.Join(project.PreviewOrigins, ", "))
 }
 
 // passkeyRPFromOrigin derives the WebAuthn relying-party id (the origin host,
@@ -445,12 +469,38 @@ func toFlowStepComplete(c domain.FlowStepComplete) api.FlowStepComplete {
 	return api.FlowStepCompleteShow
 }
 
+// flowFieldDecodeError is a log-safe wrapper around a Fields value decode failure.
+// By the time decodeFlowFields runs, ogen has already syntax-validated the JSON;
+// failures here are typically values encoding/json cannot represent as Go any
+// (for example numbers outside float64). Error() names only the field for clients;
+// Unwrap preserves the json.Unmarshal cause for errors.Is/As. LogValue omits the
+// cause string (it can embed payload fragments / PII).
+type flowFieldDecodeError struct {
+	field string
+	err   error
+}
+
+func (e *flowFieldDecodeError) Error() string {
+	return fmt.Sprintf("invalid value for field %q", e.field)
+}
+
+func (e *flowFieldDecodeError) Unwrap() error {
+	return e.err
+}
+
+func (e *flowFieldDecodeError) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("kind", "field_value"),
+		slog.String("field", e.field),
+	)
+}
+
 func decodeFlowFields(raw map[string]jx.Raw) (map[string]any, error) {
 	out := make(map[string]any, len(raw))
 	for k, v := range raw {
 		var decoded any
 		if err := json.Unmarshal(v, &decoded); err != nil {
-			return nil, fmt.Errorf("decode field %q: %w", k, err)
+			return nil, &flowFieldDecodeError{field: k, err: err}
 		}
 		out[k] = decoded
 	}
@@ -462,39 +512,67 @@ func jsonQuoted(s string) []byte {
 	return b
 }
 
+var (
+	codeFlowCookieInvalid   = domain.ErrFlowCookieInvalid().Code
+	codeFlowCookieExpired   = domain.ErrFlowCookieExpired().Code
+	codeFlowNotFound        = domain.ErrFlowNotFound().Code
+	codeFlowCompleted       = domain.ErrFlowCompleted().Code
+	codeFlowInvalidAction   = domain.ErrFlowInvalidAction().Code
+	codeFlowSessionConflict = domain.ErrFlowSessionConflict().Code
+	codeFlowUnsupported     = domain.ErrFlowUnsupported().Code
+	codeFlowInvalidPurpose  = domain.ErrFlowInvalidPurpose().Code
+)
+
+func flowErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
+	switch err.Code {
+	case codeFlowCookieInvalid, codeFlowCookieExpired:
+		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
+	case codeFlowNotFound:
+		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	case codeFlowCompleted:
+		return errorResponseWithStatusCode(http.StatusGone, err)
+	case codeFlowSessionConflict:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
+	case codeFlowInvalidAction, codeFlowUnsupported, codeFlowInvalidPurpose:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	default:
+		return internalErrorResponse(err)
+	}
+}
+
 // isCookieOrIDError matches any sentinel that means "this caller isn't
 // holding a valid flow handle for this path" — either the cookie was
 // missing/tampered/expired, or its embedded id doesn't match the path.
 func isCookieOrIDError(err error) bool {
-	return errors.Is(err, errFlowCookieMissing) ||
-		errors.Is(err, errFlowCookieInvalid) ||
-		errors.Is(err, errFlowCookieExpired) ||
-		errors.Is(err, errFlowIDMismatch)
+	return errors.Is(err, domain.ErrFlowCookieInvalid()) ||
+		errors.Is(err, domain.ErrFlowCookieExpired()) ||
+		errors.Is(err, domain.ErrFlowNotFound())
 }
 
 func mapFlowErrorStatus(err error) *api.ErrorDetailsStatusCode {
-	switch {
-	case errors.Is(err, errFlowCookieMissing), errors.Is(err, errFlowCookieInvalid):
-		return errorResponseWithStatusCode(http.StatusUnauthorized,
-			domain.Error{Code: "flow_cookie_invalid", Message: "flow cookie is missing or invalid"})
-	case errors.Is(err, errFlowCookieExpired):
-		return errorResponseWithStatusCode(http.StatusUnauthorized,
-			domain.Error{Code: "flow_cookie_expired", Message: "flow cookie has expired"})
-	case errors.Is(err, errFlowIDMismatch):
-		return errorResponseWithStatusCode(http.StatusNotFound,
-			domain.Error{Code: "flow_not_found", Message: "flow id does not match cookie"})
-	case errors.Is(err, errFlowCompleted):
-		return errorResponseWithStatusCode(http.StatusGone,
-			domain.Error{Code: "flow_completed", Message: "flow has already completed"})
-	case errors.Is(err, domain.ErrInvalidAction):
-		return errorResponseWithStatusCode(http.StatusBadRequest,
-			domain.Error{Code: "invalid_action", Message: err.Error()})
-	case errors.Is(err, domain.ErrSessionConflict):
-		return errorResponseWithStatusCode(http.StatusConflict,
-			domain.Error{Code: "session_conflict", Message: err.Error()})
-	case errors.Is(err, domain.ErrUnsupported):
-		return errorResponseWithStatusCode(http.StatusBadRequest,
-			domain.Error{Code: "unsupported", Message: err.Error()})
+	var domErr domain.Error
+	if errors.As(err, &domErr) && strings.HasPrefix(domErr.Code, domain.PrefixFlow.ErrorCodePrefix("")) {
+		// Always emit the sentinel's fixed public Message, not a wrapped
+		// err.Error() chain (ADR 030).
+		switch {
+		case errors.Is(err, domain.ErrFlowCookieInvalid()):
+			return flowErrorResponse(domain.ErrFlowCookieInvalid())
+		case errors.Is(err, domain.ErrFlowCookieExpired()):
+			return flowErrorResponse(domain.ErrFlowCookieExpired())
+		case errors.Is(err, domain.ErrFlowNotFound()):
+			return flowErrorResponse(domain.ErrFlowNotFound())
+		case errors.Is(err, domain.ErrFlowCompleted()):
+			return flowErrorResponse(domain.ErrFlowCompleted())
+		case errors.Is(err, domain.ErrFlowInvalidAction()):
+			return flowErrorResponse(domain.ErrFlowInvalidAction())
+		case errors.Is(err, domain.ErrFlowSessionConflict()):
+			return flowErrorResponse(domain.ErrFlowSessionConflict())
+		case errors.Is(err, domain.ErrFlowUnsupported()):
+			return flowErrorResponse(domain.ErrFlowUnsupported())
+		case errors.Is(err, domain.ErrFlowInvalidPurpose()):
+			return flowErrorResponse(domain.ErrFlowInvalidPurpose())
+		}
+		return flowErrorResponse(domErr)
 	}
 	return errorResponse(err)
 }
@@ -502,10 +580,10 @@ func mapFlowErrorStatus(err error) *api.ErrorDetailsStatusCode {
 func mapFlowGetError(err error) api.GetFlowStepRes {
 	switch {
 	case isCookieOrIDError(err):
-		notFound := api.GetFlowStepNotFound{Code: "flow_not_found", Message: "flow not found"}
+		notFound := api.GetFlowStepNotFound(domainErrorDetails(domain.ErrFlowNotFound()))
 		return &notFound
-	case errors.Is(err, errFlowCompleted):
-		gone := api.GetFlowStepGone{Code: "flow_completed", Message: "flow has already completed"}
+	case errors.Is(err, domain.ErrFlowCompleted()):
+		gone := api.GetFlowStepGone(domainErrorDetails(domain.ErrFlowCompleted()))
 		return &gone
 	}
 	return errorResponse(err)
@@ -537,6 +615,7 @@ var (
 	codeMissingProjectID              = domain.ErrMissingProjectID().Code
 	codeFlowDefinitionAlreadyExists   = domain.ErrFlowDefinitionAlreadyExists().Code
 	codeFlowDefinitionUpdateConflict  = domain.ErrFlowDefinitionUpdateConflict(nil).Code
+	codeFlowDefinitionDenied          = domain.ErrFlowDefinitionPermissionDenied().Code
 )
 
 func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
@@ -551,6 +630,8 @@ func flowDefinitionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithDetails(err, http.StatusBadRequest)
 	case codeFlowDefinitionAlreadyExists, codeFlowDefinitionUpdateConflict:
 		return errorResponseWithDetails(err, http.StatusConflict)
+	case codeFlowDefinitionDenied:
+		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:
 		return internalErrorResponse(err)
 	}

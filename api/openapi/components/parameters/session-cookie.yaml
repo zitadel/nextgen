@@ -1,6 +1,0 @@
-name: __nextgen_session
-in: cookie
-required: true
-description: The __nextgen_session cookie issued at session creation or superseding handoff exchange.
-schema:
-  type: string

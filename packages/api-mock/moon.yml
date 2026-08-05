@@ -4,32 +4,38 @@ layer: "library"
 stack: "backend"
 dependsOn:
   - "api"
+  - "config"
 
 tasks:
   lint:
     command: "corepack pnpm exec oxlint ."
     deps:
       - "api:build"
+      - "config:build"
 
   typecheck:
-    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
+    command: "corepack pnpm exec tsc --build tsconfig.json"
     deps:
       - "api:build"
+      - "config:build"
 
   build:
     command: "node -e \"process.exit(0)\""
     deps:
       - "api:build"
+      - "config:build"
 
   test:
     command: "corepack pnpm run test"
     deps:
       - "api:build"
+      - "config:build"
 
   test-browser:
     command: "corepack pnpm run test:browser"
     deps:
       - "api:build"
+      - "config:build"
     options:
       runInCI: false
 
@@ -38,4 +44,3 @@ tasks:
     options:
       persistent: true
       runInCI: false
-

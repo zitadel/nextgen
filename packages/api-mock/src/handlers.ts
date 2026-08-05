@@ -30,8 +30,6 @@ import type {
 import type { RequestHandler } from "msw";
 
 import { withBranding } from "./branding.js";
-import { startFlowActor, type FlowActor, type FlowStepName } from "./flow-machine.js";
-import { AuthnStore, type PasskeyProof } from "./lib/authn/index.js";
 import {
   doneStep,
   identifierStep,
@@ -44,6 +42,8 @@ import {
   registerStep,
   ssoRedirectStep,
 } from "./fixtures/login.js";
+import { startFlowActor, type FlowActor, type FlowStepName } from "./flow-machine.js";
+import { AuthnStore, type PasskeyProof } from "./lib/authn/index.js";
 
 export type CapturedRequest =
   | { kind: "createFlow"; body: CreateFlowBody }
@@ -163,28 +163,37 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         iss,
       };
 
-      const registrationErrorKey = before === "register" && body.action === "submit" && email
-        ? authn.registrationError(email)
-        : null;
+      const registrationErrorKey =
+        before === "register" && body.action === "submit" && email
+          ? authn.registrationError(email)
+          : null;
       if (registrationErrorKey) {
         const base = withBranding(registerStep(fixtureInput));
         return { ...base, step: { ...base.step, error: registrationErrorKey } };
       }
 
-      const loginErrorKey = before === "identifier" && body.action === "submit" && email
-        ? authn.loginError(email)
-        : null;
+      const contextEmail = snapshot.context.capturedFields.email;
+
+      // Invalid credentials surface on the **password** step, not the
+      // identifier: in the split flow the identifier submit only resolves the
+      // user, and the password submit is the first request that can fail
+      // authentication. The address therefore comes from the flow context (the
+      // password submit body carries no email).
+      const loginErrorKey =
+        before === "password" && body.action === "submit" && contextEmail
+          ? authn.loginError(contextEmail)
+          : null;
       if (loginErrorKey) {
-        const base = withBranding(identifierStep(fixtureInput));
+        const base = withBranding(passwordStep({ ...fixtureInput, capturedEmail: contextEmail }));
         return { ...base, step: { ...base.step, error: loginErrorKey } };
       }
 
-      const contextEmail = snapshot.context.capturedFields.email;
       const passkeyUpsellInput = { ...fixtureInput, capturedEmail: contextEmail };
 
-      const upsellErrorKey = before === "passkey-upsell" && body.action !== "skip" && contextEmail
-        ? authn.passkeyUpsellError(contextEmail)
-        : null;
+      const upsellErrorKey =
+        before === "passkey-upsell" && body.action !== "skip" && contextEmail
+          ? authn.passkeyUpsellError(contextEmail)
+          : null;
       if (upsellErrorKey) {
         const base = withBranding(passkeyUpsellStep(passkeyUpsellInput));
         return { ...base, step: { ...base.step, error: upsellErrorKey } };
@@ -192,27 +201,35 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
 
       const proof = body.challenge_response?.proof as PasskeyProof | undefined;
 
-      const setupCred = before === "passkey-setup" && proof
-        ? authn.registerFromProof(contextEmail ?? "mock-user@example.com", proof)
-        : null;
-      const setupErrorKey = before === "passkey-setup" && !setupCred
-        ? "error.passkey_setup_failed"
-        : null;
+      const setupCred =
+        before === "passkey-setup" && proof
+          ? authn.registerFromProof(contextEmail ?? "mock-user@example.com", proof)
+          : null;
+      const setupErrorKey =
+        before === "passkey-setup" && !setupCred ? "error.passkey_setup_failed" : null;
       if (setupErrorKey) {
         const base = withBranding(passkeySetupStep(passkeyUpsellInput));
         const { challenge: _c, ...step } = base.step;
         return { ...base, step: { ...step, error: setupErrorKey } };
       }
 
-      const loginCred = before === "passkey-login" && body.action !== "cancel" && proof
-        ? authn.authenticateFromProof(proof)
-        : null;
-      const passkeyLoginErrorKey = before === "passkey-login" && body.action !== "cancel" && !loginCred
-        ? "error.passkey_not_registered"
-        : null;
+      const loginCred =
+        before === "passkey-login" && body.action !== "cancel" && proof
+          ? authn.authenticateFromProof(proof)
+          : null;
+      const passkeyLoginErrorKey =
+        before === "passkey-login" && body.action !== "cancel" && !loginCred
+          ? "error.passkey_not_registered"
+          : null;
       if (passkeyLoginErrorKey) {
         const registeredCredentials = authn.getByUser(contextEmail ?? "");
-        const loginInput = { flowId: FLOW_ID, sessionToken: snapshot.context.sessionToken, capturedEmail: contextEmail, registeredCredentials, iss };
+        const loginInput = {
+          flowId: FLOW_ID,
+          sessionToken: snapshot.context.sessionToken,
+          capturedEmail: contextEmail,
+          registeredCredentials,
+          iss,
+        };
         const base = withBranding(passkeyLoginStep(loginInput));
         const { challenge: _c, ...step } = base.step;
         return { ...base, step: { ...step, error: passkeyLoginErrorKey } };

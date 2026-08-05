@@ -13,23 +13,44 @@ flowchart LR
 
 ## Tier 1: Tokens
 
-Liquid maps branding into `--zl-*` on `:host` ([`tokens.md`](tokens.md)). Either put the `:host { ... }` block in `branding.liquid_template`, or (if the structured extension in [`schema.md`](schema.md) lands) let a bundled master template emit it from `branding.palette` / `branding.shape` / `branding.typography`.
+Two routes, and they compose.
+
+**Server-side (the tenant's own branding).** Liquid maps branding into `--zl-*` on `:host` ([`tokens.md`](tokens.md)). Either put the `:host { ... }` block in `branding.liquid_template`, or (if the structured extension in [`schema.md`](schema.md) lands) let a bundled master template emit it from `branding.palette` / `branding.shape` / `branding.typography`.
+
+**Host-page (the app that embedded the widget).** A plain rule in the embedding app's stylesheet sets the same variables on the element:
+
+```css
+zitadel-login {
+  --zl-color-text-primary-white: #101828;
+  --zl-radius-m: 0.25rem;
+}
+```
+
+Custom properties inherit across shadow boundaries, so these reach the atoms' internal stylesheets, which no outside selector can otherwise address.
+
+**Host-page beats server-side.** The CSS cascade's encapsulation-context step gives normal declarations from the outer tree precedence over the `:host` rules the orchestrator adopts into its shadow root — both the design-system base layer and the tenant branding layer. That ordering is intended: an app embedding its own login matches its design system without a server round-trip, while an app that sets no tokens gets centrally-managed branding unchanged. It also means the orchestrator must never express token defaults as `!important` or as inline styles on the host element — either would silently invert this tier. `packages/components/src/orchestrator/customization.browser.spec.ts` pins the precedence.
 
 ## Tier 2: CSS parts
 
-Use `::part()` to restyle internals of a named atom without forking it.
+Use `::part()` to restyle internals of a named atom without forking it. Two scopes:
+
+**Through the orchestrator** — the page embedding `<zitadel-login>` addresses atom internals as `<atom>-<part>`: the atom's tag minus `zl-`, a hyphen, the part name. The orchestrator stamps the forwarding (`exportparts`, derived from the manifest registry in `packages/components/src/orchestrator/exportparts.ts`) on every atom it renders — template-rendered and gate-patched alike — so the mapping holds for tenant templates too. Templates cannot author their own forwarding; the sanitiser strips `exportparts`.
 
 ```css
-zl-field::part(input) {
+zitadel-login::part(field-input) {
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
-zl-submit::part(button)::after {
+zitadel-login::part(button-root)::after {
   content: " →";
 }
 ```
 
-Every atom exposes a documented part set (`input`, `label`, `button`, `divider`, …). Part names are part of the public contract and follow the same stability rules as token names.
+The orchestrator additionally exposes its own chrome parts directly: `form`, `attribution`, `attribution-pill`.
+
+**Directly composed atoms** — a page using atoms without the orchestrator addresses bare part names: `zl-field::part(input)`.
+
+Each atom's manifest is the canonical part catalogue ([`validator.md`](validator.md)). Part names and the `<atom>-<part>` forwarding rule are public contract and follow the same stability rules as token names.
 
 ## Tier 3: Named slots
 

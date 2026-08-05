@@ -5,7 +5,7 @@ import { chmod, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { run, runCapture } from "./dev-process.mjs";
+import { mapWithConcurrency, run, runCapture } from "./dev-process.mjs";
 import {
   PUBLIC_PACKAGE_DIRS,
   PUBLIC_RELEASE_PACKAGES,
@@ -93,7 +93,9 @@ export async function buildServerBinaries(options = {}) {
   const runFn = options.run ?? run;
   const baseEnv = { ...process.env, ...(options.env ?? {}) };
 
-  for (const platform of platforms) {
+  // The per-platform builds are independent and the Go build cache is safe
+  // under concurrency, so cross-compile all platforms at once.
+  await mapWithConcurrency(platforms, platforms.length, async (platform) => {
     const dir = platformDir(outDir, platform);
     const output = join(dir, binaryName(platform.goos));
     await mkdir(dir, { recursive: true });
@@ -123,7 +125,7 @@ export async function buildServerBinaries(options = {}) {
         },
       },
     );
-  }
+  });
 
   return { outDir, platforms, version, gitInfo: info };
 }
@@ -227,7 +229,10 @@ export async function packPublicPackages(options = {}) {
   await rm(tarballsDir, { recursive: true, force: true });
   await mkdir(tarballsDir, { recursive: true });
 
-  for (const dir of PUBLIC_PACKAGE_DIRS) {
+  // Packs are independent (distinct package dirs, distinct tarball names in a
+  // shared destination); cap concurrency so the cli prepack rebuild and the
+  // larger packages do not stampede the runner.
+  await mapWithConcurrency(PUBLIC_PACKAGE_DIRS, 8, async (dir) => {
     const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
     await assertPublishDirectoryReady({ repoRoot, dir, manifest });
     // `pnpm pack` runs the package's `prepack`, which for @zitadel/cli rebuilds
@@ -242,7 +247,7 @@ export async function packPublicPackages(options = {}) {
       cwd: repoRoot,
       env,
     });
-  }
+  });
 
   return tarballsDir;
 }

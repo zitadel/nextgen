@@ -6,10 +6,39 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/zitadel/nextgen/internal/domain/idgen"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
+
+// Step error text keys the state machine emits when an auth-attempt
+// proof is rejected. Every engine-emitted step error must be a
+// localizable `error.*` catalog key or a reserved outcome token:
+// /login localizes only `error.*`-prefixed step errors and treats
+// outcome tokens as routing, so anything else renders verbatim (see
+// `localiseFlowErrorKeys` in
+// packages/components/src/orchestrator/liquid.ts). New emission sites
+// add a const here; [FlowStepErrorAllowed] and its contract test keep
+// the set honest.
+const (
+	// FlowStepErrorInvalidCredentials reports a rejected password
+	// proof. The client routes it inline to the password field
+	// (fieldErrorKeys in liquid.ts).
+	FlowStepErrorInvalidCredentials = "error.invalid_credentials"
+	// FlowStepErrorPasskeyInvalid reports a rejected passkey assertion.
+	FlowStepErrorPasskeyInvalid = "error.passkey_invalid"
+	// FlowStepErrorPasskeyRegistrationInvalid reports a rejected
+	// passkey registration attestation.
+	FlowStepErrorPasskeyRegistrationInvalid = "error.passkey_registration_invalid"
+)
+
+// FlowStepErrorAllowed reports whether a step error value honors the
+// client contract: a localizable `error.*` text key or a reserved
+// outcome token (reservedOutcomes in flow_definition_validator.go).
+func FlowStepErrorAllowed(key string) bool {
+	if strings.HasPrefix(key, "error.") {
+		return true
+	}
+	_, ok := reservedOutcomes[key]
+	return ok
+}
 
 // FlowStateMachine drives a flow definition forward in response to
 // client submissions. The handler owns cookie I/O; the state machine
@@ -19,10 +48,10 @@ import (
 // challenges, no gates. `Pop` on [FlowStepResult] stays reserved for
 // the deferred pivot work.
 type FlowStateMachine interface {
-	Start(ctx context.Context, client database.QueryExecutor, in FlowStartInput) (FlowStepResult, error)
-	Process(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error)
+	Start(ctx context.Context, in FlowStartInput) (FlowStepResult, error)
+	Process(ctx context.Context, def *FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error)
 	// Render re-emits the current step without advancing. Backs GET /flow/{id}.
-	Render(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState) (FlowStepResult, error)
+	Render(ctx context.Context, def *FlowDefinition, state *FlowState) (FlowStepResult, error)
 }
 
 // FlowStartInput carries everything the state machine needs to
@@ -39,7 +68,7 @@ type FlowStartInput struct {
 // FlowSubmitInput carries a single client submission.
 //
 // GateProofs and SSOProvider are reserved; the state machine returns
-// [ErrUnsupported] for any flow that exercises them today.
+// [ErrFlowUnsupported] for any flow that exercises them today.
 type FlowSubmitInput struct {
 	Action      string
 	Fields      map[string]any
@@ -141,6 +170,9 @@ const FlowActionPasskey = "passkey"
 // transition fires once the returned attestation verifies.
 const FlowActionPasskeyRegister = "passkey_register"
 
+// flowBackActionName is the name attached to the injected back action.
+const flowBackActionName = "back"
+
 // FlowChallengeMethodPasskey is the [FlowStepChallenge.Method] /
 // [FlowPendingChallenge.Method] value for the WebAuthn passkey ceremony.
 const FlowChallengeMethodPasskey = "passkey"
@@ -155,7 +187,7 @@ const FlowChallengeMethodPasskeyRegister = "passkey_register"
 const flowPasskeyDefaultUserVerification = "preferred"
 
 // FlowSessionRef pins the session row this flow runs on top of. A
-// version mismatch surfaces as [ErrSessionConflict].
+// version mismatch surfaces as [ErrFlowSessionConflict].
 type FlowSessionRef struct {
 	ID      string
 	Version int64
@@ -168,22 +200,15 @@ type FlowAuthRequestRef struct {
 	RequestedACR *string
 }
 
-var (
-	ErrInvalidAction   = errors.New("flow state machine: action not allowed on current step")
-	ErrSessionConflict = errors.New("flow state machine: session version conflict")
-	ErrIntegrity       = errors.New("flow state machine: integrity violation")
-	ErrUnsupported     = errors.New("flow state machine: feature not supported in MVP")
-)
-
 // FlowStateMachineRuntime is the production [FlowStateMachine].
 type FlowStateMachineRuntime struct {
 	schemas               SchemaResolver
+	schemaStore           JSONSchemaStore
 	fields                FlowFieldResolver
 	userCreater           FlowOnSuccessHandler
 	userForPasskeyCreater FlowPasskeyUserCreater
 	authAttempts          FlowAuthAttemptService
 	passkeyRegistration   FlowPasskeyRegistrationService
-	ids                   idgen.Generator
 	now                   func() time.Time
 }
 
@@ -191,12 +216,12 @@ type FlowStateMachineRuntime struct {
 // tests can produce deterministic [FlowState.IssuedAt] values.
 func NewFlowStateMachine(
 	schemas SchemaResolver,
+	schemaStore JSONSchemaStore,
 	fields FlowFieldResolver,
 	createUser FlowOnSuccessHandler,
 	userForPasskeyCreater FlowPasskeyUserCreater,
 	authAttempts FlowAuthAttemptService,
 	passkeyRegistration FlowPasskeyRegistrationService,
-	ids idgen.Generator,
 	now func() time.Time,
 ) *FlowStateMachineRuntime {
 	if now == nil {
@@ -204,25 +229,25 @@ func NewFlowStateMachine(
 	}
 	return &FlowStateMachineRuntime{
 		schemas:               schemas,
+		schemaStore:           schemaStore,
 		fields:                fields,
 		userCreater:           createUser,
 		userForPasskeyCreater: userForPasskeyCreater,
 		authAttempts:          authAttempts,
 		passkeyRegistration:   passkeyRegistration,
-		ids:                   ids,
 		now:                   now,
 	}
 }
 
 var _ FlowStateMachine = (*FlowStateMachineRuntime)(nil)
 
-func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.QueryExecutor, in FlowStartInput) (FlowStepResult, error) {
+func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) (FlowStepResult, error) {
 	if in.Definition == nil {
-		return FlowStepResult{}, fmt.Errorf("%w: start without definition", ErrIntegrity)
+		return FlowStepResult{}, fmt.Errorf("%w: start without definition", ErrFlowIntegrity())
 	}
 	initialStepName, ok := in.Definition.InitialStepFor(in.Purpose)
 	if !ok {
-		return FlowStepResult{}, fmt.Errorf("%w: definition %q does not serve purpose %s", ErrIntegrity, in.Definition.ID, in.Purpose)
+		return FlowStepResult{}, fmt.Errorf("%w: definition %q does not serve purpose %s", ErrFlowIntegrity(), in.Definition.ID, in.Purpose)
 	}
 
 	state := &FlowState{
@@ -249,7 +274,7 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 	}
 
 	if r.authAttempts == nil {
-		return FlowStepResult{}, fmt.Errorf("%w: auth-attempt service not wired", ErrIntegrity)
+		return FlowStepResult{}, fmt.Errorf("%w: auth-attempt service not wired", ErrFlowIntegrity())
 	}
 	attemptID, err := r.authAttempts.Start(ctx, FlowCreateAttemptInput{ProjectID: state.ProjectID})
 	if err != nil {
@@ -257,7 +282,7 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 	}
 	state.AuthAttemptID = attemptID
 
-	step, err := r.renderStep(ctx, client, in.Definition, state, nil)
+	step, err := r.renderStep(ctx, in.Definition, state)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -266,11 +291,11 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, client database.Que
 
 // Render re-emits the current step without advancing. Refreshes IssuedAt
 // so the cookie max-age window slides while the user is on the step.
-func (r *FlowStateMachineRuntime) Render(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState) (FlowStepResult, error) {
+func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinition, state *FlowState) (FlowStepResult, error) {
 	if def == nil || state == nil {
-		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrIntegrity)
+		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrFlowIntegrity())
 	}
-	step, err := r.renderStep(ctx, client, def, state, nil)
+	step, err := r.renderStep(ctx, def, state)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -284,7 +309,6 @@ func (r *FlowStateMachineRuntime) Render(ctx context.Context, client database.Qu
 // per-kind methods and their helpers.
 type processCtx struct {
 	ctx         context.Context
-	client      database.QueryExecutor
 	def         *FlowDefinition
 	state       *FlowState
 	currentStep *FlowDefinitionStep
@@ -293,28 +317,31 @@ type processCtx struct {
 
 // Process advances the flow one step by dispatching the submission to
 // the handler for its action kind.
-func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error) {
+func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefinition, state *FlowState, in FlowSubmitInput) (FlowStepResult, error) {
 	if def == nil || state == nil {
-		return FlowStepResult{}, fmt.Errorf("%w: process without definition or state", ErrIntegrity)
+		return FlowStepResult{}, fmt.Errorf("%w: process without definition or state", ErrFlowIntegrity())
 	}
 	if in.SSOProvider != nil {
-		return FlowStepResult{}, fmt.Errorf("%w: sso submissions", ErrUnsupported)
+		return FlowStepResult{}, fmt.Errorf("%w: sso submissions", ErrFlowUnsupported())
 	}
 	if len(in.GateProofs) > 0 {
-		return FlowStepResult{}, fmt.Errorf("%w: gate proofs", ErrUnsupported)
+		return FlowStepResult{}, fmt.Errorf("%w: gate proofs", ErrFlowUnsupported())
 	}
 
 	currentStep, ok := def.FindStep(state.CurrentStep)
 	if !ok {
-		return FlowStepResult{}, fmt.Errorf("%w: current step %q missing from definition", ErrIntegrity, state.CurrentStep)
+		return FlowStepResult{}, fmt.Errorf("%w: current step %q missing from definition", ErrFlowIntegrity(), state.CurrentStep)
 	}
 
-	pc := &processCtx{ctx: ctx, client: client, def: def, state: state, currentStep: currentStep, in: in}
+	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep, in: in}
 	actionKind := stepActionKind(currentStep, in.Action)
 
-	// Navigate skips the input pipeline entirely.
+	// Back and Navigate both skip the input pipeline entirely.
+	if actionKind == FlowActionKindBack {
+		return r.processBack(pc)
+	}
 	if actionKind == FlowActionKindNavigate {
-		return r.routeOutcome(pc, FlowResolvedFields{}, in.Action)
+		return r.routeOutcome(pc, FlowResolvedFields{}, in.Action, false)
 	}
 
 	// Every other kind resolves the step's inputs, then validates and
@@ -323,7 +350,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	if err != nil {
 		return FlowStepResult{}, err
 	}
-	halt, err := r.validateAndMerge(pc, resolved)
+	halt, err := r.validateAndMerge(pc, resolved, actionKind)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
@@ -335,7 +362,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 	// drop it so we don't re-emit the abandoned prompt.
 	if state.PendingChallenge != nil && in.ChallengeResponse == nil &&
 		!pendingMatchesKind(state.PendingChallenge.Method, in.Action, actionKind) {
-		state.PendingChallenge = nil
+		state.ClearPendingChallenge()
 	}
 
 	switch actionKind {
@@ -353,7 +380,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, client database.Q
 // resolveInputs resolves the step's fields and prefills any values the
 // user already supplied on earlier steps.
 func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (FlowResolvedFields, error) {
-	resolved, err := r.resolveStepFields(pc.ctx, pc.client, pc.state, pc.currentStep)
+	resolved, err := r.resolveStepFields(pc.ctx, pc.state, pc.currentStep)
 	if err != nil {
 		return FlowResolvedFields{}, err
 	}
@@ -365,18 +392,33 @@ func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (FlowResolvedFie
 // them into CollectedData. Returns a rendered halt step on validation
 // failure.
 //
-// TODO: this rejects passkey submissions on steps that declare required
-// fields (e.g. "sign in with passkey" on the password step) because
-// in.Fields is empty. Validation should scope to fields the client
-// actually submitted, or to what the current action kind needs.
-func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved FlowResolvedFields) (*FlowStepResult, error) {
+// Every action validates the values it sent; field-collecting actions
+// (see [collectsStepFields]) additionally require declared required fields
+// to be present.
+//
+// TODO: Validate rejects an empty required field the client did submit,
+// on every action. So "sign in with passkey" on a step with a required
+// password fails, because the client sends password="" with it. The check
+// should depend on the action — but an empty identifier on a passkey leg
+// can be a valid rejection, so we can't just skip it everywhere.
+// Pre-existing; add a password-step test when fixed.
+func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved FlowResolvedFields, actionKind FlowActionKind) (*FlowStepResult, error) {
+	var errs FlowFieldValidationErrors
 	if validationErr := r.fields.Validate(resolved, pc.in.Fields); validationErr != nil {
-		if errs, ok := errors.AsType[FlowFieldValidationErrors](validationErr); ok {
-			step := r.buildStep(pc.currentStep, resolved, new(errs.Error()), nil, nil)
-			pc.state.IssuedAt = r.now()
-			return &FlowStepResult{State: pc.state, Step: step}, nil
+		v, ok := errors.AsType[FlowFieldValidationErrors](validationErr)
+		if !ok {
+			return nil, fmt.Errorf("flow state machine: validate fields: %w", validationErr)
 		}
-		return nil, fmt.Errorf("flow state machine: validate fields: %w", validationErr)
+		errs = append(errs, v...)
+	}
+	if collectsStepFields(actionKind, pc.in) {
+		errs = append(errs, r.fields.MissingRequired(resolved, pc.in.Fields)...)
+	}
+	if len(errs) > 0 {
+		sortFlowFieldValidationErrors(errs)
+		step := r.buildStep(pc.state, pc.currentStep, resolved, new(errs.StepError()), nil, nil)
+		pc.state.IssuedAt = r.now()
+		return &FlowStepResult{State: pc.state, Step: step}, nil
 	}
 
 	if err := mergeCollected(pc.state, pc.in.Fields); err != nil {
@@ -389,7 +431,7 @@ func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved Flow
 // renderStepError re-renders the current step with an error key set,
 // so the user stays put and sees what went wrong.
 func (r *FlowStateMachineRuntime) renderStepError(pc *processCtx, resolved FlowResolvedFields, errKey *string) FlowStepResult {
-	step := r.buildStep(pc.currentStep, resolved, errKey, nil, nil)
+	step := r.buildStep(pc.state, pc.currentStep, resolved, errKey, nil, nil)
 	pc.state.IssuedAt = r.now()
 	return FlowStepResult{State: pc.state, Step: step}
 }
@@ -399,87 +441,76 @@ func (r *FlowStateMachineRuntime) renderStepError(pc *processCtx, resolved FlowR
 // renders (or terminates on a terminal step). When outcome differs
 // from the user-submitted action it came from a handler diversion
 // (e.g. user_not_found); a missing transition in that case degrades
-// to a step error instead of ErrInvalidAction.
-func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowResolvedFields, outcome string) (FlowStepResult, error) {
+// to a step error instead of ErrFlowInvalidAction. If irreversible,
+// BackStack is dropped after advance.
+func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowResolvedFields, outcome string, irreversible bool) (FlowStepResult, error) {
 	transition, ok := pc.currentStep.Transitions[outcome]
 	if !ok {
 		if outcome != pc.in.Action {
 			msg := outcome
 			return r.renderStepError(pc, resolved, &msg), nil
 		}
-		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", ErrInvalidAction, pc.in.Action, pc.currentStep.Name)
+		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", ErrFlowInvalidAction(), pc.in.Action, pc.currentStep.Name)
 	}
 	if transition.Action != nil {
-		return FlowStepResult{}, fmt.Errorf("%w: cross-flow transitions", ErrUnsupported)
+		return FlowStepResult{}, fmt.Errorf("%w: cross-flow transitions", ErrFlowUnsupported())
 	}
 
 	nextStep, ok := pc.def.FindStep(transition.Target)
 	if !ok {
-		return FlowStepResult{}, fmt.Errorf("%w: transition target %q missing from definition", ErrIntegrity, transition.Target)
+		return FlowStepResult{}, fmt.Errorf("%w: transition target %q missing from definition", ErrFlowIntegrity(), transition.Target)
 	}
 
-	// Flip only after we know the outcome routes somewhere.
+	// Snapshot purpose before the flip so back can restore it.
+	prevPurpose := pc.state.CurrentPurpose
 	applyOutcomeFlip(pc.state, outcome)
 
-	r.advance(pc.state, pc.currentStep, nextStep.Name)
+	r.advance(pc.state, pc.currentStep, prevPurpose, nextStep.Name)
 
-	if nextStep.Complete != nil {
-		step, handoff, err := r.terminate(pc.ctx, pc.client, pc.def, pc.state, nextStep)
-		if err != nil {
-			return FlowStepResult{}, err
-		}
-		return FlowStepResult{
-			State:                 pc.state,
-			Step:                  step,
-			HandoffToken:          handoff.Token,
-			HandoffTokenExpiresAt: handoff.ExpiresAt,
-		}, nil
+	// after irreversible actions, clear the back stack so the user can't navigate back in the flow.
+	if irreversible {
+		pc.state.ClearBackStack()
 	}
 
-	step, err := r.renderStep(pc.ctx, pc.client, pc.def, pc.state, nextStep)
+	if nextStep.Complete != nil {
+		return r.terminate(pc, nextStep)
+	}
+
+	step, err := r.renderStep(pc.ctx, pc.def, pc.state)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
 	return FlowStepResult{State: pc.state, Step: step}, nil
 }
 
-// runDispatchAndOnSuccess runs the identifier + password dispatch and,
-// if the step declares one, its on_success handler. Shared by
-// processSubmit and the passkey abandonment fallback.
-func (r *FlowStateMachineRuntime) runDispatchAndOnSuccess(pc *processCtx, resolved FlowResolvedFields) (string, *FlowStepResult, error) {
-	routeOutcome := pc.in.Action
-
+// processSubmit handles kind=submit: dispatch challenges, run
+// on_success (if declared), and route the resulting outcome.
+func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowResolvedFields) (FlowStepResult, error) {
 	dispatch, err := r.dispatchChallenges(pc, resolved)
 	if err != nil {
-		return "", nil, err
+		return FlowStepResult{}, err
 	}
 	if dispatch.StepError != nil {
-		halt := r.renderStepError(pc, resolved, dispatch.StepError)
-		return "", &halt, nil
+		return r.renderStepError(pc, resolved, dispatch.StepError), nil
 	}
 	if dispatch.Outcome != "" {
-		return dispatch.Outcome, nil, nil
+		return r.routeOutcome(pc, resolved, dispatch.Outcome, false)
 	}
-
 	if pc.currentStep.OnSuccess == nil {
-		return routeOutcome, nil, nil
+		return r.routeOutcome(pc, resolved, pc.in.Action, false)
 	}
 
 	// on_success reads across every visited step, not just the current one.
 	visitedResolved, err := r.resolveVisitedFields(pc)
 	if err != nil {
-		return "", nil, err
+		return FlowStepResult{}, err
 	}
 	result, err := r.runOnSuccess(pc, visitedResolved)
 	if err != nil {
-		return "", nil, err
+		return FlowStepResult{}, err
 	}
 	if result.StepError != nil {
-		halt := r.renderStepError(pc, resolved, result.StepError)
-		return "", &halt, nil
-	}
-	if result.Outcome != "" {
-		routeOutcome = result.Outcome
+		return r.renderStepError(pc, resolved, result.StepError), nil
 	}
 	if result.UserID != "" {
 		recordResolvedUser(pc.state, result.UserID)
@@ -488,23 +519,10 @@ func (r *FlowStateMachineRuntime) runDispatchAndOnSuccess(pc *processCtx, resolv
 			AttemptID: pc.state.AuthAttemptID,
 			UserID:    result.UserID,
 		}); err != nil {
-			return "", nil, fmt.Errorf("flow state machine: register created user on attempt: %w", err)
+			return FlowStepResult{}, fmt.Errorf("flow state machine: register created user on attempt: %w", err)
 		}
 	}
-
-	return routeOutcome, nil, nil
-}
-
-// processSubmit handles kind=submit — dispatch + on_success + route.
-func (r *FlowStateMachineRuntime) processSubmit(pc *processCtx, resolved FlowResolvedFields) (FlowStepResult, error) {
-	outcome, halt, err := r.runDispatchAndOnSuccess(pc, resolved)
-	if err != nil {
-		return FlowStepResult{}, err
-	}
-	if halt != nil {
-		return *halt, nil
-	}
-	return r.routeOutcome(pc, resolved, outcome)
+	return r.routeOutcome(pc, resolved, pc.in.Action, result.Irreversible)
 }
 
 // processPasskeyLogin handles kind=passkey. The issue leg runs
@@ -522,7 +540,7 @@ func (r *FlowStateMachineRuntime) processPasskeyLogin(pc *processCtx, resolved F
 		}
 		if dispatch.Outcome != "" {
 			// user_not_found and the like — skip the ceremony and route directly.
-			return r.routeOutcome(pc, resolved, dispatch.Outcome)
+			return r.routeOutcome(pc, resolved, dispatch.Outcome, false)
 		}
 	}
 
@@ -540,7 +558,7 @@ func (r *FlowStateMachineRuntime) processPasskeyLogin(pc *processCtx, resolved F
 		return r.processSubmit(pc, resolved)
 	}
 
-	return r.routeOutcome(pc, resolved, pc.in.Action)
+	return r.routeOutcome(pc, resolved, pc.in.Action, pk.irreversible)
 }
 
 // processPasskeyRegister handles kind=passkey_register. Uses the
@@ -571,7 +589,7 @@ func (r *FlowStateMachineRuntime) processPasskeyRegister(pc *processCtx, resolve
 		return r.processSubmit(pc, resolved)
 	}
 
-	return r.routeOutcome(pc, resolved, pc.in.Action)
+	return r.routeOutcome(pc, resolved, pc.in.Action, pk.irreversible)
 }
 
 // flowDispatchResult summarizes the challenge dispatch loop. Outcome
@@ -650,7 +668,7 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 				Plain:     value,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
-				msg := "auth_attempt.password_invalid"
+				msg := FlowStepErrorInvalidCredentials
 				return flowDispatchResult{StepError: &msg}, nil
 			}
 			if err != nil {
@@ -696,8 +714,9 @@ func fieldValueByChallenge(resolved FlowResolvedFields, fields map[string]any, t
 // to return immediately (challenge issued and awaiting proof, or a
 // verification error rendered on the step).
 type passkeyPhaseResult struct {
-	handled bool
-	halt    *FlowStepResult
+	handled      bool
+	irreversible bool
+	halt         *FlowStepResult
 }
 
 // processPasskey runs all two-phase WebAuthn ceremonies (authentication and
@@ -713,18 +732,18 @@ type passkeyPhaseResult struct {
 //     mint an assertion challenge; discoverable login allowed when no user is
 //     yet identified.
 //   - issue leg (register): step offers a `passkey_register` action and it
-//     was selected → use the resolved user id or mint a provisional one, then
-//     issue a creation challenge.
+//     was selected → use the collected user id (or let the registration
+//     service mint a provisional one), then issue a creation challenge.
 func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowResolvedFields, passkeyResolved FlowResolvedFields, actionKind FlowActionKind) (passkeyPhaseResult, error) {
-	ctx, client, state, step, in := pc.ctx, pc.client, pc.state, pc.currentStep, pc.in
+	ctx, state, step, in := pc.ctx, pc.state, pc.currentStep, pc.in
 	switch {
 	// A ceremony is in flight but no proof arrived: resume or abandon.
 	case state.PendingChallenge != nil && in.ChallengeResponse == nil:
 		if !pendingMatchesKind(state.PendingChallenge.Method, in.Action, actionKind) {
-			state.PendingChallenge = nil
+			state.ClearPendingChallenge()
 			return passkeyPhaseResult{}, nil
 		}
-		rendered := r.buildStep(step, resolved, nil, nil, nil)
+		rendered := r.buildStep(pc.state, pc.currentStep, resolved, nil, nil, nil)
 		attachPendingChallenge(rendered, state.PendingChallenge)
 		state.IssuedAt = r.now()
 		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
@@ -753,16 +772,16 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 					return passkeyPhaseResult{}, fmt.Errorf("flow state machine: ensure user exists: %w", err)
 				}
 			}
-			err := r.passkeyRegistration.SubmitPasskeyRegistration(ctx, client, FlowSubmitPasskeyRegistrationInput{
+			err := r.passkeyRegistration.SubmitPasskeyRegistration(ctx, FlowSubmitPasskeyRegistrationInput{
 				ProjectID:   state.ProjectID,
 				UserID:      userID,
 				ChallengeID: challengeID,
 				Attestation: in.ChallengeResponse.Proof,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
-				state.PendingChallenge = nil
-				msg := "auth_attempt.passkey_registration_invalid"
-				rendered := r.buildStep(step, resolved, &msg, nil, nil)
+				state.ClearPendingChallenge()
+				msg := FlowStepErrorPasskeyRegistrationInvalid
+				rendered := r.buildStep(pc.state, pc.currentStep, resolved, &msg, nil, nil)
 				state.IssuedAt = r.now()
 				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
 			}
@@ -781,8 +800,9 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 					return passkeyPhaseResult{}, fmt.Errorf("flow state machine: register passkey user on attempt: %w", err)
 				}
 			}
-			state.PendingChallenge = nil
-			return passkeyPhaseResult{handled: true}, nil
+			state.ClearPendingChallenge()
+			// Registration wrote a credential — the user cannot back out.
+			return passkeyPhaseResult{handled: true, irreversible: true}, nil
 
 		default: // FlowChallengeMethodPasskey
 			userID, err := r.authAttempts.SubmitPasskey(ctx, FlowSubmitPasskeyInput{
@@ -792,9 +812,9 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				Assertion:   in.ChallengeResponse.Proof,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
-				state.PendingChallenge = nil
-				msg := "auth_attempt.passkey_invalid"
-				rendered := r.buildStep(step, resolved, &msg, nil, nil)
+				state.ClearPendingChallenge()
+				msg := FlowStepErrorPasskeyInvalid
+				rendered := r.buildStep(pc.state, pc.currentStep, resolved, &msg, nil, nil)
 				state.IssuedAt = r.now()
 				return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
 			}
@@ -802,7 +822,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: submit passkey: %w", err)
 			}
 			recordResolvedUser(state, userID)
-			state.PendingChallenge = nil
+			state.ClearPendingChallenge()
 			return passkeyPhaseResult{handled: true}, nil
 		}
 
@@ -811,7 +831,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			return passkeyPhaseResult{}, nil
 		}
 		if in.PasskeyRP == nil {
-			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey relying-party params missing", ErrIntegrity)
+			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey relying-party params missing", ErrFlowIntegrity())
 		}
 		out, err := r.authAttempts.IssuePasskeyChallenge(ctx, FlowIssuePasskeyChallengeInput{
 			ProjectID:        state.ProjectID,
@@ -829,7 +849,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			Options:  out.Options,
 			IssuedAt: r.now(),
 		}
-		rendered := r.buildStep(step, resolved, nil, nil, nil)
+		rendered := r.buildStep(pc.state, pc.currentStep, resolved, nil, nil, nil)
 		attachPendingChallenge(rendered, state.PendingChallenge)
 		state.IssuedAt = r.now()
 		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
@@ -839,24 +859,13 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 			return passkeyPhaseResult{}, nil
 		}
 		if in.PasskeyRP == nil {
-			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey relying-party params missing", ErrIntegrity)
+			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey relying-party params missing", ErrFlowIntegrity())
 		}
 		if r.passkeyRegistration == nil {
-			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey registration service not wired", ErrIntegrity)
+			return passkeyPhaseResult{}, fmt.Errorf("%w: passkey registration service not wired", ErrFlowIntegrity())
 		}
 		userID := state.CollectedData.UserID
-		if userID == "" {
-			// TODO: only domain should generate user ids
-			newID, err := r.ids.New("user")
-			if err != nil {
-				return passkeyPhaseResult{}, fmt.Errorf("flow state machine: generate user id: %w", err)
-			}
-			userID = newID
-			state.CollectedData.UserID = userID
-			// Mark as provisional: user doesn't exist in the DB yet.
-			// The verify leg will call HandleProvisional + RegisterCreatedUser.
-			state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey = true
-		}
+		provisional := userID == ""
 		username, displayName := passkeyRegistrationDisplay(passkeyResolved, state.CollectedData.UserData)
 		out, err := r.passkeyRegistration.IssuePasskeyRegistrationChallenge(ctx, FlowIssuePasskeyRegistrationChallengeInput{
 			ProjectID:   state.ProjectID,
@@ -869,13 +878,17 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 		if err != nil {
 			return passkeyPhaseResult{}, fmt.Errorf("flow state machine: issue passkey registration: %w", err)
 		}
+		state.CollectedData.UserID = out.UserID
+		if provisional {
+			state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey = true
+		}
 		state.PendingChallenge = &FlowPendingChallenge{
 			ID:       out.ChallengeID,
 			Method:   FlowChallengeMethodPasskeyRegister,
 			Options:  out.Options,
 			IssuedAt: r.now(),
 		}
-		rendered := r.buildStep(step, resolved, nil, nil, nil)
+		rendered := r.buildStep(pc.state, pc.currentStep, resolved, nil, nil, nil)
 		attachPendingChallenge(rendered, state.PendingChallenge)
 		state.IssuedAt = r.now()
 		return passkeyPhaseResult{handled: true, halt: &FlowStepResult{State: state, Step: rendered}}, nil
@@ -953,25 +966,57 @@ func (r *FlowStateMachineRuntime) runOnSuccess(pc *processCtx, resolved FlowReso
 			ResolvedFlow:  pc.def,
 		})
 	default:
-		return FlowOnSuccessResult{}, fmt.Errorf("%w: on_success %s not wired", ErrIntegrity, *pc.currentStep.OnSuccess)
+		return FlowOnSuccessResult{}, fmt.Errorf("%w: on_success %s not wired", ErrFlowIntegrity(), *pc.currentStep.OnSuccess)
 	}
 }
 
-func (r *FlowStateMachineRuntime) advance(state *FlowState, prev *FlowDefinitionStep, nextStepName string) {
+// advance records the transition. prevPurpose is captured before the
+// outcome flip so `back` can restore both step and purpose.
+func (r *FlowStateMachineRuntime) advance(state *FlowState, prev *FlowDefinitionStep, prevPurpose FlowDefinitionPurpose, nextStepName string) {
 	state.History = append(state.History, prev.Name)
+	state.BackStack = append(state.BackStack, FlowBackEntry{StepName: prev.Name, Purpose: prevPurpose})
 	state.CurrentStep = nextStepName
 	state.IssuedAt = r.now()
 }
 
-func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, step *FlowDefinitionStep) (*FlowStep, FlowHandoffOutput, error) {
-	rendered, err := r.renderStep(ctx, client, def, state, step)
+// processBack pops the previous BackStack entry and re-renders that
+// step, restoring the snapshotted purpose. CollectedData is preserved
+// (previous form prefills); PendingChallenge is dropped; History is
+// left intact.
+func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, error) {
+	prev, ok := pc.state.PeekBackStack()
+	if !ok {
+		return FlowStepResult{}, fmt.Errorf("%w: back submitted with empty back stack on step %q", ErrFlowInvalidAction(), pc.state.CurrentStep)
+	}
+	if _, ok := pc.def.FindStep(prev.StepName); !ok {
+		return FlowStepResult{}, fmt.Errorf("%w: back-stack step %q missing from definition", ErrFlowIntegrity(), prev.StepName)
+	}
+	pc.state.PopBackStack()
+	pc.state.CurrentStep = prev.StepName
+	pc.state.CurrentPurpose = prev.Purpose
+	pc.state.ClearPendingChallenge()
+
+	step, err := r.renderStep(pc.ctx, pc.def, pc.state)
 	if err != nil {
-		return nil, FlowHandoffOutput{}, err
+		return FlowStepResult{}, err
+	}
+	pc.state.IssuedAt = r.now()
+	return FlowStepResult{State: pc.state, Step: step}, nil
+}
+
+// terminate renders a completed step and, when a user was resolved,
+// mints the handoff. Clears BackStack — no back past a
+// point-of-no-return.
+func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *FlowDefinitionStep) (FlowStepResult, error) {
+	pc.state.ClearBackStack()
+	rendered, err := r.renderStep(pc.ctx, pc.def, pc.state)
+	if err != nil {
+		return FlowStepResult{}, err
 	}
 	kind := *step.Complete
 	rendered.Complete = &kind
-	if kind == FlowStepCompleteRedirect && state.RedirectURI != nil {
-		uri := *state.RedirectURI
+	if kind == FlowStepCompleteRedirect && pc.state.RedirectURI != nil {
+		uri := *pc.state.RedirectURI
 		rendered.RedirectURL = &uri
 	}
 
@@ -980,45 +1025,49 @@ func (r *FlowStateMachineRuntime) terminate(ctx context.Context, client database
 	// started with empty RequiredChecks, so IsCompleted is vacuously
 	// true and a token would be minted. Remove once the policy engine
 	// populates RequiredChecks.
-	if state.CollectedData.UserID == "" {
-		return rendered, FlowHandoffOutput{}, nil
+	if pc.state.CollectedData.UserID == "" {
+		return FlowStepResult{State: pc.state, Step: rendered}, nil
 	}
 
-	if state.AuthAttemptID == "" {
-		return nil, FlowHandoffOutput{}, fmt.Errorf("%w: terminate without auth attempt id", ErrIntegrity)
+	if pc.state.AuthAttemptID == "" {
+		return FlowStepResult{}, fmt.Errorf("%w: terminate without auth attempt id", ErrFlowIntegrity())
 	}
-	handoff, err := r.authAttempts.Handoff(ctx, FlowHandoffInput{
-		ProjectID: state.ProjectID,
-		AttemptID: state.AuthAttemptID,
+	handoff, err := r.authAttempts.Handoff(pc.ctx, FlowHandoffInput{
+		ProjectID: pc.state.ProjectID,
+		AttemptID: pc.state.AuthAttemptID,
 	})
 	if err != nil {
-		return nil, FlowHandoffOutput{}, fmt.Errorf("flow state machine: handoff: %w", err)
+		return FlowStepResult{}, fmt.Errorf("flow state machine: handoff: %w", err)
 	}
-	return rendered, handoff, nil
+	return FlowStepResult{
+		State:                 pc.state,
+		Step:                  rendered,
+		HandoffToken:          handoff.Token,
+		HandoffTokenExpiresAt: handoff.ExpiresAt,
+	}, nil
 }
 
-func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, client database.QueryExecutor, def *FlowDefinition, state *FlowState, stepOverride *FlowDefinitionStep) (*FlowStep, error) {
-	step := stepOverride
-	if step == nil {
-		s, ok := def.FindStep(state.CurrentStep)
-		if !ok {
-			return nil, fmt.Errorf("%w: render unknown step %q", ErrIntegrity, state.CurrentStep)
-		}
-		step = s
+// renderStep renders the step currently pinned by state.CurrentStep.
+// Callers advance state (or pop for back) before invoking so
+// state.CurrentStep already points at the step they want rendered.
+func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *FlowDefinition, state *FlowState) (*FlowStep, error) {
+	step, ok := def.FindStep(state.CurrentStep)
+	if !ok {
+		return nil, fmt.Errorf("%w: render unknown step %q", ErrFlowIntegrity(), state.CurrentStep)
 	}
-	resolved, err := r.resolveStepFields(ctx, client, state, step)
+	resolved, err := r.resolveStepFields(ctx, state, step)
 	if err != nil {
 		return nil, err
 	}
 	prefillFromCollected(&resolved, state.CollectedData.UserData)
-	return r.buildStep(step, resolved, nil, nil, nil), nil
+	return r.buildStep(state, step, resolved, nil, nil, nil), nil
 }
 
-func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client database.QueryExecutor, state *FlowState, step *FlowDefinitionStep) (FlowResolvedFields, error) {
+func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *FlowState, step *FlowDefinitionStep) (FlowResolvedFields, error) {
 	if len(step.Fields) == 0 {
 		return FlowResolvedFields{}, nil
 	}
-	schema, err := r.schemas.Resolve(ctx, client, state.ProjectID, state.UserSchemaURL, nil)
+	schema, err := r.schemas.Resolve(ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
 	if err != nil {
 		return FlowResolvedFields{}, fmt.Errorf("flow state machine: load user schema on step %q: %w", step.Name, err)
 	}
@@ -1034,7 +1083,7 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, client 
 // handlers read this to find attributes by challenge across the full
 // progress, not just the current step.
 func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (FlowResolvedFields, error) {
-	ctx, client, def, state, current := pc.ctx, pc.client, pc.def, pc.state, pc.currentStep
+	ctx, def, state, current := pc.ctx, pc.def, pc.state, pc.currentStep
 	seen := map[Field]struct{}{}
 	collect := func(s *FlowDefinitionStep) {
 		if s == nil {
@@ -1057,7 +1106,7 @@ func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (FlowReso
 	for n := range seen {
 		names = append(names, n)
 	}
-	schema, err := r.schemas.Resolve(ctx, client, state.ProjectID, state.UserSchemaURL, nil)
+	schema, err := r.schemas.Resolve(ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
 	if err != nil {
 		return FlowResolvedFields{}, fmt.Errorf("flow state machine: load user schema for visited fields: %w", err)
 	}
@@ -1068,22 +1117,34 @@ func (r *FlowStateMachineRuntime) resolveVisitedFields(pc *processCtx) (FlowReso
 	return resolved, nil
 }
 
-func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved FlowResolvedFields, errorKey *string, complete *FlowStepComplete, redirectURL *string) *FlowStep {
+// buildStep assembles a FlowStep from the raw pieces. Callers without a
+// processCtx (Start, renderStep) supply state + step directly; callers
+// mid-pipeline pass pc.state + pc.currentStep.
+func (r *FlowStateMachineRuntime) buildStep(state *FlowState, step *FlowDefinitionStep, resolved FlowResolvedFields, errorKey *string, complete *FlowStepComplete, redirectURL *string) *FlowStep {
 	// Surface only user-selectable actions declared on the step.
 	// Implicit outcomes (e.g. user_not_found) live in step.Transitions
 	// but are engine-emitted routing keys, not buttons for the client.
-	actions := make([]FlowAction, len(step.Actions))
-	for i, a := range step.Actions {
+	actions := make([]FlowAction, 0, len(step.Actions)+1)
+	for _, a := range step.Actions {
 		textKey := a.TextKey
 		if textKey == "" {
 			textKey = step.Name + ".action." + a.Name
 		}
-		actions[i] = FlowAction{
+		actions = append(actions, FlowAction{
 			Name:    a.Name,
 			Kind:    a.Kind,
 			TextKey: textKey,
 			Primary: a.Primary,
-		}
+		})
+	}
+	// Inject `back` when there's somewhere to return to. TextKey
+	// follows the `<step>.action.<name>` convention.
+	if len(state.BackStack) > 0 && step.Complete == nil {
+		actions = append(actions, FlowAction{
+			Name:    flowBackActionName,
+			Kind:    FlowActionKindBack,
+			TextKey: step.Name + ".action." + flowBackActionName,
+		})
 	}
 	return &FlowStep{
 		Name:         step.Name,
@@ -1095,6 +1156,17 @@ func (r *FlowStateMachineRuntime) buildStep(step *FlowDefinitionStep, resolved F
 		Actions:      actions,
 		SSOProviders: nil,
 	}
+}
+
+// collectsStepFields reports whether a submission commits the step's
+// fields to user creation: the submit action, or the passkey-register
+// issue leg (no proof yet). These enforce required-field presence; passkey
+// login legs and challenge-verify legs send a subset or none.
+func collectsStepFields(kind FlowActionKind, in FlowSubmitInput) bool {
+	if kind == FlowActionKindSubmit {
+		return true
+	}
+	return kind == FlowActionKindPasskeyRegister && in.ChallengeResponse == nil
 }
 
 // stepHasActionKind reports whether the step declares any action of the
@@ -1111,16 +1183,22 @@ func stepHasActionKind(step *FlowDefinitionStep, kind FlowActionKind) bool {
 // stepActionKind returns the kind of the step's action with the given name.
 // Returns the zero value (unset) when name does not match any action on the
 // step — including the empty action submitted by passive POSTs.
-func stepActionKind(step *FlowDefinitionStep, name string) FlowActionKind {
-	if name == "" {
-		return 0
+func stepActionKind(step *FlowDefinitionStep, actionName string) FlowActionKind {
+	if actionName == "" {
+		return FlowActionKindUnset
 	}
 	for _, a := range step.Actions {
-		if a.Name == name {
+		if a.Name == actionName {
 			return a.Kind
 		}
 	}
-	return 0
+
+	// back is not always defined in the step.Actions, it might be auto-injected.
+	if actionName == flowBackActionName {
+		return FlowActionKindBack
+	}
+
+	return FlowActionKindUnset
 }
 
 // recordResolvedUser stores the resolved user id; if it changed, any
@@ -1138,7 +1216,7 @@ func recordResolvedUser(state *FlowState, userID string) {
 // clearUserBoundState drops the resolved user id, any in-flight
 // ceremony, and the passkey provisional marker.
 func clearUserBoundState(state *FlowState) {
-	state.PendingChallenge = nil
+	state.ClearPendingChallenge()
 	state.CollectedData.UserID = ""
 	state.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey = false
 }

@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A list of authentication methods supported by the user definition.",
+  "minProperties": 1,
+  "additionalProperties": false,
+  "properties": {
+    "password": {
+      "$ref": "auth-method.json"
+    },
+    "passkey": {
+      "$ref": "auth-method.json"
+    },
+    "magic_link": {
+      "$ref": "auth-method.json"
+    },
+    "sso": {
+      "$ref": "auth-method.json"
+    },
+    "otp": {
+      "$ref": "auth-method.json"
+    }
+  }
+}

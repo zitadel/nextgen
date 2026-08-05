@@ -112,4 +112,53 @@ describe("ThemeController", () => {
     controller.hostDisconnected();
     expect(removeSpy).toHaveBeenCalled();
   });
+
+  describe("mode precedence: element > branding > fallback", () => {
+    it("uses the fallback when neither element nor branding states a mode", () => {
+      const { matchMedia } = fakeMatchMedia(false);
+      globalThis.matchMedia = matchMedia;
+      const controller = new ThemeController(host);
+      // A widget defers to the visitor's preference…
+      controller.setModePreference(undefined, "auto");
+      expect(controller.theme).toBe("light");
+      // …a page owns its surface.
+      controller.setModePreference(undefined, "dark");
+      expect(controller.theme).toBe("dark");
+    });
+
+    it("lets branding override the fallback", () => {
+      const controller = new ThemeController(host);
+      controller.setModePreference(undefined, "dark");
+      controller.setBranding({ theme: { mode: "light" } } as Branding);
+      expect(controller.theme).toBe("light");
+    });
+
+    it("lets the element's explicit mode beat branding", () => {
+      // The embedding page knows its own surface better than stored
+      // tenant branding does.
+      const controller = new ThemeController(host);
+      controller.setBranding({ theme: { mode: "dark" } } as Branding);
+      controller.setModePreference("light", "auto");
+      expect(controller.theme).toBe("light");
+    });
+
+    it("an explicit auto still follows prefers-color-scheme", () => {
+      const { mql, matchMedia } = fakeMatchMedia(true);
+      globalThis.matchMedia = matchMedia;
+      const controller = new ThemeController(host);
+      controller.setBranding({ theme: { mode: "light" } } as Branding);
+      controller.setModePreference("auto", "dark");
+      expect(controller.theme).toBe("dark");
+      mql.__triggerChange(false);
+      expect(controller.theme).toBe("light");
+    });
+
+    it("keeps dark when auto cannot read a preference", () => {
+      // @ts-expect-error environment without matchMedia
+      delete globalThis.matchMedia;
+      const controller = new ThemeController(host);
+      controller.setModePreference(undefined, "auto");
+      expect(controller.theme).toBe("dark");
+    });
+  });
 });

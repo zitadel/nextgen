@@ -9,6 +9,10 @@ tasks:
   lint:
     command: "corepack pnpm run lint"
 
+  # KNOWN-VACUOUS: this typecheck loads a solution-style tsconfig with plain
+  # tsc --noEmit, which checks nothing (see scripts/check-typecheck-programs.mjs
+  # and its KNOWN_VACUOUS allowlist). The real program does not compile yet;
+  # fixing it is tracked as a follow-up.
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:
@@ -22,13 +26,19 @@ tasks:
       - "dist/**/*"
 
   build-release:
-    command: "corepack pnpm run build"
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
     deps:
       - "api:build-release"
     outputs:
       - "dist/**/*"
     options:
       cache: false
+      # Release builds remove stale package output and rebuild dist in one
+      # task. They stay out of `moon ci`; release:snapshot invokes them in
+      # the later release step instead of the normal build/test graph.
+      runInCI: false
 
   test:
     command: "corepack pnpm run test"

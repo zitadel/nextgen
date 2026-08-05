@@ -2,11 +2,13 @@ post:
   operationId: createSchema
   summary: Create new schema
   description: |
-    Create a new schema. The schema definition must include a unique $id field,
-    which will be used to identify the schema in future requests. The $id must 
-    be a valid URI and should ideally point to the location where the schema 
-    can be accessed.
-    
+    Create a new schema. The optional `$id` field is the JSON Schema document
+    URI used to identify the schema in future requests (GitOps-stable identity,
+    not a free-form resource primary key). When `$id` is omitted, the server
+    generates a `sch_*` URL. When provided, `$id` must be unique within the
+    project and should ideally be a valid URI pointing at where the schema can
+    be accessed.
+
     The schema can either be a concrete schema, e.g. a user schema, or a 
     schema-url which will be resolved by the server.
   tags:
@@ -66,6 +68,41 @@ post:
         application/json:
           schema:
             $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+
+get:
+  operationId: listSchemas
+  summary: List all schemas
+  description: |
+    Retrieve a list of all schemas available in the system. This endpoint 
+    supports pagination and filtering based on schema attributes.
+  tags:
+    - Schemas
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - $ref: ../../components/parameters/offset.yaml
+    - $ref: ../../components/parameters/page-token.yaml
+    - name: object_type
+      in: query
+      description: The type of object of the schema to filter by.
+      schema:
+        type: string
+        maxLength: 256
+  security:
+    - oauth2:
+        - schema.read
+  responses:
+    '200':
+      description: A list of schemas was retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: list-schemas-response.yaml
     default:
       description: Unexpected error response.
       content:

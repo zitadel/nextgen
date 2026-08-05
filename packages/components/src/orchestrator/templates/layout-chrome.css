@@ -8,19 +8,34 @@
  * `:host` via the branding stylesheet.
  */
 
+/* Widget-first: the default host is content-sized and paints nothing —
+   the embedding app owns the page. `variant="page"` (hosted shell,
+   scaffolded login routes) opts into the full-page chrome. The
+   `--zl-page-min-height` custom property overrides the height in both
+   modes (a host-set value always wins over the variant default). */
 :host {
   display: block;
-  min-height: 100%;
-  background: var(--zl-color-surface-default-black, #0f0f11);
+  background: transparent;
   color: var(--zl-color-text-primary-white, #f4f4f6);
   font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+}
+:host([variant="page"]) {
+  min-height: 100%;
+  background: var(--zl-color-surface-default-black, #0f0f11);
 }
 .zl-mount {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  /* Width-based chrome below (`@container`) responds to the widget's own
+     width, not the viewport — a sidebar embed on a desktop viewport must
+     collapse like a phone would. */
+  container-type: inline-size;
+  min-height: var(--zl-page-min-height, auto);
   background: inherit;
   color: inherit;
+}
+:host([variant="page"]) .zl-mount {
+  min-height: var(--zl-page-min-height, 100vh);
 }
 .zl-mount > zl-page-shell,
 .zl-mount > [data-zl-template-root] {
@@ -113,4 +128,227 @@
 .zl-card-forgot__link:focus-visible {
   outline: var(--zl-focus-width, 2px) solid var(--zl-focus-color, #f4f4f6);
   outline-offset: var(--zl-focus-offset, 2px);
+}
+/* Split-design chrome (ADR 040 design catalog: `split` / `split-right`).
+   Consumed by the ejectable templates in @zitadel/config under
+   defaults/branding/ — a brand pane beside the form pane, collapsing to
+   form-only on narrow viewports. */
+.zl-split {
+  display: grid;
+  /* Tunable from the template root's style attribute (the sanitiser allows
+     style=""): custom properties cascade into this shadow chrome. */
+  grid-template-columns: var(--zl-split-columns, minmax(0, 1fr) minmax(0, 1fr));
+  align-items: var(--zl-split-align, center);
+  min-height: 100%;
+  gap: var(--zl-spacing-05, 2rem);
+}
+.zl-split__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--zl-spacing-04, 1.5rem);
+  padding: 52px 16px;
+}
+.zl-split__logo {
+  max-width: min(16rem, 60%);
+}
+.zl-split__hero {
+  max-width: 100%;
+  border-radius: var(--zl-radius-m, 0.75rem);
+  object-fit: cover;
+}
+.zl-split__form {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+/* Condensed brand header inside the form pane. Hidden on wide viewports
+   (the full brand pane carries the branding there); shown on narrow ones
+   so collapsing the brand pane doesn't erase the tenant's identity. */
+.zl-split__compact {
+  display: none;
+  max-width: min(12rem, 60%);
+}
+/* The height cap is an image concern — it keeps a tall logo from crowding
+   out the card. The hero design's fallback is a <p> whose copy tenants are
+   meant to edit, and a shared cap would clip it the moment it wraps; the
+   `img` qualifier keeps the two cases from inheriting each other's limits.
+   Both rules are `img`-qualified so source order (not specificity) decides
+   between the logo cap and the hero banner cap. */
+img.zl-split__compact {
+  max-height: 2.5rem;
+}
+/* hero_url-only tenants: the compact fallback renders the hero image as a
+   modest banner instead of vanishing with the brand pane. */
+img.zl-split__compact--hero {
+  max-height: 6rem;
+  max-width: 100%;
+  width: 100%;
+  border-radius: var(--zl-radius-m, 0.75rem);
+  object-fit: cover;
+}
+.zl-split--right .zl-split__brand {
+  order: 2;
+}
+.zl-split--right .zl-split__form {
+  order: 1;
+}
+/* Container query, not media query: keyed to the mount's inline size so a
+   narrow embed on a wide viewport collapses exactly like a phone. */
+@container (max-width: 48rem) {
+  .zl-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* Templates opt into keeping the full pane (stacked above the form) by
+     setting --zl-split-brand-mobile: flex on their root element. */
+  .zl-split__brand {
+    display: var(--zl-split-brand-mobile, none);
+  }
+  .zl-split__form {
+    flex-direction: column;
+    gap: var(--zl-spacing-04, 1.5rem);
+  }
+  .zl-split__compact {
+    display: block;
+  }
+}
+/* Hero-design landing primitives (`hero`): a token-styled mock landing
+   page inside .zl-split__brand. Consumed by the ejectable hero template in
+   @zitadel/config under defaults/branding/hero/ — tenants edit the copy,
+   the classes keep it on design tokens so palettes and theme mode apply. */
+.zl-hero {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 34rem;
+  text-align: left;
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+  font-family: var(--zl-font-family-sans, system-ui, sans-serif);
+}
+.zl-hero__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--zl-spacing-05, 2rem);
+}
+.zl-hero__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zl-spacing-02, 0.5rem);
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.zl-hero__brand-logo {
+  max-height: 1.75rem;
+}
+.zl-hero__brand-mark {
+  display: inline-flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--zl-radius-s, 0.5rem);
+  background: linear-gradient(
+    135deg,
+    var(--zl-color-icon-default-purple, #bba5e4),
+    var(--zl-color-icon-default-pink, #f48aa0)
+  );
+}
+/* Text fallback for the mobile compact header when no logo_url is set
+   (display is owned by .zl-split__compact; this only styles the text).
+   Overrides the logo-sized width the shared class assumes, resets the
+   paragraph margin, and lets a long unbroken brand name wrap instead of
+   pushing the form pane sideways. */
+.zl-hero__compact-brand {
+  margin: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--zl-color-text-primary-white, #f4f4f6);
+}
+.zl-hero__nav-links {
+  display: flex;
+  gap: var(--zl-spacing-04, 1.5rem);
+  font-size: 0.9375rem;
+  color: var(--zl-color-text-secondary-gray, #bfbfcf);
+}
+.zl-hero__nav-links a {
+  color: inherit;
+  text-decoration: none;
+}
+.zl-hero__nav-links a:hover {
+  text-decoration: underline;
+}
+.zl-hero__eyebrow {
+  margin: 0 0 var(--zl-spacing-03, 1rem);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--zl-color-text-subtitle-purple, #bba5e4);
+}
+.zl-hero__headline {
+  margin: 0 0 var(--zl-spacing-03, 1rem);
+  font-family: var(--zl-font-family-heading, var(--zl-font-family-sans, system-ui, sans-serif));
+  font-size: 2.75rem;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.zl-hero__sub {
+  margin: 0 0 var(--zl-spacing-05, 2rem);
+  max-width: 30rem;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--zl-color-text-secondary-gray, #bfbfcf);
+}
+.zl-hero__bullets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-02, 0.5rem);
+  margin: 0 0 var(--zl-spacing-05, 2rem);
+  padding: 0;
+  list-style: none;
+}
+.zl-hero__bullets li {
+  display: flex;
+  align-items: center;
+  gap: var(--zl-spacing-02, 0.5rem);
+  font-size: 1rem;
+}
+.zl-hero__bullets li::before {
+  content: "✓";
+  color: var(--zl-color-icon-default-purple, #bba5e4);
+  font-weight: 700;
+}
+.zl-hero__footnote {
+  margin: 0;
+  padding-top: var(--zl-spacing-04, 1.5rem);
+  border-top: 1px solid var(--zl-color-border-default-black, #252528);
+  font-size: 0.8125rem;
+  color: var(--zl-color-text-disabled, #686883);
+}
+.zl-hero__footnote strong {
+  color: var(--zl-color-text-secondary-gray, #bfbfcf);
+  font-weight: 600;
+}
+/* Minimal-design chrome (`minimal`): fields straight on the page, no card.
+   With no card to carry spacing, the pane's padding IS the page chrome, so
+   it follows the same widget-first rule as the shell's own padding: page
+   mode opts in, a widget embed is content-sized and the embedding app owns
+   spacing. The split panes above are different on purpose — their padding
+   separates the two panes' content and is part of that design's
+   composition, so it survives in both modes. */
+.zl-minimal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-04, 1.5rem);
+  width: min(24rem, 100%);
+  margin-inline: auto;
+}
+:host([variant="page"]) .zl-minimal {
+  padding: 52px 16px;
 }

@@ -1,21 +1,81 @@
 type: oauth2
-flows: 
-  authorizationCode: 
+flows:
+  authorizationCode:
     authorizationUrl: https://acc.nextgen.zitadel.com/oauth/authorize
     tokenUrl: https://acc.nextgen.zitadel.com/oauth/token
-    scopes: 
+    scopes:
       openid: OpenID Connect scope
       profile: Access to the user's profile information
       email: Access to the user's email address
       schema.read: Permission to read schemas
       schema.write: Permission to create and manage schemas
-      user.write: Permission to create users
+      user.write: Permission to create and manage users
       user.read: Permission to read users
-  clientCredentials: 
+      user.delete: Permission to delete users
+      team.read: Permission to read teams
+      team.write: Permission to create and manage teams
+      team.delete: Permission to delete teams
+      flow_definition.read: Permission to read flow definitions
+      flow_definition.write: Permission to create and manage flow definitions
+      flow_definition.delete: Permission to delete flow definitions
+      project.read: Permission to read projects
+      project.write: Permission to create and manage projects
+      branding.read: Permission to read branding revisions
+      branding.write: Permission to publish branding revisions
+      domain.read: Permission to read project domains (reserved; endpoints not yet available)
+      domain.write: Permission to create and manage project domains (reserved; endpoints not yet available)
+      domain.delete: Permission to delete project domains (reserved; endpoints not yet available)
+      feature.read: Permission to read project feature configuration (reserved; endpoints not yet available)
+      feature.write: Permission to change project feature configuration (reserved; endpoints not yet available)
+      allowed_origin.read: Permission to read allowed origins (reserved; endpoints not yet available)
+      allowed_origin.write: Permission to create and manage allowed origins (reserved; endpoints not yet available)
+      allowed_origin.delete: Permission to delete allowed origins (reserved; endpoints not yet available)
+      signing_key.create: Permission to create signing keys (reserved; endpoints not yet available)
+      signing_key.read: Permission to read signing keys (reserved; endpoints not yet available)
+      signing_key.delete: Permission to delete signing keys (reserved; endpoints not yet available)
+      webhook.read: Permission to read webhooks (reserved; endpoints not yet available)
+      webhook.write: Permission to create and manage webhooks (reserved; endpoints not yet available)
+      webhook.delete: Permission to delete webhooks (reserved; endpoints not yet available)
+      session.read: Permission to read sessions
+      session.write: Permission to create and manage sessions
+      session.delete: Permission to revoke sessions
+      auth_attempt.read: Permission to read auth attempts
+      auth_attempt.write: Permission to create and manage auth attempts
+  clientCredentials:
     tokenUrl: https://acc.nextgen.zitadel.com/oauth/token
-    scopes: 
+    scopes:
       openid: OpenID Connect scope
       schema.read: Permission to read schemas
       schema.write: Permission to create and manage schemas
       user.read: Permission to read users
-      user.create: Permission to create users
+      user.write: Permission to create and manage users
+      user.delete: Permission to delete users
+      team.read: Permission to read teams
+      team.write: Permission to create and manage teams
+      team.delete: Permission to delete teams
+      flow_definition.read: Permission to read flow definitions
+      flow_definition.write: Permission to create and manage flow definitions
+      flow_definition.delete: Permission to delete flow definitions
+      project.read: Permission to read projects
+      project.write: Permission to create and manage projects
+      branding.read: Permission to read branding revisions
+      branding.write: Permission to publish branding revisions
+      domain.read: Permission to read project domains (reserved; endpoints not yet available)
+      domain.write: Permission to create and manage project domains (reserved; endpoints not yet available)
+      domain.delete: Permission to delete project domains (reserved; endpoints not yet available)
+      feature.read: Permission to read project feature configuration (reserved; endpoints not yet available)
+      feature.write: Permission to change project feature configuration (reserved; endpoints not yet available)
+      allowed_origin.read: Permission to read allowed origins (reserved; endpoints not yet available)
+      allowed_origin.write: Permission to create and manage allowed origins (reserved; endpoints not yet available)
+      allowed_origin.delete: Permission to delete allowed origins (reserved; endpoints not yet available)
+      signing_key.create: Permission to create signing keys (reserved; endpoints not yet available)
+      signing_key.read: Permission to read signing keys (reserved; endpoints not yet available)
+      signing_key.delete: Permission to delete signing keys (reserved; endpoints not yet available)
+      webhook.read: Permission to read webhooks (reserved; endpoints not yet available)
+      webhook.write: Permission to create and manage webhooks (reserved; endpoints not yet available)
+      webhook.delete: Permission to delete webhooks (reserved; endpoints not yet available)
+      session.read: Permission to read sessions
+      session.write: Permission to create and manage sessions
+      session.delete: Permission to revoke sessions
+      auth_attempt.read: Permission to read auth attempts
+      auth_attempt.write: Permission to create and manage auth attempts

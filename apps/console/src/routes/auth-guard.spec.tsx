@@ -1,0 +1,126 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { makeTestSession } from "../auth/session.fixture";
+import { createAppRouter } from "../router";
+
+/**
+ * Console authentication guard (Console ADR 0003): the `_authed` pathless
+ * layout redirects unauthenticated visitors to `/login` (preserving the
+ * requested path in `?next=`), the login route redirects signed-in visitors
+ * away, and sign-out lands back on the login screen.
+ *
+ * The auth module is mocked at the module boundary; the widget is stubbed
+ * because `<zitadel-login>` drives real flow requests on mount, which a
+ * jsdom spec neither needs nor supports (the widget has its own browser
+ * suite in `@zitadel/components`).
+ */
+const fetchSession = vi.fn();
+const signOut = vi.fn(async () => undefined);
+
+vi.mock("@/auth/session", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/auth/session")>();
+  return {
+    ...actual,
+    fetchSession: (...args: []) => fetchSession(...args),
+    signOut: (...args: []) => signOut(...args),
+  };
+});
+
+vi.mock("@zitadel/sdk-react", () => ({
+  ZitadelLogin: (props: { postSignInUrl?: string; project?: { projectId?: string } }) => (
+    <div
+      data-testid="zitadel-login"
+      data-post-sign-in-url={props.postSignInUrl}
+      data-project-id={props.project?.projectId}
+    />
+  ),
+}));
+
+async function renderAt(path: string) {
+  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
+  render(<RouterProvider router={router} />);
+  return router;
+}
+
+beforeEach(() => {
+  fetchSession.mockReset();
+  signOut.mockClear();
+  // The login screen renders the widget only when a project id resolves
+  // (ADR 0004 §3); pin the dev override so guard tests exercise the widget
+  // path. The no-project test below clears it.
+  vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_test");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe("authentication guard", () => {
+  it("redirects an unauthenticated deep link to /login with the path in ?next=", async () => {
+    fetchSession.mockResolvedValue(null);
+    const router = await renderAt("/users");
+
+    expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/login");
+    expect(router.state.location.search).toEqual({ next: "/users" });
+    // The widget's post-sign-in target carries the requested path, and the
+    // widget receives a `project` HANDLE (not discrete attribute props):
+    // the element property is the only config source that outranks the
+    // app-wide configureZitadel() call, whose project id is empty.
+    expect(screen.getByTestId("zitadel-login")).toHaveAttribute("data-post-sign-in-url", "/users");
+    expect(screen.getByTestId("zitadel-login")).toHaveAttribute("data-project-id", "proj_test");
+  });
+
+  it("omits ?next= when the root path was requested", async () => {
+    fetchSession.mockResolvedValue(null);
+    const router = await renderAt("/");
+
+    await screen.findByTestId("zitadel-login");
+    expect(router.state.location.search).toEqual({});
+  });
+
+  it("redirects a signed-in visitor away from /login to the requested path", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    const router = await renderAt("/login?next=/schemas");
+
+    expect(await screen.findByRole("heading", { name: "Schemas" })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/schemas");
+  });
+
+  it("drops unsafe ?next= values instead of following them", async () => {
+    fetchSession.mockResolvedValue(null);
+    await renderAt("/login?next=https://evil.example/phish");
+
+    expect(await screen.findByTestId("zitadel-login")).toHaveAttribute(
+      "data-post-sign-in-url",
+      "/",
+    );
+  });
+
+  it("shows the setup hint instead of the widget while no project exists", async () => {
+    vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
+    fetchSession.mockResolvedValue(null);
+    await renderAt("/");
+
+    expect(await screen.findByRole("heading", { name: "No project yet" })).toBeInTheDocument();
+    expect(screen.queryByTestId("zitadel-login")).not.toBeInTheDocument();
+  });
+
+  it("signs out from the sidebar user menu and lands on /login", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    const router = await renderAt("/");
+    await screen.findByRole("button", { name: /Account: Test User/ });
+
+    // After sign-out the guard must see no session again.
+    fetchSession.mockResolvedValue(null);
+    await userEvent.click(screen.getByRole("button", { name: /Account: Test User/ }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
+
+    expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
+    expect(signOut).toHaveBeenCalledOnce();
+    expect(router.state.location.pathname).toBe("/login");
+  });
+});

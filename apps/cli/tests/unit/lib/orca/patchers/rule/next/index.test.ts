@@ -52,22 +52,58 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "zitadel.json")).toContain('"project": "proj-1"');
     expect(editContents(plan, "app/page.tsx")).toBeUndefined();
     expect(writeContents(plan, "app/login/page.tsx")).toContain(MANAGED_MARKER);
-    expect(writeContents(plan, "app/login/page.tsx")).toContain('href="/register"');
+    expect(writeContents(plan, "app/login/page.tsx")).not.toContain('href="/register"');
+    expect(writeContents(plan, "app/login/page.tsx")).not.toContain("next/link");
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('href="/profile"');
-    expect(writeContents(plan, "app/login/page.tsx")).toContain('background: "#0f0f11"');
-    expect(writeContents(plan, "app/login/page.tsx")).toContain('color: "#f4f4f6"');
+    // Page chrome comes from the widget itself now — the wrapper only pins
+    // the color scheme, and no token hex is duplicated into generated code.
+    expect(writeContents(plan, "app/login/page.tsx")).toContain('variant="page"');
+    expect(writeContents(plan, "app/login/page.tsx")).not.toContain("#0f0f11");
     expect(writeContents(plan, "app/login/page.tsx")).toContain('colorScheme: "dark"');
+    // The embedding alternative is named where a developer will see it, and
+    // a minimal scaffold keeps the widget's neutral built-in copy.
+    expect(writeContents(plan, "app/login/page.tsx")).toContain('variant="widget"');
+    expect(writeContents(plan, "app/login/page.tsx")).not.toContain("businessLocales");
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('alignItems: "center"');
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('padding: "48px 24px"');
     expect(writeContents(plan, "app/register/page.tsx")).toContain(MANAGED_MARKER);
-    expect(writeContents(plan, "app/register/page.tsx")).toContain('href="/login"');
+    expect(writeContents(plan, "app/register/page.tsx")).not.toContain('href="/login"');
     expect(writeContents(plan, "app/register/page.tsx")).not.toContain('href="/profile"');
-    expect(writeContents(plan, "app/register/page.tsx")).toContain('background: "#0f0f11"');
-    expect(writeContents(plan, "app/register/page.tsx")).toContain('color: "#f4f4f6"');
+    expect(writeContents(plan, "app/register/page.tsx")).toContain('variant="page"');
+    expect(writeContents(plan, "app/register/page.tsx")).not.toContain("#0f0f11");
     expect(writeContents(plan, "app/register/page.tsx")).toContain('colorScheme: "dark"');
     expect(writeContents(plan, "middleware.ts")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "middleware.ts")).toContain("export function middleware(");
     expect(plan.ops.some((op) => op.kind === "add-dep")).toBe(true);
+  });
+
+  it("wires the business copy overlay for business-use-case projects", () => {
+    const plan = new NextPatcher().plan({ ...ctxFor("app"), useCase: "business" });
+    for (const path of ["app/login/page.tsx", "app/register/page.tsx"]) {
+      const page = writeContents(plan, path);
+      // The overlay ships with the SDK: the page pulls it from the client
+      // entry it already imports and assigns it through the ref — a JSX
+      // locales prop would decay to an attribute on React 18 (sdk-next's
+      // floor) and silently keep the neutral copy.
+      expect(page).toContain("businessLocales, configureZitadel");
+      expect(page).toContain("element.locales = businessLocales");
+      expect(page).not.toContain("locales={businessLocales}");
+    }
+    // Consumer scaffolds keep the neutral built-ins, like minimal ones.
+    const consumer = new NextPatcher().plan({ ...ctxFor("app"), useCase: "consumer" });
+    expect(writeContents(consumer, "app/login/page.tsx")).not.toContain("businessLocales");
+  });
+
+  it("leaves profile page chrome to the session card's page surface", () => {
+    const plan = new NextPatcher().plan(ctxFor("app"));
+    const profile = writeContents(plan, "app/profile/page.tsx");
+    expect(profile).toContain('variant="page"');
+    // The card paints its own full-page chrome from design tokens — no
+    // duplicated token hex or forced viewport height in generated markup.
+    expect(profile).not.toContain("#0f0f11");
+    expect(profile).not.toContain("minHeight");
+    expect(profile).toContain('colorScheme: "dark"');
+    expect(profile).toContain('variant="widget"');
   });
 
   it("replaces the starter home page for a freshly scaffolded Next app", () => {
@@ -75,10 +111,8 @@ describe("NextPatcher.plan", () => {
     const homePage = editContents(plan, "app/page.tsx", "starter");
 
     expect(homePage).toContain(MANAGED_MARKER);
-    expect(homePage).toContain('href="/login"');
-    expect(homePage).toContain('href="/register"');
-    expect(homePage).toContain('href="/profile"');
-    expect(homePage).toContain('colorScheme: "dark"');
+    expect(homePage).toContain('redirect("/login")');
+    expect(homePage).not.toContain("Sign in, create an account");
   });
 
   it("emits proxy.ts for Next 16 projects", () => {
@@ -96,7 +130,7 @@ describe("NextPatcher.plan", () => {
     expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "0.1.0-alpha.0" });
   });
 
-  it("does not scaffold the user schema or flow (server-provisioned)", () => {
+  it("leaves schema and flow files for setup's resource materializer", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
     expect(writeContents(plan, ".zitadel/schemas/user.json")).toBeUndefined();
     expect(writeContents(plan, ".zitadel/flows/default.json")).toBeUndefined();

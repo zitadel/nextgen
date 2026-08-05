@@ -9,12 +9,16 @@ tasks:
     options:
       runInCI: false
 
+  sync-export:
+    command: "corepack pnpm run sync:export"
+
   generate:
     command: "corepack pnpm run generate"
     outputs:
       - "src/generated/tokens.css"
       - "src/generated/tokens.ts"
       - "src/generated/tailwind.css"
+      - "src/generated/shadcn.css"
 
   lint:
     command: "corepack pnpm exec oxlint ."
@@ -22,7 +26,7 @@ tasks:
       - "generate"
 
   typecheck:
-    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
+    command: "corepack pnpm exec tsc --build tsconfig.json"
     deps:
       - "generate"
 

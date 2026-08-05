@@ -6,14 +6,21 @@ export function parseLocalJourneyArgs(args) {
     frameworkIds: [...frameworkIds],
     image: "",
     keep: false,
+    preset: "",
     runtime: "binary",
+    suite: "frameworks",
     tarballsDir: "",
     workDir: "",
   };
+  let explicitFramework = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     switch (arg) {
+      // A bare separator survives some `pnpm run` forwarding; skip it.
+      case "--": {
+        break;
+      }
       case "--backend": {
         readValue(args, ++index, arg);
         throw new Error(
@@ -32,11 +39,20 @@ export function parseLocalJourneyArgs(args) {
         const frameworkId = readValue(args, ++index, arg);
         frameworkForId(frameworkId);
         parsed.frameworkIds = [frameworkId];
+        explicitFramework = true;
+        break;
+      }
+      case "--suite": {
+        parsed.suite = parseSuite(readValue(args, ++index, arg));
         break;
       }
       case "--image": {
         parsed.image = readValue(args, ++index, arg);
         parsed.runtime = "docker";
+        break;
+      }
+      case "--preset": {
+        parsed.preset = readValue(args, ++index, arg);
         break;
       }
       case "--runtime": {
@@ -68,8 +84,25 @@ export function parseLocalJourneyArgs(args) {
   if (parsed.runtime === "binary" && parsed.image) {
     throw new Error("--image requires --runtime docker");
   }
+  if (parsed.suite === "testkit") {
+    if (explicitFramework) {
+      throw new Error(
+        "--suite testkit runs a fixed next app; drop --framework (the SDK matrix is the frameworks suite's job)",
+      );
+    }
+    // The testkit consumer journey scaffolds one next app and runs the
+    // @zitadel/testing suite inside it.
+    parsed.frameworkIds = ["next"];
+  }
 
   return parsed;
+}
+
+function parseSuite(value) {
+  if (value === "frameworks" || value === "testkit") {
+    return value;
+  }
+  throw new Error(`--suite must be frameworks or testkit, got ${value}`);
 }
 
 function parseRuntime(value) {

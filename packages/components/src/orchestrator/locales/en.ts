@@ -21,8 +21,8 @@ export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
   "identifier.title": "Sign in",
   "identifier.description": "Enter your email to continue",
-  "identifier.field.email": "Work email",
-  "identifier.field.email.placeholder": "you@company.com",
+  "identifier.field.email": "Email",
+  "identifier.field.email.placeholder": "you@example.com",
   "identifier.field.password": "Password",
   "identifier.action.submit": "Sign in",
   "identifier.action.continue": "Sign in",
@@ -51,8 +51,8 @@ export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
   "collect-credentials.title": "Create your account",
   "collect-credentials.description": "Set up your email and password",
-  "collect-credentials.field.email": "Work email",
-  "collect-credentials.field.email.placeholder": "you@company.com",
+  "collect-credentials.field.email": "Email",
+  "collect-credentials.field.email.placeholder": "you@example.com",
   "collect-credentials.field.password": "Password",
   // No static password rule hint: the only enforced rule is the schema's
   // minLength, and "symbol + number" was never enforced. The client will build
@@ -67,6 +67,7 @@ export const en: Record<string, string> = {
   "register-password.description": "Choose a secure password for your account",
   "register-password.field.password": "Password",
   "register-password.action.submit": "Sign up",
+  "register-password.action.back": "Back",
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: passkey-upsell (passkey enrollment offer — after registration)
@@ -86,8 +87,8 @@ export const en: Record<string, string> = {
   // ═══════════════════════════════════════════════════════════════════════════
   "collect-passkey-email.title": "Create your account",
   "collect-passkey-email.description": "Enter your email to set up a passkey",
-  "collect-passkey-email.field.email": "Work email",
-  "collect-passkey-email.field.email.placeholder": "you@company.com",
+  "collect-passkey-email.field.email": "Email",
+  "collect-passkey-email.field.email.placeholder": "you@example.com",
   "collect-passkey-email.action.submit": "Continue",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -110,17 +111,19 @@ export const en: Record<string, string> = {
   "password.field.password": "Password",
   "password.action.signin": "Sign in",
   "password.action.passkey": "Sign in with a passkey",
+  "password.action.back": "Back",
   "password.action.register.lead": "Don't have an account? ",
   "password.action.register.link": "Sign up",
 
   "register.title": "Create your account",
   // Empty by design — the sign-up card has no subheadline (Figma 6593:141743).
   "register.description": "",
-  "register.field.email": "Work email",
-  "register.field.email.placeholder": "you@company.com",
+  "register.field.email": "Email",
+  "register.field.email.placeholder": "you@example.com",
   "register.field.password": "Password",
   "register.field.givenName": "Given name",
   "register.field.familyName": "Family name",
+  "register.field.companyName": "Company name",
   // Native <input type="date"> localizes its own display format to the user's
   // locale and submits ISO YYYY-MM-DD — no placeholder/help format hint needed.
   "register.field.dateOfBirth": "Date of birth",
@@ -130,6 +133,7 @@ export const en: Record<string, string> = {
   "register.action.password": "Continue with password",
   "register.action.passkey": "Continue with a passkey",
   "register.action.submit": "Sign up",
+  "register.action.back": "Back",
   "register.action.sign_in.lead": "Already have an account? ",
   "register.action.sign_in.link": "Sign in",
 
@@ -139,6 +143,12 @@ export const en: Record<string, string> = {
 
   // --- Passkey login ---
   "passkey-login.title": "Sign in with your passkey",
+
+  // --- Step: passkey-first (entry step of the passkey-first preset) ---
+  "passkey-first.title": "Sign in",
+  "passkey-first.description": "Use your passkey to continue",
+  "passkey-first.action.passkey": "Continue with passkey",
+  "passkey-first.action.email_fallback": "Use email instead",
 
   // --- Password recovery ---
   "recover.title": "Check your email",
@@ -150,17 +160,29 @@ export const en: Record<string, string> = {
   "submit.signin": "Sign in",
   "action.forgot_password": "Forgot password?",
   "action.cancel": "Cancel",
+  // Generic fallback for the engine-injected `<step>.action.back` key on
+  // custom step names (see INJECTED_KEY_FALLBACKS in liquid.ts).
+  "action.back": "Back",
 
   // --- SSO ---
   "sso.redirect.title": "Redirecting to your provider…",
 
+  // --- Passkey ceremony ---
+  "passkey.pending.status": "Waiting for your passkey…",
+
   // --- Passkey errors ---
-  "error.passkey_cancelled": "Passkey setup was cancelled",
+  // Covers both user dismissal and any close the browser reports as
+  // NotAllowedError — it fires for login and registration ceremonies alike.
+  "error.passkey_cancelled": "The passkey prompt was closed before completing.",
+  "error.passkey_timeout": "The passkey request timed out. Please try again.",
   "error.passkey_not_registered":
     "This passkey is not registered. Please sign in with your email and password.",
   "error.passkey_setup_failed": "Passkey registration did not complete. Please try again.",
   "error.passkey_unsupported": "This device does not support passkeys",
   "error.passkey_failed": "Something went wrong. Please try again.",
+  "error.passkey_invalid": "This passkey could not be verified. Please try again.",
+  "error.passkey_registration_invalid":
+    "The new passkey could not be verified. Please try registering it again.",
 
   // --- Field / form errors (Figma field annotations) ---
   "error.email_required": "Please enter an email address",
@@ -171,6 +193,15 @@ export const en: Record<string, string> = {
   /** Figma sign-in error `6602:180268` — inline on password field. */
   "error.invalid_credentials": "Wrong email or password.",
   "error.required": "This field is required.",
+
+  // --- Generic field-rule fallbacks ({0} = field label) ---
+  // Used by `localiseFlowErrorKeys` (liquid.ts) when no field-specific
+  // entry exists for a server-emitted `error.<field>_<rule>` key.
+  "error.field_required": "{0} is required.",
+  "error.field_format": "Please enter a valid {0}.",
+  "error.field_min_length": "{0} is too short.",
+  "error.field_max_length": "{0} is too long.",
+  "error.field_invalid": "Please check {0}.",
 
   // --- Sign-in form-level alert (Figma `6594:125237`, alert `6596:132779`) ---
   "error.sign_in_server.title": "We couldn't complete your sign in.",

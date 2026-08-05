@@ -32,7 +32,9 @@ tasks:
       - "dist/**/*"
 
   build-release:
-    command: "corepack pnpm run build"
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
     deps:
       - "api:build-release"
       - "components:build-release"
@@ -41,6 +43,15 @@ tasks:
       - "dist/**/*"
     options:
       cache: false
+      # Release builds remove stale package output and rebuild dist inside one
+      # mutex-held task. They stay out of `moon ci`; release:snapshot invokes
+      # them in the later release step instead of the normal build/test graph.
+      runInCI: false
+      # cli:test drives the built oclif CLI, whose commands import this
+      # package's dist at runtime. The shared mutex keeps this release build
+      # and its preclean from running while those tests are importing it; a
+      # task dep on cli:test would cycle the project graph.
+      mutex: "public-dist"
 
   test:
     command: "corepack pnpm run test"

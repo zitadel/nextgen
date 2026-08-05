@@ -11,7 +11,7 @@ export {
   matchesRoutes,
   filterResponseHeaders,
 } from "./middleware.js";
-export { verifyJwt, decodeJwt, base64UrlDecode, JWKS_TTL_MS } from "./jwt.js";
+export { verifyJwt, decodeJwt, isJwtShaped, base64UrlDecode, JWKS_TTL_MS } from "./jwt.js";
 export type { JwtPayload, JwtHeader, DecodedJwt, VerifyJwtOptions } from "./jwt.js";
 
 export type ZitadelEnvironment = "development" | "preview" | "production";

@@ -2,26 +2,30 @@ import { builders, generateCode } from "magicast";
 
 import { configCandidates } from "./config-paths";
 import type { FileOp } from "./file-writer/types";
+import { PROXY_PATH } from "./proxy";
+import {
+  assertNoUnreviewedProjectSecretProxy,
+  PROXY_CREDENTIAL_POLICY_MARKER,
+} from "./proxy-credential-policy";
 import {
   ensureEditableObject,
   importIsPresent,
   parseConfigModule,
   resolveDefaultExportObject,
 } from "./utils/magicast";
-import { PROXY_PATH } from "./proxy";
 
 /**
  * Shared Vite dev-server proxy merged into the project's Vite config for the SPA
  * frameworks (React, Vue, Solid, Svelte, Qwik). It forwards same-origin
  * `/__nextgen/*` calls to the
  * backend, strips the prefix, and attaches the project's service-key secret
- * (read from `ZITADEL_PROJECT_SECRET` in `.env.local`) as the bearer on every
- * proxied request. The secret stays server-side: Vite only exposes vars with the
- * configured `envPrefix` (default `VITE_`) to client bundles, so this server-only
- * key never leaks into the browser.
+ * (read from `ZITADEL_PROJECT_SECRET` in `.env.local`) only to the current
+ * app-plane `POST /sessions/exchange` operation. The secret stays server-side:
+ * Vite only exposes vars with the configured `envPrefix` (default `VITE_`) to
+ * client bundles, so this server-only key never leaks into the browser.
  */
 function proxyEntryCode(server: string): string {
-  return `{
+  return `/* ${PROXY_CREDENTIAL_POLICY_MARKER} */ {
   target: ${JSON.stringify(server)},
   changeOrigin: false,
   rewrite: (path) => path.replace(/^\\${PROXY_PATH}/, "").replace(/^(?!\\/)/, "/"),
@@ -32,10 +36,50 @@ function proxyEntryCode(server: string): string {
     }
     const bearer = \`Bearer \${secret}\`;
     proxy.on("proxyReq", (proxyReq) => {
-      proxyReq.setHeader("authorization", bearer);
+      const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
+      if (
+        proxyReq.method === "POST" &&
+        pathname === "/sessions/exchange" &&
+        !proxyReq.getHeader("authorization")
+      ) {
+        proxyReq.setHeader("authorization", bearer);
+      }
     });
   },
 }`;
+}
+
+const LEGACY_PROXY_REQUEST_LISTENER =
+  /(^[\t ]*)proxy\.on\("proxyReq", \(proxyReq\) => \{\r?\n\1 {2}proxyReq\.setHeader\("authorization", bearer\);\r?\n\1\}\);/m;
+
+function exchangeOnlyProxyRequestListener(indent: string): string {
+  return `${indent}/* ${PROXY_CREDENTIAL_POLICY_MARKER} */
+${indent}proxy.on("proxyReq", (proxyReq) => {
+${indent}  const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
+${indent}  if (
+${indent}    proxyReq.method === "POST" &&
+${indent}    pathname === "/sessions/exchange" &&
+${indent}    !proxyReq.getHeader("authorization")
+${indent}  ) {
+${indent}    proxyReq.setHeader("authorization", bearer);
+${indent}  }
+${indent}});`;
+}
+
+/**
+ * Identifies the exact proxy shape emitted before the exchange-only credential
+ * policy. Setup may replace that generated listener, but must preserve the
+ * surrounding `/__nextgen` proxy and any user changes elsewhere in the entry.
+ */
+function isLegacyManagedProxy(source: string): boolean {
+  if (source.includes(PROXY_CREDENTIAL_POLICY_MARKER)) {
+    return false;
+  }
+  return [
+    'loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET',
+    'throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).")',
+    "const bearer = `Bearer ${secret}`;",
+  ].every((fingerprint) => source.includes(fingerprint)) && LEGACY_PROXY_REQUEST_LISTENER.test(source);
 }
 
 /** The imports that the injected proxy entry depends on. */
@@ -58,9 +102,21 @@ export function viteProxyEdit(
 ): (source: string | undefined) => string {
   return (source) => {
     const label = "the Vite config (vite.config.*)";
-    const mod = parseConfigModule(source, label);
+    let workingSource = source;
+    if (workingSource !== undefined && isLegacyManagedProxy(workingSource)) {
+      // Replace only the generated bearer listener. User changes elsewhere in
+      // the proxy entry (target, rewrite, TLS options, comments) remain intact.
+      workingSource = workingSource.replace(
+        LEGACY_PROXY_REQUEST_LISTENER,
+        (_listener, indent: string) => exchangeOnlyProxyRequestListener(indent),
+      );
+    } else if (workingSource !== undefined) {
+      assertNoUnreviewedProjectSecretProxy(workingSource, label);
+    }
+
+    const mod = parseConfigModule(workingSource, label);
     const config = resolveDefaultExportObject(mod, label);
-    let changed = false;
+    let changed = workingSource !== source;
     const serverConfig = ensureEditableObject(config, "server");
     if (serverConfig.port === undefined) {
       serverConfig.port = devPort;
@@ -113,5 +169,12 @@ export interface ViteSupport {
 
 /** Builds the shared Vite-config proxy {@link FileOp} for a {@link ViteSupport} patcher. */
 export function buildViteProxyOp(devPort: number, server: string): FileOp {
-  return { kind: "edit", path: [...VITE_CONFIG_PATHS], edit: viteProxyEdit(devPort, server) };
+  return {
+    kind: "edit",
+    path: [...VITE_CONFIG_PATHS],
+    edit: viteProxyEdit(devPort, server),
+    // The dev proxy is the auth request path — the doctor managed-files
+    // check fails when this merge is no longer applied.
+    wiring: "infrastructure",
+  };
 }

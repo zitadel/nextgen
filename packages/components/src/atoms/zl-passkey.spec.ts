@@ -237,4 +237,153 @@ describe("<zl-passkey>", () => {
     const result = await errored;
     expect(result.aborted).toBe(true);
   });
+
+  it("emits zl-passkey-started when the ceremony actually begins", async () => {
+    const el = create({ ceremony: "authenticate", options: { challenge: "AAAA" } });
+    const order: string[] = [];
+    el.addEventListener("zl-passkey-started", () => order.push("started"));
+    el.addEventListener("zl-passkey-result", () => order.push("result"));
+    const started = nextEvent<{ challenge_id: string; method: string }>(el, "zl-passkey-started");
+    const done = nextEvent(el, "zl-passkey-result");
+    host.appendChild(el);
+    const detail = await started;
+    await done;
+    expect(detail).toEqual({ challenge_id: "chal-1", method: "passkey" });
+    expect(order).toEqual(["started", "result"]);
+  });
+
+  it("does not emit zl-passkey-started when a guard rejects the start", async () => {
+    const startedListener = vi.fn();
+    const el = create({ manual: true });
+    el.addEventListener("zl-passkey-started", startedListener);
+    host.appendChild(el);
+    const errored = nextEvent(el, "zl-passkey-error");
+    void el.startCeremony();
+    await errored;
+    expect(startedListener).not.toHaveBeenCalled();
+  });
+
+  it("renders pending status + cancel while in flight and clears them after", async () => {
+    let resolveGet!: (value: PublicKeyCredential) => void;
+    credentials.get.mockImplementation(
+      () => new Promise<PublicKeyCredential>((resolve) => (resolveGet = resolve)),
+    );
+    const el = create({
+      ceremony: "authenticate",
+      options: { challenge: "AAAA" },
+      pendingLabel: "Waiting for your passkey…",
+      cancelLabel: "Cancel",
+    });
+    const done = nextEvent(el, "zl-passkey-result");
+    host.appendChild(el);
+    await el.updateComplete;
+
+    const pendingUi = el.querySelector('[data-testid="zitadel-passkey-pending"]');
+    expect(pendingUi).not.toBeNull();
+    expect(pendingUi?.textContent).toContain("Waiting for your passkey…");
+    expect(el.querySelector('[data-testid="zitadel-passkey-cancel"]')).not.toBeNull();
+
+    resolveGet(fakeAssertion());
+    await done;
+    await el.updateComplete;
+    expect(el.querySelector('[data-testid="zitadel-passkey-pending"]')).toBeNull();
+  });
+
+  it("renders no pending UI when silent", async () => {
+    // A ceremony that never settles — only the pending state matters here.
+    credentials.get.mockImplementation(() => new Promise(() => undefined));
+    const el = create({ ceremony: "authenticate", options: { challenge: "AAAA" }, silent: true });
+    host.appendChild(el);
+    await el.updateComplete;
+    expect(el.querySelector('[data-testid="zitadel-passkey-pending"]')).toBeNull();
+  });
+
+  it("cancel click aborts the ceremony without leaking zl-submit to ancestors", async () => {
+    credentials.get.mockImplementation(
+      (arg: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          arg.signal?.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "AbortError")),
+          );
+        }),
+    );
+    const hostSubmitListener = vi.fn();
+    host.addEventListener("zl-submit", hostSubmitListener);
+    const el = create({ ceremony: "authenticate", options: { challenge: "AAAA" } });
+    const errored = nextEvent<{ aborted: boolean; timed_out: boolean }>(el, "zl-passkey-error");
+    host.appendChild(el);
+    await el.updateComplete;
+
+    const cancel = el.querySelector<HTMLElement>('[data-testid="zitadel-passkey-cancel"]');
+    expect(cancel).not.toBeNull();
+    cancel?.click();
+
+    const result = await errored;
+    expect(result.aborted).toBe(true);
+    expect(result.timed_out).toBe(false);
+    expect(hostSubmitListener).not.toHaveBeenCalled();
+    await el.updateComplete;
+    expect(el.querySelector('[data-testid="zitadel-passkey-pending"]')).toBeNull();
+  });
+
+  it("classifies NotAllowedError at the server timeout as timed_out", async () => {
+    vi.useFakeTimers();
+    try {
+      let rejectGet!: (reason: unknown) => void;
+      credentials.get.mockImplementation(
+        () => new Promise((_resolve, reject) => (rejectGet = reject)),
+      );
+      const el = create({
+        ceremony: "authenticate",
+        options: { challenge: "AAAA", timeout: 60_000 },
+      });
+      const errored = nextEvent<{ aborted: boolean; timed_out: boolean }>(el, "zl-passkey-error");
+      host.appendChild(el);
+
+      vi.advanceTimersByTime(60_000);
+      rejectGet(new DOMException("timed out", "NotAllowedError"));
+      const result = await errored;
+      expect(result.aborted).toBe(true);
+      expect(result.timed_out).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("treats a prompt NotAllowedError as a cancellation, not a timeout", async () => {
+    let rejectGet!: (reason: unknown) => void;
+    credentials.get.mockImplementation(
+      () => new Promise((_resolve, reject) => (rejectGet = reject)),
+    );
+    const el = create({
+      ceremony: "authenticate",
+      options: { challenge: "AAAA", timeout: 60_000 },
+    });
+    const errored = nextEvent<{ aborted: boolean; timed_out: boolean }>(el, "zl-passkey-error");
+    host.appendChild(el);
+    await Promise.resolve();
+    rejectGet(new DOMException("dismissed", "NotAllowedError"));
+    const result = await errored;
+    expect(result.aborted).toBe(true);
+    expect(result.timed_out).toBe(false);
+  });
+
+  it("never claims a timeout when the server sent no timeout", async () => {
+    vi.useFakeTimers();
+    try {
+      let rejectGet!: (reason: unknown) => void;
+      credentials.get.mockImplementation(
+        () => new Promise((_resolve, reject) => (rejectGet = reject)),
+      );
+      const el = create({ ceremony: "authenticate", options: { challenge: "AAAA" } });
+      const errored = nextEvent<{ timed_out: boolean }>(el, "zl-passkey-error");
+      host.appendChild(el);
+      vi.advanceTimersByTime(600_000);
+      rejectGet(new DOMException("dismissed", "NotAllowedError"));
+      const result = await errored;
+      expect(result.timed_out).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

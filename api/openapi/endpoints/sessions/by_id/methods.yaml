@@ -24,7 +24,13 @@ get:
           schema:
             $ref: ../session-response.yaml
     '401':
-      description: Missing or invalid session token.
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
       content:
         application/json:
           schema:
@@ -36,19 +42,18 @@ get:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      description: Unexpected error.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: getSession-error-response.yaml
 
 delete:
   operationId: revokeSession
   summary: Revoke session
   description: |
-    Revokes the session immediately (`state: revoked`). This is the logout operation.
+    Revokes the session immediately (`state: revoked`).
 
-    The session_token issued at creation (or superseded by a handoff exchange) is required.
+    This is the operator revoke path and requires the `session.delete` scope on a
+    project-bound credential. End-user logout with the `__nextgen_session` cookie is
+    `DELETE /sessions/me` (`nextgenSession` scheme).
+
     After revocation, any tokens derived from this session are invalidated.
   tags:
     - Sessions
@@ -61,11 +66,14 @@ delete:
   responses:
     '204':
       description: Session revoked successfully.
-      headers:
-        Set-Cookie:
-          $ref: ../../../components/headers/set-cookie-session-token.yaml
     '401':
-      description: Missing or invalid session token.
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
       content:
         application/json:
           schema:
@@ -88,4 +96,3 @@ delete:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
-

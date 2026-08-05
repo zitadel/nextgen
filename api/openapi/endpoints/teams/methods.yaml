@@ -3,10 +3,13 @@ post:
   summary: Create team
   tags:
     - Teams
-  security: []
+  security:
+    - oauth2:
+        - team.write
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
   requestBody:
+    required: true
     content:
       application/json:
         schema:
@@ -17,9 +20,34 @@ post:
       content:
         application/json:
           schema:
-            $ref: create-team-response.yaml
+            $ref: team-response.yaml
     '400':
       description: The provided parameters were not acceptable
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '409':
+      description: |
+        A team with the given name already exists in this project.
       content:
         application/json:
           schema:

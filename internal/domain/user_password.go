@@ -1,12 +1,12 @@
 package domain
 
 import (
-	"context"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
+
+const PrefixUserPassword ResourcePrefix = "upw"
 
 func ErrUserPasswordInvalid() Error {
 	return newError("user.password_invalid", "The password provided is invalid.", nil, nil)
@@ -21,7 +21,7 @@ func HashPassword(password string, hasher crypto.Hasher) (string, error) {
 }
 
 type UserPassword struct {
-	ID                  int64
+	ID                  string
 	ProjectID           string
 	UserID              string
 	EncodedHash         string
@@ -50,35 +50,21 @@ type SetUserPassword struct {
 	VerificationID *string
 }
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/user_password.mock.go . UserPasswordRepository
+// UserPasswordField enumerates the fields of UserPassword which can be used for
+// filtering and ordering in storage statements.
+type UserPasswordField uint8
 
-type UserPasswordRepository interface {
-	Repository
-
-	userPasswordConditions
-	userPasswordChanges
-
-	GetByUserID(ctx context.Context, client database.QueryExecutor, projectID string, userID string) (*UserPassword, error)
-	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*UserPassword, error)
-	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*UserPassword, error)
-	Set(ctx context.Context, client database.QueryExecutor, user *SetUserPassword) error
-	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
-	DeleteByUserID(ctx context.Context, client database.QueryExecutor, projectID string, userID string) error
-}
-
-type userPasswordConditions interface {
-	ProjectIDCondition(projectID string) database.Condition
-	UserIDCondition(userID string) database.Condition
-	PrimaryKeyCondition(id int64) database.Condition
-	UniqueCondition(projectID, userID string) database.Condition
-}
-
-type userPasswordChanges interface {
-	SetEncodedHash(hash string) database.Change
-	SetChangeRequired(bool) database.Change
-	SetChangedAt(time.Time) database.Change
-	SetVerificationID(string) database.Change
-	SetLastSuccessfulCheck(time.Time) database.Change
-	IncrementFailedAttempts() database.Change
-	ResetFailedAttempts() database.Change
-}
+const (
+	UserPasswordFieldUnspecified UserPasswordField = iota
+	UserPasswordFieldID
+	UserPasswordFieldProjectID
+	UserPasswordFieldUserID
+	UserPasswordFieldEncodedHash
+	UserPasswordFieldChangeRequired
+	UserPasswordFieldChangedAt
+	UserPasswordFieldVerificationID
+	UserPasswordFieldLastSuccessfulCheck
+	UserPasswordFieldFailedAttempts
+	UserPasswordFieldCreatedAt
+	UserPasswordFieldUpdatedAt
+)

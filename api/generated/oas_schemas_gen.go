@@ -19,6 +19,99 @@ func (*ActivateFlowDefinitionNoContent) activateFlowDefinitionRes() {}
 
 // Merged schema.
 // Ref: #
+type AlreadyClaimedResponse struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Merged property.
+	Details AlreadyClaimedResponseDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AlreadyClaimedResponse) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AlreadyClaimedResponse) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AlreadyClaimedResponse) GetDetails() AlreadyClaimedResponseDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AlreadyClaimedResponse) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AlreadyClaimedResponse) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AlreadyClaimedResponse) SetDetails(val AlreadyClaimedResponseDetails) {
+	s.Details = val
+}
+
+func (*AlreadyClaimedResponse) completeClaimRes() {}
+func (*AlreadyClaimedResponse) initClaimRes()     {}
+
+// Merged schema.
+type AlreadyClaimedResponseDetails struct {
+	TeamID TeamID `json:"team_id"`
+	// The dashboard URL for the team that owns the project.
+	DashboardURL    url.URL `json:"dashboard_url"`
+	AdditionalProps AlreadyClaimedResponseDetailsAdditional
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *AlreadyClaimedResponseDetails) GetTeamID() TeamID {
+	return s.TeamID
+}
+
+// GetDashboardURL returns the value of DashboardURL.
+func (s *AlreadyClaimedResponseDetails) GetDashboardURL() url.URL {
+	return s.DashboardURL
+}
+
+// GetAdditionalProps returns the value of AdditionalProps.
+func (s *AlreadyClaimedResponseDetails) GetAdditionalProps() AlreadyClaimedResponseDetailsAdditional {
+	return s.AdditionalProps
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *AlreadyClaimedResponseDetails) SetTeamID(val TeamID) {
+	s.TeamID = val
+}
+
+// SetDashboardURL sets the value of DashboardURL.
+func (s *AlreadyClaimedResponseDetails) SetDashboardURL(val url.URL) {
+	s.DashboardURL = val
+}
+
+// SetAdditionalProps sets the value of AdditionalProps.
+func (s *AlreadyClaimedResponseDetails) SetAdditionalProps(val AlreadyClaimedResponseDetailsAdditional) {
+	s.AdditionalProps = val
+}
+
+type AlreadyClaimedResponseDetailsAdditional map[string]jx.Raw
+
+func (s *AlreadyClaimedResponseDetailsAdditional) init() AlreadyClaimedResponseDetailsAdditional {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type AttAlreadyCompleted struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -685,19 +778,108 @@ func (s *AuthMethods) SetOtp(val OptAuthMethod) {
 	s.Otp = val
 }
 
+// Merged schema.
+// Ref: #
+type AuthUnauthorized struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAuthUnauthorizedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AuthUnauthorized) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AuthUnauthorized) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AuthUnauthorized) GetDetails() OptAuthUnauthorizedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AuthUnauthorized) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AuthUnauthorized) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
+	s.Details = val
+}
+
+func (*AuthUnauthorized) completeClaimRes()   {}
+func (*AuthUnauthorized) revokeMySessionRes() {}
+
+// Additional error-specific context.
+type AuthUnauthorizedDetails map[string]jx.Raw
+
+func (s *AuthUnauthorizedDetails) init() AuthUnauthorizedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// AuthUnauthorizedHeaders wraps AuthUnauthorized with response headers.
+type AuthUnauthorizedHeaders struct {
+	CacheControl OptString
+	Response     AuthUnauthorized
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *AuthUnauthorizedHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *AuthUnauthorizedHeaders) GetResponse() AuthUnauthorized {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *AuthUnauthorizedHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *AuthUnauthorizedHeaders) SetResponse(val AuthUnauthorized) {
+	s.Response = val
+}
+
+func (*AuthUnauthorizedHeaders) getMySessionRes() {}
+
 // AuthorizeGetFound is response for AuthorizeGet operation.
 type AuthorizeGetFound struct{}
 
 func (*AuthorizeGetFound) authorizeGetRes() {}
 
-// Resolved branding configuration. Inherited from the app → team → project
-// hierarchy at flow creation time (most specific wins). Read-only projection —
-// branding is configured via the Team/App Branding API, not the Flow API.
+// Branding configuration. Appears in two places with one shape:
+// - On flow responses as a read-only projection: the server resolves the
+// latest branding revision for the project per step response (falling
+// back to built-in defaults when none is stored). Branding is configured
+// via the Branding API / `zitadel apply`, not the Flow API.
+// - As the request body of `POST /branding`, which publishes the same
+// shape as a new immutable revision (see ADR 040).
 // Ref: #
 type Branding struct {
 	// Layout preset selector. The default.liquid master template uses this
 	// to branch into layout variants. Customers who eject the template
-	// can ignore this field entirely.
+	// can ignore this field entirely; it also serves as the degrade target
+	// when a custom template fails component-side validation.
 	Layout OptBrandingLayout `json:"layout"`
 	// The LiquidJS template string for rendering this step. The orchestrator
 	// parses this template, injects the capability dictionaries as context,
@@ -705,7 +887,13 @@ type Branding struct {
 	LiquidTemplate OptString `json:"liquid_template"`
 	// Team logo URL.
 	LogoURL OptURI `json:"logo_url"`
-	// Custom font URL (e.g., Google Fonts CSS).
+	// Custom font stylesheet URL (e.g., Google Fonts CSS). Read-only in
+	// v1: `POST /branding` rejects a non-empty value, because the login
+	// component loads this stylesheet at document level (shadow-scoped
+	// `@font-face` rules never register faces) and an arbitrary URL would
+	// grant `branding.write` page-wide CSS control over the embedding
+	// application. Safe tenant font delivery is an ADR 040 follow-up;
+	// until then, load fonts from the embedding page.
 	FontURL OptURI `json:"font_url"`
 	// Hero/background image URL (used by split layout).
 	HeroURL OptURI `json:"hero_url"`
@@ -763,7 +951,8 @@ func (s *Branding) SetHeroURL(val OptURI) {
 
 // Layout preset selector. The default.liquid master template uses this
 // to branch into layout variants. Customers who eject the template
-// can ignore this field entirely.
+// can ignore this field entirely; it also serves as the degrade target
+// when a custom template fails component-side validation.
 type BrandingLayout string
 
 const (
@@ -804,6 +993,51 @@ func (s *BrandingLayout) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// A stored branding revision. `branding` echoes the canonical stored
+// configuration so clients (e.g. the CLI sync engine) can reconcile local
+// files with the server's stored state.
+// Ref: #
+type BrandingRevisionResponse struct {
+	// The unique identifier of this branding revision.
+	ID string `json:"id"`
+	// When this revision was published.
+	CreatedAt time.Time `json:"created_at"`
+	Branding  Branding  `json:"branding"`
+}
+
+// GetID returns the value of ID.
+func (s *BrandingRevisionResponse) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *BrandingRevisionResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetBranding returns the value of Branding.
+func (s *BrandingRevisionResponse) GetBranding() Branding {
+	return s.Branding
+}
+
+// SetID sets the value of ID.
+func (s *BrandingRevisionResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *BrandingRevisionResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetBranding sets the value of Branding.
+func (s *BrandingRevisionResponse) SetBranding(val Branding) {
+	s.Branding = val
+}
+
+func (*BrandingRevisionResponse) createBrandingRes()  {}
+func (*BrandingRevisionResponse) getBrandingByIdRes() {}
 
 type ChallengeID string
 
@@ -1048,6 +1282,292 @@ func (s *ChallengeResponseState) UnmarshalText(data []byte) error {
 		return errors.Errorf("invalid value: %q", data)
 	}
 }
+
+// A completed claim. Carries the owning team, when the claim landed, and the
+// dashboard where it can be managed, so a generated client can rely on those
+// fields being present whenever `status` is `completed`.
+// Ref: #
+type ClaimStatusCompleted struct {
+	// The claim has completed.
+	Status ClaimStatusCompletedStatus `json:"status"`
+	TeamID TeamID                     `json:"team_id"`
+	// The time when the project was claimed.
+	ClaimedAt time.Time `json:"claimed_at"`
+	// The dashboard URL for the owning team.
+	DashboardURL url.URL `json:"dashboard_url"`
+}
+
+// GetStatus returns the value of Status.
+func (s *ClaimStatusCompleted) GetStatus() ClaimStatusCompletedStatus {
+	return s.Status
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *ClaimStatusCompleted) GetTeamID() TeamID {
+	return s.TeamID
+}
+
+// GetClaimedAt returns the value of ClaimedAt.
+func (s *ClaimStatusCompleted) GetClaimedAt() time.Time {
+	return s.ClaimedAt
+}
+
+// GetDashboardURL returns the value of DashboardURL.
+func (s *ClaimStatusCompleted) GetDashboardURL() url.URL {
+	return s.DashboardURL
+}
+
+// SetStatus sets the value of Status.
+func (s *ClaimStatusCompleted) SetStatus(val ClaimStatusCompletedStatus) {
+	s.Status = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *ClaimStatusCompleted) SetTeamID(val TeamID) {
+	s.TeamID = val
+}
+
+// SetClaimedAt sets the value of ClaimedAt.
+func (s *ClaimStatusCompleted) SetClaimedAt(val time.Time) {
+	s.ClaimedAt = val
+}
+
+// SetDashboardURL sets the value of DashboardURL.
+func (s *ClaimStatusCompleted) SetDashboardURL(val url.URL) {
+	s.DashboardURL = val
+}
+
+// The claim has completed.
+type ClaimStatusCompletedStatus string
+
+const (
+	ClaimStatusCompletedStatusCompleted ClaimStatusCompletedStatus = "completed"
+)
+
+// AllValues returns all ClaimStatusCompletedStatus values.
+func (ClaimStatusCompletedStatus) AllValues() []ClaimStatusCompletedStatus {
+	return []ClaimStatusCompletedStatus{
+		ClaimStatusCompletedStatusCompleted,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClaimStatusCompletedStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case ClaimStatusCompletedStatusCompleted:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClaimStatusCompletedStatus) UnmarshalText(data []byte) error {
+	switch ClaimStatusCompletedStatus(data) {
+	case ClaimStatusCompletedStatusCompleted:
+		*s = ClaimStatusCompletedStatusCompleted
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// A claim challenge that is still awaiting the browser leg.
+// Ref: #
+type ClaimStatusPending struct {
+	// The claim has not completed yet.
+	Status ClaimStatusPendingStatus `json:"status"`
+}
+
+// GetStatus returns the value of Status.
+func (s *ClaimStatusPending) GetStatus() ClaimStatusPendingStatus {
+	return s.Status
+}
+
+// SetStatus sets the value of Status.
+func (s *ClaimStatusPending) SetStatus(val ClaimStatusPendingStatus) {
+	s.Status = val
+}
+
+// The claim has not completed yet.
+type ClaimStatusPendingStatus string
+
+const (
+	ClaimStatusPendingStatusPending ClaimStatusPendingStatus = "pending"
+)
+
+// AllValues returns all ClaimStatusPendingStatus values.
+func (ClaimStatusPendingStatus) AllValues() []ClaimStatusPendingStatus {
+	return []ClaimStatusPendingStatus{
+		ClaimStatusPendingStatusPending,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClaimStatusPendingStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case ClaimStatusPendingStatusPending:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClaimStatusPendingStatus) UnmarshalText(data []byte) error {
+	switch ClaimStatusPendingStatus(data) {
+	case ClaimStatusPendingStatusPending:
+		*s = ClaimStatusPendingStatusPending
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The state of a claim challenge. While pending it carries only `status`; once
+// completed it also carries the owning team, the claim timestamp, and the
+// dashboard URL. Modelled as discriminated variants so a `pending` response can
+// never carry stale completion fields and a `completed` response always carries
+// them.
+// Ref: #
+// ClaimStatusResponse represents sum type.
+type ClaimStatusResponse struct {
+	Type                 ClaimStatusResponseType // switch on this field
+	ClaimStatusPending   ClaimStatusPending
+	ClaimStatusCompleted ClaimStatusCompleted
+}
+
+// ClaimStatusResponseType is oneOf type of ClaimStatusResponse.
+type ClaimStatusResponseType string
+
+// Possible values for ClaimStatusResponseType.
+const (
+	ClaimStatusPendingClaimStatusResponse   ClaimStatusResponseType = "pending"
+	ClaimStatusCompletedClaimStatusResponse ClaimStatusResponseType = "completed"
+)
+
+// IsClaimStatusPending reports whether ClaimStatusResponse is ClaimStatusPending.
+func (s ClaimStatusResponse) IsClaimStatusPending() bool {
+	return s.Type == ClaimStatusPendingClaimStatusResponse
+}
+
+// IsClaimStatusCompleted reports whether ClaimStatusResponse is ClaimStatusCompleted.
+func (s ClaimStatusResponse) IsClaimStatusCompleted() bool {
+	return s.Type == ClaimStatusCompletedClaimStatusResponse
+}
+
+// SetClaimStatusPending sets ClaimStatusResponse to ClaimStatusPending.
+func (s *ClaimStatusResponse) SetClaimStatusPending(v ClaimStatusPending) {
+	s.Type = ClaimStatusPendingClaimStatusResponse
+	s.ClaimStatusPending = v
+}
+
+// GetClaimStatusPending returns ClaimStatusPending and true boolean if ClaimStatusResponse is ClaimStatusPending.
+func (s ClaimStatusResponse) GetClaimStatusPending() (v ClaimStatusPending, ok bool) {
+	if !s.IsClaimStatusPending() {
+		return v, false
+	}
+	return s.ClaimStatusPending, true
+}
+
+// NewClaimStatusPendingClaimStatusResponse returns new ClaimStatusResponse from ClaimStatusPending.
+func NewClaimStatusPendingClaimStatusResponse(v ClaimStatusPending) ClaimStatusResponse {
+	var s ClaimStatusResponse
+	s.SetClaimStatusPending(v)
+	return s
+}
+
+// SetClaimStatusCompleted sets ClaimStatusResponse to ClaimStatusCompleted.
+func (s *ClaimStatusResponse) SetClaimStatusCompleted(v ClaimStatusCompleted) {
+	s.Type = ClaimStatusCompletedClaimStatusResponse
+	s.ClaimStatusCompleted = v
+}
+
+// GetClaimStatusCompleted returns ClaimStatusCompleted and true boolean if ClaimStatusResponse is ClaimStatusCompleted.
+func (s ClaimStatusResponse) GetClaimStatusCompleted() (v ClaimStatusCompleted, ok bool) {
+	if !s.IsClaimStatusCompleted() {
+		return v, false
+	}
+	return s.ClaimStatusCompleted, true
+}
+
+// NewClaimStatusCompletedClaimStatusResponse returns new ClaimStatusResponse from ClaimStatusCompleted.
+func NewClaimStatusCompletedClaimStatusResponse(v ClaimStatusCompleted) ClaimStatusResponse {
+	var s ClaimStatusResponse
+	s.SetClaimStatusCompleted(v)
+	return s
+}
+
+func (*ClaimStatusResponse) getClaimStatusRes() {}
+
+type CompleteClaimBadRequest ErrorDetails
+
+func (*CompleteClaimBadRequest) completeClaimRes() {}
+
+type CompleteClaimNotFound ErrorDetails
+
+func (*CompleteClaimNotFound) completeClaimRes() {}
+
+// The request to complete a project claim.
+// Ref: #
+type CompleteClaimRequest struct {
+	ChallengeID ChallengeID `json:"challenge_id"`
+}
+
+// GetChallengeID returns the value of ChallengeID.
+func (s *CompleteClaimRequest) GetChallengeID() ChallengeID {
+	return s.ChallengeID
+}
+
+// SetChallengeID sets the value of ChallengeID.
+func (s *CompleteClaimRequest) SetChallengeID(val ChallengeID) {
+	s.ChallengeID = val
+}
+
+// The result of a completed project claim.
+// Ref: #
+type CompleteClaimResponse struct {
+	ProjectID ProjectID `json:"project_id"`
+	TeamID    TeamID    `json:"team_id"`
+	// The time when the project was claimed.
+	ClaimedAt time.Time `json:"claimed_at"`
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *CompleteClaimResponse) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *CompleteClaimResponse) GetTeamID() TeamID {
+	return s.TeamID
+}
+
+// GetClaimedAt returns the value of ClaimedAt.
+func (s *CompleteClaimResponse) GetClaimedAt() time.Time {
+	return s.ClaimedAt
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *CompleteClaimResponse) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *CompleteClaimResponse) SetTeamID(val TeamID) {
+	s.TeamID = val
+}
+
+// SetClaimedAt sets the value of ClaimedAt.
+func (s *CompleteClaimResponse) SetClaimedAt(val time.Time) {
+	s.ClaimedAt = val
+}
+
+func (*CompleteClaimResponse) completeClaimRes() {}
+
+type CompleteClaimTooManyRequests ErrorDetails
+
+func (*CompleteClaimTooManyRequests) completeClaimRes() {}
 
 // A successfully verified authentication factor with verification metadata.
 // Method-specific details are included in the `payload` field.
@@ -1726,8 +2246,19 @@ func (*CreateHandoffErrorResponseStatusCode) createHandoffRes() {}
 
 // Ref: #
 type CreateProjectRequest struct {
+	// The name of the project.
+	Name string `json:"name"`
 	// Origins which are allowed for previewing and testing the project.
 	PreviewOrigins []string `json:"previewOrigins"`
+	// Whether the server should provision fallback default user schema and flow
+	// resources for the project. CLI-managed projects set this to false and
+	// upload their local .zitadel config files through the schema and flow APIs.
+	SeedDefaults OptBool `json:"seedDefaults"`
+}
+
+// GetName returns the value of Name.
+func (s *CreateProjectRequest) GetName() string {
+	return s.Name
 }
 
 // GetPreviewOrigins returns the value of PreviewOrigins.
@@ -1735,15 +2266,32 @@ func (s *CreateProjectRequest) GetPreviewOrigins() []string {
 	return s.PreviewOrigins
 }
 
+// GetSeedDefaults returns the value of SeedDefaults.
+func (s *CreateProjectRequest) GetSeedDefaults() OptBool {
+	return s.SeedDefaults
+}
+
+// SetName sets the value of Name.
+func (s *CreateProjectRequest) SetName(val string) {
+	s.Name = val
+}
+
 // SetPreviewOrigins sets the value of PreviewOrigins.
 func (s *CreateProjectRequest) SetPreviewOrigins(val []string) {
 	s.PreviewOrigins = val
+}
+
+// SetSeedDefaults sets the value of SeedDefaults.
+func (s *CreateProjectRequest) SetSeedDefaults(val OptBool) {
+	s.SeedDefaults = val
 }
 
 // Ref: #
 type CreateProjectResponse struct {
 	// The unique identifier of the project.
 	ID string `json:"id"`
+	// The name of the project.
+	Name string `json:"name"`
 	// Secret which can be used for authentication when modifying the project.
 	ProjectSecret string `json:"projectSecret"`
 	// Secret which can be used for previewing and testing the project.
@@ -1757,6 +2305,11 @@ type CreateProjectResponse struct {
 // GetID returns the value of ID.
 func (s *CreateProjectResponse) GetID() string {
 	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *CreateProjectResponse) GetName() string {
+	return s.Name
 }
 
 // GetProjectSecret returns the value of ProjectSecret.
@@ -1782,6 +2335,11 @@ func (s *CreateProjectResponse) GetCreatedAt() time.Time {
 // SetID sets the value of ID.
 func (s *CreateProjectResponse) SetID(val string) {
 	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *CreateProjectResponse) SetName(val string) {
+	s.Name = val
 }
 
 // SetProjectSecret sets the value of ProjectSecret.
@@ -1982,42 +2540,41 @@ type CreateTeamBadRequest ErrorDetails
 
 func (*CreateTeamBadRequest) createTeamRes() {}
 
-// Ref: #
-type CreateTeamRequest struct{}
+type CreateTeamConflict ErrorDetails
+
+func (*CreateTeamConflict) createTeamRes() {}
+
+type CreateTeamForbidden ErrorDetails
+
+func (*CreateTeamForbidden) createTeamRes() {}
+
+type CreateTeamNotFound ErrorDetails
+
+func (*CreateTeamNotFound) createTeamRes() {}
 
 // Ref: #
-type CreateTeamResponse struct {
-	// The unique identifier of the team.
-	ID string `json:"id"`
-	// The time when the team was created.
-	CreatedAt time.Time `json:"createdAt"`
+type CreateTeamRequest struct {
+	// The name of the team. Must be unique within the project.
+	Name string `json:"name"`
 }
 
-// GetID returns the value of ID.
-func (s *CreateTeamResponse) GetID() string {
-	return s.ID
+// GetName returns the value of Name.
+func (s *CreateTeamRequest) GetName() string {
+	return s.Name
 }
 
-// GetCreatedAt returns the value of CreatedAt.
-func (s *CreateTeamResponse) GetCreatedAt() time.Time {
-	return s.CreatedAt
+// SetName sets the value of Name.
+func (s *CreateTeamRequest) SetName(val string) {
+	s.Name = val
 }
-
-// SetID sets the value of ID.
-func (s *CreateTeamResponse) SetID(val string) {
-	s.ID = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *CreateTeamResponse) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-func (*CreateTeamResponse) createTeamRes() {}
 
 type CreateTeamTooManyRequests ErrorDetails
 
 func (*CreateTeamTooManyRequests) createTeamRes() {}
+
+type CreateTeamUnauthorized ErrorDetails
+
+func (*CreateTeamUnauthorized) createTeamRes() {}
 
 type CreateUserBadRequest ErrorDetails
 
@@ -2094,6 +2651,36 @@ func (*DeactivateFlowDefinitionNoContent) deactivateFlowDefinitionRes() {}
 type DeleteFlowDefinitionNoContent struct{}
 
 func (*DeleteFlowDefinitionNoContent) deleteFlowDefinitionRes() {}
+
+type DeleteTeamBadRequest ErrorDetails
+
+func (*DeleteTeamBadRequest) deleteTeamRes() {}
+
+type DeleteTeamForbidden ErrorDetails
+
+func (*DeleteTeamForbidden) deleteTeamRes() {}
+
+// DeleteTeamNoContent is response for DeleteTeam operation.
+type DeleteTeamNoContent struct{}
+
+func (*DeleteTeamNoContent) deleteTeamRes() {}
+
+type DeleteTeamUnauthorized ErrorDetails
+
+func (*DeleteTeamUnauthorized) deleteTeamRes() {}
+
+// DeleteUserByIDNoContent is response for DeleteUserByID operation.
+type DeleteUserByIDNoContent struct{}
+
+func (*DeleteUserByIDNoContent) deleteUserByIDRes() {}
+
+type DeleteUserByIDNotFound ErrorDetails
+
+func (*DeleteUserByIDNotFound) deleteUserByIDRes() {}
+
+type DeleteUserByIDUnauthorized ErrorDetails
+
+func (*DeleteUserByIDUnauthorized) deleteUserByIDRes() {}
 
 // Ref: #
 type DeviceAuthorizationResponse struct {
@@ -2225,12 +2812,15 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 func (*ErrorDetails) activateFlowDefinitionRes() {}
 func (*ErrorDetails) authorizeDeviceRes()        {}
 func (*ErrorDetails) authorizeGetRes()           {}
+func (*ErrorDetails) createBrandingRes()         {}
 func (*ErrorDetails) createFlowRes()             {}
 func (*ErrorDetails) createProjectRes()          {}
 func (*ErrorDetails) createSessionRes()          {}
 func (*ErrorDetails) deleteFlowDefinitionRes()   {}
 func (*ErrorDetails) endSessionRes()             {}
+func (*ErrorDetails) getBrandingByIdRes()        {}
 func (*ErrorDetails) getMyUserRes()              {}
+func (*ErrorDetails) initClaimRes()              {}
 func (*ErrorDetails) introspectRes()             {}
 func (*ErrorDetails) listFlowDefinitionsRes()    {}
 func (*ErrorDetails) submitFlowStepRes()         {}
@@ -2276,6 +2866,8 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 func (*ErrorDetailsStatusCode) activateFlowDefinitionRes()   {}
 func (*ErrorDetailsStatusCode) authorizeDeviceRes()          {}
 func (*ErrorDetailsStatusCode) authorizeGetRes()             {}
+func (*ErrorDetailsStatusCode) completeClaimRes()            {}
+func (*ErrorDetailsStatusCode) createBrandingRes()           {}
 func (*ErrorDetailsStatusCode) createFlowDefinitionRes()     {}
 func (*ErrorDetailsStatusCode) createFlowRes()               {}
 func (*ErrorDetailsStatusCode) createProjectRes()            {}
@@ -2285,28 +2877,37 @@ func (*ErrorDetailsStatusCode) createTeamRes()               {}
 func (*ErrorDetailsStatusCode) createUserRes()               {}
 func (*ErrorDetailsStatusCode) deactivateFlowDefinitionRes() {}
 func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) deleteTeamRes()               {}
+func (*ErrorDetailsStatusCode) deleteUserByIDRes()           {}
 func (*ErrorDetailsStatusCode) endSessionRes()               {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()          {}
+func (*ErrorDetailsStatusCode) getBrandingByIdRes()          {}
+func (*ErrorDetailsStatusCode) getClaimStatusRes()           {}
 func (*ErrorDetailsStatusCode) getFlowDefinitionRes()        {}
 func (*ErrorDetailsStatusCode) getFlowStepRes()              {}
 func (*ErrorDetailsStatusCode) getHealthRes()                {}
 func (*ErrorDetailsStatusCode) getKeysRes()                  {}
 func (*ErrorDetailsStatusCode) getLiveRes()                  {}
-func (*ErrorDetailsStatusCode) getMySessionRes()             {}
 func (*ErrorDetailsStatusCode) getMyUserRes()                {}
 func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes()   {}
 func (*ErrorDetailsStatusCode) getProjectRes()               {}
 func (*ErrorDetailsStatusCode) getReadyRes()                 {}
 func (*ErrorDetailsStatusCode) getSchemaByIdRes()            {}
-func (*ErrorDetailsStatusCode) getSessionRes()               {}
 func (*ErrorDetailsStatusCode) getTeamRes()                  {}
 func (*ErrorDetailsStatusCode) getTokenRes()                 {}
 func (*ErrorDetailsStatusCode) getUserByIDRes()              {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()              {}
+func (*ErrorDetailsStatusCode) initClaimRes()                {}
 func (*ErrorDetailsStatusCode) introspectRes()               {}
+func (*ErrorDetailsStatusCode) listBrandingRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
+func (*ErrorDetailsStatusCode) listSchemasRes()              {}
 func (*ErrorDetailsStatusCode) listSessionsRes()             {}
+func (*ErrorDetailsStatusCode) listUserPasskeysRes()         {}
 func (*ErrorDetailsStatusCode) listUsersRes()                {}
+func (*ErrorDetailsStatusCode) patchProjectRes()             {}
+func (*ErrorDetailsStatusCode) queryProjectsRes()            {}
+func (*ErrorDetailsStatusCode) queryTeamsRes()               {}
 func (*ErrorDetailsStatusCode) revokeMySessionRes()          {}
 func (*ErrorDetailsStatusCode) revokeSessionRes()            {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()              {}
@@ -2314,6 +2915,7 @@ func (*ErrorDetailsStatusCode) setUserPasswordRes()          {}
 func (*ErrorDetailsStatusCode) submitFlowEventRes()          {}
 func (*ErrorDetailsStatusCode) submitFlowStepRes()           {}
 func (*ErrorDetailsStatusCode) updateFlowDefinitionRes()     {}
+func (*ErrorDetailsStatusCode) updateTeamRes()               {}
 
 type ExchangeHandoffBadRequest ErrorDetails
 
@@ -2725,6 +3327,247 @@ func (s *FieldValidationFormat) UnmarshalText(data []byte) error {
 	}
 }
 
+// Ref: #
+type FilterField string
+
+const (
+	FilterFieldCreatedAt FilterField = "createdAt"
+)
+
+// AllValues returns all FilterField values.
+func (FilterField) AllValues() []FilterField {
+	return []FilterField{
+		FilterFieldCreatedAt,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FilterField) MarshalText() ([]byte, error) {
+	switch s {
+	case FilterFieldCreatedAt:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FilterField) UnmarshalText(data []byte) error {
+	switch FilterField(data) {
+	case FilterFieldCreatedAt:
+		*s = FilterFieldCreatedAt
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Filter operation defines the operations which can be used when filtering on a
+// query endpoint.
+// Ref: #
+type FilterOperation string
+
+const (
+	FilterOperationEquals             FilterOperation = "equals"
+	FilterOperationNotEquals          FilterOperation = "not_equals"
+	FilterOperationContains           FilterOperation = "contains"
+	FilterOperationNotContains        FilterOperation = "not_contains"
+	FilterOperationLessThan           FilterOperation = "less_than"
+	FilterOperationLessThanOrEqual    FilterOperation = "less_than_or_equal"
+	FilterOperationGreaterThan        FilterOperation = "greater_than"
+	FilterOperationGreaterThanOrEqual FilterOperation = "greater_than_or_equal"
+)
+
+// AllValues returns all FilterOperation values.
+func (FilterOperation) AllValues() []FilterOperation {
+	return []FilterOperation{
+		FilterOperationEquals,
+		FilterOperationNotEquals,
+		FilterOperationContains,
+		FilterOperationNotContains,
+		FilterOperationLessThan,
+		FilterOperationLessThanOrEqual,
+		FilterOperationGreaterThan,
+		FilterOperationGreaterThanOrEqual,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FilterOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case FilterOperationEquals:
+		return []byte(s), nil
+	case FilterOperationNotEquals:
+		return []byte(s), nil
+	case FilterOperationContains:
+		return []byte(s), nil
+	case FilterOperationNotContains:
+		return []byte(s), nil
+	case FilterOperationLessThan:
+		return []byte(s), nil
+	case FilterOperationLessThanOrEqual:
+		return []byte(s), nil
+	case FilterOperationGreaterThan:
+		return []byte(s), nil
+	case FilterOperationGreaterThanOrEqual:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FilterOperation) UnmarshalText(data []byte) error {
+	switch FilterOperation(data) {
+	case FilterOperationEquals:
+		*s = FilterOperationEquals
+		return nil
+	case FilterOperationNotEquals:
+		*s = FilterOperationNotEquals
+		return nil
+	case FilterOperationContains:
+		*s = FilterOperationContains
+		return nil
+	case FilterOperationNotContains:
+		*s = FilterOperationNotContains
+		return nil
+	case FilterOperationLessThan:
+		*s = FilterOperationLessThan
+		return nil
+	case FilterOperationLessThanOrEqual:
+		*s = FilterOperationLessThanOrEqual
+		return nil
+	case FilterOperationGreaterThan:
+		*s = FilterOperationGreaterThan
+		return nil
+	case FilterOperationGreaterThanOrEqual:
+		*s = FilterOperationGreaterThanOrEqual
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Filter-value specifies which values can be filtered by a query endpoint. This
+// is a union of types. When a value is specified which is not assignable to the
+// field which is being filtered, a 400 error will be returned.
+// Ref: #
+// FilterValue represents sum type.
+type FilterValue struct {
+	Type    FilterValueType // switch on this field
+	String  string
+	Float64 float64
+	Bool    bool
+	Null    struct{}
+}
+
+// FilterValueType is oneOf type of FilterValue.
+type FilterValueType string
+
+// Possible values for FilterValueType.
+const (
+	StringFilterValue  FilterValueType = "string"
+	Float64FilterValue FilterValueType = "float64"
+	BoolFilterValue    FilterValueType = "bool"
+	NullFilterValue    FilterValueType = "struct{}"
+)
+
+// IsString reports whether FilterValue is string.
+func (s FilterValue) IsString() bool { return s.Type == StringFilterValue }
+
+// IsFloat64 reports whether FilterValue is float64.
+func (s FilterValue) IsFloat64() bool { return s.Type == Float64FilterValue }
+
+// IsBool reports whether FilterValue is bool.
+func (s FilterValue) IsBool() bool { return s.Type == BoolFilterValue }
+
+// IsNull reports whether FilterValue is struct{}.
+func (s FilterValue) IsNull() bool { return s.Type == NullFilterValue }
+
+// SetString sets FilterValue to string.
+func (s *FilterValue) SetString(v string) {
+	s.Type = StringFilterValue
+	s.String = v
+}
+
+// GetString returns string and true boolean if FilterValue is string.
+func (s FilterValue) GetString() (v string, ok bool) {
+	if !s.IsString() {
+		return v, false
+	}
+	return s.String, true
+}
+
+// NewStringFilterValue returns new FilterValue from string.
+func NewStringFilterValue(v string) FilterValue {
+	var s FilterValue
+	s.SetString(v)
+	return s
+}
+
+// SetFloat64 sets FilterValue to float64.
+func (s *FilterValue) SetFloat64(v float64) {
+	s.Type = Float64FilterValue
+	s.Float64 = v
+}
+
+// GetFloat64 returns float64 and true boolean if FilterValue is float64.
+func (s FilterValue) GetFloat64() (v float64, ok bool) {
+	if !s.IsFloat64() {
+		return v, false
+	}
+	return s.Float64, true
+}
+
+// NewFloat64FilterValue returns new FilterValue from float64.
+func NewFloat64FilterValue(v float64) FilterValue {
+	var s FilterValue
+	s.SetFloat64(v)
+	return s
+}
+
+// SetBool sets FilterValue to bool.
+func (s *FilterValue) SetBool(v bool) {
+	s.Type = BoolFilterValue
+	s.Bool = v
+}
+
+// GetBool returns bool and true boolean if FilterValue is bool.
+func (s FilterValue) GetBool() (v bool, ok bool) {
+	if !s.IsBool() {
+		return v, false
+	}
+	return s.Bool, true
+}
+
+// NewBoolFilterValue returns new FilterValue from bool.
+func NewBoolFilterValue(v bool) FilterValue {
+	var s FilterValue
+	s.SetBool(v)
+	return s
+}
+
+// SetNull sets FilterValue to struct{}.
+func (s *FilterValue) SetNull(v struct{}) {
+	s.Type = NullFilterValue
+	s.Null = v
+}
+
+// GetNull returns struct{} and true boolean if FilterValue is struct{}.
+func (s FilterValue) GetNull() (v struct{}, ok bool) {
+	if !s.IsNull() {
+		return v, false
+	}
+	return s.Null, true
+}
+
+// NewNullFilterValue returns new FilterValue from struct{}.
+func NewNullFilterValue(v struct{}) FilterValue {
+	var s FilterValue
+	s.SetNull(v)
+	return s
+}
+
 // Scopes which teams or apps this flow definition applies to. Empty or
 // omitted fields mean "no restriction"; when both are empty the definition
 // matches every request in the project. The engine picks the most specific
@@ -2772,10 +3615,12 @@ type FlowDefinition struct {
 	// reference. Acts as the human display label as well; no separate slug.
 	Name   string               `json:"name"`
 	Status FlowDefinitionStatus `json:"status"`
-	// User schema this flow operates on. Step `fields` reference properties
-	// defined in this schema. The engine resolves field types, validation,
-	// and implicit outcomes from schema annotations at runtime.
-	UserSchema url.URL `json:"user_schema"`
+	// Server-assigned identifier of the user schema this flow operates on,
+	// as returned by `POST /schemas`. Opaque to the client — the shape is a
+	// server implementation detail. Step `fields` reference properties
+	// defined in the resolved schema; the engine resolves field types, validation, and
+	// implicit outcomes from schema annotations at runtime.
+	UserSchema string `json:"user_schema"`
 	// Maps each purpose this definition handles to its entry-point step.
 	// Keys are purpose names; values must match a `name` in `steps`. A
 	// definition can serve multiple purposes (e.g. a combined login/register
@@ -2798,7 +3643,7 @@ func (s *FlowDefinition) GetStatus() FlowDefinitionStatus {
 }
 
 // GetUserSchema returns the value of UserSchema.
-func (s *FlowDefinition) GetUserSchema() url.URL {
+func (s *FlowDefinition) GetUserSchema() string {
 	return s.UserSchema
 }
 
@@ -2828,7 +3673,7 @@ func (s *FlowDefinition) SetStatus(val FlowDefinitionStatus) {
 }
 
 // SetUserSchema sets the value of UserSchema.
-func (s *FlowDefinition) SetUserSchema(val url.URL) {
+func (s *FlowDefinition) SetUserSchema(val string) {
 	s.UserSchema = val
 }
 
@@ -3723,7 +4568,16 @@ type FlowStep struct {
 	// Step name from the flow definition.
 	Name  string       `json:"name"`
 	Texts OptStepTexts `json:"texts"`
-	// Error message from a previous failed submission.
+	// Error from a previous failed submission. Field-validation failures
+	// carry localisation text keys: `error.<field>_<rule>` per violation
+	// (e.g. `error.email_required`; the `format` rule is spelled
+	// `error.<field>_invalid`), multiple violations joined with `"; "`.
+	// Field names appear verbatim, so clients localise unknown keys via
+	// the generic `error.field_<rule>` catalog entries. Other engine
+	// failures carry `error.*` catalog keys as well (e.g.
+	// `error.invalid_credentials`, `error.passkey_invalid`); a
+	// non-`error.` payload is an outcome token (e.g. `user_not_found`)
+	// that clients keep verbatim.
 	Error OptNilString `json:"error"`
 	// Present only on terminal steps. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
@@ -4376,6 +5230,18 @@ func (s *GetAuthAttemptErrorResponseStatusCode) SetResponse(val GetAuthAttemptEr
 
 func (*GetAuthAttemptErrorResponseStatusCode) getAuthAttemptRes() {}
 
+type GetClaimStatusNotFound ErrorDetails
+
+func (*GetClaimStatusNotFound) getClaimStatusRes() {}
+
+type GetClaimStatusTooManyRequests ErrorDetails
+
+func (*GetClaimStatusTooManyRequests) getClaimStatusRes() {}
+
+type GetClaimStatusUnauthorized ErrorDetails
+
+func (*GetClaimStatusUnauthorized) getClaimStatusRes() {}
+
 type GetFlowStepGone ErrorDetails
 
 func (*GetFlowStepGone) getFlowStepRes() {}
@@ -4416,73 +5282,105 @@ func (s GetLiveOK) Read(p []byte) (n int, err error) {
 
 func (*GetLiveOK) getLiveRes() {}
 
-type GetMySessionNotFound ErrorDetails
-
-func (*GetMySessionNotFound) getMySessionRes() {}
-
-type GetMySessionUnauthorized ErrorDetails
-
-func (*GetMySessionUnauthorized) getMySessionRes() {}
-
-type GetMyUserOK map[string]jx.Raw
-
-func (s *GetMyUserOK) init() GetMyUserOK {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
+// GetMySessionErrorResponse represents sum type.
+type GetMySessionErrorResponse struct {
+	Type         GetMySessionErrorResponseType // switch on this field
+	SessNotFound SessNotFound
+	Internal     Internal
 }
 
-func (*GetMyUserOK) getMyUserRes() {}
+// GetMySessionErrorResponseType is oneOf type of GetMySessionErrorResponse.
+type GetMySessionErrorResponseType string
+
+// Possible values for GetMySessionErrorResponseType.
+const (
+	SessNotFoundGetMySessionErrorResponse GetMySessionErrorResponseType = "sess.not_found"
+	InternalGetMySessionErrorResponse     GetMySessionErrorResponseType = "internal"
+)
+
+// IsSessNotFound reports whether GetMySessionErrorResponse is SessNotFound.
+func (s GetMySessionErrorResponse) IsSessNotFound() bool {
+	return s.Type == SessNotFoundGetMySessionErrorResponse
+}
+
+// IsInternal reports whether GetMySessionErrorResponse is Internal.
+func (s GetMySessionErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetMySessionErrorResponse
+}
+
+// SetSessNotFound sets GetMySessionErrorResponse to SessNotFound.
+func (s *GetMySessionErrorResponse) SetSessNotFound(v SessNotFound) {
+	s.Type = SessNotFoundGetMySessionErrorResponse
+	s.SessNotFound = v
+}
+
+// GetSessNotFound returns SessNotFound and true boolean if GetMySessionErrorResponse is SessNotFound.
+func (s GetMySessionErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
+	if !s.IsSessNotFound() {
+		return v, false
+	}
+	return s.SessNotFound, true
+}
+
+// NewSessNotFoundGetMySessionErrorResponse returns new GetMySessionErrorResponse from SessNotFound.
+func NewSessNotFoundGetMySessionErrorResponse(v SessNotFound) GetMySessionErrorResponse {
+	var s GetMySessionErrorResponse
+	s.SetSessNotFound(v)
+	return s
+}
+
+// SetInternal sets GetMySessionErrorResponse to Internal.
+func (s *GetMySessionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetMySessionErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetMySessionErrorResponse is Internal.
+func (s GetMySessionErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetMySessionErrorResponse returns new GetMySessionErrorResponse from Internal.
+func NewInternalGetMySessionErrorResponse(v Internal) GetMySessionErrorResponse {
+	var s GetMySessionErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// GetMySessionErrorResponseStatusCode wraps GetMySessionErrorResponse with StatusCode.
+type GetMySessionErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetMySessionErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetMySessionErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetMySessionErrorResponseStatusCode) GetResponse() GetMySessionErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetMySessionErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetMySessionErrorResponseStatusCode) SetResponse(val GetMySessionErrorResponse) {
+	s.Response = val
+}
+
+func (*GetMySessionErrorResponseStatusCode) getMySessionRes() {}
 
 type GetProjectNotFound ErrorDetails
 
 func (*GetProjectNotFound) getProjectRes() {}
-
-// The current state of a project.
-// Ref: #
-type GetProjectResponse struct {
-	// The unique identifier of the project.
-	ID string `json:"id"`
-	// The time when the project was created.
-	CreatedAt time.Time `json:"createdAt"`
-	// The time when the project was last updated.
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-// GetID returns the value of ID.
-func (s *GetProjectResponse) GetID() string {
-	return s.ID
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *GetProjectResponse) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// GetUpdatedAt returns the value of UpdatedAt.
-func (s *GetProjectResponse) GetUpdatedAt() time.Time {
-	return s.UpdatedAt
-}
-
-// SetID sets the value of ID.
-func (s *GetProjectResponse) SetID(val string) {
-	s.ID = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *GetProjectResponse) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-// SetUpdatedAt sets the value of UpdatedAt.
-func (s *GetProjectResponse) SetUpdatedAt(val time.Time) {
-	s.UpdatedAt = val
-}
-
-func (*GetProjectResponse) getProjectRes() {}
 
 type GetProjectUnauthorized ErrorDetails
 
@@ -4552,6 +5450,104 @@ func NewUserSchemaGetSchemaByIdOK(v UserSchema) GetSchemaByIdOK {
 
 func (*GetSchemaByIdOK) getSchemaByIdRes() {}
 
+// GetSessionErrorResponse represents sum type.
+type GetSessionErrorResponse struct {
+	Type         GetSessionErrorResponseType // switch on this field
+	SessNotFound SessNotFound
+	Internal     Internal
+}
+
+// GetSessionErrorResponseType is oneOf type of GetSessionErrorResponse.
+type GetSessionErrorResponseType string
+
+// Possible values for GetSessionErrorResponseType.
+const (
+	SessNotFoundGetSessionErrorResponse GetSessionErrorResponseType = "sess.not_found"
+	InternalGetSessionErrorResponse     GetSessionErrorResponseType = "internal"
+)
+
+// IsSessNotFound reports whether GetSessionErrorResponse is SessNotFound.
+func (s GetSessionErrorResponse) IsSessNotFound() bool {
+	return s.Type == SessNotFoundGetSessionErrorResponse
+}
+
+// IsInternal reports whether GetSessionErrorResponse is Internal.
+func (s GetSessionErrorResponse) IsInternal() bool { return s.Type == InternalGetSessionErrorResponse }
+
+// SetSessNotFound sets GetSessionErrorResponse to SessNotFound.
+func (s *GetSessionErrorResponse) SetSessNotFound(v SessNotFound) {
+	s.Type = SessNotFoundGetSessionErrorResponse
+	s.SessNotFound = v
+}
+
+// GetSessNotFound returns SessNotFound and true boolean if GetSessionErrorResponse is SessNotFound.
+func (s GetSessionErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
+	if !s.IsSessNotFound() {
+		return v, false
+	}
+	return s.SessNotFound, true
+}
+
+// NewSessNotFoundGetSessionErrorResponse returns new GetSessionErrorResponse from SessNotFound.
+func NewSessNotFoundGetSessionErrorResponse(v SessNotFound) GetSessionErrorResponse {
+	var s GetSessionErrorResponse
+	s.SetSessNotFound(v)
+	return s
+}
+
+// SetInternal sets GetSessionErrorResponse to Internal.
+func (s *GetSessionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetSessionErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetSessionErrorResponse is Internal.
+func (s GetSessionErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetSessionErrorResponse returns new GetSessionErrorResponse from Internal.
+func NewInternalGetSessionErrorResponse(v Internal) GetSessionErrorResponse {
+	var s GetSessionErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// GetSessionErrorResponseStatusCode wraps GetSessionErrorResponse with StatusCode.
+type GetSessionErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetSessionErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetSessionErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetSessionErrorResponseStatusCode) GetResponse() GetSessionErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetSessionErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetSessionErrorResponseStatusCode) SetResponse(val GetSessionErrorResponse) {
+	s.Response = val
+}
+
+func (*GetSessionErrorResponseStatusCode) getSessionRes() {}
+
+type GetSessionForbidden ErrorDetails
+
+func (*GetSessionForbidden) getSessionRes() {}
+
 type GetSessionNotFound ErrorDetails
 
 func (*GetSessionNotFound) getSessionRes() {}
@@ -4564,49 +5560,6 @@ type GetTeamNotFound ErrorDetails
 
 func (*GetTeamNotFound) getTeamRes() {}
 
-// The current state of a team.
-// Ref: #
-type GetTeamResponse struct {
-	// The unique identifier of the team.
-	ID string `json:"id"`
-	// The time when the team was created.
-	CreatedAt time.Time `json:"createdAt"`
-	// The time when the team was last updated.
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-// GetID returns the value of ID.
-func (s *GetTeamResponse) GetID() string {
-	return s.ID
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *GetTeamResponse) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// GetUpdatedAt returns the value of UpdatedAt.
-func (s *GetTeamResponse) GetUpdatedAt() time.Time {
-	return s.UpdatedAt
-}
-
-// SetID sets the value of ID.
-func (s *GetTeamResponse) SetID(val string) {
-	s.ID = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *GetTeamResponse) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-// SetUpdatedAt sets the value of UpdatedAt.
-func (s *GetTeamResponse) SetUpdatedAt(val time.Time) {
-	s.UpdatedAt = val
-}
-
-func (*GetTeamResponse) getTeamRes() {}
-
 type GetTeamUnauthorized ErrorDetails
 
 func (*GetTeamUnauthorized) getTeamRes() {}
@@ -4614,19 +5567,6 @@ func (*GetTeamUnauthorized) getTeamRes() {}
 type GetUserByIDNotFound ErrorDetails
 
 func (*GetUserByIDNotFound) getUserByIDRes() {}
-
-type GetUserByIDOK map[string]jx.Raw
-
-func (s *GetUserByIDOK) init() GetUserByIDOK {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-func (*GetUserByIDOK) getUserByIDRes() {}
 
 type GetUserByIDUnauthorized ErrorDetails
 
@@ -4798,6 +5738,49 @@ func (s *IdentifierProof) GetLoginName() string {
 func (s *IdentifierProof) SetLoginName(val string) {
 	s.LoginName = val
 }
+
+// The claim challenge minted for a project.
+// Ref: #
+type InitClaimResponse struct {
+	// The browser URL a developer opens to complete the claim. It embeds the
+	// `challenge_id` so the browser leg does not need the project secret.
+	ClaimURL    url.URL     `json:"claim_url"`
+	ChallengeID ChallengeID `json:"challenge_id"`
+	// The time when the claim challenge expires.
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// GetClaimURL returns the value of ClaimURL.
+func (s *InitClaimResponse) GetClaimURL() url.URL {
+	return s.ClaimURL
+}
+
+// GetChallengeID returns the value of ChallengeID.
+func (s *InitClaimResponse) GetChallengeID() ChallengeID {
+	return s.ChallengeID
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *InitClaimResponse) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// SetClaimURL sets the value of ClaimURL.
+func (s *InitClaimResponse) SetClaimURL(val url.URL) {
+	s.ClaimURL = val
+}
+
+// SetChallengeID sets the value of ChallengeID.
+func (s *InitClaimResponse) SetChallengeID(val ChallengeID) {
+	s.ChallengeID = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *InitClaimResponse) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+func (*InitClaimResponse) initClaimRes() {}
 
 // Merged schema.
 // Ref: #
@@ -5572,6 +6555,39 @@ func (s *KeysResponseKeysItem) SetX5tS256(val OptString) {
 	s.X5tS256 = val
 }
 
+type Limit int
+
+type ListBrandingResponse []ListBrandingResponseItem
+
+func (*ListBrandingResponse) listBrandingRes() {}
+
+type ListBrandingResponseItem struct {
+	// The unique identifier of this branding revision.
+	ID string `json:"id"`
+	// When this revision was published.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetID returns the value of ID.
+func (s *ListBrandingResponseItem) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ListBrandingResponseItem) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ListBrandingResponseItem) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ListBrandingResponseItem) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
 type ListFlowDefinitionsPurpose string
 
 const (
@@ -5641,6 +6657,36 @@ func (s *ListFlowDefinitionsPurpose) UnmarshalText(data []byte) error {
 	}
 }
 
+type ListSchemasResponse []ListSchemasResponseItem
+
+func (*ListSchemasResponse) listSchemasRes() {}
+
+type ListSchemasResponseItem struct {
+	// The unique identifier for this schema.
+	ID        string    `json:"id"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// GetID returns the value of ID.
+func (s *ListSchemasResponseItem) GetID() string {
+	return s.ID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ListSchemasResponseItem) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ListSchemasResponseItem) SetID(val string) {
+	s.ID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ListSchemasResponseItem) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
 type ListSessionsBadRequest ErrorDetails
 
 func (*ListSessionsBadRequest) listSessionsRes() {}
@@ -5708,6 +6754,96 @@ type ListSessionsUnauthorized ErrorDetails
 
 func (*ListSessionsUnauthorized) listSessionsRes() {}
 
+type ListUserPasskeysBadRequest ErrorDetails
+
+func (*ListUserPasskeysBadRequest) listUserPasskeysRes() {}
+
+type ListUserPasskeysForbidden ErrorDetails
+
+func (*ListUserPasskeysForbidden) listUserPasskeysRes() {}
+
+type ListUserPasskeysInternalServerError ErrorDetails
+
+func (*ListUserPasskeysInternalServerError) listUserPasskeysRes() {}
+
+type ListUserPasskeysNotFound ErrorDetails
+
+func (*ListUserPasskeysNotFound) listUserPasskeysRes() {}
+
+// Response containing the user's passkeys.
+// Ref: #
+type ListUserPasskeysResponse struct {
+	Passkeys []ListUserPasskeysResponsePasskeysItem `json:"passkeys"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetPasskeys returns the value of Passkeys.
+func (s *ListUserPasskeysResponse) GetPasskeys() []ListUserPasskeysResponsePasskeysItem {
+	return s.Passkeys
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListUserPasskeysResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetPasskeys sets the value of Passkeys.
+func (s *ListUserPasskeysResponse) SetPasskeys(val []ListUserPasskeysResponsePasskeysItem) {
+	s.Passkeys = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListUserPasskeysResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListUserPasskeysResponse) listUserPasskeysRes() {}
+
+type ListUserPasskeysResponsePasskeysItem struct {
+	// The unique identifier of the passkey.
+	ID string `json:"id"`
+	// The name of the passkey.
+	Name string `json:"name"`
+	// The timestamp when the passkey was created.
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// GetID returns the value of ID.
+func (s *ListUserPasskeysResponsePasskeysItem) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *ListUserPasskeysResponsePasskeysItem) GetName() string {
+	return s.Name
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ListUserPasskeysResponsePasskeysItem) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ListUserPasskeysResponsePasskeysItem) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *ListUserPasskeysResponsePasskeysItem) SetName(val string) {
+	s.Name = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ListUserPasskeysResponsePasskeysItem) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+type ListUserPasskeysUnauthorized ErrorDetails
+
+func (*ListUserPasskeysUnauthorized) listUserPasskeysRes() {}
+
 type ListUsersBadRequest ErrorDetails
 
 func (*ListUsersBadRequest) listUsersRes() {}
@@ -5716,19 +6852,60 @@ type ListUsersInternalServerError ErrorDetails
 
 func (*ListUsersInternalServerError) listUsersRes() {}
 
-type ListUsersOKApplicationJSON []ListUsersOKItem
+// Paginated list of users.
+// Ref: #
+type ListUsersResponse struct {
+	Users []User `json:"users"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
 
-func (*ListUsersOKApplicationJSON) listUsersRes() {}
+// GetUsers returns the value of Users.
+func (s *ListUsersResponse) GetUsers() []User {
+	return s.Users
+}
 
-type ListUsersOKItem map[string]jx.Raw
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListUsersResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
 
-func (s *ListUsersOKItem) init() ListUsersOKItem {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
+// SetUsers sets the value of Users.
+func (s *ListUsersResponse) SetUsers(val []User) {
+	s.Users = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListUsersResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListUsersResponse) listUsersRes() {}
+
+type NextgenSession struct {
+	APIKey string
+	Roles  []string
+}
+
+// GetAPIKey returns the value of APIKey.
+func (s *NextgenSession) GetAPIKey() string {
+	return s.APIKey
+}
+
+// GetRoles returns the value of Roles.
+func (s *NextgenSession) GetRoles() []string {
+	return s.Roles
+}
+
+// SetAPIKey sets the value of APIKey.
+func (s *NextgenSession) SetAPIKey(val string) {
+	s.APIKey = val
+}
+
+// SetRoles sets the value of Roles.
+func (s *NextgenSession) SetRoles(val []string) {
+	s.Roles = val
 }
 
 type OAuth2 struct {
@@ -6779,6 +7956,52 @@ func (o OptAuthMethod) Or(d AuthMethod) AuthMethod {
 	return d
 }
 
+// NewOptAuthUnauthorizedDetails returns new OptAuthUnauthorizedDetails with value set to v.
+func NewOptAuthUnauthorizedDetails(v AuthUnauthorizedDetails) OptAuthUnauthorizedDetails {
+	return OptAuthUnauthorizedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAuthUnauthorizedDetails is optional AuthUnauthorizedDetails.
+type OptAuthUnauthorizedDetails struct {
+	Value AuthUnauthorizedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAuthUnauthorizedDetails was set.
+func (o OptAuthUnauthorizedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAuthUnauthorizedDetails) Reset() {
+	var v AuthUnauthorizedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAuthUnauthorizedDetails) SetTo(v AuthUnauthorizedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAuthUnauthorizedDetails) Get() (v AuthUnauthorizedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAuthUnauthorizedDetails) Or(d AuthUnauthorizedDetails) AuthUnauthorizedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptBool returns new OptBool with value set to v.
 func NewOptBool(v bool) OptBool {
 	return OptBool{
@@ -7325,6 +8548,52 @@ func (o OptFieldValidationFormat) Get() (v FieldValidationFormat, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFieldValidationFormat) Or(d FieldValidationFormat) FieldValidationFormat {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFilterValue returns new OptFilterValue with value set to v.
+func NewOptFilterValue(v FilterValue) OptFilterValue {
+	return OptFilterValue{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFilterValue is optional FilterValue.
+type OptFilterValue struct {
+	Value FilterValue
+	Set   bool
+}
+
+// IsSet returns true if OptFilterValue was set.
+func (o OptFilterValue) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFilterValue) Reset() {
+	var v FilterValue
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFilterValue) SetTo(v FilterValue) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFilterValue) Get() (v FilterValue, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFilterValue) Or(d FilterValue) FilterValue {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -8251,6 +9520,52 @@ func (o OptIssueChallengeRequestPasskeyOptionsUserVerification) Or(d IssueChalle
 	return d
 }
 
+// NewOptLimit returns new OptLimit with value set to v.
+func NewOptLimit(v Limit) OptLimit {
+	return OptLimit{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptLimit is optional Limit.
+type OptLimit struct {
+	Value Limit
+	Set   bool
+}
+
+// IsSet returns true if OptLimit was set.
+func (o OptLimit) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptLimit) Reset() {
+	var v Limit
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptLimit) SetTo(v Limit) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptLimit) Get() (v Limit, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptLimit) Or(d Limit) Limit {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptListFlowDefinitionsPurpose returns new OptListFlowDefinitionsPurpose with value set to v.
 func NewOptListFlowDefinitionsPurpose(v ListFlowDefinitionsPurpose) OptListFlowDefinitionsPurpose {
 	return OptListFlowDefinitionsPurpose{
@@ -9094,6 +10409,236 @@ func (o OptPostTokenRequestGrantType) Or(d PostTokenRequestGrantType) PostTokenR
 	return d
 }
 
+// NewOptProjClaimExpiredDetails returns new OptProjClaimExpiredDetails with value set to v.
+func NewOptProjClaimExpiredDetails(v ProjClaimExpiredDetails) OptProjClaimExpiredDetails {
+	return OptProjClaimExpiredDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjClaimExpiredDetails is optional ProjClaimExpiredDetails.
+type OptProjClaimExpiredDetails struct {
+	Value ProjClaimExpiredDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjClaimExpiredDetails was set.
+func (o OptProjClaimExpiredDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjClaimExpiredDetails) Reset() {
+	var v ProjClaimExpiredDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjClaimExpiredDetails) SetTo(v ProjClaimExpiredDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjClaimExpiredDetails) Get() (v ProjClaimExpiredDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjClaimExpiredDetails) Or(d ProjClaimExpiredDetails) ProjClaimExpiredDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptProjNotFoundDetails returns new OptProjNotFoundDetails with value set to v.
+func NewOptProjNotFoundDetails(v ProjNotFoundDetails) OptProjNotFoundDetails {
+	return OptProjNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjNotFoundDetails is optional ProjNotFoundDetails.
+type OptProjNotFoundDetails struct {
+	Value ProjNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjNotFoundDetails was set.
+func (o OptProjNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjNotFoundDetails) Reset() {
+	var v ProjNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjNotFoundDetails) SetTo(v ProjNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjNotFoundDetails) Get() (v ProjNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjNotFoundDetails) Or(d ProjNotFoundDetails) ProjNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptProjPermissionDeniedDetails returns new OptProjPermissionDeniedDetails with value set to v.
+func NewOptProjPermissionDeniedDetails(v ProjPermissionDeniedDetails) OptProjPermissionDeniedDetails {
+	return OptProjPermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjPermissionDeniedDetails is optional ProjPermissionDeniedDetails.
+type OptProjPermissionDeniedDetails struct {
+	Value ProjPermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjPermissionDeniedDetails was set.
+func (o OptProjPermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjPermissionDeniedDetails) Reset() {
+	var v ProjPermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjPermissionDeniedDetails) SetTo(v ProjPermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjPermissionDeniedDetails) Get() (v ProjPermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjPermissionDeniedDetails) Or(d ProjPermissionDeniedDetails) ProjPermissionDeniedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptQueryProjectsRequestSorting returns new OptQueryProjectsRequestSorting with value set to v.
+func NewOptQueryProjectsRequestSorting(v QueryProjectsRequestSorting) OptQueryProjectsRequestSorting {
+	return OptQueryProjectsRequestSorting{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptQueryProjectsRequestSorting is optional QueryProjectsRequestSorting.
+type OptQueryProjectsRequestSorting struct {
+	Value QueryProjectsRequestSorting
+	Set   bool
+}
+
+// IsSet returns true if OptQueryProjectsRequestSorting was set.
+func (o OptQueryProjectsRequestSorting) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptQueryProjectsRequestSorting) Reset() {
+	var v QueryProjectsRequestSorting
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptQueryProjectsRequestSorting) SetTo(v QueryProjectsRequestSorting) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptQueryProjectsRequestSorting) Get() (v QueryProjectsRequestSorting, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptQueryProjectsRequestSorting) Or(d QueryProjectsRequestSorting) QueryProjectsRequestSorting {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptQueryTeamsRequestSorting returns new OptQueryTeamsRequestSorting with value set to v.
+func NewOptQueryTeamsRequestSorting(v QueryTeamsRequestSorting) OptQueryTeamsRequestSorting {
+	return OptQueryTeamsRequestSorting{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptQueryTeamsRequestSorting is optional QueryTeamsRequestSorting.
+type OptQueryTeamsRequestSorting struct {
+	Value QueryTeamsRequestSorting
+	Set   bool
+}
+
+// IsSet returns true if OptQueryTeamsRequestSorting was set.
+func (o OptQueryTeamsRequestSorting) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptQueryTeamsRequestSorting) Reset() {
+	var v QueryTeamsRequestSorting
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptQueryTeamsRequestSorting) SetTo(v QueryTeamsRequestSorting) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptQueryTeamsRequestSorting) Get() (v QueryTeamsRequestSorting, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptQueryTeamsRequestSorting) Or(d QueryTeamsRequestSorting) QueryTeamsRequestSorting {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSchemaURI returns new OptSchemaURI with value set to v.
 func NewOptSchemaURI(v SchemaURI) OptSchemaURI {
 	return OptSchemaURI{
@@ -9134,6 +10679,52 @@ func (o OptSchemaURI) Get() (v SchemaURI, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptSchemaURI) Or(d SchemaURI) SchemaURI {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSessNotFoundDetails returns new OptSessNotFoundDetails with value set to v.
+func NewOptSessNotFoundDetails(v SessNotFoundDetails) OptSessNotFoundDetails {
+	return OptSessNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessNotFoundDetails is optional SessNotFoundDetails.
+type OptSessNotFoundDetails struct {
+	Value SessNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSessNotFoundDetails was set.
+func (o OptSessNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessNotFoundDetails) Reset() {
+	var v SessNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessNotFoundDetails) SetTo(v SessNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessNotFoundDetails) Get() (v SessNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessNotFoundDetails) Or(d SessNotFoundDetails) SessNotFoundDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -9364,6 +10955,52 @@ func (o OptUserID) Get() (v UserID, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUserID) Or(d UserID) UserID {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserMetadata returns new OptUserMetadata with value set to v.
+func NewOptUserMetadata(v UserMetadata) OptUserMetadata {
+	return OptUserMetadata{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserMetadata is optional UserMetadata.
+type OptUserMetadata struct {
+	Value UserMetadata
+	Set   bool
+}
+
+// IsSet returns true if OptUserMetadata was set.
+func (o OptUserMetadata) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserMetadata) Reset() {
+	var v UserMetadata
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserMetadata) SetTo(v UserMetadata) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserMetadata) Get() (v UserMetadata, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserMetadata) Or(d UserMetadata) UserMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -9867,6 +11504,34 @@ func (s *PasswordProof) SetPassword(val string) {
 	s.Password = val
 }
 
+type PatchProjectBadRequest ErrorDetails
+
+func (*PatchProjectBadRequest) patchProjectRes() {}
+
+type PatchProjectNotFound ErrorDetails
+
+func (*PatchProjectNotFound) patchProjectRes() {}
+
+// Ref: #
+type PatchProjectRequest struct {
+	// The name of the project.
+	Name OptNilString `json:"name"`
+}
+
+// GetName returns the value of Name.
+func (s *PatchProjectRequest) GetName() OptNilString {
+	return s.Name
+}
+
+// SetName sets the value of Name.
+func (s *PatchProjectRequest) SetName(val OptNilString) {
+	s.Name = val
+}
+
+type PatchProjectUnauthorized ErrorDetails
+
+func (*PatchProjectUnauthorized) patchProjectRes() {}
+
 // Ref: #
 type PostTokenRequest struct {
 	// The authorization code received from the authorization server. Required
@@ -10029,7 +11694,569 @@ func (s *PostTokenRequestGrantType) UnmarshalText(data []byte) error {
 	}
 }
 
+// Merged schema.
+// Ref: #
+type ProjClaimExpired struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjClaimExpiredDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjClaimExpired) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjClaimExpired) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjClaimExpired) GetDetails() OptProjClaimExpiredDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjClaimExpired) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjClaimExpired) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjClaimExpired) SetDetails(val OptProjClaimExpiredDetails) {
+	s.Details = val
+}
+
+func (*ProjClaimExpired) completeClaimRes()  {}
+func (*ProjClaimExpired) getClaimStatusRes() {}
+
+// Additional error-specific context.
+type ProjClaimExpiredDetails map[string]jx.Raw
+
+func (s *ProjClaimExpiredDetails) init() ProjClaimExpiredDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjNotFound) GetDetails() OptProjNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjNotFound) SetDetails(val OptProjNotFoundDetails) {
+	s.Details = val
+}
+
+func (*ProjNotFound) initClaimRes() {}
+
+// Additional error-specific context.
+type ProjNotFoundDetails map[string]jx.Raw
+
+func (s *ProjNotFoundDetails) init() ProjNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjPermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjPermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjPermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjPermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjPermissionDenied) GetDetails() OptProjPermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjPermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjPermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjPermissionDenied) SetDetails(val OptProjPermissionDeniedDetails) {
+	s.Details = val
+}
+
+func (*ProjPermissionDenied) getClaimStatusRes() {}
+
+// Additional error-specific context.
+type ProjPermissionDeniedDetails map[string]jx.Raw
+
+func (s *ProjPermissionDeniedDetails) init() ProjPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 type ProjectID string
+
+// The current state of a project.
+// Ref: #
+type ProjectResponse struct {
+	// The unique identifier of the project.
+	ID string `json:"id"`
+	// The name of the project.
+	Name string `json:"name"`
+	// Origins which are allowed for previewing and testing the project.
+	PreviewOrigins []string `json:"previewOrigins"`
+	// The time when the project was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the project was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// GetID returns the value of ID.
+func (s *ProjectResponse) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *ProjectResponse) GetName() string {
+	return s.Name
+}
+
+// GetPreviewOrigins returns the value of PreviewOrigins.
+func (s *ProjectResponse) GetPreviewOrigins() []string {
+	return s.PreviewOrigins
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ProjectResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *ProjectResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *ProjectResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *ProjectResponse) SetName(val string) {
+	s.Name = val
+}
+
+// SetPreviewOrigins sets the value of PreviewOrigins.
+func (s *ProjectResponse) SetPreviewOrigins(val []string) {
+	s.PreviewOrigins = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ProjectResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *ProjectResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*ProjectResponse) getProjectRes()   {}
+func (*ProjectResponse) patchProjectRes() {}
+
+type QueryProjectsBadRequest ErrorDetails
+
+func (*QueryProjectsBadRequest) queryProjectsRes() {}
+
+type QueryProjectsForbidden ErrorDetails
+
+func (*QueryProjectsForbidden) queryProjectsRes() {}
+
+// Request to query projects.
+// Ref: #
+type QueryProjectsRequest struct {
+	Limit OptLimit `json:"limit"`
+	// Token to retrieve the next page of results.
+	PageToken OptNilPageToken                `json:"page_token"`
+	Sorting   OptQueryProjectsRequestSorting `json:"sorting"`
+	// Filter criteria for querying projects.
+	Filter []QueryProjectsRequestFilterItem `json:"filter"`
+}
+
+// GetLimit returns the value of Limit.
+func (s *QueryProjectsRequest) GetLimit() OptLimit {
+	return s.Limit
+}
+
+// GetPageToken returns the value of PageToken.
+func (s *QueryProjectsRequest) GetPageToken() OptNilPageToken {
+	return s.PageToken
+}
+
+// GetSorting returns the value of Sorting.
+func (s *QueryProjectsRequest) GetSorting() OptQueryProjectsRequestSorting {
+	return s.Sorting
+}
+
+// GetFilter returns the value of Filter.
+func (s *QueryProjectsRequest) GetFilter() []QueryProjectsRequestFilterItem {
+	return s.Filter
+}
+
+// SetLimit sets the value of Limit.
+func (s *QueryProjectsRequest) SetLimit(val OptLimit) {
+	s.Limit = val
+}
+
+// SetPageToken sets the value of PageToken.
+func (s *QueryProjectsRequest) SetPageToken(val OptNilPageToken) {
+	s.PageToken = val
+}
+
+// SetSorting sets the value of Sorting.
+func (s *QueryProjectsRequest) SetSorting(val OptQueryProjectsRequestSorting) {
+	s.Sorting = val
+}
+
+// SetFilter sets the value of Filter.
+func (s *QueryProjectsRequest) SetFilter(val []QueryProjectsRequestFilterItem) {
+	s.Filter = val
+}
+
+type QueryProjectsRequestFilterItem struct {
+	// The field to filter by.
+	Field     FilterField     `json:"field"`
+	Value     OptFilterValue  `json:"value"`
+	Operation FilterOperation `json:"operation"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryProjectsRequestFilterItem) GetField() FilterField {
+	return s.Field
+}
+
+// GetValue returns the value of Value.
+func (s *QueryProjectsRequestFilterItem) GetValue() OptFilterValue {
+	return s.Value
+}
+
+// GetOperation returns the value of Operation.
+func (s *QueryProjectsRequestFilterItem) GetOperation() FilterOperation {
+	return s.Operation
+}
+
+// SetField sets the value of Field.
+func (s *QueryProjectsRequestFilterItem) SetField(val FilterField) {
+	s.Field = val
+}
+
+// SetValue sets the value of Value.
+func (s *QueryProjectsRequestFilterItem) SetValue(val OptFilterValue) {
+	s.Value = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *QueryProjectsRequestFilterItem) SetOperation(val FilterOperation) {
+	s.Operation = val
+}
+
+type QueryProjectsRequestSorting struct {
+	// The field to sort by.
+	Field FilterField `json:"field"`
+	// The direction to sort by.
+	Direction SortDirection `json:"direction"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryProjectsRequestSorting) GetField() FilterField {
+	return s.Field
+}
+
+// GetDirection returns the value of Direction.
+func (s *QueryProjectsRequestSorting) GetDirection() SortDirection {
+	return s.Direction
+}
+
+// SetField sets the value of Field.
+func (s *QueryProjectsRequestSorting) SetField(val FilterField) {
+	s.Field = val
+}
+
+// SetDirection sets the value of Direction.
+func (s *QueryProjectsRequestSorting) SetDirection(val SortDirection) {
+	s.Direction = val
+}
+
+// Paginated list of projects.
+// Ref: #
+type QueryProjectsResponse struct {
+	Projects []ProjectResponse `json:"projects"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetProjects returns the value of Projects.
+func (s *QueryProjectsResponse) GetProjects() []ProjectResponse {
+	return s.Projects
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *QueryProjectsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetProjects sets the value of Projects.
+func (s *QueryProjectsResponse) SetProjects(val []ProjectResponse) {
+	s.Projects = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *QueryProjectsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*QueryProjectsResponse) queryProjectsRes() {}
+
+type QueryProjectsTooManyRequests ErrorDetails
+
+func (*QueryProjectsTooManyRequests) queryProjectsRes() {}
+
+type QueryProjectsUnauthorized ErrorDetails
+
+func (*QueryProjectsUnauthorized) queryProjectsRes() {}
+
+type QueryTeamsBadRequest ErrorDetails
+
+func (*QueryTeamsBadRequest) queryTeamsRes() {}
+
+type QueryTeamsForbidden ErrorDetails
+
+func (*QueryTeamsForbidden) queryTeamsRes() {}
+
+type QueryTeamsNotFound ErrorDetails
+
+func (*QueryTeamsNotFound) queryTeamsRes() {}
+
+// Request to query the teams of a project.
+// Ref: #
+type QueryTeamsRequest struct {
+	Limit OptLimit `json:"limit"`
+	// Token to retrieve the next page of results.
+	PageToken OptNilPageToken             `json:"page_token"`
+	Sorting   OptQueryTeamsRequestSorting `json:"sorting"`
+	// Filter criteria for querying teams.
+	Filter []QueryTeamsRequestFilterItem `json:"filter"`
+}
+
+// GetLimit returns the value of Limit.
+func (s *QueryTeamsRequest) GetLimit() OptLimit {
+	return s.Limit
+}
+
+// GetPageToken returns the value of PageToken.
+func (s *QueryTeamsRequest) GetPageToken() OptNilPageToken {
+	return s.PageToken
+}
+
+// GetSorting returns the value of Sorting.
+func (s *QueryTeamsRequest) GetSorting() OptQueryTeamsRequestSorting {
+	return s.Sorting
+}
+
+// GetFilter returns the value of Filter.
+func (s *QueryTeamsRequest) GetFilter() []QueryTeamsRequestFilterItem {
+	return s.Filter
+}
+
+// SetLimit sets the value of Limit.
+func (s *QueryTeamsRequest) SetLimit(val OptLimit) {
+	s.Limit = val
+}
+
+// SetPageToken sets the value of PageToken.
+func (s *QueryTeamsRequest) SetPageToken(val OptNilPageToken) {
+	s.PageToken = val
+}
+
+// SetSorting sets the value of Sorting.
+func (s *QueryTeamsRequest) SetSorting(val OptQueryTeamsRequestSorting) {
+	s.Sorting = val
+}
+
+// SetFilter sets the value of Filter.
+func (s *QueryTeamsRequest) SetFilter(val []QueryTeamsRequestFilterItem) {
+	s.Filter = val
+}
+
+type QueryTeamsRequestFilterItem struct {
+	// The field to filter by.
+	Field     TeamFilterField `json:"field"`
+	Value     OptFilterValue  `json:"value"`
+	Operation FilterOperation `json:"operation"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryTeamsRequestFilterItem) GetField() TeamFilterField {
+	return s.Field
+}
+
+// GetValue returns the value of Value.
+func (s *QueryTeamsRequestFilterItem) GetValue() OptFilterValue {
+	return s.Value
+}
+
+// GetOperation returns the value of Operation.
+func (s *QueryTeamsRequestFilterItem) GetOperation() FilterOperation {
+	return s.Operation
+}
+
+// SetField sets the value of Field.
+func (s *QueryTeamsRequestFilterItem) SetField(val TeamFilterField) {
+	s.Field = val
+}
+
+// SetValue sets the value of Value.
+func (s *QueryTeamsRequestFilterItem) SetValue(val OptFilterValue) {
+	s.Value = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *QueryTeamsRequestFilterItem) SetOperation(val FilterOperation) {
+	s.Operation = val
+}
+
+type QueryTeamsRequestSorting struct {
+	// The field to sort by.
+	Field TeamFilterField `json:"field"`
+	// The direction to sort by.
+	Direction SortDirection `json:"direction"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryTeamsRequestSorting) GetField() TeamFilterField {
+	return s.Field
+}
+
+// GetDirection returns the value of Direction.
+func (s *QueryTeamsRequestSorting) GetDirection() SortDirection {
+	return s.Direction
+}
+
+// SetField sets the value of Field.
+func (s *QueryTeamsRequestSorting) SetField(val TeamFilterField) {
+	s.Field = val
+}
+
+// SetDirection sets the value of Direction.
+func (s *QueryTeamsRequestSorting) SetDirection(val SortDirection) {
+	s.Direction = val
+}
+
+// Paginated list of teams.
+// Ref: #
+type QueryTeamsResponse struct {
+	Teams []TeamResponse `json:"teams"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetTeams returns the value of Teams.
+func (s *QueryTeamsResponse) GetTeams() []TeamResponse {
+	return s.Teams
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *QueryTeamsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetTeams sets the value of Teams.
+func (s *QueryTeamsResponse) SetTeams(val []TeamResponse) {
+	s.Teams = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *QueryTeamsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*QueryTeamsResponse) queryTeamsRes() {}
+
+type QueryTeamsTooManyRequests ErrorDetails
+
+func (*QueryTeamsTooManyRequests) queryTeamsRes() {}
+
+type QueryTeamsUnauthorized ErrorDetails
+
+func (*QueryTeamsUnauthorized) queryTeamsRes() {}
 
 type RevokeMySessionConflict ErrorDetails
 
@@ -10055,10 +12282,6 @@ func (*RevokeMySessionNoContent) revokeMySessionRes() {}
 type RevokeMySessionNotFound ErrorDetails
 
 func (*RevokeMySessionNotFound) revokeMySessionRes() {}
-
-type RevokeMySessionUnauthorized ErrorDetails
-
-func (*RevokeMySessionUnauthorized) revokeMySessionRes() {}
 
 // Ref: #
 type RevokeRequest struct {
@@ -10092,20 +12315,12 @@ type RevokeSessionConflict ErrorDetails
 
 func (*RevokeSessionConflict) revokeSessionRes() {}
 
+type RevokeSessionForbidden ErrorDetails
+
+func (*RevokeSessionForbidden) revokeSessionRes() {}
+
 // RevokeSessionNoContent is response for RevokeSession operation.
-type RevokeSessionNoContent struct {
-	SetCookie string
-}
-
-// GetSetCookie returns the value of SetCookie.
-func (s *RevokeSessionNoContent) GetSetCookie() string {
-	return s.SetCookie
-}
-
-// SetSetCookie sets the value of SetCookie.
-func (s *RevokeSessionNoContent) SetSetCookie(val string) {
-	s.SetCookie = val
-}
+type RevokeSessionNoContent struct{}
 
 func (*RevokeSessionNoContent) revokeSessionRes() {}
 
@@ -10195,6 +12410,87 @@ func (s *SchemaURL) SetURL(val url.URL) {
 	s.URL = val
 }
 
+// Merged schema.
+// Ref: #
+type SessNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSessNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SessNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SessNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SessNotFound) GetDetails() OptSessNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SessNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SessNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SessNotFound) SetDetails(val OptSessNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SessNotFoundDetails map[string]jx.Raw
+
+func (s *SessNotFoundDetails) init() SessNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// SessNotFoundHeaders wraps SessNotFound with response headers.
+type SessNotFoundHeaders struct {
+	CacheControl OptString
+	Response     SessNotFound
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *SessNotFoundHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *SessNotFoundHeaders) GetResponse() SessNotFound {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *SessNotFoundHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SessNotFoundHeaders) SetResponse(val SessNotFound) {
+	s.Response = val
+}
+
+func (*SessNotFoundHeaders) getMySessionRes() {}
+
 type SessionID string
 
 // Paginated list of sessions.
@@ -10247,6 +12543,21 @@ type SessionResponse struct {
 	// The authenticated user. Null for anonymous sessions and until the `user`
 	// factor has been verified through an `auth_attempt`.
 	UserID OptNilUserID `json:"user_id"`
+	// Human-readable name of the authenticated user, resolved from the
+	// conventional user-schema properties: `name` when defined, otherwise
+	// the given and family name parts joined — `givenName`/`familyName`
+	// (the shipped presets' spelling) or `given_name`/`family_name`. Only
+	// present on reads that hydrate the user's identity
+	// (`GET /sessions/me`) and only when the session has an authenticated
+	// user whose schema carries those properties; clients fall back to
+	// `email`, then `user_id`.
+	Name OptString `json:"name"`
+	// Email address of the authenticated user, resolved from the
+	// conventional `email` user-schema property. Only present on reads
+	// that hydrate the user's identity (`GET /sessions/me`) and only when
+	// the session has an authenticated user whose schema carries that
+	// property.
+	Email OptString `json:"email"`
 	// Verified authentication factors accumulated by this session.
 	// Each key is a factor type (e.g. `password`, `totp`, `passkey`).
 	// Each value is a factor event object with at least `verified_at` and
@@ -10286,6 +12597,16 @@ func (s *SessionResponse) GetState() SessionResponseState {
 // GetUserID returns the value of UserID.
 func (s *SessionResponse) GetUserID() OptNilUserID {
 	return s.UserID
+}
+
+// GetName returns the value of Name.
+func (s *SessionResponse) GetName() OptString {
+	return s.Name
+}
+
+// GetEmail returns the value of Email.
+func (s *SessionResponse) GetEmail() OptString {
+	return s.Email
 }
 
 // GetFactors returns the value of Factors.
@@ -10338,6 +12659,16 @@ func (s *SessionResponse) SetUserID(val OptNilUserID) {
 	s.UserID = val
 }
 
+// SetName sets the value of Name.
+func (s *SessionResponse) SetName(val OptString) {
+	s.Name = val
+}
+
+// SetEmail sets the value of Email.
+func (s *SessionResponse) SetEmail(val OptString) {
+	s.Email = val
+}
+
 // SetFactors sets the value of Factors.
 func (s *SessionResponse) SetFactors(val []CompletedFactor) {
 	s.Factors = val
@@ -10368,8 +12699,35 @@ func (s *SessionResponse) SetExpiresAt(val time.Time) {
 	s.ExpiresAt = val
 }
 
-func (*SessionResponse) getMySessionRes() {}
-func (*SessionResponse) getSessionRes()   {}
+func (*SessionResponse) getSessionRes() {}
+
+// SessionResponseHeaders wraps SessionResponse with response headers.
+type SessionResponseHeaders struct {
+	CacheControl OptString
+	Response     SessionResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *SessionResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *SessionResponseHeaders) GetResponse() SessionResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *SessionResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SessionResponseHeaders) SetResponse(val SessionResponse) {
+	s.Response = val
+}
+
+func (*SessionResponseHeaders) getMySessionRes() {}
 
 type SessionResponseMetadata map[string]jx.Raw
 
@@ -10599,6 +12957,48 @@ func (s *SetUserPasswordRequest) SetIsChangeRequired(val OptBool) {
 	s.IsChangeRequired = val
 }
 
+// Ref: #
+type SortDirection string
+
+const (
+	SortDirectionAsc  SortDirection = "asc"
+	SortDirectionDesc SortDirection = "desc"
+)
+
+// AllValues returns all SortDirection values.
+func (SortDirection) AllValues() []SortDirection {
+	return []SortDirection{
+		SortDirectionAsc,
+		SortDirectionDesc,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s SortDirection) MarshalText() ([]byte, error) {
+	switch s {
+	case SortDirectionAsc:
+		return []byte(s), nil
+	case SortDirectionDesc:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *SortDirection) UnmarshalText(data []byte) error {
+	switch SortDirection(data) {
+	case SortDirectionAsc:
+		*s = SortDirectionAsc
+		return nil
+	case SortDirectionDesc:
+		*s = SortDirectionDesc
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Configuration for a user-invokable action on a step. The `name` is sent
 // back in the submit request as `action`; the engine resolves the action's
 // declared `kind` to decide how to handle the submission.
@@ -10791,7 +13191,155 @@ type SubmitFlowStepOK FlowResponseHeaders
 
 func (*SubmitFlowStepOK) submitFlowStepRes() {}
 
+// Ref: #
+type TeamFilterField string
+
+const (
+	TeamFilterFieldCreatedAt TeamFilterField = "createdAt"
+)
+
+// AllValues returns all TeamFilterField values.
+func (TeamFilterField) AllValues() []TeamFilterField {
+	return []TeamFilterField{
+		TeamFilterFieldCreatedAt,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s TeamFilterField) MarshalText() ([]byte, error) {
+	switch s {
+	case TeamFilterFieldCreatedAt:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *TeamFilterField) UnmarshalText(data []byte) error {
+	switch TeamFilterField(data) {
+	case TeamFilterFieldCreatedAt:
+		*s = TeamFilterFieldCreatedAt
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type TeamID string
+
+// Details of a team.
+// Ref: #
+type TeamResponse struct {
+	// The unique identifier of the team.
+	ID string `json:"id"`
+	// The name of the team.
+	Name   string     `json:"name"`
+	Status TeamStatus `json:"status"`
+	// The time when the team was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the team was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// GetID returns the value of ID.
+func (s *TeamResponse) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *TeamResponse) GetName() string {
+	return s.Name
+}
+
+// GetStatus returns the value of Status.
+func (s *TeamResponse) GetStatus() TeamStatus {
+	return s.Status
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *TeamResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *TeamResponse) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *TeamResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *TeamResponse) SetName(val string) {
+	s.Name = val
+}
+
+// SetStatus sets the value of Status.
+func (s *TeamResponse) SetStatus(val TeamStatus) {
+	s.Status = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *TeamResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *TeamResponse) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+func (*TeamResponse) createTeamRes() {}
+func (*TeamResponse) getTeamRes()    {}
+func (*TeamResponse) updateTeamRes() {}
+
+// The lifecycle state of a team.
+// active: The team is available for use.
+// deactivated: The team is no longer active but is retained for historical and audit purposes.
+// Ref: #
+type TeamStatus string
+
+const (
+	TeamStatusActive      TeamStatus = "active"
+	TeamStatusDeactivated TeamStatus = "deactivated"
+)
+
+// AllValues returns all TeamStatus values.
+func (TeamStatus) AllValues() []TeamStatus {
+	return []TeamStatus{
+		TeamStatusActive,
+		TeamStatusDeactivated,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s TeamStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case TeamStatusActive:
+		return []byte(s), nil
+	case TeamStatusDeactivated:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *TeamStatus) UnmarshalText(data []byte) error {
+	switch TeamStatus(data) {
+	case TeamStatusActive:
+		*s = TeamStatusActive
+		return nil
+	case TeamStatusDeactivated:
+		*s = TeamStatusDeactivated
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Ref: #
 type TokenResponse struct {
@@ -10855,18 +13403,68 @@ type UpdateFlowDefinitionNotFound ErrorDetails
 
 func (*UpdateFlowDefinitionNotFound) updateFlowDefinitionRes() {}
 
+type UpdateTeamBadRequest ErrorDetails
+
+func (*UpdateTeamBadRequest) updateTeamRes() {}
+
+type UpdateTeamConflict ErrorDetails
+
+func (*UpdateTeamConflict) updateTeamRes() {}
+
+type UpdateTeamForbidden ErrorDetails
+
+func (*UpdateTeamForbidden) updateTeamRes() {}
+
+type UpdateTeamNotFound ErrorDetails
+
+func (*UpdateTeamNotFound) updateTeamRes() {}
+
+// Ref: #
+type UpdateTeamRequest struct {
+	// The name of the team. Must be unique within the project.
+	Name OptString `json:"name"`
+}
+
+// GetName returns the value of Name.
+func (s *UpdateTeamRequest) GetName() OptString {
+	return s.Name
+}
+
+// SetName sets the value of Name.
+func (s *UpdateTeamRequest) SetName(val OptString) {
+	s.Name = val
+}
+
+type UpdateTeamUnauthorized ErrorDetails
+
+func (*UpdateTeamUnauthorized) updateTeamRes() {}
+
 // A user represents an individual identity in the system. It can be used to
 // represent a human user, but also a service account or any other type of
 // identity. The content of a user is determined by the configured schema for
 // users, this is only a base schema.
+// The server assigns the resource primary key (`id`) on create. Clients must
+// not send `id` in the create body; it is returned in the create response.
 // Ref: #
 type User struct {
+	ID       OptUserID       `json:"id"`
+	Metadata OptUserMetadata `json:"metadata"`
 	// The schema that defines the content of the user. These schemas can be
 	// created using the `/schemas` endpoint. A default schema is provided.
 	// This schema can be retrieved using the same endpoint. The schema will
 	// be used to validate the user's properties.
 	Schema          string `json:"$schema"`
 	AdditionalProps UserAdditional
+}
+
+// GetID returns the value of ID.
+func (s *User) GetID() OptUserID {
+	return s.ID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *User) GetMetadata() OptUserMetadata {
+	return s.Metadata
 }
 
 // GetSchema returns the value of Schema.
@@ -10879,6 +13477,16 @@ func (s *User) GetAdditionalProps() UserAdditional {
 	return s.AdditionalProps
 }
 
+// SetID sets the value of ID.
+func (s *User) SetID(val OptUserID) {
+	s.ID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *User) SetMetadata(val OptUserMetadata) {
+	s.Metadata = val
+}
+
 // SetSchema sets the value of Schema.
 func (s *User) SetSchema(val string) {
 	s.Schema = val
@@ -10888,6 +13496,9 @@ func (s *User) SetSchema(val string) {
 func (s *User) SetAdditionalProps(val UserAdditional) {
 	s.AdditionalProps = val
 }
+
+func (*User) getMyUserRes()   {}
+func (*User) getUserByIDRes() {}
 
 type UserAdditional map[string]jx.Raw
 
@@ -10901,6 +13512,102 @@ func (s *UserAdditional) init() UserAdditional {
 }
 
 type UserID string
+
+// Ref: #
+type UserMetadata struct {
+	// The time when the user was created.
+	CreatedAt time.Time `json:"createdAt"`
+	// The time when the user was last updated.
+	UpdatedAt time.Time `json:"updatedAt"`
+	// The status of the user.
+	Status UserMetadataStatus `json:"status"`
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *UserMetadata) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *UserMetadata) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// GetStatus returns the value of Status.
+func (s *UserMetadata) GetStatus() UserMetadataStatus {
+	return s.Status
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *UserMetadata) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *UserMetadata) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+// SetStatus sets the value of Status.
+func (s *UserMetadata) SetStatus(val UserMetadataStatus) {
+	s.Status = val
+}
+
+// The status of the user.
+type UserMetadataStatus string
+
+const (
+	UserMetadataStatusActive       UserMetadataStatus = "active"
+	UserMetadataStatusSuspended    UserMetadataStatus = "suspended"
+	UserMetadataStatusDeactivated  UserMetadataStatus = "deactivated"
+	UserMetadataStatusPendingPurge UserMetadataStatus = "pending_purge"
+)
+
+// AllValues returns all UserMetadataStatus values.
+func (UserMetadataStatus) AllValues() []UserMetadataStatus {
+	return []UserMetadataStatus{
+		UserMetadataStatusActive,
+		UserMetadataStatusSuspended,
+		UserMetadataStatusDeactivated,
+		UserMetadataStatusPendingPurge,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserMetadataStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case UserMetadataStatusActive:
+		return []byte(s), nil
+	case UserMetadataStatusSuspended:
+		return []byte(s), nil
+	case UserMetadataStatusDeactivated:
+		return []byte(s), nil
+	case UserMetadataStatusPendingPurge:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserMetadataStatus) UnmarshalText(data []byte) error {
+	switch UserMetadataStatus(data) {
+	case UserMetadataStatusActive:
+		*s = UserMetadataStatusActive
+		return nil
+	case UserMetadataStatusSuspended:
+		*s = UserMetadataStatusSuspended
+		return nil
+	case UserMetadataStatusDeactivated:
+		*s = UserMetadataStatusDeactivated
+		return nil
+	case UserMetadataStatusPendingPurge:
+		*s = UserMetadataStatusPendingPurge
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Merged schema.
 // Ref: #
@@ -10959,6 +13666,10 @@ func (s *UserNotFoundDetails) init() UserNotFoundDetails {
 
 // This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`.
 // This is done because a lot of code generators cannot handle that.
+// A few properties are reserved:
+// - id: is used to return the id of the user
+// - metadata: is used to embed metadata of the user, like creation date,
+// status,... in a return object.
 // Ref: #
 type UserProperty struct {
 	// The verification method for this property, if applicable.
@@ -10973,8 +13684,8 @@ type UserProperty struct {
 	XMinusSensitive OptBool `json:"x-sensitive"`
 	// Whether this property is used for multi-factor authentication or not.
 	XMinusMfa OptBool `json:"x-mfa"`
-	// A map of additional properties for the user definition, where the key is the property name and the
-	// value is the property schema.
+	// A map of additional properties for the user definition, where the key is
+	// the property name and the value is the property schema.
 	Properties      OptUserPropertyProperties `json:"properties"`
 	AdditionalProps UserPropertyAdditional
 }
@@ -11070,8 +13781,8 @@ func (s *UserPropertyAdditional) init() UserPropertyAdditional {
 	return m
 }
 
-// A map of additional properties for the user definition, where the key is the property name and the
-// value is the property schema.
+// A map of additional properties for the user definition, where the key is
+// the property name and the value is the property schema.
 type UserPropertyProperties map[string]jx.Raw
 
 func (s *UserPropertyProperties) init() UserPropertyProperties {
@@ -11137,15 +13848,15 @@ func (s *UserPropertyXMinusUnique) UnmarshalText(data []byte) error {
 type UserSchema struct {
 	// The JSON Schema version used for this schema.
 	Schema OptString `json:"$schema"`
-	// The unique identifier for this user schema.
-	ID url.URL `json:"$id"`
+	// The type of user this schema describes. This is a customer chosen name.
+	ObjectType OptString `json:"objectType"`
 	// Discriminator value for a user schema create request.
 	Kind string `json:"kind"`
 	// The user Schema version used for this schema.
 	MetaSchema             url.URL     `json:"metaSchema"`
 	XMinusAuthMinusMethods AuthMethods `json:"x-auth-methods"`
-	// A map of additional properties for the user definition, where the key is the property name and the
-	// value is the property schema.
+	// A map of additional properties for the user definition, where the
+	// key is the property name and the value is the property schema.
 	Properties      OptUserSchemaProperties `json:"properties"`
 	AdditionalProps UserSchemaAdditional
 }
@@ -11155,9 +13866,9 @@ func (s *UserSchema) GetSchema() OptString {
 	return s.Schema
 }
 
-// GetID returns the value of ID.
-func (s *UserSchema) GetID() url.URL {
-	return s.ID
+// GetObjectType returns the value of ObjectType.
+func (s *UserSchema) GetObjectType() OptString {
+	return s.ObjectType
 }
 
 // GetKind returns the value of Kind.
@@ -11190,9 +13901,9 @@ func (s *UserSchema) SetSchema(val OptString) {
 	s.Schema = val
 }
 
-// SetID sets the value of ID.
-func (s *UserSchema) SetID(val url.URL) {
-	s.ID = val
+// SetObjectType sets the value of ObjectType.
+func (s *UserSchema) SetObjectType(val OptString) {
+	s.ObjectType = val
 }
 
 // SetKind sets the value of Kind.
@@ -11231,8 +13942,8 @@ func (s *UserSchemaAdditional) init() UserSchemaAdditional {
 	return m
 }
 
-// A map of additional properties for the user definition, where the key is the property name and the
-// value is the property schema.
+// A map of additional properties for the user definition, where the
+// key is the property name and the value is the property schema.
 type UserSchemaProperties map[string]UserProperty
 
 func (s *UserSchemaProperties) init() UserSchemaProperties {

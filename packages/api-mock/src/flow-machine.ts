@@ -7,19 +7,26 @@
  * `CreateFlow201Step.name`) so handlers can use the snapshot value directly
  * as the fixture key.
  *
+ * The graph mirrors the real default login flow
+ * (`packages/config/defaults/default-login.json`): sign-in is **split** across
+ * `identifier` (email) then `password`. It deliberately used to be a single
+ * combined card, which meant every consumer of this mock exercised a screen the
+ * server never emits — see this package's AGENTS.md.
+ *
  * State graph:
  *
- *   idle --START(login)----> identifier (email+password, Figma 6593:141985)
- *                                       --SUBMIT(submit)--> done
+ *   idle --START(login)----> identifier (email only)
+ *                                       --SUBMIT(submit)--> password
  *                                       --SUBMIT(recover)--> recover --SUBMIT--> identifier
  *                                       --SUBMIT(register)--> register
  *                                       --SUBMIT(passkey)--> passkey-login
  *                                       --SUBMIT(sso_provider_id)--> sso-redirect
+ *                            password   --SUBMIT(submit)--> done
+ *                                       --SUBMIT(back)----> identifier
+ *                                       --SUBMIT(passkey)--> passkey-login
  *      \--START(register)--> register --SUBMIT--> register-password --SUBMIT--> done
  *                                     --SUBMIT(sign_in)--> identifier
  *
- *   password -- legacy split step; not reachable from any START transition;
- *               kept so tests can target it directly via actor injection
  *   passkey-upsell / passkey-setup -- legacy upsell pair; the default flow no
  *               longer routes through them (passkey registration is offered
  *               up front instead). Kept so tests can target them directly
@@ -72,16 +79,34 @@ const initialContext = {
   ssoProviderId: null,
 } satisfies FlowMachineContext;
 
-const rotateToken = assign<FlowMachineContext, FlowMachineEvent, undefined, FlowMachineEvent, never>({
+const rotateToken = assign<
+  FlowMachineContext,
+  FlowMachineEvent,
+  undefined,
+  FlowMachineEvent,
+  never
+>({
   tokenSeq: ({ context }) => context.tokenSeq + 1,
   sessionToken: ({ context }) => `tok_mock_${context.tokenSeq + 1}`,
 });
 
-const captureFields = assign<FlowMachineContext, FlowMachineEvent & { type: "SUBMIT" }, undefined, FlowMachineEvent, never>({
+const captureFields = assign<
+  FlowMachineContext,
+  FlowMachineEvent & { type: "SUBMIT" },
+  undefined,
+  FlowMachineEvent,
+  never
+>({
   capturedFields: ({ context, event }) => ({ ...context.capturedFields, ...event.fields }),
 });
 
-const setPurpose = assign<FlowMachineContext, FlowMachineEvent & { type: "START" }, undefined, FlowMachineEvent, never>({
+const setPurpose = assign<
+  FlowMachineContext,
+  FlowMachineEvent & { type: "START" },
+  undefined,
+  FlowMachineEvent,
+  never
+>({
   purpose: ({ event }) => event.purpose,
 });
 
@@ -144,7 +169,9 @@ export const flowMachine = createMachine({
             actions: [captureFields, rotateToken],
           },
           {
-            target: "done",
+            // Default `submit`: hand off to the password step, as the real
+            // flow's `submit -> password` transition does.
+            target: "password",
             actions: [captureFields, rotateToken],
           },
         ],
@@ -167,7 +194,14 @@ export const flowMachine = createMachine({
     },
     "register-password": {
       on: {
-        SUBMIT: { target: "done", actions: [captureFields, rotateToken] },
+        SUBMIT: [
+          {
+            guard: ({ event }) => event.action === "back",
+            target: "register",
+            actions: [rotateToken],
+          },
+          { target: "done", actions: [captureFields, rotateToken] },
+        ],
       },
     },
     recover: {
@@ -177,7 +211,24 @@ export const flowMachine = createMachine({
     },
     password: {
       on: {
-        SUBMIT: { target: "passkey-upsell", actions: [captureFields, rotateToken] },
+        SUBMIT: [
+          {
+            // ADR 022 back-navigation: the engine injects a `back` action on
+            // any step that has a predecessor.
+            guard: ({ event }) => event.action === "back",
+            target: "identifier",
+            actions: [rotateToken],
+          },
+          {
+            guard: ({ event }) => event.action === "passkey",
+            target: "passkey-login",
+            actions: [captureFields, rotateToken],
+          },
+          {
+            target: "done",
+            actions: [captureFields, rotateToken],
+          },
+        ],
       },
     },
     "passkey-upsell": {

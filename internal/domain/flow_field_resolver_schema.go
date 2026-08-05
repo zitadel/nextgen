@@ -6,8 +6,6 @@ import (
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/ianlancetaylor/jsonschema/types"
-
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_field_resolver.schema.mock.go . SchemaResolver
@@ -17,7 +15,7 @@ import (
 // access; [SchemaFieldResolver] is the translator that runs on top of
 // the loaded schema.
 type SchemaResolver interface {
-	Resolve(ctx context.Context, client database.QueryExecutor, projectID, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error)
+	Resolve(ctx context.Context, store JSONSchemaStore, projectID, schemaURL string, rootSchema []byte) (*jsonschema.Schema, error)
 }
 
 // SchemaFieldResolver is the production [FlowFieldResolver]. It is a
@@ -208,7 +206,10 @@ func buildValidation(prop schemaReader) *FlowFieldValidation {
 		MaxLength: prop.Int("maxLength"),
 		Enum:      prop.StringEnum(),
 	}
-	if v.Format == "" && v.MinLength == 0 && v.MaxLength == 0 && len(v.Enum) == 0 {
+	if c, ok := prop.Const(); ok {
+		v.Const = c
+	}
+	if v.Format == "" && v.MinLength == 0 && v.MaxLength == 0 && len(v.Enum) == 0 && v.Const == nil {
 		return nil
 	}
 	return &v
@@ -307,6 +308,20 @@ func (r schemaReader) String(keyword string) string {
 		}
 	}
 	return ""
+}
+
+// Const returns the property's `const` value and true when present. The
+// value keeps its JSON-decoded type (bool, string, float64, ...).
+func (r schemaReader) Const() (any, bool) {
+	v, ok := r.s.LookupKeyword("const")
+	if !ok {
+		return nil, false
+	}
+	part, ok := v.(types.PartAny)
+	if !ok {
+		return nil, false
+	}
+	return part.V, true
 }
 
 // Int returns the int value of the given keyword, or 0 when absent.

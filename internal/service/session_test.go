@@ -3,51 +3,47 @@ package service_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
+	"go.uber.org/mock/gomock"
+
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-type sessionRepoStub struct {
-	createFunc   func(context.Context, database.QueryExecutor, *domain.Session) error
-	exchangeFunc func(context.Context, database.QueryExecutor, string, string, *string, time.Duration) (*domain.Session, error)
-	getFunc      func(context.Context, database.QueryExecutor, string, string) (*domain.Session, error)
+// userReaderStub implements service.UserIdentityReader and records the
+// identity lookup inputs so tests can assert which user was hydrated.
+type userReaderStub struct {
+	getFunc          func(context.Context, string, string, ...string) (*domain.User, error)
+	gotProjectID     string
+	gotUserID        string
+	gotAttributeKeys []string
 }
 
-func (s *sessionRepoStub) Create(ctx context.Context, q database.QueryExecutor, session *domain.Session) error {
-	if s.createFunc == nil {
-		panic("unexpected Create call")
-	}
-	return s.createFunc(ctx, q, session)
-}
-
-func (s *sessionRepoStub) Exchange(ctx context.Context, q database.QueryExecutor, projectID, handoffToken string, idempotencyKey *string, ttl time.Duration) (*domain.Session, error) {
-	if s.exchangeFunc == nil {
-		panic("unexpected Exchange call")
-	}
-	return s.exchangeFunc(ctx, q, projectID, handoffToken, idempotencyKey, ttl)
-}
-
-func (s *sessionRepoStub) Get(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error) {
+func (s *userReaderStub) GetIdentity(ctx context.Context, projectID, userID string, attributeKeys ...string) (*domain.User, error) {
+	s.gotProjectID, s.gotUserID = projectID, userID
+	s.gotAttributeKeys = attributeKeys
 	if s.getFunc == nil {
-		panic("unexpected Get call")
+		panic("unexpected users.GetIdentity call")
 	}
-	return s.getFunc(ctx, q, projectID, sessionID)
-}
-
-func (s *sessionRepoStub) List(context.Context, database.QueryExecutor, string) ([]*domain.Session, error) {
-	panic("unexpected List call")
-}
-
-func (s *sessionRepoStub) Delete(context.Context, database.QueryExecutor, string, string) error {
-	panic("unexpected Delete call")
+	return s.getFunc(ctx, projectID, userID, attributeKeys...)
 }
 
 func sessionConfigForTest() service.SessionConfig {
 	return service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}
+}
+
+func newMockedSessionService(t *testing.T, users service.UserIdentityReader, cfg service.SessionConfig) (service.SessionService, *servicemocks.MockAllStatements) {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockStatementPool(ctrl)
+	statements := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(statements).AnyTimes()
+	return service.NewSessionService(pool, users, cfg), statements
 }
 
 func TestSessionService_Create(t *testing.T) {
@@ -85,11 +81,10 @@ func TestSessionService_Create(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := &sessionRepoStub{
-				createFunc: func(_ context.Context, q database.QueryExecutor, gotSession *domain.Session) error {
-					if q != stubPool() {
-						t.Fatalf("Create q = %v, want service pool", q)
-					}
+			svc, statements := newMockedSessionService(t, &userReaderStub{}, sessionConfigForTest())
+			statements.EXPECT().
+				CreateSession(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, gotSession *domain.Session) error {
 					if gotSession.ProjectID != tt.input.ProjectID {
 						t.Fatalf("Create session.ProjectID = %q, want %q", gotSession.ProjectID, tt.input.ProjectID)
 					}
@@ -101,10 +96,9 @@ func TestSessionService_Create(t *testing.T) {
 					}
 					gotSession.ID = tt.wantID
 					return tt.repoErr
-				},
-			}
+				})
 
-			got, err := service.NewSessionService(stubPool(), repo, sessionConfigForTest()).Create(t.Context(), tt.input)
+			got, err := svc.Create(t.Context(), tt.input)
 			if tt.wantErr != nil {
 				assertSessionResult(t, "Create", got, err, nil, tt.wantErr)
 				return
@@ -208,28 +202,28 @@ func TestSessionService_Exchange(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := &sessionRepoStub{
-				exchangeFunc: func(_ context.Context, q database.QueryExecutor, projectID, handoffToken string, gotIdempotencyKey *string, gotTTL time.Duration) (*domain.Session, error) {
-					if q != stubPool() {
-						t.Fatalf("Exchange q = %v, want service pool", q)
-					}
-					if projectID != tt.input.ProjectID {
-						t.Fatalf("Exchange projectID = %q, want %q", projectID, tt.input.ProjectID)
-					}
-					if handoffToken != tt.input.HandoffToken {
-						t.Fatalf("Exchange handoffToken = %q, want %q", handoffToken, tt.input.HandoffToken)
-					}
-					if gotIdempotencyKey != tt.input.IdempotencyKey {
-						t.Fatalf("Exchange idempotencyKey = %p, want %p", gotIdempotencyKey, tt.input.IdempotencyKey)
-					}
-					if tt.wantErr == nil && gotTTL != tt.wantTTL {
-						t.Fatalf("Exchange ttl = %v, want %v", gotTTL, tt.wantTTL)
-					}
-					return tt.repoResult, tt.repoErr
-				},
+			svc, statements := newMockedSessionService(t, &userReaderStub{}, cfg)
+			if tt.repoResult != nil || tt.repoErr != nil {
+				statements.EXPECT().
+					ExchangeSession(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, projectID, handoffToken string, gotIdempotencyKey *string, gotTTL time.Duration) (*domain.Session, error) {
+						if projectID != tt.input.ProjectID {
+							t.Fatalf("Exchange projectID = %q, want %q", projectID, tt.input.ProjectID)
+						}
+						if handoffToken != tt.input.HandoffToken {
+							t.Fatalf("Exchange handoffToken = %q, want %q", handoffToken, tt.input.HandoffToken)
+						}
+						if gotIdempotencyKey != tt.input.IdempotencyKey {
+							t.Fatalf("Exchange idempotencyKey = %p, want %p", gotIdempotencyKey, tt.input.IdempotencyKey)
+						}
+						if tt.wantErr == nil && gotTTL != tt.wantTTL {
+							t.Fatalf("Exchange ttl = %v, want %v", gotTTL, tt.wantTTL)
+						}
+						return tt.repoResult, tt.repoErr
+					})
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo, cfg).Exchange(t.Context(), tt.input)
+			got, err := svc.Exchange(t.Context(), tt.input)
 			assertSessionResult(t, "Exchange", got, err, tt.want, tt.wantErr)
 		})
 	}
@@ -275,11 +269,10 @@ func TestSessionService_Get(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			repo := &sessionRepoStub{
-				getFunc: func(_ context.Context, q database.QueryExecutor, projectID, sessionID string) (*domain.Session, error) {
-					if q != stubPool() {
-						t.Fatalf("Get q = %v, want service pool", q)
-					}
+			svc, statements := newMockedSessionService(t, &userReaderStub{}, sessionConfigForTest())
+			statements.EXPECT().
+				GetSessionByID(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, projectID, sessionID string) (*domain.Session, error) {
 					if projectID != tt.input.ProjectID {
 						t.Fatalf("Get projectID = %q, want %q", projectID, tt.input.ProjectID)
 					}
@@ -287,11 +280,91 @@ func TestSessionService_Get(t *testing.T) {
 						t.Fatalf("Get sessionID = %q, want %q", sessionID, tt.input.SessionID)
 					}
 					return tt.repoResult, tt.repoErr
-				},
+				})
+
+			got, err := svc.Get(t.Context(), tt.input)
+			assertSessionResult(t, "Get", got, err, tt.want, tt.wantErr)
+		})
+	}
+}
+
+func TestSessionService_Get_UserIdentity(t *testing.T) {
+	userID := "user-1"
+	identityUser := &domain.User{
+		ProjectID: "proj",
+		ID:        userID,
+		Attributes: []domain.Attribute{
+			{Key: "email", Value: "ada@example.com"},
+			{Key: "given_name", Value: "Ada"},
+		},
+	}
+
+	for _, tt := range []struct {
+		name          string
+		sessionUserID *string
+		userResult    *domain.User
+		userErr       error
+		wantUser      *domain.User
+		wantErr       error
+	}{
+		{
+			name:          "hydrates the linked user",
+			sessionUserID: &userID,
+			userResult:    identityUser,
+			wantUser:      identityUser,
+		},
+		{
+			name:          "skips anonymous sessions",
+			sessionUserID: nil,
+		},
+		{
+			name:          "tolerates a session that outlived its user",
+			sessionUserID: &userID,
+			userErr:       database.NewNoRowFoundError(nil),
+		},
+		{
+			name:          "wraps unexpected user lookup error",
+			sessionUserID: &userID,
+			userErr:       errors.New("boom"),
+			wantErr:       domain.ErrInternal(nil),
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			users := &userReaderStub{}
+			if tt.sessionUserID != nil {
+				users.getFunc = func(_ context.Context, projectID, uid string, keys ...string) (*domain.User, error) {
+					return tt.userResult, tt.userErr
+				}
 			}
 
-			got, err := service.NewSessionService(stubPool(), repo, sessionConfigForTest()).Get(t.Context(), tt.input)
-			assertSessionResult(t, "Get", got, err, tt.want, tt.wantErr)
+			svc, statements := newMockedSessionService(t, users, sessionConfigForTest())
+			statements.EXPECT().
+				GetSessionByID(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(&domain.Session{ProjectID: "proj", ID: "sess", UserID: tt.sessionUserID}, nil)
+
+			input := service.GetSessionInput{ProjectID: "proj", SessionID: "sess", WithUserIdentity: true}
+			got, err := svc.Get(t.Context(), input)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("Get err = %v, want %v", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Get returned error: %v", err)
+			}
+			if got.User != tt.wantUser {
+				t.Fatalf("Get session.User = %v, want %v", got.User, tt.wantUser)
+			}
+			if tt.sessionUserID == nil {
+				return
+			}
+			if users.gotProjectID != "proj" || users.gotUserID != userID {
+				t.Fatalf("users queried with (%q, %q), want (%q, %q)", users.gotProjectID, users.gotUserID, "proj", userID)
+			}
+			if !slices.Equal(users.gotAttributeKeys, domain.IdentityAttributeKeys) {
+				t.Fatalf("users.GetIdentity keys = %v, want %v", users.gotAttributeKeys, domain.IdentityAttributeKeys)
+			}
 		})
 	}
 }

@@ -6,6 +6,7 @@
     "@playwright/test": "catalog:",
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
+    "@zitadel/testing": "workspace:*",
     "eslint-plugin-playwright": "catalog:"
   }
 }

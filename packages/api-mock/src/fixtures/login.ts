@@ -15,6 +15,17 @@ import type { CreateFlow201, CreateFlow201Step } from "@zitadel/api/generated/mo
 import { signHandoffToken } from "../crypto.js";
 import type { StoredCredential } from "../lib/authn/index.js";
 
+/**
+ * The field name every credential step uses: the schema pointer into the user
+ * schema's `x-auth-methods`, exactly as the real server emits it
+ * (`packages/config/defaults/default-login.json`).
+ *
+ * Load-bearing, not cosmetic — the server answers `req.invalid` to a submit
+ * keyed on plain `password`, so a mock using the short name would let the
+ * orchestrator send a key the real backend refuses with no test noticing.
+ */
+export const PASSWORD_FIELD = "x-auth-methods#password";
+
 export type StepFixtureInput = {
   flowId: string;
   sessionToken: string;
@@ -59,7 +70,11 @@ function emailToUserHandle(email: string): string {
  * Wrap a step shape in the standard {@link CreateFlow201} envelope.
  * All fixtures delegate to this helper so the session fields stay consistent.
  */
-function wrap(input: StepFixtureInput, step: CreateFlow201Step, extras?: Partial<CreateFlow201>): CreateFlow201 {
+function wrap(
+  input: StepFixtureInput,
+  step: CreateFlow201Step,
+  extras?: Partial<CreateFlow201>,
+): CreateFlow201 {
   return {
     id: input.flowId,
     session_id: "sess_mock",
@@ -70,11 +85,21 @@ function wrap(input: StepFixtureInput, step: CreateFlow201Step, extras?: Partial
 }
 
 /**
- * Combined sign-in card — Figma 2xl `6593:141983`, card `6593:141985`,
- * stack `6593:141989` (email + password + forgot + CTAs on one step).
+ * Identifier step — collects the email only, then hands off to
+ * {@link passwordStep}.
  *
- * Matches the Flow API shape in `docs/design/flowengine/flow-engine.md`
- * (single `login` step with `fields: [email, password]`).
+ * Mirrors the real default login flow
+ * (`packages/config/defaults/default-login.json`, embedded into the server via
+ * `configdefaults.DefaultLoginFlowDefinition()`): the credential is **not**
+ * collected here. This step used to serve a combined email+password card, which
+ * meant every consumer of this mock was exercising a screen the server never
+ * emits; see this package's AGENTS.md.
+ *
+ * `register` and `recover` are mock-only affordances: the real flow reaches
+ * `register` through the engine's `user_not_found` transition rather than a link,
+ * and defines no recovery step yet. They are kept so those screens stay
+ * reachable for Storybook and tests — but they are the one place this fixture
+ * knowingly exceeds the real definition.
  */
 export function identifierStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
@@ -87,15 +112,9 @@ export function identifierStep(input: StepFixtureInput): CreateFlow201 {
         text_key: "identifier.field.email",
         required: true,
       },
-      {
-        name: "password",
-        type: "password",
-        text_key: "identifier.field.password",
-        required: true,
-      },
     ],
     actions: [
-      { name: "submit", kind: "submit", text_key: "submit.signin", primary: true },
+      { name: "submit", kind: "submit", text_key: "identifier.action.continue", primary: true },
       { name: "passkey", kind: "passkey", text_key: "identifier.action.passkey" },
       { name: "register", kind: "navigate", text_key: "identifier.action.register.link" },
       { name: "recover", kind: "navigate", text_key: "action.forgot_password" },
@@ -160,6 +179,10 @@ export function registerStep(input: StepFixtureInput): CreateFlow201 {
 /**
  * Register-password step — second step in the two-step registration flow.
  * Collects the password after the user has entered their profile fields.
+ *
+ * Keyed by {@link PASSWORD_FIELD} for the same reason as {@link passwordStep}:
+ * the real flow definition declares `x-auth-methods#password` here too, and the
+ * server rejects the short name.
  */
 export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
@@ -170,7 +193,7 @@ export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
     },
     fields: [
       {
-        name: "password",
+        name: PASSWORD_FIELD,
         type: "password",
         text_key: "register-password.field.password",
         required: true,
@@ -178,16 +201,30 @@ export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
       },
     ],
     actions: [
-      { name: "submit", kind: "submit", text_key: "register-password.action.submit", primary: true },
+      {
+        name: "submit",
+        kind: "submit",
+        text_key: "register-password.action.submit",
+        primary: true,
+      },
+      { name: "back", kind: "back", text_key: "action.back" },
     ],
     gates: {},
   });
 }
 
 /**
- * Password-only step — legacy split-credential screen kept for tests that
- * target it directly. Not reachable from any `START` transition in the normal
- * flow; the happy path goes `identifier → passkey-upsell` directly.
+ * Password step — the second half of the split sign-in, reached from
+ * {@link identifierStep} and where invalid credentials surface.
+ *
+ * The field name is the schema pointer `x-auth-methods#password`, exactly as the
+ * real server emits it (`packages/config/defaults/default-login.json`). This is
+ * load-bearing, not cosmetic: the server rejects a submit keyed on plain
+ * `password` with `req.invalid`, so a mock that used the short name let the
+ * orchestrator submit a key the real backend refuses without any test noticing.
+ *
+ * The real engine also injects a `back` action here (ADR 022), which the flow
+ * definition itself does not list.
  */
 export function passwordStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
@@ -195,16 +232,16 @@ export function passwordStep(input: StepFixtureInput): CreateFlow201 {
     texts: { title_key: "password.title" },
     fields: [
       {
-        name: "password",
+        name: PASSWORD_FIELD,
         type: "password",
         text_key: "password.field.password",
         required: true,
       },
     ],
     actions: [
-      { name: "submit", kind: "submit", text_key: "submit.signin", primary: true },
+      { name: "submit", kind: "submit", text_key: "password.action.signin", primary: true },
       { name: "passkey", kind: "passkey", text_key: "password.action.passkey" },
-      { name: "register", kind: "navigate", text_key: "password.action.register.link" },
+      { name: "back", kind: "back", text_key: "action.back" },
     ],
     gates: {},
   });
@@ -223,9 +260,7 @@ export function recoverStep(input: StepFixtureInput): CreateFlow201 {
       description_key: "recover.description",
     },
     fields: [],
-    actions: [
-      { name: "submit", kind: "navigate", text_key: "recover.action.back", primary: true },
-    ],
+    actions: [{ name: "submit", kind: "navigate", text_key: "recover.action.back", primary: true }],
     gates: {},
   });
 }
@@ -240,7 +275,12 @@ export function passkeyUpsellStep(input: StepFixtureInput): CreateFlow201 {
     texts: { title_key: "passkey-upsell.title" },
     fields: [],
     actions: [
-      { name: "setup", kind: "passkey_register", text_key: "passkey-upsell.action.setup", primary: true },
+      {
+        name: "setup",
+        kind: "passkey_register",
+        text_key: "passkey-upsell.action.setup",
+        primary: true,
+      },
       { name: "skip", kind: "navigate", text_key: "passkey-upsell.action.skip" },
     ],
     gates: {},
@@ -259,9 +299,7 @@ export function passkeySetupStep(input: StepFixtureInput): CreateFlow201 {
     name: "passkey-setup",
     texts: { title_key: "passkey-upsell.title" },
     fields: [],
-    actions: [
-      { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
-    ],
+    actions: [{ name: "submit", kind: "submit", text_key: "submit.continue", primary: true }],
     gates: {},
     challenge: {
       method: "passkey",
@@ -344,9 +382,7 @@ export function passkeyLoginStep(input: StepFixtureInput): CreateFlow201 {
  * TODO: thread `ssoProviderId` from the machine context through to a computed
  * redirect URL so each provider gets a distinct mock destination.
  */
-export function ssoRedirectStep(
-  input: StepFixtureInput & { redirectUrl?: string },
-): CreateFlow201 {
+export function ssoRedirectStep(input: StepFixtureInput & { redirectUrl?: string }): CreateFlow201 {
   return wrap(input, {
     name: "sso-redirect",
     texts: { title_key: "sso.redirect.title" },

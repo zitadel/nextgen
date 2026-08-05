@@ -4,12 +4,12 @@
     "outDir": "./out-tsc/vitest",
     "types": ["vitest/globals", "vitest/importMeta", "vite/client", "node", "vitest"],
     "lib": ["es2022", "dom"],
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "composite": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "noEmit": true,
+    "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["vite.config.mts", "src/**/*.spec.ts", "src/**/*.spec.tsx", "src/test-setup.ts"],
-  "references": [
-    {
-      "path": "./tsconfig.app.json"
-    }
-  ]
+  "include": ["vite.config.mts", "src/**/*.ts", "src/**/*.tsx", "src/test-setup.ts"]
 }

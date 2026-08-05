@@ -1,22 +1,4 @@
-import type React from "react";
-import type { ZitadelProject } from "@zitadel/api/config";
-import type { Locale } from "@zitadel/components";
-
-declare module "react" {
-  namespace JSX {
-    interface IntrinsicElements {
-      "zitadel-login": React.HTMLAttributes<HTMLElement> & {
-        project?: ZitadelProject;
-        "session-exchange-path"?: string;
-        "post-sign-in-url"?: string;
-        purpose?: string;
-        lang?: string;
-        locales?: Record<string, Locale>;
-      };
-      "zitadel-logout": React.HTMLAttributes<HTMLElement> & {
-        project?: ZitadelProject;
-        "post-sign-out-url"?: string;
-      };
-    }
-  }
-}
+// React JSX declarations for the <zitadel-*> custom elements ship with the
+// SDK — a hand-maintained copy here went stale against the real element
+// surface (missing <zitadel-session>, variant, theme).
+/// <reference types="@zitadel/sdk-next/jsx" />

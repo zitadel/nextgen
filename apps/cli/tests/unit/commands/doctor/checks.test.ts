@@ -10,6 +10,7 @@ import {
   EnvExampleCheck,
   FrameworkCheck,
   GitignoreCheck,
+  ManagedFilesCheck,
   ProjectMatchCheck,
   SchemaCheck,
   SecretCheck,
@@ -18,7 +19,10 @@ import {
 } from "../../../../src/commands/doctor/checks";
 import { loadPatchContext } from "../../../../src/commands/doctor/patch-context";
 import { createOrca } from "../../../../src/lib/orca";
+import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angular/templates";
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
+import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
+import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
 
 const tempDirs: string[] = [];
 
@@ -46,6 +50,7 @@ async function makeProject(): Promise<string> {
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
   await mkdir(join(cwd, "app/login"), { recursive: true });
   await mkdir(join(cwd, "app/register"), { recursive: true });
+  await mkdir(join(cwd, "app/profile"), { recursive: true });
 
   await writeFile(
     join(cwd, "package.json"),
@@ -73,12 +78,102 @@ async function makeProject(): Promise<string> {
   await writeFile(join(cwd, ".zitadel/schemas/user.json"), JSON.stringify(VALID_USER_SCHEMA));
   await writeFile(join(cwd, "app/login/page.tsx"), `${MANAGED_MARKER}\nexport default function L() {}\n`);
   await writeFile(join(cwd, "app/register/page.tsx"), `${MANAGED_MARKER}\nexport default function R() {}\n`);
+  await writeFile(join(cwd, "app/profile/page.tsx"), `${MANAGED_MARKER}\nexport default function P() {}\n`);
   await writeFile(join(cwd, "middleware.ts"), `${MANAGED_MARKER}\nexport function middleware() {}\n`);
+  await writeFile(join(cwd, "custom-elements.d.ts"), `${MANAGED_MARKER}\nexport {};\n`);
   return cwd;
+}
+
+/** Writes `.zitadel/state.json` carrying a scaffold manifest section. */
+async function writeScaffoldState(cwd: string, scaffold: ScaffoldManifest): Promise<void> {
+  await writeFile(
+    join(cwd, ".zitadel/state.json"),
+    JSON.stringify({ framework: "next", resources: {}, scaffold }),
+  );
+}
+
+async function readScaffoldState(cwd: string): Promise<ScaffoldManifest> {
+  const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+    scaffold: ScaffoldManifest;
+  };
+  return state.scaffold;
 }
 
 function ctxFor(cwd: string, dryRun = false): CheckContext {
   return { cwd, orca: createOrca(), cliVersion: "0.1.0-alpha.0", dryRun };
+}
+
+/**
+ * A healthy Angular managed project with every config wiring applied:
+ * `angular.json` carries the proxyConfig + port, the auth routes are in the
+ * route table, and a `dev` script exists. The codex-review reproduction:
+ * detaching only the angular.json wiring must fail doctor even though all
+ * marked files are pristine.
+ */
+async function makeAngularProject(): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-checks-ng-"));
+  tempDirs.push(cwd);
+  await mkdir(join(cwd, ".zitadel"), { recursive: true });
+  await mkdir(join(cwd, "src/app"), { recursive: true });
+
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({
+      name: "demo",
+      scripts: { dev: "ng serve" },
+      dependencies: { "@angular/core": "^19.0.0", "@zitadel/sdk-angular": "latest" },
+    }),
+  );
+  await writeFile(
+    join(cwd, "zitadel.json"),
+    JSON.stringify({
+      project: "proj-001",
+      server: "https://api.zitadel.cloud",
+      framework: { id: "angular" },
+      environments: { development: { issuer: "http://localhost:4200" } },
+    }),
+  );
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
+  await chmod(join(cwd, ".zitadel/secret"), 0o600);
+  await writeFile(
+    join(cwd, "angular.json"),
+    JSON.stringify({
+      projects: {
+        demo: {
+          architect: {
+            serve: { options: { proxyConfig: "proxy.conf.cjs", port: 4200 } },
+          },
+        },
+      },
+    }),
+  );
+  await writeFile(
+    join(cwd, "src/app/app.routes.ts"),
+    [
+      'import { Routes } from "@angular/router";',
+      "",
+      "export const routes: Routes = [",
+      '  { path: "login", children: [] },',
+      '  { path: "register", children: [] },',
+      '  { path: "profile", children: [] },',
+      "];",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(join(cwd, "src/app/app.ts"), `${MANAGED_MARKER}\nexport class App {}\n`);
+  await writeFile(join(cwd, "src/app/app.html"), `<!-- ${MANAGED_MARKER} -->\n<main></main>\n`);
+  await writeFile(join(cwd, "proxy.conf.cjs"), proxyConfTemplate());
+  return cwd;
+}
+
+/** Rewrites angular.json with the serve proxyConfig wiring removed. */
+async function detachAngularProxy(cwd: string): Promise<void> {
+  await writeFile(
+    join(cwd, "angular.json"),
+    JSON.stringify({
+      projects: { demo: { architect: { serve: { options: { port: 4200 } } } } },
+    }),
+  );
 }
 
 afterEach(async () => {
@@ -213,6 +308,24 @@ describe("FrameworkCheck", () => {
     );
     expect((await new FrameworkCheck().run(ctxFor(cwd))).status).toBe("fail");
   });
+
+  it("fails with the version floor when the app dropped below Next 15", async () => {
+    // A scaffolded app later downgraded (or a pre-floor scaffold): doctor
+    // must say why the integration is unsupported, not crash or pass.
+    const cwd = await makeProject();
+    const pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    pkg.dependencies.next = "^14.2.0";
+    await writeFile(join(cwd, "package.json"), JSON.stringify(pkg));
+    const outcome = await new FrameworkCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("below the supported floor");
+    // The typed error's category and remedy travel through the outcome so
+    // the doctor envelope can surface them instead of generic --fix advice.
+    expect(outcome.code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
+    expect(outcome.hint).toContain("Upgrade");
+  });
 });
 
 describe("SchemaCheck", () => {
@@ -279,6 +392,541 @@ describe("DependencyCheck", () => {
   });
 });
 
+describe("ManagedFilesCheck", () => {
+  type ManagedDetails = {
+    mode: "manifest" | "template";
+    files: Array<{ path: string; class: string; state: string }>;
+  };
+
+  it("passes for a healthy scaffold without a manifest (template mode)", async () => {
+    const cwd = await makeProject();
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("pass");
+    const details = outcome.details as ManagedDetails;
+    expect(details.mode).toBe("template");
+    // The framework home page is conditionally scaffolded (fresh apps only)
+    // and must not be demanded of a pre-existing app without a manifest.
+    expect(details.files.map((file) => file.path)).not.toContain("app/page.tsx");
+    expect(details.files).toHaveLength(5);
+  });
+
+  it("fails when an infrastructure file is missing", async () => {
+    const cwd = await makeProject();
+    await rm(join(cwd, "middleware.ts"));
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("middleware.ts");
+  });
+
+  it("warns (not fails) when a presentation page is missing", async () => {
+    const cwd = await makeProject();
+    await rm(join(cwd, "app/login/page.tsx"));
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("app/login/page.tsx");
+  });
+
+  it("passes for a user-adopted page (marker removed)", async () => {
+    const cwd = await makeProject();
+    await writeFile(join(cwd, "app/register/page.tsx"), "export default function Mine() {}\n");
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("pass");
+    const details = outcome.details as ManagedDetails;
+    expect(details.files.find((file) => file.path === "app/register/page.tsx")?.state).toBe(
+      "adopted",
+    );
+  });
+
+  it("warns instead of failing when nothing can be enumerated", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-checks-bare-"));
+    tempDirs.push(cwd);
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("Could not enumerate");
+  });
+
+  it("template-mode fix restores a deleted boundary and leaves an edited page untouched", async () => {
+    const cwd = await makeProject();
+    const editedLogin = `${MANAGED_MARKER}\nexport default function L() { return "custom"; }\n`;
+    await writeFile(join(cwd, "app/login/page.tsx"), editedLogin);
+    await rm(join(cwd, "middleware.ts"));
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
+    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toBe(editedLogin);
+  });
+
+  it("trusts the manifest over current templates", async () => {
+    const cwd = await makeProject();
+    const middleware = await readFile(join(cwd, "middleware.ts"), "utf8");
+    await writeScaffoldState(cwd, {
+      files: { "middleware.ts": { hash: hashScaffoldFile(middleware), class: "infrastructure" } },
+    });
+    // Deleting a file the manifest never recorded must not matter.
+    await rm(join(cwd, "custom-elements.d.ts"));
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("pass");
+    const details = outcome.details as ManagedDetails;
+    expect(details.mode).toBe("manifest");
+    expect(details.files).toHaveLength(1);
+    expect(details.files[0]).toMatchObject({ path: "middleware.ts", state: "pristine" });
+  });
+
+  it("classifies edited files via the recorded hash", async () => {
+    const cwd = await makeProject();
+    await writeScaffoldState(cwd, {
+      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
+    });
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("pass");
+    const details = outcome.details as ManagedDetails;
+    expect(details.files[0]?.state).toBe("edited");
+  });
+
+  it("fails on missing manifest infrastructure; fix restores it and refreshes the hash", async () => {
+    const cwd = await makeProject();
+    await writeScaffoldState(cwd, {
+      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
+    });
+    await rm(join(cwd, "middleware.ts"));
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
+
+    await check.fix(ctxFor(cwd));
+
+    const outcome = await check.run(ctxFor(cwd));
+    expect(outcome.status).toBe("pass");
+    expect((outcome.details as ManagedDetails).files[0]?.state).toBe("pristine");
+    const restored = await readFile(join(cwd, "middleware.ts"), "utf8");
+    expect(restored).toContain(MANAGED_MARKER);
+    expect((await readScaffoldState(cwd)).files["middleware.ts"]?.hash).toBe(
+      hashScaffoldFile(restored),
+    );
+    // Without `scaffolded_framework` in the manifest, repair must not have
+    // invented a framework home page.
+    await expect(readFile(join(cwd, "app/page.tsx"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
+
+  it("fix never touches edited or adopted files", async () => {
+    const cwd = await makeProject();
+    const editedLogin = `${MANAGED_MARKER}\nexport default function L() { return "edited"; }\n`;
+    const adoptedRegister = "export default function Own() {}\n";
+    await writeFile(join(cwd, "app/login/page.tsx"), editedLogin);
+    await writeFile(join(cwd, "app/register/page.tsx"), adoptedRegister);
+    await writeScaffoldState(cwd, {
+      files: {
+        "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" },
+        "app/login/page.tsx": { hash: "1".repeat(64), class: "presentation" },
+        "app/register/page.tsx": { hash: "2".repeat(64), class: "presentation" },
+      },
+    });
+    await rm(join(cwd, "middleware.ts"));
+
+    await new ManagedFilesCheck().fix(ctxFor(cwd));
+
+    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toBe(editedLogin);
+    expect(await readFile(join(cwd, "app/register/page.tsx"), "utf8")).toBe(adoptedRegister);
+    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
+  });
+
+  it("fix previews without writing under dryRun", async () => {
+    const cwd = await makeProject();
+    await writeScaffoldState(cwd, {
+      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
+    });
+    await rm(join(cwd, "middleware.ts"));
+
+    await new ManagedFilesCheck().fix(ctxFor(cwd, true));
+
+    await expect(readFile(join(cwd, "middleware.ts"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    expect((await readScaffoldState(cwd)).files["middleware.ts"]?.hash).toBe("0".repeat(64));
+  });
+
+  it("fix never re-pins an already-declared SDK dependency version", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^15", "@zitadel/sdk-next": "user-pinned-0.0.1" },
+      }),
+    );
+    await rm(join(cwd, "middleware.ts"));
+
+    await new ManagedFilesCheck().fix(ctxFor(cwd));
+
+    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toContain(MANAGED_MARKER);
+    const pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies["@zitadel/sdk-next"]).toBe("user-pinned-0.0.1");
+  });
+
+  it("degrades to template mode when a manifest entry is malformed", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, ".zitadel/state.json"),
+      JSON.stringify({
+        framework: "next",
+        resources: {},
+        scaffold: { files: { "middleware.ts": null } },
+      }),
+    );
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("pass");
+    expect((outcome.details as ManagedDetails).mode).toBe("template");
+  });
+
+  it("template-mode fix materializes a manifest for pre-manifest apps", async () => {
+    const cwd = await makeProject();
+    // A pre-manifest app: state.json exists (sync resources) but has no
+    // scaffold section. One page was adopted by the user; the boundary is
+    // missing.
+    await writeFile(
+      join(cwd, ".zitadel/state.json"),
+      JSON.stringify({ framework: "next", resources: {} }),
+    );
+    await writeFile(join(cwd, "app/register/page.tsx"), "export default function Own() {}\n");
+    await rm(join(cwd, "middleware.ts"));
+    const check = new ManagedFilesCheck();
+    expect(((await check.run(ctxFor(cwd))).details as ManagedDetails).mode).toBe("template");
+
+    await check.fix(ctxFor(cwd));
+
+    const scaffold = await readScaffoldState(cwd);
+    expect(scaffold.files["middleware.ts"]?.class).toBe("infrastructure");
+    expect(scaffold.files["app/login/page.tsx"]?.class).toBe("presentation");
+    // Adopted and conditionally-scaffolded files stay out of the manifest.
+    expect(scaffold.files).not.toHaveProperty("app/register/page.tsx");
+    expect(scaffold.files).not.toHaveProperty("app/page.tsx");
+    const after = await check.run(ctxFor(cwd));
+    expect(after.status).toBe("pass");
+    expect((after.details as ManagedDetails).mode).toBe("manifest");
+  });
+
+  it("fails when a managed config wiring is detached, and --fix re-applies it", async () => {
+    const cwd = await makeAngularProject();
+    const check = new ManagedFilesCheck();
+    const healthy = await check.run(ctxFor(cwd));
+    expect(healthy.status).toBe("pass");
+    expect(healthy.message).toContain("wirings verified");
+
+    // The codex repro: only the angular.json proxy wiring is removed — every
+    // marked file stays pristine, yet auth requests are broken.
+    await detachAngularProxy(cwd);
+    const detached = await check.run(ctxFor(cwd));
+    expect(detached.status).toBe("fail");
+    expect(detached.message).toContain("detached managed config wiring: angular.json");
+
+    await check.fix(ctxFor(cwd));
+
+    const repaired = await check.run(ctxFor(cwd));
+    expect(repaired.status).toBe("pass");
+    const angularJson = JSON.parse(await readFile(join(cwd, "angular.json"), "utf8")) as {
+      projects: { demo: { architect: { serve: { options: Record<string, unknown> } } } };
+    };
+    expect(angularJson.projects.demo.architect.serve.options.proxyConfig).toBe("proxy.conf.cjs");
+  });
+
+  it("fails when a wiring's host config file is deleted outright", async () => {
+    const cwd = await makeAngularProject();
+    await rm(join(cwd, "angular.json"));
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("detached managed config wiring: angular.json");
+  });
+
+  it("warns unverifiable when a wiring's config was restructured beyond the transform", async () => {
+    const cwd = await makeAngularProject();
+    // Two projects, no defaultProject: the transform throws rather than
+    // guessing — the wiring state is unknown, which must surface, not vanish.
+    await writeFile(
+      join(cwd, "angular.json"),
+      JSON.stringify({ projects: { a: {}, b: {} } }),
+    );
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("unverifiable managed config wiring");
+    expect(outcome.message).toContain("angular.json");
+  });
+
+  it("warns when an unrecognized legacy proxy may still over-forward the project secret", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    const unsafe = (await readFile(proxyPath, "utf8")).replace(
+      `/* zitadel:proxy:v2 */
+function setBearer(proxyReq) {
+  const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
+  if (
+    proxyReq.method === "POST" &&
+    pathname === "/sessions/exchange" &&
+    !proxyReq.getHeader("authorization")
+  ) {
+    proxyReq.setHeader("authorization", bearer);
+  }
+}`,
+      `function setBearer(proxyReq) {
+  proxyReq
+    .setHeader("authorization", bearer);
+}`,
+    );
+    await writeFile(proxyPath, unsafe);
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("proxy.conf.cjs");
+    expect(outcome.message).toContain(
+      "may forward ZITADEL_PROJECT_SECRET outside POST /sessions/exchange",
+    );
+  });
+
+  it("migrates a pristine retired boundary: --fix removes middleware.ts and installs proxy.ts", async () => {
+    const cwd = await makeProject();
+    const middleware = `${MANAGED_MARKER}\nexport function middleware() {}\n`;
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+    );
+    await writeScaffoldState(cwd, {
+      files: {
+        "middleware.ts": { hash: hashScaffoldFile(middleware), class: "infrastructure" },
+      },
+    });
+    const check = new ManagedFilesCheck();
+    const before = await check.run(ctxFor(cwd));
+    expect(before.status).toBe("warn");
+    expect(before.message).toContain("retired boundary middleware.ts left over");
+
+    await check.fix(ctxFor(cwd));
+
+    // The pristine leftover is gone, the current boundary exists, and the
+    // manifest swapped over — Next 16 would reject the pair.
+    await expect(readFile(join(cwd, "middleware.ts"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    expect(await readFile(join(cwd, "proxy.ts"), "utf8")).toContain(MANAGED_MARKER);
+    const scaffold = await readScaffoldState(cwd);
+    expect(scaffold.files).not.toHaveProperty("middleware.ts");
+    expect(scaffold.files["proxy.ts"]?.class).toBe("infrastructure");
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("refuses to create proxy.ts beside an edited middleware.ts and reports the conflict", async () => {
+    const cwd = await makeProject();
+    // The user upgraded to Next 16 but kept an edited middleware.ts; an
+    // unrelated page is missing so --fix has repair work to do.
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+    );
+    const editedMiddleware = `${MANAGED_MARKER}\nexport function middleware() { /* custom */ }\n`;
+    await writeFile(join(cwd, "middleware.ts"), editedMiddleware);
+    await writeScaffoldState(cwd, {
+      files: {
+        "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" },
+        "app/login/page.tsx": { hash: "1".repeat(64), class: "presentation" },
+      },
+    });
+    await rm(join(cwd, "app/login/page.tsx"));
+    const check = new ManagedFilesCheck();
+    const before = await check.run(ctxFor(cwd));
+    expect(before.status).toBe("fail");
+    expect(before.message).toContain("conflicting request boundaries");
+    expect(before.message).toContain("middleware.ts");
+
+    await check.fix(ctxFor(cwd));
+
+    // The unrelated page is restored; the conflicting boundary pair is NOT
+    // created — Next throws when both exist — and the user file is untouched.
+    expect(await readFile(join(cwd, "app/login/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
+    await expect(readFile(join(cwd, "proxy.ts"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toBe(editedMiddleware);
+    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
+  });
+
+  it("ignores a user-owned proxy.ts on Next 15 (not a reserved convention there)", async () => {
+    const cwd = await makeProject();
+    // The fixture is Next ^15 (boundary: middleware.ts). A root proxy.ts is
+    // simply the user's file and must not trip the boundary-conflict logic.
+    await writeFile(join(cwd, "proxy.ts"), "export function proxy() { /* user-owned */ }\n");
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("pass");
+    expect(outcome.message).not.toContain("conflicting");
+  });
+
+  it("does not materialize a manifest while a boundary conflict is unresolved", async () => {
+    const cwd = await makeProject();
+    // Pre-manifest Next 15 app upgraded to 16 with an edited middleware.ts:
+    // --fix must not finalize a manifest that records no boundary at all.
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+    );
+    await writeFile(
+      join(cwd, "middleware.ts"),
+      `${MANAGED_MARKER}\nexport function middleware() { /* custom */ }\n`,
+    );
+    await writeFile(
+      join(cwd, ".zitadel/state.json"),
+      JSON.stringify({ framework: "next", resources: {} }),
+    );
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
+
+    await check.fix(ctxFor(cwd));
+
+    // No proxy.ts, no manifest: the app stays on the template fallback,
+    // which keeps demanding the boundary — deleting middleware.ts later
+    // still fails instead of passing against an empty manifest.
+    await expect(readFile(join(cwd, "proxy.ts"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+      scaffold?: unknown;
+    };
+    expect(state.scaffold).toBeUndefined();
+    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
+
+    // The user resolves the conflict properly (migrates their edits): the
+    // next --fix materializes a manifest that records the boundary.
+    await rm(join(cwd, "middleware.ts"));
+    await writeFile(join(cwd, "proxy.ts"), `${MANAGED_MARKER}\nexport function proxy() {}\n`);
+    await check.fix(ctxFor(cwd));
+    const scaffold = await readScaffoldState(cwd);
+    expect(scaffold.files["proxy.ts"]?.class).toBe("infrastructure");
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("stays on the template fallback when an infrastructure file was adopted", async () => {
+    const cwd = await makeProject();
+    // The user replaced the boundary with their own marker-less file; a
+    // materialized manifest could not track it, so none is written and the
+    // presence-enforcing fallback stays in charge.
+    await writeFile(join(cwd, "middleware.ts"), "export function middleware() {}\n");
+    await writeFile(
+      join(cwd, ".zitadel/state.json"),
+      JSON.stringify({ framework: "next", resources: {} }),
+    );
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+
+    await check.fix(ctxFor(cwd));
+
+    const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+      scaffold?: unknown;
+    };
+    expect(state.scaffold).toBeUndefined();
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("warns (not fails) when only the convenience dev script is missing", async () => {
+    const cwd = await makeAngularProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { "@angular/core": "^19.0.0", "@zitadel/sdk-angular": "latest" },
+      }),
+    );
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("unapplied managed config edit(s): package.json");
+  });
+
+  it("degrades to template mode when the manifest files record is an array", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, ".zitadel/state.json"),
+      JSON.stringify({ framework: "next", resources: {}, scaffold: { files: [] } }),
+    );
+
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("pass");
+    expect((outcome.details as ManagedDetails).mode).toBe("template");
+    expect((outcome.details as ManagedDetails).files.length).toBeGreaterThan(0);
+  });
+
+  it("reconciles retired boundary paths across a Next 15 to 16 upgrade", async () => {
+    const cwd = await makeProject();
+    // The app was scaffolded on Next 15 (manifest demands middleware.ts),
+    // then upgraded to Next 16 — the current templates write proxy.ts.
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16", "@zitadel/sdk-next": "latest" } }),
+    );
+    await writeScaffoldState(cwd, {
+      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
+    });
+    await rm(join(cwd, "middleware.ts"));
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).status).toBe("fail");
+
+    await check.fix(ctxFor(cwd));
+
+    // Repair restored the *current* boundary and the manifest converged on
+    // it: the retired middleware.ts entry is gone, so doctor passes instead
+    // of failing forever (setup skips initialized projects).
+    expect(await readFile(join(cwd, "proxy.ts"), "utf8")).toContain(MANAGED_MARKER);
+    const scaffold = await readScaffoldState(cwd);
+    expect(scaffold.files).not.toHaveProperty("middleware.ts");
+    expect(scaffold.files["proxy.ts"]?.class).toBe("infrastructure");
+    const after = await check.run(ctxFor(cwd));
+    expect(after.status).toBe("pass");
+    expect((after.details as ManagedDetails).mode).toBe("manifest");
+  });
+
+  it("restores the framework home page when the manifest recorded a fresh scaffold", async () => {
+    const cwd = await makeProject();
+    await writeScaffoldState(cwd, {
+      files: { "app/page.tsx": { hash: "0".repeat(64), class: "presentation" } },
+      scaffolded_framework: true,
+    });
+
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).status).toBe("warn");
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+    expect(await readFile(join(cwd, "app/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
+  });
+});
+
 describe("ProjectMatchCheck", () => {
   it("passes when secret project_id matches config project", async () => {
     const cwd = await makeProject();
@@ -302,5 +950,48 @@ describe("loadPatchContext", () => {
     expect(ctx.project.id).toBe("proj-001");
     expect(ctx.issuer).toBe("http://localhost:3000");
     expect(ctx.cliVersion).toBe("0.1.0-alpha.0");
+    expect(ctx.preset).toBeUndefined();
+    expect(ctx.scaffoldedFramework).toBeUndefined();
+  });
+
+  it("restores preset, use case, and scaffold facts", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({
+        project: "proj-001",
+        server: "https://api.zitadel.cloud",
+        framework: { id: "next" },
+        environments: { development: { issuer: "http://localhost:3000" } },
+        preset: "passkey-first",
+        useCase: "consumer",
+      }),
+    );
+    await writeScaffoldState(cwd, { files: {}, scaffolded_framework: true, dev_port: 3005 });
+
+    const ctx = await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0");
+
+    expect(ctx.preset).toBe("passkey-first");
+    expect(ctx.useCase).toBe("consumer");
+    expect(ctx.scaffoldedFramework).toBe(true);
+    // The config issuer still wins over the manifest port.
+    expect(ctx.issuer).toBe("http://localhost:3000");
+  });
+
+  it("falls back to the manifest dev_port for the issuer", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({
+        project: "proj-001",
+        server: "https://api.zitadel.cloud",
+        framework: { id: "next" },
+      }),
+    );
+    await writeScaffoldState(cwd, { files: {}, dev_port: 3005 });
+
+    const ctx = await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0");
+
+    expect(ctx.issuer).toBe("http://localhost:3005");
   });
 });

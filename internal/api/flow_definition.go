@@ -7,13 +7,15 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/muhlemmer/gu"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
 func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDefinitionRequest) (api.CreateFlowDefinitionRes, error) {
+	if err := requireProjectAccess(ctx, string(req.GetProjectID()), flowDefinitionAccess, opWrite); err != nil {
+		return nil, err
+	}
 	svcReq, err := mapCreateRequestToService(req)
 	if err != nil {
 		return nil, err
@@ -28,6 +30,9 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 }
 
 func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefinitionParams) (api.GetFlowDefinitionRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opRead); err != nil {
+		return nil, err
+	}
 	definition, err := h.flowDefinitionService.Get(ctx, string(params.ProjectID), params.ID)
 	if err != nil {
 		return nil, err
@@ -36,20 +41,30 @@ func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefini
 }
 
 func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDefinitionsParams) (api.ListFlowDefinitionsRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opRead); err != nil {
+		return nil, err
+	}
 	svcReq := mapListRequestToService(params)
 
-	definitions, err := h.flowDefinitionService.List(ctx, svcReq)
+	listed, err := h.flowDefinitionService.List(ctx, svcReq)
 	if err != nil {
 		return nil, err
 	}
-	respDefinitions := make([]api.FlowDefinitionResponse, 0, len(definitions))
-	for _, def := range definitions {
+	respDefinitions := make([]api.FlowDefinitionResponse, 0, len(listed.Items))
+	for _, def := range listed.Items {
 		respDefinitions = append(respDefinitions, flowDefinitionResponse(def))
 	}
-	return &api.FlowDefinitionListResponse{FlowDefinitions: respDefinitions}, nil
+	resp := &api.FlowDefinitionListResponse{FlowDefinitions: respDefinitions}
+	if listed.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
+	}
+	return resp, nil
 }
 
 func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefinitionUpdateRequest, params api.UpdateFlowDefinitionParams) (api.UpdateFlowDefinitionRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opWrite); err != nil {
+		return nil, err
+	}
 	svcReq, err := mapUpdateRequestToService(params, req)
 	if err != nil {
 		return nil, err
@@ -65,6 +80,9 @@ func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefiniti
 }
 
 func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlowDefinitionParams) (api.DeleteFlowDefinitionRes, error) {
+	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opDelete); err != nil {
+		return nil, err
+	}
 	err := h.flowDefinitionService.Delete(ctx, string(params.ProjectID), params.ID)
 	if err != nil {
 		return nil, err
@@ -91,11 +109,10 @@ func mapUpdateRequestToService(params api.UpdateFlowDefinitionParams, req *api.F
 }
 
 func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchemaURI, definition api.FlowDefinition, status string) (service.FlowDefinitionRequest, error) {
-	userSchemaURI := definition.GetUserSchema()
 	svcReq := service.FlowDefinitionRequest{
 		ProjectID:     projectID,
 		Name:          definition.GetName(),
-		UserSchema:    userSchemaURI.String(),
+		UserSchema:    definition.GetUserSchema(),
 		Status:        status,
 		SchemaVersion: "1.0.0", // todo (grvijayan): find a way to set this based on the schema URI or the request (currently not set in the request)
 	}
@@ -232,7 +249,7 @@ func mapListRequestToService(params api.ListFlowDefinitionsParams) service.ListF
 	}
 	limit, ok := params.Limit.Get()
 	if ok {
-		req.Limit = limit
+		req.Limit = int(limit)
 	}
 	pageToken, ok := params.PageToken.Get()
 	if ok {
@@ -265,8 +282,6 @@ func flowDefinitionDetailResponse(flowDefinition *domain.FlowDefinition) *api.Fl
 	}
 	steps := mapDomainStepsToAPI(flowDefinition.Steps)
 
-	userSchemaURI, _ := url.Parse(flowDefinition.UserSchema)
-
 	return &api.FlowDefinitionDetailResponse{
 		ID:        flowDefinition.ID,
 		ProjectID: flowDefinition.ProjectID,
@@ -276,7 +291,7 @@ func flowDefinitionDetailResponse(flowDefinition *domain.FlowDefinition) *api.Fl
 			Steps:      steps,
 			Purposes:   purposes,
 			Audience:   audience,
-			UserSchema: gu.Value(userSchemaURI),
+			UserSchema: flowDefinition.UserSchema,
 		},
 		CreatedAt: flowDefinition.CreatedAt,
 		UpdatedAt: flowDefinition.UpdatedAt,

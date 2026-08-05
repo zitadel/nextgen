@@ -1,0 +1,8 @@
+type: apiKey
+in: cookie
+name: __nextgen_session
+description: |
+  The __nextgen_session cookie issued at session creation or superseding handoff exchange.
+
+  A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
+  `Missing or invalid session token.`

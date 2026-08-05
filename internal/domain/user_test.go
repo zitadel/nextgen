@@ -1,7 +1,6 @@
 package domain_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,16 +39,14 @@ func TestNewCreateUser(t *testing.T) {
 			},
 		},
 		{
-			name: "empty id mints a fresh one with the user prefix",
+			name: "empty id leaves assignment to the dialect on create",
 			id:   "",
 			user: map[string]any{
 				"$schema": "https://example.test/schema.json",
 				"email":   "alice@example.com",
 			},
 			check: func(t *testing.T, got *domain.CreateUser) {
-				prefix := string(domain.PrefixUser) + "_"
-				assert.True(t, strings.HasPrefix(got.ID, prefix), "want prefix %q, got id %q", prefix, got.ID)
-				assert.Greater(t, len(got.ID), len(prefix), "minted id must not be just the prefix")
+				assert.Empty(t, got.ID)
 			},
 		},
 	}
@@ -59,6 +56,69 @@ func TestNewCreateUser(t *testing.T) {
 			got, err := domain.NewCreateUser("proj_1", nil, tt.id, []byte(minimalUserSchema), tt.user)
 			require.NoError(t, err)
 			tt.check(t, got)
+		})
+	}
+}
+
+func TestUserDisplayName(t *testing.T) {
+	tests := []struct {
+		name  string
+		attrs []domain.Attribute
+		want  string
+	}{
+		{
+			// The shipped presets collect camelCase name parts
+			// (packages/config/defaults/*.json).
+			name: "camelCase preset shape",
+			attrs: []domain.Attribute{
+				{Key: "givenName", Value: "Ada"},
+				{Key: "familyName", Value: "Lovelace"},
+			},
+			want: "Ada Lovelace",
+		},
+		{
+			name: "snake_case fallback",
+			attrs: []domain.Attribute{
+				{Key: "given_name", Value: "Ada"},
+				{Key: "family_name", Value: "Lovelace"},
+			},
+			want: "Ada Lovelace",
+		},
+		{
+			name: "camelCase wins over snake_case per part",
+			attrs: []domain.Attribute{
+				{Key: "givenName", Value: "Ada"},
+				{Key: "given_name", Value: "ignored"},
+				{Key: "family_name", Value: "Lovelace"},
+			},
+			want: "Ada Lovelace",
+		},
+		{
+			name: "explicit name takes precedence",
+			attrs: []domain.Attribute{
+				{Key: "name", Value: "Countess of Lovelace"},
+				{Key: "givenName", Value: "Ada"},
+			},
+			want: "Countess of Lovelace",
+		},
+		{
+			name: "single part stands alone",
+			attrs: []domain.Attribute{
+				{Key: "familyName", Value: "Lovelace"},
+			},
+			want: "Lovelace",
+		},
+		{
+			name:  "no identity attributes",
+			attrs: []domain.Attribute{{Key: "email", Value: "ada@example.com"}},
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			user := &domain.User{Attributes: tt.attrs}
+			assert.Equal(t, tt.want, user.DisplayName())
 		})
 	}
 }

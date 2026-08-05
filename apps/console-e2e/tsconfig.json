@@ -6,5 +6,11 @@
     "sourceMap": false,
     "types": ["node"]
   },
-  "include": ["playwright.config.mts", "src/**/*.spec.ts", "src/**/*.d.ts"]
+  "include": [
+    "playwright*.config.mts",
+    "scripts/**/*.mts",
+    "src/**/*.spec.ts",
+    "src/**/*.d.ts",
+    "src-real/**/*.spec.ts"
+  ]
 }

@@ -1,9 +1,8 @@
-//go:build postgres_integration
+//go:build postgres_integration || spanner_integration
 
 package integration_test
 
 import (
-	"net/url"
 	"testing"
 
 	"github.com/go-faster/jx"
@@ -12,7 +11,6 @@ import (
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // TestCombinedFlowLoginFlipToRegister exercises example 05 (combined password
@@ -25,32 +23,30 @@ import (
 // drives the same behavior through the real HTTP service so the cookie
 // rotation + service-layer dispatch don't regress.
 func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	userSchemaURL, err := url.Parse(schemaURL)
-	require.NoError(t, err)
 
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
-		FlowDefinition: combinedPasswordFlowDefinition(*userSchemaURL),
+		FlowDefinition: combinedPasswordFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "expected FlowResponseHeaders, got %T", createResp)
+	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	require.Equal(t, "identifier", flowHeaders.Response.Step.Name)
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
@@ -71,26 +67,25 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	flipOK, ok := flipResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK after flip, got %T: %+v", flipResp, flipResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, flipResp, helpers.MustMarshal(t, flipResp))
+	flipOK := flipResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "register-identifier", flipOK.Response.Step.Name, "user_not_found must flip to register-identifier")
 	zflow = mustExtractZflow(t, flipOK.SetCookie.Value)
 
-	// Complete the register-identifier step with additional profile fields.
+	// Complete the register-identifier step. The default schema collects only
+	// email (the minimal use case), so that is all the register step carries.
 	idResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
-			"email":      jx.Raw(`"` + newEmail + `"`),
-			"givenName":  jx.Raw(`"Flip"`),
-			"familyName": jx.Raw(`"User"`),
+			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
 		ID:    flowID,
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	idOK, ok := idResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK after register identifier, got %T: %+v", idResp, idResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, idResp, helpers.MustMarshal(t, idResp))
+	idOK := idResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "register-password", idOK.Response.Step.Name)
 	zflow = mustExtractZflow(t, idOK.SetCookie.Value)
 
@@ -105,8 +100,8 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	pwOK, ok := pwResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK after register password, got %T: %+v", pwResp, pwResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
+	pwOK := pwResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "done", pwOK.Response.Step.Name)
 	require.True(t, pwOK.Response.Step.Complete.Set, "expected terminal step")
 
@@ -115,25 +110,19 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	require.NotEmpty(t, handoffToken)
 
 	// User row landed in the DB with the flipped-into email.
-	db := harness.EnsureDBPool(t)
-	userRepo := harness.EnsureUserRepo(t)
-	_, err = userRepo.Get(t.Context(), db,
-		database.WithCondition(database.And(
-			userRepo.ProjectIDCondition(project.ID),
-			userRepo.AttributesCondition([]domain.Attribute{{Key: "email", Value: newEmail}}),
-		)),
-	)
+	users := harness.EnsureUserFixture(t)
+	_, err = users.GetByAttributes(t.Context(), project.ID, []domain.Attribute{{Key: "email", Value: newEmail}})
 	require.NoError(t, err, "flip-into-register must persist exactly one user")
 }
 
 // combinedPasswordFlowDefinition mirrors examples/05-combined-login-register
 // using fields available on the default-human-user schema.
-func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
+func combinedPasswordFlowDefinition(userSchema string) api.FlowDefinition {
 	createUser := api.FlowDefinitionStepOnSuccessCreateUser
 	return api.FlowDefinition{
 		Name:       "combined-password",
 		Status:     "active",
-		UserSchema: userSchemaURL,
+		UserSchema: userSchema,
 		Purposes: api.FlowDefinitionPurposes{
 			"login":    "identifier",
 			"register": "register-identifier",
@@ -164,7 +153,7 @@ func combinedPasswordFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 			},
 			{
 				Name:   "register-identifier",
-				Fields: []string{"email", "givenName", "familyName"},
+				Fields: []string{"email"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 					{Name: "login", Kind: api.StepActionKindSubmit},

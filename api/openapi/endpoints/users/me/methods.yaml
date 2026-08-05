@@ -3,17 +3,15 @@ get:
   summary: Get my user information
   tags:
     - Users
-  parameters:
-    - $ref: ../../../components/parameters/session-cookie.yaml
-  security: []
+  security:
+    - nextgenSession: []
   responses:
     '200':
       description: Current user information retrieved successfully
       content:
         application/json:
           schema:
-            type: object
-            additionalProperties: true
+            $ref: ../user.yaml
     '401':
       description: Client was not authorized or the session is anonymous
       content:

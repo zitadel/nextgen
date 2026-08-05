@@ -1,0 +1,85 @@
+{
+  "name": "@zitadel/config",
+  "version": "0.1.0-alpha.17",
+  "description": "Versioned Zitadel local config schemas and defaults",
+  "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
+  "bugs": {
+    "url": "https://github.com/zitadel/nextgen/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zitadel/nextgen.git",
+    "directory": "packages/config"
+  },
+  "files": [
+    "dist",
+    "defaults/*.json",
+    "defaults/*.md",
+    "defaults/presets/*/*.json",
+    "defaults/branding/*/*.liquid",
+    "meta-schemas/*.json",
+    "LICENSE"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "@zitadel/source": "./src/index.ts",
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./defaults": {
+      "@zitadel/source": "./src/defaults.ts",
+      "types": "./dist/defaults.d.mts",
+      "import": "./dist/defaults.mjs"
+    },
+    "./schemas": {
+      "@zitadel/source": "./src/schemas.ts",
+      "types": "./dist/schemas.d.mts",
+      "import": "./dist/schemas.mjs"
+    },
+    "./normalize": {
+      "@zitadel/source": "./src/normalize.ts",
+      "types": "./dist/normalize.d.mts",
+      "import": "./dist/normalize.mjs"
+    },
+    "./validate": {
+      "@zitadel/source": "./src/validate.ts",
+      "types": "./dist/validate.d.mts",
+      "import": "./dist/validate.mjs"
+    },
+    "./meta-schemas": {
+      "@zitadel/source": "./src/meta-schemas.ts",
+      "types": "./dist/meta-schemas.d.mts",
+      "import": "./dist/meta-schemas.mjs"
+    },
+    "./template": {
+      "@zitadel/source": "./src/template.ts",
+      "types": "./dist/template.d.mts",
+      "import": "./dist/template.mjs"
+    },
+    "./defaults/default-human-user.json": "./defaults/default-human-user.json",
+    "./defaults/default-login.json": "./defaults/default-login.json",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --build tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "lint": "oxlint ."
+  },
+  "dependencies": {
+    "@zitadel/api": "workspace:*",
+    "liquidjs": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "ajv": "catalog:",
+    "tsdown": "catalog:",
+    "tslib": "catalog:",
+    "vitest": "catalog:"
+  }
+}

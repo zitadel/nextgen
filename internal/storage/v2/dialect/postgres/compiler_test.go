@@ -9,9 +9,10 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/flowdefinition"
 )
 
-const testProjectQuery = "SELECT id, created_at, updated_at, project_secret, preview_secret, preview_origins FROM zitadel_nextgen.projects"
+const testProjectQuery = "SELECT id, created_at, updated_at, preview_origins FROM zitadel_nextgen.projects"
 
 const testFlowDefinitionQuery = "SELECT project_id, id, name FROM zitadel_nextgen.flow_definitions"
 
@@ -46,11 +47,11 @@ func compileReadExpectError[F ~uint8, T any](t *testing.T, stmt string, opts *da
 	return compileRead(&compiler, stmt, opts, schema)
 }
 
-func assertDomainErrorCode(t *testing.T, err error, code string) {
+func assertDatabaseErrorCode(t *testing.T, err error, code string) {
 	t.Helper()
 
 	require.Error(t, err)
-	var dbErr domain.Error
+	var dbErr database.Error
 	require.ErrorAs(t, err, &dbErr)
 	assert.Equal(t, code, dbErr.Code)
 }
@@ -198,6 +199,30 @@ func TestCompileReadStringEqualFold(t *testing.T) {
 	assert.Equal(t, "Login", args[0])
 }
 
+func TestCompileArrayContains(t *testing.T) {
+	t.Parallel()
+
+	sql, args := compileFilterOnly(t,
+		database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), "login"),
+		flowdefinition.Schema,
+	)
+	assert.Equal(t, "$1::zitadel_nextgen.flow_definition_purposes = ANY(purposes)", sql)
+	require.Len(t, args, 1)
+	assert.Equal(t, "login", args[0])
+}
+
+func TestCompileStatusEqualParamCast(t *testing.T) {
+	t.Parallel()
+
+	sql, args := compileFilterOnly(t,
+		database.Equal(database.Col(domain.FlowDefinitionFieldStatus), "active"),
+		flowdefinition.Schema,
+	)
+	assert.Equal(t, "status = $1::zitadel_nextgen.flow_definition_states", sql)
+	require.Len(t, args, 1)
+	assert.Equal(t, "active", args[0])
+}
+
 func TestCompileReadCursorDesc(t *testing.T) {
 	t.Parallel()
 
@@ -270,7 +295,7 @@ func TestCompileReadInvalidCursorToken(t *testing.T) {
 			Cursor: []byte("not-a-valid-cursor"),
 		},
 	}, projectSchema)
-	assertDomainErrorCode(t, err, "db.invalid_cursor")
+	assertDatabaseErrorCode(t, err, "db.invalid_cursor")
 }
 
 func TestCompileReadCursorOrderMismatch(t *testing.T) {
@@ -296,7 +321,7 @@ func TestCompileReadCursorOrderMismatch(t *testing.T) {
 			Cursor: cursor,
 		},
 	}, projectSchema)
-	assertDomainErrorCode(t, err, "db.cursor_order_mismatch")
+	assertDatabaseErrorCode(t, err, "db.cursor_order_mismatch")
 }
 
 func TestCompileReadCursorCoerceFailure(t *testing.T) {
@@ -320,9 +345,9 @@ func TestCompileReadCursorCoerceFailure(t *testing.T) {
 			Cursor: cursor,
 		},
 	}, projectSchema)
-	assertDomainErrorCode(t, err, "db.invalid_cursor")
+	assertDatabaseErrorCode(t, err, "db.invalid_cursor")
 
-	var dbErr domain.Error
+	var dbErr database.Error
 	require.ErrorAs(t, err, &dbErr)
 	assert.Error(t, dbErr.Parent)
 }
@@ -603,7 +628,7 @@ func TestCompileStringFilter(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			sql, args := compileFilterOnly(t, tt.filter, flowDefinitionSchema)
+			sql, args := compileFilterOnly(t, tt.filter, flowdefinition.Schema)
 			assert.Equal(t, tt.wantSQL, sql)
 			require.Len(t, args, 1)
 			assert.Equal(t, tt.wantArg, args[0])
@@ -703,7 +728,7 @@ func compileFlowDefinitionRead(t *testing.T, opts *database.ListOptions[domain.F
 	t.Helper()
 
 	var compiler statementCompiler
-	err := compileRead(&compiler, testFlowDefinitionQuery, opts, flowDefinitionSchema)
+	err := compileRead(&compiler, testFlowDefinitionQuery, opts, flowdefinition.Schema)
 	require.NoError(t, err)
 	return compiler.String(), compiler.args
 }

@@ -19,7 +19,7 @@ import (
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/maputil"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 const (
@@ -38,14 +38,31 @@ func ErrJSONSchemaAlreadyExists() Error {
 	return newError(PrefixJSONSchema.ErrorCodePrefix("already_exists"), "a schema with the given id already exists", nil, nil)
 }
 
+func ErrJSONSchemaPermissionDenied() Error {
+	return newError(PrefixJSONSchema.ErrorCodePrefix("permission_denied"), "the schema management API requires the project secret", nil, nil)
+}
+
 var absoluteScheme = regexp.MustCompile(`^https?://`)
 
 type JSONSchema struct {
-	ProjectID string
-	URL       string
-	CreatedAt time.Time
-	Schema    []byte
+	ProjectID  string
+	URL        string
+	ObjectType *string
+	CreatedAt  time.Time
+	Schema     []byte
 }
+
+// JSONSchemaField enumerates the fields of JSONSchema which can be used for
+// filtering and ordering in list operations.
+type JSONSchemaField uint8
+
+const (
+	JSONSchemaFieldUnspecified JSONSchemaField = iota
+	JSONSchemaFieldProjectID
+	JSONSchemaFieldURL
+	JSONSchemaFieldObjectType
+	JSONSchemaFieldCreatedAt
+)
 
 func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error) {
 	var schema map[string]any
@@ -54,51 +71,44 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 	}
 
 	schemaID, _ := maputil.Get[string](schema, "$id")
-	if schemaID == "" {
-		schemaID, err = newID(PrefixJSONSchema)
-		if err != nil {
-			return nil, ErrInternal(err).WithMessage("failed to generate schema id")
+
+	if props, ok := maputil.Get[map[string]any](schema, "properties"); ok {
+		if _, ok := maputil.Get[any](props, "id"); ok {
+			return nil, ErrJSONSchemaInvalid().WithMessage("schema cannot have property id")
+		}
+		if _, ok := maputil.Get[any](props, "metadata"); ok {
+			return nil, ErrJSONSchemaInvalid().WithMessage("schema cannot have property metadata")
 		}
 	}
 
+	var objectType *string
+	if ot, ok := maputil.Get[string](schema, "objectType"); ok {
+		objectType = &ot
+	}
+
 	return &JSONSchema{
-		ProjectID: projectID,
-		URL:       schemaID,
-		CreatedAt: time.Now().UTC(),
-		Schema:    schemabs,
+		ProjectID:  projectID,
+		URL:        schemaID,
+		ObjectType: objectType,
+		CreatedAt:  time.Now().UTC(),
+		Schema:     schemabs,
 	}, nil
 }
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/json_schema.mock.go . JSONSchemaRepository
+//go:generate go tool mockgen -typed -package domainmock -destination ./mock/json_schema.mock.go . JSONSchemaStore
 
-// JSONSchemaRepository is the repository for JSON schemas.
+// JSONSchemaStore is the persistence port for JSON schemas used by
+// [JSONSchemaResolver] and service callers that only need get/create.
 // Because schema validation happens on data writes in domain logic,
-// schemas are immutable. They can only be created and deleted (if no data references them).
-// Schemas can use versioned URLs to support multiple versions of the same schema.
-type JSONSchemaRepository interface {
-	Repository
-
-	jsonSchemaColumns
-	jsonSchemaConditions
-
-	GetByID(ctx context.Context, client database.QueryExecutor, projectID string, schemaID string) (*JSONSchema, error)
-	Get(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) (*JSONSchema, error)
-	List(ctx context.Context, client database.QueryExecutor, opts ...database.QueryOption) ([]*JSONSchema, error)
-	Create(ctx context.Context, client database.QueryExecutor, schema *JSONSchema) error
-	Delete(ctx context.Context, client database.QueryExecutor, condition database.Condition) error
-}
-
-type jsonSchemaColumns interface {
-	ProjectID() database.Column
-	URL() database.Column
-	CreatedAt() database.Column
-	Payload() database.Column
-}
-
-type jsonSchemaConditions interface {
-	PrimaryKeyCondition(projectID, url string) database.Condition
-	ProjectIDCondition(projectID string) database.Condition
-	URLCondition(url string) database.Condition
+// schemas are immutable. They can only be created and deleted (if no data
+// references them). Schemas can use versioned URLs to support multiple
+// versions of the same schema.
+//
+// Method names match the v2 statement surface so pool/tx statements satisfy
+// this interface without an adapter.
+type JSONSchemaStore interface {
+	GetJSONSchemaByID(ctx context.Context, projectID, schemaID string) (*JSONSchema, error)
+	CreateJSONSchema(ctx context.Context, schema *JSONSchema) error
 }
 
 const (
@@ -142,9 +152,9 @@ func jsonSchemaResolverCacheKey(projectID, schemaURL string) string {
 
 // JSONSchemaResolver retrieves JSON schemas by their URL recursively,
 // starting from the given schema URL and following all references in the schema.
-// It caches resolved schemas in memory and uses a repository to store them for future use.
+// It caches resolved schemas in memory and uses a [JSONSchemaStore] to load and
+// persist them for future use.
 type JSONSchemaResolver struct {
-	repository JSONSchemaRepository
 	// cache of fully resolved JSON schemas,
 	// keyed by projectID and schemaURL
 	cache           *lru.TwoQueueCache[string, *jsonschema.Schema]
@@ -152,16 +162,16 @@ type JSONSchemaResolver struct {
 	maxSize         int
 	httpClient      *http.Client
 	// builtinPublicBase is the absolute URL prefix for product-built-in schemas (no trailing slash).
-	// When empty, builtin embedded schemas are disabled and resolution uses only the repository / HTTP ingest.
+	// When empty, builtin embedded schemas are disabled and resolution uses only the store / HTTP ingest.
 	builtinPublicBase string
 }
 
-// NewJSONSchemaResolver wires a resolver with shared repository, LRU cache, resolve limits,
+// NewJSONSchemaResolver wires a resolver with an LRU cache, resolve limits,
 // an optional HTTP client for ingestion, and an optional builtinPublicBase URL.
 // When builtinPublicBase is non-nil, schema URLs under that prefix are loaded from embedded templates
-// instead of the database; they are not persisted via [JSONSchemaRepository.Create].
+// instead of the database; they are not persisted via [JSONSchemaStore.CreateJSONSchema].
+// Persistence is supplied per [JSONSchemaResolver.Resolve] call via [JSONSchemaStore].
 func NewJSONSchemaResolver(
-	repository JSONSchemaRepository,
 	cache *lru.TwoQueueCache[string, *jsonschema.Schema],
 	maxResolveDepth int,
 	maxSize int,
@@ -182,7 +192,6 @@ func NewJSONSchemaResolver(
 		base = strings.TrimSuffix(builtinPublicBase.String(), "/")
 	}
 	return &JSONSchemaResolver{
-		repository:        repository,
 		cache:             cache,
 		maxResolveDepth:   maxResolveDepth,
 		maxSize:           maxSize,
@@ -194,11 +203,11 @@ func NewJSONSchemaResolver(
 // Resolve retrieves a JSON schema by its URL recursively,
 // starting from the given schema URL and following all references in the schema.
 // It first tries to find the fully resolved schema in the cache.
-// If not found in the cache, it looks for the schema and all its references by URL from the database.
+// If not found in the cache, it looks for the schema and all its references by URL from the store.
 // When the resolver has an HTTP client, it can fetch a missing schema from its URL and persist it.
 func (r *JSONSchemaResolver) Resolve(
 	ctx context.Context,
-	client database.QueryExecutor,
+	store JSONSchemaStore,
 	projectID string,
 	schemaURL string,
 	rootSchema []byte,
@@ -207,7 +216,7 @@ func (r *JSONSchemaResolver) Resolve(
 	if schema, ok := r.cache.Get(cacheKey); ok {
 		return schema, nil
 	}
-	schema, err := r.resolveRecursively(ctx, client, projectID, schemaURL, 0, rootSchema, nil)
+	schema, err := r.resolveRecursively(ctx, store, projectID, schemaURL, 0, rootSchema, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +226,7 @@ func (r *JSONSchemaResolver) Resolve(
 
 func (r *JSONSchemaResolver) resolveRecursively(
 	ctx context.Context,
-	client database.QueryExecutor,
+	store JSONSchemaStore,
 	projectID string,
 	schemaURL string,
 	depth int,
@@ -231,12 +240,12 @@ func (r *JSONSchemaResolver) resolveRecursively(
 		cache = make(map[string]*jsonschema.Schema)
 	}
 	loader := func(url string) ([]byte, error) {
-		return r.loadSchemaPayload(ctx, client, projectID, url)
+		return r.loadSchemaPayload(ctx, store, projectID, url)
 	}
 	return compileSchema(schemaURL, schemaData, depth, r.maxResolveDepth, cache, loader)
 }
 
-func (r *JSONSchemaResolver) loadSchemaPayload(ctx context.Context, client database.QueryExecutor, projectID, schemaURL string) ([]byte, error) {
+func (r *JSONSchemaResolver) loadSchemaPayload(ctx context.Context, store JSONSchemaStore, projectID, schemaURL string) ([]byte, error) {
 	if r.builtinPublicBase != "" {
 		relPath, ok := builtinSchemaURLPathAfterBase(r.builtinPublicBase, schemaURL)
 		if ok {
@@ -245,7 +254,7 @@ func (r *JSONSchemaResolver) loadSchemaPayload(ctx context.Context, client datab
 			}
 		}
 	}
-	return r.getFromDatabase(ctx, client, projectID, schemaURL)
+	return r.getFromDatabase(ctx, store, projectID, schemaURL)
 }
 
 // builtinSchemaURLPathAfterBase reports whether schemaURL is under base and returns the path
@@ -354,10 +363,8 @@ func resolveRefs(node any, base *url.URL) (any, error) {
 	return walk(node)
 }
 
-func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, client database.QueryExecutor, projectID, schemaURL string) ([]byte, error) {
-	dbSchema, err := r.repository.Get(ctx, client, database.WithCondition(
-		r.repository.PrimaryKeyCondition(projectID, schemaURL),
-	))
+func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, store JSONSchemaStore, projectID, schemaURL string) ([]byte, error) {
+	dbSchema, err := store.GetJSONSchemaByID(ctx, projectID, schemaURL)
 	if err == nil {
 		return dbSchema.Schema, nil
 	}
@@ -378,7 +385,7 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, client databas
 		URL:       schemaURL,
 		Schema:    data,
 	}
-	if err := r.repository.Create(ctx, client, dbSchema); err != nil {
+	if err := store.CreateJSONSchema(ctx, dbSchema); err != nil {
 		return nil, err
 	}
 	return data, nil

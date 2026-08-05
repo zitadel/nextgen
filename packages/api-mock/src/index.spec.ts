@@ -1,18 +1,14 @@
+import { configureZitadel } from "@zitadel/api/config";
 import {
   createFlow,
   getFlowStep,
   submitFlowStep,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen";
-import { configureZitadel } from "@zitadel/api/config";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 
-import {
-  applyBranding,
-  clearBranding,
-  setupMockHandlers,
-} from "./index.js";
 import type { MockHandle } from "./handlers.js";
+import { applyBranding, clearBranding, PASSWORD_FIELD, setupMockHandlers } from "./index.js";
 
 const PROJECT_ID = "proj_demo";
 
@@ -58,17 +54,28 @@ afterEach(() => {
 });
 
 describe("setupMockHandlers", () => {
-  test("walks combined sign-in -> done", async () => {
+  test("walks the split sign-in: identifier -> password -> done", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     expect(start.step.name).toBe("identifier");
-    expect(start.step.fields?.some((f) => f.name === "email")).toBe(true);
-    expect(start.step.fields?.some((f) => f.name === "password")).toBe(true);
+    expect(start.step.fields?.map((f) => f.name)).toEqual(["email"]);
     expect(start.id).toBeTruthy();
 
-    const done = await submitFlowStep(start.id, {
+    const password = await submitFlowStep(start.id, {
       session_token: start.session_token,
       action: "submit",
-      fields: { email: "alice@acme.com", password: "hunter2" },
+      fields: { email: "alice@acme.com" },
+    });
+    // The real default flow collects the credential on its own step, keyed by
+    // the schema pointer — not plain `password` (the server 400s on that).
+    expect(password.step.name).toBe("password");
+    expect(password.step.fields?.map((f) => f.name)).toEqual([PASSWORD_FIELD]);
+    // ADR 022: the engine injects `back` on any step with a predecessor.
+    expect(password.step.actions?.some((a) => a.kind === "back")).toBe(true);
+
+    const done = await submitFlowStep(start.id, {
+      session_token: password.session_token,
+      action: "submit",
+      fields: { [PASSWORD_FIELD]: "hunter2" },
     });
     expect(done.step.name).toBe("done");
     // complete: "show" — the web component fires zitadel-flow-complete and
@@ -128,12 +135,14 @@ describe("setupMockHandlers", () => {
       },
     });
     expect(passwordStep.step.name).toBe("register-password");
-    expect(passwordStep.step.fields?.some((f) => f.name === "password")).toBe(true);
+    // Same schema pointer as the sign-in credential step — the real flow
+    // definition declares `x-auth-methods#password` on both.
+    expect(passwordStep.step.fields?.map((f) => f.name)).toEqual([PASSWORD_FIELD]);
 
     const done = await submitFlowStep(passwordStep.id, {
       session_token: passwordStep.session_token,
       action: "submit",
-      fields: { password: "hunter2" },
+      fields: { [PASSWORD_FIELD]: "hunter2" },
     });
     expect(done.step.name).toBe("done");
     expect(done.step.complete).toBe("show");
@@ -152,26 +161,51 @@ describe("setupMockHandlers", () => {
     expect(submit.step.redirect_url).toBeTruthy();
   });
 
-  test("sign-in wrong credentials stays on identifier with password field error", async () => {
+  /**
+   * Credential failures land on the **password** step, which is the first
+   * request that can fail authentication in the split flow. The error address
+   * comes from the flow context, since the password submit carries no email.
+   */
+  async function submitCredentials(email: string) {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    const submit = await submitFlowStep(start.id, {
+    const password = await submitFlowStep(start.id, {
       session_token: start.session_token,
       action: "submit",
-      fields: { email: "wrong@example.com", password: "hunter2" },
+      fields: { email },
     });
-    expect(submit.step.name).toBe("identifier");
+    expect(password.step.name).toBe("password");
+    return submitFlowStep(start.id, {
+      session_token: password.session_token,
+      action: "submit",
+      fields: { [PASSWORD_FIELD]: "hunter2" },
+    });
+  }
+
+  test("sign-in wrong credentials stays on password with a field error", async () => {
+    const submit = await submitCredentials("wrong@example.com");
+    expect(submit.step.name).toBe("password");
     expect(submit.step.error).toBe("error.invalid_credentials");
   });
 
-  test("sign-in server error stays on identifier with form-level error key", async () => {
+  test("sign-in server error stays on password with a form-level error key", async () => {
+    const submit = await submitCredentials("server@example.com");
+    expect(submit.step.name).toBe("password");
+    expect(submit.step.error).toBe("error.sign_in_server");
+  });
+
+  test("back from the password step returns to the identifier", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
-    const submit = await submitFlowStep(start.id, {
+    const password = await submitFlowStep(start.id, {
       session_token: start.session_token,
       action: "submit",
-      fields: { email: "server@example.com", password: "hunter2" },
+      fields: { email: "alice@acme.com" },
     });
-    expect(submit.step.name).toBe("identifier");
-    expect(submit.step.error).toBe("error.sign_in_server");
+    const back = await submitFlowStep(start.id, {
+      session_token: password.session_token,
+      action: "back",
+      fields: {},
+    });
+    expect(back.step.name).toBe("identifier");
   });
 
   test("passkey-login: pre-registered credential reaches done with challenge round-trip", async () => {
@@ -274,5 +308,53 @@ describe("setupMockHandlers", () => {
       fields: { email: "alice@acme.com" },
     });
     expect(next.branding).toBeUndefined();
+  });
+
+  describe("back-navigation (ADR 022)", () => {
+    test("register-password → back → register", async () => {
+      const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
+      expect(start.step.name).toBe("register");
+
+      const regPw = await submitFlowStep(start.id, {
+        session_token: start.session_token,
+        action: "submit",
+        fields: { email: "alice@acme.com", given_name: "Alice", family_name: "Acme" },
+      });
+      expect(regPw.step.name).toBe("register-password");
+      expect(regPw.step.actions?.find((a) => a.kind === "back")).toBeTruthy();
+
+      const back = await submitFlowStep(regPw.id, {
+        session_token: regPw.session_token,
+        action: "back",
+        fields: {},
+      });
+      expect(back.step.name).toBe("register");
+    });
+
+    test("back rotates the session token", async () => {
+      const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
+      const regPw = await submitFlowStep(start.id, {
+        session_token: start.session_token,
+        action: "submit",
+        fields: { email: "alice@acme.com", given_name: "Alice", family_name: "Acme" },
+      });
+      const back = await submitFlowStep(regPw.id, {
+        session_token: regPw.session_token,
+        action: "back",
+        fields: {},
+      });
+      expect(back.session_token).not.toBe(regPw.session_token);
+    });
+
+    test("identifier step has no back action", async () => {
+      const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+      expect(start.step.actions?.find((a) => a.kind === "back")).toBeUndefined();
+    });
+
+    test("register step has no back action (initial step for register purpose)", async () => {
+      const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
+      expect(start.step.name).toBe("register");
+      expect(start.step.actions?.find((a) => a.kind === "back")).toBeUndefined();
+    });
   });
 });

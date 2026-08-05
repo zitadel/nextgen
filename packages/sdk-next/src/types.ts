@@ -10,4 +10,9 @@ export type {
   UnauthState,
   AuthResult,
   NextgenMiddlewareOptions,
+  // Client-safe auth shapes returned by getSession() — same shape as
+  // sdk-nuxt's useAuth(), token intentionally absent.
+  ClientSession,
+  ClientAuthState,
+  ClientAuthResult,
 } from "@zitadel/sdk-core/middleware";

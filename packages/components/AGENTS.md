@@ -82,6 +82,47 @@ read that before touching `zl-field` or adding new input atoms.
 go in `*.browser.spec.ts` files (real Chromium); jsdom-friendly aria/markup
 checks go in `*.spec.ts`.
 
+### Input atoms expose a real native control (agent-first)
+
+The Zitadel CLI is an agent-facing product: an agent must be able to fill the
+generated auth UI and register a user. Automation drivers — Playwright
+(`selectOption`, `fill`, `getByTestId`), the chrome-devtools accessibility
+snapshot, the Codex in-app browser, password managers, and screen readers — all
+operate through **real native form controls and the accessibility tree**, not
+through hand-rolled ARIA widgets in Shadow DOM. A purely custom widget (a
+`<div role="combobox">` + `<ul role="listbox">`, for example) is opaque to them:
+its options never surface as targetable nodes.
+
+So every input atom must make its operable, accessible, automatable control a
+**real native element**:
+
+- `<zl-field>` → native `<input>`.
+- `<zl-checkbox>` → native `<input type="checkbox">`.
+- `<zl-select>` → native `<select>` with real `<option>`s.
+
+That native element must:
+
+- carry a stable `data-testid` of the form `zitadel-<kind>-<name>` (e.g.
+  `zitadel-input-email`, `zitadel-checkbox-newsletterOptIn`,
+  `zitadel-select-maritalStatus`), so tests/agents target it by name;
+- re-dispatch a composed native `change` (and `input` where applicable) across
+  the shadow boundary, and keep `internals.setFormValue()` in sync on every
+  change — so a value set directly on the native control (autofill, an agent,
+  programmatic `selectOption`) is still captured before submit;
+- stay in the accessibility tree and the tab order. Visually hide it with
+  `opacity: 0` / `pointer-events: none` (see `<zl-checkbox>`, `<zl-select>`
+  surface CSS) — **never** `display: none`, `visibility: hidden`, or
+  `aria-hidden`, which would drop it from the a11y tree and the tab order.
+
+When a design needs styling the native control can't provide (e.g. a custom
+dropdown popup), keep the styled UI as a **pointer-only visual layer**: mark it
+`aria-hidden` and out of the tab order so it doesn't duplicate the native
+control for AT/agents, and route its state through `data-*` hooks rather than
+ARIA. The native control remains the single source of truth; the visual layer
+just mirrors `value` and feeds the same change path. `<zl-select>` is the
+reference implementation. This convention was established in PR #279 (fields,
+buttons) and extended to selects.
+
 ### No `CSS.escape` in runtime code
 
 `jsdom` 29 does not ship `CSS.escape`. Code that runs in tests must not rely

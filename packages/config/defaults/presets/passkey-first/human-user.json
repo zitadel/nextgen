@@ -1,0 +1,31 @@
+{
+  "title": "DefaultHumanUserSchema",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "metaSchema": "${SERVER_URL}/user-schema.json",
+  "$id": "${USER_SCHEMA_URL}",
+  "objectType": "human-user",
+  "kind": "user-schema",
+  "type": "object",
+  "description": "The default editable schema for human users (passkey-first sign-in).",
+  "x-auth-methods": {
+    "passkey": {
+      "enabled": true,
+      "position": 1
+    },
+    "password": {
+      "enabled": true,
+      "position": 2
+    }
+  },
+  "required": [
+    "email"
+  ],
+  "properties": {
+    "email": {
+      "type": "string",
+      "format": "email",
+      "x-unique": "project",
+      "description": "The user's email address."
+    }
+  }
+}

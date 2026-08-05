@@ -139,15 +139,60 @@ type FlowProgress struct {
 	// step.
 	CurrentStep string
 
-	// History is the ordered list of step names visited within this
-	// progress entry (excluding any parents on PivotStack). Used for
-	// `back` navigation and diagnostics.
+	// History is the append-only audit trail of visited steps.
 	History []string
+
+	// BackStack maintains the history of visited steps, but gets
+	// cleared after an irreversible action.
+	// The engine also uses it to decide when an action.back should
+	// be injected into the response.
+	BackStack []FlowBackEntry
 
 	// CollectedData accumulates submitted field values for this
 	// progress entry, keyed by schema property name. A child flow's
 	// CollectedData is discarded when its progress is popped.
 	CollectedData CollectedFlowData
+}
+
+// FlowBackEntry holds an entry to be pushed into BackStack.
+type FlowBackEntry struct {
+	StepName string
+	// Purpose is kept in the history so the flow returns with the current purpose.
+	Purpose FlowDefinitionPurpose
+}
+
+// ClearBackStack drops any accumulated back-navigation entries. Called
+// past irreversible mutations and at flow termination.
+func (s *FlowState) ClearBackStack() {
+	s.BackStack = nil
+}
+
+// PeekBackStack returns the top BackStack entry without mutating the
+// state. Returns false when the stack is empty.
+func (s *FlowState) PeekBackStack() (FlowBackEntry, bool) {
+	n := len(s.BackStack) - 1
+	if n < 0 {
+		return FlowBackEntry{}, false
+	}
+	return s.BackStack[n], true
+}
+
+// PopBackStack removes and returns the top BackStack entry. Returns
+// false when the stack is empty, leaving the state untouched.
+func (s *FlowState) PopBackStack() (FlowBackEntry, bool) {
+	prev, ok := s.PeekBackStack()
+	if !ok {
+		return FlowBackEntry{}, false
+	}
+	s.BackStack = s.BackStack[:len(s.BackStack)-1]
+	return prev, true
+}
+
+// ClearPendingChallenge drops any outstanding ceremony binding on the
+// state. Called when the challenge is superseded (verify succeeded, or
+// the user navigated away).
+func (s *FlowState) ClearPendingChallenge() {
+	s.PendingChallenge = nil
 }
 
 type CollectedFlowData struct {

@@ -1,4 +1,4 @@
-//go:build postgres_integration
+//go:build postgres_integration || spanner_integration
 
 package integration_test
 
@@ -14,7 +14,6 @@ import (
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // TestPostCreateUserPasskeyUpsell exercises the example 06 distinguishing
@@ -28,12 +27,10 @@ import (
 func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	testServer := harness.EnsureTestServer(t)
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	userSchemaURL, err := url.Parse(schemaURL)
-	require.NoError(t, err)
 
 	rpOriginURL, err := url.Parse(testServer.URL)
 	require.NoError(t, err)
@@ -47,22 +44,22 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 
 	client, err := helpers.NewApiClient(testServer.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
-		FlowDefinition: passkeyUpsellFlowDefinition(*userSchemaURL),
+		FlowDefinition: passkeyUpsellFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %+v", defResp)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok)
+	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	require.Equal(t, "register", flowHeaders.Response.Step.Name)
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
@@ -76,16 +73,15 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 	regResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
-			"email":     jx.Raw(`"` + newEmail + `"`),
-			"givenName": jx.Raw(`"Upsell"`),
+			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{
 		ID:    flowID,
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	regOK, ok := regResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK after register, got %T: %+v", regResp, regResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, regResp, helpers.MustMarshal(t, regResp))
+	regOK := regResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "register-password", regOK.Response.Step.Name)
 	zflow = mustExtractZflow(t, regOK.SetCookie.Value)
 
@@ -100,21 +96,15 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	pwOK, ok := pwResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK after register-password, got %T: %+v", pwResp, pwResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
+	pwOK := pwResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "passkey-upsell", pwOK.Response.Step.Name,
 		"after create_user the session must be threaded into the passkey-upsell step")
 	zflow = mustExtractZflow(t, pwOK.SetCookie.Value)
 
 	// User is now in the DB (create_user fired).
-	db := harness.EnsureDBPool(t)
-	userRepo := harness.EnsureUserRepo(t)
-	user, err := userRepo.Get(t.Context(), db,
-		database.WithCondition(database.And(
-			userRepo.ProjectIDCondition(project.ID),
-			userRepo.AttributesCondition([]domain.Attribute{{Key: "email", Value: newEmail}}),
-		)),
-	)
+	users := harness.EnsureUserFixture(t)
+	user, err := users.GetByAttributes(t.Context(), project.ID, []domain.Attribute{{Key: "email", Value: newEmail}})
 	require.NoError(t, err, "create_user must persist exactly one user before the upsell")
 
 	// passkey-upsell: issue passkey_register challenge for the just-created user.
@@ -126,8 +116,8 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 		Origin: api.NewOptURI(*rpOriginURL),
 	})
 	require.NoError(t, err)
-	issueOK, ok := issueResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK on passkey_register issue, got %T: %+v", issueResp, issueResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, issueResp, helpers.MustMarshal(t, issueResp))
+	issueOK := issueResp.(*api.SubmitFlowStepOK)
 	zflow = mustExtractZflow(t, issueOK.SetCookie.Value)
 
 	require.True(t, issueOK.Response.Step.Challenge.Set, "expected challenge on passkey_register issue")
@@ -170,41 +160,35 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	verifyOK, ok := verifyResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK on passkey_register verify, got %T: %+v", verifyResp, verifyResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, verifyResp, helpers.MustMarshal(t, verifyResp))
+	verifyOK := verifyResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "done", verifyOK.Response.Step.Name)
 	require.True(t, verifyOK.Response.Step.Complete.Set, "expected terminal step")
 
 	// Passkey row exists for the freshly-created user — the seam works.
-	passkeyRepo := harness.EnsureUserPasskeyRepo(t)
-	_, err = passkeyRepo.Get(t.Context(), db,
-		database.WithCondition(database.And(
-			passkeyRepo.ProjectIDCondition(project.ID),
-			passkeyRepo.UserIDCondition(user.ID),
-		)),
-	)
+	passkeys := harness.EnsureUserPasskeyFixture(t)
+	pks, err := passkeys.ListByUser(t.Context(), project.ID, user.ID)
 	require.NoError(t, err, "passkey_register must enroll exactly one credential against the create_user-pinned ID")
+	require.Len(t, pks, 1)
 }
 
 // TestPostCreateUserPasskeyUpsell_SkipsToDone confirms the skip branch of
 // the upsell still terminates cleanly: after create_user, action=skip
 // transitions to `done` without enrolling a passkey.
 func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
-	userSchemaURL, err := url.Parse(schemaURL)
-	require.NoError(t, err)
 
 	server := harness.EnsureTestServer(t)
 	client, err := helpers.NewApiClient(server.URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	defResp, err := client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      api.ProjectID(project.ID),
-		FlowDefinition: passkeyUpsellFlowDefinition(*userSchemaURL),
+		FlowDefinition: passkeyUpsellFlowDefinition(schemaURL),
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp)
@@ -214,8 +198,8 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		Purpose:   api.CreateFlowRequestPurposeRegister,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "expected FlowResponseHeaders, got %T: %+v", createResp, createResp)
+	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
 
@@ -227,13 +211,12 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	regResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
 		Action: "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
-			"email":     jx.Raw(`"` + newEmail + `"`),
-			"givenName": jx.Raw(`"Skip"`),
+			"email": jx.Raw(`"` + newEmail + `"`),
 		}),
 	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
 	require.NoError(t, err)
-	regOK, ok := regResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK after register, got %T: %+v", regResp, regResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, regResp, helpers.MustMarshal(t, regResp))
+	regOK := regResp.(*api.SubmitFlowStepOK)
 	zflow = mustExtractZflow(t, regOK.SetCookie.Value)
 
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
@@ -243,8 +226,8 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		}),
 	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
 	require.NoError(t, err)
-	pwOK, ok := pwResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK after register-password, got %T: %+v", pwResp, pwResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, pwResp, helpers.MustMarshal(t, pwResp))
+	pwOK := pwResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "passkey-upsell", pwOK.Response.Step.Name)
 	zflow = mustExtractZflow(t, pwOK.SetCookie.Value)
 
@@ -252,8 +235,8 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 		Action: "skip",
 	}, api.SubmitFlowStepParams{ID: flowID, Zflow: zflow})
 	require.NoError(t, err)
-	skipOK, ok := skipResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "expected SubmitFlowStepOK on skip, got %T: %+v", skipResp, skipResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, skipResp, helpers.MustMarshal(t, skipResp))
+	skipOK := skipResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "done", skipOK.Response.Step.Name)
 	require.True(t, skipOK.Response.Step.Complete.Set, "expected terminal step")
 }
@@ -261,7 +244,7 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 // passkeyUpsellFlowDefinition mirrors examples/06-combined-password-passkey's
 // register sub-flow trimmed to the register → register-password → passkey-upsell
 // → done path, using fields available on the default-human-user schema.
-func passkeyUpsellFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
+func passkeyUpsellFlowDefinition(userSchemaURL string) api.FlowDefinition {
 	createUser := api.FlowDefinitionStepOnSuccessCreateUser
 	return api.FlowDefinition{
 		Name:       "register-with-passkey-upsell",
@@ -271,7 +254,7 @@ func passkeyUpsellFlowDefinition(userSchemaURL url.URL) api.FlowDefinition {
 		Steps: []api.FlowDefinitionStep{
 			{
 				Name:   "register",
-				Fields: []string{"email", "givenName"},
+				Fields: []string{"email"},
 				Actions: []api.StepAction{
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},

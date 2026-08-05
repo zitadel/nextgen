@@ -1,20 +1,42 @@
 import { MANAGED_MARKER } from "../../../../paths";
 
+import type { PatchContext } from "../../types";
 import { PROXY_PATH } from "../proxy";
 
 /**
  * The managed `src/App.svelte`: a minimal path-based router that renders the
- * `@zitadel/sdk-svelte` widgets — a landing chooser at `/`, login at `/login`,
- * register at `/register`, and the signed-in session card at `/profile`. The managed marker lives in
- * the `<script lang="ts">` block (a JS comment) so eject/doctor stay
- * marker-aware. The project id comes from `VITE_ZITADEL_PROJECT_ID`. No secret
- * reaches the browser: the dev proxy in `vite.config.*` attaches the project
- * service-key secret (from `ZITADEL_PROJECT_SECRET`) server-side.
+ * `@zitadel/sdk-svelte` widgets — login at `/login`, register at `/register`, and
+ * the signed-in session card at `/profile`. The root path redirects to `/login`.
+ * The managed marker lives in the `<script lang="ts">` block (a JS comment) so
+ * eject/doctor stay marker-aware. The project id comes from
+ * `VITE_ZITADEL_PROJECT_ID`. No secret reaches the browser: the dev proxy in
+ * `vite.config.*` attaches the project service-key secret (from
+ * `ZITADEL_PROJECT_SECRET`) server-side only to `POST /sessions/exchange`.
+ *
+ * Projects set up with the business use case additionally pass the SDK's
+ * `businessLocales` overlay to the login widgets, restoring work-email copy on
+ * top of the widget's neutral built-in dictionaries. A plain `locales` prop
+ * suffices here: the wrapper component assigns it as a DOM property internally.
  */
-export function appTemplate(): string {
+export function appTemplate(ctx: PatchContext): string {
+  const business = ctx.useCase === "business";
+  const importNames = business
+    ? "ZitadelLogin, ZitadelSession, businessLocales, configureZitadel"
+    : "ZitadelLogin, ZitadelSession, configureZitadel";
+  // The overlay ships with the SDK, so the generated app only wires it up
+  // (and stays plain otherwise).
+  const localesComment = business
+    ? `
+
+// Set up for a business audience: businessLocales overlays work-email copy on
+// the login widget's neutral built-in dictionaries. Remove the locales prop to
+// fall back to the neutral wording.`
+    : "";
+  const localesAttr = business ? " locales={businessLocales}" : "";
   return `<script lang="ts">
 ${MANAGED_MARKER}
-import { ZitadelLogin, ZitadelSession, configureZitadel } from "@zitadel/sdk-svelte";
+import { onMount } from "svelte";
+import { ${importNames} } from "@zitadel/sdk-svelte";${localesComment}
 
 const project = configureZitadel({
   projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID,
@@ -22,31 +44,25 @@ const project = configureZitadel({
 });
 
 const path = window.location.pathname;
+
+onMount(() => {
+  if (path === "/") {
+    window.location.replace("/login");
+  }
+});
 </script>
 
-{#if path === "/"}
-  <main style="position:fixed;inset:0;padding:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#0f0f11;color-scheme:dark;color:#f4f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;letter-spacing:normal;text-align:center">
-    <section style="width:100%;max-width:560px">
-      <p style="margin:0 0 12px;color:#9ca3af;font-size:14px">Zitadel auth</p>
-      <h1 style="margin:0 0 24px;font-size:32px;line-height:1.15;font-weight:600;color:#f4f4f6">Sign in, create an account, or open your profile.</h1>
-      <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center">
-        <a href="/login" style="padding:10px 16px;border-radius:8px;background:#f4f4f6;color:#0f0f11;text-decoration:none;font-weight:600;font-size:14px">Sign in</a>
-        <a href="/register" style="padding:10px 16px;border-radius:8px;border:1px solid #3f3f46;color:#f4f4f6;text-decoration:none;font-weight:600;font-size:14px">Create account</a>
-        <a href="/profile" style="padding:10px 16px;border-radius:8px;border:1px solid #3f3f46;color:#f4f4f6;text-decoration:none;font-weight:600;font-size:14px">Profile</a>
-      </div>
-    </section>
-  </main>
-{:else if path.startsWith("/profile")}
+{#if path.startsWith("/profile")}
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
     <ZitadelSession {project} postSignOutUrl="/login" />
   </div>
 {:else if path.startsWith("/register")}
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
-    <ZitadelLogin {project} purpose="register" postSignInUrl="/profile" />
+    <ZitadelLogin {project}${localesAttr} purpose="register" postSignInUrl="/profile" />
   </div>
-{:else}
+{:else if path !== "/"}
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
-    <ZitadelLogin {project} purpose="login" postSignInUrl="/profile" />
+    <ZitadelLogin {project}${localesAttr} purpose="login" postSignInUrl="/profile" />
   </div>
 {/if}
 `;

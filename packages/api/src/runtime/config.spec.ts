@@ -114,4 +114,34 @@ describe("getApi", () => {
     const api2 = getApi(project);
     expect(api1).toBe(api2);
   });
+
+  test("a publishable key on the handle rides as the bearer (ADR 036)", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+
+    const project = configureZitadel({
+      proxyPath: "http://localhost/__nextgen",
+      projectId: "proj_1",
+      publishableKey: "pk_test_123",
+    });
+    expect(project.publishableKey).toBe("pk_test_123");
+
+    await getApi(project).getHealth();
+
+    const headers = new Headers((fetchSpy.mock.calls[0]![1] as RequestInit).headers);
+    expect(headers.get("authorization")).toBe("Bearer pk_test_123");
+  });
+
+  test("a handle without a publishable key produces token-less requests", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("{}", { status: 200 }));
+
+    const project = configureZitadel({ proxyPath: "http://localhost/__nextgen", projectId: "proj_1" });
+    await getApi(project).getHealth();
+
+    const headers = new Headers((fetchSpy.mock.calls[0]![1] as RequestInit).headers);
+    expect(headers.get("authorization")).toBeNull();
+  });
 });

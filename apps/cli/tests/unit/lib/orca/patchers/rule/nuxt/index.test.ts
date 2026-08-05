@@ -38,14 +38,54 @@ describe("NuxtPatcher.plan", () => {
     const plan = new NuxtPatcher().plan(ctx("app"));
     expect(writeContents(plan, "app/app.vue")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "app/pages/login.vue")).toContain(MANAGED_MARKER);
-    expect(writeContents(plan, "app/pages/login.vue")).toContain("background: #0f0f11");
+    // Page chrome comes from the widget itself now — the wrapper only pins
+    // the color scheme, and no token hex is duplicated into generated code.
+    expect(writeContents(plan, "app/pages/login.vue")).toContain('variant="page"');
+    expect(writeContents(plan, "app/pages/login.vue")).not.toContain("background: #0f0f11");
     expect(writeContents(plan, "app/pages/login.vue")).toContain("color-scheme: dark");
     expect(writeContents(plan, "app/pages/login.vue")).not.toContain("background: #f3f4f6");
     expect(writeContents(plan, "app/pages/login.vue")).not.toContain("align-items: center");
+    // The embedding alternative is named where a developer will see it.
+    expect(writeContents(plan, "app/pages/login.vue")).toContain('variant="widget"');
     expect(writeContents(plan, "app/plugins/auth.server.ts")).toContain(MANAGED_MARKER);
-    const edit = plan.ops.find((op): op is Extract<FileOp, { kind: "edit" }> => op.kind === "edit");
+    const edit = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "edit" }> =>
+        op.kind === "edit" && String(op.path).includes("nuxt.config"),
+    );
     // nuxt.config stays at the project root, not under app/.
     expect(edit?.path).toContain("nuxt.config.ts");
+  });
+
+  it("wires the business copy overlay for business-use-case projects", () => {
+    // Minimal scaffolds keep the widget's neutral built-in copy.
+    expect(writeContents(new NuxtPatcher().plan(ctx()), "app/pages/login.vue")).not.toContain(
+      "businessLocales",
+    );
+    const business = new NuxtPatcher().plan({ ...ctx(), useCase: "business" });
+    for (const path of ["app/pages/login.vue", "app/pages/register.vue"]) {
+      const page = writeContents(business, path);
+      // The overlay ships with the SDK: the page pulls it from the entry it
+      // already imports, and a plain :locales binding suffices even on the
+      // raw custom element — Vue sets bindings whose key exists on the
+      // element as DOM properties (no React-18 ref detour as in Next).
+      expect(page).toContain("businessLocales, useZitadelProject");
+      expect(page).toContain(':locales="businessLocales"');
+    }
+    // Consumer scaffolds keep the neutral built-ins, like minimal ones.
+    const consumer = new NuxtPatcher().plan({ ...ctx(), useCase: "consumer" });
+    expect(writeContents(consumer, "app/pages/login.vue")).not.toContain("businessLocales");
+  });
+
+  it("leaves profile page chrome to the session card's page surface", () => {
+    const plan = new NuxtPatcher().plan(ctx("app"));
+    const profile = writeContents(plan, "app/pages/profile.vue");
+    expect(profile).toContain('variant="page"');
+    // The card paints its own full-page chrome from design tokens — no
+    // duplicated token hex or forced viewport height in generated markup.
+    expect(profile).not.toContain("#0f0f11");
+    expect(profile).not.toContain("min-height: 100vh");
+    expect(profile).toContain("color-scheme: dark");
+    expect(profile).toContain('variant="widget"');
   });
 
   it("writes at the root for a Nuxt 3 project (appDir '.')", () => {

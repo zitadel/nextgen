@@ -968,6 +968,10 @@ function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
   };
 }
 
+function runtimePidOf(stdout: string): number {
+  return (parseJson(stdout) as { data: { runtime: { pid: number } } }).data.runtime.pid;
+}
+
 async function expectedDefaultImage(): Promise<string> {
   const pkg = JSON.parse(
     await readFile(new URL("../../../package.json", import.meta.url), "utf8"),

@@ -15,7 +15,12 @@
     projectId,
     proxyPath,
     purpose = 'login',
+    flowName,
     postSignInUrl,
+    locales,
+    lang,
+    variant,
+    theme,
     onFlowStep,
     onFlowInput,
     onFlowComplete,
@@ -63,7 +68,12 @@
   bind:this={el}
   {project}
   {purpose}
+  {locales}
+  {lang}
   project-id={projectId}
   proxy-path={proxyPath}
   post-sign-in-url={postSignInUrl}
+  flow-name={flowName}
+  variant={variant}
+  theme={theme}
 ></zitadel-login>

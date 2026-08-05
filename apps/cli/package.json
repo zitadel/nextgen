@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "0.1.0-alpha.13",
+  "version": "0.1.0-alpha.17",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -62,17 +62,20 @@
     "@oclif/plugin-version": "catalog:",
     "@oclif/plugin-which": "catalog:",
     "@zitadel/api": "workspace:*",
+    "@zitadel/config": "workspace:*",
     "@zitadel/server": "workspace:*",
     "ajv": "catalog:",
     "consola": "^3.4.2",
     "magicast": "^0.5.3",
     "mixpanel": "^0.18.1",
     "safe-stable-stringify": "catalog:",
+    "semver": "catalog:",
     "zod": "catalog:",
     "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/semver": "catalog:",
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
     "msw": "catalog:",

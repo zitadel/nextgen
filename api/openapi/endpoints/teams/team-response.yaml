@@ -1,0 +1,25 @@
+type: object
+description: Details of a team.
+required:
+  - id
+  - name
+  - status
+  - createdAt
+  - updatedAt
+properties:
+  id:
+    type: string
+    description: The unique identifier of the team.
+  name:
+    type: string
+    description: The name of the team.
+  status:
+    $ref: ../../components/schemas/team-status.yaml
+  createdAt:
+    type: string
+    format: date-time
+    description: The time when the team was created.
+  updatedAt:
+    type: string
+    format: date-time
+    description: The time when the team was last updated.

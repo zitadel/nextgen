@@ -25,6 +25,7 @@ export async function prepareApp(options = {}) {
   const appPort = appPortFromUrl(appUrl);
   const zitadelPort = optionalPort(env.JOURNEY_ZITADEL_PORT, "JOURNEY_ZITADEL_PORT");
   const runtime = localRuntime(env.JOURNEY_RUNTIME);
+  const preset = options.preset ?? env.JOURNEY_PRESET ?? "";
   const fs = {
     appendFile: options.appendFile ?? appendFile,
     mkdir: options.mkdir ?? mkdir,
@@ -85,9 +86,21 @@ export async function prepareApp(options = {}) {
         "local",
         "--dev-port",
         String(appPort),
+        ...(preset ? ["--preset", preset] : []),
       ],
       writeFile: fs.writeFile,
     });
+    if (framework.id === "next") {
+      await runManagedFileDriftProbe({
+        appDir,
+        cliPackage,
+        env: npmEnv,
+        fs,
+        outputDir,
+        runCapture: runCaptureFn,
+        stepArgsFor: (base) => withRuntime(withPort(base, zitadelPort), runtime),
+      });
+    }
   } catch (error) {
     await collectLocalRuntimeLogs({
       appDir,
@@ -116,6 +129,7 @@ export async function prepareApp(options = {}) {
     framework: framework.id,
     frameworkDisplayName: framework.displayName,
     localRuntimeUrl: startJson?.data?.urls?.api ?? null,
+    preset: preset || null,
     runtime,
     outputDir,
     registryUrl,
@@ -132,6 +146,9 @@ export async function prepareApp(options = {}) {
   await exportEnv("JOURNEY_APP_DIR", appDir, fs.appendFile, env);
   await exportEnv("JOURNEY_APP_URL", appUrl, fs.appendFile, env);
   await exportEnv("JOURNEY_FRAMEWORK", framework.id, fs.appendFile, env);
+  if (preset) {
+    await exportEnv("JOURNEY_PRESET", preset, fs.appendFile, env);
+  }
   await exportEnv("JOURNEY_OUTPUT_DIR", outputDir, fs.appendFile, env);
   await exportOutput("app_dir", appDir, fs.appendFile, env);
   await exportOutput("framework", framework.id, fs.appendFile, env);
@@ -169,6 +186,15 @@ async function runCliJsonStep(input) {
     });
   }
 
+  if (input.expectFailure) {
+    if (result.code === 0 || parsed.status === "ok") {
+      throw new Error(
+        `${input.step} was expected to fail but returned status ` +
+          `${JSON.stringify(parsed.status)} (exit ${result.code})`,
+      );
+    }
+    return parsed;
+  }
   if (result.code !== 0) {
     throw new Error(`${input.step} exited ${result.code}: ${parsed.message ?? result.stderr}`);
   }
@@ -176,6 +202,61 @@ async function runCliJsonStep(input) {
     throw new Error(`${input.step} returned status ${JSON.stringify(parsed.status)}`);
   }
   return parsed;
+}
+
+/**
+ * Journey-level proof of the doctor managed-files contract on the freshly
+ * generated app: deleting the scaffolded request boundary must fail
+ * `doctor`, and `doctor --fix` must restore the file and pass. Runs on the
+ * Next suite only — the contract is framework-neutral and unit-covered in
+ * apps/cli; one framework proves the published consumer path end to end
+ * without slowing every suite. Writes `doctor-drift.json` and
+ * `doctor-fix.json` artifacts that `contract.spec.ts` asserts on.
+ */
+async function runManagedFileDriftProbe(input) {
+  const boundary = await firstExistingFile(
+    input.appDir,
+    ["proxy.ts", "middleware.ts"],
+    input.fs.readFile,
+  );
+  await input.fs.rm(join(input.appDir, boundary));
+  await runCliJsonStep({
+    appDir: input.appDir,
+    cliPackage: input.cliPackage,
+    env: input.env,
+    expectFailure: true,
+    outputDir: input.outputDir,
+    runCapture: input.runCapture,
+    step: "doctor-drift",
+    stepArgs: input.stepArgsFor(["doctor"]),
+    writeFile: input.fs.writeFile,
+  });
+  await runCliJsonStep({
+    appDir: input.appDir,
+    cliPackage: input.cliPackage,
+    env: input.env,
+    outputDir: input.outputDir,
+    runCapture: input.runCapture,
+    step: "doctor-fix",
+    stepArgs: input.stepArgsFor(["doctor", "--fix"]),
+    writeFile: input.fs.writeFile,
+  });
+  const restored = await input.fs.readFile(join(input.appDir, boundary), "utf8");
+  if (!restored.includes("zitadel-cli: managed-file")) {
+    throw new Error(`doctor --fix did not restore the managed ${boundary}`);
+  }
+}
+
+async function firstExistingFile(dir, candidates, readFileFn) {
+  for (const candidate of candidates) {
+    try {
+      await readFileFn(join(dir, candidate), "utf8");
+      return candidate;
+    } catch {
+      // try the next candidate
+    }
+  }
+  throw new Error(`none of ${candidates.join(", ")} exists in ${dir}`);
 }
 
 async function collectLocalRuntimeLogs(input) {

@@ -6,6 +6,9 @@ stack: "backend"
 fileGroups:
   serverInputs:
     - "/**/*.go"
+    # Embedded goose migrations (//go:embed sql/*.sql); without these Moon can
+    # cache-hit test/build after schema-only changes while Go would rebuild.
+    - "/**/*.sql"
     - "/go.mod"
     - "/go.sum"
     - "/api/**/*.yaml"
@@ -28,7 +31,9 @@ tasks:
     script: |
       unformatted="$(git ls-files -z -- '*.go' | xargs -0 gofmt -l)"
       if [ -n "$unformatted" ]; then
-        printf '%s\n' "$unformatted"
+        echo "error: gofmt would rewrite the following files:" >&2
+        printf '%s\n' "$unformatted" >&2
+        echo "hint: run gofmt -w on those paths, then re-check with moon run server:format" >&2
         exit 1
       fi
     inputs:
@@ -87,7 +92,6 @@ tasks:
     command: "go"
     args:
       - "test"
-      - "-json"
       - "-v"
       - "-tags"
       - "postgres_integration"
@@ -98,30 +102,70 @@ tasks:
       - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
-      runInCI: false
+      # Invoked explicitly by the CI "Run Go integration tests (postgres)" step.
+      # runInCI must be true, otherwise moon hides the task from `moon run` in CI
+      # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
+      # selects the `test` task by name, not `test-postgres`.
+      runInCI: true
 
   test-spanner:
+    # Serializes (-parallel 1 -p 1) when ZITADEL_TEST_SPANNER_INSTANCE is unset
+    # so the single-transaction emulator stays reliable.
+    script: |
+      set -euo pipefail
+      extra=()
+      if [ -z "${ZITADEL_TEST_SPANNER_INSTANCE:-}" ]; then
+        extra+=(-parallel 1 -p 1)
+      fi
+      go test -v -tags spanner_integration -timeout 10m "${extra[@]}" ./...
+    inputs:
+      - "@group(serverInputs)"
+    options:
+      runFromWorkspaceRoot: true
+      # Invoked by the CI Spanner emulator / test-instance steps.
+      # runInCI must be true, otherwise moon hides the task from `moon run` in CI
+      # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
+      # selects the `test` task by name, not `test-spanner`.
+      runInCI: true
+
+  test-sqlite:
     command: "go"
     args:
       - "test"
       - "-v"
       - "-tags"
-      - "spanner_integration"
+      - "sqlite_integration"
       - "-timeout"
-      - "10m"
+      - "5m"
       - "./..."
     inputs:
       - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
-      runInCI: false
+      # Invoked explicitly by the CI "Run Go integration tests (sqlite)" step.
+      # runInCI must be true, otherwise moon hides the task from `moon run` in CI
+      # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
+      # selects the `test` task by name, not `test-sqlite`.
+      runInCI: true
 
   build:
     command: "go build -trimpath -o dist/server/nextgen ."
     deps:
       - "check-generate"
+      # The binary embeds both UI dists (//go:embed all:dist in
+      # internal/staticui/*/embed.go). These deps order the UI builds before
+      # the Go compile, so a batched invocation can never embed a half-written
+      # dist.
+      - "console:build"
+      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
+      # The embedded dist bytes participate in the hash directly, so staticui
+      # changes made outside this task's deps still invalidate the cached
+      # binary. Scoped to build rather than serverInputs: only the binary
+      # artifact depends on dist content — test/vet/format must not re-run on
+      # UI-only changes.
+      - "/internal/staticui/**"
     outputs:
       - "/dist/server/nextgen"
     options:

@@ -10,7 +10,7 @@ import {
 } from "@zitadel/sdk-core/middleware";
 import { NextResponse } from "next/server";
 
-import { verifyJwt, base64UrlDecode } from "./lib/jwt";
+import { verifyJwt, isJwtShaped } from "./lib/jwt.js";
 
 /**
  * Clones the incoming request headers, injects `extra` key/value pairs,
@@ -86,6 +86,7 @@ export async function nextgenMiddleware(
     allowedTokenTypes = ["JWT", "at+JWT"],
     jwksTimeoutMs,
     proxyTimeoutMs = 5000,
+    opaqueTokenTimeoutMs = 5000,
   } = options;
 
   // Guard against open-redirect: loginPath must be a relative path. An absolute
@@ -122,36 +123,9 @@ export async function nextgenMiddleware(
     audience,
     allowedTokenTypes,
     jwksTimeoutMs,
+    opaqueTokenTimeoutMs,
     pathname,
   });
-}
-
-const DECODER = new TextDecoder();
-
-/**
- * Returns `true` when `token` looks structurally like a signed JWT (JWS) —
- * NOT an encrypted token (JWE).
- *
- * JWS compact: 3 dot-separated segments; header has `alg` but NOT `enc`.
- * JWE compact: 5 dot-separated segments; header has BOTH `alg` and `enc`.
- *
- * Our backend issues JWE tokens (AES-256-GCM via go-jose `A256GCMKW/A256GCM`),
- * whose compact form is `header.encrypted_key.iv.ciphertext.tag`. The header
- * decodes to JSON with `"alg":"A256GCMKW","enc":"A256GCM"`. Checking for the
- * absence of `enc` correctly identifies signed JWTs without false-positives on
- * JWE tokens.
- *
- * This is a structural check only — not a security check.
- */
-function isJwtShaped(token: string): boolean {
-  const parts = token.split(".");
-  if (parts.length < 3 || !parts[0]) return false;
-  try {
-    const header = JSON.parse(DECODER.decode(base64UrlDecode(parts[0]))) as Record<string, unknown>;
-    return typeof header?.alg === "string" && !("enc" in header);
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -233,13 +207,12 @@ async function proxyRequest(
 
   const hasBody = !["GET", "HEAD"].includes(req.method);
 
-  // Attach the project service-key secret as the bearer on every proxied
-  // request. The server's security handler verifies it cryptographically; the
-  // browser never sees the secret because this middleware runs in Next.js's
-  // Edge runtime and reads `process.env.ZITADEL_PROJECT_SECRET`. Next auto-
-  // loads `.env.local` at dev time (which is gitignored) and inlines env vars
-  // referenced here into the Edge bundle at build time for production.
-  if (!upstreamHeaders.has("authorization")) {
+  // ADR 036: the current browser flow needs the confidential project secret
+  // only for the handoff exchange. Stamping it onto every proxied operation
+  // turns this public request boundary into an operator-capable open relay.
+  // Preserve an explicit caller credential so the exchange can use the future
+  // publishable-key plane without being overwritten.
+  if (requiresProjectSecret(req.method, suffix) && !upstreamHeaders.has("authorization")) {
     const secret = process.env.ZITADEL_PROJECT_SECRET;
     if (secret) {
       upstreamHeaders.set("authorization", `Bearer ${secret}`);
@@ -272,6 +245,10 @@ async function proxyRequest(
   });
 }
 
+function requiresProjectSecret(method: string, pathname: string): boolean {
+  return method.toUpperCase() === "POST" && pathname === "/sessions/exchange";
+}
+
 /**
  * Options passed internally to {@link handleAuth} after destructuring the
  * public-facing {@link NextgenMiddlewareOptions}.
@@ -302,6 +279,11 @@ interface AuthHandlerOptions {
    */
   readonly allowedTokenTypes: readonly string[];
   readonly jwksTimeoutMs: number | undefined;
+  /**
+   * Forwarded from {@link NextgenMiddlewareOptions.opaqueTokenTimeoutMs};
+   * governs the `GET /sessions/me` fallback for opaque (non-JWT) tokens.
+   */
+  readonly opaqueTokenTimeoutMs: number;
   readonly pathname: string;
 }
 
@@ -324,6 +306,7 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
     audience,
     allowedTokenTypes,
     jwksTimeoutMs,
+    opaqueTokenTimeoutMs,
     pathname,
   } = opts;
 
@@ -357,7 +340,7 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
   // failed verification (bad sig, wrong typ/alg) must be rejected — never
   // accepted by a backend call that doesn't re-check the JWT claims.
   if (!payload && cookieToken && !isJwtShaped(cookieToken)) {
-    const isValid = await validateOpaqueSessionToken(cookieToken, url, jwksTimeoutMs ?? 5000);
+    const isValid = await validateOpaqueSessionToken(cookieToken, url, opaqueTokenTimeoutMs);
     if (isValid) {
       const tunnelled = tunnelHeaders(req, {
         "x-nextgen-auth-token": cookieToken,

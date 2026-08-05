@@ -1,3 +1,5 @@
+import type { PatchedFile } from "../../types";
+
 /**
  * A single filesystem mutation in a rule-based patcher's plan. Rule patchers
  * emit these as a declarative description of intended changes so the
@@ -51,10 +53,27 @@ export type FileOp =
        * the `vite.config.{ts,mts,js,…}` variants) — the executor edits the first
        * one that exists, falling back to the first candidate when none do. The
        * candidate list itself is generic; which paths to try is the patcher's call.
+       *
+       * `overwrites` marks a transform that replaces the file wholesale instead
+       * of merging into it (its output ignores `source`, e.g. the scaffolded
+       * framework home page). A missing-only repair may replay such an edit only
+       * when no candidate exists; merging edits stay replayable because a
+       * transform whose output equals the input is skipped.
        */
       readonly kind: "edit";
       readonly path: string | ReadonlyArray<string>;
       readonly edit: (source: string | undefined) => string;
+      readonly overwrites?: true;
+      /**
+       * Marks a merging edit as managed *wiring* the doctor managed-files
+       * check verifies via the transform's idempotency: when running the
+       * transform against the current file changes it, the wiring is absent.
+       * `infrastructure` wirings (dev proxy merges, route registrations) fail
+       * the check when detached; `convenience` (the Angular `dev` script)
+       * only warns. Unlabelled edits (guidance sections, the overwriting
+       * home page) are not probed.
+       */
+      readonly wiring?: "infrastructure" | "convenience";
     };
 
 /**
@@ -72,10 +91,12 @@ export type ScaffoldPlan = {
  * The outcome of applying a {@link ScaffoldPlan}. Distinguishes files actually
  * written from those left unchanged (idempotent re-runs) and tracks added
  * dependencies. Structurally compatible with the family-neutral `PatchResult`
- * the patcher returns to callers.
+ * the patcher returns to callers: `files` carries the typed rows, and the
+ * legacy `filesWritten` list holds deduplicated file paths only.
  */
 export type ScaffoldResult = {
   dryRun: boolean;
+  files: ReadonlyArray<PatchedFile>;
   filesWritten: ReadonlyArray<string>;
   filesSkipped: ReadonlyArray<string>;
   depsAdded: ReadonlyArray<string>;

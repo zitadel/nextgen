@@ -43,8 +43,9 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
  *
  * Runs every registered {@link SANITY_CHECKS} entry and emits the aggregate
  * result; if any check fails it throws `E_VALIDATION` carrying the full check
- * details. With `--fix`, each failing check first attempts its own repair (a
- * no-op for checks with no safe automatic remedy), then the battery re-runs.
+ * details. With `--fix`, each check that did not pass — failed or warned —
+ * first attempts its own repair (a no-op for checks with no safe automatic
+ * remedy), then the battery re-runs.
  *
  * The `--fix` loop is best-effort: a repair that throws (e.g. a missing
  * prerequisite file the check itself would also flag) is logged at debug
@@ -54,7 +55,7 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
 export default class Doctor extends BaseCommand {
   static override description = "Verify local runtime and project state.";
   static override flags = {
-    fix: Flags.boolean({ description: "Re-apply missing managed files." }),
+    fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
     image: Flags.string({ description: "Container image to check." }),
     port: Flags.integer({ description: "Local HTTP port.", default: DEFAULT_LOCAL_SERVER_PORT }),
     runtime: Flags.string({
@@ -86,7 +87,9 @@ export default class Doctor extends BaseCommand {
     if (hasConfig && flags.fix) {
       const before = await Promise.all(SANITY_CHECKS.map((check) => check.run(ctx)));
       for (const [index, check] of SANITY_CHECKS.entries()) {
-        if (before[index]?.status !== "fail") {
+        // Repair warn-level drift too (e.g. a deleted presentation page):
+        // fixes are restore-missing-only, so running one on a warning is safe.
+        if (before[index]?.status === "pass") {
           continue;
         }
         try {
@@ -136,7 +139,13 @@ export default class Doctor extends BaseCommand {
 
     if (failed.length > 0) {
       const advice = failureAdvice(failed, image, port, this.meta.cliVersion);
-      const code = failed.some((check) => check.name === "port") ? "E_PORT_IN_USE" : "E_VALIDATION";
+      // A check that failed with a typed CLI error advertises its own
+      // category (e.g. the framework floor's E_UNSUPPORTED_PROJECT_SHAPE) —
+      // surface that instead of the generic validation class so agents can
+      // branch on it. The port check keeps its dedicated code first.
+      const code = failed.some((check) => check.name === "port")
+        ? "E_PORT_IN_USE"
+        : (failed.find((check) => check.code !== undefined)?.code ?? "E_VALIDATION");
       throw new ZitadelError(code, "Zitadel doctor found issues", {
         hint: advice.hint,
         nextCommands: advice.nextCommands,
@@ -214,6 +223,14 @@ function failureAdvice(
         publicCliCommand("reset --force", cliVersion),
       ],
     };
+  }
+
+  // A failure that surfaced as a typed CLI error carries its own remedy —
+  // e.g. the framework floor's upgrade hint. That beats the generic --fix
+  // advice below, which cannot repair an unsupported version.
+  const typed = failed.find((check) => check.code !== undefined && check.hint !== undefined);
+  if (typed?.hint !== undefined) {
+    return { hint: typed.hint, nextCommands: [publicCliCommand("doctor", cliVersion)] };
   }
 
   const hasProjectFailure = failed.some((check) => !LOCAL_RUNTIME_CHECK_NAMES.has(check.name));

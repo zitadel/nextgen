@@ -9,7 +9,6 @@ const GENERATED_PATHS = [
   "internal/domain",
   "internal/instrumentation",
   "internal/service/mocks",
-  "internal/storage/database",
 ];
 
 const before = await gitState();

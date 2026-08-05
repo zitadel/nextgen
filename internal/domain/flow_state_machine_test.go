@@ -13,18 +13,8 @@ import (
 
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/idgen/idgenmock"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 )
-
-func findAttribute(attrs []*domain.CreateAttribute, key string) *domain.CreateAttribute {
-	for _, a := range attrs {
-		if a.Key == key {
-			return a
-		}
-	}
-	return nil
-}
 
 func containsFieldName(fields []domain.FlowField, name string) bool {
 	for _, f := range fields {
@@ -55,7 +45,6 @@ type flowTestWorld struct {
 	schemaResolver       *domainmock.MockSchemaResolver
 	createUser           *domainmock.MockFlowOnSuccessHandler
 	createUserForPasskey *domainmock.MockFlowPasskeyUserCreater
-	ids                  *idgenmock.MockGenerator
 	sm                   *domain.FlowStateMachineRuntime
 }
 
@@ -70,11 +59,11 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		AnyTimes()
 
 	schemaResolver := domainmock.NewMockSchemaResolver(mock)
+	schemaStore := domainmock.NewMockJSONSchemaStore(mock)
 	authAttemptService := domainmock.NewMockFlowAuthAttemptService(mock)
 	passkeyRegService := domainmock.NewMockFlowPasskeyRegistrationService(mock)
 	createUser := domainmock.NewMockFlowOnSuccessHandler(mock)
 	createUserForPasskey := domainmock.NewMockFlowPasskeyUserCreater(mock)
-	ids := idgenmock.NewMockGenerator(mock)
 
 	resolver := domain.NewSchemaFieldResolver()
 
@@ -82,12 +71,12 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 
 	sm := domain.NewFlowStateMachine(
 		schemaResolver,
+		schemaStore,
 		resolver,
 		createUser,
 		createUserForPasskey,
 		authAttemptService,
 		passkeyRegService,
-		ids,
 		now,
 	)
 
@@ -99,7 +88,6 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		passkeyRegService:    passkeyRegService,
 		createUser:           createUser,
 		createUserForPasskey: createUserForPasskey,
-		ids:                  ids,
 		sm:                   sm,
 	}
 }
@@ -190,7 +178,7 @@ func TestFlowStateMachine_Start_RendersInitialStep(t *testing.T) {
 		Return("att_01TEST", nil).
 		Times(1)
 
-	result, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	result, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -255,7 +243,7 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	// establishes the credential per its manifest.
 	w.authAttemptService.EXPECT().SubmitPassword(gomock.Any(), gomock.Any()).Times(0)
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -263,7 +251,7 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{
 			"email":                   email,
@@ -322,7 +310,7 @@ func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 
 	def := loginDefinition()
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -330,7 +318,7 @@ func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{
 			"email":                   email,
@@ -365,7 +353,7 @@ func TestFlowStateMachine_Process_LoginUserNotFound(t *testing.T) {
 	// handoff must not run for an informational terminal reached without an identity
 	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -373,7 +361,7 @@ func TestFlowStateMachine_Process_LoginUserNotFound(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{
 			"email":                   "ghost@example.com",
@@ -409,7 +397,7 @@ func TestFlowStateMachine_Process_LoginInvalidPassword(t *testing.T) {
 
 	def := loginDefinition()
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -417,7 +405,7 @@ func TestFlowStateMachine_Process_LoginInvalidPassword(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{
 			"email":                   email,
@@ -428,7 +416,7 @@ func TestFlowStateMachine_Process_LoginInvalidPassword(t *testing.T) {
 	require.NotNil(t, result.Step)
 	require.Equal(t, "credentials", result.Step.Name)
 	require.NotNil(t, result.Step.Error)
-	assert.Contains(t, *result.Step.Error, "password")
+	assert.Equal(t, domain.FlowStepErrorInvalidCredentials, *result.Step.Error)
 }
 
 func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
@@ -442,7 +430,7 @@ func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -450,7 +438,7 @@ func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{
 			"email":                   "not-an-email",
@@ -461,7 +449,101 @@ func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
 	require.NotNil(t, result.Step)
 	require.Equal(t, "credentials", result.Step.Name)
 	if assert.NotNil(t, result.Step.Error) {
-		assert.Contains(t, *result.Step.Error, "email")
+		// The wire dialect end to end: format violations surface as the
+		// `_invalid`-spelled text key, not a raw diagnostic string.
+		assert.Equal(t, "error.email_invalid", *result.Step.Error)
+	}
+}
+
+func TestFlowStateMachine_Process_OmittedRequiredFieldKeepsStep(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := signupDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	// The submit action collects the step's fields, so the required email
+	// the client left out entirely must surface as a per-field error rather
+	// than passing through to fail late at create_user.
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"x-auth-methods#password": "correct-horse-battery-staple",
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	require.Equal(t, "credentials", result.Step.Name)
+	if assert.NotNil(t, result.Step.Error) {
+		assert.Equal(t, "error.email_required", *result.Step.Error)
+	}
+}
+
+// The passkey-register issue leg collects the step's fields, so an omitted
+// required field must halt instead of minting a challenge that only fails
+// later at create_user.
+func TestFlowStateMachine_Process_PasskeyRegisterOmittedRequiredFieldKeepsStep(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	show := domain.FlowStepCompleteShow
+	def := &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-passkey-reg-required",
+		UserSchema: defaultSchemaURL,
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeRegister: "register"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "register",
+				Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionPasskeyRegister, Kind: domain.FlowActionKindPasskeyRegister, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionPasskeyRegister: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	// No IssuePasskeyRegistrationChallenge expectation: the missing required
+	// field must halt before any challenge is minted.
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskeyRegister,
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	assert.Equal(t, "register", result.Step.Name)
+	assert.Nil(t, result.Step.Challenge, "no challenge may be issued when a required field is missing")
+	if assert.NotNil(t, result.Step.Error) {
+		assert.Equal(t, "error.email_required", *result.Step.Error)
 	}
 }
 
@@ -486,7 +568,7 @@ func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
 	// Mutate the submit transition to point at a non-existent step.
 	def.Steps[0].Transitions[domain.FlowActionSubmit] = domain.FlowStepTransition{Target: "nope"}
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -494,14 +576,14 @@ func TestFlowStateMachine_Process_IntegrityOnMissingTargetStep(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	_, err = w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{
 			"email":                   "alice@example.com",
 			"x-auth-methods#password": "correct-horse-battery-staple",
 		},
 	})
-	require.ErrorIs(t, err, domain.ErrIntegrity)
+	require.ErrorIs(t, err, domain.ErrFlowIntegrity())
 }
 
 func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
@@ -523,7 +605,7 @@ func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 
 	def := signupDefinition()
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -531,14 +613,14 @@ func TestFlowStateMachine_Process_InvalidActionRejected(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	_, err = w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: "not_declared",
 		Fields: map[string]any{
 			"email":                   "alice@example.com",
 			"x-auth-methods#password": "correct-horse-battery-staple",
 		},
 	})
-	require.ErrorIs(t, err, domain.ErrInvalidAction)
+	require.ErrorIs(t, err, domain.ErrFlowInvalidAction())
 }
 
 func TestFlowStateMachine_Process_SSOSubmissionUnsupported(t *testing.T) {
@@ -552,7 +634,7 @@ func TestFlowStateMachine_Process_SSOSubmissionUnsupported(t *testing.T) {
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -560,11 +642,11 @@ func TestFlowStateMachine_Process_SSOSubmissionUnsupported(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	_, err = w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action:      domain.FlowActionSubmit,
 		SSOProvider: &domain.FlowSSOProviderRef{ID: "google"},
 	})
-	require.ErrorIs(t, err, domain.ErrUnsupported)
+	require.ErrorIs(t, err, domain.ErrFlowUnsupported())
 }
 
 // passkeyLoginDefinition builds a single-step passkey login: an
@@ -629,7 +711,7 @@ func TestFlowStateMachine_Process_PasskeyIssueThenVerify(t *testing.T) {
 
 	def := passkeyLoginDefinition()
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -639,7 +721,7 @@ func TestFlowStateMachine_Process_PasskeyIssueThenVerify(t *testing.T) {
 
 	// Issue leg: selecting the passkey action mints a challenge and halts on the
 	// same step, surfacing the ceremony options.
-	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	issued, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskey,
 		PasskeyRP: &domain.FlowPasskeyRP{RPID: rpid, Origins: []string{"https://example.com"}},
 	})
@@ -652,7 +734,7 @@ func TestFlowStateMachine_Process_PasskeyIssueThenVerify(t *testing.T) {
 	assert.Equal(t, "authenticate", issued.State.CurrentStep)
 
 	// Verify leg: the signed assertion clears the challenge and advances.
-	verified, err := w.sm.Process(t.Context(), nil, def, issued.State, domain.FlowSubmitInput{
+	verified, err := w.sm.Process(t.Context(), def, issued.State, domain.FlowSubmitInput{
 		Action:            domain.FlowActionPasskey,
 		ChallengeResponse: &domain.FlowChallengeResponse{ChallengeID: challengeID, Method: "passkey", Proof: []byte(proof)},
 	})
@@ -683,7 +765,7 @@ func TestFlowStateMachine_Process_PasskeyProofRejectedKeepsStep(t *testing.T) {
 
 	def := passkeyLoginDefinition()
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -691,20 +773,20 @@ func TestFlowStateMachine_Process_PasskeyProofRejectedKeepsStep(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	issued, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskey,
 		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.State.PendingChallenge)
 
-	rejected, err := w.sm.Process(t.Context(), nil, def, issued.State, domain.FlowSubmitInput{
+	rejected, err := w.sm.Process(t.Context(), def, issued.State, domain.FlowSubmitInput{
 		Action:            domain.FlowActionPasskey,
 		ChallengeResponse: &domain.FlowChallengeResponse{ChallengeID: challengeID, Proof: []byte(`{}`)},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, rejected.Step.Error)
-	assert.Equal(t, "auth_attempt.passkey_invalid", *rejected.Step.Error)
+	assert.Equal(t, domain.FlowStepErrorPasskeyInvalid, *rejected.Step.Error)
 	assert.Nil(t, rejected.State.PendingChallenge)
 	assert.Equal(t, "authenticate", rejected.State.CurrentStep)
 }
@@ -761,7 +843,7 @@ func TestFlowStateMachine_Process_PasskeyAbandonedOnDifferentAction(t *testing.T
 
 	def := passkeyAbandonDefinition()
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -769,14 +851,14 @@ func TestFlowStateMachine_Process_PasskeyAbandonedOnDifferentAction(t *testing.T
 	})
 	require.NoError(t, err)
 
-	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	issued, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskey,
 		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.State.PendingChallenge)
 
-	abandoned, err := w.sm.Process(t.Context(), nil, def, issued.State, domain.FlowSubmitInput{
+	abandoned, err := w.sm.Process(t.Context(), def, issued.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 	})
 	require.NoError(t, err)
@@ -860,7 +942,7 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 		Return("", domain.ErrAuthAttemptProofRejected(nil)).
 		Times(1)
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -872,7 +954,7 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 	// clicks "Login with passkey". The dispatch loop identifies user1, then
 	// processPasskey mints a challenge scoped to user1 (empty allowCredentials
 	// since user1 has no passkey).
-	issued1, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	issued1, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskey,
 		Fields:    map[string]any{"email": email1},
 		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
@@ -883,7 +965,7 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 
 	// Attempt 1, verify leg: the assertion that comes back doesn't match any
 	// credential the attempt is constrained to → server rejects.
-	rejected, err := w.sm.Process(t.Context(), nil, def, issued1.State, domain.FlowSubmitInput{
+	rejected, err := w.sm.Process(t.Context(), def, issued1.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionPasskey,
 		ChallengeResponse: &domain.FlowChallengeResponse{
 			ChallengeID: challengeID1,
@@ -891,7 +973,7 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 		},
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "auth_attempt.passkey_invalid", gu.Value(rejected.Step.Error))
+	assert.Equal(t, domain.FlowStepErrorPasskeyInvalid, gu.Value(rejected.Step.Error))
 	assert.Nil(t, rejected.State.PendingChallenge, "rejection clears PendingChallenge")
 
 	// Attempt 2, issue leg: the user re-types user2's email (passkey-only)
@@ -909,7 +991,7 @@ func TestFlowStateMachine_Process_PasskeyAfterRejectionRebindsIdentifier(t *test
 		IssuePasskeyChallenge(gomock.Any(), gomock.Any()).
 		Return(domain.FlowPasskeyChallengeOutput{ChallengeID: challengeID2, Options: []byte(publicKey)}, nil)
 
-	issued2, err := w.sm.Process(t.Context(), nil, def, rejected.State, domain.FlowSubmitInput{
+	issued2, err := w.sm.Process(t.Context(), def, rejected.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskey,
 		Fields:    map[string]any{"email": "user2@example.com"},
 		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
@@ -952,7 +1034,7 @@ func TestFlowStateMachine_Process_PasskeyResubmitSameIdentifierKeepsPendingChall
 		IssuePasskeyChallenge(gomock.Any(), gomock.Any()).
 		Return(domain.FlowPasskeyChallengeOutput{ChallengeID: challengeID, Options: []byte(publicKey)}, nil)
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -960,7 +1042,7 @@ func TestFlowStateMachine_Process_PasskeyResubmitSameIdentifierKeepsPendingChall
 	})
 	require.NoError(t, err)
 
-	first, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	first, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskey,
 		Fields:    map[string]any{"email": email},
 		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
@@ -969,7 +1051,7 @@ func TestFlowStateMachine_Process_PasskeyResubmitSameIdentifierKeepsPendingChall
 
 	// Same email re-submitted (e.g. user clicked the passkey action again
 	// after dismissing the browser prompt). Same user resolved → ceremony stays.
-	second, err := w.sm.Process(t.Context(), nil, def, first.State, domain.FlowSubmitInput{
+	second, err := w.sm.Process(t.Context(), def, first.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskey,
 		Fields:    map[string]any{"email": email},
 		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
@@ -1007,7 +1089,7 @@ func TestFlowStateMachine_Start_InitializesCurrentPurpose(t *testing.T) {
 			def.Purposes[domain.FlowDefinitionPurposeLogin] = "credentials"
 			def.Purposes[domain.FlowDefinitionPurposeRecovery] = "credentials"
 
-			result, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+			result, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 				Definition:    def,
 				Purpose:       tc.purpose,
 				Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -1034,7 +1116,7 @@ func TestFlowStateMachine_FlipTable_LoginUserNotFoundFlipsToRegister(t *testing.
 		SubmitIdentifier(gomock.Any(), gomock.Any()).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -1043,7 +1125,7 @@ func TestFlowStateMachine_FlipTable_LoginUserNotFoundFlipsToRegister(t *testing.
 	require.NoError(t, err)
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, start.State.CurrentPurpose)
 
-	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"email": "ghost@example.com", "x-auth-methods#password": "irrelevant"},
 	})
@@ -1069,7 +1151,7 @@ func TestFlowStateMachine_FlipTable_RecoveryPassthrough(t *testing.T) {
 	delete(def.Purposes, domain.FlowDefinitionPurposeLogin)
 	def.Purposes[domain.FlowDefinitionPurposeRecovery] = "credentials"
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRecovery,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -1077,7 +1159,7 @@ func TestFlowStateMachine_FlipTable_RecoveryPassthrough(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"email": "ghost@example.com", "x-auth-methods#password": "irrelevant"},
 	})
@@ -1167,7 +1249,7 @@ func TestFlowStateMachine_FlipTable_PasskeyIssue_UnknownEmail_FlipsToRegister(t 
 		IssuePasskeyChallenge(gomock.Any(), gomock.Any()).
 		Times(0)
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -1176,7 +1258,7 @@ func TestFlowStateMachine_FlipTable_PasskeyIssue_UnknownEmail_FlipsToRegister(t 
 	require.NoError(t, err)
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, start.State.CurrentPurpose)
 
-	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskey,
 		Fields:    map[string]any{"email": email},
 		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
@@ -1239,7 +1321,7 @@ func TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip(t *test
 		SubmitIdentifier(gomock.Any(), gomock.Any()).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -1247,7 +1329,7 @@ func TestFlowStateMachine_FlipTable_OutcomeWithoutTransition_DoesNotFlip(t *test
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"email": "ghost@example.com", "x-auth-methods#password": "irrelevant"},
 	})
@@ -1308,7 +1390,7 @@ func TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn(t *te
 		ExpiresAt: time.Unix(1700000060, 0).UTC(),
 	}, nil)
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -1318,7 +1400,7 @@ func TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn(t *te
 
 	// Typo: dispatch returns user_not_found, no transition wired,
 	// engine surfaces a step error and the user stays on credentials.
-	typo, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	typo, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"email": email, "x-auth-methods#password": incorrectPassword},
 	})
@@ -1330,7 +1412,7 @@ func TestFlowStateMachine_FlipTable_LoginTypoThenCorrectEmail_StillSignsIn(t *te
 
 	// Retry with the correct (known) email: still in login mode, so
 	// identifier resolves, password verifies, and the user signs in.
-	result, err := w.sm.Process(t.Context(), nil, def, typo.State, domain.FlowSubmitInput{
+	result, err := w.sm.Process(t.Context(), def, typo.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"email": email, "x-auth-methods#password": correctPassword},
 	})
@@ -1562,7 +1644,7 @@ func TestFlowDispatch_RegisterMultiStep_HappyPath(t *testing.T) {
 	// register mode never verifies password
 	w.authAttemptService.EXPECT().SubmitPassword(gomock.Any(), gomock.Any()).Times(0)
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -1570,7 +1652,7 @@ func TestFlowDispatch_RegisterMultiStep_HappyPath(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	afterProfile, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	afterProfile, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
@@ -1578,14 +1660,14 @@ func TestFlowDispatch_RegisterMultiStep_HappyPath(t *testing.T) {
 	assert.Equal(t, "set-password", afterProfile.State.CurrentStep)
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, afterProfile.State.CurrentPurpose)
 
-	afterPassword, err := w.sm.Process(t.Context(), nil, def, afterProfile.State, domain.FlowSubmitInput{
+	afterPassword, err := w.sm.Process(t.Context(), def, afterProfile.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "create", afterPassword.State.CurrentStep)
 
-	done, err := w.sm.Process(t.Context(), nil, def, afterPassword.State, domain.FlowSubmitInput{
+	done, err := w.sm.Process(t.Context(), def, afterPassword.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 	})
 	require.NoError(t, err)
@@ -1609,7 +1691,7 @@ func TestFlowDispatch_RegisterEntry_IdentifierAlreadyExists_Flips(t *testing.T) 
 
 	def := multiStepSignupDefinition()
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -1617,7 +1699,7 @@ func TestFlowDispatch_RegisterEntry_IdentifierAlreadyExists_Flips(t *testing.T) 
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"email": "taken@example.com"},
 	})
@@ -1654,7 +1736,7 @@ func TestFlowDispatch_CombinedFlow_LoginUnknownEmail_FlipsAndCreates(t *testing.
 			ExpiresAt: time.Unix(1700000060, 0).UTC(),
 		}, nil)
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -1662,7 +1744,7 @@ func TestFlowDispatch_CombinedFlow_LoginUnknownEmail_FlipsAndCreates(t *testing.
 	})
 	require.NoError(t, err)
 
-	afterIdentify, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	afterIdentify, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
@@ -1670,7 +1752,7 @@ func TestFlowDispatch_CombinedFlow_LoginUnknownEmail_FlipsAndCreates(t *testing.
 	assert.Equal(t, "register-password", afterIdentify.State.CurrentStep)
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, afterIdentify.State.CurrentPurpose)
 
-	done, err := w.sm.Process(t.Context(), nil, def, afterIdentify.State, domain.FlowSubmitInput{
+	done, err := w.sm.Process(t.Context(), def, afterIdentify.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
 	})
@@ -1696,7 +1778,7 @@ func TestFlowDispatch_CombinedFlow_RegisterKnownEmail_FlipsToSignin(t *testing.T
 
 	def := combinedSigninSignupDefinition()
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -1704,7 +1786,7 @@ func TestFlowDispatch_CombinedFlow_RegisterKnownEmail_FlipsToSignin(t *testing.T
 	})
 	require.NoError(t, err)
 
-	afterIdentify, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	afterIdentify, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"email": "alice@example.com"},
 	})
@@ -1712,7 +1794,7 @@ func TestFlowDispatch_CombinedFlow_RegisterKnownEmail_FlipsToSignin(t *testing.T
 	assert.Equal(t, "signin-password", afterIdentify.State.CurrentStep)
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, afterIdentify.State.CurrentPurpose)
 
-	done, err := w.sm.Process(t.Context(), nil, def, afterIdentify.State, domain.FlowSubmitInput{
+	done, err := w.sm.Process(t.Context(), def, afterIdentify.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
 	})
@@ -1744,7 +1826,7 @@ func TestFlowDispatch_Recovery_IdentifierResolvedPasswordNotDispatched(t *testin
 
 	def := recoveryDefinition()
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRecovery,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -1752,7 +1834,7 @@ func TestFlowDispatch_Recovery_IdentifierResolvedPasswordNotDispatched(t *testin
 	})
 	require.NoError(t, err)
 
-	afterIdentify, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	afterIdentify, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"email": "alice@example.com"},
 	})
@@ -1760,7 +1842,7 @@ func TestFlowDispatch_Recovery_IdentifierResolvedPasswordNotDispatched(t *testin
 	assert.Equal(t, "new-password", afterIdentify.State.CurrentStep)
 	assert.Equal(t, domain.FlowDefinitionPurposeRecovery, afterIdentify.State.CurrentPurpose)
 
-	_, err = w.sm.Process(t.Context(), nil, def, afterIdentify.State, domain.FlowSubmitInput{
+	_, err = w.sm.Process(t.Context(), def, afterIdentify.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"x-auth-methods#password": "fresh-secret"},
 	})
@@ -1873,20 +1955,20 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 	def := passkeyRegisterDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
-	w.ids.EXPECT().New(gomock.Any()).Return(userID, nil)
 	w.createUserForPasskey.EXPECT().
 		CreateProvisionalUser(gomock.Any(), userID, gomock.Any()).
 		Times(1)
 	w.passkeyRegService.EXPECT().
 		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
-			return assert.Equal(t, userID, in.UserID)
+			return assert.Empty(t, in.UserID)
 		})).
 		Return(domain.FlowPasskeyRegistrationChallengeOutput{
 			ChallengeID: challengeID,
+			UserID:      userID,
 			Options:     []byte(registrationOpts),
 		}, nil)
 	w.passkeyRegService.EXPECT().
-		SubmitPasskeyRegistration(gomock.Any(), gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasskeyRegistrationInput) bool {
+		SubmitPasskeyRegistration(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasskeyRegistrationInput) bool {
 			return assert.Equal(t, challengeID, in.ChallengeID) &&
 				assert.Equal(t, proof, string(in.Attestation))
 		}))
@@ -1898,7 +1980,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 			ExpiresAt: time.Unix(1700000060, 0).UTC(),
 		}, nil)
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -1907,7 +1989,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 	require.NoError(t, err)
 
 	// Issue leg: passkey_register action mints a creation challenge.
-	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	issued, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskeyRegister,
 		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
@@ -1918,7 +2000,7 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 	require.NotNil(t, issued.State.PendingChallenge)
 
 	// Verify leg: attestation clears the challenge and advances to done.
-	verified, err := w.sm.Process(t.Context(), nil, def, issued.State, domain.FlowSubmitInput{
+	verified, err := w.sm.Process(t.Context(), def, issued.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionPasskeyRegister,
 		ChallengeResponse: &domain.FlowChallengeResponse{
 			ChallengeID: "reg-1",
@@ -1929,6 +2011,11 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, verified.State.PendingChallenge)
 	require.NotNil(t, verified.Step.Complete)
+	// Passkey registration writes a credential — irreversible. The back
+	// stack drops so no `back` action leaks past the mutation boundary,
+	// while History keeps the visitation trail.
+	assert.Empty(t, verified.State.BackStack, "passkey-register verify must clear the back stack")
+	assert.Equal(t, []string{"register"}, verified.State.History, "audit history records the visit even after an irreversible advance")
 }
 
 func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T) {
@@ -1951,13 +2038,13 @@ func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T)
 			Options:     []byte(registrationOpts),
 		}, nil)
 	w.passkeyRegService.EXPECT().
-		SubmitPasskeyRegistration(gomock.Any(), gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasskeyRegistrationInput) bool {
+		SubmitPasskeyRegistration(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitPasskeyRegistrationInput) bool {
 			return assert.Equal(t, challengeID, in.ChallengeID) &&
 				assert.Equal(t, proof, string(in.Attestation))
 		})).
 		Return(domain.ErrAuthAttemptProofRejected(nil))
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -1966,14 +2053,14 @@ func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T)
 	require.NoError(t, err)
 	start.State.CollectedData.UserID = "user_alice"
 
-	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	issued, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskeyRegister,
 		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.State.PendingChallenge)
 
-	rejected, err := w.sm.Process(t.Context(), nil, def, issued.State, domain.FlowSubmitInput{
+	rejected, err := w.sm.Process(t.Context(), def, issued.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionPasskeyRegister,
 		ChallengeResponse: &domain.FlowChallengeResponse{
 			ChallengeID: "reg-1",
@@ -1983,14 +2070,15 @@ func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T)
 	})
 	require.NoError(t, err)
 	require.NotNil(t, rejected.Step.Error)
-	assert.Equal(t, "auth_attempt.passkey_registration_invalid", *rejected.Step.Error)
+	assert.Equal(t, domain.FlowStepErrorPasskeyRegistrationInvalid, *rejected.Step.Error)
 	assert.Nil(t, rejected.State.PendingChallenge)
 	assert.Equal(t, "register", rejected.State.CurrentStep)
 }
 
 // TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID verifies that
-// when no user is identified yet (passkey-only registration path), the state
-// machine generates a provisional user ID and issues the challenge successfully.
+// when no user is identified yet (passkey-only registration path), the passkey
+// service mints a provisional user ID (returned on the issue output) and the
+// state machine stores it for the verify phase.
 func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	t.Parallel()
 	const challengeID = "reg-1"
@@ -2000,36 +2088,34 @@ func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	def := passkeyRegisterDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
-	w.ids.EXPECT().New(gomock.Any()).Return(userID, nil)
-	// The provisional user ID should have been generated and passed to the service.
 	w.passkeyRegService.EXPECT().
 		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
-			return assert.Equal(t, userID, in.UserID) &&
+			return assert.Empty(t, in.UserID) &&
 				assert.Empty(t, in.Username) &&
 				assert.Empty(t, in.DisplayName)
 		})).
 		Return(domain.FlowPasskeyRegistrationChallengeOutput{
 			ChallengeID: challengeID,
+			UserID:      userID,
 			Options:     []byte(registrationOpts),
 		}, nil)
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-	// No user ID seeded — the state machine should generate one.
 
-	issued, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	issued, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskeyRegister,
 		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.Step.Challenge)
-	// The generated ID should be stored in CollectedData for use in the verify phase.
 	assert.Equal(t, userID, issued.State.CollectedData.UserID)
+	assert.True(t, issued.State.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey)
 }
 
 func TestFlowStateMachine_Process_PasskeyRegisterUsesCollectedIdentifierForDisplay(t *testing.T) {
@@ -2052,19 +2138,19 @@ func TestFlowStateMachine_Process_PasskeyRegisterUsesCollectedIdentifierForDispl
 				assert.Equal(t, email, in.Value)
 		})).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
-	w.ids.EXPECT().New(gomock.Any()).Return(userID, nil)
 	w.passkeyRegService.EXPECT().
 		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
-			return assert.Equal(t, userID, in.UserID) &&
+			return assert.Empty(t, in.UserID) &&
 				assert.Equal(t, email, in.Username) &&
 				assert.Equal(t, email, in.DisplayName)
 		})).
 		Return(domain.FlowPasskeyRegistrationChallengeOutput{
 			ChallengeID: challengeID,
+			UserID:      userID,
 			Options:     []byte(registrationOpts),
 		}, nil)
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeRegister,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -2072,14 +2158,14 @@ func TestFlowStateMachine_Process_PasskeyRegisterUsesCollectedIdentifierForDispl
 	})
 	require.NoError(t, err)
 
-	registerStep, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	registerStep, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{"email": email},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "register", registerStep.Step.Name)
 
-	issued, err := w.sm.Process(t.Context(), nil, def, registerStep.State, domain.FlowSubmitInput{
+	issued, err := w.sm.Process(t.Context(), def, registerStep.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskeyRegister,
 		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
 	})
@@ -2124,7 +2210,7 @@ func TestFlowStateMachine_Start_PreservesActionOrder(t *testing.T) {
 		},
 	}
 
-	result, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	result, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -2162,11 +2248,11 @@ func TestFlowStateMachine_Process_NavigateSkipsValidation(t *testing.T) {
 				Fields: []domain.Field{"email", "x-auth-methods#password"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
-					{Name: "back", Kind: domain.FlowActionKindNavigate},
+					{Name: "cancel", Kind: domain.FlowActionKindNavigate},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "done"},
-					"back":                  {Target: "landing"},
+					"cancel":                {Target: "landing"},
 				},
 			},
 			{Name: "landing", Complete: &show},
@@ -2180,7 +2266,7 @@ func TestFlowStateMachine_Process_NavigateSkipsValidation(t *testing.T) {
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -2190,8 +2276,8 @@ func TestFlowStateMachine_Process_NavigateSkipsValidation(t *testing.T) {
 
 	// Empty fields would fail validation under a submit action; navigate
 	// must skip validation and follow the transition.
-	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
-		Action: "back",
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: "cancel",
 		Fields: map[string]any{},
 	})
 	require.NoError(t, err)
@@ -2218,7 +2304,7 @@ func TestFlowStateMachine_Process_SubmitKindRegression(t *testing.T) {
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
 
-	start, err := w.sm.Start(t.Context(), nil, domain.FlowStartInput{
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
 		Definition:    def,
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
@@ -2226,7 +2312,7 @@ func TestFlowStateMachine_Process_SubmitKindRegression(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	result, err := w.sm.Process(t.Context(), nil, def, start.State, domain.FlowSubmitInput{
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
 		Fields: map[string]any{
 			"email":    "not-an-email",
@@ -2238,5 +2324,520 @@ func TestFlowStateMachine_Process_SubmitKindRegression(t *testing.T) {
 	require.Equal(t, "credentials", result.Step.Name)
 	if assert.NotNil(t, result.Step.Error, "submit kind must still run field validation") {
 		assert.Contains(t, *result.Step.Error, "email")
+	}
+}
+
+// navigateOnlyDefinition is a minimal multi-step fixture used by the
+// back-navigation tests: step1 → step2 → done routed by navigate-kind
+// actions, with no fields, challenges, or on_success. Keeps the
+// back-nav tests free of auth-attempt and schema mocks.
+func navigateOnlyDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-back-nav",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "step1",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "step1",
+				Actions: []domain.FlowStepAction{
+					{Name: "go", Kind: domain.FlowActionKindNavigate, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"go": {Target: "step2"},
+				},
+			},
+			{
+				Name: "step2",
+				Actions: []domain.FlowStepAction{
+					{Name: "go", Kind: domain.FlowActionKindNavigate, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"go": {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+// findBackAction returns the engine-injected back action on a rendered
+// step, or nil if it isn't present. Tests key on kind, not name — the
+// contract is kind-driven.
+func findBackAction(step *domain.FlowStep) *domain.FlowAction {
+	if step == nil {
+		return nil
+	}
+	for i, a := range step.Actions {
+		if a.Kind == domain.FlowActionKindBack {
+			return &step.Actions[i]
+		}
+	}
+	return nil
+}
+
+func findFieldByName(fields []domain.FlowField, name string) *domain.FlowField {
+	for i, f := range fields {
+		if f.Name == name {
+			return &fields[i]
+		}
+	}
+	return nil
+}
+
+func TestFlowStateMachine_Back_NotInjectedOnInitialStep(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := navigateOnlyDefinition()
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "step1", start.Step.Name)
+	assert.Empty(t, start.State.BackStack, "back stack must be empty on the initial step")
+	assert.Nil(t, findBackAction(start.Step), "back action must not appear on the initial step")
+}
+
+func TestFlowStateMachine_Back_InjectedAfterAdvance(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := navigateOnlyDefinition()
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{Action: "go"})
+	require.NoError(t, err)
+	require.Equal(t, "step2", result.Step.Name)
+	require.Len(t, result.State.BackStack, 1)
+	assert.Equal(t, "step1", result.State.BackStack[0].StepName)
+	assert.Equal(t, []string{"step1"}, result.State.History)
+
+	back := findBackAction(result.Step)
+	if assert.NotNil(t, back, "back action must be injected after the first advance") {
+		assert.Equal(t, "step2.action.back", back.TextKey)
+		assert.False(t, back.Primary, "back must never be primary")
+	}
+}
+
+func TestFlowStateMachine_Back_OmittedOnTerminalStep(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := navigateOnlyDefinition()
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).Times(0)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	mid, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{Action: "go"})
+	require.NoError(t, err)
+	term, err := w.sm.Process(t.Context(), def, mid.State, domain.FlowSubmitInput{Action: "go"})
+	require.NoError(t, err)
+
+	require.Equal(t, "done", term.Step.Name)
+	require.NotNil(t, term.Step.Complete)
+	assert.Empty(t, term.State.BackStack, "terminate must clear the back stack — no back past a point-of-no-return")
+	assert.Nil(t, findBackAction(term.Step), "terminal step must not carry an injected back action")
+}
+
+func TestFlowStateMachine_Back_PopsAndRendersPreviousStep(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := navigateOnlyDefinition()
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	advanced, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{Action: "go"})
+	require.NoError(t, err)
+	require.Equal(t, "step2", advanced.Step.Name)
+
+	back, err := w.sm.Process(t.Context(), def, advanced.State, domain.FlowSubmitInput{Action: "back"})
+	require.NoError(t, err)
+	require.Equal(t, "step1", back.Step.Name)
+	assert.Empty(t, back.State.BackStack, "back-stack pops on back submission")
+	// History is append-only; the audit trail still records that step1 was visited.
+	assert.Equal(t, []string{"step1"}, back.State.History)
+	assert.Nil(t, findBackAction(back.Step), "back action must be absent once the stack is empty")
+}
+
+func TestFlowStateMachine_Back_EmptyBackStackRejected(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := navigateOnlyDefinition()
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	// Client-synthesized back on the initial step must be rejected.
+	_, err = w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{Action: "back"})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, domain.ErrFlowInvalidAction())
+}
+
+// loginRegisterFlipDefinition mirrors the shape of the default flow:
+// unknown email on the identifier step routes to a non-terminal
+// register step, so the login→register purpose flip can be exercised
+// (and reverted by back).
+func loginRegisterFlipDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-login-register-flip",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin:    "identifier",
+			domain.FlowDefinitionPurposeRegister: "register",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "identifier",
+				Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit:                {Target: "password"},
+					domain.FlowImplicitOutcomeUserNotFound: {Target: "register"},
+				},
+			},
+			{
+				Name:   "password",
+				Fields: []domain.Field{"x-auth-methods#password"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{
+				Name:   "register",
+				Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+// TestFlowStateMachine_Back_RestoresPurposeAfterFlip regresses a bug
+// where back popped the step but left CurrentPurpose flipped, so a
+// re-submit of the same unknown identifier bypassed user_not_found.
+func TestFlowStateMachine_Back_RestoresPurposeAfterFlip(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := loginRegisterFlipDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att-1", nil)
+	// Unknown email → identifier dispatch rejects the proof.
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("", domain.ErrAuthAttemptProofRejected(nil)).
+		Times(1)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	require.Equal(t, domain.FlowDefinitionPurposeLogin, start.State.CurrentPurpose)
+
+	// Submit unknown email → user_not_found flips CurrentPurpose to register.
+	afterSubmit, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "ghost@example.com"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "register", afterSubmit.Step.Name)
+	require.Equal(t, domain.FlowDefinitionPurposeRegister, afterSubmit.State.CurrentPurpose)
+
+	// Back must restore the identifier step AND the login purpose.
+	afterBack, err := w.sm.Process(t.Context(), def, afterSubmit.State, domain.FlowSubmitInput{Action: "back"})
+	require.NoError(t, err)
+	assert.Equal(t, "identifier", afterBack.Step.Name)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, afterBack.State.CurrentPurpose, "back must restore the pre-flip purpose")
+}
+
+func TestFlowStateMachine_Back_StackClearedAfterCreateUser(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := signupDefinition()
+
+	const userID = "user_01TEST"
+	const email = "alice@example.com"
+	const password = "correct-horse-battery-staple"
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("", domain.ErrAuthAttemptProofRejected(nil)).
+		Times(1)
+	// create_user signals Irreversible on success; test pins the signal.
+	w.createUser.EXPECT().
+		Handle(gomock.Any(), gomock.Any()).
+		Return(domain.FlowOnSuccessResult{UserID: userID, Irreversible: true}, nil)
+	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any()).Times(1)
+	w.authAttemptService.EXPECT().
+		Handoff(gomock.Any(), gomock.Any()).
+		Return(domain.FlowHandoffOutput{Token: "handoff_01TEST", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil).
+		Times(1)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"email":                   email,
+			"x-auth-methods#password": password,
+		},
+	})
+	require.NoError(t, err)
+
+	// History records the visit; the back stack is cleared because
+	// create_user signaled an irreversible mutation.
+	assert.Equal(t, []string{"credentials"}, result.State.History)
+	assert.Empty(t, result.State.BackStack, "an irreversible on_success must drop the back stack")
+}
+
+// navigateThreeStepDefinition chains three navigable steps to a
+// terminal, so a multi-hop back can pop the stack progressively.
+func navigateThreeStepDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-back-nav-3",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "step1",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{Name: "step1", Actions: []domain.FlowStepAction{{Name: "go", Kind: domain.FlowActionKindNavigate, Primary: true}}, Transitions: map[string]domain.FlowStepTransition{"go": {Target: "step2"}}},
+			{Name: "step2", Actions: []domain.FlowStepAction{{Name: "go", Kind: domain.FlowActionKindNavigate, Primary: true}}, Transitions: map[string]domain.FlowStepTransition{"go": {Target: "step3"}}},
+			{Name: "step3", Actions: []domain.FlowStepAction{{Name: "go", Kind: domain.FlowActionKindNavigate, Primary: true}}, Transitions: map[string]domain.FlowStepTransition{"go": {Target: "done"}}},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+func TestFlowStateMachine_Back_MultiHopPopsProgressively(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := navigateThreeStepDefinition()
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	s2, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{Action: "go"})
+	require.NoError(t, err)
+	s3, err := w.sm.Process(t.Context(), def, s2.State, domain.FlowSubmitInput{Action: "go"})
+	require.NoError(t, err)
+	require.Equal(t, "step3", s3.Step.Name)
+	require.Len(t, s3.State.BackStack, 2)
+
+	back1, err := w.sm.Process(t.Context(), def, s3.State, domain.FlowSubmitInput{Action: "back"})
+	require.NoError(t, err)
+	assert.Equal(t, "step2", back1.Step.Name)
+	require.Len(t, back1.State.BackStack, 1)
+	assert.NotNil(t, findBackAction(back1.Step))
+
+	back2, err := w.sm.Process(t.Context(), def, back1.State, domain.FlowSubmitInput{Action: "back"})
+	require.NoError(t, err)
+	assert.Equal(t, "step1", back2.Step.Name)
+	assert.Empty(t, back2.State.BackStack)
+	assert.Nil(t, findBackAction(back2.Step), "back must be absent on the initial step after popping to it")
+	// History records every forward visit; back does not rewind it.
+	assert.Equal(t, []string{"step1", "step2"}, back2.State.History)
+}
+
+func TestFlowStateMachine_Back_PreservesCollectedData(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := loginRegisterFlipDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att-1", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("", domain.ErrAuthAttemptProofRejected(nil)).
+		Times(1)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	const email = "ghost@example.com"
+	afterSubmit, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": email},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "register", afterSubmit.Step.Name)
+
+	afterBack, err := w.sm.Process(t.Context(), def, afterSubmit.State, domain.FlowSubmitInput{Action: "back"})
+	require.NoError(t, err)
+	require.Equal(t, "identifier", afterBack.Step.Name)
+	// The email survives back so the previous form pre-fills.
+	assert.Equal(t, email, afterBack.State.CollectedData.UserData["email"])
+	require.NotEmpty(t, afterBack.Step.Fields)
+	if emailField := findFieldByName(afterBack.Step.Fields, "email"); assert.NotNil(t, emailField) && emailField.Value != nil {
+		assert.Equal(t, email, *emailField.Value, "identifier step must prefill from CollectedData on back")
+	}
+}
+
+func TestFlowStateMachine_Back_DropsPendingChallenge(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := navigateOnlyDefinition()
+
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	advanced, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{Action: "go"})
+	require.NoError(t, err)
+
+	// Simulate a ceremony pending on step2. The challenge id is bound to
+	// step2; back must drop it so a downstream verify can't resurrect it
+	// against a different step.
+	advanced.State.PendingChallenge = &domain.FlowPendingChallenge{ID: "ch-1", Method: domain.FlowChallengeMethodPasskey}
+
+	afterBack, err := w.sm.Process(t.Context(), def, advanced.State, domain.FlowSubmitInput{Action: "back"})
+	require.NoError(t, err)
+	assert.Equal(t, "step1", afterBack.Step.Name)
+	assert.Nil(t, afterBack.State.PendingChallenge, "back must drop the pending challenge")
+}
+
+// TestFlowStepErrorContract sweeps every value the engine can emit as
+// `step.Error` and pins the client contract: a localizable `error.*`
+// text key or a reserved outcome token. The scenario tests above prove
+// each value is emitted where expected; this gate is what fails when a
+// new emission value (a step-error const, an implicit outcome, a
+// validation rule) breaks the dialect /login localizes.
+func TestFlowStepErrorContract(t *testing.T) {
+	t.Parallel()
+
+	stepErrorConsts := []string{
+		domain.FlowStepErrorInvalidCredentials,
+		domain.FlowStepErrorPasskeyInvalid,
+		domain.FlowStepErrorPasskeyRegistrationInvalid,
+	}
+	for _, key := range stepErrorConsts {
+		assert.True(t, domain.FlowStepErrorAllowed(key), "step-error const %q must honor the contract", key)
+	}
+
+	challenges := []domain.FlowFieldChallenge{
+		domain.FlowFieldChallengeNone,
+		domain.FlowFieldChallengeIdentifier,
+		domain.FlowFieldChallengePassword,
+		domain.FlowFieldChallengePasskey,
+		domain.FlowFieldChallengeMagicLink,
+		domain.FlowFieldChallengeSSO,
+		domain.FlowFieldChallengeOTP,
+	}
+	for _, challenge := range challenges {
+		for _, outcome := range domain.ImplicitOutcomesForChallenge(challenge) {
+			// Unwired transitions surface the outcome token verbatim as
+			// step.Error, so every implicit outcome must stay reserved.
+			assert.True(t, domain.FlowStepErrorAllowed(outcome),
+				"implicit outcome %q of challenge %q must be a reserved token", outcome, challenge)
+		}
+	}
+	assert.True(t, domain.FlowStepErrorAllowed(domain.FlowImplicitOutcomeUserNotFound))
+	assert.True(t, domain.FlowStepErrorAllowed(domain.FlowImplicitOutcomeUserAlreadyExists))
+
+	rules := []domain.FlowFieldValidationRule{
+		domain.FlowFieldValidationRuleRequired,
+		domain.FlowFieldValidationRuleFormat,
+		domain.FlowFieldValidationRuleMinLength,
+		domain.FlowFieldValidationRuleMaxLength,
+		domain.FlowFieldValidationRuleUnknown,
+	}
+	// Field names are tenant-controlled and used verbatim in the key —
+	// the credential shape is the adversarial case.
+	for _, field := range []string{"email", "x-auth-methods#password"} {
+		for _, rule := range rules {
+			key := domain.FlowFieldValidationError{Field: field, Rule: rule}.TextKey()
+			assert.True(t, domain.FlowStepErrorAllowed(key),
+				"validation key %q (field %q, rule %q) must honor the contract", key, field, rule)
+		}
+	}
+
+	for _, key := range []string{"auth_attempt.password_invalid", "password_invalid", ""} {
+		assert.False(t, domain.FlowStepErrorAllowed(key), "%q must not pass the contract", key)
 	}
 }

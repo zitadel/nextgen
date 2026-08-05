@@ -41,6 +41,44 @@ func (m *MockFlowFieldResolver) EXPECT() *MockFlowFieldResolverMockRecorder {
 	return m.recorder
 }
 
+// MissingRequired mocks base method.
+func (m *MockFlowFieldResolver) MissingRequired(fields domain.FlowResolvedFields, values map[string]any) domain.FlowFieldValidationErrors {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MissingRequired", fields, values)
+	ret0, _ := ret[0].(domain.FlowFieldValidationErrors)
+	return ret0
+}
+
+// MissingRequired indicates an expected call of MissingRequired.
+func (mr *MockFlowFieldResolverMockRecorder) MissingRequired(fields, values any) *MockFlowFieldResolverMissingRequiredCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MissingRequired", reflect.TypeOf((*MockFlowFieldResolver)(nil).MissingRequired), fields, values)
+	return &MockFlowFieldResolverMissingRequiredCall{Call: call}
+}
+
+// MockFlowFieldResolverMissingRequiredCall wrap *gomock.Call
+type MockFlowFieldResolverMissingRequiredCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockFlowFieldResolverMissingRequiredCall) Return(arg0 domain.FlowFieldValidationErrors) *MockFlowFieldResolverMissingRequiredCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockFlowFieldResolverMissingRequiredCall) Do(f func(domain.FlowResolvedFields, map[string]any) domain.FlowFieldValidationErrors) *MockFlowFieldResolverMissingRequiredCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockFlowFieldResolverMissingRequiredCall) DoAndReturn(f func(domain.FlowResolvedFields, map[string]any) domain.FlowFieldValidationErrors) *MockFlowFieldResolverMissingRequiredCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // Resolve mocks base method.
 func (m *MockFlowFieldResolver) Resolve(schema *jsonschema.Schema, stepName string, fields []domain.Field) (domain.FlowResolvedFields, error) {
 	m.ctrl.T.Helper()

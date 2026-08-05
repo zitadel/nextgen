@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,12 +16,12 @@ import (
 func TestCreateSchema(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
@@ -31,7 +32,7 @@ func TestCreateSchema(t *testing.T) {
 		}{
 			{
 				name:   "user-schema in body",
-				schema: harness.TestData.Schemas.CreateSchemaRequestUserSchema,
+				schema: harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema,
 			},
 			// TODO: add this test case once we have a public github-repo from which to get a schema
 			//{
@@ -45,7 +46,7 @@ func TestCreateSchema(t *testing.T) {
 				t.Parallel()
 
 				apiSchema := api.UserSchema{}
-				err = apiSchema.UnmarshalJSON([]byte(tc.schema))
+				err := apiSchema.UnmarshalJSON([]byte(tc.schema))
 				require.NoError(t, err)
 
 				req := api.CreateSchemaReq{
@@ -104,17 +105,34 @@ func TestCreateSchema(t *testing.T) {
 		t.Run("duplicates are not allowed", func(t *testing.T) {
 			t.Parallel()
 
-			project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+			schema := fmt.Sprintf(
+				`{
+                  "title": "without id",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "$id": "duplicate-id",
+                  "metaSchema": "%s/user-schema.json",
+                  "kind": "user-schema",
+                  "type": "object",
+                  "x-auth-methods": {
+                    "password": { "enabled": true, "position": 1 }
+                  },
+                  "properties": {
+                    "givenName": { "type": "string" }
+                  }
+                }
+                `, helpers.BuiltinSchemaBaseURL)
+
+			project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 			require.NoError(t, err)
-			harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+			harness.CreateUserSchema(t, project, schema)
 
 			apiSchema := api.UserSchema{}
-			err = apiSchema.UnmarshalJSON([]byte(harness.TestData.Schemas.CreateSchemaRequestUserSchema))
+			err = apiSchema.UnmarshalJSON([]byte(schema))
 			require.NoError(t, err)
 
 			client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 			require.NoError(t, err)
-			client.SetToken(project.ProjectSecret)
+			harness.SetProjectSecretOnApiClient(t, client, project)
 
 			req := api.CreateSchemaReq{
 				Type:       api.UserSchemaCreateSchemaReq,
@@ -135,12 +153,12 @@ func TestCreateSchema(t *testing.T) {
 func TestGetSchema(t *testing.T) {
 	t.Parallel()
 
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), nil)
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
@@ -148,7 +166,7 @@ func TestGetSchema(t *testing.T) {
 		t.Run("simple", func(t *testing.T) {
 			t.Parallel()
 
-			schemaID := harness.CreateUserSchema(t, project, harness.TestData.Schemas.CreateSchemaRequestUserSchema)
+			schemaID := harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 
 			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
 				ID:        schemaID,
@@ -175,4 +193,116 @@ func TestGetSchema(t *testing.T) {
 			assert.IsType(t, &api.GetSchemaByIdNotFound{}, resp, helpers.MustMarshal(t, resp))
 		})
 	})
+}
+
+func TestSchemaRevisions(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	testCases := []struct {
+		name            string
+		objectType      string
+		schemaRevisions []string
+	}{
+		{
+			name:       "client does not provision ID",
+			objectType: "client-does-not-provision-id",
+			schemaRevisions: []string{
+				fmt.Sprintf(
+					`{
+                  "title": "without id",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "objectType": "client-does-not-provision-id",
+                  "metaSchema": "%s/user-schema.json",
+                  "kind": "user-schema",
+                  "type": "object",
+                  "x-auth-methods": {
+                    "password": { "enabled": true, "position": 1 }
+                  },
+                  "properties": {
+                    "givenName": { "type": "string" }
+                  }
+                }
+                `, helpers.BuiltinSchemaBaseURL),
+				fmt.Sprintf(
+					`{
+                  "title": "without id",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "objectType": "client-does-not-provision-id",
+                  "metaSchema": "%s/user-schema.json",
+                  "kind": "user-schema",
+                  "type": "object",
+                  "x-auth-methods": {
+                    "password": { "enabled": true, "position": 1 }
+                  },
+                  "properties": {
+                    "firstName": { "type": "string" }
+                  }
+                }
+                `, helpers.BuiltinSchemaBaseURL),
+				fmt.Sprintf(
+					`{
+                  "title": "without id",
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "objectType": "client-does-not-provision-id",
+                  "metaSchema": "%s/user-schema.json",
+                  "kind": "user-schema",
+                  "type": "object",
+                  "x-auth-methods": {
+                    "password": { "enabled": true, "position": 0 }
+                  },
+                  "properties": {
+                    "givenName": { "type": "string" }
+                  }
+                }
+                `, helpers.BuiltinSchemaBaseURL),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var lastCreatedID string
+			for _, rev := range tc.schemaRevisions {
+				sch := api.UserSchema{}
+				err := sch.UnmarshalJSON([]byte(rev))
+				require.NoError(t, err)
+
+				resp, err := client.CreateSchema(
+					t.Context(),
+					api.CreateSchemaReq{Type: api.UserSchemaCreateSchemaReq, UserSchema: sch},
+					api.CreateSchemaParams{ProjectID: api.ProjectID(project.ID)},
+				)
+				require.NoError(t, err)
+				if assert.IsType(t, &api.CreateSchemaResponse{}, resp, helpers.MustMarshal(t, resp)) {
+					lastCreatedID = resp.(*api.CreateSchemaResponse).ID
+				}
+			}
+
+			resp, err := client.ListSchemas(
+				t.Context(),
+				api.ListSchemasParams{
+					ProjectID:  api.ProjectID(project.ID),
+					ObjectType: api.OptString{Value: tc.objectType, Set: true},
+				},
+			)
+			require.NoError(t, err)
+			if assert.IsType(t, &api.ListSchemasResponse{}, resp, helpers.MustMarshal(t, resp)) {
+				list := *(resp.(*api.ListSchemasResponse))
+				// ensure all revisions are present
+				assert.Len(t, list, len(tc.schemaRevisions))
+
+				// ensure list endpoint is LIFO and latest items match
+				assert.Equal(t, list[0].ID, lastCreatedID)
+			}
+		})
+	}
 }

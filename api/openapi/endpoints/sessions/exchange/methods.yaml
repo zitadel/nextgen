@@ -23,7 +23,7 @@ post:
     - Sessions
   security:
     - oauth2:
-        - sessions.write
+        - session.write
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/idempotency-key.yaml

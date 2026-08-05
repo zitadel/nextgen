@@ -54,6 +54,12 @@ export const PUBLIC_RELEASE_PACKAGES = [
     buildTarget: "api:build-release",
   },
   {
+    name: "@zitadel/config",
+    dir: "packages/config",
+    moonProject: "config",
+    buildTarget: "config:build-release",
+  },
+  {
     name: "@zitadel/components",
     dir: "packages/components",
     moonProject: "components",
@@ -112,6 +118,12 @@ export const PUBLIC_RELEASE_PACKAGES = [
     dir: "packages/sdk-qwik",
     moonProject: "sdk-qwik",
     buildTarget: "sdk-qwik:build-release",
+  },
+  {
+    name: "@zitadel/testing",
+    dir: "packages/testing",
+    moonProject: "testing",
+    buildTarget: "testing:build-release",
   },
 ];
 

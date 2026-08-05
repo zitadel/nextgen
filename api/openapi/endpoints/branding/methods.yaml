@@ -1,0 +1,75 @@
+post:
+  operationId: createBranding
+  summary: Publish a new branding revision
+  description: |
+    Publishes a new immutable branding revision for the project. Branding
+    revisions cannot be updated or deleted; every edit publishes a new
+    revision, and flow responses resolve the latest revision per project
+    (see ADR 040).
+
+    The `liquid_template` is validated lexically on save (size, encoding,
+    banned patterns such as `<script>` tags, inline event handlers, and the
+    `| raw` filter). Authoritative LiquidJS validation runs at authoring
+    time via `zitadel plan` / `zitadel apply`.
+  tags:
+    - Branding
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - branding.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../../components/flows/branding.yaml
+  responses:
+    '201':
+      description: The branding revision was created successfully.
+      content:
+        application/json:
+          schema:
+            $ref: branding-revision-response.yaml
+    '400':
+      description: The provided branding configuration was not valid.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+
+get:
+  operationId: listBranding
+  summary: List branding revisions
+  description: |
+    Lists branding revisions for the project, newest first, capped at the
+    100 most recent. The first entry is the revision flow responses
+    currently resolve. Deliberately unpaginated in v1 — list endpoints
+    gain a real query mechanism together (ADR 031); advertising pagination
+    parameters the server ignores would be worse than none.
+  tags:
+    - Branding
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - branding.read
+  responses:
+    '200':
+      description: Branding revisions were retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: list-branding-response.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml

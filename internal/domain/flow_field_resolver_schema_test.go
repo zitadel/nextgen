@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const testProjectID = "proj-1"
@@ -31,7 +30,7 @@ type fakeSchemaResolver struct {
 	bytesByURL map[string][]byte
 }
 
-func (f *fakeSchemaResolver) Resolve(_ context.Context, _ database.QueryExecutor, _, schemaURL string, _ []byte) (*jsonschema.Schema, error) {
+func (f *fakeSchemaResolver) Resolve(_ context.Context, _ domain.JSONSchemaStore, _, schemaURL string, _ []byte) (*jsonschema.Schema, error) {
 	raw, ok := f.bytesByURL[schemaURL]
 	if !ok {
 		return nil, errors.New("fakeSchemaResolver: schema not found: " + schemaURL)
@@ -56,7 +55,7 @@ const defaultSchemaURL = "https://example.test/user/v1/default.user.schema.json"
 const defaultSchemaContent string = `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"type": "object",
-		"x-auth-methods": { "password": { "enabled": true } },
+		"x-auth-methods": { "password": { "enabled": true }, "passkey": { "enabled": true } },
 		"required": ["email", "username", "given_name", "family_name"],
 		"properties": {
 			"email":       { "type": "string", "format": "email", "maxLength": 320, "x-unique": "team" },
@@ -296,6 +295,50 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 					{Name: "created", TextKey: "step.field.created", Type: domain.FlowFieldTypeDate, Validation: &domain.FlowFieldValidation{Format: "date-time"}},
 					{Name: "gender", TextKey: "step.field.gender", Type: domain.FlowFieldTypeSelect, Validation: &domain.FlowFieldValidation{Enum: []string{"female", "male", "non_binary"}}},
 					{Name: "newsletter", TextKey: "step.field.newsletter", Type: domain.FlowFieldTypeCheckbox},
+				},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		{
+			name: "boolean const: true surfaces Const on the checkbox",
+			schema: `{
+				"type": "object",
+				"properties": {
+					"acceptedTermsAndConditions": { "type": "boolean", "const": true }
+				}
+			}`,
+			step:   "step",
+			fields: []domain.Field{"acceptedTermsAndConditions"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{
+						Name:       "acceptedTermsAndConditions",
+						TextKey:    "step.field.acceptedTermsAndConditions",
+						Type:       domain.FlowFieldTypeCheckbox,
+						Validation: &domain.FlowFieldValidation{Const: true},
+					},
+				},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		{
+			name: "string const surfaces Const on a text field",
+			schema: `{
+				"type": "object",
+				"properties": {
+					"tier": { "type": "string", "const": "free" }
+				}
+			}`,
+			step:   "step",
+			fields: []domain.Field{"tier"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{
+						Name:       "tier",
+						TextKey:    "step.field.tier",
+						Type:       domain.FlowFieldTypeText,
+						Validation: &domain.FlowFieldValidation{Const: "free"},
+					},
 				},
 				ImplicitOutcomes: map[string][]string{},
 			},

@@ -19,7 +19,7 @@ tasks:
       - "generate"
 
   typecheck:
-    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
+    command: "corepack pnpm exec tsc --build tsconfig.json"
     deps:
       - "generate"
 
@@ -31,13 +31,24 @@ tasks:
       - "dist/**/*"
 
   build-release:
-    command: "corepack pnpm run build"
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
     deps:
       - "generate"
     outputs:
       - "dist/**/*"
     options:
       cache: false
+      # The release preclean and rebuild run in one mutex-held task. Do not
+      # rely on parent runDepsInParallel ordering; only task deps and mutexes
+      # keep dist cleanup from racing builds that read or rewrite it.
+      runInCI: false
+      # cli:test drives the built oclif CLI, whose commands import this
+      # package's dist at runtime. The shared mutex keeps this release build
+      # (whose clean step rewrites dist/) from running while those tests are
+      # importing it; a task dep on cli:test would cycle the project graph.
+      mutex: "public-dist"
 
   test:
     command: "corepack pnpm exec vitest run --passWithNoTests"

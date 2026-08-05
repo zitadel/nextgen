@@ -2,8 +2,6 @@ package domain
 
 import (
 	"context"
-
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_passkey_registration.mock.go . FlowPasskeyRegistrationService
@@ -20,9 +18,8 @@ type FlowPasskeyRegistrationService interface {
 
 	// SubmitPasskeyRegistration verifies the attestation against the issued
 	// challenge and persists the new credential. Rejection surfaces as
-	// [ErrAuthAttemptProofRejected]. client is the DB transaction from the
-	// flow state machine so the passkey save is atomic with user creation.
-	SubmitPasskeyRegistration(ctx context.Context, client database.QueryExecutor, in FlowSubmitPasskeyRegistrationInput) error
+	// [ErrAuthAttemptProofRejected].
+	SubmitPasskeyRegistration(ctx context.Context, in FlowSubmitPasskeyRegistrationInput) error
 }
 
 // FlowIssuePasskeyRegistrationChallengeInput carries the relying-party
@@ -39,10 +36,11 @@ type FlowIssuePasskeyRegistrationChallengeInput struct {
 }
 
 // FlowPasskeyRegistrationChallengeOutput is the issued challenge.
-// Options is the PublicKeyCredentialCreationOptions JSON the client hands
-// to navigator.credentials.create().
+// UserID is the WebAuthn user handle (minted by the registration service when
+// the issue input had none).
 type FlowPasskeyRegistrationChallengeOutput struct {
 	ChallengeID string
+	UserID      string
 	Options     []byte
 }
 

@@ -58,7 +58,9 @@ export {
   TEMPLATE_NAMES,
   en,
   de,
+  it,
   builtinLocales,
+  businessLocales,
   startFlow,
   submitStep,
   getCurrentStep,
@@ -77,4 +79,5 @@ export {
   type LiquidContext,
   type Locale,
   type ResolvedTheme,
+  type ThemeMode,
 } from "./orchestrator/index.js";

@@ -1,0 +1,222 @@
+<zl-page-shell data-zl-template-root>
+  <div class="zl-split">
+    <aside class="zl-split__brand">
+      {% comment %} ──────────────────────────────────────────────────────────
+        YOUR LANDING CONTENT — everything inside this aside is yours.
+        Edit the copy and structure freely: structural HTML (div, section,
+        nav, h1–h6, ul, li, a, img, …) plus inline style="" attributes are
+        allowed; button, input, form, script, and style tags are stripped —
+        use plain anchors for landing CTAs. The zl-hero__* classes keep
+        this pane on design tokens so palettes and theme mode apply.
+
+        The login card in the section below is fully wired to the flow
+        engine; leave its zl-* atoms intact. Layout knobs (set on the root
+        element's style attribute): --zl-split-columns, --zl-split-align,
+        --zl-split-brand-mobile. Add zl-split--right to the wrapper div to
+        mirror the panes. More in .zitadel/branding/README.md.
+      ────────────────────────────────────────────────────────────── {% endcomment %}
+      <div class="zl-hero">
+        <nav class="zl-hero__nav">
+          <span class="zl-hero__brand">
+            {% if branding.logo_url %}
+              <img class="zl-hero__brand-logo" src="{{ branding.logo_url }}" alt="" />
+            {% else %}
+              <span class="zl-hero__brand-mark" aria-hidden="true"></span>
+            {% endif %}
+            Your brand
+          </span>
+          <span class="zl-hero__nav-links">
+            <a href="#">Product</a>
+            <a href="#">Pricing</a>
+            <a href="#">Docs</a>
+          </span>
+        </nav>
+
+        <p class="zl-hero__eyebrow">Your product category</p>
+        <h2 class="zl-hero__headline">A headline about what you ship.</h2>
+        <p class="zl-hero__sub">
+          Use this pane to tell visitors why they sign up: what your product
+          does, who it is for, and what happens after they sign in. Replace
+          every line here before you publish.
+        </p>
+
+        <ul class="zl-hero__bullets">
+          <li>Your first selling point</li>
+          <li>Your second selling point</li>
+          <li>Your third selling point</li>
+        </ul>
+
+        <p class="zl-hero__footnote">
+          Replace this line with real social proof, such as customer logos or
+          a certification you actually hold.
+        </p>
+      </div>
+    </aside>
+    <section class="zl-split__form">
+    {% if branding.logo_url %}
+      <img class="zl-split__compact" src="{{ branding.logo_url }}" alt="" />
+    {% else %}
+      <p class="zl-split__compact zl-hero__compact-brand">Your brand</p>
+    {% endif %}
+    <zl-card>
+      <h1 slot="header" class="zl-card-title">{{ step.texts.title_key | t: identity.display_name }}</h1>
+      {% if step.texts.description_key %}
+        {% assign card_subtitle = step.texts.description_key | t: identity.display_name %}
+        {% if card_subtitle != "" %}
+          <p slot="header" class="zl-card-subtitle">{{ card_subtitle }}</p>
+        {% endif %}
+      {% endif %}
+
+      {% if errors and errors.size > 0 %}
+        {% for err in errors %}
+          {% if err | formLevelError %}
+            {% assign alert_heading = err.text_key | alertHeading %}
+            {% assign alert_body = err.text_key | alertBody %}
+            <zl-alert severity="error" dismissible data-zl-step-error{% if alert_heading != "" %} heading="{{ alert_heading | t }}"{% endif %}>
+              {% if alert_body != "" %}{{ alert_body | t }}{% elsif err.text_key %}{{ err.text_key | t }}{% else %}{{ err.message }}{% endif %}
+            </zl-alert>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+
+      {% for f in fields %}
+        {% assign field_placeholder = f.text_key | fieldPlaceholder %}
+        {% assign field_help = f.text_key | fieldHelp %}
+        {% assign field_err = f.name | fieldError: errors %}
+        {% case f.type %}
+        {% when 'checkbox' %}
+          <zl-checkbox
+            name="{{ f.name }}"
+            data-testid="zitadel-field-{{ f.name | testid }}"
+            label="{{ f.text_key | t }}"
+            value="true"
+            {% if f.value %}checked{% endif %}
+            {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
+          ></zl-checkbox>
+        {% when 'select' %}
+          <zl-select
+            name="{{ f.name }}"
+            data-testid="zitadel-field-{{ f.name | testid }}"
+            label="{{ f.text_key | t }}"
+            value="{{ f.value }}"
+            options='{{ f.validation.enum | selectOptions | json }}'
+            {% if f.required %}required{% endif %}
+            {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
+          {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
+          ></zl-select>
+        {% else %}
+          {% assign autocomplete_val = '' %}
+          {% if f.name == 'email' %}
+            {% assign autocomplete_val = 'email' %}
+          {% elsif f.type == 'password' and step.name contains 'register' %}
+            {% assign autocomplete_val = 'new-password' %}
+          {% elsif f.type == 'password' %}
+            {% assign autocomplete_val = 'current-password' %}
+          {% endif %}
+          <zl-field
+            name="{{ f.name }}"
+            data-testid="zitadel-field-{{ f.name | testid }}"
+            label="{{ f.text_key | t }}"
+            type="{{ f.type }}"
+            value="{{ f.value }}"
+            {% if autocomplete_val != '' %}autocomplete="{{ autocomplete_val }}"{% endif %}
+            {% if f.required %}required{% endif %}
+            {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
+            {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
+          >
+            {% if field_help != "" %}
+              <span slot="help">{{ field_help }}</span>
+            {% endif %}
+          </zl-field>
+        {% endcase %}
+      {% endfor %}
+
+      {% assign recover = actions | where: "name", "recover" | first %}
+      {% if recover %}
+        <p class="zl-card-forgot">
+          <a href="#" class="zl-card-forgot__link" data-action="recover">{{ recover.text_key | t }}</a>
+        </p>
+      {% endif %}
+
+      {% for a in actions %}
+        {% if a.primary %}
+          <zl-button
+            hierarchy="primary"
+            size="medium"
+            type="submit"
+            block
+            action="{{ a.name }}"
+            data-testid="zitadel-action-{{ a.name }}"
+            label="{{ a.text_key | t }}"
+            {% if loading %}loading{% endif %}
+          ></zl-button>
+        {% endif %}
+      {% endfor %}
+
+      {% for a in actions %}
+        {% unless a.primary or a.kind == 'back' or a.name == 'passkey' or a.name == 'register' or a.name == 'sign_in' or a.name == 'recover' %}
+          <zl-button
+            hierarchy="secondary"
+            size="medium"
+            type="button"
+            block
+            action="{{ a.name }}"
+            data-testid="zitadel-action-{{ a.name }}"
+            label="{{ a.text_key | t }}"
+          ></zl-button>
+        {% endunless %}
+      {% endfor %}
+
+      {% assign passkey = actions | where: "name", "passkey" | first %}
+      {% if passkey %}
+        {% unless passkey.primary %}
+          <zl-button
+            hierarchy="secondary"
+            size="medium"
+            block
+            action="passkey"
+            data-testid="zitadel-action-passkey"
+            label="{{ passkey.text_key | t }}"
+          ></zl-button>
+        {% endunless %}
+      {% endif %}
+
+
+      {% assign register = actions | where: "name", "register" | first %}
+      {% if register %}
+        <p class="zl-card-nav">
+          {{ 'identifier.action.register.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="register" data-testid="zitadel-action-register-link">{{ 'identifier.action.register.link' | t }}</a>
+        </p>
+      {% endif %}
+
+      {% assign sign_in = actions | where: "name", "sign_in" | first %}
+      {% if sign_in %}
+        <p class="zl-card-nav">
+          {{ 'register.action.sign_in.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="sign_in" data-testid="zitadel-action-sign_in-link">{{ 'register.action.sign_in.link' | t }}</a>
+        </p>
+      {% endif %}
+
+      {% if challenge %}
+        {% if challenge.method == "passkey" or challenge.method == "passkey_register" %}
+          {% assign ceremony = "authenticate" %}
+          {% assign submit_method = challenge.method %}
+          {% if challenge.method == "passkey_register" or challenge.options.user %}
+            {% assign ceremony = "register" %}
+            {% assign submit_method = "passkey_register" %}
+          {% endif %}
+          <zl-passkey
+            ceremony="{{ ceremony }}"
+            method="{{ submit_method }}"
+            challenge-id="{{ challenge.challenge_id }}"
+            options='{{ challenge.options | json }}'
+            pending-label="{{ 'passkey.pending.status' | t }}"
+            cancel-label="{{ 'action.cancel' | t }}"
+          ></zl-passkey>
+        {% endif %}
+      {% endif %}
+
+      {% mandatory_gates %}
+    </zl-card>
+    </section>
+  </div>
+</zl-page-shell>

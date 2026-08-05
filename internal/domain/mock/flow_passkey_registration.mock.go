@@ -14,7 +14,6 @@ import (
 	reflect "reflect"
 
 	domain "github.com/zitadel/nextgen/internal/domain"
-	database "github.com/zitadel/nextgen/internal/storage/database"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -82,17 +81,17 @@ func (c *MockFlowPasskeyRegistrationServiceIssuePasskeyRegistrationChallengeCall
 }
 
 // SubmitPasskeyRegistration mocks base method.
-func (m *MockFlowPasskeyRegistrationService) SubmitPasskeyRegistration(ctx context.Context, client database.QueryExecutor, in domain.FlowSubmitPasskeyRegistrationInput) error {
+func (m *MockFlowPasskeyRegistrationService) SubmitPasskeyRegistration(ctx context.Context, in domain.FlowSubmitPasskeyRegistrationInput) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SubmitPasskeyRegistration", ctx, client, in)
+	ret := m.ctrl.Call(m, "SubmitPasskeyRegistration", ctx, in)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // SubmitPasskeyRegistration indicates an expected call of SubmitPasskeyRegistration.
-func (mr *MockFlowPasskeyRegistrationServiceMockRecorder) SubmitPasskeyRegistration(ctx, client, in any) *MockFlowPasskeyRegistrationServiceSubmitPasskeyRegistrationCall {
+func (mr *MockFlowPasskeyRegistrationServiceMockRecorder) SubmitPasskeyRegistration(ctx, in any) *MockFlowPasskeyRegistrationServiceSubmitPasskeyRegistrationCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubmitPasskeyRegistration", reflect.TypeOf((*MockFlowPasskeyRegistrationService)(nil).SubmitPasskeyRegistration), ctx, client, in)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SubmitPasskeyRegistration", reflect.TypeOf((*MockFlowPasskeyRegistrationService)(nil).SubmitPasskeyRegistration), ctx, in)
 	return &MockFlowPasskeyRegistrationServiceSubmitPasskeyRegistrationCall{Call: call}
 }
 
@@ -108,13 +107,13 @@ func (c *MockFlowPasskeyRegistrationServiceSubmitPasskeyRegistrationCall) Return
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockFlowPasskeyRegistrationServiceSubmitPasskeyRegistrationCall) Do(f func(context.Context, database.QueryExecutor, domain.FlowSubmitPasskeyRegistrationInput) error) *MockFlowPasskeyRegistrationServiceSubmitPasskeyRegistrationCall {
+func (c *MockFlowPasskeyRegistrationServiceSubmitPasskeyRegistrationCall) Do(f func(context.Context, domain.FlowSubmitPasskeyRegistrationInput) error) *MockFlowPasskeyRegistrationServiceSubmitPasskeyRegistrationCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockFlowPasskeyRegistrationServiceSubmitPasskeyRegistrationCall) DoAndReturn(f func(context.Context, database.QueryExecutor, domain.FlowSubmitPasskeyRegistrationInput) error) *MockFlowPasskeyRegistrationServiceSubmitPasskeyRegistrationCall {
+func (c *MockFlowPasskeyRegistrationServiceSubmitPasskeyRegistrationCall) DoAndReturn(f func(context.Context, domain.FlowSubmitPasskeyRegistrationInput) error) *MockFlowPasskeyRegistrationServiceSubmitPasskeyRegistrationCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -1,0 +1,14 @@
+type: string
+description: |
+  Filter operation defines the operations which can be used when filtering on a
+  query endpoint.
+enum:
+  - equals
+  - not_equals
+  - contains
+  - not_contains
+  - less_than
+  - less_than_or_equal
+  - greater_than
+  - greater_than_or_equal
+  

@@ -1,49 +1,111 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-@import "@zitadel/design-tokens/css/tokens.css";
-@import "@zitadel/design-tokens/css/tailwind.css";
+/* Design tokens as the shadcn/ui contract: `shadcn.css` pulls in the `--zl-*`
+   variables (dark `:root` + light `[data-theme="light"]`) and maps the standard
+   shadcn utility names (`bg-background`, `text-muted-foreground`, `rounded-md`,
+   `font-serif`) onto them via `@theme inline`. The console is authored against
+   those standard names so shadcn/ui components drop in unchanged. */
+@import "@zitadel/design-tokens/css/shadcn.css";
+
+/* Still required while sessions/projects/flow-definitions/system/boundaries
+   compose `@zitadel/ui-react` atoms. Drop when those call sites migrate to shadcn. */
 @import "@zitadel/ui-react/styles.css";
+
+/* Self-hosted Arimo — the design's body typeface (`font-sans`). */
+@import "@fontsource/arimo/400.css";
+@import "@fontsource/arimo/500.css";
+@import "@fontsource/arimo/600.css";
+@import "@fontsource/arimo/700.css";
+
+/* `dark:` utilities key off the same `data-theme` attribute the tokens flip on,
+   though components should prefer semantic tokens (which re-theme for free). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* APK Futural — the brand display typeface used for headings (`font-serif`).
+   Licensed webfont matching zitadel.com; Regular (400) is the only weight. */
+@font-face {
+  font-family: "APK Futural";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src:
+    url("./fonts/apk-futural/APK-Futural-Regular.woff2") format("woff2"),
+    url("./fonts/apk-futural/APK-Futural-Regular.woff") format("woff");
+}
+
+/* Point the heading/serif token at APK Futural. Overriding here (rather than in
+   generated CSS) keeps the brand display font scoped to the app. */
+:root,
+[data-theme="dark"],
+[data-theme="light"] {
+  --zl-font-family-heading: "APK Futural", "Arimo", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+
+/* Global page theming only. Component styles live in Tailwind utilities on the
+   components themselves. `data-theme` on <html> selects the token mode (dark
+   `:root` vs light override); `color-scheme` keeps native form controls aligned
+   with the *resolved* theme (not just the OS preference). */
+html,
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+}
 
 body {
   margin: 0;
   font-family: var(--zl-font-family-sans, system-ui, sans-serif);
-  color: var(--zl-color-text-default, #1a1a1a);
+  background: var(--zl-background);
+  color: var(--zl-foreground);
 }
 
-header {
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--zl-color-border-default, #e2e8f0);
+/* Tailwind v4 Preflight sets `border-color: currentColor`, so any shadcn
+   component that writes a bare `border` / `border-l` (sheet, popover, dialog,
+   command, tabs, badge…) draws its edge in the *text* colour — a near-white
+   1px line in dark mode. Registry components assume the canonical shadcn base
+   rule below, which points every unqualified border at the border token; only
+   utilities that name their own colour (`border-input`, `border-border`) are
+   unaffected. Without this, each newly installed component has to remember to
+   re-specify the colour. */
+@layer base {
+  *,
+  ::after,
+  ::before {
+    border-color: var(--color-border);
+  }
 }
 
-header h1 {
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
+/* Tailwind v4 Preflight no longer forces `cursor: pointer` on interactive
+   controls; restore it for genuinely interactive elements. */
+button:not(:disabled):not([aria-disabled="true"]),
+[role="button"]:not([aria-disabled="true"]),
+[role="radio"]:not([aria-disabled="true"]),
+a[href] {
+  cursor: pointer;
 }
 
-main {
-  padding: 2rem 1.5rem;
-}
+/* Chrome paints its own background on an autofilled field and ignores
+   `background-color`, so the input flashes a foreign colour until it loses focus.
+   `color-scheme` (above) only darkens that fill; it does not remove it.
 
-.console-welcome {
-  max-width: 32rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.console-welcome h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-.console-welcome p {
-  margin: 0;
-  line-height: 1.6;
-}
-
-.console-welcome__hint {
-  font-size: 0.875rem;
-  color: var(--zl-color-text-muted, #64748b);
+   Clipping the fill to the glyphs removes it while leaving the text painted, so
+   the field keeps whatever surface its own utilities gave it — important here
+   because console inputs are transparent or `input/30` over a sheet or card, so
+   overpainting an opaque colour (the usual `box-shadow` inset trick) would be
+   visibly wrong on anything that is not the page background.
+   `-webkit-text-fill-color` is needed because the autofill style overrides
+   `color`. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: var(--color-foreground);
+  caret-color: var(--color-foreground);
 }

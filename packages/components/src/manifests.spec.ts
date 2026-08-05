@@ -79,7 +79,16 @@ describe("manifest registry", () => {
     // validator and editor tooling stay honest.
     const passkey = findManifest("zl-passkey");
     expect(passkey?.attrs).toEqual(
-      expect.arrayContaining(["ceremony", "method", "challenge-id", "options", "manual"]),
+      expect.arrayContaining([
+        "ceremony",
+        "method",
+        "challenge-id",
+        "options",
+        "manual",
+        "pending-label",
+        "cancel-label",
+        "silent",
+      ]),
     );
   });
 

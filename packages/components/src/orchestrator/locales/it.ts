@@ -17,8 +17,8 @@ export const it: Locale = {
   // ═══════════════════════════════════════════════════════════════════════════
   "identifier.title": "Accedi",
   "identifier.description": "Inserisci la tua e-mail per continuare",
-  "identifier.field.email": "E-mail aziendale",
-  "identifier.field.email.placeholder": "tu@azienda.com",
+  "identifier.field.email": "E-mail",
+  "identifier.field.email.placeholder": "tu@esempio.com",
   "identifier.field.password": "Password",
   "identifier.action.submit": "Accedi",
   "identifier.action.continue": "Accedi",
@@ -47,8 +47,8 @@ export const it: Locale = {
   // ═══════════════════════════════════════════════════════════════════════════
   "collect-credentials.title": "Crea il tuo account",
   "collect-credentials.description": "Configura e-mail e password",
-  "collect-credentials.field.email": "E-mail aziendale",
-  "collect-credentials.field.email.placeholder": "tu@azienda.com",
+  "collect-credentials.field.email": "E-mail",
+  "collect-credentials.field.email.placeholder": "tu@esempio.com",
   "collect-credentials.field.password": "Password",
   "collect-credentials.action.submit": "Registrati",
 
@@ -60,6 +60,7 @@ export const it: Locale = {
   "register-password.description": "Scegli una password sicura per il tuo account",
   "register-password.field.password": "Password",
   "register-password.action.submit": "Registrati",
+  "register-password.action.back": "Indietro",
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Step: passkey-upsell (proposta passkey — dopo la registrazione)
@@ -78,8 +79,8 @@ export const it: Locale = {
   "collect-passkey-email.title": "Crea il tuo account",
   "collect-passkey-email.description":
     "Inserisci la tua e-mail per configurare una passkey",
-  "collect-passkey-email.field.email": "E-mail aziendale",
-  "collect-passkey-email.field.email.placeholder": "tu@azienda.com",
+  "collect-passkey-email.field.email": "E-mail",
+  "collect-passkey-email.field.email.placeholder": "tu@esempio.com",
   "collect-passkey-email.action.submit": "Continua",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -102,17 +103,19 @@ export const it: Locale = {
   "password.field.password": "Password",
   "password.action.signin": "Accedi",
   "password.action.passkey": "Accedi con passkey",
+  "password.action.back": "Indietro",
   "password.action.register.lead": "Non hai un account? ",
   "password.action.register.link": "Registrati",
 
   "register.title": "Crea il tuo account",
   // Vuoto per design — la scheda di registrazione non ha sottotitolo (Figma 6593:141743).
   "register.description": "",
-  "register.field.email": "E-mail aziendale",
-  "register.field.email.placeholder": "tu@azienda.com",
+  "register.field.email": "E-mail",
+  "register.field.email.placeholder": "tu@esempio.com",
   "register.field.password": "Password",
   "register.field.givenName": "Nome",
   "register.field.familyName": "Cognome",
+  "register.field.companyName": "Nome azienda",
   // L'<input type="date"> nativo localizza il proprio formato di visualizzazione in base
   // alla lingua dell'utente e invia ISO YYYY-MM-DD — nessun segnaposto/suggerimento di formato necessario.
   "register.field.dateOfBirth": "Data di nascita",
@@ -122,6 +125,7 @@ export const it: Locale = {
   "register.action.password": "Continua con password",
   "register.action.passkey": "Continua con passkey",
   "register.action.submit": "Registrati",
+  "register.action.back": "Indietro",
   "register.action.sign_in.lead": "Hai già un account? ",
   "register.action.sign_in.link": "Accedi",
 
@@ -131,6 +135,12 @@ export const it: Locale = {
 
   // --- Accesso con passkey ---
   "passkey-login.title": "Accedi con la tua passkey",
+
+  // --- Step: passkey-first (passo iniziale del preset passkey-first) ---
+  "passkey-first.title": "Accedi",
+  "passkey-first.description": "Usa la tua passkey per continuare",
+  "passkey-first.action.passkey": "Continua con passkey",
+  "passkey-first.action.email_fallback": "Usa invece l'email",
 
   // --- Recupero password ---
   "recover.title": "Controlla la tua e-mail",
@@ -143,18 +153,26 @@ export const it: Locale = {
   "submit.signin": "Accedi",
   "action.forgot_password": "Password dimenticata?",
   "action.cancel": "Annulla",
+  // Fallback generico per la chiave `<step>.action.back` iniettata dal motore
+  // (vedi INJECTED_KEY_FALLBACKS in liquid.ts).
+  "action.back": "Indietro",
 
   // --- SSO ---
   "sso.redirect.title": "Reindirizzamento al provider…",
 
+  // --- Cerimonia passkey ---
+  "passkey.pending.status": "In attesa della tua passkey…",
+
   // --- Errori passkey ---
-  "error.passkey_cancelled": "La configurazione della passkey è stata annullata",
-  "error.passkey_not_registered":
-    "Questa passkey non è registrata. Accedi con e-mail e password.",
-  "error.passkey_setup_failed":
-    "La registrazione della passkey non è stata completata. Riprova.",
+  "error.passkey_cancelled": "La richiesta della passkey è stata chiusa prima del completamento.",
+  "error.passkey_timeout": "La richiesta della passkey è scaduta. Riprova.",
+  "error.passkey_not_registered": "Questa passkey non è registrata. Accedi con e-mail e password.",
+  "error.passkey_setup_failed": "La registrazione della passkey non è stata completata. Riprova.",
   "error.passkey_unsupported": "Questo dispositivo non supporta le passkey",
   "error.passkey_failed": "Qualcosa è andato storto. Riprova.",
+  "error.passkey_invalid": "Non è stato possibile verificare questa passkey. Riprova.",
+  "error.passkey_registration_invalid":
+    "Non è stato possibile verificare la nuova passkey. Riprova a registrarla.",
 
   // --- Errori campo / modulo ---
   "error.email_required": "Inserisci un indirizzo e-mail",
@@ -164,6 +182,13 @@ export const it: Locale = {
   "error.email_exists": "Esiste già un account con questo indirizzo e-mail.",
   "error.invalid_credentials": "E-mail o password errata.",
   "error.required": "Questo campo è obbligatorio.",
+
+  // --- Fallback generici per regole di campo ({0} = etichetta del campo) ---
+  "error.field_required": "{0} è obbligatorio.",
+  "error.field_format": "Inserisci un valore valido per {0}.",
+  "error.field_min_length": "{0} è troppo corto.",
+  "error.field_max_length": "{0} è troppo lungo.",
+  "error.field_invalid": "Controlla {0}.",
 
   // --- Alert a livello di modulo ---
   "error.sign_in_server.title": "Non è stato possibile completare l'accesso.",

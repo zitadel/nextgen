@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 func testHasher(t *testing.T) *crypto.PasswapHasher {
@@ -33,15 +34,15 @@ func validDocument() *users.Document {
 			ProjectID: "proj_demo",
 			TeamID:    "team_demo",
 			SchemaURL: "https://schemas.test/demo.json",
-			ID:        "usr_demo",
+			ID:        "user_demo",
 		},
-		Attributes: map[string]json.RawMessage{
+		Attributes: map[domain.AttributeKey]json.RawMessage{
 			"username":             json.RawMessage(`"admin"`),
 			"email":                json.RawMessage(`"admin@demo.local"`),
 			"zitadel.source":       json.RawMessage(`"cli"`),
 			"zitadel.default_user": json.RawMessage(`true`),
 		},
-		Authenticators: map[string]json.RawMessage{
+		Authenticators: map[domain.AttributeKey]json.RawMessage{
 			"password": json.RawMessage(`{"encoded_hash":"$2a$10$n0iK.MdnhoKlMKk.sFZofeQSTKxcGnsssJD9WvPiXHvo.X/.P/t6m","change_required":false}`),
 		},
 	}

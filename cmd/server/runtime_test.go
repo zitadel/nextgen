@@ -4,14 +4,14 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadConfigCreatesAndReusesEncryptionKeyFile(t *testing.T) {
+func TestLoadConfigCreatesAndReusesMasterKeyFile(t *testing.T) {
 	dataDir := t.TempDir()
 	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
 
@@ -21,51 +21,119 @@ func TestLoadConfigCreatesAndReusesEncryptionKeyFile(t *testing.T) {
 	cfg, err := loadConfig(configPath)
 	require.NoError(t, err)
 
-	keyPath := filepath.Join(dataDir, defaultEncryptionKeyFileName)
-	raw, err := os.ReadFile(keyPath)
-	require.NoError(t, err)
+	keyDir := filepath.Join(dataDir, defaultMasterKeyDirName)
+	assert.DirExists(t, keyDir)
 
-	key := strings.TrimSpace(string(raw))
-	assert.Len(t, key, 64)
-	assert.Equal(t, key, cfg.Server.EncryptionKey)
-	assert.Equal(t, keyPath, cfg.Server.EncryptionKeyFile)
+	entries, err := os.ReadDir(keyDir)
+	require.NoError(t, err)
+	var keyFilePath string
+	for _, e := range entries {
+		if !e.IsDir() {
+			keyFilePath = filepath.Join(keyDir, e.Name())
+			break
+		}
+	}
+	assert.NotEmpty(t, keyFilePath)
+	assert.FileExists(t, keyFilePath)
+
+	if assert.Contains(t, cfg.Server.MasterKeys, masterKeyFileName) {
+		assert.Equal(t, &MasterKeyConfig{
+			File:             keyFilePath,
+			UseForEncryption: true,
+		}, cfg.Server.MasterKeys[masterKeyFileName])
+	}
 
 	if runtime.GOOS != "windows" {
-		info, err := os.Stat(keyPath)
+		info, err := os.Stat(keyFilePath)
 		require.NoError(t, err)
 		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 	}
 
-	cfg, err = loadConfig(configPath)
+	cfg2, err := loadConfig(configPath)
 	require.NoError(t, err)
-	assert.Equal(t, key, cfg.Server.EncryptionKey)
+	assert.Equal(t, cfg.Server.MasterKeys, cfg2.Server.MasterKeys)
 }
 
-func TestLoadConfigDoesNotCreateEncryptionKeyFileWhenKeyConfigured(t *testing.T) {
+func TestLoadConfigDoesNotCreateMasterKeyFileWhenKeyConfigured(t *testing.T) {
 	dataDir := t.TempDir()
 	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
-	t.Setenv("NEXTGEN_SERVER_ENCRYPTION_KEY", "4D61737465726B65794E65656473546F48617665333243686172616374657273")
 
 	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
-	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+	require.NoError(t, os.WriteFile(configPath, []byte(`
+server:
+  master_keys:
+    configured-master-key: 
+      use_for_encryption: true
+      private_key: configured-private-key
+`), 0o600))
 
 	cfg, err := loadConfig(configPath)
 	require.NoError(t, err)
 
-	assert.Equal(t, "4D61737465726B65794E65656473546F48617665333243686172616374657273", cfg.Server.EncryptionKey)
-	assert.NoFileExists(t, filepath.Join(dataDir, defaultEncryptionKeyFileName))
+	// A configured key means ensureServerMasterKey generates nothing: the master
+	// key directory is created but no key file is written into it.
+	require.Len(t, cfg.Server.MasterKeys, 1)
+	if assert.Contains(t, cfg.Server.MasterKeys, "configured-master-key") {
+		assert.Equal(t, &MasterKeyConfig{
+			UseForEncryption: true,
+			PrivateKey:       "configured-private-key",
+		}, cfg.Server.MasterKeys["configured-master-key"])
+	}
+
+	// The directory exists, but no key file was generated.
+	entries, err := os.ReadDir(filepath.Join(dataDir, defaultMasterKeyDirName))
+	require.NoError(t, err)
+	assert.Empty(t, entries, "no key file should be generated when a key is configured")
 }
 
-func TestEmbeddedPostgresOptionsUseDataDir(t *testing.T) {
+func TestDefaultSQLitePathUsesDataDir(t *testing.T) {
 	dataDir := t.TempDir()
+	assert.Equal(t, filepath.Join(dataDir, "zitadel.db"), defaultSQLitePath(dataDir))
+}
 
-	options := embeddedPostgresOptions(dataDir)
+// writeMasterKeyFile writes a master key file with a specific modification time
+// so tests can control which key is considered the newest.
+func writeMasterKeyFile(t *testing.T, masterKeyDir, name string, modTime time.Time) string {
+	t.Helper()
+	path := filepath.Join(masterKeyDir, name)
+	require.NoError(t, os.WriteFile(path, []byte(name), 0o600))
+	require.NoError(t, os.Chtimes(path, modTime, modTime))
+	return path
+}
 
-	root := filepath.Join(dataDir, "embedded-postgres")
-	assert.Equal(t, filepath.Join(root, "runtime"), options.RuntimePath)
-	assert.Equal(t, filepath.Join(root, "data"), options.DataPath)
-	assert.Equal(t, filepath.Join(root, "cache"), options.CachePath)
-	assert.Equal(t, filepath.Join(root, "postgres.log"), options.LogPath)
-	assert.NotEqual(t, options.RuntimePath, filepath.Dir(options.DataPath))
-	assert.NotEqual(t, options.RuntimePath, options.CachePath)
+func TestEnsureServerMasterKeyLoadsAllKeysAndMarksNewestForEncryption(t *testing.T) {
+	dataDir := t.TempDir()
+	masterKeyDir := filepath.Join(dataDir, defaultMasterKeyDirName)
+	require.NoError(t, os.MkdirAll(masterKeyDir, 0o700))
+
+	// Three keys with increasing modification times; the last is the newest.
+	base := time.Now()
+	oldest := writeMasterKeyFile(t, masterKeyDir, "master-key-1.pem", base.Add(-2*time.Hour))
+	middle := writeMasterKeyFile(t, masterKeyDir, "master-key-2.pem", base.Add(-1*time.Hour))
+	newest := writeMasterKeyFile(t, masterKeyDir, "master-key-3.pem", base)
+
+	cfg := &ServerConfig{DataDir: dataDir}
+	require.NoError(t, ensureServerMasterKey(cfg))
+
+	// Every key file is loaded as a file-backed entry.
+	require.Len(t, cfg.MasterKeys, 3)
+	if assert.Contains(t, cfg.MasterKeys, "master-key-1.pem") {
+		assert.Equal(t, cfg.MasterKeys["master-key-1.pem"], &MasterKeyConfig{File: oldest})
+	}
+	if assert.Contains(t, cfg.MasterKeys, "master-key-2.pem") {
+		assert.Equal(t, cfg.MasterKeys["master-key-2.pem"], &MasterKeyConfig{File: middle})
+	}
+	if assert.Contains(t, cfg.MasterKeys, "master-key-3.pem") {
+		assert.Equal(t, cfg.MasterKeys["master-key-3.pem"], &MasterKeyConfig{File: newest, UseForEncryption: true})
+	}
+
+	// Exactly one key is marked for encryption, and it is the newest.
+	var forEncryption []*MasterKeyConfig
+	for _, k := range cfg.MasterKeys {
+		if k.UseForEncryption {
+			forEncryption = append(forEncryption, k)
+		}
+	}
+	require.Len(t, forEncryption, 1)
+	assert.Equal(t, newest, forEncryption[0].File)
 }

@@ -103,8 +103,6 @@ jobs:
           ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
           fetch-depth: 0
 
-      - uses: moonrepo/setup-toolchain@v0
-
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
@@ -135,6 +133,11 @@ jobs:
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
+      # Bare `moon` below is the workspace's own pinned @moonrepo/cli, so CI
+      # runs the exact version the lockfile resolves — same as local dev.
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
       - name: Configure Changesets git tag author
         if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && ! inputs.dry_run) }}
         run: |
@@ -148,9 +151,10 @@ jobs:
           if [ -n "$RECOVER_VERSION" ]; then
             args+=(--recover-version "$RECOVER_VERSION")
           fi
-          # Dry runs do not publish, so provenance stays off here. Real
-          # publishes keep the GitHub Actions environment intact for OIDC.
-          moon run "${args[@]}"
+          # Release tasks are excluded from `moon ci`, but this workflow invokes
+          # them explicitly. Unset only CI so Moon keeps the task in the action
+          # pipeline while preserving the GitHub Actions/OIDC environment.
+          env -u CI moon run "${args[@]}"
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -164,11 +168,15 @@ jobs:
           if [ -n "$RECOVER_VERSION" ]; then
             args+=(-- --recover-version "$RECOVER_VERSION")
           fi
-          # Keep the GitHub Actions environment intact: npm trusted publishing
-          # and provenance use it to exchange the workflow OIDC token.
-          moon run "${args[@]}"
+          # Release tasks are excluded from `moon ci`, but this workflow invokes
+          # them explicitly. Unset only CI so Moon keeps the task in the action
+          # pipeline while preserving the GitHub Actions/OIDC environment.
+          env -u CI moon run "${args[@]}"
         env:
           BASE_SHA: ${{ github.event.before || 'HEAD^' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_PROVENANCE: "true"
+          # Depot runners are self-hosted from npm's provenance verifier's
+          # perspective. Keep trusted publishing via OIDC, but do not request
+          # npm provenance until the release job runs on GitHub-hosted runners.
+          NPM_CONFIG_PROVENANCE: "false"
           RECOVER_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.recover_version || '' }}

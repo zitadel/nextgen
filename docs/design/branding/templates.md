@@ -1,6 +1,6 @@
 # Templates
 
-**Status:** Stub. Liquid layer is specified with the flow engine docs; grouping TBD ([`README.md`](README.md) q2–q3). **Parent:** [`README.md`](README.md). **See also:** [`../flowengine/template-security.md`](../flowengine/template-security.md) (escape, CSP, banned filters).
+**Status:** Draft. Storage, validation, and authoring workflow decided in [ADR 040](../../adrs/040-tenant-login-templates-editable-config.md); grouping settled below. **Parent:** [`README.md`](README.md). **See also:** [`../flowengine/template-security.md`](../flowengine/template-security.md) (escape, CSP, banned filters); [`../glossary.md`](../glossary.md#6-config-terms) (branding / template / design / layout vocabulary).
 
 A template is a Liquid string the component evaluates against the flow payload. It composes `<zl-*>` atoms in a chosen order and grouping, resolves labels through the i18n filter, and calls `{% mandatory_gates %}` as the safety net. Nothing more.
 
@@ -105,16 +105,55 @@ Notes:
 - `actions` is a keyed dictionary with a `primary: true` flag on the primary entry; there is no `actions.primary` alias. Exactly one entry must be `primary`.
 - `{% mandatory_gates %}` appends missing required UI. Structural validator requires this tag.
 
-## Built-in set
+## Built-in set and the design catalog
 
-Two built-in `layout` values ship with the component package in v1:
+Two built-in `layout` values ship with the component package (the bundled `default.liquid` branches on them):
 
 | `layout`             | Sketch                                                                                                              |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `centered` (default) | Card centred on page. Fields stacked, primary action full-width, SSO below a divider.                               |
 | `split`              | Brand panel on the left (logo, `hero_url` background), form on the right. Maps to the legacy `side-by-side` layout. |
 
-ADR-033 described four presets (`centered`, `split`, `muted`, `minimal`). Whether `muted` and `minimal` graduate into the `layout` enum in a later revision is tracked as open question 2 in [`README.md`](README.md). For v1, the same chrome effect is reachable via `branding.liquid_template`.
+The `layout` enum stays this small on purpose. Richer starting points ship as **designs** — full template files in `@zitadel/config` that `zitadel branding eject --design <name>` (or `zitadel setup --design <name>`) scaffolds into `.zitadel/branding/`:
+
+| Design        | Descriptor `layout` | Sketch                                                                  |
+| ------------- | ------------------- | ----------------------------------------------------------------------- |
+| `centered`    | `centered`          | The bundled default, ejected verbatim.                                  |
+| `split`       | `split`             | Brand panel left (logo, `hero_url`), form right.                        |
+| `split-right` | `split`             | Mirrored: form left, brand panel right.                                 |
+| `hero`        | `split`             | Landing-style brand pane left (nav, headline, feature bullets — editable copy on token-styled `zl-hero__*` classes), form right. |
+| `minimal`     | `centered`          | Chrome stripped to heading, fields, and actions.                        |
+
+A design is delivered *as a template* (the escape hatch this doc always reserved for ADR-033's `muted`/`minimal`), with the descriptor's `layout` set to the nearest built-in so an invalid template degrades to sane chrome. Every shipped design passes the authoring validator and a component-level render test.
+
+### Split chrome: mobile fallback and knobs
+
+On viewports ≤48rem the chrome collapses `.zl-split` to one column and hides `.zl-split__brand`; the shipped split-family designs render a `.zl-split__compact` node inside the form pane (logo, or a text brand line in `hero`) that only shows there, so the tenant's identity survives the collapse. Three custom properties tune the chrome — set them on the template's root element via its `style` attribute (inline `style=""` passes the sanitiser; the values cascade into the orchestrator's shadow chrome):
+
+| Property                  | Default                            | Effect                                                     |
+| ------------------------- | ---------------------------------- | ---------------------------------------------------------- |
+| `--zl-split-columns`      | `minmax(0, 1fr) minmax(0, 1fr)`    | Grid template — e.g. `7fr 5fr` for a wider brand pane.      |
+| `--zl-split-align`        | `center`                           | Vertical alignment of the two panes (`start` for tall brand content). |
+| `--zl-split-brand-mobile` | `none`                             | `flex` keeps the full brand pane on mobile, stacked above the form. |
+
+Widget-level sizing belongs to the **embedding page**, not the template:
+`<zitadel-login>` defaults to `variant="widget"` (content-sized, no page
+chrome) and dedicated login routes set `variant="page"` for the full-page
+shape. `--zl-page-min-height` remains the fine-grained height override in
+both modes, and the split-family collapse responds to the widget's own width
+(container queries), not the viewport — see the embedding section in the
+`@zitadel/components` README.
+
+## Authoring workflow (eject → edit → plan → apply)
+
+```
+zitadel branding eject --design split   # writes .zitadel/branding/{branding.json, login.liquid}
+$EDITOR .zitadel/branding/login.liquid  # real Liquid, not JSON-escaped strings
+zitadel plan                            # authoritative validation + diff (revise on edit)
+zitadel apply                           # publishes an immutable branding revision
+```
+
+`branding.json` references the template via `liquid_template_file`; the CLI inlines it into the wire `liquid_template` on upload. Flow responses resolve the latest revision per project — see [ADR 040](../../adrs/040-tenant-login-templates-editable-config.md).
 
 ## Contract every template must satisfy
 
@@ -129,13 +168,9 @@ Regardless of grouping decision (open question 3 in [`README.md`](README.md)), e
 
 The runtime `{% mandatory_gates %}` tag appends any missing required element to the rendered output as a safety net. See [`validator.md`](validator.md) for the static structural-validation equivalent, and [`../flowengine/template-security.md`](../flowengine/template-security.md) for the orthogonal security validator.
 
-## Grouping (open, README q3)
+## Grouping (decided: one global template)
 
-- **A:** one file per `flow.purpose`, branches per step inside.
-- **B:** one file per `(flow.purpose, step.name)`.
-- **C:** one global file with big conditionals.
-
-Choice affects the branding object shape, editor UI, and what "change this one screen" costs. Decision blocks stage 1 delivery because built-ins need to be shipped in the chosen shape.
+v1 stores **one template per project** with step-conditional branches inside (option C — the shape the bundled `default.liquid` already has). The other candidates (per `flow.purpose`, per `(purpose, step)`) remain available as storage-side evolution because storage shape and wire shape are decoupled: the component always receives one *resolved* string per step response, so a later move to a keyed map changes only the server's resolution rule, never the branding object the widget reads.
 
 ## Editor stages
 
@@ -146,6 +181,8 @@ Detail deferred to the stage rollout in [`README.md`](README.md). Summary:
 | 1     | Built-ins only                          | N/A                          |
 | 2     | Generated Liquid from a fixed block set | Generator enforces validity  |
 | 3     | Hand-written Liquid                     | Full static validator inline |
+
+Stage 3 exists today through the CLI (the eject workflow above); a graphical editor for stages 2–3 layers on the same `@zitadel/config` validator later.
 
 ## See also
 

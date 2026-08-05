@@ -22,7 +22,7 @@ func (d *Dialect) Connect(ctx context.Context) (database.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newClient(client), nil
+	return newClient(d.Database, client), nil
 }
 
 // Name implements [database.Dialect].

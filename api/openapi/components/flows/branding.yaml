@@ -1,8 +1,13 @@
 type: object
 description: |
-  Resolved branding configuration. Inherited from the app → team → project
-  hierarchy at flow creation time (most specific wins). Read-only projection —
-  branding is configured via the Team/App Branding API, not the Flow API.
+  Branding configuration. Appears in two places with one shape:
+
+  - On flow responses as a read-only projection: the server resolves the
+    latest branding revision for the project per step response (falling
+    back to built-in defaults when none is stored). Branding is configured
+    via the Branding API / `zitadel apply`, not the Flow API.
+  - As the request body of `POST /branding`, which publishes the same
+    shape as a new immutable revision (see ADR 040).
 properties:
   layout:
     type: string
@@ -10,10 +15,12 @@ properties:
     description: |
       Layout preset selector. The default.liquid master template uses this
       to branch into layout variants. Customers who eject the template
-      can ignore this field entirely.
+      can ignore this field entirely; it also serves as the degrade target
+      when a custom template fails component-side validation.
     default: centered
   liquid_template:
     type: string
+    maxLength: 131072
     description: |
       The LiquidJS template string for rendering this step. The orchestrator
       parses this template, injects the capability dictionaries as context,
@@ -25,7 +32,14 @@ properties:
   font_url:
     type: string
     format: uri
-    description: Custom font URL (e.g., Google Fonts CSS).
+    description: |
+      Custom font stylesheet URL (e.g., Google Fonts CSS). Read-only in
+      v1: `POST /branding` rejects a non-empty value, because the login
+      component loads this stylesheet at document level (shadow-scoped
+      `@font-face` rules never register faces) and an arbitrary URL would
+      grant `branding.write` page-wide CSS control over the embedding
+      application. Safe tenant font delivery is an ADR 040 follow-up;
+      until then, load fonts from the embedding page.
   hero_url:
     type: string
     format: uri

@@ -1,9 +1,10 @@
-import { readFile, rename, rm, stat } from "node:fs/promises";
+import { readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { ZitadelError } from "../lib/errors";
 import { createOrca } from "../lib/orca";
+import { AGENTS_HEADER, removeGuidanceSection } from "../lib/orca/patchers/rule/guidance";
 import type { EjectActions } from "../lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../lib/paths";
 import { readRendererId, readZitadelConfig } from "../lib/project";
@@ -22,6 +23,7 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
     envBackups: [".env.local"],
     dependencies: [],
     configEdits: [],
+    guidanceFiles: ["AGENTS.md", "README.md"],
   };
   const orca = createOrca();
   const framework = await orca.tryDetect(cwd);
@@ -154,6 +156,32 @@ export default class Eject extends BaseCommand {
         await rm(abs, { recursive: true, force: true });
       }
       removed.push(rel);
+    }
+
+    // Guidance sections live inside user-owned docs (README.md / AGENTS.md):
+    // strip only the marker-fenced section so the stale golden path doesn't
+    // outlive the files it points at. The whole file goes only when nothing
+    // but the scaffold-created header (or whitespace) would remain — i.e. we
+    // created it and nobody added anything since.
+    for (const rel of actions.guidanceFiles) {
+      const abs = join(cwd, rel);
+      if (!(await pathExists(abs))) {
+        continue;
+      }
+      const contents = await readFile(abs, "utf8").catch(() => "");
+      const stripped = removeGuidanceSection(contents);
+      if (stripped === contents) {
+        continue;
+      }
+      const husk = stripped.trim() === "" || stripped.trim() === AGENTS_HEADER.trim();
+      if (!dryRun) {
+        if (husk) {
+          await rm(abs, { force: true });
+        } else {
+          await writeFile(abs, stripped);
+        }
+      }
+      removed.push(husk ? rel : `${rel} (managed section)`);
     }
 
     // In-place config merges (vite.config.ts / angular.json / nuxt.config.ts)

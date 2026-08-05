@@ -86,9 +86,12 @@ const (
 type FlowActionKind uint8
 
 const (
+	// FlowActionKindUnset is the zero value. stepActionKind returns it
+	// when the submitted name isn't declared on the step.
+	FlowActionKindUnset FlowActionKind = iota
 	// FlowActionKindSubmit advances by collecting the step's fields and
 	// running the standard validate/dispatch/on_success pipeline.
-	FlowActionKindSubmit FlowActionKind = iota + 1
+	FlowActionKindSubmit
 	// FlowActionKindPasskey issues a WebAuthn assertion challenge and
 	// resolves the matching transition once the assertion verifies.
 	FlowActionKindPasskey
@@ -137,13 +140,6 @@ func NewFlowDefinition(
 	steps []FlowDefinitionStep,
 	status FlowDefinitionStatus,
 ) (_ *FlowDefinition, err error) {
-
-	if flowDefID == "" {
-		flowDefID, err = newID(FlowDefinitionPrefix)
-		if err != nil {
-			return nil, ErrInternal(err).WithMessage("failed to generate flow-definition id")
-		}
-	}
 	return &FlowDefinition{
 		ProjectID:     projectID,
 		ID:            flowDefID,

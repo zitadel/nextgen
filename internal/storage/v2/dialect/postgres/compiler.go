@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/compare"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pattern"
 )
 
 type statementCompiler struct {
@@ -74,6 +76,8 @@ func compileFilter[F ~uint8, T any](c *statementCompiler, filter database.Filter
 		compileCompareFilter(c, f, schema)
 	case *database.StringFilter[F]:
 		compileStringFilter(c, f, schema)
+	case *database.ArrayContainsFilter[F]:
+		compileArrayContainsFilter(c, f, schema)
 	default:
 		panic("unknown filter type")
 	}
@@ -118,11 +122,18 @@ func compileOrFilter[F ~uint8, T any](c *statementCompiler, filter database.OrFi
 }
 
 func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *database.CompareFilter[F], schema database.Schema[F, T]) {
+	if compare.HasNilValue(filter.Terms) {
+		compare.CompileNullAware(c, filter, schema, func(_ compare.Writer, arg any, col database.Column[F]) {
+			writeArgWithParamCast(c, arg, schema, col)
+		})
+		return
+	}
+
 	op := compareOpSQL(filter.Op)
 	if len(filter.Terms) == 1 {
 		c.WriteString(schema.SQLName(filter.Terms[0].Column))
 		c.WriteString(op)
-		writeArg(c, filter.Terms[0].Value)
+		writeArgWithParamCast(c, filter.Terms[0].Value, schema, filter.Terms[0].Column)
 		return
 	}
 
@@ -140,9 +151,23 @@ func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *databas
 		if i > 0 {
 			c.WriteString(", ")
 		}
-		writeArg(c, term.Value)
+		writeArgWithParamCast(c, term.Value, schema, term.Column)
 	}
 	c.WriteString(")")
+}
+
+func compileArrayContainsFilter[F ~uint8, T any](c *statementCompiler, filter *database.ArrayContainsFilter[F], schema database.Schema[F, T]) {
+	writeArgWithParamCast(c, filter.Value, schema, filter.Column)
+	c.WriteString(" = ANY(")
+	c.WriteString(schema.SQLName(filter.Column))
+	c.WriteString(")")
+}
+
+func writeArgWithParamCast[F ~uint8, T any](c *statementCompiler, arg any, schema database.Schema[F, T], col database.Column[F]) {
+	writeArg(c, arg)
+	if cast := schema.ParamCast(col); cast != "" {
+		c.WriteString(cast)
+	}
 }
 
 func compareOpSQL(op database.CompareOp) string {
@@ -184,7 +209,7 @@ func compileStringFilter[F ~uint8, T any](c *statementCompiler, filter *database
 			c.WriteString(col)
 		}
 		c.WriteString(" LIKE ")
-		compileLikePattern(c, filter.Match, value)
+		pattern.CompileLikePattern(c, filter.Match, value)
 	default:
 		panic("unknown string match")
 	}
@@ -210,6 +235,14 @@ func compileLimit(c *statementCompiler, limit uint32) {
 		c.WriteString(" LIMIT ")
 		writeArg(c, limit)
 	}
+}
+
+func (c *statementCompiler) WriteString(s string) {
+	c.Builder.WriteString(s)
+}
+
+func (c *statementCompiler) WriteArg(arg any) {
+	writeArg(c, arg)
 }
 
 func writeArg(c *statementCompiler, arg any) {

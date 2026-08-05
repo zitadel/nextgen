@@ -42,4 +42,4 @@ content:
         summary: internal
         value:
           code: internal
-          message: An unexpected error occurred. Check the details for more information.
+          message: An unexpected error occurred.

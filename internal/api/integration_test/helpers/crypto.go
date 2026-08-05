@@ -7,49 +7,46 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/oidc/v3/pkg/op"
+	"github.com/zitadel/nextgen/internal/domain"
 )
-
-func (h *Harness) EnsureEncryptionKey(t *testing.T) [32]byte {
-	t.Helper()
-	if h.EncryptionKey == nil {
-		h.EncryptionKey = []byte("MasterkeyNeedsToHave32Characters")
-	}
-	return [32]byte(h.EncryptionKey)
-}
 
 func (h *Harness) EnsureSigningKey(t *testing.T) *rsa.PrivateKey {
 	t.Helper()
-	if h.SigningKey == nil {
+	h.signingKey.mutex.Lock()
+	defer h.signingKey.mutex.Unlock()
+
+	if h.signingKey.value == nil {
 		signingKey, err := rsa.GenerateKey(rand.Reader, 2048)
 		require.NoError(t, err)
-		h.SigningKey = signingKey
+		h.signingKey.value = signingKey
 	}
-	return h.SigningKey
+	return h.signingKey.value
 }
 
 func (h *Harness) EnsureHasher(t *testing.T) crypto.Hasher {
 	t.Helper()
-	if h.Hasher == nil {
-		h.Hasher = createNewHasher(t)
-	}
-	return h.Hasher
+	return h.ensureHasher(t)
 }
 
 func (h *Harness) EnsureHashVerifier(t *testing.T) crypto.HashVerifier {
 	t.Helper()
-	if h.Hasher == nil {
-		h.Hasher = createNewHasher(t)
-	}
-	return h.Hasher
+	return h.ensureHasher(t)
 }
 
 func (h *Harness) EnsureHashValidator(t *testing.T) crypto.HashValidator {
 	t.Helper()
-	if h.Hasher == nil {
-		h.Hasher = createNewHasher(t)
+	return h.ensureHasher(t)
+}
+
+func (h *Harness) ensureHasher(t *testing.T) *crypto.PasswapHasher {
+	t.Helper()
+	h.hasher.mutex.Lock()
+	defer h.hasher.mutex.Unlock()
+
+	if h.hasher.value == nil {
+		h.hasher.value = createNewHasher(t)
 	}
-	return h.Hasher
+	return h.hasher.value
 }
 
 func createNewHasher(t *testing.T) *crypto.PasswapHasher {
@@ -73,20 +70,22 @@ func createNewHasher(t *testing.T) *crypto.PasswapHasher {
 	return hasher
 }
 
-func (h *Harness) EnsureCrypter(t *testing.T) crypto.Crypter {
+func (h *Harness) EnsureMasterKey(t *testing.T) *domain.MasterKeys {
 	t.Helper()
-	if h.Crypter == nil {
-		h.Crypter = op.NewAES256GCMCrypto(
-			h.EnsureEncryptionKey(t),
-			"",
-		)
-	}
-	return h.Crypter
-}
+	h.masterKeys.mutex.Lock()
+	defer h.masterKeys.mutex.Unlock()
 
-func (h *Harness) EnsureEncrypter(t *testing.T) crypto.Encrypter {
-	return h.EnsureCrypter(t)
-}
-func (h *Harness) EnsureDecrypter(t *testing.T) crypto.Decrypter {
-	return h.EnsureCrypter(t)
+	if h.masterKeys.value == nil {
+		key, err := rsa.GenerateKey(rand.Reader, 4096)
+		require.NoError(t, err)
+		h.masterKeys.value, err = domain.NewMasterKeys([]domain.MasterKey{
+			domain.NewMasterKey(
+				"master-key",
+				*key,
+				true,
+			),
+		})
+		require.NoError(t, err)
+	}
+	return h.masterKeys.value
 }

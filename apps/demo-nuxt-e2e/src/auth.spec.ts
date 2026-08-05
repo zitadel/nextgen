@@ -22,10 +22,14 @@ import { expect, test } from "@playwright/test";
 test("signs in via the embedded component and lands on /admin", async ({ page }) => {
   await page.goto("/login");
 
+  // Split sign-in, matching the real default flow: `identifier` collects the
+  // email, then `password` collects the credential. Both steps label their
+  // primary action "Sign in".
   const email = "alice@acme.com";
   await page.getByLabel(/email/i).fill(email);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+
   await page.getByLabel(/password/i).fill("hunter2");
-  // Submitting goes straight to the terminal step; no passkey upsell screen.
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
   await page.waitForURL("**/admin", { timeout: 15_000 });

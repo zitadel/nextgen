@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-react",
-  "version": "0.1.0-alpha.13",
+  "version": "0.1.0-alpha.17",
   "description": "React components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-react#readme",
   "bugs": {

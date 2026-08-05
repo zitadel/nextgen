@@ -35,6 +35,13 @@ export type FlowError = {
   code?: string;
   text_key?: string;
   message?: string;
+  /**
+   * Name of the step field this error targets. When set (and the step renders
+   * that field), the template routes the error inline under the control via
+   * the `fieldError` filter; when absent it renders in the form-level banner
+   * (`formLevelError`). See `localiseFlowErrorKeys` in `liquid.ts`.
+   */
+  field?: string;
 };
 
 export type FlowIdentity = {

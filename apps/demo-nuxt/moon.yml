@@ -25,6 +25,11 @@ tasks:
       - "sdk-nuxt:build"
     outputs:
       - ".output/**/*"
+    options:
+      # Reads sdk-nuxt/dist while bundling; shares the mutex with the
+      # sdk-nuxt builders so a concurrent build-release cannot clean that
+      # directory mid-bundle.
+      mutex: "sdk-nuxt-dist"
 
   dev:
     command: "corepack pnpm run dev"

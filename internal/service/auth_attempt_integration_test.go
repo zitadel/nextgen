@@ -10,22 +10,16 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
-// newAuthAttemptServiceForIntegration wires the service with real repos.
+// newAuthAttemptServiceForIntegration wires the service with real statement pools.
 // The password verifier is nil because these tests exercise only the
 // user-proof path, which never touches it.
-func newAuthAttemptServiceForIntegration(pool database.Pool) service.AuthAttemptService {
+func newAuthAttemptServiceForIntegration(v2Pool service.StatementPool) service.AuthAttemptService {
 	return service.NewAuthAttemptService(
-		pool,
-		repository.NewAuthAttemptRepository(pool),
-		repository.NewSessionRepository(pool),
-		repository.NewProjectRepository(pool),
-		repository.NewUserRepository(),
-		repository.NewUserPasswordRepository(),
-		repository.NewUserPasskeyRepository(),
+		v2Pool,
+		service.SessionStatementsResolver{Pool: v2Pool},
+		service.UserStatementsLookup{Pool: v2Pool},
 		nil,
 	)
 }
@@ -49,12 +43,11 @@ func issueUserChallenge(t *testing.T, svc service.AuthAttemptService, projectID 
 }
 
 func TestAuthAttemptService_VerifyProof_integration(t *testing.T) {
-	pool := integrationPoolOrFail(t)
-	svc := newAuthAttemptServiceForIntegration(pool)
+	svc := newAuthAttemptServiceForIntegration(integrationPoolOrFail(t))
 
 	t.Run("user_not_found_records_failure_on_bound_challenge", func(t *testing.T) {
 		projectID := "p-aa-not-found-" + time.Now().Format("150405.000000")
-		ensureProject(t, pool, projectID)
+		ensureProject(t, projectID)
 		attemptID, challengeID := issueUserChallenge(t, svc, projectID)
 
 		_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
@@ -75,7 +68,7 @@ func TestAuthAttemptService_VerifyProof_integration(t *testing.T) {
 
 	t.Run("stale_challenge_id_leaves_row_untouched", func(t *testing.T) {
 		projectID := "p-aa-stale-" + time.Now().Format("150405.000000")
-		ensureProject(t, pool, projectID)
+		ensureProject(t, projectID)
 		attemptID, _ := issueUserChallenge(t, svc, projectID)
 
 		_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{

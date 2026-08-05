@@ -100,7 +100,7 @@ func TestExampleFlowDefinitions(t *testing.T) {
 				projectID,
 				req.FlowDefinition.GetName(),
 				schemaURI.String(),
-				userSchemaRef.String(),
+				userSchemaRef,
 				purposes,
 				domain.FlowDefinitionAudience{
 					AppIDs:  req.FlowDefinition.GetAudience().Value.AppIds,

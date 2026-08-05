@@ -13,8 +13,16 @@ type AuthorizeGetRes interface {
 	authorizeGetRes()
 }
 
+type CompleteClaimRes interface {
+	completeClaimRes()
+}
+
 type CreateAuthAttemptRes interface {
 	createAuthAttemptRes()
+}
+
+type CreateBrandingRes interface {
+	createBrandingRes()
 }
 
 type CreateFlowDefinitionRes interface {
@@ -57,6 +65,14 @@ type DeleteFlowDefinitionRes interface {
 	deleteFlowDefinitionRes()
 }
 
+type DeleteTeamRes interface {
+	deleteTeamRes()
+}
+
+type DeleteUserByIDRes interface {
+	deleteUserByIDRes()
+}
+
 type EndSessionRes interface {
 	endSessionRes()
 }
@@ -67,6 +83,14 @@ type ExchangeHandoffRes interface {
 
 type GetAuthAttemptRes interface {
 	getAuthAttemptRes()
+}
+
+type GetBrandingByIdRes interface {
+	getBrandingByIdRes()
+}
+
+type GetClaimStatusRes interface {
+	getClaimStatusRes()
 }
 
 type GetFlowDefinitionRes interface {
@@ -133,6 +157,10 @@ type GetUserInfoRes interface {
 	getUserInfoRes()
 }
 
+type InitClaimRes interface {
+	initClaimRes()
+}
+
 type IntrospectRes interface {
 	introspectRes()
 }
@@ -141,16 +169,40 @@ type IssueChallengeRes interface {
 	issueChallengeRes()
 }
 
+type ListBrandingRes interface {
+	listBrandingRes()
+}
+
 type ListFlowDefinitionsRes interface {
 	listFlowDefinitionsRes()
+}
+
+type ListSchemasRes interface {
+	listSchemasRes()
 }
 
 type ListSessionsRes interface {
 	listSessionsRes()
 }
 
+type ListUserPasskeysRes interface {
+	listUserPasskeysRes()
+}
+
 type ListUsersRes interface {
 	listUsersRes()
+}
+
+type PatchProjectRes interface {
+	patchProjectRes()
+}
+
+type QueryProjectsRes interface {
+	queryProjectsRes()
+}
+
+type QueryTeamsRes interface {
+	queryTeamsRes()
 }
 
 type RevokeMySessionRes interface {
@@ -179,6 +231,10 @@ type SubmitFlowStepRes interface {
 
 type UpdateFlowDefinitionRes interface {
 	updateFlowDefinitionRes()
+}
+
+type UpdateTeamRes interface {
+	updateTeamRes()
 }
 
 type VerifyChallengeProofRes interface {

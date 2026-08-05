@@ -8,20 +8,16 @@
  * OpenAPI spec). Callers that need the type import `CreateSchemaBody`
  * from there directly; callers that need the runtime validator import
  * the matching Zod schema from
- * `@zitadel/api/generated/endpoints/zitadelNextGen.zod`. This
- * module owns only CLI-specific concerns: the builder, the per-field
- * preset catalog, and the two `DEFAULT_*` URI constants.
+ * `@zitadel/api/generated/endpoints/zitadelNextGen.zod`. The default
+ * schema/flow bodies the CLI scaffolds are composed in
+ * `@zitadel/config/defaults` (`getDefaultHumanUserSchema`) — the single
+ * source of field defaults.
  *
  * **Dependency rule.** No upward imports (`commands/`, `sync/`, etc.)
  * and no filesystem I/O. Reading and writing local files is the
  * caller's responsibility, served by `apps/cli/src/lib/json-dir.ts`
  * plus this module's {@link SCHEMAS_DIR} constant.
  */
-export {
-  DEFAULT_USER_META_SCHEMA,
-  DEFAULT_USER_SCHEMA_ID,
-  buildUserSchema,
-} from "./build";
 
 /**
  * Relative directory (from the project root) where local user-schema

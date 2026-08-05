@@ -14,7 +14,7 @@ const step: CreateFlow201Step = {
     { name: "email", type: "email", text_key: "identifier.field.email", required: true },
   ],
   actions: [
-    { name: "submit", text_key: "submit.continue", primary: true },
+    { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
   ],
   gates: {},
 };
@@ -56,6 +56,37 @@ describe("patchMandatoryGates", () => {
     const out = patchMandatoryGates(html, step, locale);
     const fieldMatches = out.match(/<zl-field/g) ?? [];
     expect(fieldMatches.length).toBe(1);
+  });
+
+  it("does not duplicate a required select already rendered as <zl-select>", () => {
+    // A required `select` renders as <zl-select>, not <zl-field>. The safety
+    // net must recognise it so it doesn't append a duplicate generic text
+    // field (with a raw text_key label) at the bottom of the form.
+    const selectStep: CreateFlow201Step = {
+      ...step,
+      fields: [{ name: "country", type: "select", text_key: "register.field.country", required: true }],
+    };
+    const html =
+      `<zl-select name="country"></zl-select>` +
+      `<zl-button hierarchy="primary" type="submit" action="submit"></zl-button>` +
+      `${mandatoryGatesMarkerComment}`;
+    const out = patchMandatoryGates(html, selectStep, locale);
+    expect(out).not.toContain("<zl-field");
+    expect(out.match(/name="country"/g) ?? []).toHaveLength(1);
+  });
+
+  it("does not duplicate a required checkbox already rendered as <zl-checkbox>", () => {
+    const checkboxStep: CreateFlow201Step = {
+      ...step,
+      fields: [{ name: "terms", type: "checkbox", text_key: "register.field.terms", required: true }],
+    };
+    const html =
+      `<zl-checkbox name="terms"></zl-checkbox>` +
+      `<zl-button hierarchy="primary" type="submit" action="submit"></zl-button>` +
+      `${mandatoryGatesMarkerComment}`;
+    const out = patchMandatoryGates(html, checkboxStep, locale);
+    expect(out).not.toContain("<zl-field");
+    expect(out.match(/name="terms"/g) ?? []).toHaveLength(1);
   });
 
   it("appends at end if the marker is missing entirely", () => {

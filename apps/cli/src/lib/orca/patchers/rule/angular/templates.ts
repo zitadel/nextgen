@@ -1,21 +1,50 @@
 import { MANAGED_MARKER } from "../../../../paths";
+import type { PatchContext } from "../../types";
 import { PROXY_PATH } from "../proxy";
+import {
+  assertNoUnreviewedProjectSecretProxy,
+  PROXY_CREDENTIAL_POLICY_MARKER,
+} from "../proxy-credential-policy";
 
 /**
  * The managed root component `src/app/app.ts`: a standalone component that
  * renders the `@zitadel/sdk-angular` widgets based on the current path. The
  * project id (public, not secret) is inlined; the dev proxy in `proxy.conf.cjs`
- * attaches the project service-key secret as the bearer server-side (read from
- * `.env.local`), and no secret reaches the browser.
+ * attaches the project service-key secret as the bearer server-side only to
+ * `POST /sessions/exchange` (read from `.env.local`), and no secret reaches
+ * the browser.
+ *
+ * Projects set up with the business use case additionally expose the SDK's
+ * `businessLocales` overlay as a class property, which `app.html` binds to the
+ * login widgets via `[locales]` — restoring work-email copy on top of the
+ * widget's neutral built-in dictionaries.
  */
-export function appComponentTemplate(projectId: string): string {
-  return `${MANAGED_MARKER}
-import { Component } from "@angular/core";
-import {
+export function appComponentTemplate(ctx: PatchContext): string {
+  const business = ctx.useCase === "business";
+  const importNames = business
+    ? `
+  ZitadelLoginComponent,
+  ZitadelSessionComponent,
+  businessLocales,
+  configureZitadel,
+`
+    : `
   ZitadelLoginComponent,
   ZitadelSessionComponent,
   configureZitadel,
-} from "@zitadel/sdk-angular";
+`;
+  // The overlay ships with the SDK, so the generated app only wires it up
+  // (and stays plain otherwise).
+  const localesProperty = business
+    ? `
+  // Set up for a business audience: businessLocales overlays work-email copy
+  // on the login widget's neutral built-in dictionaries. Remove it (and the
+  // [locales] binding in app.html) to fall back to the neutral wording.
+  protected readonly locales = businessLocales;`
+    : "";
+  return `${MANAGED_MARKER}
+import { Component, OnInit } from "@angular/core";
+import {${importNames}} from "@zitadel/sdk-angular";
 
 @Component({
   selector: "app-root",
@@ -23,12 +52,18 @@ import {
   imports: [ZitadelLoginComponent, ZitadelSessionComponent],
   templateUrl: "./app.html",
 })
-export class App {
+export class App implements OnInit {
   protected readonly project = configureZitadel({
-    projectId: ${JSON.stringify(projectId)},
+    projectId: ${JSON.stringify(ctx.project.id)},
     proxyPath: "${PROXY_PATH}",
   });
-  protected readonly path = window.location.pathname;
+  protected readonly path = window.location.pathname;${localesProperty}
+
+  ngOnInit(): void {
+    if (this.path === "/") {
+      window.location.replace("/login");
+    }
+  }
 }
 `;
 }
@@ -36,22 +71,13 @@ export class App {
 /**
  * The managed `src/app/app.html`. The marker lives in an HTML comment that still
  * contains the literal managed-marker text, so eject/doctor stay marker-aware.
+ * Business-use-case scaffolds bind the component's `locales` overlay property
+ * onto the login widgets.
  */
-export function appTemplateHtml(): string {
+export function appTemplateHtml(ctx: PatchContext): string {
+  const localesBinding = ctx.useCase === "business" ? `\n      [locales]="locales"` : "";
   return `<!-- ${MANAGED_MARKER} -->
-@if (path === '/') {
-  <main style="position:fixed;inset:0;padding:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:#0f0f11;color-scheme:dark;color:#f4f4f6;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.5;letter-spacing:normal;text-align:center">
-    <section style="width:100%;max-width:560px">
-      <p style="margin:0 0 12px;color:#9ca3af;font-size:14px">Zitadel auth</p>
-      <h1 style="margin:0 0 24px;font-size:32px;line-height:1.15;font-weight:600;color:#f4f4f6">Sign in, create an account, or open your profile.</h1>
-      <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center">
-        <a href="/login" style="padding:10px 16px;border-radius:8px;background:#f4f4f6;color:#0f0f11;text-decoration:none;font-weight:600;font-size:14px">Sign in</a>
-        <a href="/register" style="padding:10px 16px;border-radius:8px;border:1px solid #3f3f46;color:#f4f4f6;text-decoration:none;font-weight:600;font-size:14px">Create account</a>
-        <a href="/profile" style="padding:10px 16px;border-radius:8px;border:1px solid #3f3f46;color:#f4f4f6;text-decoration:none;font-weight:600;font-size:14px">Profile</a>
-      </div>
-    </section>
-  </main>
-} @else if (path.startsWith('/profile')) {
+@if (path.startsWith('/profile')) {
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-session
       [project]="project"
@@ -61,7 +87,7 @@ export function appTemplateHtml(): string {
 } @else if (path.startsWith('/register')) {
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-login
-      [project]="project"
+      [project]="project"${localesBinding}
       purpose="register"
       [postSignInUrl]="'/profile'"
     ></zitadel-auth-login>
@@ -69,7 +95,7 @@ export function appTemplateHtml(): string {
 } @else {
   <div style="position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark">
     <zitadel-auth-login
-      [project]="project"
+      [project]="project"${localesBinding}
       purpose="login"
       [postSignInUrl]="'/profile'"
     ></zitadel-auth-login>
@@ -80,8 +106,9 @@ export function appTemplateHtml(): string {
 
 /**
  * The managed `proxy.conf.cjs` for `ng serve`: forwards `/__nextgen/*` to the
- * backend and attaches the project's service-key secret as the bearer on every
- * proxied request. Both the backend URL (`ZITADEL_URL`) and the secret
+ * backend and attaches the project's service-key secret only to the current
+ * app-plane `POST /sessions/exchange` request. Both the backend URL
+ * (`ZITADEL_URL`) and the secret
  * (`ZITADEL_PROJECT_SECRET`) are read from `.env.local`, which `zitadel setup`
  * writes and `.gitignore` excludes — Angular's CLI does not auto-load env files
  * into the dev-server process, so this file does it itself with a small inline
@@ -119,9 +146,7 @@ if (!secret) {
 }
 const bearer = \`Bearer \${secret}\`;
 
-function setBearer(proxyReq) {
-  proxyReq.setHeader("authorization", bearer);
-}
+${EXCHANGE_ONLY_BEARER}
 
 function stripPrefix(path) {
   return path.replace(/^\\${PROXY_PATH}/, "").replace(/^(?!\\/)/, "/");
@@ -138,4 +163,39 @@ module.exports = {
   },
 };
 `;
+}
+
+const LEGACY_UNCONDITIONAL_BEARER = `function setBearer(proxyReq) {
+  proxyReq.setHeader("authorization", bearer);
+}`;
+
+const EXCHANGE_ONLY_BEARER = `/* ${PROXY_CREDENTIAL_POLICY_MARKER} */
+function setBearer(proxyReq) {
+  const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
+  if (
+    proxyReq.method === "POST" &&
+    pathname === "/sessions/exchange" &&
+    !proxyReq.getHeader("authorization")
+  ) {
+    proxyReq.setHeader("authorization", bearer);
+  }
+}`;
+
+/**
+ * Creates the managed Angular proxy and upgrades the exact insecure hook the
+ * CLI emitted before the exchange-only policy. Other edits are preserved; a
+ * safe custom proxy is left untouched, while an unrecognized proxy that may
+ * still over-forward the project secret is surfaced for manual review.
+ */
+export function proxyConfEdit(): (source: string | undefined) => string {
+  return (source) => {
+    if (source === undefined) {
+      return proxyConfTemplate();
+    }
+    if (source.includes(MANAGED_MARKER) && source.includes(LEGACY_UNCONDITIONAL_BEARER)) {
+      return source.replace(LEGACY_UNCONDITIONAL_BEARER, EXCHANGE_ONLY_BEARER);
+    }
+    assertNoUnreviewedProjectSecretProxy(source, "proxy.conf.cjs");
+    return source;
+  };
 }

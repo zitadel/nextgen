@@ -37,8 +37,29 @@ describe("VuePatcher.plan", () => {
   it("writes the managed App.vue and merges the Vite config", () => {
     const plan = new VuePatcher().plan(ctx());
     expect(writeContents(plan, "src/App.vue")).toContain(MANAGED_MARKER);
-    const edit = plan.ops.find((op): op is Extract<FileOp, { kind: "edit" }> => op.kind === "edit");
+    const edit = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "edit" }> =>
+        op.kind === "edit" && String(op.path).includes("vite.config"),
+    );
     expect(edit?.path).toContain("vite.config.ts");
+  });
+
+  it("wires the business copy overlay for business-use-case projects", () => {
+    // Minimal scaffolds keep the widget's neutral built-in copy.
+    expect(writeContents(new VuePatcher().plan(ctx()), "src/App.vue")).not.toContain(
+      "businessLocales",
+    );
+    const business = writeContents(
+      new VuePatcher().plan({ ...ctx(), useCase: "business" }),
+      "src/App.vue",
+    );
+    // The overlay ships with the SDK, and the wrapper component assigns the
+    // locales prop as a DOM property internally.
+    expect(business).toContain("businessLocales, configureZitadel");
+    expect(business).toContain(':locales="businessLocales"');
+    // Consumer scaffolds keep the neutral built-ins, like minimal ones.
+    const consumer = new VuePatcher().plan({ ...ctx(), useCase: "consumer" });
+    expect(writeContents(consumer, "src/App.vue")).not.toContain("businessLocales");
   });
 
   it("adds the SDK dependency at the CLI's prerelease tag", () => {

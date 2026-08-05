@@ -1,4 +1,4 @@
-name: Add new issues to product management project
+name: Add new issues and PRs to kanban project
 
 on:
   issues:
@@ -12,49 +12,13 @@ permissions:
   contents: read
 
 jobs:
-  add-to-project:
-    name: Add issue and community pr to project
-    runs-on: ubuntu-latest
-    steps:
-      - name: Generate project app token
-        id: app-token
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ secrets.PROJECT_APP_ID }}
-          private-key: ${{ secrets.PROJECT_APP_PRIVATE_KEY }}
-          owner: zitadel
-
-      - name: add issue
-        if: ${{ github.event_name == 'issues' }}
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: gh project item-add 2 --owner zitadel --url "${{ github.event.issue.html_url }}"
-
-      - name: check user team membership
-        id: checkUserMember
-        if: ${{ github.event_name == 'pull_request_target' && github.actor != 'dependabot[bot]' }}
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          if gh api "orgs/zitadel/teams/engineers/memberships/${{ github.actor }}" >/dev/null 2>&1; then
-            echo "is_engineer=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_engineer=false" >> "$GITHUB_OUTPUT"
-          fi
-          if gh api "orgs/zitadel/teams/staff/memberships/${{ github.actor }}" >/dev/null 2>&1; then
-            echo "is_staff=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_staff=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: add pr
-        if: ${{ github.event_name == 'pull_request_target' && github.actor != 'dependabot[bot]' && steps.checkUserMember.outputs.is_engineer != 'true' }}
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: gh project item-add 2 --owner zitadel --url "${{ github.event.pull_request.html_url }}"
-
-      - name: add community label
-        if: ${{ github.event_name == 'pull_request_target' && github.actor != 'dependabot[bot]' && steps.checkUserMember.outputs.is_staff != 'true' }}
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: gh pr edit "${{ github.event.pull_request.html_url }}" --add-label os-contribution
+  add-to-kanban:
+    name: Add issue/PR to kanban
+    if: github.actor != 'dependabot[bot]'
+    uses: zitadel/.github/.github/workflows/kanban.yml@main
+    secrets:
+      PROJECT_APP_ID: ${{ secrets.PROJECT_APP_ID }}
+      PROJECT_APP_PRIVATE_KEY: ${{ secrets.PROJECT_APP_PRIVATE_KEY }}
+    with:
+      issue_url: ${{ github.event_name == 'issues' && github.event.issue.html_url || '' }}
+      pr_url: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.html_url || '' }}

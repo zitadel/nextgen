@@ -3,6 +3,7 @@
 package service_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -11,24 +12,22 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 func newSessionServiceForIntegration(t *testing.T) (service.SessionService, service.SessionConfig) {
 	t.Helper()
-	pool := integrationPoolOrFail(t)
-	sessRepo := repository.NewSessionRepository(pool)
 	cfg := service.SessionConfig{DefaultTTL: time.Hour, MaxTTL: 24 * time.Hour}
-	return service.NewSessionService(pool, sessRepo, cfg), cfg
+	pool := integrationPoolOrFail(t)
+	return service.NewSessionService(pool, service.UserStatementsIdentityReader{Pool: pool}, cfg), cfg
 }
 
 func TestSessionService_Exchange_integration(t *testing.T) {
-	pool := integrationPoolOrFail(t)
 	svc, cfg := newSessionServiceForIntegration(t)
+	pool := integrationPoolOrFail(t)
 
 	t.Run("new_session_promotes_password", func(t *testing.T) {
 		projectID := "p-svc-ex-new-" + time.Now().Format("150405.000000")
-		plain, _ := handoffCompletedAttempt(t, pool, projectID, nil)
+		plain, _ := handoffCompletedAttempt(t, projectID, nil)
 
 		exchanged, err := svc.Exchange(t.Context(), service.ExchangeInput{
 			ProjectID:    projectID,
@@ -51,7 +50,7 @@ func TestSessionService_Exchange_integration(t *testing.T) {
 
 	t.Run("explicit_ttl", func(t *testing.T) {
 		projectID := "p-svc-ex-ttl-" + time.Now().Format("150405.000000")
-		plain, _ := handoffCompletedAttempt(t, pool, projectID, nil)
+		plain, _ := handoffCompletedAttempt(t, projectID, nil)
 		override := 2 * time.Hour
 
 		exchanged, err := svc.Exchange(t.Context(), service.ExchangeInput{
@@ -71,13 +70,15 @@ func TestSessionService_Exchange_integration(t *testing.T) {
 
 	t.Run("step_up_existing_session", func(t *testing.T) {
 		projectID := "p-svc-ex-step-" + time.Now().Format("150405.000000")
-		ensureProject(t, pool, projectID)
+		ensureProject(t, projectID)
 
 		anonymous, err := domain.NewSession(projectID, nil)
 		require.NoError(t, err)
-		require.NoError(t, repository.NewSessionRepository(pool).Create(t.Context(), pool, anonymous))
+		require.NoError(t, pool.Transaction(t.Context(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+			return tx.Statements().CreateSession(ctx, anonymous)
+		}))
 
-		plain, _ := handoffCompletedAttempt(t, pool, projectID, func(a *domain.AuthAttempt) {
+		plain, _ := handoffCompletedAttempt(t, projectID, func(a *domain.AuthAttempt) {
 			a.SessionID = &anonymous.ID
 		})
 
@@ -99,7 +100,7 @@ func TestSessionService_Exchange_integration(t *testing.T) {
 
 	t.Run("invalid_handoff_token", func(t *testing.T) {
 		projectID := "p-svc-ex-invalid-" + time.Now().Format("150405.000000")
-		ensureProject(t, pool, projectID)
+		ensureProject(t, projectID)
 
 		_, err := svc.Exchange(t.Context(), service.ExchangeInput{
 			ProjectID:    projectID,
@@ -112,7 +113,7 @@ func TestSessionService_Exchange_integration(t *testing.T) {
 
 	t.Run("consumed_token", func(t *testing.T) {
 		projectID := "p-svc-ex-consume-" + time.Now().Format("150405.000000")
-		plain, _ := handoffCompletedAttempt(t, pool, projectID, nil)
+		plain, _ := handoffCompletedAttempt(t, projectID, nil)
 
 		_, err := svc.Exchange(t.Context(), service.ExchangeInput{
 			ProjectID:    projectID,

@@ -9,7 +9,7 @@ post:
     - Flow Definitions
   security:
     - oauth2:
-        - flow_definitions.write
+        - flow_definition.write
   parameters:
     - $ref: ../../../../components/parameters/flow-definition-id.yaml
     - $ref: ../../../../components/parameters/project-id.yaml

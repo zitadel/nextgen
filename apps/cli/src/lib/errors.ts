@@ -1,4 +1,4 @@
-import { ApiError } from "@zitadel/api/runtime/fetch";
+import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 
 /**
  * Closed set of failure categories the CLI can surface. Every error the
@@ -14,6 +14,7 @@ export type ZitadelErrorCode =
   | "E_AUTH"
   | "E_CONFLICT"
   | "E_LOCAL_SERVER_NOT_RUNNING"
+  | "E_NOT_FOUND"
   | "E_PORT_IN_USE"
   | "E_VALIDATION"
   | "E_NOT_IMPLEMENTED";
@@ -31,6 +32,7 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
   E_AUTH: 1,
   E_CONFLICT: 5,
   E_LOCAL_SERVER_NOT_RUNNING: 4,
+  E_NOT_FOUND: 4,
   E_PORT_IN_USE: 5,
   E_VALIDATION: 3,
   E_NOT_IMPLEMENTED: 2,
@@ -89,18 +91,28 @@ export function toZitadelError(error: unknown): ZitadelError {
   }
 
   if (error instanceof ApiError) {
-    // `401`/`403` → bad or missing project secret; `5xx` → transport or
-    // server fault; everything else 4xx → the body the CLI sent was
-    // rejected (validation, conflict, not-found, …).
+    // `401`/`403` → bad or missing project secret; `404` → something is
+    // missing (see below); `5xx` → transport or server fault; everything
+    // else 4xx → the body the CLI sent was rejected (validation, conflict, …).
+    const details = { status: error.status, url: error.url, body: error.body };
+    if (error.status === 404) {
+      // A 404 carrying the platform's error envelope (a `code` field) is a
+      // domain-level miss from a real Zitadel API — an unknown schema or
+      // project id. Without the envelope the endpoint itself is missing:
+      // the CLI is pointed at a server that isn't a Zitadel platform API.
+      const wrongServer = !isPlatformErrorEnvelope(error.body);
+      const message = wrongServer
+        ? `${apiErrorMessage(error)} — ${error.url} has no such endpoint; is this a Zitadel platform API?`
+        : apiErrorMessage(error);
+      return new ZitadelError("E_NOT_FOUND", message, { details });
+    }
     const code: ZitadelErrorCode =
       error.status === 401 || error.status === 403
         ? "E_AUTH"
         : error.status >= 500
           ? "E_NETWORK"
           : "E_VALIDATION";
-    return new ZitadelError(code, error.message, {
-      details: { status: error.status, url: error.url, body: error.body },
-    });
+    return new ZitadelError(code, apiErrorMessage(error), { details });
   }
 
   if (isErrnoException(error)) {
@@ -145,6 +157,19 @@ export function toZitadelError(error: unknown): ZitadelError {
   }
 
   return new ZitadelError("E_VALIDATION", "Unknown error", { details: error });
+}
+
+/**
+ * True when a response body looks like the platform's structured error
+ * envelope (`{ code, message, … }`). Its presence proves the request reached
+ * a real Zitadel platform API rather than an arbitrary HTTP server.
+ */
+function isPlatformErrorEnvelope(body: unknown): boolean {
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    typeof (body as { code?: unknown }).code === "string"
+  );
 }
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {

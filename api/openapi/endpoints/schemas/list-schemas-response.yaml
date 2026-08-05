@@ -1,0 +1,13 @@
+type: array
+items:
+  type: object
+  required:
+    - id
+    - createdAt
+  properties:
+    id:
+      type: string
+      description: The unique identifier for this schema.
+    createdAt:
+      type: string
+      format: date-time

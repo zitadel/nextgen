@@ -4,11 +4,22 @@ description: |
   represent a human user, but also a service account or any other type of 
   identity. The content of a user is determined by the configured schema for 
   users, this is only a base schema.
+
+  The server assigns the resource primary key (`id`) on create. Clients must
+  not send `id` in the create body; it is returned in the create response.
+# ogen does not enforce JSON Schema `not`, and rejects `properties.id: false`.
+# Document the forbid here; the create handler rejects a client-supplied `id`.
 type: object
 additionalProperties: true
 required:
   - $schema
 properties:
+  id:
+    readOnly: true
+    $ref: ../../components/schemas/user-id.yaml
+  metadata:
+    readOnly: true
+    $ref: user-metadata.yaml
   $schema:
     type: string
     description: |

@@ -1,15 +1,15 @@
 package domain
 
 import (
-	"context"
 	"time"
 
 	"github.com/muhlemmer/gu"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 const (
 	PrefixSession       ResourcePrefix = "sess"
+	PrefixUserAgent     ResourcePrefix = "ua"
 	SessionAnonymousTTL                = 10 * time.Minute
 )
 
@@ -31,6 +31,10 @@ func ErrSessionTokenCreationFailed() Error {
 
 func ErrSessionTokenInvalid() Error {
 	return newError("sess.token_invalid", "The session token is invalid (either malformed or expired).", nil, nil)
+}
+
+func ErrSessionPermissionDenied() Error {
+	return newError(PrefixSession.ErrorCodePrefix("permission_denied"), "session: requires a session scope bound to the project", nil, nil)
 }
 
 func ErrSessionInvalidTTL() Error {
@@ -87,6 +91,12 @@ type Session struct {
 	// A user may have multiple sessions (e.g. from different devices or browsers), and UserID may be nil during some lifecycle stages.
 	UserID *string
 
+	// User is the hydrated identity of the linked user, carrying the
+	// [IdentityAttributeKeys] attributes. Only populated when the read
+	// requests it (see service.GetSessionInput.WithUserIdentity); nil for
+	// anonymous sessions and plain reads.
+	User *User
+
 	// UserAgent contains information about the user's device and browser.
 	UserAgent *UserAgent
 
@@ -117,8 +127,8 @@ func (s *Session) State() SessionState {
 	return SessionStateActive
 }
 
-func (s *Session) Token(generator TokenGenerator) (string, error) {
-	token, err := generator.Generate(&Token{
+func (s *Session) Token(encrypter op.Encrypter) (string, error) {
+	token, err := (&Token{
 		ProjectID: s.ProjectID,
 		TokenID:   s.TokenID,
 		UserID:    gu.Value(s.UserID),
@@ -126,25 +136,21 @@ func (s *Session) Token(generator TokenGenerator) (string, error) {
 		SessionID: new(s.ID),
 		CreatedAt: s.CreatedAt,
 		ExpiresAt: new(s.ExpiresAt),
-	})
+	}).JWE(encrypter)
 	if err != nil {
 		return "", ErrSessionTokenCreationFailed()
 	}
 	return token, nil
 }
 
-func DecryptSessionTokenString(tokenString string, verifier TokenVerifier) (*Token, error) {
-	payload, err := verifier.Verify(tokenString)
-	if err != nil {
-		return nil, ErrSessionTokenInvalid()
+func ValidateSessionToken(token *Token) error {
+	if token.Type != TokenTypeSessionToken {
+		return ErrSessionTokenInvalid()
 	}
-	if payload.Type != TokenTypeSessionToken {
-		return nil, ErrSessionTokenInvalid()
+	if token.SessionID == nil {
+		return ErrSessionTokenInvalid()
 	}
-	if payload.SessionID == nil {
-		return nil, ErrSessionTokenInvalid()
-	}
-	return payload, nil
+	return nil
 }
 
 type SessionState uint8
@@ -163,27 +169,18 @@ type UserAgent struct {
 	Info map[string]any
 }
 
-type SessionRepository interface {
-	// Create creates a new (anonymous) session.
-	// The storage must set the ID and the read-only fields (CreatedAt, UpdatedAt), create a token, and set its id to the session.
-	Create(ctx context.Context, q database.QueryExecutor, session *Session) error
+// SessionField enumerates the fields of Session which can be used for filtering and
+// ordering in list operations.
+type SessionField uint8
 
-	// Exchange is used to exchange a handoff token issued on an auth attempt for a session.
-	// In case the handoff token is valid, either the session associated with the auth attempt is updated or a new session is created if no session was linked.
-	// All the auth attempts (verified) factors are merged into the session.
-	// The auth attempt, including handoff token and unverified challenges, are deleted.
-	// And the newly created or updated session is returned.
-	//
-	// In case the handoff token is invalid in any way (e.g. the token does not exist, was already consumed, or has expired), ErrSessionInvalidHandoffToken is returned.
-	// In case of a conflict during the exchange (e.g. the session was revoked or verified factors could not be promoted consistently), the session is not upgraded and ErrSessionExchangeConflict is returned.
-	Exchange(ctx context.Context, q database.QueryExecutor, projectID, handoffToken string, idempotencyKey *string, ttl time.Duration) (*Session, error)
-
-	// Get retrieves a session by its ID. It returns ErrSessionNotFound if no session with the given ID exists within the project.
-	Get(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) (*Session, error)
-
-	// List returns all sessions within the project and
-	List(ctx context.Context, q database.QueryExecutor, projectID string) ([]*Session, error)
-
-	// Delete removes a session by its ID.
-	Delete(ctx context.Context, q database.QueryExecutor, projectID, sessionID string) error
-}
+const (
+	SessionFieldUnspecified SessionField = iota
+	SessionFieldProjectID
+	SessionFieldID
+	SessionFieldCreatedAt
+	SessionFieldUpdatedAt
+	SessionFieldExpiresAt
+	SessionFieldTimeToLive
+	SessionFieldTokenID
+	SessionFieldUserID
+)

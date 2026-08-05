@@ -3,33 +3,21 @@ package helpers
 import (
 	"testing"
 
-	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 func (h *Harness) EnsureAuthAttemptService(t *testing.T) service.AuthAttemptService {
 	t.Helper()
-	if h.AuthAttemptService == nil {
-		h.AuthAttemptService = service.NewAuthAttemptService(
-			h.EnsureDBPool(t),
-			h.EnsureAuthAttemptRepo(t),
-			h.EnsureSessionRepo(t),
-			h.EnsureUserRepo(t),
-			h.EnsureUserPasswordRepo(t),
-			h.EnsureUserPasskeyRepo(t),
+	h.authAttemptService.mutex.Lock()
+	defer h.authAttemptService.mutex.Unlock()
+
+	if h.authAttemptService.value == nil {
+		h.authAttemptService.value = service.NewAuthAttemptService(
+			h.EnsureServiceDB(t),
+			service.SessionStatementsResolver{Pool: h.EnsureServiceDB(t)},
+			service.UserStatementsLookup{Pool: h.EnsureServiceDB(t)},
 			h.EnsureHashVerifier(t),
 		)
 	}
-	return h.AuthAttemptService
-}
-
-func (h *Harness) EnsureAuthAttemptRepo(t *testing.T) domain.AuthAttemptRepository {
-	t.Helper()
-	if h.AuthAttemptRepo == nil {
-		h.AuthAttemptRepo = repository.NewAuthAttemptRepository(
-			h.EnsureDBPool(t),
-		)
-	}
-	return h.AuthAttemptRepo
+	return h.authAttemptService.value
 }

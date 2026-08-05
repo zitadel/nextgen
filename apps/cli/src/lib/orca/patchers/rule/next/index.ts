@@ -52,6 +52,36 @@ export class NextPatcher extends AbstractRulePatcher {
     return nextCodeFilePaths(view.framework, getRenderer(view.rendererId));
   }
 
+  protected override infrastructureFiles(view: PatchView): ReadonlyArray<string> {
+    return nextInfrastructureFilePaths(view.framework, getRenderer(view.rendererId));
+  }
+
+  protected override conditionallyScaffoldedFiles(view: PatchView): ReadonlyArray<string> {
+    // Written only when setup created the app skeleton itself; on a
+    // pre-existing app the homepage stays user-owned (see nextCodeOps).
+    return [join(view.framework.appDir, "page.tsx")];
+  }
+
+  protected override retiredAlternateFiles(
+    view: PatchView,
+  ): Readonly<Record<string, ReadonlyArray<string>>> {
+    // Next renamed the request boundary in v16 (middleware.ts → proxy.ts)
+    // and throws at build time when both exist — but only in the ≥16
+    // direction. On Next 15, proxy.ts was not a reserved convention, so a
+    // root proxy.ts there is the user's own file, never a conflicting
+    // boundary. Declaring the alternate one-way keeps a healthy Next 15 app
+    // with an unrelated proxy.ts passing.
+    const current = requestBoundaryFile(view.framework).filename;
+    if (current !== "proxy.ts") {
+      return {};
+    }
+    return {
+      [join(view.framework.appDir, "../proxy.ts")]: [
+        join(view.framework.appDir, "../middleware.ts"),
+      ],
+    };
+  }
+
   protected routeDeps(view: PatchView): ReadonlyArray<string> {
     return [getRenderer(view.rendererId).dependency.name];
   }
@@ -93,6 +123,28 @@ function nextCodeFilePaths(
   return paths;
 }
 
+/**
+ * The subset of {@link nextCodeFilePaths} that is load-bearing for the auth
+ * integration rather than a presentation starting point: the request boundary
+ * (proxy/middleware), the provider file, and the custom-elements declarations.
+ * Shares path construction with {@link nextCodeFilePaths} so the two cannot
+ * drift; the `doctor` managed-files check fails when one of these is missing.
+ */
+function nextInfrastructureFilePaths(
+  framework: PatchView["framework"],
+  renderer: RendererSpec,
+): ReadonlyArray<string> {
+  const appDir = framework.appDir;
+  const paths = [join(appDir, `../${requestBoundaryFile(framework).filename}`)];
+  if (renderer.templates.provider) {
+    paths.push(join(appDir, renderer.templates.provider.filename));
+  }
+  if (renderer.templates.customElementsDts) {
+    paths.push(join(appDir, "../custom-elements.d.ts"));
+  }
+  return paths;
+}
+
 /** The Next route/request-boundary write ops plus the SDK dependency. */
 function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
   const appDir = ctx.framework.appDir;
@@ -106,17 +158,20 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
           kind: "edit",
           path: join(appDir, "page.tsx"),
           edit: () => homePageTemplate(),
+          // Replaces create-next-app's default homepage wholesale; the
+          // missing-only repair path must not replay it over user content.
+          overwrites: true,
         }
       : undefined,
     {
       kind: "write",
       path: join(appDir, "login/page.tsx"),
-      contents: renderer.templates.authPage("login").contents,
+      contents: renderer.templates.authPage("login", { useCase: ctx.useCase }).contents,
     },
     {
       kind: "write",
       path: join(appDir, "register/page.tsx"),
-      contents: renderer.templates.authPage("register").contents,
+      contents: renderer.templates.authPage("register", { useCase: ctx.useCase }).contents,
     },
     profile
       ? { kind: "write", path: join(appDir, "profile/page.tsx"), contents: profile.contents }
@@ -149,28 +204,10 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
 
 function homePageTemplate(): string {
   return `${MANAGED_MARKER}
-import Link from "next/link";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return (
-    <main style={{ position: "fixed", inset: 0, padding: "48px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f0f11", colorScheme: "dark", color: "#f4f4f6", fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", lineHeight: 1.5, letterSpacing: "normal", textAlign: "center" }}>
-      <section style={{ width: "100%", maxWidth: "560px" }}>
-        <p style={{ margin: "0 0 12px", color: "#9ca3af", fontSize: "14px" }}>Zitadel auth</p>
-        <h1 style={{ margin: "0 0 24px", fontSize: "32px", lineHeight: 1.15, fontWeight: 600, color: "#f4f4f6" }}>Sign in, create an account, or open your profile.</h1>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
-          <Link href="/login" style={{ padding: "10px 16px", borderRadius: "8px", background: "#f4f4f6", color: "#0f0f11", textDecoration: "none", fontWeight: 600, fontSize: "14px" }}>
-            Sign in
-          </Link>
-          <Link href="/register" style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #3f3f46", color: "#f4f4f6", textDecoration: "none", fontWeight: 600, fontSize: "14px" }}>
-            Create account
-          </Link>
-          <Link href="/profile" style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #3f3f46", color: "#f4f4f6", textDecoration: "none", fontWeight: 600, fontSize: "14px" }}>
-            Profile
-          </Link>
-        </div>
-      </section>
-    </main>
-  );
+  redirect("/login");
 }
 `;
 }

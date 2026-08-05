@@ -2,14 +2,14 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/idgen"
-	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 const passkeyRegistrationTTL = 5 * time.Minute
@@ -19,23 +19,14 @@ const passkeyRegistrationDefaultUsername = "Passkey account"
 // ceremony. It exposes [Begin] and [Finish] for direct callers and is wrapped by
 // [FlowPasskeyRegistrationAdapter] for the flow engine.
 type PasskeyRegistrationService struct {
-	pool          database.Pool
-	registrations domain.PasskeyRegistrationRepository
-	passkeys      domain.UserPasskeyRepository
-	ids           idgen.Generator
+	v2Pool StatementPool
 }
 
 func NewPasskeyRegistrationService(
-	pool database.Pool,
-	registrations domain.PasskeyRegistrationRepository,
-	passkeys domain.UserPasskeyRepository,
-	ids idgen.Generator,
+	v2Pool StatementPool,
 ) *PasskeyRegistrationService {
 	return &PasskeyRegistrationService{
-		pool:          pool,
-		registrations: registrations,
-		passkeys:      passkeys,
-		ids:           ids,
+		v2Pool: v2Pool,
 	}
 }
 
@@ -52,45 +43,53 @@ type BeginRegistrationInput struct {
 // BeginRegistrationOutput is returned by [PasskeyRegistrationService.Begin].
 type BeginRegistrationOutput struct {
 	RegistrationID string
+	UserID         string
 	Options        []byte // PublicKeyCredentialCreationOptions JSON
 }
 
-// Begin starts a passkey registration ceremony for the given user and relying-party
-// parameters. It mints a challenge, persists it, and returns the creation options
-// for the browser's navigator.credentials.create() call.
+// Begin starts a passkey registration ceremony. Empty UserID is minted via
+// the dialect before the challenge is persisted.
 func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistrationInput) (BeginRegistrationOutput, error) {
 	origins, err := parseOrigins(in.RPOrigins)
 	if err != nil {
 		return BeginRegistrationOutput{}, err
 	}
 
-	existing, err := s.listPasskeys(ctx, in.ProjectID, in.UserID)
+	userID := in.UserID
+	if userID == "" {
+		userID, err = s.v2Pool.Statements().NewManagedID(string(domain.PrefixUser))
+		if err != nil {
+			return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: mint user id: %w", err)
+		}
+	}
+
+	listed, err := s.v2Pool.Statements().ListUserPasskeys(ctx, &database.ListOptions[domain.UserPasskeyField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserPasskeyFieldProjectID), in.ProjectID),
+			database.Equal(database.Col(domain.UserPasskeyFieldUserID), userID),
+		),
+	})
 	if err != nil {
 		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: list passkeys: %w", err)
 	}
 
 	username, displayName := passkeyRegistrationLabels(in.Username, in.DisplayName)
 	challenge, err := domain.CreatePasskeyRegistrationChallenge(
-		in.UserID, username, displayName,
-		existing,
+		userID, username, displayName,
+		listed.Items,
 		in.RPID, origins,
 	)
 	if err != nil {
 		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: begin: %w", err)
 	}
 
-	regID, err := s.ids.New(string(domain.PrefixPasskeyRegistration))
-	if err != nil {
-		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: generate id: %w", err)
-	}
-
-	if err := s.registrations.Create(ctx, s.pool, &domain.CreatePasskeyRegistration{
-		ID:        regID,
+	reg := &domain.CreatePasskeyRegistration{
 		ProjectID: in.ProjectID,
-		UserID:    in.UserID,
+		UserID:    userID,
 		Challenge: challenge,
 		ExpiresAt: time.Now().Add(passkeyRegistrationTTL),
-	}); err != nil {
+	}
+	if err := s.v2Pool.Statements().CreatePasskeyRegistration(ctx, reg); err != nil {
 		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: store challenge: %w", err)
 	}
 
@@ -102,7 +101,11 @@ func (s *PasskeyRegistrationService) Begin(ctx context.Context, in BeginRegistra
 		return BeginRegistrationOutput{}, fmt.Errorf("passkey registration: build options: %w", err)
 	}
 
-	return BeginRegistrationOutput{RegistrationID: regID, Options: options}, nil
+	return BeginRegistrationOutput{
+		RegistrationID: reg.ID,
+		UserID:         userID,
+		Options:        options,
+	}, nil
 }
 
 func passkeyRegistrationLabels(username, displayName string) (string, string) {
@@ -122,47 +125,39 @@ type FinishRegistrationInput struct {
 	ProjectID      string
 	RegistrationID string
 	Attestation    []byte
+	// PasskeyName labels the credential in passkey management surfaces.
+	// Optional: when empty, a name is derived from the credential itself
+	// ([domain.GeneratePasskeyCredentialName]).
+	PasskeyName string
 }
 
 // Finish verifies the attestation against the stored challenge and persists the new
 // credential. The user identity is authoritative from the stored challenge record.
 // Rejection surfaces as [domain.ErrAuthAttemptProofRejected].
 func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegistrationInput) error {
-	return s.FinishWith(ctx, s.pool, in)
-}
-
-// FinishWith is like [Finish] but uses the given QueryExecutor instead of the pool.
-// Used by [FlowPasskeyRegistrationAdapter] to run the credential write inside the
-// flow engine's transaction so the passkey save is atomic with user creation.
-func (s *PasskeyRegistrationService) FinishWith(ctx context.Context, client database.QueryExecutor, in FinishRegistrationInput) error {
-	reg, err := s.registrations.Get(ctx, client, in.ProjectID, in.RegistrationID)
+	stmts := s.v2Pool.Statements()
+	reg, err := stmts.GetPasskeyRegistration(ctx, in.ProjectID, in.RegistrationID)
 	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return domain.ErrPasskeyRegistrationNotFound()
+		}
 		return err
 	}
 
-	newPasskey, err := domain.VerifyPasskeyRegistration(reg.Challenge, in.Attestation)
+	newPasskey, err := domain.VerifyPasskeyRegistration(reg.Challenge, in.Attestation, in.PasskeyName)
 	if err != nil {
 		return domain.ErrAuthAttemptProofRejected(err)
 	}
 	newPasskey.ProjectID = in.ProjectID
 	newPasskey.UserID = reg.UserID
 
-	if err := s.passkeys.Create(ctx, client, newPasskey); err != nil {
+	if err := stmts.CreateUserPasskey(ctx, newPasskey); err != nil {
 		return fmt.Errorf("passkey registration: store credential: %w", err)
 	}
 
 	// Best-effort cleanup; don't shadow the success.
-	_ = s.registrations.Delete(ctx, client, in.ProjectID, in.RegistrationID)
+	_ = stmts.DeletePasskeyRegistration(ctx, in.ProjectID, in.RegistrationID)
 	return nil
-}
-
-func (s *PasskeyRegistrationService) listPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
-	return s.passkeys.List(
-		ctx,
-		s.pool,
-		database.WithCondition(s.passkeys.ProjectIDCondition(projectID)),
-		database.WithCondition(s.passkeys.UserIDCondition(userID)),
-	)
 }
 
 func parseOrigins(raw []string) ([]url.URL, error) {

@@ -10,42 +10,46 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/database/repository"
 )
 
 const BuiltinSchemaBaseURL = "https://test.example.schemas.com/schemas"
 
 func (h *Harness) EnsureSchemaService(t *testing.T) *service.SchemaService {
 	t.Helper()
-	if h.SchemaService == nil {
-		h.SchemaService = service.NewSchemaService(
-			h.EnsureDBPool(t),
-			h.EnsureSchemaRepo(t),
+	h.schemaService.mutex.Lock()
+	defer h.schemaService.mutex.Unlock()
+
+	if h.schemaService.value == nil {
+		h.schemaService.value = service.NewSchemaService(
+			h.EnsureServiceDB(t),
 			h.EnsureSchemaResolver(t),
 			h.EnsureSchemaValidator(t),
 		)
 	}
-	return h.SchemaService
+	return h.schemaService.value
 }
 
-func (h *Harness) EnsureSchemaRepo(t *testing.T) domain.JSONSchemaRepository {
+func (h *Harness) EnsureSchemaStore(t *testing.T) domain.JSONSchemaStore {
 	t.Helper()
-	if h.SchemaRepo == nil {
-		h.SchemaRepo = repository.NewJSONSchemaRepository(
-			h.EnsureDBPool(t),
-		)
+	h.schemaStore.mutex.Lock()
+	defer h.schemaStore.mutex.Unlock()
+
+	if h.schemaStore.value == nil {
+		h.schemaStore.value = h.EnsureServiceDB(t).Statements()
 	}
-	return h.SchemaRepo
+	return h.schemaStore.value
 }
 
 func (h *Harness) EnsureSchemaResolver(t *testing.T) *domain.JSONSchemaResolver {
 	t.Helper()
-	if h.SchemaResolver == nil {
+	h.schemaResolver.mutex.Lock()
+	defer h.schemaResolver.mutex.Unlock()
+
+	if h.schemaResolver.value == nil {
 		cache, err := lru.New2Q[string, *jsonschema.Schema](100)
 		require.NoError(t, err)
 
-		h.SchemaResolver = domain.NewJSONSchemaResolver(
-			h.EnsureSchemaRepo(t),
+		h.schemaResolver.value = domain.NewJSONSchemaResolver(
 			cache,
 			0,
 			0,
@@ -53,25 +57,28 @@ func (h *Harness) EnsureSchemaResolver(t *testing.T) *domain.JSONSchemaResolver 
 			mustParseURL(t, BuiltinSchemaBaseURL),
 		)
 	}
-	return h.SchemaResolver
+	return h.schemaResolver.value
 }
 
 func (h *Harness) EnsureSchemaValidator(t *testing.T) *domain.SchemaValidator {
 	t.Helper()
-	if h.SchemaValidator == nil {
+	h.schemaValidator.mutex.Lock()
+	defer h.schemaValidator.mutex.Unlock()
+
+	if h.schemaValidator.value == nil {
 		schemaValidator, err := domain.NewSchemaValidator(BuiltinSchemaBaseURL)
 		require.NoError(t, err)
 
-		h.SchemaValidator = schemaValidator
+		h.schemaValidator.value = schemaValidator
 	}
-	return h.SchemaValidator
+	return h.schemaValidator.value
 }
 
 func (h *Harness) CreateUserSchema(t *testing.T, project *domain.Project, schema string) string {
 	t.Helper()
 	client, err := NewApiClient(h.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	client.SetToken(project.ProjectSecret)
+	h.SetProjectSecretOnApiClient(t, client, project)
 
 	apiSchema := api.UserSchema{}
 	err = apiSchema.UnmarshalJSON([]byte(schema))

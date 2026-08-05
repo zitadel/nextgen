@@ -23,7 +23,7 @@ Branding:
     hero_url: { type: string, format: uri }
 ```
 
-**Read-only projection** at flow creation (app / org / instance merge, most specific wins). Widget must accept the five-field shape as-is.
+**Read-only projection**, resolved per step response as the **latest branding revision for the project** (falling back to built-in defaults). Written via the Branding API / `zitadel apply`, never via the Flow API; audience overrides on the app → team → project ladder are a later resolution-rule evolution ([ADR 040](../../adrs/040-tenant-login-templates-editable-config.md)). Widget must accept the five-field shape as-is.
 
 ```mermaid
 flowchart TB
@@ -107,11 +107,13 @@ Master Liquid branches on this; ejected templates may ignore it. Default `center
 
 #### `liquid_template` (string)
 
-The LiquidJS template string for the current step. When present, the orchestrator uses it instead of the bundled default. Must pass the security validator in [`../flowengine/template-security.md`](../flowengine/template-security.md) and the structural validator in [`validator.md`](validator.md).
+The LiquidJS template string for the current step. When present, the orchestrator uses it instead of the bundled default. Validated at authoring time by the `@zitadel/config` validator and gated lexically on save ([`../flowengine/template-security.md`](../flowengine/template-security.md)); the structural contract lives in [`validator.md`](validator.md). Authored locally as a sibling `.liquid` file that the CLI inlines on upload ([`templates.md`](templates.md) § Authoring workflow).
 
 #### `logo_url`, `font_url`, `hero_url` (URIs, optional)
 
 Asset URLs. Must be https. `font_url` is injected as a `<link rel="stylesheet">` before the widget paints. `hero_url` is consumed by the `split` layout.
+
+`font_url` is **read-only in v1**: because the component must inject it at document level (shadow-scoped `@font-face` never registers faces), a writable value would give `branding.write` page-wide CSS control over the embedding application. `POST /branding` rejects it and the local config dialect omits it; safe delivery is an [ADR 040](../../adrs/040-tenant-login-templates-editable-config.md) follow-up. Until then, load fonts from the embedding page.
 
 ### Proposed extensions
 
@@ -142,6 +144,8 @@ Additional asset URLs alongside the baseline `logo_url` / `hero_url`. The consum
 
 - **`mode`**: `light` \| `dark` \| `auto` (`auto` uses `prefers-color-scheme`). Resolved value on root `data-theme`.
 - **`dark`**: optional `palette` overrides when dark; missing keys inherit light. Omit `theme` or set `mode: light` to disable.
+
+Both modes carry real token values ([ADR 014 §5](../../adrs/014-design-tokens-and-ui-react-pairs.md)). `mode` is one input among three; resolution runs strongest-first: the embedding page's `<zitadel-login theme="…">` property → this `branding.theme.mode` → a variant-derived default (`dark` for `variant="page"`, `auto` for the embeddable `variant="widget"`). The element wins because the page hosting the widget knows its own surface better than stored tenant branding does.
 
 #### ~~`advanced.custom_css`~~ (removed)
 

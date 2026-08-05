@@ -2,7 +2,7 @@ get:
   operationId: getTeam
   summary: Get team
   description: |
-    Returns the current state of a team.
+    Returns a Team by its id.
   tags:
     - Teams
   parameters:
@@ -14,14 +14,14 @@ get:
         $ref: ../../../components/schemas/team-id.yaml
   security:
     - oauth2:
-        - teams.read
+        - team.read
   responses:
     '200':
-      description: Team state.
+      description: The team.
       content:
         application/json:
           schema:
-            $ref: ../get-team-response.yaml
+            $ref: ../team-response.yaml
     '401':
       description: Missing or invalid credentials.
       content:
@@ -30,6 +30,128 @@ get:
             $ref: ../../../components/error-details.yaml
     '404':
       description: Team not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+
+delete:
+  operationId: deleteTeam
+  summary: Delete team
+  description: |
+    Deactivates the team.
+
+    The team is tombstoned rather than erased: it stays readable through
+    getTeam with status `deactivated`. Its memberships are removed and the
+    users whose lifecycle it owns are deactivated with it.
+
+    The request is idempotent. Deleting a team that is already deactivated
+    or doesn't exist succeeds without changing anything.
+  tags:
+    - Teams
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - name: team_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../components/schemas/team-id.yaml
+  security:
+    - oauth2:
+        - team.delete
+  responses:
+    '204':
+      description: The team is deactivated.
+    '400':
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: |
+        Insufficient permissions, or the credentials are not bound to the
+        project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+
+patch:
+  operationId: updateTeam
+  summary: Update team
+  description: |
+    Update team. Only active teams can be updated.
+  tags:
+    - Teams
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - name: team_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../components/schemas/team-id.yaml
+  security:
+    - oauth2:
+        - team.write
+  requestBody:
+    description: Update team request.
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../update-team-request.yaml
+  responses:
+    '200':
+      description: Updated the team.
+      content:
+        application/json:
+          schema:
+            $ref: ../team-response.yaml
+    '400':
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: Team not found or not active, or the project does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '409':
+      description: A team with the same name already exists.
       content:
         application/json:
           schema:

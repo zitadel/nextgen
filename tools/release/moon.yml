@@ -11,19 +11,20 @@ tasks:
       runFromWorkspaceRoot: true
       runInCI: true
 
-  clean-public-package-dist:
-    command: "node scripts/release-clean.mjs public-package-dist"
+  check-graph:
+    command: "node scripts/check-release-graph.mjs"
     options:
       cache: false
       runFromWorkspaceRoot: true
-      runInCI: true
+      runInCI: false
 
   build-public-packages:
     command: "node -e 0"
     deps:
-      - "release:clean-public-package-dist"
+      - "release:check-graph"
       - "cli:build-release"
       - "api:build-release"
+      - "config:build-release"
       - "components:build-release"
       - "sdk-core:build-release"
       - "sdk-next:build-release"
@@ -34,11 +35,15 @@ tasks:
       - "sdk-solid:build-release"
       - "sdk-svelte:build-release"
       - "sdk-qwik:build-release"
+      - "testing:build-release"
     options:
       cache: false
       runDepsInParallel: false
       runFromWorkspaceRoot: true
-      runInCI: true
+      # Excluded from `moon ci`: release package builds remove stale files and
+      # rewrite dist output inside their build-release tasks. The check-graph
+      # guard verifies those scripts and mutexes before packaging runs.
+      runInCI: false
 
   version:
     command: "node scripts/release.mjs version"
@@ -50,7 +55,7 @@ tasks:
     command: "node scripts/release.mjs pack"
     deps:
       - "release:build-public-packages"
-      - "console:build"
+      - "console:build-release"
       - "login-ui:build-release"
     outputs:
       - "/dist/release/**/*"
@@ -65,7 +70,7 @@ tasks:
     deps:
       - "server:test"
       - "release:build-public-packages"
-      - "console:build"
+      - "console:build-release"
       - "login-ui:build-release"
     outputs:
       - "/dist/release/**/*"
@@ -79,10 +84,13 @@ tasks:
     command: "node scripts/release.mjs publish"
     deps:
       - "release:build-public-packages"
-      - "console:build"
+      - "console:build-release"
       - "login-ui:build-release"
     options:
       cache: false
       runDepsInParallel: false
       runFromWorkspaceRoot: true
-      runInCI: true
+      # Invoked explicitly (`moon run release:publish`) by the
+      # release-publish workflow; never scheduled by `moon ci`, matching the
+      # rest of the release chain (see build-public-packages).
+      runInCI: false

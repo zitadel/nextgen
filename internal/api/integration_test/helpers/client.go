@@ -2,8 +2,12 @@ package helpers
 
 import (
 	"context"
+	"testing"
 
+	"github.com/ogen-go/ogen/ogenerrors"
+	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 type FakeSecuritySource struct {
@@ -13,6 +17,8 @@ type FakeSecuritySource struct {
 	Username string
 	Password string
 	Roles    []string
+
+	SessionToken string
 }
 
 func (f FakeSecuritySource) OAuth2(ctx context.Context, operationName api.OperationName) (api.OAuth2, error) {
@@ -27,6 +33,20 @@ func (f FakeSecuritySource) UsernamePassword(ctx context.Context, operationName 
 		Username: f.Username,
 		Password: f.Password,
 		Roles:    f.Roles,
+	}, nil
+}
+
+// NextgenSession provides the __nextgen_session cookie. With an empty
+// SessionToken the scheme is skipped and the generated client fails fast with
+// "security requirement is not satisfied" instead of sending the request —
+// to exercise the server's missing-credential path, send a raw HTTP request
+// (see TestGetMyUser/missing_session_cookie).
+func (f FakeSecuritySource) NextgenSession(ctx context.Context, operationName api.OperationName) (api.NextgenSession, error) {
+	if f.SessionToken == "" {
+		return api.NextgenSession{}, ogenerrors.ErrSkipClientSecurity
+	}
+	return api.NextgenSession{
+		APIKey: f.SessionToken,
 	}, nil
 }
 
@@ -54,6 +74,9 @@ func NewApiClient(
 func (c *ApiClient) SetToken(token string) {
 	c.securitySource.Token = token
 }
+func (c *ApiClient) Token() string {
+	return c.securitySource.Token
+}
 func (c *ApiClient) SetScopes(scopes []string) {
 	c.securitySource.Scopes = scopes
 }
@@ -65,4 +88,29 @@ func (c *ApiClient) SetPassword(password string) {
 }
 func (c *ApiClient) SetRoles(roles []string) {
 	c.securitySource.Roles = roles
+}
+func (c *ApiClient) SetSessionToken(token string) {
+	c.securitySource.SessionToken = token
+}
+
+func (h *Harness) SetProjectSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
+	t.Helper()
+
+	tokenCrypter, err := h.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	secret, err := project.ProjectSecret(tokenCrypter)
+	require.NoError(t, err)
+
+	client.SetToken(secret)
+}
+
+func (h *Harness) SetPreviewSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
+	t.Helper()
+
+	tokenCrypter, err := h.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	secret, err := project.PreviewSecret(tokenCrypter)
+	require.NoError(t, err)
+
+	client.SetToken(secret)
 }

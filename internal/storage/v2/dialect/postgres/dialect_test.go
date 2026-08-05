@@ -17,8 +17,8 @@ func TestDecodeConfig(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "postgres", dialect.Name())
 
-		pgConfig, ok := dialect.(*Config)
-		require.True(t, ok)
+		require.IsType(t, &Config{}, dialect)
+		pgConfig := dialect.(*Config)
 		assert.Equal(t, "localhost", pgConfig.ConnConfig.Host)
 		assert.Equal(t, uint16(5432), pgConfig.ConnConfig.Port)
 		assert.Equal(t, "dbname", pgConfig.ConnConfig.Database)
@@ -38,8 +38,8 @@ func TestDecodeConfig(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "postgres", dialect.Name())
 
-		pgConfig, ok := dialect.(*Config)
-		require.True(t, ok)
+		require.IsType(t, &Config{}, dialect)
+		pgConfig := dialect.(*Config)
 		require.NotNil(t, pgConfig.ConnConfig)
 		assert.Equal(t, "db.example", pgConfig.ConnConfig.Host)
 		assert.Equal(t, uint16(5433), pgConfig.ConnConfig.Port)

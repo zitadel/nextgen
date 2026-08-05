@@ -12,7 +12,9 @@ import { GitignoreCheck } from "./gitignore";
 import { EnvExampleCheck } from "./env-example";
 import { FrameworkCheck } from "./framework";
 import { DependencyCheck } from "./dependency";
+import { ManagedFilesCheck } from "./managed-files";
 import { ProjectMatchCheck } from "./project-match";
+import { SchemaCheck } from "./schema";
 
 export type { SanityCheck, CheckContext, CheckOutcome } from "./types";
 export { AbstractSanityCheck } from "./types";
@@ -24,6 +26,7 @@ export { EnvExampleCheck } from "./env-example";
 export { FrameworkCheck } from "./framework";
 export { SchemaCheck } from "./schema";
 export { DependencyCheck } from "./dependency";
+export { ManagedFilesCheck } from "./managed-files";
 export { ProjectMatchCheck } from "./project-match";
 
 /** Every diagnostic the `doctor` command runs, in display order. */
@@ -34,11 +37,8 @@ export const SANITY_CHECKS: ReadonlyArray<SanityCheck> = [
   new GitignoreCheck(),
   new EnvExampleCheck(),
   new FrameworkCheck(),
-  // SchemaCheck is disabled: the user schema is now provisioned server-side
-  // and no longer scaffolded into `.zitadel/schemas/user.json`, so there is
-  // no local file to verify. The check is kept (imported/exported below) for
-  // the future pull-based workflow that will re-introduce local resources.
-  // new SchemaCheck(),
+  new SchemaCheck(),
   new DependencyCheck(),
+  new ManagedFilesCheck(),
   new ProjectMatchCheck(),
 ];

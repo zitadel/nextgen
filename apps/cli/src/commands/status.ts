@@ -1,5 +1,8 @@
+import { createZitadelClient } from "@zitadel/api/client";
+
 import { isProcessRunning } from "../lib/local-server/binary";
 import { inspectContainer } from "../lib/local-server/docker";
+import { customizeAndPublishActions, verifyLoginAction } from "../lib/journey-guidance";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   checkLocalServerHealth,
@@ -53,8 +56,17 @@ export default class Status extends BaseCommand {
     const serverLifecycle = lifecycleForRuntime({ docker, healthy, processRunning, runtime });
 
     const project = await projectStatus(this.meta.cwd);
-    const nextCommands = nextCommandsFor(serverLifecycle, project.lifecycle, this.meta.cliVersion);
-    const nextActions = nextActionsFor(project.lifecycle);
+    const users =
+      project.lifecycle === "configured"
+        ? await detectUserPresence(this.meta.cwd, this.meta.source)
+        : "unknown";
+    const nextCommands = nextCommandsFor(
+      serverLifecycle,
+      project.lifecycle,
+      users,
+      this.meta.cliVersion,
+    );
+    const nextActions = nextActionsFor(project, users, this.meta.cliVersion);
 
     return this.emit({
       status: "ok",
@@ -154,11 +166,58 @@ async function projectStatus(cwd: string): Promise<ProjectStatus> {
   };
 }
 
-function nextActionsFor(projectLifecycle: ProjectStatus["lifecycle"]): string[] {
-  if (projectLifecycle === "not-configured") {
+type UserPresence = "none" | "some" | "unknown";
+
+const PRESENCE_PROBE_TIMEOUT_MS = 1500;
+
+/**
+ * Whether the project has any users yet — the journey signal that stages the
+ * guidance: before the first successful registration the next step is
+ * verifying login, afterwards it is customizing and publishing config. Best
+ * effort by design: any failure (server unreachable, stale secret, timeout)
+ * reads as `unknown` and the caller keeps the lifecycle-only output.
+ */
+async function detectUserPresence(cwd: string, source: string): Promise<UserPresence> {
+  try {
+    const secret = await readZitadelSecret(cwd);
+    const client = createZitadelClient({
+      baseUrl: source,
+      token: secret.project_secret,
+    });
+    const probe = client
+      .listUsers({ limit: 1 }, { signal: AbortSignal.timeout(PRESENCE_PROBE_TIMEOUT_MS) })
+      .then(({ users }): UserPresence => (users.length > 0 ? "some" : "none"))
+      .catch((): UserPresence => "unknown");
+    // The abort signal alone is not enough: DNS resolution can outlive it
+    // (getaddrinfo runs on the threadpool and some environments take many
+    // seconds to fail), and `status` must stay snappy. Race a detached timer
+    // so the answer degrades to "unknown" at the deadline no matter what the
+    // socket layer does; unref'd so it never keeps the CLI process alive.
+    return await Promise.race([
+      probe,
+      new Promise<UserPresence>((resolve) => {
+        setTimeout(() => resolve("unknown"), PRESENCE_PROBE_TIMEOUT_MS + 250).unref();
+      }),
+    ]);
+  } catch {
+    return "unknown";
+  }
+}
+
+function nextActionsFor(project: ProjectStatus, users: UserPresence, cliVersion: string): string[] {
+  if (project.lifecycle === "not-configured") {
     return [
       "From your app directory, run setup; the CLI will detect the framework or ask in an empty directory.",
     ];
+  }
+  if (project.lifecycle !== "configured") {
+    return [];
+  }
+  if (users === "none") {
+    return [verifyLoginAction(project.issuer)];
+  }
+  if (users === "some") {
+    return customizeAndPublishActions(cliVersion);
   }
   return [];
 }
@@ -166,6 +225,7 @@ function nextActionsFor(projectLifecycle: ProjectStatus["lifecycle"]): string[] 
 function nextCommandsFor(
   serverLifecycle: string,
   projectLifecycle: ProjectStatus["lifecycle"],
+  users: UserPresence,
   cliVersion: string,
 ): string[] {
   const commands: string[] = [];
@@ -180,7 +240,17 @@ function nextCommandsFor(
       publicCliCommand("doctor --fix", cliVersion),
     );
   } else {
-    commands.push(publicCliCommand("doctor", cliVersion), publicCliCommand("apply", cliVersion));
+    commands.push(publicCliCommand("doctor", cliVersion));
+    if (users === "none") {
+      // Staged like next_actions: before the first login is proven in a
+      // browser, publishing is premature — `plan` previews safely and the
+      // verify mission lives in next_actions. `apply` joins once users
+      // exist ("some") or when the probe can't tell ("unknown" keeps the
+      // lifecycle-only behavior rather than withholding on no signal).
+      commands.push(publicCliCommand("plan", cliVersion));
+    } else {
+      commands.push(publicCliCommand("apply", cliVersion));
+    }
   }
   return commands;
 }
