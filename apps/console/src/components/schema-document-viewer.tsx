@@ -7,7 +7,6 @@ import { InlineCode } from "@/components/ui/inline-code";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type CodeLanguage, type CodeLine, highlightCode } from "@/lib/highlight";
 import type { UserSchema } from "@/lib/schema";
-import { cn } from "@/lib/utils";
 
 /**
  * The command the footer tells an operator to run (decisions log D0b).
@@ -63,12 +62,7 @@ export function SchemaDocumentViewer({ schema }: { schema: UserSchema }) {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        <CopyButton
-          value={source}
-          label={`Copy the schema document as ${format.toUpperCase()}`}
-          size="sm"
-          iconClassName="size-3.5"
-        />
+        <CopyButton value={source} label={`Copy the schema document as ${format.toUpperCase()}`} />
       </div>
 
       {/* The design's code block hugs its content, but it is drawn around a
@@ -148,21 +142,10 @@ const TABS_TRIGGER =
  *
  * The confirmation is an icon swap plus a live region: the design gives the
  * button no room for a label, and a silent icon change is invisible to a screen
- * reader. `navigator.clipboard` is unavailable on an insecure origin, so a
- * rejected write leaves the button in its resting state rather than claiming a
- * copy that did not happen.
+ * reader. A write that is refused — or a missing clipboard — leaves the button
+ * in its resting state rather than claiming a copy that did not happen.
  */
-function CopyButton({
-  value,
-  label,
-  size,
-  iconClassName,
-}: {
-  value: string;
-  label: string;
-  size: "sm";
-  iconClassName: string;
-}) {
+function CopyButton({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -176,19 +159,25 @@ function CopyButton({
       <Button
         type="button"
         variant="ghost"
-        size={size}
+        size="sm"
         aria-label={label}
         onClick={() => {
-          void navigator.clipboard?.writeText(value).then(
+          // `navigator.clipboard` is absent on an insecure origin. Guarded
+          // explicitly rather than by optional-chaining the call: both are
+          // safe, but the chain form reads as though `.then()` runs on
+          // `undefined`.
+          const { clipboard } = navigator;
+          if (!clipboard) return;
+          void clipboard.writeText(value).then(
             () => setCopied(true),
             () => setCopied(false),
           );
         }}
       >
         {copied ? (
-          <Check className={cn(iconClassName, "text-foreground")} aria-hidden />
+          <Check className="size-3.5 text-foreground" aria-hidden />
         ) : (
-          <Copy className={iconClassName} aria-hidden />
+          <Copy className="size-3.5" aria-hidden />
         )}
       </Button>
       <span role="status" aria-live="polite" className="sr-only">
