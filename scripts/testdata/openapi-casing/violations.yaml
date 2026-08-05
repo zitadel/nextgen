@@ -1,0 +1,66 @@
+### Fixture for scripts/openapi-casing-rules.test.mjs. Every name here must be
+### rejected by one of the wire-casing rules in redocly.yaml. Each violation is
+### isolated in its own node: the enum rule reports once per enum array, so bad
+### values sharing an array would prove only that the first one failed.
+openapi: 3.1.0
+info:
+  title: wire casing violations
+  version: 1.0.0
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+  - url: https://example.test
+security: []
+tags:
+  - name: Fixture
+    description: Fixture operations.
+paths:
+  /things:
+    get:
+      operationId: listThings
+      summary: List things
+      tags:
+        - Fixture
+      parameters:
+        - name: objectType
+          in: query
+          schema:
+            type: string
+        - name: plain_camel_case
+          in: query
+          schema:
+            type: string
+            enum:
+              - createdAt
+        # Both escapes below pass an anchored /^[a-z][a-z0-9]*[A-Z]/, which
+        # cannot cross the underscore. They are the reason the rule is
+        # unanchored.
+        - name: hump_after_underscore
+          in: query
+          schema:
+            type: string
+            enum:
+              - created_atUTC
+        - name: hump_in_last_word
+          in: query
+          schema:
+            type: string
+            enum:
+              - some_valueCamel
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  createdAt:
+                    type: string
+                  # Property names get a positive snake_case match, not just a
+                  # camelCase test, so PascalCase has to fail here too.
+                  PascalCase:
+                    type: string
+        "400":
+          description: bad request
