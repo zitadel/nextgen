@@ -3555,6 +3555,8 @@ func (s SessionSortField) Validate() error {
 	switch s {
 	case "created_at":
 		return nil
+	case "user_id":
+		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}

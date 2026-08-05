@@ -24531,6 +24531,8 @@ func (s *SessionSortField) Decode(d *jx.Decoder) error {
 	switch SessionSortField(v) {
 	case SessionSortFieldCreatedAt:
 		*s = SessionSortFieldCreatedAt
+	case SessionSortFieldUserID:
+		*s = SessionSortFieldUserID
 	default:
 		*s = SessionSortField(v)
 	}

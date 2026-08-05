@@ -5,3 +5,4 @@ description: |
   `state` would skip or duplicate rows between pages.
 enum:
   - created_at
+  - user_id

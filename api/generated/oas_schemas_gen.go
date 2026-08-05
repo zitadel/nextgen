@@ -12971,12 +12971,14 @@ type SessionSortField string
 
 const (
 	SessionSortFieldCreatedAt SessionSortField = "created_at"
+	SessionSortFieldUserID    SessionSortField = "user_id"
 )
 
 // AllValues returns all SessionSortField values.
 func (SessionSortField) AllValues() []SessionSortField {
 	return []SessionSortField{
 		SessionSortFieldCreatedAt,
+		SessionSortFieldUserID,
 	}
 }
 
@@ -12984,6 +12986,8 @@ func (SessionSortField) AllValues() []SessionSortField {
 func (s SessionSortField) MarshalText() ([]byte, error) {
 	switch s {
 	case SessionSortFieldCreatedAt:
+		return []byte(s), nil
+	case SessionSortFieldUserID:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -12995,6 +12999,9 @@ func (s *SessionSortField) UnmarshalText(data []byte) error {
 	switch SessionSortField(data) {
 	case SessionSortFieldCreatedAt:
 		*s = SessionSortFieldCreatedAt
+		return nil
+	case SessionSortFieldUserID:
+		*s = SessionSortFieldUserID
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
