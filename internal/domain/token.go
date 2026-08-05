@@ -24,8 +24,22 @@ func ErrInvalidToken() Error {
 	return newError(TokenPrefix.ErrorCodePrefix("invalid"), "the token is not valid", nil, nil)
 }
 
+// ErrTokenRevoked is returned when a token decrypts and is well-formed but its
+// record says it is no longer active — revoked, expired, or gone from storage.
+// It is deliberately indistinguishable from [ErrInvalidToken] to a caller: a
+// bearer learns only that the credential does not work.
+func ErrTokenRevoked() Error {
+	return newError(TokenPrefix.ErrorCodePrefix("revoked"), "the token is not valid", nil, nil)
+}
+
 // Token is a persisted token record (access, session, PAT, etc.).
-// Revocation is modeled as deletion from storage.
+//
+// A revocable token carries its record's id (`TokenID`, the `jti`). The token
+// itself is never stored — only the id, which is not a secret (ADR 029) — and
+// verification resolves that id against the record to decide whether the token
+// is still active. Revocation marks the record with [Token.RevokedAt] rather
+// than deleting it, so a replayed token is distinguishable from an unknown one
+// (ADR 037).
 type Token struct {
 	ProjectID string
 	TokenID   string
@@ -40,6 +54,23 @@ type Token struct {
 	Scope         []string
 	CreatedAt     time.Time
 	ExpiresAt     *time.Time
+	// RevokedAt is set on the stored record once the token is revoked. It is
+	// never carried in the issued token — it is read from storage at
+	// verification time.
+	RevokedAt *time.Time `json:"-"`
+}
+
+// IsRevocable reports whether this token's authority is resolved against a
+// stored record. A revocable token must carry a TokenID to be verifiable.
+func (t *Token) IsRevocable() bool { return t.Type.Persistable() }
+
+// Active reports whether the stored record still grants the token's authority
+// at the given instant: not revoked and not past its expiry.
+func (t *Token) Active(now time.Time) bool {
+	if t.RevokedAt != nil {
+		return false
+	}
+	return t.ExpiresAt == nil || t.ExpiresAt.After(now)
 }
 
 // ValidatePersisted checks identifier fields before writing to the tokens table.
@@ -71,6 +102,15 @@ func (t *Token) ValidatePersisted() error {
 		}
 	case TokenTypePersonalAccessToken:
 		if t.SessionID != nil || t.OIDCSessionID != nil || t.SAMLSessionID != nil {
+			return ErrInvalidTokenIdentifiers()
+		}
+	case TokenTypeProjectToken, TokenTypeProjectPreview:
+		// A project credential authenticates software, not a user, so it
+		// carries neither a user nor any session identifier.
+		if t.SessionID != nil || t.OIDCSessionID != nil || t.SAMLSessionID != nil {
+			return ErrInvalidTokenIdentifiers()
+		}
+		if t.UserID != "" {
 			return ErrInvalidTokenIdentifiers()
 		}
 	case TokenTypeUnspecified:
@@ -170,4 +210,5 @@ const (
 	TokenFieldScope
 	TokenFieldExpiresAt
 	TokenFieldCreatedAt
+	TokenFieldRevokedAt
 )

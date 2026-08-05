@@ -21,9 +21,15 @@ const (
 
 	deleteByIDTokenStmt = `DELETE FROM tokens WHERE project_id = ? AND token_id = ?`
 
+	revokeByIDTokenStmt = `UPDATE tokens SET revoked_at = ?
+WHERE project_id = ? AND token_id = ? AND revoked_at IS NULL`
+
+	revokeBySessionIDTokenStmt = `UPDATE tokens SET revoked_at = ?
+WHERE project_id = ? AND session_id = ? AND revoked_at IS NULL`
+
 	tokenQuery = `SELECT project_id, token_id, user_id, token_type,
 	session_id, oidc_session_id, saml_session_id,
-	scope, expires_at, created_at
+	scope, expires_at, created_at, revoked_at
 FROM tokens`
 )
 
@@ -78,6 +84,18 @@ func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) 
 // DeleteTokenByID implements [service.TokenStatements].
 func (ts tokenStatements) DeleteTokenByID(ctx context.Context, projectID, tokenID string) error {
 	_, err := ts.client.Exec(ctx, deleteByIDTokenStmt, projectID, tokenID)
+	return wrapError(err)
+}
+
+// RevokeTokenByID implements [service.TokenStatements].
+func (ts tokenStatements) RevokeTokenByID(ctx context.Context, projectID, tokenID string) error {
+	_, err := ts.client.Exec(ctx, revokeByIDTokenStmt, nowUnixNano(), projectID, tokenID)
+	return wrapError(err)
+}
+
+// RevokeTokensBySessionID implements [service.TokenStatements].
+func (ts tokenStatements) RevokeTokensBySessionID(ctx context.Context, projectID, sessionID string) error {
+	_, err := ts.client.Exec(ctx, revokeBySessionIDTokenStmt, nowUnixNano(), projectID, sessionID)
 	return wrapError(err)
 }
 
@@ -136,7 +154,7 @@ func scanToken(rows *sql.Rows) (*domain.Token, error) {
 		userID                           sql.NullString
 		sessionID, oidcSessionID, samlID sql.NullString
 		scopeStr                         string
-		expiresAtNano                    sql.NullInt64
+		expiresAtNano, revokedAtNano     sql.NullInt64
 		tokenType                        string
 		createdNano                      int64
 	)
@@ -151,6 +169,7 @@ func scanToken(rows *sql.Rows) (*domain.Token, error) {
 		&scopeStr,
 		&expiresAtNano,
 		&createdNano,
+		&revokedAtNano,
 	); err != nil {
 		return nil, err
 	}
@@ -185,12 +204,19 @@ func scanToken(rows *sql.Rows) (*domain.Token, error) {
 		exp := timeFromUnixNano(expiresAtNano.Int64)
 		token.ExpiresAt = &exp
 	}
+	if revokedAtNano.Valid {
+		revoked := timeFromUnixNano(revokedAtNano.Int64)
+		token.RevokedAt = &revoked
+	}
 	token.CreatedAt = timeFromUnixNano(createdNano)
 	return token, nil
 }
 
-func tokenUserIDArg(userID string, tokenType domain.TokenType) any {
-	if tokenType == domain.TokenTypeSessionToken && userID == "" {
+// tokenUserIDArg keeps an absent user NULL rather than "": the column carries a
+// foreign key to users, and project credentials authenticate software, not a
+// user, so they have none at all.
+func tokenUserIDArg(userID string, _ domain.TokenType) any {
+	if userID == "" {
 		return nil
 	}
 	return userID
@@ -282,5 +308,15 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 		SQLName:  "created_at",
 		Accessor: func(t *domain.Token) any { return t.CreatedAt },
 		Coerce:   database.CoerceTime,
+	},
+	domain.TokenFieldRevokedAt: {
+		SQLName: "revoked_at",
+		Accessor: func(t *domain.Token) any {
+			if t.RevokedAt == nil {
+				return (*time.Time)(nil)
+			}
+			return *t.RevokedAt
+		},
+		Coerce: database.CoerceTime,
 	},
 })

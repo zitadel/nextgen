@@ -80,41 +80,79 @@ func (c *MockTokenServiceGenerateJWECall) DoAndReturn(f func(context.Context, *d
 	return c
 }
 
-// VerifyToken mocks base method.
-func (m *MockTokenService) VerifyToken(ctx context.Context, token string) (*domain.Token, error) {
+// IntrospectToken mocks base method.
+func (m *MockTokenService) IntrospectToken(ctx context.Context, token string) (*domain.Token, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyToken", ctx, token)
+	ret := m.ctrl.Call(m, "IntrospectToken", ctx, token)
 	ret0, _ := ret[0].(*domain.Token)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// VerifyToken indicates an expected call of VerifyToken.
-func (mr *MockTokenServiceMockRecorder) VerifyToken(ctx, token any) *MockTokenServiceVerifyTokenCall {
+// IntrospectToken indicates an expected call of IntrospectToken.
+func (mr *MockTokenServiceMockRecorder) IntrospectToken(ctx, token any) *MockTokenServiceIntrospectTokenCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyToken", reflect.TypeOf((*MockTokenService)(nil).VerifyToken), ctx, token)
-	return &MockTokenServiceVerifyTokenCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IntrospectToken", reflect.TypeOf((*MockTokenService)(nil).IntrospectToken), ctx, token)
+	return &MockTokenServiceIntrospectTokenCall{Call: call}
 }
 
-// MockTokenServiceVerifyTokenCall wrap *gomock.Call
-type MockTokenServiceVerifyTokenCall struct {
+// MockTokenServiceIntrospectTokenCall wrap *gomock.Call
+type MockTokenServiceIntrospectTokenCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockTokenServiceVerifyTokenCall) Return(arg0 *domain.Token, arg1 error) *MockTokenServiceVerifyTokenCall {
+func (c *MockTokenServiceIntrospectTokenCall) Return(arg0 *domain.Token, arg1 error) *MockTokenServiceIntrospectTokenCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockTokenServiceVerifyTokenCall) Do(f func(context.Context, string) (*domain.Token, error)) *MockTokenServiceVerifyTokenCall {
+func (c *MockTokenServiceIntrospectTokenCall) Do(f func(context.Context, string) (*domain.Token, error)) *MockTokenServiceIntrospectTokenCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockTokenServiceVerifyTokenCall) DoAndReturn(f func(context.Context, string) (*domain.Token, error)) *MockTokenServiceVerifyTokenCall {
+func (c *MockTokenServiceIntrospectTokenCall) DoAndReturn(f func(context.Context, string) (*domain.Token, error)) *MockTokenServiceIntrospectTokenCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// RevokeToken mocks base method.
+func (m *MockTokenService) RevokeToken(ctx context.Context, projectID, tokenID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RevokeToken", ctx, projectID, tokenID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RevokeToken indicates an expected call of RevokeToken.
+func (mr *MockTokenServiceMockRecorder) RevokeToken(ctx, projectID, tokenID any) *MockTokenServiceRevokeTokenCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeToken", reflect.TypeOf((*MockTokenService)(nil).RevokeToken), ctx, projectID, tokenID)
+	return &MockTokenServiceRevokeTokenCall{Call: call}
+}
+
+// MockTokenServiceRevokeTokenCall wrap *gomock.Call
+type MockTokenServiceRevokeTokenCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockTokenServiceRevokeTokenCall) Return(arg0 error) *MockTokenServiceRevokeTokenCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockTokenServiceRevokeTokenCall) Do(f func(context.Context, string, string) error) *MockTokenServiceRevokeTokenCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockTokenServiceRevokeTokenCall) DoAndReturn(f func(context.Context, string, string) error) *MockTokenServiceRevokeTokenCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

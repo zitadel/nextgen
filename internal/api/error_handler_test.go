@@ -60,7 +60,7 @@ func TestOgenErrorHandlerInvalidSessionCookie(t *testing.T) {
 	t.Parallel()
 	mock := gomock.NewController(t)
 	tokenService := mocks.NewMockTokenService(mock)
-	tokenService.EXPECT().VerifyToken(gomock.Any(), gomock.Any()).Return(nil, errors.New("bad token"))
+	tokenService.EXPECT().IntrospectToken(gomock.Any(), gomock.Any()).Return(nil, errors.New("bad token"))
 
 	srv := newErrorHandlerTestServer(t, tokenService)
 

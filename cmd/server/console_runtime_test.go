@@ -13,7 +13,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
@@ -185,10 +184,10 @@ func (f *fakeProjectService) DefaultProject(context.Context, string) (*domain.Pr
 
 func TestStandaloneRuntimeResolverWithoutProject(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	keys := servicemocks.NewMockKeyService(ctrl)
-	keys.EXPECT().GetProjectCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	tokens := servicemocks.NewMockTokenService(ctrl)
+	tokens.EXPECT().GenerateJWE(gomock.Any(), gomock.Any()).Times(0)
 
-	resolve := standaloneRuntimeResolver(&fakeProjectService{}, keys, "")
+	resolve := standaloneRuntimeResolver(&fakeProjectService{}, tokens, "")
 	meta, err := resolve(context.Background())
 
 	require.NoError(t, err)
@@ -197,16 +196,12 @@ func TestStandaloneRuntimeResolverWithoutProject(t *testing.T) {
 
 func TestStandaloneRuntimeResolverDerivesPublishableKey(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	tokenCrypter := cryptomock.NewMockCrypter(ctrl)
-	// PreviewSecret serializes the read-only token and encrypts it with the
-	// project's token encryption key; the mocked crypter stands in for the JWE output.
-	tokenCrypter.EXPECT().Encrypt(gomock.Any()).Return("pk_preview", nil)
-	keys := servicemocks.NewMockKeyService(ctrl)
-	keys.EXPECT().GetProjectCrypter(gomock.Any(), "proj_first", domain.EncryptionKeyPurposeToken).Return(tokenCrypter, nil)
+	tokens := servicemocks.NewMockTokenService(ctrl)
+	tokens.EXPECT().GenerateJWE(gomock.Any(), gomock.Any()).Return("pk_preview", nil)
 
 	resolve := standaloneRuntimeResolver(
 		&fakeProjectService{project: &domain.Project{ID: "proj_first"}},
-		keys,
+		tokens,
 		"",
 	)
 	meta, err := resolve(context.Background())
@@ -221,9 +216,9 @@ func TestStandaloneRuntimeResolverDerivesPublishableKey(t *testing.T) {
 
 func TestStandaloneRuntimeResolverPropagatesProjectError(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	keys := servicemocks.NewMockKeyService(ctrl)
+	tokens := servicemocks.NewMockTokenService(ctrl)
 
-	resolve := standaloneRuntimeResolver(&fakeProjectService{err: errors.New("db down")}, keys, "")
+	resolve := standaloneRuntimeResolver(&fakeProjectService{err: errors.New("db down")}, tokens, "")
 	_, err := resolve(context.Background())
 
 	assert.Error(t, err)

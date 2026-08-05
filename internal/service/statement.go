@@ -149,6 +149,8 @@ type TokenStatements interface {
 	GetTokenByID(ctx context.Context, projectID, tokenID string) (*domain.Token, error)
 	ListTokens(ctx context.Context, filter *database.ListOptions[domain.TokenField]) (*database.ListResult[*domain.Token], error)
 	DeleteTokenByID(ctx context.Context, projectID, tokenID string) error
+	RevokeTokenByID(ctx context.Context, projectID, tokenID string) error
+	RevokeTokensBySessionID(ctx context.Context, projectID, sessionID string) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

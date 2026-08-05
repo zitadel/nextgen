@@ -172,8 +172,12 @@ func TestSessionStatements_Exchange_rotatesToken(t *testing.T) {
 		assert.Equal(t, anonymous.ID, exchanged.ID)
 		assert.NotEqual(t, oldTokenID, exchanged.TokenID)
 
-		_, err = testPool.GetTokenByID(t.Context(), projectID, oldTokenID)
-		require.Error(t, err)
+		// Rotation revokes the predecessor rather than deleting it, so a replay
+		// of the rotated-out token is answered "revoked", not "unknown".
+		previous, err := testPool.GetTokenByID(t.Context(), projectID, oldTokenID)
+		require.NoError(t, err)
+		require.NotNil(t, previous.RevokedAt)
+		assert.False(t, previous.Active(time.Now()))
 
 		current, err := testPool.GetTokenByID(t.Context(), projectID, exchanged.TokenID)
 		require.NoError(t, err)

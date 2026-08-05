@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -52,7 +51,11 @@ type runtimeResolver func(ctx context.Context) (consoleRuntime, error)
 // standaloneRuntimeResolver resolves the standalone runtime document from
 // the deployment's default project (configured pin or first-created),
 // including the project's publishable key derived from its token encryption key.
-func standaloneRuntimeResolver(projects service.ProjectService, keys service.KeyService, cfgProjectID string) runtimeResolver {
+func standaloneRuntimeResolver(
+	projects service.ProjectService,
+	tokens service.TokenService,
+	cfgProjectID string,
+) runtimeResolver {
 	return func(ctx context.Context) (consoleRuntime, error) {
 		project, err := projects.DefaultProject(ctx, cfgProjectID)
 		if err != nil {
@@ -64,11 +67,8 @@ func standaloneRuntimeResolver(projects service.ProjectService, keys service.Key
 		}
 		meta.ConsoleProjectID = project.ID
 
-		tokenCrypter, err := keys.GetProjectCrypter(ctx, project.ID, domain.EncryptionKeyPurposeToken)
-		if err != nil {
-			return consoleRuntime{}, err
-		}
-		publishableKey, err := project.PreviewSecret(tokenCrypter)
+		tkn := project.PreviewToken()
+		publishableKey, err := tokens.GenerateJWE(ctx, tkn)
 		if err != nil {
 			return consoleRuntime{}, err
 		}
