@@ -240,8 +240,8 @@ POST   /flow_definitions/{id}/deactivate
 
 ## Events and audit
 
-Unified wide-event audit stream. See [ADR 029](../../adrs/029-wide-events-internal-audit-primitive.md)
-(internal model) and [ADR 030](../../adrs/030-events-api-retention-export.md) (API,
+Unified wide-event audit stream. See [ADR 048](../../adrs/048-wide-events-internal-audit-primitive.md)
+(internal model) and [ADR 049](../../adrs/049-events-api-retention-export.md) (API,
 retention, export).
 
 ```http
@@ -367,7 +367,7 @@ Draft request/response sketches for this design PR:
 
 auth_attempts, api_keys (flat), imports, capabilities: **TODO — not yet specified.**
 
-events: partially specified via [ADR 030](../../adrs/030-events-api-retention-export.md);
+events: partially specified via [ADR 049](../../adrs/049-events-api-retention-export.md);
 OpenAPI sketch pending.
 
 Implementation OpenAPI source remains under `api/openapi/**`; generated Go code

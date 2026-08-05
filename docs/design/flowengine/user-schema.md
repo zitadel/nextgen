@@ -22,10 +22,10 @@ What matters here is the contract: which schema annotations exist, how the flow 
 
 Audit event payloads use a **deny-by-default** PII policy: user attribute values
 are omitted unless a field is explicitly marked with `x-audit`. See
-[ADR 029](../../adrs/029-wide-events-internal-audit-primitive.md) §8.
-`x-sensitive` remains in the OpenAPI user-property schema and CLI presets
-(e.g. phone/password); it is **deprecated only for audit redaction**. Audit
-uses deny-by-default + `x-audit`, not `x-sensitive`.
+[ADR 048](../../adrs/048-wide-events-internal-audit-primitive.md) §8.
+`x-sensitive` remains for API/flow payload redaction (OpenAPI user-property
+schema and CLI presets, e.g. phone/password). Audit does not use `x-sensitive`;
+it uses deny-by-default + `x-audit`. The two annotations are complementary.
 
 ## How the Flow Engine and Policy Engine Consume Schemas
 

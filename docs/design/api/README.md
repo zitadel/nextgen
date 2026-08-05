@@ -56,7 +56,7 @@ for this design PR live in:
 - [`../flowengine/api/session-api.yaml`](../flowengine/api/session-api.yaml)
 
 Specs for auth_attempts, flat api_keys, imports, and capabilities are not yet written.
-Events are partially specified in [ADR 030](../../adrs/030-events-api-retention-export.md);
+Events are partially specified in [ADR 049](../../adrs/049-events-api-retention-export.md);
 OpenAPI sketch pending.
 Implementation OpenAPI source remains under `api/openapi/**`; generated Go code
 continues to come from that source, not from these design sketches.
