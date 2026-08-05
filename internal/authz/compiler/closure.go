@@ -37,9 +37,8 @@ func shortestDepths(source Relation, direct map[Relation][]Relation) map[Relatio
 	depths := map[Relation]int{source: 0}
 	queue := []Relation{source}
 
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
+	for i := 0; i < len(queue); i++ {
+		current := queue[i]
 		nextDepth := depths[current] + 1
 
 		for _, implied := range direct[current] {
