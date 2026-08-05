@@ -222,7 +222,6 @@ func (s *UserService) ListUserTeams(ctx context.Context, input ListUserTeamsInpu
 			OrderBy: database.OrderBy[domain.UserTeamField]{
 				Columns: []database.Column[domain.UserTeamField]{
 					database.Col(domain.UserTeamFieldTeamName),
-					database.Col(domain.UserTeamFieldCreatedAt),
 					database.Col(domain.UserTeamFieldTeamID),
 				},
 				Direction: database.OrderAsc,
