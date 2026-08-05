@@ -189,28 +189,39 @@ func flowCreatedAfter(a, b *domain.FlowDefinition) bool {
 	return a.ID > b.ID
 }
 
+// resolveFlowSession returns the id of the session the flow runs against: the
+// one the client supplied (a pre-created anonymous session, or an existing
+// session for step-up), or a freshly persisted anonymous session when none is
+// supplied. Linking the auth-attempt to this session lets exchange upgrade it in
+// place (building -> active) instead of minting a second one.
+//
+// It persists through the statement pool rather than SessionService because the
+// pool is flowService's only persistence port — every other storage access here
+// already goes through s.v2Pool.Statements() — so routing session creation
+// through SessionService would add a service-to-service dependency for no gain.
+// (domain.NewSession only builds the value; it cannot persist.)
+func (s *flowService) resolveFlowSession(ctx context.Context, req StartFlowRequest) (string, error) {
+	if req.SessionID != nil {
+		return *req.SessionID, nil
+	}
+	session, err := domain.NewSession(req.Definition.ProjectID, nil)
+	if err != nil {
+		return "", fmt.Errorf("flow service: create anonymous session: %w", err)
+	}
+	if err := s.v2Pool.Statements().CreateSession(ctx, session); err != nil {
+		return "", fmt.Errorf("flow service: persist anonymous session: %w", err)
+	}
+	return session.ID, nil
+}
+
 func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.FlowStepResult, error) {
 	if req.Definition == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: start without definition")
 	}
 
-	// Persist a session for the flow: reuse the one the client supplied (a
-	// pre-created anonymous session, or an existing session for step-up),
-	// otherwise create a new anonymous session. Linking the auth-attempt to this
-	// session lets exchange upgrade it in place (building -> active) instead of
-	// minting a second one.
-	sessionID := ""
-	if req.SessionID != nil {
-		sessionID = *req.SessionID
-	} else {
-		session, err := domain.NewSession(req.Definition.ProjectID, nil)
-		if err != nil {
-			return domain.FlowStepResult{}, fmt.Errorf("flow service: create anonymous session: %w", err)
-		}
-		if err := s.v2Pool.Statements().CreateSession(ctx, session); err != nil {
-			return domain.FlowStepResult{}, fmt.Errorf("flow service: persist anonymous session: %w", err)
-		}
-		sessionID = session.ID
+	sessionID, err := s.resolveFlowSession(ctx, req)
+	if err != nil {
+		return domain.FlowStepResult{}, err
 	}
 
 	in := domain.FlowStartInput{
