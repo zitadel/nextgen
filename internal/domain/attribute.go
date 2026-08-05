@@ -82,31 +82,39 @@ func (attrs *Attributes) UnmarshalJSON(data []byte) error {
 func (attrs Attributes) ToMap() (map[string]any, error) {
 	tree := make(map[string]any)
 	for _, attr := range attrs {
-		keyNodes := attr.Key.Nodes()
-
-		subTree := tree
-		for len(keyNodes) > 1 {
-			// not a leaf node, traverse down the tree
-
-			var m map[string]any
-			v, ok := subTree[keyNodes[0]]
-			if !ok {
-				// nested map does not yet exist, create a new one
-				m = make(map[string]any)
-			} else if m, ok = v.(map[string]any); !ok {
-				// if the key overlaps with another value which is not an object, error to be sure
-				return nil, fmt.Errorf("the given key already exists in the map with a value which is not a map (%s)", keyNodes[0])
-			}
-
-			subTree[keyNodes[0]] = m
-			subTree = m
-			keyNodes = keyNodes[1:]
+		if err := setNested(tree, attr.Key, attr.Value); err != nil {
+			return nil, err
 		}
-
-		subTree[keyNodes[0]] = attr.Value
-
 	}
 	return tree, nil
+}
+
+// setNested writes value into tree at the dotted key, creating the
+// intermediate maps it descends through.
+func setNested(tree map[string]any, key AttributeKey, value any) error {
+	keyNodes := key.Nodes()
+
+	subTree := tree
+	for len(keyNodes) > 1 {
+		// not a leaf node, traverse down the tree
+
+		var m map[string]any
+		v, ok := subTree[keyNodes[0]]
+		if !ok {
+			// nested map does not yet exist, create a new one
+			m = make(map[string]any)
+		} else if m, ok = v.(map[string]any); !ok {
+			// if the key overlaps with another value which is not an object, error to be sure
+			return fmt.Errorf("the given key already exists in the map with a value which is not a map (%s)", keyNodes[0])
+		}
+
+		subTree[keyNodes[0]] = m
+		subTree = m
+		keyNodes = keyNodes[1:]
+	}
+
+	subTree[keyNodes[0]] = value
+	return nil
 }
 
 func (attrs Attributes) MarshalJSON() ([]byte, error) {

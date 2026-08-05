@@ -81,6 +81,10 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 		}
 	}
 
+	if err := rejectDottedPropertyNames(schema); err != nil {
+		return nil, err
+	}
+
 	var objectType *string
 	if ot, ok := maputil.Get[string](schema, "objectType"); ok {
 		objectType = &ot
@@ -93,6 +97,31 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 		CreatedAt:  time.Now().UTC(),
 		Schema:     schemabs,
 	}, nil
+}
+
+// rejectDottedPropertyNames walks the schema's nested `properties` and
+// rejects a name holding a dot. Nested values are keyed by their dotted
+// path in the attribute store and addressed by that same path in a flow
+// step's fields, so `{"a.b": …}` and `{"a": {"b": …}}` would be
+// indistinguishable in both places.
+func rejectDottedPropertyNames(schema map[string]any) error {
+	props, ok := maputil.Get[map[string]any](schema, "properties")
+	if !ok {
+		return nil
+	}
+	for name, prop := range props {
+		if strings.Contains(name, ".") {
+			return ErrJSONSchemaInvalid().WithMessage(fmt.Sprintf("schema property %q cannot contain a dot", name))
+		}
+		sub, ok := prop.(map[string]any)
+		if !ok {
+			continue
+		}
+		if err := rejectDottedPropertyNames(sub); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/json_schema.mock.go . JSONSchemaStore

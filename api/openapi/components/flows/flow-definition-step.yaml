@@ -22,10 +22,12 @@ properties:
     type: array
     description: |
       Schema property names to collect from the user. Each entry references
-      a property in the flow's user schema. The engine resolves field type,
+      a property in the flow's user schema, naming a nested one by its
+      dotted path (`address.street`). The engine resolves field type,
       validation rules, and implicit outcomes from schema annotations
       (e.g. a property with `x-unique` set implies a `user_not_found`
-      transition outcome).
+      transition outcome). An object- or array-typed property has no
+      field-shaped input: collect its leaves instead.
     items:
       type: string
     default: []

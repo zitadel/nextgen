@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/ianlancetaylor/jsonschema"
 )
@@ -115,7 +116,7 @@ func resolveAllStepFields(schema *jsonschema.Schema, steps []FlowDefinitionStep)
 	}
 
 	// validate that all required fields in the schema are present in the flow definition
-	if err := validateRequiredUserSchemaFields(sr.RequiredSet(), steps); err != nil {
+	if err := validateRequiredUserSchemaFields(sr.RequiredLeafPaths(), steps); err != nil {
 		return nil, err
 	}
 
@@ -192,7 +193,18 @@ func validateRequiredUserSchemaFields(required map[string]struct{}, steps []Flow
 	}
 	missingFields := make([]string, 0, len(required))
 	for requiredField := range required {
-		if _, ok := fields[requiredField]; !ok {
+		// A required leaf is covered only by itself; a required object
+		// that declares no `required` of its own is covered by any field
+		// beneath it, since the object materializes once a child is
+		// collected.
+		covered := false
+		for f := range fields {
+			if f == requiredField || strings.HasPrefix(f, requiredField+".") {
+				covered = true
+				break
+			}
+		}
+		if !covered {
 			missingFields = append(missingFields, requiredField)
 		}
 	}
