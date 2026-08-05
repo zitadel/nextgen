@@ -45,7 +45,7 @@ import {
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { signHandoffToken } from "./crypto.js";
-import { expireClaimChallenge } from "./platform-handlers.js";
+import { expireClaimChallenge, snapshotPlatformStore } from "./platform-handlers.js";
 import { PLATFORM_PROJECT_ID, startMockServer } from "./server.js";
 
 const PORT = 4456;
@@ -444,6 +444,17 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(typeof body.challenge_id).toBe("string");
     expect(() => new URL(body.claim_url as string)).not.toThrow();
     expect(new Date(body.expires_at as string).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  test("the store snapshot exposes minted challenge ids", async () => {
+    // A test driving the mock over HTTP (the CLI suite) never sees the init
+    // response body, so the snapshot is its only route to the id the
+    // completion and expiry mutators take.
+    const project = await createProject("claim-snapshot");
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+
+    expect(snapshotPlatformStore().claimChallengeIds).toContain(challenge_id);
   });
 
   test("GET /projects/:id/claim/status is pending before completion", async () => {
