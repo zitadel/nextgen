@@ -183,6 +183,10 @@ type SessionStatements interface {
 	GetSessionByID(ctx context.Context, projectID, sessionID string) (*domain.Session, error)
 	ListSessions(ctx context.Context, filter *database.ListOptions[domain.SessionField]) (*database.ListResult[*domain.Session], error)
 	DeleteSessionByID(ctx context.Context, projectID, sessionID string) error
+	// RevokeSessionByID soft-revokes a session (stamps revoked_at) so the row
+	// stays visible; a missing or already-revoked session reports
+	// ErrSessionNotFound.
+	RevokeSessionByID(ctx context.Context, projectID, sessionID string) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

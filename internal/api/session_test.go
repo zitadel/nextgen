@@ -32,6 +32,12 @@ func TestValidateSessionToken(t *testing.T) {
 	token.TokenID = "tkn_100"
 	session.ExpiresAt = now.Add(-time.Minute)
 	require.ErrorIs(t, validateSessionToken(session, token), domain.ErrSessionTokenInvalid())
+
+	// A revoked session invalidates its derived token even while unexpired.
+	session.ExpiresAt = now.Add(time.Hour)
+	revokedAt := now
+	session.RevokedAt = &revokedAt
+	require.ErrorIs(t, validateSessionToken(session, token), domain.ErrSessionTokenInvalid())
 }
 
 func TestInvalidSessionCredential(t *testing.T) {

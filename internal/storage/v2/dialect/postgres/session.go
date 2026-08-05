@@ -21,7 +21,8 @@ const (
 VALUES ($1, $2, $3, $4::INTERVAL, $5) RETURNING created_at, updated_at, expires_at`
 	updateSessionTokenIDStmt = `UPDATE zitadel_nextgen.sessions SET token_id = $3 WHERE project_id = $1 AND id = $2`
 	deleteSessionByIDStmt    = `DELETE FROM zitadel_nextgen.sessions WHERE project_id = $1 AND id = $2`
-	sessionQuery             = `SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.time_to_live, s.token_id, s.user_id,
+	revokeSessionByIDStmt    = `UPDATE zitadel_nextgen.sessions SET revoked_at = NOW() WHERE project_id = $1 AND id = $2 AND revoked_at IS NULL`
+	sessionQuery             = `SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.time_to_live, s.token_id, s.user_id, s.revoked_at,
 	ua.id, ua.info,
 	c.type, c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload
 FROM zitadel_nextgen.sessions s
@@ -89,6 +90,20 @@ func (ss sessionStatements) ListSessions(ctx context.Context, filter *database.L
 
 func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, sessionID string) error {
 	tag, err := ss.client.Exec(ctx, deleteSessionByIDStmt, projectID, sessionID)
+	if err != nil {
+		return wrapError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrSessionNotFound()
+	}
+	return nil
+}
+
+// RevokeSessionByID soft-revokes the session by stamping revoked_at, leaving the
+// row in place so it stays visible. A missing or already-revoked session reports
+// ErrSessionNotFound so the caller can treat revoke as idempotent.
+func (ss sessionStatements) RevokeSessionByID(ctx context.Context, projectID, sessionID string) error {
+	tag, err := ss.client.Exec(ctx, revokeSessionByIDStmt, projectID, sessionID)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -316,6 +331,7 @@ func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
 			createdAt, updatedAt, expiresAt                time.Time
 			timeToLive                                     time.Duration
 			userID                                         *string
+			revokedAt                                      *time.Time
 			userAgentID                                    *string
 			userAgentInfo                                  []byte
 			checkType                                      *int64
@@ -323,7 +339,7 @@ func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
 			failureCount                                   *uint16
 			challenge, factor                              []byte
 		)
-		if err := rows.Scan(&projectID, &sessionID, &createdAt, &updatedAt, &expiresAt, &timeToLive, &tokenID, &userID,
+		if err := rows.Scan(&projectID, &sessionID, &createdAt, &updatedAt, &expiresAt, &timeToLive, &tokenID, &userID, &revokedAt,
 			&userAgentID, &userAgentInfo, &checkType, &checkID, &lastChallengedAt, &lastVerifiedAt, &lastFailedAt, &failureCount, &challenge, &factor); err != nil {
 			return nil, fmt.Errorf("failed to scan session row: %w", err)
 		}
@@ -334,7 +350,7 @@ func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
 			if tokenID != nil {
 				tok = *tokenID
 			}
-			session = &domain.Session{ProjectID: projectID, ID: id, CreatedAt: createdAt, UpdatedAt: updatedAt, ExpiresAt: expiresAt, TimeToLive: timeToLive, TokenID: tok, UserID: userID}
+			session = &domain.Session{ProjectID: projectID, ID: id, CreatedAt: createdAt, UpdatedAt: updatedAt, ExpiresAt: expiresAt, TimeToLive: timeToLive, TokenID: tok, UserID: userID, RevokedAt: revokedAt}
 			if userAgentID != nil {
 				info := map[string]any{}
 				if len(userAgentInfo) > 0 {
@@ -420,4 +436,10 @@ var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBin
 		}
 		return *s.UserID
 	}, Coerce: database.CoerceString},
+	domain.SessionFieldRevokedAt: {SQLName: "s.revoked_at", Accessor: func(s *domain.Session) any {
+		if s.RevokedAt == nil {
+			return time.Time{}
+		}
+		return *s.RevokedAt
+	}, Coerce: database.CoerceTime},
 })

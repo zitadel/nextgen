@@ -79,6 +79,20 @@ func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, se
 	return nil
 }
 
+// RevokeSessionByID soft-revokes the session by stamping revoked_at, leaving the
+// row in place so it stays visible. A missing or already-revoked session reports
+// ErrSessionNotFound so the caller can treat revoke as idempotent.
+func (ss sessionStatements) RevokeSessionByID(ctx context.Context, projectID, sessionID string) error {
+	n, err := ss.db.Update(ctx, buildStatement(`UPDATE sessions SET revoked_at = CURRENT_TIMESTAMP() WHERE project_id = @p1 AND id = @p2 AND revoked_at IS NULL`, projectID, sessionID).statement())
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return domain.ErrSessionNotFound()
+	}
+	return nil
+}
+
 func (ss sessionStatements) ExchangeSession(ctx context.Context, projectID, handoffToken string, _ *string, ttl time.Duration) (*domain.Session, error) {
 	var refreshed *domain.Session
 	err := withTransaction(ctx, ss.db, func(ctx context.Context, tx queryExecutor) error {
@@ -102,7 +116,7 @@ func (s sessionExchangeStore) DeleteAuthAttempt(ctx context.Context, projectID, 
 	return newAuthAttemptStatements(s.db).DeleteAuthAttemptByID(ctx, projectID, attemptID)
 }
 
-const sessionQuery = `SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.time_to_live, s.token_id, s.user_id,
+const sessionQuery = `SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.time_to_live, s.token_id, s.user_id, s.revoked_at,
 	ua.id, ua.info,
 	c.type, c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload
 FROM sessions s
@@ -304,12 +318,13 @@ func scanSessions(iter *spanner.RowIterator) ([]*domain.Session, error) {
 			createdAt, updatedAt, expiresAt                time.Time
 			timeToLiveNanos                                int64
 			userID                                         spanner.NullString
+			revokedAt                                      spanner.NullTime
 			userAgentID, checkID                           spanner.NullString
 			checkType, failureCount                        spanner.NullInt64
 			userAgentInfo, challenge, factor               spanner.NullJSON
 			lastChallengedAt, lastVerifiedAt, lastFailedAt spanner.NullTime
 		)
-		if err := row.Columns(&projectID, &sessionID, &createdAt, &updatedAt, &expiresAt, &timeToLiveNanos, &tokenID, &userID,
+		if err := row.Columns(&projectID, &sessionID, &createdAt, &updatedAt, &expiresAt, &timeToLiveNanos, &tokenID, &userID, &revokedAt,
 			&userAgentID, &userAgentInfo, &checkType, &checkID, &lastChallengedAt, &lastVerifiedAt, &lastFailedAt, &failureCount, &challenge, &factor); err != nil {
 			return fmt.Errorf("failed to scan session row: %w", err)
 		}
@@ -323,6 +338,10 @@ func scanSessions(iter *spanner.RowIterator) ([]*domain.Session, error) {
 			session = &domain.Session{ProjectID: projectID, ID: id, CreatedAt: createdAt, UpdatedAt: updatedAt, ExpiresAt: expiresAt, TimeToLive: time.Duration(timeToLiveNanos), TokenID: tok}
 			if userID.Valid {
 				session.UserID = &userID.StringVal
+			}
+			if revokedAt.Valid {
+				t := revokedAt.Time
+				session.RevokedAt = &t
 			}
 			if userAgentID.Valid {
 				info := map[string]any{}
@@ -426,4 +445,10 @@ var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBin
 		}
 		return *s.UserID
 	}, Coerce: database.CoerceString},
+	domain.SessionFieldRevokedAt: {SQLName: "s.revoked_at", Accessor: func(s *domain.Session) any {
+		if s.RevokedAt == nil {
+			return time.Time{}
+		}
+		return *s.RevokedAt
+	}, Coerce: database.CoerceTime},
 })

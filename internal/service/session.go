@@ -20,7 +20,9 @@ type SessionService interface {
 	// errors: domain.ErrSessionNotFound, domain.ErrInternal
 	Get(ctx context.Context, input GetSessionInput) (*domain.Session, error)
 	List(ctx context.Context, input ListSessionInput) ([]*domain.Session, error)
-	Delete(ctx context.Context, input DeleteSessionInput) error
+	// Revoke soft-revokes a session by id. It is idempotent: revoking a missing
+	// or already-revoked session returns nil.
+	Revoke(ctx context.Context, input RevokeSessionInput) error
 }
 
 // UserIdentityReader is the secondary port Get uses to hydrate the identity
@@ -55,7 +57,7 @@ type ListSessionInput struct {
 	ProjectID string
 }
 
-type DeleteSessionInput struct {
+type RevokeSessionInput struct {
 	ProjectID string
 	SessionID string
 }
@@ -120,13 +122,14 @@ func (s *sessionService) List(ctx context.Context, input ListSessionInput) ([]*d
 	return nil, domain.ErrNotImplemented()
 }
 
-func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) error {
-	err := s.v2Pool.Statements().DeleteSessionByID(ctx, input.ProjectID, input.SessionID)
+func (s *sessionService) Revoke(ctx context.Context, input RevokeSessionInput) error {
+	err := s.v2Pool.Statements().RevokeSessionByID(ctx, input.ProjectID, input.SessionID)
 	if err != nil {
+		// A missing or already-revoked session is a no-op: revoke is idempotent.
 		if errors.Is(err, domain.ErrSessionNotFound()) {
 			return nil
 		}
-		return domain.ErrInternal(err).WithMessage("Failed to delete the session.")
+		return domain.ErrInternal(err).WithMessage("Failed to revoke the session.")
 	}
 	return nil
 }

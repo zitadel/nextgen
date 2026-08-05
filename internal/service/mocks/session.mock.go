@@ -81,44 +81,6 @@ func (c *MockSessionServiceCreateCall) DoAndReturn(f func(context.Context, servi
 	return c
 }
 
-// Delete mocks base method.
-func (m *MockSessionService) Delete(ctx context.Context, input service.DeleteSessionInput) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", ctx, input)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Delete indicates an expected call of Delete.
-func (mr *MockSessionServiceMockRecorder) Delete(ctx, input any) *MockSessionServiceDeleteCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockSessionService)(nil).Delete), ctx, input)
-	return &MockSessionServiceDeleteCall{Call: call}
-}
-
-// MockSessionServiceDeleteCall wrap *gomock.Call
-type MockSessionServiceDeleteCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockSessionServiceDeleteCall) Return(arg0 error) *MockSessionServiceDeleteCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockSessionServiceDeleteCall) Do(f func(context.Context, service.DeleteSessionInput) error) *MockSessionServiceDeleteCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockSessionServiceDeleteCall) DoAndReturn(f func(context.Context, service.DeleteSessionInput) error) *MockSessionServiceDeleteCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // Exchange mocks base method.
 func (m *MockSessionService) Exchange(ctx context.Context, input service.ExchangeInput) (*domain.Session, error) {
 	m.ctrl.T.Helper()
@@ -232,6 +194,44 @@ func (c *MockSessionServiceListCall) Do(f func(context.Context, service.ListSess
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockSessionServiceListCall) DoAndReturn(f func(context.Context, service.ListSessionInput) ([]*domain.Session, error)) *MockSessionServiceListCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// Revoke mocks base method.
+func (m *MockSessionService) Revoke(ctx context.Context, input service.RevokeSessionInput) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Revoke", ctx, input)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Revoke indicates an expected call of Revoke.
+func (mr *MockSessionServiceMockRecorder) Revoke(ctx, input any) *MockSessionServiceRevokeCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Revoke", reflect.TypeOf((*MockSessionService)(nil).Revoke), ctx, input)
+	return &MockSessionServiceRevokeCall{Call: call}
+}
+
+// MockSessionServiceRevokeCall wrap *gomock.Call
+type MockSessionServiceRevokeCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockSessionServiceRevokeCall) Return(arg0 error) *MockSessionServiceRevokeCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockSessionServiceRevokeCall) Do(f func(context.Context, service.RevokeSessionInput) error) *MockSessionServiceRevokeCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockSessionServiceRevokeCall) DoAndReturn(f func(context.Context, service.RevokeSessionInput) error) *MockSessionServiceRevokeCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -2974,6 +2974,44 @@ func (c *MockAllStatementsNewManagedIDCall) DoAndReturn(f func(string) (string, 
 	return c
 }
 
+// RevokeSessionByID mocks base method.
+func (m *MockAllStatements) RevokeSessionByID(ctx context.Context, projectID, sessionID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RevokeSessionByID", ctx, projectID, sessionID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RevokeSessionByID indicates an expected call of RevokeSessionByID.
+func (mr *MockAllStatementsMockRecorder) RevokeSessionByID(ctx, projectID, sessionID any) *MockAllStatementsRevokeSessionByIDCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeSessionByID", reflect.TypeOf((*MockAllStatements)(nil).RevokeSessionByID), ctx, projectID, sessionID)
+	return &MockAllStatementsRevokeSessionByIDCall{Call: call}
+}
+
+// MockAllStatementsRevokeSessionByIDCall wrap *gomock.Call
+type MockAllStatementsRevokeSessionByIDCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsRevokeSessionByIDCall) Return(arg0 error) *MockAllStatementsRevokeSessionByIDCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsRevokeSessionByIDCall) Do(f func(context.Context, string, string) error) *MockAllStatementsRevokeSessionByIDCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsRevokeSessionByIDCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsRevokeSessionByIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // SetAuthAttemptChallenge mocks base method.
 func (m *MockAllStatements) SetAuthAttemptChallenge(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
 	m.ctrl.T.Helper()
@@ -5564,6 +5602,44 @@ func (c *MockSessionStatementsListSessionsCall) Do(f func(context.Context, *data
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockSessionStatementsListSessionsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.SessionField]) (*database.ListResult[*domain.Session], error)) *MockSessionStatementsListSessionsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// RevokeSessionByID mocks base method.
+func (m *MockSessionStatements) RevokeSessionByID(ctx context.Context, projectID, sessionID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RevokeSessionByID", ctx, projectID, sessionID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RevokeSessionByID indicates an expected call of RevokeSessionByID.
+func (mr *MockSessionStatementsMockRecorder) RevokeSessionByID(ctx, projectID, sessionID any) *MockSessionStatementsRevokeSessionByIDCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeSessionByID", reflect.TypeOf((*MockSessionStatements)(nil).RevokeSessionByID), ctx, projectID, sessionID)
+	return &MockSessionStatementsRevokeSessionByIDCall{Call: call}
+}
+
+// MockSessionStatementsRevokeSessionByIDCall wrap *gomock.Call
+type MockSessionStatementsRevokeSessionByIDCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockSessionStatementsRevokeSessionByIDCall) Return(arg0 error) *MockSessionStatementsRevokeSessionByIDCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockSessionStatementsRevokeSessionByIDCall) Do(f func(context.Context, string, string) error) *MockSessionStatementsRevokeSessionByIDCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockSessionStatementsRevokeSessionByIDCall) DoAndReturn(f func(context.Context, string, string) error) *MockSessionStatementsRevokeSessionByIDCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

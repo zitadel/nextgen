@@ -14,7 +14,7 @@ import (
 	v2session "github.com/zitadel/nextgen/internal/storage/v2/session"
 )
 
-const sessionQuery = `SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.time_to_live, s.token_id, s.user_id,
+const sessionQuery = `SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.time_to_live, s.token_id, s.user_id, s.revoked_at,
 	ua.id, ua.info,
 	c.type, c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload
 FROM sessions s
@@ -80,6 +80,23 @@ func (ss sessionStatements) ListSessions(ctx context.Context, filter *database.L
 // DeleteSessionByID implements [service.SessionStatements].
 func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, sessionID string) error {
 	n, err := execAffected(ctx, ss.client, `DELETE FROM sessions WHERE project_id = ? AND id = ?`, projectID, sessionID)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return domain.ErrSessionNotFound()
+	}
+	return nil
+}
+
+// RevokeSessionByID implements [service.SessionStatements]. It soft-revokes the
+// session by stamping revoked_at, leaving the row in place so it stays visible.
+// A missing or already-revoked session reports ErrSessionNotFound so the caller
+// can treat revoke as idempotent.
+func (ss sessionStatements) RevokeSessionByID(ctx context.Context, projectID, sessionID string) error {
+	n, err := execAffected(ctx, ss.client,
+		`UPDATE sessions SET revoked_at = ? WHERE project_id = ? AND id = ? AND revoked_at IS NULL`,
+		nowUnixNano(), projectID, sessionID)
 	if err != nil {
 		return err
 	}
@@ -333,6 +350,7 @@ func scanSessions(rows *sql.Rows) ([]*domain.Session, error) {
 			createdNano, updatedNano, expiresNano                int64
 			timeToLiveNanos                                      int64
 			userID                                               sql.NullString
+			revokedNano                                          sql.NullInt64
 			userAgentID                                          sql.NullString
 			userAgentInfo                                        sql.NullString
 			checkType, failureCount                              sql.NullInt64
@@ -341,7 +359,7 @@ func scanSessions(rows *sql.Rows) ([]*domain.Session, error) {
 			challengePayload, factorPayload                      sql.NullString
 		)
 		if err := rows.Scan(
-			&projectID, &sessionID, &createdNano, &updatedNano, &expiresNano, &timeToLiveNanos, &tokenID, &userID,
+			&projectID, &sessionID, &createdNano, &updatedNano, &expiresNano, &timeToLiveNanos, &tokenID, &userID, &revokedNano,
 			&userAgentID, &userAgentInfo,
 			&checkType, &checkID, &lastChallengedNano, &lastVerifiedNano, &lastFailedNano, &failureCount,
 			&challengePayload, &factorPayload,
@@ -366,6 +384,10 @@ func scanSessions(rows *sql.Rows) ([]*domain.Session, error) {
 			if userID.Valid {
 				v := userID.String
 				session.UserID = &v
+			}
+			if revokedNano.Valid {
+				t := timeFromUnixNano(revokedNano.Int64)
+				session.RevokedAt = &t
 			}
 			if userAgentID.Valid {
 				info := map[string]any{}
@@ -469,5 +491,15 @@ var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBin
 			return *s.UserID
 		},
 		Coerce: database.CoerceString,
+	},
+	domain.SessionFieldRevokedAt: {
+		SQLName: "s.revoked_at",
+		Accessor: func(s *domain.Session) any {
+			if s.RevokedAt == nil {
+				return time.Time{}
+			}
+			return *s.RevokedAt
+		},
+		Coerce: database.CoerceTime,
 	},
 })

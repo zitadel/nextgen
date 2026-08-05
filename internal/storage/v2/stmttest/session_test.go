@@ -44,3 +44,33 @@ func TestUserStatements_DeleteCascadesSessionAndToken(t *testing.T) {
 		assert.ErrorIs(t, err, new(database.NoRowFoundError), "session token should cascade with user")
 	})
 }
+
+func TestSessionStatements_RevokeSoftDeletes(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		sess, err := domain.NewSession(projectID, nil)
+		require.NoError(t, err)
+		require.NoError(t, d.stmts.CreateSession(t.Context(), sess))
+		require.NotEmpty(t, sess.ID)
+		t.Cleanup(func() {
+			_ = d.stmts.DeleteSessionByID(context.Background(), projectID, sess.ID)
+		})
+
+		// Revoke soft-deletes: the row stays and revoked_at is stamped.
+		require.NoError(t, d.stmts.RevokeSessionByID(t.Context(), projectID, sess.ID))
+
+		got, err := d.stmts.GetSessionByID(t.Context(), projectID, sess.ID)
+		require.NoError(t, err, "a revoked session must remain readable, not be deleted")
+		require.NotNil(t, got.RevokedAt, "revoked_at must be persisted")
+		assert.Equal(t, domain.SessionStateRevoked, got.State())
+
+		// The revoked_at IS NULL guard makes a second revoke a no-op at storage:
+		// it reports NotFound so the service can treat revoke as idempotent.
+		err = d.stmts.RevokeSessionByID(t.Context(), projectID, sess.ID)
+		assert.ErrorIs(t, err, domain.ErrSessionNotFound(), "re-revoking an already-revoked session is a no-op")
+
+		// Revoking a session that does not exist reports NotFound too.
+		err = d.stmts.RevokeSessionByID(t.Context(), projectID, "sess_missing")
+		assert.ErrorIs(t, err, domain.ErrSessionNotFound())
+	})
+}

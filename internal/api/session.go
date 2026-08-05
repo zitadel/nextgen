@@ -130,12 +130,12 @@ func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionPara
 	if err := requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opDelete); err != nil {
 		return nil, err
 	}
-	input := service.DeleteSessionInput{
+	input := service.RevokeSessionInput{
 		ProjectID: string(params.ProjectID),
 		SessionID: string(params.SessionID),
 	}
 
-	err := h.sessionService.Delete(ctx, input)
+	err := h.sessionService.Revoke(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func (h Handler) RevokeMySession(ctx context.Context) (api.RevokeMySessionRes, e
 	if !ok {
 		return nil, invalidSessionCredential(domain.ErrSessionTokenInvalid())
 	}
-	input := service.DeleteSessionInput{
+	input := service.RevokeSessionInput{
 		ProjectID: sessionToken.ProjectID,
 		SessionID: gu.Value(sessionToken.SessionID),
 	}
@@ -167,7 +167,7 @@ func (h Handler) RevokeMySession(ctx context.Context) (api.RevokeMySessionRes, e
 		return nil, invalidSessionCredential(err)
 	}
 
-	err = h.sessionService.Delete(ctx, input)
+	err = h.sessionService.Revoke(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -188,6 +188,11 @@ func invalidSessionCredential(err error) domain.Error {
 
 func validateSessionToken(session *domain.Session, token *domain.Token) error {
 	if session.TokenID != token.TokenID {
+		return domain.ErrSessionTokenInvalid()
+	}
+	if session.RevokedAt != nil {
+		// A revoked session invalidates any token derived from it, so self-session
+		// reads (GET/DELETE /sessions/me) must reject the cookie.
 		return domain.ErrSessionTokenInvalid()
 	}
 	if time.Now().After(session.ExpiresAt) {
@@ -281,16 +286,16 @@ func userAgentToAPI(agent *domain.UserAgent) api.OptNilSessionResponseUserAgent 
 
 func sessionStateToAPI(state domain.SessionState) api.SessionResponseState {
 	switch state {
-	case domain.SessionStateUnspecified:
-		return api.SessionResponseStateBuilding
 	case domain.SessionStateActive:
 		return api.SessionResponseStateActive
-	case domain.SessionStateBuilding:
-		return api.SessionResponseStateBuilding
 	case domain.SessionStateExpired:
 		return api.SessionResponseStateExpired
+	case domain.SessionStateRevoked:
+		return api.SessionResponseStateRevoked
+	case domain.SessionStateBuilding, domain.SessionStateUnspecified:
+		return api.SessionResponseStateBuilding
 	default:
-		return api.SessionResponseStateRevoked // TODO: ?
+		return api.SessionResponseStateBuilding
 	}
 }
 
