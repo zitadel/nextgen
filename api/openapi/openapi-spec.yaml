@@ -109,6 +109,8 @@ paths:
     $ref: endpoints/projects/by_id/claim/complete/methods.yaml
   /sessions:
     $ref: endpoints/sessions/methods.yaml
+  /sessions/query:
+    $ref: endpoints/sessions/query/methods.yaml
   /sessions/exchange:
     $ref: endpoints/sessions/exchange/methods.yaml
   /sessions/{session_id}:

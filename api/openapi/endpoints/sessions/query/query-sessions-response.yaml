@@ -6,11 +6,11 @@ properties:
   sessions:
     type: array
     items:
-      $ref: session-response.yaml
+      $ref: ../session-response.yaml
   next_page_token:
     description: |
       Token to pass as `page_token` in the next request to fetch the following page.
       Absent when there are no more results.
     oneOf:
-      - $ref: ../../components/schemas/page-token.yaml
+      - $ref: ../../../components/schemas/page-token.yaml
       - type: 'null'

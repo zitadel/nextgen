@@ -181,10 +181,6 @@ type ListSchemasRes interface {
 	listSchemasRes()
 }
 
-type ListSessionsRes interface {
-	listSessionsRes()
-}
-
 type ListUserPasskeysRes interface {
 	listUserPasskeysRes()
 }
@@ -199,6 +195,10 @@ type PatchProjectRes interface {
 
 type QueryProjectsRes interface {
 	queryProjectsRes()
+}
+
+type QuerySessionsRes interface {
+	querySessionsRes()
 }
 
 type QueryTeamsRes interface {
