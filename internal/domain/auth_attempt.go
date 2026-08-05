@@ -63,7 +63,7 @@ type AuthAttempt struct {
 	// ProjectID links to [Project].
 	ProjectID string
 	// ID is the unique identifier for the auth attempt within the project.
-	// The storage layer assigns this value on Create (database-generated identity).
+	// The storage layer assigns this value on Create (dialect-minted prefixed opaque string).
 	ID string
 
 	// HandoffToken is the single-use token minted explicitly with the handoff call after all required factors are verified, used by the client to exchange for a session.
@@ -105,14 +105,8 @@ func WithSession(sessionID *string, authFactors ...AuthFactor) AuthAttemptOption
 }
 
 func NewAuthAttempt(projectID string, requiredChecks []AuthCheckType, opts ...AuthAttemptOption) (*AuthAttempt, error) {
-	id, err := newID(PrefixAuthAttempt)
-	if err != nil {
-		return nil, err
-	}
-
 	attempt := &AuthAttempt{
 		ProjectID:      projectID,
-		ID:             id,
 		RequiredChecks: requiredChecks,
 		TimeToLive:     new(AuthAttemptTTL),
 	}

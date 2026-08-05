@@ -15,22 +15,31 @@ get:
   responses:
     '200':
       description: Session state.
+      headers:
+        Cache-Control:
+          $ref: ../../../components/headers/cache-control-private-no-store.yaml
       content:
         application/json:
           schema:
             $ref: ../session-response.yaml
     '401':
       description: Missing or invalid session token.
+      headers:
+        Cache-Control:
+          $ref: ../../../components/headers/cache-control-private-no-store.yaml
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../components/schemas/errors/auth-unauthorized.yaml
     '404':
       description: Session not found.
+      headers:
+        Cache-Control:
+          $ref: ../../../components/headers/cache-control-private-no-store.yaml
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../components/schemas/errors/sess-not_found.yaml
     default:
       $ref: getMySession-error-response.yaml
 
@@ -57,7 +66,8 @@ delete:
       content:
         application/json:
           schema:
-            $ref: ../../../components/error-details.yaml
+            $ref: ../../../components/schemas/errors/auth-unauthorized.yaml
+
     '404':
       description: Session not found.
       content:
@@ -76,4 +86,3 @@ delete:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
-

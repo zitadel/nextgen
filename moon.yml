@@ -43,6 +43,33 @@ tasks:
       cache: false
       runInCI: false
 
+  # Matched by the `:test` target in the ci workflow's `moon ci` call, so the
+  # affected-gate logic never becomes a test file nothing executes.
+  test:
+    command: "node --test scripts/ci-mode.test.mjs"
+    inputs:
+      - "scripts/ci-mode.mjs"
+      - "scripts/ci-mode.test.mjs"
+      - "scripts/dev-process.mjs"
+    options:
+      cache: true
+      runInCI: true
+
+  check-typecheck:
+    script: "node --test scripts/check-typecheck-programs.test.mjs && node scripts/check-typecheck-programs.mjs"
+    inputs:
+      - "scripts/check-typecheck-programs.mjs"
+      - "scripts/check-typecheck-programs.test.mjs"
+      - "apps/*/moon.yml"
+      - "packages/*/moon.yml"
+      - "apps/*/package.json"
+      - "packages/*/package.json"
+      - "apps/*/tsconfig*.json"
+      - "packages/*/tsconfig*.json"
+    options:
+      cache: true
+      runInCI: true
+
   check-adrs:
     command: "node scripts/check-adrs-index.mjs"
     inputs:

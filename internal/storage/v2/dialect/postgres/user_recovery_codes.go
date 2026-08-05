@@ -15,8 +15,8 @@ import (
 )
 
 const createUserRecoveryCodesStmt = `INSERT INTO zitadel_nextgen.user_recovery_codes (
-	project_id, user_id, recovery_codes
-) VALUES ($1, $2, $3)`
+	id, project_id, user_id, recovery_codes
+) VALUES ($1, $2, $3, $4)`
 
 const userRecoveryCodesQuery = `SELECT id, project_id, user_id, recovery_codes,
 	last_successful_check, failed_attempts, created_at, updated_at
@@ -37,7 +37,11 @@ func (s userRecoveryCodesStatements) CreateUserRecoveryCodes(ctx context.Context
 	if err := domain.RequireNonEmptyRecoveryCodes(codes.RecoveryCodes); err != nil {
 		return err
 	}
+	if err := ensureManagedID(&codes.ID, domain.PrefixUserRecoveryCodes); err != nil {
+		return err
+	}
 	_, err := s.client.Exec(ctx, createUserRecoveryCodesStmt,
+		codes.ID,
 		codes.ProjectID,
 		codes.UserID,
 		append([]string(nil), codes.RecoveryCodes...),

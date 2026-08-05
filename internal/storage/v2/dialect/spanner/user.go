@@ -45,6 +45,10 @@ WHERE project_id = @p2 AND user_id = @p3 AND status <> @p1`
 	deleteUserMembershipsStmt = `DELETE FROM team_memberships WHERE project_id = @p1 AND user_id = @p2`
 
 	deleteUserStmt = `DELETE FROM users WHERE project_id = @p1 AND id = @p2`
+
+	userExistsStmt = `SELECT EXISTS (
+    SELECT 1 FROM users WHERE project_id = @p1 AND id = @p2
+)`
 )
 
 type userStatements struct{ statement }
@@ -59,6 +63,9 @@ func newUserStatements(db queryExecutor) userStatements {
 
 // CreateUser implements [service.UserStatements].
 func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser) error {
+	if err := ensureManagedID(&user.ID, domain.PrefixUser); err != nil {
+		return err
+	}
 	if len(user.Attributes) == 0 {
 		return fmt.Errorf("user create requires attributes")
 	}
@@ -72,9 +79,6 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 		}
 
 		for _, a := range user.Attributes {
-			if a == nil {
-				return fmt.Errorf("nil attribute")
-			}
 			raw, err := json.Marshal(a.Value)
 			if err != nil {
 				return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
@@ -235,6 +239,23 @@ func (us userStatements) DeleteUserByID(ctx context.Context, projectID, userID s
 	})
 }
 
+func (us userStatements) UserExists(ctx context.Context, projectID, userID string) (bool, error) {
+	var exists bool
+	err := us.db.Query(ctx, buildStatement(userExistsStmt, projectID, userID).statement(),
+		func(iter *spanner.RowIterator) error {
+			var qErr error
+			exists, qErr = collectOneRow(iter, func(row *spanner.Row) (bool, error) {
+				var found bool
+				return found, row.Columns(&found)
+			})
+			return qErr
+		})
+	if err != nil {
+		return false, wrapError(err)
+	}
+	return exists, nil
+}
+
 func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User, opts service.UserQueryOptions) error {
 	if len(users) == 0 {
 		return nil
@@ -247,7 +268,8 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 		}
 		if err := us.db.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
 			return iter.Do(func(row *spanner.Row) error {
-				var userID, key, valueJSON string
+				var userID, valueJSON string
+				var key domain.AttributeKey
 				if err := row.Columns(&userID, &key, &valueJSON); err != nil {
 					return err
 				}
@@ -281,8 +303,8 @@ func (us userStatements) scanUserHeader(row *spanner.Row) (*domain.User, error) 
 		&user.ID,
 		&lifecycleOwner,
 		&status,
-		&user.CreatedAt,
-		&user.UpdatedAt,
+		&user.Metadata.CreatedAt,
+		&user.Metadata.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -290,7 +312,7 @@ func (us userStatements) scanUserHeader(row *spanner.Row) (*domain.User, error) 
 		v := lifecycleOwner.StringVal
 		user.LifecycleOwnerTeamID = &v
 	}
-	user.Status = domain.UserStatus(status)
+	user.Metadata.Status = domain.UserStatus(status)
 	return user, nil
 }
 

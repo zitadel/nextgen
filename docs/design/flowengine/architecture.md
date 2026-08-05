@@ -262,7 +262,11 @@ Backs the schema-driven `FlowFieldResolver` implementation. Reads the user schem
 
 ### ID generator
 
-`internal/domain/idgen.Generator`. The service mints `flow_*` ids at `Start`; the auth-attempt adapter mints `att_*`; the create-user handler mints `user_*`.
+Dialect-owned `NewManagedID` on the storage pool (ADR 047). `FlowService`
+mints `flow_*` / provisional `session_*` ids at `Start`; passkey registration
+mints provisional `user_*` ids in `PasskeyRegistrationService.Begin` when the
+caller has none; create inserts mint managed resource IDs in the dialect.
+Auth attempts use DB IDENTITY (ephemeral IDs).
 
 ## Where to read next
 

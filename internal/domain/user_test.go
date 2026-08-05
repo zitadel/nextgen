@@ -1,7 +1,6 @@
 package domain_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,16 +39,14 @@ func TestNewCreateUser(t *testing.T) {
 			},
 		},
 		{
-			name: "empty id mints a fresh one with the user prefix",
+			name: "empty id leaves assignment to the dialect on create",
 			id:   "",
 			user: map[string]any{
 				"$schema": "https://example.test/schema.json",
 				"email":   "alice@example.com",
 			},
 			check: func(t *testing.T, got *domain.CreateUser) {
-				prefix := string(domain.PrefixUser) + "_"
-				assert.True(t, strings.HasPrefix(got.ID, prefix), "want prefix %q, got id %q", prefix, got.ID)
-				assert.Greater(t, len(got.ID), len(prefix), "minted id must not be just the prefix")
+				assert.Empty(t, got.ID)
 			},
 		},
 	}

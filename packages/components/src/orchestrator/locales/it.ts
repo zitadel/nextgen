@@ -17,8 +17,8 @@ export const it: Locale = {
   // ═══════════════════════════════════════════════════════════════════════════
   "identifier.title": "Accedi",
   "identifier.description": "Inserisci la tua e-mail per continuare",
-  "identifier.field.email": "E-mail aziendale",
-  "identifier.field.email.placeholder": "tu@azienda.com",
+  "identifier.field.email": "E-mail",
+  "identifier.field.email.placeholder": "tu@esempio.com",
   "identifier.field.password": "Password",
   "identifier.action.submit": "Accedi",
   "identifier.action.continue": "Accedi",
@@ -47,8 +47,8 @@ export const it: Locale = {
   // ═══════════════════════════════════════════════════════════════════════════
   "collect-credentials.title": "Crea il tuo account",
   "collect-credentials.description": "Configura e-mail e password",
-  "collect-credentials.field.email": "E-mail aziendale",
-  "collect-credentials.field.email.placeholder": "tu@azienda.com",
+  "collect-credentials.field.email": "E-mail",
+  "collect-credentials.field.email.placeholder": "tu@esempio.com",
   "collect-credentials.field.password": "Password",
   "collect-credentials.action.submit": "Registrati",
 
@@ -79,8 +79,8 @@ export const it: Locale = {
   "collect-passkey-email.title": "Crea il tuo account",
   "collect-passkey-email.description":
     "Inserisci la tua e-mail per configurare una passkey",
-  "collect-passkey-email.field.email": "E-mail aziendale",
-  "collect-passkey-email.field.email.placeholder": "tu@azienda.com",
+  "collect-passkey-email.field.email": "E-mail",
+  "collect-passkey-email.field.email.placeholder": "tu@esempio.com",
   "collect-passkey-email.action.submit": "Continua",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -110,8 +110,8 @@ export const it: Locale = {
   "register.title": "Crea il tuo account",
   // Vuoto per design — la scheda di registrazione non ha sottotitolo (Figma 6593:141743).
   "register.description": "",
-  "register.field.email": "E-mail aziendale",
-  "register.field.email.placeholder": "tu@azienda.com",
+  "register.field.email": "E-mail",
+  "register.field.email.placeholder": "tu@esempio.com",
   "register.field.password": "Password",
   "register.field.givenName": "Nome",
   "register.field.familyName": "Cognome",
@@ -166,10 +166,8 @@ export const it: Locale = {
   // --- Errori passkey ---
   "error.passkey_cancelled": "La richiesta della passkey è stata chiusa prima del completamento.",
   "error.passkey_timeout": "La richiesta della passkey è scaduta. Riprova.",
-  "error.passkey_not_registered":
-    "Questa passkey non è registrata. Accedi con e-mail e password.",
-  "error.passkey_setup_failed":
-    "La registrazione della passkey non è stata completata. Riprova.",
+  "error.passkey_not_registered": "Questa passkey non è registrata. Accedi con e-mail e password.",
+  "error.passkey_setup_failed": "La registrazione della passkey non è stata completata. Riprova.",
   "error.passkey_unsupported": "Questo dispositivo non supporta le passkey",
   "error.passkey_failed": "Qualcosa è andato storto. Riprova.",
   "error.passkey_invalid": "Non è stato possibile verificare questa passkey. Riprova.",

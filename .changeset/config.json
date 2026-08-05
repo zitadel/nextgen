@@ -22,7 +22,8 @@
       "@zitadel/sdk-angular",
       "@zitadel/sdk-solid",
       "@zitadel/sdk-svelte",
-      "@zitadel/sdk-qwik"
+      "@zitadel/sdk-qwik",
+      "@zitadel/testing"
     ]
   ],
   "linked": [],
@@ -42,7 +43,6 @@
     "@zitadel/demo-nuxt",
     "@zitadel/demo-nuxt-e2e",
     "@zitadel/login-ui",
-    "@zitadel/storybook",
-    "@zitadel/testing"
+    "@zitadel/storybook"
   ]
 }

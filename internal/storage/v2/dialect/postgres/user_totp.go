@@ -15,8 +15,8 @@ import (
 )
 
 const createUserTOTPStmt = `INSERT INTO zitadel_nextgen.user_totp (
-	project_id, user_id, secret
-) VALUES ($1, $2, $3)`
+	id, project_id, user_id, secret
+) VALUES ($1, $2, $3, $4)`
 
 const userTOTPQuery = `SELECT id, project_id, user_id, secret, verified_at,
 	last_successful_check, failed_attempts, created_at, updated_at
@@ -34,7 +34,10 @@ func newUserTOTPStatements(client queryExecutor) userTOTPStatements {
 
 // CreateUserTOTP implements [service.UserTOTPStatements].
 func (us userTOTPStatements) CreateUserTOTP(ctx context.Context, totp *domain.CreateUserTOTP) error {
-	_, err := us.client.Exec(ctx, createUserTOTPStmt, totp.ProjectID, totp.UserID, append([]byte(nil), totp.Secret...))
+	if err := ensureManagedID(&totp.ID, domain.PrefixUserTOTP); err != nil {
+		return err
+	}
+	_, err := us.client.Exec(ctx, createUserTOTPStmt, totp.ID, totp.ProjectID, totp.UserID, append([]byte(nil), totp.Secret...))
 	return wrapError(err)
 }
 

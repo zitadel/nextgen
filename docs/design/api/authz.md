@@ -1,16 +1,16 @@
 # Authorization
 
-> The permission-check layer: `credential × resolved scope × required permission → decision`. For vocabulary, [`../glossary.md`](../glossary.md). For scope resolution, [`url-architecture.md`](url-architecture.md).
+> The permission-check layer: `credential × resolved scope × required permission → decision`. For vocabulary, [`../glossary.md`](../glossary.md). For scope resolution, [`url-architecture.md`](url-architecture.md). For the canonical permission names, [`system-permission-catalog.md`](system-permission-catalog.md).
 
 ## The invariant
 
 Every endpoint declares, internally:
 
 ```
-resource_kind   : users
+resource_kind   : user
 operation       : read | list | create | update | delete | <verb>
 scope_source    : path.id | query.project_id | body.project_id | credential
-required_perms  : users.read
+required_perms  : user.read
 ```
 
 The middleware executes, in order:
@@ -38,7 +38,9 @@ A user can be in the platform project (a developer/admin) or a customer project 
 
 ## Permission resolution
 
-Permissions are dotted strings: `users.read`, `projects.settings.write`, `team.memberships.write`. The resolver answers: "for this principal, in this resolved scope, is this permission granted?"
+Permissions are flat `{resource}.{verb}` strings such as `user.read`, `project.write`, and `team_membership.write`. Multi-word resource types use `_` (for example `team_membership`, `flow_definition`), not dot nesting. Scope (which project or team) comes from the resolved grant, not from nesting in the permission name. Parent-resource permissions do not inherit into separately cataloged resources: for example, `project.write` does not imply `branding.write`, `allowed_origin.write`, or `webhook.write`. Bundles may grant those permissions together. The resolver answers: "for this principal, in this resolved scope, is this permission granted?" See [`system-permission-catalog.md`](system-permission-catalog.md) for the full list.
+
+> **Not enforced yet.** This is the target model. The server's current compatibility layer (`scopeAllowed` in `internal/api/authz.go`) still treats the legacy operator-grade `project.write` as an umbrella scope that satisfies every finer per-resource scope, including `branding.write`. Per-resource scopes become independently mintable with [ADR 036](../../adrs/036-api-credential-planes.md)'s credential planes; until then, do not assume the stricter model is enforced when configuring clients.
 
 **Grants and roles** provide the mapping:
 
@@ -82,7 +84,7 @@ Results are cached per request context but never across requests — stale autho
 
 Worth restating here because it's enforced *at the permission-check layer*, not at endpoints. See [`credentials.md`](credentials.md#sk_team_-narrow-permission-model--locked) for the full allow/deny list.
 
-An `sk_team_…` hitting `PATCH /projects/{id}` gets 404 regardless of path. The middleware sees "credential-class = `sk_team_`, required permission = `projects.settings.write`" and rejects before the resource-scope index is even consulted. Any other path leads to cross-tenant admin escalation.
+An `sk_team_…` hitting `PATCH /projects/{id}` gets 404 regardless of path. The middleware sees "credential-class = `sk_team_`, required permission = `project.write`" and rejects before the resource-scope index is even consulted. Any other path leads to cross-tenant admin escalation.
 
 ## 404 vs 403
 
@@ -93,4 +95,5 @@ Both "ID does not exist" and "authorisation fails" return **404 Not Found**. Thi
 - [`../glossary.md`](../glossary.md)
 - [`credentials.md`](credentials.md) — full principal definitions and the `sk_team_` allowlist
 - [`url-architecture.md`](url-architecture.md) — scope resolution that runs before the permission check
-- [`resource-map.md`](resource-map.md) — per-endpoint `required_perms` declarations
+- [`resource-map.md`](resource-map.md) — endpoint surface inventory
+- [`system-permission-catalog.md`](system-permission-catalog.md) — canonical permission names, bundles, and per-resource permission matrix

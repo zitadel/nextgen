@@ -61,16 +61,11 @@ func NewBranding(projectID string, layout, liquidTemplate, logoURL, fontURL, her
 	if projectID == "" {
 		return nil, ErrBrandingMissingProjectID()
 	}
-	id, err := newID(PrefixBranding)
-	if err != nil {
-		return nil, ErrInternal(err).WithMessage("failed to generate branding id")
-	}
 	if layout == "" {
 		layout = BrandingLayoutCentered
 	}
 	b := &Branding{
 		ProjectID:      projectID,
-		ID:             id,
 		Layout:         layout,
 		LiquidTemplate: liquidTemplate,
 		LogoURL:        logoURL,

@@ -14,14 +14,14 @@ import (
 )
 
 const createTokenStmt = `INSERT INTO zitadel_nextgen.tokens (
-	project_id, user_id, token_type,
+	project_id, token_id, user_id, token_type,
 	session_id, oidc_session_id, saml_session_id,
 	scope, expires_at, created_at
 ) VALUES (
-	$1, $2, $3::zitadel_nextgen.token_types,
-	$4, $5, $6,
-	$7, $8, now()
-) RETURNING token_id`
+	$1, $2, $3, $4::zitadel_nextgen.token_types,
+	$5, $6, $7,
+	$8, $9, now()
+) RETURNING created_at`
 
 const deleteByIDTokenStmt = `DELETE FROM zitadel_nextgen.tokens WHERE project_id = $1 AND token_id = $2`
 
@@ -48,15 +48,18 @@ func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) 
 	if token.TokenID != "" {
 		return fmt.Errorf("token_id must not be set on create")
 	}
+	if err := ensureManagedID(&token.TokenID, domain.TokenPrefix); err != nil {
+		return err
+	}
 
 	scope := token.Scope
 	if scope == nil {
 		scope = []string{}
 	}
 
-	var tokenID database.Identity
 	err := ts.client.QueryRow(ctx, createTokenStmt,
 		token.ProjectID,
+		token.TokenID,
 		tokenUserIDArg(token.UserID, token.Type),
 		token.Type.String(),
 		tokenSessionIDArg(token.SessionID),
@@ -64,20 +67,16 @@ func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) 
 		tokenSessionIDArg(token.SAMLSessionID),
 		scope,
 		token.ExpiresAt,
-	).Scan(&tokenID)
+	).Scan(&token.CreatedAt)
 	if err != nil {
 		return wrapError(err)
 	}
-	if tokenID == "" {
-		return fmt.Errorf("failed to create token: no token_id returned")
-	}
-	token.TokenID = tokenID.String()
 	return nil
 }
 
 // DeleteTokenByID implements [service.TokenStatements].
 func (ts tokenStatements) DeleteTokenByID(ctx context.Context, projectID, tokenID string) error {
-	_, err := ts.client.Exec(ctx, deleteByIDTokenStmt, projectID, database.Identity(tokenID))
+	_, err := ts.client.Exec(ctx, deleteByIDTokenStmt, projectID, tokenID)
 	return wrapError(err)
 }
 
@@ -87,7 +86,7 @@ func (ts tokenStatements) GetTokenByID(ctx context.Context, projectID, tokenID s
 	if err := compileRead(&compiler, tokenQuery, &database.ListOptions[domain.TokenField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.TokenFieldProjectID), projectID),
-			database.Equal(database.Col(domain.TokenFieldTokenID), database.Identity(tokenID)),
+			database.Equal(database.Col(domain.TokenFieldTokenID), tokenID),
 		),
 	}, tokenSchema); err != nil {
 		return nil, err
@@ -141,15 +140,14 @@ func (ts tokenStatements) ListTokens(ctx context.Context, filter *database.ListO
 func (ts tokenStatements) scanToken(row pgx.CollectableRow) (*domain.Token, error) {
 	token := new(domain.Token)
 	var (
-		tokenID                          database.Identity
 		userID                           *string
-		sessionID, oidcSessionID, samlID database.Identity
+		sessionID, oidcSessionID, samlID *string
 		scope                            []string
 		expiresAt                        *time.Time
 	)
 	if err := row.Scan(
 		&token.ProjectID,
-		&tokenID,
+		&token.TokenID,
 		&userID,
 		&token.Type,
 		&sessionID,
@@ -161,22 +159,12 @@ func (ts tokenStatements) scanToken(row pgx.CollectableRow) (*domain.Token, erro
 	); err != nil {
 		return nil, err
 	}
-	token.TokenID = tokenID.String()
 	if userID != nil {
 		token.UserID = *userID
 	}
-	if sessionID != "" {
-		s := sessionID.String()
-		token.SessionID = &s
-	}
-	if oidcSessionID != "" {
-		s := oidcSessionID.String()
-		token.OIDCSessionID = &s
-	}
-	if samlID != "" {
-		s := samlID.String()
-		token.SAMLSessionID = &s
-	}
+	token.SessionID = sessionID
+	token.OIDCSessionID = oidcSessionID
+	token.SAMLSessionID = samlID
 	if scope == nil {
 		token.Scope = []string{}
 	} else {
@@ -193,18 +181,18 @@ func tokenUserIDArg(userID string, tokenType domain.TokenType) any {
 	return userID
 }
 
-func tokenSessionIDArg(sessionID *string) database.Identity {
-	if sessionID == nil {
-		return ""
-	}
-	return database.Identity(*sessionID)
-}
-
-func tokenOptionalIdentity(id *string) any {
-	if id == nil {
+func tokenSessionIDArg(sessionID *string) any {
+	if sessionID == nil || *sessionID == "" {
 		return nil
 	}
-	return database.Identity(*id)
+	return *sessionID
+}
+
+func tokenOptionalString(id *string) any {
+	if id == nil || *id == "" {
+		return nil
+	}
+	return *id
 }
 
 func coerceTokenType(v any) (any, error) {
@@ -222,21 +210,6 @@ func coerceTokenType(v any) (any, error) {
 	}
 }
 
-func coerceTokenIdentity(v any) (any, error) {
-	switch id := v.(type) {
-	case database.Identity:
-		return id, nil
-	case string:
-		return database.Identity(id), nil
-	default:
-		s, err := database.CoerceStringValue(v)
-		if err != nil {
-			return nil, err
-		}
-		return database.Identity(s), nil
-	}
-}
-
 var _ service.TokenStatements = (*tokenStatements)(nil)
 
 var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding[domain.Token]{
@@ -247,8 +220,8 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 	},
 	domain.TokenFieldTokenID: {
 		SQLName:  "token_id",
-		Accessor: func(t *domain.Token) any { return database.Identity(t.TokenID) },
-		Coerce:   coerceTokenIdentity,
+		Accessor: func(t *domain.Token) any { return t.TokenID },
+		Coerce:   database.CoerceString,
 	},
 	domain.TokenFieldUserID: {
 		SQLName:  "user_id",
@@ -262,18 +235,18 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 	},
 	domain.TokenFieldSessionID: {
 		SQLName:  "session_id",
-		Accessor: func(t *domain.Token) any { return tokenOptionalIdentity(t.SessionID) },
-		Coerce:   coerceTokenIdentity,
+		Accessor: func(t *domain.Token) any { return tokenOptionalString(t.SessionID) },
+		Coerce:   database.CoerceString,
 	},
 	domain.TokenFieldOIDCSessionID: {
 		SQLName:  "oidc_session_id",
-		Accessor: func(t *domain.Token) any { return tokenOptionalIdentity(t.OIDCSessionID) },
-		Coerce:   coerceTokenIdentity,
+		Accessor: func(t *domain.Token) any { return tokenOptionalString(t.OIDCSessionID) },
+		Coerce:   database.CoerceString,
 	},
 	domain.TokenFieldSAMLSessionID: {
 		SQLName:  "saml_session_id",
-		Accessor: func(t *domain.Token) any { return tokenOptionalIdentity(t.SAMLSessionID) },
-		Coerce:   coerceTokenIdentity,
+		Accessor: func(t *domain.Token) any { return tokenOptionalString(t.SAMLSessionID) },
+		Coerce:   database.CoerceString,
 	},
 	domain.TokenFieldScope: {
 		SQLName:  "scope",
@@ -284,7 +257,7 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 		SQLName: "expires_at",
 		Accessor: func(t *domain.Token) any {
 			if t.ExpiresAt == nil {
-				return time.Time{}
+				return (*time.Time)(nil)
 			}
 			return *t.ExpiresAt
 		},

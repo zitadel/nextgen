@@ -26,6 +26,7 @@ export default defineComponent({
     projectId: { type: String, default: undefined },
     proxyPath: { type: String, default: undefined },
     postSignOutUrl: { type: String, default: undefined },
+    theme: { type: String as PropType<"light" | "dark" | "auto">, default: undefined },
   },
   emits: ["signout"],
   setup(props, { emit, expose }) {
@@ -44,6 +45,7 @@ export default defineComponent({
         projectId: props.projectId,
         proxyPath: props.proxyPath,
         "post-sign-out-url": props.postSignOutUrl,
+        theme: props.theme,
         onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
           emit("signout", event.detail);
         },

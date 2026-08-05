@@ -8,7 +8,7 @@ tasks:
     command: "corepack pnpm exec oxlint ."
 
   typecheck:
-    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
+    command: "corepack pnpm exec tsc --build tsconfig.json"
 
   build:
     command: "corepack pnpm run build"

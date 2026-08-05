@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
@@ -43,15 +43,15 @@ func (f UserFixture) Create(ctx context.Context, user *domain.CreateUser) error 
 }
 
 func (f UserFixture) GetByID(ctx context.Context, projectID, userID string) (*domain.User, error) {
-	return f.Pool.Statements().GetUser(ctx, v2database.And(
-		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
-		v2database.Equal(v2database.Col(domain.UserFieldID), userID),
+	return f.Pool.Statements().GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserFieldID), userID),
 	), service.UserQueryOptions{})
 }
 
 func (f UserFixture) GetByAttributes(ctx context.Context, projectID string, attrs []domain.Attribute) (*domain.User, error) {
 	return f.Pool.Statements().GetUser(ctx,
-		v2database.Equal(v2database.Col(domain.UserFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
 		service.UserQueryOptions{Attributes: attrs},
 	)
 }
@@ -61,9 +61,9 @@ func (f UserFixture) SetPassword(ctx context.Context, pw *domain.SetUserPassword
 }
 
 func (f UserFixture) GetPasswordByUserID(ctx context.Context, projectID, userID string) (*domain.UserPassword, error) {
-	return f.Pool.Statements().GetUserPassword(ctx, v2database.And(
-		v2database.Equal(v2database.Col(domain.UserPasswordFieldProjectID), projectID),
-		v2database.Equal(v2database.Col(domain.UserPasswordFieldUserID), userID),
+	return f.Pool.Statements().GetUserPassword(ctx, database.And(
+		database.Equal(database.Col(domain.UserPasswordFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserPasswordFieldUserID), userID),
 	))
 }
 

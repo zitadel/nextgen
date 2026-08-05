@@ -90,6 +90,12 @@ describe("design-tokens public surface", () => {
         "font.family.heading",
         "font.family.mono",
         "font.family.sans",
+        "gradient.baseEnd",
+        "gradient.lavenderStart",
+        "gradient.neutralStart",
+        "gradient.purpleStart",
+        "gradient.redStart",
+        "gradient.roseStart",
         "motion.duration.base",
         "motion.duration.fast",
         "motion.duration.instant",
@@ -118,6 +124,12 @@ describe("design-tokens public surface", () => {
         "spacing.14",
         "spacing.15",
         "spacing.16",
+        "syntax.boolean",
+        "syntax.comment",
+        "syntax.key",
+        "syntax.number",
+        "syntax.punctuation",
+        "syntax.string",
         "theme.accent",
         "theme.accentForeground",
         "theme.background",
@@ -151,6 +163,7 @@ describe("design-tokens public surface", () => {
         "theme.sidebarPrimary",
         "theme.sidebarPrimaryForeground",
         "theme.sidebarRing",
+        "theme.success",
       ]
     `);
   });

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 // TestManagementAuthz exercises the shared project-access guard across the
@@ -160,6 +161,43 @@ func TestManagementAuthz(t *testing.T) {
 			pwResp, err := foreign.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "hijacked-password"}, api.SetUserPasswordParams{ProjectID: victimID, UserID: "user_irrelevant"})
 			require.NoError(t, err)
 			assertAuthzError(t, pwResp, "user.invalid")
+
+			delResp, err := foreign.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{ProjectID: victimID, UserID: "user_irrelevant"})
+			require.NoError(t, err)
+			assertAuthzError(t, delResp, "user.not_found")
+		})
+
+		t.Run("a foreign delete of a real user leaves it standing", func(t *testing.T) {
+			t.Parallel()
+
+			// The other probes use fabricated ids because the guard rejects
+			// before the service. A delete is worth proving against real data:
+			// the answer must not distinguish the user from a nonexistent one,
+			// and the user must survive.
+			victimUser, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+				ProjectID: victim.ID,
+				User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "authz-delete-probe@example.com"),
+			})
+			require.NoError(t, err)
+			victimUserID := api.UserID(victimUser["id"].(string))
+
+			delResp, err := foreign.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{ProjectID: victimID, UserID: victimUserID})
+			require.NoError(t, err)
+			assertAuthzError(t, delResp, "user.not_found")
+
+			ownClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+			require.NoError(t, err)
+			harness.SetProjectSecretOnApiClient(t, ownClient, victim)
+
+			getResp, err := ownClient.GetUserByID(t.Context(), api.GetUserByIDParams{ProjectID: victimID, UserID: victimUserID})
+			require.NoError(t, err)
+			assert.IsType(t, &api.User{}, getResp, helpers.MustMarshal(t, getResp))
+
+			// The owner's secret does reach the delete: project.write implies
+			// user.delete, so the rejection above was the binding, not the op.
+			ownDelResp, err := ownClient.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{ProjectID: victimID, UserID: victimUserID})
+			require.NoError(t, err)
+			assert.IsType(t, &api.DeleteUserByIDNoContent{}, ownDelResp, helpers.MustMarshal(t, ownDelResp))
 		})
 
 		t.Run("preview secret rejected", func(t *testing.T) {
@@ -169,6 +207,11 @@ func TestManagementAuthz(t *testing.T) {
 			pwResp, err := preview.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "hijacked-password"}, api.SetUserPasswordParams{ProjectID: victimID, UserID: "user_irrelevant"})
 			require.NoError(t, err)
 			assertAuthzStatus(t, pwResp, 403, "user.permission_denied")
+
+			// …nor delete users…
+			delResp, err := preview.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{ProjectID: victimID, UserID: "user_irrelevant"})
+			require.NoError(t, err)
+			assertAuthzStatus(t, delResp, 403, "user.permission_denied")
 
 			// …and must not enumerate the project's users, even though the
 			// operation is implicitly scoped to its own project.
@@ -191,6 +234,16 @@ func TestManagementAuthz(t *testing.T) {
 			getResp, err := foreign.GetTeam(t.Context(), api.GetTeamParams{ProjectID: victimID, TeamID: "team_irrelevant"})
 			require.NoError(t, err)
 			assertAuthzError(t, getResp, "team.team_not_found")
+
+			updateResp, err := foreign.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, api.UpdateTeamParams{ProjectID: victimID, TeamID: "team_irrelevant"})
+			require.NoError(t, err)
+			assertAuthzError(t, updateResp, "team.project_not_found")
+
+			// A read of a foreign project answers "nothing there", so a
+			// listing cannot be used to prove the project exists.
+			queryResp, err := foreign.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: victimID})
+			require.NoError(t, err)
+			assertAuthzError(t, queryResp, "team.team_not_found")
 		})
 
 		t.Run("preview secret rejected", func(t *testing.T) {
@@ -198,7 +251,18 @@ func TestManagementAuthz(t *testing.T) {
 
 			resp, err := preview.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: helpers.TeamName()}, api.CreateTeamParams{ProjectID: victimID})
 			require.NoError(t, err)
-			assertAuthzStatus(t, resp, 403, "team.permission_denied")
+			require.IsType(t, &api.CreateTeamForbidden{}, resp, helpers.MustMarshal(t, resp))
+			assertAuthzError(t, resp, "team.permission_denied")
+
+			updateResp, err := preview.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, api.UpdateTeamParams{ProjectID: victimID, TeamID: "team_irrelevant"})
+			require.NoError(t, err)
+			require.IsType(t, &api.UpdateTeamForbidden{}, updateResp, helpers.MustMarshal(t, updateResp))
+			assertAuthzError(t, updateResp, "team.permission_denied")
+
+			queryResp, err := preview.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: victimID})
+			require.NoError(t, err)
+			require.IsType(t, &api.QueryTeamsForbidden{}, queryResp, helpers.MustMarshal(t, queryResp))
+			assertAuthzError(t, queryResp, "team.permission_denied")
 		})
 
 		t.Run("unauthenticated create is a 401", func(t *testing.T) {
@@ -277,8 +341,8 @@ func TestManagementAuthz(t *testing.T) {
 				// other, must not see victim).
 				resp, err := foreign.QueryProjects(t.Context(), &api.QueryProjectsRequest{})
 				require.NoError(t, err)
-				listResp, ok := resp.(*api.QueryProjectsResponse)
-				require.True(t, ok, helpers.MustMarshal(t, resp))
+				require.IsType(t, &api.QueryProjectsResponse{}, resp, helpers.MustMarshal(t, resp))
+				listResp := resp.(*api.QueryProjectsResponse)
 				require.Len(t, listResp.Projects, 1, "the foreign secret sees only its own project")
 				assert.Equal(t, other.ID, listResp.Projects[0].ID, "the foreign secret sees exactly its own project (other)")
 
@@ -289,8 +353,8 @@ func TestManagementAuthz(t *testing.T) {
 
 				ownResp, err := ownClient.QueryProjects(t.Context(), &api.QueryProjectsRequest{})
 				require.NoError(t, err)
-				ownListResp, ok := ownResp.(*api.QueryProjectsResponse)
-				require.True(t, ok, helpers.MustMarshal(t, ownResp))
+				require.IsType(t, &api.QueryProjectsResponse{}, ownResp, helpers.MustMarshal(t, ownResp))
+				ownListResp := ownResp.(*api.QueryProjectsResponse)
 				require.Len(t, ownListResp.Projects, 1, "the own secret sees only its own project")
 				assert.Equal(t, victim.ID, ownListResp.Projects[0].ID, "the own secret sees exactly its own project (victim)")
 			})

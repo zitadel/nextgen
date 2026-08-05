@@ -4,6 +4,7 @@ package postgres
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniqueTokenFixtureIDs(t *testing.T) (projectID, schemaURL, userID string) {
@@ -52,7 +53,7 @@ func ensureTokenTestUser(t *testing.T, projectID, schemaURL, userID string) {
 func requireGeneratedTokenID(t *testing.T, tokenID string) {
 	t.Helper()
 	require.NotEmpty(t, tokenID)
-	require.True(t, v2database.Identity(tokenID).IsNumeric())
+	require.True(t, strings.HasPrefix(tokenID, string(domain.TokenPrefix)+"_"))
 }
 
 func TestTokenStatements_CRUD_OIDCAccessToken(t *testing.T) {
@@ -90,8 +91,8 @@ func TestTokenStatements_CRUD_OIDCAccessToken(t *testing.T) {
 	assert.True(t, exp.Equal(*got.ExpiresAt))
 	assert.False(t, got.CreatedAt.IsZero())
 
-	listed, err := testPool.ListTokens(t.Context(), &v2database.ListOptions[domain.TokenField]{
-		Filter: v2database.Equal(v2database.Col(domain.TokenFieldProjectID), projectID),
+	listed, err := testPool.ListTokens(t.Context(), &database.ListOptions[domain.TokenField]{
+		Filter: database.Equal(database.Col(domain.TokenFieldProjectID), projectID),
 	})
 	require.NoError(t, err)
 	require.Len(t, listed.Items, 1)
@@ -99,7 +100,7 @@ func TestTokenStatements_CRUD_OIDCAccessToken(t *testing.T) {
 	require.NoError(t, testPool.DeleteTokenByID(t.Context(), projectID, tok.TokenID))
 
 	_, err = testPool.GetTokenByID(t.Context(), projectID, tok.TokenID)
-	assert.ErrorIs(t, err, new(v2database.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestTokenStatements_SessionToken(t *testing.T) {
@@ -234,7 +235,7 @@ func TestTokenStatements_Get_NotFound(t *testing.T) {
 	ensureTokenTestUser(t, projectID, schemaURL, userID)
 
 	_, err := testPool.GetTokenByID(t.Context(), projectID, "999999")
-	assert.ErrorIs(t, err, new(v2database.NoRowFoundError))
+	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }
 
 func TestTokenStatements_List_NextCursorRequiresOrderBy(t *testing.T) {
@@ -257,9 +258,9 @@ func TestTokenStatements_List_NextCursorRequiresOrderBy(t *testing.T) {
 		})
 	}
 
-	noOrder, err := testPool.ListTokens(t.Context(), &v2database.ListOptions[domain.TokenField]{
-		Filter: v2database.Equal(v2database.Col(domain.TokenFieldProjectID), projectID),
-		Pagination: v2database.Page[domain.TokenField]{
+	noOrder, err := testPool.ListTokens(t.Context(), &database.ListOptions[domain.TokenField]{
+		Filter: database.Equal(database.Col(domain.TokenFieldProjectID), projectID),
+		Pagination: database.Page[domain.TokenField]{
 			Limit: 1,
 		},
 	})
@@ -267,13 +268,13 @@ func TestTokenStatements_List_NextCursorRequiresOrderBy(t *testing.T) {
 	require.Len(t, noOrder.Items, 1)
 	assert.Nil(t, noOrder.NextCursor)
 
-	withOrder, err := testPool.ListTokens(t.Context(), &v2database.ListOptions[domain.TokenField]{
-		Filter: v2database.Equal(v2database.Col(domain.TokenFieldProjectID), projectID),
-		Pagination: v2database.Page[domain.TokenField]{
+	withOrder, err := testPool.ListTokens(t.Context(), &database.ListOptions[domain.TokenField]{
+		Filter: database.Equal(database.Col(domain.TokenFieldProjectID), projectID),
+		Pagination: database.Page[domain.TokenField]{
 			Limit: 1,
-			OrderBy: v2database.OrderBy[domain.TokenField]{
-				Columns:   []v2database.Column[domain.TokenField]{v2database.Col(domain.TokenFieldTokenID)},
-				Direction: v2database.OrderAsc,
+			OrderBy: database.OrderBy[domain.TokenField]{
+				Columns:   []database.Column[domain.TokenField]{database.Col(domain.TokenFieldTokenID)},
+				Direction: database.OrderAsc,
 			},
 		},
 	})

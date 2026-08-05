@@ -14,6 +14,20 @@ import (
 	"github.com/ogen-go/ogen/uri"
 )
 
+func encodeCompleteClaimRequest(
+	req *CompleteClaimRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeCreateAuthAttemptRequest(
 	req *CreateAuthAttemptRequest,
 	r *http.Request,
@@ -379,6 +393,20 @@ func encodeQueryProjectsRequest(
 	return nil
 }
 
+func encodeQueryTeamsRequest(
+	req *QueryTeamsRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeRevokeTokenRequest(
 	req *RevokeRequest,
 	r *http.Request,
@@ -468,6 +496,20 @@ func encodeSubmitFlowStepRequest(
 
 func encodeUpdateFlowDefinitionRequest(
 	req *FlowDefinitionUpdateRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeUpdateTeamRequest(
+	req *UpdateTeamRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

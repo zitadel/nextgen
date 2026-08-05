@@ -22,7 +22,7 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 	db *service.DB,
 	serverURL string,
 	schemaValidator *domain.SchemaValidator,
-	kek *cryptomock.MockCrypter,
+	masterKey *cryptomock.MockCrypter,
 	pool *servicemocks.MockPool,
 	transaction *servicemocks.MockTransactioner[service.AllStatements],
 	statementer *servicemocks.MockStatementer[service.AllStatements],
@@ -33,10 +33,10 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 	mock = gomock.NewController(t)
 
 	pool = servicemocks.NewMockPool(mock)
-	kek = cryptomock.NewMockCrypter(mock)
+	masterKey = cryptomock.NewMockCrypter(mock)
 
 	keyService := servicemocks.NewMockKeyService(mock)
-	keyService.EXPECT().GetKekCrypter(gomock.Any()).Return(kek, nil).AnyTimes()
+	keyService.EXPECT().GetMasterKeyCrypter(gomock.Any()).Return(masterKey, nil).AnyTimes()
 
 	transaction = servicemocks.NewMockTransactioner[service.AllStatements](mock)
 	statementer = servicemocks.NewMockStatementer[service.AllStatements](mock)
@@ -75,7 +75,7 @@ func TestProjectService_Create(t *testing.T) {
 		projectName            string
 		previewOrigins         []string
 		seedDefaults           bool
-		setupMocks             func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements)
+		setupMocks             func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements)
 		wantErr                error
 		expectedPreviewOrigins []string
 	}{
@@ -84,10 +84,18 @@ func TestProjectService_Create(t *testing.T) {
 			projectName:    "test",
 			previewOrigins: nil,
 			seedDefaults:   true,
-			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
-				kek.EXPECT().Encrypt(gomock.Any())
-				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
-				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any())
+			setupMocks: func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
+				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, p *domain.Project) error {
+						p.ID = "proj_generated"
+						return nil
+					},
+				)
+				masterKey.EXPECT().Encrypt(gomock.Any())
+				masterKey.EXPECT().Decrypt(gomock.Any()).Return("thiskeyis32byteslongforsurerealy", nil)
+				statements.EXPECT().NewManagedID(string(domain.PrefixEncryptionKey)).Return("enc_key_minted", nil)
+				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
+				statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 			},
@@ -98,10 +106,18 @@ func TestProjectService_Create(t *testing.T) {
 			projectName:    "test",
 			previewOrigins: []string{"*.vercel.app", "*.netlify.app"},
 			seedDefaults:   true,
-			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
-				kek.EXPECT().Encrypt(gomock.Any())
-				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
-				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any())
+			setupMocks: func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
+				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, p *domain.Project) error {
+						p.ID = "proj_generated"
+						return nil
+					},
+				)
+				masterKey.EXPECT().Encrypt(gomock.Any())
+				masterKey.EXPECT().Decrypt(gomock.Any()).Return("thiskeyis32byteslongforsurerealy", nil)
+				statements.EXPECT().NewManagedID(string(domain.PrefixEncryptionKey)).Return("enc_key_minted", nil)
+				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
+				statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 			},
@@ -111,10 +127,18 @@ func TestProjectService_Create(t *testing.T) {
 			name:         "ok — skip fallback defaults",
 			projectName:  "test",
 			seedDefaults: false,
-			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
-				kek.EXPECT().Encrypt(gomock.Any())
-				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any())
-				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any())
+			setupMocks: func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
+				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, p *domain.Project) error {
+						p.ID = "proj_generated"
+						return nil
+					},
+				)
+				masterKey.EXPECT().Encrypt(gomock.Any())
+				masterKey.EXPECT().Decrypt(gomock.Any()).Return("thiskeyis32byteslongforsurerealy", nil)
+				statements.EXPECT().NewManagedID(string(domain.PrefixEncryptionKey)).Return("enc_key_minted", nil)
+				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
+				statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
 				// No schema/flow-definition seeding when seedDefaults is false.
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any()).Times(0)
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any()).Times(0)
@@ -124,8 +148,7 @@ func TestProjectService_Create(t *testing.T) {
 		{
 			name:        "project creation error should bubble up",
 			projectName: "test",
-			setupMocks: func(kek *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
-				kek.EXPECT().Encrypt(gomock.Any())
+			setupMocks: func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).Return(assert.AnError)
 			},
 			wantErr: domain.ErrInternal(assert.AnError),
@@ -143,8 +166,8 @@ func TestProjectService_Create(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			svc, _, _, _, _, kek, _, _, _, statements := createMockedProjectService(t)
-			tc.setupMocks(kek, statements)
+			svc, _, _, _, _, masterKey, _, _, _, statements := createMockedProjectService(t)
+			tc.setupMocks(masterKey, statements)
 
 			got, err := svc.Create(context.Background(), tc.projectName, tc.previewOrigins, tc.seedDefaults)
 			if tc.wantErr != nil {

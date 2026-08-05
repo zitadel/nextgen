@@ -17,18 +17,23 @@
  * variables (the previous filename-coupled behaviour) is treated as a bug, not
  * a warning.
  *
- * Collection detection is by *shape*, not file name:
- *   - the multi-mode collection whose modes include Light + Dark is the themed
- *     semantic colour surface (its leaves become `color.<name> = {dark,light}`);
- *   - any other multi-mode collection is treated as viewport typography
- *     (its leaves become `typography.<mode>.<name>`);
- *   - single-mode collections contribute primitives, surfaced by group name
- *     (`radius`, `text`, `font`, `font-weight`, `container`).
+ * What each collection *is* is declared in `src/collections.ts`, not inferred
+ * from its shape. Inference is what let `Gradient Colors` and `Syntax` — two
+ * collections that merely happen to share Light/Dark modes — land in the same
+ * bucket, where one silently replaced the other.
+ *
+ * An unclassified export defaults to `registry-only` and is reported in
+ * `$source.unclassifiedCollections`; a stale manifest entry lands in
+ * `$source.staleCollectionRoles`. Both are caught by `sync-from-export.spec.ts`,
+ * i.e. by a red check on the sync PR — *not* by throwing here, which would kill
+ * the workflow before it ever opens a PR to put a check on.
  */
 import { access, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { argv } from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+
+import { type CollectionRole, collectionRoles } from "../src/collections.js";
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const EXPORT_DIR = resolve(ROOT, "../figma-export");
@@ -181,9 +186,54 @@ function kebab(segments: string[]): string {
   return segments.join("-").toLowerCase().replace(/\s+/g, "-");
 }
 
-function isThemeCollection(c: ParsedCollection): boolean {
-  const lower = c.modes.map((m) => m.toLowerCase());
-  return lower.includes("light") && lower.includes("dark");
+/**
+ * Bind every parsed collection to its declared role.
+ *
+ * A collection the manifest does not name falls back to `registry-only` — the
+ * conservative role, surfacing nothing — and is reported in `$source`. It is
+ * deliberately *not* a throw: `:sync-export` runs before the workflow opens or
+ * updates the sync PR, so throwing here kills the run without ever producing a
+ * red check, and the only trace is a workflow log nobody reads. Failing soft
+ * lets the exports land as a reviewable PR; `sync-from-export.spec.ts` then
+ * fails `full-pr` until someone classifies them, which is a signal that shows
+ * up where the work actually is.
+ *
+ * A manifest entry with no matching export is reported the same way — it means
+ * a collection was renamed or removed in Figma and the manifest is now stale.
+ */
+function assignRoles(
+  collections: ParsedCollection[],
+  roles: Record<string, CollectionRole>,
+): { assigned: Map<ParsedCollection, CollectionRole>; unclassified: string[]; stale: string[] } {
+  const assigned = new Map<ParsedCollection, CollectionRole>();
+  const unclassified: string[] = [];
+  for (const c of collections) {
+    const role = roles[c.name];
+    if (role === undefined) unclassified.push(c.name);
+    assigned.set(c, role ?? "registry-only");
+  }
+  const stale = Object.keys(roles).filter((name) => !collections.some((c) => c.name === name));
+  return { assigned, unclassified, stale };
+}
+
+/** The collections holding a given role, in export order. */
+function withRole(
+  assigned: Map<ParsedCollection, CollectionRole>,
+  role: CollectionRole,
+): ParsedCollection[] {
+  return [...assigned].filter(([, r]) => r === role).map(([c]) => c);
+}
+
+/** The single collection that owns `color.*`. */
+function semanticCollection(assigned: Map<ParsedCollection, CollectionRole>): ParsedCollection {
+  const found = withRole(assigned, "semantic");
+  if (found.length !== 1) {
+    throw new Error(
+      `Exactly one collection must have role "semantic" (found ${found.length}` +
+        `${found.length > 0 ? `: ${found.map((c) => c.name).join(", ")}` : ""}). See src/collections.ts.`,
+    );
+  }
+  return found[0]!;
 }
 
 function findMode(c: ParsedCollection, wanted: string): string {
@@ -192,29 +242,114 @@ function findMode(c: ParsedCollection, wanted: string): string {
   return found;
 }
 
+/** The leaves a collection declared for `wanted` (`"light"`, `"dark"`). */
+function leavesForMode(c: ParsedCollection, wanted: string): Map<string, Raw> {
+  const leaves = c.leaves.get(findMode(c, wanted));
+  if (!leaves) throw new Error(`Collection ${c.name} declared a ${wanted} mode but exported no leaves for it`);
+  return leaves;
+}
+
 const HEX = /^#[0-9a-f]{3,8}$/i;
+
+export interface ThemedColor {
+  dark: string;
+  light: string;
+}
+
+/**
+ * Assign `value` to `slot`, or throw if another collection already holds it.
+ * Roles keep two collections out of each other's *bucket*; this keeps two
+ * collections in the same bucket out of each other's *key*.
+ */
+function claim<T>(
+  into: Record<string, T>,
+  owners: Map<string, string>,
+  key: string,
+  label: string,
+  owner: string,
+  value: T,
+): void {
+  const existing = owners.get(key);
+  if (existing !== undefined) {
+    throw new Error(
+      `Collections "${existing}" and "${owner}" both project ${label}. Refusing to overwrite — ` +
+        `namespace one of them in Figma so both survive the sync.`,
+    );
+  }
+  owners.set(key, owner);
+  into[key] = value;
+}
+
+/**
+ * Resolve `{path, name}` entries of a Light/Dark collection into `{dark,light}`
+ * hex pairs. Leaves that do not resolve to a hex in both modes are returned as
+ * `skipped` rather than dropped on the floor, so callers can account for them.
+ */
+function resolveThemedPairs(
+  c: ParsedCollection,
+  registry: Registry,
+  entries: Array<{ path: string; name: string }>,
+): { pairs: Record<string, ThemedColor>; skipped: string[] } {
+  const lightMode = findMode(c, "light");
+  const darkMode = findMode(c, "dark");
+  const pairs: Record<string, ThemedColor> = {};
+  const skipped: string[] = [];
+  for (const { path, name } of entries) {
+    const dark = String(registry.resolve(path, darkMode));
+    const light = String(registry.resolve(path, lightMode));
+    if (!HEX.test(dark) || !HEX.test(light)) {
+      skipped.push(path);
+      continue;
+    }
+    pairs[name] = { dark, light };
+  }
+  return { pairs, skipped };
+}
+
 /**
  * The designer keeps the consumer-facing semantic colours under the `base`
  * group; the rest of the themed collection is scratch/working variables. Build
  * `color.<name> = {dark,light}` from the `base` group only, skipping any leaf
  * that does not resolve to a hex colour.
  */
-function buildColorSurface(theme: ParsedCollection, registry: Registry): Record<string, { dark: string; light: string }> {
-  const lightMode = findMode(theme, "light");
-  const darkMode = findMode(theme, "dark");
-  const paths = [...theme.leaves.get(lightMode)!.keys()];
-  const basePaths = paths.filter((p) => p.startsWith("base."));
-  const surface = basePaths.length > 0 ? basePaths : paths;
-  const out: Record<string, { dark: string; light: string }> = {};
-  for (const path of surface) {
-    const dark = String(registry.resolve(path, darkMode));
-    const light = String(registry.resolve(path, lightMode));
-    if (!HEX.test(dark) || !HEX.test(light)) continue;
-    // `base.sidebar-accent` -> `sidebar-accent`; `base.chart-1` -> `chart-1`.
-    const name = kebab(path.split(".").slice(1));
-    out[name] = { dark, light };
+function buildColorSurface(theme: ParsedCollection, registry: Registry): Record<string, ThemedColor> {
+  const paths = [...leavesForMode(theme, "light").keys()].filter((p) => p.startsWith("base."));
+  // `base.sidebar-accent` -> `sidebar-accent`; `base.chart-1` -> `chart-1`.
+  const entries = paths.map((path) => ({ path, name: kebab(path.split(".").slice(1)) }));
+  return resolveThemedPairs(theme, registry, entries).pairs;
+}
+
+/**
+ * Project a non-semantic Light/Dark collection (`Syntax`, `Gradient Colors`)
+ * into `themed.<group>`, where `<group>` is the leaves' shared first segment:
+ * `syntax.key` -> `themed.syntax.key`, `gradient.red.start` ->
+ * `themed.gradient.red-start`. Namespacing by group is what stops two
+ * Light/Dark collections landing on the same key.
+ */
+function buildThemedGroups(
+  c: ParsedCollection,
+  registry: Registry,
+): { groups: Record<string, Record<string, ThemedColor>>; skipped: string[] } {
+  const byGroup = new Map<string, Array<{ path: string; name: string }>>();
+  for (const path of leavesForMode(c, "light").keys()) {
+    const parts = path.split(".");
+    // A leaf sitting at the collection root has no group of its own; fall back
+    // to the collection name so it still gets a namespace of its own.
+    const group = parts.length > 1 ? kebab([parts[0]!]) : kebab([c.name]);
+    const name = kebab(parts.length > 1 ? parts.slice(1) : parts);
+    const bucket = byGroup.get(group);
+    if (bucket) bucket.push({ path, name });
+    else byGroup.set(group, [{ path, name }]);
   }
-  return out;
+
+  const groups: Record<string, Record<string, ThemedColor>> = {};
+  const skipped: string[] = [];
+  for (const [group, entries] of byGroup) {
+    const resolved = resolveThemedPairs(c, registry, entries);
+    skipped.push(...resolved.skipped);
+    if (Object.keys(resolved.pairs).length > 0) groups[group] = resolved.pairs;
+  }
+  return { groups, skipped };
 }
 
 /** Nest a dotted path into `target`, camel-casing each segment. */
@@ -247,14 +382,28 @@ export interface SyncedTokens {
     collections: string[];
     themeModes: string[];
     resolvedLeaves: number;
+    /**
+     * Exports `src/collections.ts` does not classify. Defaulted to
+     * `registry-only` so the sync still produces a reviewable PR; the resolver
+     * spec fails until they are classified. Must be empty on a merged sync.
+     */
+    unclassifiedCollections: string[];
+    /** Manifest entries with no matching export — renamed or removed in Figma. */
+    staleCollectionRoles: string[];
   };
-  color: Record<string, { dark: string; light: string }>;
+  color: Record<string, ThemedColor>;
   radius: Record<string, unknown>;
   text: Record<string, unknown>;
   fontFamily: Record<string, unknown>;
   fontWeight: Record<string, unknown>;
   /** Figma's `container/*` max-width scale (px). `build.ts` maps semantic roles onto these steps. */
   container: Record<string, unknown>;
+  /**
+   * Light/Dark collections other than the semantic surface, namespaced by
+   * group: `themed.syntax.key`, `themed.gradient.red-start`. `build.ts` emits
+   * these as `--zl-<group>-<name>` with a `[data-theme="light"]` override.
+   */
+  themed: Record<string, Record<string, ThemedColor>>;
   typography: Record<string, Record<string, unknown>>;
 }
 
@@ -263,7 +412,10 @@ export interface SyncedTokens {
  * returns the resolved token surface. Kept separate from `main()` so it can be
  * unit-tested against the checked-in fixture without touching the filesystem.
  */
-export function syncTokens(files: Array<{ name: string; data: unknown }>): SyncedTokens {
+export function syncTokens(
+  files: Array<{ name: string; data: unknown }>,
+  roles: Record<string, CollectionRole> = collectionRoles,
+): SyncedTokens {
   if (files.length === 0) throw new Error("No JSON exports provided");
 
   const collections = files.map(({ name, data }) => parseCollection(name, data));
@@ -288,33 +440,49 @@ export function syncTokens(files: Array<{ name: string; data: unknown }>): Synce
   }
   if (resolvedLeaves === 0) throw new Error("No token leaves ingested from exports");
 
-  const themeCollection = collections.find(isThemeCollection);
-  if (!themeCollection) {
-    throw new Error("No Light/Dark themed collection found in exports (cannot build colour surface)");
-  }
-  const color = buildColorSurface(themeCollection, registry);
+  const { assigned, unclassified, stale } = assignRoles(collections, roles);
+
+  const semantic = semanticCollection(assigned);
+  const color = buildColorSurface(semantic, registry);
   if (Object.keys(color).length === 0) {
-    throw new Error(`Themed collection ${themeCollection.name} produced no colours`);
+    throw new Error(`Semantic collection ${semantic.name} (${semantic.file}) produced no colours`);
   }
 
-  // Merge every single-mode collection's leaves so we can surface primitive
-  // groups (radius/text/font) by group name regardless of which file they came from.
+  // Each themed collection gets its own namespace. Roles keep them out of the
+  // viewport bucket; `claim` keeps two of them off the same group name.
+  const themed: Record<string, Record<string, ThemedColor>> = {};
+  const themedOwners = new Map<string, string>();
+  for (const c of withRole(assigned, "themed")) {
+    const { groups, skipped } = buildThemedGroups(c, registry);
+    if (Object.keys(groups).length === 0) {
+      throw new Error(
+        `Themed collection ${c.name} (${c.file}) produced no colours` +
+          (skipped.length > 0 ? `; no leaf resolved to a hex in both modes (${skipped.join(", ")})` : ""),
+      );
+    }
+    for (const [group, entries] of Object.entries(groups)) {
+      claim(themed, themedOwners, group, `themed.${group}`, c.name, entries);
+    }
+  }
+
+  // Primitive groups (radius/text/font/…) are merged across the collections
+  // declared to own them, so they surface regardless of which file they sit in.
+  // `Registry.add` has already rejected genuinely conflicting concrete values.
   const singleMode = new Map<string, Raw>();
-  for (const c of collections) {
+  for (const c of withRole(assigned, "primitives")) {
     const flat = c.leaves.get(NO_MODE);
     if (flat) for (const [path, value] of flat) singleMode.set(path, value);
   }
-
-  // Viewport typography: any multi-mode collection that isn't the theme surface.
   const typography: Record<string, Record<string, unknown>> = {};
-  for (const c of collections) {
-    if (c === themeCollection || c.modes[0] === NO_MODE) continue;
+  const typographyOwners = new Map<string, string>();
+  for (const c of withRole(assigned, "viewport")) {
     for (const mode of c.modes) {
       const modeOut: Record<string, unknown> = {};
-      for (const path of c.leaves.get(mode)!.keys()) {
+      for (const path of leavesForMode(c, mode.toLowerCase()).keys()) {
         setNested(modeOut, path, registry.resolve(path, mode));
       }
-      typography[mode.toLowerCase()] = modeOut;
+      const key = mode.toLowerCase();
+      claim(typography, typographyOwners, key, `typography.${key}`, c.name, modeOut);
     }
   }
 
@@ -325,6 +493,8 @@ export function syncTokens(files: Array<{ name: string; data: unknown }>): Synce
       collections: collections.map((c) => c.name),
       themeModes: ["dark", "light"],
       resolvedLeaves,
+      unclassifiedCollections: unclassified,
+      staleCollectionRoles: stale,
     },
     color,
     radius: buildGroup("radius", singleMode, registry),
@@ -332,6 +502,7 @@ export function syncTokens(files: Array<{ name: string; data: unknown }>): Synce
     fontFamily: buildGroup("font", singleMode, registry),
     fontWeight: buildGroup("font-weight", singleMode, registry),
     container: buildGroup("container", singleMode, registry),
+    themed,
     typography,
   };
 }
@@ -357,11 +528,29 @@ async function main(): Promise<void> {
 
   const out = syncTokens(files);
   await writeFile(TOKENS_FILE, `${JSON.stringify(out, null, 2)}\n`);
+  const themedGroups = Object.entries(out.themed).map(([g, e]) => `${g} (${Object.keys(e).length})`);
   // eslint-disable-next-line no-console
   console.log(
     `design-tokens sync-export: resolved ${out.$source.resolvedLeaves} leaves across ${out.$source.collections.length} collections; ` +
-      `surfaced ${Object.keys(out.color).length} colours -> ${TOKENS_FILE}`,
+      `surfaced ${Object.keys(out.color).length} colours` +
+      (themedGroups.length > 0 ? ` + themed groups ${themedGroups.join(", ")}` : "") +
+      ` -> ${TOKENS_FILE}`,
   );
+  const { unclassifiedCollections, staleCollectionRoles } = out.$source;
+  if (unclassifiedCollections.length > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `WARNING: ${unclassifiedCollections.join(", ")} not classified in src/collections.ts — ` +
+        `defaulted to registry-only, so they surface nothing. design-tokens:test will fail until classified.`,
+    );
+  }
+  if (staleCollectionRoles.length > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `WARNING: src/collections.ts classifies ${staleCollectionRoles.join(", ")}, but no export declares them. ` +
+        `Renamed or removed in Figma?`,
+    );
+  }
   // eslint-disable-next-line no-console
   console.warn("Now run `moon run design-tokens:generate` and review the tokens.snapshot.spec.ts diff.");
 }

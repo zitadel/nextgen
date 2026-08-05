@@ -14,7 +14,7 @@ tasks:
       - "shared-component-styles:build"
 
   typecheck:
-    command: "corepack pnpm exec tsc --noEmit -p tsconfig.json"
+    command: "corepack pnpm exec tsc --build tsconfig.json"
     deps:
       - "design-tokens:build"
       - "shared-component-styles:build"

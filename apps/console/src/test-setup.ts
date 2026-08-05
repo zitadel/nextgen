@@ -44,6 +44,18 @@ if (typeof window !== "undefined") {
   window.scrollTo = (() => undefined) as typeof window.scrollTo;
 }
 
+// jsdom implements no Pointer Capture API and no scrollIntoView. Radix's
+// popover/dropdown triggers call `hasPointerCapture` while deciding whether a
+// pointerdown became a drag, and cmdk scrolls its active option into view — so
+// without these a combobox never opens under test (the click is swallowed
+// before Radix toggles state).
+if (typeof Element !== "undefined") {
+  Element.prototype.hasPointerCapture ??= () => false;
+  Element.prototype.releasePointerCapture ??= () => undefined;
+  Element.prototype.setPointerCapture ??= () => undefined;
+  Element.prototype.scrollIntoView ??= () => undefined;
+}
+
 // Hermetic env: Vitest (via Vite) loads `.env.local`, so without this stub a
 // developer's local VITE_CONSOLE_PROJECT_ID would leak into test requests and
 // make outcomes depend on gitignored local files. Specs that need a value

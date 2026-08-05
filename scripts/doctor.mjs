@@ -124,16 +124,41 @@ async function checkPlaywright() {
 }
 
 async function checkMoon() {
+  // node_modules/.bin/moon is the authority: the catalog-pinned @moonrepo/cli
+  // that pnpm scripts and CI resolve. A PATH lookup here could silently report
+  // a global install instead.
+  let pinned;
   try {
-    const { stdout } = await runCapture("moon", ["--version"], {
-      cwd: repoRoot,
-    });
-    pass(`Moon ${stdout.trim()}`);
+    const { stdout } = await runCapture(
+      join(repoRoot, "node_modules", ".bin", "moon"),
+      ["--version"],
+      {
+        cwd: repoRoot,
+      },
+    );
+    pinned = stdout.trim();
+    pass(`Moon ${pinned}`);
   } catch {
     fail(
       "Moon is not available; local checks and release tasks need it",
       "Run: corepack pnpm install --frozen-lockfile",
     );
+    return;
+  }
+
+  try {
+    const { stdout } = await runCapture("moon", ["--version"], {
+      cwd: repoRoot,
+    });
+    const onPath = stdout.trim();
+    if (onPath !== pinned) {
+      warn(
+        `moon on PATH is ${onPath} but the workspace pins ${pinned}`,
+        "A global install shadows node_modules/.bin in plain shells; pnpm scripts and CI use the pinned one",
+      );
+    }
+  } catch {
+    // No moon on PATH at all is fine: pnpm scripts and CI resolve .bin anyway.
   }
 }
 

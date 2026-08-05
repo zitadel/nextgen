@@ -43,6 +43,18 @@ func (UnimplementedHandler) AuthorizeGet(ctx context.Context, params AuthorizeGe
 	return r, ht.ErrNotImplemented
 }
 
+// CompleteClaim implements completeClaim operation.
+//
+// Called by the browser after the developer authenticates on the claim page.
+// Authenticated by the `__nextgen_session` cookie, it attaches the project to
+// the developer's personal team using the `challenge_id` from the claim URL as
+// its single-use, browser-safe authorization.
+//
+// POST /projects/{project_id}/claim/complete
+func (UnimplementedHandler) CompleteClaim(ctx context.Context, req *CompleteClaimRequest, params CompleteClaimParams) (r CompleteClaimRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateAuthAttempt implements createAuthAttempt operation.
 //
 // Starts a new authentication attempt. This is the entry point for the auth_attempts state machine.
@@ -129,10 +141,12 @@ func (UnimplementedHandler) CreateProject(ctx context.Context, req *CreateProjec
 
 // CreateSchema implements createSchema operation.
 //
-// Create a new schema. The schema definition must include a unique $id field,
-// which will be used to identify the schema in future requests. The $id must
-// be a valid URI and should ideally point to the location where the schema
-// can be accessed.
+// Create a new schema. The optional `$id` field is the JSON Schema document
+// URI used to identify the schema in future requests (GitOps-stable identity,
+// not a free-form resource primary key). When `$id` is omitted, the server
+// generates a `sch_*` URL. When provided, `$id` must be unique within the
+// project and should ideally be a valid URI pointing at where the schema can
+// be accessed.
 // The schema can either be a concrete schema, e.g. a user schema, or a
 // schema-url which will be resolved by the server.
 //
@@ -149,8 +163,15 @@ func (UnimplementedHandler) CreateSchema(ctx context.Context, req CreateSchemaRe
 // - Pre-allocate a `session_id` before the user is known, so device/telemetry signals
 // can be correlated with the eventual authenticated session from the start.
 // - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
-// The returned `session_token` authorises GET and DELETE on this session.
-// It is superseded when a handoff exchange completes — clients must replace it at that point.
+// Creating a session is an app-plane operation on the project credential
+// (`session.write`). The returned `session_token` is a session credential for the
+// end-user client, not a management scope: it is delivered as the
+// `__nextgen_session` cookie and authorises the self-service operations
+// `GET /sessions/me` and `DELETE /sessions/me` (`nextgenSession` scheme). The
+// by-id operations `GET /sessions/{session_id}` and `DELETE /sessions/{session_id}`
+// are operator endpoints and require `session.read` / `session.delete` instead.
+// The `session_token` is superseded when a handoff exchange completes — clients must
+// replace it at that point.
 // Anonymous sessions expire aggressively (10-minute TTL). The TTL resets to the configured
 // full session TTL when the first authentication factor is written via a completing `auth_attempt`.
 //
@@ -200,6 +221,29 @@ func (UnimplementedHandler) DeactivateFlowDefinition(ctx context.Context, params
 //
 // DELETE /flow_definitions/{id}
 func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (r DeleteFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// DeleteTeam implements deleteTeam operation.
+//
+// Deactivates the team.
+// The team is tombstoned rather than erased: it stays readable through
+// getTeam with status `deactivated`. Its memberships are removed and the
+// users whose lifecycle it owns are deactivated with it.
+// The request is idempotent. Deleting a team that is already deactivated
+// or doesn't exist succeeds without changing anything.
+//
+// DELETE /teams/{team_id}
+func (UnimplementedHandler) DeleteTeam(ctx context.Context, params DeleteTeamParams) (r DeleteTeamRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// DeleteUserByID implements DeleteUserByID operation.
+//
+// Delete user by ID.
+//
+// DELETE /users/{user_id}
+func (UnimplementedHandler) DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (r DeleteUserByIDRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -253,6 +297,18 @@ func (UnimplementedHandler) GetAuthAttempt(ctx context.Context, params GetAuthAt
 //
 // GET /branding/{id}
 func (UnimplementedHandler) GetBrandingById(ctx context.Context, params GetBrandingByIdParams) (r GetBrandingByIdRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetClaimStatus implements getClaimStatus operation.
+//
+// Polled by the CLI while a browser completes the claim. Authorized by the
+// project secret that initiated the challenge. Returns `pending`, or
+// `completed` with the owning team, the claim timestamp, and the dashboard
+// URL once the browser leg has finished.
+//
+// GET /projects/{project_id}/claim/status
+func (UnimplementedHandler) GetClaimStatus(ctx context.Context, params GetClaimStatusParams) (r GetClaimStatusRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -375,7 +431,7 @@ func (UnimplementedHandler) GetSession(ctx context.Context, params GetSessionPar
 
 // GetTeam implements getTeam operation.
 //
-// Returns the current state of a team.
+// Returns a Team by its id.
 //
 // GET /teams/{team_id}
 func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (r GetTeamRes, _ error) {
@@ -406,6 +462,19 @@ func (UnimplementedHandler) GetUserByID(ctx context.Context, params GetUserByIDP
 //
 // GET /auth/userinfo
 func (UnimplementedHandler) GetUserInfo(ctx context.Context) (r GetUserInfoRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// InitClaim implements initClaim operation.
+//
+// Starts a claim challenge for an unclaimed project. Authenticated by the
+// project secret, this mints a single-use, short-lived challenge and returns
+// the `claim_url` the developer opens in a browser to complete the claim,
+// together with the `challenge_id` the CLI polls with. The exact expiry is
+// carried by `expires_at` on the response.
+//
+// POST /projects/{project_id}/claim/init
+func (UnimplementedHandler) InitClaim(ctx context.Context, params InitClaimParams) (r InitClaimRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -474,6 +543,15 @@ func (UnimplementedHandler) ListSessions(ctx context.Context, params ListSession
 	return r, ht.ErrNotImplemented
 }
 
+// ListUserPasskeys implements listUserPasskeys operation.
+//
+// List user passkeys.
+//
+// GET /users/{user_id}/passkeys
+func (UnimplementedHandler) ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (r ListUserPasskeysRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListUsers implements listUsers operation.
 //
 // List users.
@@ -501,6 +579,16 @@ func (UnimplementedHandler) QueryProjects(ctx context.Context, req *QueryProject
 	return r, ht.ErrNotImplemented
 }
 
+// QueryTeams implements queryTeams operation.
+//
+// Returns the teams of a project, paginated with a cursor.
+// Teams of every lifecycle status are returned; each carries its `status`.
+//
+// POST /teams/query
+func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (r QueryTeamsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // RevokeMySession implements revokeMySession operation.
 //
 // Revokes the session immediately (`state: revoked`). This is the logout operation.
@@ -516,8 +604,10 @@ func (UnimplementedHandler) RevokeMySession(ctx context.Context) (r RevokeMySess
 
 // RevokeSession implements revokeSession operation.
 //
-// Revokes the session immediately (`state: revoked`). This is the logout operation.
-// The session_token issued at creation (or superseded by a handoff exchange) is required.
+// Revokes the session immediately (`state: revoked`).
+// This is the operator revoke path and requires the `session.delete` scope on a
+// project-bound credential. End-user logout with the `__nextgen_session` cookie is
+// `DELETE /sessions/me` (`nextgenSession` scheme).
 // After revocation, any tokens derived from this session are invalidated.
 //
 // DELETE /sessions/{session_id}
@@ -589,6 +679,15 @@ func (UnimplementedHandler) SubmitFlowStep(ctx context.Context, req *FlowSubmitR
 //
 // PUT /flow_definitions/{id}
 func (UnimplementedHandler) UpdateFlowDefinition(ctx context.Context, req *FlowDefinitionUpdateRequest, params UpdateFlowDefinitionParams) (r UpdateFlowDefinitionRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// UpdateTeam implements updateTeam operation.
+//
+// Update team. Only active teams can be updated.
+//
+// PATCH /teams/{team_id}
+func (UnimplementedHandler) UpdateTeam(ctx context.Context, req *UpdateTeamRequest, params UpdateTeamParams) (r UpdateTeamRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

@@ -9,6 +9,7 @@ import (
 
 const (
 	PrefixSession       ResourcePrefix = "sess"
+	PrefixUserAgent     ResourcePrefix = "ua"
 	SessionAnonymousTTL                = 10 * time.Minute
 )
 
@@ -30,6 +31,10 @@ func ErrSessionTokenCreationFailed() Error {
 
 func ErrSessionTokenInvalid() Error {
 	return newError("sess.token_invalid", "The session token is invalid (either malformed or expired).", nil, nil)
+}
+
+func ErrSessionPermissionDenied() Error {
+	return newError(PrefixSession.ErrorCodePrefix("permission_denied"), "session: requires a session scope bound to the project", nil, nil)
 }
 
 func ErrSessionInvalidTTL() Error {

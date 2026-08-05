@@ -13,18 +13,8 @@ import (
 
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/idgen/idgenmock"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 )
-
-func findAttribute(attrs []*domain.CreateAttribute, key string) *domain.CreateAttribute {
-	for _, a := range attrs {
-		if a.Key == key {
-			return a
-		}
-	}
-	return nil
-}
 
 func containsFieldName(fields []domain.FlowField, name string) bool {
 	for _, f := range fields {
@@ -55,7 +45,6 @@ type flowTestWorld struct {
 	schemaResolver       *domainmock.MockSchemaResolver
 	createUser           *domainmock.MockFlowOnSuccessHandler
 	createUserForPasskey *domainmock.MockFlowPasskeyUserCreater
-	ids                  *idgenmock.MockGenerator
 	sm                   *domain.FlowStateMachineRuntime
 }
 
@@ -75,7 +64,6 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	passkeyRegService := domainmock.NewMockFlowPasskeyRegistrationService(mock)
 	createUser := domainmock.NewMockFlowOnSuccessHandler(mock)
 	createUserForPasskey := domainmock.NewMockFlowPasskeyUserCreater(mock)
-	ids := idgenmock.NewMockGenerator(mock)
 
 	resolver := domain.NewSchemaFieldResolver()
 
@@ -89,7 +77,6 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		createUserForPasskey,
 		authAttemptService,
 		passkeyRegService,
-		ids,
 		now,
 	)
 
@@ -101,7 +88,6 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		passkeyRegService:    passkeyRegService,
 		createUser:           createUser,
 		createUserForPasskey: createUserForPasskey,
-		ids:                  ids,
 		sm:                   sm,
 	}
 }
@@ -1969,16 +1955,16 @@ func TestFlowStateMachine_Process_PasskeyRegisterIssueThenVerify(t *testing.T) {
 	def := passkeyRegisterDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
-	w.ids.EXPECT().New(gomock.Any()).Return(userID, nil)
 	w.createUserForPasskey.EXPECT().
 		CreateProvisionalUser(gomock.Any(), userID, gomock.Any()).
 		Times(1)
 	w.passkeyRegService.EXPECT().
 		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
-			return assert.Equal(t, userID, in.UserID)
+			return assert.Empty(t, in.UserID)
 		})).
 		Return(domain.FlowPasskeyRegistrationChallengeOutput{
 			ChallengeID: challengeID,
+			UserID:      userID,
 			Options:     []byte(registrationOpts),
 		}, nil)
 	w.passkeyRegService.EXPECT().
@@ -2090,8 +2076,9 @@ func TestFlowStateMachine_Process_PasskeyRegisterRejectedKeepsStep(t *testing.T)
 }
 
 // TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID verifies that
-// when no user is identified yet (passkey-only registration path), the state
-// machine generates a provisional user ID and issues the challenge successfully.
+// when no user is identified yet (passkey-only registration path), the passkey
+// service mints a provisional user ID (returned on the issue output) and the
+// state machine stores it for the verify phase.
 func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	t.Parallel()
 	const challengeID = "reg-1"
@@ -2101,16 +2088,15 @@ func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	def := passkeyRegisterDefinition()
 
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
-	w.ids.EXPECT().New(gomock.Any()).Return(userID, nil)
-	// The provisional user ID should have been generated and passed to the service.
 	w.passkeyRegService.EXPECT().
 		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
-			return assert.Equal(t, userID, in.UserID) &&
+			return assert.Empty(t, in.UserID) &&
 				assert.Empty(t, in.Username) &&
 				assert.Empty(t, in.DisplayName)
 		})).
 		Return(domain.FlowPasskeyRegistrationChallengeOutput{
 			ChallengeID: challengeID,
+			UserID:      userID,
 			Options:     []byte(registrationOpts),
 		}, nil)
 
@@ -2121,7 +2107,6 @@ func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 		UserSchemaURL: defaultSchemaURL,
 	})
 	require.NoError(t, err)
-	// No user ID seeded — the state machine should generate one.
 
 	issued, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
 		Action:    domain.FlowActionPasskeyRegister,
@@ -2129,8 +2114,8 @@ func TestFlowStateMachine_Process_PasskeyRegisterGeneratesUserID(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, issued.Step.Challenge)
-	// The generated ID should be stored in CollectedData for use in the verify phase.
 	assert.Equal(t, userID, issued.State.CollectedData.UserID)
+	assert.True(t, issued.State.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey)
 }
 
 func TestFlowStateMachine_Process_PasskeyRegisterUsesCollectedIdentifierForDisplay(t *testing.T) {
@@ -2153,15 +2138,15 @@ func TestFlowStateMachine_Process_PasskeyRegisterUsesCollectedIdentifierForDispl
 				assert.Equal(t, email, in.Value)
 		})).
 		Return("", domain.ErrAuthAttemptProofRejected(nil))
-	w.ids.EXPECT().New(gomock.Any()).Return(userID, nil)
 	w.passkeyRegService.EXPECT().
 		IssuePasskeyRegistrationChallenge(gomock.Any(), gomock.Cond(func(in domain.FlowIssuePasskeyRegistrationChallengeInput) bool {
-			return assert.Equal(t, userID, in.UserID) &&
+			return assert.Empty(t, in.UserID) &&
 				assert.Equal(t, email, in.Username) &&
 				assert.Equal(t, email, in.DisplayName)
 		})).
 		Return(domain.FlowPasskeyRegistrationChallengeOutput{
 			ChallengeID: challengeID,
+			UserID:      userID,
 			Options:     []byte(registrationOpts),
 		}, nil)
 

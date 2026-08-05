@@ -119,3 +119,40 @@ describe("seedUser via connectZitadel", () => {
     });
   });
 });
+
+describe("seed vocabulary", () => {
+  it("identity() mints unique unused credentials and touches no API", () => {
+    const zitadel = connectZitadel(handle);
+    const one = zitadel.identity();
+    const two = zitadel.identity();
+    expect(one.email).toMatch(/^e2e-[0-9a-f]{8}@example\.com$/);
+    expect(one.email).not.toBe(two.email);
+    expect(one.password).not.toBe(two.password);
+    // onUnhandledRequest: "error" would fail this test if anything was called.
+  });
+
+  it("seedUsers applies the per-index template and keeps unique defaults", async () => {
+    let nextId = 0;
+    server.use(
+      http.post(`${BASE}/users`, async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        nextId += 1;
+        return HttpResponse.json({ id: `user_${nextId}`, echo: body }, { status: 201 });
+      }),
+    );
+    const zitadel = connectZitadel(handle);
+    const users = await zitadel.seedUsers(3, {
+      email: (index) => `fixture-${index}@example.com`,
+      attributes: (index) => ({ givenName: `User${index}` }),
+    });
+
+    expect(users.map((user) => user.id)).toEqual(["user_1", "user_2", "user_3"]);
+    expect(users.map((user) => user.email)).toEqual([
+      "fixture-0@example.com",
+      "fixture-1@example.com",
+      "fixture-2@example.com",
+    ]);
+    // Untemplated passwords stay unique per user.
+    expect(new Set(users.map((user) => user.password)).size).toBe(3);
+  });
+});

@@ -4,6 +4,7 @@ package postgres
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -69,6 +70,25 @@ func TestJSONSchemaStatements_CRUD(t *testing.T) {
 
 	_, err = testPool.GetJSONSchemaByID(t.Context(), projectID, schemaURL)
 	assert.ErrorIs(t, err, new(v2database.NoRowFoundError))
+}
+
+func TestJSONSchemaStatements_Create_EmptyURLAssigned(t *testing.T) {
+	projectID, _ := uniqueJSONSchemaIDs(t)
+	ensureJSONSchemaProject(t, projectID)
+
+	schema := &domain.JSONSchema{
+		ProjectID: projectID,
+		Schema:    []byte(`{"type":"object"}`),
+	}
+	require.NoError(t, testPool.CreateJSONSchema(t.Context(), schema))
+	t.Cleanup(func() { _ = testPool.DeleteJSONSchemaByID(context.Background(), projectID, schema.URL) })
+
+	require.NotEmpty(t, schema.URL)
+	assert.True(t, strings.HasPrefix(schema.URL, string(domain.PrefixJSONSchema)+"_"))
+
+	got, err := testPool.GetJSONSchemaByID(t.Context(), projectID, schema.URL)
+	require.NoError(t, err)
+	assert.Equal(t, schema.URL, got.URL)
 }
 
 func TestJSONSchemaStatements_Get_NotFound(t *testing.T) {

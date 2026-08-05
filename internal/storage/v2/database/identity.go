@@ -3,25 +3,16 @@ package database
 import (
 	"database/sql/driver"
 	"fmt"
-	"strconv"
 )
 
-// Identity is the canonical string form of a resource identifier in Go.
-// Storage may persist it as BIGINT (ephemeral, database-generated) or TEXT/STRING (managed).
+// Identity is a string resource identifier for SQL bind/scan helpers.
+// Resource primary keys are dialect-minted prefixed opaque strings (ADR 047)
+// stored as TEXT / STRING(MAX).
 type Identity string
 
 // String implements fmt.Stringer.
 func (id Identity) String() string {
 	return string(id)
-}
-
-// IsNumeric reports whether id is a non-empty signed integer decimal suitable for BIGINT binding.
-func (id Identity) IsNumeric() bool {
-	if id == "" {
-		return false
-	}
-	_, err := strconv.ParseInt(string(id), 10, 64)
-	return err == nil
 }
 
 // Scan implements sql.Scanner.
@@ -31,12 +22,6 @@ func (id *Identity) Scan(src any) error {
 		return nil
 	}
 	switch v := src.(type) {
-	case int64:
-		*id = Identity(strconv.FormatInt(v, 10))
-	case int32:
-		*id = Identity(strconv.FormatInt(int64(v), 10))
-	case int:
-		*id = Identity(strconv.FormatInt(int64(v), 10))
 	case string:
 		*id = Identity(v)
 	case []byte:
@@ -47,13 +32,30 @@ func (id *Identity) Scan(src any) error {
 	return nil
 }
 
+// DecodeSpanner implements the Cloud Spanner client's spanner.Decoder
+// interface (structurally, without importing the spanner package).
+func (id *Identity) DecodeSpanner(input any) error {
+	switch v := input.(type) {
+	case nil:
+		*id = ""
+	case string:
+		*id = Identity(v)
+	case *string:
+		if v == nil {
+			*id = ""
+		} else {
+			*id = Identity(*v)
+		}
+	default:
+		return fmt.Errorf("database.Identity: unsupported DecodeSpanner type %T", input)
+	}
+	return nil
+}
+
 // Value implements driver.Valuer.
 func (id Identity) Value() (driver.Value, error) {
 	if id == "" {
 		return nil, nil
-	}
-	if id.IsNumeric() {
-		return strconv.ParseInt(string(id), 10, 64)
 	}
 	return string(id), nil
 }

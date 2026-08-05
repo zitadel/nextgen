@@ -30,6 +30,9 @@ func newBrandingStatements(client queryExecutor) brandingStatements {
 
 // CreateBranding implements [service.BrandingStatements].
 func (b brandingStatements) CreateBranding(ctx context.Context, entity *domain.Branding) error {
+	if err := ensureManagedID(&entity.ID, domain.PrefixBranding); err != nil {
+		return err
+	}
 	definition, err := branding.Marshal(entity)
 	if err != nil {
 		return err

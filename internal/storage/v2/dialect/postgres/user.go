@@ -95,6 +95,13 @@ WHERE project_id = $1 AND user_id = $2
 DELETE FROM zitadel_nextgen.users
 WHERE project_id = $1 AND id = $2
 `
+
+	userExistsStmt = `
+SELECT EXISTS (
+    SELECT 1 FROM zitadel_nextgen.users
+    WHERE project_id = $1 AND id = $2
+)
+`
 )
 
 type userStatements struct{ statement }
@@ -109,18 +116,18 @@ func newUserStatements(client queryExecutor) userStatements {
 
 // CreateUser implements [service.UserStatements].
 func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser) error {
+	if err := ensureManagedID(&user.ID, domain.PrefixUser); err != nil {
+		return err
+	}
 	if len(user.Attributes) == 0 {
 		return fmt.Errorf("user create requires attributes")
 	}
-	keys := make([]string, len(user.Attributes))
+	keys := make([]domain.AttributeKey, len(user.Attributes))
 	values := make([][]byte, len(user.Attributes))
 	hashes := make([][]byte, len(user.Attributes))
 	scopes := make([]string, len(user.Attributes))
 
 	for i, a := range user.Attributes {
-		if a == nil {
-			return fmt.Errorf("nil attribute at index %d", i)
-		}
 		raw, err := json.Marshal(a.Value)
 		if err != nil {
 			return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
@@ -273,6 +280,18 @@ func (us userStatements) DeleteUserByID(ctx context.Context, projectID, userID s
 	})
 }
 
+func (us userStatements) UserExists(ctx context.Context, projectID, userID string) (bool, error) {
+	rows, err := us.client.Query(ctx, userExistsStmt, projectID, userID)
+	if err != nil {
+		return false, wrapError(err)
+	}
+	exists, err := pgx.CollectExactlyOneRow(rows, pgx.RowTo[bool])
+	if err != nil {
+		return false, wrapError(err)
+	}
+	return exists, nil
+}
+
 func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User, opts service.UserQueryOptions) error {
 	if len(users) == 0 {
 		return nil
@@ -289,7 +308,8 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 			return wrapError(err)
 		}
 		_, err = pgx.CollectRows(rows, func(row pgx.CollectableRow) (struct{}, error) {
-			var userID, key string
+			var userID string
+			var key domain.AttributeKey
 			var value []byte
 			if err := row.Scan(&userID, &key, &value); err != nil {
 				return struct{}{}, err
@@ -324,12 +344,12 @@ func scanUserHeader(row pgx.CollectableRow) (*domain.User, error) {
 		&u.ID,
 		&lifecycleOwnerTeamID,
 		&status,
-		&u.CreatedAt,
-		&u.UpdatedAt,
+		&u.Metadata.CreatedAt,
+		&u.Metadata.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
-	u.Status = domain.UserStatus(status)
+	u.Metadata.Status = domain.UserStatus(status)
 	u.LifecycleOwnerTeamID = lifecycleOwnerTeamID
 	return u, nil
 }

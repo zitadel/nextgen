@@ -18,7 +18,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import type { VerifyJwtOptions } from "../../lib/jwt";
 
-import { base64UrlDecode, decodeJwt, verifyJwt, JWKS_TTL_MS } from "../../lib/jwt";
+import { base64UrlDecode, decodeJwt, isJwtShaped, verifyJwt, JWKS_TTL_MS } from "../../lib/jwt";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -685,5 +685,43 @@ describe("verifyJwt", () => {
 
       expect(await verifyJwt(token, baseOpts())).toBeNull();
     });
+  });
+});
+
+describe("isJwtShaped", () => {
+  function header(obj: Record<string, unknown>): string {
+    return b64url(Buffer.from(JSON.stringify(obj)));
+  }
+
+  it("recognises a signed JWT (JWS) — alg present, no enc", () => {
+    expect(isJwtShaped(`${header({ alg: "RS256", typ: "JWT" })}.payload.sig`)).toBe(true);
+  });
+
+  it("recognises a real signed token", () => {
+    expect(isJwtShaped(makeJwt({ sub: "u1" }, nextKid()))).toBe(true);
+  });
+
+  it("rejects a JWE token — header carries both alg and enc", () => {
+    const jweHeader = header({ alg: "A256GCMKW", enc: "A256GCM" });
+    expect(isJwtShaped(`${jweHeader}.enckey.iv.ciphertext.tag`)).toBe(false);
+  });
+
+  it("rejects opaque strings without three dot-separated segments", () => {
+    expect(isJwtShaped("opaque-session-token")).toBe(false);
+    expect(isJwtShaped("two.parts")).toBe(false);
+    expect(isJwtShaped("")).toBe(false);
+  });
+
+  it("rejects tokens with an empty first segment", () => {
+    expect(isJwtShaped(".payload.sig")).toBe(false);
+  });
+
+  it("rejects tokens whose header is not Base64URL JSON", () => {
+    expect(isJwtShaped("not-base64-json!!.payload.sig")).toBe(false);
+  });
+
+  it("rejects tokens whose header has no string alg", () => {
+    expect(isJwtShaped(`${header({ typ: "JWT" })}.payload.sig`)).toBe(false);
+    expect(isJwtShaped(`${header({ alg: 42 })}.payload.sig`)).toBe(false);
   });
 });

@@ -1,25 +1,8 @@
-import type { Page } from "@playwright/test";
 import { expect, test } from "@zitadel/testing/playwright";
 
-const ERROR_HEADINGS = ["Not authorized", "Something went wrong"];
+import { expectNoErrorBoundary, signIn } from "./support";
 
 test.describe.configure({ mode: "parallel" });
-
-/**
- * Completes the console's login screen (Console ADR 0003) with a seeded
- * user: the default-login flow's identifier step ("Work email" + "Sign in"),
- * then the password step ("Password" + "Sign in"). The widget exchanges the
- * handoff for the `__nextgen_session` cookie and performs a full-document
- * navigation away from /login.
- */
-async function signIn(page: Page, user: { email: string; password: string }): Promise<void> {
-  await page.goto("/login");
-  await page.getByLabel("Work email").fill(user.email);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.getByLabel("Password").fill(user.password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-}
 
 test("shows the bootstrapped project", async ({ page, zitadel, seed }) => {
   await signIn(page, await seed.user());
@@ -95,8 +78,14 @@ test("keeps the project credential out of browser requests and resources", async
   expect((await page.content()).includes(zitadel.handle.projectSecret)).toBe(false);
 });
 
-async function expectNoErrorBoundary(page: Page): Promise<void> {
-  for (const heading of ERROR_HEADINGS) {
-    await expect(page.getByText(heading, { exact: true })).toHaveCount(0);
-  }
-}
+test("shows the status the API stamped on a seeded user", async ({ page, seed }) => {
+  // The Status column reads `metadata.status`, which the API only started
+  // returning recently. Asserted against a real instance rather than a stub so
+  // the column is proven against the shape the server actually sends.
+  const user = await seed.user();
+  await signIn(page, user);
+
+  await page.goto("/users");
+  const row = page.getByRole("row").filter({ hasText: user.email });
+  await expect(row.getByText("active", { exact: true })).toBeVisible();
+});

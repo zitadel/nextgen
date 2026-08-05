@@ -17,16 +17,16 @@ func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectReque
 		return nil, err
 	}
 
-	dek, err := h.keyService.GetProjectDEKCrypter(ctx, project.ID)
+	tokenCrypter, err := h.keyService.GetProjectCrypter(ctx, project.ID, domain.EncryptionKeyPurposeToken)
 	if err != nil {
 		return nil, err
 	}
 
-	projectSecret, err := project.ProjectSecret(dek)
+	projectSecret, err := project.ProjectSecret(tokenCrypter)
 	if err != nil {
 		return nil, err
 	}
-	previewSecret, err := project.PreviewSecret(dek)
+	previewSecret, err := project.PreviewSecret(tokenCrypter)
 	if err != nil {
 		return nil, err
 	}
@@ -160,6 +160,10 @@ func projectErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	case domain.ErrProjectNameInvalid().Code, domain.ErrProjectMissingID().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case domain.ErrProjectAlreadyClaimed().Code:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
+	case domain.ErrProjectClaimExpired().Code:
+		return errorResponseWithStatusCode(http.StatusGone, err)
 	default:
 		return internalErrorResponse(err)
 	}

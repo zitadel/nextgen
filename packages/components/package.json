@@ -47,6 +47,9 @@
     "./orchestrator": {
       "types": "./dist/orchestrator/index.d.mts",
       "import": "./dist/orchestrator/index.mjs"
+    },
+    "./jsx": {
+      "types": "./dist/jsx.d.ts"
     }
   },
   "publishConfig": {
@@ -67,6 +70,7 @@
   },
   "devDependencies": {
     "@tsdown/css": "catalog:",
+    "@types/react": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "@zitadel/api-mock": "workspace:*",

@@ -140,13 +140,6 @@ func NewFlowDefinition(
 	steps []FlowDefinitionStep,
 	status FlowDefinitionStatus,
 ) (_ *FlowDefinition, err error) {
-
-	if flowDefID == "" {
-		flowDefID, err = newID(FlowDefinitionPrefix)
-		if err != nil {
-			return nil, ErrInternal(err).WithMessage("failed to generate flow-definition id")
-		}
-	}
 	return &FlowDefinition{
 		ProjectID:     projectID,
 		ID:            flowDefID,

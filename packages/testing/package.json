@@ -12,8 +12,10 @@
     "url": "git+https://github.com/zitadel/nextgen.git",
     "directory": "packages/testing"
   },
-  "private": true,
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist"
   ],
@@ -36,7 +38,7 @@
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --build tsconfig.json",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "lint": "oxlint ."
@@ -45,6 +47,14 @@
     "@zitadel/api": "workspace:*",
     "@zitadel/cli": "workspace:*",
     "@zitadel/config": "workspace:*"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.60"
+  },
+  "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/descope/virtualwebauthn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -27,6 +28,9 @@ func (s *passkeyRegState) expectCRUD(stmts *servicemocks.MockAllStatements) {
 	stmts.EXPECT().
 		CreatePasskeyRegistration(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, r *domain.CreatePasskeyRegistration) error {
+			if r.ID == "" {
+				r.ID = "pkreg_test01"
+			}
 			s.created = r
 			if s.stored == nil {
 				s.stored = map[string]*domain.PasskeyRegistration{}
@@ -75,10 +79,6 @@ func (s *passkeyUserState) expectUserPasskeys(stmts *servicemocks.MockAllStateme
 		}).AnyTimes()
 }
 
-type fakeIDGen struct{ next string }
-
-func (f *fakeIDGen) New(_ string) (string, error) { return f.next, nil }
-
 func buildTestRegistrationSvc(t *testing.T, regState *passkeyRegState, userState *passkeyUserState) *service.PasskeyRegistrationService {
 	t.Helper()
 	ctrl := gomock.NewController(t)
@@ -87,7 +87,7 @@ func buildTestRegistrationSvc(t *testing.T, regState *passkeyRegState, userState
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
 	regState.expectCRUD(statements)
 	userState.expectUserPasskeys(statements)
-	return service.NewPasskeyRegistrationService(pool, &fakeIDGen{next: "pkreg_test01"})
+	return service.NewPasskeyRegistrationService(pool)
 }
 
 func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
@@ -105,14 +105,15 @@ func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "pkreg_test01", out.RegistrationID)
+	assert.Equal(t, "user-1", out.UserID)
 	assert.NotEmpty(t, out.Options)
 
 	var optMap map[string]any
 	require.NoError(t, json.Unmarshal(out.Options, &optMap))
 	assert.Contains(t, optMap, "challenge")
 	assert.Contains(t, optMap, "rp")
-	user, ok := optMap["user"].(map[string]any)
-	require.True(t, ok, "creation options must include a user object")
+	require.IsType(t, map[string]any{}, optMap["user"], "creation options must include a user object")
+	user := optMap["user"].(map[string]any)
 	assert.Equal(t, "alice@example.com", user["name"])
 	assert.Equal(t, "Alice Example", user["displayName"])
 
@@ -123,6 +124,30 @@ func TestPasskeyRegistrationService_Begin_StoresSession(t *testing.T) {
 	assert.Equal(t, "alice@example.com", regState.created.Challenge.Username)
 	assert.Equal(t, "Alice Example", regState.created.Challenge.DisplayName)
 	assert.True(t, regState.created.ExpiresAt.After(time.Now()))
+}
+
+func TestPasskeyRegistrationService_Begin_MintsUserIDWhenEmpty(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockStatementPool(ctrl)
+	statements := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(statements).AnyTimes()
+
+	regState := &passkeyRegState{}
+	userState := &passkeyUserState{}
+	regState.expectCRUD(statements)
+	userState.expectUserPasskeys(statements)
+	statements.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_minted01", nil)
+
+	svc := service.NewPasskeyRegistrationService(pool)
+	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
+		ProjectID: "proj-1",
+		RPID:      "example.com",
+		RPOrigins: []string{"https://example.com"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "user_minted01", out.UserID)
+	require.NotNil(t, regState.created)
+	assert.Equal(t, "user_minted01", regState.created.UserID)
 }
 
 func TestPasskeyRegistrationService_Begin_UsesNeutralLabelWithoutUsername(t *testing.T) {
@@ -141,8 +166,8 @@ func TestPasskeyRegistrationService_Begin_UsesNeutralLabelWithoutUsername(t *tes
 
 	var optMap map[string]any
 	require.NoError(t, json.Unmarshal(out.Options, &optMap))
-	user, ok := optMap["user"].(map[string]any)
-	require.True(t, ok, "creation options must include a user object")
+	require.IsType(t, map[string]any{}, optMap["user"], "creation options must include a user object")
+	user := optMap["user"].(map[string]any)
 	assert.Equal(t, "Passkey account", user["name"])
 	assert.Empty(t, user["displayName"])
 	assert.Equal(t, "Passkey account", regState.created.Challenge.Username)
@@ -164,8 +189,8 @@ func TestPasskeyRegistrationService_Begin_RequestsDiscoverableCredential(t *test
 
 	var optMap map[string]any
 	require.NoError(t, json.Unmarshal(out.Options, &optMap))
-	selection, ok := optMap["authenticatorSelection"].(map[string]any)
-	require.True(t, ok, "creation options must include authenticatorSelection")
+	require.IsType(t, map[string]any{}, optMap["authenticatorSelection"], "creation options must include authenticatorSelection")
+	selection := optMap["authenticatorSelection"].(map[string]any)
 	assert.Equal(t, "required", selection["residentKey"])
 	assert.Equal(t, "preferred", selection["userVerification"])
 }
@@ -205,4 +230,71 @@ func TestPasskeyRegistrationService_Finish_InvalidAttestationReturnsProofRejecte
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrAuthAttemptProofRejected(nil)))
 	assert.Empty(t, regState.deleted)
+}
+
+func TestPasskeyRegistrationService_Finish_StoresPasskeyName(t *testing.T) {
+	tests := []struct {
+		name         string
+		passkeyName  string
+		expectedName string
+	}{
+		{
+			name:         "caller-supplied name is stored",
+			passkeyName:  "Work laptop",
+			expectedName: "Work laptop",
+		},
+		{
+			// Without a name the credential still needs something displayable;
+			// the user's display name is not it — it is the same for every
+			// credential the user registers.
+			name:         "no name falls back to the credential's own properties",
+			expectedName: domain.PasskeyNameDeviceBound,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			regState := &passkeyRegState{}
+			userState := &passkeyUserState{}
+			svc := buildTestRegistrationSvc(t, regState, userState)
+
+			out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
+				ProjectID:   "proj-1",
+				UserID:      "user-1",
+				Username:    "alice@example.com",
+				DisplayName: "Alice Example",
+				RPID:        passkeyRPID,
+				RPOrigins:   []string{passkeyOrigin},
+			})
+			require.NoError(t, err)
+
+			err = svc.Finish(context.Background(), service.FinishRegistrationInput{
+				ProjectID:      "proj-1",
+				RegistrationID: out.RegistrationID,
+				Attestation:    []byte(attestPasskeyRegistration(t, out.Options)),
+				PasskeyName:    tt.passkeyName,
+			})
+			require.NoError(t, err)
+
+			require.Len(t, userState.created, 1)
+			assert.Equal(t, tt.expectedName, userState.created[0].Name)
+		})
+	}
+}
+
+// attestPasskeyRegistration answers creation options with a real attestation
+// from a fresh virtual authenticator.
+func attestPasskeyRegistration(t *testing.T, options []byte) string {
+	t.Helper()
+
+	rp := virtualwebauthn.RelyingParty{ID: passkeyRPID, Name: "Example", Origin: passkeyOrigin}
+	auth := virtualwebauthn.NewAuthenticatorWithOptions(virtualwebauthn.AuthenticatorOptions{
+		UserHandle: []byte("user-1"),
+	})
+	cred := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
+	auth.AddCredential(cred)
+
+	attestationOptions, err := virtualwebauthn.ParseAttestationOptions(string(options))
+	require.NoError(t, err)
+
+	return virtualwebauthn.CreateAttestationResponse(rp, auth, cred, *attestationOptions)
 }

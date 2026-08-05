@@ -27,7 +27,7 @@ export { applyFontUrl } from "./font-loader.js";
 // the same reason (re-exporting it from `liquid.js` would pull that `Liquid`
 // import back into the public declaration bundle).
 export { TEMPLATE_NAMES } from "./template-names.js";
-export { en, de, it, builtinLocales, type Locale } from "./locales/index.js";
+export { en, de, it, builtinLocales, businessLocales, type Locale } from "./locales/index.js";
 export {
   patchMandatoryGates,
   mandatoryGatesMarkerComment,

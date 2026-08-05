@@ -47,8 +47,14 @@
   min-height: 100%;
   height: 100%;
 }
-/* Widget mode (React renderer parity with :host([data-widget])). */
+/* Widget mode (React renderer parity with :host([data-widget])): shed ALL
+   page chrome — sizing, paint, and the responsive padding — so the host box
+   hugs the card and the embedding app owns spacing. The attribute selector
+   outranks the 48rem padding bump above on specificity, so `padding: 0`
+   holds at every width. The region gap stays: it separates real content
+   (card → attribution pill), and empty regions are display:none anyway. */
 .zr-page-shell[data-widget] {
   min-height: var(--zl-page-min-height, auto);
   background: transparent;
+  padding: 0;
 }

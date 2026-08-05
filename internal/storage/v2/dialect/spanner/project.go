@@ -35,6 +35,9 @@ func newProjectStatements(db queryExecutor) projectStatements {
 
 // CreateProject implements [service.ProjectStatements].
 func (ps projectStatements) CreateProject(ctx context.Context, project *domain.Project) error {
+	if err := ensureManagedID(&project.ID, domain.PrefixProject); err != nil {
+		return err
+	}
 	previewOrigins, err := encodePreviewOrigins(project.PreviewOrigins)
 	if err != nil {
 		return wrapError(err)

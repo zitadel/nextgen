@@ -8,29 +8,30 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 )
 
-func TestTokenSchema_CursorPreservesLargeInt64IDs(t *testing.T) {
+func TestTokenSchema_CursorPreservesOpaqueStringIDs(t *testing.T) {
 	t.Parallel()
 
-	// BIT_REVERSED_POSITIVE IDs routinely exceed float64 mantissa precision.
-	const largeID = "9223372036854775807" // math.MaxInt64
-	sess := "9007199254740993"            // 2^53 + 1
+	// Prefixed opaque IDs (and any decimal-looking bodies) must stay strings through
+	// JSON cursor round-trip so float64 mantissa never corrupts them.
+	const tokenID = "tkn_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C"
+	sess := "sess_9007199254740993"
 	tok := &domain.Token{
-		TokenID:   largeID,
+		TokenID:   tokenID,
 		SessionID: &sess,
 	}
 
-	cols := []v2database.Column[domain.TokenField]{
-		v2database.Col(domain.TokenFieldTokenID),
-		v2database.Col(domain.TokenFieldSessionID),
+	cols := []database.Column[domain.TokenField]{
+		database.Col(domain.TokenFieldTokenID),
+		database.Col(domain.TokenFieldSessionID),
 	}
 	values := tokenSchema.ValuesFrom(tok, cols)
 	require.Len(t, values, 2)
 	assert.IsType(t, "", values[0], "token_id accessor must return a string for JSON-safe cursors")
-	assert.Equal(t, largeID, values[0])
+	assert.Equal(t, tokenID, values[0])
 	assert.Equal(t, sess, values[1])
 
 	cursor := &pagination.Cursor[domain.TokenField]{Columns: cols, Values: values}
@@ -40,15 +41,15 @@ func TestTokenSchema_CursorPreservesLargeInt64IDs(t *testing.T) {
 	coerced, err := tokenSchema.CoerceCursorValues(decoded.Columns, decoded.Values)
 	require.NoError(t, err)
 	require.Len(t, coerced, 2)
-	assert.Equal(t, int64(math.MaxInt64), coerced[0])
-	assert.Equal(t, int64(9007199254740993), coerced[1])
+	assert.Equal(t, tokenID, coerced[0])
+	assert.Equal(t, sess, coerced[1])
 }
 
 func TestTokenSchema_CursorRejectsJSONFloatIDs(t *testing.T) {
 	t.Parallel()
 
-	cols := []v2database.Column[domain.TokenField]{
-		v2database.Col(domain.TokenFieldTokenID),
+	cols := []database.Column[domain.TokenField]{
+		database.Col(domain.TokenFieldTokenID),
 	}
 	_, err := tokenSchema.CoerceCursorValues(cols, []any{float64(math.MaxInt64)})
 	require.Error(t, err)

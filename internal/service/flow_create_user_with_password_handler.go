@@ -33,30 +33,35 @@ var _ domain.FlowOnSuccessHandler = (*FlowCreateUserWithPasswordHandler)(nil)
 
 func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domain.FlowOnSuccessInput) (domain.FlowOnSuccessResult, error) {
 	in.State.CollectedData.UserData["$schema"] = in.UserSchemaURL
+
+	password := in.State.CollectedData.AuthMethods.Password
+	if password == "" {
+		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
+	}
+
+	userID, err := h.userService.v2Pool.Statements().NewManagedID(string(domain.PrefixUser))
+	if err != nil {
+		return domain.FlowOnSuccessResult{}, fmt.Errorf("create_user: mint user id: %w", err)
+	}
+
 	createUserAction := NewCreateUserAction(
 		CreateUserInput{
 			ProjectID: in.ProjectID,
 			User:      in.State.CollectedData.UserData,
+			ID:        userID,
 		},
 		h.schemaStore,
 	)
+	setPasswordAction := NewSetUserPasswordAction(
+		SetPasswordInput{
+			ProjectID: in.ProjectID,
+			UserID:    userID,
+			Password:  password,
+		},
+		h.hasher,
+	)
 
-	if in.State.CollectedData.AuthMethods.Password == "" {
-		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
-	}
-
-	setPasswordAction := NewLazyUserAction(func(ctx context.Context) (UserAction, error) {
-		return NewSetUserPasswordAction(
-			SetPasswordInput{
-				ProjectID: in.ProjectID,
-				UserID:    createUserAction.CreateUser.ID,
-				Password:  in.State.CollectedData.AuthMethods.Password,
-			},
-			h.hasher,
-		), nil
-	})
-
-	err := h.userService.ApplyActions(ctx, createUserAction, setPasswordAction)
+	err = h.userService.ApplyActions(ctx, createUserAction, setPasswordAction)
 	if err != nil {
 		if derr, ok := errors.AsType[domain.Error](err); ok && derr.Code == domain.ErrUserAlreadyExists().Code {
 			return domain.FlowOnSuccessResult{StepError: new("user_already_exists")}, nil
@@ -65,7 +70,7 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 	}
 
 	return domain.FlowOnSuccessResult{
-		UserID:       createUserAction.CreateUser.ID,
+		UserID:       userID,
 		Irreversible: true,
 	}, nil
 }

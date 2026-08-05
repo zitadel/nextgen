@@ -20,7 +20,7 @@ tasks:
       runInCI: false
 
   # Same sign-in journey against a real ephemeral instance seeded via
-  # @zitadel/testing instead of api-mock. Boots a server + embedded Postgres.
+  # @zitadel/testing instead of api-mock. Boots a server + SQLite local default.
   e2e-real:
     command: "corepack pnpm exec playwright test --config playwright.real.config.mts"
     deps:
@@ -30,9 +30,9 @@ tasks:
       - "demo-next:build"
     env:
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
-      # server:build compiles only the Go binary (no embedded UIs); this suite
-      # drives the app-embedded <zitadel-login>, so the server-hosted UIs stay
-      # off instead of pulling console/login-ui builds into the dep graph.
+      # server:build embeds the console/login UIs via its task deps; this
+      # suite drives the app-embedded <zitadel-login>, so the server-hosted
+      # UIs stay off to pin that path.
       NEXTGEN_SERVER_LOGIN_ENABLED: "false"
       NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
     options:

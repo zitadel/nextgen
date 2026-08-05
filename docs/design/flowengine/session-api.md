@@ -330,7 +330,7 @@ Authorization: Bearer sk_proj_…   ← project service key
 Content-Type: application/json
 
 {
-  "handoff_token": "htok_…"
+  "handoff_token": "handoff_…"
 }
 ```
 
@@ -341,7 +341,7 @@ Content-Type: application/json
   "session": {
     "session_id":        "sess_…",
     "state":             "active",
-    "user_id":           "usr_…",
+    "user_id":           "user_…",
     "factors":           { "password": { "verified_at": "…" }, "totp": { "verified_at": "…" } },
     "assurance_levels":  ["urn:nist:aal:1", "urn:nist:aal:2"],
     "created_at":        "…",

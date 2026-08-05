@@ -3,11 +3,23 @@ import { randomUUID } from "node:crypto";
 import type { ZitadelClient } from "@zitadel/api/client";
 
 import { requireString } from "./bootstrap";
-import type { SeededUser, SeedUserInput } from "./types";
+import type { Identity, SeededUser, SeedUserInput, SeedUsersTemplate } from "./types";
 
 export interface SeedContext {
   projectId: string;
   schemaId: string;
+}
+
+/**
+ * A unique unused email + password. Nothing is created on the instance —
+ * this is the input for registration-flow specs, which must prove the flow
+ * creates the user.
+ */
+export function identity(): Identity {
+  return {
+    email: `e2e-${randomUUID().slice(0, 8)}@example.com`,
+    password: `Pw!${randomUUID()}`,
+  };
 }
 
 /**
@@ -23,8 +35,9 @@ export async function seedUser(
   context: SeedContext,
   input: SeedUserInput = {},
 ): Promise<SeededUser> {
-  const email = input.email ?? `e2e-${randomUUID().slice(0, 8)}@example.com`;
-  const password = input.password ?? `Pw!${randomUUID()}`;
+  const fresh = identity();
+  const email = input.email ?? fresh.email;
+  const password = input.password ?? fresh.password;
   // Reserved fields win over attributes: the returned SeededUser must never
   // disagree with what was actually created (a silently overridden email or
   // $schema would yield credentials that cannot log in).
@@ -43,4 +56,30 @@ export async function seedUser(
     { project_id: context.projectId },
   );
   return { id, email, password };
+}
+
+/**
+ * Seed `count` users sequentially. The template makes fixture data
+ * deterministic per index (stable emails/names keep screenshot diffs about
+ * code, not reshuffled data — the `console:dev-real` pattern); untemplated
+ * fields fall back to the unique defaults. Name-like attributes need a
+ * schema that declares them (`useCase: "consumer"` or wider).
+ */
+export async function seedUsers(
+  client: ZitadelClient,
+  context: SeedContext,
+  count: number,
+  template: SeedUsersTemplate = {},
+): Promise<SeededUser[]> {
+  const users: SeededUser[] = [];
+  for (let index = 0; index < count; index += 1) {
+    users.push(
+      await seedUser(client, context, {
+        email: template.email?.(index),
+        password: template.password?.(index),
+        attributes: template.attributes?.(index),
+      }),
+    );
+  }
+  return users;
 }

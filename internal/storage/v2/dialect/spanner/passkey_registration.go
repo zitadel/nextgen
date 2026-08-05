@@ -29,6 +29,9 @@ func newPasskeyRegistrationStatements(db queryExecutor) passkeyRegistrationState
 
 // CreatePasskeyRegistration implements [service.PasskeyRegistrationStatements].
 func (ps passkeyRegistrationStatements) CreatePasskeyRegistration(ctx context.Context, reg *domain.CreatePasskeyRegistration) error {
+	if err := ensureManagedID(&reg.ID, domain.PrefixPasskeyRegistration); err != nil {
+		return err
+	}
 	challengeJSON, err := json.Marshal(reg.Challenge)
 	if err != nil {
 		return fmt.Errorf("passkey_registration: marshal challenge: %w", err)

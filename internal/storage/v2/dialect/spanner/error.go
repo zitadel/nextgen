@@ -37,8 +37,10 @@ func wrapError(err error) error {
 		return database.NewNoRowFoundError(err)
 	case codes.AlreadyExists:
 		return database.NewUniqueError("", "", err)
-	case codes.FailedPrecondition, codes.InvalidArgument:
-		return database.NewCheckError("", "", err)
+	// A violated CHECK arrives as OutOfRange, which Spanner also returns for
+	// ordinary query failures like a division by zero.
+	case codes.FailedPrecondition, codes.InvalidArgument, codes.OutOfRange:
+		return classifyIntegrityError(err)
 	default:
 		if strings.HasPrefix(err.Error(), "scany: expected 1 row, got: ") {
 			return database.NewMultipleRowsFoundError(err)
@@ -46,6 +48,27 @@ func wrapError(err error) error {
 		if strings.HasPrefix(err.Error(), "scany:") || strings.HasPrefix(err.Error(), "scanning:") {
 			return database.NewScanError(err)
 		}
+		return database.NewUnknownError(err)
+	}
+}
+
+// classifyIntegrityError maps Spanner integrity failures onto the same typed
+// errors Postgres returns. Spanner reuses the codes it returns for ordinary
+// query failures, so only the message tells them apart. An UnknownError is
+// returned by default.
+func classifyIntegrityError(err error) error {
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "foreign key"):
+		return database.NewForeignKeyError("", "", err)
+	case strings.Contains(msg, "unique"):
+		return database.NewUniqueError("", "", err)
+	case strings.Contains(msg, "not null"), strings.Contains(msg, "null value"):
+		return database.NewNotNullError("", "", err)
+	// Postgres spells the column width as a CHECK, so report it the same way.
+	case strings.Contains(msg, "check constraint"), strings.Contains(msg, "exceeds the maximum size limit"):
+		return database.NewCheckError("", "", err)
+	default:
 		return database.NewUnknownError(err)
 	}
 }

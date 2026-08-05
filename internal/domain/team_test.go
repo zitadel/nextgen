@@ -3,7 +3,6 @@ package domain_test
 import (
 	"strings"
 	"testing"
-	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,12 +30,12 @@ func TestNewTeam(t *testing.T) {
 			check: func(t *testing.T, got *domain.Team) {
 				assert.Equal(t, "proj_1", got.ProjectID)
 				assert.Equal(t, "my-team", got.Name)
-				assert.NotEmpty(t, got.ID)
+				assert.Empty(t, got.ID)
 			},
 			wantErr: nil,
 		},
 		{
-			name: "team name is trimmed",
+			name: "stores the validated name",
 			args: args{
 				projectID: "proj_1",
 				name:      "  my-team  ",
@@ -47,61 +46,12 @@ func TestNewTeam(t *testing.T) {
 			wantErr: nil,
 		},
 		{
-			name: "team with empty name",
+			name: "invalid name is rejected",
 			args: args{
 				projectID: "proj_1",
 				name:      "",
 			},
 			wantErr: domain.ErrTeamNameInvalid(),
-		},
-		{
-			name: "team with whitespace-only name",
-			args: args{
-				projectID: "proj_1",
-				name:      "   ",
-			},
-			wantErr: domain.ErrTeamNameInvalid(),
-		},
-		{
-			name: "team name at the length limit",
-			args: args{
-				projectID: "proj_1",
-				name:      strings.Repeat("a", domain.TeamNameMaxLength),
-			},
-			check: func(t *testing.T, got *domain.Team) {
-				assert.Len(t, got.Name, domain.TeamNameMaxLength)
-			},
-			wantErr: nil,
-		},
-		{
-			name: "multi-byte team name at the length limit",
-			args: args{
-				projectID: "proj_1",
-				name:      strings.Repeat("チ", domain.TeamNameMaxLength),
-			},
-			check: func(t *testing.T, got *domain.Team) {
-				assert.Equal(t, domain.TeamNameMaxLength, utf8.RuneCountInString(got.Name))
-			},
-			wantErr: nil,
-		},
-		{
-			name: "team name over the length limit",
-			args: args{
-				projectID: "proj_1",
-				name:      strings.Repeat("a", domain.TeamNameMaxLength+1),
-			},
-			wantErr: domain.ErrTeamNameInvalid(),
-		},
-		{
-			name: "team name is trimmed before the length check",
-			args: args{
-				projectID: "proj_1",
-				name:      "  " + strings.Repeat("a", domain.TeamNameMaxLength) + "  ",
-			},
-			check: func(t *testing.T, got *domain.Team) {
-				assert.Len(t, got.Name, domain.TeamNameMaxLength)
-			},
-			wantErr: nil,
 		},
 	}
 	for _, tt := range tests {
@@ -116,6 +66,72 @@ func TestNewTeam(t *testing.T) {
 			}
 			require.NoError(t, err)
 			tt.check(t, got)
+		})
+	}
+}
+
+func TestValidateTeamName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		given    string
+		wantName string
+		wantErr  error
+	}{
+		{
+			name:     "returns the name",
+			given:    "my-team",
+			wantName: "my-team",
+		},
+		{
+			name:     "returns the trimmed name",
+			given:    "  my-team  ",
+			wantName: "my-team",
+		},
+		{
+			name:    "empty",
+			given:   "",
+			wantErr: domain.ErrTeamNameInvalid(),
+		},
+		{
+			name:    "whitespace only",
+			given:   "   ",
+			wantErr: domain.ErrTeamNameInvalid(),
+		},
+		{
+			name:     "at the length limit",
+			given:    strings.Repeat("a", domain.TeamNameMaxLength),
+			wantName: strings.Repeat("a", domain.TeamNameMaxLength),
+		},
+		{
+			name:     "multi-byte at the length limit",
+			given:    strings.Repeat("チ", domain.TeamNameMaxLength),
+			wantName: strings.Repeat("チ", domain.TeamNameMaxLength),
+		},
+		{
+			name:    "over the length limit",
+			given:   strings.Repeat("a", domain.TeamNameMaxLength+1),
+			wantErr: domain.ErrTeamNameInvalid(),
+		},
+		{
+			name:     "trimmed before the length check",
+			given:    "  " + strings.Repeat("a", domain.TeamNameMaxLength) + "  ",
+			wantName: strings.Repeat("a", domain.TeamNameMaxLength),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := domain.ValidateTeamName(tt.given)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Empty(t, got)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantName, got)
 		})
 	}
 }

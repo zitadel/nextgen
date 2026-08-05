@@ -12,6 +12,7 @@ test("local journey defaults to the full framework matrix", () => {
     keep: false,
     preset: "",
     runtime: "binary",
+    suite: "frameworks",
     tarballsDir: "",
     workDir: "",
   });
@@ -39,6 +40,7 @@ test("local journey can select one framework and tune concurrency", () => {
       keep: true,
       preset: "",
       runtime: "docker",
+      suite: "frameworks",
       tarballsDir: "/tmp/tarballs",
       workDir: "/tmp/journey",
     },
@@ -55,11 +57,31 @@ test("local journey can scaffold with a sign-in preset", () => {
       keep: false,
       preset: "passkey-first",
       runtime: "binary",
+      suite: "frameworks",
       tarballsDir: "",
       workDir: "",
     },
   );
   assert.throws(() => parseLocalJourneyArgs(["--preset"]), /requires a value/);
+});
+
+test("the testkit suite pins the next framework and rejects an explicit one", () => {
+  assert.deepEqual(parseLocalJourneyArgs(["--suite", "testkit"]), {
+    concurrency: 5,
+    frameworkIds: ["next"],
+    image: "",
+    keep: false,
+    preset: "",
+    runtime: "binary",
+    suite: "testkit",
+    tarballsDir: "",
+    workDir: "",
+  });
+  assert.throws(
+    () => parseLocalJourneyArgs(["--suite", "testkit", "--framework", "next"]),
+    /drop --framework/,
+  );
+  assert.throws(() => parseLocalJourneyArgs(["--suite", "everything"]), /frameworks or testkit/);
 });
 
 test("local journey can request the binary runtime explicitly", () => {
@@ -70,6 +92,7 @@ test("local journey can request the binary runtime explicitly", () => {
     keep: false,
     preset: "",
     runtime: "binary",
+    suite: "frameworks",
     tarballsDir: "",
     workDir: "",
   });

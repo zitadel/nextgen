@@ -21,7 +21,7 @@ CREATE TABLE zitadel_nextgen.flow_definitions (
     , name              TEXT NOT NULL CHECK (name <> '')
     , schema_version    TEXT NOT NULL CHECK (schema_version <> '')
     , status            zitadel_nextgen.flow_definition_states NOT NULL DEFAULT 'draft'::zitadel_nextgen.flow_definition_states
-    , purposes          zitadel_nextgen.flow_definition_purposes[] NOT NULL DEFAULT '{}'
+    , purposes          zitadel_nextgen.flow_definition_purposes[] NOT NULL
     , definition        JSONB NOT NULL
     , created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
     , updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()

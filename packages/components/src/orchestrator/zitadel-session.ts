@@ -1,23 +1,31 @@
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { type ZitadelProject } from "@zitadel/api/config";
 
 import { getSession, revokeSession } from "./api-client.js";
-import { applyBaseTokens } from "./branding-to-tokens.js";
 import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
+import { ZitadelSurface } from "./surface.js";
 import { emit } from "../internal/emit.js";
 import { baseHostStyles, t } from "../styles/index.js";
 
 import "../atoms/index.js";
 
 /**
- * `<zitadel-session>` — the full-screen "signed in" card.
+ * `<zitadel-session>` — the "signed in" card.
  *
  * Renders the post-sign-in confirmation surface (Figma `7355:8959`): a
  * centred auth card reading "Signed in as {identity}" with a **Sign out**
  * action. Composed from the same `<zl-page-shell>` / `<zl-card>` /
  * `<zl-button>` atoms as the `<zitadel-login>` orchestrator, so it inherits
  * tenant branding tokens with no hardcoded colour, radius, or shadow.
+ *
+ * Like `<zitadel-login>` it is widget-first: the default `variant="widget"`
+ * is content-sized and transparent so the card drops into an app's own
+ * page; dedicated signed-in routes opt into `variant="page"`, which claims
+ * the viewport and paints the surface background (the page paint lives on
+ * the internal `<zl-page-shell>`). `theme` resolves through the shared
+ * surface base — explicit value, else `dark` for `page` / `auto` for
+ * `widget`.
  *
  * This is the companion surface to `<zitadel-login>` for the "go straight to
  * /login" flow: the orchestrator signs the user in and redirects here (or to
@@ -42,15 +50,13 @@ import "../atoms/index.js";
  * sign-in via the `<zitadel-login>` `post-sign-in-url`.
  */
 @customElement("zitadel-session")
-export class ZitadelSession extends LitElement {
+export class ZitadelSession extends ZitadelSurface {
   static override styles = [
     baseHostStyles,
     css`
       :host {
         display: block;
-        min-height: 100vh;
-        background: ${t.color.surface.defaultBlack};
-        color: ${t.color.text.primaryWhite};
+        width: 100%;
       }
       .title {
         margin: 0;
@@ -123,7 +129,6 @@ export class ZitadelSession extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this.dataset.theme = "dark";
     this.maybeLoadIdentity();
   }
 
@@ -132,9 +137,13 @@ export class ZitadelSession extends LitElement {
     return this.displayName || this.displayEmail || this.displayUserId;
   }
 
+  override willUpdate(): void {
+    // No tenant branding payload on this surface (yet) — the theme resolves
+    // from the element preference and the variant fallback.
+    this.applySurfaceTheme(undefined);
+  }
+
   override updated(): void {
-    const root = this.shadowRoot;
-    if (root) applyBaseTokens(root);
     this.maybeLoadIdentity();
   }
 
@@ -204,8 +213,11 @@ export class ZitadelSession extends LitElement {
   }
 
   override render() {
+    // Static template, so widget polarity is a plain binding — unlike
+    // `<zitadel-login>`, whose `zl-page-shell` lives in unsafeHTML-parsed
+    // markup and needs the imperative re-stamp loop.
     return html`
-      <zl-page-shell>
+      <zl-page-shell ?data-widget=${this.variant !== "page"}>
         <zl-card>
           <h1 slot="header" class="title">${this.heading}</h1>
           ${this.identityLabel

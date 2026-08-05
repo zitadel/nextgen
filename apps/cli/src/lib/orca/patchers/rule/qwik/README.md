@@ -19,5 +19,5 @@ Integrates Zitadel auth into a Vite + Qwik single-page app.
 
 The SDK widgets call `/__nextgen/*` same-origin. In dev, the Vite proxy forwards
 those to the backend and attaches the project service-key secret (read from
-`ZITADEL_PROJECT_SECRET`) to every proxied request. Production needs
+`ZITADEL_PROJECT_SECRET`) only to `POST /sessions/exchange`. Production needs
 `@zitadel/edge-proxy` in front.

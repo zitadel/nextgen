@@ -31,13 +31,32 @@ tasks:
     outputs:
       - "dist/**/*"
 
+  build-release:
+    script: |
+      node ../../scripts/release-clean.mjs local-dist
+      corepack pnpm run build
+    deps:
+      - "api:build-release"
+      - "config:build-release"
+    outputs:
+      - "dist/**/*"
+    options:
+      cache: false
+      # Release builds remove stale package output and rebuild dist inside one
+      # task. They stay out of `moon ci`; release:build-public-packages invokes
+      # them in the release step instead of the normal build/test graph. The
+      # deps read api/config release dist (tsdown bundles both into the CJS
+      # entries), and nothing in the release graph reads this package's dist,
+      # so task ordering alone is enough — no shared mutex needed here.
+      runInCI: false
+
   test:
     command: "corepack pnpm run test"
     deps:
       - "build"
 
-  # Boots a real local server (binary runtime + embedded Postgres). Kept out
-  # of CI and the cache: it spawns OS processes and takes ~30s per boot.
+  # Boots a real local server (binary runtime + SQLite by default). Kept out
+  # of CI and the cache: it spawns OS processes and takes a few seconds per boot.
   test-integration:
     command: "corepack pnpm run test:integration"
     deps:
@@ -46,9 +65,9 @@ tasks:
       - "server:build"
     env:
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
-      # server:build compiles only the Go binary; without console:build /
-      # login-ui:build the embedded UIs are absent and the server refuses to
-      # start. These tests drive the API and app-embedded login, not /ui/*.
+      # server:build embeds the console/login UIs via its task deps; keep the
+      # server-hosted surfaces off anyway — these tests drive the API and
+      # app-embedded login, not /ui/*.
       NEXTGEN_SERVER_LOGIN_ENABLED: "false"
       NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
     options:

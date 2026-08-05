@@ -2,14 +2,15 @@ server:
   address: ":8080"
   # Optional. If unset, a nextgen-data directory next to the server binary is used.
   data_dir: ./nextgen-data
-  # Optional. Root key-encryption keys (KEKs) that wrap data-encryption keys,
-  # keyed by key ID. If unset, the server generates and reuses an RSA KEK under
-  # <data_dir>/keks. Exactly one key must be marked use_for_encryption.
-  # encryption_keys:
-  #   root-kek:
+  # Optional. Master keys that wrap the key encryption key (KEK) of every
+  # project, keyed by key ID. If unset, the server generates and reuses an RSA
+  # master key under <data_dir>/master-keys. Exactly one key must be marked
+  # use_for_encryption.
+  # master_keys:
+  #   master-key:
   #     use_for_encryption: true
   #     # Provide the RSA private key as a file (PEM incl. OpenSSH, or JWK) ...
-  #     file: ./nextgen-data/keks/root-kek.pem
+  #     file: ./nextgen-data/master-keys/master-key.pem
   #     # ... or inline it instead:
   #     # private_key: |
   #     #   -----BEGIN PRIVATE KEY-----
@@ -20,8 +21,12 @@ server:
   login_enabled: true
   login_path: /ui/login
 
-database:
-  postgres: postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable
+# Optional. When omitted, the server uses SQLite at <data_dir>/zitadel.db.
+# Configure exactly one dialect to override the default:
+# database:
+#   sqlite: ./nextgen-data/zitadel.db
+#   # or:
+#   # postgres: postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable
 
 password_hasher:
   # Algorithm used to hash new passwords/secrets. Defaults to argon2id

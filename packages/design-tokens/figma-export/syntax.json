@@ -1,0 +1,65 @@
+{
+  "$metadata": {
+    "collection": "Syntax",
+    "modes": [
+      "Light",
+      "Dark"
+    ]
+  },
+  "Light": {
+    "syntax": {
+      "key": {
+        "$value": "#401889",
+        "$type": "color"
+      },
+      "string": {
+        "$value": "#bd2514",
+        "$type": "color"
+      },
+      "number": {
+        "$value": "#c52247",
+        "$type": "color"
+      },
+      "boolean": {
+        "$value": "#5a23bd",
+        "$type": "color"
+      },
+      "punctuation": {
+        "$value": "#686883",
+        "$type": "color"
+      },
+      "comment": {
+        "$value": "#71718b",
+        "$type": "color"
+      }
+    }
+  },
+  "Dark": {
+    "syntax": {
+      "key": {
+        "$value": "#9066da",
+        "$type": "color"
+      },
+      "string": {
+        "$value": "#f25543",
+        "$type": "color"
+      },
+      "number": {
+        "$value": "#e25f7d",
+        "$type": "color"
+      },
+      "boolean": {
+        "$value": "#bba5e4",
+        "$type": "color"
+      },
+      "punctuation": {
+        "$value": "#82829c",
+        "$type": "color"
+      },
+      "comment": {
+        "$value": "#7c7c95",
+        "$type": "color"
+      }
+    }
+  }
+}

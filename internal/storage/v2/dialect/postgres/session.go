@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	insertUserAgentStmt = `INSERT INTO zitadel_nextgen.user_agents (project_id, info) VALUES ($1, $2) RETURNING id`
-	insertSessionStmt   = `INSERT INTO zitadel_nextgen.sessions (project_id, user_agent_id, time_to_live, token_id)
-VALUES ($1, $2, $3::INTERVAL, 0) RETURNING id, created_at, updated_at, expires_at`
+	insertUserAgentStmt = `INSERT INTO zitadel_nextgen.user_agents (project_id, id, info) VALUES ($1, $2, $3)`
+	insertSessionStmt   = `INSERT INTO zitadel_nextgen.sessions (project_id, id, user_agent_id, time_to_live, token_id)
+VALUES ($1, $2, $3, $4::INTERVAL, $5) RETURNING created_at, updated_at, expires_at`
 	updateSessionTokenIDStmt = `UPDATE zitadel_nextgen.sessions SET token_id = $3 WHERE project_id = $1 AND id = $2`
 	deleteSessionByIDStmt    = `DELETE FROM zitadel_nextgen.sessions WHERE project_id = $1 AND id = $2`
 	sessionQuery             = `SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.time_to_live, s.token_id, s.user_id,
@@ -50,7 +50,7 @@ func (ss sessionStatements) GetSessionByID(ctx context.Context, projectID, sessi
 	sessions, err := ss.querySessions(ctx, &database.ListOptions[domain.SessionField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.SessionFieldProjectID), projectID),
-			database.Equal(database.Col(domain.SessionFieldID), database.Identity(sessionID)),
+			database.Equal(database.Col(domain.SessionFieldID), sessionID),
 		),
 		Pagination: database.Page[domain.SessionField]{
 			OrderBy: database.OrderBy[domain.SessionField]{Columns: []database.Column[domain.SessionField]{database.Col(domain.SessionFieldID)}},
@@ -88,7 +88,7 @@ func (ss sessionStatements) ListSessions(ctx context.Context, filter *database.L
 }
 
 func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, sessionID string) error {
-	tag, err := ss.client.Exec(ctx, deleteSessionByIDStmt, projectID, database.Identity(sessionID))
+	tag, err := ss.client.Exec(ctx, deleteSessionByIDStmt, projectID, sessionID)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -150,7 +150,10 @@ func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.S
 	if session.TimeToLive <= 0 {
 		session.TimeToLive = domain.SessionAnonymousTTL
 	}
-	var userAgentID database.Identity
+	if err := ensureManagedID(&session.ID, domain.PrefixSession); err != nil {
+		return err
+	}
+	var userAgentID *string
 	if session.UserAgent != nil {
 		info := session.UserAgent.Info
 		if info == nil {
@@ -166,17 +169,20 @@ func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.S
 		if err != nil {
 			return fmt.Errorf("failed to marshal user agent info: %w", err)
 		}
-		if err := ss.client.QueryRow(ctx, insertUserAgentStmt, session.ProjectID, raw).Scan(&userAgentID); err != nil {
+		uaID := ""
+		if err := ensureManagedID(&uaID, domain.PrefixUserAgent); err != nil {
+			return err
+		}
+		if _, err := ss.client.Exec(ctx, insertUserAgentStmt, session.ProjectID, uaID, raw); err != nil {
 			return fmt.Errorf("failed to insert user agent: %w", wrapError(err))
 		}
+		userAgentID = &uaID
 	}
-	var sessionID database.Identity
-	err := ss.client.QueryRow(ctx, insertSessionStmt, session.ProjectID, userAgentID, session.TimeToLive).
-		Scan(&sessionID, &session.CreatedAt, &session.UpdatedAt, &session.ExpiresAt)
+	err := ss.client.QueryRow(ctx, insertSessionStmt, session.ProjectID, session.ID, userAgentID, session.TimeToLive, nil).
+		Scan(&session.CreatedAt, &session.UpdatedAt, &session.ExpiresAt)
 	if err != nil {
 		return fmt.Errorf("failed to insert session: %w", wrapError(err))
 	}
-	session.ID = sessionID.String()
 	return ss.CreateSessionToken(ctx, session, "")
 }
 
@@ -199,7 +205,7 @@ func (ss sessionStatements) CreateSessionToken(ctx context.Context, session *dom
 	if err := tokens.CreateToken(ctx, tok); err != nil {
 		return fmt.Errorf("failed to create session token: %w", err)
 	}
-	if _, err := ss.client.Exec(ctx, updateSessionTokenIDStmt, session.ProjectID, database.Identity(session.ID), database.Identity(tok.TokenID)); err != nil {
+	if _, err := ss.client.Exec(ctx, updateSessionTokenIDStmt, session.ProjectID, session.ID, tok.TokenID); err != nil {
 		return fmt.Errorf("failed to set session token_id: %w", wrapError(err))
 	}
 	session.TokenID = tok.TokenID
@@ -226,7 +232,7 @@ func (ss sessionStatements) UpdateSessionAfterExchange(ctx context.Context, proj
 	c.WriteString(" WHERE project_id = ")
 	c.WriteArg(projectID)
 	c.WriteString(" AND id = ")
-	c.WriteArg(database.Identity(sessionID))
+	c.WriteArg(sessionID)
 	tag, err := ss.client.Exec(ctx, c.String(), c.args...)
 	if err != nil {
 		return wrapError(err)
@@ -242,7 +248,7 @@ func (ss sessionStatements) ApplyExchange(ctx context.Context, projectID, sessio
 		if !c.OnAttempt {
 			continue
 		}
-		tag, err := ss.client.Exec(ctx, promoteCheckStmt, database.Identity(sessionID), projectID, database.Identity(c.ID))
+		tag, err := ss.client.Exec(ctx, promoteCheckStmt, sessionID, projectID, c.ID)
 		if err != nil {
 			return wrapError(err)
 		}
@@ -251,7 +257,7 @@ func (ss sessionStatements) ApplyExchange(ctx context.Context, projectID, sessio
 		}
 	}
 	for _, c := range lastVerifiedChecks {
-		if _, err := ss.client.Exec(ctx, deleteSessionCheckLoserStmt, projectID, database.Identity(sessionID), c.Type, database.Identity(c.ID)); err != nil {
+		if _, err := ss.client.Exec(ctx, deleteSessionCheckLoserStmt, projectID, sessionID, c.Type, c.ID); err != nil {
 			return wrapError(err)
 		}
 	}
@@ -264,7 +270,7 @@ func (ss sessionStatements) UserIDFromLastVerifiedChecks(ctx context.Context, pr
 		return nil, nil
 	}
 	var factor []byte
-	if err := ss.client.QueryRow(ctx, selectFactorPayloadStmt, projectID, database.Identity(w.ID)).Scan(&factor); err != nil {
+	if err := ss.client.QueryRow(ctx, selectFactorPayloadStmt, projectID, w.ID).Scan(&factor); err != nil {
 		return nil, fmt.Errorf("failed to load user factor payload: %w", wrapError(err))
 	}
 	var payload domain.AuthFactorUser
@@ -280,20 +286,20 @@ func (ss sessionStatements) UserIDFromLastVerifiedChecks(ctx context.Context, pr
 }
 
 func (ss sessionStatements) loadStoredChecks(ctx context.Context, query, projectID, id string, onAttempt bool) ([]v2session.StoredCheck, error) {
-	rows, err := ss.client.Query(ctx, query, projectID, database.Identity(id))
+	rows, err := ss.client.Query(ctx, query, projectID, id)
 	if err != nil {
 		return nil, wrapError(err)
 	}
 	defer rows.Close()
 	var out []v2session.StoredCheck
 	for rows.Next() {
-		var checkID database.Identity
+		var checkID string
 		var typ int64
 		var lastVerifiedAt time.Time
 		if err := rows.Scan(&checkID, &typ, &lastVerifiedAt); err != nil {
 			return nil, err
 		}
-		out = append(out, v2session.StoredCheck{ID: checkID.String(), Type: domain.AuthCheckType(typ), LastVerifiedAt: lastVerifiedAt, OnAttempt: onAttempt})
+		out = append(out, v2session.StoredCheck{ID: checkID, Type: domain.AuthCheckType(typ), LastVerifiedAt: lastVerifiedAt, OnAttempt: onAttempt})
 	}
 	return out, rows.Err()
 }
@@ -304,11 +310,13 @@ func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
 	for rows.Next() {
 		var (
 			projectID                                      string
-			sessionID, tokenID, checkID                    database.Identity
+			sessionID                                      string
+			tokenID                                        *string
+			checkID                                        *string
 			createdAt, updatedAt, expiresAt                time.Time
 			timeToLive                                     time.Duration
 			userID                                         *string
-			userAgentID                                    *int64
+			userAgentID                                    *string
 			userAgentInfo                                  []byte
 			checkType                                      *int64
 			lastChallengedAt, lastVerifiedAt, lastFailedAt *time.Time
@@ -319,10 +327,14 @@ func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
 			&userAgentID, &userAgentInfo, &checkType, &checkID, &lastChallengedAt, &lastVerifiedAt, &lastFailedAt, &failureCount, &challenge, &factor); err != nil {
 			return nil, fmt.Errorf("failed to scan session row: %w", err)
 		}
-		id := sessionID.String()
+		id := sessionID
 		session, ok := byID[id]
 		if !ok {
-			session = &domain.Session{ProjectID: projectID, ID: id, CreatedAt: createdAt, UpdatedAt: updatedAt, ExpiresAt: expiresAt, TimeToLive: timeToLive, TokenID: tokenID.String(), UserID: userID}
+			tok := ""
+			if tokenID != nil {
+				tok = *tokenID
+			}
+			session = &domain.Session{ProjectID: projectID, ID: id, CreatedAt: createdAt, UpdatedAt: updatedAt, ExpiresAt: expiresAt, TimeToLive: timeToLive, TokenID: tok, UserID: userID}
 			if userAgentID != nil {
 				info := map[string]any{}
 				if len(userAgentInfo) > 0 {
@@ -335,7 +347,7 @@ func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
 			byID[id] = session
 			order = append(order, id)
 		}
-		if checkType == nil || checkID.String() == "" {
+		if checkType == nil || checkID == nil || *checkID == "" {
 			continue
 		}
 		var challengedAt, failedAt, verifiedAt time.Time
@@ -352,7 +364,7 @@ func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
 		if failureCount != nil {
 			failures = *failureCount
 		}
-		checks, err := v2session.DecodeAuthChecks(domain.AuthCheckType(*checkType), checkID.String(), challengedAt, failedAt, verifiedAt, failures, challenge, factor)
+		checks, err := v2session.DecodeAuthChecks(domain.AuthCheckType(*checkType), *checkID, challengedAt, failedAt, verifiedAt, failures, challenge, factor)
 		if err != nil {
 			return nil, err
 		}
@@ -372,20 +384,6 @@ func scanSessions(rows pgx.Rows) ([]*domain.Session, error) {
 	return out, nil
 }
 
-func coerceSessionIdentity(v any) (any, error) {
-	switch id := v.(type) {
-	case database.Identity:
-		return id, nil
-	case string:
-		return database.Identity(id), nil
-	default:
-		s, err := database.CoerceStringValue(v)
-		if err != nil {
-			return nil, err
-		}
-		return database.Identity(s), nil
-	}
-}
 func coerceSessionDuration(v any) (any, error) {
 	switch d := v.(type) {
 	case time.Duration:
@@ -410,12 +408,12 @@ var _ v2session.ExchangeStore = sessionExchangeStore{}
 
 var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBinding[domain.Session]{
 	domain.SessionFieldProjectID:  {SQLName: "s.project_id", Accessor: func(s *domain.Session) any { return s.ProjectID }, Coerce: database.CoerceString},
-	domain.SessionFieldID:         {SQLName: "s.id", Accessor: func(s *domain.Session) any { return database.Identity(s.ID) }, Coerce: coerceSessionIdentity},
+	domain.SessionFieldID:         {SQLName: "s.id", Accessor: func(s *domain.Session) any { return s.ID }, Coerce: database.CoerceString},
 	domain.SessionFieldCreatedAt:  {SQLName: "s.created_at", Accessor: func(s *domain.Session) any { return s.CreatedAt }, Coerce: database.CoerceTime},
 	domain.SessionFieldUpdatedAt:  {SQLName: "s.updated_at", Accessor: func(s *domain.Session) any { return s.UpdatedAt }, Coerce: database.CoerceTime},
 	domain.SessionFieldExpiresAt:  {SQLName: "s.expires_at", Accessor: func(s *domain.Session) any { return s.ExpiresAt }, Coerce: database.CoerceTime},
 	domain.SessionFieldTimeToLive: {SQLName: "s.time_to_live", Accessor: func(s *domain.Session) any { return s.TimeToLive }, Coerce: coerceSessionDuration},
-	domain.SessionFieldTokenID:    {SQLName: "s.token_id", Accessor: func(s *domain.Session) any { return database.Identity(s.TokenID) }, Coerce: coerceSessionIdentity},
+	domain.SessionFieldTokenID:    {SQLName: "s.token_id", Accessor: func(s *domain.Session) any { return s.TokenID }, Coerce: database.CoerceString},
 	domain.SessionFieldUserID: {SQLName: "s.user_id", Accessor: func(s *domain.Session) any {
 		if s.UserID == nil {
 			return ""

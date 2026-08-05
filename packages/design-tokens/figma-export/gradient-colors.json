@@ -1,0 +1,89 @@
+{
+  "$metadata": {
+    "collection": "Gradient Colors",
+    "modes": [
+      "Light",
+      "Dark"
+    ]
+  },
+  "Light": {
+    "gradient": {
+      "purple": {
+        "start": {
+          "$value": "#401889",
+          "$type": "color"
+        }
+      },
+      "red": {
+        "start": {
+          "$value": "#f25543",
+          "$type": "color"
+        }
+      },
+      "neutral": {
+        "start": {
+          "$value": "#bfbfcf",
+          "$type": "color"
+        }
+      },
+      "base": {
+        "end": {
+          "$value": "#fafafa",
+          "$type": "color"
+        }
+      },
+      "lavender": {
+        "start": {
+          "$value": "#bba5e4",
+          "$type": "color"
+        }
+      },
+      "rose": {
+        "start": {
+          "$value": "#ea8aa0",
+          "$type": "color"
+        }
+      }
+    }
+  },
+  "Dark": {
+    "gradient": {
+      "purple": {
+        "start": {
+          "$value": "#401889",
+          "$type": "color"
+        }
+      },
+      "red": {
+        "start": {
+          "$value": "#f25543",
+          "$type": "color"
+        }
+      },
+      "neutral": {
+        "start": {
+          "$value": "#484a57",
+          "$type": "color"
+        }
+      },
+      "base": {
+        "end": {
+          "$value": "#0f0f11",
+          "$type": "color"
+        }
+      },
+      "lavender": {
+        "start": {
+          "$value": "#bba5e4",
+          "$type": "color"
+        }
+      },
+      "rose": {
+        "start": {
+          "$value": "#ea8aa0",
+          "$type": "color"
+        }
+      }
+    }
+  }
+}

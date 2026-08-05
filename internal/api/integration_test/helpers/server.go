@@ -16,7 +16,7 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 
 	if h.testServer.value == nil {
 		h.testServer.value = httptest.NewServer(
-			h.EnsureGeneratedServer(t),
+			api.WithSessionStateNoStore(h.EnsureGeneratedServer(t)),
 		)
 	}
 	return h.testServer.value
@@ -57,6 +57,7 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 			h.EnsureBrandingService(t),
 			h.EnsureTokenService(t),
 			h.EnsureKeyService(t),
+			"",
 		)
 	}
 	return h.handler.value

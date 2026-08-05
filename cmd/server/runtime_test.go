@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadConfigCreatesAndReusesEncryptionKeyFile(t *testing.T) {
+func TestLoadConfigCreatesAndReusesMasterKeyFile(t *testing.T) {
 	dataDir := t.TempDir()
 	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
 
@@ -21,7 +21,7 @@ func TestLoadConfigCreatesAndReusesEncryptionKeyFile(t *testing.T) {
 	cfg, err := loadConfig(configPath)
 	require.NoError(t, err)
 
-	keyDir := filepath.Join(dataDir, defaultKEKDirName)
+	keyDir := filepath.Join(dataDir, defaultMasterKeyDirName)
 	assert.DirExists(t, keyDir)
 
 	entries, err := os.ReadDir(keyDir)
@@ -36,11 +36,11 @@ func TestLoadConfigCreatesAndReusesEncryptionKeyFile(t *testing.T) {
 	assert.NotEmpty(t, keyFilePath)
 	assert.FileExists(t, keyFilePath)
 
-	if assert.Contains(t, cfg.Server.EncryptionKeys, "root-kek.pem") {
-		assert.Equal(t, &EncryptionKeyConfig{
+	if assert.Contains(t, cfg.Server.MasterKeys, masterKeyFileName) {
+		assert.Equal(t, &MasterKeyConfig{
 			File:             keyFilePath,
 			UseForEncryption: true,
-		}, cfg.Server.EncryptionKeys["root-kek.pem"])
+		}, cfg.Server.MasterKeys[masterKeyFileName])
 	}
 
 	if runtime.GOOS != "windows" {
@@ -51,18 +51,18 @@ func TestLoadConfigCreatesAndReusesEncryptionKeyFile(t *testing.T) {
 
 	cfg2, err := loadConfig(configPath)
 	require.NoError(t, err)
-	assert.Equal(t, cfg.Server.EncryptionKeys, cfg2.Server.EncryptionKeys)
+	assert.Equal(t, cfg.Server.MasterKeys, cfg2.Server.MasterKeys)
 }
 
-func TestLoadConfigDoesNotCreateEncryptionKeyFileWhenKeyConfigured(t *testing.T) {
+func TestLoadConfigDoesNotCreateMasterKeyFileWhenKeyConfigured(t *testing.T) {
 	dataDir := t.TempDir()
 	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
 
 	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
 	require.NoError(t, os.WriteFile(configPath, []byte(`
 server:
-  encryption_keys:
-    configured-kek: 
+  master_keys:
+    configured-master-key: 
       use_for_encryption: true
       private_key: configured-private-key
 `), 0o600))
@@ -70,75 +70,66 @@ server:
 	cfg, err := loadConfig(configPath)
 	require.NoError(t, err)
 
-	// A configured key means ensureServerKEK generates nothing: the KEK
-	// directory is created but no key file is written into it.
-	require.Len(t, cfg.Server.EncryptionKeys, 1)
-	if assert.Contains(t, cfg.Server.EncryptionKeys, "configured-kek") {
-		assert.Equal(t, &EncryptionKeyConfig{
+	// A configured key means ensureServerMasterKey generates nothing: the master
+	// key directory is created but no key file is written into it.
+	require.Len(t, cfg.Server.MasterKeys, 1)
+	if assert.Contains(t, cfg.Server.MasterKeys, "configured-master-key") {
+		assert.Equal(t, &MasterKeyConfig{
 			UseForEncryption: true,
 			PrivateKey:       "configured-private-key",
-		}, cfg.Server.EncryptionKeys["configured-kek"])
+		}, cfg.Server.MasterKeys["configured-master-key"])
 	}
 
 	// The directory exists, but no key file was generated.
-	entries, err := os.ReadDir(filepath.Join(dataDir, defaultKEKDirName))
+	entries, err := os.ReadDir(filepath.Join(dataDir, defaultMasterKeyDirName))
 	require.NoError(t, err)
 	assert.Empty(t, entries, "no key file should be generated when a key is configured")
 }
 
-func TestEmbeddedPostgresOptionsUseDataDir(t *testing.T) {
+func TestDefaultSQLitePathUsesDataDir(t *testing.T) {
 	dataDir := t.TempDir()
-
-	options := embeddedPostgresOptions(dataDir)
-
-	root := filepath.Join(dataDir, "embedded-postgres")
-	assert.Equal(t, filepath.Join(root, "runtime"), options.RuntimePath)
-	assert.Equal(t, filepath.Join(root, "data"), options.DataPath)
-	assert.Equal(t, filepath.Join(root, "cache"), options.CachePath)
-	assert.Equal(t, filepath.Join(root, "postgres.log"), options.LogPath)
-	assert.NotEqual(t, options.RuntimePath, filepath.Dir(options.DataPath))
-	assert.NotEqual(t, options.RuntimePath, options.CachePath)
+	assert.Equal(t, filepath.Join(dataDir, "zitadel.db"), defaultSQLitePath(dataDir))
 }
 
-// writeKEKFile writes a KEK file with a specific modification time so tests can
-// control which key is considered the newest.
-func writeKEKFile(t *testing.T, kekDir, name string, modTime time.Time) string {
+// writeMasterKeyFile writes a master key file with a specific modification time
+// so tests can control which key is considered the newest.
+func writeMasterKeyFile(t *testing.T, masterKeyDir, name string, modTime time.Time) string {
 	t.Helper()
-	path := filepath.Join(kekDir, name)
+	path := filepath.Join(masterKeyDir, name)
 	require.NoError(t, os.WriteFile(path, []byte(name), 0o600))
 	require.NoError(t, os.Chtimes(path, modTime, modTime))
 	return path
 }
 
-func TestEnsureServerKEKLoadsAllKeysAndMarksNewestForEncryption(t *testing.T) {
+func TestEnsureServerMasterKeyLoadsAllKeysAndMarksNewestForEncryption(t *testing.T) {
 	dataDir := t.TempDir()
-	kekDir := filepath.Join(dataDir, defaultKEKDirName)
-	require.NoError(t, os.MkdirAll(kekDir, 0o700))
+	masterKeyDir := filepath.Join(dataDir, defaultMasterKeyDirName)
+	require.NoError(t, os.MkdirAll(masterKeyDir, 0o700))
 
 	// Three keys with increasing modification times; the last is the newest.
 	base := time.Now()
-	oldest := writeKEKFile(t, kekDir, "kek-1.pem", base.Add(-2*time.Hour))
-	middle := writeKEKFile(t, kekDir, "kek-2.pem", base.Add(-1*time.Hour))
-	newest := writeKEKFile(t, kekDir, "kek-3.pem", base)
+	oldest := writeMasterKeyFile(t, masterKeyDir, "master-key-1.pem", base.Add(-2*time.Hour))
+	middle := writeMasterKeyFile(t, masterKeyDir, "master-key-2.pem", base.Add(-1*time.Hour))
+	newest := writeMasterKeyFile(t, masterKeyDir, "master-key-3.pem", base)
 
 	cfg := &ServerConfig{DataDir: dataDir}
-	require.NoError(t, ensureServerKEK(cfg))
+	require.NoError(t, ensureServerMasterKey(cfg))
 
 	// Every key file is loaded as a file-backed entry.
-	require.Len(t, cfg.EncryptionKeys, 3)
-	if assert.Contains(t, cfg.EncryptionKeys, "kek-1.pem") {
-		assert.Equal(t, cfg.EncryptionKeys["kek-1.pem"], &EncryptionKeyConfig{File: oldest})
+	require.Len(t, cfg.MasterKeys, 3)
+	if assert.Contains(t, cfg.MasterKeys, "master-key-1.pem") {
+		assert.Equal(t, cfg.MasterKeys["master-key-1.pem"], &MasterKeyConfig{File: oldest})
 	}
-	if assert.Contains(t, cfg.EncryptionKeys, "kek-2.pem") {
-		assert.Equal(t, cfg.EncryptionKeys["kek-2.pem"], &EncryptionKeyConfig{File: middle})
+	if assert.Contains(t, cfg.MasterKeys, "master-key-2.pem") {
+		assert.Equal(t, cfg.MasterKeys["master-key-2.pem"], &MasterKeyConfig{File: middle})
 	}
-	if assert.Contains(t, cfg.EncryptionKeys, "kek-3.pem") {
-		assert.Equal(t, cfg.EncryptionKeys["kek-3.pem"], &EncryptionKeyConfig{File: newest, UseForEncryption: true})
+	if assert.Contains(t, cfg.MasterKeys, "master-key-3.pem") {
+		assert.Equal(t, cfg.MasterKeys["master-key-3.pem"], &MasterKeyConfig{File: newest, UseForEncryption: true})
 	}
 
 	// Exactly one key is marked for encryption, and it is the newest.
-	var forEncryption []*EncryptionKeyConfig
-	for _, k := range cfg.EncryptionKeys {
+	var forEncryption []*MasterKeyConfig
+	for _, k := range cfg.MasterKeys {
 		if k.UseForEncryption {
 			forEncryption = append(forEncryption, k)
 		}

@@ -19,14 +19,14 @@ CREATE TABLE teams (
 -- +goose StatementEnd
 -- +goose StatementBegin
 -- Team names are unique per project, case-insensitive.
-CREATE UNIQUE INDEX idx_teams_project_name
+CREATE UNIQUE INDEX uq_teams_project_name
     ON teams (project_id, name_lower)
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose NO TRANSACTION
 -- +goose StatementBegin
-DROP INDEX IF EXISTS idx_teams_project_name
+DROP INDEX IF EXISTS uq_teams_project_name
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS teams

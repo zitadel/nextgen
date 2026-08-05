@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // list-query translation for resource List endpoints.
@@ -57,9 +57,9 @@ func normalizeLimit(limit int) int {
 // mapListError translates storage-layer list errors into domain errors.
 func mapListError(err error, internalMsg string) error {
 	switch {
-	case errors.Is(err, v2database.ErrInvalidCursor()):
+	case errors.Is(err, database.ErrInvalidCursor()):
 		return domain.ErrRequestInvalid().WithDetails("invalid page token")
-	case errors.Is(err, v2database.ErrCursorOrderMismatch()):
+	case errors.Is(err, database.ErrCursorOrderMismatch()):
 		return domain.ErrRequestInvalid().WithDetails("page token does not match the requested sorting")
 	default:
 		return domain.ErrInternal(err).WithMessage(internalMsg)
@@ -68,26 +68,26 @@ func mapListError(err error, internalMsg string) error {
 
 // parseSortDirection maps an API sort direction to a storage order direction.
 // An empty direction defaults to ascending.
-func parseSortDirection(direction string) (v2database.OrderDirection, error) {
+func parseSortDirection(direction string) (database.OrderDirection, error) {
 	switch direction {
 	case "", sortAsc:
-		return v2database.OrderAsc, nil
+		return database.OrderAsc, nil
 	case sortDesc:
-		return v2database.OrderDesc, nil
+		return database.OrderDesc, nil
 	default:
-		return v2database.OrderAsc, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown sort direction %q", direction))
+		return database.OrderAsc, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown sort direction %q", direction))
 	}
 }
 
 // compareFilter maps an operation to a comparison filter for an ordered column (e.g. a timestamp or number).
-func compareFilter[F ~uint8](op string, col v2database.Column[F], value any) (v2database.Filter[F], error) {
+func compareFilter[F ~uint8](op string, col database.Column[F], value any) (database.Filter[F], error) {
 	switch op {
 	case filterOpEquals:
-		return v2database.Equal(col, value), nil
+		return database.Equal(col, value), nil
 	case filterOpLessThan:
-		return v2database.LessThan(col, value), nil
+		return database.LessThan(col, value), nil
 	case filterOpGreaterThan:
-		return v2database.GreaterThan(col, value), nil
+		return database.GreaterThan(col, value), nil
 	case filterOpNotEquals, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
 		// todo (grvijayan): update when these operations are supported
 		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
@@ -99,12 +99,12 @@ func compareFilter[F ~uint8](op string, col v2database.Column[F], value any) (v2
 }
 
 // stringFilter maps an operation to a text filter.
-func stringFilter[F ~uint8](op string, col v2database.Column[F], value string) (v2database.Filter[F], error) {
+func stringFilter[F ~uint8](op string, col database.Column[F], value string) (database.Filter[F], error) {
 	switch op {
 	case filterOpEquals:
-		return v2database.StringEqual(col, value), nil
+		return database.StringEqual(col, value), nil
 	case filterOpContains:
-		return v2database.StringContains(col, value), nil
+		return database.StringContains(col, value), nil
 	case filterOpNotEquals, filterOpNotContains:
 		// todo (grvijayan): update when these operations are supported
 		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))

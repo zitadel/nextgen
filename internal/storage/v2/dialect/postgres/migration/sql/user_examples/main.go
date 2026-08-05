@@ -125,7 +125,7 @@ func runGetUserByID() {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	user, err := GetUserByID(ctx, "inst_5", "usr_00501017")
+	user, err := GetUserByID(ctx, "inst_5", "user_00501017")
 	if err != nil {
 		panic(err)
 	}
@@ -168,7 +168,7 @@ func runPutUser() {
 		panic(err)
 	}
 
-	result, err := PutUser(ctx, "inst_5", "usr_00501017", attributes)
+	result, err := PutUser(ctx, "inst_5", "user_00501017", attributes)
 	if err != nil {
 		panic(err)
 	}
@@ -203,7 +203,7 @@ func runPatchUser() {
 
 	deleteKeys := []string{"address.city"}
 
-	user, err := PatchUser(ctx, "inst_5", "usr_00501017", attributes, deleteKeys)
+	user, err := PatchUser(ctx, "inst_5", "user_00501017", attributes, deleteKeys)
 	if err != nil {
 		panic(err)
 	}

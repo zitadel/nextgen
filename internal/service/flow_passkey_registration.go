@@ -35,6 +35,7 @@ func (a *FlowPasskeyRegistrationAdapter) IssuePasskeyRegistrationChallenge(ctx c
 	}
 	return domain.FlowPasskeyRegistrationChallengeOutput{
 		ChallengeID: out.RegistrationID,
+		UserID:      out.UserID,
 		Options:     out.Options,
 	}, nil
 }

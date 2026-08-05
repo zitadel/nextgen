@@ -61,6 +61,22 @@ export function agentsGuidanceSection(ctx: PatchContext): string {
     ctx.preset === "passkey-first"
       ? " Agents: automated browsers can't complete passkey ceremonies — verify the loop via the email/password fallback actions, or attach a CDP WebAuthn virtual authenticator."
       : "";
+  // JSX typing is a Next/React concern; other frameworks type the elements
+  // through their own SDK wrappers, so the pointer would be misleading there.
+  const jsxTypesNote =
+    ctx.framework.id === "next"
+      ? " React JSX types for the `<zitadel-*>` elements ship with the SDK — `custom-elements.d.ts` references `@zitadel/sdk-next/jsx`."
+      : "";
+  // The app's own chrome (header nav, account menus) needs a session read of
+  // its own — the widgets render their surfaces but never tell the host page
+  // whether someone is signed in. Name the framework's supported read path;
+  // the contract details live with each helper's own docs.
+  const sessionStateParagraph =
+    ctx.framework.id === "next"
+      ? "Your app's own chrome (header navigation, account menus) reads session state with `getSession()` from `@zitadel/sdk-next/session` — a no-store client read of the same-origin `/__nextgen/sessions/me` that the session card itself uses. It returns identity only for 200 with a non-empty `user_id`, and signed-out only for the backend's canonical `401/auth.unauthorized` or `404/sess.not_found`; any other response is unknown/error, never signed-out. In Server Components on routes covered by the request-boundary `matcher`, `auth()` from `@zitadel/sdk-next/server` works too. Sign-in and sign-out navigate (`post-sign-in-url` / `post-sign-out-url`), so chrome re-reads on the next page load without extra wiring."
+      : ctx.framework.id === "nuxt"
+        ? "Your app's own chrome (header navigation, account menus) reads session state with the auto-imported `useAuth()` composable — seeded from the server on every render by the scaffolded auth plugin. Sign-in and sign-out navigate (`post-sign-in-url` / `post-sign-out-url`), so the state is fresh on every page load."
+        : 'Your app\'s own chrome (header navigation, account menus) can read session state from the same-origin `/__nextgen/sessions/me` — the same server-answered read the session card performs. Fetch with `credentials: "include"`, `cache: "no-store"`, and `Accept: application/json`; treat 200 as signed-in only with a non-empty `user_id`, and signed-out only for the canonical error envelope `401/auth.unauthorized` or `404/sess.not_found`. Any other response is unknown/error, never signed-out. Sign-in and sign-out navigate (`post-sign-in-url` / `post-sign-out-url`), so chrome re-reads on the next page load.';
   return `## Authentication (Zitadel)
 
 This app's login is managed by Zitadel. Local config is the source of truth; never change auth behavior by editing generated route files.
@@ -76,6 +92,10 @@ The golden path:
    - \`${plan}\`
    - \`${apply}\`
    - Agents: append \`--non-interactive --json\` to both. \`plan\` validates flow invariants with the server's own rules **before** anything uploads — fix what it reports and re-run.
+
+Presentation, by contrast, is edited in the generated pages: they pin the sign-in widgets to \`variant="page"\` (full-page chrome); switch to \`variant="widget"\` to embed a card inside your own layout, and set \`theme\` (\`light\` | \`dark\` | \`auto\`) to pick the color scheme.${jsxTypesNote}
+
+${sessionStateParagraph}
 
 Machine-readable dialect (read these before authoring flow or schema edits):
 

@@ -1,4 +1,4 @@
-//go:build postgres_integration
+//go:build postgres_integration || spanner_integration
 
 package integration_test
 
@@ -65,7 +65,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 	credNew := virtualwebauthn.NewCredential(virtualwebauthn.KeyTypeEC2)
 
 	// Seed team + user + existing passkey.
-	team, err := harness.EnsureTeamService(t).CreateTeam(t.Context(), service.CreateTeamInput{
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
 		Name:      helpers.TeamName(),
 	})
@@ -80,7 +80,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		SchemaURL:               userSchemaURL,
 		ID:                      userID,
 		InitialMembershipTeamID: &team.ID,
-		Attributes:              []*domain.CreateAttribute{emailAttr},
+		Attributes:              domain.CreateAttributes{*emailAttr},
 	}))
 
 	passkeys := harness.EnsureUserPasskeyFixture(t)
@@ -131,7 +131,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition failed: %+v", defResp)
+	require.IsType(t, &api.FlowDefinitionDetailResponse{}, defResp, "create flow definition failed: %s", helpers.MustMarshal(t, defResp))
 
 	// --- Start flow ---
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
@@ -139,8 +139,8 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		Purpose:   api.CreateFlowRequestPurposeLogin,
 	})
 	require.NoError(t, err)
-	flowHeaders, ok := createResp.(*api.FlowResponseHeaders)
-	require.True(t, ok, "expected FlowResponseHeaders, got %T", createResp)
+	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
+	flowHeaders := createResp.(*api.FlowResponseHeaders)
 	flowID := flowHeaders.Response.ID
 	zflow := mustExtractZflow(t, flowHeaders.SetCookie.Value)
 
@@ -153,8 +153,8 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		Origin: api.NewOptURI(*rpOriginURL),
 	})
 	require.NoError(t, err)
-	authIssueOK, ok := authIssueResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "auth issue failed: %T %+v", authIssueResp, authIssueResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, authIssueResp, "auth issue failed: %s", helpers.MustMarshal(t, authIssueResp))
+	authIssueOK := authIssueResp.(*api.SubmitFlowStepOK)
 	zflow = mustExtractZflow(t, authIssueOK.SetCookie.Value)
 
 	authChallenge := authIssueOK.Response.Step.Challenge.Value
@@ -181,8 +181,8 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	authVerifyOK, ok := authVerifyResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "auth verify failed: %T %+v", authVerifyResp, authVerifyResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, authVerifyResp, "auth verify failed: %s", helpers.MustMarshal(t, authVerifyResp))
+	authVerifyOK := authVerifyResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "register-step", authVerifyOK.Response.Step.Name)
 	zflow = mustExtractZflow(t, authVerifyOK.SetCookie.Value)
 
@@ -195,8 +195,8 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		Origin: api.NewOptURI(*rpOriginURL),
 	})
 	require.NoError(t, err)
-	regIssueOK, ok := regIssueResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "registration issue failed: %T %+v", regIssueResp, regIssueResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, regIssueResp, "registration issue failed: %s", helpers.MustMarshal(t, regIssueResp))
+	regIssueOK := regIssueResp.(*api.SubmitFlowStepOK)
 	zflow = mustExtractZflow(t, regIssueOK.SetCookie.Value)
 
 	require.True(t, regIssueOK.Response.Step.Challenge.Set, "expected challenge on issue")
@@ -227,8 +227,8 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		Zflow: zflow,
 	})
 	require.NoError(t, err)
-	regVerifyOK, ok := regVerifyResp.(*api.SubmitFlowStepOK)
-	require.True(t, ok, "registration verify failed: %T %+v", regVerifyResp, regVerifyResp)
+	require.IsType(t, &api.SubmitFlowStepOK{}, regVerifyResp, "registration verify failed: %s", helpers.MustMarshal(t, regVerifyResp))
+	regVerifyOK := regVerifyResp.(*api.SubmitFlowStepOK)
 
 	// The flow advances to "done" which has no user factor requirement — no handoff yet.
 	// (The passkey auth step resolves the user; passkey register step doesn't re-issue a handoff.)

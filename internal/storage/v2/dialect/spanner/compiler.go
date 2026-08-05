@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/compare"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pattern"
 )
@@ -121,6 +122,13 @@ func compileOrFilter[F ~uint8, T any](c *statementCompiler, filter database.OrFi
 }
 
 func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *database.CompareFilter[F], schema database.Schema[F, T]) {
+	if compare.HasNilValue(filter.Terms) {
+		compare.CompileNullAware(c, filter, schema, func(_ compare.Writer, arg any, _ database.Column[F]) {
+			writeArg(c, arg)
+		})
+		return
+	}
+
 	op := compareOpSQL(filter.Op)
 	if len(filter.Terms) == 1 {
 		writeCompareTerm(c, filter.Terms[0], op, schema)

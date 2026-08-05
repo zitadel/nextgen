@@ -27,10 +27,24 @@ tasks:
       - "server:build"
       - "console:build"
     env:
+      # A fixed pin, deliberately outside the deferred-bind blocks
+      # (22000-23999 journey runner / 24000-31999 embedded-pg — doctrine in
+      # apps/cli-journey-e2e/scripts/ports.mjs): withZitadel() needs the port
+      # while the Playwright config evaluates (readiness URL; workers
+      # re-evaluate the config), and those blocks are dynamically scanned
+      # reservation domains where a static tenant can be reserved out from
+      # under this lane between config evaluation and server bind. 8093 is
+      # below the default ephemeral ranges on our supported runners, so the
+      # outbound source-port steals the blocks guard against cannot hit it;
+      # the only collider is an explicit listener — typically this lane's
+      # own orphan from an aborted run, which fails loud by design (sweep:
+      # `moon run workspace:cli -- stop --all`).
+      # Neighbors: 8092 demo-next-e2e e2e-real, 8094 console dev-real.
       REAL_ZITADEL_PORT: "8093"
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
-      # Vite serves the console and proxies its API requests. The source-built
-      # Go binary has no embedded UI dists, so keep both server surfaces off.
+      # Vite serves the console and proxies its API requests. The binary
+      # embeds the /ui/* surfaces, but this suite must exercise the
+      # Vite-served console, so keep both server surfaces off.
       NEXTGEN_SERVER_LOGIN_ENABLED: "false"
       NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
     options:

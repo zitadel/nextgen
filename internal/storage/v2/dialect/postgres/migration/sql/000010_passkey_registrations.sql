@@ -1,6 +1,6 @@
 -- +goose Up
 CREATE TABLE zitadel_nextgen.passkey_registrations (
-    id          TEXT        NOT NULL PRIMARY KEY DEFAULT gen_random_uuid()::TEXT
+    id          TEXT        NOT NULL PRIMARY KEY
     , project_id  TEXT COLLATE "C" NOT NULL
     , user_id     TEXT COLLATE "C" NOT NULL
     , challenge   JSONB       NOT NULL

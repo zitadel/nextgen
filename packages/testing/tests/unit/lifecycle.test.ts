@@ -25,7 +25,7 @@ describe("bootLocalServer", () => {
 
     const calls = await fake.calls();
     expect(calls).toHaveLength(1);
-    const [startArgs] = calls;
+    const startArgs = calls[0]!;
     expect(startArgs[0]).toBe("start");
     expect(startArgs).toContain("--non-interactive");
     expect(startArgs).toContain("--json");
@@ -121,7 +121,7 @@ describe("bootLocalServer", () => {
 
     const calls = await fake.calls();
     expect(calls).toHaveLength(2);
-    const stopArgs = calls[1];
+    const stopArgs = calls[1]!;
     expect(stopArgs[0]).toBe("stop");
     expect(stopArgs[stopArgs.indexOf("-c") + 1]).toBe(server.runtime.dir);
     await expect(exists(server.runtime.dir)).resolves.toBe(false);

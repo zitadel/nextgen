@@ -27,8 +27,15 @@ incrementally rather than in one breaking change:
 | --- | --- | --- | --- |
 | Legacy | `--zl-color-surface-*`, `--zl-color-text-*`, `--zl-color-gray-*`, `--zl-spacing-*`, `--zl-radius-*` | `src/legacy.tokens.json` (frozen) | being migrated away from |
 | shadcn | `--zl-background`, `--zl-foreground`, `--zl-primary`, `--zl-card`, `--zl-border`, `--zl-sidebar-*`, `--zl-chart-*` | designer DTCG export (`figma-export/`) | the target surface |
+| Themed groups | `--zl-syntax-*`, `--zl-gradient-*` | designer DTCG export (`figma-export/`) | additive |
 
-Both are themed: dark values live on `:root` / `[data-theme="dark"]`, light
+Themed groups are the designer's Light/Dark collections beyond the shadcn
+roles — syntax highlighting colours and gradient stops. They live under
+`tokens.<group>.*` and are aliased for Tailwind as `bg-zl-gradient-red-start`,
+`text-zl-syntax-key`. They are not part of the unprefixed shadcn contract in
+`css/shadcn.css`, so reach them by their `--zl-*` or `zl-`-prefixed names.
+
+All are themed: dark values live on `:root` / `[data-theme="dark"]`, light
 overrides on `[data-theme="light"]`. The new shadcn names never collide with the
 legacy `--zl-color-*` namespace, so a file can reference either (or both) during
 migration. In the typed export, legacy colours stay under `tokens.color.*` and the
@@ -95,6 +102,15 @@ Sync **never** commits to `main` directly.
 - **Fail-loud ingest.** `:sync-export` throws on any unresolved reference or
   an empty colour surface, so a broken designer push stops the workflow before
   it can open a PR with silently-dropped tokens.
+- **Declared roles.** `src/collections.ts` says what each Figma collection is
+  (`semantic`, `themed`, `viewport`, `primitives`, `registry-only`), so adding
+  or renaming a collection in Figma is a decision someone makes rather than one
+  the resolver guesses. An unclassified export defaults to `registry-only` and
+  is reported in `$source.unclassifiedCollections`, where the resolver spec
+  fails on it — a red check on the sync PR, rather than a throw that would kill
+  the workflow before any PR exists. Within a role, two collections landing on
+  the same key throws. The snapshot test cannot catch any of this, because it
+  only sees names that already reached `build.ts`.
 - **Deterministic build.** Same JSON in, byte-identical artifacts out.
   Reviewers diff `src/generated/*` directly.
 - **Alias resolution.** The designer's export layers primitives (`tailwind
@@ -114,6 +130,7 @@ packages/design-tokens/
 │   ├── sync-from-figma.ts            ← Figma REST → figma.tokens.json
 │   └── build.ts                      ← legacy.tokens.json + figma.tokens.json + overrides → outputs
 ├── src/
+│   ├── collections.ts                ← what each Figma collection is (roles)
 │   ├── legacy.tokens.json            ← frozen legacy colour source (committed)
 │   ├── overrides.ts                  ← typography, motion, focus, breakpoints,
 │   │                                   container widths (committed)
@@ -128,16 +145,22 @@ packages/design-tokens/
 └── dist/                             ← gitignored; built by tsdown for npm
 ```
 
-The export currently contains five collections (Tailwind primitives, named
-theme colours, Light/Dark modes, viewport typography, and an icon-library flag),
-but the resolver does not care about their file names — add, rename, or split
-export files freely.
+The export currently contains nine collections (Tailwind primitives, named
+theme colours, Light/Dark modes, viewport typography, an icon-library flag, a
+brand palette, gradient stops, heading typography, and syntax colours), but the
+resolver does not care about their file names — add, rename, or split export
+files freely. What each one *is* is declared in `src/collections.ts`; see the
+role table in [AGENTS.md](AGENTS.md). A collection can be `registry-only`:
+`brand` exists purely to be referenced by `{brand.*}` aliases and surfaces no
+variables of its own.
 
 ## Adding a new token
 
 1. Add the variable in Figma → publish the library.
 2. Push from the Community sync plugin (or run `:sync-export` locally if you
-   have a committed export under `figma-export/`).
+   have a committed export under `figma-export/`). If the variable landed in a
+   **new collection**, the sync stops until you give it a role in
+   `src/collections.ts` — that is deliberate.
 3. Run `moon run design-tokens:generate` and `moon run design-tokens:test`.
    Update the snapshot if the new name is intentional.
 4. Commit `figma.tokens.json`, `tokens.{css,ts}`, `tailwind.css`, and

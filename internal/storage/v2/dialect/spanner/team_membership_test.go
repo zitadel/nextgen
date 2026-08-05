@@ -24,7 +24,7 @@ func TestTeamMembershipStatements_CRUD(t *testing.T) {
 	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 
 	teamID := "team_tm_v2"
-	userID := "usr_tm_v2"
+	userID := "user_tm_v2"
 	schemaURL := "https://schemas.test/team-membership/v1.json"
 
 	require.NoError(t, stmts.CreateJSONSchema(ctx, &domain.JSONSchema{

@@ -6,9 +6,12 @@ scoped `AGENTS.md` files.
 ## Storage Scope
 
 - Storage is SQL-first. Prefer SQL-compatible modeling and query patterns.
-- Supported databases are PostgreSQL and Spanner.
-- Dialect implementations (pool, migrations, embedded bring-up, statements)
-  live under `internal/storage/v2/dialect/`.
+- Supported databases are PostgreSQL, Spanner, and SQLite.
+- SQLite is the zero-config / local (and small homelab) default when no
+  `database:` dialect is configured. It is not a production peer to Spanner.
+- Dialect implementations (pool, migrations, statements) live under
+  `internal/storage/v2/dialect/`. Integration bring-up for Postgres/Spanner
+  is in `internal/storage/v2/testdb` (testcontainers or env DSNs).
 - Storage v2 (`internal/storage/v2/`) is the active dialect and statements
   layer. Entity persistence uses v2 statements exclusively.
 - The legacy v1 package `internal/storage/database/` (query-builder, dialects,
@@ -18,4 +21,6 @@ scoped `AGENTS.md` files.
 
 Read the nearest scoped file before changing storage code:
 
-- `internal/storage/v2/AGENTS.md` — v2 statements, multi-write `withTransaction` rule
+- `internal/storage/v2/AGENTS.md` — v2 statements, multi-write
+  `withTransaction` rule, and identifier minting (`Ensure` /
+  `NewManagedID`)

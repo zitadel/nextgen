@@ -8,7 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserPasskeyStatements,UserRecoveryCodesStatements,BrandingStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserPasskeyStatements,UserRecoveryCodesStatements,BrandingStatements,ClaimStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -19,7 +19,13 @@ type Statements interface {
 	IsStatements()
 }
 
+// ManagedIDGenerator mints prefixed managed resource IDs.
+type ManagedIDGenerator interface {
+	NewManagedID(prefix string) (string, error)
+}
+
 type AllStatements interface {
+	ManagedIDGenerator
 	ProjectStatements
 	FlowDefinitionStatements
 	CryptoKeyStatements
@@ -36,6 +42,7 @@ type AllStatements interface {
 	UserPasskeyStatements
 	UserRecoveryCodesStatements
 	BrandingStatements
+	ClaimStatements
 	Statements
 }
 
@@ -73,8 +80,10 @@ type CryptoKeyStatements interface {
 	Statements
 	GetEncryptionKey(ctx context.Context, filter database.Filter[domain.EncryptionKeyField]) (*domain.EncryptionKey, error)
 	ListEncryptionKeys(ctx context.Context, opts *database.ListOptions[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error)
-	CreateEncryptionKey(ctx context.Context, dek *domain.EncryptionKey) error
+	CreateEncryptionKey(ctx context.Context, key *domain.EncryptionKey) error
 	UpdateKey(ctx context.Context, id string, key string) error
+	GetSigningKey(ctx context.Context, filter database.Filter[domain.SigningKeyField]) (*domain.SigningKey, error)
+	CreateSigningKey(ctx context.Context, key *domain.SigningKey) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -101,9 +110,16 @@ type TeamStatements interface {
 	Statements
 	CreateTeam(ctx context.Context, entity *domain.Team) error
 	GetTeamByID(ctx context.Context, projectID, id string) (*domain.Team, error)
+	UpdateTeam(ctx context.Context, entity *domain.Team) error
+	ListTeams(ctx context.Context, filter *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error)
 	// DeactivateTeam tombs the team and cascades membership/user lifecycle
 	// updates. It wraps the multi-write steps in withTransaction (opens a tx
 	// via Statements(), joins an outer pool.Transaction when already nested).
+	//
+	// Only an active team is deactivated: the team UPDATE is guarded on the status,
+	// and a zero-row result skips the cascade and reports success. An unknown or
+	// already-deactivated team is therefore a no-op;
+	// updated_at records when the team was first deactivated.
 	DeactivateTeam(ctx context.Context, projectID, id string) error
 }
 
@@ -211,6 +227,7 @@ type UserStatements interface {
 	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error
 	DeleteUserByID(ctx context.Context, projectID, userID string) error
+	UserExists(ctx context.Context, projectID, userID string) (bool, error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -278,4 +295,26 @@ type BrandingStatements interface {
 	CreateBranding(ctx context.Context, entity *domain.Branding) error
 	GetBrandingByID(ctx context.Context, projectID, id string) (*domain.Branding, error)
 	ListBrandings(ctx context.Context, filter *database.ListOptions[domain.BrandingField]) (*database.ListResult[*domain.Branding], error)
+}
+
+// TODO(IAM-marco): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type ClaimPool interface {
+// 	Statementer[ClaimStatements]
+// 	Transactioner[ClaimStatements]
+// }
+
+type ClaimStatements interface {
+	Statements
+	// CreateChallenge inserts a pending claim challenge; entity.ID is the
+	// SHA-256 hash of the challenge token, minted by the caller.
+	CreateChallenge(ctx context.Context, entity *domain.ClaimChallenge) error
+	GetChallengeByID(ctx context.Context, projectID, id string) (*domain.ClaimChallenge, error)
+	// MarkChallengeCompleted flips pending -> completed; a challenge that is
+	// absent, in another project, or already completed returns NoRowFoundError.
+	MarkChallengeCompleted(ctx context.Context, projectID, id string) error
+	// GetPersonalTeamForUser resolves the user's earliest membership as the
+	// personal team and returns NoRowFoundError when that membership or its team
+	// is not active. It never falls back to a later membership: a deactivated
+	// personal team is not silently replaced by another team the user belongs to.
+	GetPersonalTeamForUser(ctx context.Context, projectID, userID string) (*domain.Team, error)
 }

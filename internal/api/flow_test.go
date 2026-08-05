@@ -111,10 +111,10 @@ func newTestServer(t *testing.T) *testServer {
 	tokenService := mocks.NewMockTokenService(mock)
 	keyService := mocks.NewMockKeyService(mock)
 	keyService.EXPECT().GetCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
-	keyService.EXPECT().GetProjectDEKCrypter(gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
+	keyService.EXPECT().GetProjectCrypter(gomock.Any(), gomock.Any(), gomock.Any()).Return(crypter, nil).AnyTimes()
 
 	fake := &fakeFlowSvc{}
-	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil, nil, tokenService, keyService)
+	handler := api.NewHandler(fake, stubAuthAttempt{}, nil, nil, nil, nil, nil, nil, nil, tokenService, keyService, "")
 	oas, err := gen.NewServer(
 		handler,
 		api.NewSecurityHandler(tokenService),

@@ -104,7 +104,7 @@ internal API resources, using the shared primitives defined in
 (permission/relation, permission expression, grant/assignment, delegation,
 principal, scope). It replaces legacy level-specific role semantics: instead
 of a role fixed to "instance admin" or "project admin", a permission such as
-`project.settings.write` is granted at an explicit, resolved scope.
+`project.write` is granted at an explicit, resolved scope.
 
 The system catalog ships a **Zitadel-defined default schema** built from
 those primitives: RBAC-style bundles today (see [ADR 032 §1](032-permission-catalogs.md#1-one-model-two-catalogs)'s
@@ -263,8 +263,9 @@ scoped SQL query against data we already own.
 1. Define the exact system permission catalog and optional default bundles.
    Use resource-oriented naming consistent with the ADR-042 pattern — e.g.
    `project.create`, `project.read`, `project.write`, `project.delete`,
-   `project.app.read`, `project.app.write`, `project.app.delete` — and
-   extend to all Zitadel resource types.
+   `app.read`, `app.write`, `app.delete` — and extend to all Zitadel resource
+   types. Canonical names live in
+   [`docs/design/api/system-permission-catalog.md`](../design/api/system-permission-catalog.md).
 2. Design relational migrations for `resource_scope_index` and agent
    delegation tables. Wave 0 DDL spike and locked decisions:
    [`docs/design/api/permission-storage.md`](../design/api/permission-storage.md)

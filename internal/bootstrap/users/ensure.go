@@ -43,16 +43,30 @@ func ensureProject(ctx context.Context, stmts service.AllStatements, projectID s
 }
 
 func ensureTeam(ctx context.Context, stmts service.AllStatements, projectID, teamID string) error {
+	// Team names are unique per project too, so a UniqueError from the insert
+	// below does not prove the team exists.
+	_, err := stmts.GetTeamByID(ctx, projectID, teamID)
+	if err == nil {
+		return nil
+	}
+	// Only a missing row means we still have to create it.
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+		return fmt.Errorf("get team %q: %w", teamID, err)
+	}
 	// The bootstrap header carries no team name, so derive a placeholder
 	// name from the team ID to satisfy the NOT NULL name column.
-	err := stmts.CreateTeam(ctx, &domain.Team{
+	if err := stmts.CreateTeam(ctx, &domain.Team{
 		ProjectID: projectID,
 		ID:        teamID,
 		Name:      "team-" + teamID,
-	})
-	if err != nil {
+	}); err != nil {
+		// Another replica may have created the team since the read above. A
+		// violation of the name index leaves it missing, so read again instead
+		// of reading the constraint name, which not every dialect reports.
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
-			return nil
+			if _, getErr := stmts.GetTeamByID(ctx, projectID, teamID); getErr == nil {
+				return nil
+			}
 		}
 		return fmt.Errorf("ensure team %q: %w", teamID, err)
 	}

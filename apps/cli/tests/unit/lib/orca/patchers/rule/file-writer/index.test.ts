@@ -32,24 +32,81 @@ async function exists(path: string): Promise<boolean> {
 }
 
 describe("scaffold - mkdir", () => {
-  it("creates a directory recursively", async () => {
+  it("creates a directory recursively and reports it as a dir row, not a written file", async () => {
     const result = await scaffold(plan({ kind: "mkdir", path: "a/b/c" }), {
       cwd: dir,
       dryRun: false,
       force: false,
     });
-    expect(result.filesWritten).toEqual([join(dir, "a/b/c")]);
+    expect(result.files).toEqual([{ path: join(dir, "a/b/c"), kind: "dir", action: "create" }]);
+    expect(result.filesWritten).toEqual([]);
     expect(await exists(join(dir, "a/b/c"))).toBe(false); // it's a dir, readFile fails
   });
 
-  it("does not touch disk on dry-run but still records the path", async () => {
+  it("does not touch disk on dry-run but still records the row", async () => {
     const result = await scaffold(plan({ kind: "mkdir", path: "made-up" }), {
       cwd: dir,
       dryRun: true,
       force: false,
     });
     expect(result.dryRun).toBe(true);
-    expect(result.filesWritten).toEqual([join(dir, "made-up")]);
+    expect(result.files).toEqual([{ path: join(dir, "made-up"), kind: "dir", action: "create" }]);
+  });
+
+  it("reports an already-existing directory as skipped", async () => {
+    await scaffold(plan({ kind: "mkdir", path: "app" }), { cwd: dir, dryRun: false, force: false });
+    const second = await scaffold(plan({ kind: "mkdir", path: "app" }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    expect(second.files).toEqual([]);
+    expect(second.filesSkipped).toEqual([join(dir, "app")]);
+  });
+
+  it("never reports mode healing on win32, where POSIX modes are not implemented", async () => {
+    await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o755 }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    const descriptor = Object.getOwnPropertyDescriptor(process, "platform")!;
+    Object.defineProperty(process, "platform", { value: "win32" });
+    try {
+      const rerun = await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o700 }), {
+        cwd: dir,
+        dryRun: false,
+        force: false,
+      });
+      expect(rerun.files).toEqual([]);
+      expect(rerun.filesSkipped).toEqual([join(dir, "vault")]);
+    } finally {
+      Object.defineProperty(process, "platform", descriptor);
+    }
+  });
+
+  it("reports a permission repair on an existing directory as an update, not a skip", async () => {
+    await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o755 }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    const healed = await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o700 }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    expect(healed.files).toEqual([{ path: join(dir, "vault"), kind: "dir", action: "update" }]);
+    expect(healed.filesSkipped).toEqual([]);
+    expect((await stat(join(dir, "vault"))).mode & 0o777).toBe(0o700);
+
+    const settled = await scaffold(plan({ kind: "mkdir", path: "vault", mode: 0o700 }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    expect(settled.files).toEqual([]);
+    expect(settled.filesSkipped).toEqual([join(dir, "vault")]);
   });
 });
 
@@ -435,7 +492,12 @@ describe("scaffold - multi-op plans", () => {
       ),
       { cwd: dir, dryRun: false, force: false },
     );
-    expect(result.filesWritten).toContain(join(dir, "app/login"));
+    expect(result.files).toContainEqual({
+      path: join(dir, "app/login"),
+      kind: "dir",
+      action: "create",
+    });
+    expect(result.filesWritten).not.toContain(join(dir, "app/login"));
     expect(result.filesWritten).toContain(join(dir, "app/login/page.tsx"));
     expect(result.filesWritten).toContain(join(dir, ".gitignore"));
     expect(result.depsAdded).toEqual(["sdk"]);
@@ -453,10 +515,134 @@ describe("scaffold - multi-op plans", () => {
     );
     await scaffold(full, { cwd: dir, dryRun: false, force: false });
     const second = await scaffold(full, { cwd: dir, dryRun: false, force: false });
-    // mkdir always reports written; the file-backed ops should all skip.
+    expect(second.files).toEqual([]);
+    expect(second.filesWritten).toEqual([]);
+    expect(second.filesSkipped).toContain(join(dir, "app"));
     expect(second.filesSkipped).toContain(join(dir, "app/page.tsx"));
     expect(second.filesSkipped).toContain(join(dir, ".env.local"));
     expect(second.filesSkipped).toContain(join(dir, ".gitignore"));
     expect(second.filesSkipped).toContain(join(dir, "package.json"));
+  });
+});
+
+describe("scaffold - reporting", () => {
+  it("deduplicates a path touched by several ops, keeping the net action", async () => {
+    // Mirrors the real plan shape: the base ops and the framework ops both
+    // merge into the same env file on a fresh project.
+    const result = await scaffold(
+      plan(
+        { kind: "merge-env", path: ".env.local", entries: { FOO: "1" } },
+        { kind: "merge-env", path: ".env.local", entries: { BAR: "2" } },
+      ),
+      { cwd: dir, dryRun: false, force: false },
+    );
+    expect(result.files).toEqual([
+      { path: join(dir, ".env.local"), kind: "file", action: "create" },
+    ]);
+    expect(result.filesWritten).toEqual([join(dir, ".env.local")]);
+    const text = await readFile(join(dir, ".env.local"), "utf8");
+    expect(text).toContain("FOO=1");
+    expect(text).toContain("BAR=2");
+  });
+
+  it("does not report a path as skipped when another op wrote it in the same run", async () => {
+    const result = await scaffold(
+      plan(
+        { kind: "merge-env", path: ".env.local", entries: { FOO: "1" } },
+        // Second op adds nothing new — alone it would count as a skip.
+        { kind: "merge-env", path: ".env.local", entries: { FOO: "ignored" } },
+      ),
+      { cwd: dir, dryRun: false, force: false },
+    );
+    expect(result.filesWritten).toEqual([join(dir, ".env.local")]);
+    expect(result.filesSkipped).toEqual([]);
+  });
+
+  it("distinguishes created files from updated ones", async () => {
+    await writeFile(join(dir, ".gitignore"), "node_modules\n");
+    const result = await scaffold(
+      plan(
+        { kind: "write", path: "app/page.tsx", contents: "<page />" },
+        { kind: "append-gitignore", entries: [".zitadel"] },
+      ),
+      { cwd: dir, dryRun: false, force: false },
+    );
+    expect(result.files).toContainEqual({
+      path: join(dir, "app/page.tsx"),
+      kind: "file",
+      action: "create",
+    });
+    expect(result.files).toContainEqual({
+      path: join(dir, ".gitignore"),
+      kind: "file",
+      action: "update",
+    });
+  });
+});
+
+describe("scaffold - add-dep formatting", () => {
+  it("changes only the dependency block, byte-for-byte", async () => {
+    // Blank line + inline nested objects: the splice must not normalize them.
+    const source = `{
+  "name": "demo",
+  "engines": { "node": ">=20" },
+
+  "scripts": {"dev": "next dev"},
+  "dependencies": {
+    "next": "^16"
+  }
+}
+`;
+    await writeFile(join(dir, "package.json"), source);
+    await scaffold(plan({ kind: "add-dep", name: "@zitadel/sdk-next", version: "1.2.3" }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    expect(await readFile(join(dir, "package.json"), "utf8")).toBe(`{
+  "name": "demo",
+  "engines": { "node": ">=20" },
+
+  "scripts": {"dev": "next dev"},
+  "dependencies": {
+    "@zitadel/sdk-next": "1.2.3",
+    "next": "^16"
+  }
+}
+`);
+  });
+
+  it("preserves the user's key order, indentation, and trailing newline", async () => {
+    const source = `{
+    "name": "demo",
+    "version": "1.0.0",
+    "scripts": {
+        "dev": "next dev"
+    },
+    "dependencies": {
+        "zzz": "1.0.0",
+        "next": "^16"
+    }
+}
+`;
+    await writeFile(join(dir, "package.json"), source);
+    await scaffold(plan({ kind: "add-dep", name: "@zitadel/sdk-next", version: "1.2.3" }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    const text = await readFile(join(dir, "package.json"), "utf8");
+    const parsed = JSON.parse(text) as { dependencies: Record<string, string> };
+    // Top-level order untouched; only the dependency map is name-sorted.
+    expect(Object.keys(JSON.parse(text) as Record<string, unknown>)).toEqual([
+      "name",
+      "version",
+      "scripts",
+      "dependencies",
+    ]);
+    expect(Object.keys(parsed.dependencies)).toEqual(["@zitadel/sdk-next", "next", "zzz"]);
+    // 4-space indentation and the trailing newline survive.
+    expect(text).toContain('\n    "name": "demo"');
+    expect(text.endsWith("\n")).toBe(true);
   });
 });

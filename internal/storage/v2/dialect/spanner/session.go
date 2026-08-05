@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -29,14 +28,10 @@ func (ss sessionStatements) CreateSession(ctx context.Context, session *domain.S
 }
 
 func (ss sessionStatements) GetSessionByID(ctx context.Context, projectID, sessionID string) (*domain.Session, error) {
-	id, err := parseIdentity(sessionID)
-	if err != nil {
-		return nil, err
-	}
 	sessions, err := ss.querySessions(ctx, &database.ListOptions[domain.SessionField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.SessionFieldProjectID), projectID),
-			database.Equal(database.Col(domain.SessionFieldID), id),
+			database.Equal(database.Col(domain.SessionFieldID), sessionID),
 		),
 		Pagination: database.Page[domain.SessionField]{
 			OrderBy: database.OrderBy[domain.SessionField]{Columns: []database.Column[domain.SessionField]{database.Col(domain.SessionFieldID)}},
@@ -74,11 +69,7 @@ func (ss sessionStatements) ListSessions(ctx context.Context, filter *database.L
 }
 
 func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, sessionID string) error {
-	id, err := parseIdentity(sessionID)
-	if err != nil {
-		return err
-	}
-	n, err := ss.db.Update(ctx, buildStatement(`DELETE FROM sessions WHERE project_id = @p1 AND id = @p2`, projectID, id).statement())
+	n, err := ss.db.Update(ctx, buildStatement(`DELETE FROM sessions WHERE project_id = @p1 AND id = @p2`, projectID, sessionID).statement())
 	if err != nil {
 		return err
 	}
@@ -136,6 +127,9 @@ func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.S
 	if session.TimeToLive <= 0 {
 		session.TimeToLive = domain.SessionAnonymousTTL
 	}
+	if err := ensureManagedID(&session.ID, domain.PrefixSession); err != nil {
+		return err
+	}
 	var userAgentID any
 	if session.UserAgent != nil {
 		info := session.UserAgent.Info
@@ -152,36 +146,21 @@ func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.S
 		if err != nil {
 			return fmt.Errorf("failed to marshal user agent info: %w", err)
 		}
-		stmt := buildStatement(`INSERT INTO user_agents (project_id, info) VALUES (@p1, @p2) THEN RETURN id`, session.ProjectID, encodeSpannerJSON(raw)).statement()
-		err = ss.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
-			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-				var id database.Identity
-				if err := row.Columns(&id); err != nil {
-					return struct{}{}, err
-				}
-				parsed, err := parseIdentity(id.String())
-				if err != nil {
-					return struct{}{}, err
-				}
-				userAgentID = parsed
-				return struct{}{}, nil
-			})
+		uaID := ""
+		if err := ensureManagedID(&uaID, domain.PrefixUserAgent); err != nil {
 			return err
-		})
-		if err != nil {
+		}
+		stmt := buildStatement(`INSERT INTO user_agents (project_id, id, info) VALUES (@p1, @p2, @p3)`, session.ProjectID, uaID, encodeSpannerJSON(raw)).statement()
+		if _, err := ss.db.Update(ctx, stmt); err != nil {
 			return fmt.Errorf("failed to insert user agent: %w", err)
 		}
+		userAgentID = uaID
 	}
-	stmt := buildStatement(`INSERT INTO sessions (project_id, user_agent_id, time_to_live, token_id, created_at, updated_at) VALUES (@p1, @p2, @p3, 0, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()) THEN RETURN id, created_at, updated_at, expires_at`,
-		session.ProjectID, userAgentID, session.TimeToLive.Nanoseconds()).statement()
+	stmt := buildStatement(`INSERT INTO sessions (project_id, id, user_agent_id, time_to_live, token_id, created_at, updated_at) VALUES (@p1, @p2, @p3, @p4, @p5, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()) THEN RETURN created_at, updated_at, expires_at`,
+		session.ProjectID, session.ID, userAgentID, session.TimeToLive.Nanoseconds(), nil).statement()
 	err := ss.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			var sessionID database.Identity
-			if err := row.Columns(&sessionID, &session.CreatedAt, &session.UpdatedAt, &session.ExpiresAt); err != nil {
-				return struct{}{}, err
-			}
-			session.ID = sessionID.String()
-			return struct{}{}, nil
+			return struct{}{}, row.Columns(&session.CreatedAt, &session.UpdatedAt, &session.ExpiresAt)
 		})
 		return err
 	})
@@ -204,15 +183,7 @@ func (ss sessionStatements) CreateSessionToken(ctx context.Context, session *dom
 	if err := tokens.CreateToken(ctx, tok); err != nil {
 		return fmt.Errorf("failed to create session token: %w", err)
 	}
-	sessionID, err := parseIdentity(session.ID)
-	if err != nil {
-		return err
-	}
-	tokenID, err := parseTokenIdentity(tok.TokenID)
-	if err != nil {
-		return err
-	}
-	if _, err := ss.db.Update(ctx, buildStatement(`UPDATE sessions SET token_id = @p3 WHERE project_id = @p1 AND id = @p2`, session.ProjectID, sessionID, tokenID).statement()); err != nil {
+	if _, err := ss.db.Update(ctx, buildStatement(`UPDATE sessions SET token_id = @p3 WHERE project_id = @p1 AND id = @p2`, session.ProjectID, session.ID, tok.TokenID).statement()); err != nil {
 		return fmt.Errorf("failed to set session token_id: %w", err)
 	}
 	session.TokenID = tok.TokenID
@@ -225,10 +196,6 @@ func (ss sessionStatements) CreateSessionToken(ctx context.Context, session *dom
 }
 
 func (ss sessionStatements) UpdateSessionAfterExchange(ctx context.Context, projectID, sessionID string, userID *string, ttl time.Duration) error {
-	id, err := parseIdentity(sessionID)
-	if err != nil {
-		return err
-	}
 	var c statementCompiler
 	c.WriteString(`UPDATE sessions SET updated_at = CURRENT_TIMESTAMP()`)
 	if userID != nil {
@@ -242,7 +209,7 @@ func (ss sessionStatements) UpdateSessionAfterExchange(ctx context.Context, proj
 	c.WriteString(" WHERE project_id = ")
 	c.WriteArg(projectID)
 	c.WriteString(" AND id = ")
-	c.WriteArg(id)
+	c.WriteArg(sessionID)
 	n, err := ss.db.Update(ctx, c.statement())
 	if err != nil {
 		return err
@@ -254,19 +221,11 @@ func (ss sessionStatements) UpdateSessionAfterExchange(ctx context.Context, proj
 }
 
 func (ss sessionStatements) ApplyExchange(ctx context.Context, projectID, sessionID string, last map[domain.AuthCheckType]v2session.StoredCheck) error {
-	sid, err := parseIdentity(sessionID)
-	if err != nil {
-		return err
-	}
 	for _, c := range last {
 		if !c.OnAttempt {
 			continue
 		}
-		cid, err := parseIdentity(c.ID)
-		if err != nil {
-			return err
-		}
-		n, err := ss.db.Update(ctx, buildStatement(`UPDATE checks SET session_id = @p1, auth_attempt_id = NULL, challenge_payload = NULL, last_challenged_at = NULL, last_failed_at = NULL, failure_count = 0 WHERE project_id = @p2 AND id = @p3 AND auth_attempt_id IS NOT NULL`, sid, projectID, cid).statement())
+		n, err := ss.db.Update(ctx, buildStatement(`UPDATE checks SET session_id = @p1, auth_attempt_id = NULL, challenge_payload = NULL, last_challenged_at = NULL, last_failed_at = NULL, failure_count = 0 WHERE project_id = @p2 AND id = @p3 AND auth_attempt_id IS NOT NULL`, sessionID, projectID, c.ID).statement())
 		if err != nil {
 			return err
 		}
@@ -275,11 +234,7 @@ func (ss sessionStatements) ApplyExchange(ctx context.Context, projectID, sessio
 		}
 	}
 	for _, c := range last {
-		cid, err := parseIdentity(c.ID)
-		if err != nil {
-			return err
-		}
-		if _, err := ss.db.Update(ctx, buildStatement(`DELETE FROM checks WHERE project_id = @p1 AND session_id = @p2 AND type = @p3 AND id <> @p4`, projectID, sid, int64(c.Type), cid).statement()); err != nil {
+		if _, err := ss.db.Update(ctx, buildStatement(`DELETE FROM checks WHERE project_id = @p1 AND session_id = @p2 AND type = @p3 AND id <> @p4`, projectID, sessionID, int64(c.Type), c.ID).statement()); err != nil {
 			return err
 		}
 	}
@@ -291,12 +246,8 @@ func (ss sessionStatements) UserIDFromLastVerifiedChecks(ctx context.Context, pr
 	if !ok {
 		return nil, nil
 	}
-	cid, err := parseIdentity(w.ID)
-	if err != nil {
-		return nil, err
-	}
 	var factor spanner.NullJSON
-	err = ss.db.Query(ctx, buildStatement(`SELECT factor_payload FROM checks WHERE project_id = @p1 AND id = @p2`, projectID, cid).statement(), func(iter *spanner.RowIterator) error {
+	err := ss.db.Query(ctx, buildStatement(`SELECT factor_payload FROM checks WHERE project_id = @p1 AND id = @p2`, projectID, w.ID).statement(), func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			return struct{}{}, row.Columns(&factor)
 		})
@@ -322,24 +273,20 @@ func (ss sessionStatements) UserIDFromLastVerifiedChecks(ctx context.Context, pr
 }
 
 func (ss sessionStatements) LoadVerifiedChecks(ctx context.Context, projectID, id string, onAttempt bool) ([]v2session.StoredCheck, error) {
-	parsed, err := parseIdentity(id)
-	if err != nil {
-		return nil, err
-	}
 	query := `SELECT id, type, last_verified_at FROM checks WHERE project_id = @p1 AND session_id = @p2 AND last_verified_at IS NOT NULL`
 	if onAttempt {
 		query = `SELECT id, type, last_verified_at FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND last_verified_at IS NOT NULL`
 	}
 	var out []v2session.StoredCheck
-	err = ss.db.Query(ctx, buildStatement(query, projectID, parsed).statement(), func(iter *spanner.RowIterator) error {
+	err := ss.db.Query(ctx, buildStatement(query, projectID, id).statement(), func(iter *spanner.RowIterator) error {
 		return iter.Do(func(row *spanner.Row) error {
-			var cid database.Identity
+			var cid string
 			var typ int64
 			var at time.Time
 			if err := row.Columns(&cid, &typ, &at); err != nil {
 				return err
 			}
-			out = append(out, v2session.StoredCheck{ID: cid.String(), Type: domain.AuthCheckType(typ), LastVerifiedAt: at, OnAttempt: onAttempt})
+			out = append(out, v2session.StoredCheck{ID: cid, Type: domain.AuthCheckType(typ), LastVerifiedAt: at, OnAttempt: onAttempt})
 			return nil
 		})
 	})
@@ -352,11 +299,13 @@ func scanSessions(iter *spanner.RowIterator) ([]*domain.Session, error) {
 	err := iter.Do(func(row *spanner.Row) error {
 		var (
 			projectID                                      string
-			sessionID, tokenID                             database.Identity
+			sessionID                                      string
+			tokenID                                        spanner.NullString
 			createdAt, updatedAt, expiresAt                time.Time
 			timeToLiveNanos                                int64
 			userID                                         spanner.NullString
-			userAgentID, checkType, checkID, failureCount  spanner.NullInt64
+			userAgentID, checkID                           spanner.NullString
+			checkType, failureCount                        spanner.NullInt64
 			userAgentInfo, challenge, factor               spanner.NullJSON
 			lastChallengedAt, lastVerifiedAt, lastFailedAt spanner.NullTime
 		)
@@ -364,10 +313,14 @@ func scanSessions(iter *spanner.RowIterator) ([]*domain.Session, error) {
 			&userAgentID, &userAgentInfo, &checkType, &checkID, &lastChallengedAt, &lastVerifiedAt, &lastFailedAt, &failureCount, &challenge, &factor); err != nil {
 			return fmt.Errorf("failed to scan session row: %w", err)
 		}
-		id := sessionID.String()
+		id := sessionID
 		session, ok := byID[id]
 		if !ok {
-			session = &domain.Session{ProjectID: projectID, ID: id, CreatedAt: createdAt, UpdatedAt: updatedAt, ExpiresAt: expiresAt, TimeToLive: time.Duration(timeToLiveNanos), TokenID: tokenID.String()}
+			tok := ""
+			if tokenID.Valid {
+				tok = tokenID.StringVal
+			}
+			session = &domain.Session{ProjectID: projectID, ID: id, CreatedAt: createdAt, UpdatedAt: updatedAt, ExpiresAt: expiresAt, TimeToLive: time.Duration(timeToLiveNanos), TokenID: tok}
 			if userID.Valid {
 				session.UserID = &userID.StringVal
 			}
@@ -390,7 +343,7 @@ func scanSessions(iter *spanner.RowIterator) ([]*domain.Session, error) {
 		if !checkType.Valid || !checkID.Valid {
 			return nil
 		}
-		checks, err := v2session.DecodeAuthChecks(domain.AuthCheckType(checkType.Int64), strconv.FormatInt(checkID.Int64, 10), nullTime(lastChallengedAt), nullTime(lastFailedAt), nullTime(lastVerifiedAt), uint16(failureCount.Int64), nullJSONBytes(challenge), nullJSONBytes(factor))
+		checks, err := v2session.DecodeAuthChecks(domain.AuthCheckType(checkType.Int64), checkID.StringVal, nullTime(lastChallengedAt), nullTime(lastFailedAt), nullTime(lastVerifiedAt), uint16(failureCount.Int64), nullJSONBytes(challenge), nullJSONBytes(factor))
 		if err != nil {
 			return err
 		}
@@ -437,29 +390,6 @@ func encodeSpannerJSON(b []byte) any {
 	}
 	return spanner.NullJSON{Value: v, Valid: true}
 }
-func parseIdentity(id string) (int64, error) {
-	parsed, err := strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid identity %q: %w", id, err)
-	}
-	return parsed, nil
-}
-func coerceSessionIdentity(v any) (any, error) {
-	switch id := v.(type) {
-	case database.Identity:
-		return id, nil
-	case string:
-		return database.Identity(id), nil
-	case int64:
-		return database.Identity(strconv.FormatInt(id, 10)), nil
-	default:
-		s, err := database.CoerceStringValue(v)
-		if err != nil {
-			return nil, err
-		}
-		return database.Identity(s), nil
-	}
-}
 func coerceSessionDuration(v any) (any, error) {
 	switch d := v.(type) {
 	case time.Duration:
@@ -484,12 +414,12 @@ var _ v2session.ExchangeStore = sessionExchangeStore{}
 
 var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBinding[domain.Session]{
 	domain.SessionFieldProjectID:  {SQLName: "s.project_id", Accessor: func(s *domain.Session) any { return s.ProjectID }, Coerce: database.CoerceString},
-	domain.SessionFieldID:         {SQLName: "s.id", Accessor: func(s *domain.Session) any { return database.Identity(s.ID) }, Coerce: coerceSessionIdentity},
+	domain.SessionFieldID:         {SQLName: "s.id", Accessor: func(s *domain.Session) any { return s.ID }, Coerce: database.CoerceString},
 	domain.SessionFieldCreatedAt:  {SQLName: "s.created_at", Accessor: func(s *domain.Session) any { return s.CreatedAt }, Coerce: database.CoerceTime},
 	domain.SessionFieldUpdatedAt:  {SQLName: "s.updated_at", Accessor: func(s *domain.Session) any { return s.UpdatedAt }, Coerce: database.CoerceTime},
 	domain.SessionFieldExpiresAt:  {SQLName: "s.expires_at", Accessor: func(s *domain.Session) any { return s.ExpiresAt }, Coerce: database.CoerceTime},
 	domain.SessionFieldTimeToLive: {SQLName: "s.time_to_live", Accessor: func(s *domain.Session) any { return s.TimeToLive.Nanoseconds() }, Coerce: coerceSessionDuration},
-	domain.SessionFieldTokenID:    {SQLName: "s.token_id", Accessor: func(s *domain.Session) any { return database.Identity(s.TokenID) }, Coerce: coerceSessionIdentity},
+	domain.SessionFieldTokenID:    {SQLName: "s.token_id", Accessor: func(s *domain.Session) any { return s.TokenID }, Coerce: database.CoerceString},
 	domain.SessionFieldUserID: {SQLName: "s.user_id", Accessor: func(s *domain.Session) any {
 		if s.UserID == nil {
 			return ""

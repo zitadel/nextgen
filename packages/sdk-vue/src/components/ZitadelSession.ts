@@ -24,6 +24,8 @@ export default defineComponent({
     postSignOutUrl: { type: String, default: undefined },
     heading: { type: String, default: undefined },
     logoutLabel: { type: String, default: undefined },
+    variant: { type: String as PropType<"widget" | "page">, default: undefined },
+    theme: { type: String as PropType<"light" | "dark" | "auto">, default: undefined },
   },
   emits: ["signout"],
   setup(props, { emit, expose }) {
@@ -40,6 +42,8 @@ export default defineComponent({
         "post-sign-out-url": props.postSignOutUrl,
         heading: props.heading,
         "logout-label": props.logoutLabel,
+        variant: props.variant,
+        theme: props.theme,
         onZitadelSignout: (event: CustomEvent<ZitadelSignoutDetail>) => {
           emit("signout", event.detail);
         },

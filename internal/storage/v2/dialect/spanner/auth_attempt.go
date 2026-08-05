@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -23,13 +22,18 @@ const (
 		` c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload` +
 		` FROM auth_attempts aa` +
 		` LEFT JOIN checks c ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id`
-	createAuthAttemptStmt       = `INSERT INTO auth_attempts (project_id, required_checks, time_to_live, session_id, created_at) VALUES (@p1, @p2, @p3, @p4, @p5) THEN RETURN id`
-	createAuthCheckStmt         = `INSERT INTO checks (project_id, auth_attempt_id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 0) THEN RETURN id`
-	deleteAuthAttemptByIDStmt   = `DELETE FROM auth_attempts WHERE project_id = @p1 AND id = @p2`
-	handoffAuthAttemptStmt      = `UPDATE auth_attempts SET handoff_token = @p1, handed_off_at = @p2 WHERE project_id = @p3 AND id = @p4`
-	setAuthAttemptChallengeStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload, failure_count, last_failed_at)` +
-		` VALUES (@p1, @p2, @p3, @p4, @p5, 0, NULL) ON CONFLICT (project_id, auth_attempt_id, type)` +
-		` DO UPDATE SET last_challenged_at = EXCLUDED.last_challenged_at, challenge_payload = EXCLUDED.challenge_payload, failure_count = 0, last_failed_at = NULL` +
+	createAuthAttemptStmt     = `INSERT INTO auth_attempts (project_id, id, required_checks, time_to_live, session_id, created_at) VALUES (@p1, @p2, @p3, @p4, @p5, @p6)`
+	createAuthCheckStmt       = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 0)`
+	deleteAuthAttemptByIDStmt = `DELETE FROM auth_attempts WHERE project_id = @p1 AND id = @p2`
+	handoffAuthAttemptStmt    = `UPDATE auth_attempts SET handoff_token = @p1, handed_off_at = @p2 WHERE project_id = @p3 AND id = @p4 THEN RETURN handed_off_at`
+	// Spanner rejects a NULL_FILTERED unique index as ON CONFLICT arbiter
+	// ("Unimplemented"), so the challenge upsert is update-then-insert inside
+	// withTransaction instead of INSERT ... ON CONFLICT.
+	updateAuthAttemptChallengeStmt = `UPDATE checks SET last_challenged_at = @p4, challenge_payload = @p5, failure_count = 0, last_failed_at = NULL` +
+		` WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3` +
+		` THEN RETURN id`
+	insertAuthAttemptChallengeStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, failure_count, last_failed_at)` +
+		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, 0, NULL)` +
 		` THEN RETURN id`
 	authAttemptChallengeSucceededStmt = `UPDATE checks SET last_verified_at = @p1, factor_payload = @p2, challenge_payload = NULL, last_challenged_at = NULL, failure_count = 0` +
 		` WHERE project_id = @p3 AND auth_attempt_id = @p4 AND type = @p5 AND id = @p6`
@@ -39,6 +43,16 @@ const (
 )
 
 type authAttemptStatements struct{ statement }
+
+// encodeSpannerJSONPtr binds an optional pre-marshalled JSON payload as
+// spanner.NullJSON (nil means SQL NULL); plain strings cannot be bound to
+// Spanner JSON columns.
+func encodeSpannerJSONPtr(s *string) any {
+	if s == nil {
+		return spanner.NullJSON{}
+	}
+	return encodeSpannerJSON([]byte(*s))
+}
 
 func newAuthAttemptStatements(db queryExecutor) authAttemptStatements {
 	return authAttemptStatements{
@@ -50,6 +64,9 @@ func newAuthAttemptStatements(db queryExecutor) authAttemptStatements {
 
 // CreateAuthAttempt implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *domain.AuthAttempt) error {
+	if err := ensureManagedID(&attempt.ID, domain.PrefixAuthAttempt); err != nil {
+		return err
+	}
 	now := time.Now().UTC()
 
 	req := make([]int64, len(attempt.RequiredChecks))
@@ -62,28 +79,11 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 		ttlNanos = &n
 	}
 
-	var sessionID any
-	if attempt.SessionID != nil {
-		id, err := parseIdentity(*attempt.SessionID)
-		if err != nil {
-			return err
-		}
-		sessionID = id
-	}
-
 	return withTransaction(ctx, as.db, func(ctx context.Context, tx queryExecutor) error {
-		stmt := buildStatement(createAuthAttemptStmt, attempt.ProjectID, req, ttlNanos, sessionID, now).statement()
-		var attemptID database.Identity
-		err := tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
-			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-				return struct{}{}, row.Columns(&attemptID)
-			})
-			return err
-		})
-		if err != nil {
+		stmt := buildStatement(createAuthAttemptStmt, attempt.ProjectID, attempt.ID, req, ttlNanos, authattempt.SessionIDArg(attempt.SessionID), now).statement()
+		if _, err := tx.Update(ctx, stmt); err != nil {
 			return fmt.Errorf("failed to create auth attempt: %w", err)
 		}
-		attempt.ID = attemptID.String()
 		attempt.CreatedAt = now
 
 		for _, check := range attempt.Checks {
@@ -92,10 +92,17 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 
 			var challengedAt, verifiedAt *time.Time
 			var challengePayload, factorPayload *string
+			var err error
+
+			checkID := ""
+			if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
+				return err
+			}
 
 			if isChallenge {
 				challengedAt = &now
 				challenge.SetLastChallengedAt(now)
+				challenge.SetID(checkID)
 				challengePayload, err = authattempt.MarshalPayloadString(challenge.Payload())
 				if err != nil {
 					return fmt.Errorf("failed to marshal challenge payload: %w", err)
@@ -113,20 +120,10 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 			}
 
 			checkStmt := buildStatement(createAuthCheckStmt,
-				attempt.ProjectID, database.Identity(attempt.ID), int64(check.Type()),
-				challengedAt, verifiedAt, challengePayload, factorPayload).statement()
-			var checkID database.Identity
-			err = tx.Write(ctx, checkStmt, func(iter *spanner.RowIterator) error {
-				_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-					return struct{}{}, row.Columns(&checkID)
-				})
-				return err
-			})
-			if err != nil {
+				attempt.ProjectID, attempt.ID, checkID, int64(check.Type()),
+				challengedAt, verifiedAt, encodeSpannerJSONPtr(challengePayload), encodeSpannerJSONPtr(factorPayload)).statement()
+			if _, err := tx.Update(ctx, checkStmt); err != nil {
 				return fmt.Errorf("failed to create auth attempt check: %w", err)
-			}
-			if isChallenge {
-				challenge.SetID(checkID.String())
 			}
 		}
 		return nil
@@ -135,16 +132,24 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 
 // GetAuthAttemptByID implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) GetAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) (*domain.AuthAttempt, error) {
-	id, err := parseIdentity(authAttemptID)
-	if err != nil {
-		return nil, err
-	}
-	return as.get(ctx, authAttemptGetSelect+` WHERE aa.project_id = @p1 AND aa.id = @p2`, projectID, id)
+	var c statementCompiler
+	c.WriteString(authAttemptGetSelect)
+	c.WriteString(" WHERE aa.project_id = ")
+	c.WriteArg(projectID)
+	c.WriteString(" AND aa.id = ")
+	c.WriteArg(authAttemptID)
+	return as.get(ctx, c.String(), c.args...)
 }
 
 // GetAuthAttemptByHandoffToken implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffToken []byte) (*domain.AuthAttempt, error) {
-	return as.get(ctx, authAttemptGetSelect+` WHERE aa.project_id = @p1 AND aa.handoff_token = @p2`, projectID, handoffToken)
+	var c statementCompiler
+	c.WriteString(authAttemptGetSelect)
+	c.WriteString(" WHERE aa.project_id = ")
+	c.WriteArg(projectID)
+	c.WriteString(" AND aa.handoff_token = ")
+	c.WriteArg(handoffToken)
+	return as.get(ctx, c.String(), c.args...)
 }
 
 func (as authAttemptStatements) get(ctx context.Context, query string, args ...any) (*domain.AuthAttempt, error) {
@@ -164,14 +169,13 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 	err := iter.Do(func(row *spanner.Row) error {
 		found = true
 		var (
-			attemptID        database.Identity
 			handoffToken     []byte
 			handedOffAt      spanner.NullTime
-			sessionID        spanner.NullInt64
+			sessionID        spanner.NullString
 			requiredChecks   []spanner.NullInt64
 			checkType        spanner.NullInt64
 			timeToLiveNanos  spanner.NullInt64
-			challengeID      database.Identity
+			challengeID      spanner.NullString
 			lastChallengedAt spanner.NullTime
 			verifiedAt       spanner.NullTime
 			lastFailedAt     spanner.NullTime
@@ -180,13 +184,12 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 			factor           spanner.NullJSON
 		)
 		if err := row.Columns(
-			&attempt.ProjectID, &attemptID, &handoffToken, &handedOffAt, &sessionID,
+			&attempt.ProjectID, &attempt.ID, &handoffToken, &handedOffAt, &sessionID,
 			&requiredChecks, &attempt.CreatedAt, &checkType, &timeToLiveNanos,
 			&challengeID, &lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor,
 		); err != nil {
 			return fmt.Errorf("failed to scan auth attempt: %w", err)
 		}
-		attempt.ID = attemptID.String()
 
 		attempt.RequiredChecks = make([]domain.AuthCheckType, len(requiredChecks))
 		for i, c := range requiredChecks {
@@ -200,7 +203,7 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 			attempt.HandedOffAt = &t
 		}
 		if sessionID.Valid {
-			s := strconv.FormatInt(sessionID.Int64, 10)
+			s := sessionID.StringVal
 			attempt.SessionID = &s
 		}
 		if timeToLiveNanos.Valid {
@@ -212,11 +215,15 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 			return nil
 		}
 		var (
+			challengeIDV      string
 			lastChallengedAtV time.Time
 			lastFailedAtV     time.Time
 			verifiedAtV       time.Time
 			failureCountV     uint16
 		)
+		if challengeID.Valid {
+			challengeIDV = challengeID.StringVal
+		}
 		if lastChallengedAt.Valid {
 			lastChallengedAtV = lastChallengedAt.Time
 		}
@@ -231,7 +238,7 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 		}
 		checks, err := session.DecodeAuthChecks(
 			domain.AuthCheckType(checkType.Int64),
-			challengeID.String(),
+			challengeIDV,
 			lastChallengedAtV, lastFailedAtV, verifiedAtV, failureCountV,
 			json.RawMessage(nullJSONBytes(challenge)),
 			json.RawMessage(nullJSONBytes(factor)),
@@ -255,12 +262,8 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 
 // DeleteAuthAttemptByID implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) DeleteAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) error {
-	id, err := parseIdentity(authAttemptID)
-	if err != nil {
-		return err
-	}
-	stmt := buildStatement(deleteAuthAttemptByIDStmt, projectID, id).statement()
-	_, err = as.db.Update(ctx, stmt)
+	stmt := buildStatement(deleteAuthAttemptByIDStmt, projectID, authAttemptID).statement()
+	_, err := as.db.Update(ctx, stmt)
 	return err
 }
 
@@ -269,17 +272,19 @@ func (as authAttemptStatements) HandoffAuthAttempt(ctx context.Context, attempt 
 	if attempt.HandoffToken == nil {
 		return fmt.Errorf("failed to handoff auth attempt: handoff token is required")
 	}
-	id, err := parseIdentity(attempt.ID)
-	if err != nil {
-		return err
-	}
 	now := time.Now().UTC()
-	stmt := buildStatement(handoffAuthAttemptStmt, attempt.HandoffToken.TokenHash, now, attempt.ProjectID, id).statement()
-	_, err = as.db.Update(ctx, stmt)
+	stmt := buildStatement(handoffAuthAttemptStmt, attempt.HandoffToken.TokenHash, now, attempt.ProjectID, attempt.ID).statement()
+	var handedOffAt time.Time
+	err := as.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+			return struct{}{}, row.Columns(&handedOffAt)
+		})
+		return err
+	})
 	if err != nil {
 		return fmt.Errorf("failed to handoff auth attempt: %w", err)
 	}
-	attempt.HandedOffAt = &now
+	attempt.HandedOffAt = &handedOffAt
 	return nil
 }
 
@@ -290,24 +295,37 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 	if err != nil {
 		return fmt.Errorf("failed to marshal challenge payload: %w", err)
 	}
-	id, err := parseIdentity(authAttemptID)
-	if err != nil {
-		return err
-	}
 
-	stmt := buildStatement(setAuthAttemptChallengeStmt,
-		projectID, id, int64(challenge.Type()), now, payloadStr).statement()
-	var checkID database.Identity
-	err = as.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+	var returnedID string
+	scanCheckID := func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			return struct{}{}, row.Columns(&checkID)
+			return struct{}{}, row.Columns(&returnedID)
 		})
 		return err
+	}
+	err = withTransaction(ctx, as.db, func(ctx context.Context, tx queryExecutor) error {
+		update := buildStatement(updateAuthAttemptChallengeStmt,
+			projectID, authAttemptID, int64(challenge.Type()), now, encodeSpannerJSONPtr(payloadStr)).statement()
+		err := tx.Write(ctx, update, scanCheckID)
+		if err == nil {
+			return nil
+		}
+		var noRow *database.NoRowFoundError
+		if !errors.As(err, &noRow) {
+			return err
+		}
+		checkID := ""
+		if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
+			return err
+		}
+		insert := buildStatement(insertAuthAttemptChallengeStmt,
+			projectID, authAttemptID, int64(challenge.Type()), checkID, now, encodeSpannerJSONPtr(payloadStr)).statement()
+		return tx.Write(ctx, insert, scanCheckID)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to set challenge: %w", err)
 	}
-	challenge.SetID(checkID.String())
+	challenge.SetID(returnedID)
 	challenge.SetLastChallengedAt(now)
 	challenge.SetFailureCount(0)
 	challenge.SetLastFailedAt(time.Time{})
@@ -321,17 +339,9 @@ func (as authAttemptStatements) AuthAttemptChallengeSucceeded(ctx context.Contex
 	if err != nil {
 		return fmt.Errorf("failed to marshal factor payload: %w", err)
 	}
-	attemptID, err := parseIdentity(authAttemptID)
-	if err != nil {
-		return err
-	}
-	checkID, err := parseIdentity(challengeID)
-	if err != nil {
-		return err
-	}
 
 	stmt := buildStatement(authAttemptChallengeSucceededStmt,
-		now, factorStr, projectID, attemptID, int64(factor.Type()), checkID).statement()
+		now, encodeSpannerJSONPtr(factorStr), projectID, authAttemptID, int64(factor.Type()), challengeID).statement()
 	n, err := as.db.Update(ctx, stmt)
 	if err != nil {
 		return fmt.Errorf("failed to set challenge succeeded: %w", err)
@@ -346,20 +356,12 @@ func (as authAttemptStatements) AuthAttemptChallengeSucceeded(ctx context.Contex
 // AuthAttemptChallengeFailed implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) AuthAttemptChallengeFailed(ctx context.Context, projectID, authAttemptID string, challenge domain.AuthChallenge) error {
 	now := time.Now().UTC()
-	attemptID, err := parseIdentity(authAttemptID)
-	if err != nil {
-		return err
-	}
-	checkID, err := parseIdentity(challenge.GetID())
-	if err != nil {
-		return err
-	}
 
 	stmt := buildStatement(authAttemptChallengeFailedStmt,
-		now, projectID, attemptID, int64(challenge.Type()), checkID).statement()
+		now, projectID, authAttemptID, int64(challenge.Type()), challenge.GetID()).statement()
 	var failureCount int64
 	var lastFailedAt time.Time
-	err = as.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+	err := as.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 			return struct{}{}, row.Columns(&failureCount, &lastFailedAt)
 		})

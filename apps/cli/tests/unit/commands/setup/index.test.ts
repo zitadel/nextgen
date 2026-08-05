@@ -286,6 +286,45 @@ describe("setup command pre-flight", () => {
   });
 });
 
+describe("setup --renderer surface", () => {
+  it("--help advertises only implemented renderers", async () => {
+    const res = await runCliForTest(["setup", "--help"]);
+
+    expect(res.exitCode).toBe(0);
+    // oclif renders the flag's `options` as `<options: a|b>`; a renderer that
+    // getRenderer would reject with E_NOT_IMPLEMENTED must not be offered as
+    // a selectable value, only mentioned as not yet available (ADR 006).
+    // Whitespace is collapsed because oclif wraps help text mid-sentence.
+    const help = res.stdout.replace(/\s+/g, " ");
+    expect(res.stdout).toContain("<options: react>");
+    expect(help).not.toContain("react|web-component");
+    expect(help).toContain("Not yet available: web-component.");
+  });
+
+  it("rejects a declared-but-unpublished renderer at parse time", async () => {
+    const cwd = await makeTempDir();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--renderer",
+      "web-component",
+      "--non-interactive",
+      "--json",
+    ]);
+
+    // Fails during flag parsing — before any remote project is created. The
+    // registry's E_NOT_IMPLEMENTED path still guards renderer ids read from
+    // persisted config (see the renderer registry unit tests).
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { status: string; code: string; message: string };
+    expect(json.status).toBe("error");
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toContain("web-component");
+  });
+});
+
 async function startHealthServer(): Promise<string> {
   const server = createServer((req, res) => {
     if (req.url === "/healthz") {

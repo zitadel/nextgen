@@ -6,6 +6,7 @@ import type {
 } from "@zitadel/components";
 
 import { render } from "@testing-library/react";
+import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
@@ -14,7 +15,7 @@ import {
 import * as React from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
+import { businessLocales, ZitadelLogin, ZitadelLogout, ZitadelSession } from "./index";
 
 // A representative project handle. The element still starts its flow before
 // @lit/react binds this prop (see vitest.config.ts), so the expected mount-time
@@ -114,6 +115,13 @@ describe("ZitadelSession", () => {
     expect(el!.proxyPath).toBe("/__nextgen");
   });
 
+  it("forwards the surface variant/theme", () => {
+    const { container } = render(<ZitadelSession project={project} variant="page" theme="light" />);
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session");
+    expect(el!.variant).toBe("page");
+    expect(el!.theme).toBe("light");
+  });
+
   it.each(Object.entries(ZITADEL_SESSION_EVENT_HANDLERS))(
     "forwards %s to its callback",
     (eventName, handlerProp) => {
@@ -133,5 +141,11 @@ describe("ZitadelSession", () => {
     const { container } = render(<ZitadelSession ref={ref} project={project} />);
     expect(ref.current).toBe(container.querySelector("zitadel-session"));
     expect(ref.current?.tagName.toLowerCase()).toBe("zitadel-session");
+  });
+});
+
+describe("businessLocales", () => {
+  it("re-exports the business copy overlay from @zitadel/components", () => {
+    expect(businessLocales).toBe(componentsBusinessLocales);
   });
 });

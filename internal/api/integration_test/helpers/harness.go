@@ -17,15 +17,14 @@ import (
 )
 
 type Harness struct {
-	encryptionKey dependency[[]byte]
-	signingKey    dependency[*rsa.PrivateKey]
+	signingKey dependency[*rsa.PrivateKey]
 
 	DB *service.DB
 
 	httpClient      dependency[*http.Client]
 	testServer      dependency[*httptest.Server]
 	hasher          dependency[*crypto.PasswapHasher]
-	rootKEKs        dependency[*domain.RootKEKs]
+	masterKeys      dependency[*domain.MasterKeys]
 	secretGenerator dependency[secrets.Generator]
 	joseSigner      dependency[jose.Signer]
 

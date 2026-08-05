@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	createUserRecoveryCodesStmt = `INSERT INTO user_recovery_codes (project_id, user_id, recovery_codes) VALUES (@p1, @p2, @p3)`
+	createUserRecoveryCodesStmt = `INSERT INTO user_recovery_codes (id, project_id, user_id, recovery_codes) VALUES (@p1, @p2, @p3, @p4)`
 	userRecoveryCodesQuery      = `SELECT id, project_id, user_id, recovery_codes,
 	last_successful_check, failed_attempts, created_at, updated_at
 FROM user_recovery_codes`
@@ -35,7 +35,11 @@ func (s userRecoveryCodesStatements) CreateUserRecoveryCodes(ctx context.Context
 	if err := domain.RequireNonEmptyRecoveryCodes(codes.RecoveryCodes); err != nil {
 		return err
 	}
+	if err := ensureManagedID(&codes.ID, domain.PrefixUserRecoveryCodes); err != nil {
+		return err
+	}
 	_, err := s.db.Update(ctx, buildStatement(createUserRecoveryCodesStmt,
+		codes.ID,
 		codes.ProjectID,
 		codes.UserID,
 		append([]string(nil), codes.RecoveryCodes...),

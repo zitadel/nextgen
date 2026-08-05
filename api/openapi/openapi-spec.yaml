@@ -32,9 +32,9 @@ tags:
   - name: Sessions
     description: Session creation, lookup, exchange, and teardown endpoints.
   - name: Projects
-    description: Project creation and lookup endpoints.
+    description: Project management endpoints.
   - name: Teams
-    description: Team creation and lookup endpoints.
+    description: Team management endpoints.
   - name: Users
     description: User creation, lookup, current-user, and password endpoints.
   - name: Schemas
@@ -71,6 +71,8 @@ paths:
     $ref: endpoints/users/methods.yaml
   /users/{user_id}:
     $ref: endpoints/users/by_id/methods.yaml
+  /users/{user_id}/passkeys:
+    $ref: endpoints/users/by_id/passkeys/methods.yaml
   /users/{user_id}/password:
     $ref: endpoints/users/by_id/password/methods.yaml
   /users/me:
@@ -99,6 +101,12 @@ paths:
     $ref: endpoints/projects/query/methods.yaml
   /projects/{project_id}:
     $ref: endpoints/projects/by_id/methods.yaml
+  /projects/{project_id}/claim/init:
+    $ref: endpoints/projects/by_id/claim/init/methods.yaml
+  /projects/{project_id}/claim/status:
+    $ref: endpoints/projects/by_id/claim/status/methods.yaml
+  /projects/{project_id}/claim/complete:
+    $ref: endpoints/projects/by_id/claim/complete/methods.yaml
   /sessions:
     $ref: endpoints/sessions/methods.yaml
   /sessions/exchange:
@@ -121,6 +129,8 @@ paths:
     $ref: endpoints/flow_definitions/lifecycle/deactivate/method.yaml
   /teams:
     $ref: endpoints/teams/methods.yaml
+  /teams/query:
+    $ref: endpoints/teams/query/methods.yaml
   /teams/{team_id}:
     $ref: endpoints/teams/by_id/methods.yaml
   /branding:

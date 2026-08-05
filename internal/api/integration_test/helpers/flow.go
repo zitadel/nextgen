@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/domain/idgen"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -35,7 +34,6 @@ func (h *Harness) EnsureFlowService(t *testing.T) service.FlowService {
 		h.flowService.value = service.NewFlowService(
 			h.EnsureServiceDB(t),
 			h.EnsureFlowStateMachine(t),
-			idgen.NewULID(),
 		)
 	}
 	return h.flowService.value
@@ -51,7 +49,6 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 		authAdapter := service.NewFlowAuthAttemptAdapter(h.EnsureAuthAttemptService(t))
 		passkeyRegSvc := service.NewPasskeyRegistrationService(
 			h.EnsureServiceDB(t),
-			idgen.NewULID(),
 		)
 		passkeyRegAdapter := service.NewFlowPasskeyRegistrationAdapter(passkeyRegSvc)
 		h.flowStateMachine.value = domain.NewFlowStateMachine(
@@ -62,7 +59,6 @@ func (h *Harness) EnsureFlowStateMachine(t *testing.T) *domain.FlowStateMachineR
 			h.EnsureFlowCreateUserForPasskeyHandler(t),
 			authAdapter,
 			passkeyRegAdapter,
-			idgen.NewULID(),
 			time.Now,
 		)
 	}

@@ -10,6 +10,7 @@ import (
 
 // CheckCreate is the JSON shape used when inserting checks alongside an attempt.
 type CheckCreate struct {
+	ID               string          `json:"id"`
 	Type             uint8           `json:"type"`
 	ChallengePayload json.RawMessage `json:"challenge_payload,omitempty"`
 	FactorPayload    json.RawMessage `json:"factor_payload,omitempty"`
@@ -18,12 +19,17 @@ type CheckCreate struct {
 }
 
 // ChecksToJSON marshals domain checks into the create payload shape.
-func ChecksToJSON(checks []domain.AuthCheck) ([]byte, error) {
+// ids must be one dialect-minted check id per check (same length as checks).
+func ChecksToJSON(checks []domain.AuthCheck, ids []string) ([]byte, error) {
+	if len(ids) != len(checks) {
+		return nil, fmt.Errorf("checksToJSON: id count %d != check count %d", len(ids), len(checks))
+	}
 	checkRows := make([]CheckCreate, 0, len(checks))
-	for _, check := range checks {
-		checkRow := CheckCreate{Type: uint8(check.Type())}
+	for i, check := range checks {
+		checkRow := CheckCreate{ID: ids[i], Type: uint8(check.Type())}
 		if challenge, ok := check.(domain.AuthChallenge); ok {
 			checkRow.IsChallenge = true
+			challenge.SetID(ids[i])
 			var err error
 			checkRow.ChallengePayload, err = json.Marshal(challenge.Payload())
 			if err != nil {
@@ -48,10 +54,10 @@ func ChecksToJSON(checks []domain.AuthCheck) ([]byte, error) {
 	return checkRowsJSON, nil
 }
 
-// SessionIDArg converts an optional session ID string to a storage Identity string.
-func SessionIDArg(sessionID *string) string {
-	if sessionID == nil {
-		return ""
+// SessionIDArg converts an optional session ID string for SQL binding.
+func SessionIDArg(sessionID *string) any {
+	if sessionID == nil || *sessionID == "" {
+		return nil
 	}
 	return *sessionID
 }

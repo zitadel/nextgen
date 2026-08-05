@@ -14,7 +14,7 @@ func (h *Harness) EnsureKeyService(t *testing.T) service.KeyService {
 	if h.keyService.value == nil {
 		h.keyService.value = service.NewKeyService(
 			h.EnsureServiceDB(t),
-			*(h.EnsureRootKEK(t)),
+			*(h.EnsureMasterKey(t)),
 		)
 	}
 	return h.keyService.value

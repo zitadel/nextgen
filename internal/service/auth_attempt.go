@@ -8,7 +8,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 // ---- Service interface -------------------------------------------------------
@@ -368,7 +368,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			return nil, nil, err
 		}
 		user, err := s.users.GetByAttributes(ctx, attempt.ProjectID, []domain.Attribute{{
-			Key:   p.AttributeName,
+			Key:   domain.AttributeKey(p.AttributeName),
 			Value: p.LoginName,
 		}})
 		if err != nil {
@@ -381,9 +381,9 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return nil, nil, err
 		}
-		password, err := s.stmts.Statements().GetUserPassword(ctx, v2database.And(
-			v2database.Equal(v2database.Col(domain.UserPasswordFieldProjectID), attempt.ProjectID),
-			v2database.Equal(v2database.Col(domain.UserPasswordFieldUserID), userFactor.UserID),
+		password, err := s.stmts.Statements().GetUserPassword(ctx, database.And(
+			database.Equal(database.Col(domain.UserPasswordFieldProjectID), attempt.ProjectID),
+			database.Equal(database.Col(domain.UserPasswordFieldUserID), userFactor.UserID),
 		))
 		if err != nil {
 			return passwordChallenge, nil, domain.ErrAuthAttemptProofRejected(err)
@@ -453,10 +453,10 @@ func (s *authAttemptService) recordPasskeyUsage(ctx context.Context, projectID s
 }
 
 func (s *authAttemptService) listUserPasskeys(ctx context.Context, projectID, userID string) ([]*domain.UserPasskey, error) {
-	result, err := s.stmts.Statements().ListUserPasskeys(ctx, &v2database.ListOptions[domain.UserPasskeyField]{
-		Filter: v2database.And(
-			v2database.Equal(v2database.Col(domain.UserPasskeyFieldProjectID), projectID),
-			v2database.Equal(v2database.Col(domain.UserPasskeyFieldUserID), userID),
+	result, err := s.stmts.Statements().ListUserPasskeys(ctx, &database.ListOptions[domain.UserPasskeyField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserPasskeyFieldProjectID), projectID),
+			database.Equal(database.Col(domain.UserPasskeyFieldUserID), userID),
 		),
 	})
 	if err != nil {
@@ -465,11 +465,11 @@ func (s *authAttemptService) listUserPasskeys(ctx context.Context, projectID, us
 	return result.Items, nil
 }
 
-func userPasskeyKeyFilter(projectID, userID, credentialID string) v2database.Filter[domain.UserPasskeyField] {
-	return v2database.And(
-		v2database.Equal(v2database.Col(domain.UserPasskeyFieldProjectID), projectID),
-		v2database.Equal(v2database.Col(domain.UserPasskeyFieldUserID), userID),
-		v2database.Equal(v2database.Col(domain.UserPasskeyFieldCredentialID), credentialID),
+func userPasskeyKeyFilter(projectID, userID, credentialID string) database.Filter[domain.UserPasskeyField] {
+	return database.And(
+		database.Equal(database.Col(domain.UserPasskeyFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserPasskeyFieldUserID), userID),
+		database.Equal(database.Col(domain.UserPasskeyFieldCredentialID), credentialID),
 	)
 }
 

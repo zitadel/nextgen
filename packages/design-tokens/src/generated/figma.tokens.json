@@ -7,13 +7,19 @@
       "2--theme",
       "3. Mode",
       "4. Custom",
-      "5--icon-library"
+      "5--icon-library",
+      "brand",
+      "Gradient Colors",
+      "heading-typography",
+      "Syntax"
     ],
     "themeModes": [
       "dark",
       "light"
     ],
-    "resolvedLeaves": 944
+    "resolvedLeaves": 1089,
+    "unclassifiedCollections": [],
+    "staleCollectionRoles": []
   },
   "color": {
     "accent": {
@@ -147,6 +153,10 @@
     "sidebar-ring": {
       "dark": "#525252",
       "light": "#a3a3a3"
+    },
+    "success": {
+      "dark": "#22c55e",
+      "light": "#22c55e"
     }
   },
   "radius": {
@@ -243,6 +253,60 @@
     "5xl": 1024,
     "6xl": 1152,
     "7xl": 1280
+  },
+  "themed": {
+    "gradient": {
+      "purple-start": {
+        "dark": "#401889",
+        "light": "#401889"
+      },
+      "red-start": {
+        "dark": "#f25543",
+        "light": "#f25543"
+      },
+      "neutral-start": {
+        "dark": "#484a57",
+        "light": "#bfbfcf"
+      },
+      "base-end": {
+        "dark": "#0f0f11",
+        "light": "#fafafa"
+      },
+      "lavender-start": {
+        "dark": "#bba5e4",
+        "light": "#bba5e4"
+      },
+      "rose-start": {
+        "dark": "#ea8aa0",
+        "light": "#ea8aa0"
+      }
+    },
+    "syntax": {
+      "key": {
+        "dark": "#9066da",
+        "light": "#401889"
+      },
+      "string": {
+        "dark": "#f25543",
+        "light": "#bd2514"
+      },
+      "number": {
+        "dark": "#e25f7d",
+        "light": "#c52247"
+      },
+      "boolean": {
+        "dark": "#bba5e4",
+        "light": "#5a23bd"
+      },
+      "punctuation": {
+        "dark": "#82829c",
+        "light": "#686883"
+      },
+      "comment": {
+        "dark": "#7c7c95",
+        "light": "#71718b"
+      }
+    }
   },
   "typography": {
     "desktop": {

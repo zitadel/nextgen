@@ -1,4 +1,4 @@
-//go:build postgres_integration
+//go:build postgres_integration || spanner_integration
 
 package integration_test
 
@@ -27,9 +27,9 @@ func TestGetMySession_Identity(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
-	dek, err := harness.EnsureKeyService(t).GetProjectDEKCrypter(t.Context(), project.ID)
+	tokenCrypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
 	require.NoError(t, err)
-	projectSecret, err := project.ProjectSecret(dek)
+	projectSecret, err := project.ProjectSecret(tokenCrypter)
 	require.NoError(t, err)
 
 	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
@@ -41,15 +41,15 @@ func TestGetMySession_Identity(t *testing.T) {
 	// camelCase name parts: the shape the shipped presets actually collect
 	// (packages/config/defaults/*.json) — regression guard for the identity
 	// resolution reading only snake_case.
-	attrs := make([]*domain.CreateAttribute, 0, 3)
-	for key, value := range map[string]any{
+	attrs := make(domain.CreateAttributes, 0, 3)
+	for key, value := range map[domain.AttributeKey]any{
 		"email":      "ada@example.com",
 		"givenName":  "Ada",
 		"familyName": "Lovelace",
 	} {
 		attr, err := domain.NewCreateAttribute(key, value, domain.AttributeUniquenessUnspecified)
 		require.NoError(t, err)
-		attrs = append(attrs, attr)
+		attrs = append(attrs, *attr)
 	}
 	require.NoError(t, harness.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
 		ProjectID:  project.ID,
@@ -105,6 +105,7 @@ func TestGetMySession_Identity(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = meResp.Body.Close() }()
 	require.Equal(t, http.StatusOK, meResp.StatusCode)
+	require.Equal(t, "private, no-store", meResp.Header.Get("Cache-Control"))
 
 	var got struct {
 		UserID string `json:"user_id"`
@@ -115,4 +116,79 @@ func TestGetMySession_Identity(t *testing.T) {
 	require.Equal(t, userID, got.UserID)
 	require.Equal(t, "Ada Lovelace", got.Name)
 	require.Equal(t, "ada@example.com", got.Email)
+}
+
+// TestGetMySession_ExpiredSessionIsSignedOut pins the cross-layer contract the
+// browser helper relies on: a decryptable cookie whose stored session has
+// expired is a canonical signed-out verdict, not the internal
+// sess.token_invalid diagnostic. The no-store assertion also proves the outer
+// middleware covers handler-level failures.
+func TestGetMySession_ExpiredSessionIsSignedOut(t *testing.T) {
+	t.Parallel()
+
+	testServer := harness.EnsureTestServer(t)
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	tokenCrypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
+	require.NoError(t, err)
+	projectSecret, err := project.ProjectSecret(tokenCrypter)
+	require.NoError(t, err)
+
+	attempt := &domain.AuthAttempt{ProjectID: project.ID}
+	stmts := harness.EnsureServiceDB(t)
+	require.NoError(t, stmts.Statements().CreateAuthAttempt(t.Context(), attempt))
+	const plainToken = "handoff_expired_session_me_test"
+	sum := sha256.Sum256([]byte(plainToken))
+	attempt.HandoffToken = &domain.HandoffToken{TokenHash: sum[:]}
+	require.NoError(t, stmts.Statements().HandoffAuthAttempt(t.Context(), attempt))
+
+	// One nanosecond is valid but has elapsed before the follow-up HTTP request
+	// on both PostgreSQL and Spanner. Sending the response cookie explicitly
+	// reproduces a stale browser cookie without a timing sleep.
+	exchangeBody, err := json.Marshal(map[string]string{
+		"handoff_token": plainToken,
+		"ttl":           "PT0.000000001S",
+	})
+	require.NoError(t, err)
+	exchangeReq, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+		testServer.URL+"/sessions/exchange?project_id="+project.ID, bytes.NewReader(exchangeBody))
+	require.NoError(t, err)
+	exchangeReq.Header.Set("Content-Type", "application/json")
+	exchangeReq.Header.Set("Authorization", "Bearer "+projectSecret)
+
+	exchangeResp, err := testServer.Client().Do(exchangeReq)
+	require.NoError(t, err)
+	defer func() { _ = exchangeResp.Body.Close() }()
+	if exchangeResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(exchangeResp.Body)
+		t.Fatalf("exchange returned %d: %s", exchangeResp.StatusCode, body)
+	}
+
+	var sessionCookie *http.Cookie
+	for _, cookie := range exchangeResp.Cookies() {
+		if cookie.Name == "__nextgen_session" {
+			sessionCookie = cookie
+		}
+	}
+	require.NotNil(t, sessionCookie, "exchange must set the __nextgen_session cookie")
+
+	meReq, err := http.NewRequestWithContext(t.Context(), http.MethodGet, testServer.URL+"/sessions/me", nil)
+	require.NoError(t, err)
+	meReq.AddCookie(sessionCookie)
+
+	meResp, err := testServer.Client().Do(meReq)
+	require.NoError(t, err)
+	defer func() { _ = meResp.Body.Close() }()
+	require.Equal(t, http.StatusUnauthorized, meResp.StatusCode)
+	require.Equal(t, "private, no-store", meResp.Header.Get("Cache-Control"))
+
+	var got struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
+	require.NoError(t, json.NewDecoder(meResp.Body).Decode(&got))
+	require.Equal(t, "auth.unauthorized", got.Code)
+	require.Equal(t, "Missing or invalid session token.", got.Message)
 }

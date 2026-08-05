@@ -1,12 +1,13 @@
 import { createWriteStream } from "node:fs";
 import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import net from "node:net";
 
 import { frameworkForId } from "./frameworks.mjs";
+import { canListen, createJourneyPortAllocator } from "./ports.mjs";
 import {
   localRegistryPaths,
   npmEnvironment,
@@ -33,12 +34,17 @@ const workDir = resolve(
 );
 const diagnosticsDir = join(workDir, "diagnostics");
 const registryPaths = localRegistryPaths(workDir);
+// Reserved ports are bound long after reservation (Verdaccio within seconds,
+// the app and Zitadel ports only minutes later), so they come from the fixed
+// non-ephemeral journey block — see ports.mjs for why listen(:0) flaked.
+const usedPorts = new Set();
+const reserveJourneyPort = createJourneyPortAllocator();
 const registryPort = await resolvePort("JOURNEY_REGISTRY_PORT");
+usedPorts.add(registryPort);
 const registryUrl = `http://127.0.0.1:${registryPort}`;
 const cliPackage = await packageName(repoRoot, "apps/cli");
 const childProcesses = new Set();
 const frameworkContexts = [];
-const usedPorts = new Set([registryPort]);
 const prebuiltTarballsDir = options.tarballsDir || process.env.JOURNEY_TARBALLS_DIR || "";
 let registryProcess;
 let registryLogsCollected = false;
@@ -85,14 +91,20 @@ try {
     frameworkContexts.push(await createFrameworkContext(framework));
   }
 
-  await runWithConcurrency(
-    frameworkContexts,
-    Math.min(options.concurrency, frameworkContexts.length),
-    runFrameworkJourney,
-  );
+  if (options.suite === "testkit") {
+    await runTestkitJourney(frameworkContexts[0]);
+    success = true;
+    log("test-kit consumer journey passed");
+  } else {
+    await runWithConcurrency(
+      frameworkContexts,
+      Math.min(options.concurrency, frameworkContexts.length),
+      runFrameworkJourney,
+    );
 
-  success = true;
-  log("customer local setup journey matrix passed");
+    success = true;
+    log("customer local setup journey matrix passed");
+  }
 } catch (error) {
   await collectRegistryLogs();
   console.error("");
@@ -124,6 +136,9 @@ function printUsage() {
 
 Options:
   --framework <id>         Run one framework: next, nuxt, react, vue, or angular
+  --suite <id>             frameworks (default) or testkit: scaffold one next app,
+                           install @zitadel/testing from the journey registry, and
+                           run the checked-in consumer suite inside it
   --concurrency <n>        Number of framework journeys to run in parallel (default: 5)
   --runtime <binary|docker> Local runtime backend (default: binary)
   --image <docker-tag>     Use an existing local runtime image instead of building one
@@ -151,7 +166,14 @@ function assertMatrixPortsAreDynamic(frameworksToRun) {
 
 async function createFrameworkContext(framework) {
   const frameworkWorkDir = join(workDir, framework.id);
-  const appPort = await resolveFrameworkPort("JOURNEY_APP_PORT", 3000);
+  // The testkit suite hands the port to Playwright's webServer readiness
+  // check, which refuses a port that already answers — and 3000 is the most
+  // commonly squatted developer port (an IPv6-wildcard listener also slips
+  // past canListen's IPv4 probe). Prefer a fresh ephemeral port there.
+  const appPort = await resolveFrameworkPort(
+    "JOURNEY_APP_PORT",
+    options.suite === "testkit" ? undefined : 3000,
+  );
   const zitadelPort = await resolveFrameworkPort("JOURNEY_ZITADEL_PORT");
   const appUrl = `http://localhost:${appPort}`;
   const appDir = join(frameworkWorkDir, "myapp");
@@ -186,10 +208,7 @@ async function resolveFrameworkPort(envName, preferred) {
     return preferred;
   }
 
-  let port = await freePort();
-  while (usedPorts.has(port)) {
-    port = await freePort();
-  }
+  const port = await reserveJourneyPort(usedPorts);
   usedPorts.add(port);
   return port;
 }
@@ -267,6 +286,117 @@ async function runFrameworkJourney(context) {
   }
 }
 
+/**
+ * The customer-configuration proof for @zitadel/testing: scaffold a fresh app
+ * exactly like the framework journey, then use the kit the way its README
+ * tells a customer to — install it from the registry, drop in a Playwright
+ * config built on withZitadel(), and run the suite. No ZITADEL_SERVER_BINARY,
+ * no NEXTGEN_* env: the CLI resolves the published binary and its embedded
+ * login UI on its own.
+ */
+async function runTestkitJourney(context) {
+  const { framework } = context;
+  try {
+    await mkdir(context.diagnosticsDir, { recursive: true });
+    log(`[testkit] preparing fresh ${framework.displayName} app`);
+    await run("node", ["apps/cli-journey-e2e/scripts/prepare-app.mjs"], {
+      env: {
+        ...scrubRepoOverrides(process.env),
+        JOURNEY_APP_DIR: context.appDir,
+        JOURNEY_APP_URL: context.appUrl,
+        JOURNEY_FRAMEWORK: framework.id,
+        JOURNEY_PRESET: options.preset,
+        JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
+        JOURNEY_REGISTRY_URL: registryUrl,
+        JOURNEY_RUNTIME: options.runtime,
+        JOURNEY_WORK_DIR: context.frameworkWorkDir,
+        NPM_CONFIG_USERCONFIG: registryPaths.npmrcPath,
+      },
+    });
+
+    // Setup booted an instance to scaffold against; the kit suite boots its
+    // own ephemeral one, so stop it and let the suite reuse the port.
+    log("[testkit] stopping the setup instance");
+    await runCapture("npx", cliArgs(context, ["stop"]), {
+      cwd: context.appDir,
+      env: scrubRepoOverrides(npxEnv(context)),
+    });
+
+    const playwrightVersion = workspacePlaywrightVersion();
+    log(
+      `[testkit] installing @zitadel/testing and @playwright/test@${playwrightVersion} from the journey registry`,
+    );
+    await run(
+      "npm",
+      [
+        "install",
+        "--save-dev",
+        "--no-audit",
+        "--no-fund",
+        "@zitadel/testing@alpha",
+        `@playwright/test@${playwrightVersion}`,
+      ],
+      { cwd: context.appDir, env: scrubRepoOverrides(npxEnv(context)) },
+    );
+
+    log("[testkit] copying the checked-in consumer suite into the app");
+    await cp(join(projectRoot, "fixtures", "testkit"), context.appDir, { recursive: true });
+
+    log("[testkit] running the app's @zitadel/testing suite");
+    await run("npx", ["playwright", "test", "--config", "playwright.testkit.config.mjs"], {
+      cwd: context.appDir,
+      env: {
+        ...scrubRepoOverrides(npxEnv(context)),
+        TESTKIT_APP_PORT: String(context.appPort),
+        TESTKIT_ZITADEL_PORT: String(context.zitadelPort),
+      },
+    });
+    log("[testkit] consumer suite passed");
+  } catch (error) {
+    await collectTestkitDiagnostics(context);
+    throw new Error(`testkit: ${errorMessage(error)}`, { cause: error });
+  }
+}
+
+/**
+ * The testkit lane's contract is "the published binary works unconfigured":
+ * a developer's ZITADEL_SERVER_BINARY or NEXTGEN_* exports leaking into the
+ * scaffold or the inner suite would silently turn it back into an in-repo
+ * run, so strip them instead of trusting the environment.
+ */
+function scrubRepoOverrides(env) {
+  const scrubbed = { ...env };
+  delete scrubbed.ZITADEL_SERVER_BINARY;
+  for (const key of Object.keys(scrubbed)) {
+    if (key.startsWith("NEXTGEN_")) {
+      delete scrubbed[key];
+    }
+  }
+  return scrubbed;
+}
+
+/**
+ * Pin the app-local Playwright to the workspace's exact version so the inner
+ * suite reuses the Chromium that ensurePlaywrightBrowsers already installed
+ * instead of downloading a different revision mid-journey.
+ */
+function workspacePlaywrightVersion() {
+  const require = createRequire(join(projectRoot, "package.json"));
+  return require("@playwright/test/package.json").version;
+}
+
+async function collectTestkitDiagnostics(context) {
+  await collectDiagnostics(context);
+  await copyIfExists(
+    join(context.appDir, "playwright-report"),
+    join(context.diagnosticsDir, "testkit-playwright-report"),
+  );
+  await copyIfExists(
+    join(context.appDir, "test-results"),
+    join(context.diagnosticsDir, "testkit-test-results"),
+  );
+}
+
 async function runWithConcurrency(items, limit, worker) {
   const errors = [];
   let index = 0;
@@ -289,15 +419,12 @@ async function runWithConcurrency(items, limit, worker) {
   }
 }
 
-async function resolvePort(envName, fallback) {
+async function resolvePort(envName) {
   const value = process.env[envName];
   if (value) {
     return validatePortValue(value, envName);
   }
-  if (fallback) {
-    return fallback;
-  }
-  return freePort();
+  return reserveJourneyPort(usedPorts);
 }
 
 function validatePortValue(value, name) {
@@ -306,33 +433,6 @@ function validatePortValue(value, name) {
     throw new Error(`${name} must be a TCP port, got ${value}`);
   }
   return port;
-}
-
-function freePort() {
-  return new Promise((resolvePortPromise, reject) => {
-    const server = net.createServer();
-    server.unref();
-    server.on("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        reject(new Error("unable to allocate TCP port"));
-        return;
-      }
-      server.close(() => resolvePortPromise(address.port));
-    });
-  });
-}
-
-function canListen(port) {
-  return new Promise((resolveCanListen) => {
-    const server = net.createServer();
-    server.unref();
-    server.once("error", () => resolveCanListen(false));
-    server.listen(port, "127.0.0.1", () => {
-      server.close(() => resolveCanListen(true));
-    });
-  });
 }
 
 async function ensurePlaywrightBrowsers() {

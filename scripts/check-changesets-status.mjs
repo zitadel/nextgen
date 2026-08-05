@@ -16,6 +16,17 @@ export const publicPackages = PUBLIC_RELEASE_PACKAGES.map((pkg) => ({
   root: `${pkg.dir}/`,
 }));
 
+// The console and login UI publish no npm package of their own — they are built
+// into the server container, so a user-visible change there ships inside
+// `@zitadel/server` and belongs in the release notes. They are deliberately not
+// in PUBLIC_RELEASE_PACKAGES or the changesets fixed group: they are never
+// packed or published, they only make a changeset mandatory. See
+// `.changeset/README.md#when-a-change-needs-a-changeset`.
+export const embeddedServerSurfaces = [
+  { name: "@zitadel/server", root: "apps/console/" },
+  { name: "@zitadel/server", root: "apps/login-ui/" },
+];
+
 const publicPackageNames = publicPackages.map((pkg) => pkg.name);
 const publicPackageNameSet = new Set(publicPackageNames);
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -142,7 +153,19 @@ export function packageForFile(file) {
   if (file.endsWith("/AGENTS.md") || isTestFile(file)) {
     return undefined;
   }
-  return publicPackages.find((pkg) => file.startsWith(pkg.root));
+
+  const publicPackage = publicPackages.find((pkg) => file.startsWith(pkg.root));
+  if (publicPackage) {
+    return publicPackage;
+  }
+
+  // Markdown under an embedded surface is repo documentation — the container
+  // ships built output, not these files. An npm package's own README does ship
+  // in its tarball, which is why this exemption is scoped to the surfaces below.
+  if (file.endsWith(".md")) {
+    return undefined;
+  }
+  return embeddedServerSurfaces.find((surface) => file.startsWith(surface.root));
 }
 
 export function parseChangesetPackages(source) {
@@ -396,7 +419,7 @@ export async function main(args = forwardedArgs(), options = {}) {
   return 1;
 }
 
-async function gitChangedEntries(root, base) {
+export async function gitChangedEntries(root, base) {
   const committed = await runCapture("git", ["diff", "--name-status", `${base}...HEAD`], { cwd: root });
   const worktree = await runCapture("git", ["diff", "--name-status", "HEAD"], { cwd: root });
   const untracked = await runCapture("git", ["ls-files", "--others", "--exclude-standard"], { cwd: root });

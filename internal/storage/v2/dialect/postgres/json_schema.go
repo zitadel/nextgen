@@ -25,6 +25,9 @@ func newJSONSchemaStatements(client queryExecutor) jsonSchemaStatements {
 
 // CreateJSONSchema implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *domain.JSONSchema) error {
+	if err := ensureManagedID(&schema.URL, domain.PrefixJSONSchema); err != nil {
+		return err
+	}
 	return wrapError(js.client.QueryRow(ctx, createJSONSchemaStmt, schema.ProjectID, schema.URL, schema.ObjectType, schema.Schema).
 		Scan(&schema.ProjectID, &schema.URL, &schema.ObjectType, &schema.CreatedAt, &schema.Schema))
 }

@@ -1,9 +1,11 @@
 package server
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/crypto"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
@@ -26,17 +28,47 @@ type Config struct {
 // intentionally absent until platform mode is implemented; this deployment
 // always reports mode "standalone" for now.
 type PlatformConfig struct {
-	// ProjectID pins the deployment's default project to an existing
-	// project. When empty (the default), a standalone deployment tracks its
-	// first-created project — the one the customer's `zitadel setup`
-	// creates. The server never creates a project itself; a configured id
-	// that does not exist is a startup error.
+	// ProjectID pins a standalone deployment's default project to an existing
+	// project (an id of the form "proj_<...>"). When empty (the default), the
+	// deployment tracks its first-created project — the one the customer's
+	// `zitadel setup` creates. The server never creates that project itself; a
+	// configured id that does not exist is a startup error. Leave empty when
+	// BootstrapProject is set — the platform project's id is server-owned
+	// (domain.PlatformProjectID), not operator-authored. (#605)
 	ProjectID string `mapstructure:"project_id"`
+
+	// BootstrapProject, when true, ensures the well-known platform project
+	// (domain.PlatformProjectID) exists at startup (idempotent insert) and
+	// resolves it as the default. Off by default: no environment gets a
+	// platform project created silently. Needs no ProjectID. (#605)
+	BootstrapProject bool `mapstructure:"bootstrap_project"`
+}
+
+func (c PlatformConfig) Validate() error {
+	if c.ProjectID != "" && !domain.PrefixProject.Matches(c.ProjectID) {
+		return fmt.Errorf("platform.project_id %q must be a project id of the form %q",
+			c.ProjectID, domain.PrefixProject.IDPrefix("<id>"))
+	}
+	if c.BootstrapProject && c.ProjectID != "" && c.ProjectID != domain.PlatformProjectID {
+		return fmt.Errorf("platform.bootstrap_project uses the built-in id %q; leave platform.project_id empty or set it to that value",
+			domain.PlatformProjectID)
+	}
+	return nil
+}
+
+// ResolvedProjectID is the id the deployment pins its default project to: the
+// built-in platform id when bootstrapping, else the operator's pin.
+func (c PlatformConfig) ResolvedProjectID() string {
+	if c.BootstrapProject {
+		return domain.PlatformProjectID
+	}
+	return c.ProjectID
 }
 
 func (c Config) Validate() error {
 	for _, validate := range []func() error{
 		c.Session.Validate,
+		c.Platform.Validate,
 	} {
 		if err := validate(); err != nil {
 			return err
@@ -55,20 +87,20 @@ type ServerConfig struct {
 	// DataDir is the local runtime root used by zero-config server defaults.
 	// When unset, it defaults to a nextgen-data directory next to the binary.
 	DataDir string `mapstructure:"data_dir"`
-	// EncryptionKeys is a collection of encryption keys used as KEK (key
-	// encryption key) by the application. DEKs (data encryption key) will be
-	// created by the application and encrypted with a KEK.
+	// MasterKeys is a collection of master keys used by the application to wrap
+	// the key encryption key (KEK) of every project. The KEKs themselves are
+	// created by the application and stored encrypted in the database.
 	//
-	// This is a collection to enable encryption key rotation. Multiple keys
-	// can be provided but only one should be marked to be used for encryption.
-	// Once multiple keys are provided, all DEKs will be re-encrypted using the
-	// KEK marked to use for encryption.
+	// This is a collection to enable master key rotation. Multiple keys can be
+	// provided but only one should be marked to be used for encryption. Once
+	// multiple keys are provided, all wrapped KEKs will be re-encrypted using
+	// the master key marked to use for encryption.
 	//
-	// If no encryption keys are provided, a default encryption key is created
-	// in the kek directory. If there are no keys specified in the config but
-	// files exist in the kek directory, the newest file is used for
+	// If no master keys are provided, a default master key is created in the
+	// master key directory. If there are no keys specified in the config but
+	// files exist in the master key directory, the newest file is used for
 	// encryption.
-	EncryptionKeys map[string]*EncryptionKeyConfig `mapstructure:"encryption_keys"`
+	MasterKeys map[string]*MasterKeyConfig `mapstructure:"master_keys"`
 
 	ConsoleEnabled bool   `mapstructure:"console_enabled"`
 	ConsolePath    string `mapstructure:"console_path"`
@@ -81,7 +113,7 @@ type SchemaConfig struct {
 	LRUCacheSize      int    `mapstructure:"lru_cache_size"`
 }
 
-type EncryptionKeyConfig struct {
+type MasterKeyConfig struct {
 	// File is the path to a file which contains the RSA private key in either a
 	// JWK or a PEM file.
 	//

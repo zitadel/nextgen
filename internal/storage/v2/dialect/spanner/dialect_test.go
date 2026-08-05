@@ -18,8 +18,8 @@ func TestDecodeConfig(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "spanner", dialect.Name())
 
-		spannerDialect, ok := dialect.(*Dialect)
-		require.True(t, ok)
+		require.IsType(t, &Dialect{}, dialect)
+		spannerDialect := dialect.(*Dialect)
 		assert.Equal(t, "projects/p/instances/i/databases/d", spannerDialect.Database)
 	})
 

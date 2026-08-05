@@ -2,7 +2,12 @@ import { stat } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "../../errors";
-import { dependencyVersionMajor, hasDependency, readPackageJson } from "./package-json";
+import {
+  dependencySpecProvablyBelowMajor,
+  dependencyVersionMajor,
+  hasDependency,
+  readPackageJson,
+} from "./package-json";
 import { detectDevPort, issuerFromPort } from "./port";
 import type { Detector, FrameworkFacts } from "./types";
 
@@ -28,6 +33,20 @@ export class NextDetector implements Detector {
       return null;
     }
 
+    // Supported floor (ADR 043): the scaffolded templates target Next 15+
+    // (current App Router and request-boundary conventions). The floor is
+    // enforced here so setup and doctor share one loud gate instead of
+    // degrading silently; only a spec that provably cannot resolve to 15+
+    // is rejected — protocol specs and dist-tags pass.
+    const belowFloor = dependencySpecProvablyBelowMajor(pkg, "next", 15);
+    if (belowFloor !== undefined) {
+      throw new ZitadelError(
+        "E_UNSUPPORTED_PROJECT_SHAPE",
+        `Next.js "${belowFloor}" is below the supported floor — the CLI integrates Next.js 15 and newer`,
+        { hint: "Upgrade the app to Next 15+ (e.g. `npx @next/codemod@latest upgrade`) and rerun." },
+      );
+    }
+
     const appDir = (await dirExists(join(cwd, "app")))
       ? "app"
       : (await dirExists(join(cwd, "src/app")))
@@ -42,12 +61,13 @@ export class NextDetector implements Detector {
     }
 
     const devPort = await detectDevPort(cwd, pkg);
+    const versionMajor = dependencyVersionMajor(pkg, "next");
     return {
       id: "next",
       appDir,
       devPort,
       url: issuerFromPort(devPort),
-      versionMajor: dependencyVersionMajor(pkg, "next"),
+      ...(versionMajor === undefined ? {} : { versionMajor }),
     };
   }
 }

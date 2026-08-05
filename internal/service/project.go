@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/go-jose/go-jose/v4"
 	"github.com/ianlancetaylor/jsonschema"
 
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
@@ -86,16 +85,10 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 		return nil, err
 	}
 
-	kek, err := s.keyService.GetKekCrypter(ctx)
+	masterKey, err := s.keyService.GetMasterKeyCrypter(ctx)
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to get kek")
+		return nil, domain.ErrInternal(err).WithMessage("failed to get master key")
 	}
-
-	dek, err := domain.NewDEK(project.ID, jose.A256GCM, kek)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to create project encryption key")
-	}
-	dek.Activate(nil)
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().CreateProject(ctx, project); err != nil {
@@ -105,8 +98,28 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 			return domain.ErrInternal(err).WithMessage("failed to create project in the database")
 		}
 
-		if err := tx.Statements().CreateEncryptionKey(ctx, dek); err != nil {
-			return domain.ErrInternal(err).WithMessage("failed to create project encryption key in the database")
+		keyset, err := project.GenerateNewKeySet(masterKey, func(prefix domain.ResourcePrefix) (string, error) {
+			return tx.Statements().NewManagedID(string(prefix))
+		})
+		if err != nil {
+			return err
+		}
+		keyset.Activate(nil)
+
+		if err := tx.Statements().CreateEncryptionKey(ctx, keyset.KeyEncryptionKey); err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to create project key encryption key in the database")
+		}
+		if err := tx.Statements().CreateEncryptionKey(ctx, keyset.TokenEncryptionKey); err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to create project token encryption key in the database")
+		}
+		if err := tx.Statements().CreateEncryptionKey(ctx, keyset.SecretEncryptionKey); err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to create project secret encryption key in the database")
+		}
+		if err := tx.Statements().CreateEncryptionKey(ctx, keyset.CookieEncryptionKey); err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to create project cookie encryption key in the database")
+		}
+		if err := tx.Statements().CreateSigningKey(ctx, keyset.TokenSigningKey); err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to create project token signing key in the database")
 		}
 
 		if !seedDefaults {

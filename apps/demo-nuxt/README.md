@@ -45,6 +45,66 @@ moon run demo-nuxt:dev
 
 Open [http://localhost:3001/login](http://localhost:3001/login). Any email/password combination is accepted by the mock server.
 
+### Running against the Go server
+
+Instead of the mock, you can run against the real Go server with embedded
+Postgres. This gives you persistent state, real user creation, and the full
+flow engine.
+
+#### 1. Start the server
+
+From the repo root:
+
+```bash
+moon run workspace:cli -- start
+```
+
+This builds the embedded console and login UIs, then starts the Go server on
+`http://localhost:8080` with embedded Postgres (data stored in
+`nextgen-data/`). The server is ready when you see
+`Local Zitadel server is ready.`
+
+#### 2. Create a project
+
+```bash
+curl -s -X POST http://localhost:8080/projects \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "demo"}' | jq .
+```
+
+The response contains the `id` and `projectSecret`:
+
+```json
+{
+  "id": "proj_01JXXXXXXXXXXXXXXXX",
+  "projectSecret": "eyJhbGci..."
+}
+```
+
+#### 3. Configure `.env`
+
+Update `apps/demo-nuxt/.env` with the values from step 2:
+
+```env
+ZITADEL_URL=http://localhost:8080
+NUXT_PUBLIC_ZITADEL_PROJECT_ID=proj_01JXXXXXXXXXXXXXXXX
+```
+
+The demo only needs the project `id` — `projectSecret` authenticates
+server-side project-management calls and is not read by the demo app.
+
+#### 4. Start demo-nuxt
+
+```bash
+moon run demo-nuxt:dev
+```
+
+Open [http://localhost:3001/login](http://localhost:3001/login). Use the
+register flow to create a new user — unlike the mock, credentials are
+persisted across restarts.
+
+---
+
 **UI-only iteration** (no Nuxt, no TCP mock): the Storybook workbench runs the
 Lit atoms, the paired React components, and the `<zitadel-login>` orchestrator
 (MSW in the browser via `msw-storybook-addon`):

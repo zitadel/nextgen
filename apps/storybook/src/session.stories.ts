@@ -60,7 +60,10 @@ const meta: Meta<SessionArgs> = {
     clearBranding();
     applyBranding(brandingPresets[args.branding]);
   },
-  render: () => html`<zitadel-session></zitadel-session>`,
+  // The fullscreen story shows the dedicated signed-in route, which opts
+  // into the page variant — the element itself now defaults to the
+  // content-sized `widget` like `<zitadel-login>`.
+  render: () => html`<zitadel-session variant="page"></zitadel-session>`,
 };
 
 export default meta;

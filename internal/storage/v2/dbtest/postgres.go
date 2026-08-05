@@ -5,7 +5,6 @@ package dbtest
 import (
 	"context"
 
-	v2database "github.com/zitadel/nextgen/internal/storage/v2/database"
 	v2postgres "github.com/zitadel/nextgen/internal/storage/v2/dialect/postgres"
 	"github.com/zitadel/nextgen/internal/storage/v2/testdb"
 )
@@ -14,7 +13,7 @@ import (
 // If ZITADEL_TEST_POSTGRES_URL is set, it connects to that database (no Docker
 // required); otherwise it starts a Postgres testcontainer. The returned stop
 // function is always non-nil and safe to defer.
-func Postgres(ctx context.Context) (v2database.Pool, func(), error) {
+func Postgres(ctx context.Context) (Pool, func(), error) {
 	dsn, stop, err := testdb.PostgresDSN(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -35,5 +34,11 @@ func Postgres(ctx context.Context) (v2database.Pool, func(), error) {
 		stop()
 		return nil, nil, err
 	}
-	return pool, stop, nil
+	out, err := asPool(pool)
+	if err != nil {
+		_ = pool.Close(ctx)
+		stop()
+		return nil, nil, err
+	}
+	return out, stop, nil
 }

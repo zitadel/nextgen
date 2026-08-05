@@ -154,7 +154,7 @@
       {% endfor %}
 
       {% for a in actions %}
-        {% unless a.primary or a.name == 'passkey' or a.name == 'register' or a.name == 'sign_in' or a.name == 'recover' %}
+        {% unless a.primary or a.kind == 'back' or a.name == 'passkey' or a.name == 'register' or a.name == 'sign_in' or a.name == 'recover' %}
           <zl-button
             hierarchy="secondary"
             size="medium"

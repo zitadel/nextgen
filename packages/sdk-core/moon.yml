@@ -9,6 +9,10 @@ tasks:
   lint:
     command: "corepack pnpm run lint"
 
+  # KNOWN-VACUOUS: this typecheck loads a solution-style tsconfig with plain
+  # tsc --noEmit, which checks nothing (see scripts/check-typecheck-programs.mjs
+  # and its KNOWN_VACUOUS allowlist). The real program does not compile yet;
+  # fixing it is tracked as a follow-up.
   typecheck:
     command: "corepack pnpm run typecheck"
     deps:

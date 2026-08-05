@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"time"
 
@@ -40,16 +39,31 @@ type GetUserInput struct {
 
 type ListUsersInput struct {
 	ProjectID string
-	// Offset/Limit window the creation-ordered result; zero means
-	// "from the start" / "server default applied at the API edge".
-	Offset uint32
-	Limit  uint32
+	PageToken string
+	Limit     int
+}
+
+type ListPasskeysInput struct {
+	ProjectID string
+	UserID    string
+	PageToken string
+	Limit     int
 }
 
 type GetMyUserInput struct {
 	// SessionToken is the parsed session token, already verified at the API
 	// security boundary.
 	SessionToken *domain.Token
+}
+
+type DeleteUserInput struct {
+	ProjectID string
+	UserID    string
+}
+
+type ListUsersOutput struct {
+	Items         []*domain.User
+	NextPageToken string
 }
 
 // ---- Implementation -------------------------------------------------------------
@@ -99,70 +113,81 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
 	action := NewCreateUserAction(input, s.schemaStore)
-	err = action.Prepare(ctx)
-	if err != nil {
+	if err := s.ApplyActions(ctx, action); err != nil {
 		return nil, err
 	}
-
-	err = applyCreateUser(ctx, s.v2Pool.Statements(), action.CreateUser)
-	if err != nil {
-		if de, ok := errors.AsType[domain.Error](err); ok {
-			return nil, de
-		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to create user")
-	}
-
 	return action.User, nil
 }
 
-// ListUsers returns the project's users as attribute trees (the same
-// shape CreateUser returns and GET /users/{id} serves), ordered by
-// creation time so pagination windows are stable.
-func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) ([]map[string]any, error) {
-	limit := input.Limit
-	if input.Offset > 0 {
-		limit = input.Offset + input.Limit
-	}
+func (s *UserService) DeleteUser(ctx context.Context, input DeleteUserInput) error {
+	action := NewDeleteUserAction(input)
+	return s.ApplyActions(ctx, action)
+}
+
+func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error) {
 	result, err := s.v2Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
 		Filter: database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
 		Pagination: database.Page[domain.UserField]{
-			Limit: limit,
+			Limit:  uint32(normalizeLimit(input.Limit)),
+			Cursor: []byte(input.PageToken),
 			OrderBy: database.OrderBy[domain.UserField]{
 				Columns: []database.Column[domain.UserField]{
 					database.Col(domain.UserFieldCreatedAt),
 					database.Col(domain.UserFieldID),
 				},
-				Direction: database.OrderAsc,
+				Direction: database.OrderDesc,
 			},
 		},
 	}, UserQueryOptions{})
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to list users from database")
+		return nil, mapListError(err, "failed to list users from database")
 	}
 
-	items := result.Items
-	if input.Offset > 0 {
-		if int(input.Offset) >= len(items) {
-			items = nil
-		} else {
-			items = items[input.Offset:]
-		}
-	}
-
-	users := make([]map[string]any, 0, len(items))
-	for _, flatUser := range items {
-		user, err := domain.BuildAttributeTree(flatUser.Attributes)
-		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to parse user attributes")
-		}
-		user["id"] = flatUser.ID
-		users = append(users, user)
-	}
-	return users, nil
+	return &ListUsersOutput{
+		Items:         result.Items,
+		NextPageToken: string(result.NextCursor),
+	}, nil
 }
 
-func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[string]any, error) {
-	flatUser, err := s.v2Pool.Statements().GetUser(ctx, database.And(
+func (s *UserService) ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error) {
+	dbpasskeys, err := s.v2Pool.Statements().ListUserPasskeys(
+		ctx, &database.ListOptions[domain.UserPasskeyField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.UserPasskeyFieldProjectID), input.ProjectID),
+				database.Equal(database.Col(domain.UserPasskeyFieldUserID), input.UserID),
+			),
+			Pagination: database.Page[domain.UserPasskeyField]{
+				Limit:  uint32(normalizeLimit(input.Limit)),
+				Cursor: []byte(input.PageToken),
+				OrderBy: database.OrderBy[domain.UserPasskeyField]{
+					Columns: []database.Column[domain.UserPasskeyField]{
+						database.Col(domain.UserPasskeyFieldCreatedAt),
+					},
+					Direction: database.OrderDesc,
+				},
+			},
+		},
+	)
+	if err != nil {
+		return nil, "", domain.ErrInternal(err).WithMessage("failed to get user passkeys from database")
+	}
+
+	// Distinguish "user not found" from "user has no passkeys".
+	if len(dbpasskeys.Items) == 0 {
+		exists, err := s.v2Pool.Statements().UserExists(ctx, input.ProjectID, input.UserID)
+		if err != nil {
+			return nil, "", domain.ErrInternal(err).WithMessage("failed to get user from database")
+		}
+		if !exists {
+			return nil, "", domain.ErrUserNotFound()
+		}
+	}
+
+	return dbpasskeys.Items, string(dbpasskeys.NextCursor), nil
+}
+
+func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error) {
+	user, err := s.v2Pool.Statements().GetUser(ctx, database.And(
 		database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
 		database.Equal(database.Col(domain.UserFieldID), input.UserID),
 	), UserQueryOptions{MembershipTeamID: input.TeamID})
@@ -173,12 +198,6 @@ func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (map[
 		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
 	}
 
-	user, err := domain.BuildAttributeTree(flatUser.Attributes)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to parse user attributes")
-	}
-
-	user["id"] = flatUser.ID
 	return user, nil
 }
 
@@ -187,7 +206,7 @@ func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (
 	return s.ApplyActions(ctx, action)
 }
 
-func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]byte, error) {
+func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error) {
 	sessionToken := input.SessionToken
 	if sessionToken == nil {
 		return nil, domain.ErrSessionTokenInvalid()
@@ -207,12 +226,7 @@ func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) ([]by
 		return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
 	}
 
-	userbs, err := json.Marshal(user)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to serialize user")
-	}
-
-	return userbs, nil
+	return user, nil
 }
 
 // ---- Create User ACTION -------------------------------------------------------------
@@ -251,12 +265,15 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 		return err
 	}
 
-	o.User["id"] = o.CreateUser.ID
 	return nil
 }
 
 func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error {
-	return applyCreateUser(ctx, stmts, o.CreateUser)
+	if err := applyCreateUser(ctx, stmts, o.CreateUser); err != nil {
+		return err
+	}
+	o.User["id"] = o.CreateUser.ID
+	return nil
 }
 
 func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.CreateUser) error {
@@ -308,53 +325,31 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) 
 	return nil
 }
 
-// ---- Lazy ACTION -------------------------------------------------------------
+// ---- Delete ACTION -------------------------------------------------------------
 
-type UserActionFactory = func(ctx context.Context) (UserAction, error)
-
-// LazyUserAction allows for lazy initialization of a user-action. It forwards
-// the `Prepare` and `Apply` methods to the generated action. The UserAction is
-// created right before it is used in those functions.
-//
-// This action can be wrapped around an action when the wrapped action requires
-// an output of a previous action. It can then use a closure to get the data
-// from the other action.
-type LazyUserAction struct {
-	factory UserActionFactory
-	action  UserAction
+type DeleteUserAction struct {
+	DeleteUserInput
 }
 
-func NewLazyUserAction(factory UserActionFactory) *LazyUserAction {
-	return &LazyUserAction{
-		factory: factory,
+func NewDeleteUserAction(input DeleteUserInput) *DeleteUserAction {
+	return &DeleteUserAction{
+		DeleteUserInput: input,
 	}
 }
 
-func (o *LazyUserAction) Prepare(ctx context.Context) (err error) {
-	action, err := o.Action(ctx)
+func (o *DeleteUserAction) Prepare(_ context.Context) error {
+	return nil
+}
+
+func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error {
+	err := stmts.DeleteUserByID(ctx, o.ProjectID, o.UserID)
 	if err != nil {
-		return err
-	}
-	return action.Prepare(ctx)
-}
-
-func (o *LazyUserAction) Apply(ctx context.Context, stmts AllStatements) error {
-	action, err := o.Action(ctx)
-	if err != nil {
-		return err
-	}
-	return action.Apply(ctx, stmts)
-}
-
-func (o *LazyUserAction) Action(ctx context.Context) (UserAction, error) {
-	if o.action == nil {
-		action, err := o.factory(ctx)
-		if err != nil {
-			return nil, err
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil
 		}
-		o.action = action
+		return domain.ErrInternal(err).WithMessage("failed to delete user")
 	}
-	return o.action, nil
+	return nil
 }
 
 // UserStatementsLookup adapts [UserStatements] to [UserLookup] for AuthAttemptService.

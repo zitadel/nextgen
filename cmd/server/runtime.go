@@ -13,7 +13,11 @@ import (
 
 const (
 	defaultDataDirName = "nextgen-data"
-	defaultKEKDirName  = "keks"
+	// masterKeyFileName is the name of the auto-generated master key file. It
+	// doubles as the key ID, since keys discovered in the master key directory
+	// are identified by their file name.
+	masterKeyFileName       = "master-key.pem"
+	defaultMasterKeyDirName = "master-keys"
 )
 
 func defaultServerDataDir() (string, error) {
@@ -29,7 +33,7 @@ func defaultServerDataDir() (string, error) {
 	return path, nil
 }
 
-func serverKEKDir(cfg ServerConfig) (string, error) {
+func serverMasterKeyDir(cfg ServerConfig) (string, error) {
 	dataDir := cfg.DataDir
 	if dataDir == "" {
 		defaultDir, err := defaultServerDataDir()
@@ -38,28 +42,28 @@ func serverKEKDir(cfg ServerConfig) (string, error) {
 		}
 		dataDir = defaultDir
 	}
-	path := filepath.Join(dataDir, defaultKEKDirName)
+	path := filepath.Join(dataDir, defaultMasterKeyDirName)
 	err := os.MkdirAll(path, 0o700)
 	if err != nil {
-		return "", fmt.Errorf("failed to create KEK dir: %w", err)
+		return "", fmt.Errorf("failed to create master key dir: %w", err)
 	}
 	return path, nil
 }
 
-func ensureServerKEK(cfg *ServerConfig) error {
-	kekDir, err := serverKEKDir(*cfg)
+func ensureServerMasterKey(cfg *ServerConfig) error {
+	masterKeyDir, err := serverMasterKeyDir(*cfg)
 	if err != nil {
-		return fmt.Errorf("failed to get KEK directory: %w", err)
+		return fmt.Errorf("failed to get master key directory: %w", err)
 	}
 
-	files, err := os.ReadDir(kekDir)
+	files, err := os.ReadDir(masterKeyDir)
 	if err != nil {
-		return fmt.Errorf("failed to list KEK directory: %w", err)
+		return fmt.Errorf("failed to list master key directory: %w", err)
 	}
 
 	var newestFile string
 	var newestFileModTime time.Time
-	keysFromDir := make(map[string]*EncryptionKeyConfig, len(files))
+	keysFromDir := make(map[string]*MasterKeyConfig, len(files))
 	for _, file := range files {
 		if file.IsDir() {
 			continue
@@ -69,20 +73,20 @@ func ensureServerKEK(cfg *ServerConfig) error {
 		if err != nil {
 			return fmt.Errorf("failed to get info of file %s: %w", file.Name(), err)
 		}
-		keyPath := filepath.Join(kekDir, file.Name())
+		keyPath := filepath.Join(masterKeyDir, file.Name())
 		if info.ModTime().After(newestFileModTime) {
 			newestFile = keyPath
 			newestFileModTime = info.ModTime()
 		}
 
-		keysFromDir[file.Name()] = &EncryptionKeyConfig{
+		keysFromDir[file.Name()] = &MasterKeyConfig{
 			File: keyPath,
 		}
 	}
 
-	if len(cfg.EncryptionKeys) > 0 {
+	if len(cfg.MasterKeys) > 0 {
 		for id, key := range keysFromDir {
-			cfg.EncryptionKeys[id] = key
+			cfg.MasterKeys[id] = key
 		}
 	} else {
 		for id, key := range keysFromDir {
@@ -91,28 +95,28 @@ func ensureServerKEK(cfg *ServerConfig) error {
 				break
 			}
 		}
-		cfg.EncryptionKeys = keysFromDir
+		cfg.MasterKeys = keysFromDir
 	}
 
-	if len(cfg.EncryptionKeys) == 0 {
-		filePath, err := createEncryptionKey(kekDir)
+	if len(cfg.MasterKeys) == 0 {
+		filePath, err := createMasterKey(masterKeyDir)
 		if err != nil {
 			return err
 		}
-		cfg.EncryptionKeys = map[string]*EncryptionKeyConfig{
-			"root-kek.pem": {
+		cfg.MasterKeys = map[string]*MasterKeyConfig{
+			masterKeyFileName: {
 				File:             filePath,
 				UseForEncryption: true,
 			},
 		}
-		// TODO: add a flag which allows to disable the auto generation of a KEK (https://github.com/zitadel/nextgen/issues/655)
-		fmt.Fprintf(os.Stderr, "created server KEK file at %s (generated for local/dev only; configure server.encryption_keys for production)\n", filePath)
+		// TODO: add a flag which allows to disable the auto generation of a master key (https://github.com/zitadel/nextgen/issues/655)
+		fmt.Fprintf(os.Stderr, "created server master key file at %s (generated for local/dev only; configure server.master_keys for production)\n", filePath)
 	}
 
 	return nil
 }
 
-func createEncryptionKey(dir string) (string, error) {
+func createMasterKey(dir string) (string, error) {
 	key, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate RSA key: %w", err)
@@ -123,17 +127,17 @@ func createEncryptionKey(dir string) (string, error) {
 		Bytes: x509.MarshalPKCS1PrivateKey(key),
 	})
 
-	path := filepath.Join(dir, "root-kek.pem")
+	path := filepath.Join(dir, masterKeyFileName)
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
-		return "", fmt.Errorf("failed to create kek file %q: %w", path, err)
+		return "", fmt.Errorf("failed to create master key file %q: %w", path, err)
 	}
 	if _, err := f.Write(bs); err != nil {
 		_ = f.Close()
-		return "", fmt.Errorf("failed to write kek file %q: %w", path, err)
+		return "", fmt.Errorf("failed to write master key file %q: %w", path, err)
 	}
 	if err := f.Close(); err != nil {
-		return "", fmt.Errorf("failed to close kek file %q: %w", path, err)
+		return "", fmt.Errorf("failed to close master key file %q: %w", path, err)
 	}
 
 	return path, nil

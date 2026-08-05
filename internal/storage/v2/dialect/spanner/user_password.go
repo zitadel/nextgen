@@ -15,8 +15,8 @@ import (
 
 const (
 	setUserPasswordStmt = `INSERT INTO user_passwords (
-	project_id, user_id, encoded_hash, change_required, verification_id
-) VALUES (@p1, @p2, @p3, @p4, @p5)
+	id, project_id, user_id, encoded_hash, change_required, verification_id
+) VALUES (@p1, @p2, @p3, @p4, @p5, @p6)
 ON CONFLICT (project_id, user_id) DO UPDATE SET
 	encoded_hash = EXCLUDED.encoded_hash,
 	change_required = EXCLUDED.change_required,
@@ -43,7 +43,12 @@ func newUserPasswordStatements(db queryExecutor) userPasswordStatements {
 
 // SetUserPassword implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error {
+	id := ""
+	if err := ensureManagedID(&id, domain.PrefixUserPassword); err != nil {
+		return err
+	}
 	_, err := ps.db.Update(ctx, buildStatement(setUserPasswordStmt,
+		id,
 		pw.ProjectID,
 		pw.UserID,
 		pw.EncodedHash,

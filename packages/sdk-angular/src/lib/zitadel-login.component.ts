@@ -57,6 +57,8 @@ import "@zitadel/components";
     [attr.purpose]="purpose"
     [attr.flow-name]="flowName"
     [attr.post-sign-in-url]="postSignInUrl"
+    [attr.variant]="variant ?? null"
+    [attr.theme]="theme ?? null"
     (zitadel-flow-step)="onFlowStep($event)"
     (zitadel-flow-input)="onFlowInput($event)"
     (zitadel-flow-complete)="onFlowComplete($event)"
@@ -70,8 +72,10 @@ export class ZitadelLoginComponent {
   @Input() purpose: CreateFlowBodyPurpose = "login";
   @Input() flowName?: string;
   @Input() postSignInUrl?: string;
-  @Input() locales?: Record<string, Record<string, string>>;
+  @Input() locales?: Record<string, Partial<Record<string, string>>>;
   @Input() lang?: string;
+  @Input() variant?: "widget" | "page";
+  @Input() theme?: "light" | "dark" | "auto";
   @Output() flowStep = new EventEmitter<ZitadelFlowStepDetail>();
   @Output() flowInput = new EventEmitter<ZitadelFlowInputDetail>();
   @Output() flowComplete = new EventEmitter<ZitadelFlowCompleteDetail>();

@@ -81,17 +81,30 @@ The application uses different keys for different use-cases:
 ```mermaid
 graph TD
 %% Nodes
-    MasterKey["RSA Master Key (KEK)"]
-    DEK["AES Data Encryption Key (DEK)"]
-    TokenSigningKeys["RSA Token Signing Keys"]
+    MasterKey["RSA Master Key"]
+    KEK["AES Project Key Encryption Key (KEK)"]
+    TokenSigningKeys["Token Signing Keys"]
+    SecretEncryptionKey["AES Secret Encryption Key"]
+    TokenEncryptionKey["AES Token Encryption Key"]
+    CookieEncryptionKey["AES Cookie Encryption Key"]
     ThirdPartySecrets["Third-Party Secrets"]
     OpaqueTokens["Opaque tokens"]
+    Cookies["Flow cookies"]
 %% Hierarchy Relationships
-    MasterKey --> DEK
-    DEK --> TokenSigningKeys
-    DEK --> ThirdPartySecrets
-    DEK --> OpaqueTokens
+    MasterKey --> KEK
+    KEK --> TokenSigningKeys
+    KEK --> SecretEncryptionKey
+    KEK --> TokenEncryptionKey
+    KEK --> CookieEncryptionKey
+    SecretEncryptionKey --> ThirdPartySecrets
+    TokenEncryptionKey --> OpaqueTokens
+    CookieEncryptionKey --> Cookies
  ```
+
+Every project gets one key encryption key (KEK), wrapped by the master key. The
+KEK encrypts nothing but the project's other keys; each of those has a single
+purpose and encrypts data directly. A purpose-scoped key can therefore be
+rotated without re-encrypting everything else the project stores.
 
 #### Storage
 

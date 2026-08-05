@@ -3,7 +3,7 @@
     "project_id": "proj_demo",
     "team_id": "team_demo",
     "schema_url": "https://schemas.zitadel.dev/demo/user/v1.json",
-    "id": "usr_demo_admin"
+    "id": "user_demo_admin"
   },
   "attributes": {
     "username": "admin",

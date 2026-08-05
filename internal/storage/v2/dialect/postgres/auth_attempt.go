@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -23,16 +22,16 @@ const authAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.
 	` LEFT JOIN zitadel_nextgen.checks c ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id`
 
 const createAuthAttemptStmt = `WITH inserted_attempt AS (` +
-	` INSERT INTO zitadel_nextgen.auth_attempts (project_id, required_checks, time_to_live, session_id)` +
-	` VALUES ($1, $2::SMALLINT[], $3::INTERVAL, $4::BIGINT)` +
+	` INSERT INTO zitadel_nextgen.auth_attempts (project_id, id, required_checks, time_to_live, session_id)` +
+	` VALUES ($1, $2, $3::SMALLINT[], $4::INTERVAL, $5)` +
 	` RETURNING project_id, id, created_at` +
 	`), inserted_checks AS (` +
-	` INSERT INTO zitadel_nextgen.checks (project_id, auth_attempt_id, type, challenge_payload, factor_payload, last_challenged_at, last_verified_at)` +
-	` SELECT ia.project_id, ia.id, checks.type, checks.challenge_payload, checks.factor_payload,` +
+	` INSERT INTO zitadel_nextgen.checks (project_id, auth_attempt_id, id, type, challenge_payload, factor_payload, last_challenged_at, last_verified_at)` +
+	` SELECT ia.project_id, ia.id, checks.id, checks.type, checks.challenge_payload, checks.factor_payload,` +
 	` CASE WHEN checks.is_challenge THEN NOW() ELSE NULL END,` +
 	` CASE WHEN checks.is_factor AND NOT checks.is_challenge THEN NOW() ELSE NULL END` +
 	` FROM inserted_attempt ia` +
-	` JOIN LATERAL jsonb_to_recordset(COALESCE($5::JSONB, '[]'::JSONB)) AS checks(type SMALLINT, challenge_payload JSONB, factor_payload JSONB, is_challenge BOOLEAN, is_factor BOOLEAN) ON TRUE` +
+	` JOIN LATERAL jsonb_to_recordset(COALESCE($6::JSONB, '[]'::JSONB)) AS checks(id TEXT, type SMALLINT, challenge_payload JSONB, factor_payload JSONB, is_challenge BOOLEAN, is_factor BOOLEAN) ON TRUE` +
 	` RETURNING id, type, last_challenged_at, last_verified_at` +
 	`) SELECT ia.id, ia.created_at, ic.id, ic.type, ic.last_challenged_at, ic.last_verified_at` +
 	` FROM inserted_attempt ia` +
@@ -43,10 +42,10 @@ const deleteAuthAttemptByIDStmt = `DELETE FROM zitadel_nextgen.auth_attempts WHE
 const handoffAuthAttemptStmt = `UPDATE zitadel_nextgen.auth_attempts SET handoff_token = $3, handed_off_at = NOW() WHERE project_id = $1 AND id = $2 RETURNING handed_off_at`
 
 const setAuthAttemptChallengeStmt = `INSERT INTO zitadel_nextgen.checks` +
-	` (project_id, auth_attempt_id, type, last_challenged_at, challenge_payload)` +
-	` VALUES ($1, $2, $3, NOW(), $4::JSONB)` +
+	` (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload)` +
+	` VALUES ($1, $2, $3, $4, NOW(), $5::JSONB)` +
 	` ON CONFLICT (project_id, auth_attempt_id, type) DO UPDATE SET` +
-	` id = nextval(pg_get_serial_sequence('zitadel_nextgen.checks', 'id')),` +
+	` id = EXCLUDED.id,` +
 	` last_challenged_at = NOW(), challenge_payload = EXCLUDED.challenge_payload, failure_count = 0, last_failed_at = NULL` +
 	` RETURNING id, last_challenged_at`
 
@@ -72,7 +71,16 @@ func newAuthAttemptStatements(client queryExecutor) authAttemptStatements {
 
 // CreateAuthAttempt implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, authAttempt *domain.AuthAttempt) error {
-	checkRowsJSON, err := authattempt.ChecksToJSON(authAttempt.Checks)
+	if err := ensureManagedID(&authAttempt.ID, domain.PrefixAuthAttempt); err != nil {
+		return err
+	}
+	checkIDs := make([]string, len(authAttempt.Checks))
+	for i := range authAttempt.Checks {
+		if err := ensureManagedID(&checkIDs[i], domain.PrefixChallenge); err != nil {
+			return err
+		}
+	}
+	checkRowsJSON, err := authattempt.ChecksToJSON(authAttempt.Checks, checkIDs)
 	if err != nil {
 		return err
 	}
@@ -83,21 +91,21 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, authAttem
 	}
 
 	rows, err := as.client.Query(ctx, createAuthAttemptStmt,
-		authAttempt.ProjectID, requiredChecks, authAttempt.TimeToLive,
-		database.Identity(authattempt.SessionIDArg(authAttempt.SessionID)), checkRowsJSON)
+		authAttempt.ProjectID, authAttempt.ID, requiredChecks, authAttempt.TimeToLive,
+		authattempt.SessionIDArg(authAttempt.SessionID), checkRowsJSON)
 	if err != nil {
 		return wrapError(err)
 	}
 	defer rows.Close()
 
-	challengeIDByType := make(map[domain.AuthCheckType]database.Identity, len(authAttempt.Checks))
+	challengeIDByType := make(map[domain.AuthCheckType]string, len(authAttempt.Checks))
 	lastChallengedAtByType := make(map[domain.AuthCheckType]time.Time, len(authAttempt.Checks))
 	lastVerifiedAtByType := make(map[domain.AuthCheckType]time.Time, len(authAttempt.Checks))
 	for rows.Next() {
 		var (
-			attemptID        database.Identity
+			attemptID        string
 			createdAt        time.Time
-			challengeID      database.Identity
+			challengeID      *string
 			checkType        *uint8
 			lastChallengedAt *time.Time
 			lastVerifiedAt   *time.Time
@@ -106,12 +114,12 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, authAttem
 		if err != nil {
 			return wrapError(err)
 		}
-		authAttempt.ID = attemptID.String()
+		authAttempt.ID = attemptID
 		authAttempt.CreatedAt = createdAt
 		if checkType != nil {
 			checkTypeV := domain.AuthCheckType(*checkType)
-			if challengeID.String() != "" {
-				challengeIDByType[checkTypeV] = challengeID
+			if challengeID != nil && *challengeID != "" {
+				challengeIDByType[checkTypeV] = *challengeID
 			}
 			if lastChallengedAt != nil {
 				lastChallengedAtByType[checkTypeV] = *lastChallengedAt
@@ -131,7 +139,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, authAttem
 	for _, check := range authAttempt.Checks {
 		if t, ok := challengeIDByType[check.Type()]; ok {
 			if challenge, ok := check.(domain.AuthChallenge); ok {
-				challenge.SetID(t.String())
+				challenge.SetID(t)
 			}
 		}
 		if t, ok := lastChallengedAtByType[check.Type()]; ok {
@@ -150,17 +158,29 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, authAttem
 
 // GetAuthAttemptByID implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) GetAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) (*domain.AuthAttempt, error) {
-	return as.get(ctx, authAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.id = $2`, projectID, database.Identity(authAttemptID))
+	var c statementCompiler
+	c.WriteString(authAttemptGetSelect)
+	c.WriteString(" WHERE aa.project_id = ")
+	c.WriteArg(projectID)
+	c.WriteString(" AND aa.id = ")
+	c.WriteArg(database.Identity(authAttemptID))
+	return as.get(ctx, c.String(), c.args...)
 }
 
 // GetAuthAttemptByHandoffToken implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffToken []byte) (*domain.AuthAttempt, error) {
-	return as.get(ctx, authAttemptGetSelect+` WHERE aa.project_id = $1 AND aa.handoff_token = $2`, projectID, handoffToken)
+	var c statementCompiler
+	c.WriteString(authAttemptGetSelect)
+	c.WriteString(" WHERE aa.project_id = ")
+	c.WriteArg(projectID)
+	c.WriteString(" AND aa.handoff_token = ")
+	c.WriteArg(handoffToken)
+	return as.get(ctx, c.String(), c.args...)
 }
 
-func (as authAttemptStatements) get(ctx context.Context, query, projectID string, matcher any) (*domain.AuthAttempt, error) {
+func (as authAttemptStatements) get(ctx context.Context, query string, args ...any) (*domain.AuthAttempt, error) {
 	attempt := new(domain.AuthAttempt)
-	rows, err := as.client.Query(ctx, query, projectID, matcher)
+	rows, err := as.client.Query(ctx, query, args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -176,10 +196,9 @@ func (as authAttemptStatements) scan(rows pgx.Rows, attempt *domain.AuthAttempt)
 	for rows.Next() {
 		found = true
 		var (
-			attemptID        database.Identity
 			handoffToken     []byte
 			handedOffAt      *time.Time
-			sessionID        *int64
+			sessionID        *string
 			requiredChecks   []int16
 			checkType        *domain.AuthCheckType
 			timeToLive       *time.Duration
@@ -192,13 +211,12 @@ func (as authAttemptStatements) scan(rows pgx.Rows, attempt *domain.AuthAttempt)
 			factor           []byte
 		)
 		err := rows.Scan(
-			&attempt.ProjectID, &attemptID, &handoffToken, &handedOffAt, &sessionID,
+			&attempt.ProjectID, &attempt.ID, &handoffToken, &handedOffAt, &sessionID,
 			&requiredChecks, &attempt.CreatedAt, &checkType, &timeToLive,
 			&challengeID, &lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor)
 		if err != nil {
 			return wrapError(err)
 		}
-		attempt.ID = attemptID.String()
 
 		attempt.RequiredChecks = make([]domain.AuthCheckType, len(requiredChecks))
 		for i, c := range requiredChecks {
@@ -210,10 +228,7 @@ func (as authAttemptStatements) scan(rows pgx.Rows, attempt *domain.AuthAttempt)
 		if handedOffAt != nil {
 			attempt.HandedOffAt = handedOffAt
 		}
-		if sessionID != nil {
-			s := strconv.FormatInt(*sessionID, 10)
-			attempt.SessionID = &s
-		}
+		attempt.SessionID = sessionID
 		attempt.TimeToLive = timeToLive
 
 		if checkType == nil {
@@ -260,7 +275,7 @@ func (as authAttemptStatements) scan(rows pgx.Rows, attempt *domain.AuthAttempt)
 
 // DeleteAuthAttemptByID implements [service.AuthAttemptStatements].
 func (as authAttemptStatements) DeleteAuthAttemptByID(ctx context.Context, projectID, authAttemptID string) error {
-	_, err := as.client.Exec(ctx, deleteAuthAttemptByIDStmt, projectID, database.Identity(authAttemptID))
+	_, err := as.client.Exec(ctx, deleteAuthAttemptByIDStmt, projectID, authAttemptID)
 	return wrapError(err)
 }
 
@@ -271,7 +286,7 @@ func (as authAttemptStatements) HandoffAuthAttempt(ctx context.Context, attempt 
 	}
 	var handedOffAt time.Time
 	err := as.client.QueryRow(ctx, handoffAuthAttemptStmt,
-		attempt.ProjectID, database.Identity(attempt.ID), attempt.HandoffToken.TokenHash).Scan(&handedOffAt)
+		attempt.ProjectID, attempt.ID, attempt.HandoffToken.TokenHash).Scan(&handedOffAt)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -285,10 +300,14 @@ func (as authAttemptStatements) SetAuthAttemptChallenge(ctx context.Context, pro
 	if err != nil {
 		return fmt.Errorf("failed to marshal challenge payload: %w", err)
 	}
+	var checkID string
+	if err := ensureManagedID(&checkID, domain.PrefixChallenge); err != nil {
+		return err
+	}
 	var id string
 	var lastChallengedAt time.Time
 	err = as.client.QueryRow(ctx, setAuthAttemptChallengeStmt,
-		projectID, database.Identity(authAttemptID), challenge.Type(), payload).
+		projectID, authAttemptID, challenge.Type(), checkID, payload).
 		Scan(&id, &lastChallengedAt)
 	if err != nil {
 		return wrapError(err)
@@ -308,7 +327,7 @@ func (as authAttemptStatements) AuthAttemptChallengeSucceeded(ctx context.Contex
 	}
 	var lastVerifiedAt time.Time
 	err = as.client.QueryRow(ctx, authAttemptChallengeSucceededStmt,
-		projectID, database.Identity(authAttemptID), factor.Type(), factorPayload, challengeID).
+		projectID, authAttemptID, factor.Type(), factorPayload, challengeID).
 		Scan(&lastVerifiedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -325,7 +344,7 @@ func (as authAttemptStatements) AuthAttemptChallengeFailed(ctx context.Context, 
 	var lastFailedAt time.Time
 	var failureCount uint16
 	err := as.client.QueryRow(ctx, authAttemptChallengeFailedStmt,
-		projectID, database.Identity(authAttemptID), challenge.Type(), challenge.GetID()).
+		projectID, authAttemptID, challenge.Type(), challenge.GetID()).
 		Scan(&lastFailedAt, &failureCount)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

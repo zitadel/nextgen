@@ -10,17 +10,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-func (h *Harness) EnsureKek(t *testing.T) [32]byte {
-	t.Helper()
-	h.encryptionKey.mutex.Lock()
-	defer h.encryptionKey.mutex.Unlock()
-
-	if h.encryptionKey.value == nil {
-		h.encryptionKey.value = []byte("MasterkeyNeedsToHave32Characters")
-	}
-	return [32]byte(h.encryptionKey.value)
-}
-
 func (h *Harness) EnsureSigningKey(t *testing.T) *rsa.PrivateKey {
 	t.Helper()
 	h.signingKey.mutex.Lock()
@@ -81,22 +70,22 @@ func createNewHasher(t *testing.T) *crypto.PasswapHasher {
 	return hasher
 }
 
-func (h *Harness) EnsureRootKEK(t *testing.T) *domain.RootKEKs {
+func (h *Harness) EnsureMasterKey(t *testing.T) *domain.MasterKeys {
 	t.Helper()
-	h.rootKEKs.mutex.Lock()
-	defer h.rootKEKs.mutex.Unlock()
+	h.masterKeys.mutex.Lock()
+	defer h.masterKeys.mutex.Unlock()
 
-	if h.rootKEKs.value == nil {
+	if h.masterKeys.value == nil {
 		key, err := rsa.GenerateKey(rand.Reader, 4096)
 		require.NoError(t, err)
-		h.rootKEKs.value, err = domain.NewRootKEKs([]domain.RootKEK{
-			domain.NewRootKEK(
-				"root-kek",
+		h.masterKeys.value, err = domain.NewMasterKeys([]domain.MasterKey{
+			domain.NewMasterKey(
+				"master-key",
 				*key,
 				true,
 			),
 		})
 		require.NoError(t, err)
 	}
-	return h.rootKEKs.value
+	return h.masterKeys.value
 }

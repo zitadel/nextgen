@@ -1,5 +1,16 @@
 /* oxlint-disable playwright/expect-expect, playwright/no-conditional-in-test */
-import { expect, test, type CDPSession, type Locator, type Page } from "@playwright/test";
+import { randomUUID } from "node:crypto";
+
+import { expect, test, type Locator, type Page } from "@playwright/test";
+import {
+  clickFlowAction,
+  enableVirtualPasskey,
+  loginWithPasskey,
+  loginWithPassword,
+  registerWithPasskey,
+  registerWithPassword,
+  type ProfileEntry,
+} from "@zitadel/testing/playwright";
 
 test.describe.configure({ mode: "serial" });
 test.setTimeout(60_000);
@@ -15,6 +26,14 @@ const expectsProtectedRouteRedirect = framework === "next" || framework === "nux
 const loginUrl = /\/login(?:[/?#]|$)/;
 const profileUrl = /\/profile(?:[/?#]|$)/;
 
+// Fields some presets require at registration; the kit fills them only when
+// the flow renders them.
+const registrationProfile: ProfileEntry[] = [
+  { field: "givenName", value: "Ada", label: /given.?name/i },
+  { field: "familyName", value: "Lovelace", label: /family.?name/i },
+  { field: "dateOfBirth", value: "1990-01-15", label: /date.?of.?birth/i },
+];
+
 if (preset === "password-first") {
   test(`password-only registration, logout, and password login work in a fresh ${framework} app`, async ({
     page,
@@ -26,12 +45,14 @@ if (preset === "password-first") {
       await expectProtectedRouteToRedirect(page);
     }
     await gotoLogin(page);
-    await registerWithPassword(page, email, password);
+    await registerWithPassword(page, { email, password, profile: registrationProfile });
+    await skipPasskeyUpsellIfVisible(page);
     await expectSignedIn(page);
     await expectSessionCookie(page);
 
     await logout(page);
-    await loginWithPassword(page, email, password);
+    await gotoLogin(page);
+    await loginWithPassword(page, { email, password });
     await expectSignedIn(page);
     await expectSessionCookie(page);
   });
@@ -41,7 +62,7 @@ if (preset === "passkey-first") {
   test(`passkey-first preset: fallback registration, then one-tap passkey login in a fresh ${framework} app`, async ({
     page,
   }) => {
-    const authenticator = await enableVirtualAuthenticator(page);
+    const authenticator = await enableVirtualPasskey(page);
     const email = uniqueEmail("passkey-first");
 
     await gotoLogin(page);
@@ -54,26 +75,25 @@ if (preset === "passkey-first") {
 
     // Fresh user, no credential yet: take the email fallback into
     // registration and create the account with a passkey.
-    await clickAction(page, /use email instead|email_fallback/i, ["email_fallback"]);
-    await registerWithPasskey(page, email);
+    await clickFlowAction(page, "email_fallback", { name: /use email instead/i });
+    await registerWithPasskey(page, { email, profile: registrationProfile });
     await expectSignedIn(page);
     await expectSessionCookie(page);
-    await expectVirtualCredentialCount(authenticator, 1);
+    await expect.poll(() => authenticator.credentialCount()).toBe(1);
 
     await logout(page);
 
     // Returning user: one tap on the entry step's primary action — the
     // discoverable credential signs in without typing an email. Wait for
-    // the re-rendered entry step first: clickAction probes visibility
-    // without waiting, and right after the logout redirect the login
-    // component is still hydrating.
+    // the re-rendered entry step first: right after the logout redirect the
+    // login component is still hydrating.
     await gotoLogin(page);
     await expect(passkeyButtons.first()).toBeVisible({ timeout: 30_000 });
     await expect(passkeyButtons).toHaveCount(1);
-    await clickAction(page, /continue with passkey|passkey/i, ["passkey"]);
+    await loginWithPasskey(page);
     await expectSignedIn(page);
     await expectSessionCookie(page);
-    await expectVirtualCredentialCount(authenticator, 1);
+    await expect.poll(() => authenticator.credentialCount()).toBe(1);
   });
 }
 
@@ -81,21 +101,22 @@ if (preset === "password-first" && process.env.JOURNEY_ENABLE_PASSKEY !== "0") {
   test(`passkey-only registration, logout, and passkey login work in a fresh ${framework} app`, async ({
     page,
   }) => {
-    const authenticator = await enableVirtualAuthenticator(page);
+    const authenticator = await enableVirtualPasskey(page);
 
     const email = uniqueEmail("passkey");
 
     await gotoLogin(page);
-    await registerWithPasskey(page, email);
+    await registerWithPasskey(page, { email, profile: registrationProfile });
     await expectSignedIn(page);
     await expectSessionCookie(page);
-    await expectVirtualCredentialCount(authenticator, 1);
+    await expect.poll(() => authenticator.credentialCount()).toBe(1);
 
     await logout(page);
-    await loginWithPasskey(page, email);
+    await gotoLogin(page);
+    await loginWithPasskey(page, { email });
     await expectSignedIn(page);
     await expectSessionCookie(page);
-    await expectVirtualCredentialCount(authenticator, 1);
+    await expect.poll(() => authenticator.credentialCount()).toBe(1);
   });
 }
 
@@ -122,53 +143,6 @@ async function gotoLogin(page: Page): Promise<void> {
       await page.waitForURL(loginUrl, { timeout: 5000 });
     }
   });
-}
-
-async function registerWithPassword(
-  page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await fillEmail(page, email);
-  await advanceUnknownUserToRegistration(page);
-  await expectRegistrationChoice(page);
-  await fillEmailIfVisible(page, email);
-  await fillProfileFieldsIfVisible(page);
-  await choosePasswordRegistration(page);
-  await fillPassword(page, password);
-  await clickSubmit(page);
-  await skipPasskeyUpsellIfVisible(page);
-}
-
-async function loginWithPassword(
-  page: Page,
-  email: string,
-  password: string,
-): Promise<void> {
-  await gotoLogin(page);
-  await fillEmail(page, email);
-  if (!(await isPasswordVisible(page))) {
-    await clickSubmit(page);
-  }
-  await fillPassword(page, password);
-  await clickSubmit(page);
-}
-
-async function registerWithPasskey(page: Page, email: string): Promise<void> {
-  await fillEmail(page, email);
-  await advanceUnknownUserToRegistration(page);
-  await expectRegistrationChoice(page);
-  await fillEmailIfVisible(page, email);
-  await fillProfileFieldsIfVisible(page);
-  await clickAction(page, /register.*passkey|passkey.*register|passkey_register/i, [
-    "passkey_register",
-  ]);
-}
-
-async function loginWithPasskey(page: Page, email: string): Promise<void> {
-  await gotoLogin(page);
-  await fillEmail(page, email);
-  await clickAction(page, /sign in with.*passkey|passkey/i, ["passkey"]);
 }
 
 async function skipPasskeyUpsellIfVisible(page: Page): Promise<void> {
@@ -214,41 +188,6 @@ async function expectSessionCookie(page: Page): Promise<void> {
   expect(sessionCookie?.httpOnly).toBe(true);
 }
 
-type VirtualAuthenticator = {
-  client: CDPSession;
-  authenticatorId: string;
-};
-
-async function enableVirtualAuthenticator(page: Page): Promise<VirtualAuthenticator> {
-  const client = await page.context().newCDPSession(page);
-  await client.send("WebAuthn.enable");
-  const { authenticatorId } = await client.send("WebAuthn.addVirtualAuthenticator", {
-    options: {
-      protocol: "ctap2",
-      transport: "internal",
-      hasResidentKey: true,
-      hasUserVerification: true,
-      isUserVerified: true,
-      automaticPresenceSimulation: true,
-    },
-  });
-  return { client, authenticatorId };
-}
-
-async function expectVirtualCredentialCount(
-  authenticator: VirtualAuthenticator,
-  expected: number,
-): Promise<void> {
-  await expect
-    .poll(async () => {
-      const { credentials } = await authenticator.client.send("WebAuthn.getCredentials", {
-        authenticatorId: authenticator.authenticatorId,
-      });
-      return credentials.length;
-    })
-    .toBe(expected);
-}
-
 async function logout(page: Page): Promise<void> {
   const logout = logoutLocator(page);
   const userMenu = page.getByRole("button", { name: /open user menu/i });
@@ -272,65 +211,6 @@ async function logout(page: Page): Promise<void> {
   await expectSessionCleared(page);
 }
 
-async function advanceUnknownUserToRegistration(page: Page): Promise<void> {
-  if (await isPasswordVisible(page)) {
-    await clickAction(page, /sign up|create account|register|identifier\.action\.register/i, [
-      "register",
-    ]);
-    return;
-  }
-  await clickSubmit(page);
-}
-
-async function choosePasswordRegistration(page: Page): Promise<void> {
-  if (await isPasswordVisible(page)) {
-    return;
-  }
-  await clickAction(page, /continue.*password|password/i, ["submit"]);
-}
-
-async function expectRegistrationChoice(page: Page): Promise<void> {
-  await expect(
-    page.getByRole("heading", { name: /create|register|sign up|no-account/i }),
-  ).toBeVisible({ timeout: 30_000 });
-}
-
-async function fillEmail(page: Page, email: string): Promise<void> {
-  await fieldControl(page, "email", /email/i).fill(email);
-}
-
-async function fillEmailIfVisible(page: Page, email: string): Promise<void> {
-  const emailField = fieldControl(page, "email", /email/i);
-  if (await emailField.isVisible().catch(() => false)) {
-    await emailField.fill(email);
-  }
-}
-
-async function fillProfileFieldsIfVisible(page: Page): Promise<void> {
-  await fillFieldIfVisible(page, /given.?name/i, "Ada");
-  await fillFieldIfVisible(page, /family.?name/i, "Lovelace");
-  await fillFieldIfVisible(page, /date.?of.?birth/i, "1990-01-15");
-}
-
-async function fillFieldIfVisible(
-  page: Page,
-  label: RegExp,
-  value: string,
-): Promise<void> {
-  const field = page.getByLabel(label).first();
-  if (await field.isVisible().catch(() => false)) {
-    await field.fill(value);
-  }
-}
-
-async function fillPassword(page: Page, password: string): Promise<void> {
-  await fieldControl(page, "password", /password/i).fill(password);
-}
-
-async function isPasswordVisible(page: Page): Promise<boolean> {
-  return fieldControl(page, "password", /password/i).isVisible().catch(() => false);
-}
-
 async function expectSessionCleared(page: Page): Promise<void> {
   await expect
     .poll(
@@ -341,49 +221,6 @@ async function expectSessionCleared(page: Page): Promise<void> {
       { timeout: 5000 },
     )
     .toBe(false);
-}
-
-async function clickSubmit(page: Page): Promise<void> {
-  await clickAction(
-    page,
-    /continue|sign in|sign up|create account|register|.+\.action\.submit/i,
-    ["submit"],
-  );
-}
-
-async function clickAction(
-  page: Page,
-  name: RegExp,
-  actionNames: readonly string[] = [],
-): Promise<void> {
-  const candidates: Locator[] = [];
-  for (const actionName of actionNames) {
-    candidates.push(
-      page.getByTestId(`zitadel-action-${actionName}-button`),
-      page.getByTestId(`zitadel-action-${actionName}`),
-      page.getByTestId(`zitadel-action-${actionName}-link`),
-      actionLocator(page, actionName),
-    );
-  }
-  candidates.push(page.getByRole("button", { name }), page.getByRole("link", { name }));
-
-  for (const candidate of candidates) {
-    const target = candidate.first();
-    if (await target.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await target.click();
-      return;
-    }
-  }
-
-  const fallback = candidates[candidates.length - 1];
-  if (!fallback) {
-    throw new Error("No action candidates configured");
-  }
-  await fallback.first().click();
-}
-
-function actionLocator(page: Page, actionName: string) {
-  return page.locator(`zl-button[action="${actionName}"], [data-action="${actionName}"]`);
 }
 
 function isInterruptedByLoginNavigation(error: unknown): boolean {
@@ -409,23 +246,16 @@ function signedInLocator(page: Page): Locator {
   return page.getByRole("heading", { name: /signed in/i }).or(profileActionLocator(page));
 }
 
-function fieldControl(page: Page, fieldName: string, label: RegExp): Locator {
-  return page
-    .getByTestId(`zitadel-field-${fieldName}`)
-    .locator("input")
-    .or(page.locator(`zl-field[name="${fieldName}"]`).locator("input"))
-    .or(page.getByLabel(label))
-    .first();
-}
-
 function logoutLocator(page: Page) {
   return page
     .locator("zitadel-logout .signout-btn")
-    .or(actionLocator(page, "logout"))
+    .or(page.locator('zl-button[action="logout"], [data-action="logout"]'))
     .or(page.getByRole("button", { name: /logout|sign out/i }))
     .or(page.getByRole("link", { name: /logout|sign out/i }));
 }
 
 function uniqueEmail(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}@example.test`;
+  // crypto-backed, not Math.random(): these identifiers flow into the kit's
+  // credential-shaped ceremony inputs, where CodeQL flags insecure randomness.
+  return `${prefix}-${Date.now()}-${randomUUID().slice(0, 8)}@example.test`;
 }

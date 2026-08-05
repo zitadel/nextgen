@@ -17,7 +17,6 @@ A project is a tenant / deployment. One project is reserved as the **platform pr
 ```http
 /projects
 /projects/{id}
-/projects/{id}/branding
 /projects/{id}/domains
 /projects/{id}/features
 /projects/{id}/allowed_origins
@@ -25,6 +24,32 @@ A project is a tenant / deployment. One project is reserved as the **platform pr
 /projects/{id}/api_keys
 /projects/{id}/webhooks
 ```
+
+Branding is project-scoped but flat by revision id — see [Branding](#branding).
+
+---
+
+## Branding
+
+Immutable per-project login-appearance revisions (ADR 040). Create publishes a
+new revision; there is no update or delete. Flow responses resolve the latest
+revision for the project.
+
+```http
+/branding
+/branding/{id}
+```
+
+Create/list are project-scoped (project id on the request, matching OpenAPI):
+
+```http
+POST /branding                  # publish a new revision
+GET  /branding                  # list revisions for the project, newest first
+GET  /branding/{id}
+```
+
+Permission names in
+[`system-permission-catalog.md`](system-permission-catalog.md#project-scoped-configuration).
 
 ---
 
@@ -97,9 +122,37 @@ relationship and policy requires deprovisioning.
 
 ---
 
+## User schemas
+
+User profile / directory schema definitions — the field structure that user
+records follow. Only user schemas exist today; the collection is project-scoped.
+
+```http
+/schemas
+/schemas/{id}
+```
+
+Create/list with explicit scope:
+
+```http
+POST /schemas                   # create a user schema
+GET  /schemas?project_id=…&object_type=…
+GET  /schemas/{id}
+```
+
+`PATCH`/`DELETE /schemas/{id}` are **not yet exposed** — create, list, and get
+only. Permission names in
+[`system-permission-catalog.md`](system-permission-catalog.md#schemas-user-schemas).
+
+---
+
 ## Credentials (globally addressable)
 
-API keys are first-class resources with their own URL. Listing happens under the scope that owns them (`/projects/{id}/api_keys`, `/teams/{id}/api_keys`).
+> **Parked as a management resource** — see
+> [`system-permission-catalog.md` open questions](system-permission-catalog.md#open-questions)
+> and [`credentials.md`](credentials.md#api-keys-as-first-class-resources--parked).
+> Opaque `sk_*` service tokens remain; first-class `/api_keys` CRUD is not catalog
+> contract yet. URL inventory below is design sketch only.
 
 ```http
 /api_keys/{id}
@@ -107,7 +160,8 @@ API keys are first-class resources with their own URL. Listing happens under the
 /api_keys/{id}/revoke
 ```
 
-Detail in [`credentials.md`](credentials.md).
+Listing under the owning scope (`/projects/{id}/api_keys`, `/teams/{id}/api_keys`)
+was part of the same sketch. Detail in [`credentials.md`](credentials.md).
 
 ---
 
@@ -145,8 +199,10 @@ POST /sessions/exchange
 ```http
 POST   /sessions                         # optional anonymous pre-auth shell
 GET    /sessions                         # list (admin / management)
-GET    /sessions/{id}
-DELETE /sessions/{id}                    # logout
+GET    /sessions/{id}                    # operator get
+DELETE /sessions/{id}                    # operator revoke (not logout)
+GET    /sessions/me                      # end-user get (`nextgenSession` cookie)
+DELETE /sessions/me                      # end-user logout (`nextgenSession` cookie)
 ```
 
 Sessions carry factors + `assurance_levels[]`. Clients read and revoke
@@ -169,14 +225,15 @@ POST /flows/{session_id}/event
 Flow definition management (uploaded via `npx zitadel push`):
 
 ```http
-POST   /flow-definitions
-GET    /flow-definitions/{id}
-PATCH  /flow-definitions/{id}
-DELETE /flow-definitions/{id}
-POST   /flow-definitions/{id}/activate
-POST   /flow-definitions/{id}/archive
-POST   /flow-definitions/{id}/validate
-POST   /flow-definitions/{id}/simulate
+POST   /flow_definitions
+GET    /flow_definitions
+GET    /flow_definitions/{id}
+PUT    /flow_definitions/{id}
+DELETE /flow_definitions/{id}
+POST   /flow_definitions/{id}/activate
+POST   /flow_definitions/{id}/deactivate
+# planned: POST /flow_definitions/{id}/validate
+# planned: POST /flow_definitions/{id}/simulate
 ```
 
 ---
@@ -295,3 +352,4 @@ continues to come from that source, not from these design sketches.
 - [`url-architecture.md`](url-architecture.md) — flat vs nested rule, no version segment
 - [`authn-and-auth-flows.md`](authn-and-auth-flows.md) — auth_attempts detail
 - [`credentials.md`](credentials.md) — api_keys, `sk_*` tokens
+- [`system-permission-catalog.md`](system-permission-catalog.md) — required permission names

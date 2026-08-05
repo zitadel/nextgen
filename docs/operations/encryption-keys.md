@@ -1,7 +1,7 @@
-# Encryption keys (KEK / DEK)
+# Encryption keys (master key / project KEK)
 
-How the server protects secrets at rest: what a root key-encryption key (KEK)
-is, how it is generated, how it is configured, and how it is rotated.
+How the server protects secrets at rest: what a master key is, how it is generated, how it is configured, and how it is
+rotated.
 
 Design rationale lives in
 [ADR 029](../adrs/029-cryptography-secrets-and-key-lifecycle.md) and
@@ -10,65 +10,69 @@ implementation.
 
 ## The envelope
 
-Zitadel uses envelope encryption. Two layers of keys:
+Zitadel uses envelope encryption. Three layers of keys:
 
 ```mermaid
 graph TD
-    KEK["Root KEK<br>RSA private key<br>from config / file"]
-    DEK["DEK — per project<br>32 random bytes, AES-256-GCM<br>row in encryption_keys"]
-    Data["Encrypted data<br>tokens, third-party secrets, …"]
-    KEK -- " wraps (JWE, RSA-OAEP-256 + A256GCM) " --> DEK
-    DEK -- " encrypts (AES-256-GCM) " --> Data
+    MasterKey["Master key<br>RSA private key<br>from config / file"]
+    KEK["Project KEK<br>32 random bytes, AES-256-GCM<br>row in encryption_keys"]
+    PurposeKeys["Purpose-scoped keys — per project<br>token / secret / cookie encryption,<br>token signing"]
+    Data["Encrypted data<br>tokens, third-party secrets, cookies, …"]
+    MasterKey -- " wraps (JWE, RSA-OAEP-256 + A256GCM) " --> KEK
+    KEK -- " wraps (JWE, A256GCM) " --> PurposeKeys
+    PurposeKeys -- " encrypt (AES-256-GCM) " --> Data
 ```
 
-|            | Root KEK                                                    | DEK                                                   |
-|------------|-------------------------------------------------------------|-------------------------------------------------------|
-| Type       | RSA private key (asymmetric)                                | 32 random bytes (AES-256)                             |
-| Scope      | Global, one per deployment (plus decrypt-only predecessors) | One active key per project                            |
-| Lives in   | Config file or a file on disk                               | `encryption_keys` table, wrapped                      |
-| Created by | The operator (or auto-generated for local dev)              | The server, at project creation                       |
-| Rotated by | The operator, by adding a new key to config                 | Re-wrapped on KEK rotation; not rotated on a schedule |
+|            | Master key                                                  | Project KEK                                          | Purpose-scoped keys                             |
+|------------|-------------------------------------------------------------|------------------------------------------------------|-------------------------------------------------|
+| Type       | RSA private key (asymmetric)                                | 32 random bytes (AES-256)                            | 32 random bytes (AES-256), or EdDSA for signing |
+| Scope      | Global, one per deployment (plus decrypt-only predecessors) | One active key per project                           | One active key per purpose, per project         |
+| Lives in   | Config file or a file on disk                               | `encryption_keys` table, wrapped                     | `encryption_keys` / `signing_keys`, wrapped     |
+| Created by | The operator (or auto-generated for local dev)              | The server, at project creation                      | The server, at project creation                 |
+| Rotated by | The operator, by adding a new key to config                 | Re-wrapped on master key rotation; not on a schedule | Not rotated on a schedule                       |
 
-The root KEK never encrypts application data directly — it only wraps DEKs. The DEK never leaves the database in
-plaintext; it exists in plaintext only in memory, after a successful unwrap.
+Neither the master key nor the project KEK encrypts application data directly — the master key only wraps project KEKs,
+and a project KEK only wraps that project's purpose-scoped keys. Because each class of data has its own key, a
+purpose-scoped key can be rotated without re-encrypting anything the other keys protect. No key below the master key
+ever leaves the database in plaintext; each exists in plaintext only in memory, after a successful unwrap.
 
 ## Key identity is part of the ciphertext
 
-A wrapped DEK is a JWE compact serialization whose protected header carries the wrapping KEK's ID as `kid`:
+A wrapped key is a JWE compact serialization whose protected header carries the wrapping key's ID as `kid`:
 
 ```
-eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2R0NNIiwia2lkIjoicm9vdC1rZWsifQ...
+eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2R0NNIiwia2lkIjoibWFzdGVyLWtleSJ9...
 ```
 
-On decrypt the server reads `kid` from the header and looks up exactly that key (`domain.RootKEKs.GetByKeyID`) instead
+On decrypt the server reads `kid` from the header and looks up exactly that key (`domain.MasterKeys.GetByKeyID`) instead
 of trying every configured key. Two consequences that matter operationally:
 
-- **The KEK ID must stay stable.** The ID is the YAML map key under
-  `server.encryption_keys`, or — for keys discovered in the KEK directory — the *file name*. Renaming a config entry or
-  a key file makes every DEK wrapped by it unresolvable, even though the key material is unchanged.
-- **A KEK may only be removed from config once no DEK references it.** See
-  [Rotation](#rotating-the-root-kek).
+- **The master key ID must stay stable.** The ID is the YAML map key under
+  `server.master_keys`, or — for keys discovered in the master key directory — the *file name*. Renaming a config entry
+  or a key file makes every project KEK wrapped by it unresolvable, even though the key material is unchanged.
+- **A master key may only be removed from config once no project KEK references it.** See
+  [Rotation](#rotating-the-master-key).
 
 The algorithms are fixed: `RSA-OAEP-256` for key wrapping and `A256GCM` for content encryption
 (`internal/domain/encryption_key.go`). Only RSA keys are accepted; EC/Ed25519 keys are rejected at startup.
 
-## Generating a KEK
+## Generating a master key
 
 ### Automatic (local development only)
 
-If `server.encryption_keys` is unset **and** the KEK directory is empty, the server generates a 4096-bit RSA key on
+If `server.master_keys` is unset **and** the master key directory is empty, the server generates a 4096-bit RSA key on
 first start, writes it to
-`<server.data_dir>/keks/root-kek.pem` with mode `0600`, and prints:
+`<server.data_dir>/master-keys/master-key.pem` with mode `0600`, and prints:
 
 ```
-created server KEK file at .../keks/root-kek.pem (generated for local/dev only; configure server.encryption_keys for production)
+created server master key file at .../master-keys/master-key.pem (generated for local/dev only; configure server.master_keys for production)
 ```
 
 The key is reused on subsequent starts as long as `server.data_dir` persists.
 `server.data_dir` defaults to a `nextgen-data` directory next to the binary; in the Docker Compose quick start it is
 backed by the `nextgen-server-data`
-volume. If that directory is wiped, the key is gone and every DEK — and therefore everything encrypted under it — is
-unrecoverable.
+volume. If that directory is wiped, the key is gone and every project KEK — and therefore everything encrypted under
+it — is unrecoverable.
 
 ### Manual (any shared or production deployment)
 
@@ -76,10 +80,10 @@ Generate an RSA private key with your own tooling and hand it to the server thro
 
 ```sh
 # PKCS#1 PEM
-openssl genrsa -out root-kek-2026-07.pem 4096
+openssl genrsa -out master-key-2026-07.pem 4096
 
 # or PKCS#8 PEM
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out root-kek-2026-07.pem
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out master-key-2026-07.pem
 ```
 
 Accepted input formats (`internal/crypto.ParseRSAKey`):
@@ -94,13 +98,13 @@ The key must be unencrypted (no passphrase); the server does not prompt for one.
 ```yaml
 server:
   data_dir: /var/lib/nextgen
-  encryption_keys:
+  master_keys:
     # The map key IS the key ID written into every JWE header. Keep it stable.
-    root-kek-2026-07:
+    master-key-2026-07:
       use_for_encryption: true
-      file: /etc/nextgen/keys/root-kek-2026-07.pem
-    root-kek-2026-01:
-      # decrypt-only: still unwraps DEKs it wrapped earlier
+      file: /etc/nextgen/keys/master-key-2026-07.pem
+    master-key-2026-01:
+      # decrypt-only: still unwraps project KEKs it wrapped earlier
       private_key: |
         -----BEGIN PRIVATE KEY-----
         ...
@@ -111,9 +115,9 @@ server:
 |----------------------|-------------------------------|--------------------------------------------------------------------------------|
 | `file`               | one of `file` / `private_key` | Path to the RSA private key file (PEM or JWK)                                  |
 | `private_key`        | one of `file` / `private_key` | The RSA private key inline. **Takes precedence over `file`** when both are set |
-| `use_for_encryption` | see below                     | Marks the key used to wrap new and re-wrapped DEKs                             |
+| `use_for_encryption` | see below                     | Marks the key used to wrap new and re-wrapped project KEKs                     |
 
-Rules enforced at startup (`buildRootKEK` → `domain.NewRootKEKs`):
+Rules enforced at startup (`buildMasterKey` → `domain.NewMasterKeys`):
 
 - At least one key must resolve, otherwise the server exits with
   `no root encryption key provided`.
@@ -127,23 +131,23 @@ Rules enforced at startup (`buildRootKEK` → `domain.NewRootKEKs`):
 
 All other keys are decrypt-only.
 
-`server.encryption_keys` is **YAML-only**. It is a map with operator-chosen keys, so it is not bound to `NEXTGEN_*`
+`server.master_keys` is **YAML-only**. It is a map with operator-chosen keys, so it is not bound to `NEXTGEN_*`
 environment variables the way scalar settings are — use a config file (mounted from a secret) for key material.
 
-### KEK-directory discovery
+### Master-key-directory discovery
 
 Independently of the config file, the server scans
-`<server.data_dir>/keks/` on every start (`ensureServerKEK`, creating the directory with mode `0700` if missing) and
-merges every file it finds into
-`server.encryption_keys`, keyed by file name:
+`<server.data_dir>/master-keys/` on every start (`ensureServerMasterKey`, creating the directory with mode `0700` if
+missing) and merges every file it finds into
+`server.master_keys`, keyed by file name:
 
 | Situation                               | Result                                                                                                                                                                        |
 |-----------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Config has keys                         | Directory files are added as **decrypt-only** entries (they never get `use_for_encryption`). A directory file whose name equals a config entry's ID **overwrites** that entry |
 | Config has no keys, directory has files | All files are loaded; the one with the newest mtime is marked for encryption                                                                                                  |
-| Neither                                 | A 4096-bit key is generated at `keks/root-kek.pem` and marked for encryption                                                                                                  |
+| Neither                                 | A 4096-bit key is generated at `master-keys/master-key.pem` and marked for encryption                                                                                         |
 
-> **⚠ The merge is not skipped when `server.encryption_keys` is set.** Directory
+> **⚠ The merge is not skipped when `server.master_keys` is set.** Directory
 > scanning happens on every start, even for a fully explicit configuration, and
 > a same-named directory file **replaces the entire config entry** rather than
 > filling in its blanks — the replacement carries only `file`, so an inline
@@ -151,130 +155,140 @@ merges every file it finds into
 >
 > Two failure modes follow, and neither is reported as a configuration error:
 >
-> - **Wrong key material, silently.** A config entry named e.g. `root-kek.pem`
+> - **Wrong key material, silently.** A config entry named e.g. `master-key.pem`
 >   with an inline `private_key` is replaced by the RSA key in
->   `<data_dir>/keks/root-kek.pem`. The key ID is unchanged, so `kid` lookups
->   still resolve — they just resolve to a different key, and every unwrap fails
->   at use with `encryption_key.decrypt_failed`.
+>   `<data_dir>/master-keys/master-key.pem`. The key ID is unchanged, so `kid`
+>   lookups still resolve — they just resolve to a different key, and every
+>   unwrap fails at use with `enc_key.decrypt_failed`.
 > - **Lost encryption marker.** If the overwritten entry was the one marked
 >   `use_for_encryption` and other keys are configured, startup aborts with
 >   `no key is marked for encryption`.
 >
 > Mitigations, in order of preference:
 >
-> 1. Point `server.data_dir` at a directory whose `keks/` subdirectory is empty
->    (and has never held a generated key) for any deployment that configures
->    `server.encryption_keys` explicitly.
+> 1. Point `server.data_dir` at a directory whose `master-keys/` subdirectory is
+>    empty (and has never held a generated key) for any deployment that
+>    configures `server.master_keys` explicitly.
 > 2. Never name a config entry after a file that exists — or could later be
->    created — in the KEK directory. In particular, avoid the ID `root-kek.pem`,
->    which is the name the dev-mode generator uses.
+>    created — in the master key directory. In particular, avoid the ID
+>    `master-key.pem`, which is the name the dev-mode generator uses.
 > 3. Prefer IDs that cannot collide with a file name at all (e.g.
->    `root-kek-2026-07`, no extension).
+>    `master-key-2026-07`, no extension).
 >
-> Skipping the directory merge entirely when `server.encryption_keys` is
-> non-empty would remove the hazard; until that changes, treat the KEK directory
-> and explicit key configuration as mutually exclusive.
+> Skipping the directory merge entirely when `server.master_keys` is
+> non-empty would remove the hazard; until that changes, treat the master key
+> directory and explicit key configuration as mutually exclusive.
 
-## DEK lifecycle
+## Project key lifecycle
 
-A DEK is created when a project is created (`projectService.Create`): 32 bytes from `crypto/rand`, wrapped with the
-current encryption KEK, activated, and inserted in the same transaction as the project. A project therefore never exists
-without an active DEK.
+A project's full key set is created when the project is created (`projectService.Create`) and inserted in the same
+transaction as the project, so a project never exists without one:
 
-Storage (`encryption_keys` table, migration `000012_crypto_keys.sql`):
+| Key                   | Purpose value | Wrapped by      | Used for                                     |
+|-----------------------|---------------|-----------------|----------------------------------------------|
+| Key encryption key    | `kek`         | The master key  | Wrapping the project's other keys            |
+| Token encryption key  | `token`       | The project KEK | Opaque tokens, project and preview secrets   |
+| Secret encryption key | `secret`      | The project KEK | Third-party secrets (IdP secrets, API keys)  |
+| Cookie encryption key | `cookie`      | The project KEK | Flow state cookies                           |
+| Token signing key     | `token`       | The project KEK | Signing tokens (EdDSA, `signing_keys` table) |
+
+Each key is 32 bytes from `crypto/rand` (the signing key is an EdDSA key pair), wrapped and activated at creation.
+
+Storage (`encryption_keys` and `signing_keys` tables, migration `000012_crypto_keys.sql`):
 
 | Column                                     | Notes                                                          |
 |--------------------------------------------|----------------------------------------------------------------|
 | `project_id`, `id`                         | Composite primary key; `project_id` cascades on project delete |
 | `key`                                      | The wrapped key — JWE compact serialization, never plaintext   |
-| `algorithm`                                | `A256GCM`                                                      |
+| `algorithm`                                | `A256GCM` (`EdDSA` for signing keys)                           |
 | `state`                                    | `not_active_yet` / `active` / `expired` / `removed`            |
-| `purpose`                                  | `dek` or `kek`                                                 |
+| `purpose`                                  | `kek`, `token`, `secret` or `cookie`                           |
 | `created_at`, `activated_at`, `retired_at` | Lifecycle timestamps                                           |
 
-A partial unique index (`uq_deks_active_per_project`) enforces at most one
-`active` DEK per project.
+One partial unique index per purpose (`uq_keks_active_per_project`,
+`uq_token_encryption_keys_active_per_project`, and so on) enforces at most one
+`active` key per purpose per project.
 
-Read path — `keyService.GetProjectDEKCrypter(ctx, projectID)`:
+Read path — `keyService.GetProjectCrypter(ctx, projectID, purpose)`:
 
-1. Load the project's `active` DEK row.
+1. Load the project's `active` row for that purpose.
 2. Decode the JWE header of `key` to get the wrapping `kid`.
-3. If `kid` matches a configured root KEK, unwrap with it. Otherwise treat
-   `kid` as another key **in the database** and resolve it recursively — this is what allows chained key hierarchies
-   beyond the single KEK→DEK layer.
-4. Verify the unwrapped key is exactly 32 bytes and build an AES-256-GCM crypter whose own key ID is the DEK ID.
+3. If `kid` matches a configured master key, unwrap with it. Otherwise treat
+   `kid` as another key **in the database** and resolve it recursively — this is what resolves a purpose-scoped key
+   through its project KEK, and what allows deeper key hierarchies.
+4. Verify the unwrapped key is exactly 32 bytes and build an AES-256-GCM crypter whose own key ID is the key's ID.
 
-That DEK ID is what lands in the `kid` header of everything the DEK encrypts (tokens, third-party secrets), so the same
+That key ID is what lands in the `kid` header of everything the key encrypts (tokens, third-party secrets), so the same
 header-driven lookup works one layer down.
 
-## Rotating the root KEK
+## Rotating the master key
 
 Rotation is driven entirely by configuration; there is no API call or CLI command for it.
 
-1. **Add** the new key to `server.encryption_keys` with
+1. **Add** the new key to `server.master_keys` with
    `use_for_encryption: true`, and **keep** the previous key in the config with
    `use_for_encryption` unset (or absent).
-2. **Restart** the server. From that moment new DEKs are wrapped with the new key, and old DEKs still unwrap with the
-   retained predecessor.
-3. **Re-wrap runs automatically.** After the HTTP listener starts, the server runs `keyService.MigrateToLatestRootKEK`
+2. **Restart** the server. From that moment new project KEKs are wrapped with the new key, and old ones still unwrap
+   with the retained predecessor.
+3. **Re-wrap runs automatically.** After the HTTP listener starts, the server runs `keyService.MigrateToLatestMasterKey`
    in the background: it pages through every row in `encryption_keys` (100 at a time, ordered by ID), and for each row
-   whose `kid` points at a configured root KEK that is *not* the current encryption key, it unwraps with the old key,
-   re-wraps with the new one, and updates the row. Rows already wrapped by the current key, and rows wrapped by a key
-   that is not a configured root KEK, are skipped.
+   whose `kid` points at a configured master key that is *not* the current encryption key, it unwraps with the old key,
+   re-wraps with the new one, and updates the row. Rows already wrapped by the current key, and rows wrapped by a
+   project KEK rather than a master key, are skipped.
 4. **Confirm** completion in the logs:
 
    ```
-   INFO  migrate KEKs
-   DEBUG KEK migration done
+   INFO  migrate keys to latest master key
+   DEBUG master key migration done
    ```
 
-   Failures are logged as `error during KEK migration` with per-key details and are **not fatal** — the server keeps
-   serving, and the migration is retried on the next start.
+   Failures are logged as `error during master key migration` with per-key details and are **not fatal** — the server
+   keeps serving, and the migration is retried on the next start.
 5. **Remove** the old key from configuration only after a clean migration run.
 
-The plaintext DEK material is unchanged by rotation, so nothing encrypted *by*
-a DEK has to be re-encrypted. Only the small wrapped-key column is rewritten, which is why routine rotation is cheap.
+The plaintext key material is unchanged by rotation, so nothing encrypted *by* a project KEK or a purpose-scoped key has
+to be re-encrypted. Only the small wrapped-key column is rewritten, which is why routine rotation is cheap.
 
 ### Cautions
 
-- **Do not remove a KEK before its DEKs are migrated.** A DEK whose `kid` is no longer configured is skipped by the
-  migration (it is indistinguishable from a key wrapped by another database key) and fails at use with
-  `encryption_key.decrypt_failed` / `encryption_key.not_found`.
+- **Do not remove a master key before the project KEKs it wrapped are migrated.** A KEK whose `kid` is no longer
+  configured is skipped by the migration (it is indistinguishable from a key wrapped by another database key) and fails
+  at use with `enc_key.decrypt_failed` / `enc_key.not_found`.
 - **Do not rename a key ID as part of rotation.** Rotation means adding a *new*
   ID; changing an existing ID orphans its ciphertexts.
-- **Keep retired keys until migration is verified**, then destroy them deliberately — a retained compromised KEK is a
-  live risk (ADR 039).
-- **Back up the KEK separately from the database.** A backup of the database alone is useless without the KEK; a leak of
-  both together exposes every DEK.
+- **Keep retired keys until migration is verified**, then destroy them deliberately — a retained compromised master key
+  is a live risk (ADR 039).
+- **Back up the master key separately from the database.** A backup of the database alone is useless without the master
+  key; a leak of both together exposes every project KEK.
 
-For compromise handling — including the case where the KEK *and* the database are both exposed, which requires new DEKs
-and re-encryption of the data itself rather than just re-wrapping — follow
+For compromise handling — including the case where the master key *and* the database are both exposed, which requires
+new keys and re-encryption of the data itself rather than just re-wrapping — follow
 [ADR 039 §2](../adrs/039-signing-key-rotation-and-incident-response.md).
 
 ## Errors
 
-| Code                                | Meaning                                              |
-|-------------------------------------|------------------------------------------------------|
-| `encryption_key.not_found`          | No key row for the requested ID/project/state        |
-| `encryption_key.decrypt_failed`     | Unwrap failed, or the unwrapped key was not 32 bytes |
-| `encryption_key.encrypt_failed`     | Wrapping failed during rotation                      |
-| `encryption_key.unknown_alg`        | Key stored with an algorithm other than `A256GCM`    |
-| `encryption_key.no_replacement_key` | A key was retired without a successor                |
+| Code                         | Meaning                                              |
+|------------------------------|------------------------------------------------------|
+| `enc_key.not_found`          | No key row for the requested ID/project/state        |
+| `enc_key.decrypt_failed`     | Unwrap failed, or the unwrapped key was not 32 bytes |
+| `enc_key.encrypt_failed`     | Wrapping failed during rotation                      |
+| `enc_key.unknown_alg`        | Key stored with an algorithm other than `A256GCM`    |
+| `enc_key.no_replacement_key` | A key was retired without a successor                |
 
 Startup errors from key configuration are plain `server: …` errors and abort the process.
 
 ## Where this lives in the code
 
-| Concern                                                                  | Location                                                                                    |
-|--------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
-| `RootKEK` / `RootKEKs`, `EncryptionKey`, wrap/unwrap, rotation primitive | `internal/domain/encryption_key.go`                                                         |
-| RSA key parsing (PEM / OpenSSH / JWK)                                    | `internal/crypto/key_parser.go`                                                             |
-| Config shape                                                             | `cmd/server/config.go` (`EncryptionKeyConfig`)                                              |
-| KEK directory handling and dev key generation                            | `cmd/server/runtime.go` (`ensureServerKEK`)                                                 |
-| Startup wiring and validation                                            | `cmd/server/server.go` (`buildRootKEK`)                                                     |
-| DEK lookup, crypter construction, rotation job                           | `internal/service/keys.go`                                                                  |
-| DEK creation at project creation                                         | `internal/service/project.go`                                                               |
-| Schema                                                                   | `internal/storage/v2/dialect/{postgres,spanner}/migration/sql/000012_crypto_keys.sql` |
+| Concern                                                                      | Location                                                                              |
+|------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
+| `MasterKey` / `MasterKeys`, `EncryptionKey`, wrap/unwrap, rotation primitive | `internal/domain/encryption_key.go`                                                   |
+| RSA key parsing (PEM / OpenSSH / JWK)                                        | `internal/crypto/key_parser.go`                                                       |
+| Config shape                                                                 | `cmd/server/config.go` (`MasterKeyConfig`)                                            |
+| Master key directory handling and dev key generation                         | `cmd/server/runtime.go` (`ensureServerMasterKey`)                                     |
+| Startup wiring and validation                                                | `cmd/server/server.go` (`buildMasterKey`)                                             |
+| Key lookup by purpose, crypter construction, rotation job                    | `internal/service/keys.go`                                                            |
+| Project key set creation                                                     | `internal/domain/project.go` (`GenerateNewKeySet`), `internal/service/project.go`     |
+| Schema                                                                       | `internal/storage/v2/dialect/{postgres,spanner}/migration/sql/000012_crypto_keys.sql` |
 
 ## See also
 

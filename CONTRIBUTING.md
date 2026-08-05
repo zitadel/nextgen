@@ -18,9 +18,11 @@ If you want to add Zitadel to your own app rather than contribute here, see the
 
 ### Using the devcontainer
 
-The devcontainer at [.devcontainer/](.devcontainer/) pins Go 1.26 and a
-PostgreSQL sidecar. After changing devcontainer configuration, use
-**Dev Containers: Rebuild Container** so features and volume mounts apply.
+The devcontainer at [.devcontainer/](.devcontainer/) pins Go 1.26. With no
+database configured, the server uses SQLite under the server data directory
+(same zero-config default as outside the container). After changing
+devcontainer configuration, use **Dev Containers: Rebuild Container** so
+features and volume mounts apply.
 
 The devcontainer reuses the host Docker daemon (Docker-outside-of-Docker), so
 container-backed workflows such as the
@@ -67,9 +69,10 @@ moon run console:build login-ui:build
 go run . server
 ```
 
-With no database configured, the server starts embedded Postgres and stores its
-data under the server data directory. Use `-c docs/operations/nextgen.example.yaml`
-or `NEXTGEN_DATABASE_POSTGRES` when you want to point at a database you manage.
+With no database configured, the server uses SQLite at
+`<server.data_dir>/zitadel.db`. Override with `-c docs/operations/nextgen.example.yaml`,
+`NEXTGEN_DATABASE_SQLITE`, or `NEXTGEN_DATABASE_POSTGRES` when you want a
+path or DSN you manage.
 
 Open http://localhost:8080/ui/console/ and http://localhost:8080/ui/login/
 
@@ -256,14 +259,33 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 
 - `moon run server:check-generate` — Go generated-file drift check.
 - Playwright Chromium install for `@zitadel/components`.
-- `moon ci :lint :typecheck :build :test :test-browser`.
-- `moon run server:test`, then `moon run server:test-postgres` (Spanner
-  integration is not run in CI yet; see the note in the workflow).
+- `moon ci :lint :typecheck :build :test :test-browser :check-adrs`.
+- `moon run server:test`, then `moon run server:test-postgres`,
+  `moon run server:test-spanner` (Spanner emulator testcontainer, or a
+  real instance when `SPANNER_TEST_INSTANCE` is set), and
+  `moon run server:test-sqlite`.
 - `moon run release:snapshot -- --skip-container` — a non-publishing release
   snapshot.
 - The fresh-app consumer journey (`cli-journey-e2e:e2e-local`) with the npm
-  binary runtime against the snapshot's packed tarballs, plus one
-  passkey-first preset journey run.
+  binary runtime against the snapshot's packed tarballs, one passkey-first
+  preset journey run, and the test-kit consumer journey
+  (`cli-journey-e2e:e2e-testkit`).
+- The real-instance suites: `testing:test-integration` with
+  `demo-next-e2e:e2e-real`, then `console-e2e:e2e-real`.
+
+Within full mode, the steps after the `moon ci` graph are additionally gated
+by moon's affected task selection (`moon query tasks --affected --downstream
+deep`, computed in `scripts/ci-mode.mjs`): a lane is skipped when the diff
+provably cannot reach its tasks — a docs-only PR runs almost nothing, a
+frontend-only PR skips the Go suites. The gates fail open: known repo-wide
+files no moon task claims (workflow definitions, `scripts/`, moon config,
+root manifests and compiler/release inputs such as `tsconfig.base.json`), an
+empty diff, or a failed query all force the complete run — and when the
+query returns an empty affected set, the run is only skipped if every
+changed file is on a narrow explicitly-inert allowlist (`docs/`, root agent
+notes), because unclaimed files are not assumed inert. The journeys and the
+snapshot share one gate because the tarball handoff between them is a
+filesystem contract moon cannot see.
 
 **Version-only mode** (Changesets version PRs) runs `release:version`,
 `release:pack`, and tarball verification instead.
@@ -279,28 +301,52 @@ the Docker-fallback journey do not run in CI; they stay opt-in local checks
 
 ### Go database integration tests
 
-Both the Postgres and Spanner integration tests use
-[testcontainers](https://golang.testcontainers.org/) to start their databases
-(a Postgres container and the Cloud Spanner emulator), so a running Docker
-daemon is required — see
-[Using the devcontainer](#using-the-devcontainer) for the
-Docker-outside-of-Docker setup. Run them with the same commands CI's
-`server:test-postgres` task wraps:
+SQLite integration tests use a local file database and need no Docker:
 
 ```sh
-# Postgres
-go test -v -tags postgres_integration -timeout=10m ./...
-
-# Spanner
-go test -v -tags spanner_integration -timeout=10m ./...
+moon run server:test-sqlite
+# or: go test -v -tags sqlite_integration -timeout=5m ./...
 ```
 
-To run the integration tests against a database you manage instead of
+Postgres and Spanner integration tests use
+[testcontainers](https://golang.testcontainers.org/) to start their databases
+(a Postgres container and the Cloud Spanner **emulator** image), so a running
+Docker daemon is required — see
+[Using the devcontainer](#using-the-devcontainer) for the
+Docker-outside-of-Docker setup. Local zero-config runs use SQLite and need no
+Docker.
+
+```sh
+# Postgres (testcontainer, or ZITADEL_TEST_POSTGRES_URL)
+moon run server:test-postgres
+# or: go test -v -tags postgres_integration -timeout=10m ./...
+
+# Spanner (prefer the Moon task — see emulator-testcontainer note below)
+moon run server:test-spanner
+```
+
+To run the Postgres or Spanner suites against a database you manage instead of
 testcontainers, set `ZITADEL_TEST_POSTGRES_URL` (Postgres DSN) or
-`ZITADEL_TEST_SPANNER_URL` (Spanner DSN); every integration suite honors
-these and connects to your database instead of starting a container, so
-`go test -tags … ./...` needs no Docker. Point it at a throwaway database —
-the suites run migrations that create the `zitadel_nextgen` schema.
+`ZITADEL_TEST_SPANNER_URL` (Spanner DSN); those suites honor the env vars and
+connect instead of starting a container, so `go test -tags … ./...` needs no
+Docker. Point them at a throwaway database — the suites run migrations that
+create the `zitadel_nextgen` schema.
+
+The Spanner emulator only supports one transaction at a time, so concurrent
+integration tests are flaky against it. `moon run server:test-spanner`
+therefore passes `-parallel 1 -p 1` whenever `ZITADEL_TEST_SPANNER_INSTANCE`
+is unset (the default for local/OSS contributors, which starts the emulator
+via testcontainers). To run against a real, long-lived Spanner test instance
+instead, set `ZITADEL_TEST_SPANNER_INSTANCE` to an instance path
+(`projects/<project>/instances/<instance>`). The suites then provision a
+uniquely named database on that instance before the run and drop it
+afterwards, and the Moon task keeps normal go test parallelism.
+Authentication uses Application Default Credentials — locally run
+`gcloud auth application-default login`. CI authenticates via Workload
+Identity Federation when `SPANNER_TEST_INSTANCE` is set, and labels the job
+step as emulator vs test instance accordingly. Precedence when multiple are
+set: `ZITADEL_TEST_SPANNER_INSTANCE` > `ZITADEL_TEST_SPANNER_URL` > emulator
+testcontainer.
 
 ### Demo end-to-end suites
 
@@ -382,15 +428,68 @@ relevant architecture decision records:
 
 ### Title format
 
-Pull request titles are checked by Semantic PR. Use the conventional format
-`<type>(optional-scope): <summary>`.
+Use the conventional format `<type>(optional-scope): <summary>`. Allowed types
+and scopes live in [`.github/semantic.yml`](.github/semantic.yml) — that file is
+the source of truth for the lists, and CI rejects a title that does not match it.
+Scopes are optional; omit the scope instead of inventing one.
 
-Allowed types and scopes live in [`.github/semantic.yml`](.github/semantic.yml).
-Scopes are optional; omit the scope instead of inventing one. For
-documentation-only changes, use the `docs` type, for example:
+#### Pick the type by audience, not by effort
 
-```text
-docs: add preview status disclaimer
+The type is the first thing that decides whether a change reaches our release
+notes, and those notes are read by people who want to use our SDKs and products
+— not by people who work on this repo. A large, hard PR that only moves the
+build graph is still `build`. Work through the ladder in order:
+
+1. Can someone **using** Zitadel — the SDKs, the CLI, the API, the console — do
+   something new because of this PR? → `feat`
+2. Could that person have hit the broken behavior this PR corrects? → `fix`
+3. Neither, but the change reaches shipped code (server, SDKs, CLI, console,
+   login UI)? → `refactor` / `perf`
+4. The change only touches this repo — CI, build wiring, tests, docs, scripts,
+   tooling? → `ci` / `build` / `test` / `docs` / `chore`
+
+Two invariants follow, and CI enforces the first:
+
+- **Needs no changeset ⇒ not `feat`, not `fix`.** If nothing ships, it is not a
+  customer feature or a customer bug fix. The
+  [changeset decision table](.changeset/README.md#decision-table) answers this
+  question already — the type follows from the same answer.
+- **Changes what a user receives ⇒ not `docs`, not `chore`.** `docs` means
+  documentation *in this repo*. Content generated into a customer's project, or
+  shipped inside a package, is product.
+
+The reverse of the first invariant does **not** hold: a changeset does not force
+`feat` or `fix`. The Go server ships as one bundle, so an internal restructure
+under `internal/` correctly carries a `@zitadel/server` changeset while staying
+`refactor`.
+
+What these got wrong, from this repo's own history:
+
+| Shipped title | What it actually did | Should have been |
+| --- | --- | --- |
+| `feat: add withZitadel() Playwright orchestration to @zitadel/testing` (#680) | `@zitadel/testing` was journey-only and unpublished at the time (since #692 it ships on the release train, so kit API changes are `feat` today) | `test:` (then) |
+| `feat: add Figma export sync pipeline for design tokens` (#494) | A sync script and a workflow; nothing in a release | `build:` |
+| `chore: set argon2id as default password hashing algorithm` (#526) | Changed a shipped security default, with a `@zitadel/server` changeset | `feat:` |
+| `docs(config): improve schema README guidance` (#482) | Rewrote a README that `@zitadel/config` generates into the user's project | `feat(config):` |
+
+#### Write the summary for the reader
+
+- Imperative present tense — `add`, not `added` or `implemented`.
+- Name the surface the reader touches (`zitadel setup`, `<zitadel-login>`,
+  `@zitadel/sdk-react`, the console), not the layer that changed. `feat: project
+  storage` and `feat: add name to project domain model` name our internals;
+  neither tells a reader what they can now do.
+- Keep internal references — ADR numbers, PR numbers, file paths, "foundation",
+  "POC" — in the description, not the title.
+
+The same rules apply to the changeset summary, which matters more: that text is
+rendered verbatim into `CHANGELOG.md` and the GitHub Release, while the title
+never appears there. See [`.changeset/README.md`](.changeset/README.md#how-to-add-a-changeset).
+
+Check a title before opening the PR:
+
+```bash
+node scripts/check-pr-title.mjs --title "fix(login): keep the passkey prompt after a failed attempt"
 ```
 
 ### Description

@@ -5,6 +5,7 @@ import type {
 } from "@zitadel/components";
 
 import { render } from "@testing-library/angular";
+import { businessLocales as componentsBusinessLocales } from "@zitadel/components";
 import {
   ZITADEL_LOGIN_EVENT_HANDLERS,
   ZITADEL_LOGOUT_EVENT_HANDLERS,
@@ -12,6 +13,7 @@ import {
 } from "@zitadel/sdk-core/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { businessLocales } from "../public-api";
 import { ZitadelLoginComponent } from "./zitadel-login.component";
 import { ZitadelLogoutComponent } from "./zitadel-logout.component";
 import { ZitadelSessionComponent } from "./zitadel-session.component";
@@ -172,6 +174,15 @@ describe("ZitadelSession", () => {
     expect(el!.proxyPath).toBe("/__nextgen");
   });
 
+  it("forwards the surface variant/theme", async () => {
+    const { container } = await render(ZitadelSessionComponent, {
+      inputs: { project, variant: "page", theme: "light" },
+    });
+    const el = container.querySelector<ZitadelSessionElement>("zitadel-session");
+    expect(el!.variant).toBe("page");
+    expect(el!.theme).toBe("light");
+  });
+
   it.each(Object.keys(ZITADEL_SESSION_EVENT_HANDLERS))(
     "forwards %s through its @Output",
     async (eventName) => {
@@ -197,5 +208,11 @@ describe("ZitadelSession", () => {
     expect(exposed).not.toBeNull();
     expect(exposed!.tagName.toLowerCase()).toBe("zitadel-session");
     expect(exposed).toBe(el);
+  });
+});
+
+describe("businessLocales", () => {
+  it("re-exports the business copy overlay from @zitadel/components", () => {
+    expect(businessLocales).toBe(componentsBusinessLocales);
   });
 });

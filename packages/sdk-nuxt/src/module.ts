@@ -14,8 +14,8 @@ import type { NextgenMiddlewareOptions } from "./runtime/types";
  * Resolve `ZITADEL_PROJECT_SECRET`. Nuxt's CLI auto-loads `.env` but the
  * project's CLI scaffolds write the secret to `.env.local` (gitignored), which
  * `nuxi` does not auto-load on every release path. Fall back to a one-shot
- * parse so the secret reaches `runtimeConfig` regardless of which env file
- * Nuxt picked up.
+ * parse so the secret reaches `runtimeConfig` for the current app-plane
+ * `POST /sessions/exchange` call regardless of which env file Nuxt picked up.
  */
 function loadProjectSecret(rootDir: string): string | undefined {
   if (process.env.ZITADEL_PROJECT_SECRET) {
@@ -61,7 +61,7 @@ export default defineNuxtModule<NextgenMiddlewareOptions>({
       // Server-only — never exposed to the client. Override at deploy time via
       // `NUXT_NEXTGEN_PROJECT_SECRET`. Left undefined when the env var (and
       // `.env.local`) provide no value, so the middleware surfaces a missing
-      // bearer instead of silently sending an empty one.
+      // exchange bearer instead of silently sending an empty one.
       projectSecret: loadProjectSecret(nuxt.options.rootDir),
     };
 

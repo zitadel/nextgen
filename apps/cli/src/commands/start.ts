@@ -6,7 +6,6 @@ import { ZitadelError, toZitadelError } from "../lib/errors";
 import {
   binaryLogs,
   isProcessRunning,
-  reapEmbeddedPostgres,
   startBinaryRuntime,
   stopBinaryRuntime,
   type StopBinaryRuntimeResult,
@@ -116,22 +115,6 @@ export default class Start extends BaseCommand {
       }
       await stopExistingRuntime(existingRuntime);
       await assertPortAvailableForStart(port, serverUrl, this.meta.cliVersion);
-      // Self-heal: an embedded Postgres orphaned by an earlier unclean shutdown
-      // (crash, SIGKILL) still holds the data-dir lock and would fail the fresh
-      // server's `pg_ctl start`. Reap it before launching. No-op when clean.
-      const reapResult = await reapEmbeddedPostgres(paths.dataDir);
-      if (reapResult.status === "failed") {
-        // Launching anyway would just reproduce the opaque "exited before
-        // becoming healthy" failure; surface the real blocker instead.
-        throw new ZitadelError(
-          "E_VALIDATION",
-          "An orphaned embedded Postgres from a previous run did not stop",
-          {
-            hint: "Stop the lingering postgres process manually, then rerun `zitadel start`.",
-            details: { data_dir: paths.dataDir, reap_result: reapResult },
-          },
-        );
-      }
       const metadata = await startBinaryRuntime({
         cliVersion: this.meta.cliVersion,
         dataDir: paths.dataDir,

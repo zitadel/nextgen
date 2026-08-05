@@ -280,6 +280,16 @@ iterate in Storybook. A missing visual value is a **new token** in
 (e.g. display fonts), which stay in the consuming app because
 `@zitadel/design-tokens` ships as a public npm package.
 
+## Resource identifiers
+
+Resource primary keys are dialect-owned `prefix_<opaque>` strings
+([ADR 047](docs/adrs/047-dialect-id-generation.md)). **Always** mint them
+through the storage statements surface: create paths use dialect `Ensure`;
+pre-persist ceremony IDs use `Statements().NewManagedID`. Never add custom
+ULID/UUID generation in domain, service, API, or other packages, and do not
+call `idgen` outside dialect packages. Full minting contract:
+[`internal/storage/v2/AGENTS.md`](internal/storage/v2/AGENTS.md).
+
 ## Generated Files
 
 - Do not hand-edit `api/generated/**`; update `api/openapi/**` and run
@@ -309,10 +319,15 @@ For customer-local runtime workflows, agents should prefer
 
 ## Release, Licensing, And Secrets
 
-- PR titles must pass the Semantic PR check: use the conventional format
-  `<type>(optional-scope): <summary>`, with `.github/semantic.yml` as the
-  source of truth for allowed types and scopes. Omit the scope when unsure;
-  do not invent scopes.
+- PR titles use `<type>(optional-scope): <summary>`, with
+  [`.github/semantic.yml`](.github/semantic.yml) as the source of truth for
+  allowed types and scopes. Omit the scope when unsure; do not invent scopes.
+- Pick the type by **who the change reaches, not how much work it was**. If the
+  change needs no changeset it is not `feat` or `fix`; if it changes what a user
+  receives it is not `docs` or `chore`. CI enforces the first of those. Ladder,
+  worked examples, and summary voice:
+  [CONTRIBUTING.md](CONTRIBUTING.md#title-format). Self-check before opening:
+  `node scripts/check-pr-title.mjs --title "<title>"`.
 - Agent-created or agent-updated PRs must include a concise description with
   `Summary`, `Validation`, `Release notes / changeset`, and `Notes` sections
   before handoff. In **Release notes / changeset**, state the outcome from
@@ -354,13 +369,6 @@ is tool-specific.
 The repo requires the Node.js version from `.nvmrc`; sandbox images often
 ship an older default. Ensure the `.nvmrc` version is first on `$PATH` (for
 example via nvm) before running any `corepack` or `pnpm` command.
-
-### System dependencies for Go tests
-
-`libicu-dev` and `libssl-dev` are required at runtime by `embedded-postgres`
-(the Go test helper that auto-downloads PostgreSQL, currently 18). If Go
-tests fail with missing-library errors, install them once with
-`sudo apt-get install -y -qq libicu-dev libssl-dev`.
 
 ### Playwright browser install gotcha
 

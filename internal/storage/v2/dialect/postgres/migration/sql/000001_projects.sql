@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS zitadel_nextgen.projects(
     , name TEXT NOT NULL
     , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     , updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-    , preview_origins TEXT[]    NOT NULL DEFAULT '{}'
+    , preview_origins TEXT[]    NOT NULL
 
     , PRIMARY KEY (id)
 );

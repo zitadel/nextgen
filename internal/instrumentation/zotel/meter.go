@@ -19,6 +19,9 @@ import (
 
 func NewMeterProvider(ctx context.Context, cfg ExporterConfig, resource *resource.Resource) (_ *sdkmetric.MeterProvider, err error) {
 	readerOption, err := cfg.metrics(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	// create a view to filter out unwanted attributes
 	view := sdkmetric.NewView(

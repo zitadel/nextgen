@@ -26,10 +26,14 @@ import {
   type Orca,
   type ScaffoldTarget,
 } from "../../lib/orca";
-import { RENDERER_IDS } from "../../lib/orca/patchers/rule/next/renderers/registry";
+import {
+  AVAILABLE_RENDERER_IDS,
+  RENDERER_IDS,
+} from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
+import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import {
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
@@ -58,6 +62,22 @@ const FRAMEWORK_OPTIONS = createOrca()
   .availableFrameworks()
   .map((framework) => framework.id);
 
+/**
+ * `--renderer` offers only ids `getRenderer` will resolve: a
+ * declared-but-unpublished renderer (ADR 006) keeps its registry entry to
+ * reserve the id, but is surfaced as unavailable in the flag description
+ * instead of in `options`, so `--help` never advertises a value that is
+ * guaranteed to fail and an explicit pass is rejected at parse time — before
+ * any remote project is created.
+ */
+const UNAVAILABLE_RENDERER_IDS = RENDERER_IDS.filter(
+  (id) => !AVAILABLE_RENDERER_IDS.includes(id),
+);
+const RENDERER_FLAG_DESCRIPTION =
+  UNAVAILABLE_RENDERER_IDS.length === 0
+    ? "Renderer (default: react)."
+    : `Renderer (default: react). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
+
 /** `zitadel setup` — create a project and scaffold local auth.
  *
  * Detects (or, for an empty directory, scaffolds then re-detects) the
@@ -79,8 +99,8 @@ export default class Setup extends BaseCommand {
   static override flags = {
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
     renderer: Flags.string({
-      description: "Renderer (default: react).",
-      options: [...RENDERER_IDS],
+      description: RENDERER_FLAG_DESCRIPTION,
+      options: [...AVAILABLE_RENDERER_IDS],
     }),
     "dev-port": Flags.integer({
       description:
@@ -319,6 +339,28 @@ export default class Setup extends BaseCommand {
       files_written_count: allFilesWritten.length,
     });
 
+    if (!dryRun) {
+      // Record what was actually scaffolded so `doctor` can later verify the
+      // app files without guessing from current templates (missing vs edited
+      // vs user-adopted) and `doctor --fix` can restore exactly the missing
+      // ones. Best-effort: a failure here only degrades doctor to its
+      // template-derived fallback, it never breaks setup.
+      try {
+        await writeScaffoldManifest({
+          cwd,
+          actions: orca.patcherFor(framework.id).artifacts({
+            framework,
+            rendererId: ctx.rendererId,
+          }),
+          written: [...result.filesWritten, ...result.filesSkipped],
+          scaffoldedFramework,
+          devPort: answers.devPort,
+        });
+      } catch (error) {
+        consola.debug("Failed to record the scaffold manifest", error);
+      }
+    }
+
     const installOutcome = await installDependenciesForSetup({
       cliVersion: this.meta.cliVersion,
       cwd,
@@ -374,6 +416,15 @@ export default class Setup extends BaseCommand {
         framework: framework.id,
         server: answers.server,
         files_written: allFilesWritten.map((file) => relativeDisplay(cwd, file)),
+        // Typed per-artifact rows for the scaffolded app files (the sync
+        // resources continue to report through files_written): one row per
+        // touched path with kind (file/dir) and action (create/update), so
+        // agents can verify what setup did without parsing narration.
+        files: result.files.map((file) => ({
+          path: relativeDisplay(cwd, file.path),
+          kind: file.kind,
+          action: file.action,
+        })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
         next_actions: installOutcome.nextActions,
@@ -598,25 +649,13 @@ function pickWrittenFile(written: string[], suffix: string): string | undefined 
 
 /**
  * Translates a patcher-written path into a single sentence the user can
- * read at narration speed. Returns `null` for directories and other
- * scaffolding artefacts that aren't worth narrating individually — the
- * file count in the closing `success(...)` and the summary's INSTALLED
- * section already cover them. The verb tense flips for `--dry-run` so
- * the user sees a preview ("Would write ...") instead of a claim that
- * something happened.
+ * read at narration speed. The patch result's `filesWritten` carries
+ * deduplicated file paths only (directories stay in the typed `files`
+ * rows), so no artefact filtering is needed here. The verb tense flips
+ * for `--dry-run` so the user sees a preview ("Would write ...") instead
+ * of a claim that something happened.
  */
 function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
-  // Mkdir ops surface in `filesWritten` alongside actual file writes.
-  // They're noise at the per-step layer (the files inside them get
-  // narrated on their own lines), so swallow them here.
-  if (
-    relPath === ".zitadel" ||
-    relPath === ".zitadel/flows" ||
-    relPath === ".zitadel/schemas" ||
-    relPath === ".zitadel/meta"
-  ) {
-    return null;
-  }
   const verb = dryRun ? "Would write" : "Wrote";
   const sentence = SENTENCE_BY_PATH[relPath];
   if (sentence) {

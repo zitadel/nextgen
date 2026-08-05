@@ -1,0 +1,26 @@
+{
+  "heading-sm": {
+    "font-family": {
+      "$value": "APK Futural",
+      "$type": "string"
+    }
+  },
+  "heading-md": {
+    "font-family": {
+      "$value": "APK Futural",
+      "$type": "string"
+    }
+  },
+  "heading-lg": {
+    "font-family": {
+      "$value": "APK Futural",
+      "$type": "string"
+    }
+  },
+  "heading-xl": {
+    "font-family": {
+      "$value": "APK Futural",
+      "$type": "string"
+    }
+  }
+}
