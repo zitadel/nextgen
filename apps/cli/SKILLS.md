@@ -140,9 +140,11 @@ the CLI's help layer, not the envelope.
   safely. The link is always printed before any browser opens, so a headless
   machine, an SSH session, or `--no-open` needs no special handling — copy it
   and open it anywhere. Links last 10 minutes; once one lapses the command
-  exits `E_VALIDATION` and points at a fresh run. Flags: `--no-open` (print
-  the link instead of launching a browser), `--timeout <seconds>` (stop
-  waiting sooner than the link's own expiry).
+  exits `E_VALIDATION` and points at a fresh run. `--dry-run` stops before
+  anything is minted and reports `status: "skipped"`, `reason: "dry-run"` —
+  there is nothing to preview, because a claim is decided in a browser.
+  Flags: `--no-open` (print the link instead of launching a browser),
+  `--timeout <seconds>` (stop waiting sooner than the link's own expiry).
 - `status` — summarize the local runtime and project state.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.

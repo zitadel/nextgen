@@ -249,15 +249,22 @@ describe("claim", () => {
     expect((await readSecret(cwd)).team_id).toBeUndefined();
   });
 
-  it("does not write the secret under --dry-run", async () => {
-    const { cwd, project } = await makeProject();
+  it("mutates neither the platform nor the secret under --dry-run", async () => {
+    const { cwd } = await makeProject();
 
-    const [res] = await Promise.all([
-      claim(cwd, ["--dry-run"]),
-      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, project.id)),
-    ]);
+    const res = await claim(cwd, ["--dry-run"]);
 
     expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; reason: string; data: unknown };
+    expect(json.status).toBe("skipped");
+    expect(json.reason).toBe("dry-run");
+    expect(json.data).toMatchObject({ project_id: expect.stringMatching(/^proj-/) });
+
+    // The whole point: no challenge was minted, so a developer who wandered
+    // into the browser could not have claimed the project behind this run's
+    // back and left the local file disagreeing with the platform.
+    expect(snapshotPlatformStore().claimChallengeIds).toEqual([]);
+    expect(snapshotPlatformStore().claims).toBe(0);
     expect((await readSecret(cwd)).team_id).toBeUndefined();
   });
 

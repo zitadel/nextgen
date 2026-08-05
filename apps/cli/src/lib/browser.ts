@@ -30,7 +30,12 @@ export type OpenResult = { opened: boolean; reason?: OpenFailure };
 export type BrowserDeps = {
   platform: NodeJS.Platform;
   env: NodeJS.ProcessEnv;
-  /** Resolves an executable name against `PATH`, or `undefined` if absent. */
+  /**
+   * Resolves an executable name against `PATH`, or `undefined` if absent.
+   * The default implementation reads `PATH` from {@link BrowserDeps.env}, not
+   * from `process.env`, so overriding `env` alone is enough to redirect
+   * executable resolution.
+   */
   lookupPath: (command: string) => Promise<string | undefined>;
   /** Reads `/proc/version` for WSL detection; `undefined` when unreadable. */
   readProcVersion: () => Promise<string | undefined>;
@@ -67,7 +72,11 @@ export async function openInBrowser(
   url: string,
   overrides: Partial<BrowserDeps> = {},
 ): Promise<OpenResult> {
-  const deps: BrowserDeps = { ...defaultDeps(), ...overrides };
+  // Resolve `env` first so the default `lookupPath` closes over the *effective*
+  // environment: overriding `env.PATH` alone must redirect executable
+  // resolution, without the caller also having to replace `lookupPath`.
+  const env = overrides.env ?? process.env;
+  const deps: BrowserDeps = { ...defaultDeps(env), ...overrides };
 
   const browser = deps.env.BROWSER?.trim();
   if (browser === "none") {
@@ -156,11 +165,11 @@ function launch(deps: BrowserDeps, command: string, args: string[]): OpenResult 
   }
 }
 
-function defaultDeps(): BrowserDeps {
+function defaultDeps(env: NodeJS.ProcessEnv): BrowserDeps {
   return {
     platform: process.platform,
-    env: process.env,
-    lookupPath,
+    env,
+    lookupPath: (command) => lookupPath(command, env.PATH ?? ""),
     readProcVersion: async () => {
       try {
         return await readFile("/proc/version", "utf8");
@@ -180,13 +189,14 @@ function defaultDeps(): BrowserDeps {
 }
 
 /**
- * Minimal `which`: the first `PATH` entry holding an executable `command`.
- * Probing the filesystem directly avoids shelling out (and avoids depending
- * on a `which`/`where` binary being present on the very systems that are
- * missing `xdg-open`).
+ * Minimal `which`: the first entry of `pathEnv` holding an executable
+ * `command`. Probing the filesystem directly avoids shelling out (and avoids
+ * depending on a `which`/`where` binary being present on the very systems that
+ * are missing `xdg-open`). `pathEnv` is passed in rather than read from
+ * `process.env` so it follows whatever environment the caller injected.
  */
-async function lookupPath(command: string): Promise<string | undefined> {
-  for (const dir of (process.env.PATH ?? "").split(delimiter).filter(Boolean)) {
+async function lookupPath(command: string, pathEnv: string): Promise<string | undefined> {
+  for (const dir of pathEnv.split(delimiter).filter(Boolean)) {
     const candidate = join(dir, command);
     try {
       await access(candidate, constants.X_OK);

@@ -22,6 +22,39 @@ const MAX_POLL_MS = 5000;
 const POLL_BACKOFF_FACTOR = 1.5;
 
 /**
+ * Backstop for the poll deadline, used only when the server's own `expires_at`
+ * cannot be parsed. The challenge TTL is the platform's to decide (ADR 046) and
+ * the response carries it, so this is never the normal path — but without it a
+ * malformed or misrouted response would leave the loop with no deadline at all
+ * and the CLI polling forever. Matches the TTL the ADR documents.
+ */
+const FALLBACK_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * When to stop polling: the earlier of the server's own expiry and any
+ * `--timeout` the caller set.
+ *
+ * Trusts `expires_at` rather than assuming the TTL, because the contract
+ * documents it as the authority and the CLI should not go stale if the platform
+ * ever retunes it. An unparseable value falls back to {@link FALLBACK_TTL_MS}
+ * rather than to no deadline: a malformed or misrouted response must not leave
+ * the loop running forever. Exported so that fallback is testable without
+ * waiting out a real TTL.
+ */
+export function claimDeadline(input: {
+  expiresAt: string;
+  timeoutSeconds?: number;
+  now: number;
+}): number {
+  const parsed = Date.parse(input.expiresAt);
+  const serverDeadline = Number.isNaN(parsed) ? input.now + FALLBACK_TTL_MS : parsed;
+  if (input.timeoutSeconds === undefined) {
+    return serverDeadline;
+  }
+  return Math.min(serverDeadline, input.now + input.timeoutSeconds * 1000);
+}
+
+/**
  * `zitadel claim` — attach this project to a team.
  *
  * Shaped like the device-authorization grant (ADR 046): the CLI mints a
@@ -73,6 +106,27 @@ export default class Claim extends BaseCommand {
       });
     }
 
+    // `--dry-run` promises to mutate neither files nor the platform, so it has
+    // to stop before `initClaim`: minting a challenge is a platform write, and
+    // a developer who then finished the browser step would really claim the
+    // project while this run deliberately skipped recording it — the local file
+    // and the platform would disagree, which is worse than not previewing at
+    // all. There is nothing further to preview here anyway: the outcome of a
+    // claim is decided in a browser, not by anything the CLI could compute.
+    if (dryRun) {
+      this.recordTelemetry({ claim_outcome: "dry_run" });
+      return this.emit({
+        status: "skipped",
+        reason: "dry-run",
+        data: {
+          title: "Zitadel claim was not started.",
+          project_id: secret.project_id,
+          would: "Open a browser to attach this project to a team, then record the team in .zitadel/secret.",
+        },
+        nextCommands: ["zitadel claim"],
+      });
+    }
+
     const client = createZitadelClient({
       baseUrl: this.meta.source,
       token: secret.project_secret,
@@ -89,14 +143,11 @@ export default class Claim extends BaseCommand {
       throw error;
     }
 
-    // Trust the server's expiry rather than assuming the TTL: the contract
-    // documents `expires_at` as the authority and the CLI should not go stale
-    // if the platform ever retunes it.
-    const expiresAt = Date.parse(challenge.expires_at);
-    const deadline = Math.min(
-      Number.isNaN(expiresAt) ? Number.POSITIVE_INFINITY : expiresAt,
-      flags.timeout === undefined ? Number.POSITIVE_INFINITY : Date.now() + flags.timeout * 1000,
-    );
+    const deadline = claimDeadline({
+      expiresAt: challenge.expires_at,
+      timeoutSeconds: flags.timeout,
+      now: Date.now(),
+    });
 
     // Always show the link first, before attempting anything: it is the whole
     // instruction on its own, so a launch that never happens (headless box,
@@ -121,9 +172,10 @@ export default class Claim extends BaseCommand {
       claimed_at: completed.claimed_at,
       team_id: completed.team_id,
     };
-    if (!dryRun) {
-      await writeZitadelSecret(cwd, next);
-    }
+    // Unconditional: `--dry-run` never reaches here (it returns above), so a
+    // claim that got this far really happened on the platform and the local
+    // record must follow it.
+    await writeZitadelSecret(cwd, next);
     consola.success(`Project attached to team ${completed.team_id}`);
 
     this.recordTelemetry({ claim_outcome: "completed", browser_opened: opened });

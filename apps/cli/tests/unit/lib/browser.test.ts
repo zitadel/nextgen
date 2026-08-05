@@ -1,6 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, describe, expect, it } from "vitest";
 
 import { openInBrowser, type BrowserDeps } from "../../../src/lib/browser";
+
+const tempDirs: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(tempDirs.map((dir) => rm(dir, { recursive: true, force: true })));
+  tempDirs.length = 0;
+});
 
 const URL = "https://example.test/claim/ch_abc";
 
@@ -147,6 +158,43 @@ describe("openInBrowser", () => {
 
     await expect(openInBrowser(URL, deps)).resolves.toEqual({ opened: false, reason: "disabled" });
     expect(launches).toEqual([]);
+  });
+
+  it("resolves executables against an injected env.PATH", async () => {
+    // The default lookupPath must follow the injected env, not process.env,
+    // or overriding `env` alone would silently not affect resolution.
+    const launches: Launch[] = [];
+    const bin = await mkdtemp(join(tmpdir(), "zitadel-browser-path-"));
+    tempDirs.push(bin);
+    await writeFile(join(bin, "xdg-open"), "#!/bin/sh\n", { mode: 0o755 });
+
+    await expect(
+      openInBrowser(URL, {
+        platform: "linux",
+        env: { DISPLAY: ":0", PATH: bin },
+        readProcVersion: async () => undefined,
+        spawn: (command, args) => {
+          launches.push({ command, args });
+        },
+      }),
+    ).resolves.toEqual({ opened: true });
+    expect(launches).toEqual([{ command: "xdg-open", args: [URL] }]);
+  });
+
+  it("reports no-opener when the injected env.PATH holds none", async () => {
+    const empty = await mkdtemp(join(tmpdir(), "zitadel-browser-empty-"));
+    tempDirs.push(empty);
+
+    await expect(
+      openInBrowser(URL, {
+        platform: "linux",
+        env: { DISPLAY: ":0", PATH: empty },
+        readProcVersion: async () => undefined,
+        spawn: () => {
+          throw new Error("must not spawn");
+        },
+      }),
+    ).resolves.toEqual({ opened: false, reason: "no-opener" });
   });
 
   it("never throws when the spawn fails", async () => {
