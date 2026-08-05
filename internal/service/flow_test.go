@@ -599,7 +599,7 @@ func TestFlowService_Start_PreservesProvidedSessionID(t *testing.T) {
 	}
 }
 
-func TestFlowService_Start_PersistsBuildingSession(t *testing.T) {
+func TestFlowService_Start_PersistsSession(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	state := &domain.FlowState{ProjectID: def.ProjectID}
 	sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: state, Step: &domain.FlowStep{}}}
@@ -609,16 +609,11 @@ func TestFlowService_Start_PersistsBuildingSession(t *testing.T) {
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	stmts.EXPECT().NewManagedID(gomock.Any()).Return("flow_1", nil).AnyTimes()
 	stmts.EXPECT().CreateSession(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, sess *domain.Session) error {
-		// A flow start with no supplied session persists a new anonymous session
-		// in the building state.
+		// With no supplied session, Start persists one for the flow's project.
+		// The anonymous/building nature of a new session is domain.NewSession's
+		// contract, covered by the domain and stmttest suites.
 		if sess.ProjectID != def.ProjectID {
 			t.Errorf("session ProjectID = %q, want %q", sess.ProjectID, def.ProjectID)
-		}
-		if len(sess.Factors) != 0 || sess.UserID != nil {
-			t.Errorf("session must be building: factors=%d userID=%v", len(sess.Factors), sess.UserID)
-		}
-		if got := sess.State(); got != domain.SessionStateBuilding {
-			t.Errorf("session state = %v, want building", got)
 		}
 		sess.ID = "sess_created"
 		return nil
