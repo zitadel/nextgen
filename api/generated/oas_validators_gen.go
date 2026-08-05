@@ -3551,6 +3551,15 @@ func (s SessionResponseState) Validate() error {
 	}
 }
 
+func (s SessionSortField) Validate() error {
+	switch s {
+	case "created_at":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *SessionWithTokenResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer

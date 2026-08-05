@@ -12123,13 +12123,13 @@ func (s *QuerySessionsRequestFilterItem) SetOperation(val FilterOperation) {
 
 type QuerySessionsRequestSorting struct {
 	// The field to sort by.
-	Field SessionFilterField `json:"field"`
+	Field SessionSortField `json:"field"`
 	// The direction to sort by.
 	Direction SortDirection `json:"direction"`
 }
 
 // GetField returns the value of Field.
-func (s *QuerySessionsRequestSorting) GetField() SessionFilterField {
+func (s *QuerySessionsRequestSorting) GetField() SessionSortField {
 	return s.Field
 }
 
@@ -12139,7 +12139,7 @@ func (s *QuerySessionsRequestSorting) GetDirection() SortDirection {
 }
 
 // SetField sets the value of Field.
-func (s *QuerySessionsRequestSorting) SetField(val SessionFilterField) {
+func (s *QuerySessionsRequestSorting) SetField(val SessionSortField) {
 	s.Field = val
 }
 
@@ -12582,7 +12582,7 @@ func (s *SessNotFoundHeaders) SetResponse(val SessNotFound) {
 
 func (*SessNotFoundHeaders) getMySessionRes() {}
 
-// Field to filter or sort sessions by:
+// Field to filter sessions by:
 // - `created_at`: RFC3339 timestamp
 // - `user_id`: user id
 // - `state`: one of `building`, `active`, `expired`, `revoked`.
@@ -12961,6 +12961,44 @@ func (s *SessionResponseUserAgentAdditional) init() SessionResponseUserAgentAddi
 		*s = m
 	}
 	return m
+}
+
+// Field to sort sessions by. Only stored columns are sortable: the keyset
+// cursor holds the last row's sort values, so a computed value such as
+// `state` would skip or duplicate rows between pages.
+// Ref: #
+type SessionSortField string
+
+const (
+	SessionSortFieldCreatedAt SessionSortField = "created_at"
+)
+
+// AllValues returns all SessionSortField values.
+func (SessionSortField) AllValues() []SessionSortField {
+	return []SessionSortField{
+		SessionSortFieldCreatedAt,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s SessionSortField) MarshalText() ([]byte, error) {
+	switch s {
+	case SessionSortFieldCreatedAt:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *SessionSortField) UnmarshalText(data []byte) error {
+	switch SessionSortField(data) {
+	case SessionSortFieldCreatedAt:
+		*s = SessionSortFieldCreatedAt
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Response for session creation and handoff exchange.

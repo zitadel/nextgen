@@ -15,7 +15,7 @@ properties:
       - direction
     properties:
       field:
-        $ref: session-filter-field.yaml
+        $ref: session-sort-field.yaml
         description: The field to sort by.
       direction:
         $ref: ../../../components/schemas/sort-direction.yaml

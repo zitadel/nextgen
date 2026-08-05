@@ -1,6 +1,6 @@
 type: string
 description: |
-  Field to filter or sort sessions by:
+  Field to filter sessions by:
   - `created_at`: RFC3339 timestamp
   - `user_id`: user id
   - `state`: one of `building`, `active`, `expired`, `revoked`
