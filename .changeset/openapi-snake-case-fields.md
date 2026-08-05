@@ -5,6 +5,9 @@
 Rename the last camelCase wire fields in the OpenAPI spec to snake_case, so the whole API uses one convention.
 
 **Breaking:** every renamed property changes on the wire. An unknown property is dropped rather than rejected, so a client left on the old names sends and reads silently empty values instead of failing loudly — update all of them together.
+Dropped request fields fall back to their schema default, not to empty. `seed_defaults`
+defaults to `true` and `is_change_required` to `false`, so an old client gets the project
+resources it opted out of and loses the forced password change it asked for.
 
 Request and response properties:
 
