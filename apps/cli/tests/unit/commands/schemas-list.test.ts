@@ -80,8 +80,8 @@ describe("schemas list", () => {
         expect(url.searchParams.get("project_id")).toBe("proj_test");
         expect(url.searchParams.get("object_type")).toBe("human-user");
         return HttpResponse.json([
-          { id: "sch_02", createdAt: "2026-07-02T00:00:00Z" },
-          { id: "sch_01", createdAt: "2026-06-01T00:00:00Z" },
+          { id: "sch_02", created_at: "2026-07-02T00:00:00Z" },
+          { id: "sch_01", created_at: "2026-06-01T00:00:00Z" },
         ]);
       }),
     );
