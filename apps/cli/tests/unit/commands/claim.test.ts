@@ -51,7 +51,7 @@ afterEach(async () => {
   }
 });
 
-type Project = { id: string; projectSecret: string };
+type Project = { id: string; project_secret: string };
 
 /**
  * Seeds a project through the mock's own create endpoint (msw intercepts the
@@ -69,14 +69,20 @@ async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
   const response = await fetch(`${SERVER}/projects`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "demo", previewOrigins: [] }),
+    body: JSON.stringify({ name: "demo", preview_origins: [] }),
   });
   const project = (await response.json()) as Project;
+  // Fail loudly rather than writing `undefined` into the secret: a renamed
+  // wire field would otherwise surface as an unrelated "missing required
+  // fields" error from deep inside the command under test.
+  if (typeof project.project_secret !== "string") {
+    throw new Error(`mock POST /projects returned no project_secret: ${JSON.stringify(project)}`);
+  }
 
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeSecret(cwd, {
     project_id: project.id,
-    project_secret: project.projectSecret,
+    project_secret: project.project_secret,
     preview_secret: "sk_preview_test",
     preview_origins: [],
     created_at: "2026-01-01T00:00:00.000Z",
@@ -140,7 +146,7 @@ describe("claim", () => {
     expect(secret.claimed_at).toBe(json.data.claimed_at);
     // Claiming attaches ownership; it must not rotate the credentials the
     // running app is already using.
-    expect(secret.project_secret).toBe(project.projectSecret);
+    expect(secret.project_secret).toBe(project.project_secret);
     expect(secret.preview_secret).toBe("sk_preview_test");
   });
 
