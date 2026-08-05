@@ -210,7 +210,7 @@ func (ss sessionStatements) CreateSessionToken(ctx context.Context, session *dom
 	}
 	session.TokenID = tok.TokenID
 	if v2session.HasRealSessionToken(previousTokenID) {
-		if err := tokens.RevokeTokenByID(ctx, session.ProjectID, previousTokenID); err != nil {
+		if err := tokens.DeleteTokenByID(ctx, session.ProjectID, previousTokenID); err != nil {
 			return fmt.Errorf("failed to revoke previous session token: %w", err)
 		}
 	}

@@ -130,7 +130,7 @@ func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) e
 			return domain.ErrInternal(err).WithMessage("Failed to delete the session.")
 		}
 
-		err = tx.Statements().RevokeTokensBySessionID(ctx, input.ProjectID, input.SessionID)
+		err = tx.Statements().DeleteTokensBySessionID(ctx, input.ProjectID, input.SessionID)
 		if err != nil {
 			if errors.Is(err, domain.ErrSessionNotFound()) {
 				return nil

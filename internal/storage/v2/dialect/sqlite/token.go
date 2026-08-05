@@ -21,15 +21,11 @@ const (
 
 	deleteByIDTokenStmt = `DELETE FROM tokens WHERE project_id = ? AND token_id = ?`
 
-	revokeByIDTokenStmt = `UPDATE tokens SET revoked_at = ?
-WHERE project_id = ? AND token_id = ? AND revoked_at IS NULL`
-
-	revokeBySessionIDTokenStmt = `UPDATE tokens SET revoked_at = ?
-WHERE project_id = ? AND session_id = ? AND revoked_at IS NULL`
+	deleteBySessionIDTokenStmt = `DELETE FROM tokens WHERE project_id = ? AND session_id = ?`
 
 	tokenQuery = `SELECT project_id, token_id, user_id, token_type,
 	session_id, oidc_session_id, saml_session_id,
-	scope, expires_at, created_at, revoked_at
+	scope, expires_at, created_at
 FROM tokens`
 )
 
@@ -87,15 +83,9 @@ func (ts tokenStatements) DeleteTokenByID(ctx context.Context, projectID, tokenI
 	return wrapError(err)
 }
 
-// RevokeTokenByID implements [service.TokenStatements].
-func (ts tokenStatements) RevokeTokenByID(ctx context.Context, projectID, tokenID string) error {
-	_, err := ts.client.Exec(ctx, revokeByIDTokenStmt, nowUnixNano(), projectID, tokenID)
-	return wrapError(err)
-}
-
-// RevokeTokensBySessionID implements [service.TokenStatements].
-func (ts tokenStatements) RevokeTokensBySessionID(ctx context.Context, projectID, sessionID string) error {
-	_, err := ts.client.Exec(ctx, revokeBySessionIDTokenStmt, nowUnixNano(), projectID, sessionID)
+// DeleteTokensBySessionID implements [service.TokenStatements].
+func (ts tokenStatements) DeleteTokensBySessionID(ctx context.Context, projectID, sessionID string) error {
+	_, err := ts.client.Exec(ctx, deleteBySessionIDTokenStmt, projectID, sessionID)
 	return wrapError(err)
 }
 
@@ -154,7 +144,7 @@ func scanToken(rows *sql.Rows) (*domain.Token, error) {
 		userID                           sql.NullString
 		sessionID, oidcSessionID, samlID sql.NullString
 		scopeStr                         string
-		expiresAtNano, revokedAtNano     sql.NullInt64
+		expiresAtNano                    sql.NullInt64
 		tokenType                        string
 		createdNano                      int64
 	)
@@ -169,7 +159,6 @@ func scanToken(rows *sql.Rows) (*domain.Token, error) {
 		&scopeStr,
 		&expiresAtNano,
 		&createdNano,
-		&revokedAtNano,
 	); err != nil {
 		return nil, err
 	}
@@ -203,10 +192,6 @@ func scanToken(rows *sql.Rows) (*domain.Token, error) {
 	if expiresAtNano.Valid {
 		exp := timeFromUnixNano(expiresAtNano.Int64)
 		token.ExpiresAt = &exp
-	}
-	if revokedAtNano.Valid {
-		revoked := timeFromUnixNano(revokedAtNano.Int64)
-		token.RevokedAt = &revoked
 	}
 	token.CreatedAt = timeFromUnixNano(createdNano)
 	return token, nil
@@ -308,15 +293,5 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 		SQLName:  "created_at",
 		Accessor: func(t *domain.Token) any { return t.CreatedAt },
 		Coerce:   database.CoerceTime,
-	},
-	domain.TokenFieldRevokedAt: {
-		SQLName: "revoked_at",
-		Accessor: func(t *domain.Token) any {
-			if t.RevokedAt == nil {
-				return (*time.Time)(nil)
-			}
-			return *t.RevokedAt
-		},
-		Coerce: database.CoerceTime,
 	},
 })

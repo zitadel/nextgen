@@ -119,12 +119,12 @@ func TestTokenStatements_List_CursorNilExpiresAt(t *testing.T) {
 }
 
 // TestTokenStatements_Revocation pins the revocation contract every dialect
-// owes the token verifier (ADR 037): revoking marks the record inactive rather
-// than deleting it, so a replayed token stays distinguishable from an unknown
-// one, and the first revocation instant is kept.
+// owes the token verifier (ADR 037): revoking deletes the record, so the
+// verifier can no longer resolve the token and the table keeps no rows that
+// grant nothing.
 func TestTokenStatements_Revocation(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
-		t.Run("revoked_record_survives_and_reports_inactive", func(t *testing.T) {
+		t.Run("revoked_record_is_gone", func(t *testing.T) {
 			projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 			userID := "usr-rev-" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Revoke User")))
@@ -145,25 +145,53 @@ func TestTokenStatements_Revocation(t *testing.T) {
 			// A fresh record is active.
 			got, err := d.stmts.GetTokenByID(t.Context(), projectID, tok.TokenID)
 			require.NoError(t, err)
-			assert.Nil(t, got.RevokedAt)
 			assert.True(t, got.Active(time.Now()), "a fresh record grants its token")
 
-			require.NoError(t, d.stmts.RevokeTokenByID(t.Context(), projectID, tok.TokenID))
+			require.NoError(t, d.stmts.DeleteTokenByID(t.Context(), projectID, tok.TokenID))
 
-			// The record is still there — that is the point of marking rather
-			// than deleting — but it no longer grants anything.
-			revoked, err := d.stmts.GetTokenByID(t.Context(), projectID, tok.TokenID)
-			require.NoError(t, err, "a revoked record is readable, so a replay is not mistaken for an unknown token")
-			require.NotNil(t, revoked.RevokedAt)
-			assert.False(t, revoked.Active(time.Now()))
+			// The record is gone, so the verifier resolves nothing.
+			_, err = d.stmts.GetTokenByID(t.Context(), projectID, tok.TokenID)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
-			// Revoking again keeps the original instant.
-			first := *revoked.RevokedAt
-			require.NoError(t, d.stmts.RevokeTokenByID(t.Context(), projectID, tok.TokenID))
-			again, err := d.stmts.GetTokenByID(t.Context(), projectID, tok.TokenID)
-			require.NoError(t, err)
-			require.NotNil(t, again.RevokedAt)
-			assert.True(t, first.Equal(*again.RevokedAt), "re-revoking keeps the first revocation instant")
+			// Revoking again is a no-op rather than an error.
+			require.NoError(t, d.stmts.DeleteTokenByID(t.Context(), projectID, tok.TokenID))
+		})
+
+		t.Run("revoking_a_session_deletes_the_tokens_it_issued", func(t *testing.T) {
+			projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+			userID := "usr-rev-sess-" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Session Revoke User")))
+
+			sessionID := "sess-multi-" + uniqueSuffix(t)
+			otherSessionID := "sess-other-" + uniqueSuffix(t)
+			newSessionToken := func(session string) *domain.Token {
+				tok := &domain.Token{
+					ProjectID: projectID,
+					UserID:    userID,
+					Type:      domain.TokenTypeSessionToken,
+					SessionID: &session,
+					Scope:     []string{},
+				}
+				require.NoError(t, d.stmts.CreateToken(t.Context(), tok))
+				t.Cleanup(func() {
+					_ = d.stmts.DeleteTokenByID(context.Background(), projectID, tok.TokenID)
+				})
+				return tok
+			}
+			// Two tokens on the session (a rotation would leave exactly this).
+			first, second := newSessionToken(sessionID), newSessionToken(sessionID)
+			untouched := newSessionToken(otherSessionID)
+
+			require.NoError(t, d.stmts.DeleteTokensBySessionID(t.Context(), projectID, sessionID))
+
+			for _, tok := range []*domain.Token{first, second} {
+				_, err := d.stmts.GetTokenByID(t.Context(), projectID, tok.TokenID)
+				assert.ErrorIs(t, err, new(database.NoRowFoundError))
+			}
+
+			// Another session's token is untouched.
+			_, err := d.stmts.GetTokenByID(t.Context(), projectID, untouched.TokenID)
+			assert.NoError(t, err)
 		})
 
 		t.Run("expired_record_is_inactive_without_revocation", func(t *testing.T) {
@@ -188,13 +216,12 @@ func TestTokenStatements_Revocation(t *testing.T) {
 
 			got, err := d.stmts.GetTokenByID(t.Context(), projectID, tok.TokenID)
 			require.NoError(t, err)
-			assert.Nil(t, got.RevokedAt)
 			assert.False(t, got.Active(time.Now()), "an expired record grants nothing even unrevoked")
 		})
 
 		t.Run("revoking_an_unknown_token_is_a_no_op", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
-			assert.NoError(t, d.stmts.RevokeTokenByID(t.Context(), projectID, "tkn-does-not-exist"))
+			assert.NoError(t, d.stmts.DeleteTokenByID(t.Context(), projectID, "tkn-does-not-exist"))
 		})
 
 		t.Run("project_credentials_are_storable_and_revocable", func(t *testing.T) {
@@ -224,10 +251,9 @@ func TestTokenStatements_Revocation(t *testing.T) {
 					assert.Nil(t, got.SessionID)
 					assert.True(t, got.Active(time.Now()))
 
-					require.NoError(t, d.stmts.RevokeTokenByID(t.Context(), projectID, tok.TokenID))
-					revoked, err := d.stmts.GetTokenByID(t.Context(), projectID, tok.TokenID)
-					require.NoError(t, err)
-					assert.False(t, revoked.Active(time.Now()))
+					require.NoError(t, d.stmts.DeleteTokenByID(t.Context(), projectID, tok.TokenID))
+					_, err = d.stmts.GetTokenByID(t.Context(), projectID, tok.TokenID)
+					assert.ErrorIs(t, err, new(database.NoRowFoundError))
 				})
 			}
 		})

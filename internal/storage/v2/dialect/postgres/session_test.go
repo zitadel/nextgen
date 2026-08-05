@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
 func uniqueSessionFixtureIDs(t *testing.T) string {
@@ -172,12 +173,10 @@ func TestSessionStatements_Exchange_rotatesToken(t *testing.T) {
 		assert.Equal(t, anonymous.ID, exchanged.ID)
 		assert.NotEqual(t, oldTokenID, exchanged.TokenID)
 
-		// Rotation revokes the predecessor rather than deleting it, so a replay
-		// of the rotated-out token is answered "revoked", not "unknown".
-		previous, err := testPool.GetTokenByID(t.Context(), projectID, oldTokenID)
-		require.NoError(t, err)
-		require.NotNil(t, previous.RevokedAt)
-		assert.False(t, previous.Active(time.Now()))
+		// Rotation revokes the predecessor, and revoking deletes the record, so
+		// replaying the rotated-out token resolves nothing.
+		_, err = testPool.GetTokenByID(t.Context(), projectID, oldTokenID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 		current, err := testPool.GetTokenByID(t.Context(), projectID, exchanged.TokenID)
 		require.NoError(t, err)

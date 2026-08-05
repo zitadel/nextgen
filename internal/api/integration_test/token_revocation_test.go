@@ -82,7 +82,7 @@ func signedInSession(t *testing.T, project *domain.Project, email string) (*doma
 
 // TestRevokedSessionTokenIsRejected is the acceptance test for token
 // revocation: a token that still decrypts must stop being accepted once its
-// record says it is no longer active.
+// record is revoked, which deletes it.
 //
 // Decryption alone proves only that this deployment minted the token. Before
 // the verifier consulted the record, a revoked session's cookie kept working

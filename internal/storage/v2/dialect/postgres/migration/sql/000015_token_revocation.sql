@@ -1,5 +1,5 @@
--- Token revocation (ADR 037): a revoked token is marked inactive rather than
--- deleted, so a replayed token stays distinguishable from an unknown one.
+-- Token revocation (ADR 037): revoking a token deletes its record, so the
+-- verifier stops resolving it and the table keeps no rows that grant nothing.
 -- Project and preview secrets become storable so a leaked one can be revoked
 -- (ADR 036); they authenticate software, so they carry no user or session id.
 --
@@ -14,11 +14,6 @@ ALTER TYPE zitadel_nextgen.token_types ADD VALUE IF NOT EXISTS 'project_token';
 
 -- +goose StatementBegin
 ALTER TYPE zitadel_nextgen.token_types ADD VALUE IF NOT EXISTS 'project_preview';
--- +goose StatementEnd
-
--- +goose StatementBegin
-ALTER TABLE zitadel_nextgen.tokens
-    ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -48,8 +43,8 @@ ALTER TABLE zitadel_nextgen.tokens
     );
 -- +goose StatementEnd
 
--- Deleting a session revokes its tokens instead of deleting them, so this
--- lookup runs against a table that only grows. Index it.
+-- Deleting a session deletes the tokens it issued, which is a lookup by
+-- session rather than by primary key. Index it.
 -- +goose StatementBegin
 CREATE INDEX IF NOT EXISTS idx_tokens_session
     ON zitadel_nextgen.tokens (project_id, session_id)
@@ -89,8 +84,4 @@ ALTER TABLE zitadel_nextgen.tokens
         OR (token_type = 'personal_access_token'::zitadel_nextgen.token_types
             AND session_id IS NULL AND oidc_session_id IS NULL AND saml_session_id IS NULL)
     );
--- +goose StatementEnd
-
--- +goose StatementBegin
-ALTER TABLE zitadel_nextgen.tokens DROP COLUMN IF EXISTS revoked_at;
 -- +goose StatementEnd

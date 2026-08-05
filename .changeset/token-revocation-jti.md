@@ -12,26 +12,23 @@ that the session still exists, so a revoked session's cookie kept working until
 its own expiry passed. It no longer does.
 
 - **Verification resolves the token id.** For revocable token types the verifier
-  looks up the token's `jti` and rejects it when the record is revoked, expired,
-  or gone. Only the id is stored — never the token, and never a hash of it
-  (ADR 029).
-- **Revocation marks, it does not delete.** A revoked record is kept with
-  `revoked_at` set, so a replayed token stays distinguishable from an unknown
-  one — the groundwork for refresh-token replay detection (ADR 037).
+  looks up the token's `jti` and rejects it when the record is expired or gone.
+  Only the id is stored — never the token, and never a hash of it (ADR 029).
+- **Revocation deletes the record.** A revoked token resolves to nothing, which
+  is the same answer an unknown token gets — all a bearer should learn either
+  way — and the tokens table keeps no rows that grant anything (ADR 037).
 - **Deleting a session revokes the tokens it issued**, in one transaction, so no
-  token record outlives the session it authenticates *as a working credential*.
-  The records themselves are kept and marked revoked — a database cascade would
-  have deleted them, which is exactly the "unknown" answer revocation exists to
-  avoid. Rotating a session token likewise revokes its predecessor rather than
-  deleting it, so replaying a rotated-out token is detectable.
+  token record outlives the session it authenticates. Rotating a session token
+  likewise revokes its predecessor, so a rotated-out token stops working the
+  moment its successor is issued.
 - **Project and preview secrets are revocable.** They are now issued with a
   stored `jti`, so a leaked secret can be retired instead of living forever —
   these credentials have no expiry of their own.
 
-Expired records are never honoured — verification checks `expires_at` as well as
-`revoked_at`. There is no background sweeper yet, so revoked and expired records
-accumulate; purging them once they are past `expires_at` is safe (an unknown
-token is rejected the same way a revoked one is) and is left as follow-up work.
+Expired records are never honoured — verification checks `expires_at` too. There
+is no background sweeper yet, so records that expired without being revoked
+accumulate; purging them once they are past `expires_at` is safe and is left as
+follow-up work.
 
 **Compatibility:** project secrets issued before this change carry no `jti`.
 They keep working — they cannot be forged without the encryption key — but

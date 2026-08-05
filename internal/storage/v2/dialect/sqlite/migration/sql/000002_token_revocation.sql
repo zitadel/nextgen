@@ -1,5 +1,5 @@
--- Token revocation (ADR 037): a revoked token is marked inactive rather than
--- deleted, so a replayed token stays distinguishable from an unknown one.
+-- Token revocation (ADR 037): revoking a token deletes its record, so the
+-- verifier stops resolving it and the table keeps no rows that grant nothing.
 -- Project and preview secrets become storable so a leaked one can be revoked
 -- (ADR 036); they authenticate software, so they carry no user or session id.
 --
@@ -20,7 +20,6 @@ CREATE TABLE tokens_new (
     scope           TEXT    NOT NULL,
     expires_at      INTEGER,
     created_at      INTEGER NOT NULL,
-    revoked_at      INTEGER,
     PRIMARY KEY (project_id, token_id),
     CONSTRAINT chk_tokens_token_id CHECK (token_id <> ''),
     CONSTRAINT fk_tokens_project
@@ -50,12 +49,12 @@ CREATE TABLE tokens_new (
 INSERT INTO tokens_new (
     project_id, token_id, user_id, token_type,
     session_id, oidc_session_id, saml_session_id,
-    scope, expires_at, created_at, revoked_at
+    scope, expires_at, created_at
 )
 SELECT
     project_id, token_id, user_id, token_type,
     session_id, oidc_session_id, saml_session_id,
-    scope, expires_at, created_at, NULL
+    scope, expires_at, created_at
 FROM tokens;
 -- +goose StatementEnd
 
@@ -67,8 +66,8 @@ DROP TABLE tokens;
 ALTER TABLE tokens_new RENAME TO tokens;
 -- +goose StatementEnd
 
--- Deleting a session revokes its tokens instead of deleting them, so this
--- lookup runs against a table that only grows. Index it.
+-- Deleting a session deletes the tokens it issued, which is a lookup by
+-- session rather than by primary key. Index it.
 -- +goose StatementBegin
 CREATE INDEX idx_tokens_session ON tokens (project_id, session_id)
     WHERE session_id IS NOT NULL;

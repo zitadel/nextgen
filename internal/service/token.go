@@ -54,7 +54,7 @@ func (s *tokenService) RevokeToken(ctx context.Context, projectID, tokenID strin
 	if tokenID == "" {
 		return nil
 	}
-	if err := s.v2Pool.Statements().RevokeTokenByID(ctx, projectID, tokenID); err != nil {
+	if err := s.v2Pool.Statements().DeleteTokenByID(ctx, projectID, tokenID); err != nil {
 		return domain.ErrInternal(err).WithMessage("failed to revoke token")
 	}
 	return nil

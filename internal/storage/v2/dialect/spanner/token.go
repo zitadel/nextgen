@@ -24,21 +24,18 @@ const (
 	@p5, @p6, @p7,
 	@p8, @p9
 ) THEN RETURN created_at`
-	deleteByIDTokenStmt = `DELETE FROM tokens WHERE project_id = @p1 AND token_id = @p2`
-	revokeByIDTokenStmt = `UPDATE tokens SET revoked_at = CURRENT_TIMESTAMP()
-WHERE project_id = @p1 AND token_id = @p2 AND revoked_at IS NULL`
-	revokeBySessionIDTokenStmt = `UPDATE tokens SET revoked_at = CURRENT_TIMESTAMP()
-WHERE project_id = @p1 AND session_id = @p2 AND revoked_at IS NULL`
-	tokenQuery = `SELECT project_id, token_id, user_id, token_type,
+	deleteByIDTokenStmt        = `DELETE FROM tokens WHERE project_id = @p1 AND token_id = @p2`
+	deleteBySessionIDTokenStmt = `DELETE FROM tokens WHERE project_id = @p1 AND session_id = @p2`
+	tokenQuery                 = `SELECT project_id, token_id, user_id, token_type,
 	session_id, oidc_session_id, saml_session_id,
-	scope, expires_at, created_at, revoked_at
+	scope, expires_at, created_at
 FROM tokens`
 )
 
 var tokenColumns = []string{
 	"project_id", "token_id", "user_id", "token_type",
 	"session_id", "oidc_session_id", "saml_session_id",
-	"scope", "expires_at", "created_at", "revoked_at",
+	"scope", "expires_at", "created_at",
 }
 
 type tokenStatements struct{ statement }
@@ -105,15 +102,9 @@ func (ts tokenStatements) GetTokenByID(ctx context.Context, projectID, tokenID s
 	return ts.scanToken(row)
 }
 
-// RevokeTokenByID implements [service.TokenStatements].
-func (ts tokenStatements) RevokeTokenByID(ctx context.Context, projectID, tokenID string) error {
-	_, err := ts.db.Update(ctx, buildStatement(revokeByIDTokenStmt, projectID, tokenID).statement())
-	return err
-}
-
-// RevokeTokensBySessionID implements [service.TokenStatements].
-func (ts tokenStatements) RevokeTokensBySessionID(ctx context.Context, projectID, sessionID string) error {
-	_, err := ts.db.Update(ctx, buildStatement(revokeBySessionIDTokenStmt, projectID, sessionID).statement())
+// DeleteTokensBySessionID implements [service.TokenStatements].
+func (ts tokenStatements) DeleteTokensBySessionID(ctx context.Context, projectID, sessionID string) error {
+	_, err := ts.db.Update(ctx, buildStatement(deleteBySessionIDTokenStmt, projectID, sessionID).statement())
 	return err
 }
 
@@ -157,7 +148,7 @@ func (ts tokenStatements) scanToken(row *spanner.Row) (*domain.Token, error) {
 		userID                           spanner.NullString
 		sessionID, oidcSessionID, samlID spanner.NullString
 		scope                            []string
-		expiresAt, revokedAt             spanner.NullTime
+		expiresAt                        spanner.NullTime
 		tokenType                        string
 	)
 	if err := row.Columns(
@@ -171,7 +162,6 @@ func (ts tokenStatements) scanToken(row *spanner.Row) (*domain.Token, error) {
 		&scope,
 		&expiresAt,
 		&token.CreatedAt,
-		&revokedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -201,10 +191,6 @@ func (ts tokenStatements) scanToken(row *spanner.Row) (*domain.Token, error) {
 	if expiresAt.Valid {
 		exp := expiresAt.Time
 		token.ExpiresAt = &exp
-	}
-	if revokedAt.Valid {
-		revoked := revokedAt.Time
-		token.RevokedAt = &revoked
 	}
 	return token, nil
 }
@@ -312,15 +298,5 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 		SQLName:  "created_at",
 		Accessor: func(t *domain.Token) any { return t.CreatedAt },
 		Coerce:   database.CoerceTime,
-	},
-	domain.TokenFieldRevokedAt: {
-		SQLName: "revoked_at",
-		Accessor: func(t *domain.Token) any {
-			if t.RevokedAt == nil {
-				return (*time.Time)(nil)
-			}
-			return *t.RevokedAt
-		},
-		Coerce: database.CoerceTime,
 	},
 })
