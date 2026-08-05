@@ -191,8 +191,6 @@ func validateSessionToken(session *domain.Session, token *domain.Token) error {
 		return domain.ErrSessionTokenInvalid()
 	}
 	if session.RevokedAt != nil {
-		// A revoked session invalidates any token derived from it, so self-session
-		// reads (GET/DELETE /sessions/me) must reject the cookie.
 		return domain.ErrSessionTokenInvalid()
 	}
 	if time.Now().After(session.ExpiresAt) {
@@ -286,16 +284,18 @@ func userAgentToAPI(agent *domain.UserAgent) api.OptNilSessionResponseUserAgent 
 
 func sessionStateToAPI(state domain.SessionState) api.SessionResponseState {
 	switch state {
+	case domain.SessionStateUnspecified:
+		return api.SessionResponseStateBuilding
 	case domain.SessionStateActive:
 		return api.SessionResponseStateActive
+	case domain.SessionStateBuilding:
+		return api.SessionResponseStateBuilding
 	case domain.SessionStateExpired:
 		return api.SessionResponseStateExpired
 	case domain.SessionStateRevoked:
 		return api.SessionResponseStateRevoked
-	case domain.SessionStateBuilding, domain.SessionStateUnspecified:
-		return api.SessionResponseStateBuilding
 	default:
-		return api.SessionResponseStateBuilding
+		return api.SessionResponseStateRevoked // TODO: ?
 	}
 }
 
