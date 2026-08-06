@@ -9,7 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-const teamFieldCreatedAt = "createdAt"
+const teamFieldCreatedAt = "created_at"
 
 type TeamService struct {
 	v2Pool *DB

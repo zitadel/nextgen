@@ -130,6 +130,21 @@ the CLI's help layer, not the envelope.
   (missing `.gitignore` entries, `.env.example` keys) still append to their
   targets, and the SDK dependency is re-added only when absent — an existing
   version pin is never rewritten.
+- `claim` — attach the project to a team so it becomes permanent. Mints a
+  short-lived link, opens it in a browser, and blocks until the developer
+  finishes signing in there, then records `claimed_at` and `team_id` in
+  `.zitadel/secret`. Nothing about the project changes: the issuer, users,
+  passkeys, and applications keep working, and the project secret is not
+  rotated. Re-running once the project belongs to a team is a clean
+  `status: "skipped"` with `reason: "already-claimed"`, so agents can retry
+  safely. The link is always printed before any browser opens, so a headless
+  machine, an SSH session, or `--no-open` needs no special handling — copy it
+  and open it anywhere. Links last 10 minutes; once one lapses the command
+  exits `E_VALIDATION` and points at a fresh run. `--dry-run` stops before
+  anything is minted and reports `status: "skipped"`, `reason: "dry-run"` —
+  there is nothing to preview, because a claim is decided in a browser.
+  Flags: `--no-open` (print the link instead of launching a browser),
+  `--timeout <seconds>` (stop waiting sooner than the link's own expiry).
 - `status` — summarize the local runtime and project state.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.

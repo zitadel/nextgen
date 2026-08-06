@@ -72,12 +72,12 @@ curl -s -X POST http://localhost:8080/projects \
   -d '{"name": "demo"}' | jq .
 ```
 
-The response contains the `id` and `projectSecret`:
+The response contains the `id` and `project_secret`:
 
 ```json
 {
   "id": "proj_01JXXXXXXXXXXXXXXXX",
-  "projectSecret": "eyJhbGci..."
+  "project_secret": "eyJhbGci..."
 }
 ```
 
@@ -90,7 +90,7 @@ ZITADEL_URL=http://localhost:8080
 NUXT_PUBLIC_ZITADEL_PROJECT_ID=proj_01JXXXXXXXXXXXXXXXX
 ```
 
-The demo only needs the project `id` — `projectSecret` authenticates
+The demo only needs the project `id` — `project_secret` authenticates
 server-side project-management calls and is not read by the demo app.
 
 #### 4. Start demo-nuxt

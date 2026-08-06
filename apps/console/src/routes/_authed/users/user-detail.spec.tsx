@@ -42,7 +42,7 @@ function stub({
     $schema: "sch_business",
     email: "maya@acme.com",
     companyName: "Acme",
-    metadata: { status: "active", createdAt: "2026-07-12T09:00:00Z", updatedAt: "2026-07-12T09:00:00Z" },
+    metadata: { status: "active", created_at: "2026-07-12T09:00:00Z", updated_at: "2026-07-12T09:00:00Z" },
   },
   passkeys = [{ id: "pk_1", name: "MacBook", created_at: "2026-07-01T00:00:00Z" }],
   passkeysStatus = 200,

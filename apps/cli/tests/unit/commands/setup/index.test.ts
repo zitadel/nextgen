@@ -274,8 +274,8 @@ describe("setup command pre-flight", () => {
     expect(capture.body).toBeTruthy();
     expect(capture.body).toMatchObject({
       name: expect.any(String),
-      previewOrigins: expect.arrayContaining([expect.any(String)]),
-      seedDefaults: false,
+      preview_origins: expect.arrayContaining([expect.any(String)]),
+      seed_defaults: false,
     });
     const projectName = capture.body?.name;
     expect(typeof projectName).toBe("string");
@@ -374,10 +374,10 @@ async function startCreateProjectCaptureServer(): Promise<{
         JSON.stringify({
           id: "proj_test",
           name: "demo",
-          projectSecret: "sk_proj_test_full",
-          previewSecret: "sk_proj_test_preview",
-          previewOrigins: [],
-          createdAt: "2026-06-01T00:00:00.000Z",
+          project_secret: "sk_proj_test_full",
+          preview_secret: "sk_proj_test_preview",
+          preview_origins: [],
+          created_at: "2026-06-01T00:00:00.000Z",
         }),
       );
       return;
@@ -386,7 +386,7 @@ async function startCreateProjectCaptureServer(): Promise<{
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
           id: "sch_test",
-          createdAt: "2026-06-01T00:00:00.000Z",
+          created_at: "2026-06-01T00:00:00.000Z",
         }),
       );
       return;
@@ -395,7 +395,7 @@ async function startCreateProjectCaptureServer(): Promise<{
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
           id: "flow_test",
-          createdAt: "2026-06-01T00:00:00.000Z",
+          created_at: "2026-06-01T00:00:00.000Z",
         }),
       );
       return;
