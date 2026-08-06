@@ -145,6 +145,15 @@ the CLI's help layer, not the envelope.
   there is nothing to preview, because a claim is decided in a browser.
   Flags: `--no-open` (print the link instead of launching a browser),
   `--timeout <seconds>` (stop waiting sooner than the link's own expiry).
+  `setup`, `status`, and `doctor` report whether a team is attached, reading
+  `claimed_at`/`team_id` from `.zitadel/secret` (no platform call). `status`
+  carries `data.project.claim` as `{"kind": "detached"}` or
+  `{"kind": "attached", "team_id", "claimed_at"}`, and `doctor` reports a
+  `claim` check. A project with no team is only ever a **warning**, never a
+  failure — it works exactly like one with a team, so `doctor` still exits 0
+  and `--fix` deliberately does nothing (a claim needs a human in a browser).
+  All three stay silent about teams when the project's `server` in
+  `zitadel.json` is local or self-hosted, where there is nothing to attach.
 - `status` — summarize the local runtime and project state.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.
