@@ -29,7 +29,7 @@ function SessionsPlaceholder() {
   return (
     <ComingSoon
       title="Sessions"
-      description="Listing sessions needs an endpoint that is routed but not implemented — GET /sessions answers 501 today. Revoking already works, so this screen returns as soon as the list does."
+      description="Listing sessions needs an endpoint that is routed but not implemented — POST /sessions/query answers 501 today. Revoking already works, so this screen returns as soon as the list does."
       icon={KeyRound}
     />
   );

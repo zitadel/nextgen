@@ -16,7 +16,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-const projectFieldCreatedAt = "createdAt"
+const projectFieldCreatedAt = "created_at"
 
 // ProjectService is the project use-case surface.
 type ProjectService interface {

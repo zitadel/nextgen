@@ -189,21 +189,40 @@ func flowCreatedAfter(a, b *domain.FlowDefinition) bool {
 	return a.ID > b.ID
 }
 
+// resolveFlowSession returns the id of the session the flow runs against:
+// the one the client supplied (a pre-created anonymous session, or an existing
+// session for step-up),
+// or a freshly persisted anonymous session when none is supplied.
+//
+// Linking the auth-attempt to this session lets exchange upgrade it in
+// place (building -> active) instead of minting a second one.
+func (s *flowService) resolveFlowSession(ctx context.Context, req StartFlowRequest) (string, error) {
+	if req.SessionID != nil {
+		return *req.SessionID, nil
+	}
+	session, err := domain.NewSession(req.Definition.ProjectID, nil)
+	if err != nil {
+		return "", fmt.Errorf("flow service: create anonymous session: %w", err)
+	}
+	if err := s.v2Pool.Statements().CreateSession(ctx, session); err != nil {
+		return "", fmt.Errorf("flow service: persist anonymous session: %w", err)
+	}
+	return session.ID, nil
+}
+
 func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.FlowStepResult, error) {
 	if req.Definition == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: start without definition")
 	}
+	// A supplied session id must name a real session; reject an empty value up
+	// front so it maps to 400 rather than silently producing an unlinked flow.
+	if req.SessionID != nil && *req.SessionID == "" {
+		return domain.FlowStepResult{}, domain.ErrRequestInvalid().WithMessage("session_id must not be empty")
+	}
 
-	// TODO(wim): use SessionService to create sessions (#412)
-	sessionID := ""
-	if req.SessionID != nil {
-		sessionID = *req.SessionID
-	} else {
-		id, err := s.v2Pool.Statements().NewManagedID(string(domain.PrefixSession))
-		if err != nil {
-			return domain.FlowStepResult{}, fmt.Errorf("flow service: mint session id: %w", err)
-		}
-		sessionID = id
+	sessionID, err := s.resolveFlowSession(ctx, req)
+	if err != nil {
+		return domain.FlowStepResult{}, err
 	}
 
 	in := domain.FlowStartInput{

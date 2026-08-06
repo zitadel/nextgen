@@ -178,7 +178,7 @@ import {
 const z = await startLocalZitadel({
   port,          // default: free port
   dir,           // default: temp dir, removed on stop (caller dirs are kept)
-  appOrigins,    // registered as the project's previewOrigins
+  appOrigins,    // registered as the project's preview_origins
   useCase,       // "minimal" (default) | "consumer" | "business"
   preset,        // "password-first" (default)
   serverBinary,  // ZITADEL_SERVER_BINARY override (in-repo: dist/server/nextgen)
@@ -215,12 +215,12 @@ above.
   preflight, the health wait, and process-group stop). Swapping this for direct
   library calls later will not change the public API.
 - **Bootstrap** is the server-side half of `zitadel setup`, no files:
-  `POST /projects` (unauthenticated; returns the `projectSecret` used as
+  `POST /projects` (unauthenticated; returns the `project_secret` used as
   bearer for everything else) → `POST /schemas` (server assigns the schema id)
   → `POST /flow_definitions` (default login flow pinned to that schema id).
   Templates come from `@zitadel/config/defaults`.
 - **Seeding** is `POST /users` (the body carries `$schema: <schema id>`) +
-  `PUT /users/{id}/password` with `isChangeRequired: false`.
+  `PUT /users/{id}/password` with `is_change_required: false`.
 
 ## Parallelism model
 

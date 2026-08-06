@@ -112,13 +112,13 @@ func (h Handler) GetMySession(ctx context.Context) (api.GetMySessionRes, error) 
 	}, nil
 }
 
-func (h Handler) ListSessions(ctx context.Context, params api.ListSessionsParams) (api.ListSessionsRes, error) {
+func (h Handler) QuerySessions(ctx context.Context, req *api.QuerySessionsRequest, params api.QuerySessionsParams) (api.QuerySessionsRes, error) {
 	if err := requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opRead); err != nil {
 		return nil, err
 	}
 	input := service.ListSessionInput{
 		ProjectID: string(params.ProjectID),
-		// TODO: handle params
+		// TODO: handle req
 	}
 	sessions, err := h.sessionService.List(ctx, input)
 	if err != nil {
@@ -300,8 +300,8 @@ func sessionStateToAPI(state domain.SessionState) api.SessionResponseState {
 	}
 }
 
-func sessionsToAPI(sessions []*domain.Session) *api.SessionListResponse {
-	response := &api.SessionListResponse{
+func sessionsToAPI(sessions []*domain.Session) *api.QuerySessionsResponse {
+	response := &api.QuerySessionsResponse{
 		Sessions: make([]api.SessionResponse, len(sessions)),
 	}
 	for i, session := range sessions {
