@@ -51,7 +51,7 @@ describe("claim state", () => {
 
 describe("claim copy", () => {
   it("names the owning team once attached and nudges otherwise", () => {
-    expect(claimSummary({ kind: "attached", team_id: "team-001" })).toBe(
+    expect(claimSummary({ kind: "attached", team_id: "team-001", claimed_at: ATTACHED.claimed_at })).toBe(
       "attached to team team-001",
     );
     expect(claimSummary({ kind: "detached" })).toBe("temporary until you attach it to a team");
@@ -71,7 +71,7 @@ describe("claim copy", () => {
     for (const copy of [
       claimAction("0.1.0"),
       claimSummary({ kind: "detached" }) ?? "",
-      claimSummary({ kind: "attached", team_id: "team-001" }) ?? "",
+      claimSummary({ kind: "attached", team_id: "team-001", claimed_at: ATTACHED.claimed_at }) ?? "",
     ]) {
       expect(copy).not.toMatch(/\bunclaimed\b/i);
     }

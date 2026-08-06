@@ -10,7 +10,7 @@ import { publicCliCommand } from "./public-cli";
  * opposite output: the first prints nothing at all, the second nudges.
  */
 export type ClaimState =
-  | { kind: "attached"; team_id: string; claimed_at?: string }
+  | { kind: "attached"; team_id: string; claimed_at: string }
   | { kind: "detached" }
   | { kind: "not-applicable" };
 

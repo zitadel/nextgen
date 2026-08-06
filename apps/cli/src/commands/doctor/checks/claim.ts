@@ -23,7 +23,7 @@ export class ClaimCheck implements SanityCheck {
   readonly path = ".zitadel/secret";
 
   async run(ctx: CheckContext): Promise<CheckOutcome> {
-    let state;
+    let state: ClaimState;
     try {
       state = claimState({
         secret: await readZitadelSecret(ctx.cwd),

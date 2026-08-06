@@ -118,7 +118,7 @@ describe("status command", () => {
 
     const json = parseJson(res.stdout) as {
       data: {
-        project: { claim?: { kind: string; team_id?: string } };
+        project: { claim?: { kind: string; team_id?: string; claimed_at?: string } };
         next_actions: string[];
         next_commands: string[];
       };
