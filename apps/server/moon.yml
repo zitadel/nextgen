@@ -24,6 +24,9 @@ tasks:
     command: "npx --yes @redocly/cli@2.31.5 lint api/openapi/openapi-spec.yaml --format=github-actions"
     inputs:
       - "@group(serverInputs)"
+      # Without these a lint-config change still cache-hits.
+      - "/redocly.yaml"
+      - "/.redocly.lint-ignore.yaml"
     options:
       runFromWorkspaceRoot: true
 

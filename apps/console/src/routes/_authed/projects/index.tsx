@@ -37,8 +37,8 @@ function ProjectView() {
         <KeyValueTable
           rows={[
             ["ID", project.id],
-            ["Created", project.createdAt],
-            ["Updated", project.updatedAt],
+            ["Created", project.created_at],
+            ["Updated", project.updated_at],
           ]}
         />
       </div>

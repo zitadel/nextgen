@@ -2249,11 +2249,11 @@ type CreateProjectRequest struct {
 	// The name of the project.
 	Name string `json:"name"`
 	// Origins which are allowed for previewing and testing the project.
-	PreviewOrigins []string `json:"previewOrigins"`
+	PreviewOrigins []string `json:"preview_origins"`
 	// Whether the server should provision fallback default user schema and flow
 	// resources for the project. CLI-managed projects set this to false and
 	// upload their local .zitadel config files through the schema and flow APIs.
-	SeedDefaults OptBool `json:"seedDefaults"`
+	SeedDefaults OptBool `json:"seed_defaults"`
 }
 
 // GetName returns the value of Name.
@@ -2293,13 +2293,13 @@ type CreateProjectResponse struct {
 	// The name of the project.
 	Name string `json:"name"`
 	// Secret which can be used for authentication when modifying the project.
-	ProjectSecret string `json:"projectSecret"`
+	ProjectSecret string `json:"project_secret"`
 	// Secret which can be used for previewing and testing the project.
-	PreviewSecret string `json:"previewSecret"`
+	PreviewSecret string `json:"preview_secret"`
 	// Origins which are allowed for previewing and testing the project.
-	PreviewOrigins []string `json:"previewOrigins"`
+	PreviewOrigins []string `json:"preview_origins"`
 	// The time when the project was created.
-	CreatedAt time.Time `json:"createdAt"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // GetID returns the value of ID.
@@ -3331,7 +3331,7 @@ func (s *FieldValidationFormat) UnmarshalText(data []byte) error {
 type FilterField string
 
 const (
-	FilterFieldCreatedAt FilterField = "createdAt"
+	FilterFieldCreatedAt FilterField = "created_at"
 )
 
 // AllValues returns all FilterField values.
@@ -6664,7 +6664,7 @@ func (*ListSchemasResponse) listSchemasRes() {}
 type ListSchemasResponseItem struct {
 	// The unique identifier for this schema.
 	ID        string    `json:"id"`
-	CreatedAt time.Time `json:"createdAt"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // GetID returns the value of ID.
@@ -11803,11 +11803,11 @@ type ProjectResponse struct {
 	// The name of the project.
 	Name string `json:"name"`
 	// Origins which are allowed for previewing and testing the project.
-	PreviewOrigins []string `json:"previewOrigins"`
+	PreviewOrigins []string `json:"preview_origins"`
 	// The time when the project was created.
-	CreatedAt time.Time `json:"createdAt"`
+	CreatedAt time.Time `json:"created_at"`
 	// The time when the project was last updated.
-	UpdatedAt time.Time `json:"updatedAt"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // GetID returns the value of ID.
@@ -13092,7 +13092,7 @@ type SetUserPasswordRequest struct {
 	Password string `json:"password"`
 	// Whether the user is required to change their password on the next login.
 	// If not provided, it will default to false.
-	IsChangeRequired OptBool `json:"isChangeRequired"`
+	IsChangeRequired OptBool `json:"is_change_required"`
 }
 
 // GetPassword returns the value of Password.
@@ -13353,7 +13353,7 @@ func (*SubmitFlowStepOK) submitFlowStepRes() {}
 type TeamFilterField string
 
 const (
-	TeamFilterFieldCreatedAt TeamFilterField = "createdAt"
+	TeamFilterFieldCreatedAt TeamFilterField = "created_at"
 )
 
 // AllValues returns all TeamFilterField values.
@@ -13395,9 +13395,9 @@ type TeamResponse struct {
 	Name   string     `json:"name"`
 	Status TeamStatus `json:"status"`
 	// The time when the team was created.
-	CreatedAt time.Time `json:"createdAt"`
+	CreatedAt time.Time `json:"created_at"`
 	// The time when the team was last updated.
-	UpdatedAt time.Time `json:"updatedAt"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // GetID returns the value of ID.
@@ -13674,9 +13674,9 @@ type UserID string
 // Ref: #
 type UserMetadata struct {
 	// The time when the user was created.
-	CreatedAt time.Time `json:"createdAt"`
+	CreatedAt time.Time `json:"created_at"`
 	// The time when the user was last updated.
-	UpdatedAt time.Time `json:"updatedAt"`
+	UpdatedAt time.Time `json:"updated_at"`
 	// The status of the user.
 	Status UserMetadataStatus `json:"status"`
 }
