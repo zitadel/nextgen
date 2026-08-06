@@ -50,6 +50,8 @@ func TestInvalidSessionCredential(t *testing.T) {
 // RevokeMySession is idempotent: logging out a session that is already gone
 // still returns 204 and clears the cookie, rather than surfacing a 404.
 func TestRevokeMySession_IdempotentWhenSessionGone(t *testing.T) {
+	t.Parallel()
+
 	ctrl := gomock.NewController(t)
 	sessions := servicemocks.NewMockSessionService(ctrl)
 	sessions.EXPECT().
