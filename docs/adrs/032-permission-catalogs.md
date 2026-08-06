@@ -398,10 +398,13 @@ policies without reintroducing hard-coded levels and special cases.
 ## Follow-ups
 
 1. Design relational migrations for catalogs, permission/relation
-   definitions, expression edges, and assignments shared by both catalogs.
+   definitions, and assignments shared by both catalogs.
    Wave 0 DDL spike and locked decisions:
    [`docs/design/api/permission-storage.md`](../design/api/permission-storage.md)
    (implementation tracked by [issue #422](https://github.com/zitadel/nextgen/issues/422)).
+   Wave 0 defers `authz_expression_edges` (D5); live catalog rows are
+   `authz_relations` + `authz_relation_closure` until
+   [issue #421](https://github.com/zitadel/nextgen/issues/421).
    Catalog-specific tables — `resource_scope_index` and app grants — are
    tracked in [ADR 033](033-internal-permission-management.md) and
    [ADR 034](034-external-permission-management.md); staff/support grant
