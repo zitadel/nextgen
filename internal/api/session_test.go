@@ -101,6 +101,27 @@ func TestUserAgentToAPI(t *testing.T) {
 	require.JSONEq(t, `{"fingerprint":"fp_abc123","ip":"203.0.113.42","browser":"test"}`, string(data))
 }
 
+func TestSessionStateToAPI(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name  string
+		state domain.SessionState
+		want  api.SessionResponseState
+	}{
+		{"unspecified", domain.SessionStateUnspecified, api.SessionResponseStateBuilding},
+		{"building", domain.SessionStateBuilding, api.SessionResponseStateBuilding},
+		{"active", domain.SessionStateActive, api.SessionResponseStateActive},
+		{"expired", domain.SessionStateExpired, api.SessionResponseStateExpired},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, tt.want, sessionStateToAPI(tt.state))
+		})
+	}
+}
+
 func TestExchangeInputFromRequest(t *testing.T) {
 	t.Parallel()
 
