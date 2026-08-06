@@ -30,7 +30,12 @@ func TestChain_AppliesFirstListedOutermost(t *testing.T) {
 	require.Equal(t, []string{"a", "b", "c", "handler"}, order)
 }
 
-func TestChain_NoMiddlewaresReturnsHandler(t *testing.T) {
-	final := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
-	require.NotNil(t, middleware.Chain(final))
+func TestChain_NoMiddlewaresInvokesHandlerUnchanged(t *testing.T) {
+	called := false
+	final := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true })
+
+	middleware.Chain(final).
+		ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+
+	require.True(t, called, "Chain with no middlewares must invoke the original handler")
 }
