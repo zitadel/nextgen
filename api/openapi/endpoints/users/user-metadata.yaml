@@ -1,15 +1,15 @@
 title: UserMetadata
 type: object
 required:
-  - createdAt
-  - updatedAt
+  - created_at
+  - updated_at
   - status
 properties:
-  createdAt:
+  created_at:
     type: string
     format: date-time
     description: The time when the user was created.
-  updatedAt:
+  updated_at:
     type: string
     format: date-time
     description: The time when the user was last updated.

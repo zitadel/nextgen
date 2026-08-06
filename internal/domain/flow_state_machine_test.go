@@ -173,7 +173,7 @@ func TestFlowStateMachine_Start_RendersInitialStep(t *testing.T) {
 
 	w.authAttemptService.EXPECT().
 		Start(gomock.Any(), gomock.Cond(func(in domain.FlowCreateAttemptInput) bool {
-			return in.ProjectID == testProject
+			return in.ProjectID == testProject && in.SessionID != nil && *in.SessionID == "sess-1"
 		})).
 		Return("att_01TEST", nil).
 		Times(1)

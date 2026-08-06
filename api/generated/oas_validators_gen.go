@@ -997,7 +997,7 @@ func (s *CreateProjectResponse) Validate() error {
 		return nil
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
-			Name:  "previewOrigins",
+			Name:  "preview_origins",
 			Error: err,
 		})
 	}
@@ -1263,7 +1263,7 @@ func (s FieldValidationFormat) Validate() error {
 
 func (s FilterField) Validate() error {
 	switch s {
-	case "createdAt":
+	case "created_at":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
@@ -3549,7 +3549,7 @@ func (s *SubmitFlowStepOK) Validate() error {
 
 func (s TeamFilterField) Validate() error {
 	switch s {
-	case "createdAt":
+	case "created_at":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)

@@ -25,7 +25,7 @@ export function identity(): Identity {
 /**
  * Create a user that can immediately complete the password login flow:
  * `POST /users` (the body must carry `$schema: <schema id>`) followed by
- * `PUT /users/{id}/password` with `isChangeRequired: false`.
+ * `PUT /users/{id}/password` with `is_change_required: false`.
  *
  * Defaults mint a unique email per call (email is x-unique per project), which
  * is what makes per-test seeding parallel-safe on a shared instance.
@@ -52,7 +52,7 @@ export async function seedUser(
   const id = requireString(user.id, "user id");
   await client.setUserPassword(
     id,
-    { password, isChangeRequired: false },
+    { password, is_change_required: false },
     { project_id: context.projectId },
   );
   return { id, email, password };
