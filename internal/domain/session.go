@@ -183,4 +183,7 @@ const (
 	SessionFieldTimeToLive
 	SessionFieldTokenID
 	SessionFieldUserID
+	// SessionFieldHasVerifiedFactor has no column of its own. It is computed
+	// per session, and separates the active sessions from the building ones.
+	SessionFieldHasVerifiedFactor
 )

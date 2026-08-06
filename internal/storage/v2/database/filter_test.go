@@ -112,3 +112,16 @@ func TestArrayContainsFilter(t *testing.T) {
 	assert.True(t, filter.Restricts(col))
 	assert.False(t, filter.Restricts(database.Col(domain.FlowDefinitionFieldID)))
 }
+
+func TestBoolFilter(t *testing.T) {
+	t.Parallel()
+
+	col := database.Col(domain.FlowDefinitionFieldStatus)
+	isTrue := database.IsTrue(col)
+	assert.Equal(t, col, isTrue.Column)
+	assert.True(t, isTrue.Want)
+	assert.True(t, isTrue.Restricts(col))
+	assert.False(t, isTrue.Restricts(database.Col(domain.FlowDefinitionFieldID)))
+
+	assert.False(t, database.IsFalse(col).Want)
+}

@@ -5,6 +5,7 @@ package stmttest
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -14,6 +15,126 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
+
+// listTestSessions seeds a project with n multi-factor sessions bound to one user.
+func listTestSessions(t *testing.T, d dialect, n int) (projectID, userID string, want []string) {
+	t.Helper()
+	projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+	user := newTestUser(t, projectID, schemaURL, "user-list-"+uniqueSuffix(t), "list-"+uniqueSuffix(t)+"@example.com", "List User")
+	require.NoError(t, d.stmts.CreateUser(t.Context(), user))
+	return projectID, user.ID, seedActiveSessions(t, d.stmts, projectID, user.ID, n)
+}
+
+func projectFilter(projectID string) database.Filter[domain.SessionField] {
+	return database.Equal(database.Col(domain.SessionFieldProjectID), projectID)
+}
+
+func orderByID(direction database.OrderDirection) database.OrderBy[domain.SessionField] {
+	return database.OrderBy[domain.SessionField]{
+		Columns:   []database.Column[domain.SessionField]{database.Col(domain.SessionFieldID)},
+		Direction: direction,
+	}
+}
+
+// A session with two verified factors is two rows once checks are joined, so a
+// limit applied to the joined result would both shorten the page and strip
+// factors off its last session.
+func TestSessionStatements_ListLimitsSessionsNotJoinedRows(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, _, want := listTestSessions(t, d, 3)
+
+		result := listSessions(t, d.stmts, projectFilter(projectID), database.Page[domain.SessionField]{
+			Limit:   3,
+			OrderBy: orderByID(database.OrderAsc),
+		})
+
+		assert.Equal(t, want, sessionIDs(result.Items))
+		for _, session := range result.Items {
+			assert.Len(t, session.Factors, 2, "session %s came back with an incomplete factor list", session.ID)
+		}
+	})
+}
+
+func TestSessionStatements_ListPagesThroughEverySession(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, _, want := listTestSessions(t, d, 5)
+
+		got := walkSessions(t, d.stmts, projectFilter(projectID), database.Page[domain.SessionField]{
+			Limit:   2,
+			OrderBy: orderByID(database.OrderAsc),
+		}, 2)
+
+		assert.Equal(t, want, got, "every session must be reachable across pages, exactly once")
+	})
+}
+
+func TestSessionStatements_ListPagesDescending(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, _, want := listTestSessions(t, d, 5)
+		slices.Reverse(want)
+
+		got := walkSessions(t, d.stmts, projectFilter(projectID), database.Page[domain.SessionField]{
+			Limit:   2,
+			OrderBy: orderByID(database.OrderDesc),
+		}, 2)
+
+		assert.Equal(t, want, got)
+	})
+}
+
+func TestSessionStatements_ListFiltersByUserID(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, userID, want := listTestSessions(t, d, 2)
+		// Anonymous sessions in the same project must not match.
+		seedBuildingSessions(t, d.stmts, projectID, 2)
+
+		result := listSessions(t, d.stmts, database.And(
+			projectFilter(projectID),
+			database.Equal(database.Col(domain.SessionFieldUserID), userID),
+		), database.Page[domain.SessionField]{OrderBy: orderByID(database.OrderAsc)})
+
+		assert.Equal(t, want, sessionIDs(result.Items))
+	})
+}
+
+// building vs active is "has no verified factor", which needs an EXISTS over
+// checks rather than a column comparison.
+func TestSessionStatements_ListFiltersByVerifiedFactor(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, _, active := listTestSessions(t, d, 3)
+		building := seedBuildingSessions(t, d.stmts, projectID, 2)
+
+		for _, tt := range []struct {
+			name   string
+			filter database.Filter[domain.SessionField]
+			want   []string
+			state  domain.SessionState
+		}{
+			{
+				name:   "active",
+				filter: database.IsTrue(database.Col(domain.SessionFieldHasVerifiedFactor)),
+				want:   active,
+				state:  domain.SessionStateActive,
+			},
+			{
+				name:   "building",
+				filter: database.IsFalse(database.Col(domain.SessionFieldHasVerifiedFactor)),
+				want:   building,
+				state:  domain.SessionStateBuilding,
+			},
+		} {
+			t.Run(tt.name, func(t *testing.T) {
+				result := listSessions(t, d.stmts, database.And(projectFilter(projectID), tt.filter),
+					database.Page[domain.SessionField]{OrderBy: orderByID(database.OrderAsc)})
+
+				assert.Equal(t, tt.want, sessionIDs(result.Items))
+				for _, session := range result.Items {
+					assert.Equal(t, tt.state, session.State())
+				}
+			})
+		}
+	})
+}
 
 func TestUserStatements_DeleteCascadesSessionAndToken(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {

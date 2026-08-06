@@ -14,10 +14,21 @@ import (
 	v2session "github.com/zitadel/nextgen/internal/storage/v2/session"
 )
 
-const sessionQuery = `SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.time_to_live, s.token_id, s.user_id,
+// The checks join turns one session into one row per check, so a LIMIT over
+// the joined result counts checks, not sessions: the page comes back short
+// and its last session might miss some checks. Filter, order and limit run inside
+// this CTE, over sessions alone; sessionJoinQuery closes it and joins the
+// checks onto the page.
+const sessionPageQuery = `WITH page AS (
+SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.time_to_live, s.token_id, s.user_id, s.user_agent_id
+FROM sessions s`
+
+const sessionJoinQuery = `
+)
+SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.time_to_live, s.token_id, s.user_id,
 	ua.id, ua.info,
 	c.type, c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload
-FROM sessions s
+FROM page s
 LEFT JOIN user_agents ua ON s.project_id = ua.project_id AND s.user_agent_id = ua.id
 LEFT JOIN checks c ON c.project_id = s.project_id AND c.session_id = s.id`
 
@@ -113,9 +124,11 @@ func (s sessionExchangeStore) DeleteAuthAttempt(ctx context.Context, projectID, 
 
 func (ss sessionStatements) querySessions(ctx context.Context, filter *database.ListOptions[domain.SessionField]) ([]*domain.Session, error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, sessionQuery, filter, sessionSchema); err != nil {
+	if err := compileRead(&compiler, sessionPageQuery, filter, sessionSchema); err != nil {
 		return nil, err
 	}
+	compiler.WriteString(sessionJoinQuery)
+	compileOrderBy(&compiler, filter.Pagination.OrderBy, sessionSchema)
 	rows, err := ss.client.Query(ctx, compiler.String(), compiler.args...)
 	if err != nil {
 		return nil, wrapError(err)
@@ -469,5 +482,11 @@ var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBin
 			return *s.UserID
 		},
 		Coerce: database.CoerceString,
+	},
+	// Correlates on s, so it compiles inside the CTE alongside the other filters.
+	domain.SessionFieldHasVerifiedFactor: {
+		SQLName:  `EXISTS (SELECT 1 FROM checks c2 WHERE c2.project_id = s.project_id AND c2.session_id = s.id AND c2.last_verified_at IS NOT NULL)`,
+		Accessor: func(s *domain.Session) any { return len(s.Factors) > 0 },
+		Coerce:   database.CoerceBool,
 	},
 })

@@ -751,3 +751,19 @@ func compileFlowDefinitionRead(t *testing.T, opts *database.ListOptions[domain.F
 	require.NoError(t, err)
 	return compiler.String(), compiler.args
 }
+
+func TestCompileBoolFilterEmitsBarePredicate(t *testing.T) {
+	t.Parallel()
+
+	// Comparing the predicate to a bound value ("EXISTS (...) = @p1") costs the
+	// planner the semi-join, so no argument may be bound.
+	const exists = `EXISTS (SELECT 1 FROM checks c2 WHERE c2.project_id = s.project_id AND c2.session_id = s.id AND c2.last_verified_at IS NOT NULL)`
+
+	sql, args := compileFilterOnly(t, database.IsTrue(database.Col(domain.SessionFieldHasVerifiedFactor)), sessionSchema)
+	assert.Equal(t, "("+exists+")", sql)
+	assert.Empty(t, args)
+
+	sql, args = compileFilterOnly(t, database.IsFalse(database.Col(domain.SessionFieldHasVerifiedFactor)), sessionSchema)
+	assert.Equal(t, "NOT ("+exists+")", sql)
+	assert.Empty(t, args)
+}

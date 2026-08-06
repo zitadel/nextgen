@@ -78,9 +78,20 @@ func compileFilter[F ~uint8, T any](c *statementCompiler, filter database.Filter
 		compileStringFilter(c, f, schema)
 	case *database.ArrayContainsFilter[F]:
 		compileArrayContainsFilter(c, f, schema)
+	case *database.BoolFilter[F]:
+		compileBoolFilter(c, f, schema)
 	default:
 		panic("unknown filter type")
 	}
+}
+
+func compileBoolFilter[F ~uint8, T any](c *statementCompiler, filter *database.BoolFilter[F], schema database.Schema[F, T]) {
+	if !filter.Want {
+		c.WriteString("NOT ")
+	}
+	c.WriteString("(")
+	c.WriteString(schema.SQLName(filter.Column))
+	c.WriteString(")")
 }
 
 func compileAndFilter[F ~uint8, T any](c *statementCompiler, filter database.AndFilter[F], schema database.Schema[F, T]) {

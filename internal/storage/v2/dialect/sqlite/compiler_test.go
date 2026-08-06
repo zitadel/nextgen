@@ -118,3 +118,27 @@ func TestCompileStringFilterLikeUsesEscape(t *testing.T) {
 	require.Len(t, c.args, 1)
 	assert.Equal(t, `100\%\_a\\b`, c.args[0])
 }
+
+func TestCompileBoolFilterEmitsBarePredicate(t *testing.T) {
+	t.Parallel()
+
+	// Comparing the predicate to a bound value ("EXISTS (...) = ?") costs the
+	// planner the semi-join, so no argument may be bound.
+	const exists = `EXISTS (SELECT 1 FROM checks c2 WHERE c2.project_id = s.project_id AND c2.session_id = s.id AND c2.last_verified_at IS NOT NULL)`
+
+	for _, tt := range []struct {
+		name   string
+		filter database.Filter[domain.SessionField]
+		want   string
+	}{
+		{name: "is true", filter: database.IsTrue(database.Col(domain.SessionFieldHasVerifiedFactor)), want: "(" + exists + ")"},
+		{name: "is false", filter: database.IsFalse(database.Col(domain.SessionFieldHasVerifiedFactor)), want: "NOT (" + exists + ")"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var compiler statementCompiler
+			compileFilter(&compiler, tt.filter, sessionSchema)
+			assert.Equal(t, tt.want, compiler.String())
+			assert.Empty(t, compiler.args)
+		})
+	}
+}
