@@ -1,11 +1,12 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Check, Copy, Key, UserRoundCog } from "lucide-react";
-import { useId, useState } from "react";
+import { Key, UserRoundCog } from "lucide-react";
+import { useId } from "react";
 
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -285,19 +286,6 @@ function MetaItem({
   value: string;
   copyable?: boolean;
 }) {
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard access can be refused (permissions, insecure origin). The id
-      // is on screen and selectable, so a failure needs no error surface.
-    }
-  }
-
   return (
     <div className="flex flex-col gap-[3px]">
       <span className={EYEBROW}>{label}</span>
@@ -305,16 +293,7 @@ function MetaItem({
         <span className="text-foreground font-mono text-[13px] leading-[19px] tracking-[-0.5px]">
           {value}
         </span>
-        {copyable && (
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={() => void copy()}
-            aria-label={copied ? `${label} copied` : `Copy ${label}`}
-          >
-            {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-          </Button>
-        )}
+        {copyable && <CopyButton value={value} label={`Copy ${label}`} />}
       </div>
     </div>
   );

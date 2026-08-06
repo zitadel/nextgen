@@ -1,8 +1,7 @@
-import { Check, Copy } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { stringify as stringifyYaml } from "yaml";
 
-import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { InlineCode } from "@/components/ui/inline-code";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type CodeLanguage, type CodeLine, highlightCode } from "@/lib/highlight";
@@ -62,7 +61,11 @@ export function SchemaDocumentViewer({ schema }: { schema: UserSchema }) {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        <CopyButton value={source} label={`Copy the schema document as ${format.toUpperCase()}`} />
+        <CopyButton
+          value={source}
+          label={`Copy the schema document as ${format.toUpperCase()}`}
+          size="sm"
+        />
       </div>
 
       {/* The design's code block hugs its content, but it is drawn around a
@@ -136,53 +139,3 @@ function useHighlighted(source: string, lang: CodeLanguage): CodeLine[] | undefi
 const TABS_LIST = "h-10 p-[3px]";
 const TABS_TRIGGER =
   "flex-none data-[state=active]:bg-muted dark:data-[state=active]:border-transparent dark:data-[state=active]:bg-muted";
-
-/**
- * Copy-to-clipboard control.
- *
- * The confirmation is an icon swap plus a live region: the design gives the
- * button no room for a label, and a silent icon change is invisible to a screen
- * reader. A write that is refused — or a missing clipboard — leaves the button
- * in its resting state rather than claiming a copy that did not happen.
- */
-function CopyButton({ value, label }: { value: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 2000);
-    return () => clearTimeout(timer);
-  }, [copied]);
-
-  return (
-    <>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        aria-label={label}
-        onClick={() => {
-          // `navigator.clipboard` is absent on an insecure origin. Guarded
-          // explicitly rather than by optional-chaining the call: both are
-          // safe, but the chain form reads as though `.then()` runs on
-          // `undefined`.
-          const { clipboard } = navigator;
-          if (!clipboard) return;
-          void clipboard.writeText(value).then(
-            () => setCopied(true),
-            () => setCopied(false),
-          );
-        }}
-      >
-        {copied ? (
-          <Check className="size-3.5 text-foreground" aria-hidden />
-        ) : (
-          <Copy className="size-3.5" aria-hidden />
-        )}
-      </Button>
-      <span role="status" aria-live="polite" className="sr-only">
-        {copied ? "Copied to clipboard" : ""}
-      </span>
-    </>
-  );
-}
