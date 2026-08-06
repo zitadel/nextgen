@@ -79,7 +79,7 @@ CREATE TABLE zitadel_nextgen.resource_scope_index (
     PRIMARY KEY (resource_id),
     FOREIGN KEY (project_id, team_id)
         REFERENCES zitadel_nextgen.teams (project_id, id)
-        ON DELETE CASCADE
+        ON DELETE RESTRICT
 );
 
 CREATE INDEX idx_resource_scope_index_project
