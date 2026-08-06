@@ -16,6 +16,7 @@ import {
 } from "@zitadel/config/defaults";
 import { consola } from "consola";
 
+import { claimAction, claimCommand, claimState, claimSummary } from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import {
@@ -42,6 +43,7 @@ import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
   detectProjectFacts,
+  dim as styleDim,
   fileNameOf,
   formatFrameworkLine,
   id as styleId,
@@ -379,6 +381,18 @@ export default class Setup extends BaseCommand {
     });
 
     const writtenRel = allFilesWritten.map((file) => relativeDisplay(cwd, file));
+    // The nudge rides both surfaces from one decision: the box for humans, the
+    // envelope for agents. It lands after the install/verify actions because
+    // attaching a team is the step *after* the app demonstrably works, not a
+    // precondition for trying it. Empty off the cloud, where nothing can be
+    // attached.
+    const claimNudge =
+      claimState({ secret: {}, server: answers.server }).kind === "detached"
+        ? {
+            actions: [claimAction(this.meta.cliVersion)],
+            commands: [claimCommand(this.meta.cliVersion)],
+          }
+        : { actions: [], commands: [] };
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -398,7 +412,11 @@ export default class Setup extends BaseCommand {
       // pre-coloured rows (path/url/id helpers) survive intact.
       consola.box({
         title: "Zitadel is ready",
-        message: [renderSummary(sections), "", installOutcome.boxActions.join("\n")].join("\n"),
+        message: [
+          renderSummary(sections),
+          "",
+          [...installOutcome.boxActions, ...claimNudge.actions].join("\n"),
+        ].join("\n"),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
     }
@@ -427,8 +445,8 @@ export default class Setup extends BaseCommand {
         })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
-        next_actions: installOutcome.nextActions,
-        next_commands: installOutcome.nextCommands,
+        next_actions: [...installOutcome.nextActions, ...claimNudge.actions],
+        next_commands: [...installOutcome.nextCommands, ...claimNudge.commands],
       },
     });
   }
@@ -742,6 +760,14 @@ function buildSummary(opts: {
     { label: "Server", value: styleUrl(server) },
     { label: "App will run", value: styleUrl(issuer) },
   ];
+
+  // A project this command just created is never attached to a team yet, so the
+  // only question here is whether attaching is a thing at all on this server.
+  // `claimSummary` returns undefined off the cloud, which drops the row.
+  const ownership = claimSummary(claimState({ secret: {}, server }));
+  if (ownership) {
+    projectRows.push({ label: "Ownership", value: styleDim(ownership) });
+  }
 
   return [
     { title: "Detected", rows: detected },
