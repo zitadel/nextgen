@@ -12349,10 +12349,6 @@ type QueryTeamsUnauthorized ErrorDetails
 
 func (*QueryTeamsUnauthorized) queryTeamsRes() {}
 
-type RevokeMySessionConflict ErrorDetails
-
-func (*RevokeMySessionConflict) revokeMySessionRes() {}
-
 // RevokeMySessionNoContent is response for RevokeMySession operation.
 type RevokeMySessionNoContent struct {
 	SetCookie string
@@ -12369,10 +12365,6 @@ func (s *RevokeMySessionNoContent) SetSetCookie(val string) {
 }
 
 func (*RevokeMySessionNoContent) revokeMySessionRes() {}
-
-type RevokeMySessionNotFound ErrorDetails
-
-func (*RevokeMySessionNotFound) revokeMySessionRes() {}
 
 // Ref: #
 type RevokeRequest struct {
@@ -12402,10 +12394,6 @@ func (s *RevokeRequest) SetTokenTypeHint(val OptString) {
 	s.TokenTypeHint = val
 }
 
-type RevokeSessionConflict ErrorDetails
-
-func (*RevokeSessionConflict) revokeSessionRes() {}
-
 type RevokeSessionForbidden ErrorDetails
 
 func (*RevokeSessionForbidden) revokeSessionRes() {}
@@ -12414,10 +12402,6 @@ func (*RevokeSessionForbidden) revokeSessionRes() {}
 type RevokeSessionNoContent struct{}
 
 func (*RevokeSessionNoContent) revokeSessionRes() {}
-
-type RevokeSessionNotFound ErrorDetails
-
-func (*RevokeSessionNotFound) revokeSessionRes() {}
 
 type RevokeSessionUnauthorized ErrorDetails
 
