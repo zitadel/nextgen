@@ -7,7 +7,7 @@ description: |
 
   Roster membership is not lifecycle ownership. A user can belong to many teams
   while still owning their own lifecycle — that single owning team is reported
-  as `metadata.lifecycleOwnerTeamId` on the user itself.
+  as `metadata.lifecycle_owner_team_id` on the user itself.
 required:
   - id
   - name

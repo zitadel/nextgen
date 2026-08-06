@@ -13720,7 +13720,7 @@ type UserMetadata struct {
 	// the user's team roster: it decides who may deprovision the user, not
 	// which teams the user collaborates in. The roster is its own paginated
 	// resource — `GET /users/{user_id}/teams`.
-	LifecycleOwnerTeamId OptNilString `json:"lifecycleOwnerTeamId"`
+	LifecycleOwnerTeamID OptNilString `json:"lifecycle_owner_team_id"`
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -13738,9 +13738,9 @@ func (s *UserMetadata) GetStatus() UserMetadataStatus {
 	return s.Status
 }
 
-// GetLifecycleOwnerTeamId returns the value of LifecycleOwnerTeamId.
-func (s *UserMetadata) GetLifecycleOwnerTeamId() OptNilString {
-	return s.LifecycleOwnerTeamId
+// GetLifecycleOwnerTeamID returns the value of LifecycleOwnerTeamID.
+func (s *UserMetadata) GetLifecycleOwnerTeamID() OptNilString {
+	return s.LifecycleOwnerTeamID
 }
 
 // SetCreatedAt sets the value of CreatedAt.
@@ -13758,9 +13758,9 @@ func (s *UserMetadata) SetStatus(val UserMetadataStatus) {
 	s.Status = val
 }
 
-// SetLifecycleOwnerTeamId sets the value of LifecycleOwnerTeamId.
-func (s *UserMetadata) SetLifecycleOwnerTeamId(val OptNilString) {
-	s.LifecycleOwnerTeamId = val
+// SetLifecycleOwnerTeamID sets the value of LifecycleOwnerTeamID.
+func (s *UserMetadata) SetLifecycleOwnerTeamID(val OptNilString) {
+	s.LifecycleOwnerTeamID = val
 }
 
 // The status of the user.
@@ -14170,7 +14170,7 @@ func (s *UserSchemaProperties) init() UserSchemaProperties {
 // a page renders without a follow-up `POST /teams/query` per row.
 // Roster membership is not lifecycle ownership. A user can belong to many teams
 // while still owning their own lifecycle — that single owning team is reported
-// as `metadata.lifecycleOwnerTeamId` on the user itself.
+// as `metadata.lifecycle_owner_team_id` on the user itself.
 // Ref: #
 type UserTeam struct {
 	// The unique identifier of the team.

@@ -14,7 +14,7 @@ memberships the user was removed from are not returned. An unknown user is a
 404, which is a different answer from a user with an empty roster.
 
 The user read endpoints (`GET /users`, `GET /users/{user_id}`,
-`GET /users/me`) also gain `metadata.lifecycleOwnerTeamId` — the single team
+`GET /users/me`) also gain `metadata.lifecycle_owner_team_id` — the single team
 that owns the user's identity lifecycle, or `null` when the user is self-owned.
 That is a different concept from the roster and the two need not agree
 (ADR 024): roster membership is collaboration, lifecycle ownership decides who

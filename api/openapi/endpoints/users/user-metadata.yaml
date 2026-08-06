@@ -21,7 +21,7 @@ properties:
       - suspended
       - deactivated
       - pending_purge
-  lifecycleOwnerTeamId:
+  lifecycle_owner_team_id:
     description: |
       The team that owns this user's identity lifecycle, or `null` when the
       user is self-owned. This is a single team and a different concept from

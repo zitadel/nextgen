@@ -8520,7 +8520,7 @@ func (s *Server) handleListUserPasskeysRequest(args [1]string, argsEscaped bool,
 // The user's team roster, ordered by team name. Each entry carries the
 // team's name, so a client renders a page without resolving ids one by one.
 // This is the N:N roster and it is not lifecycle ownership: the single team
-// that owns the user's lifecycle is reported as `metadata.lifecycleOwnerTeamId`
+// that owns the user's lifecycle is reported as `metadata.lifecycle_owner_team_id`
 // on the user read endpoints. Memberships the user was removed from are not
 // returned.
 //

@@ -26432,9 +26432,9 @@ func (s *UserMetadata) encodeFields(e *jx.Encoder) {
 		s.Status.Encode(e)
 	}
 	{
-		if s.LifecycleOwnerTeamId.Set {
-			e.FieldStart("lifecycleOwnerTeamId")
-			s.LifecycleOwnerTeamId.Encode(e)
+		if s.LifecycleOwnerTeamID.Set {
+			e.FieldStart("lifecycle_owner_team_id")
+			s.LifecycleOwnerTeamID.Encode(e)
 		}
 	}
 }
@@ -26443,7 +26443,7 @@ var jsonFieldsNameOfUserMetadata = [4]string{
 	0: "created_at",
 	1: "updated_at",
 	2: "status",
-	3: "lifecycleOwnerTeamId",
+	3: "lifecycle_owner_team_id",
 }
 
 // Decode decodes UserMetadata from json.
@@ -26489,15 +26489,15 @@ func (s *UserMetadata) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"status\"")
 			}
-		case "lifecycleOwnerTeamId":
+		case "lifecycle_owner_team_id":
 			if err := func() error {
-				s.LifecycleOwnerTeamId.Reset()
-				if err := s.LifecycleOwnerTeamId.Decode(d); err != nil {
+				s.LifecycleOwnerTeamID.Reset()
+				if err := s.LifecycleOwnerTeamID.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"lifecycleOwnerTeamId\"")
+				return errors.Wrap(err, "decode field \"lifecycle_owner_team_id\"")
 			}
 		default:
 			return d.Skip()
