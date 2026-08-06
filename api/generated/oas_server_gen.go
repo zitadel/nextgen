@@ -399,6 +399,17 @@ type Handler interface {
 	//
 	// GET /users/{user_id}/passkeys
 	ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (ListUserPasskeysRes, error)
+	// ListUserTeams implements listUserTeams operation.
+	//
+	// The user's team roster, ordered by team name. Each entry carries the
+	// team's name, so a client renders a page without resolving ids one by one.
+	// This is the N:N roster and it is not lifecycle ownership: the single team
+	// that owns the user's lifecycle is reported as `metadata.lifecycle_owner_team_id`
+	// on the user read endpoints. Memberships the user was removed from are not
+	// returned.
+	//
+	// GET /users/{user_id}/teams
+	ListUserTeams(ctx context.Context, params ListUserTeamsParams) (ListUserTeamsRes, error)
 	// ListUsers implements listUsers operation.
 	//
 	// List users.
