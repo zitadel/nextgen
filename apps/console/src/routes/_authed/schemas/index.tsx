@@ -140,7 +140,7 @@ function SchemaRow({
       </div>
 
       <dl className="flex shrink-0 flex-col gap-1 text-xs leading-4 text-muted-foreground">
-        <MetaRow label="Created">{formatDate(createdAt) ?? "—"}</MetaRow>
+        <MetaRow label="Created">{formatDate(createdAt)}</MetaRow>
         {/* The design mocks a short id; a real one is a 30-character `sch_*`,
             so it is clamped with the whole value on hover and on the detail
             screen. Together with the date it is what identifies one schema

@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UserStatusBadge } from "@/components/user-status-badge";
 
 import { api } from "../../../api/zitadel";
+import { formatDate } from "../../../lib/date";
 import { displayValue, field } from "../../../lib/record";
 import { type UserSchema, schemaDisplayName, schemaFields } from "../../../lib/schema";
 import { userDisplayName } from "../../../lib/user";
@@ -256,28 +257,6 @@ function userMetadata(user: Record<string, unknown>): { status?: string; created
   if (!metadata || typeof metadata !== "object") return {};
   const record = metadata as Record<string, unknown>;
   return { status: field(record, "status"), createdAt: field(record, "created_at") };
-}
-
-/**
- * A created date, in the viewer's own locale.
- *
- * The design renders `12 Jul 2026`, which is how this reads in a British locale
- * — that is the mock's locale, not a format the product should impose. Day,
- * short month and year are requested; the order and separators are the
- * viewer's. Tests derive the expected string the same way rather than hardcoding
- * one locale's output.
- *
- * Falls back to the raw value rather than rendering `Invalid Date` if the server
- * sends something unparseable.
- */
-function formatDate(value: string): string {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 /**

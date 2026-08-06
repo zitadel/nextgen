@@ -114,8 +114,14 @@ describe("user schemas list", () => {
     // A labelled pair each, so the row reads as `CREATED <date>` / `ID <id>`
     // rather than two loose strings.
     expect(screen.getByText("Created")).toBeInTheDocument();
-    // Local-time formatting, so assert the shape rather than a fixed instant.
-    expect(screen.getByText(/^\d{1,2} Jul 2026$/)).toBeInTheDocument();
+    // Derived rather than hardcoded: the row renders the viewer's locale, so
+    // asserting one locale's output would pass only on machines set to it.
+    const created = new Date("2026-07-12T16:59:04Z").toLocaleDateString(undefined, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    expect(screen.getByText(created)).toBeInTheDocument();
     expect(screen.getByText("ID")).toBeInTheDocument();
     expect(screen.getByText("sch_business")).toBeInTheDocument();
   });
