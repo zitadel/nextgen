@@ -47,17 +47,19 @@ delete:
   operationId: revokeMySession
   summary: Revoke my session
   description: |
-    Revokes the session immediately (`state: revoked`). This is the logout operation.
+    Logs out by permanently deleting the session.
 
-    The __nextgen_session cookie issued at creation (or superseded by a handoff exchange) is required.
-    After revocation, any tokens derived from this session are invalidated including the cookie itself, which is cleared in the response.
+    The `__nextgen_session` cookie issued at creation (or superseded by a handoff
+    exchange) is required. Idempotent: if the session is already gone this still
+    returns 204. Any tokens derived from the session are invalidated, and the
+    cookie itself is cleared in the response.
   tags:
     - Sessions
   security:
     - nextgenSession: []
   responses:
     '204':
-      description: Session revoked successfully.
+      description: Session deleted; cookie cleared. Idempotent — also returned when the session was already absent.
       headers:
         Set-Cookie:
           $ref: ../../../components/headers/set-cookie-session-token.yaml
@@ -68,18 +70,6 @@ delete:
           schema:
             $ref: ../../../components/schemas/errors/auth-unauthorized.yaml
 
-    '404':
-      description: Session not found.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
-    '409':
-      description: Session already revoked or expired.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
     default:
       description: Unexpected error.
       content:

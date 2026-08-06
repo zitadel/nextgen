@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -161,6 +162,11 @@ func (h Handler) RevokeMySession(ctx context.Context) (api.RevokeMySessionRes, e
 		SessionID: input.SessionID,
 	})
 	if err != nil {
+		if errors.Is(err, domain.ErrSessionNotFound()) {
+			// The session is already gone; logout is idempotent. Clear the cookie
+			// and return 204 rather than surfacing a 404 for an absent session.
+			return &api.RevokeMySessionNoContent{SetCookie: deleteSessionCookie()}, nil
+		}
 		return nil, err
 	}
 	if err := validateSessionToken(session, sessionToken); err != nil {
