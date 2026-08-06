@@ -38,9 +38,13 @@ Operational request middleware logs ([ADR 030](030-error-model-mapping-and-repor
 MaskConfig / `zlog`) are **not** the audit source of truth.
 
 **Pre-claim policy:** Per [ADR 046](046-claim-lifecycle-v2.md) (and
-[claim-flow](../design/platform/claim-flow.md)), a project begins emitting
-auditable events only after claim. Pre-claim activity is not retroactively
-audited. This is product policy, not a technical limitation of the storage model.
+[claim-flow](../design/platform/claim-flow.md)), events are **emitted and stored
+from project creation onward**, including the pre-claim window (`CreateProject`,
+config push, claim init/complete, unclaimed-mode agent work). **List, get, and
+export** stay gated until claim — operators and shippers cannot read or forward
+unclaimed-project events (see [ADR 049](049-events-api-retention-export.md)).
+No retroactive backfill is required: history already exists in `events` when
+claim succeeds. This is product policy for visibility, not a storage limitation.
 
 This ADR adapts the wide-event model from
 [oxidel ADR-023](https://github.com/zitadel/oxidel/blob/main/docs/adr/023-wide-events.md)
@@ -98,6 +102,12 @@ CREATE TABLE zitadel_nextgen.events (
 );
 ```
 
+**Nullability convention:** correlation / identity dimensions that may be
+absent (`team_id`, WHO/WHAT/`request_id`/`session_id`/`flow_id`) are
+**nullable** (`NULL` = not applicable). Delegation and device dimensions
+(`client_id`, `token_id`, `delegation_*`, `grantor`, `fingerprint`) are
+`NOT NULL DEFAULT ''` (`''` = resolved, possibly empty).
+
 Event row `id` is a dialect-minted managed identifier
 ([ADR 047](047-dialect-id-generation.md)): Go `NewManagedID` / statement helper
 supplies the PK on INSERT (no SQL `IDENTITY` / client-supplied resource PK).
@@ -108,10 +118,11 @@ credential scope (`ScopeContext` per
 filters use the **stored** `team_id`, not recomputed membership. See
 [ADR 049](049-events-api-retention-export.md) for API authorization rules.
 
-Also register each event in the global `resource_scope_index`
-(`resource_kind = event`, `project_id`, optional `team_id`) so
-`GET /events/{id}` can resolve scope before loading the row
-([ADR 033](033-internal-permission-management.md)).
+Events are **not** registered in `resource_scope_index`. That table stays a
+small map for durable globally-addressable resources
+([ADR 033](033-internal-permission-management.md),
+[url-architecture.md](../design/api/url-architecture.md)); high-volume TTL audit
+rows do not belong there. `GET /events/{id}` is **project-scoped** (see ADR 049).
 
 Per-sink export delivery is tracked in a separate `event_deliveries` table; see
 [ADR 049 §3](049-events-api-retention-export.md).
@@ -132,7 +143,7 @@ Per-sink export delivery is tracked in a separate `event_deliveries` table; see
 `project_id` per [ADR 027](027-cursor-based-pagination.md). Forensic "when did
 it happen" uses `occurred_at`.
 
-### 2. Six orthogonal correlation scopes
+### 2. Correlation scopes (six dimensions plus tenancy)
 
 Every event participates in up to six independent grouping dimensions plus
 tenancy. Primary correlation columns are **server-authoritative** (see §4).
@@ -173,17 +184,22 @@ audit filter dimensions and are not indexed for forensic queries.
 
 ### 3. Event categories
 
-| `category` | When emitted | Sampling |
-|------------|--------------|----------|
-| `request` | Every **authenticated** API call (wide event at request end) | None |
-| `auth` | Token issue/revoke/exchange, login outcomes, MFA decisions | None |
-| `session` | Session create/end, step-up, handoff | None |
-| `admin` | Team, API key, config push, RBAC mutations | None (mutations only) |
-| `entity` | User/project lifecycle semantic events | None |
-| `signal` | Platform bot/abuse signals ([ADR 019](019-captcha-gate-and-bot-signals.md)) | None |
+| `category` | When emitted | Emission path → durability | Sampling |
+|------------|--------------|----------------------------|----------|
+| `request` | Every **authenticated** API call (wide event at request end) | Path A → batched flush (N/T); visibility ≤ T; bounded crash-loss / drop-on-overflow (§4) | None |
+| `auth` | Token issue/revoke/exchange, login outcomes, MFA decisions | Path B → in-TX with the mutating statement; no loss | None |
+| `session` | Session create/end, step-up, handoff | Path B → in-TX with the mutating statement; no loss | None |
+| `admin` | Team, API key, config push, RBAC mutations | Path B → in-TX with the mutating statement; no loss | None (mutations only) |
+| `entity` | User/project lifecycle semantic events | Path B → in-TX with the mutating statement; no loss | None |
+| `signal` | Platform bot/abuse signals ([ADR 019](019-captcha-gate-and-bot-signals.md)) | Path B → in-TX with the auth-attempt/check mutation | None |
 
 Unauthenticated routes (public login widget, health checks) emit **no**
 `request` events unless explicitly listed as security-relevant in a future ADR.
+
+**Durability bars differ by path:** Path B categories are **transactional audit**
+(co-committed with the mutation). Path A `request` events are **best-effort
+access telemetry** (batched; may be lost on crash before drain or on bounded
+overflow). Compliance readers must not treat them as the same guarantee.
 
 ### 4. Two emission paths (Go code, not database triggers)
 
@@ -235,8 +251,7 @@ into a **RequestContext** middleware:
 
 **Durability (batched insert, DB clock):** Request-wide events are **not**
 inserted synchronously per API call. Middleware enqueues into an **in-process
-durable-intent buffer** (not fire-and-forget discard; not per-request awaited
-INSERT).
+bounded durable-intent buffer** (not per-request awaited INSERT).
 
 1. Each buffered item stores payload fields plus `enqueuedAt` (Go
    `time.Time` / monotonic clock used **only** to compute
@@ -248,19 +263,28 @@ INSERT).
 3. Timestamps use the **database `now()` as the single time server**:
 
 ```sql
--- $wait_interval = time.Since(enqueuedAt) at flush (Go duration → SQL interval)
+-- $wait_interval = time.Since(enqueuedAt) at successful insert
 INSERT INTO zitadel_nextgen.events (..., occurred_at, created_at, ...)
 VALUES (..., now() - $wait_interval, now(), ...);
 ```
 
    - `occurred_at` — when the action happened (`now() - wait`)
    - `created_at` — when the row was written (`now()` / `DEFAULT now()`)
+   - Recompute `wait` at the **successful** insert (including after retries) so
+     `occurred_at` stays honest.
+   - Dialect note: Postgres `now()` is transaction-start time (all rows in one
+     flush TX can share `created_at` — `(created_at, id)` tie-break is
+     load-bearing). Spanner `CURRENT_TIMESTAMP()` is statement-eval time; commit
+     timestamps have read-back restrictions — statement helpers abstract this.
 4. List/export keyset pagination stays on `(created_at, id)`; forensic timing
    uses `occurred_at`.
-5. On process shutdown: **drain** the buffer (flush remaining events) before
-   exit. Insert failure is logged and surfaced (metric / alert); it is not
-   silently dropped.
-6. Domain events (Path B) stay **in-TX with the mutation** — only
+5. **Bounded buffer:** when full, **drop the new enqueue** (preserve older
+   buffered events) and increment a metric. Do not block the request path.
+6. **Flush failure:** retry with backoff; on give-up, drop the batch and
+   metric/alert. Not silently ignored.
+7. On process shutdown: **drain** the buffer (flush remaining events) before
+   exit.
+8. Domain events (Path B) stay **in-TX with the mutation** — only
    `category=request` is batched.
 
 [`zlog`](../../internal/instrumentation/zlog/) masking
@@ -299,7 +323,7 @@ Example event types (non-exhaustive; catalog grows with statement coverage):
 | `event_type` | `category` | Trigger |
 |--------------|------------|---------|
 | `request.api` | `request` | Authenticated HTTP handler completes |
-| `project.created` | `entity` | `CreateProject` statement |
+| `project.created` | `entity` | `CreateProject` statement (including pre-claim) |
 | `user.created` | `entity` | User create statement |
 | `user.updated` | `entity` | User patch statement |
 | `user.deactivated` | `entity` | User lifecycle statement |
@@ -307,8 +331,13 @@ Example event types (non-exhaustive; catalog grows with statement coverage):
 | `auth.token.revoked` | `auth` | Token revoke statement |
 | `auth.check.failed` | `auth` | Check verification failure |
 | `session.established` | `session` | Auth attempt handoff |
+| `session.ended` | `session` | Explicit end **or** passive expiry via session reaper/cleanup statement |
 | `admin.config.pushed` | `admin` | Config upload statement |
 | `admin.api_key.created` | `admin` | API key create statement |
+
+Passive session expiry has no user-triggered mutation: the cleanup/reaper
+statement that marks or deletes the expired session is the Path B emission
+point for `session.ended`.
 
 ### 5. AuthGate enriches delegation context
 
@@ -374,14 +403,15 @@ payloads only when explicitly allowlisted (see §8).
 
 #### Failure events and aborted transactions
 
-A uniqueness violation aborts the current PostgreSQL transaction until rollback;
-Spanner has no savepoints. Emitting `user.create.failed` therefore requires a
-**dialect-specific** path:
+Any failure event emitted after a statement aborts (unique violation,
+constraint failure, and future failure types such as some
+`auth.check.failed` paths) needs a **dialect-specific** path — not only
+`user.create.failed`:
 
-| Dialect | Failure-event emission after unique violation |
-|---------|-----------------------------------------------|
-| **PostgreSQL** | Prefer **SAVEPOINT** before registry insert; on unique violation, `ROLLBACK TO SAVEPOINT`, then `InsertEvent` in the remainder of the same TX, then commit. |
-| **Spanner** | No savepoints. On unique violation, abort/rollback the create TX, then emit `user.create.failed` in a **new short transaction**. |
+| Dialect | Failure-event emission after aborted mutating TX |
+|---------|--------------------------------------------------|
+| **PostgreSQL** | Prefer **SAVEPOINT** before the risky statement; on failure, `ROLLBACK TO SAVEPOINT`, then `InsertEvent` in the remainder of the same TX, then commit. |
+| **Spanner** | No savepoints. Abort/rollback the mutating TX, then emit the failure event in a **new short transaction**. That separate TX is inherently **weaker than co-commit** (at-most-once): a crash between rollback and the new TX loses the failure event. |
 
 SAVEPOINT is preferred on Postgres because it keeps a single connection and
 commit for the request, and `ROLLBACK TO SAVEPOINT` is cheaper than aborting
@@ -409,8 +439,9 @@ payloads use a **deny-by-default** model:
    cannot accidentally dump a full user object into an event.
 4. **`x-sensitive` and audit:** audit payloads do **not** use `x-sensitive`; they
    use deny-by-default + `x-audit`. The `x-sensitive` annotation remains for
-   API/flow payload redaction (non-audit). These mechanisms are complementary,
-   not replacements. See
+   API/flow payload redaction (non-audit) — OpenAPI `user-property`, console
+   input masking, and config normalize still use it. These mechanisms are
+   complementary, not replacements. See
    [user-schema.md](../design/flowengine/user-schema.md).
 5. **Not log masking:** [`zlog`](../../internal/instrumentation/zlog/) /
    [ADR 030](030-error-model-mapping-and-reporting.md) MaskConfig redacts
@@ -445,7 +476,8 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 
 - Database triggers or CDC as the primary audit mechanism.
 - Full unauthenticated/public request logging.
-- Retroactive pre-claim audit.
+- Retroactive fabrication of events that were never stored (pre-claim history
+  is stored; visibility opens at claim — see Context).
 
 ## Consequences
 
@@ -465,6 +497,9 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 - Server-authoritative correlation fields prevent forged forensic timelines.
 - Batched request events avoid per-call sync INSERT latency; DB `now()` keeps
   a single time server for `occurred_at` / `created_at`.
+- Pre-claim forensic history is preserved for abuse investigations once claim
+  unlocks visibility ([ADR 046](046-claim-lifecycle-v2.md)).
+- `resource_scope_index` stays small; events do not inflate it.
 
 ### Negative / Risks
 
@@ -472,29 +507,30 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
   amplification (amortized by batch flush).
 - **Delayed visibility:** request events may appear up to ~T after the action
   (batch age); forensic queries should prefer `occurred_at` when timing matters.
-- **Shutdown drain:** process crash before drain can lose buffered request
-  events; domain Path B events remain TX-safe. Metrics and alerts on flush
-  failure are required.
+- **Best-effort Path A:** crash before drain, overflow drop, or flush give-up
+  can lose `request` events; Path B remains TX-safe. Metrics and alerts are
+  required.
 - **Missing InsertEvent:** statement methods that mutate state but forget
   `InsertEvent` create coverage gaps — catch via review and
   [`stmttest`](041-storage-statement-contract-tests.md) contract coverage when
   implemented.
-- **Pre-claim blind spot:** forensic history starts at claim; operators must
-  accept this or adjust product policy ([ADR 046](046-claim-lifecycle-v2.md)).
+- **Pre-claim visibility gate:** stored events exist before claim but
+  list/export stay closed until claim ([ADR 049](049-events-api-retention-export.md)).
 - **Request vs domain correlation:** request events use a separate short TX
   from entity mutations; cross-correlate via `request_id` when investigating.
 - **Dialect divergence:** failure-event emission uses SAVEPOINT on Postgres and
-  a new TX on Spanner — statement helpers must abstract this.
+  a new TX on Spanner (at-most-once on Spanner) — statement helpers must
+  abstract this.
 
 ## Related ADRs
 
 | ADR | Relationship |
 |-----|--------------|
-| [049 Events API, Retention, and Export](049-events-api-retention-export.md) | HTTP surface, `event_deliveries`, retention purge, external export |
+| [049 Events API, Retention, and Export](049-events-api-retention-export.md) | HTTP surface, `event_deliveries`, retention purge, external export; project-scoped get |
 | [028 Storage v2 Statements](028-storage-v2-statements-and-dialects.md) | `AllStatements` / `EventStatements` is the emission boundary |
 | [041 Storage Statement Contract Tests](041-storage-statement-contract-tests.md) | `InsertEvent` coverage belongs in `stmttest` when implemented |
-| [033 Internal Permission Management](033-internal-permission-management.md) | Actor/delegation metadata; `resource_scope_index` for get-by-id |
-| [046 Claim Lifecycle v2](046-claim-lifecycle-v2.md) | Pre-claim: no events until claim |
+| [033 Internal Permission Management](033-internal-permission-management.md) | Actor/delegation metadata; `resource_scope_index` is **not** used for events |
+| [046 Claim Lifecycle v2](046-claim-lifecycle-v2.md) | Pre-claim: store always; visibility/export gated until claim |
 | [047 Dialect-Owned ID Generation](047-dialect-id-generation.md) | Event `id` is dialect-minted managed ID |
 | [030 Error Model](030-error-model-mapping-and-reporting.md) | `zlog` masking ≠ audit `x-audit` allowlist |
 | [010 Session/Auth Attempt](010-session-auth-attempt-check-model.md) | Checks table is deep forensic store; events reference by ID |

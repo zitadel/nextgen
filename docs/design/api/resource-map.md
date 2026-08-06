@@ -245,7 +245,7 @@ Unified wide-event audit stream. See [ADR 048](../../adrs/048-wide-events-intern
 retention, export).
 
 ```http
-GET /events/{id}              # scope via resource_scope_index before load
+GET /events/{id}?project_id=… # project-scoped get (events not in resource_scope_index)
 GET /events?project_id=…
          &category=…          # request | auth | session | admin | entity | signal
          &event_type=…
@@ -263,11 +263,11 @@ GET /events?project_id=…
          &page_token=…
 ```
 
-`GET /events/{id}` resolves `project_id` / `team_id` from the global
-resource-scope index before authorization and row load (same flat-by-ID pattern
-as other resources; see [url-architecture.md](url-architecture.md)). List/get
-authorization uses emit-time `team_id` stored on the event, not recomputed
-membership.
+`GET /events/{id}` is **project-scoped**: resolve `project_id` from the
+credential (or require it explicitly), authorize, then load
+`(project_id, id)`. Events are **not** registered in `resource_scope_index`
+(TTL audit volume). List/get authorization uses emit-time `team_id` stored on
+the event, not recomputed membership. See [ADR 049](../../adrs/049-events-api-retention-export.md).
 
 `category=admin` covers admin and configuration changes (formerly sketched as
 `/audit_events`). `category=auth` and `category=session` cover sign-in, token,
