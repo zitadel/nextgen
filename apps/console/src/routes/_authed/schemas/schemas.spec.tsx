@@ -70,7 +70,7 @@ afterAll(() => {
 function serveBusiness() {
   server.use(
     http.get(SCHEMAS_URL, () =>
-      HttpResponse.json([{ id: "sch_business", createdAt: "2026-07-12T16:59:04Z" }]),
+      HttpResponse.json([{ id: "sch_business", created_at: "2026-07-12T16:59:04Z" }]),
     ),
     http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS)),
   );
@@ -149,7 +149,7 @@ describe("user schemas list", () => {
     // cost that row's detail, not the screen.
     server.use(
       http.get(SCHEMAS_URL, () =>
-        HttpResponse.json([{ id: "sch_broken", createdAt: "2026-07-12T16:59:04Z" }]),
+        HttpResponse.json([{ id: "sch_broken", created_at: "2026-07-12T16:59:04Z" }]),
       ),
       http.get(`${SCHEMAS_URL}/sch_broken`, () => new HttpResponse(null, { status: 500 })),
     );
@@ -187,7 +187,7 @@ describe("user schema detail", () => {
     // navigate.
     server.use(
       http.get(SCHEMAS_URL, () =>
-        HttpResponse.json([{ id: "sch_deep", createdAt: "2026-07-12T16:59:04Z" }]),
+        HttpResponse.json([{ id: "sch_deep", created_at: "2026-07-12T16:59:04Z" }]),
       ),
       http.get(`${SCHEMAS_URL}/sch_deep`, () => HttpResponse.json(DEEP)),
     );
