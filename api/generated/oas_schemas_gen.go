@@ -2902,12 +2902,12 @@ func (*ErrorDetailsStatusCode) introspectRes()               {}
 func (*ErrorDetailsStatusCode) listBrandingRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
 func (*ErrorDetailsStatusCode) listSchemasRes()              {}
-func (*ErrorDetailsStatusCode) listSessionsRes()             {}
 func (*ErrorDetailsStatusCode) listUserPasskeysRes()         {}
 func (*ErrorDetailsStatusCode) listUserTeamsRes()            {}
 func (*ErrorDetailsStatusCode) listUsersRes()                {}
 func (*ErrorDetailsStatusCode) patchProjectRes()             {}
 func (*ErrorDetailsStatusCode) queryProjectsRes()            {}
+func (*ErrorDetailsStatusCode) querySessionsRes()            {}
 func (*ErrorDetailsStatusCode) queryTeamsRes()               {}
 func (*ErrorDetailsStatusCode) revokeMySessionRes()          {}
 func (*ErrorDetailsStatusCode) revokeSessionRes()            {}
@@ -6688,73 +6688,6 @@ func (s *ListSchemasResponseItem) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
 }
 
-type ListSessionsBadRequest ErrorDetails
-
-func (*ListSessionsBadRequest) listSessionsRes() {}
-
-type ListSessionsForbidden ErrorDetails
-
-func (*ListSessionsForbidden) listSessionsRes() {}
-
-type ListSessionsState string
-
-const (
-	ListSessionsStateBuilding ListSessionsState = "building"
-	ListSessionsStateActive   ListSessionsState = "active"
-	ListSessionsStateExpired  ListSessionsState = "expired"
-	ListSessionsStateRevoked  ListSessionsState = "revoked"
-)
-
-// AllValues returns all ListSessionsState values.
-func (ListSessionsState) AllValues() []ListSessionsState {
-	return []ListSessionsState{
-		ListSessionsStateBuilding,
-		ListSessionsStateActive,
-		ListSessionsStateExpired,
-		ListSessionsStateRevoked,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s ListSessionsState) MarshalText() ([]byte, error) {
-	switch s {
-	case ListSessionsStateBuilding:
-		return []byte(s), nil
-	case ListSessionsStateActive:
-		return []byte(s), nil
-	case ListSessionsStateExpired:
-		return []byte(s), nil
-	case ListSessionsStateRevoked:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *ListSessionsState) UnmarshalText(data []byte) error {
-	switch ListSessionsState(data) {
-	case ListSessionsStateBuilding:
-		*s = ListSessionsStateBuilding
-		return nil
-	case ListSessionsStateActive:
-		*s = ListSessionsStateActive
-		return nil
-	case ListSessionsStateExpired:
-		*s = ListSessionsStateExpired
-		return nil
-	case ListSessionsStateRevoked:
-		*s = ListSessionsStateRevoked
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-type ListSessionsUnauthorized ErrorDetails
-
-func (*ListSessionsUnauthorized) listSessionsRes() {}
-
 type ListUserPasskeysBadRequest ErrorDetails
 
 func (*ListUserPasskeysBadRequest) listUserPasskeysRes() {}
@@ -9664,52 +9597,6 @@ func (o OptListFlowDefinitionsPurpose) Or(d ListFlowDefinitionsPurpose) ListFlow
 	return d
 }
 
-// NewOptListSessionsState returns new OptListSessionsState with value set to v.
-func NewOptListSessionsState(v ListSessionsState) OptListSessionsState {
-	return OptListSessionsState{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptListSessionsState is optional ListSessionsState.
-type OptListSessionsState struct {
-	Value ListSessionsState
-	Set   bool
-}
-
-// IsSet returns true if OptListSessionsState was set.
-func (o OptListSessionsState) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptListSessionsState) Reset() {
-	var v ListSessionsState
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptListSessionsState) SetTo(v ListSessionsState) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptListSessionsState) Get() (v ListSessionsState, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptListSessionsState) Or(d ListSessionsState) ListSessionsState {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptNilDateTime returns new OptNilDateTime with value set to v.
 func NewOptNilDateTime(v time.Time) OptNilDateTime {
 	return OptNilDateTime{
@@ -10639,6 +10526,52 @@ func (o OptQueryProjectsRequestSorting) Get() (v QueryProjectsRequestSorting, ok
 
 // Or returns value if set, or given parameter if does not.
 func (o OptQueryProjectsRequestSorting) Or(d QueryProjectsRequestSorting) QueryProjectsRequestSorting {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptQuerySessionsRequestSorting returns new OptQuerySessionsRequestSorting with value set to v.
+func NewOptQuerySessionsRequestSorting(v QuerySessionsRequestSorting) OptQuerySessionsRequestSorting {
+	return OptQuerySessionsRequestSorting{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptQuerySessionsRequestSorting is optional QuerySessionsRequestSorting.
+type OptQuerySessionsRequestSorting struct {
+	Value QuerySessionsRequestSorting
+	Set   bool
+}
+
+// IsSet returns true if OptQuerySessionsRequestSorting was set.
+func (o OptQuerySessionsRequestSorting) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptQuerySessionsRequestSorting) Reset() {
+	var v QuerySessionsRequestSorting
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptQuerySessionsRequestSorting) SetTo(v QuerySessionsRequestSorting) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptQuerySessionsRequestSorting) Get() (v QuerySessionsRequestSorting, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptQuerySessionsRequestSorting) Or(d QuerySessionsRequestSorting) QuerySessionsRequestSorting {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -12144,6 +12077,164 @@ type QueryProjectsUnauthorized ErrorDetails
 
 func (*QueryProjectsUnauthorized) queryProjectsRes() {}
 
+type QuerySessionsBadRequest ErrorDetails
+
+func (*QuerySessionsBadRequest) querySessionsRes() {}
+
+type QuerySessionsForbidden ErrorDetails
+
+func (*QuerySessionsForbidden) querySessionsRes() {}
+
+// Request to query the sessions of a project.
+// Ref: #
+type QuerySessionsRequest struct {
+	Limit OptLimit `json:"limit"`
+	// Token to retrieve the next page of results.
+	PageToken OptNilPageToken                `json:"page_token"`
+	Sorting   OptQuerySessionsRequestSorting `json:"sorting"`
+	// Filter criteria for querying sessions.
+	Filter []QuerySessionsRequestFilterItem `json:"filter"`
+}
+
+// GetLimit returns the value of Limit.
+func (s *QuerySessionsRequest) GetLimit() OptLimit {
+	return s.Limit
+}
+
+// GetPageToken returns the value of PageToken.
+func (s *QuerySessionsRequest) GetPageToken() OptNilPageToken {
+	return s.PageToken
+}
+
+// GetSorting returns the value of Sorting.
+func (s *QuerySessionsRequest) GetSorting() OptQuerySessionsRequestSorting {
+	return s.Sorting
+}
+
+// GetFilter returns the value of Filter.
+func (s *QuerySessionsRequest) GetFilter() []QuerySessionsRequestFilterItem {
+	return s.Filter
+}
+
+// SetLimit sets the value of Limit.
+func (s *QuerySessionsRequest) SetLimit(val OptLimit) {
+	s.Limit = val
+}
+
+// SetPageToken sets the value of PageToken.
+func (s *QuerySessionsRequest) SetPageToken(val OptNilPageToken) {
+	s.PageToken = val
+}
+
+// SetSorting sets the value of Sorting.
+func (s *QuerySessionsRequest) SetSorting(val OptQuerySessionsRequestSorting) {
+	s.Sorting = val
+}
+
+// SetFilter sets the value of Filter.
+func (s *QuerySessionsRequest) SetFilter(val []QuerySessionsRequestFilterItem) {
+	s.Filter = val
+}
+
+type QuerySessionsRequestFilterItem struct {
+	// The field to filter by.
+	Field     SessionFilterField `json:"field"`
+	Value     OptFilterValue     `json:"value"`
+	Operation FilterOperation    `json:"operation"`
+}
+
+// GetField returns the value of Field.
+func (s *QuerySessionsRequestFilterItem) GetField() SessionFilterField {
+	return s.Field
+}
+
+// GetValue returns the value of Value.
+func (s *QuerySessionsRequestFilterItem) GetValue() OptFilterValue {
+	return s.Value
+}
+
+// GetOperation returns the value of Operation.
+func (s *QuerySessionsRequestFilterItem) GetOperation() FilterOperation {
+	return s.Operation
+}
+
+// SetField sets the value of Field.
+func (s *QuerySessionsRequestFilterItem) SetField(val SessionFilterField) {
+	s.Field = val
+}
+
+// SetValue sets the value of Value.
+func (s *QuerySessionsRequestFilterItem) SetValue(val OptFilterValue) {
+	s.Value = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *QuerySessionsRequestFilterItem) SetOperation(val FilterOperation) {
+	s.Operation = val
+}
+
+type QuerySessionsRequestSorting struct {
+	// The field to sort by.
+	Field SessionSortField `json:"field"`
+	// The direction to sort by.
+	Direction SortDirection `json:"direction"`
+}
+
+// GetField returns the value of Field.
+func (s *QuerySessionsRequestSorting) GetField() SessionSortField {
+	return s.Field
+}
+
+// GetDirection returns the value of Direction.
+func (s *QuerySessionsRequestSorting) GetDirection() SortDirection {
+	return s.Direction
+}
+
+// SetField sets the value of Field.
+func (s *QuerySessionsRequestSorting) SetField(val SessionSortField) {
+	s.Field = val
+}
+
+// SetDirection sets the value of Direction.
+func (s *QuerySessionsRequestSorting) SetDirection(val SortDirection) {
+	s.Direction = val
+}
+
+// Paginated list of sessions.
+// Ref: #
+type QuerySessionsResponse struct {
+	Sessions []SessionResponse `json:"sessions"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetSessions returns the value of Sessions.
+func (s *QuerySessionsResponse) GetSessions() []SessionResponse {
+	return s.Sessions
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *QuerySessionsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetSessions sets the value of Sessions.
+func (s *QuerySessionsResponse) SetSessions(val []SessionResponse) {
+	s.Sessions = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *QuerySessionsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*QuerySessionsResponse) querySessionsRes() {}
+
+type QuerySessionsUnauthorized ErrorDetails
+
+func (*QuerySessionsUnauthorized) querySessionsRes() {}
+
 type QueryTeamsBadRequest ErrorDetails
 
 func (*QueryTeamsBadRequest) queryTeamsRes() {}
@@ -12543,38 +12634,60 @@ func (s *SessNotFoundHeaders) SetResponse(val SessNotFound) {
 
 func (*SessNotFoundHeaders) getMySessionRes() {}
 
-type SessionID string
-
-// Paginated list of sessions.
+// Field to filter sessions by:
+// - `created_at`: RFC3339 timestamp
+// - `user_id`: user id
+// - `state`: one of `building`, `active`, `expired`, `revoked`.
 // Ref: #
-type SessionListResponse struct {
-	Sessions []SessionResponse `json:"sessions"`
-	// Token to pass as `page_token` in the next request to fetch the following page.
-	// Absent when there are no more results.
-	NextPageToken OptNilPageToken `json:"next_page_token"`
+type SessionFilterField string
+
+const (
+	SessionFilterFieldCreatedAt SessionFilterField = "created_at"
+	SessionFilterFieldUserID    SessionFilterField = "user_id"
+	SessionFilterFieldState     SessionFilterField = "state"
+)
+
+// AllValues returns all SessionFilterField values.
+func (SessionFilterField) AllValues() []SessionFilterField {
+	return []SessionFilterField{
+		SessionFilterFieldCreatedAt,
+		SessionFilterFieldUserID,
+		SessionFilterFieldState,
+	}
 }
 
-// GetSessions returns the value of Sessions.
-func (s *SessionListResponse) GetSessions() []SessionResponse {
-	return s.Sessions
+// MarshalText implements encoding.TextMarshaler.
+func (s SessionFilterField) MarshalText() ([]byte, error) {
+	switch s {
+	case SessionFilterFieldCreatedAt:
+		return []byte(s), nil
+	case SessionFilterFieldUserID:
+		return []byte(s), nil
+	case SessionFilterFieldState:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
 }
 
-// GetNextPageToken returns the value of NextPageToken.
-func (s *SessionListResponse) GetNextPageToken() OptNilPageToken {
-	return s.NextPageToken
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *SessionFilterField) UnmarshalText(data []byte) error {
+	switch SessionFilterField(data) {
+	case SessionFilterFieldCreatedAt:
+		*s = SessionFilterFieldCreatedAt
+		return nil
+	case SessionFilterFieldUserID:
+		*s = SessionFilterFieldUserID
+		return nil
+	case SessionFilterFieldState:
+		*s = SessionFilterFieldState
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
-// SetSessions sets the value of Sessions.
-func (s *SessionListResponse) SetSessions(val []SessionResponse) {
-	s.Sessions = val
-}
-
-// SetNextPageToken sets the value of NextPageToken.
-func (s *SessionListResponse) SetNextPageToken(val OptNilPageToken) {
-	s.NextPageToken = val
-}
-
-func (*SessionListResponse) listSessionsRes() {}
+type SessionID string
 
 // The current state of a session.
 // A session is the durable post-auth primitive. It accumulates verified authentication
@@ -12900,6 +13013,51 @@ func (s *SessionResponseUserAgentAdditional) init() SessionResponseUserAgentAddi
 		*s = m
 	}
 	return m
+}
+
+// Field to sort sessions by. Only stored columns are sortable: the keyset
+// cursor holds the last row's sort values, so a computed value such as
+// `state` would skip or duplicate rows between pages.
+// Ref: #
+type SessionSortField string
+
+const (
+	SessionSortFieldCreatedAt SessionSortField = "created_at"
+	SessionSortFieldUserID    SessionSortField = "user_id"
+)
+
+// AllValues returns all SessionSortField values.
+func (SessionSortField) AllValues() []SessionSortField {
+	return []SessionSortField{
+		SessionSortFieldCreatedAt,
+		SessionSortFieldUserID,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s SessionSortField) MarshalText() ([]byte, error) {
+	switch s {
+	case SessionSortFieldCreatedAt:
+		return []byte(s), nil
+	case SessionSortFieldUserID:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *SessionSortField) UnmarshalText(data []byte) error {
+	switch SessionSortField(data) {
+	case SessionSortFieldCreatedAt:
+		*s = SessionSortFieldCreatedAt
+		return nil
+	case SessionSortFieldUserID:
+		*s = SessionSortFieldUserID
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Response for session creation and handoff exchange.

@@ -1,0 +1,38 @@
+type: object
+description: Request to query the sessions of a project.
+properties:
+  limit:
+    $ref: ../../../components/schemas/limit.yaml
+  page_token:
+    description: Token to retrieve the next page of results.
+    oneOf:
+      - $ref: ../../../components/schemas/page-token.yaml
+      - type: 'null'
+  sorting:
+    type: object
+    required:
+      - field
+      - direction
+    properties:
+      field:
+        $ref: session-sort-field.yaml
+        description: The field to sort by.
+      direction:
+        $ref: ../../../components/schemas/sort-direction.yaml
+        description: The direction to sort by.
+  filter:
+    type: array
+    description: Filter criteria for querying sessions.
+    items:
+      type: object
+      required:
+        - field
+        - operation
+      properties:
+        field:
+          $ref: session-filter-field.yaml
+          description: The field to filter by.
+        value:
+          $ref: ../../../components/schemas/filter-value.yaml
+        operation:
+          $ref: ../../../components/schemas/filter-operation.yaml

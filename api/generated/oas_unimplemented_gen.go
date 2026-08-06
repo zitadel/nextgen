@@ -533,16 +533,6 @@ func (UnimplementedHandler) ListSchemas(ctx context.Context, params ListSchemasP
 	return r, ht.ErrNotImplemented
 }
 
-// ListSessions implements listSessions operation.
-//
-// Returns a paginated list of sessions for a project.
-// Requires a project service key (OAuth2 client credentials).
-//
-// GET /sessions
-func (UnimplementedHandler) ListSessions(ctx context.Context, params ListSessionsParams) (r ListSessionsRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
 // ListUserPasskeys implements listUserPasskeys operation.
 //
 // List user passkeys.
@@ -590,6 +580,17 @@ func (UnimplementedHandler) PatchProject(ctx context.Context, req *PatchProjectR
 //
 // POST /projects/query
 func (UnimplementedHandler) QueryProjects(ctx context.Context, req *QueryProjectsRequest) (r QueryProjectsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// QuerySessions implements querySessions operation.
+//
+// Returns the sessions of a project, paginated with a cursor.
+// Sessions of every lifecycle state are returned; each carries its `state`.
+// Requires `session.read` permission.
+//
+// POST /sessions/query
+func (UnimplementedHandler) QuerySessions(ctx context.Context, req *QuerySessionsRequest, params QuerySessionsParams) (r QuerySessionsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

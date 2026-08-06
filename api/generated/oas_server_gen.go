@@ -393,13 +393,6 @@ type Handler interface {
 	//
 	// GET /schemas
 	ListSchemas(ctx context.Context, params ListSchemasParams) (ListSchemasRes, error)
-	// ListSessions implements listSessions operation.
-	//
-	// Returns a paginated list of sessions for a project.
-	// Requires a project service key (OAuth2 client credentials).
-	//
-	// GET /sessions
-	ListSessions(ctx context.Context, params ListSessionsParams) (ListSessionsRes, error)
 	// ListUserPasskeys implements listUserPasskeys operation.
 	//
 	// List user passkeys.
@@ -435,6 +428,14 @@ type Handler interface {
 	//
 	// POST /projects/query
 	QueryProjects(ctx context.Context, req *QueryProjectsRequest) (QueryProjectsRes, error)
+	// QuerySessions implements querySessions operation.
+	//
+	// Returns the sessions of a project, paginated with a cursor.
+	// Sessions of every lifecycle state are returned; each carries its `state`.
+	// Requires `session.read` permission.
+	//
+	// POST /sessions/query
+	QuerySessions(ctx context.Context, req *QuerySessionsRequest, params QuerySessionsParams) (QuerySessionsRes, error)
 	// QueryTeams implements queryTeams operation.
 	//
 	// Returns the teams of a project, paginated with a cursor.
