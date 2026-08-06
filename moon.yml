@@ -70,6 +70,21 @@ tasks:
       cache: true
       runInCI: true
 
+  # The wire-casing rules are config, so a wrong subject type or regex breaks
+  # nothing loudly — the spec just stops being checked. These fixtures fail
+  # instead.
+  check-openapi-rules:
+    command: "node --test scripts/openapi-casing-rules.test.mjs"
+    inputs:
+      - "scripts/openapi-casing-rules.test.mjs"
+      - "scripts/testdata/openapi-casing/**"
+      - "/redocly.yaml"
+      # The test reads the pinned redocly version from this file.
+      - "apps/server/moon.yml"
+    options:
+      cache: true
+      runInCI: true
+
   check-adrs:
     command: "node scripts/check-adrs-index.mjs"
     inputs:

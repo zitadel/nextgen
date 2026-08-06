@@ -96,6 +96,7 @@ and agent UIs may display stderr package-manager progress together with stdout.
 * [`zitadel apply`](#zitadel-apply)
 * [`zitadel autocomplete [SHELL]`](#zitadel-autocomplete-shell)
 * [`zitadel branding eject`](#zitadel-branding-eject)
+* [`zitadel claim`](#zitadel-claim)
 * [`zitadel commands`](#zitadel-commands)
 * [`zitadel doctor`](#zitadel-doctor)
 * [`zitadel eject`](#zitadel-eject)
@@ -200,6 +201,41 @@ DESCRIPTION
   Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.
 ```
 
+## `zitadel claim`
+
+Attach this project to a team so it becomes permanent. Opens a browser to finish signing in.
+
+```
+USAGE
+  $ zitadel claim [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
+    [--telemetry] [--no-open] [--timeout <value>]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -f, --force            Overwrite protected files on conflict.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>   Override the resolved server URL.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --no-open          Print the link instead of opening a browser.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
+      --timeout=<value>  Seconds to wait for the browser step. Defaults to the link's own expiry (10 minutes).
+      --verbose          Verbose logging.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Attach this project to a team so it becomes permanent. Opens a browser to finish signing in.
+
+EXAMPLES
+  $ zitadel claim
+
+  $ zitadel claim --no-open
+
+  $ zitadel claim --timeout 120
+```
+
 ## `zitadel commands`
 
 List all zitadel commands.
@@ -245,7 +281,7 @@ FLAGS
   -s, --server=<value>    Override the resolved server URL.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --fix               Re-apply missing managed files.
+      --fix               Repair missing files and stale managed wiring.
       --image=<value>     Container image to check.
       --port=<value>      [default: 8080] Local HTTP port.
       --runtime=<option>  Local runtime backend.
@@ -443,9 +479,9 @@ Create a Zitadel project and scaffold local auth.
 ```
 USAGE
   $ zitadel setup [--json] [-c <value>] [-s <value>] [-n] [-f] [--dry-run] [--verbose] [--debug]
-    [--telemetry] [--framework next|nuxt|react|vue|solid|svelte|qwik|angular] [--renderer react|web-component]
-    [--dev-port <value>] [--skip-install] [--preset password-first|passkey-first] [--use-case minimal|consumer|business]
-    [--design centered|split|split-right|hero|minimal]
+    [--telemetry] [--framework next|nuxt|react|vue|solid|svelte|qwik|angular] [--renderer react] [--dev-port <value>]
+    [--skip-install] [--preset password-first|passkey-first] [--use-case minimal|consumer|business] [--design
+    centered|split|split-right|hero|minimal]
 
 FLAGS
   -c, --cwd=<value>         Project directory to operate on.
@@ -464,8 +500,8 @@ FLAGS
                             <options: next|nuxt|react|vue|solid|svelte|qwik|angular>
       --preset=<option>     Sign-in preset for the scaffolded schema and login flow (default: password-first).
                             <options: password-first|passkey-first>
-      --renderer=<option>   Renderer (default: react).
-                            <options: react|web-component>
+      --renderer=<option>   Renderer (default: react). Not yet available: web-component.
+                            <options: react>
       --skip-install        Do not install dependencies after setup updates package.json.
       --[no-]telemetry      Send anonymous usage analytics. Disable with --no-telemetry.
       --use-case=<option>   Use case for the scaffolded schema fields: who signs in to the app (default: minimal).

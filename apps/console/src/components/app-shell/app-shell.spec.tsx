@@ -34,7 +34,7 @@ const NAV_ORDER = ["Users"];
 const NESTED_NAV = { parent: "Users", label: "User schemas" };
 // Absent for three different reasons, all of them deliberate:
 //   - the first four have no endpoint at all
-//   - Sessions was built, but `GET /sessions` answers 501 (#699)
+//   - Sessions was built, but `POST /sessions/query` answers 501 (#699)
 //   - Projects works and stays reachable at its URL; it has simply never been
 //     designed, so it is not advertised as a finished screen
 const NEVER_SHOWN = [

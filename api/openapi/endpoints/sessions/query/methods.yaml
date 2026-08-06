@@ -1,0 +1,52 @@
+post:
+  operationId: querySessions
+  summary: Query sessions
+  description: |
+    Returns the sessions of a project, paginated with a cursor.
+    Sessions of every lifecycle state are returned; each carries its `state`.
+    Requires `session.read` permission.
+  tags:
+    - Sessions
+  security:
+    - oauth2:
+        - session.read
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+  requestBody:
+    description: Request to query the sessions of a project.
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: query-sessions-request.yaml
+  responses:
+    '200':
+      description: The list of sessions was returned successfully
+      content:
+        application/json:
+          schema:
+            $ref: query-sessions-response.yaml
+    '400':
+      description: Invalid request (e.g., invalid query parameters).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
