@@ -12569,7 +12569,7 @@ func (*SessNotFoundHeaders) getMySessionRes() {}
 // Field to filter sessions by:
 // - `created_at`: RFC3339 timestamp
 // - `user_id`: user id
-// - `state`: one of `building`, `active`, `expired`, `revoked`.
+// - `state`: one of `building`, `active`, `expired`.
 // Ref: #
 type SessionFilterField string
 
@@ -12634,8 +12634,7 @@ type SessionResponse struct {
 	// - `building`: has a user factor but is still gathering authentication factors
 	// - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
 	// factors age
-	// - `expired`: TTL elapsed
-	// - `revoked`: explicitly revoked via DELETE.
+	// - `expired`: TTL elapsed.
 	State SessionResponseState `json:"state"`
 	// The authenticated user. Null for anonymous sessions and until the `user`
 	// factor has been verified through an `auth_attempt`.
@@ -12841,15 +12840,13 @@ func (s *SessionResponseMetadata) init() SessionResponseMetadata {
 // - `building`: has a user factor but is still gathering authentication factors
 // - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
 // factors age
-// - `expired`: TTL elapsed
-// - `revoked`: explicitly revoked via DELETE.
+// - `expired`: TTL elapsed.
 type SessionResponseState string
 
 const (
 	SessionResponseStateBuilding SessionResponseState = "building"
 	SessionResponseStateActive   SessionResponseState = "active"
 	SessionResponseStateExpired  SessionResponseState = "expired"
-	SessionResponseStateRevoked  SessionResponseState = "revoked"
 )
 
 // AllValues returns all SessionResponseState values.
@@ -12858,7 +12855,6 @@ func (SessionResponseState) AllValues() []SessionResponseState {
 		SessionResponseStateBuilding,
 		SessionResponseStateActive,
 		SessionResponseStateExpired,
-		SessionResponseStateRevoked,
 	}
 }
 
@@ -12870,8 +12866,6 @@ func (s SessionResponseState) MarshalText() ([]byte, error) {
 	case SessionResponseStateActive:
 		return []byte(s), nil
 	case SessionResponseStateExpired:
-		return []byte(s), nil
-	case SessionResponseStateRevoked:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -12889,9 +12883,6 @@ func (s *SessionResponseState) UnmarshalText(data []byte) error {
 		return nil
 	case SessionResponseStateExpired:
 		*s = SessionResponseStateExpired
-		return nil
-	case SessionResponseStateRevoked:
-		*s = SessionResponseStateRevoked
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)

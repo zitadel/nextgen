@@ -3,7 +3,7 @@ description: |
   Field to filter sessions by:
   - `created_at`: RFC3339 timestamp
   - `user_id`: user id
-  - `state`: one of `building`, `active`, `expired`, `revoked`
+  - `state`: one of `building`, `active`, `expired`
 enum:
   - created_at
   - user_id
