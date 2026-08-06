@@ -287,16 +287,13 @@ func userAgentToAPI(agent *domain.UserAgent) api.OptNilSessionResponseUserAgent 
 
 func sessionStateToAPI(state domain.SessionState) api.SessionResponseState {
 	switch state {
-	case domain.SessionStateUnspecified:
-		return api.SessionResponseStateBuilding
 	case domain.SessionStateActive:
 		return api.SessionResponseStateActive
-	case domain.SessionStateBuilding:
-		return api.SessionResponseStateBuilding
 	case domain.SessionStateExpired:
 		return api.SessionResponseStateExpired
 	default:
-		return api.SessionResponseStateRevoked // TODO: ?
+		// Building, and the zero value: no verified factor yet.
+		return api.SessionResponseStateBuilding
 	}
 }
 

@@ -3544,8 +3544,6 @@ func (s SessionResponseState) Validate() error {
 		return nil
 	case "expired":
 		return nil
-	case "revoked":
-		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}

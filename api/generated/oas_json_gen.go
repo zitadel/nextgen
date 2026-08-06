@@ -24182,8 +24182,6 @@ func (s *SessionResponseState) Decode(d *jx.Decoder) error {
 		*s = SessionResponseStateActive
 	case SessionResponseStateExpired:
 		*s = SessionResponseStateExpired
-	case SessionResponseStateRevoked:
-		*s = SessionResponseStateRevoked
 	default:
 		*s = SessionResponseState(v)
 	}
