@@ -246,7 +246,7 @@ func domainUserToApiUser(user *domain.User) (*api.User, error) {
 			CreatedAt:            user.Metadata.CreatedAt,
 			UpdatedAt:            user.Metadata.UpdatedAt,
 			Status:               api.UserMetadataStatus(user.Metadata.Status),
-			LifecycleOwnerTeamId: lifecycleOwnerTeamID,
+			LifecycleOwnerTeamID: lifecycleOwnerTeamID,
 		}),
 		AdditionalProps: *props,
 	}, nil

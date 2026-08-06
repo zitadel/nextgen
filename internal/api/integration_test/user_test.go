@@ -488,7 +488,7 @@ func TestGetUser(t *testing.T) {
 	// who owns its lifecycle, and this one is self-owned.
 	metadata, ok := resp.(*api.User).Metadata.Get()
 	require.True(t, ok, "the user carries metadata")
-	assert.True(t, metadata.LifecycleOwnerTeamId.Null)
+	assert.True(t, metadata.LifecycleOwnerTeamID.Null)
 }
 
 // TestListUserTeams pins the roster endpoint and the line ADR 024 draws: the
@@ -588,7 +588,7 @@ func TestListUserTeams(t *testing.T) {
 	require.IsType(t, &api.User{}, userResp, helpers.MustMarshal(t, userResp))
 	metadata, ok := userResp.(*api.User).Metadata.Get()
 	require.True(t, ok, "the user carries metadata")
-	assert.Equal(t, api.NewOptNilString(owner.ID), metadata.LifecycleOwnerTeamId,
+	assert.Equal(t, api.NewOptNilString(owner.ID), metadata.LifecycleOwnerTeamID,
 		"the lifecycle owner is not one of the roster teams")
 
 	// An unknown user is a 404, not an empty roster.
