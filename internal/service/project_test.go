@@ -478,7 +478,7 @@ func TestProjectService_List(t *testing.T) {
 			name: "sort by createdAt desc",
 			req: service.ListProjectsRequest{
 				ProjectID: "proj_a",
-				Sorting:   &service.Sorting{Field: "createdAt", Direction: "desc"},
+				Sorting:   &service.Sorting{Field: "created_at", Direction: "desc"},
 			},
 			result: &database.ListResult[*domain.Project]{},
 			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
@@ -493,7 +493,7 @@ func TestProjectService_List(t *testing.T) {
 			name: "filter equals createdAt",
 			req: service.ListProjectsRequest{
 				ProjectID: "proj_a",
-				Filters:   []service.Filter{{Field: "createdAt", Operation: "equals", Value: createdAt.Format(time.RFC3339)}},
+				Filters:   []service.Filter{{Field: "created_at", Operation: "equals", Value: createdAt.Format(time.RFC3339)}},
 			},
 			result: &database.ListResult[*domain.Project]{},
 			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
@@ -507,7 +507,7 @@ func TestProjectService_List(t *testing.T) {
 			name: "filter greater_than createdAt parses RFC3339",
 			req: service.ListProjectsRequest{
 				ProjectID: "proj_a",
-				Filters:   []service.Filter{{Field: "createdAt", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)}},
+				Filters:   []service.Filter{{Field: "created_at", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)}},
 			},
 			result: &database.ListResult[*domain.Project]{},
 			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.ProjectField]) {
@@ -522,8 +522,8 @@ func TestProjectService_List(t *testing.T) {
 			req: service.ListProjectsRequest{
 				ProjectID: "proj_a",
 				Filters: []service.Filter{
-					{Field: "createdAt", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)},
-					{Field: "createdAt", Operation: "less_than", Value: createdAt.Add(time.Hour).Format(time.RFC3339)},
+					{Field: "created_at", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)},
+					{Field: "created_at", Operation: "less_than", Value: createdAt.Add(time.Hour).Format(time.RFC3339)},
 				},
 			},
 			result: &database.ListResult[*domain.Project]{},
@@ -609,7 +609,7 @@ func TestProjectService_List_ValidationErrors(t *testing.T) {
 			name: "unsupported operation not implemented",
 			req: service.ListProjectsRequest{
 				ProjectID: "proj_a",
-				Filters:   []service.Filter{{Field: "createdAt", Operation: "not_equals", Value: time.Now().UTC().Format(time.RFC3339)}},
+				Filters:   []service.Filter{{Field: "created_at", Operation: "not_equals", Value: time.Now().UTC().Format(time.RFC3339)}},
 			},
 			wantErr: domain.ErrNotImplemented(),
 		},
@@ -625,7 +625,7 @@ func TestProjectService_List_ValidationErrors(t *testing.T) {
 			name: "unknown sort direction is invalid",
 			req: service.ListProjectsRequest{
 				ProjectID: "proj_a",
-				Sorting:   &service.Sorting{Field: "createdAt", Direction: "sideways"},
+				Sorting:   &service.Sorting{Field: "created_at", Direction: "sideways"},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},
@@ -633,7 +633,7 @@ func TestProjectService_List_ValidationErrors(t *testing.T) {
 			name: "non-string createdAt value is invalid",
 			req: service.ListProjectsRequest{
 				ProjectID: "proj_a",
-				Filters:   []service.Filter{{Field: "createdAt", Operation: "equals", Value: 42}},
+				Filters:   []service.Filter{{Field: "created_at", Operation: "equals", Value: 42}},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},
@@ -641,7 +641,7 @@ func TestProjectService_List_ValidationErrors(t *testing.T) {
 			name: "unparseable createdAt value is invalid",
 			req: service.ListProjectsRequest{
 				ProjectID: "proj_a",
-				Filters:   []service.Filter{{Field: "createdAt", Operation: "equals", Value: "not-a-time"}},
+				Filters:   []service.Filter{{Field: "created_at", Operation: "equals", Value: "not-a-time"}},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},

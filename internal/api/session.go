@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -111,13 +112,13 @@ func (h Handler) GetMySession(ctx context.Context) (api.GetMySessionRes, error) 
 	}, nil
 }
 
-func (h Handler) ListSessions(ctx context.Context, params api.ListSessionsParams) (api.ListSessionsRes, error) {
+func (h Handler) QuerySessions(ctx context.Context, req *api.QuerySessionsRequest, params api.QuerySessionsParams) (api.QuerySessionsRes, error) {
 	if err := requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opRead); err != nil {
 		return nil, err
 	}
 	input := service.ListSessionInput{
 		ProjectID: string(params.ProjectID),
-		// TODO: handle params
+		// TODO: handle req
 	}
 	sessions, err := h.sessionService.List(ctx, input)
 	if err != nil {
@@ -161,6 +162,11 @@ func (h Handler) RevokeMySession(ctx context.Context) (api.RevokeMySessionRes, e
 		SessionID: input.SessionID,
 	})
 	if err != nil {
+		if errors.Is(err, domain.ErrSessionNotFound()) {
+			// The session is already gone; logout is idempotent. Clear the cookie
+			// and return 204 rather than surfacing a 404 for an absent session.
+			return &api.RevokeMySessionNoContent{SetCookie: deleteSessionCookie()}, nil
+		}
 		return nil, err
 	}
 	if err := validateSessionToken(session, sessionToken); err != nil {
@@ -294,8 +300,8 @@ func sessionStateToAPI(state domain.SessionState) api.SessionResponseState {
 	}
 }
 
-func sessionsToAPI(sessions []*domain.Session) *api.SessionListResponse {
-	response := &api.SessionListResponse{
+func sessionsToAPI(sessions []*domain.Session) *api.QuerySessionsResponse {
+	response := &api.QuerySessionsResponse{
 		Sessions: make([]api.SessionResponse, len(sessions)),
 	}
 	for i, session := range sessions {

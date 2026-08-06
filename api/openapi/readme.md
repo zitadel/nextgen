@@ -51,7 +51,7 @@ This API uses **cursor-based pagination** (`page_token` / `next_page_token`), no
 
 > **Note:** Some endpoints (e.g. `GET /users`) currently still use `offset`/`limit`.
 > These are marked with a `TODO` comment and will be migrated to `page_token` / `next_page_token`.
-> New list endpoints must use cursor-based pagination — see `GET /sessions` as the reference implementation.
+> New list endpoints must use cursor-based pagination — see `POST /sessions/query` as the reference implementation.
 
 ### Nullable types
 

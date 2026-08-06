@@ -1,0 +1,14 @@
+# EDIT BY HAND. Never run `--generate-ignore-file`, which redocly suggests on
+# every failure: it suppresses whatever is failing instead of fixing it and
+# deletes these notes.
+# Each entry pins one JSON pointer, so the new camelCase in the same file is still an error.
+api/openapi/endpoints/oauth/keys/keys-response.yaml:
+  rule/wire-field-snake-case:
+    # JWKS member name fixed by RFC 7517.
+    - '#/properties/keys/items/properties/x5tS256'
+api/openapi/endpoints/schemas/user-schema.yaml:
+  rule/wire-field-snake-case:
+    # Stored user-schema document fields, not envelope fields; renaming them is
+    # a data-format migration.
+    - '#/properties/objectType'
+    - '#/properties/metaSchema'

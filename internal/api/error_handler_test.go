@@ -98,10 +98,10 @@ func TestOgenErrorHandlerSecurityErrorNormalizedMessage(t *testing.T) {
 	t.Parallel()
 	srv := newErrorHandlerTestServer(t, nil)
 
-	// listSessions requires oauth2; without credentials the security check
-	// fails before parameter decode and before any handler method runs.
+	// querySessions requires oauth2; without credentials the security check
+	// fails before body and parameter decode and before any handler method runs.
 	rec := httptest.NewRecorder()
-	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/sessions", nil))
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/sessions/query", nil))
 
 	require.Equal(t, http.StatusUnauthorized, rec.Code)
 	require.JSONEq(t,

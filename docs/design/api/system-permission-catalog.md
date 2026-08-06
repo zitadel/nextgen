@@ -317,7 +317,7 @@ not yet exposed.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
-| `session.read` | `GET /sessions`, `GET /sessions/{id}` | Operator list + get. |
+| `session.read` | `POST /sessions/query`, `GET /sessions/{id}` | Operator list + get. |
 | `session.write` | `POST /sessions`, `POST /sessions/exchange` | App plane: optional anonymous shell; handoff exchange (create or upgrade authenticated session). |
 | `session.delete` | `DELETE /sessions/{id}` | Operator revoke. |
 

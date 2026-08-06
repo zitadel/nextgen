@@ -17,7 +17,7 @@ describe("viteProxyEdit", () => {
     expect(out).toContain("zitadel:proxy:v2");
     expect(out).toContain("http://127.0.0.1:8099");
     expect(out).toContain("5173");
-    // Bind the exact issuer port or fail — never drift to a port not in previewOrigins.
+    // Bind the exact issuer port or fail — never drift to a port not in preview_origins.
     expect(out).toContain("strictPort: true");
     expect(out).toContain("changeOrigin: false");
     // The bearer comes from .env.local via Vite's loadEnv, never from the
