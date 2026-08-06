@@ -160,6 +160,10 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListUserPasskeysOperation: []string{
 		"user.read",
 	},
+	ListUserTeamsOperation: []string{
+		"user.read",
+		"team.read",
+	},
 	ListUsersOperation: []string{
 		"user.read",
 	},

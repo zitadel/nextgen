@@ -52,6 +52,7 @@ const (
 	ListFlowDefinitionsOperation      OperationName = "ListFlowDefinitions"
 	ListSchemasOperation              OperationName = "ListSchemas"
 	ListUserPasskeysOperation         OperationName = "ListUserPasskeys"
+	ListUserTeamsOperation            OperationName = "ListUserTeams"
 	ListUsersOperation                OperationName = "ListUsers"
 	PatchProjectOperation             OperationName = "PatchProject"
 	QueryProjectsOperation            OperationName = "QueryProjects"

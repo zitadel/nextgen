@@ -75,6 +75,8 @@ paths:
     $ref: endpoints/users/by_id/passkeys/methods.yaml
   /users/{user_id}/password:
     $ref: endpoints/users/by_id/password/methods.yaml
+  /users/{user_id}/teams:
+    $ref: endpoints/users/by_id/teams/methods.yaml
   /users/me:
     $ref: endpoints/users/me/methods.yaml
   /flow:

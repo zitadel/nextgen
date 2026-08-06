@@ -185,6 +185,10 @@ type ListUserPasskeysRes interface {
 	listUserPasskeysRes()
 }
 
+type ListUserTeamsRes interface {
+	listUserTeamsRes()
+}
+
 type ListUsersRes interface {
 	listUsersRes()
 }
