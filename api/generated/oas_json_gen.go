@@ -26115,7 +26115,7 @@ func (s *UserMetadata) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserMetadata = [3]string{
+var jsonFieldsNameOfUserMetadata = [4]string{
 	0: "created_at",
 	1: "updated_at",
 	2: "status",
