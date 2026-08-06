@@ -5079,7 +5079,7 @@ func (s *CreateProjectRequest) encodeFields(e *jx.Encoder) {
 	}
 	{
 		if s.PreviewOrigins != nil {
-			e.FieldStart("previewOrigins")
+			e.FieldStart("preview_origins")
 			e.ArrStart()
 			for _, elem := range s.PreviewOrigins {
 				e.Str(elem)
@@ -5089,7 +5089,7 @@ func (s *CreateProjectRequest) encodeFields(e *jx.Encoder) {
 	}
 	{
 		if s.SeedDefaults.Set {
-			e.FieldStart("seedDefaults")
+			e.FieldStart("seed_defaults")
 			s.SeedDefaults.Encode(e)
 		}
 	}
@@ -5097,8 +5097,8 @@ func (s *CreateProjectRequest) encodeFields(e *jx.Encoder) {
 
 var jsonFieldsNameOfCreateProjectRequest = [3]string{
 	0: "name",
-	1: "previewOrigins",
-	2: "seedDefaults",
+	1: "preview_origins",
+	2: "seed_defaults",
 }
 
 // Decode decodes CreateProjectRequest from json.
@@ -5123,7 +5123,7 @@ func (s *CreateProjectRequest) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"name\"")
 			}
-		case "previewOrigins":
+		case "preview_origins":
 			if err := func() error {
 				s.PreviewOrigins = make([]string, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -5140,9 +5140,9 @@ func (s *CreateProjectRequest) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"previewOrigins\"")
+				return errors.Wrap(err, "decode field \"preview_origins\"")
 			}
-		case "seedDefaults":
+		case "seed_defaults":
 			if err := func() error {
 				s.SeedDefaults.Reset()
 				if err := s.SeedDefaults.Decode(d); err != nil {
@@ -5150,7 +5150,7 @@ func (s *CreateProjectRequest) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"seedDefaults\"")
+				return errors.Wrap(err, "decode field \"seed_defaults\"")
 			}
 		default:
 			return d.Skip()
@@ -5226,15 +5226,15 @@ func (s *CreateProjectResponse) encodeFields(e *jx.Encoder) {
 		e.Str(s.Name)
 	}
 	{
-		e.FieldStart("projectSecret")
+		e.FieldStart("project_secret")
 		e.Str(s.ProjectSecret)
 	}
 	{
-		e.FieldStart("previewSecret")
+		e.FieldStart("preview_secret")
 		e.Str(s.PreviewSecret)
 	}
 	{
-		e.FieldStart("previewOrigins")
+		e.FieldStart("preview_origins")
 		e.ArrStart()
 		for _, elem := range s.PreviewOrigins {
 			e.Str(elem)
@@ -5242,7 +5242,7 @@ func (s *CreateProjectResponse) encodeFields(e *jx.Encoder) {
 		e.ArrEnd()
 	}
 	{
-		e.FieldStart("createdAt")
+		e.FieldStart("created_at")
 		json.EncodeDateTime(e, s.CreatedAt)
 	}
 }
@@ -5250,10 +5250,10 @@ func (s *CreateProjectResponse) encodeFields(e *jx.Encoder) {
 var jsonFieldsNameOfCreateProjectResponse = [6]string{
 	0: "id",
 	1: "name",
-	2: "projectSecret",
-	3: "previewSecret",
-	4: "previewOrigins",
-	5: "createdAt",
+	2: "project_secret",
+	3: "preview_secret",
+	4: "preview_origins",
+	5: "created_at",
 }
 
 // Decode decodes CreateProjectResponse from json.
@@ -5289,7 +5289,7 @@ func (s *CreateProjectResponse) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"name\"")
 			}
-		case "projectSecret":
+		case "project_secret":
 			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
 				v, err := d.Str()
@@ -5299,9 +5299,9 @@ func (s *CreateProjectResponse) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"projectSecret\"")
+				return errors.Wrap(err, "decode field \"project_secret\"")
 			}
-		case "previewSecret":
+		case "preview_secret":
 			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
 				v, err := d.Str()
@@ -5311,9 +5311,9 @@ func (s *CreateProjectResponse) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"previewSecret\"")
+				return errors.Wrap(err, "decode field \"preview_secret\"")
 			}
-		case "previewOrigins":
+		case "preview_origins":
 			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
 				s.PreviewOrigins = make([]string, 0)
@@ -5331,9 +5331,9 @@ func (s *CreateProjectResponse) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"previewOrigins\"")
+				return errors.Wrap(err, "decode field \"preview_origins\"")
 			}
-		case "createdAt":
+		case "created_at":
 			requiredBitSet[0] |= 1 << 5
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
@@ -5343,7 +5343,7 @@ func (s *CreateProjectResponse) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"createdAt\"")
+				return errors.Wrap(err, "decode field \"created_at\"")
 			}
 		default:
 			return d.Skip()
@@ -14795,14 +14795,14 @@ func (s *ListSchemasResponseItem) encodeFields(e *jx.Encoder) {
 		e.Str(s.ID)
 	}
 	{
-		e.FieldStart("createdAt")
+		e.FieldStart("created_at")
 		json.EncodeDateTime(e, s.CreatedAt)
 	}
 }
 
 var jsonFieldsNameOfListSchemasResponseItem = [2]string{
 	0: "id",
-	1: "createdAt",
+	1: "created_at",
 }
 
 // Decode decodes ListSchemasResponseItem from json.
@@ -14826,7 +14826,7 @@ func (s *ListSchemasResponseItem) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"id\"")
 			}
-		case "createdAt":
+		case "created_at":
 			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
@@ -14836,7 +14836,7 @@ func (s *ListSchemasResponseItem) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"createdAt\"")
+				return errors.Wrap(err, "decode field \"created_at\"")
 			}
 		default:
 			return d.Skip()
@@ -21187,7 +21187,7 @@ func (s *ProjectResponse) encodeFields(e *jx.Encoder) {
 	}
 	{
 		if s.PreviewOrigins != nil {
-			e.FieldStart("previewOrigins")
+			e.FieldStart("preview_origins")
 			e.ArrStart()
 			for _, elem := range s.PreviewOrigins {
 				e.Str(elem)
@@ -21196,11 +21196,11 @@ func (s *ProjectResponse) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		e.FieldStart("createdAt")
+		e.FieldStart("created_at")
 		json.EncodeDateTime(e, s.CreatedAt)
 	}
 	{
-		e.FieldStart("updatedAt")
+		e.FieldStart("updated_at")
 		json.EncodeDateTime(e, s.UpdatedAt)
 	}
 }
@@ -21208,9 +21208,9 @@ func (s *ProjectResponse) encodeFields(e *jx.Encoder) {
 var jsonFieldsNameOfProjectResponse = [5]string{
 	0: "id",
 	1: "name",
-	2: "previewOrigins",
-	3: "createdAt",
-	4: "updatedAt",
+	2: "preview_origins",
+	3: "created_at",
+	4: "updated_at",
 }
 
 // Decode decodes ProjectResponse from json.
@@ -21246,7 +21246,7 @@ func (s *ProjectResponse) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"name\"")
 			}
-		case "previewOrigins":
+		case "preview_origins":
 			if err := func() error {
 				s.PreviewOrigins = make([]string, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -21263,9 +21263,9 @@ func (s *ProjectResponse) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"previewOrigins\"")
+				return errors.Wrap(err, "decode field \"preview_origins\"")
 			}
-		case "createdAt":
+		case "created_at":
 			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
@@ -21275,9 +21275,9 @@ func (s *ProjectResponse) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"createdAt\"")
+				return errors.Wrap(err, "decode field \"created_at\"")
 			}
-		case "updatedAt":
+		case "updated_at":
 			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
@@ -21287,7 +21287,7 @@ func (s *ProjectResponse) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"updatedAt\"")
+				return errors.Wrap(err, "decode field \"updated_at\"")
 			}
 		default:
 			return d.Skip()
@@ -24317,7 +24317,7 @@ func (s *SetUserPasswordRequest) encodeFields(e *jx.Encoder) {
 	}
 	{
 		if s.IsChangeRequired.Set {
-			e.FieldStart("isChangeRequired")
+			e.FieldStart("is_change_required")
 			s.IsChangeRequired.Encode(e)
 		}
 	}
@@ -24325,7 +24325,7 @@ func (s *SetUserPasswordRequest) encodeFields(e *jx.Encoder) {
 
 var jsonFieldsNameOfSetUserPasswordRequest = [2]string{
 	0: "password",
-	1: "isChangeRequired",
+	1: "is_change_required",
 }
 
 // Decode decodes SetUserPasswordRequest from json.
@@ -24349,7 +24349,7 @@ func (s *SetUserPasswordRequest) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"password\"")
 			}
-		case "isChangeRequired":
+		case "is_change_required":
 			if err := func() error {
 				s.IsChangeRequired.Reset()
 				if err := s.IsChangeRequired.Decode(d); err != nil {
@@ -24357,7 +24357,7 @@ func (s *SetUserPasswordRequest) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"isChangeRequired\"")
+				return errors.Wrap(err, "decode field \"is_change_required\"")
 			}
 		default:
 			return d.Skip()
@@ -24903,11 +24903,11 @@ func (s *TeamResponse) encodeFields(e *jx.Encoder) {
 		s.Status.Encode(e)
 	}
 	{
-		e.FieldStart("createdAt")
+		e.FieldStart("created_at")
 		json.EncodeDateTime(e, s.CreatedAt)
 	}
 	{
-		e.FieldStart("updatedAt")
+		e.FieldStart("updated_at")
 		json.EncodeDateTime(e, s.UpdatedAt)
 	}
 }
@@ -24916,8 +24916,8 @@ var jsonFieldsNameOfTeamResponse = [5]string{
 	0: "id",
 	1: "name",
 	2: "status",
-	3: "createdAt",
-	4: "updatedAt",
+	3: "created_at",
+	4: "updated_at",
 }
 
 // Decode decodes TeamResponse from json.
@@ -24963,7 +24963,7 @@ func (s *TeamResponse) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"status\"")
 			}
-		case "createdAt":
+		case "created_at":
 			requiredBitSet[0] |= 1 << 3
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
@@ -24973,9 +24973,9 @@ func (s *TeamResponse) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"createdAt\"")
+				return errors.Wrap(err, "decode field \"created_at\"")
 			}
-		case "updatedAt":
+		case "updated_at":
 			requiredBitSet[0] |= 1 << 4
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
@@ -24985,7 +24985,7 @@ func (s *TeamResponse) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"updatedAt\"")
+				return errors.Wrap(err, "decode field \"updated_at\"")
 			}
 		default:
 			return d.Skip()
@@ -25783,11 +25783,11 @@ func (s *UserMetadata) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *UserMetadata) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("createdAt")
+		e.FieldStart("created_at")
 		json.EncodeDateTime(e, s.CreatedAt)
 	}
 	{
-		e.FieldStart("updatedAt")
+		e.FieldStart("updated_at")
 		json.EncodeDateTime(e, s.UpdatedAt)
 	}
 	{
@@ -25797,8 +25797,8 @@ func (s *UserMetadata) encodeFields(e *jx.Encoder) {
 }
 
 var jsonFieldsNameOfUserMetadata = [3]string{
-	0: "createdAt",
-	1: "updatedAt",
+	0: "created_at",
+	1: "updated_at",
 	2: "status",
 }
 
@@ -25811,7 +25811,7 @@ func (s *UserMetadata) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "createdAt":
+		case "created_at":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
@@ -25821,9 +25821,9 @@ func (s *UserMetadata) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"createdAt\"")
+				return errors.Wrap(err, "decode field \"created_at\"")
 			}
-		case "updatedAt":
+		case "updated_at":
 			requiredBitSet[0] |= 1 << 1
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
@@ -25833,7 +25833,7 @@ func (s *UserMetadata) Decode(d *jx.Decoder) error {
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"updatedAt\"")
+				return errors.Wrap(err, "decode field \"updated_at\"")
 			}
 		case "status":
 			requiredBitSet[0] |= 1 << 2

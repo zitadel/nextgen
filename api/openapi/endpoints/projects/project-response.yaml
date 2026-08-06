@@ -3,8 +3,8 @@ description: The current state of a project.
 required:
   - id
   - name
-  - createdAt
-  - updatedAt
+  - created_at
+  - updated_at
 properties:
   id:
     type: string
@@ -12,17 +12,17 @@ properties:
   name:
     type: string
     description: The name of the project.
-  previewOrigins:
+  preview_origins:
     type: array
     items:
       type: string
     description: |
       Origins which are allowed for previewing and testing the project.
-  createdAt:
+  created_at:
     type: string
     format: date-time
     description: The time when the project was created.
-  updatedAt:
+  updated_at:
     type: string
     format: date-time
     description: The time when the project was last updated.

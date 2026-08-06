@@ -118,11 +118,11 @@ func NewSession(projectID string, agent *UserAgent) (*Session, error) {
 }
 
 func (s *Session) State() SessionState {
+	if !s.ExpiresAt.IsZero() && time.Now().After(s.ExpiresAt) {
+		return SessionStateExpired
+	}
 	if len(s.Factors) == 0 {
 		return SessionStateBuilding
-	}
-	if time.Now().After(s.ExpiresAt) {
-		return SessionStateExpired
 	}
 	return SessionStateActive
 }
