@@ -2903,6 +2903,7 @@ func (*ErrorDetailsStatusCode) listBrandingRes()             {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
 func (*ErrorDetailsStatusCode) listSchemasRes()              {}
 func (*ErrorDetailsStatusCode) listUserPasskeysRes()         {}
+func (*ErrorDetailsStatusCode) listUserTeamsRes()            {}
 func (*ErrorDetailsStatusCode) listUsersRes()                {}
 func (*ErrorDetailsStatusCode) patchProjectRes()             {}
 func (*ErrorDetailsStatusCode) queryProjectsRes()            {}
@@ -6776,6 +6777,57 @@ func (s *ListUserPasskeysResponsePasskeysItem) SetCreatedAt(val time.Time) {
 type ListUserPasskeysUnauthorized ErrorDetails
 
 func (*ListUserPasskeysUnauthorized) listUserPasskeysRes() {}
+
+type ListUserTeamsBadRequest ErrorDetails
+
+func (*ListUserTeamsBadRequest) listUserTeamsRes() {}
+
+type ListUserTeamsForbidden ErrorDetails
+
+func (*ListUserTeamsForbidden) listUserTeamsRes() {}
+
+type ListUserTeamsInternalServerError ErrorDetails
+
+func (*ListUserTeamsInternalServerError) listUserTeamsRes() {}
+
+type ListUserTeamsNotFound ErrorDetails
+
+func (*ListUserTeamsNotFound) listUserTeamsRes() {}
+
+// Paginated list of the teams a user belongs to.
+// Ref: #
+type ListUserTeamsResponse struct {
+	Teams []UserTeam `json:"teams"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetTeams returns the value of Teams.
+func (s *ListUserTeamsResponse) GetTeams() []UserTeam {
+	return s.Teams
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListUserTeamsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetTeams sets the value of Teams.
+func (s *ListUserTeamsResponse) SetTeams(val []UserTeam) {
+	s.Teams = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListUserTeamsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListUserTeamsResponse) listUserTeamsRes() {}
+
+type ListUserTeamsUnauthorized ErrorDetails
+
+func (*ListUserTeamsUnauthorized) listUserTeamsRes() {}
 
 type ListUsersBadRequest ErrorDetails
 
@@ -12569,7 +12621,7 @@ func (*SessNotFoundHeaders) getMySessionRes() {}
 // Field to filter sessions by:
 // - `created_at`: RFC3339 timestamp
 // - `user_id`: user id
-// - `state`: one of `building`, `active`, `expired`, `revoked`.
+// - `state`: one of `building`, `active`, `expired`.
 // Ref: #
 type SessionFilterField string
 
@@ -12634,8 +12686,7 @@ type SessionResponse struct {
 	// - `building`: has a user factor but is still gathering authentication factors
 	// - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
 	// factors age
-	// - `expired`: TTL elapsed
-	// - `revoked`: explicitly revoked via DELETE.
+	// - `expired`: TTL elapsed.
 	State SessionResponseState `json:"state"`
 	// The authenticated user. Null for anonymous sessions and until the `user`
 	// factor has been verified through an `auth_attempt`.
@@ -12841,15 +12892,13 @@ func (s *SessionResponseMetadata) init() SessionResponseMetadata {
 // - `building`: has a user factor but is still gathering authentication factors
 // - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
 // factors age
-// - `expired`: TTL elapsed
-// - `revoked`: explicitly revoked via DELETE.
+// - `expired`: TTL elapsed.
 type SessionResponseState string
 
 const (
 	SessionResponseStateBuilding SessionResponseState = "building"
 	SessionResponseStateActive   SessionResponseState = "active"
 	SessionResponseStateExpired  SessionResponseState = "expired"
-	SessionResponseStateRevoked  SessionResponseState = "revoked"
 )
 
 // AllValues returns all SessionResponseState values.
@@ -12858,7 +12907,6 @@ func (SessionResponseState) AllValues() []SessionResponseState {
 		SessionResponseStateBuilding,
 		SessionResponseStateActive,
 		SessionResponseStateExpired,
-		SessionResponseStateRevoked,
 	}
 }
 
@@ -12870,8 +12918,6 @@ func (s SessionResponseState) MarshalText() ([]byte, error) {
 	case SessionResponseStateActive:
 		return []byte(s), nil
 	case SessionResponseStateExpired:
-		return []byte(s), nil
-	case SessionResponseStateRevoked:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -12889,9 +12935,6 @@ func (s *SessionResponseState) UnmarshalText(data []byte) error {
 		return nil
 	case SessionResponseStateExpired:
 		*s = SessionResponseStateExpired
-		return nil
-	case SessionResponseStateRevoked:
-		*s = SessionResponseStateRevoked
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -13663,6 +13706,12 @@ type UserMetadata struct {
 	UpdatedAt time.Time `json:"updated_at"`
 	// The status of the user.
 	Status UserMetadataStatus `json:"status"`
+	// The team that owns this user's identity lifecycle, or `null` when the
+	// user is self-owned. This is a single team and a different concept from
+	// the user's team roster: it decides who may deprovision the user, not
+	// which teams the user collaborates in. The roster is its own paginated
+	// resource — `GET /users/{user_id}/teams`.
+	LifecycleOwnerTeamID OptNilString `json:"lifecycle_owner_team_id"`
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -13680,6 +13729,11 @@ func (s *UserMetadata) GetStatus() UserMetadataStatus {
 	return s.Status
 }
 
+// GetLifecycleOwnerTeamID returns the value of LifecycleOwnerTeamID.
+func (s *UserMetadata) GetLifecycleOwnerTeamID() OptNilString {
+	return s.LifecycleOwnerTeamID
+}
+
 // SetCreatedAt sets the value of CreatedAt.
 func (s *UserMetadata) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
@@ -13693,6 +13747,11 @@ func (s *UserMetadata) SetUpdatedAt(val time.Time) {
 // SetStatus sets the value of Status.
 func (s *UserMetadata) SetStatus(val UserMetadataStatus) {
 	s.Status = val
+}
+
+// SetLifecycleOwnerTeamID sets the value of LifecycleOwnerTeamID.
+func (s *UserMetadata) SetLifecycleOwnerTeamID(val OptNilString) {
+	s.LifecycleOwnerTeamID = val
 }
 
 // The status of the user.
@@ -14095,6 +14154,127 @@ func (s *UserSchemaProperties) init() UserSchemaProperties {
 		*s = m
 	}
 	return m
+}
+
+// One entry of a user's team roster: a team the user belongs to, with the
+// membership's participation state. The team's `name` travels with the entry, so
+// a page renders without a follow-up `POST /teams/query` per row.
+// Roster membership is not lifecycle ownership. A user can belong to many teams
+// while still owning their own lifecycle — that single owning team is reported
+// as `metadata.lifecycle_owner_team_id` on the user itself.
+// Ref: #
+type UserTeam struct {
+	// The unique identifier of the team.
+	ID string `json:"id"`
+	// The name of the team.
+	Name string `json:"name"`
+	// The user's participation state on this team. Memberships the user was
+	// removed from are not returned.
+	MembershipStatus UserTeamMembershipStatus `json:"membership_status"`
+	// The time when the user joined this team.
+	CreatedAt time.Time `json:"created_at"`
+	// The time when this membership was last changed.
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// GetID returns the value of ID.
+func (s *UserTeam) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *UserTeam) GetName() string {
+	return s.Name
+}
+
+// GetMembershipStatus returns the value of MembershipStatus.
+func (s *UserTeam) GetMembershipStatus() UserTeamMembershipStatus {
+	return s.MembershipStatus
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *UserTeam) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *UserTeam) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *UserTeam) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *UserTeam) SetName(val string) {
+	s.Name = val
+}
+
+// SetMembershipStatus sets the value of MembershipStatus.
+func (s *UserTeam) SetMembershipStatus(val UserTeamMembershipStatus) {
+	s.MembershipStatus = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *UserTeam) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *UserTeam) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+// The user's participation state on this team. Memberships the user was
+// removed from are not returned.
+type UserTeamMembershipStatus string
+
+const (
+	UserTeamMembershipStatusPending  UserTeamMembershipStatus = "pending"
+	UserTeamMembershipStatusActive   UserTeamMembershipStatus = "active"
+	UserTeamMembershipStatusInactive UserTeamMembershipStatus = "inactive"
+)
+
+// AllValues returns all UserTeamMembershipStatus values.
+func (UserTeamMembershipStatus) AllValues() []UserTeamMembershipStatus {
+	return []UserTeamMembershipStatus{
+		UserTeamMembershipStatusPending,
+		UserTeamMembershipStatusActive,
+		UserTeamMembershipStatusInactive,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s UserTeamMembershipStatus) MarshalText() ([]byte, error) {
+	switch s {
+	case UserTeamMembershipStatusPending:
+		return []byte(s), nil
+	case UserTeamMembershipStatusActive:
+		return []byte(s), nil
+	case UserTeamMembershipStatusInactive:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *UserTeamMembershipStatus) UnmarshalText(data []byte) error {
+	switch UserTeamMembershipStatus(data) {
+	case UserTeamMembershipStatusPending:
+		*s = UserTeamMembershipStatusPending
+		return nil
+	case UserTeamMembershipStatusActive:
+		*s = UserTeamMembershipStatusActive
+		return nil
+	case UserTeamMembershipStatusInactive:
+		*s = UserTeamMembershipStatusInactive
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 type UsernamePassword struct {

@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -481,7 +482,122 @@ func TestGetUser(t *testing.T) {
 	resp, err := client.GetUserByID(t.Context(), params)
 	assert.NoError(t, err)
 
-	assert.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+	require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+
+	// The roster lives at /users/{user_id}/teams; the user itself only reports
+	// who owns its lifecycle, and this one is self-owned.
+	metadata, ok := resp.(*api.User).Metadata.Get()
+	require.True(t, ok, "the user carries metadata")
+	assert.True(t, metadata.LifecycleOwnerTeamID.Null)
+}
+
+// TestListUserTeams pins the roster endpoint and the line ADR 024 draws: the
+// roster (`GET /users/{user_id}/teams`, N:N, paginated) and lifecycle ownership
+// (`metadata.lifecycleOwnerTeamId`, at most one team) are different answers and
+// need not agree.
+func TestListUserTeams(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	teams := harness.EnsureTeamService(t)
+	unique := helpers.RandString(8)
+	owner, err := teams.Create(t.Context(), service.CreateTeamInput{ProjectID: project.ID, Name: helpers.TeamName()})
+	require.NoError(t, err)
+	alpha, err := teams.Create(t.Context(), service.CreateTeamInput{ProjectID: project.ID, Name: "a-roster-" + unique})
+	require.NoError(t, err)
+	beta, err := teams.Create(t.Context(), service.CreateTeamInput{ProjectID: project.ID, Name: "b-roster-" + unique})
+	require.NoError(t, err)
+
+	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
+	users := harness.EnsureUserFixture(t)
+	emailAttr, err := domain.NewCreateAttribute("email", "roster@example.com", domain.AttributeUniquenessProject)
+	require.NoError(t, err)
+	require.NoError(t, users.Create(t.Context(), &domain.CreateUser{
+		ProjectID:               project.ID,
+		SchemaURL:               schemaURL,
+		ID:                      "user_roster-01",
+		LifecycleOwnerTeamID:    &owner.ID,
+		InitialMembershipTeamID: &alpha.ID,
+		Attributes:              domain.CreateAttributes{*emailAttr},
+	}))
+	require.NoError(t, harness.EnsureTeamMembershipFixture(t).Create(t.Context(), &domain.TeamMembership{
+		ProjectID: project.ID,
+		TeamID:    beta.ID,
+		UserID:    "user_roster-01",
+		Status:    domain.MembershipStatusPending,
+	}))
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	listTeams := func(t *testing.T, params api.ListUserTeamsParams) *api.ListUserTeamsResponse {
+		t.Helper()
+		res, err := client.ListUserTeams(t.Context(), params)
+		require.NoError(t, err)
+		require.IsType(t, &api.ListUserTeamsResponse{}, res, helpers.MustMarshal(t, res))
+		return res.(*api.ListUserTeamsResponse)
+	}
+	rosterParams := api.ListUserTeamsParams{
+		ProjectID: api.ProjectID(project.ID),
+		UserID:    api.UserID("user_roster-01"),
+	}
+
+	// The whole roster, ordered by team name, each entry naming its team.
+	roster := listTeams(t, rosterParams)
+	require.Len(t, roster.Teams, 2)
+	assert.False(t, roster.NextPageToken.IsSet(), "the whole roster fits in one page")
+
+	assert.Equal(t, alpha.ID, roster.Teams[0].ID)
+	assert.Equal(t, alpha.Name, roster.Teams[0].Name, "the team name travels with the entry")
+	assert.Equal(t, api.UserTeamMembershipStatusActive, roster.Teams[0].MembershipStatus)
+	assert.False(t, roster.Teams[0].CreatedAt.IsZero())
+
+	assert.Equal(t, beta.ID, roster.Teams[1].ID)
+	assert.Equal(t, beta.Name, roster.Teams[1].Name)
+	assert.Equal(t, api.UserTeamMembershipStatusPending, roster.Teams[1].MembershipStatus,
+		"a pending invite is on the roster and says so")
+
+	// The window walks the roster one page at a time, in the same order.
+	page := listTeams(t, api.ListUserTeamsParams{
+		ProjectID: rosterParams.ProjectID,
+		UserID:    rosterParams.UserID,
+		Limit:     api.NewOptLimit(1),
+	})
+	require.Len(t, page.Teams, 1)
+	assert.Equal(t, alpha.ID, page.Teams[0].ID)
+	pageToken, ok := page.NextPageToken.Get()
+	require.True(t, ok, "a full page carries a cursor")
+
+	page = listTeams(t, api.ListUserTeamsParams{
+		ProjectID: rosterParams.ProjectID,
+		UserID:    rosterParams.UserID,
+		Limit:     api.NewOptLimit(1),
+		PageToken: api.NewOptPageToken(pageToken),
+	})
+	require.Len(t, page.Teams, 1)
+	assert.Equal(t, beta.ID, page.Teams[0].ID)
+
+	// The user endpoint answers the other question, and answers it differently.
+	userResp, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{
+		ProjectID: rosterParams.ProjectID,
+		UserID:    rosterParams.UserID,
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.User{}, userResp, helpers.MustMarshal(t, userResp))
+	metadata, ok := userResp.(*api.User).Metadata.Get()
+	require.True(t, ok, "the user carries metadata")
+	assert.Equal(t, api.NewOptNilString(owner.ID), metadata.LifecycleOwnerTeamID,
+		"the lifecycle owner is not one of the roster teams")
+
+	// An unknown user is a 404, not an empty roster.
+	missing, err := client.ListUserTeams(t.Context(), api.ListUserTeamsParams{
+		ProjectID: rosterParams.ProjectID,
+		UserID:    api.UserID("user_does-not-exist"),
+	})
+	require.NoError(t, err)
+	assert.IsType(t, &api.ListUserTeamsNotFound{}, missing, helpers.MustMarshal(t, missing))
 }
 
 func TestGetMyUser(t *testing.T) {

@@ -50,6 +50,13 @@ type ListPasskeysInput struct {
 	Limit     int
 }
 
+type ListUserTeamsInput struct {
+	ProjectID string
+	UserID    string
+	PageToken string
+	Limit     int
+}
+
 type GetMyUserInput struct {
 	// SessionToken is the parsed session token, already verified at the API
 	// security boundary.
@@ -63,6 +70,11 @@ type DeleteUserInput struct {
 
 type ListUsersOutput struct {
 	Items         []*domain.User
+	NextPageToken string
+}
+
+type ListUserTeamsOutput struct {
+	Items         []*domain.UserTeam
 	NextPageToken string
 }
 
@@ -184,6 +196,56 @@ func (s *UserService) ListPasskeys(ctx context.Context, input ListPasskeysInput)
 	}
 
 	return dbpasskeys.Items, string(dbpasskeys.NextCursor), nil
+}
+
+// ListUserTeams serves the user's team roster one page at a time, each entry
+// carrying the team's name. Removed memberships are history and stay out.
+//
+// The roster is not lifecycle ownership (ADR 024): a user can sit on several
+// rosters while owning their own lifecycle, which is reported on the user
+// itself.
+func (s *UserService) ListUserTeams(ctx context.Context, input ListUserTeamsInput) (*ListUserTeamsOutput, error) {
+	onRoster := make([]database.Filter[domain.UserTeamField], 0, len(domain.RosterMembershipStatuses))
+	for _, status := range domain.RosterMembershipStatuses {
+		onRoster = append(onRoster, database.Equal(database.Col(domain.UserTeamFieldStatus), status.String()))
+	}
+
+	teams, err := s.v2Pool.Statements().ListUserTeams(ctx, &database.ListOptions[domain.UserTeamField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserTeamFieldProjectID), input.ProjectID),
+			database.Equal(database.Col(domain.UserTeamFieldUserID), input.UserID),
+			database.Or(onRoster...),
+		),
+		Pagination: database.Page[domain.UserTeamField]{
+			Limit:  uint32(normalizeLimit(input.Limit)),
+			Cursor: []byte(input.PageToken),
+			OrderBy: database.OrderBy[domain.UserTeamField]{
+				Columns: []database.Column[domain.UserTeamField]{
+					database.Col(domain.UserTeamFieldTeamName),
+					database.Col(domain.UserTeamFieldTeamID),
+				},
+				Direction: database.OrderAsc,
+			},
+		},
+	})
+	if err != nil {
+		return nil, mapListError(err, "failed to list user teams from database")
+	}
+
+	if len(teams.Items) == 0 {
+		exists, err := s.v2Pool.Statements().UserExists(ctx, input.ProjectID, input.UserID)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to get user from database")
+		}
+		if !exists {
+			return nil, domain.ErrUserNotFound()
+		}
+	}
+
+	return &ListUserTeamsOutput{
+		Items:         teams.Items,
+		NextPageToken: string(teams.NextCursor),
+	}, nil
 }
 
 func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error) {

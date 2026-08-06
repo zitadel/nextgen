@@ -2896,6 +2896,45 @@ func (c *MockAllStatementsListUserTOTPsCall) DoAndReturn(f func(context.Context,
 	return c
 }
 
+// ListUserTeams mocks base method.
+func (m *MockAllStatements) ListUserTeams(ctx context.Context, filter *database.ListOptions[domain.UserTeamField]) (*database.ListResult[*domain.UserTeam], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListUserTeams", ctx, filter)
+	ret0, _ := ret[0].(*database.ListResult[*domain.UserTeam])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListUserTeams indicates an expected call of ListUserTeams.
+func (mr *MockAllStatementsMockRecorder) ListUserTeams(ctx, filter any) *MockAllStatementsListUserTeamsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUserTeams", reflect.TypeOf((*MockAllStatements)(nil).ListUserTeams), ctx, filter)
+	return &MockAllStatementsListUserTeamsCall{Call: call}
+}
+
+// MockAllStatementsListUserTeamsCall wrap *gomock.Call
+type MockAllStatementsListUserTeamsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListUserTeamsCall) Return(arg0 *database.ListResult[*domain.UserTeam], arg1 error) *MockAllStatementsListUserTeamsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListUserTeamsCall) Do(f func(context.Context, *database.ListOptions[domain.UserTeamField]) (*database.ListResult[*domain.UserTeam], error)) *MockAllStatementsListUserTeamsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListUserTeamsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.UserTeamField]) (*database.ListResult[*domain.UserTeam], error)) *MockAllStatementsListUserTeamsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListUsers mocks base method.
 func (m *MockAllStatements) ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
 	m.ctrl.T.Helper()
@@ -4922,6 +4961,45 @@ func (c *MockTeamMembershipStatementsListTeamMembershipsCall) Do(f func(context.
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockTeamMembershipStatementsListTeamMembershipsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.TeamMembershipField]) (*database.ListResult[*domain.TeamMembership], error)) *MockTeamMembershipStatementsListTeamMembershipsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListUserTeams mocks base method.
+func (m *MockTeamMembershipStatements) ListUserTeams(ctx context.Context, filter *database.ListOptions[domain.UserTeamField]) (*database.ListResult[*domain.UserTeam], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListUserTeams", ctx, filter)
+	ret0, _ := ret[0].(*database.ListResult[*domain.UserTeam])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListUserTeams indicates an expected call of ListUserTeams.
+func (mr *MockTeamMembershipStatementsMockRecorder) ListUserTeams(ctx, filter any) *MockTeamMembershipStatementsListUserTeamsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUserTeams", reflect.TypeOf((*MockTeamMembershipStatements)(nil).ListUserTeams), ctx, filter)
+	return &MockTeamMembershipStatementsListUserTeamsCall{Call: call}
+}
+
+// MockTeamMembershipStatementsListUserTeamsCall wrap *gomock.Call
+type MockTeamMembershipStatementsListUserTeamsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockTeamMembershipStatementsListUserTeamsCall) Return(arg0 *database.ListResult[*domain.UserTeam], arg1 error) *MockTeamMembershipStatementsListUserTeamsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockTeamMembershipStatementsListUserTeamsCall) Do(f func(context.Context, *database.ListOptions[domain.UserTeamField]) (*database.ListResult[*domain.UserTeam], error)) *MockTeamMembershipStatementsListUserTeamsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockTeamMembershipStatementsListUserTeamsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.UserTeamField]) (*database.ListResult[*domain.UserTeam], error)) *MockTeamMembershipStatementsListUserTeamsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
