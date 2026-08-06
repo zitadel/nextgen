@@ -267,7 +267,8 @@ scoped SQL query against data we already own.
    types. Canonical names live in
    [`docs/design/api/system-permission-catalog.md`](../design/api/system-permission-catalog.md).
 2. Design relational migrations for `resource_scope_index` and agent
-   delegation tables. Wave 0 DDL spike and locked decisions:
+   delegation columns on `authz_assignments` (D2 — not sibling delegation
+   tables). Wave 0 DDL spike and locked decisions:
    [`docs/design/api/permission-storage.md`](../design/api/permission-storage.md)
    (implementation tracked by [issue #422](https://github.com/zitadel/nextgen/issues/422)).
 3. Update OpenAPI security declarations to use the final permission names.

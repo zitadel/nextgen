@@ -31,6 +31,7 @@ It does **not** ship Goose migrations, Go statements, or resolver wiring.
 | **D11** | Dual-write membership **without** Leopard in Wave 1; Leopard remains an additive derived index later ([ADR 032 §3](../../adrs/032-permission-catalogs.md#3-canonical-relational-storage)). |
 | **D12** | Hash-partitioning `resource_scope_index` (Postgres) **deferred until proven**; revisit only with vacuum/bloat/hot-spot measurements. |
 | **D13** | Cross-project ([#333](https://github.com/zitadel/nextgen/issues/333)) depiction: same `authz_assignments` row on the **protected** `project_id`, with a **foreign** `user`/`team` principal (no `principal_type = project`); principal integrity by stable prefixed ids ([ADR 011](../../adrs/011-resource-identifiers.md)), not a composite FK to local `(project_id, user_id)`. |
+| **D14** | Wave 1 live catalog tables are `authz_relations` + `authz_relation_closure` only. Bundles are **seed/fixture input** that compile into those tables — not separate live tables until [#421](https://github.com/zitadel/nextgen/issues/421) owns a compiler. |
 
 ## Entity picture
 
@@ -40,8 +41,6 @@ flowchart TB
   rsi --> scopeCtx[project_id_team_id]
   catalogs[authz_catalogs] --> relations[authz_relations]
   catalogs --> closure[authz_relation_closure]
-  catalogs --> bundles[authz_bundles]
-  bundles --> bundleMembers[authz_bundle_members]
   catalogs --> assignments[authz_assignments]
   teamMemberships[team_memberships] -->|"same_tx dual_write"| edges[authz_membership_edges]
   assignments --> check[resolver_check]
@@ -96,9 +95,17 @@ the resource. MVP kinds: `project`, `team`, `user`. For a project row:
 
 **D12:** do not hash-partition this table in Wave 1.
 
-**Spanner:** same columns; PK `(resource_id)`; prefer matching existing FK
-delete semantics on teams. Composite PK / interleave for locality is a separate
-dialect decision, also deferred until measured.
+**Dialect note:** the composite FK to `teams (project_id, id)` uses Postgres
+**MATCH SIMPLE**: when `team_id` is NULL, the FK is not enforced (project-scoped
+rows are valid). Spanner migrations must preserve the same null-skip behavior.
+
+**Delete note:** RSI uses `ON DELETE CASCADE` so flat-by-ID lookups cannot return
+deleted resource ids. `team_memberships` stays `RESTRICT` / lifecycle-gated per
+[ADR 024](../../adrs/024-user-team-lifecycle-ownership.md) — roster cleanup is
+explicit, not an index cascade.
+
+**Spanner:** same columns; PK `(resource_id)`. Composite PK / interleave for
+locality is a separate dialect decision, deferred until measured.
 
 ### `authz_catalogs`
 
@@ -126,7 +133,11 @@ CREATE UNIQUE INDEX authz_catalogs_one_active
 Compiled child rows are **immutable for a catalog version**. New schema ⇒ new
 `authz_catalogs` row + new children (no in-place rewrite of active closure).
 
-### `authz_relations`, closure, bundles
+### `authz_relations` and `authz_relation_closure`
+
+Live catalog tables for Wave 1 (**D14**). No separate `authz_bundles` /
+`authz_bundle_members` tables — bundles exist only as seed/fixture input that
+compile into relations + closure.
 
 ```sql
 CREATE TABLE zitadel_nextgen.authz_relations (
@@ -154,29 +165,11 @@ CREATE TABLE zitadel_nextgen.authz_relation_closure (
 
 CREATE INDEX idx_authz_closure_to
     ON zitadel_nextgen.authz_relation_closure (catalog_id, to_relation);
-
-CREATE TABLE zitadel_nextgen.authz_bundles (
-    catalog_id TEXT COLLATE "C" NOT NULL
-        REFERENCES zitadel_nextgen.authz_catalogs (id) ON DELETE CASCADE,
-    bundle     TEXT COLLATE "C" NOT NULL,
-    PRIMARY KEY (catalog_id, bundle)
-);
-
-CREATE TABLE zitadel_nextgen.authz_bundle_members (
-    catalog_id TEXT COLLATE "C" NOT NULL,
-    bundle     TEXT COLLATE "C" NOT NULL,
-    relation   TEXT COLLATE "C" NOT NULL,
-    PRIMARY KEY (catalog_id, bundle, relation),
-    FOREIGN KEY (catalog_id, bundle)
-        REFERENCES zitadel_nextgen.authz_bundles (catalog_id, bundle)
-        ON DELETE CASCADE,
-    FOREIGN KEY (catalog_id, relation)
-        REFERENCES zitadel_nextgen.authz_relations (catalog_id, relation)
-);
 ```
 
 **D5:** skip a full expression-edge AST table until the OpenFGA IR (#421) exists.
-Wave 1 may seed closure from bundles + hand-authored implications.
+Wave 1 seeds closure from a checked-in fixture (bundle definitions compile into
+closure rows; they are not independently editable tables).
 
 ### `authz_assignments`
 
@@ -205,7 +198,7 @@ CREATE TABLE zitadel_nextgen.authz_assignments (
     scope_team_id     TEXT COLLATE "C",
     scope_resource_id TEXT COLLATE "C",
 
-    -- Delegation / provenance (NULL for normal grants) — D2
+    -- grantor_* = provenance for any grant; delegation_id set ⇒ agent delegation (D2)
     grantor_type      TEXT COLLATE "C",
     grantor_id        TEXT COLLATE "C",
     delegation_id     TEXT COLLATE "C",
@@ -229,7 +222,10 @@ CREATE TABLE zitadel_nextgen.authz_assignments (
         OR (scope_kind = 'team'
             AND scope_team_id IS NOT NULL AND scope_resource_id IS NULL)
         OR (scope_kind = 'resource'
-            AND scope_resource_id IS NOT NULL)
+            AND scope_team_id IS NULL AND scope_resource_id IS NOT NULL)
+    ),
+    CHECK (
+        (grantor_id IS NULL) = (grantor_type IS NULL)
     ),
     CHECK (
         (delegation_id IS NULL AND grantor_id IS NULL)
@@ -254,25 +250,38 @@ CREATE UNIQUE INDEX authz_assignments_unique_active
     WHERE revoked_at IS NULL AND delegation_id IS NULL;
 ```
 
-**D4:** grant `viewer` (bundle) as `relation = 'viewer'`; checks for
-`user.read` use closure.
+**D4:** grant `viewer` (bundle name) as `relation = 'viewer'`; that relation must
+exist in `authz_relations`, and closure must include `viewer → user.read` etc.
+(produced by seed). Checks for `user.read` use closure.
+
+**Resource scope:** `scope_kind = 'resource'` stores only `scope_resource_id`.
+Any team boundary for that resource comes from `resource_scope_index` at check
+time, not from the assignment row. There is **no FK** from `scope_resource_id`
+to `resource_scope_index`; writers dual-write RSI and the assignment in the same
+transaction when granting at resource scope (same integrity story as foreign
+principals under **D13**).
 
 ### `authz_membership_edges`
 
 AuthZ projection of set membership (**D3**, **D11**). Not lifecycle; not
-permission expansion.
+permission expansion. MVP shape is `user ∈ team` only; nested team sets need a
+later migration.
 
 ```sql
 CREATE TABLE zitadel_nextgen.authz_membership_edges (
     project_id  TEXT COLLATE "C" NOT NULL
         REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE,
-    member_type TEXT COLLATE "C" NOT NULL,  -- 'user' | 'team' (nested later)
+    member_type TEXT COLLATE "C" NOT NULL,
     member_id   TEXT COLLATE "C" NOT NULL,
-    set_type    TEXT COLLATE "C" NOT NULL,  -- 'team' for MVP
+    set_type    TEXT COLLATE "C" NOT NULL,
     set_id      TEXT COLLATE "C" NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    PRIMARY KEY (project_id, set_type, set_id, member_type, member_id)
+    PRIMARY KEY (project_id, set_type, set_id, member_type, member_id),
+    CHECK (member_type = 'user' AND set_type = 'team'),
+    FOREIGN KEY (project_id, set_id)
+        REFERENCES zitadel_nextgen.teams (project_id, id)
+        ON DELETE CASCADE
 );
 
 CREATE INDEX idx_authz_membership_edges_member
@@ -292,7 +301,10 @@ home** project (e.g. platform), not copied into the protected customer project.
 
 ### Single-resource check
 
-Principal `user_alice`, required permission `user.read`, project `proj_acme`:
+Principal `user_alice`, required permission `user.read`, protected project
+`proj_acme`. The resolver always supplies `$principal_home_project_id` for
+membership-edge lookup: for a local team grant on Acme that value is
+`proj_acme`; for a platform agency team it is the platform project id.
 
 ```sql
 SELECT 1
@@ -311,7 +323,7 @@ WHERE a.project_id = 'proj_acme'
      OR (a.principal_type = 'team' AND EXISTS (
            SELECT 1
            FROM zitadel_nextgen.authz_membership_edges e
-           WHERE e.project_id  = a.project_id
+           WHERE e.project_id  = $principal_home_project_id
              AND e.set_type    = 'team'
              AND e.set_id      = a.principal_id
              AND e.member_type = 'user'
@@ -320,11 +332,6 @@ WHERE a.project_id = 'proj_acme'
       )
 LIMIT 1;
 ```
-
-For foreign team principals (#333), the edge lookup uses the **home**
-`project_id` of that team (platform), not necessarily `a.project_id`. Wave 1
-resolvers must pass the principal’s home project when expanding team
-usersets; the assignment row itself stays on the protected project.
 
 ### List predicate sketch
 
@@ -339,8 +346,8 @@ usersets; the assignment row itself stays on the protected project.
 ## End-to-end narrative
 
 Actors: project `proj_acme`, team `team_eng`, users `user_alice` /
-`user_bob` / `user_carol`, active catalog `cat_sys_1`, bundle `viewer` ⇒
-`user.read` (via closure).
+`user_bob` / `user_carol`, active catalog `cat_sys_1`, relation `viewer` with
+closure `viewer ⇒ user.read`.
 
 ```text
 t0  Seed cat_sys_1 (viewer ⇒ user.read, …)
@@ -363,81 +370,54 @@ t5  Remove Alice from eng:
 ## Cross-project grants depiction (#333)
 
 Wave 0 **documents** how [#333](https://github.com/zitadel/nextgen/issues/333)
-fits this schema. It does **not** implement staff/agency product, credential
-binding, or break-glass.
+fits this schema (**D13**). It does **not** implement staff/agency product,
+credential binding, or break-glass.
 
-**LOCKED (D13):** the grant always resides on the **protected** project.
-The principal may be a foreign `user` or `team` (typically in the platform
-project). Do **not** use `principal_type = project`.
+Grant resides on the protected project; principal may be a foreign `user` or
+`team` (typically platform). Do **not** use `principal_type = project`.
 
 ```text
 -- Alice (platform user) gets support on customer project Acme
 authz_assignments (
-  id              = asgn_support_01,
-  project_id      = proj_acme,
-  catalog_id      = cat_sys_1,
-  principal_type  = user,
-  principal_id    = user_alice,
-  relation        = support,          -- final name/tier is #333
-  scope_kind      = project,
-  grantor_type    = user,
-  grantor_id      = user_ops_lead,
-  expires_at      = ...,
-  revoked_at      = NULL
-)
-
--- Agency team (platform) gets support on Acme; members resolve via
--- authz_membership_edges in the platform project, not copied into Acme
-authz_assignments (
-  id              = asgn_support_02,
-  project_id      = proj_acme,
-  catalog_id      = cat_sys_1,
-  principal_type  = team,
-  principal_id    = team_agency,
-  relation        = support,
-  scope_kind      = project,
-  ...
+  id=asgn_support_01, project_id=proj_acme, catalog_id=cat_sys_1,
+  principal_type=user, principal_id=user_alice,
+  relation=support, scope_kind=project,
+  grantor_type=user, grantor_id=user_ops_lead, ...
 )
 ```
 
-Check path: assignments on `proj_acme` ⋉ closure ⋉ (optional) membership edges
-for team principals in the principal’s home project. How Alice’s
-session/credential is allowed to *act* on Acme remains [#333](https://github.com/zitadel/nextgen/issues/333).
-
-**Left open for #333:** relation/bundle names and tiers, break-glass, listing
-“projects I can support” at scale, staff-specific audit fields beyond
-grantor/expiry/revoke.
+An agency **team** grant is the same shape with `principal_type=team` /
+`principal_id=team_agency`; members resolve via `authz_membership_edges` in the
+platform (home) project. Credential binding that lets Alice *act* on Acme, and
+relation/tier names, remain [#333](https://github.com/zitadel/nextgen/issues/333).
 
 ## Seed sketch (fixture-level)
 
-Hand-authored until [#420](https://github.com/zitadel/nextgen/issues/420)
-finalizes permission names and [#421](https://github.com/zitadel/nextgen/issues/421)
-compiles OpenFGA. Enough for Wave 1 to seed from a checked-in fixture:
+Permission **names** live in
+[`system-permission-catalog.md`](system-permission-catalog.md). Wave 0 only
+locks table shape (**D14**): a checked-in fixture compiles into
+`authz_relations` + `authz_relation_closure` (no live bundle tables).
 
 ```text
 authz_catalogs:
   id=cat_sys_1, kind=system, owner_id=system, version=1, status=active
 
-relations (placeholders — align with #420):
-  viewer, admin                         (kind=relation; grantable bundles)
-  project.read, project.write, …
-  team.read, team.write, …
-  user.read, user.write, …
+authz_relations (examples — align with system-permission-catalog):
+  viewer, admin          (kind=relation; grantable bundle names)
+  user.read, …           (kind=permission)
 
-bundles:
-  viewer → {project.read, team.read, user.read, …}
-  admin  → {project.write, project.delete, team.write, user.write, …}
-
-closure:
-  each permission ⇒ itself
-  viewer ⇒ each viewer member permission
-  admin  ⇒ each admin member permission
+authz_relation_closure (compiled from fixture):
+  user.read ⇒ user.read
+  viewer ⇒ viewer
+  viewer ⇒ user.read
+  …
 ```
 
 ## Non-goals (Wave 0 / Wave 1)
 
 - Leopard flatten / reachability index tables (additive later; **D11**)
 - Full OpenFGA expression AST storage (**D5** / #421)
+- Live `authz_bundles` tables (**D14** — seed input only until #421)
 - App-group catalog upload tables and `app_grants` (**D9** / ADR 034)
 - Implementing #333 identity binding, staff tiers, or break-glass
 - Hash-partitioning `resource_scope_index` (**D12**)
@@ -449,5 +429,5 @@ closure:
 - [ADR 033 — Internal Permission Management](../../adrs/033-internal-permission-management.md)
 - [ADR 034 — External Permission Management](../../adrs/034-external-permission-management.md)
 - [ADR 024 — User/Team Lifecycle Ownership](../../adrs/024-user-team-lifecycle-ownership.md)
-- [`authz.md`](authz.md) · [`url-architecture.md`](url-architecture.md) · [`../glossary.md`](../glossary.md)
+- [`authz.md`](authz.md) · [`url-architecture.md`](url-architecture.md) · [`system-permission-catalog.md`](system-permission-catalog.md) · [`../glossary.md`](../glossary.md)
 - Epic [#419](https://github.com/zitadel/nextgen/issues/419) · schema [#422](https://github.com/zitadel/nextgen/issues/422) · cross-project [#333](https://github.com/zitadel/nextgen/issues/333)
