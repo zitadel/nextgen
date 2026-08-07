@@ -39,8 +39,4 @@ post:
           schema:
             $ref: ../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
+      $ref: createFlow-error-response.yaml

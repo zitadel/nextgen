@@ -489,7 +489,7 @@ func encodeCreateFlowResponse(response CreateFlowRes, w http.ResponseWriter, spa
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *CreateFlowErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -568,7 +568,7 @@ func encodeCreateFlowDefinitionResponse(response CreateFlowDefinitionRes, w http
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *CreateFlowDefinitionErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -679,7 +679,7 @@ func encodeCreateProjectResponse(response CreateProjectRes, w http.ResponseWrite
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *CreateProjectErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -833,7 +833,7 @@ func encodeCreateSessionResponse(response CreateSessionRes, w http.ResponseWrite
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *CreateSessionErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1061,7 +1061,7 @@ func encodeCreateUserResponse(response CreateUserRes, w http.ResponseWriter, spa
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *CreateUserErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1176,7 +1176,7 @@ func encodeDeleteFlowDefinitionResponse(response DeleteFlowDefinitionRes, w http
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *DeleteFlowDefinitionErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1317,7 +1317,7 @@ func encodeDeleteUserByIDResponse(response DeleteUserByIDRes, w http.ResponseWri
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *DeleteUserByIDErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1477,7 +1477,7 @@ func encodeExchangeHandoffResponse(response ExchangeHandoffRes, w http.ResponseW
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *ExchangeHandoffErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1767,7 +1767,7 @@ func encodeGetFlowDefinitionResponse(response GetFlowDefinitionRes, w http.Respo
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *GetFlowDefinitionErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -1846,7 +1846,7 @@ func encodeGetFlowStepResponse(response GetFlowStepRes, w http.ResponseWriter, s
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *GetFlowStepErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2200,7 +2200,7 @@ func encodeGetMyUserResponse(response GetMyUserRes, w http.ResponseWriter, span 
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *GetMyUserErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2324,7 +2324,7 @@ func encodeGetProjectResponse(response GetProjectRes, w http.ResponseWriter, spa
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *GetProjectErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -2745,7 +2745,7 @@ func encodeGetUserByIDResponse(response GetUserByIDRes, w http.ResponseWriter, s
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *GetUserByIDErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3128,7 +3128,7 @@ func encodeListFlowDefinitionsResponse(response ListFlowDefinitionsRes, w http.R
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *ListFlowDefinitionsErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3299,7 +3299,7 @@ func encodeListUserPasskeysResponse(response ListUserPasskeysRes, w http.Respons
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *ListUserPasskeysErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3417,7 +3417,7 @@ func encodeListUserTeamsResponse(response ListUserTeamsRes, w http.ResponseWrite
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *ListUserTeamsErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3496,7 +3496,7 @@ func encodeListUsersResponse(response ListUsersRes, w http.ResponseWriter, span 
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *ListUsersErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3580,7 +3580,7 @@ func encodePatchProjectResponse(response PatchProjectRes, w http.ResponseWriter,
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *PatchProjectErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3685,7 +3685,7 @@ func encodeQueryProjectsResponse(response QueryProjectsRes, w http.ResponseWrite
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *QueryProjectsErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3777,7 +3777,7 @@ func encodeQuerySessionsResponse(response QuerySessionsRes, w http.ResponseWrite
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *QuerySessionsErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -3963,7 +3963,7 @@ func encodeRevokeMySessionResponse(response RevokeMySessionRes, w http.ResponseW
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *RevokeMySessionErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4027,7 +4027,7 @@ func encodeRevokeSessionResponse(response RevokeSessionRes, w http.ResponseWrite
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *RevokeSessionErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4142,7 +4142,7 @@ func encodeSetUserPasswordResponse(response SetUserPasswordRes, w http.ResponseW
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *SetUserPasswordErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4333,7 +4333,7 @@ func encodeSubmitFlowStepResponse(response SubmitFlowStepRes, w http.ResponseWri
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *SubmitFlowStepErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {
@@ -4412,7 +4412,7 @@ func encodeUpdateFlowDefinitionResponse(response UpdateFlowDefinitionRes, w http
 
 		return nil
 
-	case *ErrorDetailsStatusCode:
+	case *UpdateFlowDefinitionErrorResponseStatusCode:
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		code := response.StatusCode
 		if code == 0 {

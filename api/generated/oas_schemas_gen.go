@@ -112,49 +112,49 @@ func (s *AlreadyClaimedResponseDetailsAdditional) init() AlreadyClaimedResponseD
 
 // Merged schema.
 // Ref: #
-type AttAlreadyCompleted struct {
+type AttAlreadyHandedOff struct {
 	// Merged property.
 	Code string `json:"code"`
 	// Human-readable explanation of the error.
 	Message string `json:"message"`
 	// Additional error-specific context.
-	Details OptAttAlreadyCompletedDetails `json:"details"`
+	Details OptAttAlreadyHandedOffDetails `json:"details"`
 }
 
 // GetCode returns the value of Code.
-func (s *AttAlreadyCompleted) GetCode() string {
+func (s *AttAlreadyHandedOff) GetCode() string {
 	return s.Code
 }
 
 // GetMessage returns the value of Message.
-func (s *AttAlreadyCompleted) GetMessage() string {
+func (s *AttAlreadyHandedOff) GetMessage() string {
 	return s.Message
 }
 
 // GetDetails returns the value of Details.
-func (s *AttAlreadyCompleted) GetDetails() OptAttAlreadyCompletedDetails {
+func (s *AttAlreadyHandedOff) GetDetails() OptAttAlreadyHandedOffDetails {
 	return s.Details
 }
 
 // SetCode sets the value of Code.
-func (s *AttAlreadyCompleted) SetCode(val string) {
+func (s *AttAlreadyHandedOff) SetCode(val string) {
 	s.Code = val
 }
 
 // SetMessage sets the value of Message.
-func (s *AttAlreadyCompleted) SetMessage(val string) {
+func (s *AttAlreadyHandedOff) SetMessage(val string) {
 	s.Message = val
 }
 
 // SetDetails sets the value of Details.
-func (s *AttAlreadyCompleted) SetDetails(val OptAttAlreadyCompletedDetails) {
+func (s *AttAlreadyHandedOff) SetDetails(val OptAttAlreadyHandedOffDetails) {
 	s.Details = val
 }
 
 // Additional error-specific context.
-type AttAlreadyCompletedDetails map[string]jx.Raw
+type AttAlreadyHandedOffDetails map[string]jx.Raw
 
-func (s *AttAlreadyCompletedDetails) init() AttAlreadyCompletedDetails {
+func (s *AttAlreadyHandedOffDetails) init() AttAlreadyHandedOffDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -1858,6 +1858,186 @@ type CreateFlowDefinitionConflict ErrorDetails
 
 func (*CreateFlowDefinitionConflict) createFlowDefinitionRes() {}
 
+// CreateFlowDefinitionErrorResponse represents sum type.
+type CreateFlowDefinitionErrorResponse struct {
+	Type                     CreateFlowDefinitionErrorResponseType // switch on this field
+	FlowdefAlreadyExists     FlowdefAlreadyExists
+	FlowdefInvalid           FlowdefInvalid
+	Internal                 Internal
+	SchNotFound              SchNotFound
+	FlowdefSchemaFetchFailed FlowdefSchemaFetchFailed
+}
+
+// CreateFlowDefinitionErrorResponseType is oneOf type of CreateFlowDefinitionErrorResponse.
+type CreateFlowDefinitionErrorResponseType string
+
+// Possible values for CreateFlowDefinitionErrorResponseType.
+const (
+	FlowdefAlreadyExistsCreateFlowDefinitionErrorResponse     CreateFlowDefinitionErrorResponseType = "flowdef.already_exists"
+	FlowdefInvalidCreateFlowDefinitionErrorResponse           CreateFlowDefinitionErrorResponseType = "flowdef.invalid"
+	InternalCreateFlowDefinitionErrorResponse                 CreateFlowDefinitionErrorResponseType = "internal"
+	SchNotFoundCreateFlowDefinitionErrorResponse              CreateFlowDefinitionErrorResponseType = "sch.not_found"
+	FlowdefSchemaFetchFailedCreateFlowDefinitionErrorResponse CreateFlowDefinitionErrorResponseType = "flowdef.schema_fetch_failed"
+)
+
+// IsFlowdefAlreadyExists reports whether CreateFlowDefinitionErrorResponse is FlowdefAlreadyExists.
+func (s CreateFlowDefinitionErrorResponse) IsFlowdefAlreadyExists() bool {
+	return s.Type == FlowdefAlreadyExistsCreateFlowDefinitionErrorResponse
+}
+
+// IsFlowdefInvalid reports whether CreateFlowDefinitionErrorResponse is FlowdefInvalid.
+func (s CreateFlowDefinitionErrorResponse) IsFlowdefInvalid() bool {
+	return s.Type == FlowdefInvalidCreateFlowDefinitionErrorResponse
+}
+
+// IsInternal reports whether CreateFlowDefinitionErrorResponse is Internal.
+func (s CreateFlowDefinitionErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateFlowDefinitionErrorResponse
+}
+
+// IsSchNotFound reports whether CreateFlowDefinitionErrorResponse is SchNotFound.
+func (s CreateFlowDefinitionErrorResponse) IsSchNotFound() bool {
+	return s.Type == SchNotFoundCreateFlowDefinitionErrorResponse
+}
+
+// IsFlowdefSchemaFetchFailed reports whether CreateFlowDefinitionErrorResponse is FlowdefSchemaFetchFailed.
+func (s CreateFlowDefinitionErrorResponse) IsFlowdefSchemaFetchFailed() bool {
+	return s.Type == FlowdefSchemaFetchFailedCreateFlowDefinitionErrorResponse
+}
+
+// SetFlowdefAlreadyExists sets CreateFlowDefinitionErrorResponse to FlowdefAlreadyExists.
+func (s *CreateFlowDefinitionErrorResponse) SetFlowdefAlreadyExists(v FlowdefAlreadyExists) {
+	s.Type = FlowdefAlreadyExistsCreateFlowDefinitionErrorResponse
+	s.FlowdefAlreadyExists = v
+}
+
+// GetFlowdefAlreadyExists returns FlowdefAlreadyExists and true boolean if CreateFlowDefinitionErrorResponse is FlowdefAlreadyExists.
+func (s CreateFlowDefinitionErrorResponse) GetFlowdefAlreadyExists() (v FlowdefAlreadyExists, ok bool) {
+	if !s.IsFlowdefAlreadyExists() {
+		return v, false
+	}
+	return s.FlowdefAlreadyExists, true
+}
+
+// NewFlowdefAlreadyExistsCreateFlowDefinitionErrorResponse returns new CreateFlowDefinitionErrorResponse from FlowdefAlreadyExists.
+func NewFlowdefAlreadyExistsCreateFlowDefinitionErrorResponse(v FlowdefAlreadyExists) CreateFlowDefinitionErrorResponse {
+	var s CreateFlowDefinitionErrorResponse
+	s.SetFlowdefAlreadyExists(v)
+	return s
+}
+
+// SetFlowdefInvalid sets CreateFlowDefinitionErrorResponse to FlowdefInvalid.
+func (s *CreateFlowDefinitionErrorResponse) SetFlowdefInvalid(v FlowdefInvalid) {
+	s.Type = FlowdefInvalidCreateFlowDefinitionErrorResponse
+	s.FlowdefInvalid = v
+}
+
+// GetFlowdefInvalid returns FlowdefInvalid and true boolean if CreateFlowDefinitionErrorResponse is FlowdefInvalid.
+func (s CreateFlowDefinitionErrorResponse) GetFlowdefInvalid() (v FlowdefInvalid, ok bool) {
+	if !s.IsFlowdefInvalid() {
+		return v, false
+	}
+	return s.FlowdefInvalid, true
+}
+
+// NewFlowdefInvalidCreateFlowDefinitionErrorResponse returns new CreateFlowDefinitionErrorResponse from FlowdefInvalid.
+func NewFlowdefInvalidCreateFlowDefinitionErrorResponse(v FlowdefInvalid) CreateFlowDefinitionErrorResponse {
+	var s CreateFlowDefinitionErrorResponse
+	s.SetFlowdefInvalid(v)
+	return s
+}
+
+// SetInternal sets CreateFlowDefinitionErrorResponse to Internal.
+func (s *CreateFlowDefinitionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateFlowDefinitionErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateFlowDefinitionErrorResponse is Internal.
+func (s CreateFlowDefinitionErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateFlowDefinitionErrorResponse returns new CreateFlowDefinitionErrorResponse from Internal.
+func NewInternalCreateFlowDefinitionErrorResponse(v Internal) CreateFlowDefinitionErrorResponse {
+	var s CreateFlowDefinitionErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetSchNotFound sets CreateFlowDefinitionErrorResponse to SchNotFound.
+func (s *CreateFlowDefinitionErrorResponse) SetSchNotFound(v SchNotFound) {
+	s.Type = SchNotFoundCreateFlowDefinitionErrorResponse
+	s.SchNotFound = v
+}
+
+// GetSchNotFound returns SchNotFound and true boolean if CreateFlowDefinitionErrorResponse is SchNotFound.
+func (s CreateFlowDefinitionErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
+	if !s.IsSchNotFound() {
+		return v, false
+	}
+	return s.SchNotFound, true
+}
+
+// NewSchNotFoundCreateFlowDefinitionErrorResponse returns new CreateFlowDefinitionErrorResponse from SchNotFound.
+func NewSchNotFoundCreateFlowDefinitionErrorResponse(v SchNotFound) CreateFlowDefinitionErrorResponse {
+	var s CreateFlowDefinitionErrorResponse
+	s.SetSchNotFound(v)
+	return s
+}
+
+// SetFlowdefSchemaFetchFailed sets CreateFlowDefinitionErrorResponse to FlowdefSchemaFetchFailed.
+func (s *CreateFlowDefinitionErrorResponse) SetFlowdefSchemaFetchFailed(v FlowdefSchemaFetchFailed) {
+	s.Type = FlowdefSchemaFetchFailedCreateFlowDefinitionErrorResponse
+	s.FlowdefSchemaFetchFailed = v
+}
+
+// GetFlowdefSchemaFetchFailed returns FlowdefSchemaFetchFailed and true boolean if CreateFlowDefinitionErrorResponse is FlowdefSchemaFetchFailed.
+func (s CreateFlowDefinitionErrorResponse) GetFlowdefSchemaFetchFailed() (v FlowdefSchemaFetchFailed, ok bool) {
+	if !s.IsFlowdefSchemaFetchFailed() {
+		return v, false
+	}
+	return s.FlowdefSchemaFetchFailed, true
+}
+
+// NewFlowdefSchemaFetchFailedCreateFlowDefinitionErrorResponse returns new CreateFlowDefinitionErrorResponse from FlowdefSchemaFetchFailed.
+func NewFlowdefSchemaFetchFailedCreateFlowDefinitionErrorResponse(v FlowdefSchemaFetchFailed) CreateFlowDefinitionErrorResponse {
+	var s CreateFlowDefinitionErrorResponse
+	s.SetFlowdefSchemaFetchFailed(v)
+	return s
+}
+
+// CreateFlowDefinitionErrorResponseStatusCode wraps CreateFlowDefinitionErrorResponse with StatusCode.
+type CreateFlowDefinitionErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateFlowDefinitionErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateFlowDefinitionErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateFlowDefinitionErrorResponseStatusCode) GetResponse() CreateFlowDefinitionErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateFlowDefinitionErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateFlowDefinitionErrorResponseStatusCode) SetResponse(val CreateFlowDefinitionErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateFlowDefinitionErrorResponseStatusCode) createFlowDefinitionRes() {}
+
 // Creates a flow definition.
 // The flow definition is created in an `active` state by default.
 // The status can also be set via the `status` attribute in the flow definition payload.
@@ -1897,6 +2077,240 @@ func (s *CreateFlowDefinitionRequest) SetSchemaURI(val OptSchemaURI) {
 func (s *CreateFlowDefinitionRequest) SetFlowDefinition(val FlowDefinition) {
 	s.FlowDefinition = val
 }
+
+// CreateFlowErrorResponse represents sum type.
+type CreateFlowErrorResponse struct {
+	Type                   CreateFlowErrorResponseType // switch on this field
+	AttInvalidRequest      AttInvalidRequest
+	FlowdefNotFound        FlowdefNotFound
+	FlowdefPurposeMismatch FlowdefPurposeMismatch
+	FlowIntegrity          FlowIntegrity
+	Internal               Internal
+	TknInvalidTknid        TknInvalidTknid
+	ReqInvalid             ReqInvalid
+}
+
+// CreateFlowErrorResponseType is oneOf type of CreateFlowErrorResponse.
+type CreateFlowErrorResponseType string
+
+// Possible values for CreateFlowErrorResponseType.
+const (
+	AttInvalidRequestCreateFlowErrorResponse      CreateFlowErrorResponseType = "att.invalid_request"
+	FlowdefNotFoundCreateFlowErrorResponse        CreateFlowErrorResponseType = "flowdef.not_found"
+	FlowdefPurposeMismatchCreateFlowErrorResponse CreateFlowErrorResponseType = "flowdef.purpose_mismatch"
+	FlowIntegrityCreateFlowErrorResponse          CreateFlowErrorResponseType = "flow.integrity"
+	InternalCreateFlowErrorResponse               CreateFlowErrorResponseType = "internal"
+	TknInvalidTknidCreateFlowErrorResponse        CreateFlowErrorResponseType = "tkn.invalid_tknid"
+	ReqInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "req.invalid"
+)
+
+// IsAttInvalidRequest reports whether CreateFlowErrorResponse is AttInvalidRequest.
+func (s CreateFlowErrorResponse) IsAttInvalidRequest() bool {
+	return s.Type == AttInvalidRequestCreateFlowErrorResponse
+}
+
+// IsFlowdefNotFound reports whether CreateFlowErrorResponse is FlowdefNotFound.
+func (s CreateFlowErrorResponse) IsFlowdefNotFound() bool {
+	return s.Type == FlowdefNotFoundCreateFlowErrorResponse
+}
+
+// IsFlowdefPurposeMismatch reports whether CreateFlowErrorResponse is FlowdefPurposeMismatch.
+func (s CreateFlowErrorResponse) IsFlowdefPurposeMismatch() bool {
+	return s.Type == FlowdefPurposeMismatchCreateFlowErrorResponse
+}
+
+// IsFlowIntegrity reports whether CreateFlowErrorResponse is FlowIntegrity.
+func (s CreateFlowErrorResponse) IsFlowIntegrity() bool {
+	return s.Type == FlowIntegrityCreateFlowErrorResponse
+}
+
+// IsInternal reports whether CreateFlowErrorResponse is Internal.
+func (s CreateFlowErrorResponse) IsInternal() bool { return s.Type == InternalCreateFlowErrorResponse }
+
+// IsTknInvalidTknid reports whether CreateFlowErrorResponse is TknInvalidTknid.
+func (s CreateFlowErrorResponse) IsTknInvalidTknid() bool {
+	return s.Type == TknInvalidTknidCreateFlowErrorResponse
+}
+
+// IsReqInvalid reports whether CreateFlowErrorResponse is ReqInvalid.
+func (s CreateFlowErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidCreateFlowErrorResponse
+}
+
+// SetAttInvalidRequest sets CreateFlowErrorResponse to AttInvalidRequest.
+func (s *CreateFlowErrorResponse) SetAttInvalidRequest(v AttInvalidRequest) {
+	s.Type = AttInvalidRequestCreateFlowErrorResponse
+	s.AttInvalidRequest = v
+}
+
+// GetAttInvalidRequest returns AttInvalidRequest and true boolean if CreateFlowErrorResponse is AttInvalidRequest.
+func (s CreateFlowErrorResponse) GetAttInvalidRequest() (v AttInvalidRequest, ok bool) {
+	if !s.IsAttInvalidRequest() {
+		return v, false
+	}
+	return s.AttInvalidRequest, true
+}
+
+// NewAttInvalidRequestCreateFlowErrorResponse returns new CreateFlowErrorResponse from AttInvalidRequest.
+func NewAttInvalidRequestCreateFlowErrorResponse(v AttInvalidRequest) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetAttInvalidRequest(v)
+	return s
+}
+
+// SetFlowdefNotFound sets CreateFlowErrorResponse to FlowdefNotFound.
+func (s *CreateFlowErrorResponse) SetFlowdefNotFound(v FlowdefNotFound) {
+	s.Type = FlowdefNotFoundCreateFlowErrorResponse
+	s.FlowdefNotFound = v
+}
+
+// GetFlowdefNotFound returns FlowdefNotFound and true boolean if CreateFlowErrorResponse is FlowdefNotFound.
+func (s CreateFlowErrorResponse) GetFlowdefNotFound() (v FlowdefNotFound, ok bool) {
+	if !s.IsFlowdefNotFound() {
+		return v, false
+	}
+	return s.FlowdefNotFound, true
+}
+
+// NewFlowdefNotFoundCreateFlowErrorResponse returns new CreateFlowErrorResponse from FlowdefNotFound.
+func NewFlowdefNotFoundCreateFlowErrorResponse(v FlowdefNotFound) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetFlowdefNotFound(v)
+	return s
+}
+
+// SetFlowdefPurposeMismatch sets CreateFlowErrorResponse to FlowdefPurposeMismatch.
+func (s *CreateFlowErrorResponse) SetFlowdefPurposeMismatch(v FlowdefPurposeMismatch) {
+	s.Type = FlowdefPurposeMismatchCreateFlowErrorResponse
+	s.FlowdefPurposeMismatch = v
+}
+
+// GetFlowdefPurposeMismatch returns FlowdefPurposeMismatch and true boolean if CreateFlowErrorResponse is FlowdefPurposeMismatch.
+func (s CreateFlowErrorResponse) GetFlowdefPurposeMismatch() (v FlowdefPurposeMismatch, ok bool) {
+	if !s.IsFlowdefPurposeMismatch() {
+		return v, false
+	}
+	return s.FlowdefPurposeMismatch, true
+}
+
+// NewFlowdefPurposeMismatchCreateFlowErrorResponse returns new CreateFlowErrorResponse from FlowdefPurposeMismatch.
+func NewFlowdefPurposeMismatchCreateFlowErrorResponse(v FlowdefPurposeMismatch) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetFlowdefPurposeMismatch(v)
+	return s
+}
+
+// SetFlowIntegrity sets CreateFlowErrorResponse to FlowIntegrity.
+func (s *CreateFlowErrorResponse) SetFlowIntegrity(v FlowIntegrity) {
+	s.Type = FlowIntegrityCreateFlowErrorResponse
+	s.FlowIntegrity = v
+}
+
+// GetFlowIntegrity returns FlowIntegrity and true boolean if CreateFlowErrorResponse is FlowIntegrity.
+func (s CreateFlowErrorResponse) GetFlowIntegrity() (v FlowIntegrity, ok bool) {
+	if !s.IsFlowIntegrity() {
+		return v, false
+	}
+	return s.FlowIntegrity, true
+}
+
+// NewFlowIntegrityCreateFlowErrorResponse returns new CreateFlowErrorResponse from FlowIntegrity.
+func NewFlowIntegrityCreateFlowErrorResponse(v FlowIntegrity) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetFlowIntegrity(v)
+	return s
+}
+
+// SetInternal sets CreateFlowErrorResponse to Internal.
+func (s *CreateFlowErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateFlowErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateFlowErrorResponse is Internal.
+func (s CreateFlowErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateFlowErrorResponse returns new CreateFlowErrorResponse from Internal.
+func NewInternalCreateFlowErrorResponse(v Internal) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetTknInvalidTknid sets CreateFlowErrorResponse to TknInvalidTknid.
+func (s *CreateFlowErrorResponse) SetTknInvalidTknid(v TknInvalidTknid) {
+	s.Type = TknInvalidTknidCreateFlowErrorResponse
+	s.TknInvalidTknid = v
+}
+
+// GetTknInvalidTknid returns TknInvalidTknid and true boolean if CreateFlowErrorResponse is TknInvalidTknid.
+func (s CreateFlowErrorResponse) GetTknInvalidTknid() (v TknInvalidTknid, ok bool) {
+	if !s.IsTknInvalidTknid() {
+		return v, false
+	}
+	return s.TknInvalidTknid, true
+}
+
+// NewTknInvalidTknidCreateFlowErrorResponse returns new CreateFlowErrorResponse from TknInvalidTknid.
+func NewTknInvalidTknidCreateFlowErrorResponse(v TknInvalidTknid) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetTknInvalidTknid(v)
+	return s
+}
+
+// SetReqInvalid sets CreateFlowErrorResponse to ReqInvalid.
+func (s *CreateFlowErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidCreateFlowErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if CreateFlowErrorResponse is ReqInvalid.
+func (s CreateFlowErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidCreateFlowErrorResponse returns new CreateFlowErrorResponse from ReqInvalid.
+func NewReqInvalidCreateFlowErrorResponse(v ReqInvalid) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// CreateFlowErrorResponseStatusCode wraps CreateFlowErrorResponse with StatusCode.
+type CreateFlowErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateFlowErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateFlowErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateFlowErrorResponseStatusCode) GetResponse() CreateFlowErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateFlowErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateFlowErrorResponseStatusCode) SetResponse(val CreateFlowErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateFlowErrorResponseStatusCode) createFlowRes() {}
 
 // Ref: #
 type CreateFlowRequest struct {
@@ -2094,11 +2508,12 @@ func (s *CreateFlowRequestPurpose) UnmarshalText(data []byte) error {
 
 // CreateHandoffErrorResponse represents sum type.
 type CreateHandoffErrorResponse struct {
-	Type            CreateHandoffErrorResponseType // switch on this field
-	AttNotFound     AttNotFound
-	AttInvalidState AttInvalidState
-	AttNotCompleted AttNotCompleted
-	Internal        Internal
+	Type                CreateHandoffErrorResponseType // switch on this field
+	AttAlreadyHandedOff AttAlreadyHandedOff
+	AttInvalidState     AttInvalidState
+	AttNotCompleted     AttNotCompleted
+	AttNotFound         AttNotFound
+	Internal            Internal
 }
 
 // CreateHandoffErrorResponseType is oneOf type of CreateHandoffErrorResponse.
@@ -2106,15 +2521,16 @@ type CreateHandoffErrorResponseType string
 
 // Possible values for CreateHandoffErrorResponseType.
 const (
-	AttNotFoundCreateHandoffErrorResponse     CreateHandoffErrorResponseType = "att.not_found"
-	AttInvalidStateCreateHandoffErrorResponse CreateHandoffErrorResponseType = "att.invalid_state"
-	AttNotCompletedCreateHandoffErrorResponse CreateHandoffErrorResponseType = "att.not_completed"
-	InternalCreateHandoffErrorResponse        CreateHandoffErrorResponseType = "internal"
+	AttAlreadyHandedOffCreateHandoffErrorResponse CreateHandoffErrorResponseType = "att.already_handed_off"
+	AttInvalidStateCreateHandoffErrorResponse     CreateHandoffErrorResponseType = "att.invalid_state"
+	AttNotCompletedCreateHandoffErrorResponse     CreateHandoffErrorResponseType = "att.not_completed"
+	AttNotFoundCreateHandoffErrorResponse         CreateHandoffErrorResponseType = "att.not_found"
+	InternalCreateHandoffErrorResponse            CreateHandoffErrorResponseType = "internal"
 )
 
-// IsAttNotFound reports whether CreateHandoffErrorResponse is AttNotFound.
-func (s CreateHandoffErrorResponse) IsAttNotFound() bool {
-	return s.Type == AttNotFoundCreateHandoffErrorResponse
+// IsAttAlreadyHandedOff reports whether CreateHandoffErrorResponse is AttAlreadyHandedOff.
+func (s CreateHandoffErrorResponse) IsAttAlreadyHandedOff() bool {
+	return s.Type == AttAlreadyHandedOffCreateHandoffErrorResponse
 }
 
 // IsAttInvalidState reports whether CreateHandoffErrorResponse is AttInvalidState.
@@ -2127,29 +2543,34 @@ func (s CreateHandoffErrorResponse) IsAttNotCompleted() bool {
 	return s.Type == AttNotCompletedCreateHandoffErrorResponse
 }
 
+// IsAttNotFound reports whether CreateHandoffErrorResponse is AttNotFound.
+func (s CreateHandoffErrorResponse) IsAttNotFound() bool {
+	return s.Type == AttNotFoundCreateHandoffErrorResponse
+}
+
 // IsInternal reports whether CreateHandoffErrorResponse is Internal.
 func (s CreateHandoffErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateHandoffErrorResponse
 }
 
-// SetAttNotFound sets CreateHandoffErrorResponse to AttNotFound.
-func (s *CreateHandoffErrorResponse) SetAttNotFound(v AttNotFound) {
-	s.Type = AttNotFoundCreateHandoffErrorResponse
-	s.AttNotFound = v
+// SetAttAlreadyHandedOff sets CreateHandoffErrorResponse to AttAlreadyHandedOff.
+func (s *CreateHandoffErrorResponse) SetAttAlreadyHandedOff(v AttAlreadyHandedOff) {
+	s.Type = AttAlreadyHandedOffCreateHandoffErrorResponse
+	s.AttAlreadyHandedOff = v
 }
 
-// GetAttNotFound returns AttNotFound and true boolean if CreateHandoffErrorResponse is AttNotFound.
-func (s CreateHandoffErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
-	if !s.IsAttNotFound() {
+// GetAttAlreadyHandedOff returns AttAlreadyHandedOff and true boolean if CreateHandoffErrorResponse is AttAlreadyHandedOff.
+func (s CreateHandoffErrorResponse) GetAttAlreadyHandedOff() (v AttAlreadyHandedOff, ok bool) {
+	if !s.IsAttAlreadyHandedOff() {
 		return v, false
 	}
-	return s.AttNotFound, true
+	return s.AttAlreadyHandedOff, true
 }
 
-// NewAttNotFoundCreateHandoffErrorResponse returns new CreateHandoffErrorResponse from AttNotFound.
-func NewAttNotFoundCreateHandoffErrorResponse(v AttNotFound) CreateHandoffErrorResponse {
+// NewAttAlreadyHandedOffCreateHandoffErrorResponse returns new CreateHandoffErrorResponse from AttAlreadyHandedOff.
+func NewAttAlreadyHandedOffCreateHandoffErrorResponse(v AttAlreadyHandedOff) CreateHandoffErrorResponse {
 	var s CreateHandoffErrorResponse
-	s.SetAttNotFound(v)
+	s.SetAttAlreadyHandedOff(v)
 	return s
 }
 
@@ -2192,6 +2613,27 @@ func (s CreateHandoffErrorResponse) GetAttNotCompleted() (v AttNotCompleted, ok 
 func NewAttNotCompletedCreateHandoffErrorResponse(v AttNotCompleted) CreateHandoffErrorResponse {
 	var s CreateHandoffErrorResponse
 	s.SetAttNotCompleted(v)
+	return s
+}
+
+// SetAttNotFound sets CreateHandoffErrorResponse to AttNotFound.
+func (s *CreateHandoffErrorResponse) SetAttNotFound(v AttNotFound) {
+	s.Type = AttNotFoundCreateHandoffErrorResponse
+	s.AttNotFound = v
+}
+
+// GetAttNotFound returns AttNotFound and true boolean if CreateHandoffErrorResponse is AttNotFound.
+func (s CreateHandoffErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
+	if !s.IsAttNotFound() {
+		return v, false
+	}
+	return s.AttNotFound, true
+}
+
+// NewAttNotFoundCreateHandoffErrorResponse returns new CreateHandoffErrorResponse from AttNotFound.
+func NewAttNotFoundCreateHandoffErrorResponse(v AttNotFound) CreateHandoffErrorResponse {
+	var s CreateHandoffErrorResponse
+	s.SetAttNotFound(v)
 	return s
 }
 
@@ -2243,6 +2685,270 @@ func (s *CreateHandoffErrorResponseStatusCode) SetResponse(val CreateHandoffErro
 }
 
 func (*CreateHandoffErrorResponseStatusCode) createHandoffRes() {}
+
+// CreateProjectErrorResponse represents sum type.
+type CreateProjectErrorResponse struct {
+	Type                CreateProjectErrorResponseType // switch on this field
+	EncKeyDecryptFailed EncKeyDecryptFailed
+	EncKeyNotFound      EncKeyNotFound
+	Internal            Internal
+	TknInvalid          TknInvalid
+	SchInvalidRequest   SchInvalidRequest
+	NotImplemented      NotImplemented
+	ProjNameInvalid     ProjNameInvalid
+	EncKeyUnknownAlg    EncKeyUnknownAlg
+}
+
+// CreateProjectErrorResponseType is oneOf type of CreateProjectErrorResponse.
+type CreateProjectErrorResponseType string
+
+// Possible values for CreateProjectErrorResponseType.
+const (
+	EncKeyDecryptFailedCreateProjectErrorResponse CreateProjectErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyNotFoundCreateProjectErrorResponse      CreateProjectErrorResponseType = "enc_key.not_found"
+	InternalCreateProjectErrorResponse            CreateProjectErrorResponseType = "internal"
+	TknInvalidCreateProjectErrorResponse          CreateProjectErrorResponseType = "tkn.invalid"
+	SchInvalidRequestCreateProjectErrorResponse   CreateProjectErrorResponseType = "sch.invalid_request"
+	NotImplementedCreateProjectErrorResponse      CreateProjectErrorResponseType = "not_implemented"
+	ProjNameInvalidCreateProjectErrorResponse     CreateProjectErrorResponseType = "proj.name_invalid"
+	EncKeyUnknownAlgCreateProjectErrorResponse    CreateProjectErrorResponseType = "enc_key.unknown_alg"
+)
+
+// IsEncKeyDecryptFailed reports whether CreateProjectErrorResponse is EncKeyDecryptFailed.
+func (s CreateProjectErrorResponse) IsEncKeyDecryptFailed() bool {
+	return s.Type == EncKeyDecryptFailedCreateProjectErrorResponse
+}
+
+// IsEncKeyNotFound reports whether CreateProjectErrorResponse is EncKeyNotFound.
+func (s CreateProjectErrorResponse) IsEncKeyNotFound() bool {
+	return s.Type == EncKeyNotFoundCreateProjectErrorResponse
+}
+
+// IsInternal reports whether CreateProjectErrorResponse is Internal.
+func (s CreateProjectErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateProjectErrorResponse
+}
+
+// IsTknInvalid reports whether CreateProjectErrorResponse is TknInvalid.
+func (s CreateProjectErrorResponse) IsTknInvalid() bool {
+	return s.Type == TknInvalidCreateProjectErrorResponse
+}
+
+// IsSchInvalidRequest reports whether CreateProjectErrorResponse is SchInvalidRequest.
+func (s CreateProjectErrorResponse) IsSchInvalidRequest() bool {
+	return s.Type == SchInvalidRequestCreateProjectErrorResponse
+}
+
+// IsNotImplemented reports whether CreateProjectErrorResponse is NotImplemented.
+func (s CreateProjectErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateProjectErrorResponse
+}
+
+// IsProjNameInvalid reports whether CreateProjectErrorResponse is ProjNameInvalid.
+func (s CreateProjectErrorResponse) IsProjNameInvalid() bool {
+	return s.Type == ProjNameInvalidCreateProjectErrorResponse
+}
+
+// IsEncKeyUnknownAlg reports whether CreateProjectErrorResponse is EncKeyUnknownAlg.
+func (s CreateProjectErrorResponse) IsEncKeyUnknownAlg() bool {
+	return s.Type == EncKeyUnknownAlgCreateProjectErrorResponse
+}
+
+// SetEncKeyDecryptFailed sets CreateProjectErrorResponse to EncKeyDecryptFailed.
+func (s *CreateProjectErrorResponse) SetEncKeyDecryptFailed(v EncKeyDecryptFailed) {
+	s.Type = EncKeyDecryptFailedCreateProjectErrorResponse
+	s.EncKeyDecryptFailed = v
+}
+
+// GetEncKeyDecryptFailed returns EncKeyDecryptFailed and true boolean if CreateProjectErrorResponse is EncKeyDecryptFailed.
+func (s CreateProjectErrorResponse) GetEncKeyDecryptFailed() (v EncKeyDecryptFailed, ok bool) {
+	if !s.IsEncKeyDecryptFailed() {
+		return v, false
+	}
+	return s.EncKeyDecryptFailed, true
+}
+
+// NewEncKeyDecryptFailedCreateProjectErrorResponse returns new CreateProjectErrorResponse from EncKeyDecryptFailed.
+func NewEncKeyDecryptFailedCreateProjectErrorResponse(v EncKeyDecryptFailed) CreateProjectErrorResponse {
+	var s CreateProjectErrorResponse
+	s.SetEncKeyDecryptFailed(v)
+	return s
+}
+
+// SetEncKeyNotFound sets CreateProjectErrorResponse to EncKeyNotFound.
+func (s *CreateProjectErrorResponse) SetEncKeyNotFound(v EncKeyNotFound) {
+	s.Type = EncKeyNotFoundCreateProjectErrorResponse
+	s.EncKeyNotFound = v
+}
+
+// GetEncKeyNotFound returns EncKeyNotFound and true boolean if CreateProjectErrorResponse is EncKeyNotFound.
+func (s CreateProjectErrorResponse) GetEncKeyNotFound() (v EncKeyNotFound, ok bool) {
+	if !s.IsEncKeyNotFound() {
+		return v, false
+	}
+	return s.EncKeyNotFound, true
+}
+
+// NewEncKeyNotFoundCreateProjectErrorResponse returns new CreateProjectErrorResponse from EncKeyNotFound.
+func NewEncKeyNotFoundCreateProjectErrorResponse(v EncKeyNotFound) CreateProjectErrorResponse {
+	var s CreateProjectErrorResponse
+	s.SetEncKeyNotFound(v)
+	return s
+}
+
+// SetInternal sets CreateProjectErrorResponse to Internal.
+func (s *CreateProjectErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateProjectErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateProjectErrorResponse is Internal.
+func (s CreateProjectErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateProjectErrorResponse returns new CreateProjectErrorResponse from Internal.
+func NewInternalCreateProjectErrorResponse(v Internal) CreateProjectErrorResponse {
+	var s CreateProjectErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetTknInvalid sets CreateProjectErrorResponse to TknInvalid.
+func (s *CreateProjectErrorResponse) SetTknInvalid(v TknInvalid) {
+	s.Type = TknInvalidCreateProjectErrorResponse
+	s.TknInvalid = v
+}
+
+// GetTknInvalid returns TknInvalid and true boolean if CreateProjectErrorResponse is TknInvalid.
+func (s CreateProjectErrorResponse) GetTknInvalid() (v TknInvalid, ok bool) {
+	if !s.IsTknInvalid() {
+		return v, false
+	}
+	return s.TknInvalid, true
+}
+
+// NewTknInvalidCreateProjectErrorResponse returns new CreateProjectErrorResponse from TknInvalid.
+func NewTknInvalidCreateProjectErrorResponse(v TknInvalid) CreateProjectErrorResponse {
+	var s CreateProjectErrorResponse
+	s.SetTknInvalid(v)
+	return s
+}
+
+// SetSchInvalidRequest sets CreateProjectErrorResponse to SchInvalidRequest.
+func (s *CreateProjectErrorResponse) SetSchInvalidRequest(v SchInvalidRequest) {
+	s.Type = SchInvalidRequestCreateProjectErrorResponse
+	s.SchInvalidRequest = v
+}
+
+// GetSchInvalidRequest returns SchInvalidRequest and true boolean if CreateProjectErrorResponse is SchInvalidRequest.
+func (s CreateProjectErrorResponse) GetSchInvalidRequest() (v SchInvalidRequest, ok bool) {
+	if !s.IsSchInvalidRequest() {
+		return v, false
+	}
+	return s.SchInvalidRequest, true
+}
+
+// NewSchInvalidRequestCreateProjectErrorResponse returns new CreateProjectErrorResponse from SchInvalidRequest.
+func NewSchInvalidRequestCreateProjectErrorResponse(v SchInvalidRequest) CreateProjectErrorResponse {
+	var s CreateProjectErrorResponse
+	s.SetSchInvalidRequest(v)
+	return s
+}
+
+// SetNotImplemented sets CreateProjectErrorResponse to NotImplemented.
+func (s *CreateProjectErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateProjectErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateProjectErrorResponse is NotImplemented.
+func (s CreateProjectErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateProjectErrorResponse returns new CreateProjectErrorResponse from NotImplemented.
+func NewNotImplementedCreateProjectErrorResponse(v NotImplemented) CreateProjectErrorResponse {
+	var s CreateProjectErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjNameInvalid sets CreateProjectErrorResponse to ProjNameInvalid.
+func (s *CreateProjectErrorResponse) SetProjNameInvalid(v ProjNameInvalid) {
+	s.Type = ProjNameInvalidCreateProjectErrorResponse
+	s.ProjNameInvalid = v
+}
+
+// GetProjNameInvalid returns ProjNameInvalid and true boolean if CreateProjectErrorResponse is ProjNameInvalid.
+func (s CreateProjectErrorResponse) GetProjNameInvalid() (v ProjNameInvalid, ok bool) {
+	if !s.IsProjNameInvalid() {
+		return v, false
+	}
+	return s.ProjNameInvalid, true
+}
+
+// NewProjNameInvalidCreateProjectErrorResponse returns new CreateProjectErrorResponse from ProjNameInvalid.
+func NewProjNameInvalidCreateProjectErrorResponse(v ProjNameInvalid) CreateProjectErrorResponse {
+	var s CreateProjectErrorResponse
+	s.SetProjNameInvalid(v)
+	return s
+}
+
+// SetEncKeyUnknownAlg sets CreateProjectErrorResponse to EncKeyUnknownAlg.
+func (s *CreateProjectErrorResponse) SetEncKeyUnknownAlg(v EncKeyUnknownAlg) {
+	s.Type = EncKeyUnknownAlgCreateProjectErrorResponse
+	s.EncKeyUnknownAlg = v
+}
+
+// GetEncKeyUnknownAlg returns EncKeyUnknownAlg and true boolean if CreateProjectErrorResponse is EncKeyUnknownAlg.
+func (s CreateProjectErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, ok bool) {
+	if !s.IsEncKeyUnknownAlg() {
+		return v, false
+	}
+	return s.EncKeyUnknownAlg, true
+}
+
+// NewEncKeyUnknownAlgCreateProjectErrorResponse returns new CreateProjectErrorResponse from EncKeyUnknownAlg.
+func NewEncKeyUnknownAlgCreateProjectErrorResponse(v EncKeyUnknownAlg) CreateProjectErrorResponse {
+	var s CreateProjectErrorResponse
+	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// CreateProjectErrorResponseStatusCode wraps CreateProjectErrorResponse with StatusCode.
+type CreateProjectErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateProjectErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateProjectErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateProjectErrorResponseStatusCode) GetResponse() CreateProjectErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateProjectErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateProjectErrorResponseStatusCode) SetResponse(val CreateProjectErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateProjectErrorResponseStatusCode) createProjectRes() {}
 
 // Ref: #
 type CreateProjectRequest struct {
@@ -2454,6 +3160,186 @@ func (s *CreateSchemaResponse) SetID(val string) {
 
 func (*CreateSchemaResponse) createSchemaRes() {}
 
+// CreateSessionErrorResponse represents sum type.
+type CreateSessionErrorResponse struct {
+	Type                CreateSessionErrorResponseType // switch on this field
+	EncKeyDecryptFailed EncKeyDecryptFailed
+	EncKeyNotFound      EncKeyNotFound
+	Internal            Internal
+	TknInvalid          TknInvalid
+	EncKeyUnknownAlg    EncKeyUnknownAlg
+}
+
+// CreateSessionErrorResponseType is oneOf type of CreateSessionErrorResponse.
+type CreateSessionErrorResponseType string
+
+// Possible values for CreateSessionErrorResponseType.
+const (
+	EncKeyDecryptFailedCreateSessionErrorResponse CreateSessionErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyNotFoundCreateSessionErrorResponse      CreateSessionErrorResponseType = "enc_key.not_found"
+	InternalCreateSessionErrorResponse            CreateSessionErrorResponseType = "internal"
+	TknInvalidCreateSessionErrorResponse          CreateSessionErrorResponseType = "tkn.invalid"
+	EncKeyUnknownAlgCreateSessionErrorResponse    CreateSessionErrorResponseType = "enc_key.unknown_alg"
+)
+
+// IsEncKeyDecryptFailed reports whether CreateSessionErrorResponse is EncKeyDecryptFailed.
+func (s CreateSessionErrorResponse) IsEncKeyDecryptFailed() bool {
+	return s.Type == EncKeyDecryptFailedCreateSessionErrorResponse
+}
+
+// IsEncKeyNotFound reports whether CreateSessionErrorResponse is EncKeyNotFound.
+func (s CreateSessionErrorResponse) IsEncKeyNotFound() bool {
+	return s.Type == EncKeyNotFoundCreateSessionErrorResponse
+}
+
+// IsInternal reports whether CreateSessionErrorResponse is Internal.
+func (s CreateSessionErrorResponse) IsInternal() bool {
+	return s.Type == InternalCreateSessionErrorResponse
+}
+
+// IsTknInvalid reports whether CreateSessionErrorResponse is TknInvalid.
+func (s CreateSessionErrorResponse) IsTknInvalid() bool {
+	return s.Type == TknInvalidCreateSessionErrorResponse
+}
+
+// IsEncKeyUnknownAlg reports whether CreateSessionErrorResponse is EncKeyUnknownAlg.
+func (s CreateSessionErrorResponse) IsEncKeyUnknownAlg() bool {
+	return s.Type == EncKeyUnknownAlgCreateSessionErrorResponse
+}
+
+// SetEncKeyDecryptFailed sets CreateSessionErrorResponse to EncKeyDecryptFailed.
+func (s *CreateSessionErrorResponse) SetEncKeyDecryptFailed(v EncKeyDecryptFailed) {
+	s.Type = EncKeyDecryptFailedCreateSessionErrorResponse
+	s.EncKeyDecryptFailed = v
+}
+
+// GetEncKeyDecryptFailed returns EncKeyDecryptFailed and true boolean if CreateSessionErrorResponse is EncKeyDecryptFailed.
+func (s CreateSessionErrorResponse) GetEncKeyDecryptFailed() (v EncKeyDecryptFailed, ok bool) {
+	if !s.IsEncKeyDecryptFailed() {
+		return v, false
+	}
+	return s.EncKeyDecryptFailed, true
+}
+
+// NewEncKeyDecryptFailedCreateSessionErrorResponse returns new CreateSessionErrorResponse from EncKeyDecryptFailed.
+func NewEncKeyDecryptFailedCreateSessionErrorResponse(v EncKeyDecryptFailed) CreateSessionErrorResponse {
+	var s CreateSessionErrorResponse
+	s.SetEncKeyDecryptFailed(v)
+	return s
+}
+
+// SetEncKeyNotFound sets CreateSessionErrorResponse to EncKeyNotFound.
+func (s *CreateSessionErrorResponse) SetEncKeyNotFound(v EncKeyNotFound) {
+	s.Type = EncKeyNotFoundCreateSessionErrorResponse
+	s.EncKeyNotFound = v
+}
+
+// GetEncKeyNotFound returns EncKeyNotFound and true boolean if CreateSessionErrorResponse is EncKeyNotFound.
+func (s CreateSessionErrorResponse) GetEncKeyNotFound() (v EncKeyNotFound, ok bool) {
+	if !s.IsEncKeyNotFound() {
+		return v, false
+	}
+	return s.EncKeyNotFound, true
+}
+
+// NewEncKeyNotFoundCreateSessionErrorResponse returns new CreateSessionErrorResponse from EncKeyNotFound.
+func NewEncKeyNotFoundCreateSessionErrorResponse(v EncKeyNotFound) CreateSessionErrorResponse {
+	var s CreateSessionErrorResponse
+	s.SetEncKeyNotFound(v)
+	return s
+}
+
+// SetInternal sets CreateSessionErrorResponse to Internal.
+func (s *CreateSessionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateSessionErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateSessionErrorResponse is Internal.
+func (s CreateSessionErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateSessionErrorResponse returns new CreateSessionErrorResponse from Internal.
+func NewInternalCreateSessionErrorResponse(v Internal) CreateSessionErrorResponse {
+	var s CreateSessionErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetTknInvalid sets CreateSessionErrorResponse to TknInvalid.
+func (s *CreateSessionErrorResponse) SetTknInvalid(v TknInvalid) {
+	s.Type = TknInvalidCreateSessionErrorResponse
+	s.TknInvalid = v
+}
+
+// GetTknInvalid returns TknInvalid and true boolean if CreateSessionErrorResponse is TknInvalid.
+func (s CreateSessionErrorResponse) GetTknInvalid() (v TknInvalid, ok bool) {
+	if !s.IsTknInvalid() {
+		return v, false
+	}
+	return s.TknInvalid, true
+}
+
+// NewTknInvalidCreateSessionErrorResponse returns new CreateSessionErrorResponse from TknInvalid.
+func NewTknInvalidCreateSessionErrorResponse(v TknInvalid) CreateSessionErrorResponse {
+	var s CreateSessionErrorResponse
+	s.SetTknInvalid(v)
+	return s
+}
+
+// SetEncKeyUnknownAlg sets CreateSessionErrorResponse to EncKeyUnknownAlg.
+func (s *CreateSessionErrorResponse) SetEncKeyUnknownAlg(v EncKeyUnknownAlg) {
+	s.Type = EncKeyUnknownAlgCreateSessionErrorResponse
+	s.EncKeyUnknownAlg = v
+}
+
+// GetEncKeyUnknownAlg returns EncKeyUnknownAlg and true boolean if CreateSessionErrorResponse is EncKeyUnknownAlg.
+func (s CreateSessionErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, ok bool) {
+	if !s.IsEncKeyUnknownAlg() {
+		return v, false
+	}
+	return s.EncKeyUnknownAlg, true
+}
+
+// NewEncKeyUnknownAlgCreateSessionErrorResponse returns new CreateSessionErrorResponse from EncKeyUnknownAlg.
+func NewEncKeyUnknownAlgCreateSessionErrorResponse(v EncKeyUnknownAlg) CreateSessionErrorResponse {
+	var s CreateSessionErrorResponse
+	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// CreateSessionErrorResponseStatusCode wraps CreateSessionErrorResponse with StatusCode.
+type CreateSessionErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateSessionErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateSessionErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateSessionErrorResponseStatusCode) GetResponse() CreateSessionErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateSessionErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateSessionErrorResponseStatusCode) SetResponse(val CreateSessionErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateSessionErrorResponseStatusCode) createSessionRes() {}
+
 // Request to create an anonymous session shell.
 // Ref: #
 type CreateSessionRequest struct {
@@ -2584,6 +3470,128 @@ type CreateUserConflict ErrorDetails
 
 func (*CreateUserConflict) createUserRes() {}
 
+// CreateUserErrorResponse represents sum type.
+type CreateUserErrorResponse struct {
+	Type              CreateUserErrorResponseType // switch on this field
+	Internal          Internal
+	UserAlreadyExists UserAlreadyExists
+	UserInvalid       UserInvalid
+}
+
+// CreateUserErrorResponseType is oneOf type of CreateUserErrorResponse.
+type CreateUserErrorResponseType string
+
+// Possible values for CreateUserErrorResponseType.
+const (
+	InternalCreateUserErrorResponse          CreateUserErrorResponseType = "internal"
+	UserAlreadyExistsCreateUserErrorResponse CreateUserErrorResponseType = "user.already_exists"
+	UserInvalidCreateUserErrorResponse       CreateUserErrorResponseType = "user.invalid"
+)
+
+// IsInternal reports whether CreateUserErrorResponse is Internal.
+func (s CreateUserErrorResponse) IsInternal() bool { return s.Type == InternalCreateUserErrorResponse }
+
+// IsUserAlreadyExists reports whether CreateUserErrorResponse is UserAlreadyExists.
+func (s CreateUserErrorResponse) IsUserAlreadyExists() bool {
+	return s.Type == UserAlreadyExistsCreateUserErrorResponse
+}
+
+// IsUserInvalid reports whether CreateUserErrorResponse is UserInvalid.
+func (s CreateUserErrorResponse) IsUserInvalid() bool {
+	return s.Type == UserInvalidCreateUserErrorResponse
+}
+
+// SetInternal sets CreateUserErrorResponse to Internal.
+func (s *CreateUserErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalCreateUserErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if CreateUserErrorResponse is Internal.
+func (s CreateUserErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalCreateUserErrorResponse returns new CreateUserErrorResponse from Internal.
+func NewInternalCreateUserErrorResponse(v Internal) CreateUserErrorResponse {
+	var s CreateUserErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetUserAlreadyExists sets CreateUserErrorResponse to UserAlreadyExists.
+func (s *CreateUserErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
+	s.Type = UserAlreadyExistsCreateUserErrorResponse
+	s.UserAlreadyExists = v
+}
+
+// GetUserAlreadyExists returns UserAlreadyExists and true boolean if CreateUserErrorResponse is UserAlreadyExists.
+func (s CreateUserErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists, ok bool) {
+	if !s.IsUserAlreadyExists() {
+		return v, false
+	}
+	return s.UserAlreadyExists, true
+}
+
+// NewUserAlreadyExistsCreateUserErrorResponse returns new CreateUserErrorResponse from UserAlreadyExists.
+func NewUserAlreadyExistsCreateUserErrorResponse(v UserAlreadyExists) CreateUserErrorResponse {
+	var s CreateUserErrorResponse
+	s.SetUserAlreadyExists(v)
+	return s
+}
+
+// SetUserInvalid sets CreateUserErrorResponse to UserInvalid.
+func (s *CreateUserErrorResponse) SetUserInvalid(v UserInvalid) {
+	s.Type = UserInvalidCreateUserErrorResponse
+	s.UserInvalid = v
+}
+
+// GetUserInvalid returns UserInvalid and true boolean if CreateUserErrorResponse is UserInvalid.
+func (s CreateUserErrorResponse) GetUserInvalid() (v UserInvalid, ok bool) {
+	if !s.IsUserInvalid() {
+		return v, false
+	}
+	return s.UserInvalid, true
+}
+
+// NewUserInvalidCreateUserErrorResponse returns new CreateUserErrorResponse from UserInvalid.
+func NewUserInvalidCreateUserErrorResponse(v UserInvalid) CreateUserErrorResponse {
+	var s CreateUserErrorResponse
+	s.SetUserInvalid(v)
+	return s
+}
+
+// CreateUserErrorResponseStatusCode wraps CreateUserErrorResponse with StatusCode.
+type CreateUserErrorResponseStatusCode struct {
+	StatusCode int
+	Response   CreateUserErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *CreateUserErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *CreateUserErrorResponseStatusCode) GetResponse() CreateUserErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *CreateUserErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *CreateUserErrorResponseStatusCode) SetResponse(val CreateUserErrorResponse) {
+	s.Response = val
+}
+
+func (*CreateUserErrorResponseStatusCode) createUserRes() {}
+
 type CreateUserForbidden ErrorDetails
 
 func (*CreateUserForbidden) createUserRes() {}
@@ -2647,6 +3655,130 @@ type DeactivateFlowDefinitionNoContent struct{}
 
 func (*DeactivateFlowDefinitionNoContent) deactivateFlowDefinitionRes() {}
 
+// DeleteFlowDefinitionErrorResponse represents sum type.
+type DeleteFlowDefinitionErrorResponse struct {
+	Type                    DeleteFlowDefinitionErrorResponseType // switch on this field
+	Internal                Internal
+	FlowdefMissingID        FlowdefMissingID
+	FlowdefMissingProjectID FlowdefMissingProjectID
+}
+
+// DeleteFlowDefinitionErrorResponseType is oneOf type of DeleteFlowDefinitionErrorResponse.
+type DeleteFlowDefinitionErrorResponseType string
+
+// Possible values for DeleteFlowDefinitionErrorResponseType.
+const (
+	InternalDeleteFlowDefinitionErrorResponse                DeleteFlowDefinitionErrorResponseType = "internal"
+	FlowdefMissingIDDeleteFlowDefinitionErrorResponse        DeleteFlowDefinitionErrorResponseType = "flowdef.missing_id"
+	FlowdefMissingProjectIDDeleteFlowDefinitionErrorResponse DeleteFlowDefinitionErrorResponseType = "flowdef.missing_project_id"
+)
+
+// IsInternal reports whether DeleteFlowDefinitionErrorResponse is Internal.
+func (s DeleteFlowDefinitionErrorResponse) IsInternal() bool {
+	return s.Type == InternalDeleteFlowDefinitionErrorResponse
+}
+
+// IsFlowdefMissingID reports whether DeleteFlowDefinitionErrorResponse is FlowdefMissingID.
+func (s DeleteFlowDefinitionErrorResponse) IsFlowdefMissingID() bool {
+	return s.Type == FlowdefMissingIDDeleteFlowDefinitionErrorResponse
+}
+
+// IsFlowdefMissingProjectID reports whether DeleteFlowDefinitionErrorResponse is FlowdefMissingProjectID.
+func (s DeleteFlowDefinitionErrorResponse) IsFlowdefMissingProjectID() bool {
+	return s.Type == FlowdefMissingProjectIDDeleteFlowDefinitionErrorResponse
+}
+
+// SetInternal sets DeleteFlowDefinitionErrorResponse to Internal.
+func (s *DeleteFlowDefinitionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalDeleteFlowDefinitionErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if DeleteFlowDefinitionErrorResponse is Internal.
+func (s DeleteFlowDefinitionErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalDeleteFlowDefinitionErrorResponse returns new DeleteFlowDefinitionErrorResponse from Internal.
+func NewInternalDeleteFlowDefinitionErrorResponse(v Internal) DeleteFlowDefinitionErrorResponse {
+	var s DeleteFlowDefinitionErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetFlowdefMissingID sets DeleteFlowDefinitionErrorResponse to FlowdefMissingID.
+func (s *DeleteFlowDefinitionErrorResponse) SetFlowdefMissingID(v FlowdefMissingID) {
+	s.Type = FlowdefMissingIDDeleteFlowDefinitionErrorResponse
+	s.FlowdefMissingID = v
+}
+
+// GetFlowdefMissingID returns FlowdefMissingID and true boolean if DeleteFlowDefinitionErrorResponse is FlowdefMissingID.
+func (s DeleteFlowDefinitionErrorResponse) GetFlowdefMissingID() (v FlowdefMissingID, ok bool) {
+	if !s.IsFlowdefMissingID() {
+		return v, false
+	}
+	return s.FlowdefMissingID, true
+}
+
+// NewFlowdefMissingIDDeleteFlowDefinitionErrorResponse returns new DeleteFlowDefinitionErrorResponse from FlowdefMissingID.
+func NewFlowdefMissingIDDeleteFlowDefinitionErrorResponse(v FlowdefMissingID) DeleteFlowDefinitionErrorResponse {
+	var s DeleteFlowDefinitionErrorResponse
+	s.SetFlowdefMissingID(v)
+	return s
+}
+
+// SetFlowdefMissingProjectID sets DeleteFlowDefinitionErrorResponse to FlowdefMissingProjectID.
+func (s *DeleteFlowDefinitionErrorResponse) SetFlowdefMissingProjectID(v FlowdefMissingProjectID) {
+	s.Type = FlowdefMissingProjectIDDeleteFlowDefinitionErrorResponse
+	s.FlowdefMissingProjectID = v
+}
+
+// GetFlowdefMissingProjectID returns FlowdefMissingProjectID and true boolean if DeleteFlowDefinitionErrorResponse is FlowdefMissingProjectID.
+func (s DeleteFlowDefinitionErrorResponse) GetFlowdefMissingProjectID() (v FlowdefMissingProjectID, ok bool) {
+	if !s.IsFlowdefMissingProjectID() {
+		return v, false
+	}
+	return s.FlowdefMissingProjectID, true
+}
+
+// NewFlowdefMissingProjectIDDeleteFlowDefinitionErrorResponse returns new DeleteFlowDefinitionErrorResponse from FlowdefMissingProjectID.
+func NewFlowdefMissingProjectIDDeleteFlowDefinitionErrorResponse(v FlowdefMissingProjectID) DeleteFlowDefinitionErrorResponse {
+	var s DeleteFlowDefinitionErrorResponse
+	s.SetFlowdefMissingProjectID(v)
+	return s
+}
+
+// DeleteFlowDefinitionErrorResponseStatusCode wraps DeleteFlowDefinitionErrorResponse with StatusCode.
+type DeleteFlowDefinitionErrorResponseStatusCode struct {
+	StatusCode int
+	Response   DeleteFlowDefinitionErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *DeleteFlowDefinitionErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *DeleteFlowDefinitionErrorResponseStatusCode) GetResponse() DeleteFlowDefinitionErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *DeleteFlowDefinitionErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *DeleteFlowDefinitionErrorResponseStatusCode) SetResponse(val DeleteFlowDefinitionErrorResponse) {
+	s.Response = val
+}
+
+func (*DeleteFlowDefinitionErrorResponseStatusCode) deleteFlowDefinitionRes() {}
+
 // DeleteFlowDefinitionNoContent is response for DeleteFlowDefinition operation.
 type DeleteFlowDefinitionNoContent struct{}
 
@@ -2668,6 +3800,74 @@ func (*DeleteTeamNoContent) deleteTeamRes() {}
 type DeleteTeamUnauthorized ErrorDetails
 
 func (*DeleteTeamUnauthorized) deleteTeamRes() {}
+
+// DeleteUserByIDErrorResponse represents sum type.
+type DeleteUserByIDErrorResponse struct {
+	Type     DeleteUserByIDErrorResponseType // switch on this field
+	Internal Internal
+}
+
+// DeleteUserByIDErrorResponseType is oneOf type of DeleteUserByIDErrorResponse.
+type DeleteUserByIDErrorResponseType string
+
+// Possible values for DeleteUserByIDErrorResponseType.
+const (
+	InternalDeleteUserByIDErrorResponse DeleteUserByIDErrorResponseType = "internal"
+)
+
+// IsInternal reports whether DeleteUserByIDErrorResponse is Internal.
+func (s DeleteUserByIDErrorResponse) IsInternal() bool {
+	return s.Type == InternalDeleteUserByIDErrorResponse
+}
+
+// SetInternal sets DeleteUserByIDErrorResponse to Internal.
+func (s *DeleteUserByIDErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalDeleteUserByIDErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if DeleteUserByIDErrorResponse is Internal.
+func (s DeleteUserByIDErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalDeleteUserByIDErrorResponse returns new DeleteUserByIDErrorResponse from Internal.
+func NewInternalDeleteUserByIDErrorResponse(v Internal) DeleteUserByIDErrorResponse {
+	var s DeleteUserByIDErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// DeleteUserByIDErrorResponseStatusCode wraps DeleteUserByIDErrorResponse with StatusCode.
+type DeleteUserByIDErrorResponseStatusCode struct {
+	StatusCode int
+	Response   DeleteUserByIDErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *DeleteUserByIDErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *DeleteUserByIDErrorResponseStatusCode) GetResponse() DeleteUserByIDErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *DeleteUserByIDErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *DeleteUserByIDErrorResponseStatusCode) SetResponse(val DeleteUserByIDErrorResponse) {
+	s.Response = val
+}
+
+func (*DeleteUserByIDErrorResponseStatusCode) deleteUserByIDRes() {}
 
 // DeleteUserByIDNoContent is response for DeleteUserByID operation.
 type DeleteUserByIDNoContent struct{}
@@ -2761,6 +3961,165 @@ func (s *DeviceAuthorizationResponse) SetVerificationURIComplete(val OptString) 
 }
 
 func (*DeviceAuthorizationResponse) authorizeDeviceRes() {}
+
+// Merged schema.
+// Ref: #
+type EncKeyDecryptFailed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptEncKeyDecryptFailedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *EncKeyDecryptFailed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *EncKeyDecryptFailed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *EncKeyDecryptFailed) GetDetails() OptEncKeyDecryptFailedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *EncKeyDecryptFailed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *EncKeyDecryptFailed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *EncKeyDecryptFailed) SetDetails(val OptEncKeyDecryptFailedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type EncKeyDecryptFailedDetails map[string]jx.Raw
+
+func (s *EncKeyDecryptFailedDetails) init() EncKeyDecryptFailedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type EncKeyNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptEncKeyNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *EncKeyNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *EncKeyNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *EncKeyNotFound) GetDetails() OptEncKeyNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *EncKeyNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *EncKeyNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *EncKeyNotFound) SetDetails(val OptEncKeyNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type EncKeyNotFoundDetails map[string]jx.Raw
+
+func (s *EncKeyNotFoundDetails) init() EncKeyNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type EncKeyUnknownAlg struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptEncKeyUnknownAlgDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *EncKeyUnknownAlg) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *EncKeyUnknownAlg) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *EncKeyUnknownAlg) GetDetails() OptEncKeyUnknownAlgDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *EncKeyUnknownAlg) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *EncKeyUnknownAlg) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *EncKeyUnknownAlg) SetDetails(val OptEncKeyUnknownAlgDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type EncKeyUnknownAlgDetails map[string]jx.Raw
+
+func (s *EncKeyUnknownAlgDetails) init() EncKeyUnknownAlgDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // EndSessionNoContent is response for EndSession operation.
 type EndSessionNoContent struct{}
@@ -2868,59 +4227,382 @@ func (*ErrorDetailsStatusCode) authorizeDeviceRes()          {}
 func (*ErrorDetailsStatusCode) authorizeGetRes()             {}
 func (*ErrorDetailsStatusCode) completeClaimRes()            {}
 func (*ErrorDetailsStatusCode) createBrandingRes()           {}
-func (*ErrorDetailsStatusCode) createFlowDefinitionRes()     {}
-func (*ErrorDetailsStatusCode) createFlowRes()               {}
-func (*ErrorDetailsStatusCode) createProjectRes()            {}
 func (*ErrorDetailsStatusCode) createSchemaRes()             {}
-func (*ErrorDetailsStatusCode) createSessionRes()            {}
 func (*ErrorDetailsStatusCode) createTeamRes()               {}
-func (*ErrorDetailsStatusCode) createUserRes()               {}
 func (*ErrorDetailsStatusCode) deactivateFlowDefinitionRes() {}
-func (*ErrorDetailsStatusCode) deleteFlowDefinitionRes()     {}
 func (*ErrorDetailsStatusCode) deleteTeamRes()               {}
-func (*ErrorDetailsStatusCode) deleteUserByIDRes()           {}
 func (*ErrorDetailsStatusCode) endSessionRes()               {}
-func (*ErrorDetailsStatusCode) exchangeHandoffRes()          {}
 func (*ErrorDetailsStatusCode) getBrandingByIdRes()          {}
 func (*ErrorDetailsStatusCode) getClaimStatusRes()           {}
-func (*ErrorDetailsStatusCode) getFlowDefinitionRes()        {}
-func (*ErrorDetailsStatusCode) getFlowStepRes()              {}
 func (*ErrorDetailsStatusCode) getHealthRes()                {}
 func (*ErrorDetailsStatusCode) getKeysRes()                  {}
 func (*ErrorDetailsStatusCode) getLiveRes()                  {}
-func (*ErrorDetailsStatusCode) getMyUserRes()                {}
 func (*ErrorDetailsStatusCode) getOpenIDConfigurationRes()   {}
-func (*ErrorDetailsStatusCode) getProjectRes()               {}
 func (*ErrorDetailsStatusCode) getReadyRes()                 {}
 func (*ErrorDetailsStatusCode) getSchemaByIdRes()            {}
 func (*ErrorDetailsStatusCode) getTeamRes()                  {}
 func (*ErrorDetailsStatusCode) getTokenRes()                 {}
-func (*ErrorDetailsStatusCode) getUserByIDRes()              {}
 func (*ErrorDetailsStatusCode) getUserInfoRes()              {}
 func (*ErrorDetailsStatusCode) initClaimRes()                {}
 func (*ErrorDetailsStatusCode) introspectRes()               {}
 func (*ErrorDetailsStatusCode) listBrandingRes()             {}
-func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()      {}
 func (*ErrorDetailsStatusCode) listSchemasRes()              {}
-func (*ErrorDetailsStatusCode) listUserPasskeysRes()         {}
-func (*ErrorDetailsStatusCode) listUserTeamsRes()            {}
-func (*ErrorDetailsStatusCode) listUsersRes()                {}
-func (*ErrorDetailsStatusCode) patchProjectRes()             {}
-func (*ErrorDetailsStatusCode) queryProjectsRes()            {}
-func (*ErrorDetailsStatusCode) querySessionsRes()            {}
 func (*ErrorDetailsStatusCode) queryTeamsRes()               {}
-func (*ErrorDetailsStatusCode) revokeMySessionRes()          {}
-func (*ErrorDetailsStatusCode) revokeSessionRes()            {}
 func (*ErrorDetailsStatusCode) revokeTokenRes()              {}
-func (*ErrorDetailsStatusCode) setUserPasswordRes()          {}
 func (*ErrorDetailsStatusCode) submitFlowEventRes()          {}
-func (*ErrorDetailsStatusCode) submitFlowStepRes()           {}
-func (*ErrorDetailsStatusCode) updateFlowDefinitionRes()     {}
 func (*ErrorDetailsStatusCode) updateTeamRes()               {}
 
 type ExchangeHandoffBadRequest ErrorDetails
 
 func (*ExchangeHandoffBadRequest) exchangeHandoffRes() {}
+
+// ExchangeHandoffErrorResponse represents sum type.
+type ExchangeHandoffErrorResponse struct {
+	Type                    ExchangeHandoffErrorResponseType // switch on this field
+	AttNotFound             AttNotFound
+	EncKeyDecryptFailed     EncKeyDecryptFailed
+	EncKeyNotFound          EncKeyNotFound
+	Internal                Internal
+	TknInvalid              TknInvalid
+	TknInvalidTknid         TknInvalidTknid
+	SessExchangeConflict    SessExchangeConflict
+	SessInvalidHandoffToken SessInvalidHandoffToken
+	SessInvalidTTL          SessInvalidTTL
+	SessNotFound            SessNotFound
+	EncKeyUnknownAlg        EncKeyUnknownAlg
+}
+
+// ExchangeHandoffErrorResponseType is oneOf type of ExchangeHandoffErrorResponse.
+type ExchangeHandoffErrorResponseType string
+
+// Possible values for ExchangeHandoffErrorResponseType.
+const (
+	AttNotFoundExchangeHandoffErrorResponse             ExchangeHandoffErrorResponseType = "att.not_found"
+	EncKeyDecryptFailedExchangeHandoffErrorResponse     ExchangeHandoffErrorResponseType = "enc_key.decrypt_failed"
+	EncKeyNotFoundExchangeHandoffErrorResponse          ExchangeHandoffErrorResponseType = "enc_key.not_found"
+	InternalExchangeHandoffErrorResponse                ExchangeHandoffErrorResponseType = "internal"
+	TknInvalidExchangeHandoffErrorResponse              ExchangeHandoffErrorResponseType = "tkn.invalid"
+	TknInvalidTknidExchangeHandoffErrorResponse         ExchangeHandoffErrorResponseType = "tkn.invalid_tknid"
+	SessExchangeConflictExchangeHandoffErrorResponse    ExchangeHandoffErrorResponseType = "sess.exchange_conflict"
+	SessInvalidHandoffTokenExchangeHandoffErrorResponse ExchangeHandoffErrorResponseType = "sess.invalid_handoff_token"
+	SessInvalidTTLExchangeHandoffErrorResponse          ExchangeHandoffErrorResponseType = "sess.invalid_ttl"
+	SessNotFoundExchangeHandoffErrorResponse            ExchangeHandoffErrorResponseType = "sess.not_found"
+	EncKeyUnknownAlgExchangeHandoffErrorResponse        ExchangeHandoffErrorResponseType = "enc_key.unknown_alg"
+)
+
+// IsAttNotFound reports whether ExchangeHandoffErrorResponse is AttNotFound.
+func (s ExchangeHandoffErrorResponse) IsAttNotFound() bool {
+	return s.Type == AttNotFoundExchangeHandoffErrorResponse
+}
+
+// IsEncKeyDecryptFailed reports whether ExchangeHandoffErrorResponse is EncKeyDecryptFailed.
+func (s ExchangeHandoffErrorResponse) IsEncKeyDecryptFailed() bool {
+	return s.Type == EncKeyDecryptFailedExchangeHandoffErrorResponse
+}
+
+// IsEncKeyNotFound reports whether ExchangeHandoffErrorResponse is EncKeyNotFound.
+func (s ExchangeHandoffErrorResponse) IsEncKeyNotFound() bool {
+	return s.Type == EncKeyNotFoundExchangeHandoffErrorResponse
+}
+
+// IsInternal reports whether ExchangeHandoffErrorResponse is Internal.
+func (s ExchangeHandoffErrorResponse) IsInternal() bool {
+	return s.Type == InternalExchangeHandoffErrorResponse
+}
+
+// IsTknInvalid reports whether ExchangeHandoffErrorResponse is TknInvalid.
+func (s ExchangeHandoffErrorResponse) IsTknInvalid() bool {
+	return s.Type == TknInvalidExchangeHandoffErrorResponse
+}
+
+// IsTknInvalidTknid reports whether ExchangeHandoffErrorResponse is TknInvalidTknid.
+func (s ExchangeHandoffErrorResponse) IsTknInvalidTknid() bool {
+	return s.Type == TknInvalidTknidExchangeHandoffErrorResponse
+}
+
+// IsSessExchangeConflict reports whether ExchangeHandoffErrorResponse is SessExchangeConflict.
+func (s ExchangeHandoffErrorResponse) IsSessExchangeConflict() bool {
+	return s.Type == SessExchangeConflictExchangeHandoffErrorResponse
+}
+
+// IsSessInvalidHandoffToken reports whether ExchangeHandoffErrorResponse is SessInvalidHandoffToken.
+func (s ExchangeHandoffErrorResponse) IsSessInvalidHandoffToken() bool {
+	return s.Type == SessInvalidHandoffTokenExchangeHandoffErrorResponse
+}
+
+// IsSessInvalidTTL reports whether ExchangeHandoffErrorResponse is SessInvalidTTL.
+func (s ExchangeHandoffErrorResponse) IsSessInvalidTTL() bool {
+	return s.Type == SessInvalidTTLExchangeHandoffErrorResponse
+}
+
+// IsSessNotFound reports whether ExchangeHandoffErrorResponse is SessNotFound.
+func (s ExchangeHandoffErrorResponse) IsSessNotFound() bool {
+	return s.Type == SessNotFoundExchangeHandoffErrorResponse
+}
+
+// IsEncKeyUnknownAlg reports whether ExchangeHandoffErrorResponse is EncKeyUnknownAlg.
+func (s ExchangeHandoffErrorResponse) IsEncKeyUnknownAlg() bool {
+	return s.Type == EncKeyUnknownAlgExchangeHandoffErrorResponse
+}
+
+// SetAttNotFound sets ExchangeHandoffErrorResponse to AttNotFound.
+func (s *ExchangeHandoffErrorResponse) SetAttNotFound(v AttNotFound) {
+	s.Type = AttNotFoundExchangeHandoffErrorResponse
+	s.AttNotFound = v
+}
+
+// GetAttNotFound returns AttNotFound and true boolean if ExchangeHandoffErrorResponse is AttNotFound.
+func (s ExchangeHandoffErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
+	if !s.IsAttNotFound() {
+		return v, false
+	}
+	return s.AttNotFound, true
+}
+
+// NewAttNotFoundExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from AttNotFound.
+func NewAttNotFoundExchangeHandoffErrorResponse(v AttNotFound) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetAttNotFound(v)
+	return s
+}
+
+// SetEncKeyDecryptFailed sets ExchangeHandoffErrorResponse to EncKeyDecryptFailed.
+func (s *ExchangeHandoffErrorResponse) SetEncKeyDecryptFailed(v EncKeyDecryptFailed) {
+	s.Type = EncKeyDecryptFailedExchangeHandoffErrorResponse
+	s.EncKeyDecryptFailed = v
+}
+
+// GetEncKeyDecryptFailed returns EncKeyDecryptFailed and true boolean if ExchangeHandoffErrorResponse is EncKeyDecryptFailed.
+func (s ExchangeHandoffErrorResponse) GetEncKeyDecryptFailed() (v EncKeyDecryptFailed, ok bool) {
+	if !s.IsEncKeyDecryptFailed() {
+		return v, false
+	}
+	return s.EncKeyDecryptFailed, true
+}
+
+// NewEncKeyDecryptFailedExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from EncKeyDecryptFailed.
+func NewEncKeyDecryptFailedExchangeHandoffErrorResponse(v EncKeyDecryptFailed) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetEncKeyDecryptFailed(v)
+	return s
+}
+
+// SetEncKeyNotFound sets ExchangeHandoffErrorResponse to EncKeyNotFound.
+func (s *ExchangeHandoffErrorResponse) SetEncKeyNotFound(v EncKeyNotFound) {
+	s.Type = EncKeyNotFoundExchangeHandoffErrorResponse
+	s.EncKeyNotFound = v
+}
+
+// GetEncKeyNotFound returns EncKeyNotFound and true boolean if ExchangeHandoffErrorResponse is EncKeyNotFound.
+func (s ExchangeHandoffErrorResponse) GetEncKeyNotFound() (v EncKeyNotFound, ok bool) {
+	if !s.IsEncKeyNotFound() {
+		return v, false
+	}
+	return s.EncKeyNotFound, true
+}
+
+// NewEncKeyNotFoundExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from EncKeyNotFound.
+func NewEncKeyNotFoundExchangeHandoffErrorResponse(v EncKeyNotFound) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetEncKeyNotFound(v)
+	return s
+}
+
+// SetInternal sets ExchangeHandoffErrorResponse to Internal.
+func (s *ExchangeHandoffErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalExchangeHandoffErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ExchangeHandoffErrorResponse is Internal.
+func (s ExchangeHandoffErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from Internal.
+func NewInternalExchangeHandoffErrorResponse(v Internal) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetTknInvalid sets ExchangeHandoffErrorResponse to TknInvalid.
+func (s *ExchangeHandoffErrorResponse) SetTknInvalid(v TknInvalid) {
+	s.Type = TknInvalidExchangeHandoffErrorResponse
+	s.TknInvalid = v
+}
+
+// GetTknInvalid returns TknInvalid and true boolean if ExchangeHandoffErrorResponse is TknInvalid.
+func (s ExchangeHandoffErrorResponse) GetTknInvalid() (v TknInvalid, ok bool) {
+	if !s.IsTknInvalid() {
+		return v, false
+	}
+	return s.TknInvalid, true
+}
+
+// NewTknInvalidExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from TknInvalid.
+func NewTknInvalidExchangeHandoffErrorResponse(v TknInvalid) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetTknInvalid(v)
+	return s
+}
+
+// SetTknInvalidTknid sets ExchangeHandoffErrorResponse to TknInvalidTknid.
+func (s *ExchangeHandoffErrorResponse) SetTknInvalidTknid(v TknInvalidTknid) {
+	s.Type = TknInvalidTknidExchangeHandoffErrorResponse
+	s.TknInvalidTknid = v
+}
+
+// GetTknInvalidTknid returns TknInvalidTknid and true boolean if ExchangeHandoffErrorResponse is TknInvalidTknid.
+func (s ExchangeHandoffErrorResponse) GetTknInvalidTknid() (v TknInvalidTknid, ok bool) {
+	if !s.IsTknInvalidTknid() {
+		return v, false
+	}
+	return s.TknInvalidTknid, true
+}
+
+// NewTknInvalidTknidExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from TknInvalidTknid.
+func NewTknInvalidTknidExchangeHandoffErrorResponse(v TknInvalidTknid) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetTknInvalidTknid(v)
+	return s
+}
+
+// SetSessExchangeConflict sets ExchangeHandoffErrorResponse to SessExchangeConflict.
+func (s *ExchangeHandoffErrorResponse) SetSessExchangeConflict(v SessExchangeConflict) {
+	s.Type = SessExchangeConflictExchangeHandoffErrorResponse
+	s.SessExchangeConflict = v
+}
+
+// GetSessExchangeConflict returns SessExchangeConflict and true boolean if ExchangeHandoffErrorResponse is SessExchangeConflict.
+func (s ExchangeHandoffErrorResponse) GetSessExchangeConflict() (v SessExchangeConflict, ok bool) {
+	if !s.IsSessExchangeConflict() {
+		return v, false
+	}
+	return s.SessExchangeConflict, true
+}
+
+// NewSessExchangeConflictExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from SessExchangeConflict.
+func NewSessExchangeConflictExchangeHandoffErrorResponse(v SessExchangeConflict) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetSessExchangeConflict(v)
+	return s
+}
+
+// SetSessInvalidHandoffToken sets ExchangeHandoffErrorResponse to SessInvalidHandoffToken.
+func (s *ExchangeHandoffErrorResponse) SetSessInvalidHandoffToken(v SessInvalidHandoffToken) {
+	s.Type = SessInvalidHandoffTokenExchangeHandoffErrorResponse
+	s.SessInvalidHandoffToken = v
+}
+
+// GetSessInvalidHandoffToken returns SessInvalidHandoffToken and true boolean if ExchangeHandoffErrorResponse is SessInvalidHandoffToken.
+func (s ExchangeHandoffErrorResponse) GetSessInvalidHandoffToken() (v SessInvalidHandoffToken, ok bool) {
+	if !s.IsSessInvalidHandoffToken() {
+		return v, false
+	}
+	return s.SessInvalidHandoffToken, true
+}
+
+// NewSessInvalidHandoffTokenExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from SessInvalidHandoffToken.
+func NewSessInvalidHandoffTokenExchangeHandoffErrorResponse(v SessInvalidHandoffToken) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetSessInvalidHandoffToken(v)
+	return s
+}
+
+// SetSessInvalidTTL sets ExchangeHandoffErrorResponse to SessInvalidTTL.
+func (s *ExchangeHandoffErrorResponse) SetSessInvalidTTL(v SessInvalidTTL) {
+	s.Type = SessInvalidTTLExchangeHandoffErrorResponse
+	s.SessInvalidTTL = v
+}
+
+// GetSessInvalidTTL returns SessInvalidTTL and true boolean if ExchangeHandoffErrorResponse is SessInvalidTTL.
+func (s ExchangeHandoffErrorResponse) GetSessInvalidTTL() (v SessInvalidTTL, ok bool) {
+	if !s.IsSessInvalidTTL() {
+		return v, false
+	}
+	return s.SessInvalidTTL, true
+}
+
+// NewSessInvalidTTLExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from SessInvalidTTL.
+func NewSessInvalidTTLExchangeHandoffErrorResponse(v SessInvalidTTL) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetSessInvalidTTL(v)
+	return s
+}
+
+// SetSessNotFound sets ExchangeHandoffErrorResponse to SessNotFound.
+func (s *ExchangeHandoffErrorResponse) SetSessNotFound(v SessNotFound) {
+	s.Type = SessNotFoundExchangeHandoffErrorResponse
+	s.SessNotFound = v
+}
+
+// GetSessNotFound returns SessNotFound and true boolean if ExchangeHandoffErrorResponse is SessNotFound.
+func (s ExchangeHandoffErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
+	if !s.IsSessNotFound() {
+		return v, false
+	}
+	return s.SessNotFound, true
+}
+
+// NewSessNotFoundExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from SessNotFound.
+func NewSessNotFoundExchangeHandoffErrorResponse(v SessNotFound) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetSessNotFound(v)
+	return s
+}
+
+// SetEncKeyUnknownAlg sets ExchangeHandoffErrorResponse to EncKeyUnknownAlg.
+func (s *ExchangeHandoffErrorResponse) SetEncKeyUnknownAlg(v EncKeyUnknownAlg) {
+	s.Type = EncKeyUnknownAlgExchangeHandoffErrorResponse
+	s.EncKeyUnknownAlg = v
+}
+
+// GetEncKeyUnknownAlg returns EncKeyUnknownAlg and true boolean if ExchangeHandoffErrorResponse is EncKeyUnknownAlg.
+func (s ExchangeHandoffErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, ok bool) {
+	if !s.IsEncKeyUnknownAlg() {
+		return v, false
+	}
+	return s.EncKeyUnknownAlg, true
+}
+
+// NewEncKeyUnknownAlgExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from EncKeyUnknownAlg.
+func NewEncKeyUnknownAlgExchangeHandoffErrorResponse(v EncKeyUnknownAlg) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// ExchangeHandoffErrorResponseStatusCode wraps ExchangeHandoffErrorResponse with StatusCode.
+type ExchangeHandoffErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ExchangeHandoffErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ExchangeHandoffErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ExchangeHandoffErrorResponseStatusCode) GetResponse() ExchangeHandoffErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ExchangeHandoffErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ExchangeHandoffErrorResponseStatusCode) SetResponse(val ExchangeHandoffErrorResponse) {
+	s.Response = val
+}
+
+func (*ExchangeHandoffErrorResponseStatusCode) exchangeHandoffRes() {}
 
 type ExchangeHandoffGone ErrorDetails
 
@@ -4425,6 +6107,112 @@ func (s *FlowHint) SetAppID(val OptString) {
 	s.AppID = val
 }
 
+// Merged schema.
+// Ref: #
+type FlowIntegrity struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowIntegrityDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowIntegrity) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowIntegrity) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowIntegrity) GetDetails() OptFlowIntegrityDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowIntegrity) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowIntegrity) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowIntegrity) SetDetails(val OptFlowIntegrityDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowIntegrityDetails map[string]jx.Raw
+
+func (s *FlowIntegrityDetails) init() FlowIntegrityDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type FlowInvalidAction struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowInvalidActionDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowInvalidAction) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowInvalidAction) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowInvalidAction) GetDetails() OptFlowInvalidActionDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowInvalidAction) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowInvalidAction) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowInvalidAction) SetDetails(val OptFlowInvalidActionDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowInvalidActionDetails map[string]jx.Raw
+
+func (s *FlowInvalidActionDetails) init() FlowInvalidActionDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // Ref: #
 type FlowResponse struct {
 	// Flow handle. Use this as the path parameter for subsequent
@@ -5037,6 +6825,483 @@ func (s *FlowSubmitRequestGateProofs) init() FlowSubmitRequestGateProofs {
 	return m
 }
 
+// Merged schema.
+// Ref: #
+type FlowUnsupported struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowUnsupportedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowUnsupported) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowUnsupported) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowUnsupported) GetDetails() OptFlowUnsupportedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowUnsupported) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowUnsupported) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowUnsupported) SetDetails(val OptFlowUnsupportedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowUnsupportedDetails map[string]jx.Raw
+
+func (s *FlowUnsupportedDetails) init() FlowUnsupportedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type FlowdefAlreadyExists struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowdefAlreadyExistsDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowdefAlreadyExists) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowdefAlreadyExists) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowdefAlreadyExists) GetDetails() OptFlowdefAlreadyExistsDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowdefAlreadyExists) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowdefAlreadyExists) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowdefAlreadyExists) SetDetails(val OptFlowdefAlreadyExistsDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowdefAlreadyExistsDetails map[string]jx.Raw
+
+func (s *FlowdefAlreadyExistsDetails) init() FlowdefAlreadyExistsDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type FlowdefInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowdefInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowdefInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowdefInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowdefInvalid) GetDetails() OptFlowdefInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowdefInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowdefInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowdefInvalid) SetDetails(val OptFlowdefInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowdefInvalidDetails map[string]jx.Raw
+
+func (s *FlowdefInvalidDetails) init() FlowdefInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type FlowdefMissingID struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowdefMissingIDDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowdefMissingID) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowdefMissingID) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowdefMissingID) GetDetails() OptFlowdefMissingIDDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowdefMissingID) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowdefMissingID) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowdefMissingID) SetDetails(val OptFlowdefMissingIDDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowdefMissingIDDetails map[string]jx.Raw
+
+func (s *FlowdefMissingIDDetails) init() FlowdefMissingIDDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type FlowdefMissingProjectID struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowdefMissingProjectIDDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowdefMissingProjectID) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowdefMissingProjectID) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowdefMissingProjectID) GetDetails() OptFlowdefMissingProjectIDDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowdefMissingProjectID) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowdefMissingProjectID) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowdefMissingProjectID) SetDetails(val OptFlowdefMissingProjectIDDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowdefMissingProjectIDDetails map[string]jx.Raw
+
+func (s *FlowdefMissingProjectIDDetails) init() FlowdefMissingProjectIDDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type FlowdefNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowdefNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowdefNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowdefNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowdefNotFound) GetDetails() OptFlowdefNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowdefNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowdefNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowdefNotFound) SetDetails(val OptFlowdefNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowdefNotFoundDetails map[string]jx.Raw
+
+func (s *FlowdefNotFoundDetails) init() FlowdefNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type FlowdefPurposeMismatch struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowdefPurposeMismatchDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowdefPurposeMismatch) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowdefPurposeMismatch) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowdefPurposeMismatch) GetDetails() OptFlowdefPurposeMismatchDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowdefPurposeMismatch) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowdefPurposeMismatch) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowdefPurposeMismatch) SetDetails(val OptFlowdefPurposeMismatchDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowdefPurposeMismatchDetails map[string]jx.Raw
+
+func (s *FlowdefPurposeMismatchDetails) init() FlowdefPurposeMismatchDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type FlowdefSchemaFetchFailed struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowdefSchemaFetchFailedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowdefSchemaFetchFailed) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowdefSchemaFetchFailed) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowdefSchemaFetchFailed) GetDetails() OptFlowdefSchemaFetchFailedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowdefSchemaFetchFailed) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowdefSchemaFetchFailed) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowdefSchemaFetchFailed) SetDetails(val OptFlowdefSchemaFetchFailedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowdefSchemaFetchFailedDetails map[string]jx.Raw
+
+func (s *FlowdefSchemaFetchFailedDetails) init() FlowdefSchemaFetchFailedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type FlowdefUpdateConflict struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowdefUpdateConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowdefUpdateConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowdefUpdateConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowdefUpdateConflict) GetDetails() OptFlowdefUpdateConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowdefUpdateConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowdefUpdateConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowdefUpdateConflict) SetDetails(val OptFlowdefUpdateConflictDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowdefUpdateConflictDetails map[string]jx.Raw
+
+func (s *FlowdefUpdateConflictDetails) init() FlowdefUpdateConflictDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // A security challenge that must be satisfied before this step's submission
 // is accepted. The engine may also inject gates at runtime based on policy
 // or risk evaluation.
@@ -5243,6 +7508,254 @@ type GetClaimStatusUnauthorized ErrorDetails
 
 func (*GetClaimStatusUnauthorized) getClaimStatusRes() {}
 
+// GetFlowDefinitionErrorResponse represents sum type.
+type GetFlowDefinitionErrorResponse struct {
+	Type                    GetFlowDefinitionErrorResponseType // switch on this field
+	FlowdefNotFound         FlowdefNotFound
+	Internal                Internal
+	FlowdefMissingID        FlowdefMissingID
+	FlowdefMissingProjectID FlowdefMissingProjectID
+}
+
+// GetFlowDefinitionErrorResponseType is oneOf type of GetFlowDefinitionErrorResponse.
+type GetFlowDefinitionErrorResponseType string
+
+// Possible values for GetFlowDefinitionErrorResponseType.
+const (
+	FlowdefNotFoundGetFlowDefinitionErrorResponse         GetFlowDefinitionErrorResponseType = "flowdef.not_found"
+	InternalGetFlowDefinitionErrorResponse                GetFlowDefinitionErrorResponseType = "internal"
+	FlowdefMissingIDGetFlowDefinitionErrorResponse        GetFlowDefinitionErrorResponseType = "flowdef.missing_id"
+	FlowdefMissingProjectIDGetFlowDefinitionErrorResponse GetFlowDefinitionErrorResponseType = "flowdef.missing_project_id"
+)
+
+// IsFlowdefNotFound reports whether GetFlowDefinitionErrorResponse is FlowdefNotFound.
+func (s GetFlowDefinitionErrorResponse) IsFlowdefNotFound() bool {
+	return s.Type == FlowdefNotFoundGetFlowDefinitionErrorResponse
+}
+
+// IsInternal reports whether GetFlowDefinitionErrorResponse is Internal.
+func (s GetFlowDefinitionErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetFlowDefinitionErrorResponse
+}
+
+// IsFlowdefMissingID reports whether GetFlowDefinitionErrorResponse is FlowdefMissingID.
+func (s GetFlowDefinitionErrorResponse) IsFlowdefMissingID() bool {
+	return s.Type == FlowdefMissingIDGetFlowDefinitionErrorResponse
+}
+
+// IsFlowdefMissingProjectID reports whether GetFlowDefinitionErrorResponse is FlowdefMissingProjectID.
+func (s GetFlowDefinitionErrorResponse) IsFlowdefMissingProjectID() bool {
+	return s.Type == FlowdefMissingProjectIDGetFlowDefinitionErrorResponse
+}
+
+// SetFlowdefNotFound sets GetFlowDefinitionErrorResponse to FlowdefNotFound.
+func (s *GetFlowDefinitionErrorResponse) SetFlowdefNotFound(v FlowdefNotFound) {
+	s.Type = FlowdefNotFoundGetFlowDefinitionErrorResponse
+	s.FlowdefNotFound = v
+}
+
+// GetFlowdefNotFound returns FlowdefNotFound and true boolean if GetFlowDefinitionErrorResponse is FlowdefNotFound.
+func (s GetFlowDefinitionErrorResponse) GetFlowdefNotFound() (v FlowdefNotFound, ok bool) {
+	if !s.IsFlowdefNotFound() {
+		return v, false
+	}
+	return s.FlowdefNotFound, true
+}
+
+// NewFlowdefNotFoundGetFlowDefinitionErrorResponse returns new GetFlowDefinitionErrorResponse from FlowdefNotFound.
+func NewFlowdefNotFoundGetFlowDefinitionErrorResponse(v FlowdefNotFound) GetFlowDefinitionErrorResponse {
+	var s GetFlowDefinitionErrorResponse
+	s.SetFlowdefNotFound(v)
+	return s
+}
+
+// SetInternal sets GetFlowDefinitionErrorResponse to Internal.
+func (s *GetFlowDefinitionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetFlowDefinitionErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetFlowDefinitionErrorResponse is Internal.
+func (s GetFlowDefinitionErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetFlowDefinitionErrorResponse returns new GetFlowDefinitionErrorResponse from Internal.
+func NewInternalGetFlowDefinitionErrorResponse(v Internal) GetFlowDefinitionErrorResponse {
+	var s GetFlowDefinitionErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetFlowdefMissingID sets GetFlowDefinitionErrorResponse to FlowdefMissingID.
+func (s *GetFlowDefinitionErrorResponse) SetFlowdefMissingID(v FlowdefMissingID) {
+	s.Type = FlowdefMissingIDGetFlowDefinitionErrorResponse
+	s.FlowdefMissingID = v
+}
+
+// GetFlowdefMissingID returns FlowdefMissingID and true boolean if GetFlowDefinitionErrorResponse is FlowdefMissingID.
+func (s GetFlowDefinitionErrorResponse) GetFlowdefMissingID() (v FlowdefMissingID, ok bool) {
+	if !s.IsFlowdefMissingID() {
+		return v, false
+	}
+	return s.FlowdefMissingID, true
+}
+
+// NewFlowdefMissingIDGetFlowDefinitionErrorResponse returns new GetFlowDefinitionErrorResponse from FlowdefMissingID.
+func NewFlowdefMissingIDGetFlowDefinitionErrorResponse(v FlowdefMissingID) GetFlowDefinitionErrorResponse {
+	var s GetFlowDefinitionErrorResponse
+	s.SetFlowdefMissingID(v)
+	return s
+}
+
+// SetFlowdefMissingProjectID sets GetFlowDefinitionErrorResponse to FlowdefMissingProjectID.
+func (s *GetFlowDefinitionErrorResponse) SetFlowdefMissingProjectID(v FlowdefMissingProjectID) {
+	s.Type = FlowdefMissingProjectIDGetFlowDefinitionErrorResponse
+	s.FlowdefMissingProjectID = v
+}
+
+// GetFlowdefMissingProjectID returns FlowdefMissingProjectID and true boolean if GetFlowDefinitionErrorResponse is FlowdefMissingProjectID.
+func (s GetFlowDefinitionErrorResponse) GetFlowdefMissingProjectID() (v FlowdefMissingProjectID, ok bool) {
+	if !s.IsFlowdefMissingProjectID() {
+		return v, false
+	}
+	return s.FlowdefMissingProjectID, true
+}
+
+// NewFlowdefMissingProjectIDGetFlowDefinitionErrorResponse returns new GetFlowDefinitionErrorResponse from FlowdefMissingProjectID.
+func NewFlowdefMissingProjectIDGetFlowDefinitionErrorResponse(v FlowdefMissingProjectID) GetFlowDefinitionErrorResponse {
+	var s GetFlowDefinitionErrorResponse
+	s.SetFlowdefMissingProjectID(v)
+	return s
+}
+
+// GetFlowDefinitionErrorResponseStatusCode wraps GetFlowDefinitionErrorResponse with StatusCode.
+type GetFlowDefinitionErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetFlowDefinitionErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetFlowDefinitionErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetFlowDefinitionErrorResponseStatusCode) GetResponse() GetFlowDefinitionErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetFlowDefinitionErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetFlowDefinitionErrorResponseStatusCode) SetResponse(val GetFlowDefinitionErrorResponse) {
+	s.Response = val
+}
+
+func (*GetFlowDefinitionErrorResponseStatusCode) getFlowDefinitionRes() {}
+
+// GetFlowStepErrorResponse represents sum type.
+type GetFlowStepErrorResponse struct {
+	Type          GetFlowStepErrorResponseType // switch on this field
+	FlowIntegrity FlowIntegrity
+	Internal      Internal
+}
+
+// GetFlowStepErrorResponseType is oneOf type of GetFlowStepErrorResponse.
+type GetFlowStepErrorResponseType string
+
+// Possible values for GetFlowStepErrorResponseType.
+const (
+	FlowIntegrityGetFlowStepErrorResponse GetFlowStepErrorResponseType = "flow.integrity"
+	InternalGetFlowStepErrorResponse      GetFlowStepErrorResponseType = "internal"
+)
+
+// IsFlowIntegrity reports whether GetFlowStepErrorResponse is FlowIntegrity.
+func (s GetFlowStepErrorResponse) IsFlowIntegrity() bool {
+	return s.Type == FlowIntegrityGetFlowStepErrorResponse
+}
+
+// IsInternal reports whether GetFlowStepErrorResponse is Internal.
+func (s GetFlowStepErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetFlowStepErrorResponse
+}
+
+// SetFlowIntegrity sets GetFlowStepErrorResponse to FlowIntegrity.
+func (s *GetFlowStepErrorResponse) SetFlowIntegrity(v FlowIntegrity) {
+	s.Type = FlowIntegrityGetFlowStepErrorResponse
+	s.FlowIntegrity = v
+}
+
+// GetFlowIntegrity returns FlowIntegrity and true boolean if GetFlowStepErrorResponse is FlowIntegrity.
+func (s GetFlowStepErrorResponse) GetFlowIntegrity() (v FlowIntegrity, ok bool) {
+	if !s.IsFlowIntegrity() {
+		return v, false
+	}
+	return s.FlowIntegrity, true
+}
+
+// NewFlowIntegrityGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from FlowIntegrity.
+func NewFlowIntegrityGetFlowStepErrorResponse(v FlowIntegrity) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetFlowIntegrity(v)
+	return s
+}
+
+// SetInternal sets GetFlowStepErrorResponse to Internal.
+func (s *GetFlowStepErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetFlowStepErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetFlowStepErrorResponse is Internal.
+func (s GetFlowStepErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from Internal.
+func NewInternalGetFlowStepErrorResponse(v Internal) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// GetFlowStepErrorResponseStatusCode wraps GetFlowStepErrorResponse with StatusCode.
+type GetFlowStepErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetFlowStepErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetFlowStepErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetFlowStepErrorResponseStatusCode) GetResponse() GetFlowStepErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetFlowStepErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetFlowStepErrorResponseStatusCode) SetResponse(val GetFlowStepErrorResponse) {
+	s.Response = val
+}
+
+func (*GetFlowStepErrorResponseStatusCode) getFlowStepRes() {}
+
 type GetFlowStepGone ErrorDetails
 
 func (*GetFlowStepGone) getFlowStepRes() {}
@@ -5286,8 +7799,8 @@ func (*GetLiveOK) getLiveRes() {}
 // GetMySessionErrorResponse represents sum type.
 type GetMySessionErrorResponse struct {
 	Type         GetMySessionErrorResponseType // switch on this field
-	SessNotFound SessNotFound
 	Internal     Internal
+	SessNotFound SessNotFound
 }
 
 // GetMySessionErrorResponseType is oneOf type of GetMySessionErrorResponse.
@@ -5295,39 +7808,18 @@ type GetMySessionErrorResponseType string
 
 // Possible values for GetMySessionErrorResponseType.
 const (
-	SessNotFoundGetMySessionErrorResponse GetMySessionErrorResponseType = "sess.not_found"
 	InternalGetMySessionErrorResponse     GetMySessionErrorResponseType = "internal"
+	SessNotFoundGetMySessionErrorResponse GetMySessionErrorResponseType = "sess.not_found"
 )
-
-// IsSessNotFound reports whether GetMySessionErrorResponse is SessNotFound.
-func (s GetMySessionErrorResponse) IsSessNotFound() bool {
-	return s.Type == SessNotFoundGetMySessionErrorResponse
-}
 
 // IsInternal reports whether GetMySessionErrorResponse is Internal.
 func (s GetMySessionErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetMySessionErrorResponse
 }
 
-// SetSessNotFound sets GetMySessionErrorResponse to SessNotFound.
-func (s *GetMySessionErrorResponse) SetSessNotFound(v SessNotFound) {
-	s.Type = SessNotFoundGetMySessionErrorResponse
-	s.SessNotFound = v
-}
-
-// GetSessNotFound returns SessNotFound and true boolean if GetMySessionErrorResponse is SessNotFound.
-func (s GetMySessionErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
-	if !s.IsSessNotFound() {
-		return v, false
-	}
-	return s.SessNotFound, true
-}
-
-// NewSessNotFoundGetMySessionErrorResponse returns new GetMySessionErrorResponse from SessNotFound.
-func NewSessNotFoundGetMySessionErrorResponse(v SessNotFound) GetMySessionErrorResponse {
-	var s GetMySessionErrorResponse
-	s.SetSessNotFound(v)
-	return s
+// IsSessNotFound reports whether GetMySessionErrorResponse is SessNotFound.
+func (s GetMySessionErrorResponse) IsSessNotFound() bool {
+	return s.Type == SessNotFoundGetMySessionErrorResponse
 }
 
 // SetInternal sets GetMySessionErrorResponse to Internal.
@@ -5348,6 +7840,27 @@ func (s GetMySessionErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetMySessionErrorResponse(v Internal) GetMySessionErrorResponse {
 	var s GetMySessionErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetSessNotFound sets GetMySessionErrorResponse to SessNotFound.
+func (s *GetMySessionErrorResponse) SetSessNotFound(v SessNotFound) {
+	s.Type = SessNotFoundGetMySessionErrorResponse
+	s.SessNotFound = v
+}
+
+// GetSessNotFound returns SessNotFound and true boolean if GetMySessionErrorResponse is SessNotFound.
+func (s GetMySessionErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
+	if !s.IsSessNotFound() {
+		return v, false
+	}
+	return s.SessNotFound, true
+}
+
+// NewSessNotFoundGetMySessionErrorResponse returns new GetMySessionErrorResponse from SessNotFound.
+func NewSessNotFoundGetMySessionErrorResponse(v SessNotFound) GetMySessionErrorResponse {
+	var s GetMySessionErrorResponse
+	s.SetSessNotFound(v)
 	return s
 }
 
@@ -5378,6 +7891,222 @@ func (s *GetMySessionErrorResponseStatusCode) SetResponse(val GetMySessionErrorR
 }
 
 func (*GetMySessionErrorResponseStatusCode) getMySessionRes() {}
+
+// GetMyUserErrorResponse represents sum type.
+type GetMyUserErrorResponse struct {
+	Type             GetMyUserErrorResponseType // switch on this field
+	Internal         Internal
+	SessTokenInvalid SessTokenInvalid
+	UserNotFound     UserNotFound
+}
+
+// GetMyUserErrorResponseType is oneOf type of GetMyUserErrorResponse.
+type GetMyUserErrorResponseType string
+
+// Possible values for GetMyUserErrorResponseType.
+const (
+	InternalGetMyUserErrorResponse         GetMyUserErrorResponseType = "internal"
+	SessTokenInvalidGetMyUserErrorResponse GetMyUserErrorResponseType = "sess.token_invalid"
+	UserNotFoundGetMyUserErrorResponse     GetMyUserErrorResponseType = "user.not_found"
+)
+
+// IsInternal reports whether GetMyUserErrorResponse is Internal.
+func (s GetMyUserErrorResponse) IsInternal() bool { return s.Type == InternalGetMyUserErrorResponse }
+
+// IsSessTokenInvalid reports whether GetMyUserErrorResponse is SessTokenInvalid.
+func (s GetMyUserErrorResponse) IsSessTokenInvalid() bool {
+	return s.Type == SessTokenInvalidGetMyUserErrorResponse
+}
+
+// IsUserNotFound reports whether GetMyUserErrorResponse is UserNotFound.
+func (s GetMyUserErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundGetMyUserErrorResponse
+}
+
+// SetInternal sets GetMyUserErrorResponse to Internal.
+func (s *GetMyUserErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetMyUserErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetMyUserErrorResponse is Internal.
+func (s GetMyUserErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetMyUserErrorResponse returns new GetMyUserErrorResponse from Internal.
+func NewInternalGetMyUserErrorResponse(v Internal) GetMyUserErrorResponse {
+	var s GetMyUserErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetSessTokenInvalid sets GetMyUserErrorResponse to SessTokenInvalid.
+func (s *GetMyUserErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
+	s.Type = SessTokenInvalidGetMyUserErrorResponse
+	s.SessTokenInvalid = v
+}
+
+// GetSessTokenInvalid returns SessTokenInvalid and true boolean if GetMyUserErrorResponse is SessTokenInvalid.
+func (s GetMyUserErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
+	if !s.IsSessTokenInvalid() {
+		return v, false
+	}
+	return s.SessTokenInvalid, true
+}
+
+// NewSessTokenInvalidGetMyUserErrorResponse returns new GetMyUserErrorResponse from SessTokenInvalid.
+func NewSessTokenInvalidGetMyUserErrorResponse(v SessTokenInvalid) GetMyUserErrorResponse {
+	var s GetMyUserErrorResponse
+	s.SetSessTokenInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets GetMyUserErrorResponse to UserNotFound.
+func (s *GetMyUserErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundGetMyUserErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if GetMyUserErrorResponse is UserNotFound.
+func (s GetMyUserErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundGetMyUserErrorResponse returns new GetMyUserErrorResponse from UserNotFound.
+func NewUserNotFoundGetMyUserErrorResponse(v UserNotFound) GetMyUserErrorResponse {
+	var s GetMyUserErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// GetMyUserErrorResponseStatusCode wraps GetMyUserErrorResponse with StatusCode.
+type GetMyUserErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetMyUserErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetMyUserErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetMyUserErrorResponseStatusCode) GetResponse() GetMyUserErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetMyUserErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetMyUserErrorResponseStatusCode) SetResponse(val GetMyUserErrorResponse) {
+	s.Response = val
+}
+
+func (*GetMyUserErrorResponseStatusCode) getMyUserRes() {}
+
+// GetProjectErrorResponse represents sum type.
+type GetProjectErrorResponse struct {
+	Type           GetProjectErrorResponseType // switch on this field
+	Internal       Internal
+	NotImplemented NotImplemented
+}
+
+// GetProjectErrorResponseType is oneOf type of GetProjectErrorResponse.
+type GetProjectErrorResponseType string
+
+// Possible values for GetProjectErrorResponseType.
+const (
+	InternalGetProjectErrorResponse       GetProjectErrorResponseType = "internal"
+	NotImplementedGetProjectErrorResponse GetProjectErrorResponseType = "not_implemented"
+)
+
+// IsInternal reports whether GetProjectErrorResponse is Internal.
+func (s GetProjectErrorResponse) IsInternal() bool { return s.Type == InternalGetProjectErrorResponse }
+
+// IsNotImplemented reports whether GetProjectErrorResponse is NotImplemented.
+func (s GetProjectErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetProjectErrorResponse
+}
+
+// SetInternal sets GetProjectErrorResponse to Internal.
+func (s *GetProjectErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetProjectErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetProjectErrorResponse is Internal.
+func (s GetProjectErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetProjectErrorResponse returns new GetProjectErrorResponse from Internal.
+func NewInternalGetProjectErrorResponse(v Internal) GetProjectErrorResponse {
+	var s GetProjectErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetProjectErrorResponse to NotImplemented.
+func (s *GetProjectErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetProjectErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetProjectErrorResponse is NotImplemented.
+func (s GetProjectErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetProjectErrorResponse returns new GetProjectErrorResponse from NotImplemented.
+func NewNotImplementedGetProjectErrorResponse(v NotImplemented) GetProjectErrorResponse {
+	var s GetProjectErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// GetProjectErrorResponseStatusCode wraps GetProjectErrorResponse with StatusCode.
+type GetProjectErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetProjectErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetProjectErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetProjectErrorResponseStatusCode) GetResponse() GetProjectErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetProjectErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetProjectErrorResponseStatusCode) SetResponse(val GetProjectErrorResponse) {
+	s.Response = val
+}
+
+func (*GetProjectErrorResponseStatusCode) getProjectRes() {}
 
 type GetProjectNotFound ErrorDetails
 
@@ -5454,8 +8183,8 @@ func (*GetSchemaByIdOK) getSchemaByIdRes() {}
 // GetSessionErrorResponse represents sum type.
 type GetSessionErrorResponse struct {
 	Type         GetSessionErrorResponseType // switch on this field
-	SessNotFound SessNotFound
 	Internal     Internal
+	SessNotFound SessNotFound
 }
 
 // GetSessionErrorResponseType is oneOf type of GetSessionErrorResponse.
@@ -5463,37 +8192,16 @@ type GetSessionErrorResponseType string
 
 // Possible values for GetSessionErrorResponseType.
 const (
-	SessNotFoundGetSessionErrorResponse GetSessionErrorResponseType = "sess.not_found"
 	InternalGetSessionErrorResponse     GetSessionErrorResponseType = "internal"
+	SessNotFoundGetSessionErrorResponse GetSessionErrorResponseType = "sess.not_found"
 )
-
-// IsSessNotFound reports whether GetSessionErrorResponse is SessNotFound.
-func (s GetSessionErrorResponse) IsSessNotFound() bool {
-	return s.Type == SessNotFoundGetSessionErrorResponse
-}
 
 // IsInternal reports whether GetSessionErrorResponse is Internal.
 func (s GetSessionErrorResponse) IsInternal() bool { return s.Type == InternalGetSessionErrorResponse }
 
-// SetSessNotFound sets GetSessionErrorResponse to SessNotFound.
-func (s *GetSessionErrorResponse) SetSessNotFound(v SessNotFound) {
-	s.Type = SessNotFoundGetSessionErrorResponse
-	s.SessNotFound = v
-}
-
-// GetSessNotFound returns SessNotFound and true boolean if GetSessionErrorResponse is SessNotFound.
-func (s GetSessionErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
-	if !s.IsSessNotFound() {
-		return v, false
-	}
-	return s.SessNotFound, true
-}
-
-// NewSessNotFoundGetSessionErrorResponse returns new GetSessionErrorResponse from SessNotFound.
-func NewSessNotFoundGetSessionErrorResponse(v SessNotFound) GetSessionErrorResponse {
-	var s GetSessionErrorResponse
-	s.SetSessNotFound(v)
-	return s
+// IsSessNotFound reports whether GetSessionErrorResponse is SessNotFound.
+func (s GetSessionErrorResponse) IsSessNotFound() bool {
+	return s.Type == SessNotFoundGetSessionErrorResponse
 }
 
 // SetInternal sets GetSessionErrorResponse to Internal.
@@ -5514,6 +8222,27 @@ func (s GetSessionErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetSessionErrorResponse(v Internal) GetSessionErrorResponse {
 	var s GetSessionErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetSessNotFound sets GetSessionErrorResponse to SessNotFound.
+func (s *GetSessionErrorResponse) SetSessNotFound(v SessNotFound) {
+	s.Type = SessNotFoundGetSessionErrorResponse
+	s.SessNotFound = v
+}
+
+// GetSessNotFound returns SessNotFound and true boolean if GetSessionErrorResponse is SessNotFound.
+func (s GetSessionErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
+	if !s.IsSessNotFound() {
+		return v, false
+	}
+	return s.SessNotFound, true
+}
+
+// NewSessNotFoundGetSessionErrorResponse returns new GetSessionErrorResponse from SessNotFound.
+func NewSessNotFoundGetSessionErrorResponse(v SessNotFound) GetSessionErrorResponse {
+	var s GetSessionErrorResponse
+	s.SetSessNotFound(v)
 	return s
 }
 
@@ -5564,6 +8293,102 @@ func (*GetTeamNotFound) getTeamRes() {}
 type GetTeamUnauthorized ErrorDetails
 
 func (*GetTeamUnauthorized) getTeamRes() {}
+
+// GetUserByIDErrorResponse represents sum type.
+type GetUserByIDErrorResponse struct {
+	Type         GetUserByIDErrorResponseType // switch on this field
+	Internal     Internal
+	UserNotFound UserNotFound
+}
+
+// GetUserByIDErrorResponseType is oneOf type of GetUserByIDErrorResponse.
+type GetUserByIDErrorResponseType string
+
+// Possible values for GetUserByIDErrorResponseType.
+const (
+	InternalGetUserByIDErrorResponse     GetUserByIDErrorResponseType = "internal"
+	UserNotFoundGetUserByIDErrorResponse GetUserByIDErrorResponseType = "user.not_found"
+)
+
+// IsInternal reports whether GetUserByIDErrorResponse is Internal.
+func (s GetUserByIDErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetUserByIDErrorResponse
+}
+
+// IsUserNotFound reports whether GetUserByIDErrorResponse is UserNotFound.
+func (s GetUserByIDErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundGetUserByIDErrorResponse
+}
+
+// SetInternal sets GetUserByIDErrorResponse to Internal.
+func (s *GetUserByIDErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetUserByIDErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetUserByIDErrorResponse is Internal.
+func (s GetUserByIDErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetUserByIDErrorResponse returns new GetUserByIDErrorResponse from Internal.
+func NewInternalGetUserByIDErrorResponse(v Internal) GetUserByIDErrorResponse {
+	var s GetUserByIDErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetUserNotFound sets GetUserByIDErrorResponse to UserNotFound.
+func (s *GetUserByIDErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundGetUserByIDErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if GetUserByIDErrorResponse is UserNotFound.
+func (s GetUserByIDErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundGetUserByIDErrorResponse returns new GetUserByIDErrorResponse from UserNotFound.
+func NewUserNotFoundGetUserByIDErrorResponse(v UserNotFound) GetUserByIDErrorResponse {
+	var s GetUserByIDErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// GetUserByIDErrorResponseStatusCode wraps GetUserByIDErrorResponse with StatusCode.
+type GetUserByIDErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetUserByIDErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetUserByIDErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetUserByIDErrorResponseStatusCode) GetResponse() GetUserByIDErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetUserByIDErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetUserByIDErrorResponseStatusCode) SetResponse(val GetUserByIDErrorResponse) {
+	s.Response = val
+}
+
+func (*GetUserByIDErrorResponseStatusCode) getUserByIDRes() {}
 
 type GetUserByIDNotFound ErrorDetails
 
@@ -6017,10 +8842,10 @@ func (*IntrospectResponse) introspectRes() {}
 // IssueChallengeErrorResponse represents sum type.
 type IssueChallengeErrorResponse struct {
 	Type                IssueChallengeErrorResponseType // switch on this field
-	AttNotFound         AttNotFound
+	AttAlreadyHandedOff AttAlreadyHandedOff
 	AttInvalidRequest   AttInvalidRequest
 	AttInvalidState     AttInvalidState
-	AttAlreadyCompleted AttAlreadyCompleted
+	AttNotFound         AttNotFound
 	Internal            Internal
 }
 
@@ -6029,16 +8854,16 @@ type IssueChallengeErrorResponseType string
 
 // Possible values for IssueChallengeErrorResponseType.
 const (
-	AttNotFoundIssueChallengeErrorResponse         IssueChallengeErrorResponseType = "att.not_found"
+	AttAlreadyHandedOffIssueChallengeErrorResponse IssueChallengeErrorResponseType = "att.already_handed_off"
 	AttInvalidRequestIssueChallengeErrorResponse   IssueChallengeErrorResponseType = "att.invalid_request"
 	AttInvalidStateIssueChallengeErrorResponse     IssueChallengeErrorResponseType = "att.invalid_state"
-	AttAlreadyCompletedIssueChallengeErrorResponse IssueChallengeErrorResponseType = "att.already_completed"
+	AttNotFoundIssueChallengeErrorResponse         IssueChallengeErrorResponseType = "att.not_found"
 	InternalIssueChallengeErrorResponse            IssueChallengeErrorResponseType = "internal"
 )
 
-// IsAttNotFound reports whether IssueChallengeErrorResponse is AttNotFound.
-func (s IssueChallengeErrorResponse) IsAttNotFound() bool {
-	return s.Type == AttNotFoundIssueChallengeErrorResponse
+// IsAttAlreadyHandedOff reports whether IssueChallengeErrorResponse is AttAlreadyHandedOff.
+func (s IssueChallengeErrorResponse) IsAttAlreadyHandedOff() bool {
+	return s.Type == AttAlreadyHandedOffIssueChallengeErrorResponse
 }
 
 // IsAttInvalidRequest reports whether IssueChallengeErrorResponse is AttInvalidRequest.
@@ -6051,9 +8876,9 @@ func (s IssueChallengeErrorResponse) IsAttInvalidState() bool {
 	return s.Type == AttInvalidStateIssueChallengeErrorResponse
 }
 
-// IsAttAlreadyCompleted reports whether IssueChallengeErrorResponse is AttAlreadyCompleted.
-func (s IssueChallengeErrorResponse) IsAttAlreadyCompleted() bool {
-	return s.Type == AttAlreadyCompletedIssueChallengeErrorResponse
+// IsAttNotFound reports whether IssueChallengeErrorResponse is AttNotFound.
+func (s IssueChallengeErrorResponse) IsAttNotFound() bool {
+	return s.Type == AttNotFoundIssueChallengeErrorResponse
 }
 
 // IsInternal reports whether IssueChallengeErrorResponse is Internal.
@@ -6061,24 +8886,24 @@ func (s IssueChallengeErrorResponse) IsInternal() bool {
 	return s.Type == InternalIssueChallengeErrorResponse
 }
 
-// SetAttNotFound sets IssueChallengeErrorResponse to AttNotFound.
-func (s *IssueChallengeErrorResponse) SetAttNotFound(v AttNotFound) {
-	s.Type = AttNotFoundIssueChallengeErrorResponse
-	s.AttNotFound = v
+// SetAttAlreadyHandedOff sets IssueChallengeErrorResponse to AttAlreadyHandedOff.
+func (s *IssueChallengeErrorResponse) SetAttAlreadyHandedOff(v AttAlreadyHandedOff) {
+	s.Type = AttAlreadyHandedOffIssueChallengeErrorResponse
+	s.AttAlreadyHandedOff = v
 }
 
-// GetAttNotFound returns AttNotFound and true boolean if IssueChallengeErrorResponse is AttNotFound.
-func (s IssueChallengeErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
-	if !s.IsAttNotFound() {
+// GetAttAlreadyHandedOff returns AttAlreadyHandedOff and true boolean if IssueChallengeErrorResponse is AttAlreadyHandedOff.
+func (s IssueChallengeErrorResponse) GetAttAlreadyHandedOff() (v AttAlreadyHandedOff, ok bool) {
+	if !s.IsAttAlreadyHandedOff() {
 		return v, false
 	}
-	return s.AttNotFound, true
+	return s.AttAlreadyHandedOff, true
 }
 
-// NewAttNotFoundIssueChallengeErrorResponse returns new IssueChallengeErrorResponse from AttNotFound.
-func NewAttNotFoundIssueChallengeErrorResponse(v AttNotFound) IssueChallengeErrorResponse {
+// NewAttAlreadyHandedOffIssueChallengeErrorResponse returns new IssueChallengeErrorResponse from AttAlreadyHandedOff.
+func NewAttAlreadyHandedOffIssueChallengeErrorResponse(v AttAlreadyHandedOff) IssueChallengeErrorResponse {
 	var s IssueChallengeErrorResponse
-	s.SetAttNotFound(v)
+	s.SetAttAlreadyHandedOff(v)
 	return s
 }
 
@@ -6124,24 +8949,24 @@ func NewAttInvalidStateIssueChallengeErrorResponse(v AttInvalidState) IssueChall
 	return s
 }
 
-// SetAttAlreadyCompleted sets IssueChallengeErrorResponse to AttAlreadyCompleted.
-func (s *IssueChallengeErrorResponse) SetAttAlreadyCompleted(v AttAlreadyCompleted) {
-	s.Type = AttAlreadyCompletedIssueChallengeErrorResponse
-	s.AttAlreadyCompleted = v
+// SetAttNotFound sets IssueChallengeErrorResponse to AttNotFound.
+func (s *IssueChallengeErrorResponse) SetAttNotFound(v AttNotFound) {
+	s.Type = AttNotFoundIssueChallengeErrorResponse
+	s.AttNotFound = v
 }
 
-// GetAttAlreadyCompleted returns AttAlreadyCompleted and true boolean if IssueChallengeErrorResponse is AttAlreadyCompleted.
-func (s IssueChallengeErrorResponse) GetAttAlreadyCompleted() (v AttAlreadyCompleted, ok bool) {
-	if !s.IsAttAlreadyCompleted() {
+// GetAttNotFound returns AttNotFound and true boolean if IssueChallengeErrorResponse is AttNotFound.
+func (s IssueChallengeErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
+	if !s.IsAttNotFound() {
 		return v, false
 	}
-	return s.AttAlreadyCompleted, true
+	return s.AttNotFound, true
 }
 
-// NewAttAlreadyCompletedIssueChallengeErrorResponse returns new IssueChallengeErrorResponse from AttAlreadyCompleted.
-func NewAttAlreadyCompletedIssueChallengeErrorResponse(v AttAlreadyCompleted) IssueChallengeErrorResponse {
+// NewAttNotFoundIssueChallengeErrorResponse returns new IssueChallengeErrorResponse from AttNotFound.
+func NewAttNotFoundIssueChallengeErrorResponse(v AttNotFound) IssueChallengeErrorResponse {
 	var s IssueChallengeErrorResponse
-	s.SetAttAlreadyCompleted(v)
+	s.SetAttNotFound(v)
 	return s
 }
 
@@ -6589,6 +9414,130 @@ func (s *ListBrandingResponseItem) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
 }
 
+// ListFlowDefinitionsErrorResponse represents sum type.
+type ListFlowDefinitionsErrorResponse struct {
+	Type                    ListFlowDefinitionsErrorResponseType // switch on this field
+	FlowdefInvalid          FlowdefInvalid
+	Internal                Internal
+	FlowdefMissingProjectID FlowdefMissingProjectID
+}
+
+// ListFlowDefinitionsErrorResponseType is oneOf type of ListFlowDefinitionsErrorResponse.
+type ListFlowDefinitionsErrorResponseType string
+
+// Possible values for ListFlowDefinitionsErrorResponseType.
+const (
+	FlowdefInvalidListFlowDefinitionsErrorResponse          ListFlowDefinitionsErrorResponseType = "flowdef.invalid"
+	InternalListFlowDefinitionsErrorResponse                ListFlowDefinitionsErrorResponseType = "internal"
+	FlowdefMissingProjectIDListFlowDefinitionsErrorResponse ListFlowDefinitionsErrorResponseType = "flowdef.missing_project_id"
+)
+
+// IsFlowdefInvalid reports whether ListFlowDefinitionsErrorResponse is FlowdefInvalid.
+func (s ListFlowDefinitionsErrorResponse) IsFlowdefInvalid() bool {
+	return s.Type == FlowdefInvalidListFlowDefinitionsErrorResponse
+}
+
+// IsInternal reports whether ListFlowDefinitionsErrorResponse is Internal.
+func (s ListFlowDefinitionsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListFlowDefinitionsErrorResponse
+}
+
+// IsFlowdefMissingProjectID reports whether ListFlowDefinitionsErrorResponse is FlowdefMissingProjectID.
+func (s ListFlowDefinitionsErrorResponse) IsFlowdefMissingProjectID() bool {
+	return s.Type == FlowdefMissingProjectIDListFlowDefinitionsErrorResponse
+}
+
+// SetFlowdefInvalid sets ListFlowDefinitionsErrorResponse to FlowdefInvalid.
+func (s *ListFlowDefinitionsErrorResponse) SetFlowdefInvalid(v FlowdefInvalid) {
+	s.Type = FlowdefInvalidListFlowDefinitionsErrorResponse
+	s.FlowdefInvalid = v
+}
+
+// GetFlowdefInvalid returns FlowdefInvalid and true boolean if ListFlowDefinitionsErrorResponse is FlowdefInvalid.
+func (s ListFlowDefinitionsErrorResponse) GetFlowdefInvalid() (v FlowdefInvalid, ok bool) {
+	if !s.IsFlowdefInvalid() {
+		return v, false
+	}
+	return s.FlowdefInvalid, true
+}
+
+// NewFlowdefInvalidListFlowDefinitionsErrorResponse returns new ListFlowDefinitionsErrorResponse from FlowdefInvalid.
+func NewFlowdefInvalidListFlowDefinitionsErrorResponse(v FlowdefInvalid) ListFlowDefinitionsErrorResponse {
+	var s ListFlowDefinitionsErrorResponse
+	s.SetFlowdefInvalid(v)
+	return s
+}
+
+// SetInternal sets ListFlowDefinitionsErrorResponse to Internal.
+func (s *ListFlowDefinitionsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListFlowDefinitionsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListFlowDefinitionsErrorResponse is Internal.
+func (s ListFlowDefinitionsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListFlowDefinitionsErrorResponse returns new ListFlowDefinitionsErrorResponse from Internal.
+func NewInternalListFlowDefinitionsErrorResponse(v Internal) ListFlowDefinitionsErrorResponse {
+	var s ListFlowDefinitionsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetFlowdefMissingProjectID sets ListFlowDefinitionsErrorResponse to FlowdefMissingProjectID.
+func (s *ListFlowDefinitionsErrorResponse) SetFlowdefMissingProjectID(v FlowdefMissingProjectID) {
+	s.Type = FlowdefMissingProjectIDListFlowDefinitionsErrorResponse
+	s.FlowdefMissingProjectID = v
+}
+
+// GetFlowdefMissingProjectID returns FlowdefMissingProjectID and true boolean if ListFlowDefinitionsErrorResponse is FlowdefMissingProjectID.
+func (s ListFlowDefinitionsErrorResponse) GetFlowdefMissingProjectID() (v FlowdefMissingProjectID, ok bool) {
+	if !s.IsFlowdefMissingProjectID() {
+		return v, false
+	}
+	return s.FlowdefMissingProjectID, true
+}
+
+// NewFlowdefMissingProjectIDListFlowDefinitionsErrorResponse returns new ListFlowDefinitionsErrorResponse from FlowdefMissingProjectID.
+func NewFlowdefMissingProjectIDListFlowDefinitionsErrorResponse(v FlowdefMissingProjectID) ListFlowDefinitionsErrorResponse {
+	var s ListFlowDefinitionsErrorResponse
+	s.SetFlowdefMissingProjectID(v)
+	return s
+}
+
+// ListFlowDefinitionsErrorResponseStatusCode wraps ListFlowDefinitionsErrorResponse with StatusCode.
+type ListFlowDefinitionsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListFlowDefinitionsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListFlowDefinitionsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListFlowDefinitionsErrorResponseStatusCode) GetResponse() ListFlowDefinitionsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListFlowDefinitionsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListFlowDefinitionsErrorResponseStatusCode) SetResponse(val ListFlowDefinitionsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListFlowDefinitionsErrorResponseStatusCode) listFlowDefinitionsRes() {}
+
 type ListFlowDefinitionsPurpose string
 
 const (
@@ -6692,6 +9641,102 @@ type ListUserPasskeysBadRequest ErrorDetails
 
 func (*ListUserPasskeysBadRequest) listUserPasskeysRes() {}
 
+// ListUserPasskeysErrorResponse represents sum type.
+type ListUserPasskeysErrorResponse struct {
+	Type         ListUserPasskeysErrorResponseType // switch on this field
+	Internal     Internal
+	UserNotFound UserNotFound
+}
+
+// ListUserPasskeysErrorResponseType is oneOf type of ListUserPasskeysErrorResponse.
+type ListUserPasskeysErrorResponseType string
+
+// Possible values for ListUserPasskeysErrorResponseType.
+const (
+	InternalListUserPasskeysErrorResponse     ListUserPasskeysErrorResponseType = "internal"
+	UserNotFoundListUserPasskeysErrorResponse ListUserPasskeysErrorResponseType = "user.not_found"
+)
+
+// IsInternal reports whether ListUserPasskeysErrorResponse is Internal.
+func (s ListUserPasskeysErrorResponse) IsInternal() bool {
+	return s.Type == InternalListUserPasskeysErrorResponse
+}
+
+// IsUserNotFound reports whether ListUserPasskeysErrorResponse is UserNotFound.
+func (s ListUserPasskeysErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundListUserPasskeysErrorResponse
+}
+
+// SetInternal sets ListUserPasskeysErrorResponse to Internal.
+func (s *ListUserPasskeysErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListUserPasskeysErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListUserPasskeysErrorResponse is Internal.
+func (s ListUserPasskeysErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListUserPasskeysErrorResponse returns new ListUserPasskeysErrorResponse from Internal.
+func NewInternalListUserPasskeysErrorResponse(v Internal) ListUserPasskeysErrorResponse {
+	var s ListUserPasskeysErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetUserNotFound sets ListUserPasskeysErrorResponse to UserNotFound.
+func (s *ListUserPasskeysErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundListUserPasskeysErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if ListUserPasskeysErrorResponse is UserNotFound.
+func (s ListUserPasskeysErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundListUserPasskeysErrorResponse returns new ListUserPasskeysErrorResponse from UserNotFound.
+func NewUserNotFoundListUserPasskeysErrorResponse(v UserNotFound) ListUserPasskeysErrorResponse {
+	var s ListUserPasskeysErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// ListUserPasskeysErrorResponseStatusCode wraps ListUserPasskeysErrorResponse with StatusCode.
+type ListUserPasskeysErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListUserPasskeysErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListUserPasskeysErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListUserPasskeysErrorResponseStatusCode) GetResponse() ListUserPasskeysErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListUserPasskeysErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListUserPasskeysErrorResponseStatusCode) SetResponse(val ListUserPasskeysErrorResponse) {
+	s.Response = val
+}
+
+func (*ListUserPasskeysErrorResponseStatusCode) listUserPasskeysRes() {}
+
 type ListUserPasskeysForbidden ErrorDetails
 
 func (*ListUserPasskeysForbidden) listUserPasskeysRes() {}
@@ -6782,6 +9827,130 @@ type ListUserTeamsBadRequest ErrorDetails
 
 func (*ListUserTeamsBadRequest) listUserTeamsRes() {}
 
+// ListUserTeamsErrorResponse represents sum type.
+type ListUserTeamsErrorResponse struct {
+	Type         ListUserTeamsErrorResponseType // switch on this field
+	Internal     Internal
+	ReqInvalid   ReqInvalid
+	UserNotFound UserNotFound
+}
+
+// ListUserTeamsErrorResponseType is oneOf type of ListUserTeamsErrorResponse.
+type ListUserTeamsErrorResponseType string
+
+// Possible values for ListUserTeamsErrorResponseType.
+const (
+	InternalListUserTeamsErrorResponse     ListUserTeamsErrorResponseType = "internal"
+	ReqInvalidListUserTeamsErrorResponse   ListUserTeamsErrorResponseType = "req.invalid"
+	UserNotFoundListUserTeamsErrorResponse ListUserTeamsErrorResponseType = "user.not_found"
+)
+
+// IsInternal reports whether ListUserTeamsErrorResponse is Internal.
+func (s ListUserTeamsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListUserTeamsErrorResponse
+}
+
+// IsReqInvalid reports whether ListUserTeamsErrorResponse is ReqInvalid.
+func (s ListUserTeamsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListUserTeamsErrorResponse
+}
+
+// IsUserNotFound reports whether ListUserTeamsErrorResponse is UserNotFound.
+func (s ListUserTeamsErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundListUserTeamsErrorResponse
+}
+
+// SetInternal sets ListUserTeamsErrorResponse to Internal.
+func (s *ListUserTeamsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListUserTeamsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListUserTeamsErrorResponse is Internal.
+func (s ListUserTeamsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListUserTeamsErrorResponse returns new ListUserTeamsErrorResponse from Internal.
+func NewInternalListUserTeamsErrorResponse(v Internal) ListUserTeamsErrorResponse {
+	var s ListUserTeamsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListUserTeamsErrorResponse to ReqInvalid.
+func (s *ListUserTeamsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListUserTeamsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListUserTeamsErrorResponse is ReqInvalid.
+func (s ListUserTeamsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListUserTeamsErrorResponse returns new ListUserTeamsErrorResponse from ReqInvalid.
+func NewReqInvalidListUserTeamsErrorResponse(v ReqInvalid) ListUserTeamsErrorResponse {
+	var s ListUserTeamsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets ListUserTeamsErrorResponse to UserNotFound.
+func (s *ListUserTeamsErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundListUserTeamsErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if ListUserTeamsErrorResponse is UserNotFound.
+func (s ListUserTeamsErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundListUserTeamsErrorResponse returns new ListUserTeamsErrorResponse from UserNotFound.
+func NewUserNotFoundListUserTeamsErrorResponse(v UserNotFound) ListUserTeamsErrorResponse {
+	var s ListUserTeamsErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// ListUserTeamsErrorResponseStatusCode wraps ListUserTeamsErrorResponse with StatusCode.
+type ListUserTeamsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListUserTeamsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListUserTeamsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListUserTeamsErrorResponseStatusCode) GetResponse() ListUserTeamsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListUserTeamsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListUserTeamsErrorResponseStatusCode) SetResponse(val ListUserTeamsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListUserTeamsErrorResponseStatusCode) listUserTeamsRes() {}
+
 type ListUserTeamsForbidden ErrorDetails
 
 func (*ListUserTeamsForbidden) listUserTeamsRes() {}
@@ -6832,6 +10001,100 @@ func (*ListUserTeamsUnauthorized) listUserTeamsRes() {}
 type ListUsersBadRequest ErrorDetails
 
 func (*ListUsersBadRequest) listUsersRes() {}
+
+// ListUsersErrorResponse represents sum type.
+type ListUsersErrorResponse struct {
+	Type       ListUsersErrorResponseType // switch on this field
+	Internal   Internal
+	ReqInvalid ReqInvalid
+}
+
+// ListUsersErrorResponseType is oneOf type of ListUsersErrorResponse.
+type ListUsersErrorResponseType string
+
+// Possible values for ListUsersErrorResponseType.
+const (
+	InternalListUsersErrorResponse   ListUsersErrorResponseType = "internal"
+	ReqInvalidListUsersErrorResponse ListUsersErrorResponseType = "req.invalid"
+)
+
+// IsInternal reports whether ListUsersErrorResponse is Internal.
+func (s ListUsersErrorResponse) IsInternal() bool { return s.Type == InternalListUsersErrorResponse }
+
+// IsReqInvalid reports whether ListUsersErrorResponse is ReqInvalid.
+func (s ListUsersErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListUsersErrorResponse
+}
+
+// SetInternal sets ListUsersErrorResponse to Internal.
+func (s *ListUsersErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListUsersErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListUsersErrorResponse is Internal.
+func (s ListUsersErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListUsersErrorResponse returns new ListUsersErrorResponse from Internal.
+func NewInternalListUsersErrorResponse(v Internal) ListUsersErrorResponse {
+	var s ListUsersErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetReqInvalid sets ListUsersErrorResponse to ReqInvalid.
+func (s *ListUsersErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListUsersErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListUsersErrorResponse is ReqInvalid.
+func (s ListUsersErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListUsersErrorResponse returns new ListUsersErrorResponse from ReqInvalid.
+func NewReqInvalidListUsersErrorResponse(v ReqInvalid) ListUsersErrorResponse {
+	var s ListUsersErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// ListUsersErrorResponseStatusCode wraps ListUsersErrorResponse with StatusCode.
+type ListUsersErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListUsersErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListUsersErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListUsersErrorResponseStatusCode) GetResponse() ListUsersErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListUsersErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListUsersErrorResponseStatusCode) SetResponse(val ListUsersErrorResponse) {
+	s.Response = val
+}
+
+func (*ListUsersErrorResponseStatusCode) listUsersRes() {}
 
 type ListUsersInternalServerError ErrorDetails
 
@@ -6891,6 +10154,59 @@ func (s *NextgenSession) SetAPIKey(val string) {
 // SetRoles sets the value of Roles.
 func (s *NextgenSession) SetRoles(val []string) {
 	s.Roles = val
+}
+
+// Merged schema.
+// Ref: #
+type NotImplemented struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptNotImplementedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *NotImplemented) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *NotImplemented) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *NotImplemented) GetDetails() OptNotImplementedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *NotImplemented) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *NotImplemented) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *NotImplemented) SetDetails(val OptNotImplementedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type NotImplementedDetails map[string]jx.Raw
+
+func (s *NotImplementedDetails) init() NotImplementedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 type OAuth2 struct {
@@ -7573,38 +10889,38 @@ func (s *OpenidConfigurationTokenEndpointAuthMethodsSupportedItem) UnmarshalText
 	}
 }
 
-// NewOptAttAlreadyCompletedDetails returns new OptAttAlreadyCompletedDetails with value set to v.
-func NewOptAttAlreadyCompletedDetails(v AttAlreadyCompletedDetails) OptAttAlreadyCompletedDetails {
-	return OptAttAlreadyCompletedDetails{
+// NewOptAttAlreadyHandedOffDetails returns new OptAttAlreadyHandedOffDetails with value set to v.
+func NewOptAttAlreadyHandedOffDetails(v AttAlreadyHandedOffDetails) OptAttAlreadyHandedOffDetails {
+	return OptAttAlreadyHandedOffDetails{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptAttAlreadyCompletedDetails is optional AttAlreadyCompletedDetails.
-type OptAttAlreadyCompletedDetails struct {
-	Value AttAlreadyCompletedDetails
+// OptAttAlreadyHandedOffDetails is optional AttAlreadyHandedOffDetails.
+type OptAttAlreadyHandedOffDetails struct {
+	Value AttAlreadyHandedOffDetails
 	Set   bool
 }
 
-// IsSet returns true if OptAttAlreadyCompletedDetails was set.
-func (o OptAttAlreadyCompletedDetails) IsSet() bool { return o.Set }
+// IsSet returns true if OptAttAlreadyHandedOffDetails was set.
+func (o OptAttAlreadyHandedOffDetails) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptAttAlreadyCompletedDetails) Reset() {
-	var v AttAlreadyCompletedDetails
+func (o *OptAttAlreadyHandedOffDetails) Reset() {
+	var v AttAlreadyHandedOffDetails
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptAttAlreadyCompletedDetails) SetTo(v AttAlreadyCompletedDetails) {
+func (o *OptAttAlreadyHandedOffDetails) SetTo(v AttAlreadyHandedOffDetails) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptAttAlreadyCompletedDetails) Get() (v AttAlreadyCompletedDetails, ok bool) {
+func (o OptAttAlreadyHandedOffDetails) Get() (v AttAlreadyHandedOffDetails, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -7612,7 +10928,7 @@ func (o OptAttAlreadyCompletedDetails) Get() (v AttAlreadyCompletedDetails, ok b
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptAttAlreadyCompletedDetails) Or(d AttAlreadyCompletedDetails) AttAlreadyCompletedDetails {
+func (o OptAttAlreadyHandedOffDetails) Or(d AttAlreadyHandedOffDetails) AttAlreadyHandedOffDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -8401,6 +11717,144 @@ func (o OptDuration) Or(d ogenx.ISODuration) ogenx.ISODuration {
 	return d
 }
 
+// NewOptEncKeyDecryptFailedDetails returns new OptEncKeyDecryptFailedDetails with value set to v.
+func NewOptEncKeyDecryptFailedDetails(v EncKeyDecryptFailedDetails) OptEncKeyDecryptFailedDetails {
+	return OptEncKeyDecryptFailedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEncKeyDecryptFailedDetails is optional EncKeyDecryptFailedDetails.
+type OptEncKeyDecryptFailedDetails struct {
+	Value EncKeyDecryptFailedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptEncKeyDecryptFailedDetails was set.
+func (o OptEncKeyDecryptFailedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEncKeyDecryptFailedDetails) Reset() {
+	var v EncKeyDecryptFailedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEncKeyDecryptFailedDetails) SetTo(v EncKeyDecryptFailedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEncKeyDecryptFailedDetails) Get() (v EncKeyDecryptFailedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEncKeyDecryptFailedDetails) Or(d EncKeyDecryptFailedDetails) EncKeyDecryptFailedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEncKeyNotFoundDetails returns new OptEncKeyNotFoundDetails with value set to v.
+func NewOptEncKeyNotFoundDetails(v EncKeyNotFoundDetails) OptEncKeyNotFoundDetails {
+	return OptEncKeyNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEncKeyNotFoundDetails is optional EncKeyNotFoundDetails.
+type OptEncKeyNotFoundDetails struct {
+	Value EncKeyNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptEncKeyNotFoundDetails was set.
+func (o OptEncKeyNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEncKeyNotFoundDetails) Reset() {
+	var v EncKeyNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEncKeyNotFoundDetails) SetTo(v EncKeyNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEncKeyNotFoundDetails) Get() (v EncKeyNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEncKeyNotFoundDetails) Or(d EncKeyNotFoundDetails) EncKeyNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEncKeyUnknownAlgDetails returns new OptEncKeyUnknownAlgDetails with value set to v.
+func NewOptEncKeyUnknownAlgDetails(v EncKeyUnknownAlgDetails) OptEncKeyUnknownAlgDetails {
+	return OptEncKeyUnknownAlgDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEncKeyUnknownAlgDetails is optional EncKeyUnknownAlgDetails.
+type OptEncKeyUnknownAlgDetails struct {
+	Value EncKeyUnknownAlgDetails
+	Set   bool
+}
+
+// IsSet returns true if OptEncKeyUnknownAlgDetails was set.
+func (o OptEncKeyUnknownAlgDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEncKeyUnknownAlgDetails) Reset() {
+	var v EncKeyUnknownAlgDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEncKeyUnknownAlgDetails) SetTo(v EncKeyUnknownAlgDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEncKeyUnknownAlgDetails) Get() (v EncKeyUnknownAlgDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEncKeyUnknownAlgDetails) Or(d EncKeyUnknownAlgDetails) EncKeyUnknownAlgDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptErrorDetailsDetails returns new OptErrorDetailsDetails with value set to v.
 func NewOptErrorDetailsDetails(v ErrorDetailsDetails) OptErrorDetailsDetails {
 	return OptErrorDetailsDetails{
@@ -8907,6 +12361,98 @@ func (o OptFlowHint) Or(d FlowHint) FlowHint {
 	return d
 }
 
+// NewOptFlowIntegrityDetails returns new OptFlowIntegrityDetails with value set to v.
+func NewOptFlowIntegrityDetails(v FlowIntegrityDetails) OptFlowIntegrityDetails {
+	return OptFlowIntegrityDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowIntegrityDetails is optional FlowIntegrityDetails.
+type OptFlowIntegrityDetails struct {
+	Value FlowIntegrityDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowIntegrityDetails was set.
+func (o OptFlowIntegrityDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowIntegrityDetails) Reset() {
+	var v FlowIntegrityDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowIntegrityDetails) SetTo(v FlowIntegrityDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowIntegrityDetails) Get() (v FlowIntegrityDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowIntegrityDetails) Or(d FlowIntegrityDetails) FlowIntegrityDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowInvalidActionDetails returns new OptFlowInvalidActionDetails with value set to v.
+func NewOptFlowInvalidActionDetails(v FlowInvalidActionDetails) OptFlowInvalidActionDetails {
+	return OptFlowInvalidActionDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowInvalidActionDetails is optional FlowInvalidActionDetails.
+type OptFlowInvalidActionDetails struct {
+	Value FlowInvalidActionDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowInvalidActionDetails was set.
+func (o OptFlowInvalidActionDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowInvalidActionDetails) Reset() {
+	var v FlowInvalidActionDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowInvalidActionDetails) SetTo(v FlowInvalidActionDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowInvalidActionDetails) Get() (v FlowInvalidActionDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowInvalidActionDetails) Or(d FlowInvalidActionDetails) FlowInvalidActionDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowStepChallenge returns new OptFlowStepChallenge with value set to v.
 func NewOptFlowStepChallenge(v FlowStepChallenge) OptFlowStepChallenge {
 	return OptFlowStepChallenge{
@@ -9269,6 +12815,420 @@ func (o OptFlowSubmitRequestGateProofs) Get() (v FlowSubmitRequestGateProofs, ok
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowSubmitRequestGateProofs) Or(d FlowSubmitRequestGateProofs) FlowSubmitRequestGateProofs {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowUnsupportedDetails returns new OptFlowUnsupportedDetails with value set to v.
+func NewOptFlowUnsupportedDetails(v FlowUnsupportedDetails) OptFlowUnsupportedDetails {
+	return OptFlowUnsupportedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowUnsupportedDetails is optional FlowUnsupportedDetails.
+type OptFlowUnsupportedDetails struct {
+	Value FlowUnsupportedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowUnsupportedDetails was set.
+func (o OptFlowUnsupportedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowUnsupportedDetails) Reset() {
+	var v FlowUnsupportedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowUnsupportedDetails) SetTo(v FlowUnsupportedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowUnsupportedDetails) Get() (v FlowUnsupportedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowUnsupportedDetails) Or(d FlowUnsupportedDetails) FlowUnsupportedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowdefAlreadyExistsDetails returns new OptFlowdefAlreadyExistsDetails with value set to v.
+func NewOptFlowdefAlreadyExistsDetails(v FlowdefAlreadyExistsDetails) OptFlowdefAlreadyExistsDetails {
+	return OptFlowdefAlreadyExistsDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowdefAlreadyExistsDetails is optional FlowdefAlreadyExistsDetails.
+type OptFlowdefAlreadyExistsDetails struct {
+	Value FlowdefAlreadyExistsDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowdefAlreadyExistsDetails was set.
+func (o OptFlowdefAlreadyExistsDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowdefAlreadyExistsDetails) Reset() {
+	var v FlowdefAlreadyExistsDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowdefAlreadyExistsDetails) SetTo(v FlowdefAlreadyExistsDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowdefAlreadyExistsDetails) Get() (v FlowdefAlreadyExistsDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowdefAlreadyExistsDetails) Or(d FlowdefAlreadyExistsDetails) FlowdefAlreadyExistsDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowdefInvalidDetails returns new OptFlowdefInvalidDetails with value set to v.
+func NewOptFlowdefInvalidDetails(v FlowdefInvalidDetails) OptFlowdefInvalidDetails {
+	return OptFlowdefInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowdefInvalidDetails is optional FlowdefInvalidDetails.
+type OptFlowdefInvalidDetails struct {
+	Value FlowdefInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowdefInvalidDetails was set.
+func (o OptFlowdefInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowdefInvalidDetails) Reset() {
+	var v FlowdefInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowdefInvalidDetails) SetTo(v FlowdefInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowdefInvalidDetails) Get() (v FlowdefInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowdefInvalidDetails) Or(d FlowdefInvalidDetails) FlowdefInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowdefMissingIDDetails returns new OptFlowdefMissingIDDetails with value set to v.
+func NewOptFlowdefMissingIDDetails(v FlowdefMissingIDDetails) OptFlowdefMissingIDDetails {
+	return OptFlowdefMissingIDDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowdefMissingIDDetails is optional FlowdefMissingIDDetails.
+type OptFlowdefMissingIDDetails struct {
+	Value FlowdefMissingIDDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowdefMissingIDDetails was set.
+func (o OptFlowdefMissingIDDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowdefMissingIDDetails) Reset() {
+	var v FlowdefMissingIDDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowdefMissingIDDetails) SetTo(v FlowdefMissingIDDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowdefMissingIDDetails) Get() (v FlowdefMissingIDDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowdefMissingIDDetails) Or(d FlowdefMissingIDDetails) FlowdefMissingIDDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowdefMissingProjectIDDetails returns new OptFlowdefMissingProjectIDDetails with value set to v.
+func NewOptFlowdefMissingProjectIDDetails(v FlowdefMissingProjectIDDetails) OptFlowdefMissingProjectIDDetails {
+	return OptFlowdefMissingProjectIDDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowdefMissingProjectIDDetails is optional FlowdefMissingProjectIDDetails.
+type OptFlowdefMissingProjectIDDetails struct {
+	Value FlowdefMissingProjectIDDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowdefMissingProjectIDDetails was set.
+func (o OptFlowdefMissingProjectIDDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowdefMissingProjectIDDetails) Reset() {
+	var v FlowdefMissingProjectIDDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowdefMissingProjectIDDetails) SetTo(v FlowdefMissingProjectIDDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowdefMissingProjectIDDetails) Get() (v FlowdefMissingProjectIDDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowdefMissingProjectIDDetails) Or(d FlowdefMissingProjectIDDetails) FlowdefMissingProjectIDDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowdefNotFoundDetails returns new OptFlowdefNotFoundDetails with value set to v.
+func NewOptFlowdefNotFoundDetails(v FlowdefNotFoundDetails) OptFlowdefNotFoundDetails {
+	return OptFlowdefNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowdefNotFoundDetails is optional FlowdefNotFoundDetails.
+type OptFlowdefNotFoundDetails struct {
+	Value FlowdefNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowdefNotFoundDetails was set.
+func (o OptFlowdefNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowdefNotFoundDetails) Reset() {
+	var v FlowdefNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowdefNotFoundDetails) SetTo(v FlowdefNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowdefNotFoundDetails) Get() (v FlowdefNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowdefNotFoundDetails) Or(d FlowdefNotFoundDetails) FlowdefNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowdefPurposeMismatchDetails returns new OptFlowdefPurposeMismatchDetails with value set to v.
+func NewOptFlowdefPurposeMismatchDetails(v FlowdefPurposeMismatchDetails) OptFlowdefPurposeMismatchDetails {
+	return OptFlowdefPurposeMismatchDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowdefPurposeMismatchDetails is optional FlowdefPurposeMismatchDetails.
+type OptFlowdefPurposeMismatchDetails struct {
+	Value FlowdefPurposeMismatchDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowdefPurposeMismatchDetails was set.
+func (o OptFlowdefPurposeMismatchDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowdefPurposeMismatchDetails) Reset() {
+	var v FlowdefPurposeMismatchDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowdefPurposeMismatchDetails) SetTo(v FlowdefPurposeMismatchDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowdefPurposeMismatchDetails) Get() (v FlowdefPurposeMismatchDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowdefPurposeMismatchDetails) Or(d FlowdefPurposeMismatchDetails) FlowdefPurposeMismatchDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowdefSchemaFetchFailedDetails returns new OptFlowdefSchemaFetchFailedDetails with value set to v.
+func NewOptFlowdefSchemaFetchFailedDetails(v FlowdefSchemaFetchFailedDetails) OptFlowdefSchemaFetchFailedDetails {
+	return OptFlowdefSchemaFetchFailedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowdefSchemaFetchFailedDetails is optional FlowdefSchemaFetchFailedDetails.
+type OptFlowdefSchemaFetchFailedDetails struct {
+	Value FlowdefSchemaFetchFailedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowdefSchemaFetchFailedDetails was set.
+func (o OptFlowdefSchemaFetchFailedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowdefSchemaFetchFailedDetails) Reset() {
+	var v FlowdefSchemaFetchFailedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowdefSchemaFetchFailedDetails) SetTo(v FlowdefSchemaFetchFailedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowdefSchemaFetchFailedDetails) Get() (v FlowdefSchemaFetchFailedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowdefSchemaFetchFailedDetails) Or(d FlowdefSchemaFetchFailedDetails) FlowdefSchemaFetchFailedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowdefUpdateConflictDetails returns new OptFlowdefUpdateConflictDetails with value set to v.
+func NewOptFlowdefUpdateConflictDetails(v FlowdefUpdateConflictDetails) OptFlowdefUpdateConflictDetails {
+	return OptFlowdefUpdateConflictDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowdefUpdateConflictDetails is optional FlowdefUpdateConflictDetails.
+type OptFlowdefUpdateConflictDetails struct {
+	Value FlowdefUpdateConflictDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowdefUpdateConflictDetails was set.
+func (o OptFlowdefUpdateConflictDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowdefUpdateConflictDetails) Reset() {
+	var v FlowdefUpdateConflictDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowdefUpdateConflictDetails) SetTo(v FlowdefUpdateConflictDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowdefUpdateConflictDetails) Get() (v FlowdefUpdateConflictDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowdefUpdateConflictDetails) Or(d FlowdefUpdateConflictDetails) FlowdefUpdateConflictDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -10164,6 +14124,52 @@ func (o OptNilUserPropertyXMinusUnique) Or(d UserPropertyXMinusUnique) UserPrope
 	return d
 }
 
+// NewOptNotImplementedDetails returns new OptNotImplementedDetails with value set to v.
+func NewOptNotImplementedDetails(v NotImplementedDetails) OptNotImplementedDetails {
+	return OptNotImplementedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNotImplementedDetails is optional NotImplementedDetails.
+type OptNotImplementedDetails struct {
+	Value NotImplementedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptNotImplementedDetails was set.
+func (o OptNotImplementedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNotImplementedDetails) Reset() {
+	var v NotImplementedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptNotImplementedDetails) SetTo(v NotImplementedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNotImplementedDetails) Get() (v NotImplementedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNotImplementedDetails) Or(d NotImplementedDetails) NotImplementedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptPageToken returns new OptPageToken with value set to v.
 func NewOptPageToken(v PageToken) OptPageToken {
 	return OptPageToken{
@@ -10302,6 +14308,52 @@ func (o OptPasskeyFactorPayloadAuthenticatorAttachment) Or(d PasskeyFactorPayloa
 	return d
 }
 
+// NewOptPkregNotFoundDetails returns new OptPkregNotFoundDetails with value set to v.
+func NewOptPkregNotFoundDetails(v PkregNotFoundDetails) OptPkregNotFoundDetails {
+	return OptPkregNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPkregNotFoundDetails is optional PkregNotFoundDetails.
+type OptPkregNotFoundDetails struct {
+	Value PkregNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptPkregNotFoundDetails was set.
+func (o OptPkregNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPkregNotFoundDetails) Reset() {
+	var v PkregNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPkregNotFoundDetails) SetTo(v PkregNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPkregNotFoundDetails) Get() (v PkregNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPkregNotFoundDetails) Or(d PkregNotFoundDetails) PkregNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptPostTokenRequestGrantType returns new OptPostTokenRequestGrantType with value set to v.
 func NewOptPostTokenRequestGrantType(v PostTokenRequestGrantType) OptPostTokenRequestGrantType {
 	return OptPostTokenRequestGrantType{
@@ -10388,6 +14440,98 @@ func (o OptProjClaimExpiredDetails) Get() (v ProjClaimExpiredDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptProjClaimExpiredDetails) Or(d ProjClaimExpiredDetails) ProjClaimExpiredDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptProjMissingIDDetails returns new OptProjMissingIDDetails with value set to v.
+func NewOptProjMissingIDDetails(v ProjMissingIDDetails) OptProjMissingIDDetails {
+	return OptProjMissingIDDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjMissingIDDetails is optional ProjMissingIDDetails.
+type OptProjMissingIDDetails struct {
+	Value ProjMissingIDDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjMissingIDDetails was set.
+func (o OptProjMissingIDDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjMissingIDDetails) Reset() {
+	var v ProjMissingIDDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjMissingIDDetails) SetTo(v ProjMissingIDDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjMissingIDDetails) Get() (v ProjMissingIDDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjMissingIDDetails) Or(d ProjMissingIDDetails) ProjMissingIDDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptProjNameInvalidDetails returns new OptProjNameInvalidDetails with value set to v.
+func NewOptProjNameInvalidDetails(v ProjNameInvalidDetails) OptProjNameInvalidDetails {
+	return OptProjNameInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjNameInvalidDetails is optional ProjNameInvalidDetails.
+type OptProjNameInvalidDetails struct {
+	Value ProjNameInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjNameInvalidDetails was set.
+func (o OptProjNameInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjNameInvalidDetails) Reset() {
+	var v ProjNameInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjNameInvalidDetails) SetTo(v ProjNameInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjNameInvalidDetails) Get() (v ProjNameInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjNameInvalidDetails) Or(d ProjNameInvalidDetails) ProjNameInvalidDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -10624,6 +14768,144 @@ func (o OptQueryTeamsRequestSorting) Or(d QueryTeamsRequestSorting) QueryTeamsRe
 	return d
 }
 
+// NewOptReqInvalidDetails returns new OptReqInvalidDetails with value set to v.
+func NewOptReqInvalidDetails(v ReqInvalidDetails) OptReqInvalidDetails {
+	return OptReqInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptReqInvalidDetails is optional ReqInvalidDetails.
+type OptReqInvalidDetails struct {
+	Value ReqInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptReqInvalidDetails was set.
+func (o OptReqInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptReqInvalidDetails) Reset() {
+	var v ReqInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptReqInvalidDetails) SetTo(v ReqInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptReqInvalidDetails) Get() (v ReqInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptReqInvalidDetails) Or(d ReqInvalidDetails) ReqInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchInvalidRequestDetails returns new OptSchInvalidRequestDetails with value set to v.
+func NewOptSchInvalidRequestDetails(v SchInvalidRequestDetails) OptSchInvalidRequestDetails {
+	return OptSchInvalidRequestDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchInvalidRequestDetails is optional SchInvalidRequestDetails.
+type OptSchInvalidRequestDetails struct {
+	Value SchInvalidRequestDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchInvalidRequestDetails was set.
+func (o OptSchInvalidRequestDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchInvalidRequestDetails) Reset() {
+	var v SchInvalidRequestDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchInvalidRequestDetails) SetTo(v SchInvalidRequestDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchInvalidRequestDetails) Get() (v SchInvalidRequestDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchInvalidRequestDetails) Or(d SchInvalidRequestDetails) SchInvalidRequestDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSchNotFoundDetails returns new OptSchNotFoundDetails with value set to v.
+func NewOptSchNotFoundDetails(v SchNotFoundDetails) OptSchNotFoundDetails {
+	return OptSchNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSchNotFoundDetails is optional SchNotFoundDetails.
+type OptSchNotFoundDetails struct {
+	Value SchNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSchNotFoundDetails was set.
+func (o OptSchNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSchNotFoundDetails) Reset() {
+	var v SchNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSchNotFoundDetails) SetTo(v SchNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSchNotFoundDetails) Get() (v SchNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSchNotFoundDetails) Or(d SchNotFoundDetails) SchNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSchemaURI returns new OptSchemaURI with value set to v.
 func NewOptSchemaURI(v SchemaURI) OptSchemaURI {
 	return OptSchemaURI{
@@ -10670,6 +14952,144 @@ func (o OptSchemaURI) Or(d SchemaURI) SchemaURI {
 	return d
 }
 
+// NewOptSessExchangeConflictDetails returns new OptSessExchangeConflictDetails with value set to v.
+func NewOptSessExchangeConflictDetails(v SessExchangeConflictDetails) OptSessExchangeConflictDetails {
+	return OptSessExchangeConflictDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessExchangeConflictDetails is optional SessExchangeConflictDetails.
+type OptSessExchangeConflictDetails struct {
+	Value SessExchangeConflictDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSessExchangeConflictDetails was set.
+func (o OptSessExchangeConflictDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessExchangeConflictDetails) Reset() {
+	var v SessExchangeConflictDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessExchangeConflictDetails) SetTo(v SessExchangeConflictDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessExchangeConflictDetails) Get() (v SessExchangeConflictDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessExchangeConflictDetails) Or(d SessExchangeConflictDetails) SessExchangeConflictDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSessInvalidHandoffTokenDetails returns new OptSessInvalidHandoffTokenDetails with value set to v.
+func NewOptSessInvalidHandoffTokenDetails(v SessInvalidHandoffTokenDetails) OptSessInvalidHandoffTokenDetails {
+	return OptSessInvalidHandoffTokenDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessInvalidHandoffTokenDetails is optional SessInvalidHandoffTokenDetails.
+type OptSessInvalidHandoffTokenDetails struct {
+	Value SessInvalidHandoffTokenDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSessInvalidHandoffTokenDetails was set.
+func (o OptSessInvalidHandoffTokenDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessInvalidHandoffTokenDetails) Reset() {
+	var v SessInvalidHandoffTokenDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessInvalidHandoffTokenDetails) SetTo(v SessInvalidHandoffTokenDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessInvalidHandoffTokenDetails) Get() (v SessInvalidHandoffTokenDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessInvalidHandoffTokenDetails) Or(d SessInvalidHandoffTokenDetails) SessInvalidHandoffTokenDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSessInvalidTTLDetails returns new OptSessInvalidTTLDetails with value set to v.
+func NewOptSessInvalidTTLDetails(v SessInvalidTTLDetails) OptSessInvalidTTLDetails {
+	return OptSessInvalidTTLDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessInvalidTTLDetails is optional SessInvalidTTLDetails.
+type OptSessInvalidTTLDetails struct {
+	Value SessInvalidTTLDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSessInvalidTTLDetails was set.
+func (o OptSessInvalidTTLDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessInvalidTTLDetails) Reset() {
+	var v SessInvalidTTLDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessInvalidTTLDetails) SetTo(v SessInvalidTTLDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessInvalidTTLDetails) Get() (v SessInvalidTTLDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessInvalidTTLDetails) Or(d SessInvalidTTLDetails) SessInvalidTTLDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSessNotFoundDetails returns new OptSessNotFoundDetails with value set to v.
 func NewOptSessNotFoundDetails(v SessNotFoundDetails) OptSessNotFoundDetails {
 	return OptSessNotFoundDetails{
@@ -10710,6 +15130,52 @@ func (o OptSessNotFoundDetails) Get() (v SessNotFoundDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptSessNotFoundDetails) Or(d SessNotFoundDetails) SessNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSessTokenInvalidDetails returns new OptSessTokenInvalidDetails with value set to v.
+func NewOptSessTokenInvalidDetails(v SessTokenInvalidDetails) OptSessTokenInvalidDetails {
+	return OptSessTokenInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessTokenInvalidDetails is optional SessTokenInvalidDetails.
+type OptSessTokenInvalidDetails struct {
+	Value SessTokenInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSessTokenInvalidDetails was set.
+func (o OptSessTokenInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessTokenInvalidDetails) Reset() {
+	var v SessTokenInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessTokenInvalidDetails) SetTo(v SessTokenInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessTokenInvalidDetails) Get() (v SessTokenInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessTokenInvalidDetails) Or(d SessTokenInvalidDetails) SessTokenInvalidDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -10854,6 +15320,98 @@ func (o OptTeamID) Or(d TeamID) TeamID {
 	return d
 }
 
+// NewOptTknInvalidDetails returns new OptTknInvalidDetails with value set to v.
+func NewOptTknInvalidDetails(v TknInvalidDetails) OptTknInvalidDetails {
+	return OptTknInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptTknInvalidDetails is optional TknInvalidDetails.
+type OptTknInvalidDetails struct {
+	Value TknInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptTknInvalidDetails was set.
+func (o OptTknInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptTknInvalidDetails) Reset() {
+	var v TknInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptTknInvalidDetails) SetTo(v TknInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptTknInvalidDetails) Get() (v TknInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptTknInvalidDetails) Or(d TknInvalidDetails) TknInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptTknInvalidTknidDetails returns new OptTknInvalidTknidDetails with value set to v.
+func NewOptTknInvalidTknidDetails(v TknInvalidTknidDetails) OptTknInvalidTknidDetails {
+	return OptTknInvalidTknidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptTknInvalidTknidDetails is optional TknInvalidTknidDetails.
+type OptTknInvalidTknidDetails struct {
+	Value TknInvalidTknidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptTknInvalidTknidDetails was set.
+func (o OptTknInvalidTknidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptTknInvalidTknidDetails) Reset() {
+	var v TknInvalidTknidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptTknInvalidTknidDetails) SetTo(v TknInvalidTknidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptTknInvalidTknidDetails) Get() (v TknInvalidTknidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptTknInvalidTknidDetails) Or(d TknInvalidTknidDetails) TknInvalidTknidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptURI returns new OptURI with value set to v.
 func NewOptURI(v url.URL) OptURI {
 	return OptURI{
@@ -10900,6 +15458,52 @@ func (o OptURI) Or(d url.URL) url.URL {
 	return d
 }
 
+// NewOptUserAlreadyExistsDetails returns new OptUserAlreadyExistsDetails with value set to v.
+func NewOptUserAlreadyExistsDetails(v UserAlreadyExistsDetails) OptUserAlreadyExistsDetails {
+	return OptUserAlreadyExistsDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserAlreadyExistsDetails is optional UserAlreadyExistsDetails.
+type OptUserAlreadyExistsDetails struct {
+	Value UserAlreadyExistsDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserAlreadyExistsDetails was set.
+func (o OptUserAlreadyExistsDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserAlreadyExistsDetails) Reset() {
+	var v UserAlreadyExistsDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserAlreadyExistsDetails) SetTo(v UserAlreadyExistsDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserAlreadyExistsDetails) Get() (v UserAlreadyExistsDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserAlreadyExistsDetails) Or(d UserAlreadyExistsDetails) UserAlreadyExistsDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserID returns new OptUserID with value set to v.
 func NewOptUserID(v UserID) OptUserID {
 	return OptUserID{
@@ -10940,6 +15544,52 @@ func (o OptUserID) Get() (v UserID, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUserID) Or(d UserID) UserID {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUserInvalidDetails returns new OptUserInvalidDetails with value set to v.
+func NewOptUserInvalidDetails(v UserInvalidDetails) OptUserInvalidDetails {
+	return OptUserInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserInvalidDetails is optional UserInvalidDetails.
+type OptUserInvalidDetails struct {
+	Value UserInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUserInvalidDetails was set.
+func (o OptUserInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserInvalidDetails) Reset() {
+	var v UserInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserInvalidDetails) SetTo(v UserInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserInvalidDetails) Get() (v UserInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserInvalidDetails) Or(d UserInvalidDetails) UserInvalidDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -11493,6 +16143,158 @@ type PatchProjectBadRequest ErrorDetails
 
 func (*PatchProjectBadRequest) patchProjectRes() {}
 
+// PatchProjectErrorResponse represents sum type.
+type PatchProjectErrorResponse struct {
+	Type            PatchProjectErrorResponseType // switch on this field
+	Internal        Internal
+	ProjMissingID   ProjMissingID
+	ProjNameInvalid ProjNameInvalid
+	ProjNotFound    ProjNotFound
+}
+
+// PatchProjectErrorResponseType is oneOf type of PatchProjectErrorResponse.
+type PatchProjectErrorResponseType string
+
+// Possible values for PatchProjectErrorResponseType.
+const (
+	InternalPatchProjectErrorResponse        PatchProjectErrorResponseType = "internal"
+	ProjMissingIDPatchProjectErrorResponse   PatchProjectErrorResponseType = "proj.missing_id"
+	ProjNameInvalidPatchProjectErrorResponse PatchProjectErrorResponseType = "proj.name_invalid"
+	ProjNotFoundPatchProjectErrorResponse    PatchProjectErrorResponseType = "proj.not_found"
+)
+
+// IsInternal reports whether PatchProjectErrorResponse is Internal.
+func (s PatchProjectErrorResponse) IsInternal() bool {
+	return s.Type == InternalPatchProjectErrorResponse
+}
+
+// IsProjMissingID reports whether PatchProjectErrorResponse is ProjMissingID.
+func (s PatchProjectErrorResponse) IsProjMissingID() bool {
+	return s.Type == ProjMissingIDPatchProjectErrorResponse
+}
+
+// IsProjNameInvalid reports whether PatchProjectErrorResponse is ProjNameInvalid.
+func (s PatchProjectErrorResponse) IsProjNameInvalid() bool {
+	return s.Type == ProjNameInvalidPatchProjectErrorResponse
+}
+
+// IsProjNotFound reports whether PatchProjectErrorResponse is ProjNotFound.
+func (s PatchProjectErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundPatchProjectErrorResponse
+}
+
+// SetInternal sets PatchProjectErrorResponse to Internal.
+func (s *PatchProjectErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalPatchProjectErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if PatchProjectErrorResponse is Internal.
+func (s PatchProjectErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalPatchProjectErrorResponse returns new PatchProjectErrorResponse from Internal.
+func NewInternalPatchProjectErrorResponse(v Internal) PatchProjectErrorResponse {
+	var s PatchProjectErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetProjMissingID sets PatchProjectErrorResponse to ProjMissingID.
+func (s *PatchProjectErrorResponse) SetProjMissingID(v ProjMissingID) {
+	s.Type = ProjMissingIDPatchProjectErrorResponse
+	s.ProjMissingID = v
+}
+
+// GetProjMissingID returns ProjMissingID and true boolean if PatchProjectErrorResponse is ProjMissingID.
+func (s PatchProjectErrorResponse) GetProjMissingID() (v ProjMissingID, ok bool) {
+	if !s.IsProjMissingID() {
+		return v, false
+	}
+	return s.ProjMissingID, true
+}
+
+// NewProjMissingIDPatchProjectErrorResponse returns new PatchProjectErrorResponse from ProjMissingID.
+func NewProjMissingIDPatchProjectErrorResponse(v ProjMissingID) PatchProjectErrorResponse {
+	var s PatchProjectErrorResponse
+	s.SetProjMissingID(v)
+	return s
+}
+
+// SetProjNameInvalid sets PatchProjectErrorResponse to ProjNameInvalid.
+func (s *PatchProjectErrorResponse) SetProjNameInvalid(v ProjNameInvalid) {
+	s.Type = ProjNameInvalidPatchProjectErrorResponse
+	s.ProjNameInvalid = v
+}
+
+// GetProjNameInvalid returns ProjNameInvalid and true boolean if PatchProjectErrorResponse is ProjNameInvalid.
+func (s PatchProjectErrorResponse) GetProjNameInvalid() (v ProjNameInvalid, ok bool) {
+	if !s.IsProjNameInvalid() {
+		return v, false
+	}
+	return s.ProjNameInvalid, true
+}
+
+// NewProjNameInvalidPatchProjectErrorResponse returns new PatchProjectErrorResponse from ProjNameInvalid.
+func NewProjNameInvalidPatchProjectErrorResponse(v ProjNameInvalid) PatchProjectErrorResponse {
+	var s PatchProjectErrorResponse
+	s.SetProjNameInvalid(v)
+	return s
+}
+
+// SetProjNotFound sets PatchProjectErrorResponse to ProjNotFound.
+func (s *PatchProjectErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundPatchProjectErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if PatchProjectErrorResponse is ProjNotFound.
+func (s PatchProjectErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundPatchProjectErrorResponse returns new PatchProjectErrorResponse from ProjNotFound.
+func NewProjNotFoundPatchProjectErrorResponse(v ProjNotFound) PatchProjectErrorResponse {
+	var s PatchProjectErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// PatchProjectErrorResponseStatusCode wraps PatchProjectErrorResponse with StatusCode.
+type PatchProjectErrorResponseStatusCode struct {
+	StatusCode int
+	Response   PatchProjectErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *PatchProjectErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *PatchProjectErrorResponseStatusCode) GetResponse() PatchProjectErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *PatchProjectErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *PatchProjectErrorResponseStatusCode) SetResponse(val PatchProjectErrorResponse) {
+	s.Response = val
+}
+
+func (*PatchProjectErrorResponseStatusCode) patchProjectRes() {}
+
 type PatchProjectNotFound ErrorDetails
 
 func (*PatchProjectNotFound) patchProjectRes() {}
@@ -11516,6 +16318,59 @@ func (s *PatchProjectRequest) SetName(val OptNilString) {
 type PatchProjectUnauthorized ErrorDetails
 
 func (*PatchProjectUnauthorized) patchProjectRes() {}
+
+// Merged schema.
+// Ref: #
+type PkregNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptPkregNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *PkregNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *PkregNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *PkregNotFound) GetDetails() OptPkregNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *PkregNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *PkregNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *PkregNotFound) SetDetails(val OptPkregNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type PkregNotFoundDetails map[string]jx.Raw
+
+func (s *PkregNotFoundDetails) init() PkregNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // Ref: #
 type PostTokenRequest struct {
@@ -11737,6 +16592,112 @@ func (s *ProjClaimExpiredDetails) init() ProjClaimExpiredDetails {
 
 // Merged schema.
 // Ref: #
+type ProjMissingID struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjMissingIDDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjMissingID) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjMissingID) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjMissingID) GetDetails() OptProjMissingIDDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjMissingID) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjMissingID) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjMissingID) SetDetails(val OptProjMissingIDDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjMissingIDDetails map[string]jx.Raw
+
+func (s *ProjMissingIDDetails) init() ProjMissingIDDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjNameInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjNameInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjNameInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjNameInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjNameInvalid) GetDetails() OptProjNameInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjNameInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjNameInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjNameInvalid) SetDetails(val OptProjNameInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjNameInvalidDetails map[string]jx.Raw
+
+func (s *ProjNameInvalidDetails) init() ProjNameInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type ProjNotFound struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -11919,6 +16880,158 @@ type QueryProjectsBadRequest ErrorDetails
 
 func (*QueryProjectsBadRequest) queryProjectsRes() {}
 
+// QueryProjectsErrorResponse represents sum type.
+type QueryProjectsErrorResponse struct {
+	Type           QueryProjectsErrorResponseType // switch on this field
+	Internal       Internal
+	NotImplemented NotImplemented
+	ProjMissingID  ProjMissingID
+	ReqInvalid     ReqInvalid
+}
+
+// QueryProjectsErrorResponseType is oneOf type of QueryProjectsErrorResponse.
+type QueryProjectsErrorResponseType string
+
+// Possible values for QueryProjectsErrorResponseType.
+const (
+	InternalQueryProjectsErrorResponse       QueryProjectsErrorResponseType = "internal"
+	NotImplementedQueryProjectsErrorResponse QueryProjectsErrorResponseType = "not_implemented"
+	ProjMissingIDQueryProjectsErrorResponse  QueryProjectsErrorResponseType = "proj.missing_id"
+	ReqInvalidQueryProjectsErrorResponse     QueryProjectsErrorResponseType = "req.invalid"
+)
+
+// IsInternal reports whether QueryProjectsErrorResponse is Internal.
+func (s QueryProjectsErrorResponse) IsInternal() bool {
+	return s.Type == InternalQueryProjectsErrorResponse
+}
+
+// IsNotImplemented reports whether QueryProjectsErrorResponse is NotImplemented.
+func (s QueryProjectsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedQueryProjectsErrorResponse
+}
+
+// IsProjMissingID reports whether QueryProjectsErrorResponse is ProjMissingID.
+func (s QueryProjectsErrorResponse) IsProjMissingID() bool {
+	return s.Type == ProjMissingIDQueryProjectsErrorResponse
+}
+
+// IsReqInvalid reports whether QueryProjectsErrorResponse is ReqInvalid.
+func (s QueryProjectsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidQueryProjectsErrorResponse
+}
+
+// SetInternal sets QueryProjectsErrorResponse to Internal.
+func (s *QueryProjectsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalQueryProjectsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if QueryProjectsErrorResponse is Internal.
+func (s QueryProjectsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalQueryProjectsErrorResponse returns new QueryProjectsErrorResponse from Internal.
+func NewInternalQueryProjectsErrorResponse(v Internal) QueryProjectsErrorResponse {
+	var s QueryProjectsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets QueryProjectsErrorResponse to NotImplemented.
+func (s *QueryProjectsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedQueryProjectsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if QueryProjectsErrorResponse is NotImplemented.
+func (s QueryProjectsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedQueryProjectsErrorResponse returns new QueryProjectsErrorResponse from NotImplemented.
+func NewNotImplementedQueryProjectsErrorResponse(v NotImplemented) QueryProjectsErrorResponse {
+	var s QueryProjectsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjMissingID sets QueryProjectsErrorResponse to ProjMissingID.
+func (s *QueryProjectsErrorResponse) SetProjMissingID(v ProjMissingID) {
+	s.Type = ProjMissingIDQueryProjectsErrorResponse
+	s.ProjMissingID = v
+}
+
+// GetProjMissingID returns ProjMissingID and true boolean if QueryProjectsErrorResponse is ProjMissingID.
+func (s QueryProjectsErrorResponse) GetProjMissingID() (v ProjMissingID, ok bool) {
+	if !s.IsProjMissingID() {
+		return v, false
+	}
+	return s.ProjMissingID, true
+}
+
+// NewProjMissingIDQueryProjectsErrorResponse returns new QueryProjectsErrorResponse from ProjMissingID.
+func NewProjMissingIDQueryProjectsErrorResponse(v ProjMissingID) QueryProjectsErrorResponse {
+	var s QueryProjectsErrorResponse
+	s.SetProjMissingID(v)
+	return s
+}
+
+// SetReqInvalid sets QueryProjectsErrorResponse to ReqInvalid.
+func (s *QueryProjectsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidQueryProjectsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if QueryProjectsErrorResponse is ReqInvalid.
+func (s QueryProjectsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidQueryProjectsErrorResponse returns new QueryProjectsErrorResponse from ReqInvalid.
+func NewReqInvalidQueryProjectsErrorResponse(v ReqInvalid) QueryProjectsErrorResponse {
+	var s QueryProjectsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// QueryProjectsErrorResponseStatusCode wraps QueryProjectsErrorResponse with StatusCode.
+type QueryProjectsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   QueryProjectsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *QueryProjectsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *QueryProjectsErrorResponseStatusCode) GetResponse() QueryProjectsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *QueryProjectsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *QueryProjectsErrorResponseStatusCode) SetResponse(val QueryProjectsErrorResponse) {
+	s.Response = val
+}
+
+func (*QueryProjectsErrorResponseStatusCode) queryProjectsRes() {}
+
 type QueryProjectsForbidden ErrorDetails
 
 func (*QueryProjectsForbidden) queryProjectsRes() {}
@@ -12080,6 +17193,102 @@ func (*QueryProjectsUnauthorized) queryProjectsRes() {}
 type QuerySessionsBadRequest ErrorDetails
 
 func (*QuerySessionsBadRequest) querySessionsRes() {}
+
+// QuerySessionsErrorResponse represents sum type.
+type QuerySessionsErrorResponse struct {
+	Type           QuerySessionsErrorResponseType // switch on this field
+	Internal       Internal
+	NotImplemented NotImplemented
+}
+
+// QuerySessionsErrorResponseType is oneOf type of QuerySessionsErrorResponse.
+type QuerySessionsErrorResponseType string
+
+// Possible values for QuerySessionsErrorResponseType.
+const (
+	InternalQuerySessionsErrorResponse       QuerySessionsErrorResponseType = "internal"
+	NotImplementedQuerySessionsErrorResponse QuerySessionsErrorResponseType = "not_implemented"
+)
+
+// IsInternal reports whether QuerySessionsErrorResponse is Internal.
+func (s QuerySessionsErrorResponse) IsInternal() bool {
+	return s.Type == InternalQuerySessionsErrorResponse
+}
+
+// IsNotImplemented reports whether QuerySessionsErrorResponse is NotImplemented.
+func (s QuerySessionsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedQuerySessionsErrorResponse
+}
+
+// SetInternal sets QuerySessionsErrorResponse to Internal.
+func (s *QuerySessionsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalQuerySessionsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if QuerySessionsErrorResponse is Internal.
+func (s QuerySessionsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalQuerySessionsErrorResponse returns new QuerySessionsErrorResponse from Internal.
+func NewInternalQuerySessionsErrorResponse(v Internal) QuerySessionsErrorResponse {
+	var s QuerySessionsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets QuerySessionsErrorResponse to NotImplemented.
+func (s *QuerySessionsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedQuerySessionsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if QuerySessionsErrorResponse is NotImplemented.
+func (s QuerySessionsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedQuerySessionsErrorResponse returns new QuerySessionsErrorResponse from NotImplemented.
+func NewNotImplementedQuerySessionsErrorResponse(v NotImplemented) QuerySessionsErrorResponse {
+	var s QuerySessionsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// QuerySessionsErrorResponseStatusCode wraps QuerySessionsErrorResponse with StatusCode.
+type QuerySessionsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   QuerySessionsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *QuerySessionsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *QuerySessionsErrorResponseStatusCode) GetResponse() QuerySessionsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *QuerySessionsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *QuerySessionsErrorResponseStatusCode) SetResponse(val QuerySessionsErrorResponse) {
+	s.Response = val
+}
+
+func (*QuerySessionsErrorResponseStatusCode) querySessionsRes() {}
 
 type QuerySessionsForbidden ErrorDetails
 
@@ -12401,6 +17610,155 @@ type QueryTeamsUnauthorized ErrorDetails
 
 func (*QueryTeamsUnauthorized) queryTeamsRes() {}
 
+// Merged schema.
+// Ref: #
+type ReqInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptReqInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ReqInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ReqInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ReqInvalid) GetDetails() OptReqInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ReqInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ReqInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ReqInvalid) SetDetails(val OptReqInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ReqInvalidDetails map[string]jx.Raw
+
+func (s *ReqInvalidDetails) init() ReqInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// RevokeMySessionErrorResponse represents sum type.
+type RevokeMySessionErrorResponse struct {
+	Type         RevokeMySessionErrorResponseType // switch on this field
+	Internal     Internal
+	SessNotFound SessNotFound
+}
+
+// RevokeMySessionErrorResponseType is oneOf type of RevokeMySessionErrorResponse.
+type RevokeMySessionErrorResponseType string
+
+// Possible values for RevokeMySessionErrorResponseType.
+const (
+	InternalRevokeMySessionErrorResponse     RevokeMySessionErrorResponseType = "internal"
+	SessNotFoundRevokeMySessionErrorResponse RevokeMySessionErrorResponseType = "sess.not_found"
+)
+
+// IsInternal reports whether RevokeMySessionErrorResponse is Internal.
+func (s RevokeMySessionErrorResponse) IsInternal() bool {
+	return s.Type == InternalRevokeMySessionErrorResponse
+}
+
+// IsSessNotFound reports whether RevokeMySessionErrorResponse is SessNotFound.
+func (s RevokeMySessionErrorResponse) IsSessNotFound() bool {
+	return s.Type == SessNotFoundRevokeMySessionErrorResponse
+}
+
+// SetInternal sets RevokeMySessionErrorResponse to Internal.
+func (s *RevokeMySessionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalRevokeMySessionErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if RevokeMySessionErrorResponse is Internal.
+func (s RevokeMySessionErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalRevokeMySessionErrorResponse returns new RevokeMySessionErrorResponse from Internal.
+func NewInternalRevokeMySessionErrorResponse(v Internal) RevokeMySessionErrorResponse {
+	var s RevokeMySessionErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetSessNotFound sets RevokeMySessionErrorResponse to SessNotFound.
+func (s *RevokeMySessionErrorResponse) SetSessNotFound(v SessNotFound) {
+	s.Type = SessNotFoundRevokeMySessionErrorResponse
+	s.SessNotFound = v
+}
+
+// GetSessNotFound returns SessNotFound and true boolean if RevokeMySessionErrorResponse is SessNotFound.
+func (s RevokeMySessionErrorResponse) GetSessNotFound() (v SessNotFound, ok bool) {
+	if !s.IsSessNotFound() {
+		return v, false
+	}
+	return s.SessNotFound, true
+}
+
+// NewSessNotFoundRevokeMySessionErrorResponse returns new RevokeMySessionErrorResponse from SessNotFound.
+func NewSessNotFoundRevokeMySessionErrorResponse(v SessNotFound) RevokeMySessionErrorResponse {
+	var s RevokeMySessionErrorResponse
+	s.SetSessNotFound(v)
+	return s
+}
+
+// RevokeMySessionErrorResponseStatusCode wraps RevokeMySessionErrorResponse with StatusCode.
+type RevokeMySessionErrorResponseStatusCode struct {
+	StatusCode int
+	Response   RevokeMySessionErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *RevokeMySessionErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *RevokeMySessionErrorResponseStatusCode) GetResponse() RevokeMySessionErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *RevokeMySessionErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *RevokeMySessionErrorResponseStatusCode) SetResponse(val RevokeMySessionErrorResponse) {
+	s.Response = val
+}
+
+func (*RevokeMySessionErrorResponseStatusCode) revokeMySessionRes() {}
+
 // RevokeMySessionNoContent is response for RevokeMySession operation.
 type RevokeMySessionNoContent struct {
 	SetCookie string
@@ -12445,6 +17803,74 @@ func (s *RevokeRequest) SetToken(val OptString) {
 func (s *RevokeRequest) SetTokenTypeHint(val OptString) {
 	s.TokenTypeHint = val
 }
+
+// RevokeSessionErrorResponse represents sum type.
+type RevokeSessionErrorResponse struct {
+	Type     RevokeSessionErrorResponseType // switch on this field
+	Internal Internal
+}
+
+// RevokeSessionErrorResponseType is oneOf type of RevokeSessionErrorResponse.
+type RevokeSessionErrorResponseType string
+
+// Possible values for RevokeSessionErrorResponseType.
+const (
+	InternalRevokeSessionErrorResponse RevokeSessionErrorResponseType = "internal"
+)
+
+// IsInternal reports whether RevokeSessionErrorResponse is Internal.
+func (s RevokeSessionErrorResponse) IsInternal() bool {
+	return s.Type == InternalRevokeSessionErrorResponse
+}
+
+// SetInternal sets RevokeSessionErrorResponse to Internal.
+func (s *RevokeSessionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalRevokeSessionErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if RevokeSessionErrorResponse is Internal.
+func (s RevokeSessionErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalRevokeSessionErrorResponse returns new RevokeSessionErrorResponse from Internal.
+func NewInternalRevokeSessionErrorResponse(v Internal) RevokeSessionErrorResponse {
+	var s RevokeSessionErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// RevokeSessionErrorResponseStatusCode wraps RevokeSessionErrorResponse with StatusCode.
+type RevokeSessionErrorResponseStatusCode struct {
+	StatusCode int
+	Response   RevokeSessionErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *RevokeSessionErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *RevokeSessionErrorResponseStatusCode) GetResponse() RevokeSessionErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *RevokeSessionErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *RevokeSessionErrorResponseStatusCode) SetResponse(val RevokeSessionErrorResponse) {
+	s.Response = val
+}
+
+func (*RevokeSessionErrorResponseStatusCode) revokeSessionRes() {}
 
 type RevokeSessionForbidden ErrorDetails
 
@@ -12505,6 +17931,112 @@ func (s *SSOProvider) SetTemplate(val string) {
 	s.Template = val
 }
 
+// Merged schema.
+// Ref: #
+type SchInvalidRequest struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchInvalidRequestDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchInvalidRequest) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchInvalidRequest) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchInvalidRequest) GetDetails() OptSchInvalidRequestDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchInvalidRequest) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchInvalidRequest) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchInvalidRequest) SetDetails(val OptSchInvalidRequestDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchInvalidRequestDetails map[string]jx.Raw
+
+func (s *SchInvalidRequestDetails) init() SchInvalidRequestDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SchNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSchNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SchNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SchNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SchNotFound) GetDetails() OptSchNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SchNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SchNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SchNotFound) SetDetails(val OptSchNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SchNotFoundDetails map[string]jx.Raw
+
+func (s *SchNotFoundDetails) init() SchNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 type SchemaURI url.URL
 
 // A schema definition that references an external schema via a URL. It is
@@ -12535,6 +18067,165 @@ func (s *SchemaURL) SetKind(val string) {
 // SetURL sets the value of URL.
 func (s *SchemaURL) SetURL(val url.URL) {
 	s.URL = val
+}
+
+// Merged schema.
+// Ref: #
+type SessExchangeConflict struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSessExchangeConflictDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SessExchangeConflict) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SessExchangeConflict) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SessExchangeConflict) GetDetails() OptSessExchangeConflictDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SessExchangeConflict) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SessExchangeConflict) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SessExchangeConflict) SetDetails(val OptSessExchangeConflictDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SessExchangeConflictDetails map[string]jx.Raw
+
+func (s *SessExchangeConflictDetails) init() SessExchangeConflictDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SessInvalidHandoffToken struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSessInvalidHandoffTokenDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SessInvalidHandoffToken) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SessInvalidHandoffToken) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SessInvalidHandoffToken) GetDetails() OptSessInvalidHandoffTokenDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SessInvalidHandoffToken) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SessInvalidHandoffToken) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SessInvalidHandoffToken) SetDetails(val OptSessInvalidHandoffTokenDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SessInvalidHandoffTokenDetails map[string]jx.Raw
+
+func (s *SessInvalidHandoffTokenDetails) init() SessInvalidHandoffTokenDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type SessInvalidTTL struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSessInvalidTTLDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SessInvalidTTL) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SessInvalidTTL) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SessInvalidTTL) GetDetails() OptSessInvalidTTLDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SessInvalidTTL) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SessInvalidTTL) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SessInvalidTTL) SetDetails(val OptSessInvalidTTLDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SessInvalidTTLDetails map[string]jx.Raw
+
+func (s *SessInvalidTTLDetails) init() SessInvalidTTLDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 // Merged schema.
@@ -12617,6 +18308,59 @@ func (s *SessNotFoundHeaders) SetResponse(val SessNotFound) {
 }
 
 func (*SessNotFoundHeaders) getMySessionRes() {}
+
+// Merged schema.
+// Ref: #
+type SessTokenInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSessTokenInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SessTokenInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SessTokenInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SessTokenInvalid) GetDetails() OptSessTokenInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SessTokenInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SessTokenInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SessTokenInvalid) SetDetails(val OptSessTokenInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SessTokenInvalidDetails map[string]jx.Raw
+
+func (s *SessTokenInvalidDetails) init() SessTokenInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // Field to filter sessions by:
 // - `created_at`: RFC3339 timestamp
@@ -13099,6 +18843,102 @@ type SetUserPasswordBadRequest ErrorDetails
 
 func (*SetUserPasswordBadRequest) setUserPasswordRes() {}
 
+// SetUserPasswordErrorResponse represents sum type.
+type SetUserPasswordErrorResponse struct {
+	Type         SetUserPasswordErrorResponseType // switch on this field
+	Internal     Internal
+	UserNotFound UserNotFound
+}
+
+// SetUserPasswordErrorResponseType is oneOf type of SetUserPasswordErrorResponse.
+type SetUserPasswordErrorResponseType string
+
+// Possible values for SetUserPasswordErrorResponseType.
+const (
+	InternalSetUserPasswordErrorResponse     SetUserPasswordErrorResponseType = "internal"
+	UserNotFoundSetUserPasswordErrorResponse SetUserPasswordErrorResponseType = "user.not_found"
+)
+
+// IsInternal reports whether SetUserPasswordErrorResponse is Internal.
+func (s SetUserPasswordErrorResponse) IsInternal() bool {
+	return s.Type == InternalSetUserPasswordErrorResponse
+}
+
+// IsUserNotFound reports whether SetUserPasswordErrorResponse is UserNotFound.
+func (s SetUserPasswordErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundSetUserPasswordErrorResponse
+}
+
+// SetInternal sets SetUserPasswordErrorResponse to Internal.
+func (s *SetUserPasswordErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalSetUserPasswordErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if SetUserPasswordErrorResponse is Internal.
+func (s SetUserPasswordErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from Internal.
+func NewInternalSetUserPasswordErrorResponse(v Internal) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetUserNotFound sets SetUserPasswordErrorResponse to UserNotFound.
+func (s *SetUserPasswordErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundSetUserPasswordErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if SetUserPasswordErrorResponse is UserNotFound.
+func (s SetUserPasswordErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from UserNotFound.
+func NewUserNotFoundSetUserPasswordErrorResponse(v UserNotFound) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// SetUserPasswordErrorResponseStatusCode wraps SetUserPasswordErrorResponse with StatusCode.
+type SetUserPasswordErrorResponseStatusCode struct {
+	StatusCode int
+	Response   SetUserPasswordErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *SetUserPasswordErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *SetUserPasswordErrorResponseStatusCode) GetResponse() SetUserPasswordErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *SetUserPasswordErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SetUserPasswordErrorResponseStatusCode) SetResponse(val SetUserPasswordErrorResponse) {
+	s.Response = val
+}
+
+func (*SetUserPasswordErrorResponseStatusCode) setUserPasswordRes() {}
+
 type SetUserPasswordInternalServerError ErrorDetails
 
 func (*SetUserPasswordInternalServerError) setUserPasswordRes() {}
@@ -13372,6 +19212,494 @@ type SubmitFlowStepBadRequest FlowResponseHeaders
 
 func (*SubmitFlowStepBadRequest) submitFlowStepRes() {}
 
+// SubmitFlowStepErrorResponse represents sum type.
+type SubmitFlowStepErrorResponse struct {
+	Type                SubmitFlowStepErrorResponseType // switch on this field
+	AttAlreadyHandedOff AttAlreadyHandedOff
+	AttInvalidRequest   AttInvalidRequest
+	AttInvalidState     AttInvalidState
+	AttNotCompleted     AttNotCompleted
+	AttNotFound         AttNotFound
+	AttProofRejected    AttProofRejected
+	AttStaleChallenge   AttStaleChallenge
+	FlowIntegrity       FlowIntegrity
+	FlowInvalidAction   FlowInvalidAction
+	FlowUnsupported     FlowUnsupported
+	Internal            Internal
+	NotImplemented      NotImplemented
+	PkregNotFound       PkregNotFound
+	UserAlreadyExists   UserAlreadyExists
+	UserInvalid         UserInvalid
+	UserNotFound        UserNotFound
+}
+
+// SubmitFlowStepErrorResponseType is oneOf type of SubmitFlowStepErrorResponse.
+type SubmitFlowStepErrorResponseType string
+
+// Possible values for SubmitFlowStepErrorResponseType.
+const (
+	AttAlreadyHandedOffSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "att.already_handed_off"
+	AttInvalidRequestSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "att.invalid_request"
+	AttInvalidStateSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.invalid_state"
+	AttNotCompletedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "att.not_completed"
+	AttNotFoundSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.not_found"
+	AttProofRejectedSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "att.stale_challenge"
+	FlowIntegritySubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "flow.integrity"
+	FlowInvalidActionSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "flow.invalid_action"
+	FlowUnsupportedSubmitFlowStepErrorResponse     SubmitFlowStepErrorResponseType = "flow.unsupported"
+	InternalSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "internal"
+	NotImplementedSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "not_implemented"
+	PkregNotFoundSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "pkreg.not_found"
+	UserAlreadyExistsSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "user.already_exists"
+	UserInvalidSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "user.invalid"
+	UserNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "user.not_found"
+)
+
+// IsAttAlreadyHandedOff reports whether SubmitFlowStepErrorResponse is AttAlreadyHandedOff.
+func (s SubmitFlowStepErrorResponse) IsAttAlreadyHandedOff() bool {
+	return s.Type == AttAlreadyHandedOffSubmitFlowStepErrorResponse
+}
+
+// IsAttInvalidRequest reports whether SubmitFlowStepErrorResponse is AttInvalidRequest.
+func (s SubmitFlowStepErrorResponse) IsAttInvalidRequest() bool {
+	return s.Type == AttInvalidRequestSubmitFlowStepErrorResponse
+}
+
+// IsAttInvalidState reports whether SubmitFlowStepErrorResponse is AttInvalidState.
+func (s SubmitFlowStepErrorResponse) IsAttInvalidState() bool {
+	return s.Type == AttInvalidStateSubmitFlowStepErrorResponse
+}
+
+// IsAttNotCompleted reports whether SubmitFlowStepErrorResponse is AttNotCompleted.
+func (s SubmitFlowStepErrorResponse) IsAttNotCompleted() bool {
+	return s.Type == AttNotCompletedSubmitFlowStepErrorResponse
+}
+
+// IsAttNotFound reports whether SubmitFlowStepErrorResponse is AttNotFound.
+func (s SubmitFlowStepErrorResponse) IsAttNotFound() bool {
+	return s.Type == AttNotFoundSubmitFlowStepErrorResponse
+}
+
+// IsAttProofRejected reports whether SubmitFlowStepErrorResponse is AttProofRejected.
+func (s SubmitFlowStepErrorResponse) IsAttProofRejected() bool {
+	return s.Type == AttProofRejectedSubmitFlowStepErrorResponse
+}
+
+// IsAttStaleChallenge reports whether SubmitFlowStepErrorResponse is AttStaleChallenge.
+func (s SubmitFlowStepErrorResponse) IsAttStaleChallenge() bool {
+	return s.Type == AttStaleChallengeSubmitFlowStepErrorResponse
+}
+
+// IsFlowIntegrity reports whether SubmitFlowStepErrorResponse is FlowIntegrity.
+func (s SubmitFlowStepErrorResponse) IsFlowIntegrity() bool {
+	return s.Type == FlowIntegritySubmitFlowStepErrorResponse
+}
+
+// IsFlowInvalidAction reports whether SubmitFlowStepErrorResponse is FlowInvalidAction.
+func (s SubmitFlowStepErrorResponse) IsFlowInvalidAction() bool {
+	return s.Type == FlowInvalidActionSubmitFlowStepErrorResponse
+}
+
+// IsFlowUnsupported reports whether SubmitFlowStepErrorResponse is FlowUnsupported.
+func (s SubmitFlowStepErrorResponse) IsFlowUnsupported() bool {
+	return s.Type == FlowUnsupportedSubmitFlowStepErrorResponse
+}
+
+// IsInternal reports whether SubmitFlowStepErrorResponse is Internal.
+func (s SubmitFlowStepErrorResponse) IsInternal() bool {
+	return s.Type == InternalSubmitFlowStepErrorResponse
+}
+
+// IsNotImplemented reports whether SubmitFlowStepErrorResponse is NotImplemented.
+func (s SubmitFlowStepErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedSubmitFlowStepErrorResponse
+}
+
+// IsPkregNotFound reports whether SubmitFlowStepErrorResponse is PkregNotFound.
+func (s SubmitFlowStepErrorResponse) IsPkregNotFound() bool {
+	return s.Type == PkregNotFoundSubmitFlowStepErrorResponse
+}
+
+// IsUserAlreadyExists reports whether SubmitFlowStepErrorResponse is UserAlreadyExists.
+func (s SubmitFlowStepErrorResponse) IsUserAlreadyExists() bool {
+	return s.Type == UserAlreadyExistsSubmitFlowStepErrorResponse
+}
+
+// IsUserInvalid reports whether SubmitFlowStepErrorResponse is UserInvalid.
+func (s SubmitFlowStepErrorResponse) IsUserInvalid() bool {
+	return s.Type == UserInvalidSubmitFlowStepErrorResponse
+}
+
+// IsUserNotFound reports whether SubmitFlowStepErrorResponse is UserNotFound.
+func (s SubmitFlowStepErrorResponse) IsUserNotFound() bool {
+	return s.Type == UserNotFoundSubmitFlowStepErrorResponse
+}
+
+// SetAttAlreadyHandedOff sets SubmitFlowStepErrorResponse to AttAlreadyHandedOff.
+func (s *SubmitFlowStepErrorResponse) SetAttAlreadyHandedOff(v AttAlreadyHandedOff) {
+	s.Type = AttAlreadyHandedOffSubmitFlowStepErrorResponse
+	s.AttAlreadyHandedOff = v
+}
+
+// GetAttAlreadyHandedOff returns AttAlreadyHandedOff and true boolean if SubmitFlowStepErrorResponse is AttAlreadyHandedOff.
+func (s SubmitFlowStepErrorResponse) GetAttAlreadyHandedOff() (v AttAlreadyHandedOff, ok bool) {
+	if !s.IsAttAlreadyHandedOff() {
+		return v, false
+	}
+	return s.AttAlreadyHandedOff, true
+}
+
+// NewAttAlreadyHandedOffSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from AttAlreadyHandedOff.
+func NewAttAlreadyHandedOffSubmitFlowStepErrorResponse(v AttAlreadyHandedOff) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetAttAlreadyHandedOff(v)
+	return s
+}
+
+// SetAttInvalidRequest sets SubmitFlowStepErrorResponse to AttInvalidRequest.
+func (s *SubmitFlowStepErrorResponse) SetAttInvalidRequest(v AttInvalidRequest) {
+	s.Type = AttInvalidRequestSubmitFlowStepErrorResponse
+	s.AttInvalidRequest = v
+}
+
+// GetAttInvalidRequest returns AttInvalidRequest and true boolean if SubmitFlowStepErrorResponse is AttInvalidRequest.
+func (s SubmitFlowStepErrorResponse) GetAttInvalidRequest() (v AttInvalidRequest, ok bool) {
+	if !s.IsAttInvalidRequest() {
+		return v, false
+	}
+	return s.AttInvalidRequest, true
+}
+
+// NewAttInvalidRequestSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from AttInvalidRequest.
+func NewAttInvalidRequestSubmitFlowStepErrorResponse(v AttInvalidRequest) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetAttInvalidRequest(v)
+	return s
+}
+
+// SetAttInvalidState sets SubmitFlowStepErrorResponse to AttInvalidState.
+func (s *SubmitFlowStepErrorResponse) SetAttInvalidState(v AttInvalidState) {
+	s.Type = AttInvalidStateSubmitFlowStepErrorResponse
+	s.AttInvalidState = v
+}
+
+// GetAttInvalidState returns AttInvalidState and true boolean if SubmitFlowStepErrorResponse is AttInvalidState.
+func (s SubmitFlowStepErrorResponse) GetAttInvalidState() (v AttInvalidState, ok bool) {
+	if !s.IsAttInvalidState() {
+		return v, false
+	}
+	return s.AttInvalidState, true
+}
+
+// NewAttInvalidStateSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from AttInvalidState.
+func NewAttInvalidStateSubmitFlowStepErrorResponse(v AttInvalidState) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetAttInvalidState(v)
+	return s
+}
+
+// SetAttNotCompleted sets SubmitFlowStepErrorResponse to AttNotCompleted.
+func (s *SubmitFlowStepErrorResponse) SetAttNotCompleted(v AttNotCompleted) {
+	s.Type = AttNotCompletedSubmitFlowStepErrorResponse
+	s.AttNotCompleted = v
+}
+
+// GetAttNotCompleted returns AttNotCompleted and true boolean if SubmitFlowStepErrorResponse is AttNotCompleted.
+func (s SubmitFlowStepErrorResponse) GetAttNotCompleted() (v AttNotCompleted, ok bool) {
+	if !s.IsAttNotCompleted() {
+		return v, false
+	}
+	return s.AttNotCompleted, true
+}
+
+// NewAttNotCompletedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from AttNotCompleted.
+func NewAttNotCompletedSubmitFlowStepErrorResponse(v AttNotCompleted) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetAttNotCompleted(v)
+	return s
+}
+
+// SetAttNotFound sets SubmitFlowStepErrorResponse to AttNotFound.
+func (s *SubmitFlowStepErrorResponse) SetAttNotFound(v AttNotFound) {
+	s.Type = AttNotFoundSubmitFlowStepErrorResponse
+	s.AttNotFound = v
+}
+
+// GetAttNotFound returns AttNotFound and true boolean if SubmitFlowStepErrorResponse is AttNotFound.
+func (s SubmitFlowStepErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
+	if !s.IsAttNotFound() {
+		return v, false
+	}
+	return s.AttNotFound, true
+}
+
+// NewAttNotFoundSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from AttNotFound.
+func NewAttNotFoundSubmitFlowStepErrorResponse(v AttNotFound) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetAttNotFound(v)
+	return s
+}
+
+// SetAttProofRejected sets SubmitFlowStepErrorResponse to AttProofRejected.
+func (s *SubmitFlowStepErrorResponse) SetAttProofRejected(v AttProofRejected) {
+	s.Type = AttProofRejectedSubmitFlowStepErrorResponse
+	s.AttProofRejected = v
+}
+
+// GetAttProofRejected returns AttProofRejected and true boolean if SubmitFlowStepErrorResponse is AttProofRejected.
+func (s SubmitFlowStepErrorResponse) GetAttProofRejected() (v AttProofRejected, ok bool) {
+	if !s.IsAttProofRejected() {
+		return v, false
+	}
+	return s.AttProofRejected, true
+}
+
+// NewAttProofRejectedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from AttProofRejected.
+func NewAttProofRejectedSubmitFlowStepErrorResponse(v AttProofRejected) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetAttProofRejected(v)
+	return s
+}
+
+// SetAttStaleChallenge sets SubmitFlowStepErrorResponse to AttStaleChallenge.
+func (s *SubmitFlowStepErrorResponse) SetAttStaleChallenge(v AttStaleChallenge) {
+	s.Type = AttStaleChallengeSubmitFlowStepErrorResponse
+	s.AttStaleChallenge = v
+}
+
+// GetAttStaleChallenge returns AttStaleChallenge and true boolean if SubmitFlowStepErrorResponse is AttStaleChallenge.
+func (s SubmitFlowStepErrorResponse) GetAttStaleChallenge() (v AttStaleChallenge, ok bool) {
+	if !s.IsAttStaleChallenge() {
+		return v, false
+	}
+	return s.AttStaleChallenge, true
+}
+
+// NewAttStaleChallengeSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from AttStaleChallenge.
+func NewAttStaleChallengeSubmitFlowStepErrorResponse(v AttStaleChallenge) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetAttStaleChallenge(v)
+	return s
+}
+
+// SetFlowIntegrity sets SubmitFlowStepErrorResponse to FlowIntegrity.
+func (s *SubmitFlowStepErrorResponse) SetFlowIntegrity(v FlowIntegrity) {
+	s.Type = FlowIntegritySubmitFlowStepErrorResponse
+	s.FlowIntegrity = v
+}
+
+// GetFlowIntegrity returns FlowIntegrity and true boolean if SubmitFlowStepErrorResponse is FlowIntegrity.
+func (s SubmitFlowStepErrorResponse) GetFlowIntegrity() (v FlowIntegrity, ok bool) {
+	if !s.IsFlowIntegrity() {
+		return v, false
+	}
+	return s.FlowIntegrity, true
+}
+
+// NewFlowIntegritySubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from FlowIntegrity.
+func NewFlowIntegritySubmitFlowStepErrorResponse(v FlowIntegrity) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetFlowIntegrity(v)
+	return s
+}
+
+// SetFlowInvalidAction sets SubmitFlowStepErrorResponse to FlowInvalidAction.
+func (s *SubmitFlowStepErrorResponse) SetFlowInvalidAction(v FlowInvalidAction) {
+	s.Type = FlowInvalidActionSubmitFlowStepErrorResponse
+	s.FlowInvalidAction = v
+}
+
+// GetFlowInvalidAction returns FlowInvalidAction and true boolean if SubmitFlowStepErrorResponse is FlowInvalidAction.
+func (s SubmitFlowStepErrorResponse) GetFlowInvalidAction() (v FlowInvalidAction, ok bool) {
+	if !s.IsFlowInvalidAction() {
+		return v, false
+	}
+	return s.FlowInvalidAction, true
+}
+
+// NewFlowInvalidActionSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from FlowInvalidAction.
+func NewFlowInvalidActionSubmitFlowStepErrorResponse(v FlowInvalidAction) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetFlowInvalidAction(v)
+	return s
+}
+
+// SetFlowUnsupported sets SubmitFlowStepErrorResponse to FlowUnsupported.
+func (s *SubmitFlowStepErrorResponse) SetFlowUnsupported(v FlowUnsupported) {
+	s.Type = FlowUnsupportedSubmitFlowStepErrorResponse
+	s.FlowUnsupported = v
+}
+
+// GetFlowUnsupported returns FlowUnsupported and true boolean if SubmitFlowStepErrorResponse is FlowUnsupported.
+func (s SubmitFlowStepErrorResponse) GetFlowUnsupported() (v FlowUnsupported, ok bool) {
+	if !s.IsFlowUnsupported() {
+		return v, false
+	}
+	return s.FlowUnsupported, true
+}
+
+// NewFlowUnsupportedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from FlowUnsupported.
+func NewFlowUnsupportedSubmitFlowStepErrorResponse(v FlowUnsupported) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetFlowUnsupported(v)
+	return s
+}
+
+// SetInternal sets SubmitFlowStepErrorResponse to Internal.
+func (s *SubmitFlowStepErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalSubmitFlowStepErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if SubmitFlowStepErrorResponse is Internal.
+func (s SubmitFlowStepErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from Internal.
+func NewInternalSubmitFlowStepErrorResponse(v Internal) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets SubmitFlowStepErrorResponse to NotImplemented.
+func (s *SubmitFlowStepErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedSubmitFlowStepErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if SubmitFlowStepErrorResponse is NotImplemented.
+func (s SubmitFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from NotImplemented.
+func NewNotImplementedSubmitFlowStepErrorResponse(v NotImplemented) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetPkregNotFound sets SubmitFlowStepErrorResponse to PkregNotFound.
+func (s *SubmitFlowStepErrorResponse) SetPkregNotFound(v PkregNotFound) {
+	s.Type = PkregNotFoundSubmitFlowStepErrorResponse
+	s.PkregNotFound = v
+}
+
+// GetPkregNotFound returns PkregNotFound and true boolean if SubmitFlowStepErrorResponse is PkregNotFound.
+func (s SubmitFlowStepErrorResponse) GetPkregNotFound() (v PkregNotFound, ok bool) {
+	if !s.IsPkregNotFound() {
+		return v, false
+	}
+	return s.PkregNotFound, true
+}
+
+// NewPkregNotFoundSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from PkregNotFound.
+func NewPkregNotFoundSubmitFlowStepErrorResponse(v PkregNotFound) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetPkregNotFound(v)
+	return s
+}
+
+// SetUserAlreadyExists sets SubmitFlowStepErrorResponse to UserAlreadyExists.
+func (s *SubmitFlowStepErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
+	s.Type = UserAlreadyExistsSubmitFlowStepErrorResponse
+	s.UserAlreadyExists = v
+}
+
+// GetUserAlreadyExists returns UserAlreadyExists and true boolean if SubmitFlowStepErrorResponse is UserAlreadyExists.
+func (s SubmitFlowStepErrorResponse) GetUserAlreadyExists() (v UserAlreadyExists, ok bool) {
+	if !s.IsUserAlreadyExists() {
+		return v, false
+	}
+	return s.UserAlreadyExists, true
+}
+
+// NewUserAlreadyExistsSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserAlreadyExists.
+func NewUserAlreadyExistsSubmitFlowStepErrorResponse(v UserAlreadyExists) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserAlreadyExists(v)
+	return s
+}
+
+// SetUserInvalid sets SubmitFlowStepErrorResponse to UserInvalid.
+func (s *SubmitFlowStepErrorResponse) SetUserInvalid(v UserInvalid) {
+	s.Type = UserInvalidSubmitFlowStepErrorResponse
+	s.UserInvalid = v
+}
+
+// GetUserInvalid returns UserInvalid and true boolean if SubmitFlowStepErrorResponse is UserInvalid.
+func (s SubmitFlowStepErrorResponse) GetUserInvalid() (v UserInvalid, ok bool) {
+	if !s.IsUserInvalid() {
+		return v, false
+	}
+	return s.UserInvalid, true
+}
+
+// NewUserInvalidSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserInvalid.
+func NewUserInvalidSubmitFlowStepErrorResponse(v UserInvalid) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserInvalid(v)
+	return s
+}
+
+// SetUserNotFound sets SubmitFlowStepErrorResponse to UserNotFound.
+func (s *SubmitFlowStepErrorResponse) SetUserNotFound(v UserNotFound) {
+	s.Type = UserNotFoundSubmitFlowStepErrorResponse
+	s.UserNotFound = v
+}
+
+// GetUserNotFound returns UserNotFound and true boolean if SubmitFlowStepErrorResponse is UserNotFound.
+func (s SubmitFlowStepErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
+	if !s.IsUserNotFound() {
+		return v, false
+	}
+	return s.UserNotFound, true
+}
+
+// NewUserNotFoundSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from UserNotFound.
+func NewUserNotFoundSubmitFlowStepErrorResponse(v UserNotFound) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUserNotFound(v)
+	return s
+}
+
+// SubmitFlowStepErrorResponseStatusCode wraps SubmitFlowStepErrorResponse with StatusCode.
+type SubmitFlowStepErrorResponseStatusCode struct {
+	StatusCode int
+	Response   SubmitFlowStepErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *SubmitFlowStepErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *SubmitFlowStepErrorResponseStatusCode) GetResponse() SubmitFlowStepErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *SubmitFlowStepErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *SubmitFlowStepErrorResponseStatusCode) SetResponse(val SubmitFlowStepErrorResponse) {
+	s.Response = val
+}
+
+func (*SubmitFlowStepErrorResponseStatusCode) submitFlowStepRes() {}
+
 type SubmitFlowStepOK FlowResponseHeaders
 
 func (*SubmitFlowStepOK) submitFlowStepRes() {}
@@ -13526,6 +19854,112 @@ func (s *TeamStatus) UnmarshalText(data []byte) error {
 	}
 }
 
+// Merged schema.
+// Ref: #
+type TknInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptTknInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *TknInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *TknInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *TknInvalid) GetDetails() OptTknInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *TknInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *TknInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *TknInvalid) SetDetails(val OptTknInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type TknInvalidDetails map[string]jx.Raw
+
+func (s *TknInvalidDetails) init() TknInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type TknInvalidTknid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptTknInvalidTknidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *TknInvalidTknid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *TknInvalidTknid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *TknInvalidTknid) GetDetails() OptTknInvalidTknidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *TknInvalidTknid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *TknInvalidTknid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *TknInvalidTknid) SetDetails(val OptTknInvalidTknidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type TknInvalidTknidDetails map[string]jx.Raw
+
+func (s *TknInvalidTknidDetails) init() TknInvalidTknidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // Ref: #
 type TokenResponse struct {
 	// The access token issued by the authorization server.
@@ -13583,6 +20017,270 @@ func (*TokenResponse) getTokenRes() {}
 type UpdateFlowDefinitionBadRequest ErrorDetails
 
 func (*UpdateFlowDefinitionBadRequest) updateFlowDefinitionRes() {}
+
+// UpdateFlowDefinitionErrorResponse represents sum type.
+type UpdateFlowDefinitionErrorResponse struct {
+	Type                     UpdateFlowDefinitionErrorResponseType // switch on this field
+	FlowdefInvalid           FlowdefInvalid
+	FlowdefNotFound          FlowdefNotFound
+	FlowdefUpdateConflict    FlowdefUpdateConflict
+	Internal                 Internal
+	SchNotFound              SchNotFound
+	FlowdefMissingID         FlowdefMissingID
+	FlowdefMissingProjectID  FlowdefMissingProjectID
+	FlowdefSchemaFetchFailed FlowdefSchemaFetchFailed
+}
+
+// UpdateFlowDefinitionErrorResponseType is oneOf type of UpdateFlowDefinitionErrorResponse.
+type UpdateFlowDefinitionErrorResponseType string
+
+// Possible values for UpdateFlowDefinitionErrorResponseType.
+const (
+	FlowdefInvalidUpdateFlowDefinitionErrorResponse           UpdateFlowDefinitionErrorResponseType = "flowdef.invalid"
+	FlowdefNotFoundUpdateFlowDefinitionErrorResponse          UpdateFlowDefinitionErrorResponseType = "flowdef.not_found"
+	FlowdefUpdateConflictUpdateFlowDefinitionErrorResponse    UpdateFlowDefinitionErrorResponseType = "flowdef.update_conflict"
+	InternalUpdateFlowDefinitionErrorResponse                 UpdateFlowDefinitionErrorResponseType = "internal"
+	SchNotFoundUpdateFlowDefinitionErrorResponse              UpdateFlowDefinitionErrorResponseType = "sch.not_found"
+	FlowdefMissingIDUpdateFlowDefinitionErrorResponse         UpdateFlowDefinitionErrorResponseType = "flowdef.missing_id"
+	FlowdefMissingProjectIDUpdateFlowDefinitionErrorResponse  UpdateFlowDefinitionErrorResponseType = "flowdef.missing_project_id"
+	FlowdefSchemaFetchFailedUpdateFlowDefinitionErrorResponse UpdateFlowDefinitionErrorResponseType = "flowdef.schema_fetch_failed"
+)
+
+// IsFlowdefInvalid reports whether UpdateFlowDefinitionErrorResponse is FlowdefInvalid.
+func (s UpdateFlowDefinitionErrorResponse) IsFlowdefInvalid() bool {
+	return s.Type == FlowdefInvalidUpdateFlowDefinitionErrorResponse
+}
+
+// IsFlowdefNotFound reports whether UpdateFlowDefinitionErrorResponse is FlowdefNotFound.
+func (s UpdateFlowDefinitionErrorResponse) IsFlowdefNotFound() bool {
+	return s.Type == FlowdefNotFoundUpdateFlowDefinitionErrorResponse
+}
+
+// IsFlowdefUpdateConflict reports whether UpdateFlowDefinitionErrorResponse is FlowdefUpdateConflict.
+func (s UpdateFlowDefinitionErrorResponse) IsFlowdefUpdateConflict() bool {
+	return s.Type == FlowdefUpdateConflictUpdateFlowDefinitionErrorResponse
+}
+
+// IsInternal reports whether UpdateFlowDefinitionErrorResponse is Internal.
+func (s UpdateFlowDefinitionErrorResponse) IsInternal() bool {
+	return s.Type == InternalUpdateFlowDefinitionErrorResponse
+}
+
+// IsSchNotFound reports whether UpdateFlowDefinitionErrorResponse is SchNotFound.
+func (s UpdateFlowDefinitionErrorResponse) IsSchNotFound() bool {
+	return s.Type == SchNotFoundUpdateFlowDefinitionErrorResponse
+}
+
+// IsFlowdefMissingID reports whether UpdateFlowDefinitionErrorResponse is FlowdefMissingID.
+func (s UpdateFlowDefinitionErrorResponse) IsFlowdefMissingID() bool {
+	return s.Type == FlowdefMissingIDUpdateFlowDefinitionErrorResponse
+}
+
+// IsFlowdefMissingProjectID reports whether UpdateFlowDefinitionErrorResponse is FlowdefMissingProjectID.
+func (s UpdateFlowDefinitionErrorResponse) IsFlowdefMissingProjectID() bool {
+	return s.Type == FlowdefMissingProjectIDUpdateFlowDefinitionErrorResponse
+}
+
+// IsFlowdefSchemaFetchFailed reports whether UpdateFlowDefinitionErrorResponse is FlowdefSchemaFetchFailed.
+func (s UpdateFlowDefinitionErrorResponse) IsFlowdefSchemaFetchFailed() bool {
+	return s.Type == FlowdefSchemaFetchFailedUpdateFlowDefinitionErrorResponse
+}
+
+// SetFlowdefInvalid sets UpdateFlowDefinitionErrorResponse to FlowdefInvalid.
+func (s *UpdateFlowDefinitionErrorResponse) SetFlowdefInvalid(v FlowdefInvalid) {
+	s.Type = FlowdefInvalidUpdateFlowDefinitionErrorResponse
+	s.FlowdefInvalid = v
+}
+
+// GetFlowdefInvalid returns FlowdefInvalid and true boolean if UpdateFlowDefinitionErrorResponse is FlowdefInvalid.
+func (s UpdateFlowDefinitionErrorResponse) GetFlowdefInvalid() (v FlowdefInvalid, ok bool) {
+	if !s.IsFlowdefInvalid() {
+		return v, false
+	}
+	return s.FlowdefInvalid, true
+}
+
+// NewFlowdefInvalidUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from FlowdefInvalid.
+func NewFlowdefInvalidUpdateFlowDefinitionErrorResponse(v FlowdefInvalid) UpdateFlowDefinitionErrorResponse {
+	var s UpdateFlowDefinitionErrorResponse
+	s.SetFlowdefInvalid(v)
+	return s
+}
+
+// SetFlowdefNotFound sets UpdateFlowDefinitionErrorResponse to FlowdefNotFound.
+func (s *UpdateFlowDefinitionErrorResponse) SetFlowdefNotFound(v FlowdefNotFound) {
+	s.Type = FlowdefNotFoundUpdateFlowDefinitionErrorResponse
+	s.FlowdefNotFound = v
+}
+
+// GetFlowdefNotFound returns FlowdefNotFound and true boolean if UpdateFlowDefinitionErrorResponse is FlowdefNotFound.
+func (s UpdateFlowDefinitionErrorResponse) GetFlowdefNotFound() (v FlowdefNotFound, ok bool) {
+	if !s.IsFlowdefNotFound() {
+		return v, false
+	}
+	return s.FlowdefNotFound, true
+}
+
+// NewFlowdefNotFoundUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from FlowdefNotFound.
+func NewFlowdefNotFoundUpdateFlowDefinitionErrorResponse(v FlowdefNotFound) UpdateFlowDefinitionErrorResponse {
+	var s UpdateFlowDefinitionErrorResponse
+	s.SetFlowdefNotFound(v)
+	return s
+}
+
+// SetFlowdefUpdateConflict sets UpdateFlowDefinitionErrorResponse to FlowdefUpdateConflict.
+func (s *UpdateFlowDefinitionErrorResponse) SetFlowdefUpdateConflict(v FlowdefUpdateConflict) {
+	s.Type = FlowdefUpdateConflictUpdateFlowDefinitionErrorResponse
+	s.FlowdefUpdateConflict = v
+}
+
+// GetFlowdefUpdateConflict returns FlowdefUpdateConflict and true boolean if UpdateFlowDefinitionErrorResponse is FlowdefUpdateConflict.
+func (s UpdateFlowDefinitionErrorResponse) GetFlowdefUpdateConflict() (v FlowdefUpdateConflict, ok bool) {
+	if !s.IsFlowdefUpdateConflict() {
+		return v, false
+	}
+	return s.FlowdefUpdateConflict, true
+}
+
+// NewFlowdefUpdateConflictUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from FlowdefUpdateConflict.
+func NewFlowdefUpdateConflictUpdateFlowDefinitionErrorResponse(v FlowdefUpdateConflict) UpdateFlowDefinitionErrorResponse {
+	var s UpdateFlowDefinitionErrorResponse
+	s.SetFlowdefUpdateConflict(v)
+	return s
+}
+
+// SetInternal sets UpdateFlowDefinitionErrorResponse to Internal.
+func (s *UpdateFlowDefinitionErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalUpdateFlowDefinitionErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if UpdateFlowDefinitionErrorResponse is Internal.
+func (s UpdateFlowDefinitionErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from Internal.
+func NewInternalUpdateFlowDefinitionErrorResponse(v Internal) UpdateFlowDefinitionErrorResponse {
+	var s UpdateFlowDefinitionErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetSchNotFound sets UpdateFlowDefinitionErrorResponse to SchNotFound.
+func (s *UpdateFlowDefinitionErrorResponse) SetSchNotFound(v SchNotFound) {
+	s.Type = SchNotFoundUpdateFlowDefinitionErrorResponse
+	s.SchNotFound = v
+}
+
+// GetSchNotFound returns SchNotFound and true boolean if UpdateFlowDefinitionErrorResponse is SchNotFound.
+func (s UpdateFlowDefinitionErrorResponse) GetSchNotFound() (v SchNotFound, ok bool) {
+	if !s.IsSchNotFound() {
+		return v, false
+	}
+	return s.SchNotFound, true
+}
+
+// NewSchNotFoundUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from SchNotFound.
+func NewSchNotFoundUpdateFlowDefinitionErrorResponse(v SchNotFound) UpdateFlowDefinitionErrorResponse {
+	var s UpdateFlowDefinitionErrorResponse
+	s.SetSchNotFound(v)
+	return s
+}
+
+// SetFlowdefMissingID sets UpdateFlowDefinitionErrorResponse to FlowdefMissingID.
+func (s *UpdateFlowDefinitionErrorResponse) SetFlowdefMissingID(v FlowdefMissingID) {
+	s.Type = FlowdefMissingIDUpdateFlowDefinitionErrorResponse
+	s.FlowdefMissingID = v
+}
+
+// GetFlowdefMissingID returns FlowdefMissingID and true boolean if UpdateFlowDefinitionErrorResponse is FlowdefMissingID.
+func (s UpdateFlowDefinitionErrorResponse) GetFlowdefMissingID() (v FlowdefMissingID, ok bool) {
+	if !s.IsFlowdefMissingID() {
+		return v, false
+	}
+	return s.FlowdefMissingID, true
+}
+
+// NewFlowdefMissingIDUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from FlowdefMissingID.
+func NewFlowdefMissingIDUpdateFlowDefinitionErrorResponse(v FlowdefMissingID) UpdateFlowDefinitionErrorResponse {
+	var s UpdateFlowDefinitionErrorResponse
+	s.SetFlowdefMissingID(v)
+	return s
+}
+
+// SetFlowdefMissingProjectID sets UpdateFlowDefinitionErrorResponse to FlowdefMissingProjectID.
+func (s *UpdateFlowDefinitionErrorResponse) SetFlowdefMissingProjectID(v FlowdefMissingProjectID) {
+	s.Type = FlowdefMissingProjectIDUpdateFlowDefinitionErrorResponse
+	s.FlowdefMissingProjectID = v
+}
+
+// GetFlowdefMissingProjectID returns FlowdefMissingProjectID and true boolean if UpdateFlowDefinitionErrorResponse is FlowdefMissingProjectID.
+func (s UpdateFlowDefinitionErrorResponse) GetFlowdefMissingProjectID() (v FlowdefMissingProjectID, ok bool) {
+	if !s.IsFlowdefMissingProjectID() {
+		return v, false
+	}
+	return s.FlowdefMissingProjectID, true
+}
+
+// NewFlowdefMissingProjectIDUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from FlowdefMissingProjectID.
+func NewFlowdefMissingProjectIDUpdateFlowDefinitionErrorResponse(v FlowdefMissingProjectID) UpdateFlowDefinitionErrorResponse {
+	var s UpdateFlowDefinitionErrorResponse
+	s.SetFlowdefMissingProjectID(v)
+	return s
+}
+
+// SetFlowdefSchemaFetchFailed sets UpdateFlowDefinitionErrorResponse to FlowdefSchemaFetchFailed.
+func (s *UpdateFlowDefinitionErrorResponse) SetFlowdefSchemaFetchFailed(v FlowdefSchemaFetchFailed) {
+	s.Type = FlowdefSchemaFetchFailedUpdateFlowDefinitionErrorResponse
+	s.FlowdefSchemaFetchFailed = v
+}
+
+// GetFlowdefSchemaFetchFailed returns FlowdefSchemaFetchFailed and true boolean if UpdateFlowDefinitionErrorResponse is FlowdefSchemaFetchFailed.
+func (s UpdateFlowDefinitionErrorResponse) GetFlowdefSchemaFetchFailed() (v FlowdefSchemaFetchFailed, ok bool) {
+	if !s.IsFlowdefSchemaFetchFailed() {
+		return v, false
+	}
+	return s.FlowdefSchemaFetchFailed, true
+}
+
+// NewFlowdefSchemaFetchFailedUpdateFlowDefinitionErrorResponse returns new UpdateFlowDefinitionErrorResponse from FlowdefSchemaFetchFailed.
+func NewFlowdefSchemaFetchFailedUpdateFlowDefinitionErrorResponse(v FlowdefSchemaFetchFailed) UpdateFlowDefinitionErrorResponse {
+	var s UpdateFlowDefinitionErrorResponse
+	s.SetFlowdefSchemaFetchFailed(v)
+	return s
+}
+
+// UpdateFlowDefinitionErrorResponseStatusCode wraps UpdateFlowDefinitionErrorResponse with StatusCode.
+type UpdateFlowDefinitionErrorResponseStatusCode struct {
+	StatusCode int
+	Response   UpdateFlowDefinitionErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *UpdateFlowDefinitionErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *UpdateFlowDefinitionErrorResponseStatusCode) GetResponse() UpdateFlowDefinitionErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *UpdateFlowDefinitionErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *UpdateFlowDefinitionErrorResponseStatusCode) SetResponse(val UpdateFlowDefinitionErrorResponse) {
+	s.Response = val
+}
+
+func (*UpdateFlowDefinitionErrorResponseStatusCode) updateFlowDefinitionRes() {}
 
 type UpdateFlowDefinitionNotFound ErrorDetails
 
@@ -13696,7 +20394,113 @@ func (s *UserAdditional) init() UserAdditional {
 	return m
 }
 
+// Merged schema.
+// Ref: #
+type UserAlreadyExists struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserAlreadyExistsDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserAlreadyExists) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserAlreadyExists) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserAlreadyExists) GetDetails() OptUserAlreadyExistsDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserAlreadyExists) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserAlreadyExists) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserAlreadyExists) SetDetails(val OptUserAlreadyExistsDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserAlreadyExistsDetails map[string]jx.Raw
+
+func (s *UserAlreadyExistsDetails) init() UserAlreadyExistsDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 type UserID string
+
+// Merged schema.
+// Ref: #
+type UserInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUserInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UserInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UserInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UserInvalid) GetDetails() OptUserInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UserInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UserInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UserInvalid) SetDetails(val OptUserInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UserInvalidDetails map[string]jx.Raw
+
+func (s *UserInvalidDetails) init() UserInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // Ref: #
 type UserMetadata struct {
@@ -14316,12 +21120,12 @@ func (s *UsernamePassword) SetRoles(val []string) {
 // VerifyChallengeProofErrorResponse represents sum type.
 type VerifyChallengeProofErrorResponse struct {
 	Type                VerifyChallengeProofErrorResponseType // switch on this field
-	AttNotFound         AttNotFound
-	AttStaleChallenge   AttStaleChallenge
+	AttAlreadyHandedOff AttAlreadyHandedOff
 	AttInvalidRequest   AttInvalidRequest
-	AttProofRejected    AttProofRejected
 	AttInvalidState     AttInvalidState
-	AttAlreadyCompleted AttAlreadyCompleted
+	AttNotFound         AttNotFound
+	AttProofRejected    AttProofRejected
+	AttStaleChallenge   AttStaleChallenge
 	Internal            Internal
 }
 
@@ -14330,23 +21134,18 @@ type VerifyChallengeProofErrorResponseType string
 
 // Possible values for VerifyChallengeProofErrorResponseType.
 const (
-	AttNotFoundVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "att.not_found"
-	AttStaleChallengeVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "att.stale_challenge"
+	AttAlreadyHandedOffVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "att.already_handed_off"
 	AttInvalidRequestVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "att.invalid_request"
-	AttProofRejectedVerifyChallengeProofErrorResponse    VerifyChallengeProofErrorResponseType = "att.proof_rejected"
 	AttInvalidStateVerifyChallengeProofErrorResponse     VerifyChallengeProofErrorResponseType = "att.invalid_state"
-	AttAlreadyCompletedVerifyChallengeProofErrorResponse VerifyChallengeProofErrorResponseType = "att.already_completed"
+	AttNotFoundVerifyChallengeProofErrorResponse         VerifyChallengeProofErrorResponseType = "att.not_found"
+	AttProofRejectedVerifyChallengeProofErrorResponse    VerifyChallengeProofErrorResponseType = "att.proof_rejected"
+	AttStaleChallengeVerifyChallengeProofErrorResponse   VerifyChallengeProofErrorResponseType = "att.stale_challenge"
 	InternalVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "internal"
 )
 
-// IsAttNotFound reports whether VerifyChallengeProofErrorResponse is AttNotFound.
-func (s VerifyChallengeProofErrorResponse) IsAttNotFound() bool {
-	return s.Type == AttNotFoundVerifyChallengeProofErrorResponse
-}
-
-// IsAttStaleChallenge reports whether VerifyChallengeProofErrorResponse is AttStaleChallenge.
-func (s VerifyChallengeProofErrorResponse) IsAttStaleChallenge() bool {
-	return s.Type == AttStaleChallengeVerifyChallengeProofErrorResponse
+// IsAttAlreadyHandedOff reports whether VerifyChallengeProofErrorResponse is AttAlreadyHandedOff.
+func (s VerifyChallengeProofErrorResponse) IsAttAlreadyHandedOff() bool {
+	return s.Type == AttAlreadyHandedOffVerifyChallengeProofErrorResponse
 }
 
 // IsAttInvalidRequest reports whether VerifyChallengeProofErrorResponse is AttInvalidRequest.
@@ -14354,19 +21153,24 @@ func (s VerifyChallengeProofErrorResponse) IsAttInvalidRequest() bool {
 	return s.Type == AttInvalidRequestVerifyChallengeProofErrorResponse
 }
 
-// IsAttProofRejected reports whether VerifyChallengeProofErrorResponse is AttProofRejected.
-func (s VerifyChallengeProofErrorResponse) IsAttProofRejected() bool {
-	return s.Type == AttProofRejectedVerifyChallengeProofErrorResponse
-}
-
 // IsAttInvalidState reports whether VerifyChallengeProofErrorResponse is AttInvalidState.
 func (s VerifyChallengeProofErrorResponse) IsAttInvalidState() bool {
 	return s.Type == AttInvalidStateVerifyChallengeProofErrorResponse
 }
 
-// IsAttAlreadyCompleted reports whether VerifyChallengeProofErrorResponse is AttAlreadyCompleted.
-func (s VerifyChallengeProofErrorResponse) IsAttAlreadyCompleted() bool {
-	return s.Type == AttAlreadyCompletedVerifyChallengeProofErrorResponse
+// IsAttNotFound reports whether VerifyChallengeProofErrorResponse is AttNotFound.
+func (s VerifyChallengeProofErrorResponse) IsAttNotFound() bool {
+	return s.Type == AttNotFoundVerifyChallengeProofErrorResponse
+}
+
+// IsAttProofRejected reports whether VerifyChallengeProofErrorResponse is AttProofRejected.
+func (s VerifyChallengeProofErrorResponse) IsAttProofRejected() bool {
+	return s.Type == AttProofRejectedVerifyChallengeProofErrorResponse
+}
+
+// IsAttStaleChallenge reports whether VerifyChallengeProofErrorResponse is AttStaleChallenge.
+func (s VerifyChallengeProofErrorResponse) IsAttStaleChallenge() bool {
+	return s.Type == AttStaleChallengeVerifyChallengeProofErrorResponse
 }
 
 // IsInternal reports whether VerifyChallengeProofErrorResponse is Internal.
@@ -14374,45 +21178,24 @@ func (s VerifyChallengeProofErrorResponse) IsInternal() bool {
 	return s.Type == InternalVerifyChallengeProofErrorResponse
 }
 
-// SetAttNotFound sets VerifyChallengeProofErrorResponse to AttNotFound.
-func (s *VerifyChallengeProofErrorResponse) SetAttNotFound(v AttNotFound) {
-	s.Type = AttNotFoundVerifyChallengeProofErrorResponse
-	s.AttNotFound = v
+// SetAttAlreadyHandedOff sets VerifyChallengeProofErrorResponse to AttAlreadyHandedOff.
+func (s *VerifyChallengeProofErrorResponse) SetAttAlreadyHandedOff(v AttAlreadyHandedOff) {
+	s.Type = AttAlreadyHandedOffVerifyChallengeProofErrorResponse
+	s.AttAlreadyHandedOff = v
 }
 
-// GetAttNotFound returns AttNotFound and true boolean if VerifyChallengeProofErrorResponse is AttNotFound.
-func (s VerifyChallengeProofErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
-	if !s.IsAttNotFound() {
+// GetAttAlreadyHandedOff returns AttAlreadyHandedOff and true boolean if VerifyChallengeProofErrorResponse is AttAlreadyHandedOff.
+func (s VerifyChallengeProofErrorResponse) GetAttAlreadyHandedOff() (v AttAlreadyHandedOff, ok bool) {
+	if !s.IsAttAlreadyHandedOff() {
 		return v, false
 	}
-	return s.AttNotFound, true
+	return s.AttAlreadyHandedOff, true
 }
 
-// NewAttNotFoundVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from AttNotFound.
-func NewAttNotFoundVerifyChallengeProofErrorResponse(v AttNotFound) VerifyChallengeProofErrorResponse {
+// NewAttAlreadyHandedOffVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from AttAlreadyHandedOff.
+func NewAttAlreadyHandedOffVerifyChallengeProofErrorResponse(v AttAlreadyHandedOff) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
-	s.SetAttNotFound(v)
-	return s
-}
-
-// SetAttStaleChallenge sets VerifyChallengeProofErrorResponse to AttStaleChallenge.
-func (s *VerifyChallengeProofErrorResponse) SetAttStaleChallenge(v AttStaleChallenge) {
-	s.Type = AttStaleChallengeVerifyChallengeProofErrorResponse
-	s.AttStaleChallenge = v
-}
-
-// GetAttStaleChallenge returns AttStaleChallenge and true boolean if VerifyChallengeProofErrorResponse is AttStaleChallenge.
-func (s VerifyChallengeProofErrorResponse) GetAttStaleChallenge() (v AttStaleChallenge, ok bool) {
-	if !s.IsAttStaleChallenge() {
-		return v, false
-	}
-	return s.AttStaleChallenge, true
-}
-
-// NewAttStaleChallengeVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from AttStaleChallenge.
-func NewAttStaleChallengeVerifyChallengeProofErrorResponse(v AttStaleChallenge) VerifyChallengeProofErrorResponse {
-	var s VerifyChallengeProofErrorResponse
-	s.SetAttStaleChallenge(v)
+	s.SetAttAlreadyHandedOff(v)
 	return s
 }
 
@@ -14437,27 +21220,6 @@ func NewAttInvalidRequestVerifyChallengeProofErrorResponse(v AttInvalidRequest) 
 	return s
 }
 
-// SetAttProofRejected sets VerifyChallengeProofErrorResponse to AttProofRejected.
-func (s *VerifyChallengeProofErrorResponse) SetAttProofRejected(v AttProofRejected) {
-	s.Type = AttProofRejectedVerifyChallengeProofErrorResponse
-	s.AttProofRejected = v
-}
-
-// GetAttProofRejected returns AttProofRejected and true boolean if VerifyChallengeProofErrorResponse is AttProofRejected.
-func (s VerifyChallengeProofErrorResponse) GetAttProofRejected() (v AttProofRejected, ok bool) {
-	if !s.IsAttProofRejected() {
-		return v, false
-	}
-	return s.AttProofRejected, true
-}
-
-// NewAttProofRejectedVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from AttProofRejected.
-func NewAttProofRejectedVerifyChallengeProofErrorResponse(v AttProofRejected) VerifyChallengeProofErrorResponse {
-	var s VerifyChallengeProofErrorResponse
-	s.SetAttProofRejected(v)
-	return s
-}
-
 // SetAttInvalidState sets VerifyChallengeProofErrorResponse to AttInvalidState.
 func (s *VerifyChallengeProofErrorResponse) SetAttInvalidState(v AttInvalidState) {
 	s.Type = AttInvalidStateVerifyChallengeProofErrorResponse
@@ -14479,24 +21241,66 @@ func NewAttInvalidStateVerifyChallengeProofErrorResponse(v AttInvalidState) Veri
 	return s
 }
 
-// SetAttAlreadyCompleted sets VerifyChallengeProofErrorResponse to AttAlreadyCompleted.
-func (s *VerifyChallengeProofErrorResponse) SetAttAlreadyCompleted(v AttAlreadyCompleted) {
-	s.Type = AttAlreadyCompletedVerifyChallengeProofErrorResponse
-	s.AttAlreadyCompleted = v
+// SetAttNotFound sets VerifyChallengeProofErrorResponse to AttNotFound.
+func (s *VerifyChallengeProofErrorResponse) SetAttNotFound(v AttNotFound) {
+	s.Type = AttNotFoundVerifyChallengeProofErrorResponse
+	s.AttNotFound = v
 }
 
-// GetAttAlreadyCompleted returns AttAlreadyCompleted and true boolean if VerifyChallengeProofErrorResponse is AttAlreadyCompleted.
-func (s VerifyChallengeProofErrorResponse) GetAttAlreadyCompleted() (v AttAlreadyCompleted, ok bool) {
-	if !s.IsAttAlreadyCompleted() {
+// GetAttNotFound returns AttNotFound and true boolean if VerifyChallengeProofErrorResponse is AttNotFound.
+func (s VerifyChallengeProofErrorResponse) GetAttNotFound() (v AttNotFound, ok bool) {
+	if !s.IsAttNotFound() {
 		return v, false
 	}
-	return s.AttAlreadyCompleted, true
+	return s.AttNotFound, true
 }
 
-// NewAttAlreadyCompletedVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from AttAlreadyCompleted.
-func NewAttAlreadyCompletedVerifyChallengeProofErrorResponse(v AttAlreadyCompleted) VerifyChallengeProofErrorResponse {
+// NewAttNotFoundVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from AttNotFound.
+func NewAttNotFoundVerifyChallengeProofErrorResponse(v AttNotFound) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
-	s.SetAttAlreadyCompleted(v)
+	s.SetAttNotFound(v)
+	return s
+}
+
+// SetAttProofRejected sets VerifyChallengeProofErrorResponse to AttProofRejected.
+func (s *VerifyChallengeProofErrorResponse) SetAttProofRejected(v AttProofRejected) {
+	s.Type = AttProofRejectedVerifyChallengeProofErrorResponse
+	s.AttProofRejected = v
+}
+
+// GetAttProofRejected returns AttProofRejected and true boolean if VerifyChallengeProofErrorResponse is AttProofRejected.
+func (s VerifyChallengeProofErrorResponse) GetAttProofRejected() (v AttProofRejected, ok bool) {
+	if !s.IsAttProofRejected() {
+		return v, false
+	}
+	return s.AttProofRejected, true
+}
+
+// NewAttProofRejectedVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from AttProofRejected.
+func NewAttProofRejectedVerifyChallengeProofErrorResponse(v AttProofRejected) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetAttProofRejected(v)
+	return s
+}
+
+// SetAttStaleChallenge sets VerifyChallengeProofErrorResponse to AttStaleChallenge.
+func (s *VerifyChallengeProofErrorResponse) SetAttStaleChallenge(v AttStaleChallenge) {
+	s.Type = AttStaleChallengeVerifyChallengeProofErrorResponse
+	s.AttStaleChallenge = v
+}
+
+// GetAttStaleChallenge returns AttStaleChallenge and true boolean if VerifyChallengeProofErrorResponse is AttStaleChallenge.
+func (s VerifyChallengeProofErrorResponse) GetAttStaleChallenge() (v AttStaleChallenge, ok bool) {
+	if !s.IsAttStaleChallenge() {
+		return v, false
+	}
+	return s.AttStaleChallenge, true
+}
+
+// NewAttStaleChallengeVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from AttStaleChallenge.
+func NewAttStaleChallengeVerifyChallengeProofErrorResponse(v AttStaleChallenge) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetAttStaleChallenge(v)
 	return s
 }
 

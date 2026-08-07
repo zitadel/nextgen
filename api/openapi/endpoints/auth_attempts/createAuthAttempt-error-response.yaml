@@ -16,9 +16,9 @@ content:
         summary: att.invalid_request
         value:
           code: att.invalid_request
-          message: invalid request
+          message: 'invalid request'
       internal:
         summary: internal
         value:
           code: internal
-          message: An unexpected error occurred.
+          message: 'An unexpected error occurred.'

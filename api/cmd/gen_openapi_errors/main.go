@@ -1,5 +1,10 @@
-// gen_openapi_errors generates OpenAPI default responses from service error comments.
-// It automatically discovers error codes by parsing the domain package and all service files.
+// gen_openapi_errors generates OpenAPI default responses for each operation.
+//
+// The error set of a service method is inferred from the implementation by
+// [erroranalysis], which follows the error value through the call graph. The
+// "errors:" doc comments on the service interfaces are no longer the source of
+// truth; where one disagrees with the code, the generator reports the drift and
+// the code wins.
 //
 // Paths are calculated relative to this generator's location:
 //   - Domain: ../../../internal/domain
@@ -17,6 +22,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"text/template"
@@ -24,6 +30,8 @@ import (
 	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/zitadel/nextgen/api/internal/erroranalysis"
 )
 
 type ErrorCode struct {
@@ -63,9 +71,16 @@ content:
         summary: {{ .Code }}
         value:
           code: {{ .Code }}
-          message: {{ .Message }}
+          message: {{ yamlScalar .Message }}
 {{- end }}
 `
+
+// yamlScalar renders s as a single-quoted YAML scalar. Error messages are free
+// text and several contain ": " ("flow definition: not found"), which YAML
+// parses as a nested mapping when left bare.
+func yamlScalar(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
+}
 
 func main() {
 	// Get the directory where this generator is located
@@ -78,6 +93,7 @@ func main() {
 
 	// Calculate paths relative to generator location
 	// Generator is at: api/cmd/gen_openapi_errors/main.go
+	moduleRoot := filepath.Join(generatorDir, "../../..")
 	domainPath := filepath.Join(generatorDir, "../../../internal/domain")
 	servicePath := filepath.Join(generatorDir, "../../../internal/service")
 	internalAPIPath := filepath.Join(generatorDir, "../../../internal/api")
@@ -87,9 +103,17 @@ func main() {
 	errorMapping := buildErrorMapping(domainPath)
 	fmt.Printf("📋 Discovered %d error codes from domain package\n", len(errorMapping))
 
-	// Step 2: Parse all service files to get error documentation
-	allMethods := parseAllServiceFiles(servicePath)
-	fmt.Printf("📋 Discovered %d service methods with error documentation\n", len(allMethods))
+	// Step 2: Infer each service method's error set from its implementation,
+	// then hold the hand-written "errors:" comments up against it.
+	analyzed, err := erroranalysis.Analyze(erroranalysis.Config{Dir: moduleRoot})
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "❌ Error analyzing service error paths: %v\n", err)
+		os.Exit(1)
+	}
+	allMethods := methodErrorsFromAnalysis(analyzed)
+	fmt.Printf("📋 Inferred error sets for %d service methods\n", len(allMethods))
+
+	reportCommentDrift(parseAllServiceFiles(servicePath), allMethods)
 
 	// Step 3: Define endpoint mappings
 	endpoints, err := discoverEndpointsWithDefaultErrorResponse(openapiBasePath)
@@ -106,25 +130,39 @@ func main() {
 	}
 	fmt.Printf("📋 Reflected %d operation-to-service mappings from API handlers\n", len(serviceMethodByOperation))
 
-	tmpl := template.Must(template.New("default").Parse(defaultResponseTemplate))
+	tmpl := template.Must(template.New("default").
+		Funcs(template.FuncMap{"yamlScalar": yamlScalar}).
+		Parse(defaultResponseTemplate))
 
 	// Step 4: Generate error response files for each endpoint
 	for _, endpoint := range endpoints {
-		serviceMethod, ok := serviceMethodByOperation[endpoint.operationID]
+		serviceMethods, ok := serviceMethodByOperation[endpoint.operationID]
 		if !ok {
 			fmt.Printf("⚠️  No reflected service mapping for %s (%s), skipping\n", endpoint.operationID, endpoint.yamlPath)
 			continue
 		}
 
-		method, ok := allMethods[serviceMethod]
-		if !ok {
-			fmt.Printf("⚠️  Service method %s not found, skipping %s\n", serviceMethod, endpoint.operationID)
-			continue
+		// A handler may call several services — createSession mints a crypter
+		// before creating the session — and can surface an error from any of
+		// them, so the operation advertises the union.
+		var errFuncs []string
+		for _, serviceMethod := range serviceMethods {
+			method, ok := allMethods[serviceMethod]
+			if !ok {
+				fmt.Printf("⚠️  Service method %s not found, skipping it for %s\n", serviceMethod, endpoint.operationID)
+				continue
+			}
+			for _, errFunc := range method.errorFuncs {
+				if !slices.Contains(errFuncs, errFunc) {
+					errFuncs = append(errFuncs, errFunc)
+				}
+			}
 		}
+		sort.Strings(errFuncs)
 
 		// Convert error functions to error codes using the auto-discovered mapping
 		var errorCodes []ErrorCode
-		for _, errFunc := range method.errorFuncs {
+		for _, errFunc := range errFuncs {
 			if errInfo, ok := errorMapping[errFunc]; ok {
 				errorCodes = append(errorCodes, ErrorCode{
 					Code:     errInfo.code,
@@ -132,7 +170,7 @@ func main() {
 					Message:  errInfo.message,
 				})
 			} else {
-				fmt.Printf("⚠️  Unknown error function %s in %s\n", errFunc, serviceMethod)
+				fmt.Printf("⚠️  Unknown error function %s in %s\n", errFunc, endpoint.operationID)
 			}
 		}
 
@@ -171,24 +209,27 @@ func main() {
 	fmt.Println("\n💡 Generated operation-specific error response files")
 }
 
-func discoverServiceMethodByOperation(internalAPIPath string, endpoints []endpointOperation) (map[string]string, error) {
+func discoverServiceMethodByOperation(internalAPIPath string, endpoints []endpointOperation) (map[string][]string, error) {
 	handlerMethods, err := discoverHandlerServiceMethods(internalAPIPath)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceMethodByOperation := make(map[string]string, len(endpoints))
+	serviceMethodByOperation := make(map[string][]string, len(endpoints))
 	for _, endpoint := range endpoints {
 		handlerMethod := operationIDToHandlerMethod(endpoint.operationID)
-		if serviceMethod, ok := handlerMethods[handlerMethod]; ok {
-			serviceMethodByOperation[endpoint.operationID] = serviceMethod
+		if serviceMethods, ok := handlerMethods[handlerMethod]; ok {
+			serviceMethodByOperation[endpoint.operationID] = serviceMethods
 		}
 	}
 
 	return serviceMethodByOperation, nil
 }
 
-func discoverHandlerServiceMethods(internalAPIPath string) (map[string]string, error) {
+// discoverHandlerServiceMethods maps each Handler method to every service
+// method it calls. Only interface-typed fields are matched: a service held as a
+// concrete pointer has no interface for the analysis to key on.
+func discoverHandlerServiceMethods(internalAPIPath string) (map[string][]string, error) {
 	files, err := filepath.Glob(filepath.Join(internalAPIPath, "*.go"))
 	if err != nil {
 		return nil, err
@@ -196,7 +237,7 @@ func discoverHandlerServiceMethods(internalAPIPath string) (map[string]string, e
 
 	fset := token.NewFileSet()
 	fieldServiceInterfaces := map[string]string{}
-	handlerMethods := map[string]string{}
+	handlerMethods := map[string][]string{}
 
 	for _, filePath := range files {
 		file, err := parser.ParseFile(fset, filePath, nil, parser.SkipObjectResolution)
@@ -287,12 +328,15 @@ func discoverHandlerServiceMethods(internalAPIPath string) (map[string]string, e
 				return true
 			})
 
-			if len(serviceCalls) != 1 {
+			if len(serviceCalls) == 0 {
 				continue
 			}
+			methods := make([]string, 0, len(serviceCalls))
 			for serviceMethod := range serviceCalls {
-				handlerMethods[funcDecl.Name.Name] = serviceMethod
+				methods = append(methods, serviceMethod)
 			}
+			sort.Strings(methods)
+			handlerMethods[funcDecl.Name.Name] = methods
 		}
 	}
 
@@ -515,8 +559,10 @@ func extractResourcePrefixes(files []*ast.File) map[string]string {
 
 	for _, file := range files {
 		for _, decl := range file.Decls {
+			// Resource prefixes are normally const, but TokenPrefix is a var —
+			// accept both, or its error codes go missing entirely.
 			genDecl, ok := decl.(*ast.GenDecl)
-			if !ok || genDecl.Tok != token.CONST {
+			if !ok || (genDecl.Tok != token.CONST && genDecl.Tok != token.VAR) {
 				continue
 			}
 
@@ -577,6 +623,85 @@ type serviceMethod struct {
 	interfaceName string
 	methodName    string
 	errorFuncs    []string
+}
+
+// boundaryErrors are reachable on every operation no matter what the service
+// raises: domainErrorDetails in internal/api falls back to domain.ErrInternal
+// for anything that is not a domain.Error, so a storage or library failure
+// surfaces as `internal` on any endpoint. The service-level analysis cannot see
+// that — it is a property of the HTTP boundary — so it is added here.
+var boundaryErrors = []string{"domain.ErrInternal"}
+
+// methodErrorsFromAnalysis adapts the inferred error sets to the shape the
+// generation loop consumes.
+func methodErrorsFromAnalysis(analyzed map[string]erroranalysis.Method) map[string]serviceMethod {
+	out := make(map[string]serviceMethod, len(analyzed))
+	for key, m := range analyzed {
+		if m.Unimplemented {
+			fmt.Printf("⚠️  %s has no implementation to analyze\n", key)
+			continue
+		}
+
+		codes := slices.Clone(m.Errors)
+		for _, code := range boundaryErrors {
+			if !slices.Contains(codes, code) {
+				codes = append(codes, code)
+			}
+		}
+		sort.Strings(codes)
+
+		out[key] = serviceMethod{
+			interfaceName: m.Interface,
+			methodName:    m.Name,
+			errorFuncs:    codes,
+		}
+	}
+	return out
+}
+
+// reportCommentDrift prints where a hand-written "errors:" doc comment no
+// longer matches what the implementation can actually return. The comments are
+// advisory now, so this is a nudge to fix (or delete) them — not a failure.
+func reportCommentDrift(declared, inferred map[string]serviceMethod) {
+	keys := make([]string, 0, len(declared))
+	for key := range declared {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	drifted := 0
+	for _, key := range keys {
+		want := declared[key].errorFuncs
+		got := inferred[key].errorFuncs
+
+		var missing, extra []string
+		for _, code := range want {
+			if !slices.Contains(got, code) {
+				extra = append(extra, code)
+			}
+		}
+		for _, code := range got {
+			if !slices.Contains(want, code) {
+				missing = append(missing, code)
+			}
+		}
+		if len(missing) == 0 && len(extra) == 0 {
+			continue
+		}
+
+		drifted++
+		fmt.Printf("⚠️  %s: doc comment is out of date\n", key)
+		if len(missing) > 0 {
+			fmt.Printf("      code returns but comment omits: %s\n", strings.Join(missing, ", "))
+		}
+		if len(extra) > 0 {
+			fmt.Printf("      comment claims but code cannot return: %s\n", strings.Join(extra, ", "))
+		}
+	}
+
+	if drifted > 0 {
+		fmt.Printf("💡 %d service method comment(s) drifted; the spec follows the code\n", drifted)
+	}
 }
 
 // parseAllServiceFiles scans all .go files in the service directory and extracts

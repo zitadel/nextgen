@@ -4,35 +4,42 @@ content:
   application/json:
     schema:
       oneOf:
-        - $ref: '../../../../components/schemas/errors/att-not_found.yaml'
+        - $ref: '../../../../components/schemas/errors/att-already_handed_off.yaml'
         - $ref: '../../../../components/schemas/errors/att-invalid_state.yaml'
         - $ref: '../../../../components/schemas/errors/att-not_completed.yaml'
+        - $ref: '../../../../components/schemas/errors/att-not_found.yaml'
         - $ref: '../../../../components/schemas/errors/internal.yaml'
       discriminator:
         propertyName: code
         mapping:
-          att.not_found: '../../../../components/schemas/errors/att-not_found.yaml'
+          att.already_handed_off: '../../../../components/schemas/errors/att-already_handed_off.yaml'
           att.invalid_state: '../../../../components/schemas/errors/att-invalid_state.yaml'
           att.not_completed: '../../../../components/schemas/errors/att-not_completed.yaml'
+          att.not_found: '../../../../components/schemas/errors/att-not_found.yaml'
           internal: '../../../../components/schemas/errors/internal.yaml'
     examples:
-      att.not_found:
-        summary: att.not_found
+      att.already_handed_off:
+        summary: att.already_handed_off
         value:
-          code: att.not_found
-          message: The auth attempt was not found.
+          code: att.already_handed_off
+          message: 'The auth attempt was already handed off. No new handoff can be created and the previous token will only be returned if the same Idempotency-Key header is provided.'
       att.invalid_state:
         summary: att.invalid_state
         value:
           code: att.invalid_state
-          message: The auth attempt is in an invalid state for the intended change.
+          message: 'The auth attempt is in an invalid state for the intended change.'
       att.not_completed:
         summary: att.not_completed
         value:
           code: att.not_completed
-          message: The auth attempt must be completed for any further action.
+          message: 'The auth attempt must be completed for any further action.'
+      att.not_found:
+        summary: att.not_found
+        value:
+          code: att.not_found
+          message: 'The auth attempt was not found.'
       internal:
         summary: internal
         value:
           code: internal
-          message: An unexpected error occurred.
+          message: 'An unexpected error occurred.'

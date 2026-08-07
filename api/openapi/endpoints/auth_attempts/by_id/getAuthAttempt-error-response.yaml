@@ -16,9 +16,9 @@ content:
         summary: att.not_found
         value:
           code: att.not_found
-          message: The auth attempt was not found.
+          message: 'The auth attempt was not found.'
       internal:
         summary: internal
         value:
           code: internal
-          message: An unexpected error occurred.
+          message: 'An unexpected error occurred.'
