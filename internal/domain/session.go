@@ -113,7 +113,7 @@ type Session struct {
 func NewSession(projectID string, agent *UserAgent) (*Session, error) {
 	return &Session{
 		ProjectID:  projectID,
-		UserAgent:  agent.Clone(), // own our copy; storage mutates Info in place
+		UserAgent:  agent.Clone(),
 		TimeToLive: SessionAnonymousTTL,
 	}, nil
 }
