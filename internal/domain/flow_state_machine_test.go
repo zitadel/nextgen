@@ -2768,7 +2768,13 @@ const nestedProfileSchemaContent string = `{
 			"type": "object",
 			"properties": {
 				"street": { "type": "string" },
-				"city":   { "type": "string" }
+				"city":   { "type": "string" },
+				"geo": {
+					"type": "object",
+					"properties": {
+						"label": { "type": "string" }
+					}
+				}
 			}
 		}
 	}
@@ -2786,7 +2792,7 @@ func nestedProfileDefinition() *domain.FlowDefinition {
 		Steps: []domain.FlowDefinitionStep{
 			{
 				Name:   "profile",
-				Fields: []domain.Field{"email", "address.street", "address.city"},
+				Fields: []domain.Field{"email", "address.street"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -2796,7 +2802,7 @@ func nestedProfileDefinition() *domain.FlowDefinition {
 			},
 			{
 				Name:   "confirm",
-				Fields: []domain.Field{"address.street"},
+				Fields: []domain.Field{"address.street", "address.city", "address.geo.label"},
 				Actions: []domain.FlowStepAction{
 					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
 				},
@@ -2844,7 +2850,6 @@ func TestFlowStateMachine_CollectsNestedFieldsAsADocument(t *testing.T) {
 		Fields: map[string]any{
 			"email":          "alice@example.com",
 			"address.street": "Main Street 1",
-			"address.city":   "Zurich",
 		},
 	})
 	require.NoError(t, err)
@@ -2854,7 +2859,6 @@ func TestFlowStateMachine_CollectsNestedFieldsAsADocument(t *testing.T) {
 	address, ok := res.State.CollectedData.UserData["address"].(map[string]any)
 	require.True(t, ok, "dotted fields must merge into a nested object")
 	assert.Equal(t, "Main Street 1", address["street"])
-	assert.Equal(t, "Zurich", address["city"])
 	assert.Equal(t, "alice@example.com", res.State.CollectedData.UserData["email"])
 
 	// A later step collecting the same leaf pre-fills it from the nested
@@ -2864,6 +2868,28 @@ func TestFlowStateMachine_CollectsNestedFieldsAsADocument(t *testing.T) {
 	require.NotNil(t, confirmStreet)
 	require.NotNil(t, confirmStreet.Value, "nested leaf must prefill from collected data")
 	assert.Equal(t, "Main Street 1", *confirmStreet.Value)
+
+	// A second step writing different leaves of the same object merges into
+	// the map already in state instead of replacing it, and a leaf more than
+	// one level down builds the intermediate objects it descends through.
+	final, err := w.sm.Process(t.Context(), def, res.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"address.street":    "Main Street 1",
+			"address.city":      "Zurich",
+			"address.geo.label": "downtown",
+		},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]any{
+		"email": "alice@example.com",
+		"address": map[string]any{
+			"street": "Main Street 1",
+			"city":   "Zurich",
+			"geo":    map[string]any{"label": "downtown"},
+		},
+	}, final.State.CollectedData.UserData)
 }
 
 func TestFlowStateMachine_Back_DropsPendingChallenge(t *testing.T) {
