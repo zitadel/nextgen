@@ -74,6 +74,32 @@ func TestAuthzMembershipEdgeStatements_MissingSetReturnsForeignKeyError(t *testi
 	})
 }
 
+// DeleteTeamCascadesEdges confirms the set FK (project_id, set_id) → teams uses
+// ON DELETE CASCADE on every dialect: hard-deleting the team removes edges.
+// Skip team_memberships — their team FKs are RESTRICT/NO ACTION and would block
+// the delete before the membership-edge FK is exercised.
+func TestAuthzMembershipEdgeStatements_DeleteTeamCascadesEdges(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		teamID := "team-cascade-" + uniqueSuffix(t)
+		memberID := "usr-cascade-" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
+		require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), &domain.AuthzMembershipEdge{
+			ProjectID:  projectID,
+			MemberType: domain.AuthzMemberTypeUser,
+			MemberID:   memberID,
+			SetType:    domain.AuthzSetTypeTeam,
+			SetID:      teamID,
+		}))
+
+		require.NoError(t, d.hardDeleteTeam(t.Context(), projectID, teamID))
+
+		_, err := d.stmts.GetAuthzMembershipEdge(t.Context(),
+			domain.NewUserTeamMembershipEdgeKey(projectID, teamID, memberID))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}
+
 func TestAuthzMembershipEdgeStatements_DeleteByMemberAndSet(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)

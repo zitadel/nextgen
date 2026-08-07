@@ -113,7 +113,9 @@ flowchart TB
 Conventions match existing migrations: Postgres schema `zitadel_nextgen`,
 `TEXT COLLATE "C"`, `TIMESTAMPTZ`; Spanner uses `STRING(MAX)` / `TIMESTAMP`,
 no schema prefix, and often `ON DELETE NO ACTION` where Postgres uses
-`RESTRICT` (see `team_memberships`).
+`RESTRICT` (see `team_memberships`). Where the Postgres strawman uses
+`ON DELETE CASCADE` (including `authz_membership_edges` → teams), Spanner
+matches with `CASCADE` — do not translate that to `NO ACTION`.
 
 ### `resource_scope_index`
 

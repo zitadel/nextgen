@@ -257,7 +257,7 @@ CREATE TABLE authz_membership_edges (
     CONSTRAINT fk_authz_membership_edges_project
         FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
     CONSTRAINT fk_authz_membership_edges_set
-        FOREIGN KEY (project_id, set_id) REFERENCES teams (project_id, id) ON DELETE NO ACTION
+        FOREIGN KEY (project_id, set_id) REFERENCES teams (project_id, id) ON DELETE CASCADE
 ) PRIMARY KEY (project_id, set_type, set_id, member_type, member_id)
 -- +goose StatementEnd
 
