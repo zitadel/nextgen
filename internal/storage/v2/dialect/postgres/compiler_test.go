@@ -233,7 +233,7 @@ func TestCompileReadCursorDesc(t *testing.T) {
 			database.Col(domain.ProjectFieldID),
 		},
 		Direction: database.OrderDesc,
-		Values: []any{createdAt, "proj_1"},
+		Values:    []any{createdAt, "proj_1"},
 	}).Marshal()
 
 	sql, args := compileProjectRead(t, &database.ListOptions[domain.ProjectField]{
