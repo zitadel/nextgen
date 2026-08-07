@@ -170,10 +170,7 @@ type UserAgent struct {
 	Info map[string]any
 }
 
-// Clone returns a deep copy safe to mutate independently of the original: its
-// Info map is separate, so persistence side-effects (storage adds ip/fingerprint
-// keys before marshalling) never leak back to a caller's request-scoped value.
-// The copy is shallow over Info's values, which are always strings.
+// Clone returns a deep copy safe to mutate independently of the original.
 func (ua *UserAgent) Clone() *UserAgent {
 	if ua == nil {
 		return nil
