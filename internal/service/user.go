@@ -78,9 +78,23 @@ type ListUserTeamsOutput struct {
 	NextPageToken string
 }
 
+// ---- Interface -------------------------------------------------------------
+
+type UserService interface {
+	ApplyActions(ctx context.Context, actions ...UserAction) (err error)
+	CreateUser(ctx context.Context, input CreateUserInput) (map[string]any, error)
+	DeleteUser(ctx context.Context, input DeleteUserInput) error
+	ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error)
+	ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error)
+	ListUserTeams(ctx context.Context, input ListUserTeamsInput) (*ListUserTeamsOutput, error)
+	GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error)
+	SetPassword(ctx context.Context, input SetPasswordInput) (err error)
+	GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error)
+}
+
 // ---- Implementation -------------------------------------------------------------
 
-type UserService struct {
+type userService struct {
 	v2Pool      StatementPool
 	schemaStore domain.JSONSchemaStore
 	hasher      crypto.Hasher
@@ -90,15 +104,15 @@ func NewUserService(
 	v2Pool StatementPool,
 	schemaStore domain.JSONSchemaStore,
 	hasher crypto.Hasher,
-) *UserService {
-	return &UserService{
+) UserService {
+	return &userService{
 		v2Pool:      v2Pool,
 		schemaStore: schemaStore,
 		hasher:      hasher,
 	}
 }
 
-func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (err error) {
+func (s *userService) ApplyActions(ctx context.Context, actions ...UserAction) (err error) {
 	for _, action := range actions {
 		err = action.Prepare(ctx)
 		if err != nil {
@@ -123,7 +137,7 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 	return nil
 }
 
-func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
+func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
 	action := NewCreateUserAction(input, s.schemaStore)
 	if err := s.ApplyActions(ctx, action); err != nil {
 		return nil, err
@@ -131,12 +145,12 @@ func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 	return action.User, nil
 }
 
-func (s *UserService) DeleteUser(ctx context.Context, input DeleteUserInput) error {
+func (s *userService) DeleteUser(ctx context.Context, input DeleteUserInput) error {
 	action := NewDeleteUserAction(input)
 	return s.ApplyActions(ctx, action)
 }
 
-func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error) {
+func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error) {
 	result, err := s.v2Pool.Statements().ListUsers(ctx, &database.ListOptions[domain.UserField]{
 		Filter: database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
 		Pagination: database.Page[domain.UserField]{
@@ -161,7 +175,7 @@ func (s *UserService) ListUsers(ctx context.Context, input ListUsersInput) (*Lis
 	}, nil
 }
 
-func (s *UserService) ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error) {
+func (s *userService) ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error) {
 	dbpasskeys, err := s.v2Pool.Statements().ListUserPasskeys(
 		ctx, &database.ListOptions[domain.UserPasskeyField]{
 			Filter: database.And(
@@ -204,7 +218,7 @@ func (s *UserService) ListPasskeys(ctx context.Context, input ListPasskeysInput)
 // The roster is not lifecycle ownership (ADR 024): a user can sit on several
 // rosters while owning their own lifecycle, which is reported on the user
 // itself.
-func (s *UserService) ListUserTeams(ctx context.Context, input ListUserTeamsInput) (*ListUserTeamsOutput, error) {
+func (s *userService) ListUserTeams(ctx context.Context, input ListUserTeamsInput) (*ListUserTeamsOutput, error) {
 	onRoster := make([]database.Filter[domain.UserTeamField], 0, len(domain.RosterMembershipStatuses))
 	for _, status := range domain.RosterMembershipStatuses {
 		onRoster = append(onRoster, database.Equal(database.Col(domain.UserTeamFieldStatus), status.String()))
@@ -248,7 +262,7 @@ func (s *UserService) ListUserTeams(ctx context.Context, input ListUserTeamsInpu
 	}, nil
 }
 
-func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error) {
+func (s *userService) GetUserByID(ctx context.Context, input GetUserInput) (*domain.User, error) {
 	user, err := s.v2Pool.Statements().GetUser(ctx, database.And(
 		database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
 		database.Equal(database.Col(domain.UserFieldID), input.UserID),
@@ -263,12 +277,12 @@ func (s *UserService) GetUserByID(ctx context.Context, input GetUserInput) (*dom
 	return user, nil
 }
 
-func (s *UserService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
+func (s *userService) SetPassword(ctx context.Context, input SetPasswordInput) (err error) {
 	action := NewSetUserPasswordAction(input, s.hasher)
 	return s.ApplyActions(ctx, action)
 }
 
-func (s *UserService) GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error) {
+func (s *userService) GetMyUser(ctx context.Context, input GetMyUserInput) (*domain.User, error) {
 	sessionToken := input.SessionToken
 	if sessionToken == nil {
 		return nil, domain.ErrSessionTokenInvalid()
