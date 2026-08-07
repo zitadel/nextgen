@@ -75,6 +75,34 @@ describe("normalizeSchemaBody", () => {
     });
   });
 
+  // A leaf of an object property normalizes the same way a top-level one
+  // does, or its defaults would read as a permanent diff.
+  it("strips defaults from nested properties too", () => {
+    const normalized = normalizeSchemaBody({
+      properties: {
+        address: {
+          type: "object",
+          "x-editable": true,
+          properties: {
+            street: { type: "string", "x-editable": true, "x-sensitive": false },
+            city: { type: "string", "x-sensitive": true },
+          },
+        },
+      },
+    });
+    expect(normalized).toEqual({
+      properties: {
+        address: {
+          type: "object",
+          properties: {
+            street: { type: "string" },
+            city: { type: "string", "x-sensitive": true },
+          },
+        },
+      },
+    });
+  });
+
   it("keeps non-default values, including non-boolean x-mfa", () => {
     const body = {
       properties: {
