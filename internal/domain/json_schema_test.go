@@ -474,6 +474,47 @@ func TestNewJSONSchema_ReservedProperties(t *testing.T) {
 		}
 	})
 
+	// A nested value is keyed by its dotted path in the attribute store and
+	// addressed by that same path in a flow step's fields, so a literal dot
+	// in a property name would be indistinguishable from nesting.
+	t.Run("dotted property names", func(t *testing.T) {
+		t.Run("rejected", func(t *testing.T) {
+			tests := []struct {
+				name    string
+				schema  string
+				message string
+			}{
+				{
+					name:    "at the top level",
+					schema:  `{"type":"object","properties":{"address.street":{"type":"string"}}}`,
+					message: `schema property "address.street" cannot contain a dot`,
+				},
+				{
+					name:    "inside a nested object",
+					schema:  `{"type":"object","properties":{"address":{"type":"object","properties":{"zip.code":{"type":"string"}}}}}`,
+					message: `schema property "zip.code" cannot contain a dot`,
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					schema, err := domain.NewJSONSchema(projectID, []byte(tt.schema))
+					require.Error(t, err)
+					assert.Nil(t, schema)
+					assert.ErrorIs(t, err, domain.ErrJSONSchemaInvalid())
+					assert.EqualError(t, err, tt.message)
+				})
+			}
+		})
+
+		t.Run("an ordinary nested schema is accepted", func(t *testing.T) {
+			const content = `{"type":"object","properties":{"address":{"type":"object","properties":{"street":{"type":"string"}}}}}`
+			schema, err := domain.NewJSONSchema(projectID, []byte(content))
+			require.NoError(t, err)
+			require.NotNil(t, schema)
+		})
+	})
+
 	t.Run("a reserved key with a null value is not rejected", func(t *testing.T) {
 		// Characterisation test, not an endorsement: maputil.Get[any] reports a
 		// JSON null as absent, because a type assertion on a nil interface
