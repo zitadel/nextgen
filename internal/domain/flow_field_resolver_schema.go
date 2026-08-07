@@ -26,7 +26,8 @@ type SchemaResolver interface {
 // Translation map (user meta-schema → [FlowField]):
 //
 //   - `type` + `format` → [FlowFieldType]
-//   - top-level `required` membership → [FlowField.Required]
+//   - `required` membership at every level of the field's path →
+//     [FlowField.Required]
 //   - `minLength`, `maxLength`, `format` → [FlowFieldValidation]
 //   - `x-unique` (non-empty) → [FlowFieldChallengeIdentifier] +
 //     [FlowImplicitOutcomeUserNotFound] + [FlowField.Unique]
@@ -43,8 +44,6 @@ var _ FlowFieldResolver = (*SchemaFieldResolver)(nil)
 
 func (r *SchemaFieldResolver) Resolve(schema *jsonschema.Schema, stepName string, fieldNames []Field) (FlowResolvedFields, error) {
 	root := newSchemaReader(schema)
-	properties := root.Properties()
-	required := root.RequiredSet()
 	authMethods, err := root.AuthMethods()
 	if err != nil {
 		return FlowResolvedFields{}, fmt.Errorf("flow field resolver: read x-auth-methods: %w", err)
@@ -62,7 +61,7 @@ func (r *SchemaFieldResolver) Resolve(schema *jsonschema.Schema, stepName string
 		case field.IsAuthMethod():
 			ff, err = resolveAuthMethodField(authMethods, field, stepName)
 		default:
-			ff, err = resolveUserPropertyField(properties, required, field, stepName)
+			ff, err = resolveUserPropertyField(root, field, stepName)
 		}
 		if err != nil {
 			return FlowResolvedFields{}, err
@@ -79,17 +78,19 @@ func (r *SchemaFieldResolver) Resolve(schema *jsonschema.Schema, stepName string
 	}, nil
 }
 
-// resolveUserPropertyField builds a [FlowField] from a top-level
-// property of the user schema. Returns [ErrFlowFieldUnknown] when the
-// property is absent, [ErrFlowFieldUnsupportedType] when the JSON
-// `type` keyword is an ambiguous union.
-func resolveUserPropertyField(properties map[string]schemaReader, required map[string]struct{}, field Field, stepName string) (FlowField, error) {
-	prop, ok := properties[field.String()]
-	if !ok {
-		return FlowField{}, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, field.String())
+// resolveUserPropertyField builds a [FlowField] from a property of the
+// user schema, addressed by its dotted path. Returns
+// [ErrFlowFieldUnknown] when the path does not resolve,
+// [ErrFlowFieldNotScalar] when it lands on an object or array, and
+// [ErrFlowFieldUnsupportedType] when the JSON `type` keyword is an
+// ambiguous union.
+func resolveUserPropertyField(root schemaReader, field Field, stepName string) (FlowField, error) {
+	prop, required, err := walkUserProperty(root, field)
+	if err != nil {
+		return FlowField{}, err
 	}
 
-	fieldType, err := deriveUserPropertyType(prop)
+	fieldType, err := deriveUserPropertyType(prop, field)
 	if err != nil {
 		return FlowField{}, err
 	}
@@ -102,14 +103,37 @@ func resolveUserPropertyField(properties map[string]schemaReader, required map[s
 		Type:      fieldType,
 		Challenge: deriveIdentifierChallenge(unique),
 		Unique:    unique,
-	}
-	if _, ok := required[field.String()]; ok {
-		ff.Required = true
+		Required:  required,
 	}
 	if v := buildValidation(prop); v != nil {
 		ff.Validation = v
 	}
 	return ff, nil
+}
+
+// walkUserProperty resolves a field's dotted path against the user
+// schema, descending one `properties` level per segment, and reports
+// whether every segment is listed in its own level's `required`. A
+// missing segment — or an intermediate one that holds no `properties`,
+// so the path cannot continue through it — yields
+// [ErrFlowFieldUnknown] naming the whole path.
+func walkUserProperty(root schemaReader, field Field) (schemaReader, bool, error) {
+	segments := AttributeKey(field.String()).Nodes()
+	parent, required := root, true
+	for i, segment := range segments {
+		prop, ok := parent.Properties()[segment]
+		if !ok {
+			return schemaReader{}, false, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, field.String())
+		}
+		if _, ok := parent.RequiredSet()[segment]; !ok {
+			required = false
+		}
+		if i < len(segments)-1 && prop.Properties() == nil {
+			return schemaReader{}, false, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, field.String())
+		}
+		parent = prop
+	}
+	return parent, required, nil
 }
 
 // resolveAuthMethodField builds a [FlowField] from an
@@ -144,11 +168,17 @@ func resolveAuthMethodField(authMethods xAuthMethodsReader, field Field, stepNam
 // JSON `type` keywords to a [FlowFieldType]. A closed `enum` surfaces
 // as `select`; JSON `type: boolean` surfaces as `checkbox`. Returns
 // [ErrFlowFieldUnsupportedType] when the JSON `type` is an ambiguous
-// union the resolver cannot reduce to a single kind.
-func deriveUserPropertyType(prop schemaReader) (FlowFieldType, error) {
+// union the resolver cannot reduce to a single kind, and
+// [ErrFlowFieldNotScalar] when the property has no field-shaped input.
+func deriveUserPropertyType(prop schemaReader, field Field) (FlowFieldType, error) {
 	jsonType, err := prop.JSONType()
 	if err != nil {
 		return "", err
+	}
+	// A property carrying `properties` is an object even when it omits
+	// the `type` keyword, which would otherwise fall through to text.
+	if jsonType == "object" || jsonType == "array" || prop.Properties() != nil {
+		return "", fmt.Errorf("%w: %q", ErrFlowFieldNotScalar, field.String())
 	}
 	if len(prop.StringEnum()) > 0 {
 		return FlowFieldTypeSelect, nil
@@ -355,7 +385,7 @@ func (r schemaReader) Properties() map[string]schemaReader {
 	return out
 }
 
-// RequiredSet returns the names listed in the top-level `required`
+// RequiredSet returns the names listed in this level's `required`
 // keyword as a set.
 func (r schemaReader) RequiredSet() map[string]struct{} {
 	out := map[string]struct{}{}
@@ -371,6 +401,30 @@ func (r schemaReader) RequiredSet() map[string]struct{} {
 		out[n] = struct{}{}
 	}
 	return out
+}
+
+// RequiredLeafPaths returns the dotted paths a document must carry:
+// every name in `required`, recursed through the nested `required` of
+// each required object. A required object that declares no `required`
+// of its own ends the descent at the object itself — any leaf beneath
+// it satisfies the coverage check.
+func (r schemaReader) RequiredLeafPaths() map[string]struct{} {
+	out := map[string]struct{}{}
+	r.collectRequiredLeafPaths("", out)
+	return out
+}
+
+func (r schemaReader) collectRequiredLeafPaths(prefix AttributeKey, out map[string]struct{}) {
+	properties := r.Properties()
+	for name := range r.RequiredSet() {
+		path := prefix.AppendNode(name)
+		prop, ok := properties[name]
+		if !ok || len(prop.RequiredSet()) == 0 {
+			out[string(path)] = struct{}{}
+			continue
+		}
+		prop.collectRequiredLeafPaths(path, out)
+	}
 }
 
 // AuthMethods returns a reader over the root schema's `x-auth-methods`

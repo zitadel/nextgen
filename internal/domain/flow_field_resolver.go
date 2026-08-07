@@ -50,7 +50,8 @@ type FlowResolvedFields struct {
 
 // FlowField is the resolved per-field metadata.
 type FlowField struct {
-	// Name is the user-schema property name this field collects.
+	// Name is the user-schema property this field collects, as a dotted
+	// path for a nested property (`address.street`).
 	Name string
 
 	// Type is the UI input kind the client should render. It is
@@ -64,7 +65,10 @@ type FlowField struct {
 	// `field.email`). Resolved client-side via the `| t` filter.
 	TextKey string
 
-	// Required reflects membership in the schema's top-level `required` array.
+	// Required reflects membership in the schema's `required` array at
+	// every level of the field's path: a nested leaf is required only
+	// when each of its ancestors is required too, matching what schema
+	// validation accepts for the document as a whole.
 	Required bool
 
 	// Value is an optional pre-fill (e.g. an identifier carried over
@@ -268,3 +272,9 @@ var ErrFlowFieldUnknown = errors.New("flow field: not a property in the user sch
 // reduced to X and does not trigger this error; any other multi-entry
 // union does.
 var ErrFlowFieldUnsupportedType = errors.New("flow field: unsupported JSON type")
+
+// ErrFlowFieldNotScalar is returned by [FlowFieldResolver.Resolve] when a
+// field names an object- or array-typed property. An object is collected
+// one leaf at a time through its dotted path (`address.street`); an array
+// has no field-shaped input.
+var ErrFlowFieldNotScalar = errors.New("flow field: not a scalar property, name a nested leaf instead")
