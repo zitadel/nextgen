@@ -45,14 +45,14 @@ export async function goGenerate({ log = console.log } = {}) {
 
   for (const dir of first) {
     log(`--- ${dir}`);
-    await run("go", ["generate", "./..."], { cwd: join(ROOT, dir) });
+    await run("go", ["generate", "."], { cwd: join(ROOT, dir) });
   }
 
   const limit = Math.max(1, Math.min(availableParallelism(), rest.length));
   await mapWithConcurrency(rest, limit, async (dir) => {
     // Buffered per package so concurrent generators never interleave. On
     // failure runCapture folds both streams into the thrown error's message.
-    const { stdout, stderr } = await runCapture("go", ["generate", "./..."], {
+    const { stdout, stderr } = await runCapture("go", ["generate", "."], {
       cwd: join(ROOT, dir),
     });
     const output = `${stdout}${stderr}`.trim();
@@ -60,7 +60,14 @@ export async function goGenerate({ log = console.log } = {}) {
   });
 }
 
-/** Every directory holding a `//go:generate` directive, repo-relative. */
+/**
+ * Every directory holding a `//go:generate` directive, repo-relative.
+ *
+ * Each is generated with `go generate .` rather than `./...`, so a directory
+ * whose subdirectories also hold directives (`internal/instrumentation` over
+ * `zotel` and `zlog`) does not run them a second time — which would otherwise
+ * put two processes on the same output file concurrently.
+ */
 function findGeneratePackages() {
   const found = new Set();
 

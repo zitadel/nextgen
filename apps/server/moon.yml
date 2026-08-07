@@ -53,6 +53,7 @@ tasks:
     inputs:
       - "@group(serverInputs)"
       - "/scripts/go-generate.mjs"
+      - "/scripts/dev-process.mjs"
     outputs:
       - "/api/generated/**"
       - "/api/openapi/components/schemas/errors/**"
@@ -67,6 +68,7 @@ tasks:
     inputs:
       - "@group(serverInputs)"
       - "/scripts/go-generate.mjs"
+      - "/scripts/dev-process.mjs"
     options:
       runFromWorkspaceRoot: true
 
