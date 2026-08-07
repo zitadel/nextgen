@@ -516,6 +516,16 @@ func TestNewJSONSchema_ReservedProperties(t *testing.T) {
 					schema:  `{"type":"object","properties":{"address":{"type":"object","properties":{"zip.code":{"type":"string"}}}}}`,
 					message: `schema property "zip.code" cannot contain a dot`,
 				},
+				{
+					name:    "under $defs behind a $ref",
+					schema:  `{"type":"object","$defs":{"address":{"type":"object","properties":{"zip.code":{"type":"string"}}}},"properties":{"address":{"$ref":"#/$defs/address"}}}`,
+					message: `schema property "zip.code" cannot contain a dot`,
+				},
+				{
+					name:    "inside an allOf branch",
+					schema:  `{"type":"object","allOf":[{"properties":{"zip.code":{"type":"string"}}}]}`,
+					message: `schema property "zip.code" cannot contain a dot`,
+				},
 			}
 
 			for _, tt := range tests {

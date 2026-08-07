@@ -99,23 +99,29 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 	}, nil
 }
 
-// rejectDottedPropertyNames walks the schema's nested `properties` and
-// rejects a name holding a dot.
-func rejectDottedPropertyNames(schema map[string]any) error {
-	props, ok := maputil.Get[map[string]any](schema, "properties")
-	if !ok {
-		return nil
-	}
-	for name, prop := range props {
-		if strings.Contains(name, ".") {
-			return ErrJSONSchemaInvalid().WithMessage(fmt.Sprintf("schema property %q cannot contain a dot", name))
+// rejectDottedPropertyNames rejects a property name holding a dot. It
+// walks every node, not just nested `properties`, so a name declared
+// under `$defs`, `allOf`, or `items` and pulled in by `$ref` is caught.
+func rejectDottedPropertyNames(node any) error {
+	switch v := node.(type) {
+	case map[string]any:
+		if props, ok := v["properties"].(map[string]any); ok {
+			for name := range props {
+				if strings.Contains(name, ".") {
+					return ErrJSONSchemaInvalid().WithMessage(fmt.Sprintf("schema property %q cannot contain a dot", name))
+				}
+			}
 		}
-		sub, ok := prop.(map[string]any)
-		if !ok {
-			continue
+		for _, val := range v {
+			if err := rejectDottedPropertyNames(val); err != nil {
+				return err
+			}
 		}
-		if err := rejectDottedPropertyNames(sub); err != nil {
-			return err
+	case []any:
+		for _, item := range v {
+			if err := rejectDottedPropertyNames(item); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
