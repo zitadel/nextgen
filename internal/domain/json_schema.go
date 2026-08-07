@@ -100,10 +100,7 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 }
 
 // rejectDottedPropertyNames walks the schema's nested `properties` and
-// rejects a name holding a dot. Nested values are keyed by their dotted
-// path in the attribute store and addressed by that same path in a flow
-// step's fields, so `{"a.b": …}` and `{"a": {"b": …}}` would be
-// indistinguishable in both places.
+// rejects a name holding a dot.
 func rejectDottedPropertyNames(schema map[string]any) error {
 	props, ok := maputil.Get[map[string]any](schema, "properties")
 	if !ok {
