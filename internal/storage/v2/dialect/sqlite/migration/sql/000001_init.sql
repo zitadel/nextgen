@@ -396,6 +396,37 @@ CREATE INDEX idx_passkey_registrations_expires_at ON passkey_registrations (expi
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+CREATE TABLE claim_challenges (
+    -- id is the SHA-256 hash of a handoff-token-style challenge token minted in
+    -- Go (ADR 041 §3); the plaintext travels outside the system, only the hash
+    -- is stored. Application-supplied, hence no DB default.
+    id                     TEXT    NOT NULL,
+    project_id             TEXT    NOT NULL,
+    -- SHA-256 of the project secret that initiated the claim; proves possession
+    -- on claim/status (see Claim E1).
+    initiating_secret_hash TEXT    NOT NULL,
+    status                 TEXT    NOT NULL DEFAULT ('pending'),
+    expires_at             INTEGER NOT NULL,
+    created_at             INTEGER NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT chk_claim_challenges_id CHECK (id <> ''),
+    CONSTRAINT chk_claim_challenges_status CHECK (status IN ('pending', 'completed')),
+    CONSTRAINT fk_claim_challenges_project
+        FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+-- Serves a future expiry sweep; automated expiry enforcement itself is out of
+-- scope for this epic (ADR 041 §6).
+CREATE INDEX idx_claim_challenges_expires_at ON claim_challenges (expires_at);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+CREATE INDEX idx_claim_challenges_project_id ON claim_challenges (project_id);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
 CREATE TABLE user_passwords (
     project_id            TEXT    NOT NULL,
     id                    TEXT    NOT NULL,
@@ -523,6 +554,15 @@ DROP INDEX IF EXISTS idx_user_passwords_user;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS user_passwords;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_claim_challenges_project_id;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_claim_challenges_expires_at;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP TABLE IF EXISTS claim_challenges;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_passkey_registrations_expires_at;

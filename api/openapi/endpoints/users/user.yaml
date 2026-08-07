@@ -9,19 +9,21 @@ description: |
   not send `id` in the create body; it is returned in the create response.
 # ogen does not enforce JSON Schema `not`, and rejects `properties.id: false`.
 # Document the forbid here; the create handler rejects a client-supplied `id`.
-allOf:
-  - type: object
-    additionalProperties: true
-    required:
-      - $schema
-    properties:
-      $schema:
-        type: string
-        description: |
-          The schema that defines the content of the user. These schemas can be
-          created using the `/schemas` endpoint. A default schema is provided.
-          This schema can be retrieved using the same endpoint. The schema will
-          be used to validate the user's properties.
-  - not:
-      required:
-        - id
+type: object
+additionalProperties: true
+required:
+  - $schema
+properties:
+  id:
+    readOnly: true
+    $ref: ../../components/schemas/user-id.yaml
+  metadata:
+    readOnly: true
+    $ref: user-metadata.yaml
+  $schema:
+    type: string
+    description: |
+      The schema that defines the content of the user. These schemas can be
+      created using the `/schemas` endpoint. A default schema is provided.
+      This schema can be retrieved using the same endpoint. The schema will
+      be used to validate the user's properties.

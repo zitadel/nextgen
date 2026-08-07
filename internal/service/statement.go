@@ -8,7 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserPasskeyStatements,UserRecoveryCodesStatements,BrandingStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserPasskeyStatements,UserRecoveryCodesStatements,BrandingStatements,ClaimStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -42,6 +42,7 @@ type AllStatements interface {
 	UserPasskeyStatements
 	UserRecoveryCodesStatements
 	BrandingStatements
+	ClaimStatements
 	Statements
 }
 
@@ -114,6 +115,11 @@ type TeamStatements interface {
 	// DeactivateTeam tombs the team and cascades membership/user lifecycle
 	// updates. It wraps the multi-write steps in withTransaction (opens a tx
 	// via Statements(), joins an outer pool.Transaction when already nested).
+	//
+	// Only an active team is deactivated: the team UPDATE is guarded on the status,
+	// and a zero-row result skips the cascade and reports success. An unknown or
+	// already-deactivated team is therefore a no-op;
+	// updated_at records when the team was first deactivated.
 	DeactivateTeam(ctx context.Context, projectID, id string) error
 }
 
@@ -128,6 +134,7 @@ type TeamMembershipStatements interface {
 	CreateTeamMembership(ctx context.Context, membership *domain.TeamMembership) error
 	GetTeamMembership(ctx context.Context, projectID, teamID, userID string) (*domain.TeamMembership, error)
 	ListTeamMemberships(ctx context.Context, filter *database.ListOptions[domain.TeamMembershipField]) (*database.ListResult[*domain.TeamMembership], error)
+	ListUserTeams(ctx context.Context, filter *database.ListOptions[domain.UserTeamField]) (*database.ListResult[*domain.UserTeam], error)
 	UpdateTeamMembershipStatus(ctx context.Context, projectID, teamID, userID string, status domain.MembershipStatus) error
 }
 
@@ -289,4 +296,26 @@ type BrandingStatements interface {
 	CreateBranding(ctx context.Context, entity *domain.Branding) error
 	GetBrandingByID(ctx context.Context, projectID, id string) (*domain.Branding, error)
 	ListBrandings(ctx context.Context, filter *database.ListOptions[domain.BrandingField]) (*database.ListResult[*domain.Branding], error)
+}
+
+// TODO(IAM-marco): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
+// type ClaimPool interface {
+// 	Statementer[ClaimStatements]
+// 	Transactioner[ClaimStatements]
+// }
+
+type ClaimStatements interface {
+	Statements
+	// CreateChallenge inserts a pending claim challenge; entity.ID is the
+	// SHA-256 hash of the challenge token, minted by the caller.
+	CreateChallenge(ctx context.Context, entity *domain.ClaimChallenge) error
+	GetChallengeByID(ctx context.Context, projectID, id string) (*domain.ClaimChallenge, error)
+	// MarkChallengeCompleted flips pending -> completed; a challenge that is
+	// absent, in another project, or already completed returns NoRowFoundError.
+	MarkChallengeCompleted(ctx context.Context, projectID, id string) error
+	// GetPersonalTeamForUser resolves the user's earliest membership as the
+	// personal team and returns NoRowFoundError when that membership or its team
+	// is not active. It never falls back to a later membership: a deactivated
+	// personal team is not silently replaced by another team the user belongs to.
+	GetPersonalTeamForUser(ctx context.Context, projectID, userID string) (*domain.Team, error)
 }

@@ -94,8 +94,9 @@ var userAccess = resourceAccess{
 
 var teamAccess = resourceAccess{
 	scopes: map[accessOp][]string{
-		opRead:  {"team.read", "team.write"},
-		opWrite: {"team.write"},
+		opRead:   {"team.read", "team.write"},
+		opWrite:  {"team.write"},
+		opDelete: {"team.delete"},
 	},
 	legacyProjectWriteUmbrella: true,
 	readMiss:                   domain.ErrTeamNotFound,
@@ -173,6 +174,33 @@ func requireProjectAccess(ctx context.Context, projectID string, res resourceAcc
 	}
 	if !res.allows(scope.Scope, op) {
 		return res.denied()
+	}
+	return nil
+}
+
+// requireUserTeamsAccess gates listUserTeams, which is a read of two resources
+// at once: the membership rows belong to the user, and each entry carries the
+// team's name. A caller holding only user.read must not learn team names
+// through the roster, so both reads are required rather than either.
+//
+// The user check runs first so a token bound to another project answers
+// user.not_found — the endpoint's documented 404 — instead of leaking that the
+// project-binding failure was evaluated against teams. Each check still admits
+// the resource's write scope (and the legacy project.write umbrella), matching
+// every other read in this model.
+func requireUserTeamsAccess(ctx context.Context, projectID string) error {
+	if err := requireProjectAccess(ctx, projectID, userAccess, opRead); err != nil {
+		return err
+	}
+	return requireProjectAccess(ctx, projectID, teamAccess, opRead)
+}
+
+// requireTeamDelete gates deleteTeam. Deleting an unknown team answers 204, so
+// the endpoint has no not-found to report: a project the credentials are not
+// bound to is refused as the permission failure it is.
+func requireTeamDelete(ctx context.Context, projectID string) error {
+	if err := requireProjectAccess(ctx, projectID, teamAccess, opDelete); err != nil {
+		return domain.ErrTeamPermissionDenied().WithParent(err)
 	}
 	return nil
 }

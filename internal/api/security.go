@@ -22,11 +22,6 @@ func NewSecurityHandler(
 	}
 }
 
-func (s SecurityHandler) HandleUsernamePassword(ctx context.Context, operationName api.OperationName, t api.UsernamePassword) (context.Context, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.OperationName, t api.OAuth2) (context.Context, error) {
 	if t.Token == "" {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
@@ -73,6 +68,7 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.GetMySessionOperation:    true,
 	api.RevokeMySessionOperation: true,
 	api.GetMyUserOperation:       true,
+	api.CompleteClaimOperation:   true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the

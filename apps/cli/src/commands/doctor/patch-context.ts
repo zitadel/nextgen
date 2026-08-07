@@ -41,10 +41,10 @@ export async function loadPatchContext(
     useCase: readUseCase(config),
     project: {
       id: secret.project_id,
-      projectSecret: secret.project_secret,
-      previewSecret: secret.preview_secret,
-      previewOrigins: secret.preview_origins,
-      createdAt: secret.created_at,
+      project_secret: secret.project_secret,
+      preview_secret: secret.preview_secret,
+      preview_origins: secret.preview_origins,
+      created_at: secret.created_at,
     },
   };
 }

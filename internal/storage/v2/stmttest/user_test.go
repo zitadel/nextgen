@@ -161,9 +161,7 @@ func TestUserStatements_ListUsersAttributesAndAttributeKeys(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, list.Items, 1)
 			assert.Equal(t, user1.ID, list.Items[0].ID)
-			assertUserAttributes(t, list.Items[0], map[string]any{
-				"email": "alpha@example.com",
-			})
+			assertUserAttributes(t, list.Items[0], map[string]any{"email": "alpha@example.com"})
 		})
 
 		t.Run("AttributeKeysOnlyHydrate", func(t *testing.T) {
@@ -329,7 +327,7 @@ func newTestUserWithRole(t *testing.T, projectID, schemaURL, userID, email, name
 	user := newTestUser(t, projectID, schemaURL, userID, email, name)
 	roleAttr, err := domain.NewCreateAttribute("role", role, domain.AttributeUniquenessUnspecified)
 	require.NoError(t, err)
-	user.Attributes = append(user.Attributes, roleAttr)
+	user.Attributes = append(user.Attributes, *roleAttr)
 	return user
 }
 
@@ -345,9 +343,9 @@ func newTestUser(t *testing.T, projectID, schemaURL, userID, email, name string)
 		ProjectID: projectID,
 		SchemaURL: schemaURL,
 		ID:        userID,
-		Attributes: []*domain.CreateAttribute{
-			emailAttr,
-			nameAttr,
+		Attributes: []domain.CreateAttribute{
+			*emailAttr,
+			*nameAttr,
 		},
 	}
 }
@@ -365,7 +363,7 @@ func assertUserAttributes(t *testing.T, user *domain.User, want map[string]any) 
 
 	got := make(map[string]any, len(user.Attributes))
 	for _, attr := range user.Attributes {
-		got[attr.Key] = attr.Value
+		got[string(attr.Key)] = attr.Value
 	}
 	assert.Equal(t, want, got)
 }

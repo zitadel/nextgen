@@ -25,12 +25,10 @@ properties:
       - `building`: has a user factor but is still gathering authentication factors
       - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as factors age
       - `expired`: TTL elapsed
-      - `revoked`: explicitly revoked via DELETE
     enum:
       - building
       - active
       - expired
-      - revoked
     example: active
   user_id:
     description: |

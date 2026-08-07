@@ -13,11 +13,19 @@ What matters here is the contract: which schema annotations exist, how the flow 
 |---|---|---|---|
 | `x-identifier: true` | Field | Flow Engine | Field used for user resolution in the identifier step |
 | `x-mfa: "sms"` | Field | Policy Engine | Field can be used for OTP delivery |
-| `x-sensitive: true` | Field | Flow Engine | Value redacted in audit events |
+| `x-sensitive: true` | Field | Flow Engine | Value redacted in API / flow payloads (non-audit) |
+| `x-audit: true` | Field | Audit emitter | Field value may appear in audit event payloads (allowlist; deny-by-default) |
 | `x-editable: true` | Field | Flow Engine | Field appears in profiling / self-service flows |
 | `x-unique: "project"` | Field | Flow Engine | Server validates uniqueness on form submit (per-project scope) |
 | `x-claim: "claims.email"` | Field | Flow Engine | Maps to SSO/OIDC claim for auto-population |
 | `x-auth-methods` | Schema | Policy Engine | Which auth methods this user type supports (narrows what policy can require) |
+
+Audit event payloads use a **deny-by-default** PII policy: user attribute values
+are omitted unless a field is explicitly marked with `x-audit`. See
+[ADR 048](../../adrs/048-wide-events-internal-audit-primitive.md) §8.
+`x-sensitive` remains for API/flow payload redaction (OpenAPI user-property
+schema and CLI presets, e.g. phone/password). Audit does not use `x-sensitive`;
+it uses deny-by-default + `x-audit`. The two annotations are complementary.
 
 ## How the Flow Engine and Policy Engine Consume Schemas
 

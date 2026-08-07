@@ -4,6 +4,11 @@ type: object
 description: |
   This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`. 
   This is done because a lot of code generators cannot handle that.
+  
+  A few properties are reserved:
+  - id: is used to return the id of the user 
+  - metadata: is used to embed metadata of the user, like creation date, 
+    status,... in a return object
 additionalProperties: true
 properties:
   x-verify:
@@ -36,10 +41,11 @@ properties:
   x-mfa:
     type: boolean
     default: false
-    description: Whether this property is used for multi-factor authentication or
-      not
+    description: |
+      Whether this property is used for multi-factor authentication or not
   properties:
     type: object
-    description: A map of additional properties for the user definition, where the
-      key is the property name and the value is the property schema
+    description: |
+      A map of additional properties for the user definition, where the key is 
+      the property name and the value is the property schema.
     additionalProperties: true

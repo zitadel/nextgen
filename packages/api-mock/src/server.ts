@@ -10,13 +10,18 @@
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
  *   GET    /sessions/me           — get current session from opaque cookie
  *   DELETE /sessions/me           — revoke the current session (logout)
+ *   POST   /projects/:id/claim/complete — spend a claim challenge (session cookie)
  *   GET    /auth/end-session      — OIDC-style end-session, clears cookies
  *   GET    /.well-known/jwks.json — JWKS for JWT verification (dev convenience)
- *   GET    /auth/keys             — JWKS, spec-defined endpoint (operation `getKeys`)
+ *   GET    /auth/keys             — JWKS at the URL sdk-core's JWT verifier
+ *                                   derives (`${issuerUrl}/auth/keys`). Mock-only:
+ *                                   the OIDC surface is not in api/openapi.
  *
  * Platform routes (mounted via setupPlatformHandlers):
  *   POST   /projects                  — create project
  *   GET    /projects/:id              — fetch project
+ *   POST   /projects/:id/claim/init   — mint a claim challenge
+ *   GET    /projects/:id/claim/status — poll a claim challenge
  *   POST   /schemas                   — create user schema
  *   GET    /schemas/:id               — fetch user schema
  *   DELETE /schemas/:id               — delete user schema
@@ -30,6 +35,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { type Server } from "node:http";
 
 import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated/model";
+import { CompleteClaimBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import express from "express";
 import cookieParser from "cookie-parser";
 import { createMiddleware } from "@mswjs/http-middleware";
@@ -39,9 +45,14 @@ import { HandoffError, JWK, verifyHandoffToken } from "./crypto.js";
 import { defaultDevBranding } from "./default-dev-branding.js";
 import { setupMockHandlers } from "./handlers.js";
 import { buildOpenIdConfiguration } from "./openid-configuration.js";
-import { errorBody, setupPlatformHandlers } from "./platform-handlers.js";
+import { completeClaimChallenge, errorBody, setupPlatformHandlers } from "./platform-handlers.js";
 
 const SESSION_TTL_SECONDS = 3600;
+
+// The claiming human's account lives in Zitadel's own platform project (ADR
+// 046 §2), so only a session belonging to it may complete a claim. Exported so
+// conformance and downstream tests can mint an eligible session.
+export const PLATFORM_PROJECT_ID = "platform";
 
 /**
  * Tracks handoff tokens (by `jti`) we've already consumed so a replay
@@ -227,12 +238,17 @@ export function createMockApp(options: { issuer: string }): express.Express {
       // Store the session data for GET /sessions/me lookups.
       // The `email` field is kept alongside the spec-typed fields for
       // client display purposes (same as the Go server's response).
+      // A handoff is issued only after a login completes, so the exchanged
+      // session carries a verified factor. The contract now defines `active`
+      // as "has at least one verified authentication factor", so an empty
+      // factor list would contradict the state we report.
+      const verifiedFactors = [{ method: "password" as const, verified_at: createdAt.toISOString() }];
       const sessionData: StoredSession = {
         session_id: sessionId,
         project_id: projectId,
         state: "active",
         user_id: userId,
-        factors: [],
+        factors: verifiedFactors,
         assurance_levels: [],
         created_at: createdAt.toISOString(),
         expires_at: expiresAt.toISOString(),
@@ -251,7 +267,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
           project_id: projectId,
           state: "active",
           user_id: userId,
-          factors: [],
+          factors: verifiedFactors,
           assurance_levels: [],
           created_at: createdAt.toISOString(),
           expires_at: expiresAt.toISOString(),
@@ -316,6 +332,49 @@ export function createMockApp(options: { issuer: string }): express.Express {
     ]);
     res.status(204).end();
   });
+
+  // POST /projects/:project_id/claim/complete — the browser leg of the claim
+  // dance. A custom Express route (not an MSW handler) because it authenticates
+  // with the module-scoped __nextgen_session cookie, exactly like GET
+  // /sessions/me. The challenge_id from the body is its browser-safe authorization.
+  app.post(
+    "/projects/:project_id/claim/complete",
+    jsonBodyParser,
+    (req: express.Request, res: express.Response) => {
+      const token = (req.cookies as Record<string, string>).__nextgen_session;
+      const session = token ? sessionStore.get(token) : undefined;
+      if (!token || !session || new Date(session.expires_at) < new Date()) {
+        res.status(401).json(errorBody("auth.unauthorized", "missing or invalid session token"));
+        return;
+      }
+      // ADR 046 §2: only a platform-project session that is active and carries a
+      // verified factor may claim. A customer-project session, an inactive one,
+      // or an anonymous pre-login session must never complete a claim.
+      const eligible =
+        session.project_id === PLATFORM_PROJECT_ID &&
+        session.state === "active" &&
+        (session.factors?.length ?? 0) > 0;
+      if (!eligible) {
+        res
+          .status(401)
+          .json(errorBody("auth.unauthorized", "session is not eligible to claim a project"));
+        return;
+      }
+      const parsed = CompleteClaimBody.safeParse(req.body);
+      if (!parsed.success) {
+        res
+          .status(400)
+          .json(
+            errorBody("invalid_request", "request does not conform to spec", {
+              issues: parsed.error.issues,
+            }),
+          );
+        return;
+      }
+      const result = completeClaimChallenge(parsed.data.challenge_id, req.params.project_id ?? "");
+      res.status(result.status).json(result.body);
+    },
+  );
 
   app.get("/auth/end-session", (req: express.Request, res: express.Response) => {
     // Clean up session from store when logging out

@@ -27,15 +27,15 @@ func seedIdentityUser(t *testing.T, projectID string) string {
 
 	// camelCase name parts: the shape the shipped presets actually collect
 	// (packages/config/defaults/*.json).
-	attrs := make([]*domain.CreateAttribute, 0, 3)
-	for key, value := range map[string]any{
+	attrs := make(domain.CreateAttributes, 0, 3)
+	for key, value := range map[domain.AttributeKey]any{
 		"email":      "ada@example.com",
 		"givenName":  "Ada",
 		"familyName": "Lovelace",
 	} {
 		attr, err := domain.NewCreateAttribute(key, value, domain.AttributeUniquenessUnspecified)
 		require.NoError(t, err)
-		attrs = append(attrs, attr)
+		attrs = append(attrs, *attr)
 	}
 
 	userID := "user_ident-" + time.Now().Format("150405.000000")

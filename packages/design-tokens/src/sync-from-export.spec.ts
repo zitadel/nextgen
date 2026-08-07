@@ -247,6 +247,56 @@ describe("syncTokens resolver", () => {
   });
 });
 
+/**
+ * The colour roles the generated surface must carry: shadcn's own set, plus the
+ * additions this codebase consumes (`success` backs the user status badge).
+ *
+ * Asserted with `arrayContaining`, so the contract is one-directional by
+ * design — **losing** a role fails, **gaining** one does not. A designer adding
+ * a colour in Figma is routine and should not turn a sync PR red; the key
+ * snapshot in `tokens.snapshot.spec.ts` is what records the addition for review.
+ *
+ * This replaced a bare `toHaveLength(33)`, which had the failure modes exactly
+ * backwards: it went red on every harmless addition, yet stayed green on a swap
+ * — drop `ring`, gain `success`, and the count never moves.
+ */
+const REQUIRED_COLOR_ROLES = [
+  "accent",
+  "accent-foreground",
+  "background",
+  "border",
+  "card",
+  "card-foreground",
+  "chart-1",
+  "chart-2",
+  "chart-3",
+  "chart-4",
+  "chart-5",
+  "destructive",
+  "destructive-foreground",
+  "foreground",
+  "input",
+  "muted",
+  "muted-foreground",
+  "popover",
+  "popover-foreground",
+  "primary",
+  "primary-foreground",
+  "ring",
+  "ring-offset",
+  "secondary",
+  "secondary-foreground",
+  "sidebar",
+  "sidebar-accent",
+  "sidebar-accent-foreground",
+  "sidebar-border",
+  "sidebar-foreground",
+  "sidebar-primary",
+  "sidebar-primary-foreground",
+  "sidebar-ring",
+  "success",
+];
+
 describe("syncTokens against real figma-export/", () => {
   const exportDir = fileURLToPath(new URL("../figma-export", import.meta.url));
   const files = readdirSync(exportDir)
@@ -257,7 +307,7 @@ describe("syncTokens against real figma-export/", () => {
   it("resolves the designer's exports into the full shadcn colour surface", () => {
     const out = syncTokens(files);
 
-    expect(Object.keys(out.color)).toHaveLength(33);
+    expect(Object.keys(out.color)).toEqual(expect.arrayContaining(REQUIRED_COLOR_ROLES));
     expect(out.color.primary).toEqual({ dark: "#e5e5e5", light: "#171717" });
     expect(out.color.background).toEqual({ dark: "#050505", light: "#fafafa" });
     // Every surfaced colour resolved all the way to a concrete hex in both modes.

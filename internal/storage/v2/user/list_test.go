@@ -39,8 +39,8 @@ func TestGroupByProject_ClearsAttributesAndIndexes(t *testing.T) {
 func TestNextCursor_OnlyWhenPageFull(t *testing.T) {
 	now := time.Now().UTC()
 	users := []*domain.User{
-		{ID: "u1", CreatedAt: now},
-		{ID: "u2", CreatedAt: now.Add(time.Second)},
+		{ID: "u1", Metadata: domain.UserMetadata{CreatedAt: now}},
+		{ID: "u2", Metadata: domain.UserMetadata{CreatedAt: now.Add(time.Second)}},
 	}
 	page := database.Page[domain.UserField]{
 		Limit: 2,
