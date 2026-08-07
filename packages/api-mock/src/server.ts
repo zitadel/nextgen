@@ -13,7 +13,9 @@
  *   POST   /projects/:id/claim/complete — spend a claim challenge (session cookie)
  *   GET    /auth/end-session      — OIDC-style end-session, clears cookies
  *   GET    /.well-known/jwks.json — JWKS for JWT verification (dev convenience)
- *   GET    /auth/keys             — JWKS, spec-defined endpoint (operation `getKeys`)
+ *   GET    /auth/keys             — JWKS at the URL sdk-core's JWT verifier
+ *                                   derives (`${issuerUrl}/auth/keys`). Mock-only:
+ *                                   the OIDC surface is not in api/openapi.
  *
  * Platform routes (mounted via setupPlatformHandlers):
  *   POST   /projects                  — create project

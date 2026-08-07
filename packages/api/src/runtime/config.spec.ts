@@ -104,7 +104,7 @@ describe("getApi", () => {
 
     expect(api).toBeDefined();
     expect(typeof api.createFlow).toBe("function");
-    expect(typeof api.endSession).toBe("function");
+    expect(typeof api.revokeMySession).toBe("function");
     expect(typeof api.getMySession).toBe("function");
   });
 

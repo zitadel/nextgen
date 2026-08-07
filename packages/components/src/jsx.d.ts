@@ -57,7 +57,6 @@ declare module "react" {
         "proxy-path"?: string;
         url?: string;
         "post-sign-out-url"?: string;
-        "client-id"?: string;
       };
     }
   }

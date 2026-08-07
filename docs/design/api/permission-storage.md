@@ -149,6 +149,15 @@ CREATE INDEX idx_resource_scope_index_kind_project
 the resource. MVP kinds: `project`, `team`, `user`. For a project row:
 `resource_id = id`, `project_id = id`, `team_id NULL`.
 
+**Dialect note:** the composite FK to `teams (project_id, id)` uses Postgres
+**MATCH SIMPLE**: when `team_id` is NULL, the FK is not enforced (project-scoped
+rows are valid). Spanner migrations must preserve the same null-skip behavior.
+
+**Delete note:** RSI uses `ON DELETE CASCADE` so flat-by-ID lookups cannot return
+deleted resource ids. `team_memberships` stays `RESTRICT` / lifecycle-gated per
+[ADR 024](../../adrs/024-user-team-lifecycle-ownership.md) — roster cleanup is
+explicit, not an index cascade.
+
 **D12:** do not hash-partition this table in Wave 1.
 
 **Spanner:** same columns; PK `(resource_id)`; prefer matching existing FK
@@ -579,5 +588,5 @@ bundles:
 - [ADR 033 — Internal Permission Management](../../adrs/033-internal-permission-management.md)
 - [ADR 034 — External Permission Management](../../adrs/034-external-permission-management.md)
 - [ADR 024 — User/Team Lifecycle Ownership](../../adrs/024-user-team-lifecycle-ownership.md)
-- [`authz.md`](authz.md) · [`url-architecture.md`](url-architecture.md) · [`../glossary.md`](../glossary.md)
+- [`authz.md`](authz.md) · [`url-architecture.md`](url-architecture.md) · [`system-permission-catalog.md`](system-permission-catalog.md) · [`../glossary.md`](../glossary.md)
 - Epic [#419](https://github.com/zitadel/nextgen/issues/419) · schema [#422](https://github.com/zitadel/nextgen/issues/422) · cross-project [#333](https://github.com/zitadel/nextgen/issues/333)
