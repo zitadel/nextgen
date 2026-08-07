@@ -193,6 +193,10 @@ func newAnalyzer(cfg Config) (*analyzer, error) {
 		active:    map[string]bool{},
 	}
 
+	if loadErrs := loadErrors(loaded); len(loadErrs) > 0 {
+		return nil, fmt.Errorf("load packages: %s", strings.Join(loadErrs, "\n  "))
+	}
+
 	seen := map[string]bool{}
 	packages.Visit(loaded, nil, func(p *packages.Package) {
 		if seen[p.PkgPath] || !a.indexable(p) {
@@ -237,6 +241,35 @@ func (a *analyzer) indexVars(p *packages.Package) {
 			}
 		}
 	}
+}
+
+// maxReportedLoadErrors bounds the reported list: one broken package usually
+// cascades into every package that imports it, and the first few name the cause.
+const maxReportedLoadErrors = 10
+
+// loadErrors collects type-check and syntax errors across the loaded graph,
+// deduplicated per package and reported in a stable order.
+func loadErrors(loaded []*packages.Package) []string {
+	var msgs []string
+	seen := map[string]bool{}
+	packages.Visit(loaded, nil, func(p *packages.Package) {
+		for _, e := range p.Errors {
+			msg := p.PkgPath + ": " + e.Error()
+			if seen[msg] {
+				continue
+			}
+			seen[msg] = true
+			msgs = append(msgs, msg)
+		}
+	})
+	sort.Strings(msgs)
+
+	if len(msgs) > maxReportedLoadErrors {
+		extra := len(msgs) - maxReportedLoadErrors
+		msgs = append(msgs[:maxReportedLoadErrors:maxReportedLoadErrors],
+			fmt.Sprintf("(and %d more)", extra))
+	}
+	return msgs
 }
 
 // indexable keeps in-module, non-generated packages. Generated mocks implement
