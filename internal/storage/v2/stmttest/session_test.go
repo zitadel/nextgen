@@ -175,6 +175,7 @@ func TestSessionStatements_List_PagesNullUserID(t *testing.T) {
 		for _, prefix := range []string{"usr-a-", "usr-b-"} {
 			userID := prefix + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Paging User")))
+			t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
 			want = append(want, createUserBoundSession(t, d.stmts, projectID, userID).ID)
 		}
 
@@ -203,6 +204,7 @@ func TestSessionStatements_List_NullBlockSpansPages(t *testing.T) {
 		}
 		userID := "usr-null-" + uniqueSuffix(t)
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Null Block User")))
+		t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
 		want = append(want, createUserBoundSession(t, d.stmts, projectID, userID).ID)
 
 		for name, direction := range map[string]database.OrderDirection{
