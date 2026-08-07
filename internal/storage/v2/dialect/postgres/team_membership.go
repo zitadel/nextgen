@@ -31,13 +31,16 @@ func newTeamMembershipStatements(client queryExecutor) teamMembershipStatements 
 
 // CreateTeamMembership implements [service.TeamMembershipStatements].
 func (s teamMembershipStatements) CreateTeamMembership(ctx context.Context, membership *domain.TeamMembership) error {
-	err := s.client.QueryRow(ctx, createTeamMembershipStmt,
-		membership.ProjectID, membership.TeamID, membership.UserID, membership.Status.String(),
-	).Scan(&membership.CreatedAt, &membership.UpdatedAt)
-	if err != nil {
-		return wrapError(err)
-	}
-	return nil
+	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
+		err := tx.QueryRow(ctx, createTeamMembershipStmt,
+			membership.ProjectID, membership.TeamID, membership.UserID, membership.Status.String(),
+		).Scan(&membership.CreatedAt, &membership.UpdatedAt)
+		if err != nil {
+			return wrapError(err)
+		}
+		edges := newAuthzMembershipEdgeStatements(tx)
+		return service.SyncUserTeamMembershipEdge(ctx, &edges, membership.ProjectID, membership.TeamID, membership.UserID, membership.Status)
+	})
 }
 
 // GetTeamMembership implements [service.TeamMembershipStatements].
@@ -87,14 +90,17 @@ func (s teamMembershipStatements) ListTeamMemberships(ctx context.Context, filte
 
 // UpdateTeamMembershipStatus implements [service.TeamMembershipStatements].
 func (s teamMembershipStatements) UpdateTeamMembershipStatus(ctx context.Context, projectID, teamID, userID string, status domain.MembershipStatus) error {
-	tag, err := s.client.Exec(ctx, updateTeamMembershipStatusStmt, status.String(), projectID, teamID, userID)
-	if err != nil {
-		return wrapError(err)
-	}
-	if tag.RowsAffected() == 0 {
-		return database.NewNoRowFoundError(nil)
-	}
-	return nil
+	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
+		tag, err := tx.Exec(ctx, updateTeamMembershipStatusStmt, status.String(), projectID, teamID, userID)
+		if err != nil {
+			return wrapError(err)
+		}
+		if tag.RowsAffected() == 0 {
+			return database.NewNoRowFoundError(nil)
+		}
+		edges := newAuthzMembershipEdgeStatements(tx)
+		return service.SyncUserTeamMembershipEdge(ctx, &edges, projectID, teamID, userID, status)
+	})
 }
 
 func (s teamMembershipStatements) scanTeamMembership(row pgx.CollectableRow) (*domain.TeamMembership, error) {

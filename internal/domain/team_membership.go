@@ -14,6 +14,11 @@ const (
 
 func (s MembershipStatus) String() string { return string(s) }
 
+// IsAuthzActive reports whether the roster status should project an authz membership edge.
+func (s MembershipStatus) IsAuthzActive() bool {
+	return s == MembershipStatusActive
+}
+
 // TeamMembership is the canonical N:N roster between users and teams.
 type TeamMembership struct {
 	ProjectID string

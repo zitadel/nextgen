@@ -39,16 +39,18 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 		return wrapError(err)
 	}
 	now := nowUnixNano()
-	var createdNano, updatedNano int64
-	err = ps.client.QueryRow(ctx, createProjectStmt,
-		project.ID, project.Name, origins, now, now,
-	).Scan(&project.ID, &createdNano, &updatedNano)
-	if err != nil {
-		return wrapError(err)
-	}
-	project.CreatedAt = timeFromUnixNano(createdNano)
-	project.UpdatedAt = timeFromUnixNano(updatedNano)
-	return nil
+	return withTransaction(ctx, ps.client, func(ctx context.Context, tx queryExecutor) error {
+		var createdNano, updatedNano int64
+		if err := tx.QueryRow(ctx, createProjectStmt,
+			project.ID, project.Name, origins, now, now,
+		).Scan(&project.ID, &createdNano, &updatedNano); err != nil {
+			return wrapError(err)
+		}
+		project.CreatedAt = timeFromUnixNano(createdNano)
+		project.UpdatedAt = timeFromUnixNano(updatedNano)
+		rsi := newResourceScopeStatements(tx)
+		return rsi.UpsertResourceScope(ctx, domain.NewProjectResourceScope(project.ID))
+	})
 }
 
 // DeleteProjectByID implements [service.ProjectStatements].
