@@ -285,7 +285,6 @@ the SDK handle, and clears the session. Uses the same token adoption as
 | --- | --- | --- |
 | `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property; falls back to the global handle from `getZitadelConfig()` |
 | `postSignOutUrl` / `post-sign-out-url` | `string` | Navigate here after sign-out |
-| `clientId` / `client-id` | `string` | Optional OIDC client id forwarded to `getEndSessionUrl()` |
 
 Supports a light-DOM `<template>` slot for a fully custom menu; default UI is
 the avatar trigger + dropdown.
