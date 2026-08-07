@@ -34,14 +34,10 @@ var Schema = database.NewSchema(map[domain.UserField]database.FieldBinding[domai
 		Coerce:   database.CoerceString,
 	},
 	domain.UserFieldLifecycleOwnerTeamID: {
-		SQLName: "lifecycle_owner_team_id",
-		Accessor: func(u *domain.User) any {
-			if u.LifecycleOwnerTeamID == nil {
-				return ""
-			}
-			return *u.LifecycleOwnerTeamID
-		},
-		Coerce: database.CoerceString,
+		SQLName:  "lifecycle_owner_team_id",
+		Accessor: func(u *domain.User) any { return database.NullableValue(u.LifecycleOwnerTeamID) },
+		Coerce:   database.CoerceString,
+		Nullable: true,
 	},
 	domain.UserFieldStatus: {
 		SQLName:  "status",

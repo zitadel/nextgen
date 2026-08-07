@@ -1,8 +1,6 @@
 package userpasskey
 
 import (
-	"time"
-
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
@@ -50,24 +48,16 @@ var Schema = database.NewSchema(map[domain.UserPasskeyField]database.FieldBindin
 		Coerce:   database.CoerceString,
 	},
 	domain.UserPasskeyFieldVerifiedAt: {
-		SQLName: "verified_at",
-		Accessor: func(p *domain.UserPasskey) any {
-			if p.VerifiedAt == nil {
-				return time.Time{}
-			}
-			return *p.VerifiedAt
-		},
-		Coerce: database.CoerceTime,
+		SQLName:  "verified_at",
+		Accessor: func(p *domain.UserPasskey) any { return database.NullableValue(p.VerifiedAt) },
+		Coerce:   database.CoerceTime,
+		Nullable: true,
 	},
 	domain.UserPasskeyFieldLastUsedAt: {
-		SQLName: "last_used_at",
-		Accessor: func(p *domain.UserPasskey) any {
-			if p.LastUsedAt == nil {
-				return time.Time{}
-			}
-			return *p.LastUsedAt
-		},
-		Coerce: database.CoerceTime,
+		SQLName:  "last_used_at",
+		Accessor: func(p *domain.UserPasskey) any { return database.NullableValue(p.LastUsedAt) },
+		Coerce:   database.CoerceTime,
+		Nullable: true,
 	},
 	domain.UserPasskeyFieldCreatedAt: {
 		SQLName:  "created_at",

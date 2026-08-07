@@ -1,8 +1,6 @@
 package userrecoverycodes
 
 import (
-	"time"
-
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
@@ -30,14 +28,10 @@ var Schema = database.NewSchema(map[domain.UserRecoveryCodesField]database.Field
 		Coerce:   database.CoerceSliceAsAny(database.CoerceStringValue),
 	},
 	domain.UserRecoveryCodesFieldLastSuccessfulCheck: {
-		SQLName: "last_successful_check",
-		Accessor: func(c *domain.UserRecoveryCodes) any {
-			if c.LastSuccessfulCheck == nil {
-				return time.Time{}
-			}
-			return *c.LastSuccessfulCheck
-		},
-		Coerce: database.CoerceTime,
+		SQLName:  "last_successful_check",
+		Accessor: func(c *domain.UserRecoveryCodes) any { return database.NullableValue(c.LastSuccessfulCheck) },
+		Coerce:   database.CoerceTime,
+		Nullable: true,
 	},
 	domain.UserRecoveryCodesFieldFailedAttempts: {
 		SQLName:  "failed_attempts",

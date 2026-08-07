@@ -1,8 +1,6 @@
 package userpassword
 
 import (
-	"time"
-
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
@@ -40,24 +38,16 @@ var Schema = database.NewSchema(map[domain.UserPasswordField]database.FieldBindi
 		Coerce:   database.CoerceTime,
 	},
 	domain.UserPasswordFieldVerificationID: {
-		SQLName: "verification_id",
-		Accessor: func(p *domain.UserPassword) any {
-			if p.VerificationID == nil {
-				return ""
-			}
-			return *p.VerificationID
-		},
-		Coerce: database.CoerceString,
+		SQLName:  "verification_id",
+		Accessor: func(p *domain.UserPassword) any { return database.NullableValue(p.VerificationID) },
+		Coerce:   database.CoerceString,
+		Nullable: true,
 	},
 	domain.UserPasswordFieldLastSuccessfulCheck: {
-		SQLName: "last_successful_check",
-		Accessor: func(p *domain.UserPassword) any {
-			if p.LastSuccessfulCheck == nil {
-				return time.Time{}
-			}
-			return *p.LastSuccessfulCheck
-		},
-		Coerce: database.CoerceTime,
+		SQLName:  "last_successful_check",
+		Accessor: func(p *domain.UserPassword) any { return database.NullableValue(p.LastSuccessfulCheck) },
+		Coerce:   database.CoerceTime,
+		Nullable: true,
 	},
 	domain.UserPasswordFieldFailedAttempts: {
 		SQLName:  "failed_attempts",

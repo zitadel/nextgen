@@ -1,8 +1,6 @@
 package usertotp
 
 import (
-	"time"
-
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 )
@@ -30,19 +28,22 @@ var Schema = database.NewSchema(map[domain.UserTOTPField]database.FieldBinding[d
 		Coerce:   database.CoerceBytes,
 	},
 	domain.UserTOTPFieldVerifiedAt: {
-		SQLName:  "verified_at",
-		Accessor: func(t *domain.UserTOTP) any { return t.VerifiedAt },
+		SQLName: "verified_at",
+		// verified_at is NULL until the TOTP is verified; the zero time is never stored.
+		Accessor: func(t *domain.UserTOTP) any {
+			if t.VerifiedAt.IsZero() {
+				return nil
+			}
+			return t.VerifiedAt
+		},
 		Coerce:   database.CoerceTime,
+		Nullable: true,
 	},
 	domain.UserTOTPFieldLastSuccessfulCheck: {
-		SQLName: "last_successful_check",
-		Accessor: func(t *domain.UserTOTP) any {
-			if t.LastSuccessfulCheck == nil {
-				return time.Time{}
-			}
-			return *t.LastSuccessfulCheck
-		},
-		Coerce: database.CoerceTime,
+		SQLName:  "last_successful_check",
+		Accessor: func(t *domain.UserTOTP) any { return database.NullableValue(t.LastSuccessfulCheck) },
+		Coerce:   database.CoerceTime,
+		Nullable: true,
 	},
 	domain.UserTOTPFieldFailedAttempts: {
 		SQLName:  "failed_attempts",
