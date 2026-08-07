@@ -32,16 +32,23 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 	if origins == nil {
 		origins = []string{}
 	}
-	return wrapError(ps.client.QueryRow(ctx, createProjectStmt, project.ID, project.Name, origins).
-		Scan(&project.ID, &project.CreatedAt, &project.UpdatedAt))
+	return withTransaction(ctx, ps.client, func(ctx context.Context, tx queryExecutor) error {
+		if err := wrapError(tx.QueryRow(ctx, createProjectStmt, project.ID, project.Name, origins).
+			Scan(&project.ID, &project.CreatedAt, &project.UpdatedAt)); err != nil {
+			return err
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.UpsertResourceScope(ctx, domain.NewProjectResourceScope(project.ID))
+	})
 }
 
 const deleteByIDProjectStmt = `DELETE FROM zitadel_nextgen.projects WHERE id = $1`
 
 // DeleteProjectByID implements [service.ProjectStatements].
+// resource_scope_index rows for this project cascade via the project_id FK.
 func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) error {
 	_, err := ps.client.Exec(ctx, deleteByIDProjectStmt, id)
-	return err
+	return wrapError(err)
 }
 
 const projectQuery = "SELECT id, name, preview_origins, created_at, updated_at FROM zitadel_nextgen.projects"
