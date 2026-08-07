@@ -240,12 +240,38 @@ POST   /flow_definitions/{id}/deactivate
 
 ## Events and audit
 
+Unified wide-event audit stream. See [ADR 048](../../adrs/048-wide-events-internal-audit-primitive.md)
+(internal model) and [ADR 049](../../adrs/049-events-api-retention-export.md) (API,
+retention, export).
+
 ```http
-/events/{id}                             # identity events (sign-in, password change)
-/events?project_id=…
-/audit_events/{id}                       # admin/configuration changes
-/audit_events?team_id=…
+GET /events/{id}?project_id=… # project-scoped get (events not in resource_scope_index)
+GET /events?project_id=…
+         &category=…          # request | auth | session | admin | entity | signal
+         &event_type=…
+         &actor_id=…
+         &client_id=…
+         &session_id=…
+         &flow_id=…
+         &request_id=…
+         &fingerprint=…
+         &entity_type=…
+         &entity_id=…
+         &team_id=…           # emit-time team scope filter
+         &created_after=…
+         &created_before=…
+         &page_token=…
 ```
+
+`GET /events/{id}` is **project-scoped**: resolve `project_id` from the
+credential (or require it explicitly), authorize, then load
+`(project_id, id)`. Events are **not** registered in `resource_scope_index`
+(TTL audit volume). List/get authorization uses emit-time `team_id` stored on
+the event, not recomputed membership. See [ADR 049](../../adrs/049-events-api-retention-export.md).
+
+`category=admin` covers admin and configuration changes (formerly sketched as
+`/audit_events`). `category=auth` and `category=session` cover sign-in, token,
+and session lifecycle events.
 
 ---
 
@@ -339,7 +365,10 @@ Draft request/response sketches for this design PR:
 - [`../flowengine/api/flow-api.yaml`](../flowengine/api/flow-api.yaml) — flow engine runtime.
 - [`../flowengine/api/session-api.yaml`](../flowengine/api/session-api.yaml) — sessions.
 
-auth_attempts, api_keys (flat), events, audit_events, imports, capabilities: **TODO — not yet specified.**
+auth_attempts, api_keys (flat), imports, capabilities: **TODO — not yet specified.**
+
+events: partially specified via [ADR 049](../../adrs/049-events-api-retention-export.md);
+OpenAPI sketch pending.
 
 Implementation OpenAPI source remains under `api/openapi/**`; generated Go code
 continues to come from that source, not from these design sketches.
