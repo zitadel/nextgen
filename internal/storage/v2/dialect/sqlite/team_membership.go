@@ -38,16 +38,19 @@ func newTeamMembershipStatements(client queryExecutor) teamMembershipStatements 
 // CreateTeamMembership implements [service.TeamMembershipStatements].
 func (s teamMembershipStatements) CreateTeamMembership(ctx context.Context, membership *domain.TeamMembership) error {
 	now := nowUnixNano()
-	var createdNano, updNano int64
-	err := s.client.QueryRow(ctx, createTeamMembershipStmt,
-		membership.ProjectID, membership.TeamID, membership.UserID, membership.Status.String(), now, now,
-	).Scan(&createdNano, &updNano)
-	if err != nil {
-		return wrapError(err)
-	}
-	membership.CreatedAt = timeFromUnixNano(createdNano)
-	membership.UpdatedAt = timeFromUnixNano(updNano)
-	return nil
+	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
+		var createdNano, updNano int64
+		err := tx.QueryRow(ctx, createTeamMembershipStmt,
+			membership.ProjectID, membership.TeamID, membership.UserID, membership.Status.String(), now, now,
+		).Scan(&createdNano, &updNano)
+		if err != nil {
+			return wrapError(err)
+		}
+		membership.CreatedAt = timeFromUnixNano(createdNano)
+		membership.UpdatedAt = timeFromUnixNano(updNano)
+		edges := newAuthzMembershipEdgeStatements(tx)
+		return service.SyncUserTeamMembershipEdge(ctx, &edges, membership.ProjectID, membership.TeamID, membership.UserID, membership.Status)
+	})
 }
 
 // GetTeamMembership implements [service.TeamMembershipStatements].
@@ -129,14 +132,17 @@ func (s teamMembershipStatements) ListUserTeams(ctx context.Context, filter *dat
 // UpdateTeamMembershipStatus implements [service.TeamMembershipStatements].
 func (s teamMembershipStatements) UpdateTeamMembershipStatus(ctx context.Context, projectID, teamID, userID string, status domain.MembershipStatus) error {
 	now := nowUnixNano()
-	n, err := execAffected(ctx, s.client, updateTeamMembershipStatusStmt, status.String(), now, projectID, teamID, userID)
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return database.NewNoRowFoundError(nil)
-	}
-	return nil
+	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
+		n, err := execAffected(ctx, tx, updateTeamMembershipStatusStmt, status.String(), now, projectID, teamID, userID)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return database.NewNoRowFoundError(nil)
+		}
+		edges := newAuthzMembershipEdgeStatements(tx)
+		return service.SyncUserTeamMembershipEdge(ctx, &edges, projectID, teamID, userID, status)
+	})
 }
 
 func scanTeamMembership(rows *sql.Rows) (*domain.TeamMembership, error) {
