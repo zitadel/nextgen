@@ -40,6 +40,7 @@ func TestSessionStatements_List_LimitBoundsSessions(t *testing.T) {
 
 		userID := "usr-2fa-" + uniqueSuffix(t)
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Two Check User")))
+		t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
 		want := make([]string, 0, 3)
 		for range 3 {
 			want = append(want, createTwoCheckSession(t, d.stmts, projectID, userID).ID)
@@ -89,6 +90,7 @@ func TestSessionStatements_List_LimitKeepsFactorsComplete(t *testing.T) {
 
 		userID := "usr-2fa-" + uniqueSuffix(t)
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Two Check User")))
+		t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
 		created := createTwoCheckSession(t, d.stmts, projectID, userID)
 
 		result, err := d.stmts.ListSessions(t.Context(), &database.ListOptions[domain.SessionField]{
