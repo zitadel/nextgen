@@ -19,6 +19,15 @@ func (s MembershipStatus) IsAuthzActive() bool {
 	return s == MembershipStatusActive
 }
 
+// RosterMembershipStatuses are the participation states that keep a user on a
+// team's roster. [MembershipStatusRemoved] is deliberately absent: a removed
+// membership is history, not roster, and roster reads must not serve it.
+var RosterMembershipStatuses = []MembershipStatus{
+	MembershipStatusPending,
+	MembershipStatusActive,
+	MembershipStatusInactive,
+}
+
 // TeamMembership is the canonical N:N roster between users and teams.
 type TeamMembership struct {
 	ProjectID string

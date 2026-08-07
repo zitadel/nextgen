@@ -157,11 +157,12 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListSchemasOperation: []string{
 		"schema.read",
 	},
-	ListSessionsOperation: []string{
-		"session.read",
-	},
 	ListUserPasskeysOperation: []string{
 		"user.read",
+	},
+	ListUserTeamsOperation: []string{
+		"user.read",
+		"team.read",
 	},
 	ListUsersOperation: []string{
 		"user.read",
@@ -171,6 +172,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	QueryProjectsOperation: []string{
 		"project.write",
+	},
+	QuerySessionsOperation: []string{
+		"session.read",
 	},
 	QueryTeamsOperation: []string{
 		"team.read",
