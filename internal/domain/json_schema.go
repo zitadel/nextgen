@@ -406,6 +406,13 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, store JSONSche
 	if err != nil {
 		return nil, err
 	}
+	// A fetched schema never passes through NewJSONSchema.
+	var fetched map[string]any
+	if json.Unmarshal(data, &fetched) == nil {
+		if err := rejectDottedPropertyNames(fetched); err != nil {
+			return nil, err
+		}
+	}
 	dbSchema = &JSONSchema{
 		ProjectID: projectID,
 		URL:       schemaURL,
