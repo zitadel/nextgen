@@ -106,7 +106,7 @@ func createAnonymousSession(t *testing.T, stmts service.AllStatements, projectID
 
 // createUserBoundSession exchanges a user-only attempt so the session carries
 // a single check row: the joined page limit then counts sessions, keeping this
-// suite independent of the LIMIT-over-joins bug (issue 766 comment).
+// suite independent of the LIMIT-over-joins bug.
 func createUserBoundSession(t *testing.T, stmts service.AllStatements, projectID, userID string) *domain.Session {
 	t.Helper()
 	plain, _ := handoffCompletedAttempt(t, stmts, projectID, func(a *domain.AuthAttempt) {
@@ -160,8 +160,8 @@ func pageAllSessionIDs(t *testing.T, stmts service.AllStatements, projectID stri
 }
 
 // TestSessionStatements_List_PagesNullUserID pages a mix of anonymous and
-// user-bound sessions sorted by the nullable user_id. Ascending is the issue
-// 766 Postgres repro (NULLs ordered last lost the anonymous sessions);
+// user-bound sessions sorted by the nullable user_id. Ascending is the
+// original Postgres repro (NULLs ordered last lost the anonymous sessions);
 // descending ends page one on a non-nil cursor, so the NULL block beyond it
 // must still be reachable.
 func TestSessionStatements_List_PagesNullUserID(t *testing.T) {
