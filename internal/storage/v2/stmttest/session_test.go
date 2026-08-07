@@ -55,8 +55,12 @@ func TestSessionStatements_ExchangeUpgradesSessionInPlace(t *testing.T) {
 		user := newTestUser(t, projectID, schemaURL, "user-upgrade-"+uniqueSuffix(t), "upgrade@example.com", "Upgrade User")
 		require.NoError(t, d.stmts.CreateUser(t.Context(), user))
 
-		// The anonymous building session persisted when the flow started.
-		session, err := domain.NewSession(projectID, nil)
+		// The anonymous building session persisted when the flow started, with the
+		// request's device context recorded on it.
+		session, err := domain.NewSession(projectID, &domain.UserAgent{
+			IP:   "203.0.113.9",
+			Info: map[string]any{"user_agent": "agent/1"},
+		})
 		require.NoError(t, err)
 		require.NoError(t, d.stmts.CreateSession(t.Context(), session))
 		require.NotEmpty(t, session.ID)
@@ -83,10 +87,15 @@ func TestSessionStatements_ExchangeUpgradesSessionInPlace(t *testing.T) {
 		require.NotNil(t, exchanged.UserID)
 		assert.Equal(t, user.ID, *exchanged.UserID)
 		assert.Equal(t, domain.SessionStateActive, exchanged.State())
+		// The user agent recorded at creation survives the in-place upgrade.
+		require.NotNil(t, exchanged.UserAgent, "user agent must survive exchange")
+		assert.Equal(t, "203.0.113.9", exchanged.UserAgent.IP)
 
 		got, err := d.stmts.GetSessionByID(t.Context(), projectID, sessionID)
 		require.NoError(t, err)
 		assert.Equal(t, domain.SessionStateActive, got.State())
 		assert.NotEmpty(t, got.Factors, "verified factors promoted onto the upgraded session")
+		require.NotNil(t, got.UserAgent, "user agent persisted through exchange")
+		assert.Equal(t, "203.0.113.9", got.UserAgent.IP)
 	})
 }

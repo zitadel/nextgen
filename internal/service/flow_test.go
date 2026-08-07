@@ -577,7 +577,8 @@ func TestFlowService_Start_PreservesProvidedSessionID(t *testing.T) {
 	sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: state, Step: &domain.FlowStep{}}}
 
 	// No CreateSession is wired: supplying a session must reuse it, so any call
-	// to CreateSession fails the test (proving no new session is created).
+	// to CreateSession fails the test (proving no new session is created and the
+	// existing session's user agent is left untouched).
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
@@ -591,6 +592,7 @@ func TestFlowService_Start_PreservesProvidedSessionID(t *testing.T) {
 		Definition: def,
 		Purpose:    domain.FlowDefinitionPurposeReauth,
 		SessionID:  &sessionID,
+		UserAgent:  &domain.UserAgent{IP: "203.0.113.9"}, // must not trigger a create
 	}); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -630,6 +632,36 @@ func TestFlowService_Start_PersistsSession(t *testing.T) {
 	}
 	if sm.gotStartInput.Session.ID != "sess_created" {
 		t.Errorf("Session.ID = %q, want the persisted session id", sm.gotStartInput.Session.ID)
+	}
+}
+
+func TestFlowService_Start_RecordsUserAgent(t *testing.T) {
+	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	state := &domain.FlowState{ProjectID: def.ProjectID}
+	sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: state, Step: &domain.FlowStep{}}}
+
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	stmts.EXPECT().NewManagedID(gomock.Any()).Return("flow_1", nil).AnyTimes()
+	stmts.EXPECT().CreateSession(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, sess *domain.Session) error {
+		// The request's user agent is recorded on the session the flow creates.
+		if sess.UserAgent == nil || sess.UserAgent.IP != "203.0.113.9" {
+			t.Errorf("session user agent = %+v, want IP 203.0.113.9", sess.UserAgent)
+		}
+		sess.ID = "sess_created"
+		return nil
+	}).Times(1)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+
+	svc := service.NewFlowService(service.NewPool(pool), sm)
+
+	if _, err := svc.Start(t.Context(), service.StartFlowRequest{
+		Definition: def,
+		Purpose:    domain.FlowDefinitionPurposeLogin,
+		UserAgent:  &domain.UserAgent{IP: "203.0.113.9", Info: map[string]any{"user_agent": "agent/1"}},
+	}); err != nil {
+		t.Fatalf("Start: %v", err)
 	}
 }
 
