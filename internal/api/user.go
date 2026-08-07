@@ -126,6 +126,44 @@ func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPassk
 	return res, nil
 }
 
+// ListUserTeams serves the user's team roster — the N:N membership list, one
+// page at a time, each entry carrying the team's name so a client renders the
+// page without resolving ids one by one. Lifecycle ownership is a different
+// question and stays on the user itself (ADR 024).
+func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsParams) (api.ListUserTeamsRes, error) {
+	if err := requireUserTeamsAccess(ctx, string(params.ProjectID)); err != nil {
+		return nil, err
+	}
+
+	teams, err := h.userService.ListUserTeams(ctx, service.ListUserTeamsInput{
+		ProjectID: string(params.ProjectID),
+		UserID:    string(params.UserID),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res := &api.ListUserTeamsResponse{
+		Teams: make([]api.UserTeam, 0, len(teams.Items)),
+	}
+	if teams.NextPageToken != "" {
+		res.NextPageToken = api.NewOptNilPageToken(api.PageToken(teams.NextPageToken))
+	}
+	for _, team := range teams.Items {
+		res.Teams = append(res.Teams, api.UserTeam{
+			ID:               team.TeamID,
+			Name:             team.TeamName,
+			MembershipStatus: api.UserTeamMembershipStatus(team.Status),
+			CreatedAt:        team.CreatedAt,
+			UpdatedAt:        team.UpdatedAt,
+		})
+	}
+
+	return res, nil
+}
+
 func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams) (api.GetUserByIDRes, error) {
 	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opRead); err != nil {
 		return nil, err
@@ -194,13 +232,21 @@ func domainUserToApiUser(user *domain.User) (*api.User, error) {
 		return nil, err
 	}
 
+	var lifecycleOwnerTeamID api.OptNilString
+	if teamID, ok := user.OwningTeamID(); ok {
+		lifecycleOwnerTeamID.SetTo(teamID)
+	} else {
+		lifecycleOwnerTeamID.SetToNull()
+	}
+
 	return &api.User{
 		ID:     api.NewOptUserID(api.UserID(user.ID)),
 		Schema: user.SchemaURL,
 		Metadata: api.NewOptUserMetadata(api.UserMetadata{
-			CreatedAt: user.Metadata.CreatedAt,
-			UpdatedAt: user.Metadata.UpdatedAt,
-			Status:    api.UserMetadataStatus(user.Metadata.Status),
+			CreatedAt:            user.Metadata.CreatedAt,
+			UpdatedAt:            user.Metadata.UpdatedAt,
+			Status:               api.UserMetadataStatus(user.Metadata.Status),
+			LifecycleOwnerTeamID: lifecycleOwnerTeamID,
 		}),
 		AdditionalProps: *props,
 	}, nil
