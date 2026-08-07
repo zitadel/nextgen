@@ -25,9 +25,7 @@ import { baseHostStyles, focusVisibleStyles, t } from "../styles/index.js";
  * action, and calls the typed `revokeMySession` operation in `@zitadel/api`
  * (`DELETE /sessions/me`). The server clears the session cookie via
  * `Set-Cookie: Max-Age=0`; on success the element fires `zitadel-signout`
- * and optionally navigates to `post-sign-out-url`. (`getEndSessionUrl()`
- * additionally exposes the OIDC end-session URL for consumers that prefer a
- * user-agent-driven redirect.)
+ * and optionally navigates to `post-sign-out-url`.
  *
  * ## Template-slot mode
  *
@@ -213,14 +211,6 @@ export class ZitadelLogout extends LitElement {
 
   /** URL to navigate to after a successful sign-out. */
   @property({ type: String, attribute: "post-sign-out-url" }) accessor postSignOutUrl = "";
-
-  /**
-   * OIDC `client_id` to forward as a query parameter on the end-session
-   * request, mirroring the standard end-session contract. Optional —
-   * leaving this empty is fine when the backend can resolve the client
-   * from the session cookie alone.
-   */
-  @property({ type: String, attribute: "client-id" }) accessor clientId = "";
 
   /**
    * Colour mode: `light`, `dark`, or `auto` (follow `prefers-color-scheme`).
@@ -427,21 +417,6 @@ export class ZitadelLogout extends LitElement {
     if (this.postSignOutUrl && typeof window !== "undefined") {
       window.location.href = this.postSignOutUrl;
     }
-  }
-
-  /**
-   * Returns the absolute URL the end-session request will hit. Useful for
-   * test assertions and for consumers that prefer to navigate the browser
-   * directly (instead of fetching) so the OIDC session-end redirect is
-   * driven by the user agent.
-   */
-  getEndSessionUrl(): string {
-    const params = {
-      ...(this.clientId ? { client_id: this.clientId } : {}),
-      ...(this.postSignOutUrl ? { post_logout_redirect_uri: this.postSignOutUrl } : {}),
-    };
-    const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-logout>");
-    return api.getEndSessionUrl(params);
   }
 
   private handleSignOutClick(event: Event): void {
