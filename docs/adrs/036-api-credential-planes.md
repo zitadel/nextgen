@@ -11,8 +11,8 @@
 The API surface already behaves as three implicit tiers, but the model has never
 been named, and one operation contradicts it:
 
-- The **flow endpoints** (`createFlow`, `getFlowStep`, `submitFlowStep`,
-  `submitFlowEvent`) are declared `security: []`. The handlers authenticate no
+- The **flow endpoints** (`createFlow`, `getFlowStep`, `submitFlowStep`) are
+  declared `security: []`. The handlers authenticate no
   caller; the gates are `project_id` in the request, the `PreviewOrigins`
   allowlist (browser-attested `Origin`, which also derives the WebAuthn RP ID),
   and — per ADR 019 — bot signals.

@@ -8,27 +8,6 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
-	// ActivateFlowDefinition implements activateFlowDefinition operation.
-	//
-	// Activate a flow definition by transitioning it from a `draft` state to an `active` state.
-	// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
-	// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
-	// definition payload.
-	//
-	// POST /flow_definitions/{id}/activate
-	ActivateFlowDefinition(ctx context.Context, params ActivateFlowDefinitionParams) (ActivateFlowDefinitionRes, error)
-	// AuthorizeDevice implements authorizeDevice operation.
-	//
-	// Authorize a device.
-	//
-	// GET /auth/device-authorization
-	AuthorizeDevice(ctx context.Context, params AuthorizeDeviceParams) (AuthorizeDeviceRes, error)
-	// AuthorizeGet implements authorizeGet operation.
-	//
-	// Authorize a user.
-	//
-	// GET /auth/authorize
-	AuthorizeGet(ctx context.Context, params AuthorizeGetParams) (AuthorizeGetRes, error)
 	// CompleteClaim implements completeClaim operation.
 	//
 	// Called by the browser after the developer authenticates on the claim page.
@@ -67,7 +46,7 @@ type Handler interface {
 	// the first capability step. Creates a new session implicitly unless
 	// `session_id` is provided (for step-up / reauth on an existing session).
 	// The response contains an `id` field — the flow handle. Use it as the path
-	// parameter for all subsequent `/flow/{id}/submit` and `/flow/{id}/event` calls.
+	// parameter for all subsequent `/flow/{id}/submit` calls.
 	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
 	// the flow's orchestration state (current step, collected data, history).
 	// The server is stateless between requests — all flow state lives in this
@@ -151,17 +130,6 @@ type Handler interface {
 	//
 	// POST /users
 	CreateUser(ctx context.Context, req *User, params CreateUserParams) (CreateUserRes, error)
-	// DeactivateFlowDefinition implements deactivateFlowDefinition operation.
-	//
-	// Deactivates a flow definition in the `active` state by transitioning it to the `draft` state.
-	// Flow definitions in `draft` state cannot be used to start new flows. Existing flows that use the
-	// deactivated flow definition must gracefully handle this.
-	// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
-	// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
-	// definition payload.
-	//
-	// POST /flow_definitions/{id}/deactivate
-	DeactivateFlowDefinition(ctx context.Context, params DeactivateFlowDefinitionParams) (DeactivateFlowDefinitionRes, error)
 	// DeleteFlowDefinition implements deleteFlowDefinition operation.
 	//
 	// Delete a flow definition by id.
@@ -171,18 +139,23 @@ type Handler interface {
 	//
 	// DELETE /flow_definitions/{id}
 	DeleteFlowDefinition(ctx context.Context, params DeleteFlowDefinitionParams) (DeleteFlowDefinitionRes, error)
+	// DeleteTeam implements deleteTeam operation.
+	//
+	// Deactivates the team.
+	// The team is tombstoned rather than erased: it stays readable through
+	// getTeam with status `deactivated`. Its memberships are removed and the
+	// users whose lifecycle it owns are deactivated with it.
+	// The request is idempotent. Deleting a team that is already deactivated
+	// or doesn't exist succeeds without changing anything.
+	//
+	// DELETE /teams/{team_id}
+	DeleteTeam(ctx context.Context, params DeleteTeamParams) (DeleteTeamRes, error)
 	// DeleteUserByID implements DeleteUserByID operation.
 	//
 	// Delete user by ID.
 	//
 	// DELETE /users/{user_id}
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
-	// EndSession implements endSession operation.
-	//
-	// End a session.
-	//
-	// GET /auth/end-session
-	EndSession(ctx context.Context, params EndSessionParams) (EndSessionRes, error)
 	// ExchangeHandoff implements exchangeHandoff operation.
 	//
 	// Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`
@@ -246,12 +219,6 @@ type Handler interface {
 	//
 	// GET /healthz
 	GetHealth(ctx context.Context) (GetHealthRes, error)
-	// GetKeys implements getKeys operation.
-	//
-	// Get public keys.
-	//
-	// GET /auth/keys
-	GetKeys(ctx context.Context) (GetKeysRes, error)
 	// GetLive implements getLive operation.
 	//
 	// Check whether the server is started.
@@ -274,12 +241,6 @@ type Handler interface {
 	//
 	// GET /users/me
 	GetMyUser(ctx context.Context) (GetMyUserRes, error)
-	// GetOpenIDConfiguration implements getOpenIDConfiguration operation.
-	//
-	// Retrieve the OpenID Connect configuration.
-	//
-	// GET /.well-known/openid-configuration
-	GetOpenIDConfiguration(ctx context.Context) (GetOpenIDConfigurationRes, error)
 	// GetProject implements getProject operation.
 	//
 	// Returns the current state of a project.
@@ -314,24 +275,12 @@ type Handler interface {
 	//
 	// GET /teams/{team_id}
 	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
-	// GetToken implements getToken operation.
-	//
-	// Get access token.
-	//
-	// POST /auth/token
-	GetToken(ctx context.Context, req *PostTokenRequest) (GetTokenRes, error)
 	// GetUserByID implements GetUserByID operation.
 	//
 	// Get user by ID.
 	//
 	// GET /users/{user_id}
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
-	// GetUserInfo implements getUserInfo operation.
-	//
-	// Get user info.
-	//
-	// GET /auth/userinfo
-	GetUserInfo(ctx context.Context) (GetUserInfoRes, error)
 	// InitClaim implements initClaim operation.
 	//
 	// Starts a claim challenge for an unclaimed project. Authenticated by the
@@ -342,12 +291,6 @@ type Handler interface {
 	//
 	// POST /projects/{project_id}/claim/init
 	InitClaim(ctx context.Context, params InitClaimParams) (InitClaimRes, error)
-	// Introspect implements introspect operation.
-	//
-	// Introspect a token.
-	//
-	// POST /auth/introspect
-	Introspect(ctx context.Context, req *IntrospectRequest) (IntrospectRes, error)
 	// IssueChallenge implements issueChallenge operation.
 	//
 	// Issues a single-factor verification challenge within an auth attempt.
@@ -382,19 +325,23 @@ type Handler interface {
 	//
 	// GET /schemas
 	ListSchemas(ctx context.Context, params ListSchemasParams) (ListSchemasRes, error)
-	// ListSessions implements listSessions operation.
-	//
-	// Returns a paginated list of sessions for a project.
-	// Requires a project service key (OAuth2 client credentials).
-	//
-	// GET /sessions
-	ListSessions(ctx context.Context, params ListSessionsParams) (ListSessionsRes, error)
 	// ListUserPasskeys implements listUserPasskeys operation.
 	//
 	// List user passkeys.
 	//
 	// GET /users/{user_id}/passkeys
 	ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (ListUserPasskeysRes, error)
+	// ListUserTeams implements listUserTeams operation.
+	//
+	// The user's team roster, ordered by team name. Each entry carries the
+	// team's name, so a client renders a page without resolving ids one by one.
+	// This is the N:N roster and it is not lifecycle ownership: the single team
+	// that owns the user's lifecycle is reported as `metadata.lifecycle_owner_team_id`
+	// on the user read endpoints. Memberships the user was removed from are not
+	// returned.
+	//
+	// GET /users/{user_id}/teams
+	ListUserTeams(ctx context.Context, params ListUserTeamsParams) (ListUserTeamsRes, error)
 	// ListUsers implements listUsers operation.
 	//
 	// List users.
@@ -413,6 +360,14 @@ type Handler interface {
 	//
 	// POST /projects/query
 	QueryProjects(ctx context.Context, req *QueryProjectsRequest) (QueryProjectsRes, error)
+	// QuerySessions implements querySessions operation.
+	//
+	// Returns the sessions of a project, paginated with a cursor.
+	// Sessions of every lifecycle state are returned; each carries its `state`.
+	// Requires `session.read` permission.
+	//
+	// POST /sessions/query
+	QuerySessions(ctx context.Context, req *QuerySessionsRequest, params QuerySessionsParams) (QuerySessionsRes, error)
 	// QueryTeams implements queryTeams operation.
 	//
 	// Returns the teams of a project, paginated with a cursor.
@@ -422,42 +377,32 @@ type Handler interface {
 	QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
-	// Revokes the session immediately (`state: revoked`). This is the logout operation.
-	// The __nextgen_session cookie issued at creation (or superseded by a handoff exchange) is required.
-	// After revocation, any tokens derived from this session are invalidated including the cookie itself,
-	//  which is cleared in the response.
+	// Logs out by permanently deleting the session.
+	// The `__nextgen_session` cookie issued at creation (or superseded by a handoff
+	// exchange) is required. Idempotent: if the session is already gone this still
+	// returns 204. Any tokens derived from the session are invalidated, and the
+	// cookie itself is cleared in the response.
 	//
 	// DELETE /sessions/me
 	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
 	// RevokeSession implements revokeSession operation.
 	//
-	// Revokes the session immediately (`state: revoked`).
+	// Permanently deletes the session, terminating it immediately.
 	// This is the operator revoke path and requires the `session.delete` scope on a
 	// project-bound credential. End-user logout with the `__nextgen_session` cookie is
 	// `DELETE /sessions/me` (`nextgenSession` scheme).
-	// After revocation, any tokens derived from this session are invalidated.
+	// Idempotent: deleting a session that does not exist (or was already deleted)
+	// still returns 204. After deletion, any tokens derived from the session are
+	// invalidated.
 	//
 	// DELETE /sessions/{session_id}
 	RevokeSession(ctx context.Context, params RevokeSessionParams) (RevokeSessionRes, error)
-	// RevokeToken implements revokeToken operation.
-	//
-	// Revoke an access token or refresh token.
-	//
-	// POST /auth/revoke
-	RevokeToken(ctx context.Context, req *RevokeRequest) (RevokeTokenRes, error)
 	// SetUserPassword implements setUserPassword operation.
 	//
 	// Set user password.
 	//
 	// PUT /users/{user_id}/password
 	SetUserPassword(ctx context.Context, req *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error)
-	// SubmitFlowEvent implements submitFlowEvent operation.
-	//
-	// Submits telemetry or fingerprint data from the frontend.
-	// Does not advance the state machine. Used for risk evaluation.
-	//
-	// POST /flow/{id}/event
-	SubmitFlowEvent(ctx context.Context, req *FlowEventRequest, params SubmitFlowEventParams) (SubmitFlowEventRes, error)
 	// SubmitFlowStep implements submitFlowStep operation.
 	//
 	// Submits user input for the current step. The server validates,

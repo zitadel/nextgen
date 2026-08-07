@@ -71,6 +71,11 @@ func TestResourceAccessScopes(t *testing.T) {
 		{"team.write writes", teamAccess, opWrite, "team.write", true},
 		{"team.read reads", teamAccess, opRead, "team.read", true},
 		{"team.read cannot write", teamAccess, opWrite, "team.read", false},
+		{"team.delete deletes", teamAccess, opDelete, "team.delete", true},
+		{"team.write does not imply delete", teamAccess, opDelete, "team.write", false},
+		{"team.read does not imply delete", teamAccess, opDelete, "team.read", false},
+		{"team.delete cannot write", teamAccess, opWrite, "team.delete", false},
+		{"team.delete cannot read", teamAccess, opRead, "team.delete", false},
 
 		{"session.read reads", sessionAccess, opRead, "session.read", true},
 		{"sessions.read reads", sessionAccess, opRead, "sessions.read", true},
@@ -241,6 +246,75 @@ func TestRequireProjectAccess(t *testing.T) {
 			assertDomainCode(t, err, res.readMiss)
 		})
 	}
+
+	// listUserTeams reads two resources at once, so neither read alone reaches
+	// it. The roster carries team names; user.read must not be a side door to
+	// them.
+	t.Run("user teams require both reads", func(t *testing.T) {
+		userOnly := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"user.read"},
+		})
+		teamOnly := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"team.read"},
+		})
+		both := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"user.read", "team.read"},
+		})
+
+		// user.read alone stops at the team read, and vice versa.
+		err := requireUserTeamsAccess(userOnly, "proj_a")
+		assertDomainCode(t, err, domain.ErrTeamPermissionDenied().Code)
+
+		err = requireUserTeamsAccess(teamOnly, "proj_a")
+		assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
+
+		if err := requireUserTeamsAccess(both, "proj_a"); err != nil {
+			t.Fatalf("both reads together must reach the roster: %v", err)
+		}
+
+		// The write scopes imply their reads, as everywhere else in this model.
+		writers := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"user.write", "team.write"},
+		})
+		if err := requireUserTeamsAccess(writers, "proj_a"); err != nil {
+			t.Fatalf("write scopes imply their reads: %v", err)
+		}
+
+		if err := requireUserTeamsAccess(operator, "proj_a"); err != nil {
+			t.Fatalf("project.write reaches both reads: %v", err)
+		}
+
+		// The preview secret reaches neither, and the user check answers first.
+		err = requireUserTeamsAccess(preview, "proj_a")
+		assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
+
+		// A foreign project answers with the endpoint's documented 404 rather
+		// than disclosing that the binding was also evaluated against teams.
+		err = requireUserTeamsAccess(operator, "proj_b")
+		assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+		err = requireUserTeamsAccess(context.Background(), "proj_a")
+		assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+	})
+
+	t.Run("team deletes are denied rather than missed", func(t *testing.T) {
+		err := requireTeamDelete(operator, "proj_b")
+		assertDomainCode(t, err, domain.ErrTeamPermissionDenied().Code)
+
+		err = requireTeamDelete(context.Background(), "proj_a")
+		assertDomainCode(t, err, domain.ErrTeamPermissionDenied().Code)
+
+		err = requireTeamDelete(preview, "proj_a")
+		assertDomainCode(t, err, domain.ErrTeamPermissionDenied().Code)
+
+		if err := requireTeamDelete(operator, "proj_a"); err != nil {
+			t.Fatalf("project.write implies team.delete: %v", err)
+		}
+	})
 
 	// Sessions keep the strict default rather than opting into the legacy
 	// project.write umbrella: revoking sessions logs people out, which is not

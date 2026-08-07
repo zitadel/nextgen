@@ -349,6 +349,13 @@ export type PlatformStoreSnapshot = {
   projectIds: string[];
   schemaIds: string[];
   flowDefinitionIds: string[];
+  /**
+   * Ids of the live challenges. A caller that drove `claim/init` over HTTP
+   * (a CLI under test, say) never sees the response body, so this is the only
+   * way to learn the id it needs to hand to {@link completeClaimChallenge} or
+   * {@link expireClaimChallenge}.
+   */
+  claimChallengeIds: string[];
 };
 
 export function snapshotPlatformStore(): PlatformStoreSnapshot {
@@ -361,6 +368,7 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
     projectIds: [...store.projects.keys()],
     schemaIds: [...store.schemas.keys()],
     flowDefinitionIds: [...store.flowDefinitions.keys()],
+    claimChallengeIds: [...store.claimChallenges.keys()],
   };
 }
 
@@ -487,21 +495,21 @@ export function setupPlatformHandlers() {
         name: body.data.name,
         projectSecret: `sk_proj_${id.replaceAll("-", "")}_full`,
         previewSecret: `sk_proj_${id.replaceAll("-", "")}_preview`,
-        previewOrigins: body.data.previewOrigins ?? [],
+        previewOrigins: body.data.preview_origins ?? [],
         createdAt,
         updatedAt: createdAt,
       };
       store.projects.set(id, project);
-      if (body.data.seedDefaults ?? true) {
+      if (body.data.seed_defaults ?? true) {
         seedDefaultProjectResources(project.id, createdAt);
       }
       const responseBody: CreateProject201 = {
         id: project.id,
         name: project.name,
-        projectSecret: project.projectSecret,
-        previewSecret: project.previewSecret,
-        previewOrigins: project.previewOrigins,
-        createdAt: project.createdAt,
+        project_secret: project.projectSecret,
+        preview_secret: project.previewSecret,
+        preview_origins: project.previewOrigins,
+        created_at: project.createdAt,
       };
       return HttpResponse.json(responseBody, { status: 201 });
     }),
@@ -519,8 +527,8 @@ export function setupPlatformHandlers() {
       const responseBody: GetProject200 = {
         id: project.id,
         name: project.name,
-        createdAt: project.createdAt,
-        updatedAt: project.updatedAt,
+        created_at: project.createdAt,
+        updated_at: project.updatedAt,
       };
       const out = parse(GetProjectResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
@@ -712,7 +720,7 @@ export function setupPlatformHandlers() {
         .filter((r) => !objectTypeFilter || r.objectType === objectTypeFilter)
         .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
       return HttpResponse.json(
-        records.map((r) => ({ id: r.id, createdAt: r.createdAt })),
+        records.map((r) => ({ id: r.id, created_at: r.createdAt })),
       );
     }),
 

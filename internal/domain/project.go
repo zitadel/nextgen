@@ -13,6 +13,12 @@ const (
 	PrefixProject ResourcePrefix = "proj"
 )
 
+// PlatformProjectID is the well-known id of the deployment's platform project.
+// The server owns it: bootstrap (platform.bootstrap_project) creates this row
+// and default-project resolution pins to it. Readable body per ADR 047 §3.3;
+// operators never author it.
+var PlatformProjectID = PrefixProject.IDPrefix("platform") // "proj_platform"
+
 func ErrProjectNameInvalid() Error {
 	return newError(PrefixProject.ErrorCodePrefix("name_invalid"), "The project name is invalid. Expected a non-empty string.", nil, nil)
 }

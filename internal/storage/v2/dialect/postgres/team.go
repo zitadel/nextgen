@@ -19,7 +19,7 @@ const (
 	deactivateTeamStmt = `
 UPDATE zitadel_nextgen.teams
 SET status = $1, updated_at = now()
-WHERE project_id = $2 AND id = $3`
+WHERE project_id = $2 AND id = $3 AND status = $4`
 
 	deactivateTeamMembershipsStmt = `
 UPDATE zitadel_nextgen.team_memberships
@@ -56,14 +56,17 @@ func (ts teamStatements) CreateTeam(ctx context.Context, team *domain.Team) erro
 	if err := ensureManagedID(&team.ID, domain.PrefixTeam); err != nil {
 		return err
 	}
-	var status string
-	err := ts.client.QueryRow(ctx, createTeamStmt, team.ProjectID, team.ID, team.Name).
-		Scan(&team.ProjectID, &team.ID, &team.Name, &status, &team.CreatedAt, &team.UpdatedAt)
-	if err != nil {
-		return wrapError(err)
-	}
-	team.Status = domain.TeamStatus(status)
-	return nil
+	return withTransaction(ctx, ts.client, func(ctx context.Context, tx queryExecutor) error {
+		var status string
+		err := tx.QueryRow(ctx, createTeamStmt, team.ProjectID, team.ID, team.Name).
+			Scan(&team.ProjectID, &team.ID, &team.Name, &status, &team.CreatedAt, &team.UpdatedAt)
+		if err != nil {
+			return wrapError(err)
+		}
+		team.Status = domain.TeamStatus(status)
+		rsi := newResourceScopeStatements(tx)
+		return rsi.UpsertResourceScope(ctx, domain.NewTeamResourceScope(team.ProjectID, team.ID))
+	})
 }
 
 // GetTeamByID implements [service.TeamStatements].
@@ -138,17 +141,28 @@ func (ts teamStatements) ListTeams(ctx context.Context, filter *database.ListOpt
 }
 
 // DeactivateTeam implements [service.TeamStatements].
+// Deactivating a team that is not active is a no-op, so updated_at records when
+// the team was deactivated, not when delete was last called.
 func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id string) error {
 	membershipRemoved := domain.MembershipStatusRemoved.String()
 	userDeactivated := domain.UserStatusDeactivated.String()
 	teamDeactivated := domain.TeamStatusDeactivated.String()
+	teamActive := domain.TeamStatusActive.String()
 
 	return withTransaction(ctx, ts.client, func(ctx context.Context, tx queryExecutor) error {
+		tag, err := tx.Exec(ctx, deactivateTeamStmt, teamDeactivated, projectID, id, teamActive)
+		if err != nil {
+			return wrapError(err)
+		}
+		// No active team: unknown, or already tombstoned.
+		if tag.RowsAffected() == 0 {
+			return nil
+		}
+
 		for _, step := range []struct {
 			sql  string
 			args []any
 		}{
-			{deactivateTeamStmt, []any{teamDeactivated, projectID, id}},
 			{deactivateTeamMembershipsStmt, []any{membershipRemoved, projectID, id}},
 			{deactivateTeamOwnedUsersStmt, []any{userDeactivated, projectID, id}},
 			{deactivateOwnedUsersMembershipsStmt, []any{membershipRemoved, projectID, projectID, id}},
@@ -157,7 +171,8 @@ func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id strin
 				return wrapError(err)
 			}
 		}
-		return nil
+		edges := newAuthzMembershipEdgeStatements(tx)
+		return edges.DeleteAuthzMembershipEdgesForTeamDeactivate(ctx, projectID, id)
 	})
 }
 

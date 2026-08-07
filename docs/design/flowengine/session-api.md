@@ -297,7 +297,7 @@ Custom levels appear in `assurance_levels[]` alongside default NIST levels when 
 POST   /sessions                     Create anonymous session shell (pre-auth)
 GET    /sessions/{id}                Get session state, factors, assurance_levels[]
 DELETE /sessions/{id}                Revoke session (logout)
-GET    /sessions                     List sessions (admin / management)
+POST   /sessions/query               Query sessions (admin / management)
 ```
 
 Factor proofs are **not submitted here**. They go to:

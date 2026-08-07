@@ -2,7 +2,6 @@
   "title": "API reference",
   "pages": [
     "---Runtime auth---",
-    "authorization",
     "flows",
     "authentication-attempts",
     "sessions",

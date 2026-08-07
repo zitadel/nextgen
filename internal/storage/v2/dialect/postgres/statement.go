@@ -32,6 +32,10 @@ type statements struct {
 	userRecoveryCodesStatements
 	brandingStatements
 	claimStatements
+	resourceScopeStatements
+	authzAssignmentStatements
+	authzMembershipEdgeStatements
+	authzCatalogStatements
 }
 
 func (s statements) Statements() service.AllStatements {
@@ -60,6 +64,10 @@ func newStatements(client queryExecutor) statements {
 		userRecoveryCodesStatements:   newUserRecoveryCodesStatements(client),
 		brandingStatements:            newBrandingStatements(client),
 		claimStatements:               newClaimStatements(client),
+		resourceScopeStatements:       newResourceScopeStatements(client),
+		authzAssignmentStatements:     newAuthzAssignmentStatements(client),
+		authzMembershipEdgeStatements: newAuthzMembershipEdgeStatements(client),
+		authzCatalogStatements:        newAuthzCatalogStatements(client),
 	}
 }
 

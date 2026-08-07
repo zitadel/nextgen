@@ -20,7 +20,7 @@ const (
 	deactivateTeamStmt = `
 UPDATE teams
 SET status = @p1, updated_at = CURRENT_TIMESTAMP()
-WHERE project_id = @p2 AND id = @p3`
+WHERE project_id = @p2 AND id = @p3 AND status = @p4`
 
 	deactivateTeamMembershipsStmt = `
 UPDATE team_memberships
@@ -61,17 +61,23 @@ func (ts teamStatements) CreateTeam(ctx context.Context, team *domain.Team) erro
 	if err := ensureManagedID(&team.ID, domain.PrefixTeam); err != nil {
 		return err
 	}
-	stmt := buildStatement(createTeamStmt, team.ProjectID, team.ID, team.Name).statement()
-	return ts.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
-		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			var status string
-			if err := row.Columns(&team.ProjectID, &team.ID, &team.Name, &status, &team.CreatedAt, &team.UpdatedAt); err != nil {
-				return struct{}{}, err
-			}
-			team.Status = domain.TeamStatus(status)
-			return struct{}{}, nil
-		})
-		return err
+	return withTransaction(ctx, ts.db, func(ctx context.Context, tx queryExecutor) error {
+		stmt := buildStatement(createTeamStmt, team.ProjectID, team.ID, team.Name).statement()
+		if err := tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+				var status string
+				if err := row.Columns(&team.ProjectID, &team.ID, &team.Name, &status, &team.CreatedAt, &team.UpdatedAt); err != nil {
+					return struct{}{}, err
+				}
+				team.Status = domain.TeamStatus(status)
+				return struct{}{}, nil
+			})
+			return err
+		}); err != nil {
+			return err
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.UpsertResourceScope(ctx, domain.NewTeamResourceScope(team.ProjectID, team.ID))
 	})
 }
 
@@ -133,17 +139,28 @@ func (ts teamStatements) ListTeams(ctx context.Context, filter *database.ListOpt
 }
 
 // DeactivateTeam implements [service.TeamStatements].
+// Deactivating a team that is not active is a no-op, so updated_at records when
+// the team was deactivated, not when delete was last called.
 func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id string) error {
 	membershipRemoved := domain.MembershipStatusRemoved.String()
 	userDeactivated := domain.UserStatusDeactivated.String()
 	teamDeactivated := domain.TeamStatusDeactivated.String()
+	teamActive := domain.TeamStatusActive.String()
 
 	return withTransaction(ctx, ts.db, func(ctx context.Context, tx queryExecutor) error {
+		affected, err := tx.Update(ctx, buildStatement(deactivateTeamStmt, teamDeactivated, projectID, id, teamActive).statement())
+		if err != nil {
+			return err
+		}
+		// No active team: unknown, or already tombstoned.
+		if affected == 0 {
+			return nil
+		}
+
 		for _, step := range []struct {
 			sql  string
 			args []any
 		}{
-			{deactivateTeamStmt, []any{teamDeactivated, projectID, id}},
 			{deactivateTeamMembershipsStmt, []any{membershipRemoved, projectID, id}},
 			{deactivateTeamOwnedUsersStmt, []any{userDeactivated, projectID, id}},
 			{deactivateOwnedUsersMembershipsStmt, []any{membershipRemoved, projectID, projectID, id}},
@@ -152,7 +169,8 @@ func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id strin
 				return err
 			}
 		}
-		return nil
+		edges := newAuthzMembershipEdgeStatements(tx)
+		return edges.DeleteAuthzMembershipEdgesForTeamDeactivate(ctx, projectID, id)
 	})
 }
 

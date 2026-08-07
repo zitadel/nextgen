@@ -299,7 +299,7 @@ export default class Setup extends BaseCommand {
         ? { filesWritten: [] }
         : await materializeSetupResources({
             cwd,
-            client: createZitadelClient({ baseUrl: answers.server, token: project.projectSecret }),
+            client: createZitadelClient({ baseUrl: answers.server, token: project.project_secret }),
             projectId: project.id,
             force,
             preset: answers.preset,
@@ -476,10 +476,10 @@ async function resolveScaffoldFramework(
 function dryRunProject(issuer: string): CreateProject201 {
   return {
     id: "dry-run-0000",
-    projectSecret: "sk_proj_dry_run_full",
-    previewSecret: "sk_proj_dry_run_preview",
-    previewOrigins: [issuer],
-    createdAt: "2026-04-21T14:03:11.000Z",
+    project_secret: "sk_proj_dry_run_full",
+    preview_secret: "sk_proj_dry_run_preview",
+    preview_origins: [issuer],
+    created_at: "2026-04-21T14:03:11.000Z",
   };
 }
 
@@ -566,10 +566,10 @@ async function createProjectWithLocalHint(
   try {
     // API contract requires a project name; generated TS models may lag
     // briefly until `packages/api` regeneration catches up.
-    const payload = { name: projectName, previewOrigins: [issuer], seedDefaults: false } as {
+    const payload = { name: projectName, preview_origins: [issuer], seed_defaults: false } as {
       name: string;
-      previewOrigins: string[];
-      seedDefaults: false;
+      preview_origins: string[];
+      seed_defaults: false;
     };
     // Register the app's own origin so the backend's origin check allows the
     // requests the dev proxy forwards from it.

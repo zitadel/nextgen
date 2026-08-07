@@ -11,7 +11,14 @@ import (
 )
 
 func init() {
-	registerDialect("postgres", dbtest.Postgres, func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error {
-		return postgres.SeedProjectsTiedAt(ctx, pool, ids, createdAt)
-	})
+	registerDialect(
+		"postgres",
+		dbtest.Postgres,
+		func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error {
+			return postgres.SeedProjectsTiedAt(ctx, pool, ids, createdAt)
+		},
+		func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error {
+			return postgres.HardDeleteTeam(ctx, pool, projectID, teamID)
+		},
+	)
 }
