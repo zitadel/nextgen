@@ -19,7 +19,11 @@ func CoerceStringValue(v any) (string, error) {
 }
 
 // CoerceString coerces a JSON-decoded value into a string for SQL binding.
+// JSON null becomes Go nil so nullable strings bind as SQL NULL.
 func CoerceString(v any) (any, error) {
+	if v == nil {
+		return nil, nil
+	}
 	return CoerceStringValue(v)
 }
 

@@ -118,3 +118,138 @@ func TestCompileStringFilterLikeUsesEscape(t *testing.T) {
 	require.Len(t, c.args, 1)
 	assert.Equal(t, `100\%\_a\\b`, c.args[0])
 }
+
+func TestCompileOrderBy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		orderBy database.OrderBy[domain.ProjectField]
+		wantSQL string
+	}{
+		{
+			name:    "empty columns",
+			orderBy: database.OrderBy[domain.ProjectField]{},
+			wantSQL: "",
+		},
+		{
+			name: "multi asc",
+			orderBy: database.OrderBy[domain.ProjectField]{
+				Columns: []database.Column[domain.ProjectField]{
+					database.Col(domain.ProjectFieldCreatedAt),
+					database.Col(domain.ProjectFieldID),
+				},
+				Direction: database.OrderAsc,
+			},
+			wantSQL: " ORDER BY created_at, id",
+		},
+		{
+			name: "desc",
+			orderBy: database.OrderBy[domain.ProjectField]{
+				Columns: []database.Column[domain.ProjectField]{
+					database.Col(domain.ProjectFieldCreatedAt),
+					database.Col(domain.ProjectFieldID),
+				},
+				Direction: database.OrderDesc,
+			},
+			wantSQL: " ORDER BY created_at DESC, id DESC",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var c statementCompiler
+			compileOrderBy(&c, tt.orderBy, projectSchema)
+			assert.Equal(t, tt.wantSQL, c.String())
+			assert.Empty(t, c.args)
+		})
+	}
+}
+
+func TestCompileOrderByNullable(t *testing.T) {
+	t.Parallel()
+
+	columns := []database.Column[domain.SessionField]{
+		database.Col(domain.SessionFieldUserID),
+		database.Col(domain.SessionFieldID),
+	}
+	tests := []struct {
+		name      string
+		direction database.OrderDirection
+		wantSQL   string
+	}{
+		{
+			name:      "asc",
+			direction: database.OrderAsc,
+			wantSQL:   " ORDER BY s.user_id NULLS FIRST, s.id",
+		},
+		{
+			name:      "desc",
+			direction: database.OrderDesc,
+			wantSQL:   " ORDER BY s.user_id DESC NULLS LAST, s.id DESC",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var c statementCompiler
+			compileOrderBy(&c, database.OrderBy[domain.SessionField]{
+				Columns:   columns,
+				Direction: tt.direction,
+			}, sessionSchema)
+			assert.Equal(t, tt.wantSQL, c.String())
+			assert.Empty(t, c.args)
+		})
+	}
+}
+
+func TestCompileCompareFilterNullableKeyset(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		filter   database.Filter[domain.SessionField]
+		wantSQL  string
+		wantArgs []any
+	}{
+		{
+			name: "keyset greater expands null aware",
+			filter: database.CompareGreater(
+				database.Term(database.Col(domain.SessionFieldUserID), "usr_1"),
+				database.Term(database.Col(domain.SessionFieldID), "sess_1"),
+			),
+			wantSQL:  "((s.user_id > ?) OR (s.user_id = ? AND s.id > ?))",
+			wantArgs: []any{"usr_1", "usr_1", "sess_1"},
+		},
+		{
+			name: "keyset less admits null rows",
+			filter: database.CompareLess(
+				database.Term(database.Col(domain.SessionFieldUserID), "usr_1"),
+				database.Term(database.Col(domain.SessionFieldID), "sess_1"),
+			),
+			wantSQL:  "(((s.user_id < ? OR s.user_id IS NULL)) OR (s.user_id = ? AND s.id < ?))",
+			wantArgs: []any{"usr_1", "usr_1", "sess_1"},
+		},
+		{
+			name:     "range filter keeps plain compare",
+			filter:   database.LessThan(database.Col(domain.SessionFieldUserID), "usr_1"),
+			wantSQL:  "s.user_id < ?",
+			wantArgs: []any{"usr_1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var c statementCompiler
+			compileFilter(&c, tt.filter, sessionSchema)
+			assert.Equal(t, tt.wantSQL, c.String())
+			assert.Equal(t, tt.wantArgs, c.args)
+		})
+	}
+}

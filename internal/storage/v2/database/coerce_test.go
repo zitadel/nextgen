@@ -71,6 +71,27 @@ func TestCoerceTime_nil(t *testing.T) {
 	assert.Nil(t, got)
 }
 
+func TestCoerceString_nil(t *testing.T) {
+	t.Parallel()
+	got, err := database.CoerceString(nil)
+	require.NoError(t, err)
+	assert.Nil(t, got)
+
+	_, err = database.CoerceStringValue(nil)
+	assert.Error(t, err)
+}
+
+func TestNullableValue(t *testing.T) {
+	t.Parallel()
+
+	// assert.Nil would also accept a typed nil, which is the exact bug
+	// NullableValue exists to prevent; == nil pins the untyped form.
+	assert.True(t, database.NullableValue[string](nil) == nil)
+	assert.True(t, database.NullableValue[time.Time](nil) == nil)
+
+	assert.Equal(t, "usr_1", database.NullableValue(new("usr_1")))
+}
+
 func TestCoerceNumberValue(t *testing.T) {
 	t.Parallel()
 	got, err := database.CoerceNumberValue[domain.FlowDefinitionStatus](float64(domain.FlowDefinitionStatusActive))

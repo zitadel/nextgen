@@ -67,6 +67,10 @@ func Term[F ~uint8](column Column[F], value any) CompareTerm[F] {
 type CompareFilter[F ~uint8] struct {
 	Op    CompareOp
 	Terms []CompareTerm[F]
+	// Keyset marks cursor predicates built from OrderBy columns. Ordered
+	// keyset compares over nullable columns must admit NULL rows beyond the
+	// cursor; plain range filters keep standard SQL semantics and exclude NULL.
+	Keyset bool
 }
 
 // Compare builds a comparison filter across one or more column/value terms.
@@ -108,13 +112,17 @@ func CompareEqual[F ~uint8](terms ...CompareTerm[F]) *CompareFilter[F] {
 // Pass one term per OrderBy column; for example, three terms restrict rows after
 // the cursor position in (col1, col2, col3) sort order.
 func CompareGreater[F ~uint8](terms ...CompareTerm[F]) *CompareFilter[F] {
-	return Compare(OpGreater, terms...)
+	f := Compare(OpGreater, terms...)
+	f.Keyset = true
+	return f
 }
 
 // CompareLess creates a less-than filter for keyset pagination.
 // Pass one term per OrderBy column; term order must match OrderBy.Columns.
 func CompareLess[F ~uint8](terms ...CompareTerm[F]) *CompareFilter[F] {
-	return Compare(OpLess, terms...)
+	f := Compare(OpLess, terms...)
+	f.Keyset = true
+	return f
 }
 
 // Restricts implements [Filter].
