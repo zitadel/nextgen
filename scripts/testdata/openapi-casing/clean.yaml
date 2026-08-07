@@ -1,0 +1,74 @@
+### Fixture for scripts/openapi-casing-rules.test.mjs. Every name here is
+### legitimate and must not trip a wire-casing rule. The header, cookie, and RFC
+### enum values are why two of the three rules reject camelCase instead of
+### requiring snake_case: these are not ours to rename.
+openapi: 3.1.0
+info:
+  title: wire casing clean
+  version: 1.0.0
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+  - url: https://example.test
+security: []
+tags:
+  - name: Fixture
+    description: Fixture operations.
+paths:
+  /things:
+    get:
+      operationId: listThings
+      summary: List things
+      tags:
+        - Fixture
+      parameters:
+        - name: project_id
+          in: query
+          schema:
+            type: string
+        - name: Idempotency-Key
+          in: header
+          schema:
+            type: string
+        - name: Origin
+          in: header
+          schema:
+            type: string
+        - name: _zflow
+          in: cookie
+          schema:
+            type: string
+        - name: sort_field
+          in: query
+          schema:
+            type: string
+            enum:
+              - created_at
+              - greater_than_or_equal
+              - S256
+              - Bearer
+              - RSA-OAEP-256
+              - urn:ietf:params:oauth:grant-type:device_code
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  created_at:
+                    type: string
+                  preview_origins:
+                    type: array
+                    items:
+                      type: string
+                  $schema:
+                    type: string
+                  x-unique:
+                    type: string
+        "400":
+          description: bad request

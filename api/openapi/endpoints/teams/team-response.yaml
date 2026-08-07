@@ -4,8 +4,8 @@ required:
   - id
   - name
   - status
-  - createdAt
-  - updatedAt
+  - created_at
+  - updated_at
 properties:
   id:
     type: string
@@ -15,11 +15,11 @@ properties:
     description: The name of the team.
   status:
     $ref: ../../components/schemas/team-status.yaml
-  createdAt:
+  created_at:
     type: string
     format: date-time
     description: The time when the team was created.
-  updatedAt:
+  updated_at:
     type: string
     format: date-time
     description: The time when the team was last updated.

@@ -43,6 +43,18 @@ func (UnimplementedHandler) AuthorizeGet(ctx context.Context, params AuthorizeGe
 	return r, ht.ErrNotImplemented
 }
 
+// CompleteClaim implements completeClaim operation.
+//
+// Called by the browser after the developer authenticates on the claim page.
+// Authenticated by the `__nextgen_session` cookie, it attaches the project to
+// the developer's personal team using the `challenge_id` from the claim URL as
+// its single-use, browser-safe authorization.
+//
+// POST /projects/{project_id}/claim/complete
+func (UnimplementedHandler) CompleteClaim(ctx context.Context, req *CompleteClaimRequest, params CompleteClaimParams) (r CompleteClaimRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // CreateAuthAttempt implements createAuthAttempt operation.
 //
 // Starts a new authentication attempt. This is the entry point for the auth_attempts state machine.
@@ -212,6 +224,20 @@ func (UnimplementedHandler) DeleteFlowDefinition(ctx context.Context, params Del
 	return r, ht.ErrNotImplemented
 }
 
+// DeleteTeam implements deleteTeam operation.
+//
+// Deactivates the team.
+// The team is tombstoned rather than erased: it stays readable through
+// getTeam with status `deactivated`. Its memberships are removed and the
+// users whose lifecycle it owns are deactivated with it.
+// The request is idempotent. Deleting a team that is already deactivated
+// or doesn't exist succeeds without changing anything.
+//
+// DELETE /teams/{team_id}
+func (UnimplementedHandler) DeleteTeam(ctx context.Context, params DeleteTeamParams) (r DeleteTeamRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // DeleteUserByID implements DeleteUserByID operation.
 //
 // Delete user by ID.
@@ -271,6 +297,18 @@ func (UnimplementedHandler) GetAuthAttempt(ctx context.Context, params GetAuthAt
 //
 // GET /branding/{id}
 func (UnimplementedHandler) GetBrandingById(ctx context.Context, params GetBrandingByIdParams) (r GetBrandingByIdRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetClaimStatus implements getClaimStatus operation.
+//
+// Polled by the CLI while a browser completes the claim. Authorized by the
+// project secret that initiated the challenge. Returns `pending`, or
+// `completed` with the owning team, the claim timestamp, and the dashboard
+// URL once the browser leg has finished.
+//
+// GET /projects/{project_id}/claim/status
+func (UnimplementedHandler) GetClaimStatus(ctx context.Context, params GetClaimStatusParams) (r GetClaimStatusRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -427,6 +465,19 @@ func (UnimplementedHandler) GetUserInfo(ctx context.Context) (r GetUserInfoRes, 
 	return r, ht.ErrNotImplemented
 }
 
+// InitClaim implements initClaim operation.
+//
+// Starts a claim challenge for an unclaimed project. Authenticated by the
+// project secret, this mints a single-use, short-lived challenge and returns
+// the `claim_url` the developer opens in a browser to complete the claim,
+// together with the `challenge_id` the CLI polls with. The exact expiry is
+// carried by `expires_at` on the response.
+//
+// POST /projects/{project_id}/claim/init
+func (UnimplementedHandler) InitClaim(ctx context.Context, params InitClaimParams) (r InitClaimRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // Introspect implements introspect operation.
 //
 // Introspect a token.
@@ -482,22 +533,26 @@ func (UnimplementedHandler) ListSchemas(ctx context.Context, params ListSchemasP
 	return r, ht.ErrNotImplemented
 }
 
-// ListSessions implements listSessions operation.
-//
-// Returns a paginated list of sessions for a project.
-// Requires a project service key (OAuth2 client credentials).
-//
-// GET /sessions
-func (UnimplementedHandler) ListSessions(ctx context.Context, params ListSessionsParams) (r ListSessionsRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
 // ListUserPasskeys implements listUserPasskeys operation.
 //
 // List user passkeys.
 //
 // GET /users/{user_id}/passkeys
 func (UnimplementedHandler) ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (r ListUserPasskeysRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListUserTeams implements listUserTeams operation.
+//
+// The user's team roster, ordered by team name. Each entry carries the
+// team's name, so a client renders a page without resolving ids one by one.
+// This is the N:N roster and it is not lifecycle ownership: the single team
+// that owns the user's lifecycle is reported as `metadata.lifecycle_owner_team_id`
+// on the user read endpoints. Memberships the user was removed from are not
+// returned.
+//
+// GET /users/{user_id}/teams
+func (UnimplementedHandler) ListUserTeams(ctx context.Context, params ListUserTeamsParams) (r ListUserTeamsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -528,6 +583,17 @@ func (UnimplementedHandler) QueryProjects(ctx context.Context, req *QueryProject
 	return r, ht.ErrNotImplemented
 }
 
+// QuerySessions implements querySessions operation.
+//
+// Returns the sessions of a project, paginated with a cursor.
+// Sessions of every lifecycle state are returned; each carries its `state`.
+// Requires `session.read` permission.
+//
+// POST /sessions/query
+func (UnimplementedHandler) QuerySessions(ctx context.Context, req *QuerySessionsRequest, params QuerySessionsParams) (r QuerySessionsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // QueryTeams implements queryTeams operation.
 //
 // Returns the teams of a project, paginated with a cursor.
@@ -540,11 +606,11 @@ func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsReque
 
 // RevokeMySession implements revokeMySession operation.
 //
-// Revokes the session immediately (`state: revoked`). This is the logout operation.
-// The __nextgen_session cookie issued at creation (or superseded by a handoff exchange) is required.
-// After revocation, any tokens derived from this session are invalidated including the cookie itself,
-//
-//	which is cleared in the response.
+// Logs out by permanently deleting the session.
+// The `__nextgen_session` cookie issued at creation (or superseded by a handoff
+// exchange) is required. Idempotent: if the session is already gone this still
+// returns 204. Any tokens derived from the session are invalidated, and the
+// cookie itself is cleared in the response.
 //
 // DELETE /sessions/me
 func (UnimplementedHandler) RevokeMySession(ctx context.Context) (r RevokeMySessionRes, _ error) {
@@ -553,11 +619,13 @@ func (UnimplementedHandler) RevokeMySession(ctx context.Context) (r RevokeMySess
 
 // RevokeSession implements revokeSession operation.
 //
-// Revokes the session immediately (`state: revoked`).
+// Permanently deletes the session, terminating it immediately.
 // This is the operator revoke path and requires the `session.delete` scope on a
 // project-bound credential. End-user logout with the `__nextgen_session` cookie is
 // `DELETE /sessions/me` (`nextgenSession` scheme).
-// After revocation, any tokens derived from this session are invalidated.
+// Idempotent: deleting a session that does not exist (or was already deleted)
+// still returns 204. After deletion, any tokens derived from the session are
+// invalidated.
 //
 // DELETE /sessions/{session_id}
 func (UnimplementedHandler) RevokeSession(ctx context.Context, params RevokeSessionParams) (r RevokeSessionRes, _ error) {

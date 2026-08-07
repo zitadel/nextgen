@@ -10,6 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
 	"github.com/zitadel/nextgen/internal/storage/v2/dialect/pagination"
 	"github.com/zitadel/nextgen/internal/storage/v2/teammembership"
+	"github.com/zitadel/nextgen/internal/storage/v2/userteam"
 )
 
 const (
@@ -17,6 +18,14 @@ const (
 	getTeamMembershipStmt          = `SELECT project_id, team_id, user_id, status, created_at, updated_at FROM zitadel_nextgen.team_memberships WHERE project_id = $1 AND team_id = $2 AND user_id = $3`
 	updateTeamMembershipStatusStmt = `UPDATE zitadel_nextgen.team_memberships SET status = $1, updated_at = NOW() WHERE project_id = $2 AND team_id = $3 AND user_id = $4`
 	teamMembershipQuery            = `SELECT project_id, team_id, user_id, status, created_at, updated_at FROM zitadel_nextgen.team_memberships`
+
+	// userTeamQuery is the roster read: memberships joined to the team they
+	// point at, so one page carries each team's name. The aliases `m` and `t`
+	// are the ones userteam.Schema qualifies its column names with.
+	userTeamQuery = `SELECT m.project_id, m.user_id, m.team_id, t.name, m.status, m.created_at, m.updated_at
+FROM zitadel_nextgen.team_memberships m
+JOIN zitadel_nextgen.teams t
+  ON t.project_id = m.project_id AND t.id = m.team_id`
 )
 
 type teamMembershipStatements struct{ statement }
@@ -85,6 +94,38 @@ func (s teamMembershipStatements) ListTeamMemberships(ctx context.Context, filte
 	}, nil
 }
 
+// ListUserTeams implements [service.TeamMembershipStatements].
+func (s teamMembershipStatements) ListUserTeams(ctx context.Context, filter *database.ListOptions[domain.UserTeamField]) (*database.ListResult[*domain.UserTeam], error) {
+	var compiler statementCompiler
+	if err := compileRead(&compiler, userTeamQuery, filter, userteam.Schema); err != nil {
+		return nil, err
+	}
+
+	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+
+	teams, err := pgx.CollectRows(rows, s.scanUserTeam)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+
+	var nextCursor []byte
+	if filter.Pagination.Limit > 0 && len(teams) == int(filter.Pagination.Limit) {
+		cursor := &pagination.Cursor[domain.UserTeamField]{
+			Columns: filter.Pagination.OrderBy.Columns,
+			Values:  userteam.Schema.ValuesFrom(teams[len(teams)-1], filter.Pagination.OrderBy.Columns),
+		}
+		nextCursor = cursor.Marshal()
+	}
+
+	return &database.ListResult[*domain.UserTeam]{
+		Items:      teams,
+		NextCursor: nextCursor,
+	}, nil
+}
+
 // UpdateTeamMembershipStatus implements [service.TeamMembershipStatements].
 func (s teamMembershipStatements) UpdateTeamMembershipStatus(ctx context.Context, projectID, teamID, userID string, status domain.MembershipStatus) error {
 	tag, err := s.client.Exec(ctx, updateTeamMembershipStatusStmt, status.String(), projectID, teamID, userID)
@@ -112,6 +153,24 @@ func (s teamMembershipStatements) scanTeamMembership(row pgx.CollectableRow) (*d
 	}
 	membership.Status = domain.MembershipStatus(status)
 	return membership, nil
+}
+
+func (s teamMembershipStatements) scanUserTeam(row pgx.CollectableRow) (*domain.UserTeam, error) {
+	team := new(domain.UserTeam)
+	var status string
+	if err := row.Scan(
+		&team.ProjectID,
+		&team.UserID,
+		&team.TeamID,
+		&team.TeamName,
+		&status,
+		&team.CreatedAt,
+		&team.UpdatedAt,
+	); err != nil {
+		return nil, err
+	}
+	team.Status = domain.MembershipStatus(status)
+	return team, nil
 }
 
 var _ service.TeamMembershipStatements = (*teamMembershipStatements)(nil)

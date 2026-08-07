@@ -41,15 +41,15 @@ func TestGetMySession_Identity(t *testing.T) {
 	// camelCase name parts: the shape the shipped presets actually collect
 	// (packages/config/defaults/*.json) — regression guard for the identity
 	// resolution reading only snake_case.
-	attrs := make([]*domain.CreateAttribute, 0, 3)
-	for key, value := range map[string]any{
+	attrs := make(domain.CreateAttributes, 0, 3)
+	for key, value := range map[domain.AttributeKey]any{
 		"email":      "ada@example.com",
 		"givenName":  "Ada",
 		"familyName": "Lovelace",
 	} {
 		attr, err := domain.NewCreateAttribute(key, value, domain.AttributeUniquenessUnspecified)
 		require.NoError(t, err)
-		attrs = append(attrs, attr)
+		attrs = append(attrs, *attr)
 	}
 	require.NoError(t, harness.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
 		ProjectID:  project.ID,

@@ -1,8 +1,8 @@
-import { readFile, stat } from "node:fs/promises";
+import { chmod, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "./errors";
-import { isObject, parseJsonObject } from "./json";
+import { isObject, parseJsonObject, stableStringify } from "./json";
 
 /**
  * Reports whether `cwd` has already been initialized, i.e. a committed
@@ -43,6 +43,15 @@ export type ZitadelSecret = {
   preview_secret: string;
   preview_origins: string[];
   created_at: string;
+  /**
+   * When the project was attached to an owning team, recorded by
+   * `zitadel claim`. Absent until then. The durable record lives on the
+   * platform (the team's project grant); this is a local cache so commands can
+   * answer "is this already attached?" without a round trip.
+   */
+  claimed_at?: string;
+  /** The team that owns the project, recorded alongside {@link claimed_at}. */
+  team_id?: string;
 };
 
 /**
@@ -95,6 +104,27 @@ export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
     }
     throw error;
   }
+}
+
+/**
+ * Writes `.zitadel/secret` back after a command mutated it (today only
+ * `zitadel claim`, which records `claimed_at` and `team_id`).
+ *
+ * Atomic by construction: the bytes land in a sibling temp file that is
+ * `chmod`ed and then `rename`d over the target, so a crash mid-write can never
+ * leave a truncated or world-readable credentials file — the same
+ * temp-then-rename the file-writer uses for managed files. Serialised with
+ * {@link stableStringify} at mode `0600` to match exactly how setup's patcher
+ * first wrote it, so a claim does not churn the file's formatting or loosen
+ * the permissions `doctor` asserts.
+ */
+export async function writeZitadelSecret(cwd: string, secret: ZitadelSecret): Promise<void> {
+  const path = join(cwd, ".zitadel/secret");
+  const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
+  await writeFile(tmp, `${stableStringify(secret)}\n`, { mode: 0o600 });
+  // `writeFile`'s mode is masked by the process umask, so re-assert it.
+  await chmod(tmp, 0o600).catch(() => undefined);
+  await rename(tmp, path);
 }
 
 /**

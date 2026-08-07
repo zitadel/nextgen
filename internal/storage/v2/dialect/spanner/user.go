@@ -79,9 +79,6 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 		}
 
 		for _, a := range user.Attributes {
-			if a == nil {
-				return fmt.Errorf("nil attribute")
-			}
 			raw, err := json.Marshal(a.Value)
 			if err != nil {
 				return fmt.Errorf("marshal attribute %q: %w", a.Key, err)
@@ -271,7 +268,8 @@ func (us userStatements) hydrateUsers(ctx context.Context, users []*domain.User,
 		}
 		if err := us.db.Query(ctx, stmt, func(iter *spanner.RowIterator) error {
 			return iter.Do(func(row *spanner.Row) error {
-				var userID, key, valueJSON string
+				var userID, valueJSON string
+				var key domain.AttributeKey
 				if err := row.Columns(&userID, &key, &valueJSON); err != nil {
 					return err
 				}
@@ -305,8 +303,8 @@ func (us userStatements) scanUserHeader(row *spanner.Row) (*domain.User, error) 
 		&user.ID,
 		&lifecycleOwner,
 		&status,
-		&user.CreatedAt,
-		&user.UpdatedAt,
+		&user.Metadata.CreatedAt,
+		&user.Metadata.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}
@@ -314,7 +312,7 @@ func (us userStatements) scanUserHeader(row *spanner.Row) (*domain.User, error) 
 		v := lifecycleOwner.StringVal
 		user.LifecycleOwnerTeamID = &v
 	}
-	user.Status = domain.UserStatus(status)
+	user.Metadata.Status = domain.UserStatus(status)
 	return user, nil
 }
 

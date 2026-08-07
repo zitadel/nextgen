@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { MoreVertical, Plus, Search, Users } from "lucide-react";
+import { Loader2, MoreVertical, Plus, Search, Users } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { AddUserSheet } from "@/components/add-user-sheet";
@@ -21,47 +21,63 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { UserStatusBadge } from "@/components/user-status-badge";
 
 import { api } from "../../../api/zitadel";
-import { field } from "../../../lib/record";
+import { displayValue, field } from "../../../lib/record";
 import { type SchemaField, type UserSchema, schemaColumns } from "../../../lib/schema";
 import { userDisplayName } from "../../../lib/user";
 import { getConsoleProjectId } from "../../../runtime/runtime";
 
 export const Route = createFileRoute("/_authed/users/")({
   staticData: { nav: { label: "Users", order: 2, icon: Users } },
-  // `limit` is asked for explicitly at the API's maximum rather than left at the
-  // default 20. `GET /users` orders by creation ascending with no `Load more`
-  // yet (#661), so the default silently hides the most recently created users —
-  // the ones an operator has just added and is most likely looking for.
   loader: async () => {
-    const projectId = getConsoleProjectId();
-    const users = await api.listUsers({ limit: 100 });
-
-    // Columns are the loaded users' own schemas, not every schema in the
-    // project: a schema nobody uses would add a column that is blank in every
-    // row. `listUsers` returns the attribute tree with `$schema` on it, so the
-    // set is known without a second list call.
-    const schemaIds = [...new Set(users.map((user) => field(user, "$schema")).filter(isPresent))];
-    const schemas = await Promise.all(
-      schemaIds.map(async (id) => {
-        try {
-          return (await api.getSchemaById(id, { project_id: projectId })) as UserSchema;
-        } catch {
-          // One unreadable schema costs its columns, not the screen. The rows
-          // still render from the fallback below.
-          return undefined;
-        }
-      }),
-    );
-
-    return { users, columns: columnsFor(users, schemas.filter(isPresent)) };
+    const page = await api.listUsers({ limit: PAGE_SIZE });
+    return {
+      users: page.users,
+      nextPageToken: page.next_page_token ?? undefined,
+      columns: await columnsForUsers(page.users),
+    };
   },
   component: UsersScreen,
 });
 
+/**
+ * One page of users. `GET /users` is cursor-paginated, so the size is a page
+ * size rather than a cap on what the operator can reach — `Load more` walks the
+ * rest (design decisions log D5: a button, not pagination controls).
+ */
+const PAGE_SIZE = 25;
+
 function isPresent<T>(value: T | undefined | null): value is T {
   return value !== undefined && value !== null;
+}
+
+/** Server-owned keys on a user, which are never schema attributes. */
+const RESERVED_KEYS = new Set(["id", "$schema", "metadata"]);
+
+/**
+ * Columns for a set of users, from the schemas those users reference.
+ *
+ * Only the loaded users' schemas are fetched, not every schema in the project:
+ * one nobody uses would add a column that is blank in every row. Each user
+ * carries `$schema`, so the set is known without a second list call.
+ */
+async function columnsForUsers(users: Record<string, unknown>[]): Promise<SchemaField[]> {
+  const projectId = getConsoleProjectId();
+  const schemaIds = [...new Set(users.map((user) => field(user, "$schema")).filter(isPresent))];
+  const schemas = await Promise.all(
+    schemaIds.map(async (id) => {
+      try {
+        return (await api.getSchemaById(id, { project_id: projectId })) as UserSchema;
+      } catch {
+        // One unreadable schema costs its columns, not the screen. The rows
+        // still render from the fallback below.
+        return undefined;
+      }
+    }),
+  );
+  return columnsFor(users, schemas.filter(isPresent));
 }
 
 interface UserRow {
@@ -70,6 +86,8 @@ interface UserRow {
   name: string;
   /** Rendered cell values, keyed by schema property. */
   values: Record<string, string>;
+  /** `metadata.status`, absent on a record the server has not stamped. */
+  status?: string;
 }
 
 /**
@@ -87,9 +105,10 @@ function columnsFor(users: Record<string, unknown>[], schemas: UserSchema[]): Sc
   const keys = new Set<string>();
   for (const user of users) {
     for (const key of Object.keys(user)) {
-      // `id` gets its own column and `$schema` is machine metadata, not an
-      // attribute an operator reads.
-      if (key !== "id" && key !== "$schema") keys.add(key);
+      // `id`, `$schema` and `metadata` are the server's own keys, not schema
+      // attributes: `id` has its own column, `metadata` drives the Status
+      // column, and `$schema` is machine metadata an operator does not read.
+      if (!RESERVED_KEYS.has(key)) keys.add(key);
     }
   }
   return [...keys].sort().map((key) => ({
@@ -110,10 +129,58 @@ function searchShortcutLabel(): string {
 }
 
 function UsersScreen() {
-  const { users, columns } = Route.useLoaderData();
+  const loaded = Route.useLoaderData();
   const router = useRouter();
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // Pages fetched after the first live here rather than in the loader: `Load
+  // more` appends without re-running it, and a route invalidation (a delete, a
+  // create) resets to the first page, which is the honest thing to show once
+  // the set has changed underneath.
+  const [extra, setExtra] = useState<Record<string, unknown>[]>([]);
+  const [nextPageToken, setNextPageToken] = useState(loaded.nextPageToken);
+  const [columns, setColumns] = useState(loaded.columns);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    setExtra([]);
+    setNextPageToken(loaded.nextPageToken);
+    setColumns(loaded.columns);
+  }, [loaded]);
+
+  // The loader hands back a new object on every invalidation, so its identity is
+  // the generation of the list currently on screen. `loadMore` reads it after
+  // awaiting to tell whether the page it fetched still belongs to the set it was
+  // asked for.
+  const loadedRef = useRef(loaded);
+  useEffect(() => {
+    loadedRef.current = loaded;
+  }, [loaded]);
+
+  const users = useMemo(() => [...loaded.users, ...extra], [loaded.users, extra]);
+
+  async function loadMore() {
+    if (!nextPageToken || loadingMore) return;
+    const generation = loaded;
+    setLoadingMore(true);
+    try {
+      const page = await api.listUsers({ limit: PAGE_SIZE, page_token: nextPageToken });
+      // A later page can carry a schema the first page never referenced, which
+      // would otherwise render its users with every cell blank.
+      const nextColumns = await columnsForUsers([...users, ...page.users]);
+      // A delete or a create while this was in flight has already reset the list
+      // to a fresh first page. This page answers a question about the previous
+      // one — appending it would re-add rows the server no longer returns — so
+      // it is dropped, and the button is left ready to fetch the current page 2.
+      if (loadedRef.current !== generation) return;
+      setExtra((current) => [...current, ...page.users]);
+      setNextPageToken(page.next_page_token ?? undefined);
+      setColumns(nextColumns);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   // ⌘F / Ctrl+F focuses the table search instead of the browser find bar —
   // only when the event isn't already targeting an editable field.
@@ -196,6 +263,7 @@ function UsersScreen() {
               {columns.map((column) => (
                 <HeadCell key={column.key}>{column.label}</HeadCell>
               ))}
+              <HeadCell>Status</HeadCell>
               <HeadCell>ID</HeadCell>
               <TableHead className="h-14 w-[60px] px-2" />
             </TableRow>
@@ -235,6 +303,9 @@ function UsersScreen() {
                       )}
                     </TableCell>
                   ))}
+                  <TableCell className="h-11 px-2 py-0">
+                    <UserStatusBadge status={user.status} />
+                  </TableCell>
                   <TableCell className="text-foreground h-11 truncate px-2 py-0">
                     {user.id}
                   </TableCell>
@@ -251,14 +322,22 @@ function UsersScreen() {
           </TableBody>
         </Table>
       </div>
-      {/* D5: the list is one page and must not present itself as the whole set.
-          The loader asks for the API maximum, but that is still a fixed window
-          with no `Load more` behind it — cursor pagination is #661. */}
-      {users.length > 0 && (
-        <p className="text-muted-foreground mt-3 text-xs">
-          Showing {rows.length} of the {users.length} users loaded. This is the first page,
-          not the full list, and search only matches what is loaded.
-        </p>
+      {/* D5: `Load more` rather than pagination controls. The button is the only
+          signal needed — its presence means there is more, its absence means the
+          list is complete.
+
+          Full width and `secondary` per the design (`366:63442` — 963×36 spanning
+          the table, 24px below it), not a centred pill. */}
+      {nextPageToken && (
+        <Button
+          variant="secondary"
+          className="mt-6 h-9 w-full gap-1.5 px-2.5"
+          onClick={() => void loadMore()}
+          disabled={loadingMore}
+        >
+          {loadingMore && <Loader2 className="size-3 animate-spin" aria-hidden />}
+          Load more
+        </Button>
       )}
     </div>
   );
@@ -275,7 +354,7 @@ function toUserRow(
     // Only scalars are read. A property whose value is an object or array has no
     // one-line rendering, and `JSON.stringify` in a table cell is noise — the
     // detail screen is where a structured attribute belongs.
-    const value = field(user, column.key);
+    const value = displayValue(user, column.key);
     if (value !== undefined) values[column.key] = value;
   }
   return {
@@ -285,7 +364,19 @@ function toUserRow(
     // not as a column. Falls back to the email and then the id: a `minimal`
     // schema defines only `email`, so a name is genuinely absent, not missing.
     name: userDisplayName(user) ?? field(user, "email") ?? id,
+    status: userStatus(user),
   };
+}
+
+/**
+ * `metadata.status` — one of `active`, `suspended`, `deactivated`,
+ * `pending_purge`. Read defensively: `metadata` is a server-owned object on an
+ * otherwise open record, so a user written before it existed simply has none.
+ */
+function userStatus(user: Record<string, unknown>): string | undefined {
+  const metadata = user.metadata;
+  if (!metadata || typeof metadata !== "object") return undefined;
+  return field(metadata as Record<string, unknown>, "status");
 }
 
 /**

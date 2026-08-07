@@ -60,7 +60,7 @@ func ensureTestUser(t *testing.T, projectID, userID string) {
 		ProjectID:  projectID,
 		SchemaURL:  schemaURL,
 		ID:         userID,
-		Attributes: []*domain.CreateAttribute{emailAttr, nameAttr},
+		Attributes: domain.CreateAttributes{*emailAttr, *nameAttr},
 	}))
 }
 

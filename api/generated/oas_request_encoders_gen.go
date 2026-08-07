@@ -14,6 +14,20 @@ import (
 	"github.com/ogen-go/ogen/uri"
 )
 
+func encodeCompleteClaimRequest(
+	req *CompleteClaimRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeCreateAuthAttemptRequest(
 	req *CreateAuthAttemptRequest,
 	r *http.Request,
@@ -367,6 +381,20 @@ func encodePatchProjectRequest(
 
 func encodeQueryProjectsRequest(
 	req *QueryProjectsRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeQuerySessionsRequest(
+	req *QuerySessionsRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

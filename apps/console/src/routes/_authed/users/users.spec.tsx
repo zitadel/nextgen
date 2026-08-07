@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -41,11 +41,13 @@ describe("users screen", () => {
   it("renders the page heading and a user row", async () => {
     server.use(
       http.get(USERS_URL, () =>
-        HttpResponse.json([
-          // The shipped `consumer`/`business` presets spell the name parts
-          // camelCase; `listUsers` returns the schema's attribute tree verbatim.
-          { id: "user_1", givenName: "Maya", familyName: "Patel", email: "maya.patel@acme.com" },
-        ]),
+        HttpResponse.json({
+          users: [
+            // The shipped `consumer`/`business` presets spell the name parts
+            // camelCase; `listUsers` returns the schema's attribute tree verbatim.
+            { id: "user_1", givenName: "Maya", familyName: "Patel", email: "maya.patel@acme.com" },
+          ],
+        }),
       ),
     );
     await renderUsers();
@@ -61,9 +63,11 @@ describe("users screen", () => {
   it("builds the columns from the schema the users reference", async () => {
     server.use(
       http.get(USERS_URL, () =>
-        HttpResponse.json([
-          { id: "user_1", $schema: "sch_business", email: "maya@acme.com", companyName: "Acme" },
-        ]),
+        HttpResponse.json({
+          users: [
+            { id: "user_1", $schema: "sch_business", email: "maya@acme.com", companyName: "Acme" },
+          ],
+        }),
       ),
       http.get(`${SCHEMAS_URL}/sch_business`, () =>
         HttpResponse.json({
@@ -92,10 +96,12 @@ describe("users screen", () => {
     // also has business columns. The cell must read as empty, not as missing.
     server.use(
       http.get(USERS_URL, () =>
-        HttpResponse.json([
-          { id: "user_1", $schema: "sch_business", email: "maya@acme.com", companyName: "Acme" },
-          { id: "user_2", $schema: "sch_business", email: "min@acme.com" },
-        ]),
+        HttpResponse.json({
+          users: [
+            { id: "user_1", $schema: "sch_business", email: "maya@acme.com", companyName: "Acme" },
+            { id: "user_2", $schema: "sch_business", email: "min@acme.com" },
+          ],
+        }),
       ),
       http.get(`${SCHEMAS_URL}/sch_business`, () =>
         HttpResponse.json({
@@ -122,17 +128,19 @@ describe("users screen", () => {
     // schemas authored that way. A partial name must not render a stray space.
     server.use(
       http.get(USERS_URL, () =>
-        HttpResponse.json([
-          {
-            id: "user_1",
-            name: "Ada L.",
-            givenName: "Ada",
-            familyName: "Lovelace",
-            email: "a@x.com",
-          },
-          { id: "user_2", given_name: "Grace", family_name: "Hopper", email: "g@x.com" },
-          { id: "user_3", givenName: "Radia", email: "r@x.com" },
-        ]),
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              name: "Ada L.",
+              givenName: "Ada",
+              familyName: "Lovelace",
+              email: "a@x.com",
+            },
+            { id: "user_2", given_name: "Grace", family_name: "Hopper", email: "g@x.com" },
+            { id: "user_3", givenName: "Radia", email: "r@x.com" },
+          ],
+        }),
       ),
     );
     await renderUsers();
@@ -149,7 +157,7 @@ describe("users screen", () => {
     // unrelated attribute as the name is worse than having none.
     server.use(
       http.get(USERS_URL, () =>
-        HttpResponse.json([{ id: "user_1", username: "nope", email: "kenji@acme.com" }]),
+        HttpResponse.json({ users: [{ id: "user_1", username: "nope", email: "kenji@acme.com" }] }),
       ),
     );
     await renderUsers();
@@ -161,7 +169,7 @@ describe("users screen", () => {
   it("shows the user id alongside the schema's own attributes", async () => {
     server.use(
       http.get(USERS_URL, () =>
-        HttpResponse.json([{ id: "user_1", email: "kenji@acme.com", status: "Blocked" }]),
+        HttpResponse.json({ users: [{ id: "user_1", email: "kenji@acme.com", status: "Blocked" }] }),
       ),
     );
     await renderUsers();
@@ -206,10 +214,12 @@ describe("users screen", () => {
   it("filters live users across every rendered column, and by id", async () => {
     server.use(
       http.get(USERS_URL, () =>
-        HttpResponse.json([
-          { id: "user_1", givenName: "Maya", familyName: "Patel", email: "maya@acme.com" },
-          { id: "user_2", givenName: "Sasha", familyName: "Kim", email: "sasha@acme.com" },
-        ]),
+        HttpResponse.json({
+          users: [
+            { id: "user_1", givenName: "Maya", familyName: "Patel", email: "maya@acme.com" },
+            { id: "user_2", givenName: "Sasha", familyName: "Kim", email: "sasha@acme.com" },
+          ],
+        }),
       ),
     );
     await renderUsers();
@@ -227,5 +237,122 @@ describe("users screen", () => {
     await userEvent.type(screen.getByRole("searchbox", { name: "Search users" }), "Patel");
     expect(await screen.findByText("Maya")).toBeInTheDocument();
     expect(table().queryByText("Sasha")).not.toBeInTheDocument();
+  });
+
+  it("shows the status the server stamped, and an em dash without one", async () => {
+    server.use(
+      http.get(USERS_URL, () =>
+        HttpResponse.json({
+          users: [
+            { id: "user_1", email: "a@x.com", metadata: { status: "active" } },
+            { id: "user_2", email: "b@x.com", metadata: { status: "pending_purge" } },
+            // Written before `metadata` existed: nothing is invented for it.
+            { id: "user_3", email: "c@x.com" },
+          ],
+        }),
+      ),
+    );
+    await renderUsers();
+    const table = within(await screen.findByRole("table"));
+
+    expect(table.getByText("active")).toBeInTheDocument();
+    // Underscores read as words; the value is not otherwise reinterpreted.
+    expect(table.getByText("pending purge")).toBeInTheDocument();
+    expect(table.getAllByText("—").length).toBeGreaterThan(0);
+  });
+
+  it("keeps `metadata` out of the schema-driven columns", async () => {
+    // `metadata` is the server's own key. Without excluding it the fallback
+    // column set would render it as an attribute of the user's schema.
+    server.use(
+      http.get(USERS_URL, () =>
+        HttpResponse.json({
+          users: [{ id: "user_1", email: "a@x.com", metadata: { status: "active" } }],
+        }),
+      ),
+    );
+    await renderUsers();
+    const table = within(await screen.findByRole("table"));
+
+    expect(table.getByText("Status")).toBeInTheDocument();
+    expect(table.queryByText("metadata")).not.toBeInTheDocument();
+  });
+
+  it("loads the next page on demand and stops offering when there is none", async () => {
+    let asked: string | null = null;
+    server.use(
+      http.get(USERS_URL, ({ request }) => {
+        const token = new URL(request.url).searchParams.get("page_token");
+        asked = token;
+        return token
+          ? HttpResponse.json({ users: [{ id: "user_2", email: "second@x.com" }] })
+          : HttpResponse.json({
+              users: [{ id: "user_1", email: "first@x.com" }],
+              next_page_token: "tok_2",
+            });
+      }),
+    );
+    await renderUsers();
+
+    expect(await screen.findByText("first@x.com")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+
+    // The second page is appended, not swapped in.
+    expect(await screen.findByText("second@x.com")).toBeInTheDocument();
+    expect(screen.getByText("first@x.com")).toBeInTheDocument();
+    expect(asked).toBe("tok_2");
+    // No token came back, so there is nothing left to offer.
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("drops a page that lands after the list was invalidated underneath it", async () => {
+    // Deleting or creating invalidates the route, which resets to a fresh first
+    // page. A `Load more` still in flight is answering a question about the list
+    // that has just been replaced — appending it would re-add rows the server no
+    // longer returns, including the one just deleted.
+    let releaseSecondPage!: () => void;
+    const secondPageSent = new Promise<void>((resolve) => {
+      releaseSecondPage = resolve;
+    });
+    let firstPageCalls = 0;
+
+    server.use(
+      http.get(USERS_URL, async ({ request }) => {
+        const token = new URL(request.url).searchParams.get("page_token");
+        if (token) {
+          await secondPageSent;
+          return HttpResponse.json({ users: [{ id: "user_stale", email: "stale@x.com" }] });
+        }
+        firstPageCalls += 1;
+        return HttpResponse.json({
+          users: [{ id: "user_1", email: `page1-${firstPageCalls}@x.com` }],
+          next_page_token: "tok_2",
+        });
+      }),
+    );
+
+    const router = await renderUsers();
+    expect(await screen.findByText("page1-1@x.com")).toBeInTheDocument();
+
+    // Start the fetch, then invalidate before letting it answer.
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
+    // `act` so the router's own state settles inside the test rather than
+    // warning about an unwrapped update.
+    await act(async () => {
+      await router.invalidate();
+    });
+    await screen.findByText("page1-2@x.com");
+
+    releaseSecondPage();
+
+    // Wait for a positive signal that the in-flight page was handled — the
+    // button re-enables in `loadMore`'s `finally`. Asserting the stale row is
+    // absent without this passes before the response has even landed, which
+    // makes the test green with the guard removed.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Load more" })).toBeEnabled());
+
+    // The in-flight page is discarded rather than appended to the new list.
+    expect(screen.queryByText("stale@x.com")).not.toBeInTheDocument();
+    expect(screen.getByText("page1-2@x.com")).toBeInTheDocument();
   });
 });

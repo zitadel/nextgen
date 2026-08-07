@@ -1,0 +1,54 @@
+post:
+  operationId: initClaim
+  summary: Initialize a project claim
+  description: |
+    Starts a claim challenge for an unclaimed project. Authenticated by the
+    project secret, this mints a single-use, short-lived challenge and returns
+    the `claim_url` the developer opens in a browser to complete the claim,
+    together with the `challenge_id` the CLI polls with. The exact expiry is
+    carried by `expires_at` on the response.
+  tags:
+    - Projects
+  parameters:
+    - name: project_id
+      in: path
+      required: true
+      schema:
+        $ref: ../../../../../components/schemas/project-id.yaml
+  security:
+    - oauth2:
+        # project.write, not project.read: project.read is carried by the
+        # browser-plane preview secret, so it cannot gate an operator write
+        # until ADR 036 splits the credential planes into distinct schemes.
+        - project.write
+  responses:
+    '201':
+      description: Claim challenge created.
+      content:
+        application/json:
+          schema:
+            $ref: init-claim-response.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/schemas/errors/proj-not_found.yaml
+    '409':
+      description: The project is already claimed by a team.
+      content:
+        application/json:
+          schema:
+            $ref: already-claimed-response.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml

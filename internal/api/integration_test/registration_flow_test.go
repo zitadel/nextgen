@@ -80,7 +80,7 @@ func TestPasskeyRegistrationFlow(t *testing.T) {
 		SchemaURL:               userSchemaURL,
 		ID:                      userID,
 		InitialMembershipTeamID: &team.ID,
-		Attributes:              []*domain.CreateAttribute{emailAttr},
+		Attributes:              domain.CreateAttributes{*emailAttr},
 	}))
 
 	passkeys := harness.EnsureUserPasskeyFixture(t)

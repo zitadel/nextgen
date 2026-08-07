@@ -47,12 +47,16 @@ type User struct {
 	ID        string
 	// LifecycleOwnerTeamID is set when a team owns this user's lifecycle; nil means self-owned.
 	LifecycleOwnerTeamID *string
-	Status               UserStatus
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	Metadata             UserMetadata
 
 	// Attributes are populated by user read statements.
-	Attributes []Attribute
+	Attributes Attributes
+}
+
+type UserMetadata struct {
+	Status    UserStatus
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // IsSelfOwned reports whether the user owns their own lifecycle.
@@ -87,15 +91,10 @@ var IdentityAttributeKeys = []string{
 
 // StringAttribute returns the value of the attribute with the given key when
 // it is a non-empty string, and "" otherwise (absent key or non-string value).
-func (u *User) StringAttribute(key string) string {
-	for _, a := range u.Attributes {
-		if a.Key != key {
-			continue
-		}
-		value, _ := a.Value.(string)
-		return value
-	}
-	return ""
+func (u *User) StringAttribute(key AttributeKey) string {
+	value, _ := u.Attributes.Get(key)
+	s, _ := value.(string)
+	return s
 }
 
 // DisplayName resolves the user's human-readable name from the conventional
@@ -118,7 +117,7 @@ func (u *User) DisplayName() string {
 }
 
 // firstStringAttribute returns the first key's non-empty string value.
-func (u *User) firstStringAttribute(keys ...string) string {
+func (u *User) firstStringAttribute(keys ...AttributeKey) string {
 	for _, key := range keys {
 		if value := u.StringAttribute(key); value != "" {
 			return value
@@ -147,7 +146,7 @@ type CreateUser struct {
 	// to their default workspace team; an enterprise provisioned user may set both fields to the
 	// same tenant team, but lifecycle ownership and roster membership remain separate concerns.
 	InitialMembershipTeamID *string
-	Attributes              []*CreateAttribute
+	Attributes              CreateAttributes
 }
 
 // AttributeTeamScope returns the team id used for team-scoped unique attributes on create.
@@ -164,6 +163,13 @@ func (c *CreateUser) AttributeTeamScope() string {
 // NewCreateUser builds a [CreateUser] from a schema-validated user map.
 // Empty id is filled by the dialect on create; non-empty id is for ceremony only.
 func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
+	if _, ok := muser["id"]; ok {
+		return nil, ErrUserInvalid().WithDetails("client cannot choose user id")
+	}
+	if _, ok := muser["metadata"]; ok {
+		return nil, ErrUserInvalid().WithDetails("metadata is readonly and cannot be set")
+	}
+
 	schemaURL, err := SchemaFromUserMap(muser)
 	if err != nil {
 		return nil, err
@@ -186,7 +192,7 @@ func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte,
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal schema map")
 	}
 
-	attrs, err := FlattenMapToCreateAttributes(muser, mschema, "")
+	attrs, err := CreateAttributesFromMap(muser, mschema)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to flatten user attributes")
 	}

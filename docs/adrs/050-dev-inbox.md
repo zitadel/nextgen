@@ -1,4 +1,4 @@
-# ADR 048: The Dev Inbox — Captured Outbound Messages
+# ADR 050: The Dev Inbox — Captured Outbound Messages
 
 > **Status:** Proposed
 > **Date:** 2026-08-02
@@ -381,7 +381,11 @@ decisions when this ADR moves to Accepted.
   or delivers (v4-shaped: enqueue → compose → capture|deliver). The flow
   never owns SMTP or HTML; artifacts still come from flow/challenge
   state as specified above. Wide-events/River fit naturally as that bus;
-  the exact event shape stays open.
+  the exact event shape stays open. Since the lean was recorded, wide
+  events landed as [ADR 048](048-wide-events-internal-audit-primitive.md)
+  — an *audit* primitive (deny-by-default PII, export-only), so whether
+  the audit stream can double as the dispatch bus or the boundary rides
+  a job queue with its own payloads is part of that open shape question.
 - **Durable-store trigger** — lean: in-memory for the local
   single-process instance (`zitadel start` / `startLocalZitadel()`);
   switch to a durable store when any of multi-replica, a shared
