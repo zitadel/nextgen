@@ -123,3 +123,18 @@ func TestWrapError(t *testing.T) {
 		})
 	}
 }
+
+// ReadWriteTransaction retries an aborted transaction only while it can still
+// find the ABORTED status in the error the callback returned, so wrapError must
+// stay transparent to it. See #788.
+func TestWrapErrorKeepsAbortedRetryable(t *testing.T) {
+	t.Parallel()
+
+	got := wrapError(spanner.ToSpannerError(status.Error(codes.Aborted,
+		"Transaction: 1 aborted due to another transaction getting priority.")))
+
+	require.Error(t, got)
+	assert.Equal(t, codes.Aborted, status.Code(got),
+		"ABORTED was stripped; ReadWriteTransaction will not retry")
+	assert.ErrorAs(t, got, new(*spanner.Error))
+}

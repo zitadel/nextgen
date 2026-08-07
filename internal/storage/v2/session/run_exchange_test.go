@@ -6,8 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/spanner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/v2/session"
@@ -173,6 +176,43 @@ func TestRunExchange_missingSessionConflict(t *testing.T) {
 	store := &fakeExchangeStore{attempt: completedAttempt("proj", &sid)}
 	_, err := session.RunExchange(t.Context(), store, "proj", "plain", 0)
 	assert.ErrorIs(t, err, domain.ErrSessionExchangeConflict())
+}
+
+// A conflict must keep the underlying gRPC status reachable. Spanner's
+// ReadWriteTransaction decides whether to retry by looking for an ABORTED status
+// in the error the callback returns, so a conflict that flattens its cause turns
+// a retryable abort into a user-facing 400. See #788.
+func TestRunExchange_conflictPreservesAbortedStatus(t *testing.T) {
+	t.Parallel()
+
+	aborted := spanner.ToSpannerError(status.Error(codes.Aborted,
+		"Transaction: 1 aborted due to another transaction getting priority."))
+
+	// Every store call that RunExchange funnels through exchangeConflict.
+	for name, store := range map[string]*fakeExchangeStore{
+		"InsertSession":              {attempt: completedAttempt("proj", nil), insertErr: aborted},
+		"ApplyExchange":              {attempt: completedAttempt("proj", nil), applyErr: aborted},
+		"UserIDFromVerifiedChecks":   {attempt: completedAttempt("proj", nil), userIDErr: aborted},
+		"UpdateSessionAfterExchange": {attempt: completedAttempt("proj", nil), updateErr: aborted},
+		"DeleteAuthAttempt":          {attempt: completedAttempt("proj", nil), deleteErr: aborted},
+		"CreateSessionToken":         {attempt: completedAttempt("proj", nil), createTokenErr: aborted},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := session.RunExchange(t.Context(), store, "proj", "plain", time.Hour)
+			require.Error(t, err)
+
+			// The conflict code still reaches the API layer, which maps it to 400.
+			assert.ErrorIs(t, err, domain.ErrSessionExchangeConflict())
+
+			// ...and the abort still reaches Spanner's retry predicate.
+			assert.Equal(t, codes.Aborted, status.Code(err),
+				"ABORTED was stripped; ReadWriteTransaction will not retry")
+			var se *spanner.Error
+			assert.ErrorAs(t, err, &se)
+		})
+	}
 }
 
 func TestRunExchange_applyConflict(t *testing.T) {
