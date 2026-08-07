@@ -142,7 +142,7 @@ jobs:
       # journey_matrix=single collapses the framework matrix to Next when no
       # SDK, CLI, or journey surface moved — the flow widget is
       # framework-independent, so a server-only change proves as much on one
-      # framework as on five.
+      # framework as on the full matrix (apps/cli-journey-e2e/scripts/frameworks.mjs).
       - name: Run binary fresh-app journey
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.journey_fresh_app == 'true' }}
         env:

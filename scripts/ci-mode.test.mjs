@@ -48,7 +48,46 @@ const TESTING_KIT_CLASS = [
   "testing:build-release", "testing:lint", "testing:test", "testing:test-integration",
   "testing:typecheck",
 ];
-const COMPONENTS_SLICE = ["components:build", "components:test-browser", "components:lint"];
+// Full capture, 2026-08-04: components feeds every SDK, both UIs, the CLI,
+// and the journey project — 91 tasks, correctly close to "everything".
+const COMPONENTS_CLASS = [
+  "cli-journey-e2e:e2e", "cli-journey-e2e:e2e-local", "cli-journey-e2e:e2e-testkit",
+  "cli:build", "cli:build-release", "cli:lint", "cli:readme", "cli:test", "cli:typecheck",
+  "components:build", "components:build-release", "components:lint", "components:test",
+  "components:test-browser", "components:typecheck",
+  "console-e2e:e2e", "console-e2e:e2e-real",
+  "console:build", "console:build-release", "console:lint", "console:preview",
+  "console:test", "console:typecheck",
+  "demo-next-e2e:e2e", "demo-next-e2e:e2e-real",
+  "demo-next:build", "demo-next:dev", "demo-next:lint", "demo-next:start", "demo-next:typecheck",
+  "demo-nuxt-e2e:e2e",
+  "demo-nuxt:build", "demo-nuxt:dev", "demo-nuxt:lint", "demo-nuxt:start", "demo-nuxt:typecheck",
+  "login-ui:build", "login-ui:build-release", "login-ui:lint", "login-ui:preview",
+  "login-ui:typecheck",
+  "release:build-public-packages", "release:pack", "release:publish", "release:snapshot",
+  "sdk-angular:build", "sdk-angular:build-release", "sdk-angular:lint", "sdk-angular:test",
+  "sdk-angular:typecheck",
+  "sdk-next:build", "sdk-next:build-release", "sdk-next:lint", "sdk-next:test",
+  "sdk-next:typecheck",
+  "sdk-nuxt:build", "sdk-nuxt:build-release", "sdk-nuxt:lint", "sdk-nuxt:test",
+  "sdk-nuxt:typecheck",
+  "sdk-qwik:build", "sdk-qwik:build-release", "sdk-qwik:lint", "sdk-qwik:test",
+  "sdk-qwik:typecheck",
+  "sdk-react:build", "sdk-react:build-release", "sdk-react:lint", "sdk-react:test",
+  "sdk-react:typecheck",
+  "sdk-solid:build", "sdk-solid:build-release", "sdk-solid:lint", "sdk-solid:test",
+  "sdk-solid:typecheck",
+  "sdk-svelte:build", "sdk-svelte:build-release", "sdk-svelte:lint", "sdk-svelte:test",
+  "sdk-svelte:typecheck",
+  "sdk-vue:build", "sdk-vue:build-release", "sdk-vue:lint", "sdk-vue:test",
+  "sdk-vue:typecheck",
+  "server:build",
+  "storybook:build", "storybook:lint", "storybook:test", "storybook:typecheck",
+  "testing:test-integration",
+];
+// Synthetic slice, NOT a class capture: isolates the `:test-browser`-alone
+// trigger for the browsers gate, which no real class produces in isolation.
+const TEST_BROWSER_SLICE = ["components:test-browser", "components:lint"];
 
 function allTrue(gates) {
   return Object.values(gates).every(Boolean);
@@ -154,15 +193,29 @@ test("journey-project change runs all journeys, full matrix, and the snapshot th
   assert.equal(gates.go_tests, false);
 });
 
-test("components affectedness triggers journeys via the shared surface", () => {
+test("components change runs every journey and suite with the full matrix, but no Go suites", () => {
   const { gates, matrix } = resolveGates({
     mode: "full",
     files: ["packages/components/src/atoms/index.ts"],
-    targets: COMPONENTS_SLICE,
+    targets: COMPONENTS_CLASS,
   });
   assert.deepEqual(journeys(gates), [true, true, true]);
+  assert.equal(gates.snapshot, true);
+  assert.equal(gates.suites_testing_demo, true);
+  assert.equal(gates.suites_console, true);
   assert.equal(gates.browsers, true);
-  assert.equal(matrix, "single");
+  assert.equal(gates.go_tests, false);
+  assert.equal(matrix, "full");
+});
+
+test(":test-browser affectedness alone keeps the browser install without journeys", () => {
+  const { gates } = resolveGates({
+    mode: "full",
+    files: ["packages/components/src/atoms/zl-alert.spec.ts"],
+    targets: TEST_BROWSER_SLICE,
+  });
+  assert.equal(gates.browsers, true);
+  assert.deepEqual(journeys(gates), [false, false, false]);
 });
 
 test("unclaimed files force a full run with the full matrix", () => {

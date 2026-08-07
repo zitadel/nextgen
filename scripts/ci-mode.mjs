@@ -17,7 +17,8 @@ import { isDirectRun } from "./dev-process.mjs";
 // 3. Journey scope — the fresh-app journey's framework matrix collapses to a
 //    single representative framework when no SDK, CLI, or journey surface
 //    moved: the scaffolded flow widget is framework-independent, so a
-//    server-only change proves as much on one framework as on five.
+//    server-only change proves as much on one framework as on the full
+//    matrix (apps/cli-journey-e2e/scripts/frameworks.mjs owns the list).
 //
 // The gates fail open: known repo-wide files no task claims (workflow
 // definitions, scripts/, moon config, root manifests and compiler/release

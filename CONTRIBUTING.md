@@ -298,8 +298,10 @@ only skipped if every changed file is on a narrow explicitly-inert allowlist
 
 CI consumes the workflow's packed npm tarballs, not public Zitadel packages.
 Changesets PR comments are informational release-intent feedback, not a
-blocking gate. Workflow artifacts (the release snapshot always, journey
-diagnostics on failure) expire after 7 days. The demo end-to-end suites and
+blocking gate. Workflow artifacts (the release snapshot whenever a journey
+lane runs — a run whose journeys are gated off, such as a docs-only or
+console-only PR, uploads no snapshot — and journey diagnostics on failure)
+expire after 7 days. The demo end-to-end suites and
 the Docker-fallback journey do not run in CI; they stay opt-in local checks
 (see below).
 
