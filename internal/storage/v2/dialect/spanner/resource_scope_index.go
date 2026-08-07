@@ -1,0 +1,83 @@
+package spanner
+
+import (
+	"context"
+
+	"cloud.google.com/go/spanner"
+
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+)
+
+const (
+	resourceScopeIndexTable = "resource_scope_index"
+
+	upsertResourceScopeStmt = `
+INSERT INTO resource_scope_index (resource_id, resource_kind, project_id, team_id)
+VALUES (@p1, @p2, @p3, @p4)
+ON CONFLICT (resource_id) DO UPDATE SET
+    resource_kind = EXCLUDED.resource_kind,
+    project_id = EXCLUDED.project_id,
+    team_id = EXCLUDED.team_id,
+    updated_at = CURRENT_TIMESTAMP()
+THEN RETURN resource_id, resource_kind, project_id, team_id, created_at, updated_at`
+
+	deleteResourceScopeStmt = `DELETE FROM resource_scope_index WHERE resource_id = @p1`
+)
+
+var resourceScopeColumns = []string{
+	"resource_id", "resource_kind", "project_id", "team_id", "created_at", "updated_at",
+}
+
+type resourceScopeStatements struct{ statement }
+
+func newResourceScopeStatements(db queryExecutor) resourceScopeStatements {
+	return resourceScopeStatements{
+		statement: statement{
+			db: db,
+		},
+	}
+}
+
+// UpsertResourceScope implements [service.ResourceScopeStatements].
+func (s resourceScopeStatements) UpsertResourceScope(ctx context.Context, scope *domain.ResourceScope) error {
+	stmt := buildStatement(upsertResourceScopeStmt,
+		scope.ResourceID, scope.ResourceKind.String(), scope.ProjectID, spannerNullString(scope.TeamID),
+	).statement()
+	return s.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+		updated, err := collectOneRow(iter, scanResourceScope)
+		if err != nil {
+			return err
+		}
+		*scope = *updated
+		return nil
+	})
+}
+
+// GetResourceScope implements [service.ResourceScopeStatements].
+func (s resourceScopeStatements) GetResourceScope(ctx context.Context, resourceID string) (*domain.ResourceScope, error) {
+	row, err := s.db.ReadRow(ctx, resourceScopeIndexTable, spanner.Key{resourceID}, resourceScopeColumns)
+	if err != nil {
+		return nil, err
+	}
+	return scanResourceScope(row)
+}
+
+// DeleteResourceScope implements [service.ResourceScopeStatements].
+func (s resourceScopeStatements) DeleteResourceScope(ctx context.Context, resourceID string) error {
+	_, err := s.db.Update(ctx, buildStatement(deleteResourceScopeStmt, resourceID).statement())
+	return err
+}
+
+func scanResourceScope(row *spanner.Row) (*domain.ResourceScope, error) {
+	scope := new(domain.ResourceScope)
+	if err := row.Columns(
+		&scope.ResourceID, &scope.ResourceKind, &scope.ProjectID, &scope.TeamID,
+		&scope.CreatedAt, &scope.UpdatedAt,
+	); err != nil {
+		return nil, err
+	}
+	return scope, nil
+}
+
+var _ service.ResourceScopeStatements = (*resourceScopeStatements)(nil)

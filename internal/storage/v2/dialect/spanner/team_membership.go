@@ -43,14 +43,20 @@ func newTeamMembershipStatements(db queryExecutor) teamMembershipStatements {
 
 // CreateTeamMembership implements [service.TeamMembershipStatements].
 func (s teamMembershipStatements) CreateTeamMembership(ctx context.Context, membership *domain.TeamMembership) error {
-	stmt := buildStatement(createTeamMembershipStmt,
-		membership.ProjectID, membership.TeamID, membership.UserID, membership.Status.String(),
-	).statement()
-	return s.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
-		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			return struct{}{}, row.Columns(&membership.CreatedAt, &membership.UpdatedAt)
-		})
-		return err
+	return withTransaction(ctx, s.db, func(ctx context.Context, tx queryExecutor) error {
+		stmt := buildStatement(createTeamMembershipStmt,
+			membership.ProjectID, membership.TeamID, membership.UserID, membership.Status.String(),
+		).statement()
+		if err := tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+				return struct{}{}, row.Columns(&membership.CreatedAt, &membership.UpdatedAt)
+			})
+			return err
+		}); err != nil {
+			return err
+		}
+		edges := newAuthzMembershipEdgeStatements(tx)
+		return service.SyncUserTeamMembershipEdge(ctx, &edges, membership.ProjectID, membership.TeamID, membership.UserID, membership.Status)
 	})
 }
 
@@ -129,15 +135,18 @@ func (s teamMembershipStatements) ListUserTeams(ctx context.Context, filter *dat
 
 // UpdateTeamMembershipStatus implements [service.TeamMembershipStatements].
 func (s teamMembershipStatements) UpdateTeamMembershipStatus(ctx context.Context, projectID, teamID, userID string, status domain.MembershipStatus) error {
-	stmt := buildStatement(updateTeamMembershipStatusStmt, status.String(), projectID, teamID, userID).statement()
-	n, err := s.db.Update(ctx, stmt)
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return database.NewNoRowFoundError(nil)
-	}
-	return nil
+	return withTransaction(ctx, s.db, func(ctx context.Context, tx queryExecutor) error {
+		stmt := buildStatement(updateTeamMembershipStatusStmt, status.String(), projectID, teamID, userID).statement()
+		n, err := tx.Update(ctx, stmt)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return database.NewNoRowFoundError(nil)
+		}
+		edges := newAuthzMembershipEdgeStatements(tx)
+		return service.SyncUserTeamMembershipEdge(ctx, &edges, projectID, teamID, userID, status)
+	})
 }
 
 func (s teamMembershipStatements) scanTeamMembership(row *spanner.Row) (*domain.TeamMembership, error) {

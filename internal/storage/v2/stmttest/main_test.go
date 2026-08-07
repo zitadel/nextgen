@@ -16,9 +16,10 @@ import (
 )
 
 type dialectOpener struct {
-	name string
-	open func(ctx context.Context) (dbtest.Pool, func(), error)
-	seed func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error
+	name           string
+	open           func(ctx context.Context) (dbtest.Pool, func(), error)
+	seed           func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error
+	hardDeleteTeam func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error
 }
 
 // dialectOpeners is filled by build-tagged register files (postgres, spanner, and/or sqlite).
@@ -28,14 +29,18 @@ func registerDialect(
 	name string,
 	open func(ctx context.Context) (dbtest.Pool, func(), error),
 	seed func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error,
+	hardDeleteTeam func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error,
 ) {
-	dialectOpeners = append(dialectOpeners, dialectOpener{name: name, open: open, seed: seed})
+	dialectOpeners = append(dialectOpeners, dialectOpener{
+		name: name, open: open, seed: seed, hardDeleteTeam: hardDeleteTeam,
+	})
 }
 
 type dialect struct {
 	name             string
 	stmts            service.AllStatements
 	seedTiedProjects func(ctx context.Context, ids []string, createdAt time.Time) error
+	hardDeleteTeam   func(ctx context.Context, projectID, teamID string) error
 }
 
 // dialects is populated by TestMain for every registered opener.
@@ -72,11 +77,15 @@ func run(m *testing.M) int {
 		stops = append(stops, func() { _ = pool.Close(ctx) })
 
 		seed := opener.seed
+		hardDeleteTeam := opener.hardDeleteTeam
 		dialects = append(dialects, dialect{
 			name:  opener.name,
 			stmts: pool.Statements(),
 			seedTiedProjects: func(ctx context.Context, ids []string, createdAt time.Time) error {
 				return seed(ctx, pool, ids, createdAt)
+			},
+			hardDeleteTeam: func(ctx context.Context, projectID, teamID string) error {
+				return hardDeleteTeam(ctx, pool, projectID, teamID)
 			},
 		})
 	}
