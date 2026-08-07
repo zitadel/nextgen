@@ -2890,8 +2890,9 @@ func (s *FactorMethod) UnmarshalText(data []byte) error {
 // Does not contain display text — only a `text_key` resolved client-side.
 // Ref: #
 type Field struct {
-	// Field name, matching a property in the flow's user schema. Carries
-	// the submitted value back to the engine.
+	// Field name, matching a property in the flow's user schema — a
+	// dotted path (`address.street`) for a nested property. Carries the
+	// submitted value back to the engine.
 	Name string `json:"name"`
 	// The input kind the client should render. Encodes the formats and
 	// JSON types that map to a familiar HTML input: `email`, `url`,
@@ -2902,7 +2903,8 @@ type Field struct {
 	// Localization key for the field label.
 	TextKey string `json:"text_key"`
 	// The field MUST be present and non-empty on submit. Mirrors the
-	// schema's top-level `required` array.
+	// schema's `required` array at every level of the field's path: a
+	// nested leaf is required only when each of its ancestors is too.
 	Required OptBool `json:"required"`
 	// Pre-filled value (e.g., an identifier carried over from a pivot).
 	Value jx.Raw `json:"value"`
@@ -3829,10 +3831,12 @@ type FlowDefinitionStep struct {
 	// and returned in the API response as `step.name`.
 	Name string `json:"name"`
 	// Schema property names to collect from the user. Each entry references
-	// a property in the flow's user schema. The engine resolves field type,
+	// a property in the flow's user schema, naming a nested one by its
+	// dotted path (`address.street`). The engine resolves field type,
 	// validation rules, and implicit outcomes from schema annotations
 	// (e.g. a property with `x-unique` set implies a `user_not_found`
-	// transition outcome).
+	// transition outcome). An object- or array-typed property has no
+	// field-shaped input: collect its leaves instead.
 	Fields []string `json:"fields"`
 	// Ordered list of actions the user can take. The action name is what the
 	// frontend sends back in the submit request. If omitted, the engine

@@ -1,0 +1,58 @@
+{
+  "project_id": "${PROJECT_ID}",
+  "schema_uri": "https://nextgen.com/flow-definition.json",
+  "flow_definition": {
+    "name": "nested-profile-register",
+    "status": "active",
+    "user_schema": "${USER_SCHEMA_URL}",
+    "purposes": {
+      "register": "signup"
+    },
+    "steps": [
+      {
+        "name": "signup",
+        "fields": [
+          "email",
+          "x-auth-methods#password"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "kind": "submit",
+            "primary": true
+          }
+        ],
+        "transitions": {
+          "submit": {
+            "target": "address"
+          }
+        }
+      },
+      {
+        "name": "address",
+        "fields": [
+          "address.street",
+          "address.city",
+          "address.zipCode"
+        ],
+        "actions": [
+          {
+            "name": "submit",
+            "kind": "submit",
+            "primary": true
+          }
+        ],
+        "on_success": "create_user",
+        "transitions": {
+          "submit": {
+            "target": "done"
+          }
+        }
+      },
+      {
+        "name": "done",
+        "complete": "show"
+      }
+    ]
+  }
+}

@@ -35,7 +35,16 @@ var exampleUserSchema = []byte(`{
     "givenName":   { "type": "string" },
     "familyName":  { "type": "string" },
     "phoneNumber": { "type": "string" },
-    "dateOfBirth": { "type": "string", "format": "date" }
+    "dateOfBirth": { "type": "string", "format": "date" },
+    "address": {
+      "type": "object",
+      "required": ["street", "city"],
+      "properties": {
+        "street":  { "type": "string", "minLength": 1 },
+        "city":    { "type": "string", "minLength": 1 },
+        "zipCode": { "type": "string" }
+      }
+    }
   }
 }`)
 
@@ -67,6 +76,7 @@ func TestExampleFlowDefinitions(t *testing.T) {
 		{"04-passkey-register", "examples/04-passkey-register/flow-definition.json"},
 		{"05-combined-login-register", "examples/05-combined-login-register/flow-definition.json"},
 		{"06-combined-password-passkey", "examples/06-combined-password-passkey/flow-definition.json"},
+		{"07-nested-profile-fields", "examples/07-nested-profile-fields/flow-definition.json"},
 	}
 
 	for _, ex := range examples {
