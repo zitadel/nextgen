@@ -27,7 +27,7 @@ Permission is denied before any resource content is fetched. Enumeration oracles
 
 | Principal | Identifier | Scope semantics |
 |---|---|---|
-| **user** (user token) | `user_id` | Resolved against `team_memberships` and project grants for the project the user lives in. |
+| **user** (user token) | `user_id` | FGA membership checks use `authz_membership_edges` (dual-written from `team_memberships`); see D3 in [`permission-storage.md`](permission-storage.md). Roster/`team_memberships` stay lifecycle-adjacent only. |
 | **`sk_proj_…`** (claimed) | `project_id`, `team_id` (owning team) | Project-wide. |
 | **`sk_proj_…`** (pre-claim) | `project_id`, `pre_claim: true` | Project-wide against an unclaimed project. |
 | **`sk_proj_…`** (origin-scoped) | `project_id`, `origin_patterns` | Project-wide, gated on request `Origin` matching a pattern. |
@@ -73,8 +73,8 @@ marks that user as team-owned.
 
 The decision engine answers `can principal P perform action A on resource R?` considering:
 
-- Direct permission grants.
-- Role assignments through team_memberships.
+- Direct permission grants (`authz_assignments`).
+- Team usersets via `authz_membership_edges` and relation closure (see [`permission-storage.md`](permission-storage.md)); `team_memberships` is roster/lifecycle only, not the check fact source.
 - Credential-class allowlists (especially `sk_team_`).
 - Resource-scope constraints (`origin_patterns`, project/team boundary, etc.).
 
@@ -97,3 +97,4 @@ Both "ID does not exist" and "authorisation fails" return **404 Not Found**. Thi
 - [`url-architecture.md`](url-architecture.md) — scope resolution that runs before the permission check
 - [`resource-map.md`](resource-map.md) — endpoint surface inventory
 - [`system-permission-catalog.md`](system-permission-catalog.md) — canonical permission names, bundles, and per-resource permission matrix
+- [`permission-storage.md`](permission-storage.md) — Wave 0 relational DDL, dual-write membership edges, and check SQL shape

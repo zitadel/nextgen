@@ -398,11 +398,18 @@ policies without reintroducing hard-coded levels and special cases.
 ## Follow-ups
 
 1. Design relational migrations for catalogs, permission/relation
-   definitions, expression edges, and assignments shared by both catalogs.
-   (Catalog-specific tables — `resource_scope_index` and app grants — are
+   definitions, and assignments shared by both catalogs.
+   Wave 0 DDL spike and locked decisions:
+   [`docs/design/api/permission-storage.md`](../design/api/permission-storage.md)
+   (implementation tracked by [issue #422](https://github.com/zitadel/nextgen/issues/422)).
+   Wave 0 defers `authz_expression_edges` (D5); live catalog rows are
+   `authz_relations` + `authz_relation_closure` until
+   [issue #421](https://github.com/zitadel/nextgen/issues/421).
+   Catalog-specific tables — `resource_scope_index` and app grants — are
    tracked in [ADR 033](033-internal-permission-management.md) and
    [ADR 034](034-external-permission-management.md); staff/support grant
-   tables are tracked by [issue #333](https://github.com/zitadel/nextgen/issues/333).)
+   product is tracked by [issue #333](https://github.com/zitadel/nextgen/issues/333)
+   (storage depiction in the Wave 0 doc).
 2. Add resolver conformance tests that compare single-resource checks and
    list predicates across PostgreSQL and Spanner.
 3. Validate the Leopard-style flattening approach for relation closure
