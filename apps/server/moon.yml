@@ -45,9 +45,14 @@ tasks:
       runFromWorkspaceRoot: true
 
   generate:
-    command: "go generate ./..."
+    # Not `go generate ./...`: that runs every directive serially, and the cost
+    # is per-invocation (mockgen type-loads a package whether it mocks one
+    # interface or twenty). The script runs packages in parallel behind the one
+    # ordering constraint that matters — see scripts/go-generate.mjs.
+    command: "node scripts/go-generate.mjs"
     inputs:
       - "@group(serverInputs)"
+      - "/scripts/go-generate.mjs"
     outputs:
       - "/api/generated/**"
       - "/api/openapi/components/schemas/errors/**"
@@ -61,6 +66,7 @@ tasks:
     command: "node scripts/check-go-generate.mjs"
     inputs:
       - "@group(serverInputs)"
+      - "/scripts/go-generate.mjs"
     options:
       runFromWorkspaceRoot: true
 

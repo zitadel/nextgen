@@ -8,8 +8,6 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/token.mock.go . TokenService
-
 // ---- Interface -------------------------------------------------------------
 
 type TokenService interface {

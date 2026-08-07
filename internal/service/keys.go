@@ -10,8 +10,6 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/keys.mock.go . KeyService
-
 // ---- Interface -------------------------------------------------------------
 
 type KeyService interface {

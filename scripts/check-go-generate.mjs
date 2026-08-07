@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { run, runCapture } from "./dev-process.mjs";
+import { runCapture } from "./dev-process.mjs";
+import { goGenerate } from "./go-generate.mjs";
 
 const GENERATED_PATHS = [
   "api/generated",
@@ -12,7 +13,14 @@ const GENERATED_PATHS = [
 ];
 
 const before = await gitState();
-await run("go", ["generate", "./..."]);
+try {
+  await goGenerate();
+} catch (error) {
+  // The generator's own output is already folded into the message; a stack
+  // trace on top of it only buries the line that explains the failure.
+  console.error(error.message);
+  process.exit(1);
+}
 const after = await gitState();
 
 if (after !== before) {

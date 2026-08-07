@@ -293,8 +293,11 @@ call `idgen` outside dialect packages. Full minting contract:
 ## Generated Files
 
 - Do not hand-edit `api/generated/**`; update `api/openapi/**` and run
-  `moon run server:generate` or `go generate ./...`. CI enforces committed
-  generated output through `server:check-generate` (via `server:test`).
+  `moon run server:generate`. CI enforces committed generated output through
+  `server:check-generate` (via `server:test`). Bare `go generate ./...` still
+  produces the same output, but runs every directive serially — roughly 4x
+  slower. Both go through the same `//go:generate` directives; the moon task
+  just schedules them (`scripts/go-generate.mjs`).
 - Do not hand-edit generated package output under `dist/`.
 - Do not hand-edit `apps/console/src/routeTree.gen.ts`; update route files and
   let the TanStack Router plugin regenerate it.
