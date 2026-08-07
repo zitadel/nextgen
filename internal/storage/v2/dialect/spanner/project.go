@@ -42,19 +42,25 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 	if err != nil {
 		return wrapError(err)
 	}
-	stmt := buildStatement(createProjectStmt, project.ID, project.Name, previewOrigins).statement()
-	return ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
-		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			return struct{}{}, row.Columns(&project.ID, &project.CreatedAt, &project.UpdatedAt)
-		})
-		return err
+	return withTransaction(ctx, ps.db, func(ctx context.Context, tx queryExecutor) error {
+		stmt := buildStatement(createProjectStmt, project.ID, project.Name, previewOrigins).statement()
+		if err := tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+				return struct{}{}, row.Columns(&project.ID, &project.CreatedAt, &project.UpdatedAt)
+			})
+			return err
+		}); err != nil {
+			return err
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.UpsertResourceScope(ctx, domain.NewProjectResourceScope(project.ID))
 	})
 }
 
 // DeleteProjectByID implements [service.ProjectStatements].
+// resource_scope_index rows for this project cascade via the project_id FK.
 func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) error {
-	stmt := buildStatement(deleteByIDProjectStmt, id).statement()
-	_, err := ps.db.Update(ctx, stmt)
+	_, err := ps.db.Update(ctx, buildStatement(deleteByIDProjectStmt, id).statement())
 	return err
 }
 
