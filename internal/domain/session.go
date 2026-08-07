@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"maps"
 	"time"
 
 	"github.com/muhlemmer/gu"
@@ -112,7 +113,7 @@ type Session struct {
 func NewSession(projectID string, agent *UserAgent) (*Session, error) {
 	return &Session{
 		ProjectID:  projectID,
-		UserAgent:  agent,
+		UserAgent:  agent.Clone(), // own our copy; storage mutates Info in place
 		TimeToLive: SessionAnonymousTTL,
 	}, nil
 }
@@ -167,6 +168,17 @@ type UserAgent struct {
 	ID   string
 	IP   string
 	Info map[string]any
+}
+
+// Clone returns a deep copy safe to mutate independently of the original: its
+// Info map is separate, so persistence side-effects (storage adds ip/fingerprint
+// keys before marshalling) never leak back to a caller's request-scoped value.
+// The copy is shallow over Info's values, which are always strings.
+func (ua *UserAgent) Clone() *UserAgent {
+	if ua == nil {
+		return nil
+	}
+	return &UserAgent{ID: ua.ID, IP: ua.IP, Info: maps.Clone(ua.Info)}
 }
 
 // SessionField enumerates the fields of Session which can be used for filtering and
