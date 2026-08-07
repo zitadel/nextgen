@@ -81,10 +81,6 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 		}
 	}
 
-	if err := rejectDottedPropertyNames(schema); err != nil {
-		return nil, err
-	}
-
 	var objectType *string
 	if ot, ok := maputil.Get[string](schema, "objectType"); ok {
 		objectType = &ot
@@ -97,35 +93,6 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 		CreatedAt:  time.Now().UTC(),
 		Schema:     schemabs,
 	}, nil
-}
-
-// rejectDottedPropertyNames rejects a property name holding a dot. The
-// user-schema meta-schema carries the same rule so an editor flags it
-// while authoring; this copy enforces it, and reaches `$defs`, `allOf`,
-// and `items`, which the meta-schema leaves unconstrained.
-func rejectDottedPropertyNames(node any) error {
-	switch v := node.(type) {
-	case map[string]any:
-		if props, ok := v["properties"].(map[string]any); ok {
-			for name := range props {
-				if strings.Contains(name, ".") {
-					return ErrJSONSchemaInvalid().WithMessage(fmt.Sprintf("schema property %q cannot contain a dot", name))
-				}
-			}
-		}
-		for _, val := range v {
-			if err := rejectDottedPropertyNames(val); err != nil {
-				return err
-			}
-		}
-	case []any:
-		for _, item := range v {
-			if err := rejectDottedPropertyNames(item); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
 //go:generate go tool mockgen -typed -package domainmock -destination ./mock/json_schema.mock.go . JSONSchemaStore
