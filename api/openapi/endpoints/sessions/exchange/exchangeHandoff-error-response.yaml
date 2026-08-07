@@ -5,29 +5,35 @@ content:
     schema:
       oneOf:
         - $ref: '../../../components/schemas/errors/att-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-not_found.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid_tknid.yaml'
+        - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/sess-exchange_conflict.yaml'
         - $ref: '../../../components/schemas/errors/sess-invalid_handoff_token.yaml'
         - $ref: '../../../components/schemas/errors/sess-invalid_ttl.yaml'
         - $ref: '../../../components/schemas/errors/sess-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/sess-token_creation_failed.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
       discriminator:
         propertyName: code
         mapping:
           att.not_found: '../../../components/schemas/errors/att-not_found.yaml'
+          auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           enc_key.decrypt_failed: '../../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.not_found: '../../../components/schemas/errors/enc_key-not_found.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           tkn.invalid_tknid: '../../../components/schemas/errors/tkn-invalid_tknid.yaml'
+          req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           sess.exchange_conflict: '../../../components/schemas/errors/sess-exchange_conflict.yaml'
           sess.invalid_handoff_token: '../../../components/schemas/errors/sess-invalid_handoff_token.yaml'
           sess.invalid_ttl: '../../../components/schemas/errors/sess-invalid_ttl.yaml'
           sess.not_found: '../../../components/schemas/errors/sess-not_found.yaml'
+          sess.token_creation_failed: '../../../components/schemas/errors/sess-token_creation_failed.yaml'
           enc_key.unknown_alg: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
     examples:
       att.not_found:
@@ -35,6 +41,11 @@ content:
         value:
           code: att.not_found
           message: 'The auth attempt was not found.'
+      auth.unauthorized:
+        summary: auth.unauthorized
+        value:
+          code: auth.unauthorized
+          message: 'The request lacks valid authentication credentials.'
       enc_key.decrypt_failed:
         summary: enc_key.decrypt_failed
         value:
@@ -60,6 +71,11 @@ content:
         value:
           code: tkn.invalid_tknid
           message: 'token identifiers do not match token type'
+      req.invalid:
+        summary: req.invalid
+        value:
+          code: req.invalid
+          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
       sess.exchange_conflict:
         summary: sess.exchange_conflict
         value:
@@ -80,6 +96,11 @@ content:
         value:
           code: sess.not_found
           message: 'The session was not found'
+      sess.token_creation_failed:
+        summary: sess.token_creation_failed
+        value:
+          code: sess.token_creation_failed
+          message: 'The session token could not be created'
       enc_key.unknown_alg:
         summary: enc_key.unknown_alg
         value:

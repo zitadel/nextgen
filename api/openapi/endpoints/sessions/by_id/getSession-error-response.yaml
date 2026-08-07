@@ -4,21 +4,42 @@ content:
   application/json:
     schema:
       oneOf:
+        - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
+        - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/sess-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/sess-permission_denied.yaml'
       discriminator:
         propertyName: code
         mapping:
+          auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
+          req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           sess.not_found: '../../../components/schemas/errors/sess-not_found.yaml'
+          sess.permission_denied: '../../../components/schemas/errors/sess-permission_denied.yaml'
     examples:
+      auth.unauthorized:
+        summary: auth.unauthorized
+        value:
+          code: auth.unauthorized
+          message: 'The request lacks valid authentication credentials.'
       internal:
         summary: internal
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      req.invalid:
+        summary: req.invalid
+        value:
+          code: req.invalid
+          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
       sess.not_found:
         summary: sess.not_found
         value:
           code: sess.not_found
           message: 'The session was not found'
+      sess.permission_denied:
+        summary: sess.permission_denied
+        value:
+          code: sess.permission_denied
+          message: 'session: requires a session scope bound to the project'

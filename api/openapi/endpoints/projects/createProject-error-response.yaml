@@ -4,6 +4,7 @@ content:
   application/json:
     schema:
       oneOf:
+        - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-not_found.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
@@ -11,10 +12,12 @@ content:
         - $ref: '../../components/schemas/errors/sch-invalid_request.yaml'
         - $ref: '../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../components/schemas/errors/proj-name_invalid.yaml'
+        - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
       discriminator:
         propertyName: code
         mapping:
+          auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
           enc_key.decrypt_failed: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.not_found: '../../components/schemas/errors/enc_key-not_found.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
@@ -22,8 +25,14 @@ content:
           sch.invalid_request: '../../components/schemas/errors/sch-invalid_request.yaml'
           not_implemented: '../../components/schemas/errors/not_implemented.yaml'
           proj.name_invalid: '../../components/schemas/errors/proj-name_invalid.yaml'
+          req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
     examples:
+      auth.unauthorized:
+        summary: auth.unauthorized
+        value:
+          code: auth.unauthorized
+          message: 'The request lacks valid authentication credentials.'
       enc_key.decrypt_failed:
         summary: enc_key.decrypt_failed
         value:
@@ -59,6 +68,11 @@ content:
         value:
           code: proj.name_invalid
           message: 'The project name is invalid. Expected a non-empty string.'
+      req.invalid:
+        summary: req.invalid
+        value:
+          code: req.invalid
+          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
       enc_key.unknown_alg:
         summary: enc_key.unknown_alg
         value:

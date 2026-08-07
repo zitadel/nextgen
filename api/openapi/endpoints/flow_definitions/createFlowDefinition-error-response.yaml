@@ -4,20 +4,33 @@ content:
   application/json:
     schema:
       oneOf:
+        - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../components/schemas/errors/flowdef-already_exists.yaml'
         - $ref: '../../components/schemas/errors/flowdef-invalid.yaml'
+        - $ref: '../../components/schemas/errors/flowdef-not_found.yaml'
+        - $ref: '../../components/schemas/errors/flowdef-permission_denied.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/sch-not_found.yaml'
+        - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/flowdef-schema_fetch_failed.yaml'
       discriminator:
         propertyName: code
         mapping:
+          auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
           flowdef.already_exists: '../../components/schemas/errors/flowdef-already_exists.yaml'
           flowdef.invalid: '../../components/schemas/errors/flowdef-invalid.yaml'
+          flowdef.not_found: '../../components/schemas/errors/flowdef-not_found.yaml'
+          flowdef.permission_denied: '../../components/schemas/errors/flowdef-permission_denied.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           sch.not_found: '../../components/schemas/errors/sch-not_found.yaml'
+          req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           flowdef.schema_fetch_failed: '../../components/schemas/errors/flowdef-schema_fetch_failed.yaml'
     examples:
+      auth.unauthorized:
+        summary: auth.unauthorized
+        value:
+          code: auth.unauthorized
+          message: 'The request lacks valid authentication credentials.'
       flowdef.already_exists:
         summary: flowdef.already_exists
         value:
@@ -28,6 +41,16 @@ content:
         value:
           code: flowdef.invalid
           message: 'flow definition: invalid'
+      flowdef.not_found:
+        summary: flowdef.not_found
+        value:
+          code: flowdef.not_found
+          message: 'flow definition: not found'
+      flowdef.permission_denied:
+        summary: flowdef.permission_denied
+        value:
+          code: flowdef.permission_denied
+          message: 'flow definition: the flow definition management API requires the project secret'
       internal:
         summary: internal
         value:
@@ -38,6 +61,11 @@ content:
         value:
           code: sch.not_found
           message: 'schema not found'
+      req.invalid:
+        summary: req.invalid
+        value:
+          code: req.invalid
+          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
       flowdef.schema_fetch_failed:
         summary: flowdef.schema_fetch_failed
         value:

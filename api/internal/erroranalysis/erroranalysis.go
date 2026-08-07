@@ -43,6 +43,8 @@ package erroranalysis
 import (
 	"fmt"
 	"go/ast"
+	"go/constant"
+	"go/token"
 	"go/types"
 	"sort"
 	"strings"
@@ -75,6 +77,18 @@ type Config struct {
 	InterfaceSuffix string
 	// EntryPkgPath is the package holding the entry-point interfaces.
 	EntryPkgPath string
+	// HandlerPkgPath and HandlerTypeName add the API handler's methods as
+	// entry points in their own right, keyed "<HandlerTypeName>.<Method>".
+	//
+	// An operation's error set is not the union of the services its handler
+	// calls: the handler raises errors of its own before it reaches them, and
+	// the authorization guards are the loudest example — a request for a
+	// project the token is not bound to never touches a service, yet answers
+	// with that resource's not-found or permission-denied. Analyzing the
+	// handler itself picks those up, and reaches the services through the same
+	// call graph walk, so the handler set subsumes the service union.
+	HandlerPkgPath  string
+	HandlerTypeName string
 }
 
 func (c *Config) withDefaults() {
@@ -92,6 +106,12 @@ func (c *Config) withDefaults() {
 	}
 	if c.InterfaceSuffix == "" {
 		c.InterfaceSuffix = "Service"
+	}
+	if c.HandlerPkgPath == "" {
+		c.HandlerPkgPath = "github.com/zitadel/nextgen/internal/api"
+	}
+	if c.HandlerTypeName == "" {
+		c.HandlerTypeName = "Handler"
 	}
 }
 
@@ -127,11 +147,22 @@ type funcInfo struct {
 	decl *ast.FuncDecl
 }
 
+// varInit is a package-level variable's initializer, kept with the package that
+// declares it so the expression can be typed in its own TypesInfo.
+type varInit struct {
+	pkg  *packages.Package
+	expr ast.Expr
+}
+
 type analyzer struct {
 	cfg Config
 
 	pkgs  []*packages.Package
 	funcs map[*types.Func]*funcInfo
+	// vars indexes package-level variable initializers, so an argument naming a
+	// var (requireProjectAccess(..., flowDefinitionAccess, ...)) can be resolved
+	// to the composite literal that defines its func-typed fields.
+	vars map[*types.Var]varInit
 
 	// concrete holds every non-generic named type (and its pointer) declared
 	// in the module, used to resolve interface dispatch.
@@ -156,6 +187,7 @@ func newAnalyzer(cfg Config) (*analyzer, error) {
 	a := &analyzer{
 		cfg:       cfg,
 		funcs:     map[*types.Func]*funcInfo{},
+		vars:      map[*types.Var]varInit{},
 		implCache: map[*types.Interface][]types.Type{},
 		cache:     map[string]codeSet{},
 		active:    map[string]bool{},
@@ -177,8 +209,34 @@ func newAnalyzer(cfg Config) (*analyzer, error) {
 	for _, p := range a.pkgs {
 		a.indexFuncs(p)
 		a.indexTypes(p)
+		a.indexVars(p)
 	}
 	return a, nil
+}
+
+// indexVars records the initializer of every package-level variable. Only the
+// one-name-one-value form is indexed; grouped or multi-value specs carry no
+// composite literal this analysis can key a field on.
+func (a *analyzer) indexVars(p *packages.Package) {
+	for _, file := range p.Syntax {
+		for _, decl := range file.Decls {
+			gd, ok := decl.(*ast.GenDecl)
+			if !ok || gd.Tok != token.VAR {
+				continue
+			}
+			for _, spec := range gd.Specs {
+				vs, ok := spec.(*ast.ValueSpec)
+				if !ok || len(vs.Names) != len(vs.Values) {
+					continue
+				}
+				for i, name := range vs.Names {
+					if v, _ := p.TypesInfo.Defs[name].(*types.Var); v != nil {
+						a.vars[v] = varInit{pkg: p, expr: vs.Values[i]}
+					}
+				}
+			}
+		}
+	}
 }
 
 // indexable keeps in-module, non-generated packages. Generated mocks implement
@@ -262,7 +320,52 @@ func (a *analyzer) run() (map[string]Method, error) {
 			}
 		}
 	}
+
+	for _, m := range a.analyzeHandler() {
+		out[m.Key()] = m
+	}
 	return out, nil
+}
+
+// analyzeHandler treats each exported method on the API handler type as an
+// entry point, so errors the handler raises before (or instead of) calling a
+// service are attributed to the operation.
+func (a *analyzer) analyzeHandler() []Method {
+	for _, p := range a.pkgs {
+		if p.PkgPath != a.cfg.HandlerPkgPath {
+			continue
+		}
+		tn, ok := p.Types.Scope().Lookup(a.cfg.HandlerTypeName).(*types.TypeName)
+		if !ok {
+			return nil
+		}
+		named, ok := tn.Type().(*types.Named)
+		if !ok {
+			return nil
+		}
+
+		// Handler methods are declared on the value receiver in some files and
+		// the pointer in others; the pointer's method set covers both.
+		ptr := types.NewPointer(named)
+		mset := types.NewMethodSet(ptr)
+
+		methods := make([]Method, 0, mset.Len())
+		for i := range mset.Len() {
+			fn, _ := mset.At(i).Obj().(*types.Func)
+			if fn == nil || !fn.Exported() {
+				continue
+			}
+			info := a.funcs[fn.Origin()]
+			methods = append(methods, Method{
+				Interface:     a.cfg.HandlerTypeName,
+				Name:          fn.Name(),
+				Errors:        a.funcErrors(fn, nil, 0).sorted(),
+				Unimplemented: info == nil,
+			})
+		}
+		return methods
+	}
+	return nil
 }
 
 func (a *analyzer) analyzeInterface(name string, iface *types.Interface) []Method {
@@ -323,11 +426,26 @@ func lookupMethod(recv types.Type, want *types.Func) *types.Func {
 // ---- Bindings ---------------------------------------------------------------
 
 // binding is what a call site knows about one parameter: the concrete types it
-// may hold (for interface-typed parameters) and the error codes it may carry
-// (for error-typed parameters, so pass-through helpers stay transparent).
+// may hold (for interface-typed parameters), the error codes it may carry (for
+// error-typed parameters, so pass-through helpers stay transparent), and the
+// error codes reachable through each of its func-typed struct fields.
 type binding struct {
 	types []types.Type
 	codes codeSet
+	// fields carries, per func-typed struct field, the codes calling that field
+	// can raise. A call through a field value (res.readMiss()) selects a
+	// *types.Var, not a *types.Func, so there is nothing for callee to resolve
+	// and the callee body alone is opaque. The call site knows which composite
+	// literal was passed, so it resolves the field values there and hands the
+	// result down — the same call-site-sensitivity that binds concrete types to
+	// interface-typed parameters, applied to a struct of function values.
+	fields map[string]codeSet
+	// konst is the constant the parameter was called with, when the call site
+	// passed one. It exists so a guard that selects its answer from a mode
+	// parameter (if op == opWrite { return res.writeMiss() }) reports only the
+	// branch this operation actually takes, instead of every resource error the
+	// guard could raise for some other caller.
+	konst constant.Value
 }
 
 type bindings map[*types.Var]*binding
@@ -351,7 +469,22 @@ func (b bindings) key() string {
 			names = append(names, t.String())
 		}
 		sort.Strings(names)
-		parts = append(parts, v.Name()+"="+strings.Join(names, "|")+"/"+strings.Join(bd.codes.sorted(), "|"))
+
+		fields := make([]string, 0, len(bd.fields))
+		for name, codes := range bd.fields {
+			fields = append(fields, name+":"+strings.Join(codes.sorted(), "+"))
+		}
+		sort.Strings(fields)
+
+		konst := ""
+		if bd.konst != nil {
+			konst = bd.konst.ExactString()
+		}
+
+		parts = append(parts, v.Name()+"="+strings.Join(names, "|")+
+			"/"+strings.Join(bd.codes.sorted(), "|")+
+			"/"+strings.Join(fields, "|")+
+			"/"+konst)
 	}
 	sort.Strings(parts)
 	return strings.Join(parts, ";")

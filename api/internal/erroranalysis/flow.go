@@ -2,10 +2,13 @@ package erroranalysis
 
 import (
 	"go/ast"
+	"go/constant"
 	"go/token"
 	"go/types"
 	"strconv"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 )
 
 // funcErrors returns the domain error constructors fn can return, analyzed
@@ -46,6 +49,12 @@ func (a *analyzer) funcErrors(fn *types.Func, b bindings, depth int) codeSet {
 		}
 		if len(bd.codes) > 0 {
 			f.varSet(v).union(bd.codes)
+		}
+		if len(bd.fields) > 0 {
+			f.fieldEnv[v] = bd.fields
+		}
+		if bd.konst != nil {
+			f.constEnv[v] = bd.konst
 		}
 	}
 
@@ -105,17 +114,25 @@ type frame struct {
 
 	env  map[*types.Var][]types.Type
 	vars map[*types.Var]codeSet
-	out  codeSet
+	// fieldEnv holds, per struct-typed variable, the codes reachable through
+	// each of its func-typed fields, as resolved by the call site.
+	fieldEnv map[*types.Var]map[string]codeSet
+	// constEnv holds the constant a parameter was called with, used to decide
+	// comparisons against it without walking the branch that cannot run.
+	constEnv map[*types.Var]constant.Value
+	out      codeSet
 }
 
 func newFrame(a *analyzer, info *funcInfo, depth int) *frame {
 	return &frame{
-		a:     a,
-		info:  info,
-		depth: depth,
-		env:   map[*types.Var][]types.Type{},
-		vars:  map[*types.Var]codeSet{},
-		out:   codeSet{},
+		a:        a,
+		info:     info,
+		depth:    depth,
+		env:      map[*types.Var][]types.Type{},
+		vars:     map[*types.Var]codeSet{},
+		fieldEnv: map[*types.Var]map[string]codeSet{},
+		constEnv: map[*types.Var]constant.Value{},
+		out:      codeSet{},
 	}
 }
 
@@ -123,12 +140,14 @@ func newFrame(a *analyzer, info *funcInfo, depth int) *frame {
 // captures, but collects its own returns.
 func (f *frame) nested() *frame {
 	return &frame{
-		a:     f.a,
-		info:  f.info,
-		depth: f.depth + 1,
-		env:   f.env,
-		vars:  f.vars,
-		out:   codeSet{},
+		a:        f.a,
+		info:     f.info,
+		depth:    f.depth + 1,
+		env:      f.env,
+		vars:     f.vars,
+		fieldEnv: f.fieldEnv,
+		constEnv: f.constEnv,
+		out:      codeSet{},
 	}
 }
 
@@ -213,8 +232,18 @@ func (f *frame) walkStmt(stmt ast.Stmt, sig *types.Signature, out codeSet) bool 
 
 	case *ast.IfStmt:
 		mark(f.walkStmt(s.Init, sig, out))
-		mark(f.walkStmt(s.Body, sig, out))
-		mark(f.walkStmt(s.Else, sig, out))
+		// A guard that branches on a mode parameter the call site pinned to a
+		// constant only reaches one side. Walking both would credit this
+		// operation with the errors of every other caller's mode.
+		switch f.condValue(s.Cond) {
+		case condTrue:
+			mark(f.walkStmt(s.Body, sig, out))
+		case condFalse:
+			mark(f.walkStmt(s.Else, sig, out))
+		default:
+			mark(f.walkStmt(s.Body, sig, out))
+			mark(f.walkStmt(s.Else, sig, out))
+		}
 
 	case *ast.ForStmt:
 		mark(f.walkStmt(s.Init, sig, out))
@@ -436,6 +465,9 @@ func (f *frame) callErrors(call *ast.CallExpr) codeSet {
 
 	fn, recv := f.callee(call)
 	if fn == nil {
+		// Not a resolvable function: it may still be a call through a func-typed
+		// struct field the call site bound for us.
+		codes.union(f.fieldCallCodes(call))
 		return codes
 	}
 
@@ -592,11 +624,19 @@ func (f *frame) calleeBindings(fn *types.Func, call *ast.CallExpr) bindings {
 					bd.codes.union(codes)
 				}
 			}
+			if _, isStruct := deref(elem).Underlying().(*types.Struct); isStruct {
+				if fields := f.funcFieldCodes(arg); len(fields) > 0 {
+					out.get(param).fields = fields
+				}
+			}
+			if konst, ok := f.constValue(arg); ok && len(group) == 1 {
+				out.get(param).konst = konst
+			}
 		}
 	}
 
 	for v, bd := range out {
-		if len(bd.types) == 0 && len(bd.codes) == 0 {
+		if len(bd.types) == 0 && len(bd.codes) == 0 && len(bd.fields) == 0 && bd.konst == nil {
 			delete(out, v)
 		}
 	}
@@ -618,6 +658,157 @@ func (f *frame) funcLitErrors(lit *ast.FuncLit) codeSet {
 		}
 	}
 	return sub.out
+}
+
+// condResult is how much a condition could be decided before walking it.
+type condResult int
+
+const (
+	condUnknown condResult = iota
+	condTrue
+	condFalse
+)
+
+// condValue decides an == or != comparison when one side is a parameter the
+// call site bound to a constant and the other is a constant expression.
+// Anything else stays unknown, and both branches are walked as before.
+func (f *frame) condValue(cond ast.Expr) condResult {
+	bin, ok := unparen(cond).(*ast.BinaryExpr)
+	if !ok || (bin.Op != token.EQL && bin.Op != token.NEQ) {
+		return condUnknown
+	}
+
+	left, okL := f.constValue(bin.X)
+	right, okR := f.constValue(bin.Y)
+	if !okL || !okR {
+		return condUnknown
+	}
+
+	equal := constant.Compare(left, token.EQL, right)
+	if bin.Op == token.NEQ {
+		equal = !equal
+	}
+	if equal {
+		return condTrue
+	}
+	return condFalse
+}
+
+// constValue reads an expression's constant value: either the literal constant
+// the type checker folded, or the one bound to a parameter at the call site.
+func (f *frame) constValue(e ast.Expr) (constant.Value, bool) {
+	if v := f.object(e); v != nil {
+		if bound, ok := f.constEnv[v]; ok && bound != nil {
+			return bound, true
+		}
+	}
+	if tv, ok := f.info_().Types[unparen(e)]; ok && tv.Value != nil {
+		return tv.Value, true
+	}
+	return nil, false
+}
+
+// fieldCallCodes resolves a call made through a func-typed struct field
+// (res.readMiss()) using the binding its call site supplied. Without a binding
+// there is nothing to resolve: the field's value is chosen by whoever built the
+// struct, not by the function being analyzed.
+func (f *frame) fieldCallCodes(call *ast.CallExpr) codeSet {
+	sel, ok := unparen(call.Fun).(*ast.SelectorExpr)
+	if !ok {
+		return nil
+	}
+	v := f.object(sel.X)
+	if v == nil {
+		return nil
+	}
+	return f.fieldEnv[v][sel.Sel.Name]
+}
+
+// funcFieldCodes resolves arg to a struct composite literal and returns, per
+// func-typed field, the codes calling that field can raise. Both forms the
+// access rows use are handled: a bare constructor reference
+// (readMiss: domain.ErrUserNotFound) and a literal that decorates one
+// (writeMiss: func() domain.Error { return domain.ErrUserInvalid()... }).
+func (f *frame) funcFieldCodes(arg ast.Expr) map[string]codeSet {
+	pkg, lit := f.compositeLit(arg)
+	if lit == nil {
+		return nil
+	}
+
+	out := map[string]codeSet{}
+	for _, elt := range lit.Elts {
+		kv, ok := elt.(*ast.KeyValueExpr)
+		if !ok {
+			continue
+		}
+		key, ok := kv.Key.(*ast.Ident)
+		if !ok {
+			continue
+		}
+		if codes := f.a.funcValueCodes(pkg, kv.Value, f.depth+1); len(codes) > 0 {
+			out[key.Name] = codes
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// compositeLit resolves an expression to the struct literal behind it, either
+// written inline or held by a package-level variable, along with the package
+// whose type info types it.
+func (f *frame) compositeLit(arg ast.Expr) (*packages.Package, *ast.CompositeLit) {
+	switch e := unparen(arg).(type) {
+	case *ast.CompositeLit:
+		return f.info.pkg, e
+	case *ast.Ident:
+		v, _ := f.info_().Uses[e].(*types.Var)
+		if v == nil {
+			return nil, nil
+		}
+		init, ok := f.a.vars[v]
+		if !ok {
+			return nil, nil
+		}
+		lit, _ := unparen(init.expr).(*ast.CompositeLit)
+		return init.pkg, lit
+	}
+	return nil, nil
+}
+
+// funcValueCodes evaluates a func-valued expression — a reference to a function
+// or a literal — to the error codes calling it can raise.
+func (a *analyzer) funcValueCodes(pkg *packages.Package, expr ast.Expr, depth int) codeSet {
+	if pkg == nil || depth > maxDepth {
+		return nil
+	}
+
+	if lit, ok := unparen(expr).(*ast.FuncLit); ok {
+		f := &frame{
+			a:        a,
+			info:     &funcInfo{pkg: pkg},
+			depth:    depth,
+			env:      map[*types.Var][]types.Type{},
+			vars:     map[*types.Var]codeSet{},
+			fieldEnv: map[*types.Var]map[string]codeSet{},
+			constEnv: map[*types.Var]constant.Value{},
+			out:      codeSet{},
+		}
+		return f.funcLitErrors(lit)
+	}
+
+	var fn *types.Func
+	switch e := unparen(expr).(type) {
+	case *ast.Ident:
+		fn, _ = pkg.TypesInfo.Uses[e].(*types.Func)
+	case *ast.SelectorExpr:
+		fn, _ = pkg.TypesInfo.Uses[e.Sel].(*types.Func)
+	}
+	if fn == nil {
+		return nil
+	}
+	return a.funcErrors(fn, nil, depth)
 }
 
 // wrappedErrors recognizes the wrapping constructors and returns the arguments

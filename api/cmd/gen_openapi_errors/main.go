@@ -136,28 +136,48 @@ func main() {
 
 	// Step 4: Generate error response files for each endpoint
 	for _, endpoint := range endpoints {
-		serviceMethods, ok := serviceMethodByOperation[endpoint.operationID]
-		if !ok {
+		var errFuncs []string
+		addErrFuncs := func(codes []string) {
+			for _, errFunc := range codes {
+				if !slices.Contains(errFuncs, errFunc) {
+					errFuncs = append(errFuncs, errFunc)
+				}
+			}
+		}
+
+		// The handler method is the real entry point: it raises errors of its
+		// own — the authorization guard answers a foreign project with the
+		// resource's not-found before any service is reached — and the walk
+		// follows it into whatever services it calls.
+		//
+		// The reflected service union below is kept as a floor rather than
+		// replaced. It only sees interface-typed handler fields, so it is the
+		// narrower of the two, but unioning guarantees no operation advertises
+		// less than it did before the handler walk existed: a spec that lists
+		// an error the server never sends is harmless, while one that omits an
+		// error it does send makes the generated client fail to decode it.
+		handlerKey := "Handler." + operationIDToHandlerMethod(endpoint.operationID)
+		handlerMethod, hasHandler := allMethods[handlerKey]
+		if hasHandler {
+			addErrFuncs(handlerMethod.errorFuncs)
+		}
+
+		// Operations whose handler could not be analyzed still fall back to the
+		// union of the services it was reflected as calling.
+		serviceMethods, hasServices := serviceMethodByOperation[endpoint.operationID]
+		if !hasHandler && !hasServices {
 			fmt.Printf("⚠️  No reflected service mapping for %s (%s), skipping\n", endpoint.operationID, endpoint.yamlPath)
 			continue
 		}
-
-		// A handler may call several services — createSession mints a crypter
-		// before creating the session — and can surface an error from any of
-		// them, so the operation advertises the union.
-		var errFuncs []string
 		for _, serviceMethod := range serviceMethods {
 			method, ok := allMethods[serviceMethod]
 			if !ok {
 				fmt.Printf("⚠️  Service method %s not found, skipping it for %s\n", serviceMethod, endpoint.operationID)
 				continue
 			}
-			for _, errFunc := range method.errorFuncs {
-				if !slices.Contains(errFuncs, errFunc) {
-					errFuncs = append(errFuncs, errFunc)
-				}
-			}
+			addErrFuncs(method.errorFuncs)
 		}
+		addErrFuncs(transportErrors)
 		sort.Strings(errFuncs)
 
 		// Convert error functions to error codes using the auto-discovered mapping
@@ -631,6 +651,27 @@ type serviceMethod struct {
 // surfaces as `internal` on any endpoint. The service-level analysis cannot see
 // that — it is a property of the HTTP boundary — so it is added here.
 var boundaryErrors = []string{"domain.ErrInternal"}
+
+// transportErrors are raised by OgenErrorHandler for a request that never
+// reaches a handler at all, so no walk of the handler call graph can see them:
+//
+//   - a failed security requirement is rejected by the generated middleware
+//     before dispatch, as auth.unauthorized;
+//   - a request whose params or body will not decode is rejected the same way,
+//     as req.invalid.
+//
+// Omitting one is not cosmetic: the generated client discriminates the error
+// response on `code`, so a code missing from an operation's oneOf makes a real
+// response fail to decode instead of surfacing as the error it is.
+//
+// Unlike boundaryErrors these are added per operation rather than per service
+// method, because they are the transport's to raise, not the service's. Folding
+// them into the service sets would report every hand-written "errors:" comment
+// as drifted for omitting something no service can return.
+var transportErrors = []string{
+	"domain.ErrAuthUnauthorized",
+	"domain.ErrRequestInvalid",
+}
 
 // methodErrorsFromAnalysis adapts the inferred error sets to the shape the
 // generation loop consumes.

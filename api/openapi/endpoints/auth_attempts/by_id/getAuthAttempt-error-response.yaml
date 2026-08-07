@@ -5,20 +5,34 @@ content:
     schema:
       oneOf:
         - $ref: '../../../components/schemas/errors/att-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
+        - $ref: '../../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
         mapping:
           att.not_found: '../../../components/schemas/errors/att-not_found.yaml'
+          auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
+          req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
     examples:
       att.not_found:
         summary: att.not_found
         value:
           code: att.not_found
           message: 'The auth attempt was not found.'
+      auth.unauthorized:
+        summary: auth.unauthorized
+        value:
+          code: auth.unauthorized
+          message: 'The request lacks valid authentication credentials.'
       internal:
         summary: internal
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      req.invalid:
+        summary: req.invalid
+        value:
+          code: req.invalid
+          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'

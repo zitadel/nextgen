@@ -4,14 +4,27 @@ content:
   application/json:
     schema:
       oneOf:
+        - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/proj-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/proj-permission_denied.yaml'
+        - $ref: '../../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
         mapping:
+          auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          proj.not_found: '../../../components/schemas/errors/proj-not_found.yaml'
+          proj.permission_denied: '../../../components/schemas/errors/proj-permission_denied.yaml'
+          req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
     examples:
+      auth.unauthorized:
+        summary: auth.unauthorized
+        value:
+          code: auth.unauthorized
+          message: 'The request lacks valid authentication credentials.'
       internal:
         summary: internal
         value:
@@ -22,3 +35,18 @@ content:
         value:
           code: not_implemented
           message: 'This feature is not implemented yet.'
+      proj.not_found:
+        summary: proj.not_found
+        value:
+          code: proj.not_found
+          message: 'project not found'
+      proj.permission_denied:
+        summary: proj.permission_denied
+        value:
+          code: proj.permission_denied
+          message: 'the project management API requires the project secret'
+      req.invalid:
+        summary: req.invalid
+        value:
+          code: req.invalid
+          message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
