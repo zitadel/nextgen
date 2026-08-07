@@ -1,5 +1,6 @@
 ---
 "@zitadel/api": minor
+"@zitadel/server": patch
 ---
 
 Drop the OIDC/OAuth surface from the OpenAPI contract. The spec described
