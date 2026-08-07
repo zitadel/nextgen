@@ -14,10 +14,6 @@ type FakeSecuritySource struct {
 	Token  string
 	Scopes []string
 
-	Username string
-	Password string
-	Roles    []string
-
 	SessionToken string
 }
 
@@ -25,14 +21,6 @@ func (f FakeSecuritySource) OAuth2(ctx context.Context, operationName api.Operat
 	return api.OAuth2{
 		Token:  f.Token,
 		Scopes: f.Scopes,
-	}, nil
-}
-
-func (f FakeSecuritySource) UsernamePassword(ctx context.Context, operationName api.OperationName) (api.UsernamePassword, error) {
-	return api.UsernamePassword{
-		Username: f.Username,
-		Password: f.Password,
-		Roles:    f.Roles,
 	}, nil
 }
 
@@ -79,15 +67,6 @@ func (c *ApiClient) Token() string {
 }
 func (c *ApiClient) SetScopes(scopes []string) {
 	c.securitySource.Scopes = scopes
-}
-func (c *ApiClient) SetUsername(username string) {
-	c.securitySource.Username = username
-}
-func (c *ApiClient) SetPassword(password string) {
-	c.securitySource.Password = password
-}
-func (c *ApiClient) SetRoles(roles []string) {
-	c.securitySource.Roles = roles
 }
 func (c *ApiClient) SetSessionToken(token string) {
 	c.securitySource.SessionToken = token
