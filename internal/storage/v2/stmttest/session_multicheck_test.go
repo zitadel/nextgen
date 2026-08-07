@@ -4,6 +4,7 @@ package stmttest
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -43,6 +44,7 @@ func TestSessionStatements_List_LimitBoundsSessions(t *testing.T) {
 		for range 3 {
 			want = append(want, createTwoCheckSession(t, d.stmts, projectID, userID).ID)
 		}
+		slices.Sort(want)
 
 		list := func(cursor []byte) *database.ListResult[*domain.Session] {
 			result, err := d.stmts.ListSessions(t.Context(), &database.ListOptions[domain.SessionField]{
@@ -72,7 +74,9 @@ func TestSessionStatements_List_LimitBoundsSessions(t *testing.T) {
 			assert.Len(t, session.Factors, 2, "session %s must keep its complete factor list", session.ID)
 			got = append(got, session.ID)
 		}
-		assert.ElementsMatch(t, want, got, "every session must appear exactly once across all pages")
+		// Exact order, not ElementsMatch: the ORDER BY after the joins is
+		// otherwise unfenced.
+		assert.Equal(t, want, got, "pages must return every session exactly once, in ID order")
 	})
 }
 
