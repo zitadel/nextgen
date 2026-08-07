@@ -110,7 +110,7 @@ func createTwoCheckSession(t *testing.T, stmts service.AllStatements, projectID,
 // TestSessionStatements_List_LimitBoundsSessions pages three sessions that
 // carry two check rows each. The limit must bound sessions, not joined rows:
 // a limit on joined rows shrinks the page and withholds the cursor, making
-// the remaining sessions unreachable (issue 782).
+// the remaining sessions unreachable.
 func TestSessionStatements_List_LimitBoundsSessions(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
@@ -160,7 +160,7 @@ func TestSessionStatements_List_LimitBoundsSessions(t *testing.T) {
 
 // TestSessionStatements_List_LimitKeepsFactorsComplete lists a two-check
 // session with limit 1. A limit on joined rows would cut inside the session's
-// check rows and truncate its factor list (issue 782).
+// check rows and truncate its factor list.
 func TestSessionStatements_List_LimitKeepsFactorsComplete(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
