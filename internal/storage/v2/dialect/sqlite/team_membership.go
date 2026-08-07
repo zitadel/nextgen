@@ -94,11 +94,7 @@ func (s teamMembershipStatements) ListTeamMemberships(ctx context.Context, filte
 	}
 	var nextCursor []byte
 	if filter.Pagination.Limit > 0 && len(memberships) == int(filter.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.TeamMembershipField]{
-			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  teammembership.Schema.ValuesFrom(memberships[len(memberships)-1], filter.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
+		nextCursor = pagination.New(filter.Pagination.OrderBy, teammembership.Schema.ValuesFrom(memberships[len(memberships)-1], filter.Pagination.OrderBy.Columns)).Marshal()
 	}
 	return &database.ListResult[*domain.TeamMembership]{Items: memberships, NextCursor: nextCursor}, nil
 }
@@ -120,11 +116,7 @@ func (s teamMembershipStatements) ListUserTeams(ctx context.Context, filter *dat
 	}
 	var nextCursor []byte
 	if filter.Pagination.Limit > 0 && len(teams) == int(filter.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.UserTeamField]{
-			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  userteam.Schema.ValuesFrom(teams[len(teams)-1], filter.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
+		nextCursor = pagination.New(filter.Pagination.OrderBy, userteam.Schema.ValuesFrom(teams[len(teams)-1], filter.Pagination.OrderBy.Columns)).Marshal()
 	}
 	return &database.ListResult[*domain.UserTeam]{Items: teams, NextCursor: nextCursor}, nil
 }

@@ -92,11 +92,7 @@ func (ps userPasswordStatements) ListUserPasswords(ctx context.Context, filter *
 
 	var nextCursor []byte
 	if filter.Pagination.Limit > 0 && len(passwords) == int(filter.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.UserPasswordField]{
-			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  userpassword.Schema.ValuesFrom(passwords[len(passwords)-1], filter.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
+		nextCursor = pagination.New(filter.Pagination.OrderBy, userpassword.Schema.ValuesFrom(passwords[len(passwords)-1], filter.Pagination.OrderBy.Columns)).Marshal()
 	}
 
 	return &database.ListResult[*domain.UserPassword]{

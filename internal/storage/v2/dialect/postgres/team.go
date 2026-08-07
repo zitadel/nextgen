@@ -127,11 +127,7 @@ func (ts teamStatements) ListTeams(ctx context.Context, filter *database.ListOpt
 
 	var nextCursor []byte
 	if filter.Pagination.Limit > 0 && len(teams) == int(filter.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.TeamField]{
-			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  teamSchema.ValuesFrom(teams[len(teams)-1], filter.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
+		nextCursor = pagination.New(filter.Pagination.OrderBy, teamSchema.ValuesFrom(teams[len(teams)-1], filter.Pagination.OrderBy.Columns)).Marshal()
 	}
 
 	return &database.ListResult[*domain.Team]{

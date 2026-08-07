@@ -82,11 +82,7 @@ func (us userTOTPStatements) ListUserTOTPs(ctx context.Context, filter *database
 
 	var nextCursor []byte
 	if filter.Pagination.Limit > 0 && len(items) == int(filter.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.UserTOTPField]{
-			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  usertotp.Schema.ValuesFrom(items[len(items)-1], filter.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
+		nextCursor = pagination.New(filter.Pagination.OrderBy, usertotp.Schema.ValuesFrom(items[len(items)-1], filter.Pagination.OrderBy.Columns)).Marshal()
 	}
 
 	return &database.ListResult[*domain.UserTOTP]{

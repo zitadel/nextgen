@@ -248,6 +248,7 @@ func TestCompileReadCursorDesc(t *testing.T) {
 			database.Col(domain.ProjectFieldCreatedAt),
 			database.Col(domain.ProjectFieldID),
 		},
+		Direction: database.OrderDesc,
 		Values: []any{createdAt, "proj_1"},
 	}).Marshal()
 
@@ -335,6 +336,31 @@ func TestCompileReadCursorOrderMismatch(t *testing.T) {
 					database.Col(domain.ProjectFieldID),
 				},
 				Direction: database.OrderAsc,
+			},
+			Cursor: cursor,
+		},
+	}, projectSchema)
+	assertDatabaseErrorCode(t, err, "db.cursor_order_mismatch")
+}
+
+func TestCompileReadCursorDirectionMismatch(t *testing.T) {
+	t.Parallel()
+
+	createdAt := time.Date(2026, 6, 26, 10, 0, 0, 0, time.UTC)
+	cols := []database.Column[domain.ProjectField]{
+		database.Col(domain.ProjectFieldCreatedAt),
+		database.Col(domain.ProjectFieldID),
+	}
+	cursor := pagination.New(database.OrderBy[domain.ProjectField]{
+		Columns:   cols,
+		Direction: database.OrderAsc,
+	}, []any{createdAt, "proj_1"}).Marshal()
+
+	err := compileReadExpectError(t, testProjectQuery, &database.ListOptions[domain.ProjectField]{
+		Pagination: database.Page[domain.ProjectField]{
+			OrderBy: database.OrderBy[domain.ProjectField]{
+				Columns:   cols,
+				Direction: database.OrderDesc,
 			},
 			Cursor: cursor,
 		},

@@ -122,11 +122,7 @@ func (ts tokenStatements) ListTokens(ctx context.Context, filter *database.ListO
 	if filter.Pagination.Limit > 0 &&
 		len(tokens) == int(filter.Pagination.Limit) &&
 		len(filter.Pagination.OrderBy.Columns) > 0 {
-		cursor := &pagination.Cursor[domain.TokenField]{
-			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  tokenSchema.ValuesFrom(tokens[len(tokens)-1], filter.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
+		nextCursor = pagination.New(filter.Pagination.OrderBy, tokenSchema.ValuesFrom(tokens[len(tokens)-1], filter.Pagination.OrderBy.Columns)).Marshal()
 	}
 
 	return &database.ListResult[*domain.Token]{

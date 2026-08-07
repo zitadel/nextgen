@@ -129,11 +129,7 @@ func (s cryptoKeyStatements) ListEncryptionKeys(ctx context.Context, opts *datab
 
 	var nextCursor []byte
 	if opts.Pagination.Limit > 0 && len(keys) == int(opts.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.EncryptionKeyField]{
-			Columns: opts.Pagination.OrderBy.Columns,
-			Values:  encryptionKeySchema.ValuesFrom(keys[len(keys)-1], opts.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
+		nextCursor = pagination.New(opts.Pagination.OrderBy, encryptionKeySchema.ValuesFrom(keys[len(keys)-1], opts.Pagination.OrderBy.Columns)).Marshal()
 	}
 
 	return &database.ListResult[*domain.EncryptionKey]{

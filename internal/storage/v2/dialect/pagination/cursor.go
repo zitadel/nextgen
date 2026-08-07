@@ -12,8 +12,19 @@ type Cursor[F ~uint8] struct {
 	// Columns of the previous order by clause.
 	// They are used to determine if the [database.Page.OrderBy] has changed and if the cursor is still valid.
 	Columns []database.Column[F] `json:"columns"`
+	// Direction of the previous order by clause. A direction change invalidates the cursor.
+	Direction database.OrderDirection `json:"direction"`
 	// Values of the last row of the page. They are used to determine the next page of results.
 	Values []any `json:"values"`
+}
+
+// New builds a keyset cursor from the active OrderBy and the last row's sort values.
+func New[F ~uint8](orderBy database.OrderBy[F], values []any) *Cursor[F] {
+	return &Cursor[F]{
+		Columns:   orderBy.Columns,
+		Direction: orderBy.Direction,
+		Values:    values,
+	}
 }
 
 func CursorFromToken[F ~uint8](token []byte) (*Cursor[F], error) {
@@ -37,9 +48,13 @@ func (c *Cursor[F]) Marshal() []byte {
 	return []byte(base64.RawURLEncoding.EncodeToString(payload))
 }
 
-func (c *Cursor[F]) MatchesOrderBy(columns []database.Column[F]) bool {
-	if len(c.Columns) != len(columns) {
+// MatchesOrderBy reports whether the cursor was issued for the same columns and direction.
+func (c *Cursor[F]) MatchesOrderBy(orderBy database.OrderBy[F]) bool {
+	if c.Direction != orderBy.Direction {
 		return false
 	}
-	return slices.Equal(c.Columns, columns)
+	if len(c.Columns) != len(orderBy.Columns) {
+		return false
+	}
+	return slices.Equal(c.Columns, orderBy.Columns)
 }

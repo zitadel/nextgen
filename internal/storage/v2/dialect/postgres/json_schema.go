@@ -84,11 +84,7 @@ func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *data
 
 	var nextCursor []byte
 	if filter.Pagination.Limit > 0 && len(schemas) == int(filter.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.JSONSchemaField]{
-			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  jsonSchemaSchema.ValuesFrom(schemas[len(schemas)-1], filter.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
+		nextCursor = pagination.New(filter.Pagination.OrderBy, jsonSchemaSchema.ValuesFrom(schemas[len(schemas)-1], filter.Pagination.OrderBy.Columns)).Marshal()
 	}
 
 	return &database.ListResult[*domain.JSONSchema]{

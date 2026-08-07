@@ -84,11 +84,7 @@ func (s userRecoveryCodesStatements) ListUserRecoveryCodes(ctx context.Context, 
 
 	var nextCursor []byte
 	if filter.Pagination.Limit > 0 && len(items) == int(filter.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.UserRecoveryCodesField]{
-			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  userrecoverycodes.Schema.ValuesFrom(items[len(items)-1], filter.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
+		nextCursor = pagination.New(filter.Pagination.OrderBy, userrecoverycodes.Schema.ValuesFrom(items[len(items)-1], filter.Pagination.OrderBy.Columns)).Marshal()
 	}
 
 	return &database.ListResult[*domain.UserRecoveryCodes]{
