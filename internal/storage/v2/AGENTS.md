@@ -52,6 +52,36 @@ must use `withTransaction` so they:
 Calling `pool.Transaction` from a statement would use a different Postgres
 connection or nest Spanner RW transactions (forbidden).
 
+### Never flatten the cause of an error returned from a transaction
+
+Spanner aborts read-write transactions under concurrency, and
+`ReadWriteTransaction` retries them for you — but only while it can still find
+the gRPC status in the error your callback returns. It looks for a
+`*spanner.Error` or a `status.FromError` match; anything else it returns
+immediately, un-retried.
+
+So inside a transaction callback, always keep the cause in the chain:
+
+- `fmt.Errorf("...: %w", err)`, or `fmt.Errorf("%w: %w", sentinel, err)` when you
+  also need a domain sentinel to stay matchable.
+- `domain.Err…(err)` / `.WithParent(err)`, never a bare `domain.Err…()` when you
+  are holding a real cause.
+
+Writing `fmt.Errorf("%w: %v", sentinel, err)` strips the status off `err` and
+silently converts a retryable abort into a user-facing error. That was the cause
+of the CI flake in #788.
+
+For the same reason, a transaction callback must be **replayable**: a retry
+re-runs the whole closure, so keep it a pure function of state captured before
+the transaction opened.
+
+### These Spanner client methods do not retry ABORTED
+
+`ReadWriteTransaction`, `Apply` and `PartitionedUpdate` retry aborts internally.
+`BatchWrite` and `NewReadWriteStmtBasedTransaction` do **not** — they are
+caller-retried by design. Nothing uses them today; do not adopt one without
+writing the retry loop yourself.
+
 ### Reference
 
 Multi-write nesting uses the dialect `withTransaction` helpers above

@@ -261,8 +261,7 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 - Playwright Chromium install for `@zitadel/components`.
 - `moon ci :lint :typecheck :build :test :test-browser :check-adrs`.
 - `moon run server:test`, then `moon run server:test-postgres`,
-  `moon run server:test-spanner` (Spanner emulator testcontainer, or a
-  real instance when `SPANNER_TEST_INSTANCE` is set), and
+  `moon run server:test-spanner` (Spanner emulator testcontainer), and
   `moon run server:test-sqlite`.
 - `moon run release:snapshot -- --skip-container` — a non-publishing release
   snapshot.
@@ -333,20 +332,31 @@ Docker. Point them at a throwaway database — the suites run migrations that
 create the `zitadel_nextgen` schema.
 
 The Spanner emulator only supports one transaction at a time, so concurrent
-integration tests are flaky against it. `moon run server:test-spanner`
-therefore passes `-parallel 1 -p 1` whenever `ZITADEL_TEST_SPANNER_INSTANCE`
-is unset (the default for local/OSS contributors, which starts the emulator
-via testcontainers). To run against a real, long-lived Spanner test instance
-instead, set `ZITADEL_TEST_SPANNER_INSTANCE` to an instance path
-(`projects/<project>/instances/<instance>`). The suites then provision a
-uniquely named database on that instance before the run and drop it
-afterwards, and the Moon task keeps normal go test parallelism.
-Authentication uses Application Default Credentials — locally run
-`gcloud auth application-default login`. CI authenticates via Workload
-Identity Federation when `SPANNER_TEST_INSTANCE` is set, and labels the job
-step as emulator vs test instance accordingly. Precedence when multiple are
-set: `ZITADEL_TEST_SPANNER_INSTANCE` > `ZITADEL_TEST_SPANNER_URL` > emulator
-testcontainer.
+integration tests make it abort read-write transactions aggressively. That is
+deliberate and useful: Spanner aborts under concurrency in production too, and
+the emulator surfaces a missing retry immediately. The suite therefore runs at
+full parallelism against the emulator, and `TestTransactionContention` asserts
+that concurrent writers to one row all commit.
+
+If you see a raw `ABORTED` ("aborted due to another transaction getting
+priority"), do not serialize the tests and do not move them to a real instance —
+both hide the bug. It means something on that code path stripped the gRPC status
+off the error, so Spanner's `ReadWriteTransaction` stopped recognising it as
+retryable. See the error-wrapping rules in
+[internal/storage/v2/AGENTS.md](internal/storage/v2/AGENTS.md) and #788.
+
+To run against a Spanner you manage instead of the emulator testcontainer, set
+`ZITADEL_TEST_SPANNER_URL` to its DSN.
+
+`ZITADEL_TEST_SPANNER_INSTANCE` (an instance path,
+`projects/<project>/instances/<instance>`) still works and still provisions a
+uniquely named database per run, dropping it afterwards, authenticating via
+Application Default Credentials. Nothing sets it: CI is emulator-only on
+purpose, and this path is kept only so the real instance can be brought back
+quickly if the emulator turns out not to hold. Re-wiring is CI-side (restore the
+Workload Identity Federation auth step and set the variable); the Go side needs
+no change. Do not reach for it to make a failing test pass — that hides exactly
+the aborts these suites exist to catch. Removal is tracked in #793.
 
 ### Demo end-to-end suites
 
