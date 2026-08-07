@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -9,6 +10,8 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/ogenx"
 	"github.com/zitadel/nextgen/internal/domain"
+	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
+	"go.uber.org/mock/gomock"
 )
 
 func TestValidateSessionToken(t *testing.T) {
@@ -44,6 +47,34 @@ func TestInvalidSessionCredential(t *testing.T) {
 	require.Equal(t, sessionUnauthorizedMessage, err.Message)
 }
 
+// RevokeMySession is idempotent: logging out a session that is already gone
+// still returns 204 and clears the cookie, rather than surfacing a 404.
+func TestRevokeMySession_IdempotentWhenSessionGone(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	sessions := servicemocks.NewMockSessionService(ctrl)
+	sessions.EXPECT().
+		Get(gomock.Any(), gomock.Any()).
+		Return(nil, domain.ErrSessionNotFound())
+
+	h := Handler{sessionService: sessions}
+
+	sid := "sess_1"
+	ctx := context.WithValue(t.Context(), sessionTokenKey{}, &domain.Token{
+		Type:      domain.TokenTypeSessionToken,
+		ProjectID: "proj_1",
+		SessionID: &sid,
+		TokenID:   "tkn_1",
+	})
+
+	res, err := h.RevokeMySession(ctx)
+	require.NoError(t, err)
+	nc, ok := res.(*api.RevokeMySessionNoContent)
+	require.True(t, ok, "want 204 no-content, got %T", res)
+	require.NotEmpty(t, nc.SetCookie, "cookie should be cleared on idempotent logout")
+}
+
 func TestUserAgentToAPI(t *testing.T) {
 	t.Parallel()
 
@@ -68,6 +99,27 @@ func TestUserAgentToAPI(t *testing.T) {
 	data, err := json.Marshal(&ua)
 	require.NoError(t, err)
 	require.JSONEq(t, `{"fingerprint":"fp_abc123","ip":"203.0.113.42","browser":"test"}`, string(data))
+}
+
+func TestSessionStateToAPI(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name  string
+		state domain.SessionState
+		want  api.SessionResponseState
+	}{
+		{"unspecified", domain.SessionStateUnspecified, api.SessionResponseStateBuilding},
+		{"building", domain.SessionStateBuilding, api.SessionResponseStateBuilding},
+		{"active", domain.SessionStateActive, api.SessionResponseStateActive},
+		{"expired", domain.SessionStateExpired, api.SessionResponseStateExpired},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, tt.want, sessionStateToAPI(tt.state))
+		})
+	}
 }
 
 func TestExchangeInputFromRequest(t *testing.T) {

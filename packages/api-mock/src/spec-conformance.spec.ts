@@ -22,7 +22,7 @@
  * Endpoints covered structurally (orval emits no `*Response` zod for these
  * because they have no static response schema — POSTs that return only an
  * `id`, or out-of-spec routes):
- *   - POST /projects                    → { id, projectSecret, … }
+ *   - POST /projects                    → { id, project_secret, … }
  *   - POST /schemas                     → { id }
  *   - POST /flow_definitions            → flow detail envelope
  *
@@ -45,7 +45,7 @@ import {
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { signHandoffToken } from "./crypto.js";
-import { expireClaimChallenge } from "./platform-handlers.js";
+import { expireClaimChallenge, snapshotPlatformStore } from "./platform-handlers.js";
 import { PLATFORM_PROJECT_ID, startMockServer } from "./server.js";
 
 const PORT = 4456;
@@ -178,8 +178,8 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         name: "conformance-app",
-        previewOrigins: ["http://localhost:3000"],
-        seedDefaults: false,
+        preview_origins: ["http://localhost:3000"],
+        seed_defaults: false,
       }),
     });
     expect(res.status).toBe(201);
@@ -188,10 +188,10 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // structurally against the fields create-project-response.yaml requires.
     expect(typeof body.id).toBe("string");
     expect(body.name).toBe("conformance-app");
-    expect(typeof body.projectSecret).toBe("string");
-    expect(typeof body.previewSecret).toBe("string");
-    expect(Array.isArray(body.previewOrigins)).toBe(true);
-    expect(typeof body.createdAt).toBe("string");
+    expect(typeof body.project_secret).toBe("string");
+    expect(typeof body.preview_secret).toBe("string");
+    expect(Array.isArray(body.preview_origins)).toBe(true);
+    expect(typeof body.created_at).toBe("string");
   });
 
   test("GET /projects/:id matches GetProjectResponse", async () => {
@@ -394,8 +394,8 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
     });
-    const body = (await res.json()) as { id: string; projectSecret: string };
-    return { id: body.id, projectSecret: body.projectSecret };
+    const body = (await res.json()) as { id: string; project_secret: string };
+    return { id: body.id, projectSecret: body.project_secret };
   }
 
   async function initClaim(projectId: string, secret: string): Promise<Response> {
@@ -444,6 +444,17 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     expect(typeof body.challenge_id).toBe("string");
     expect(() => new URL(body.claim_url as string)).not.toThrow();
     expect(new Date(body.expires_at as string).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  test("the store snapshot exposes minted challenge ids", async () => {
+    // A test driving the mock over HTTP (the CLI suite) never sees the init
+    // response body, so the snapshot is its only route to the id the
+    // completion and expiry mutators take.
+    const project = await createProject("claim-snapshot");
+    const init = await initClaim(project.id, project.projectSecret);
+    const { challenge_id } = (await init.json()) as { challenge_id: string };
+
+    expect(snapshotPlatformStore().claimChallengeIds).toContain(challenge_id);
   });
 
   test("GET /projects/:id/claim/status is pending before completion", async () => {

@@ -255,7 +255,7 @@ function userMetadata(user: Record<string, unknown>): { status?: string; created
   const metadata = user.metadata;
   if (!metadata || typeof metadata !== "object") return {};
   const record = metadata as Record<string, unknown>;
-  return { status: field(record, "status"), createdAt: field(record, "createdAt") };
+  return { status: field(record, "status"), createdAt: field(record, "created_at") };
 }
 
 /**

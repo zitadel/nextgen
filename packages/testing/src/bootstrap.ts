@@ -42,13 +42,13 @@ export async function bootstrapProject(
   const unauthenticated = createZitadelClient({ baseUrl });
   const project = (await unauthenticated.createProject({
     name: options.projectName ?? DEFAULT_PROJECT_NAME,
-    previewOrigins: options.appOrigins ?? [],
-    seedDefaults: false,
+    preview_origins: options.appOrigins ?? [],
+    seed_defaults: false,
   } as Parameters<ZitadelClient["createProject"]>[0])) as Record<string, unknown>;
   const projectId = requireString(project.id, "project id");
-  const projectSecret = requireString(project.projectSecret, "project secret");
+  const projectSecret = requireString(project.project_secret, "project secret");
   const previewSecret =
-    typeof project.previewSecret === "string" ? project.previewSecret : undefined;
+    typeof project.preview_secret === "string" ? project.preview_secret : undefined;
 
   const client = createZitadelClient({ baseUrl, token: projectSecret });
 
