@@ -345,6 +345,15 @@ off the error, so Spanner's `ReadWriteTransaction` stopped recognising it as
 retryable. See the error-wrapping rules in
 [internal/storage/v2/AGENTS.md](internal/storage/v2/AGENTS.md) and #788.
 
+**On Apple Silicon, expect 7 pre-existing failures.** `emulator:latest` has a
+native arm64 build, and it does not round commit timestamps the way the amd64
+build CI runs does. Six subtests in `internal/storage/v2/stmttest` and
+`TestJSONSchemaStatements_CRUD` compare a `created_at` read back after a second
+statement and see tens of microseconds of drift. They are deterministic, they
+are not caused by parallelism, and they pass in CI. Ignore them, or run the
+emulator under `linux/amd64` emulation if you want a clean local run. If you
+touch timestamp handling, verify on CI rather than trusting a local pass.
+
 To run against a Spanner you manage instead of the emulator testcontainer, set
 `ZITADEL_TEST_SPANNER_URL` to its DSN.
 
