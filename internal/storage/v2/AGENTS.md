@@ -89,6 +89,14 @@ change: new statement methods, corrected error semantics (for example
 `NoRowFoundError`), and filter / cascade / uniqueness contracts that statements
 rely on. Assert through `service.AllStatements` only — no dialect SQL.
 
+**Cursor / keyset pagination:** the battle matrix lives in
+`stmttest/cursor_*.go` (harness + drain / adversarial / destructive packs).
+A new `List*` method must register an incarnation under
+`TestCursorBattle_DrainAllListIncarnations` (ASC+DESC drain and NextCursor
+emission at minimum). Nullable sort columns need an additional drain case;
+invalid/mismatched cursors and mid-page mutations are covered by the shared
+special suites for representative paths.
+
 Dialect packages keep **engine-specific** tests only: compiler SQL shape, error
 wrapping, `withTransaction` nesting, and migration/DDL smoke. Do not duplicate
 upward: if `stmttest` can assert the behavior, put it there — not a per-dialect
