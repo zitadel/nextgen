@@ -2,6 +2,7 @@ package spanner
 
 import (
 	"context"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	"github.com/zitadel/nextgen/internal/service"
@@ -40,15 +41,37 @@ func (c Client) Ping(ctx context.Context) error {
 
 // Transaction implements [service.Transactioner].
 //
-// Spanner ReadWriteTransaction automatically retries aborted transactions.
-// Callers should set a deadline on ctx to bound total retry time; without a
-// deadline a conflict loop can run indefinitely.
+// Spanner ReadWriteTransaction automatically retries aborted transactions, for
+// as long as ctx allows. [boundRetry] supplies a default deadline so a conflict
+// loop fails fast instead of spinning forever.
 func (c Client) Transaction(ctx context.Context, fn func(ctx context.Context, tx service.Statementer[service.AllStatements]) error) error {
+	ctx, cancel := boundRetry(ctx)
+	defer cancel()
+
 	_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, rwt *spanner.ReadWriteTransaction) error {
 		tx := newTransaction(rwt)
 		return fn(ctx, tx)
 	})
 	return wrapError(err)
+}
+
+// maxRetryDuration bounds how long a read-write transaction may keep retrying
+// aborts. ReadWriteTransaction retries ABORTED until ctx expires, so on a hot
+// row an unbounded transaction spins indefinitely and piles up goroutines
+// rather than surfacing a clear failure.
+//
+// One constant, not configuration. Turn it into a dialect option only
+// once a caller genuinely needs a different bound.
+const maxRetryDuration = 30 * time.Second
+
+// boundRetry applies maxRetryDuration when ctx carries no deadline of its own.
+// A caller that needs longer (or shorter) sets its own deadline and keeps it.
+// The returned cancel is always non-nil and safe to defer.
+func boundRetry(ctx context.Context) (context.Context, context.CancelFunc) {
+	if _, ok := ctx.Deadline(); ok {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, maxRetryDuration)
 }
 
 func (c Client) Statements() service.AllStatements {
