@@ -70,7 +70,13 @@
     "properties": {
       "type": "object",
       "description": "A map of additional properties for the user definition, where the key is the property name and the value is the property schema",
-      "additionalProperties": true
+      "propertyNames": {
+        "pattern": "^[^.]+$",
+        "description": "A nested value is stored under its dotted path, so a literal dot in a name would be indistinguishable from nesting."
+      },
+      "additionalProperties": {
+        "$ref": "user-property.json"
+      }
     }
   }
 }

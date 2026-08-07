@@ -106,6 +106,50 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			}`),
 		},
 		{
+			name: "dotted property name at the top level",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true, "position": 0 }
+				},
+				"properties": {
+					"address.street": { "type": "string" }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
+			// Two levels down, so it only fails if user-property.json
+			// recurses into its own `properties` map.
+			name: "dotted property name inside a nested object",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true, "position": 0 }
+				},
+				"properties": {
+					"address": {
+						"type": "object",
+						"properties": {
+							"geo": {
+								"type": "object",
+								"properties": {
+									"zip.code": { "type": "string" }
+								}
+							}
+						}
+					}
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
 			name: "missing metaSchema",
 			input: []byte(`{
 				"$id": "https://example.test/schemas/my-user.json",

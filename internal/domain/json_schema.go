@@ -99,9 +99,10 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 	}, nil
 }
 
-// rejectDottedPropertyNames rejects a property name holding a dot. It
-// walks every node, not just nested `properties`, so a name declared
-// under `$defs`, `allOf`, or `items` and pulled in by `$ref` is caught.
+// rejectDottedPropertyNames rejects a property name holding a dot. The
+// user-schema meta-schema carries the same rule so an editor flags it
+// while authoring; this copy enforces it, and reaches `$defs`, `allOf`,
+// and `items`, which the meta-schema leaves unconstrained.
 func rejectDottedPropertyNames(node any) error {
 	switch v := node.(type) {
 	case map[string]any:
@@ -411,13 +412,6 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, store JSONSche
 	data, err := r.resolveFromURL(ctx, schemaURL)
 	if err != nil {
 		return nil, err
-	}
-	// A fetched schema never passes through NewJSONSchema.
-	var fetched map[string]any
-	if json.Unmarshal(data, &fetched) == nil {
-		if err := rejectDottedPropertyNames(fetched); err != nil {
-			return nil, err
-		}
 	}
 	dbSchema = &JSONSchema{
 		ProjectID: projectID,

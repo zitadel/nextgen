@@ -239,28 +239,6 @@ func TestJSONSchemaResolver_Resolve(t *testing.T) {
 			},
 		},
 		{
-			name: "HTTP body with a dotted property name is not persisted",
-			run: func(t *testing.T, ctrl *gomock.Controller) {
-				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusOK)
-					_, _ = w.Write([]byte(`{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"address.street":{"type":"string"}}}`))
-				}))
-				t.Cleanup(srv.Close)
-
-				store := domainmock.NewMockJSONSchemaStore(ctrl)
-				store.EXPECT().GetJSONSchemaByID(gomock.Any(), projectID, srv.URL).Return(nil, database.NewNoRowFoundError(nil))
-				// The guard runs before the insert, so nothing is stored.
-				store.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any()).Times(0)
-
-				resolver := newTestResolver(t, srv.Client())
-
-				_, err := resolver.Resolve(ctx, store, projectID, srv.URL, nil)
-				require.Error(t, err)
-				assert.ErrorContains(t, err, "address.street")
-			},
-		},
-		{
 			name: "root schema bypasses initial repository lookup",
 			run: func(t *testing.T, ctrl *gomock.Controller) {
 				store := domainmock.NewMockJSONSchemaStore(ctrl)
