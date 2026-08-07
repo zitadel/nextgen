@@ -1,6 +1,8 @@
 package compiler
 
-import "github.com/zitadel/nextgen/internal/authz"
+import (
+	"github.com/zitadel/nextgen/internal/authz"
+)
 
 // Relation identifies one relation on one object type.
 type Relation struct {
