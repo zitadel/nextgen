@@ -247,6 +247,60 @@ func TestRequireProjectAccess(t *testing.T) {
 		})
 	}
 
+	// listUserTeams reads two resources at once, so neither read alone reaches
+	// it. The roster carries team names; user.read must not be a side door to
+	// them.
+	t.Run("user teams require both reads", func(t *testing.T) {
+		userOnly := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"user.read"},
+		})
+		teamOnly := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"team.read"},
+		})
+		both := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"user.read", "team.read"},
+		})
+
+		// user.read alone stops at the team read, and vice versa.
+		err := requireUserTeamsAccess(userOnly, "proj_a")
+		assertDomainCode(t, err, domain.ErrTeamPermissionDenied().Code)
+
+		err = requireUserTeamsAccess(teamOnly, "proj_a")
+		assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
+
+		if err := requireUserTeamsAccess(both, "proj_a"); err != nil {
+			t.Fatalf("both reads together must reach the roster: %v", err)
+		}
+
+		// The write scopes imply their reads, as everywhere else in this model.
+		writers := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"user.write", "team.write"},
+		})
+		if err := requireUserTeamsAccess(writers, "proj_a"); err != nil {
+			t.Fatalf("write scopes imply their reads: %v", err)
+		}
+
+		if err := requireUserTeamsAccess(operator, "proj_a"); err != nil {
+			t.Fatalf("project.write reaches both reads: %v", err)
+		}
+
+		// The preview secret reaches neither, and the user check answers first.
+		err = requireUserTeamsAccess(preview, "proj_a")
+		assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
+
+		// A foreign project answers with the endpoint's documented 404 rather
+		// than disclosing that the binding was also evaluated against teams.
+		err = requireUserTeamsAccess(operator, "proj_b")
+		assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+		err = requireUserTeamsAccess(context.Background(), "proj_a")
+		assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+	})
+
 	t.Run("team deletes are denied rather than missed", func(t *testing.T) {
 		err := requireTeamDelete(operator, "proj_b")
 		assertDomainCode(t, err, domain.ErrTeamPermissionDenied().Code)

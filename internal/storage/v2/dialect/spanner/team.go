@@ -61,17 +61,23 @@ func (ts teamStatements) CreateTeam(ctx context.Context, team *domain.Team) erro
 	if err := ensureManagedID(&team.ID, domain.PrefixTeam); err != nil {
 		return err
 	}
-	stmt := buildStatement(createTeamStmt, team.ProjectID, team.ID, team.Name).statement()
-	return ts.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
-		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			var status string
-			if err := row.Columns(&team.ProjectID, &team.ID, &team.Name, &status, &team.CreatedAt, &team.UpdatedAt); err != nil {
-				return struct{}{}, err
-			}
-			team.Status = domain.TeamStatus(status)
-			return struct{}{}, nil
-		})
-		return err
+	return withTransaction(ctx, ts.db, func(ctx context.Context, tx queryExecutor) error {
+		stmt := buildStatement(createTeamStmt, team.ProjectID, team.ID, team.Name).statement()
+		if err := tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+				var status string
+				if err := row.Columns(&team.ProjectID, &team.ID, &team.Name, &status, &team.CreatedAt, &team.UpdatedAt); err != nil {
+					return struct{}{}, err
+				}
+				team.Status = domain.TeamStatus(status)
+				return struct{}{}, nil
+			})
+			return err
+		}); err != nil {
+			return err
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.UpsertResourceScope(ctx, domain.NewTeamResourceScope(team.ProjectID, team.ID))
 	})
 }
 
@@ -163,7 +169,8 @@ func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id strin
 				return err
 			}
 		}
-		return nil
+		edges := newAuthzMembershipEdgeStatements(tx)
+		return edges.DeleteAuthzMembershipEdgesForTeamDeactivate(ctx, projectID, id)
 	})
 }
 

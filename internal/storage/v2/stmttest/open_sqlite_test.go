@@ -11,7 +11,14 @@ import (
 )
 
 func init() {
-	registerDialect("sqlite", dbtest.SQLite, func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error {
-		return sqlite.SeedProjectsTiedAt(ctx, pool, ids, createdAt)
-	})
+	registerDialect(
+		"sqlite",
+		dbtest.SQLite,
+		func(ctx context.Context, pool dbtest.Pool, ids []string, createdAt time.Time) error {
+			return sqlite.SeedProjectsTiedAt(ctx, pool, ids, createdAt)
+		},
+		func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error {
+			return sqlite.HardDeleteTeam(ctx, pool, projectID, teamID)
+		},
+	)
 }

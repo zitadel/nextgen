@@ -15,4 +15,5 @@ Integrates Zitadel auth into an Angular app.
 The SDK widgets call `/__nextgen/*` same-origin. In dev, `proxy.conf.cjs`
 forwards those to the backend and attaches the project service-key secret (read
 from `ZITADEL_PROJECT_SECRET` in `.env.local`) only to `POST /sessions/exchange`.
-Production needs `@zitadel/edge-proxy` in front.
+The production story is a platform rewrite plus the publishable key from ADR 036
+(`docs/adrs/036-api-credential-planes.md`), tracked in issue #560.

@@ -7,7 +7,7 @@ post:
     `session_id` is provided (for step-up / reauth on an existing session).
 
     The response contains an `id` field — the flow handle. Use it as the path
-    parameter for all subsequent `/flow/{id}/submit` and `/flow/{id}/event` calls.
+    parameter for all subsequent `/flow/{id}/submit` calls.
 
     The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
     the flow's orchestration state (current step, collected data, history).

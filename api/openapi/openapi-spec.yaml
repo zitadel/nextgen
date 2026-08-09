@@ -19,8 +19,6 @@ servers:
   #   description: Production API
 
 tags:
-  - name: Authorization
-    description: OIDC and OAuth discovery, authorization, token, keys, revoke, introspection, and user info endpoints.
   - name: System
     description: Health, liveness, and readiness endpoints.
   - name: Flows
@@ -43,24 +41,6 @@ tags:
     description: Branding revision publication and lookup endpoints for the login UI (layout, asset URLs, Liquid template).
 
 paths:
-  /.well-known/openid-configuration:
-    $ref: endpoints/.well-known/openid-configuration/methods.yaml
-  /auth/authorize:
-    $ref: endpoints/oauth/authorize/methods.yaml
-  /auth/device-authorization:
-    $ref: endpoints/oauth/device-authorization/methods.yaml
-  /auth/end-session:
-    $ref: endpoints/oauth/end-session/methods.yaml
-  /auth/introspect:
-    $ref: endpoints/oauth/introspect/methods.yaml
-  /auth/keys:
-    $ref: endpoints/oauth/keys/methods.yaml
-  /auth/revoke:
-    $ref: endpoints/oauth/revoke/methods.yaml
-  /auth/token:
-    $ref: endpoints/oauth/token/methods.yaml
-  /auth/userinfo:
-    $ref: endpoints/oauth/userinfo/methods.yaml
   /healthz:
     $ref: endpoints/healthz/methods.yaml
   /livez:
@@ -75,6 +55,8 @@ paths:
     $ref: endpoints/users/by_id/passkeys/methods.yaml
   /users/{user_id}/password:
     $ref: endpoints/users/by_id/password/methods.yaml
+  /users/{user_id}/teams:
+    $ref: endpoints/users/by_id/teams/methods.yaml
   /users/me:
     $ref: endpoints/users/me/methods.yaml
   /flow:
@@ -83,8 +65,6 @@ paths:
     $ref: endpoints/flow/session/methods.yaml
   /flow/{id}/submit:
     $ref: endpoints/flow/submit/methods.yaml
-  /flow/{id}/event:
-    $ref: endpoints/flow/event/methods.yaml
   /auth_attempts:
     $ref: endpoints/auth_attempts/methods.yaml
   /auth_attempts/{attempt_id}:
@@ -125,10 +105,6 @@ paths:
     $ref: endpoints/flow_definitions/methods.yaml
   /flow_definitions/{id}:
     $ref: endpoints/flow_definitions/by_id/methods.yaml
-  /flow_definitions/{id}/activate:
-    $ref: endpoints/flow_definitions/lifecycle/activate/method.yaml
-  /flow_definitions/{id}/deactivate:
-    $ref: endpoints/flow_definitions/lifecycle/deactivate/method.yaml
   /teams:
     $ref: endpoints/teams/methods.yaml
   /teams/query:
@@ -144,7 +120,5 @@ components:
   securitySchemes:
     oauth2:
       $ref: security/oauth2.yaml
-    usernamePassword:
-      $ref: security/username-password.yaml
     nextgenSession:
       $ref: security/session-cookie.yaml
