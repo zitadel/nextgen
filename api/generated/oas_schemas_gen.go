@@ -18837,7 +18837,9 @@ func (*QueryProjectsForbidden) queryProjectsRes() {}
 // Ref: #
 type QueryProjectsRequest struct {
 	Limit OptLimit `json:"limit"`
-	// Token to retrieve the next page of results.
+	// Token to retrieve the next page of results. Must be sent with the same
+	// `sorting` as the request that issued the token. Omitting `sorting` reuses
+	// the default sort and only succeeds when that default matches the token.
 	PageToken OptNilPageToken                `json:"page_token"`
 	Sorting   OptQueryProjectsRequestSorting `json:"sorting"`
 	// Filter criteria for querying projects.
@@ -18953,7 +18955,8 @@ func (s *QueryProjectsRequestSorting) SetDirection(val SortDirection) {
 type QueryProjectsResponse struct {
 	Projects []ProjectResponse `json:"projects"`
 	// Token to pass as `page_token` in the next request to fetch the following page.
-	// Absent when there are no more results.
+	// Absent when there are no more results. The follow-up request must repeat the
+	// same `sorting` that produced this token (omit only when both pages use the default).
 	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
 
@@ -19369,7 +19372,9 @@ func (*QueryTeamsNotFound) queryTeamsRes() {}
 // Ref: #
 type QueryTeamsRequest struct {
 	Limit OptLimit `json:"limit"`
-	// Token to retrieve the next page of results.
+	// Token to retrieve the next page of results. Must be sent with the same
+	// `sorting` as the request that issued the token. Omitting `sorting` reuses
+	// the default sort and only succeeds when that default matches the token.
 	PageToken OptNilPageToken             `json:"page_token"`
 	Sorting   OptQueryTeamsRequestSorting `json:"sorting"`
 	// Filter criteria for querying teams.
@@ -19485,7 +19490,8 @@ func (s *QueryTeamsRequestSorting) SetDirection(val SortDirection) {
 type QueryTeamsResponse struct {
 	Teams []TeamResponse `json:"teams"`
 	// Token to pass as `page_token` in the next request to fetch the following page.
-	// Absent when there are no more results.
+	// Absent when there are no more results. The follow-up request must repeat the
+	// same `sorting` that produced this token (omit only when both pages use the default).
 	NextPageToken OptNilPageToken `json:"next_page_token"`
 }
 

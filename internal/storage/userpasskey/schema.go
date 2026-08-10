@@ -10,7 +10,7 @@ var Schema = database.NewSchema(map[domain.UserPasskeyField]database.FieldBindin
 	domain.UserPasskeyFieldID: {
 		SQLName:  "id",
 		Accessor: func(p *domain.UserPasskey) any { return p.ID },
-		Coerce:   database.CoerceNumber[int64],
+		Coerce:   database.CoerceString,
 	},
 	domain.UserPasskeyFieldProjectID: {
 		SQLName:  "project_id",

@@ -331,7 +331,7 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 	schemaEntity, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, schemaURL)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return domain.ErrUserInvalid().WithDetails("$schema is not known to the system. First create a schema, then create users.")
+			return domain.ErrUserInvalid().WithMessage("$schema is not known to the system. First create a schema, then create users.")
 		}
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}

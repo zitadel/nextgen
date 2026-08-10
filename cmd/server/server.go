@@ -466,6 +466,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 			func(next http.Handler) http.Handler { return middleware.WithRequestIdentification(reqIdGen, next) },
 			middleware.WithLogging,
 			api.WithRequestHostMiddleware,
+			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
 		),
 	)

@@ -487,6 +487,61 @@ func TestQueryProjectsPageTokenRoundTrip(t *testing.T) {
 	assert.False(t, secondPage.NextPageToken.IsSet())
 }
 
+// TestQueryProjectsPageTokenRequiresMatchingSorting proves that page tokens
+// validate OrderBy: a DESC page-1 token fails when page 2 omits sorting (default
+// ASC), and succeeds when the same DESC sorting is repeated.
+func TestQueryProjectsPageTokenRequiresMatchingSorting(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	sorting := api.NewOptQueryProjectsRequestSorting(api.QueryProjectsRequestSorting{
+		Field:     api.FilterFieldCreatedAt,
+		Direction: api.SortDirectionDesc,
+	})
+	first, err := client.QueryProjects(t.Context(), &api.QueryProjectsRequest{
+		Limit:   api.NewOptLimit(1),
+		Sorting: sorting,
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.QueryProjectsResponse{}, first, helpers.MustMarshal(t, first))
+	firstPage := first.(*api.QueryProjectsResponse)
+	require.Len(t, firstPage.Projects, 1)
+	pageToken, ok := firstPage.NextPageToken.Get()
+	require.True(t, ok, "a full page carries a cursor")
+
+	mismatch, err := client.QueryProjects(t.Context(), &api.QueryProjectsRequest{
+		Limit:     api.NewOptLimit(1),
+		PageToken: api.NewOptNilPageToken(pageToken),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.QueryProjectsBadRequest{}, mismatch, helpers.MustMarshal(t, mismatch))
+	requestInvalid := domain.ErrRequestInvalid()
+	assertProjectResponse(t, &api.QueryProjectsBadRequest{
+		Code:    api.ErrorCode(requestInvalid.Code),
+		Message: requestInvalid.Message,
+		Details: api.NewOptErrorDetailsDetails(api.ErrorDetailsDetails{
+			"details": jx.Raw(helpers.MustMarshal(t, "page token does not match the requested sorting")),
+		}),
+	}, mismatch)
+
+	matched, err := client.QueryProjects(t.Context(), &api.QueryProjectsRequest{
+		Limit:     api.NewOptLimit(1),
+		PageToken: api.NewOptNilPageToken(pageToken),
+		Sorting:   sorting,
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.QueryProjectsResponse{}, matched, helpers.MustMarshal(t, matched))
+	matchedPage := matched.(*api.QueryProjectsResponse)
+	assert.Empty(t, matchedPage.Projects)
+	assert.False(t, matchedPage.NextPageToken.IsSet())
+}
+
 // assertProjectResponse covers every operation answering with the shared
 // project body: getProject, patchProject, and each item of queryProjects.
 func assertProjectResponse(t *testing.T, want, got any) {
