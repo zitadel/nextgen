@@ -104,38 +104,12 @@ func mapQueryProjectsToService(projectID string, req *api.QueryProjectsRequest) 
 		PageToken: string(req.PageToken.Or("")),
 	}
 	if sorting, ok := req.Sorting.Get(); ok {
-		svcReq.Sorting = &service.Sorting{
-			Field:     string(sorting.Field),
-			Direction: string(sorting.Direction),
-		}
+		svcReq.Sorting = sortingToService(sorting.Field, sorting.Direction)
 	}
 	for _, filter := range req.Filter {
-		svcReq.Filters = append(svcReq.Filters, service.Filter{
-			Field:     string(filter.Field),
-			Operation: string(filter.Operation),
-			Value:     filterValue(filter.Value),
-		})
+		svcReq.Filters = append(svcReq.Filters, filterToService(filter.Field, filter.Operation, filter.Value))
 	}
 	return svcReq
-}
-
-// filterValue unwraps the filter-value union. An absent or null value stays
-// nil; the service rejects whatever the filtered field cannot take.
-func filterValue(value api.OptFilterValue) any {
-	v, ok := value.Get()
-	if !ok {
-		return nil
-	}
-	switch v.Type {
-	case api.StringFilterValue:
-		return v.String
-	case api.Float64FilterValue:
-		return v.Float64
-	case api.BoolFilterValue:
-		return v.Bool
-	default:
-		return nil
-	}
 }
 
 // projectResponse is the shared project body: getProject, patchProject, and
