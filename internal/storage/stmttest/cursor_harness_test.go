@@ -3,6 +3,7 @@
 package stmttest
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,6 +41,8 @@ func pageAll[T any](
 	}
 }
 
+// assertDrainMatch checks unordered coverage (destructive / mutation cases where
+// page order is not the property under test).
 func assertDrainMatch(t *testing.T, want, got []string) {
 	t.Helper()
 	assert.ElementsMatch(t, want, got, "every seeded row must appear exactly once across pages")
@@ -54,65 +57,62 @@ func assertDatabaseErrorCode(t *testing.T, err error, code string) {
 	assert.Equal(t, code, dbErr.Code)
 }
 
-// assertCursorEmission checks full-page vs short-page NextCursor rules.
-func assertCursorEmission[T any](
-	t *testing.T,
-	fullPage *database.ListResult[T],
-	shortPage *database.ListResult[T],
-	limit uint32,
-) {
-	t.Helper()
-	require.NotNil(t, fullPage)
-	require.NotNil(t, shortPage)
-	require.Equal(t, int(limit), len(fullPage.Items))
-	assert.NotEmpty(t, fullPage.NextCursor, "a full page must carry a next cursor")
-	assert.Less(t, len(shortPage.Items), int(limit))
-	assert.Empty(t, shortPage.NextCursor, "a short page must not carry a next cursor")
-}
-
 // drainIncarnation runs ASC+DESC keyset drains and asserts NextCursor emission
-// for one List* incarnation. Seed want/filter/orderAsc in the caller; list wraps
-// the dialect statement. emissionLimit must be >0 and smaller than len(want).
+// for one List* incarnation. wantAsc must already be in ASC order of orderAsc.
+// emissionLimit must be >0 and smaller than len(wantAsc); the short-page check
+// asserts the remainder len(wantAsc)-emissionLimit, not merely "shorter than limit".
 func drainIncarnation[T any, F ~uint8](
 	t *testing.T,
-	want []string,
-	filter database.Filter[F],
+	wantAsc []string,
 	orderAsc database.OrderBy[F],
 	list func(database.Page[F]) (*database.ListResult[T], error),
 	id func(T) string,
 	emissionLimit uint32,
 ) {
 	t.Helper()
-	require.NotEmpty(t, want)
+	require.NotEmpty(t, wantAsc)
 	require.NotEmpty(t, orderAsc.Columns)
 	require.Greater(t, emissionLimit, uint32(0))
-	require.Less(t, int(emissionLimit), len(want), "emission needs a short trailing page")
+	require.Less(t, int(emissionLimit), len(wantAsc), "emission needs a short trailing page")
+
+	wantDesc := slices.Clone(wantAsc)
+	slices.Reverse(wantDesc)
 
 	orderDesc := orderAsc
 	orderDesc.Direction = database.OrderDesc
 
 	for name, order := range map[string]database.OrderBy[F]{"asc": orderAsc, "desc": orderDesc} {
 		t.Run(name, func(t *testing.T) {
-			got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[T], error) {
+			got := pageAll(t, len(wantAsc), nil, func(cursor []byte) (*database.ListResult[T], error) {
 				return list(database.Page[F]{
 					Limit:   emissionLimit,
 					OrderBy: order,
 					Cursor:  cursor,
 				})
 			}, id)
-			assertDrainMatch(t, want, got)
+			want := wantAsc
+			if order.Direction == database.OrderDesc {
+				want = wantDesc
+			}
+			assert.Equal(t, want, got, "paged IDs must follow OrderBy direction")
 		})
 	}
 
 	t.Run("emission", func(t *testing.T) {
 		full, err := list(database.Page[F]{Limit: emissionLimit, OrderBy: orderAsc})
 		require.NoError(t, err)
+		require.NotNil(t, full)
+		require.Equal(t, int(emissionLimit), len(full.Items))
+		require.NotEmpty(t, full.NextCursor, "a full page must carry a next cursor")
+
 		short, err := list(database.Page[F]{
-			Limit:   uint32(len(want)),
+			Limit:   uint32(len(wantAsc)),
 			OrderBy: orderAsc,
 			Cursor:  full.NextCursor,
 		})
 		require.NoError(t, err)
-		assertCursorEmission(t, full, short, emissionLimit)
+		require.NotNil(t, short)
+		assert.Equal(t, len(wantAsc)-int(emissionLimit), len(short.Items), "short page must be the remainder after the first full page")
+		assert.Empty(t, short.NextCursor, "a short page must not carry a next cursor")
 	})
 }

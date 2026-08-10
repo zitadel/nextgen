@@ -4,6 +4,7 @@ package stmttest
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/go-jose/go-jose/v4"
@@ -79,24 +80,25 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 func battleProjects(t *testing.T, d dialect) {
 	t.Helper()
 	prefix := uniqueProjectID(t)
-	want := make([]string, 0, 3)
-	for i := range 3 {
+	want := make([]string, 0, 5)
+	for i := range 5 {
 		id := prefix + "-" + string(rune('a'+i))
 		p := newTestProject(id)
 		require.NoError(t, d.stmts.CreateProject(t.Context(), p))
 		t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), id) })
 		want = append(want, id)
 	}
-	filter := database.Or(
-		database.Equal(database.Col(domain.ProjectFieldID), want[0]),
-		database.Equal(database.Col(domain.ProjectFieldID), want[1]),
-		database.Equal(database.Col(domain.ProjectFieldID), want[2]),
-	)
+	filters := make([]database.Filter[domain.ProjectField], 0, len(want))
+	for _, id := range want {
+		filters = append(filters, database.Equal(database.Col(domain.ProjectFieldID), id))
+	}
+	filter := database.Or(filters...)
 	orderAsc := database.OrderBy[domain.ProjectField]{
 		Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldID)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, filter, orderAsc, func(page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
 		return d.stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
 			Filter: filter, Pagination: page,
 		})
@@ -106,8 +108,8 @@ func battleProjects(t *testing.T, d dialect) {
 func battleTeams(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureProject(t, d.stmts)
-	want := make([]string, 0, 3)
-	for range 3 {
+	want := make([]string, 0, 5)
+	for range 5 {
 		team := newTestTeam(projectID, "")
 		require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
 		want = append(want, team.ID)
@@ -117,7 +119,8 @@ func battleTeams(t *testing.T, d dialect) {
 		Columns:   []database.Column[domain.TeamField]{database.Col(domain.TeamFieldID)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, filter, orderAsc, func(page database.Page[domain.TeamField]) (*database.ListResult[*domain.Team], error) {
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.TeamField]) (*database.ListResult[*domain.Team], error) {
 		return d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{
 			Filter: filter, Pagination: page,
 		})
@@ -127,8 +130,8 @@ func battleTeams(t *testing.T, d dialect) {
 func battleUsers(t *testing.T, d dialect) {
 	t.Helper()
 	projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-	want := make([]string, 0, 3)
-	for i := range 3 {
+	want := make([]string, 0, 5)
+	for i := range 5 {
 		id := "usr-battle-" + string(rune('a'+i)) + "-" + uniqueSuffix(t)
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, id, id+"@example.com", "Battle")))
 		t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, id) })
@@ -139,7 +142,8 @@ func battleUsers(t *testing.T, d dialect) {
 		Columns:   []database.Column[domain.UserField]{database.Col(domain.UserFieldID)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, filter, orderAsc, func(page database.Page[domain.UserField]) (*database.ListResult[*domain.User], error) {
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.UserField]) (*database.ListResult[*domain.User], error) {
 		return d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
 			Filter: filter, Pagination: page,
 		}, service.UserQueryOptions{})
@@ -164,8 +168,8 @@ func battleTokens(t *testing.T, d dialect) {
 	require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Tok")))
 	t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
 
-	want := make([]string, 0, 3)
-	for range 3 {
+	want := make([]string, 0, 5)
+	for range 5 {
 		tok := &domain.Token{
 			ProjectID: projectID,
 			UserID:    userID,
@@ -184,7 +188,8 @@ func battleTokens(t *testing.T, d dialect) {
 		Columns:   []database.Column[domain.TokenField]{database.Col(domain.TokenFieldTokenID)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, filter, orderAsc, func(page database.Page[domain.TokenField]) (*database.ListResult[*domain.Token], error) {
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.TokenField]) (*database.ListResult[*domain.Token], error) {
 		return d.stmts.ListTokens(t.Context(), &database.ListOptions[domain.TokenField]{
 			Filter: filter, Pagination: page,
 		})
@@ -205,8 +210,8 @@ func battleTokens(t *testing.T, d dialect) {
 func battleSessions(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureProject(t, d.stmts)
-	want := make([]string, 0, 3)
-	for range 3 {
+	want := make([]string, 0, 5)
+	for range 5 {
 		want = append(want, createAnonymousSession(t, d.stmts, projectID).ID)
 	}
 	filter := database.Equal(database.Col(domain.SessionFieldProjectID), projectID)
@@ -214,7 +219,8 @@ func battleSessions(t *testing.T, d dialect) {
 		Columns:   []database.Column[domain.SessionField]{database.Col(domain.SessionFieldID)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, filter, orderAsc, func(page database.Page[domain.SessionField]) (*database.ListResult[*domain.Session], error) {
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.SessionField]) (*database.ListResult[*domain.Session], error) {
 		return d.stmts.ListSessions(t.Context(), &database.ListOptions[domain.SessionField]{
 			Filter: filter, Pagination: page,
 		})
@@ -235,8 +241,8 @@ func battleBrandings(t *testing.T, d dialect) {
 	t.Helper()
 	projectID, _ := uniqueBrandingIDs(t)
 	ensureBrandingProject(t, d.stmts, projectID)
-	want := make([]string, 0, 3)
-	for range 3 {
+	want := make([]string, 0, 5)
+	for range 5 {
 		entity := sampleBranding(projectID, "")
 		require.NoError(t, d.stmts.CreateBranding(t.Context(), entity))
 		want = append(want, entity.ID)
@@ -244,7 +250,7 @@ func battleBrandings(t *testing.T, d dialect) {
 	filter := database.Equal(database.Col(domain.BrandingFieldProjectID), projectID)
 	orderAsc := branding.NewestFirst()
 	orderAsc.Direction = database.OrderAsc
-	drainIncarnation(t, want, filter, orderAsc, func(page database.Page[domain.BrandingField]) (*database.ListResult[*domain.Branding], error) {
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.BrandingField]) (*database.ListResult[*domain.Branding], error) {
 		return d.stmts.ListBrandings(t.Context(), &database.ListOptions[domain.BrandingField]{
 			Filter: filter, Pagination: page,
 		})
@@ -263,8 +269,8 @@ func battleBrandings(t *testing.T, d dialect) {
 func battleFlowDefinitions(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureProject(t, d.stmts)
-	want := make([]string, 0, 3)
-	for i := range 3 {
+	want := make([]string, 0, 5)
+	for i := range 5 {
 		id := "flow-" + uniqueSuffix(t) + "-" + string(rune('a'+i))
 		def := sampleFlowDefinition(projectID, id, "Flow "+string(rune('A'+i)))
 		require.NoError(t, d.stmts.CreateFlowDefinition(t.Context(), def))
@@ -276,7 +282,8 @@ func battleFlowDefinitions(t *testing.T, d dialect) {
 		Columns:   []database.Column[domain.FlowDefinitionField]{database.Col(domain.FlowDefinitionFieldID)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, filter, orderAsc, func(page database.Page[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
 		return d.stmts.ListFlowDefinitions(t.Context(), &database.ListOptions[domain.FlowDefinitionField]{
 			Filter: filter, Pagination: page,
 		})
@@ -296,8 +303,8 @@ func battleFlowDefinitions(t *testing.T, d dialect) {
 func battleJSONSchemas(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureProject(t, d.stmts)
-	want := make([]string, 0, 3)
-	for i := range 3 {
+	want := make([]string, 0, 5)
+	for i := range 5 {
 		url := "https://example.com/schemas/battle-" + uniqueSuffix(t) + "-" + string(rune('a'+i))
 		require.NoError(t, d.stmts.CreateJSONSchema(t.Context(), &domain.JSONSchema{
 			ProjectID: projectID,
@@ -312,7 +319,8 @@ func battleJSONSchemas(t *testing.T, d dialect) {
 		Columns:   []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldURL)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, filter, orderAsc, func(page database.Page[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error) {
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error) {
 		return d.stmts.ListJSONSchemas(t.Context(), &database.ListOptions[domain.JSONSchemaField]{
 			Filter: filter, Pagination: page,
 		})
@@ -322,8 +330,8 @@ func battleJSONSchemas(t *testing.T, d dialect) {
 func battleEncryptionKeys(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureProject(t, d.stmts)
-	want := make([]string, 0, 3)
-	for range 3 {
+	want := make([]string, 0, 5)
+	for range 5 {
 		key := newTestEncryptionKey("", projectID)
 		require.NoError(t, d.stmts.CreateEncryptionKey(t.Context(), key))
 		want = append(want, key.ID)
@@ -333,7 +341,8 @@ func battleEncryptionKeys(t *testing.T, d dialect) {
 		Columns:   []database.Column[domain.EncryptionKeyField]{database.Col(domain.EncryptionKeyFieldID)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, filter, orderAsc, func(page database.Page[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error) {
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error) {
 		return d.stmts.ListEncryptionKeys(t.Context(), &database.ListOptions[domain.EncryptionKeyField]{
 			Filter: filter, Pagination: page,
 		})
@@ -346,8 +355,8 @@ func battleTeamMemberships(t *testing.T, d dialect) {
 	team := newTestTeam(projectID, "")
 	require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
 
-	want := make([]string, 0, 3)
-	for i := range 3 {
+	want := make([]string, 0, 5)
+	for i := range 5 {
 		userID := "usr-mem-" + string(rune('a'+i)) + "-" + uniqueSuffix(t)
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Mem")))
 		t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
@@ -367,7 +376,8 @@ func battleTeamMemberships(t *testing.T, d dialect) {
 		Columns:   []database.Column[domain.TeamMembershipField]{database.Col(domain.TeamMembershipFieldUserID)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, filter, orderAsc, func(page database.Page[domain.TeamMembershipField]) (*database.ListResult[*domain.TeamMembership], error) {
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.TeamMembershipField]) (*database.ListResult[*domain.TeamMembership], error) {
 		return d.stmts.ListTeamMemberships(t.Context(), &database.ListOptions[domain.TeamMembershipField]{
 			Filter: filter, Pagination: page,
 		})
@@ -381,8 +391,8 @@ func battleUserTeams(t *testing.T, d dialect) {
 	require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Teams")))
 	t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
 
-	want := make([]string, 0, 3)
-	for range 3 {
+	want := make([]string, 0, 5)
+	for range 5 {
 		team := newTestTeam(projectID, "")
 		require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
 		require.NoError(t, d.stmts.CreateTeamMembership(t.Context(), &domain.TeamMembership{
@@ -401,7 +411,8 @@ func battleUserTeams(t *testing.T, d dialect) {
 		Columns:   []database.Column[domain.UserTeamField]{database.Col(domain.UserTeamFieldTeamID)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, filter, orderAsc, func(page database.Page[domain.UserTeamField]) (*database.ListResult[*domain.UserTeam], error) {
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.UserTeamField]) (*database.ListResult[*domain.UserTeam], error) {
 		return d.stmts.ListUserTeams(t.Context(), &database.ListOptions[domain.UserTeamField]{
 			Filter: filter, Pagination: page,
 		})

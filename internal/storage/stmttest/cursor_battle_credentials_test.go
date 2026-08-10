@@ -4,6 +4,7 @@ package stmttest
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,8 +16,8 @@ import (
 func battleUserPasswords(t *testing.T, d dialect) {
 	t.Helper()
 	projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-	want := make([]string, 0, 3)
-	for i := range 3 {
+	want := make([]string, 0, 5)
+	for i := range 5 {
 		userID := "usr-pw-" + string(rune('a'+i)) + "-" + uniqueSuffix(t)
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "PW")))
 		t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
@@ -40,7 +41,8 @@ func battleUserPasswords(t *testing.T, d dialect) {
 		Columns:   []database.Column[domain.UserPasswordField]{database.Col(domain.UserPasswordFieldID)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, filter, orderAsc, func(page database.Page[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error) {
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error) {
 		return d.stmts.ListUserPasswords(t.Context(), &database.ListOptions[domain.UserPasswordField]{
 			Filter: filter, Pagination: page,
 		})
@@ -50,8 +52,8 @@ func battleUserPasswords(t *testing.T, d dialect) {
 func battleUserTOTPs(t *testing.T, d dialect) {
 	t.Helper()
 	projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-	want := make([]string, 0, 3)
-	for i := range 3 {
+	want := make([]string, 0, 5)
+	for i := range 5 {
 		userID := "usr-totp-" + string(rune('a'+i)) + "-" + uniqueSuffix(t)
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "TOTP")))
 		t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
@@ -75,7 +77,8 @@ func battleUserTOTPs(t *testing.T, d dialect) {
 		Columns:   []database.Column[domain.UserTOTPField]{database.Col(domain.UserTOTPFieldID)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, filter, orderAsc, func(page database.Page[domain.UserTOTPField]) (*database.ListResult[*domain.UserTOTP], error) {
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.UserTOTPField]) (*database.ListResult[*domain.UserTOTP], error) {
 		return d.stmts.ListUserTOTPs(t.Context(), &database.ListOptions[domain.UserTOTPField]{
 			Filter: filter, Pagination: page,
 		})
@@ -89,8 +92,8 @@ func battleUserPasskeys(t *testing.T, d dialect) {
 	require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "PK")))
 	t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
 
-	want := make([]string, 0, 3)
-	for i := range 3 {
+	want := make([]string, 0, 5)
+	for i := range 5 {
 		credID := "cred-" + string(rune('a'+i)) + "-" + uniqueSuffix(t)
 		require.NoError(t, d.stmts.CreateUserPasskey(t.Context(), &domain.CreateUserPasskey{
 			ProjectID:    projectID,
@@ -118,7 +121,8 @@ func battleUserPasskeys(t *testing.T, d dialect) {
 		Columns:   []database.Column[domain.UserPasskeyField]{database.Col(domain.UserPasskeyFieldID)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, filter, orderAsc, func(page database.Page[domain.UserPasskeyField]) (*database.ListResult[*domain.UserPasskey], error) {
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.UserPasskeyField]) (*database.ListResult[*domain.UserPasskey], error) {
 		return d.stmts.ListUserPasskeys(t.Context(), &database.ListOptions[domain.UserPasskeyField]{
 			Filter: filter, Pagination: page,
 		})
@@ -128,8 +132,8 @@ func battleUserPasskeys(t *testing.T, d dialect) {
 func battleUserRecoveryCodes(t *testing.T, d dialect) {
 	t.Helper()
 	projectID, schemaURL := ensureUserTestProject(t, d.stmts)
-	want := make([]string, 0, 3)
-	for i := range 3 {
+	want := make([]string, 0, 5)
+	for i := range 5 {
 		userID := "usr-rc-" + string(rune('a'+i)) + "-" + uniqueSuffix(t)
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "RC")))
 		t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
@@ -153,7 +157,8 @@ func battleUserRecoveryCodes(t *testing.T, d dialect) {
 		Columns:   []database.Column[domain.UserRecoveryCodesField]{database.Col(domain.UserRecoveryCodesFieldID)},
 		Direction: database.OrderAsc,
 	}
-	drainIncarnation(t, want, filter, orderAsc, func(page database.Page[domain.UserRecoveryCodesField]) (*database.ListResult[*domain.UserRecoveryCodes], error) {
+	slices.Sort(want)
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.UserRecoveryCodesField]) (*database.ListResult[*domain.UserRecoveryCodes], error) {
 		return d.stmts.ListUserRecoveryCodes(t.Context(), &database.ListOptions[domain.UserRecoveryCodesField]{
 			Filter: filter, Pagination: page,
 		})
