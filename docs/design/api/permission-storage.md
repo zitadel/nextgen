@@ -25,8 +25,11 @@ Wave 3 (#423). In-project HTTP management wiring (resolver gate + D10
 remains later (**D11**). RSI dual-write covers schema / branding /
 flow_definition / session path ids in addition to project / team / user.
 Path-id management handlers resolve RSI before Check (flat-by-id; no
-required query `project_id`). Fine-grained catalog relations (#420) and
-SQL list-predicate injection remain follow-ups.
+required query `project_id`). Management list endpoints inject an authz
+EXISTS predicate (same assignment/closure branches as `ListObjects`) into
+the resource SELECT after Check. Fine-grained catalog relations (#420)
+remain a follow-up; `QuerySessions` list predicate waits on
+`sessionService.List`.
 
 ### Wave 1 vs OpenFGA compiler (#421 / PR #720)
 
