@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -10,6 +11,16 @@ import (
 )
 
 //go:generate go tool mockgen -typed -package mocks -destination ./mocks/session.mock.go . SessionService
+
+const (
+	sessionFieldCreatedAt = "created_at"
+	sessionFieldUserID    = "user_id"
+	sessionFieldState     = "state"
+
+	sessionStateBuilding = "building"
+	sessionStateActive   = "active"
+	sessionStateExpired  = "expired"
+)
 
 type SessionService interface {
 	Create(ctx context.Context, input CreateSessionInput) (*domain.Session, error)
@@ -19,7 +30,9 @@ type SessionService interface {
 	// onto Session.User (absent users degrade to a session without identity).
 	// errors: domain.ErrSessionNotFound, domain.ErrInternal
 	Get(ctx context.Context, input GetSessionInput) (*domain.Session, error)
-	List(ctx context.Context, input ListSessionInput) ([]*domain.Session, error)
+	// List returns the project's sessions matching the input's filters,
+	// errors: domain.ErrProjectMissingID, domain.ErrRequestInvalid, domain.ErrNotImplemented, domain.ErrInternal
+	List(ctx context.Context, input ListSessionInput) (*ListSessionsResponse, error)
 	Delete(ctx context.Context, input DeleteSessionInput) error
 }
 
@@ -52,7 +65,19 @@ type GetSessionInput struct {
 }
 
 type ListSessionInput struct {
+	// ProjectID restricts results to that single project. Handlers set it from
+	// the caller's scope. Required.
 	ProjectID string
+	Limit     int
+	PageToken string
+	Sorting   *Sorting // optional; defaults to createdAt desc (newest first)
+	Filters   []Filter
+}
+
+// ListSessionsResponse is the output for listing sessions.
+type ListSessionsResponse struct {
+	Sessions      []*domain.Session
+	NextPageToken string
 }
 
 type DeleteSessionInput struct {
@@ -115,9 +140,125 @@ func (s *sessionService) Get(ctx context.Context, input GetSessionInput) (*domai
 	return session, nil
 }
 
-func (s *sessionService) List(ctx context.Context, input ListSessionInput) ([]*domain.Session, error) {
-	//TODO implement me
-	return nil, domain.ErrNotImplemented()
+func (s *sessionService) List(ctx context.Context, input ListSessionInput) (*ListSessionsResponse, error) {
+	if input.ProjectID == "" {
+		return nil, domain.ErrProjectMissingID()
+	}
+
+	filters := make([]database.Filter[domain.SessionField], 0, len(input.Filters)+1)
+	filters = append(filters, database.Equal(database.Col(domain.SessionFieldProjectID), input.ProjectID))
+	for _, f := range input.Filters {
+		filter, err := sessionFilter(f)
+		if err != nil {
+			return nil, err
+		}
+		filters = append(filters, filter)
+	}
+
+	// Newest first by default.
+	orderBy, err := listOrderBy(input.Sorting, domain.SessionFieldCreatedAt, database.OrderDesc, sessionSortField, domain.SessionFieldID)
+	if err != nil {
+		return nil, err
+	}
+
+	var cursor []byte
+	if input.PageToken != "" {
+		cursor = []byte(input.PageToken)
+	}
+
+	result, err := s.v2Pool.Statements().ListSessions(ctx, &database.ListOptions[domain.SessionField]{
+		Filter: database.And(filters...),
+		Pagination: database.Page[domain.SessionField]{
+			Limit:   uint32(normalizeLimit(input.Limit)),
+			OrderBy: orderBy,
+			Cursor:  cursor,
+		},
+	})
+	if err != nil {
+		return nil, mapListError(err, "failed to list sessions")
+	}
+
+	return &ListSessionsResponse{
+		Sessions:      result.Items,
+		NextPageToken: string(result.NextCursor),
+	}, nil
+}
+
+// sessionSortField maps an API sort field name to its [domain.SessionField].
+func sessionSortField(field string) (domain.SessionField, error) {
+	switch field {
+	case sessionFieldCreatedAt:
+		return domain.SessionFieldCreatedAt, nil
+	case sessionFieldUserID:
+		return domain.SessionFieldUserID, nil
+	default:
+		return domain.SessionFieldUnspecified, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", field))
+	}
+}
+
+// sessionFilter maps an API filter predicate to a storage filter. Operations
+// the filter layer cannot express return [domain.ErrNotImplemented]; invalid
+// field/operation/value combinations return [domain.ErrRequestInvalid].
+func sessionFilter(f Filter) (database.Filter[domain.SessionField], error) {
+	switch f.Field {
+	case sessionFieldUserID:
+		value, ok := f.Value.(string)
+		if !ok {
+			return nil, domain.ErrRequestInvalid().WithDetails("user_id filter value must be a string")
+		}
+		return stringFilter(f.Operation, database.Col(domain.SessionFieldUserID), value)
+	case sessionFieldCreatedAt:
+		return createdAtFilter(f.Operation, database.Col(domain.SessionFieldCreatedAt), f.Value)
+	case sessionFieldState:
+		value, ok := f.Value.(string)
+		if !ok {
+			return nil, domain.ErrRequestInvalid().WithDetails("state filter value must be a string")
+		}
+		return sessionStateFilter(f.Operation, value)
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", f.Field))
+	}
+}
+
+// sessionStateFilter expresses [domain.Session.State], which is computed and
+// not stored, over stored columns:
+// expired = expires_at < now(),
+// building = user_id is NULL and expires_at >= now()
+// active = expires_at >= now() and user_id is not NULL
+func sessionStateFilter(op, state string) (database.Filter[domain.SessionField], error) {
+	switch op {
+	case filterOpEquals:
+	case filterOpNotEquals:
+		// todo (grvijayan): update when the operation is supported
+		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
+	case filterOpContains, filterOpNotContains, filterOpLessThan, filterOpGreaterThan, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for this field", op))
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown operation %q", op))
+	}
+
+	// now is bound per request, so state can drift between pages of a paginated run.
+	now := time.Now().UTC()
+	expiresAt := database.Col(domain.SessionFieldExpiresAt)
+	userID := database.Col(domain.SessionFieldUserID)
+	// todo (grvijayan): replace with a greater-or-equal compare once the filter layer supports it
+	activeSessionsFilter := database.Or(database.GreaterThan(expiresAt, now), database.Equal(expiresAt, now))
+
+	switch state {
+	case sessionStateExpired:
+		return database.LessThan(expiresAt, now), nil
+	case sessionStateBuilding:
+		// user_id stands in for State()'s factor test for SessionStateBuilding: the exchange promotes
+		// factors and binds user_id together, so one implies the other.
+		// A nil value binds SQL NULL: user_id IS NULL until the exchange.
+		return database.And(activeSessionsFilter, database.Equal(userID, nil)), nil
+	case sessionStateActive:
+		// GreaterThan nil compiles to user_id IS NOT NULL: ordered compares
+		// place every value beyond the NULL block.
+		return database.And(activeSessionsFilter, database.GreaterThan(userID, nil)), nil
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown state %q", state))
+	}
 }
 
 func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) error {
