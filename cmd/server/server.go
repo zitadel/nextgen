@@ -36,10 +36,10 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
-	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
-	"github.com/zitadel/nextgen/internal/storage/v2/dialect/idgen"
-	"github.com/zitadel/nextgen/internal/storage/v2/dialect/sqlite"
+	"github.com/zitadel/nextgen/internal/storage/database"
+	_ "github.com/zitadel/nextgen/internal/storage/dialect/all"
+	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
+	"github.com/zitadel/nextgen/internal/storage/dialect/sqlite"
 )
 
 func NewCommand() *cobra.Command {
