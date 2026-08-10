@@ -318,26 +318,25 @@ interfaces.
 - Event `id` is minted via dialect `NewManagedID` before insert
   ([ADR 047](047-dialect-id-generation.md)).
 
-Example event types (non-exhaustive; catalog grows with statement coverage):
+Example event types (non-exhaustive samples). The living operation →
+`event_type` → payload catalog is
+[events-catalog.md](../design/api/events-catalog.md):
 
 | `event_type` | `category` | Trigger |
 |--------------|------------|---------|
 | `request.api` | `request` | Authenticated HTTP handler completes |
 | `project.created` | `entity` | `CreateProject` statement (including pre-claim) |
 | `user.created` | `entity` | User create statement |
-| `user.updated` | `entity` | User patch statement |
-| `user.deactivated` | `entity` | User lifecycle statement |
-| `auth.token.issued` | `auth` | Token create statement |
-| `auth.token.revoked` | `auth` | Token revoke statement |
-| `auth.check.failed` | `auth` | Check verification failure |
-| `session.established` | `session` | Auth attempt handoff |
-| `session.ended` | `session` | Explicit end **or** passive expiry via session reaper/cleanup statement |
-| `admin.config.pushed` | `admin` | Config upload statement |
-| `admin.api_key.created` | `admin` | API key create statement |
+| `session.deleted` | `session` | Explicit session delete |
+| `session.expired` | `session` | Session reaper / TTL cleanup |
 
 Passive session expiry has no user-triggered mutation: the cleanup/reaper
 statement that marks or deletes the expired session is the Path B emission
-point for `session.ended`.
+point for `session.expired` (distinct from explicit `session.deleted`).
+
+**Path A buffer refinement:** flush also when the in-process buffer reaches
+~80% of capacity `C` (with `C ≫ N`), in addition to batch size **N** and age
+**T**. Drop only when the buffer is full.
 
 ### 5. AuthGate enriches delegation context
 

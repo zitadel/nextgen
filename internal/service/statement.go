@@ -9,7 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserPasskeyStatements,UserRecoveryCodesStatements,BrandingStatements,ClaimStatements,ResourceScopeStatements,AuthzAssignmentStatements,AuthzMembershipEdgeStatements,AuthzCatalogStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserPasskeyStatements,UserRecoveryCodesStatements,BrandingStatements,ClaimStatements,ResourceScopeStatements,AuthzAssignmentStatements,AuthzMembershipEdgeStatements,AuthzCatalogStatements,EventStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -48,6 +48,7 @@ type AllStatements interface {
 	AuthzAssignmentStatements
 	AuthzMembershipEdgeStatements
 	AuthzCatalogStatements
+	EventStatements
 	Statements
 }
 
@@ -400,4 +401,14 @@ type AuthzCatalogStatements interface {
 	PersistCatalogVersion(ctx context.Context, meta domain.AuthzCatalogVersion, mutations compiler.CatalogMutations) error
 	GetAuthzCatalog(ctx context.Context, catalogID string) (*domain.AuthzCatalog, error)
 	LoadCatalogMutations(ctx context.Context, catalogID string) (compiler.PersistedCatalog, error)
+}
+
+// EventStatements persists append-only wide events (ADR 048).
+type EventStatements interface {
+	Statements
+	InsertEvent(ctx context.Context, event *domain.Event) error
+	GetEventByID(ctx context.Context, projectID, id string) (*domain.Event, error)
+	ListEvents(ctx context.Context, filter *database.ListOptions[domain.EventField]) (*database.ListResult[*domain.Event], error)
+	// DeleteEventsOlderThan removes events with created_at before cutoff (retention job).
+	DeleteEventsOlderThan(ctx context.Context, projectID string, createdBefore time.Time) (int64, error)
 }
