@@ -25,6 +25,7 @@ import (
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -235,6 +236,43 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	requestEventBuf := audit.NewRequestBuffer(audit.PoolInserter{
+		Insert: func(ctx context.Context, event *domain.Event) error {
+			return serviceDBPool.Statements().InsertEvent(ctx, event)
+		},
+	}, audit.DefaultRequestBufferConfig())
+	defer requestEventBuf.Close()
+
+	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool}
+	retentionCfg := audit.DefaultRetentionConfig()
+	if cfg.Events.RetentionDays > 0 {
+		retentionCfg.Retention = time.Duration(cfg.Events.RetentionDays) * 24 * time.Hour
+	}
+	if cfg.Events.RetentionEvery > 0 {
+		retentionCfg.Interval = cfg.Events.RetentionEvery
+	}
+	retentionJob := audit.NewRetentionJob(exportAdapter, exportAdapter, retentionCfg)
+	retentionJob.Start()
+	defer retentionJob.Close()
+
+	exportCfg := audit.DefaultExportConfig()
+	exportCfg.Enabled = cfg.Events.ExportEnabled
+	if cfg.Events.ExportEvery > 0 {
+		exportCfg.Interval = cfg.Events.ExportEvery
+	}
+	for _, sc := range cfg.Events.Sinks {
+		exportCfg.Sinks = append(exportCfg.Sinks, audit.SinkConfig{
+			Type:    domain.EventSinkType(sc.Type),
+			URL:     sc.URL,
+			Enabled: sc.Enabled,
+		})
+	}
+	shipper := audit.NewShipper(exportAdapter, exportCfg)
+	if err := shipper.Start(ctx); err != nil {
+		return fmt.Errorf("start event shipper: %w", err)
+	}
+	defer shipper.Close()
+
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
 			flowService,
@@ -264,7 +302,8 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
-		standaloneRuntimeResolver(projectService, keyService, cfg.Platform.ResolvedProjectID()))
+		standaloneRuntimeResolver(projectService, keyService, cfg.Platform.ResolvedProjectID()),
+		requestEventBuf)
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -368,8 +407,10 @@ func loadConfig(configPath string) (Config, error) {
 	// (Console ADR 0004 §3); set NEXTGEN_PLATFORM_PROJECT_ID to pin an
 	// existing project instead. The server never creates a project itself,
 	// unless platform.bootstrap_project explicitly opts in (#605).
-	v.SetDefault("platform.project_id", "")
-	v.SetDefault("platform.bootstrap_project", false)
+	v.SetDefault("events.retention_days", 30)
+	v.SetDefault("events.retention_interval", time.Hour)
+	v.SetDefault("events.export_enabled", false)
+	v.SetDefault("events.export_interval", 5*time.Second)
 	v.SetDefault("instrumentation.service_name", "Zitadel")
 	v.SetDefault("instrumentation.log.level", zlog.LevelInfo)
 	v.SetDefault("instrumentation.log.streams", []zlog.Stream{
@@ -430,7 +471,7 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 // ----------------------------- HTTP --------------------------------------
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler http.Handler, runtime runtimeResolver) (*http.ServeMux, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	if cfg.LoginEnabled {
@@ -469,6 +510,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 			api.WithRequestHostMiddleware,
 			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
+			func(next http.Handler) http.Handler { return audit.WithRequestEventMiddleware(requestEvents, next) },
 		),
 	)
 	return mux, nil

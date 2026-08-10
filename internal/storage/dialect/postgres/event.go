@@ -47,6 +47,31 @@ FROM zitadel_nextgen.events`
 	deleteEventsOlderThanStmt = `
 DELETE FROM zitadel_nextgen.events
 WHERE project_id = $1 AND created_at < $2`
+
+	ensureEventSinkStmt = `
+INSERT INTO zitadel_nextgen.event_sinks (id, type, scope, project_id, url, enabled)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (id) DO UPDATE SET
+    type = EXCLUDED.type,
+    scope = EXCLUDED.scope,
+    project_id = EXCLUDED.project_id,
+    url = EXCLUDED.url,
+    enabled = EXCLUDED.enabled`
+
+	recordEventDeliveryStmt = `
+INSERT INTO zitadel_nextgen.event_deliveries (project_id, event_id, sink_id)
+VALUES ($1, $2, $3)
+ON CONFLICT DO NOTHING`
+
+	listUndeliveredEventsStmt = eventQuery + `
+ WHERE NOT EXISTS (
+    SELECT 1 FROM zitadel_nextgen.event_deliveries d
+    WHERE d.project_id = zitadel_nextgen.events.project_id
+      AND d.event_id = zitadel_nextgen.events.id
+      AND d.sink_id = $1
+ )
+ ORDER BY created_at, id
+ LIMIT $2`
 )
 
 type eventStatements struct{ statement }
@@ -149,6 +174,41 @@ func (e eventStatements) DeleteEventsOlderThan(ctx context.Context, projectID st
 		return 0, wrapError(err)
 	}
 	return tag.RowsAffected(), nil
+}
+
+// EnsureEventSink implements [service.EventStatements].
+func (e eventStatements) EnsureEventSink(ctx context.Context, sink *domain.EventSink) error {
+	if sink.ID == "" {
+		if err := ensureManagedID(&sink.ID, domain.PrefixEventSink); err != nil {
+			return err
+		}
+	}
+	_, err := e.client.Exec(ctx, ensureEventSinkStmt,
+		sink.ID, string(sink.Type), string(sink.Scope), nullString(sink.ProjectID), sink.URL, sink.Enabled,
+	)
+	return wrapError(err)
+}
+
+// RecordEventDelivery implements [service.EventStatements].
+func (e eventStatements) RecordEventDelivery(ctx context.Context, projectID, eventID, sinkID string) error {
+	_, err := e.client.Exec(ctx, recordEventDeliveryStmt, projectID, eventID, sinkID)
+	return wrapError(err)
+}
+
+// ListUndeliveredEvents implements [service.EventStatements].
+func (e eventStatements) ListUndeliveredEvents(ctx context.Context, sinkID string, limit uint32) ([]*domain.Event, error) {
+	if limit == 0 {
+		limit = 100
+	}
+	rows, err := e.client.Query(ctx, listUndeliveredEventsStmt, sinkID, limit)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	items, err := pgx.CollectRows(rows, e.scanEvent)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return items, nil
 }
 
 func (e eventStatements) scanEvent(row pgx.CollectableRow) (*domain.Event, error) {

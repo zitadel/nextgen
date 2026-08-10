@@ -21,6 +21,22 @@ type Config struct {
 	Session         service.SessionConfig  `mapstructure:"session"`
 	Instrumentation instrumentation.Config `mapstructure:"instrumentation"`
 	Platform        PlatformConfig         `mapstructure:"platform"`
+	Events          EventsConfig           `mapstructure:"events"`
+}
+
+// EventsConfig configures audit event retention and deployment export sinks.
+type EventsConfig struct {
+	RetentionDays int           `mapstructure:"retention_days"`
+	RetentionEvery time.Duration `mapstructure:"retention_interval"`
+	ExportEnabled bool          `mapstructure:"export_enabled"`
+	ExportEvery   time.Duration `mapstructure:"export_interval"`
+	Sinks         []EventSinkConfig `mapstructure:"sinks"`
+}
+
+type EventSinkConfig struct {
+	Type    string `mapstructure:"type"`
+	URL     string `mapstructure:"url"`
+	Enabled bool   `mapstructure:"enabled"`
 }
 
 // PlatformConfig configures the deployment's default project resolution

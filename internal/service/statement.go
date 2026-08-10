@@ -411,4 +411,7 @@ type EventStatements interface {
 	ListEvents(ctx context.Context, filter *database.ListOptions[domain.EventField]) (*database.ListResult[*domain.Event], error)
 	// DeleteEventsOlderThan removes events with created_at before cutoff (retention job).
 	DeleteEventsOlderThan(ctx context.Context, projectID string, createdBefore time.Time) (int64, error)
+	EnsureEventSink(ctx context.Context, sink *domain.EventSink) error
+	RecordEventDelivery(ctx context.Context, projectID, eventID, sinkID string) error
+	ListUndeliveredEvents(ctx context.Context, sinkID string, limit uint32) ([]*domain.Event, error)
 }

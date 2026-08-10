@@ -48,6 +48,37 @@ FROM events`
 	deleteEventsOlderThanStmt = `
 DELETE FROM events
 WHERE project_id = @p1 AND created_at < @p2`
+
+	ensureEventSinkStmt = `
+INSERT INTO event_sinks (id, type, scope, project_id, url, enabled)
+VALUES (@p1, @p2, @p3, @p4, @p5, @p6)
+ON CONFLICT (id) DO UPDATE SET
+    type = EXCLUDED.type,
+    scope = EXCLUDED.scope,
+    project_id = EXCLUDED.project_id,
+    url = EXCLUDED.url,
+    enabled = EXCLUDED.enabled`
+
+	recordEventDeliveryStmt = `
+INSERT INTO event_deliveries (project_id, event_id, sink_id) VALUES (@p1, @p2, @p3)
+ON CONFLICT (project_id, event_id, sink_id) DO NOTHING`
+
+	listUndeliveredEventsStmt = `
+SELECT
+    e.project_id, e.id, e.event_type, e.category,
+    e.occurred_at, e.created_at,
+    e.team_id, e.actor_id, e.actor_type,
+    e.entity_type, e.entity_id,
+    e.client_id, e.token_id, e.delegation_type, e.delegation_id, e.grantor, e.fingerprint,
+    e.request_id, e.session_id, e.flow_id,
+    e.payload, e.metadata
+FROM events e
+WHERE NOT EXISTS (
+    SELECT 1 FROM event_deliveries d
+    WHERE d.project_id = e.project_id AND d.event_id = e.id AND d.sink_id = @p1
+)
+ORDER BY e.created_at, e.id
+LIMIT @p2`
 )
 
 var eventColumns = []string{
@@ -166,6 +197,39 @@ func (e eventStatements) DeleteEventsOlderThan(ctx context.Context, projectID st
 		return 0, err
 	}
 	return n, nil
+}
+
+// EnsureEventSink implements [service.EventStatements].
+func (e eventStatements) EnsureEventSink(ctx context.Context, sink *domain.EventSink) error {
+	if sink.ID == "" {
+		if err := ensureManagedID(&sink.ID, domain.PrefixEventSink); err != nil {
+			return err
+		}
+	}
+	_, err := e.db.Update(ctx, buildStatement(ensureEventSinkStmt,
+		sink.ID, string(sink.Type), string(sink.Scope), nullString(sink.ProjectID), sink.URL, sink.Enabled,
+	).statement())
+	return err
+}
+
+// RecordEventDelivery implements [service.EventStatements].
+func (e eventStatements) RecordEventDelivery(ctx context.Context, projectID, eventID, sinkID string) error {
+	_, err := e.db.Update(ctx, buildStatement(recordEventDeliveryStmt, projectID, eventID, sinkID).statement())
+	return err
+}
+
+// ListUndeliveredEvents implements [service.EventStatements].
+func (e eventStatements) ListUndeliveredEvents(ctx context.Context, sinkID string, limit uint32) ([]*domain.Event, error) {
+	if limit == 0 {
+		limit = 100
+	}
+	var items []*domain.Event
+	err := e.db.Query(ctx, buildStatement(listUndeliveredEventsStmt, sinkID, int64(limit)).statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		items, err = collectRows(iter, e.scanEvent)
+		return err
+	})
+	return items, err
 }
 
 func (e eventStatements) scanEvent(row *spanner.Row) (*domain.Event, error) {

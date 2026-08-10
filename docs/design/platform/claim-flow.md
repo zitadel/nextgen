@@ -111,7 +111,9 @@ Notably absent from this list: anything that touches `project_id`, users, factor
 - **Ownership.** The project transitions from anonymous (no team) to owned (attached to a team with at least one member).
 - **Capabilities.** Free-tier capabilities that require a human owner unlock — BYO email configuration, additional team members, the dashboard's billing surface.
 - **Billing eligibility.** Adding a card becomes possible. Pro-gated capabilities (managed email, SSO/SCIM/SAML, custom delivery) are now reachable.
-- **Audit trail.** The project begins emitting auditable events from this point. Pre-claim activity is not retroactively audited.
+- **Audit trail.** Events are emitted and stored from project creation onward
+  (including the pre-claim window). List, get, and export stay gated until claim
+  succeeds — stored history becomes visible without a backfill (ADR 048 / 049).
 - **Recovery options.** Strong — tied to the auth provider used at claim (and any later-linked providers). Pre-claim, recovery was best-effort.
 - **Project secret.** Rotated from the pre-claim `sk_proj_…` value to a new claimed credential. Everything else — origin-scoped secret, `project_id`, config, resources — untouched.
 

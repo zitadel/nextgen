@@ -9,6 +9,7 @@ import (
 )
 
 type contextKey struct{}
+type actorSlotKey struct{}
 
 // ActorContext holds server-authoritative WHO/HOW dimensions for event emission (ADR 048 §5).
 type ActorContext struct {
@@ -28,8 +29,26 @@ type ActorContext struct {
 	Authenticated  bool
 }
 
-// WithActorContext stores ActorContext on ctx.
+// WithActorSlot plants a mutable actor slot on ctx so net/http middleware can
+// observe AuthGate enrichment that happens inside ogen on a child context.
+func WithActorSlot(ctx context.Context) context.Context {
+	if _, ok := ctx.Value(actorSlotKey{}).(*ActorContext); ok {
+		return ctx
+	}
+	return context.WithValue(ctx, actorSlotKey{}, &ActorContext{})
+}
+
+// ActorSlotFromContext returns the mutable slot when present.
+func ActorSlotFromContext(ctx context.Context) (*ActorContext, bool) {
+	v, ok := ctx.Value(actorSlotKey{}).(*ActorContext)
+	return v, ok && v != nil
+}
+
+// WithActorContext stores ActorContext on ctx and updates any actor slot.
 func WithActorContext(ctx context.Context, ac ActorContext) context.Context {
+	if slot, ok := ActorSlotFromContext(ctx); ok {
+		*slot = ac
+	}
 	return context.WithValue(ctx, contextKey{}, ac)
 }
 

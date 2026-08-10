@@ -45,6 +45,28 @@ FROM events`
 	deleteEventsOlderThanStmt = `
 DELETE FROM events
 WHERE project_id = ? AND created_at < ?`
+
+	ensureEventSinkStmt = `
+INSERT INTO event_sinks (id, type, scope, project_id, url, enabled)
+VALUES (?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    type = excluded.type,
+    scope = excluded.scope,
+    project_id = excluded.project_id,
+    url = excluded.url,
+    enabled = excluded.enabled`
+
+	recordEventDeliveryStmt = `
+INSERT OR IGNORE INTO event_deliveries (project_id, event_id, sink_id, delivered_at)
+VALUES (?, ?, ?, ?)`
+
+	listUndeliveredEventsStmt = eventQuery + `
+ WHERE NOT EXISTS (
+    SELECT 1 FROM event_deliveries d
+    WHERE d.project_id = events.project_id AND d.event_id = events.id AND d.sink_id = ?
+ )
+ ORDER BY created_at, id
+ LIMIT ?`
 )
 
 type eventStatements struct{ statement }
@@ -152,6 +174,42 @@ func (e eventStatements) DeleteEventsOlderThan(ctx context.Context, projectID st
 		return 0, wrapError(err)
 	}
 	return res.RowsAffected()
+}
+
+// EnsureEventSink implements [service.EventStatements].
+func (e eventStatements) EnsureEventSink(ctx context.Context, sink *domain.EventSink) error {
+	if sink.ID == "" {
+		if err := ensureManagedID(&sink.ID, domain.PrefixEventSink); err != nil {
+			return err
+		}
+	}
+	enabled := 0
+	if sink.Enabled {
+		enabled = 1
+	}
+	_, err := e.client.Exec(ctx, ensureEventSinkStmt,
+		sink.ID, string(sink.Type), string(sink.Scope), nullString(sink.ProjectID), sink.URL, enabled,
+	)
+	return wrapError(err)
+}
+
+// RecordEventDelivery implements [service.EventStatements].
+func (e eventStatements) RecordEventDelivery(ctx context.Context, projectID, eventID, sinkID string) error {
+	_, err := e.client.Exec(ctx, recordEventDeliveryStmt, projectID, eventID, sinkID, nowUnixNano())
+	return wrapError(err)
+}
+
+// ListUndeliveredEvents implements [service.EventStatements].
+func (e eventStatements) ListUndeliveredEvents(ctx context.Context, sinkID string, limit uint32) ([]*domain.Event, error) {
+	if limit == 0 {
+		limit = 100
+	}
+	rows, err := e.client.Query(ctx, listUndeliveredEventsStmt, sinkID, limit)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	return collectRows(rows, scanEvent)
 }
 
 func scanEvent(row *sql.Rows) (*domain.Event, error) {
