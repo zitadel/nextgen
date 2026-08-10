@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  ClaimCheck,
   ConfigCheck,
   DependencyCheck,
   EnvExampleCheck,
@@ -938,6 +939,71 @@ describe("ProjectMatchCheck", () => {
     await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ ...SECRET, project_id: "other" }));
     await chmod(join(cwd, ".zitadel/secret"), 0o600);
     expect((await new ProjectMatchCheck().run(ctxFor(cwd))).status).toBe("fail");
+  });
+});
+
+describe("ClaimCheck", () => {
+  /** Rewrites `.zitadel/secret`, preserving the 0600 mode doctor asserts elsewhere. */
+  async function writeSecret(cwd: string, extra: Record<string, unknown>): Promise<void> {
+    await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ ...SECRET, ...extra }));
+    await chmod(join(cwd, ".zitadel/secret"), 0o600);
+  }
+
+  /** Rewrites `zitadel.json` with a different `server`, leaving everything else intact. */
+  async function writeServer(cwd: string, server: string): Promise<void> {
+    const config = JSON.parse(await readFile(join(cwd, "zitadel.json"), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ ...config, server }));
+  }
+
+  it("warns for a cloud project with no owning team", async () => {
+    const cwd = await makeProject();
+    const outcome = await new ClaimCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("temporary until you attach it to a team");
+  });
+
+  it("passes and names the team once attached", async () => {
+    const cwd = await makeProject();
+    await writeSecret(cwd, { claimed_at: "2026-01-02T00:00:00.000Z", team_id: "team-001" });
+    const outcome = await new ClaimCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("pass");
+    expect(outcome.message).toContain("team-001");
+  });
+
+  // Local and self-hosted servers have no platform team, so there is nothing to
+  // nudge toward and a warning would be permanent noise.
+  it("passes without a nudge off the cloud", async () => {
+    for (const server of ["http://localhost:8080", "https://zitadel.example.com"]) {
+      const cwd = await makeProject();
+      await writeServer(cwd, server);
+      const outcome = await new ClaimCheck().run(ctxFor(cwd));
+      expect(outcome.status).toBe("pass");
+      expect(outcome.message).not.toContain("temporary");
+    }
+  });
+
+  // Nothing wraps a throw from this check (it implements SanityCheck directly),
+  // so an unreadable secret must not take the whole battery down with it — the
+  // `secret` check is the one that reports that problem.
+  it("skips instead of throwing when the secret cannot be read", async () => {
+    const cwd = await makeProject();
+    await rm(join(cwd, ".zitadel/secret"));
+    const outcome = await new ClaimCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("pass");
+    expect(outcome.message).toContain("Skipped");
+  });
+
+  // `doctor --fix` calls fix() on every non-passing check. Claiming needs a
+  // browser, so this one must be inert rather than half-writing the record.
+  it("has no automatic repair", async () => {
+    const cwd = await makeProject();
+    const before = await readFile(join(cwd, ".zitadel/secret"), "utf8");
+    await new ClaimCheck().fix(ctxFor(cwd));
+    expect(await readFile(join(cwd, ".zitadel/secret"), "utf8")).toBe(before);
+    expect((await new ClaimCheck().run(ctxFor(cwd))).status).toBe("warn");
   });
 });
 

@@ -6,6 +6,7 @@ package authz
 import (
 	"fmt"
 
+	authzmodel "github.com/zitadel/nextgen/internal/authz"
 	"github.com/zitadel/nextgen/internal/authz/compiler"
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -32,6 +33,79 @@ func ExpressionEdgeKind(k compiler.TermKind) (string, error) {
 	default:
 		return "", fmt.Errorf("unknown expression edge kind %d", k)
 	}
+}
+
+// ParseExpressionEdgeKind maps an authz_expression_edges.kind column value to TermKind.
+func ParseExpressionEdgeKind(kind string) (compiler.TermKind, error) {
+	switch kind {
+	case "direct":
+		return compiler.TermDirect, nil
+	case "computed_userset":
+		return compiler.TermComputedUserset, nil
+	case "tuple_to_userset":
+		return compiler.TermTupleToUserset, nil
+	default:
+		return compiler.TermInvalid, fmt.Errorf("unknown expression edge kind %q", kind)
+	}
+}
+
+// PersistedCatalogFromDomain maps a loaded domain catalog projection into the
+// compiler-shaped rows used by persist round-trip tests.
+func PersistedCatalogFromDomain(catalog *domain.AuthzCatalog) (compiler.PersistedCatalog, error) {
+	if catalog == nil {
+		return compiler.PersistedCatalog{}, fmt.Errorf("nil authz catalog")
+	}
+	out := compiler.PersistedCatalog{
+		Relations:          make([]compiler.RelationDefinition, 0, len(catalog.Relations)),
+		RelationReferences: make([]compiler.RelationReference, 0, len(catalog.References)),
+		ExpressionEdges:    make([]compiler.ExpressionEdge, 0, len(catalog.Edges)),
+		Closure:            make([]compiler.Implication, 0, len(catalog.Closure)),
+	}
+	for _, rel := range catalog.Relations {
+		out.Relations = append(out.Relations, compiler.RelationDefinition{
+			Relation: compiler.Relation{Type: rel.ObjectType, Name: rel.Relation},
+		})
+	}
+	for _, ref := range catalog.References {
+		out.RelationReferences = append(out.RelationReferences, compiler.RelationReference{
+			Relation: compiler.Relation{Type: ref.ObjectType, Name: ref.Relation},
+			Reference: authzmodel.RelationReference{
+				Type:      ref.RefType,
+				Relation:  ref.RefRelation,
+				Wildcard:  ref.Wildcard,
+				Condition: ref.Condition,
+			},
+			Position: ref.Position,
+		})
+	}
+	for _, edge := range catalog.Edges {
+		kind, err := ParseExpressionEdgeKind(edge.Kind)
+		if err != nil {
+			return compiler.PersistedCatalog{}, err
+		}
+		out.ExpressionEdges = append(out.ExpressionEdges, compiler.ExpressionEdge{
+			Target:   compiler.Relation{Type: edge.ObjectType, Name: edge.Relation},
+			Kind:     kind,
+			Source:   compiler.Relation{Type: derefString(edge.SourceObjectType), Name: derefString(edge.SourceRelation)},
+			Tupleset: compiler.Relation{Type: derefString(edge.TuplesetObjectType), Name: derefString(edge.TuplesetRelation)},
+			Position: edge.Position,
+		})
+	}
+	for _, impl := range catalog.Closure {
+		out.Closure = append(out.Closure, compiler.Implication{
+			Source:  compiler.Relation{Type: impl.FromObjectType, Name: impl.FromRelation},
+			Implied: compiler.Relation{Type: impl.ToObjectType, Name: impl.ToRelation},
+			Depth:   impl.Depth,
+		})
+	}
+	return out, nil
+}
+
+func derefString(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 // RelationRow is one authz_relations insert.

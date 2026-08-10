@@ -207,6 +207,15 @@ func (s authzCatalogStatements) GetAuthzCatalog(ctx context.Context, catalogID s
 	return catalog, nil
 }
 
+// LoadCatalogMutations implements [service.AuthzCatalogStatements].
+func (s authzCatalogStatements) LoadCatalogMutations(ctx context.Context, catalogID string) (compiler.PersistedCatalog, error) {
+	catalog, err := s.GetAuthzCatalog(ctx, catalogID)
+	if err != nil {
+		return compiler.PersistedCatalog{}, err
+	}
+	return authz.PersistedCatalogFromDomain(catalog)
+}
+
 func scanAuthzCatalogMeta(row pgx.CollectableRow) (*domain.AuthzCatalog, error) {
 	c := new(domain.AuthzCatalog)
 	if err := row.Scan(
