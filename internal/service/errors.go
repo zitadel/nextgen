@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // mapStorageError translates storage-layer errors into domain errors where needed.
