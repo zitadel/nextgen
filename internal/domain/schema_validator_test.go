@@ -150,6 +150,30 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			wantErr: domain.ErrSchemaValidationFailed,
 		},
 		{
+			// A nested leaf carries x-unique the same way a top-level one
+			// does, so a typo there has to fail rather than silently leave
+			// the value non-unique.
+			name: "invalid x-unique on a nested property",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true, "position": 0 }
+				},
+				"properties": {
+					"address": {
+						"type": "object",
+						"properties": {
+							"zipCode": { "type": "string", "x-unique": "bogus" }
+						}
+					}
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
 			name: "missing metaSchema",
 			input: []byte(`{
 				"$id": "https://example.test/schemas/my-user.json",
