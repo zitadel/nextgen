@@ -327,7 +327,13 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
     <main
       data-slot="sidebar-inset"
       className={cn(
-        "relative flex w-full flex-1 flex-col bg-background",
+        // `min-w-0` is ours, not the registry's. This is a flex item, so it
+        // defaults to `min-width: auto` and cannot shrink below the min-content
+        // width of the page inside it — one fixed-width column and the whole
+        // content column grows past the viewport, pushing the sidebar off
+        // screen instead of scrolling the thing that is too wide. Every page
+        // renders in here, so the fix belongs here rather than in each screen.
+        "relative flex w-full min-w-0 flex-1 flex-col bg-background",
         "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
         className
       )}
