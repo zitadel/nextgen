@@ -185,6 +185,48 @@ describe("setup command", () => {
     expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
   });
 
+  // Every project starts unattached, so setup is where the developer first
+  // learns the project is temporary and that `zitadel claim` exists.
+  //
+  // Asserted through `--dry-run`, which previews the real output verbatim:
+  // the install, start, and verify actions all name a project dry run never
+  // created, so the claim nudge appearing alongside them is the consistent
+  // behaviour, not a leak. Suppressing only this one would make dry run a
+  // dishonest preview of the surface under test.
+  it("tells a new cloud project it is temporary until a team is attached", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await setup(cwd, ["--dry-run", "--framework", "next"]);
+
+    const json = parseJson(res.stdout) as {
+      data: { next_actions: string[]; next_commands: string[] };
+    };
+    expect(json.data.next_actions.join("\n")).toContain("temporary until you attach it to a team");
+    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+  });
+
+  it("says nothing about teams when setting up against a self-hosted server", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--json",
+      "--server",
+      "https://zitadel.example.com",
+      "--dry-run",
+      "--framework",
+      "next",
+    ]);
+
+    const json = parseJson(res.stdout) as {
+      data: { next_actions: string[]; next_commands: string[] };
+    };
+    expect(json.data.next_actions.join("\n")).not.toContain("attach it to a team");
+    expect(json.data.next_commands.join("\n")).not.toMatch(/claim/);
+  });
+
   it.each(FRAMEWORK_FIXTURES)(
     "dry-run setup supports $framework projects",
     async ({ create, expectedFile, framework }) => {

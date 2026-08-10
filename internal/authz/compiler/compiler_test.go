@@ -159,6 +159,40 @@ type project
 	}, output.Catalog.Closure)
 }
 
+// TestCompileComputesClosureDepthsAlongChain covers a longer computed-userset
+// chain with no shortcuts so Depth values 2 and 3 are independently asserted
+// (the diamond fixture above only needs depths 0 and 1).
+func TestCompileComputesClosureDepthsAlongChain(t *testing.T) {
+	t.Parallel()
+
+	output, err := compiler.Compile(parse(t, `model
+  schema 1.1
+
+type user
+
+type document
+  relations
+    define reader: [user]
+    define commenter: reader
+    define writer: commenter
+    define owner: writer
+`))
+	require.NoError(t, err)
+
+	assert.Equal(t, []compiler.Implication{
+		{Source: relation("document", "commenter"), Implied: relation("document", "commenter"), Depth: 0},
+		{Source: relation("document", "commenter"), Implied: relation("document", "owner"), Depth: 2},
+		{Source: relation("document", "commenter"), Implied: relation("document", "writer"), Depth: 1},
+		{Source: relation("document", "owner"), Implied: relation("document", "owner"), Depth: 0},
+		{Source: relation("document", "reader"), Implied: relation("document", "commenter"), Depth: 1},
+		{Source: relation("document", "reader"), Implied: relation("document", "owner"), Depth: 3},
+		{Source: relation("document", "reader"), Implied: relation("document", "reader"), Depth: 0},
+		{Source: relation("document", "reader"), Implied: relation("document", "writer"), Depth: 2},
+		{Source: relation("document", "writer"), Implied: relation("document", "owner"), Depth: 1},
+		{Source: relation("document", "writer"), Implied: relation("document", "writer"), Depth: 0},
+	}, output.Catalog.Closure)
+}
+
 func TestCompileDoesNotTreatObjectBoundTraversalAsGlobalImplication(t *testing.T) {
 	t.Parallel()
 
