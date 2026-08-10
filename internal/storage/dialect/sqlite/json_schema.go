@@ -88,7 +88,7 @@ func (js jsonSchemaStatements) GetJSONSchemaByID(ctx context.Context, projectID,
 // ListJSONSchemas implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, jsonSchemaQuery, filter, jsonSchemaSchema); err != nil {
+	if err := compileList(ctx, &compiler, jsonSchemaQuery, filter, jsonSchemaSchema, "json_schemas", "url"); err != nil {
 		return nil, err
 	}
 	rows, err := js.client.Query(ctx, compiler.String(), compiler.args...)

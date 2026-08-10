@@ -1,6 +1,7 @@
 package spanner
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
@@ -21,6 +22,13 @@ func (c *statementCompiler) Reset() {
 }
 
 func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *database.ListOptions[F], schema database.Schema[F, T]) error {
+	return compileList[F, T](context.Background(), c, stmt, opt, schema, "", "")
+}
+
+// compileList builds a list SELECT with optional authz EXISTS injection before
+// ORDER BY / LIMIT. tableName and resourceIDCol identify the outer resource row
+// (e.g. "teams", "id"); empty skips authz.
+func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stmt string, opt *database.ListOptions[F], schema database.Schema[F, T], tableName, resourceIDCol string) error {
 	c.WriteString(stmt)
 
 	filter := opt.Filter
@@ -43,9 +51,14 @@ func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *databa
 			filter = database.And(filter, database.CompareLess(terms...))
 		}
 	}
+	hasWhere := false
 	if filter != nil {
 		c.WriteString(" WHERE ")
 		compileFilter(c, filter, schema)
+		hasWhere = true
+	}
+	if tableName != "" && resourceIDCol != "" {
+		maybeWriteAuthzListPredicate(ctx, c, &hasWhere, tableName, resourceIDCol)
 	}
 
 	compileOrderBy(c, opt.Pagination.OrderBy, schema)

@@ -99,7 +99,7 @@ func (ts teamStatements) UpdateTeam(ctx context.Context, team *domain.Team) erro
 // ListTeams implements [service.TeamStatements].
 func (ts teamStatements) ListTeams(ctx context.Context, filter *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, getTeamQuery, filter, teamSchema); err != nil {
+	if err := compileList(ctx, &compiler, getTeamQuery, filter, teamSchema, "teams", "id"); err != nil {
 		return nil, err
 	}
 	rows, err := ts.client.Query(ctx, compiler.String(), compiler.args...)
