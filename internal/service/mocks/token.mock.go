@@ -158,45 +158,6 @@ func (c *MockTokenServiceIntrospectTokenCall) DoAndReturn(f func(context.Context
 	return c
 }
 
-// PublishableKey mocks base method.
-func (m *MockTokenService) PublishableKey(ctx context.Context, project *domain.Project) (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PublishableKey", ctx, project)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// PublishableKey indicates an expected call of PublishableKey.
-func (mr *MockTokenServiceMockRecorder) PublishableKey(ctx, project any) *MockTokenServicePublishableKeyCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishableKey", reflect.TypeOf((*MockTokenService)(nil).PublishableKey), ctx, project)
-	return &MockTokenServicePublishableKeyCall{Call: call}
-}
-
-// MockTokenServicePublishableKeyCall wrap *gomock.Call
-type MockTokenServicePublishableKeyCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockTokenServicePublishableKeyCall) Return(arg0 string, arg1 error) *MockTokenServicePublishableKeyCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockTokenServicePublishableKeyCall) Do(f func(context.Context, *domain.Project) (string, error)) *MockTokenServicePublishableKeyCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockTokenServicePublishableKeyCall) DoAndReturn(f func(context.Context, *domain.Project) (string, error)) *MockTokenServicePublishableKeyCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // RevokeToken mocks base method.
 func (m *MockTokenService) RevokeToken(ctx context.Context, projectID, tokenID string) error {
 	m.ctrl.T.Helper()
