@@ -184,7 +184,7 @@ integration tags. Slice C is the long-term gate for authz behavior.
 go test ./internal/authz/...
 
 # Generative persist round-trip (needs a dialect tag)
-go test -tags sqlite_integration ./internal/storage/v2/stmttest/ -run Generative -count=1
+go test -tags sqlite_integration ./internal/storage/stmttest/ -run Generative -count=1
 
 # Longer fuzz (local / overnight)
 go test ./internal/authz/compiler/ -fuzz=FuzzCompileInvariants -fuzztime=30s
