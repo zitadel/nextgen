@@ -26,7 +26,7 @@ INSERT INTO zitadel_nextgen.events (
     payload, metadata
 ) VALUES (
     $1, $2, $3, $4,
-    now() - ($5::bigint * interval '1 nanosecond'), now(),
+    now() - ($5 * interval '1 second'), now(),
     $6, $7, $8,
     $9, $10,
     $11, $12, $13, $14, $15, $16,
@@ -93,14 +93,14 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 	}
 	payload := events.NormalizeJSON(event.Payload)
 	metadata := events.NormalizeJSON(event.Metadata)
-	waitNs := event.OccurredAtWait.Nanoseconds()
-	if waitNs < 0 {
-		waitNs = 0
+	waitSecs := event.OccurredAtWait.Seconds()
+	if waitSecs < 0 {
+		waitSecs = 0
 	}
 
 	err := e.client.QueryRow(ctx, insertEventStmt,
 		event.ProjectID, event.ID, string(event.EventType), string(event.Category),
-		waitNs,
+		waitSecs,
 		nullString(event.TeamID), nullString(event.ActorID), nullActorType(event.ActorType),
 		nullString(event.EntityType), nullString(event.EntityID),
 		event.ClientID, event.TokenID, event.DelegationType, event.DelegationID, event.Grantor, event.Fingerprint,
