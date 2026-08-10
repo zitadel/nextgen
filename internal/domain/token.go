@@ -32,6 +32,10 @@ func ErrTokenRevoked() Error {
 	return newError(TokenPrefix.ErrorCodePrefix("revoked"), "the token is not valid", nil, nil)
 }
 
+func TokenNotFound() Error {
+	return newError(TokenPrefix.ErrorCodePrefix("not_found"), "the token was not found", nil, nil)
+}
+
 // Token is a persisted token record (access, session, PAT, etc.).
 //
 // A revocable token carries its record's id (`TokenID`, the `jti`). The token

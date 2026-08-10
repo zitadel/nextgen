@@ -154,8 +154,6 @@ type TokenStatements interface {
 	CreateToken(ctx context.Context, entity *domain.Token) error
 	GetTokenByID(ctx context.Context, projectID, tokenID string) (*domain.Token, error)
 	ListTokens(ctx context.Context, filter *database.ListOptions[domain.TokenField]) (*database.ListResult[*domain.Token], error)
-	// DeleteTokenByID revokes a token: the record is removed, so verification
-	// stops resolving it (ADR 037).
 	DeleteTokenByID(ctx context.Context, projectID, tokenID string) error
 	DeleteTokensBySessionID(ctx context.Context, projectID, sessionID string) error
 }

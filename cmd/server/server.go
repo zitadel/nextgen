@@ -262,7 +262,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
-		standaloneRuntimeResolver(projectService, tokenService, cfg.Platform.ResolvedProjectID()))
+		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()))
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}

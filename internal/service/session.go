@@ -123,18 +123,11 @@ func (s *sessionService) List(ctx context.Context, input ListSessionInput) ([]*d
 func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) error {
 	return s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		err := tx.Statements().DeleteSessionByID(ctx, input.ProjectID, input.SessionID)
-		if err != nil {
-			if errors.Is(err, domain.ErrSessionNotFound()) {
-				return nil
-			}
+		if err != nil && !errors.Is(err, domain.ErrSessionNotFound()) {
 			return domain.ErrInternal(err).WithMessage("Failed to delete the session.")
 		}
 
-		err = tx.Statements().DeleteTokensBySessionID(ctx, input.ProjectID, input.SessionID)
-		if err != nil {
-			if errors.Is(err, domain.ErrSessionNotFound()) {
-				return nil
-			}
+		if err := tx.Statements().DeleteTokensBySessionID(ctx, input.ProjectID, input.SessionID); err != nil {
 			return domain.ErrInternal(err).WithMessage("Failed to revoke session tokens.")
 		}
 

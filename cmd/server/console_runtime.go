@@ -3,9 +3,11 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -54,6 +56,7 @@ type runtimeResolver func(ctx context.Context) (consoleRuntime, error)
 func standaloneRuntimeResolver(
 	projects service.ProjectService,
 	tokens service.TokenService,
+	keys service.KeyService,
 	cfgProjectID string,
 ) runtimeResolver {
 	return func(ctx context.Context) (consoleRuntime, error) {
@@ -67,14 +70,36 @@ func standaloneRuntimeResolver(
 		}
 		meta.ConsoleProjectID = project.ID
 
-		tkn := project.PreviewToken()
-		publishableKey, err := tokens.GenerateJWE(ctx, tkn)
+		key, err := publishableKey(ctx, tokens, keys, project)
 		if err != nil {
 			return consoleRuntime{}, err
 		}
-		meta.PublishableKey = publishableKey
+		meta.PublishableKey = key
 		return meta, nil
 	}
+}
+
+func publishableKey(
+	ctx context.Context,
+	tokens service.TokenService,
+	keys service.KeyService,
+	project *domain.Project,
+) (string, error) {
+	previewToken, err := tokens.GetActivePreviewToken(ctx, project.ID)
+	if err != nil {
+		// No record yet (or none that still grants anything): mint one. Any
+		// other failure is a real one and must not silently issue a key.
+		if !errors.Is(err, domain.TokenNotFound()) {
+			return "", err
+		}
+		return tokens.GenerateJWE(ctx, project.PreviewToken())
+	}
+
+	tokenCrypter, err := keys.GetProjectCrypter(ctx, project.ID, domain.EncryptionKeyPurposeToken)
+	if err != nil {
+		return "", err
+	}
+	return previewToken.JWE(tokenCrypter)
 }
 
 // newConsoleRuntimeHandler serves the runtime document.

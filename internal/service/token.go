@@ -20,6 +20,7 @@ type TokenService interface {
 	GenerateJWE(ctx context.Context, data *domain.Token) (string, error)
 	RevokeToken(ctx context.Context, projectID, tokenID string) error
 	IntrospectToken(ctx context.Context, token string) (*domain.Token, error)
+	GetActivePreviewToken(ctx context.Context, projectID string) (*domain.Token, error)
 }
 
 // ---- Implementation -------------------------------------------------------------
@@ -48,6 +49,43 @@ func (s *tokenService) GenerateJWE(ctx context.Context, data *domain.Token) (str
 		return "", err
 	}
 	return data.JWE(tokenCrypter)
+}
+
+func (s *tokenService) GetActivePreviewToken(ctx context.Context, projectID string) (*domain.Token, error) {
+	opts := &database.ListOptions[domain.TokenField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.TokenFieldProjectID), projectID),
+			database.Equal(database.Col(domain.TokenFieldType), domain.TokenTypeProjectPreview.String()),
+		),
+		Pagination: database.Page[domain.TokenField]{
+			Limit: 100,
+			OrderBy: database.OrderBy[domain.TokenField]{
+				// token_id breaks ties so the page is deterministic.
+				Columns: []database.Column[domain.TokenField]{
+					database.Col(domain.TokenFieldCreatedAt),
+					database.Col(domain.TokenFieldTokenID),
+				},
+			},
+		},
+	}
+	result, err := s.v2Pool.Statements().ListTokens(ctx, opts)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to get token")
+	}
+	now := time.Now()
+	for token, err := range result.Iterate(func(cursor []byte) (*database.ListResult[*domain.Token], error) {
+		result.NextCursor = cursor
+		return s.v2Pool.Statements().ListTokens(ctx, opts)
+	}) {
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to get token")
+		}
+
+		if token.Active(now) {
+			return token, nil
+		}
+	}
+	return nil, domain.TokenNotFound()
 }
 
 func (s *tokenService) RevokeToken(ctx context.Context, projectID, tokenID string) error {

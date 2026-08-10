@@ -259,3 +259,57 @@ func TestTokenStatements_Revocation(t *testing.T) {
 		})
 	})
 }
+
+// TestTokenStatements_ListProjectPreview pins the lookup the publishable key
+// rides on: the console runtime document resolves the project's preview
+// credential per request, so it has to find the existing record by type
+// instead of minting a row per request.
+func TestTokenStatements_ListProjectPreview(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+
+		newToken := func(tokenType domain.TokenType) *domain.Token {
+			tok := &domain.Token{
+				ProjectID: projectID,
+				Type:      tokenType,
+				Scope:     []string{"project.read"},
+			}
+			require.NoError(t, d.stmts.CreateToken(t.Context(), tok))
+			t.Cleanup(func() {
+				_ = d.stmts.DeleteTokenByID(context.Background(), projectID, tok.TokenID)
+			})
+			return tok
+		}
+		preview := newToken(domain.TokenTypeProjectPreview)
+		newToken(domain.TokenTypeProjectToken)
+
+		listPreview := func() *database.ListResult[*domain.Token] {
+			result, err := d.stmts.ListTokens(t.Context(), &database.ListOptions[domain.TokenField]{
+				Filter: database.And(
+					database.Equal(database.Col(domain.TokenFieldProjectID), projectID),
+					database.Equal(database.Col(domain.TokenFieldType), domain.TokenTypeProjectPreview.String()),
+				),
+				Pagination: database.Page[domain.TokenField]{
+					Limit: 1,
+					OrderBy: database.OrderBy[domain.TokenField]{
+						Columns: []database.Column[domain.TokenField]{
+							database.Col(domain.TokenFieldCreatedAt),
+							database.Col(domain.TokenFieldTokenID),
+						},
+					},
+				},
+			})
+			require.NoError(t, err)
+			return result
+		}
+
+		found := listPreview()
+		require.Len(t, found.Items, 1, "the project token must not answer a preview lookup")
+		assert.Equal(t, preview.TokenID, found.Items[0].TokenID)
+		assert.Equal(t, domain.TokenTypeProjectPreview, found.Items[0].Type)
+
+		// Revoked, the lookup comes back empty and the caller mints a new one.
+		require.NoError(t, d.stmts.DeleteTokenByID(t.Context(), projectID, preview.TokenID))
+		assert.Empty(t, listPreview().Items)
+	})
+}

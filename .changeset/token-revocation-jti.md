@@ -23,12 +23,14 @@ its own expiry passed. It no longer does.
   moment its successor is issued.
 - **Project and preview secrets are revocable.** They are now issued with a
   stored `jti`, so a leaked secret can be retired instead of living forever —
-  these credentials have no expiry of their own.
+  these credentials have no expiry of their own. The console's publishable key
+  is the project's preview credential re-encrypted, not a new one per request,
+  so revoking the preview secret retires the published key with it.
 
 Expired records are never honoured — verification checks `expires_at` too. There
 is no background sweeper yet, so records that expired without being revoked
-accumulate; purging them once they are past `expires_at` is safe and is left as
-follow-up work.
+accumulate; purging them once they are past `expires_at` is safe (verification
+already rejects them) and is tracked in zitadel/nextgen#800.
 
 **Compatibility:** project secrets issued before this change carry no `jti`.
 They keep working — they cannot be forged without the encryption key — but
