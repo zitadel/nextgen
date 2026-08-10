@@ -119,9 +119,9 @@ type Event struct {
 	Payload  json.RawMessage
 	Metadata json.RawMessage
 
-	// OccurredAtWait is an insert-only hint for Path A batching: SQL uses
-	// occurred_at = now() - wait. Zero means Path B (occurred_at = now()).
-	// Not a persisted column.
+	// OccurredAtWait is an insert-only hint for Path A batching: dialects set
+	// occurred_at = created_at - wait (DB clock or equivalent). Zero means
+	// Path B (occurred_at = created_at). Not a persisted column.
 	OccurredAtWait time.Duration
 }
 

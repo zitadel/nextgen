@@ -16,25 +16,6 @@ import (
 const (
 	eventsTable = "events"
 
-	insertEventStmt = `
-INSERT INTO events (
-    project_id, id, event_type, category,
-    occurred_at, created_at,
-    team_id, actor_id, actor_type,
-    entity_type, entity_id,
-    client_id, token_id, delegation_type, delegation_id, grantor, fingerprint,
-    request_id, session_id, flow_id,
-    payload, metadata
-) VALUES (
-    @p1, @p2, @p3, @p4,
-    TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @p5 NANOSECOND), CURRENT_TIMESTAMP(),
-    @p6, @p7, @p8,
-    @p9, @p10,
-    @p11, @p12, @p13, @p14, @p15, @p16,
-    @p17, @p18, @p19,
-    @p20, @p21
-) THEN RETURN occurred_at, created_at`
-
 	eventQuery = `SELECT
     project_id, id, event_type, category,
     occurred_at, created_at,
@@ -98,6 +79,12 @@ func newEventStatements(db queryExecutor) eventStatements {
 }
 
 // InsertEvent implements [service.EventStatements].
+//
+// Uses BufferWrite so Path B inserts inside an outer read-write transaction
+// queue locally and apply at commit — no per-event DML RPC. The Spanner
+// emulator serializes one transaction at a time; intermediate THEN RETURN
+// inserts lengthened compound TXs enough to blow the abort-retry budget under
+// parallel integration tests.
 func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) error {
 	if event.ProjectID == "" {
 		return domain.ErrEventInvalid("missing project_id", nil)
@@ -118,35 +105,42 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 	if err != nil {
 		return err
 	}
-	waitNs := event.OccurredAtWait.Nanoseconds()
-	if waitNs < 0 {
-		waitNs = 0
+	wait := event.OccurredAtWait
+	if wait < 0 {
+		wait = 0
 	}
+	createdAt := time.Now().UTC()
+	occurredAt := createdAt.Add(-wait)
 
-	stmt := buildStatement(insertEventStmt,
-		event.ProjectID, event.ID, string(event.EventType), string(event.Category),
-		waitNs,
-		nullString(event.TeamID), nullString(event.ActorID), nullActorType(event.ActorType),
-		nullString(event.EntityType), nullString(event.EntityID),
-		event.ClientID, event.TokenID, event.DelegationType, event.DelegationID, event.Grantor, event.Fingerprint,
-		nullString(event.RequestID), nullString(event.SessionID), nullString(event.FlowID),
-		payload, metadata,
-	).statement()
-
-	err = e.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
-		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			if err := row.Columns(&event.OccurredAt, &event.CreatedAt); err != nil {
-				return struct{}{}, err
-			}
-			event.OccurredAt = event.OccurredAt.UTC()
-			event.CreatedAt = event.CreatedAt.UTC()
-			return struct{}{}, nil
-		})
-		return err
+	m := spanner.InsertMap(eventsTable, map[string]any{
+		"project_id":      event.ProjectID,
+		"id":              event.ID,
+		"event_type":      string(event.EventType),
+		"category":        string(event.Category),
+		"occurred_at":     occurredAt,
+		"created_at":      createdAt,
+		"team_id":         nullString(event.TeamID),
+		"actor_id":        nullString(event.ActorID),
+		"actor_type":      nullActorType(event.ActorType),
+		"entity_type":     nullString(event.EntityType),
+		"entity_id":       nullString(event.EntityID),
+		"client_id":       event.ClientID,
+		"token_id":        event.TokenID,
+		"delegation_type": event.DelegationType,
+		"delegation_id":   event.DelegationID,
+		"grantor":         event.Grantor,
+		"fingerprint":     event.Fingerprint,
+		"request_id":      nullString(event.RequestID),
+		"session_id":      nullString(event.SessionID),
+		"flow_id":         nullString(event.FlowID),
+		"payload":         payload,
+		"metadata":        metadata,
 	})
-	if err != nil {
+	if err := e.db.BufferWrite(ctx, []*spanner.Mutation{m}); err != nil {
 		return err
 	}
+	event.OccurredAt = occurredAt
+	event.CreatedAt = createdAt
 	event.Payload = payloadRaw
 	event.Metadata = metadataRaw
 	return nil
