@@ -52,11 +52,18 @@ helpers so they cannot diverge. Behavior is unchanged under the default config.
 
 ```yaml
 trusted_proxies:
-  # Peers trusted to set forwarded headers. Headers are honored only when
-  # RemoteAddr matches one of these; otherwise RemoteAddr is the client.
-  cidrs:
-    - 10.0.0.0/8
-    # - <cloudflare-ranges>   # when fronted by Cloudflare
+  # Peers trusted to set forwarded headers. A header is honored only when
+  # RemoteAddr matches the resolved set; otherwise RemoteAddr is the client.
+  # Sources compose; a remote source refreshes rotating edge ranges without a
+  # redeploy (see Challenges for the guards it must satisfy).
+  sources:
+    - static:
+        cidrs: [10.0.0.0/8]        # stable infra (our LB / VPC)
+    - url:                          # optional: fronted directly by a CDN edge
+        endpoint: https://api.cloudflare.com/client/v4/ips
+        format: cloudflare          # or: cidr-lines | aws-ip-ranges | gcp
+        refresh: 12h
+        on_error: keep_last_good    # never fail open
 
   # First matching header wins; falls back to RemoteAddr.
   client_ip_from:
@@ -95,19 +102,36 @@ The trusted set is not always a fixed list of CIDRs an operator can paste once:
 - **Ephemeral infra IPs.** Cloud load balancers (AWS ALB, GCP) and Kubernetes
   ingress/pods often have no stable address to pin at all.
 
-Three ways to absorb this, which the config must allow:
+Four ways to absorb this, which the config must allow:
 
-1. **Refreshed lists**, not hardcoded — load vendor ranges from operator config
-   (or a periodic fetch), so they can be updated without a rebuild.
-2. **Trust by network position** — a private-subnet/VPC CIDR (e.g. `10.0.0.0/8`)
+1. **Trust by network position** — a private-subnet/VPC CIDR (e.g. `10.0.0.0/8`)
    is stable even when the LB's own IP is not.
-3. **Trust by hop count** — trust *N* hops from the right of `X-Forwarded-For`
+2. **Trust by hop count** — trust *N* hops from the right of `X-Forwarded-For`
    regardless of address (cf. Gitea's `REVERSE_PROXY_LIMIT`), sidestepping IPs
    entirely at the cost of assuming a fixed chain length.
+3. **Static list** — an operator-pasted set of CIDRs, updated by redeploy;
+   simplest, and correct for fixed infra.
+4. **Remote source (URL)** — point at a published list and refresh it on an
+   interval, so rotating edge ranges stay current without a redeploy. Prior art:
+   Caddy's `trusted_proxies cloudflare` module (fetches Cloudflare's API on a
+   configurable interval), HAProxy's periodic map/ACL updates, and the common
+   AWS `ip-ranges.json` refresh job. This is the direct answer to rotating CIDRs,
+   but because the fetched list *defines who we trust*, it carries obligations a
+   plain config value does not:
+   - **Format contract** — accept one defined shape (newline-delimited CIDRs) or
+     a small set of named adapters (`cloudflare`, `aws-ip-ranges`, `gcp`), since
+     providers publish different formats.
+   - **Authenticity** — fetch over authenticated TLS (pinned host) and verify a
+     signature/checksum where offered; a MITM'd list is a trust-bypass.
+   - **Fail-safe** — keep last-known-good on fetch failure, never fail open to an
+     empty/all set; define boot behavior when the source is unreachable.
+   - **Refresh & propagation** — a configurable interval, applied consistently
+     across replicas; the source endpoint becomes a runtime availability edge.
 
-The most robust default is often to terminate the dynamic edge upstream of a
-proxy **we** own, so `RemoteAddr` is that stable proxy and the CDN's changing
-ranges never need to be trusted directly.
+The most robust default is still to terminate the dynamic edge upstream of a
+proxy **we** own, so `RemoteAddr` is that stable proxy and the edge's changing
+ranges never need to be trusted directly — the remote-source option is for
+deployments where the CDN edge must be trusted head-on.
 
 ## Consequences
 
