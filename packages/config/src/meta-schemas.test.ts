@@ -40,6 +40,7 @@ describe("meta-schemas", () => {
       "flow-definition.json",
       "user-schema.json",
       "user-property.json",
+      "property-name.json",
       "auth-methods.json",
       "auth-method.json",
       "branding.json",

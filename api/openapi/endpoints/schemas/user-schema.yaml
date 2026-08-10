@@ -36,6 +36,6 @@ properties:
       A map of additional properties for the user definition, where the
       key is the property name and the value is the property schema
     propertyNames:
-      "$ref": "user-property.yaml#/$defs/PropertyName"
+      "$ref": property-name.json
     additionalProperties:
       "$ref": user-property.yaml
