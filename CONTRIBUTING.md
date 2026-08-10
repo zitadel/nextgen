@@ -275,24 +275,32 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 Within full mode, the steps after the `moon ci` graph are additionally gated
 by moon's affected task selection (`moon query tasks --affected --downstream
 deep`, computed in `scripts/ci-mode.mjs`): a lane is skipped when the diff
-provably cannot reach its tasks — a docs-only PR runs almost nothing, a
-frontend-only PR skips the Go suites. The gates fail open: known repo-wide
+provably cannot reach its
+tasks — a docs-only PR runs almost nothing, a frontend-only PR skips the Go
+suites, a console-only PR runs the e2e suites but no journeys. The journey
+variants gate per surface (the map lives as task-space constants in
+`scripts/ci-mode.mjs`): the fresh-app journey answers to every SDK plus the
+shared login surface, the passkey-preset and test-kit journeys to the shared
+surface only, and the fresh-app framework matrix collapses to a single
+framework unless an SDK, the CLI, or the journey project itself moved. The
+snapshot runs iff any journey does — the tarball handoff between them is a
+filesystem contract moon cannot see. The gates fail open: known repo-wide
 files no moon task claims (workflow definitions, `scripts/`, moon config,
 root manifests and compiler/release inputs such as `tsconfig.base.json`), an
-empty diff, or a failed query all force the complete run — and when the
-query returns an empty affected set, the run is only skipped if every
-changed file is on a narrow explicitly-inert allowlist (`docs/`, root agent
-notes), because unclaimed files are not assumed inert. The journeys and the
-snapshot share one gate because the tarball handoff between them is a
-filesystem contract moon cannot see.
+empty diff, or a failed query all force the
+complete run — and when the query returns an empty affected set, the run is
+only skipped if every changed file is on a narrow explicitly-inert allowlist
+(`docs/`, root agent notes), because unclaimed files are not assumed inert.
 
 **Version-only mode** (Changesets version PRs) runs `release:version`,
 `release:pack`, and tarball verification instead.
 
 CI consumes the workflow's packed npm tarballs, not public Zitadel packages.
 Changesets PR comments are informational release-intent feedback, not a
-blocking gate. Workflow artifacts (the release snapshot always, journey
-diagnostics on failure) expire after 7 days. The demo end-to-end suites and
+blocking gate. Workflow artifacts (the release snapshot whenever a journey
+lane runs — a run whose journeys are gated off, such as a docs-only or
+console-only PR, uploads no snapshot — and journey diagnostics on failure)
+expire after 7 days. The demo end-to-end suites and
 the Docker-fallback journey do not run in CI; they stay opt-in local checks
 (see below).
 

@@ -74,8 +74,8 @@ The React SDK is the SPA wrapper for the shared Zitadel login and logout widgets
 
 <Steps>
   <Step>The widgets call the configured proxy path on the same origin.</Step>
-  <Step>In local Vite development, the generated proxy forwards `/__nextgen/*` to Zitadel and attaches the project service key.</Step>
-  <Step>In production, deploy an equivalent edge/backend proxy or intentionally configure a backend URL for local-only experiments.</Step>
+  <Step>In local Vite development, the generated proxy forwards `/__nextgen/*` to Zitadel and attaches the project service key only on the session exchange.</Step>
+  <Step>In production, the same-origin path comes from a platform rewrite or minimal worker (see [SDK proxy](/docs/concepts/sdk-proxy)) — or intentionally configure a backend URL for local-only experiments.</Step>
 </Steps>
 
 ## Verify
