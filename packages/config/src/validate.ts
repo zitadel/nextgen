@@ -586,6 +586,27 @@ function schemaRequired(schema: Record<string, unknown>): string[] {
   return Array.isArray(schema.required) ? schema.required.map(str).filter((n) => n !== "") : [];
 }
 
+/**
+ * Mirrors `schemaReader.RequiredLeafPaths`: every name in `required`,
+ * recursed through the nested `required` of each required object. A
+ * required object declaring no `required` of its own ends the descent at
+ * the object itself.
+ */
+function requiredLeafPaths(schema: Record<string, unknown>, prefix = ""): string[] {
+  const properties = schemaProperties(schema);
+  const out: string[] = [];
+  for (const name of schemaRequired(schema)) {
+    const path = prefix === "" ? name : `${prefix}.${name}`;
+    const property = properties?.[name];
+    if (!isPlainObject(property) || schemaRequired(property).length === 0) {
+      out.push(path);
+      continue;
+    }
+    out.push(...requiredLeafPaths(property, path));
+  }
+  return out;
+}
+
 /** Mirrors `xAuthMethodsReader.IsEnabled` in flow_field_resolver_schema.go. */
 function authMethodEnabled(schema: Record<string, unknown>, method: string): boolean {
   if (!isPlainObject(schema["x-auth-methods"])) return false;
@@ -616,12 +637,38 @@ function resolveFieldChallenge(
     return { challenge: "password" };
   }
 
-  const property = properties[field];
-  if (property === undefined) {
-    return { message: `flow field: not a property in the user schema: ${q(field)}` };
+  // Mirrors walkUserProperty: a nested property is addressed by its
+  // dotted path, descending one `properties` level per segment.
+  const segments = field.split(".");
+  let property: unknown = undefined;
+  let level: Record<string, unknown> | undefined = properties;
+  for (const [i, segment] of segments.entries()) {
+    property = level?.[segment];
+    if (property === undefined) {
+      return { message: `flow field: not a property in the user schema: ${q(field)}` };
+    }
+    const nested = isPlainObject(property) ? schemaProperties(property) : undefined;
+    if (i < segments.length - 1 && nested === undefined) {
+      return { message: `flow field: not a property in the user schema: ${q(field)}` };
+    }
+    level = nested;
   }
+
   if (!isPlainObject(property)) {
     return { challenge: null };
+  }
+
+  // Mirrors deriveUserPropertyType: an object or array has no
+  // field-shaped input. A property carrying `properties` is an object
+  // even when it omits the `type` keyword.
+  if (
+    property.type === "object" ||
+    property.type === "array" ||
+    schemaProperties(property) !== undefined
+  ) {
+    return {
+      message: `flow field: not a scalar property, name a nested leaf instead: ${q(field)}`,
+    };
   }
 
   // Mirrors schemaReader.JSONType: the nullable idiom `["null", X]`
@@ -660,8 +707,13 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
       collected.add(field);
     }
   }
-  const missing = schemaRequired(raw)
-    .filter((field) => !collected.has(field))
+  // A required leaf is covered only by itself; a required object that
+  // declares no `required` of its own is covered by any field beneath it.
+  const missing = requiredLeafPaths(raw)
+    .filter(
+      (field) =>
+        !collected.has(field) && ![...collected].some((f) => f.startsWith(`${field}.`)),
+    )
     .sort();
   if (missing.length > 0) {
     issues.push(
