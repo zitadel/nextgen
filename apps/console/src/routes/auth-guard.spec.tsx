@@ -1,7 +1,9 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { makeTestSession } from "../auth/session.fixture";
 import { createAppRouter } from "../router";
@@ -38,6 +40,17 @@ vi.mock("@zitadel/sdk-react", () => ({
     />
   ),
 }));
+
+/**
+ * The redirect target below is a real screen with a loader, so the guard tests
+ * need its data call answered — an empty list is enough to prove the redirect
+ * landed. A path pattern rather than an absolute URL: this spec imports the
+ * router statically, so `api/zitadel.ts` binds its base before any `stubEnv`.
+ */
+const server = setupServer(http.get("*/api/schemas", () => HttpResponse.json([])));
+
+beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
+afterAll(() => server.close());
 
 async function renderAt(path: string) {
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
@@ -86,7 +99,7 @@ describe("authentication guard", () => {
     fetchSession.mockResolvedValue(makeTestSession());
     const router = await renderAt("/login?next=/schemas");
 
-    expect(await screen.findByRole("heading", { name: "Schemas" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "User schemas" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/schemas");
   });
 
