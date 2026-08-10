@@ -23506,12 +23506,12 @@ func (s *UserPropertyAdditional) init() UserPropertyAdditional {
 
 // A map of additional properties for the user definition, where the key is
 // the property name and the value is the property schema.
-type UserPropertyProperties map[string]jx.Raw
+type UserPropertyProperties map[string]UserProperty
 
 func (s *UserPropertyProperties) init() UserPropertyProperties {
 	m := *s
 	if m == nil {
-		m = map[string]jx.Raw{}
+		m = map[string]UserProperty{}
 		*s = m
 	}
 	return m
