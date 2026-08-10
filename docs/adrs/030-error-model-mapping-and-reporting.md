@@ -192,6 +192,7 @@ Every error response is the ogen-generated `api.ErrorDetails` (`api/openapi/comp
 - **`Details` is marshalled to the client whenever a producer sets it** (standard JSON marshalling). Setting `Details` *is* the act of exposing it — there is no separate per-code allow-list.
 - `Details` must contain only **client-actionable, non-sensitive** data (field paths, schema validation issues, conflict keys). Keeping secrets/PII out is the **producer's** responsibility (Decision 6), because the value is client-facing by intent.
 - A details **container type is not a client-redaction mechanism**: a `map`/struct marshals whatever it holds, and no generic type can distinguish intended PII (for example the subject's own email on a self-scoped endpoint) from a leak. Redaction is enforced by producer discipline and review, not by the type.
+- Producer contract, reference patterns, and inventory live in [`docs/design/api/error-details-producers.md`](../design/api/error-details-producers.md) ([#585](https://github.com/zitadel/nextgen/issues/585) task B).
 
 #### HTTP status
 
@@ -366,7 +367,7 @@ The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean
 | Wire `errreport` toggles + `GCPReporting` from `log.errors.*` / format | Instrumentation | #367 |
 | Flow error sentinels + OpenAPI schemas | API / domain | #367 |
 | Shared storage error detection helpers | Storage / service | #48 |
-| Selective API `details` population | API | #367 |
+| Selective API `details` population | API | [#585](https://github.com/zitadel/nextgen/issues/585) (was #367) |
 | Align `WithLogging`: 4xx at `Info`/`Warn`, stop logging raw response bodies | API / instrumentation | #367 |
 | Deduplicate API `code → HTTP status` mapping (helper / manifest in `internal/api`; no `ErrorClass` on domain) | API | #367 |
 | Schema-declared attribute sensitivity; audit no secret/PII in path/query params | API / domain | #367 |
