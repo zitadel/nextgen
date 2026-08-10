@@ -16,6 +16,7 @@ import {
 } from "@zitadel/config/defaults";
 import { consola } from "consola";
 
+import { claimAction, claimCommand, claimState } from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import {
@@ -379,6 +380,24 @@ export default class Setup extends BaseCommand {
     });
 
     const writtenRel = allFilesWritten.map((file) => relativeDisplay(cwd, file));
+    // The nudge rides both surfaces from one decision: the box for humans, the
+    // envelope for agents.
+    //
+    // It joins `boxActions` rather than being held back from it. That list is
+    // journey-staged by *omission* (customize/publish is absent until login
+    // works, see `install.ts`), and this is not part of that journey: attaching
+    // a team is orthogonal to whether login works yet, exactly as in `status`.
+    // Position in the list carries no staging meaning, so appending is not a
+    // way of deferring it.
+    //
+    // Empty off the cloud, where nothing can be attached.
+    const claimNudge =
+      claimState({ secret: {}, server: answers.server }).kind === "detached"
+        ? {
+            actions: [claimAction(this.meta.cliVersion)],
+            commands: [claimCommand(this.meta.cliVersion)],
+          }
+        : { actions: [], commands: [] };
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -398,7 +417,11 @@ export default class Setup extends BaseCommand {
       // pre-coloured rows (path/url/id helpers) survive intact.
       consola.box({
         title: "Zitadel is ready",
-        message: [renderSummary(sections), "", installOutcome.boxActions.join("\n")].join("\n"),
+        message: [
+          renderSummary(sections),
+          "",
+          [...installOutcome.boxActions, ...claimNudge.actions].join("\n"),
+        ].join("\n"),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
     }
@@ -427,8 +450,8 @@ export default class Setup extends BaseCommand {
         })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
-        next_actions: installOutcome.nextActions,
-        next_commands: installOutcome.nextCommands,
+        next_actions: [...installOutcome.nextActions, ...claimNudge.actions],
+        next_commands: [...installOutcome.nextCommands, ...claimNudge.commands],
       },
     });
   }

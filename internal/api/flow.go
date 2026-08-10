@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-faster/jx"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -64,6 +65,9 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 	if id, ok := req.SessionID.Get(); ok {
 		startReq.SessionID = &id
 	}
+	if ua, ok := middleware.UserAgentFromContext(ctx); ok {
+		startReq.UserAgent = ua
+	}
 
 	result, err := h.flowService.Start(ctx, startReq)
 	if err != nil {
@@ -99,9 +103,13 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		decoded, err := decodeFlowFields(fields)
 		if err != nil {
 			// Safe client message; Parent keeps a log-safe wrapper that still Unwraps
-			// to the json.Unmarshal cause for diagnostics (ADR 030).
-			return errorResponseWithStatusCode(http.StatusBadRequest,
-				domain.ErrRequestInvalid().WithMessage(err.Error()).WithParent(err)), nil
+			// to the json.Unmarshal cause for diagnostics (ADR 030). Field name goes
+			// in structured details — never parser text or payload fragments.
+			domErr := domain.ErrRequestInvalid().WithMessage(err.Error()).WithParent(err)
+			if decodeErr, ok := err.(*flowFieldDecodeError); ok {
+				domErr = domErr.WithDetails(domain.RequestInvalidFieldDetails{Field: decodeErr.field})
+			}
+			return errorResponseWithStatusCode(http.StatusBadRequest, domErr), nil
 		}
 		submitReq.Fields = decoded
 	}
