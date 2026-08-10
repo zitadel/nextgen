@@ -96,6 +96,10 @@ func HasRealSessionToken(previousTokenID string) bool {
 	return previousTokenID != ""
 }
 
+// exchangeConflict reports a conflict while keeping err in the chain. Both verbs
+// must be %w: the dialect's retry (Spanner's ReadWriteTransaction) decides by
+// looking for a gRPC status in the returned error, so flattening err to a string
+// here strips an ABORTED and turns a retryable conflict into a user-facing one.
 func exchangeConflict(err error) error {
-	return fmt.Errorf("%w: %v", domain.ErrSessionExchangeConflict(), err)
+	return fmt.Errorf("%w: %w", domain.ErrSessionExchangeConflict(), err)
 }
