@@ -253,6 +253,26 @@ func (a *AuthzAssignment) ApplyScope(scope AuthzAssignmentScope) {
 	a.ScopeResourceID = scope.ResourceID
 }
 
+// NewSKProjProjectSetupAssignment is the grant seeded at CreateProject so the
+// returned full project secret can set up the project via resolver.Check.
+//
+// Relation is project.viewer (not admin): the seeded system catalog closure
+// treats viewer as the assigned relation that satisfies viewer/editor/admin
+// checks (placeholders pending #420). PrincipalID equals the project id so the
+// grant survives secret rotate/claim.
+func NewSKProjProjectSetupAssignment(projectID string) *AuthzAssignment {
+	a := &AuthzAssignment{
+		ProjectID:     projectID,
+		CatalogID:     SystemCatalogID,
+		PrincipalType: AuthzPrincipalTypeSKProj,
+		PrincipalID:   projectID,
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+	a.ApplyScope(NewProjectAssignmentScope())
+	return a
+}
+
 // AuthzMembershipEdge is the authz projection of set membership (not lifecycle).
 // The resolver expands team grants through these edges; team_memberships remains
 // the roster table and is not read at check time.

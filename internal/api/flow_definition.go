@@ -13,7 +13,7 @@ import (
 )
 
 func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDefinitionRequest) (api.CreateFlowDefinitionRes, error) {
-	if err := requireProjectAccess(ctx, string(req.GetProjectID()), flowDefinitionAccess, opWrite); err != nil {
+	if err := h.requireProjectAccess(ctx, string(req.GetProjectID()), flowDefinitionAccess, opWrite); err != nil {
 		return nil, err
 	}
 	svcReq, err := mapCreateRequestToService(req)
@@ -30,7 +30,7 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 }
 
 func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefinitionParams) (api.GetFlowDefinitionRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opRead); err != nil {
 		return nil, err
 	}
 	definition, err := h.flowDefinitionService.Get(ctx, string(params.ProjectID), params.ID)
@@ -41,7 +41,7 @@ func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefini
 }
 
 func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDefinitionsParams) (api.ListFlowDefinitionsRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opRead); err != nil {
 		return nil, err
 	}
 	svcReq := mapListRequestToService(params)
@@ -62,7 +62,7 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 }
 
 func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefinitionUpdateRequest, params api.UpdateFlowDefinitionParams) (api.UpdateFlowDefinitionRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opWrite); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opWrite); err != nil {
 		return nil, err
 	}
 	svcReq, err := mapUpdateRequestToService(params, req)
@@ -80,7 +80,7 @@ func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefiniti
 }
 
 func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlowDefinitionParams) (api.DeleteFlowDefinitionRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opDelete); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opDelete); err != nil {
 		return nil, err
 	}
 	err := h.flowDefinitionService.Delete(ctx, string(params.ProjectID), params.ID)

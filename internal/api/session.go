@@ -73,7 +73,7 @@ func exchangeInputFromRequest(req *api.ExchangeRequest, params api.ExchangeHando
 }
 
 func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (api.GetSessionRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opRead); err != nil {
 		return nil, err
 	}
 	input := service.GetSessionInput{
@@ -113,7 +113,7 @@ func (h Handler) GetMySession(ctx context.Context) (api.GetMySessionRes, error) 
 }
 
 func (h Handler) QuerySessions(ctx context.Context, req *api.QuerySessionsRequest, params api.QuerySessionsParams) (api.QuerySessionsRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opRead); err != nil {
 		return nil, err
 	}
 	input := service.ListSessionInput{
@@ -128,7 +128,7 @@ func (h Handler) QuerySessions(ctx context.Context, req *api.QuerySessionsReques
 }
 
 func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionParams) (api.RevokeSessionRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opDelete); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opDelete); err != nil {
 		return nil, err
 	}
 	input := service.DeleteSessionInput{

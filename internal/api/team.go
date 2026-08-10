@@ -10,7 +10,7 @@ import (
 )
 
 func (h *Handler) CreateTeam(ctx context.Context, req *api.CreateTeamRequest, params api.CreateTeamParams) (r api.CreateTeamRes, _ error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opWrite); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opWrite); err != nil {
 		return nil, err
 	}
 	team, err := h.teamService.Create(ctx, service.CreateTeamInput{
@@ -24,7 +24,7 @@ func (h *Handler) CreateTeam(ctx context.Context, req *api.CreateTeamRequest, pa
 }
 
 func (h *Handler) GetTeam(ctx context.Context, params api.GetTeamParams) (api.GetTeamRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opRead); err != nil {
 		return nil, err
 	}
 	team, err := h.teamService.Get(ctx, string(params.ProjectID), string(params.TeamID))
@@ -35,7 +35,7 @@ func (h *Handler) GetTeam(ctx context.Context, params api.GetTeamParams) (api.Ge
 }
 
 func (h *Handler) UpdateTeam(ctx context.Context, req *api.UpdateTeamRequest, params api.UpdateTeamParams) (api.UpdateTeamRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opWrite); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opWrite); err != nil {
 		return nil, err
 	}
 	input := service.UpdateTeamInput{
@@ -53,7 +53,7 @@ func (h *Handler) UpdateTeam(ctx context.Context, req *api.UpdateTeamRequest, pa
 }
 
 func (h *Handler) DeleteTeam(ctx context.Context, params api.DeleteTeamParams) (api.DeleteTeamRes, error) {
-	if err := requireTeamDelete(ctx, string(params.ProjectID)); err != nil {
+	if err := h.requireTeamDelete(ctx, string(params.ProjectID)); err != nil {
 		return nil, err
 	}
 	if err := h.teamService.Delete(ctx, string(params.ProjectID), string(params.TeamID)); err != nil {
@@ -63,7 +63,7 @@ func (h *Handler) DeleteTeam(ctx context.Context, params api.DeleteTeamParams) (
 }
 
 func (h *Handler) QueryTeams(ctx context.Context, req *api.QueryTeamsRequest, params api.QueryTeamsParams) (api.QueryTeamsRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opRead); err != nil {
 		return nil, err
 	}
 

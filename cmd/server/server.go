@@ -247,6 +247,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			brandingService,
 			tokenService,
 			keyService,
+			serviceDBPool,
 			cfg.Platform.ProjectID,
 		),
 		api.NewSecurityHandler(tokenService),

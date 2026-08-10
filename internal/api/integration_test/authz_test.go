@@ -13,21 +13,18 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// TestManagementAuthz exercises the shared project-access guard across the
-// management API (the operator plane of ADR 036), generalizing the access
-// model settled for branding in ADR 037:
+// TestManagementAuthz exercises the authz resolver gate across the
+// management API (the operator plane of ADR 036):
 //
-//   - Project binding with anti-oracle responses: a second, real project's
+//   - Project foothold with anti-oracle responses: a second, real project's
 //     secret must not operate on the first project's resources, and the
 //     answers must not reveal that the foreign project exists (identical to
-//     the nonexistent-project responses).
+//     the nonexistent-project / no-foothold responses → 404 shapes).
 //   - Plane separation: the preview secret ships to visitors' browsers by
 //     design (project.read only), so the management API rejects it entirely
 //     with 403 permission_denied — including on its own project.
-//
-// The guard rejects before any service or storage call, so foreign probes use
-// fabricated resource ids; the schema subtests additionally probe a real
-// resource id to pin that real data does not leak either.
+//   - CreateProject seeds an sk_proj grant so the returned project secret
+//     can set up the project through resolver.Check.
 func TestManagementAuthz(t *testing.T) {
 	t.Parallel()
 

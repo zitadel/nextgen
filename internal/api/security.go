@@ -33,8 +33,12 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 	}
 
 	scope := ScopeContext{
-		ProjectID: payload.ProjectID,
-		Scope:     payload.Scope,
+		ProjectID:     payload.ProjectID,
+		Scope:         payload.Scope,
+		PrincipalType: domain.AuthzPrincipalTypeSKProj,
+		// Project secrets are JWEs without a stable key id; the project id is
+		// the durable principal for sk_proj grants (survives rotate/claim).
+		PrincipalID: payload.ProjectID,
 	}
 
 	ctx = WithScopeContext(ctx, scope)
@@ -126,9 +130,13 @@ type ScopeContext struct {
 	ProjectID string
 	// Scope carries the token's minted scopes verbatim (domain.Token.Scope):
 	// project secrets hold project.write + project.read, preview secrets hold
-	// project.read only. Handlers that gate management operations check this
-	// list; blanket per-operation scope enforcement is ADR 036 territory.
+	// project.read only. The authz gate uses this as a credential-class ceiling
+	// (preview may only satisfy viewer-mapped reads) on top of resolver checks.
 	Scope []string
+	// PrincipalType / PrincipalID identify the authz principal for resolver.Check.
+	// OAuth2 project secrets are sk_proj with PrincipalID == ProjectID.
+	PrincipalType domain.AuthzPrincipalType
+	PrincipalID   string
 }
 
 func WithScopeContext(ctx context.Context, scopeCtx ScopeContext) context.Context {

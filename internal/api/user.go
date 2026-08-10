@@ -10,7 +10,7 @@ import (
 )
 
 func (h *Handler) CreateUser(ctx context.Context, req *api.User, params api.CreateUserParams) (api.CreateUserRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opWrite); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), userAccess, opWrite); err != nil {
 		return nil, err
 	}
 	var teamID *string
@@ -39,7 +39,7 @@ func (h *Handler) CreateUser(ctx context.Context, req *api.User, params api.Crea
 }
 
 func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDParams) (api.DeleteUserByIDRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opDelete); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), userAccess, opDelete); err != nil {
 		return nil, err
 	}
 
@@ -63,7 +63,7 @@ func (h *Handler) ListUsers(ctx context.Context, params api.ListUsersParams) (ap
 	// No project parameter: the operation is bound to the token's own project
 	// by construction, so only the scope check is live — it keeps the
 	// browser-plane preview secret from listing the project's users.
-	if err := requireProjectAccess(ctx, scopeCtx.ProjectID, userAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, scopeCtx.ProjectID, userAccess, opRead); err != nil {
 		return nil, err
 	}
 
@@ -94,7 +94,7 @@ func (h *Handler) ListUsers(ctx context.Context, params api.ListUsersParams) (ap
 }
 
 func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPasskeysParams) (api.ListUserPasskeysRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), userAccess, opRead); err != nil {
 		return nil, err
 	}
 
@@ -131,7 +131,7 @@ func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPassk
 // page without resolving ids one by one. Lifecycle ownership is a different
 // question and stays on the user itself (ADR 024).
 func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsParams) (api.ListUserTeamsRes, error) {
-	if err := requireUserTeamsAccess(ctx, string(params.ProjectID)); err != nil {
+	if err := h.requireUserTeamsAccess(ctx, string(params.ProjectID)); err != nil {
 		return nil, err
 	}
 
@@ -165,7 +165,7 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 }
 
 func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams) (api.GetUserByIDRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), userAccess, opRead); err != nil {
 		return nil, err
 	}
 	var teamID *string
@@ -186,7 +186,7 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 }
 
 func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordRequest, params api.SetUserPasswordParams) (api.SetUserPasswordRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), userAccess, opWrite); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), userAccess, opWrite); err != nil {
 		return nil, err
 	}
 	err := h.userService.SetPassword(ctx, service.SetPasswordInput{
