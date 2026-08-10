@@ -33,16 +33,12 @@ The API nests producer payloads under `details.details` (legacy shape). Use [`ma
 
 Flow `Fields` value decode failures attach `{field}` only (no parser text, no payload fragments). See [`SubmitFlowStep`](../../../internal/api/flow.go) and [`flowFieldDecodeError`](../../../internal/api/flow.go).
 
-### Session TTL — `SessionInvalidTTLDetails`
-
-[`internal/domain/session.go`](../../../internal/domain/session.go) attaches `{ttl,max_ttl}` as structured duration values. Encoding stays with the shared details marshal path (ISO string form may be refined later).
-
 ## Inventory (fix / defer)
 
 | Location | Shape | Status |
 |----------|-------|--------|
 | `flow.go` flow field decode | `RequestInvalidFieldDetails` | **Reference** |
-| `session.go` `SessionInvalidTTLDetails` | typed struct | **Reference** (encoding follow-up deferred) |
+| `session.go` `SessionInvalidTTLDetails` | typed `{ttl,max_ttl}` (ISO via `ogenx.ISODuration`) | **Deferred** — dedicated hand-built envelope in `sessionErrorResponse` (skips `domainErrorDetails` / `marshalErrorDetails`, so no test-only `details.parent`); fold into the shared path later |
 | flowdef handlers | string validation messages | **Deferred** — already on wire in integration tests |
 | `authz.go` write-miss handlers | opaque string on wrong codes | **Deferred** — intentional authz opacity |
 | `domain/user.go`, `service/user.go` | was string `WithDetails` | **Fixed** — moved to `Message` |
