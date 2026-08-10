@@ -54,6 +54,26 @@ const (
 	TermTupleToUserset
 )
 
+// PersistedCatalog is the subset of [CatalogMutations] that PersistCatalogVersion
+// writes and LoadCatalogMutations reads (relations, references, edges, closure).
+// SchemaVersion and Types are compile-time metadata only.
+type PersistedCatalog struct {
+	Relations          []RelationDefinition
+	RelationReferences []RelationReference
+	ExpressionEdges    []ExpressionEdge
+	Closure            []Implication
+}
+
+// Persisted returns the storage rows carried by m.
+func (m CatalogMutations) Persisted() PersistedCatalog {
+	return PersistedCatalog{
+		Relations:          m.Relations,
+		RelationReferences: m.RelationReferences,
+		ExpressionEdges:    m.ExpressionEdges,
+		Closure:            m.Closure,
+	}
+}
+
 // ExpressionEdge is a flattened OR term suitable for relational storage.
 // The MVP profile only permits union as a set operator, so nested unions are
 // associative and can be flattened without changing semantics.

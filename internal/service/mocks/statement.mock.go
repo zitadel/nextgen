@@ -17,7 +17,7 @@ import (
 	compiler "github.com/zitadel/nextgen/internal/authz/compiler"
 	domain "github.com/zitadel/nextgen/internal/domain"
 	service "github.com/zitadel/nextgen/internal/service"
-	database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	database "github.com/zitadel/nextgen/internal/storage/database"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -3319,6 +3319,45 @@ func (c *MockAllStatementsListUsersCall) Do(f func(context.Context, *database.Li
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsListUsersCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.UserField], service.UserQueryOptions) (*database.ListResult[*domain.User], error)) *MockAllStatementsListUsersCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// LoadCatalogMutations mocks base method.
+func (m *MockAllStatements) LoadCatalogMutations(ctx context.Context, catalogID string) (compiler.PersistedCatalog, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LoadCatalogMutations", ctx, catalogID)
+	ret0, _ := ret[0].(compiler.PersistedCatalog)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LoadCatalogMutations indicates an expected call of LoadCatalogMutations.
+func (mr *MockAllStatementsMockRecorder) LoadCatalogMutations(ctx, catalogID any) *MockAllStatementsLoadCatalogMutationsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LoadCatalogMutations", reflect.TypeOf((*MockAllStatements)(nil).LoadCatalogMutations), ctx, catalogID)
+	return &MockAllStatementsLoadCatalogMutationsCall{Call: call}
+}
+
+// MockAllStatementsLoadCatalogMutationsCall wrap *gomock.Call
+type MockAllStatementsLoadCatalogMutationsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsLoadCatalogMutationsCall) Return(arg0 compiler.PersistedCatalog, arg1 error) *MockAllStatementsLoadCatalogMutationsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsLoadCatalogMutationsCall) Do(f func(context.Context, string) (compiler.PersistedCatalog, error)) *MockAllStatementsLoadCatalogMutationsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsLoadCatalogMutationsCall) DoAndReturn(f func(context.Context, string) (compiler.PersistedCatalog, error)) *MockAllStatementsLoadCatalogMutationsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -8996,6 +9035,45 @@ func (c *MockAuthzCatalogStatementsIsStatementsCall) Do(f func()) *MockAuthzCata
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAuthzCatalogStatementsIsStatementsCall) DoAndReturn(f func()) *MockAuthzCatalogStatementsIsStatementsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// LoadCatalogMutations mocks base method.
+func (m *MockAuthzCatalogStatements) LoadCatalogMutations(ctx context.Context, catalogID string) (compiler.PersistedCatalog, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LoadCatalogMutations", ctx, catalogID)
+	ret0, _ := ret[0].(compiler.PersistedCatalog)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LoadCatalogMutations indicates an expected call of LoadCatalogMutations.
+func (mr *MockAuthzCatalogStatementsMockRecorder) LoadCatalogMutations(ctx, catalogID any) *MockAuthzCatalogStatementsLoadCatalogMutationsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LoadCatalogMutations", reflect.TypeOf((*MockAuthzCatalogStatements)(nil).LoadCatalogMutations), ctx, catalogID)
+	return &MockAuthzCatalogStatementsLoadCatalogMutationsCall{Call: call}
+}
+
+// MockAuthzCatalogStatementsLoadCatalogMutationsCall wrap *gomock.Call
+type MockAuthzCatalogStatementsLoadCatalogMutationsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthzCatalogStatementsLoadCatalogMutationsCall) Return(arg0 compiler.PersistedCatalog, arg1 error) *MockAuthzCatalogStatementsLoadCatalogMutationsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthzCatalogStatementsLoadCatalogMutationsCall) Do(f func(context.Context, string) (compiler.PersistedCatalog, error)) *MockAuthzCatalogStatementsLoadCatalogMutationsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthzCatalogStatementsLoadCatalogMutationsCall) DoAndReturn(f func(context.Context, string) (compiler.PersistedCatalog, error)) *MockAuthzCatalogStatementsLoadCatalogMutationsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
