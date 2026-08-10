@@ -26,31 +26,34 @@ import { join } from "node:path";
 import { isDirectRun } from "./dev-process.mjs";
 import { collectGeneratedFiles, ROOT } from "./generated-outputs.mjs";
 
-export function cleanGenerated({ dryRun = false, log = console.log } = {}) {
+export function cleanGenerated({ dryRun = false, quiet = false, log = console.log } = {}) {
+  // check-go-generate calls this as a step inside a larger check, where a
+  // 118-line inventory is noise rather than information.
+  const emit = quiet ? () => undefined : log;
   const { generated, unmarked } = collectGeneratedFiles();
 
   for (const rel of generated) {
     if (!dryRun) {
       rmSync(join(ROOT, rel));
     }
-    log(`${dryRun ? "would remove" : "removed"} ${rel}`);
+    emit(`${dryRun ? "would remove" : "removed"} ${rel}`);
   }
 
   if (unmarked.length > 0) {
     // Not fatal: the file may be hand-written and wrongly matched, which is
     // exactly the case the marker check exists to protect.
-    log("");
-    log(`kept ${unmarked.length} file(s) matching an output glob without a generated marker:`);
+    emit("");
+    emit(`kept ${unmarked.length} file(s) matching an output glob without a generated marker:`);
     for (const rel of unmarked) {
-      log(`  ${rel}`);
+      emit(`  ${rel}`);
     }
-    log("Check whether the globs in scripts/generated-outputs.mjs are too broad.");
+    emit("Check whether the globs in scripts/generated-outputs.mjs are too broad.");
   }
 
-  log("");
-  log(`${dryRun ? "would remove" : "removed"} ${generated.length} generated file(s)`);
+  emit("");
+  emit(`${dryRun ? "would remove" : "removed"} ${generated.length} generated file(s)`);
   if (!dryRun) {
-    log("run `moon run server:generate` to regenerate; anything not restored was orphaned");
+    emit("run `moon run server:generate` to regenerate; anything not restored was orphaned");
   }
   return { removed: generated, unmarked };
 }

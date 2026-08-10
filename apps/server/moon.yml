@@ -87,6 +87,22 @@ tasks:
     options:
       runFromWorkspaceRoot: true
 
+  # check-generate plus a prune, so output nothing generates any more fails the
+  # build instead of lingering. Deliberately not a dep of vet/test: it deletes
+  # every generated file before regenerating, which is fine on a CI runner and
+  # rude on a machine someone is working in. CI runs this in place of the plain
+  # check — it subsumes it.
+  check-generate-pruned:
+    command: "node scripts/check-go-generate.mjs --prune"
+    inputs:
+      - "@group(serverInputs)"
+      - "/scripts/go-generate.mjs"
+      - "/scripts/clean-generated.mjs"
+      - "/scripts/generated-outputs.mjs"
+      - "/scripts/dev-process.mjs"
+    options:
+      runFromWorkspaceRoot: true
+
   vet:
     command: "go vet ./..."
     deps:

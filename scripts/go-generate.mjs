@@ -50,9 +50,14 @@ export async function goGenerate({ log = console.log } = {}) {
 
   // enumer writes .go files *into* a package; mockgen type-loads packages. So
   // every enumer directive must finish before any mockgen one, or mockgen
-  // loads a package whose generated methods do not exist yet and fails. This
-  // is what lets generation bootstrap from a tree with no generated files at
-  // all (see scripts/clean-generated.mjs).
+  // loads a package whose generated methods do not exist yet and fails.
+  //
+  // Under `go generate ./...` that ordering comes for free, because the
+  // mockgen directives live in the mock subpackages and `./...` walks packages
+  // in import-path order. This runner deliberately ignores that order — it
+  // runs packages concurrently — so it has to restate the constraint as an
+  // explicit barrier. Both paths bootstrap from a tree with no generated files
+  // in it; there is a standing check for that (server:check-generate-pruned).
   //
   // The barrier is global rather than per-package on purpose: internal/service
   // imports internal/domain, so its mockgen needs *domain's* enumer output,

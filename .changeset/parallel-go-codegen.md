@@ -29,7 +29,13 @@ and stayed committed with nothing to flag it.
 Making that usable meant fixing a latent bootstrap failure: generation could
 not run against a tree with no generated files, because deleting
 `internal/domain/*_enumer.go` stops the package type-checking and both enumer
-and mockgen need to load it. Generation now runs all enumer directives before
-any mockgen ones — a global barrier, since `internal/service`'s mockgen loads
-`internal/domain`. On the previous layout 20 files failed to regenerate from
-empty; now none do.
+and mockgen need to load it. The consolidated mockgen directives therefore live
+in the mock subpackages (`internal/domain/mock`, `internal/service/mocks`,
+`internal/crypto/mock`) rather than beside the interfaces, so `go generate
+./...` reaches them only after the packages they mock are fully generated —
+import-path order does the sequencing. The parallel runner ignores that order,
+so it restates the same constraint as an explicit enumer-before-mockgen
+barrier.
+
+On the previous layout 20 files failed to regenerate from an empty tree; now
+none do, by either path. `server:check-generate-pruned` keeps it that way.

@@ -294,10 +294,18 @@ call `idgen` outside dialect packages. Full minting contract:
 
 - Do not hand-edit `api/generated/**`; update `api/openapi/**` and run
   `moon run server:generate`. CI enforces committed generated output through
-  `server:check-generate` (via `server:test`). Bare `go generate ./...` still
-  produces the same output, but runs every directive serially — roughly 4x
-  slower. Both go through the same `//go:generate` directives; the moon task
-  just schedules them (`scripts/go-generate.mjs`).
+  `server:check-generate` (via `server:test`). Bare `go generate ./...` produces
+  the same output — including from a tree with no generated files in it — but
+  runs every directive serially, roughly 4x slower. Both go through the same
+  `//go:generate` directives; the moon task just schedules them
+  (`scripts/go-generate.mjs`).
+- The consolidated `mockgen` directives live in the mock packages
+  (`internal/domain/mock`, `internal/service/mocks`, `internal/crypto/mock`),
+  not beside the interfaces they mock. mockgen has to type-check the source
+  package, which does not compile until its `*_enumer.go` files exist, so the
+  directive has to run after them. `go generate ./...` walks packages in
+  import-path order, which sequences it correctly. Moving one of these
+  directives back next to its interfaces breaks generation from a clean tree.
 - Generating never deletes. A generated file whose directive stopped producing
   it — a renamed destination, an interface no longer mocked — stays on disk and
   stays committed, still compiling and still importable. `server:generate`
