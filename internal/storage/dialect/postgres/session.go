@@ -21,10 +21,15 @@ const (
 VALUES ($1, $2, $3, $4::INTERVAL, $5) RETURNING created_at, updated_at, expires_at`
 	updateSessionTokenIDStmt = `UPDATE zitadel_nextgen.sessions SET token_id = $3 WHERE project_id = $1 AND id = $2`
 	deleteSessionByIDStmt    = `DELETE FROM zitadel_nextgen.sessions WHERE project_id = $1 AND id = $2`
-	sessionQuery             = `SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.time_to_live, s.token_id, s.user_id,
+	// The inner subquery filters, orders and limits the sessions; user agents
+	// and checks are then joined onto that page. Limiting after the
+	// one-to-many checks join would bound joined rows, not sessions.
+	sessionQuerySelect = `SELECT s.project_id, s.id, s.created_at, s.updated_at, s.expires_at, s.time_to_live, s.token_id, s.user_id,
 	ua.id, ua.info,
 	c.type, c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload
-FROM zitadel_nextgen.sessions s
+FROM (`
+	sessionQueryInner = `SELECT s.* FROM zitadel_nextgen.sessions s`
+	sessionQueryJoins = `) s
 LEFT JOIN zitadel_nextgen.user_agents ua ON s.project_id = ua.project_id AND s.user_agent_id = ua.id
 LEFT JOIN zitadel_nextgen.checks c ON c.project_id = s.project_id AND c.session_id = s.id`
 	loadAttemptChecksStmt       = `SELECT id, type, last_verified_at FROM zitadel_nextgen.checks WHERE project_id = $1 AND auth_attempt_id = $2 AND last_verified_at IS NOT NULL`
@@ -131,9 +136,13 @@ func (ss sessionStatements) LoadVerifiedChecks(ctx context.Context, projectID, i
 
 func (ss sessionStatements) querySessions(ctx context.Context, filter *database.ListOptions[domain.SessionField]) ([]*domain.Session, error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, sessionQuery, filter, sessionSchema); err != nil {
+	compiler.WriteString(sessionQuerySelect)
+	if err := compileRead(&compiler, sessionQueryInner, filter, sessionSchema); err != nil {
 		return nil, err
 	}
+	compiler.WriteString(sessionQueryJoins)
+	// The joins do not preserve the subquery's order.
+	compileOrderBy(&compiler, filter.Pagination.OrderBy, sessionSchema)
 	rows, err := ss.client.Query(ctx, compiler.String(), compiler.args...)
 	if err != nil {
 		return nil, wrapError(err)
@@ -413,11 +422,12 @@ var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBin
 	domain.SessionFieldUpdatedAt:  {SQLName: "s.updated_at", Accessor: func(s *domain.Session) any { return s.UpdatedAt }, Coerce: database.CoerceTime},
 	domain.SessionFieldExpiresAt:  {SQLName: "s.expires_at", Accessor: func(s *domain.Session) any { return s.ExpiresAt }, Coerce: database.CoerceTime},
 	domain.SessionFieldTimeToLive: {SQLName: "s.time_to_live", Accessor: func(s *domain.Session) any { return s.TimeToLive }, Coerce: coerceSessionDuration},
-	domain.SessionFieldTokenID:    {SQLName: "s.token_id", Accessor: func(s *domain.Session) any { return s.TokenID }, Coerce: database.CoerceString},
-	domain.SessionFieldUserID: {SQLName: "s.user_id", Accessor: func(s *domain.Session) any {
-		if s.UserID == nil {
-			return ""
+	// token_id is NULL until the session token is created; "" is never stored.
+	domain.SessionFieldTokenID: {SQLName: "s.token_id", Accessor: func(s *domain.Session) any {
+		if s.TokenID == "" {
+			return nil
 		}
-		return *s.UserID
-	}, Coerce: database.CoerceString},
+		return s.TokenID
+	}, Coerce: database.CoerceString, Nullable: true},
+	domain.SessionFieldUserID: {SQLName: "s.user_id", Accessor: func(s *domain.Session) any { return database.NullableValue(s.UserID) }, Coerce: database.CoerceString, Nullable: true},
 })

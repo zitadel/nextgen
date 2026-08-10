@@ -751,3 +751,105 @@ func compileFlowDefinitionRead(t *testing.T, opts *database.ListOptions[domain.F
 	require.NoError(t, err)
 	return compiler.String(), compiler.args
 }
+
+// TestCompileOrderByNullable pins that spanner emits no NULLS clause: the
+// engine rejects it, and its fixed NULL ordering already matches what the
+// other dialects state explicitly.
+func TestCompileOrderByNullable(t *testing.T) {
+	t.Parallel()
+
+	columns := []database.Column[domain.SessionField]{
+		database.Col(domain.SessionFieldUserID),
+		database.Col(domain.SessionFieldID),
+	}
+	tests := []struct {
+		name      string
+		direction database.OrderDirection
+		wantSQL   string
+	}{
+		{
+			name:      "asc",
+			direction: database.OrderAsc,
+			wantSQL:   " ORDER BY s.user_id, s.id",
+		},
+		{
+			name:      "desc",
+			direction: database.OrderDesc,
+			wantSQL:   " ORDER BY s.user_id DESC, s.id DESC",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			sql, args := compileOrderByOnly(t, database.OrderBy[domain.SessionField]{
+				Columns:   columns,
+				Direction: tt.direction,
+			}, sessionSchema)
+			assert.Equal(t, tt.wantSQL, sql)
+			assert.Empty(t, args)
+		})
+	}
+}
+
+func TestCompileCompareFilterNullableKeyset(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		filter   database.Filter[domain.SessionField]
+		wantSQL  string
+		wantArgs []any
+	}{
+		{
+			name: "keyset greater expands null aware",
+			filter: database.CompareGreater(
+				database.Term(database.Col(domain.SessionFieldUserID), "usr_1"),
+				database.Term(database.Col(domain.SessionFieldID), "sess_1"),
+			),
+			wantSQL:  "((s.user_id > @p1) OR (s.user_id = @p2 AND s.id > @p3))",
+			wantArgs: []any{"usr_1", "usr_1", "sess_1"},
+		},
+		{
+			name: "keyset less admits null rows",
+			filter: database.CompareLess(
+				database.Term(database.Col(domain.SessionFieldUserID), "usr_1"),
+				database.Term(database.Col(domain.SessionFieldID), "sess_1"),
+			),
+			wantSQL:  "(((s.user_id < @p1 OR s.user_id IS NULL)) OR (s.user_id = @p2 AND (s.id < @p3 OR s.id IS NULL)))",
+			wantArgs: []any{"usr_1", "usr_1", "sess_1"},
+		},
+		{
+			name:     "range filter keeps plain compare",
+			filter:   database.LessThan(database.Col(domain.SessionFieldUserID), "usr_1"),
+			wantSQL:  "s.user_id < @p1",
+			wantArgs: []any{"usr_1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			sql, args := compileFilterOnly(t, tt.filter, sessionSchema)
+			assert.Equal(t, tt.wantSQL, sql)
+			assert.Equal(t, tt.wantArgs, args)
+		})
+	}
+}
+
+func TestCompileCompareFilterNilLeadingValue(t *testing.T) {
+	t.Parallel()
+
+	sql, args := compileFilterOnly(t, database.CompareGreater(
+		database.Term(database.Col(domain.SessionFieldUserID), nil),
+		database.Term(database.Col(domain.SessionFieldID), "sess_1"),
+	), sessionSchema)
+	assert.Equal(t,
+		"((s.user_id IS NOT NULL) OR (s.user_id IS NULL AND s.id > @p1))",
+		sql,
+	)
+	require.Len(t, args, 1)
+	assert.Equal(t, "sess_1", args[0])
+}

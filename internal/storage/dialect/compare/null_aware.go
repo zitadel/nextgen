@@ -10,19 +10,25 @@ type Writer interface {
 	WriteString(string)
 }
 
-// HasNilValue reports whether any compare term binds a SQL NULL (Go nil).
-func HasNilValue[F ~uint8](terms []database.CompareTerm[F]) bool {
-	for _, term := range terms {
+// NeedsNullAware reports whether a compare must use null-safe expansion:
+// any term binds SQL NULL, or a keyset compare touches a nullable column
+// (a non-nil cursor value must still admit NULL rows beyond the cursor).
+func NeedsNullAware[F ~uint8, T any](filter *database.CompareFilter[F], schema database.Schema[F, T]) bool {
+	for _, term := range filter.Terms {
 		if term.Value == nil {
+			return true
+		}
+		if filter.Keyset && schema.Nullable(term.Column) {
 			return true
 		}
 	}
 	return false
 }
 
-// CompileNullAware expands keyset compares when any cursor value is SQL NULL.
-// Assumes ASC NULLS FIRST / DESC NULLS LAST (correct for all-NULL leading
-// order columns on every dialect; matches SQLite defaults).
+// CompileNullAware expands compares whose terms bind SQL NULL or cover
+// nullable keyset columns. Requires ASC NULLS FIRST / DESC NULLS LAST:
+// postgres and sqlite state it explicitly in ORDER BY for nullable columns,
+// spanner rejects the clause but guarantees that ordering by default.
 // writeValue emits a bound placeholder (and any dialect cast) for non-nil values.
 func CompileNullAware[F ~uint8, T any](
 	w Writer,
@@ -95,6 +101,9 @@ func writeNullSafeOrdered[F ~uint8, T any](
 		return
 	}
 	if op == database.OpLess {
+		// Under DESC NULLS LAST the NULL rows sort after any non-nil cursor
+		// value, so they must keep being admitted. On a NOT NULL column the
+		// IS NULL arm is a no-op.
 		w.WriteString("(")
 		w.WriteString(col)
 		w.WriteString(" < ")

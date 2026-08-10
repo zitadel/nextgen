@@ -1,8 +1,10 @@
 package spanner
 
 import (
+	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	"github.com/stretchr/testify/assert"
@@ -122,4 +124,49 @@ func TestWrapError(t *testing.T) {
 			assert.ErrorIs(t, got, tt.want)
 		})
 	}
+}
+
+func TestBoundRetry(t *testing.T) {
+	t.Parallel()
+
+	t.Run("applies a default deadline when ctx has none", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, cancel := boundRetry(t.Context())
+		defer cancel()
+
+		deadline, ok := ctx.Deadline()
+		require.True(t, ok, "an unbounded conflict loop would spin forever")
+		assert.WithinDuration(t, time.Now().Add(maxRetryDuration), deadline, time.Second)
+	})
+
+	t.Run("keeps a deadline the caller already set", func(t *testing.T) {
+		t.Parallel()
+
+		want := time.Now().Add(time.Hour)
+		outer, cancelOuter := context.WithDeadline(t.Context(), want)
+		defer cancelOuter()
+
+		ctx, cancel := boundRetry(outer)
+		defer cancel()
+
+		got, ok := ctx.Deadline()
+		require.True(t, ok)
+		assert.Equal(t, want, got, "a caller's own deadline must win")
+	})
+}
+
+// ReadWriteTransaction retries an aborted transaction only while it can still
+// find the ABORTED status in the error the callback returned, so wrapError must
+// stay transparent to it. See #788.
+func TestWrapErrorKeepsAbortedRetryable(t *testing.T) {
+	t.Parallel()
+
+	got := wrapError(spanner.ToSpannerError(status.Error(codes.Aborted,
+		"Transaction: 1 aborted due to another transaction getting priority.")))
+
+	require.Error(t, got)
+	assert.Equal(t, codes.Aborted, status.Code(got),
+		"ABORTED was stripped; ReadWriteTransaction will not retry")
+	assert.ErrorAs(t, got, new(*spanner.Error))
 }
