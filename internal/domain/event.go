@@ -46,10 +46,10 @@ const (
 	EventTypeUserDeactivated  EventType = "user.deactivated"
 	EventTypeUserDeleted      EventType = "user.deleted"
 
-	EventTypeTeamCreated            EventType = "team.created"
-	EventTypeTeamUpdated            EventType = "team.updated"
-	EventTypeTeamDeactivated        EventType = "team.deactivated"
-	EventTypeTeamMembershipUpdated  EventType = "team.membership.updated"
+	EventTypeTeamCreated           EventType = "team.created"
+	EventTypeTeamUpdated           EventType = "team.updated"
+	EventTypeTeamDeactivated       EventType = "team.deactivated"
+	EventTypeTeamMembershipUpdated EventType = "team.membership.updated"
 
 	EventTypeAuthTokenIssued  EventType = "auth.token.issued"
 	EventTypeAuthTokenRevoked EventType = "auth.token.revoked"
@@ -90,10 +90,10 @@ const (
 
 // Event is one append-only wide-event row (ADR 048).
 type Event struct {
-	ProjectID string
-	ID        string
-	EventType EventType
-	Category  EventCategory
+	ProjectID  string
+	ID         string
+	EventType  EventType
+	Category   EventCategory
 	OccurredAt time.Time
 	CreatedAt  time.Time
 
@@ -105,12 +105,12 @@ type Event struct {
 	EntityType *string
 	EntityID   *string
 
-	ClientID        string
-	TokenID         string
-	DelegationType  string
-	DelegationID    string
-	Grantor         string
-	Fingerprint     string
+	ClientID       string
+	TokenID        string
+	DelegationType string
+	DelegationID   string
+	Grantor        string
+	Fingerprint    string
 
 	RequestID *string
 	SessionID *string

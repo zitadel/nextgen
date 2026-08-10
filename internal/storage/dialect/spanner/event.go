@@ -234,11 +234,11 @@ func (e eventStatements) ListUndeliveredEvents(ctx context.Context, sinkID strin
 
 func (e eventStatements) scanEvent(row *spanner.Row) (*domain.Event, error) {
 	var (
-		ev                                                    domain.Event
-		eventType, category                                   string
-		teamID, actorID, actorType, entityType, entityID      spanner.NullString
-		requestID, sessionID, flowID                          spanner.NullString
-		payload, metadata                                     spanner.NullJSON
+		ev                                               domain.Event
+		eventType, category                              string
+		teamID, actorID, actorType, entityType, entityID spanner.NullString
+		requestID, sessionID, flowID                     spanner.NullString
+		payload, metadata                                spanner.NullJSON
 	)
 	if err := row.Columns(
 		&ev.ProjectID, &ev.ID, &eventType, &category,

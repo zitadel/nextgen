@@ -37,7 +37,7 @@ func DefaultRequestBufferConfig() RequestBufferConfig {
 }
 
 type bufferedEvent struct {
-	event     *domain.Event
+	event      *domain.Event
 	enqueuedAt time.Time
 }
 

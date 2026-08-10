@@ -54,7 +54,7 @@ func (a EventExportAdapter) EnsureSink(ctx context.Context, sink *domain.EventSi
 }
 
 var (
-	_ audit.ProjectLister           = EventExportAdapter{}
-	_ audit.EventPurger             = EventExportAdapter{}
-	_ audit.UndeliveredEventSource  = EventExportAdapter{}
+	_ audit.ProjectLister          = EventExportAdapter{}
+	_ audit.EventPurger            = EventExportAdapter{}
+	_ audit.UndeliveredEventSource = EventExportAdapter{}
 )

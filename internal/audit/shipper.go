@@ -15,9 +15,9 @@ import (
 
 // SinkConfig is a deployment-configured event sink (no project CRUD in v1).
 type SinkConfig struct {
-	Type    domain.EventSinkType  `mapstructure:"type"`
-	URL     string                `mapstructure:"url"`
-	Enabled bool                  `mapstructure:"enabled"`
+	Type    domain.EventSinkType `mapstructure:"type"`
+	URL     string               `mapstructure:"url"`
+	Enabled bool                 `mapstructure:"enabled"`
 }
 
 // ExportConfig holds deployment-scoped sinks and shipper tuning.

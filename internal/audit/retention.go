@@ -20,9 +20,9 @@ type EventPurger interface {
 
 // RetentionConfig controls time-only event purge (ADR 049).
 type RetentionConfig struct {
-	Retention   time.Duration // default 30 days
-	Interval    time.Duration // how often to run
-	Enabled     bool
+	Retention time.Duration // default 30 days
+	Interval  time.Duration // how often to run
+	Enabled   bool
 }
 
 func DefaultRetentionConfig() RetentionConfig {

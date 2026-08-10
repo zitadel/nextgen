@@ -213,11 +213,11 @@ func (e eventStatements) ListUndeliveredEvents(ctx context.Context, sinkID strin
 
 func (e eventStatements) scanEvent(row pgx.CollectableRow) (*domain.Event, error) {
 	var (
-		ev                                                    domain.Event
-		eventType, category                                   string
-		teamID, actorID, actorType, entityType, entityID      sql.NullString
-		requestID, sessionID, flowID                          sql.NullString
-		payload, metadata                                     []byte
+		ev                                               domain.Event
+		eventType, category                              string
+		teamID, actorID, actorType, entityType, entityID sql.NullString
+		requestID, sessionID, flowID                     sql.NullString
+		payload, metadata                                []byte
 	)
 	if err := row.Scan(
 		&ev.ProjectID, &ev.ID, &eventType, &category,
