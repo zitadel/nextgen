@@ -233,8 +233,8 @@ func compileOrderBy[F ~uint8, T any](c *statementCompiler, orderBy database.Orde
 				c.WriteString(", ")
 			}
 			// Spanner rejects explicit NULLS FIRST/LAST but always orders
-			// NULLs first on ASC and last on DESC, which is the ordering the
-			// other dialects state explicitly for nullable columns.
+			// NULLs first on ASC and last on DESC, the policy the other
+			// dialects state via compare.WriteNullsOrder.
 			c.WriteString(schema.SQLName(column))
 			if orderBy.Direction == database.OrderDesc {
 				c.WriteString(" DESC")

@@ -102,20 +102,15 @@ func writeNullSafeOrdered[F ~uint8, T any](
 	}
 	if op == database.OpLess {
 		// Under DESC NULLS LAST the NULL rows sort after any non-nil cursor
-		// value, so a nullable column must keep admitting them.
-		if schema.Nullable(term.Column) {
-			w.WriteString("(")
-			w.WriteString(col)
-			w.WriteString(" < ")
-			writeValue(w, term.Value, term.Column)
-			w.WriteString(" OR ")
-			w.WriteString(col)
-			w.WriteString(" IS NULL)")
-			return
-		}
+		// value, so they must keep being admitted. On a NOT NULL column the
+		// IS NULL arm is a no-op.
+		w.WriteString("(")
 		w.WriteString(col)
 		w.WriteString(" < ")
 		writeValue(w, term.Value, term.Column)
+		w.WriteString(" OR ")
+		w.WriteString(col)
+		w.WriteString(" IS NULL)")
 		return
 	}
 	w.WriteString(col)

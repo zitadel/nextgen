@@ -231,12 +231,8 @@ func compileOrderBy[F ~uint8, T any](c *statementCompiler, orderBy database.Orde
 			c.WriteString(schema.SQLName(column))
 			if orderBy.Direction == database.OrderDesc {
 				c.WriteString(" DESC")
-				if schema.Nullable(column) {
-					c.WriteString(" NULLS LAST")
-				}
-			} else if schema.Nullable(column) {
-				c.WriteString(" NULLS FIRST")
 			}
+			compare.WriteNullsOrder(c, column, orderBy.Direction, schema)
 		}
 	}
 }

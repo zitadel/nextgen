@@ -817,7 +817,7 @@ func TestCompileCompareFilterNullableKeyset(t *testing.T) {
 				database.Term(database.Col(domain.SessionFieldUserID), "usr_1"),
 				database.Term(database.Col(domain.SessionFieldID), "sess_1"),
 			),
-			wantSQL:  "(((s.user_id < @p1 OR s.user_id IS NULL)) OR (s.user_id = @p2 AND s.id < @p3))",
+			wantSQL:  "(((s.user_id < @p1 OR s.user_id IS NULL)) OR (s.user_id = @p2 AND (s.id < @p3 OR s.id IS NULL)))",
 			wantArgs: []any{"usr_1", "usr_1", "sess_1"},
 		},
 		{
