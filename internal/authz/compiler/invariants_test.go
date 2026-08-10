@@ -43,7 +43,7 @@ func checkCompileInvariants(t testing.TB, model authz.Model) {
 	assertReflexiveClosure(t, first.Catalog)
 	assertSameObjectClosure(t, first.Catalog)
 	assertComputedImplications(t, first.Catalog)
-	assertShortestClosureDepths(t, first.Catalog)
+	assertClosureReachability(t, first.Catalog)
 	assertDenseEdgePositions(t, first.Catalog)
 	assertPlansMatchEdges(t, first)
 	assertDenseReferencePositions(t, first.Catalog)
@@ -88,7 +88,11 @@ func assertComputedImplications(t testing.TB, catalog compiler.CatalogMutations)
 	}
 }
 
-func assertShortestClosureDepths(t testing.TB, catalog compiler.CatalogMutations) {
+// assertClosureReachability checks transitive closure membership on
+// computed-userset edges. Exact Depth values are fixture-asserted elsewhere
+// (see TestCompileComputesShortestReflexiveTransitiveClosure); comparing them
+// here against a BFS copy of production shortestDepths would self-grade.
+func assertClosureReachability(t testing.TB, catalog compiler.CatalogMutations) {
 	t.Helper()
 	direct := make(map[compiler.Relation][]compiler.Relation)
 	for _, edge := range catalog.ExpressionEdges {
@@ -98,51 +102,46 @@ func assertShortestClosureDepths(t testing.TB, catalog compiler.CatalogMutations
 		direct[edge.Source] = append(direct[edge.Source], edge.Target)
 	}
 
-	got := make(map[compiler.Implication]struct{}, len(catalog.Closure))
+	type implicationPair struct {
+		source  compiler.Relation
+		implied compiler.Relation
+	}
+	got := make(map[implicationPair]struct{}, len(catalog.Closure))
 	for _, implication := range catalog.Closure {
-		got[implication] = struct{}{}
-		want := shortestDepth(implication.Source, implication.Implied, direct)
-		require.True(t, want.ok, "closure contains unreachable implication %#v", implication)
-		require.Equal(t, want.depth, implication.Depth,
-			"closure depth for %#v", implication)
+		pair := implicationPair{source: implication.Source, implied: implication.Implied}
+		got[pair] = struct{}{}
+		require.True(t, reachableViaComputedUserset(implication.Source, implication.Implied, direct),
+			"closure contains unreachable implication %#v", implication)
 	}
 
 	for _, definition := range catalog.Relations {
 		source := definition.Relation
-		for implied, depth := range allShortestDepths(source, direct) {
-			want := compiler.Implication{Source: source, Implied: implied, Depth: depth}
-			_, ok := got[want]
-			require.True(t, ok, "missing closure implication %#v", want)
+		for implied := range reachableFrom(source, direct) {
+			_, ok := got[implicationPair{source: source, implied: implied}]
+			require.True(t, ok, "missing closure implication %v -> %v", source, implied)
 		}
 	}
 }
 
-type depthResult struct {
-	depth int
-	ok    bool
+func reachableViaComputedUserset(source, target compiler.Relation, direct map[compiler.Relation][]compiler.Relation) bool {
+	_, ok := reachableFrom(source, direct)[target]
+	return ok
 }
 
-func shortestDepth(source, target compiler.Relation, direct map[compiler.Relation][]compiler.Relation) depthResult {
-	depths := allShortestDepths(source, direct)
-	depth, ok := depths[target]
-	return depthResult{depth: depth, ok: ok}
-}
-
-func allShortestDepths(source compiler.Relation, direct map[compiler.Relation][]compiler.Relation) map[compiler.Relation]int {
-	depths := map[compiler.Relation]int{source: 0}
+func reachableFrom(source compiler.Relation, direct map[compiler.Relation][]compiler.Relation) map[compiler.Relation]struct{} {
+	seen := map[compiler.Relation]struct{}{source: {}}
 	queue := []compiler.Relation{source}
 	for i := 0; i < len(queue); i++ {
 		current := queue[i]
-		nextDepth := depths[current] + 1
 		for _, implied := range direct[current] {
-			if depth, seen := depths[implied]; seen && depth <= nextDepth {
+			if _, ok := seen[implied]; ok {
 				continue
 			}
-			depths[implied] = nextDepth
+			seen[implied] = struct{}{}
 			queue = append(queue, implied)
 		}
 	}
-	return depths
+	return seen
 }
 
 func assertDenseEdgePositions(t testing.TB, catalog compiler.CatalogMutations) {

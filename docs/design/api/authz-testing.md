@@ -92,8 +92,9 @@ instead of nested `Intn` weight branches.
 | Deterministic: two `Compile` calls equal | Catalog diffs / versioning |
 | Every relation has reflexive closure depth `0` | Resolver one-join path |
 | Closure edges are same-object only | TTU must not leak into implication |
-| Computed-userset edges appear in closure with shortest depth | Wrong depth → wrong grant expansion |
+| Computed-userset edges appear in closure (`Depth >= 1`) | Missed direct implication → false deny |
 | Closure is transitively closed under computed-userset steps | Missed implication → false deny |
+| Shortest closure depths (fixture models) | Wrong depth → wrong grant expansion; generative/fuzz checks pair reachability only |
 | Expression-edge positions are dense `0..n-1` per target | Persist / ordered OR terms |
 | Plan terms match edges for the same target | Runtime vs storage drift |
 | Relation-reference positions dense per relation | Assignment type checks |
