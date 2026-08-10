@@ -116,7 +116,16 @@ func newAuthAttemptSvcWithVerifier(
 	verifier crypto.HashVerifier,
 ) service.AuthAttemptService {
 	pool := mocks.NewMockPool(ctrl)
+	statementer := mocks.NewMockStatementer[service.AllStatements](ctrl)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	pool.EXPECT().
+		Transaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, statementer)
+		}).
+		AnyTimes()
+	statementer.EXPECT().Statements().Return(stmts).AnyTimes()
+	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	return service.NewAuthAttemptService(service.NewPool(pool), sessions, users, verifier)
 }
 

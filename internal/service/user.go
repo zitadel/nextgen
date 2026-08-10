@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -115,12 +116,44 @@ func (s *UserService) ApplyActions(ctx context.Context, actions ...UserAction) (
 		return nil
 	})
 	if err != nil {
+		s.emitUserCreateFailedBestEffort(ctx, actions, err)
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return de
 		}
 		return domain.ErrInternal(err).WithMessage("failed to commit transaction")
 	}
 	return nil
+}
+
+func (s *UserService) emitUserCreateFailedBestEffort(ctx context.Context, actions []UserAction, applyErr error) {
+	var unique *database.UniqueError
+	if !errors.As(applyErr, &unique) {
+		return
+	}
+	var create *CreateUserAction
+	for _, a := range actions {
+		if c, ok := a.(*CreateUserAction); ok {
+			create = c
+			break
+		}
+	}
+	if create == nil || create.CreateUser == nil {
+		return
+	}
+	_ = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		ev := audit.WithEntity(
+			audit.FromContext(ctx, domain.EventTypeUserCreateFailed, domain.EventCategoryEntity),
+			"user", create.CreateUser.ID,
+		)
+		if ev.ProjectID == "" {
+			ev.ProjectID = create.ProjectID
+		}
+		ev, err := audit.WithPayload(ev, domain.UserCreateFailedPayload{})
+		if err != nil {
+			return err
+		}
+		return audit.Insert(ctx, tx.Statements(), ev)
+	})
 }
 
 func (s *UserService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
@@ -335,7 +368,21 @@ func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		return err
 	}
 	o.User["id"] = o.CreateUser.ID
-	return nil
+	ev := audit.WithEntity(
+		audit.FromContext(ctx, domain.EventTypeUserCreated, domain.EventCategoryEntity),
+		"user", o.CreateUser.ID,
+	)
+	if ev.ProjectID == "" {
+		ev.ProjectID = o.CreateUser.ProjectID
+	}
+	ev, err := audit.WithPayload(ev, domain.UserCreatedPayload{
+		UserID:   o.CreateUser.ID,
+		SchemaID: o.CreateUser.SchemaURL,
+	})
+	if err != nil {
+		return err
+	}
+	return audit.Insert(ctx, stmts, ev)
 }
 
 func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.CreateUser) error {
@@ -384,7 +431,18 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) 
 		}
 		return domain.ErrInternal(err).WithMessage("failed to set password")
 	}
-	return nil
+	ev := audit.WithEntity(
+		audit.FromContext(ctx, domain.EventTypeAuthFactorPasswordSet, domain.EventCategoryAuth),
+		"user_password", o.UserID,
+	)
+	if ev.ProjectID == "" {
+		ev.ProjectID = o.ProjectID
+	}
+	ev, err = audit.WithPayload(ev, domain.AuthFactorPayload{UserID: o.UserID})
+	if err != nil {
+		return err
+	}
+	return audit.Insert(ctx, stmts, ev)
 }
 
 // ---- Delete ACTION -------------------------------------------------------------
@@ -411,7 +469,14 @@ func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		}
 		return domain.ErrInternal(err).WithMessage("failed to delete user")
 	}
-	return nil
+	ev := audit.WithEntity(
+		audit.FromContext(ctx, domain.EventTypeUserDeleted, domain.EventCategoryEntity),
+		"user", o.UserID,
+	)
+	if ev.ProjectID == "" {
+		ev.ProjectID = o.ProjectID
+	}
+	return audit.Insert(ctx, stmts, ev)
 }
 
 // UserStatementsLookup adapts [UserStatements] to [UserLookup] for AuthAttemptService.

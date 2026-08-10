@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -76,7 +77,18 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
 		}
-		return nil
+		ev := audit.WithEntity(
+			audit.FromContext(ctx, domain.EventTypeSchemaCreated, domain.EventCategoryAdmin),
+			"json_schema", model.URL,
+		)
+		if ev.ProjectID == "" {
+			ev.ProjectID = model.ProjectID
+		}
+		ev, err = audit.WithPayload(ev, domain.SchemaPayload{SchemaID: model.URL})
+		if err != nil {
+			return err
+		}
+		return audit.Insert(ctx, stmts, ev)
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {

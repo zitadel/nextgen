@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -71,7 +72,16 @@ func (s *sessionService) Create(ctx context.Context, input CreateSessionInput) (
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("Failed to create the session.")
 	}
-	if err := s.v2Pool.Statements().CreateSession(ctx, session); err != nil {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().CreateSession(ctx, session); err != nil {
+			return err
+		}
+		return emitSessionEstablished(ctx, tx.Statements(), session)
+	})
+	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
+		}
 		return nil, domain.ErrInternal(err).WithMessage("Failed to create the session.")
 	}
 	return session, nil
@@ -82,10 +92,29 @@ func (s *sessionService) Exchange(ctx context.Context, input ExchangeInput) (*do
 	if err != nil {
 		return nil, err
 	}
-	session, err := s.v2Pool.Statements().ExchangeSession(ctx, input.ProjectID, input.HandoffToken, input.IdempotencyKey, ttl)
+	var session *domain.Session
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		var err error
+		session, err = tx.Statements().ExchangeSession(ctx, input.ProjectID, input.HandoffToken, input.IdempotencyKey, ttl)
+		if err != nil {
+			return err
+		}
+		if err := emitSessionEstablished(ctx, tx.Statements(), session); err != nil {
+			return err
+		}
+		if session.TokenID != "" {
+			if err := emitAuthTokenIssued(ctx, tx.Statements(), session); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		if errors.Is(err, domain.ErrSessionExchangeConflict()) || errors.Is(err, domain.ErrSessionInvalidHandoffToken()) {
 			return nil, err
+		}
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("Failed to exchange the session.")
 	}
@@ -121,14 +150,72 @@ func (s *sessionService) List(ctx context.Context, input ListSessionInput) ([]*d
 }
 
 func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) error {
-	err := s.v2Pool.Statements().DeleteSessionByID(ctx, input.ProjectID, input.SessionID)
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().DeleteSessionByID(ctx, input.ProjectID, input.SessionID); err != nil {
+			return err
+		}
+		ev := audit.WithEntity(
+			audit.FromContext(ctx, domain.EventTypeSessionDeleted, domain.EventCategorySession),
+			"session", input.SessionID,
+		)
+		if ev.ProjectID == "" {
+			ev.ProjectID = input.ProjectID
+		}
+		sid := input.SessionID
+		ev.SessionID = &sid
+		ev, err := audit.WithPayload(ev, domain.SessionDeletedPayload{})
+		if err != nil {
+			return err
+		}
+		return audit.Insert(ctx, tx.Statements(), ev)
+	})
 	if err != nil {
 		if errors.Is(err, domain.ErrSessionNotFound()) {
 			return nil
 		}
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return de
+		}
 		return domain.ErrInternal(err).WithMessage("Failed to delete the session.")
 	}
 	return nil
+}
+
+func emitSessionEstablished(ctx context.Context, stmts EventStatements, session *domain.Session) error {
+	ev := audit.WithEntity(
+		audit.FromContext(ctx, domain.EventTypeSessionEstablished, domain.EventCategorySession),
+		"session", session.ID,
+	)
+	if ev.ProjectID == "" {
+		ev.ProjectID = session.ProjectID
+	}
+	sid := session.ID
+	ev.SessionID = &sid
+	payload := domain.SessionEstablishedPayload{}
+	if session.UserID != nil {
+		payload.UserID = *session.UserID
+	}
+	ev, err := audit.WithPayload(ev, payload)
+	if err != nil {
+		return err
+	}
+	return audit.Insert(ctx, stmts, ev)
+}
+
+func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, session *domain.Session) error {
+	ev := audit.WithEntity(
+		audit.FromContext(ctx, domain.EventTypeAuthTokenIssued, domain.EventCategoryAuth),
+		"token", session.TokenID,
+	)
+	if ev.ProjectID == "" {
+		ev.ProjectID = session.ProjectID
+	}
+	ev.TokenID = session.TokenID
+	ev, err := audit.WithPayload(ev, domain.AuthTokenIssuedPayload{})
+	if err != nil {
+		return err
+	}
+	return audit.Insert(ctx, stmts, ev)
 }
 
 func NewSessionService(v2Pool StatementPool, users UserIdentityReader, cfg SessionConfig) SessionService {

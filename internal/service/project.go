@@ -12,6 +12,7 @@ import (
 
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -123,7 +124,7 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 		}
 
 		if !seedDefaults {
-			return nil
+			return emitProjectCreated(ctx, tx.Statements(), project)
 		}
 
 		userschema, err := s.createDefaultUserSchemas(ctx, tx.Statements(), project.ID)
@@ -135,7 +136,10 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to parse default user schema")
 		}
-		return s.createDefaultLoginFlowDefinitions(ctx, tx.Statements(), project.ID, userSchema)
+		if err := s.createDefaultLoginFlowDefinitions(ctx, tx.Statements(), project.ID, userSchema); err != nil {
+			return err
+		}
+		return emitProjectCreated(ctx, tx.Statements(), project)
 	})
 
 	if err != nil {
@@ -151,7 +155,7 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 	return project, nil
 }
 
-func (s *projectService) createDefaultUserSchemas(ctx context.Context, stmts JSONSchemaStatements, projectID string) (*domain.JSONSchema, error) {
+func (s *projectService) createDefaultUserSchemas(ctx context.Context, stmts AllStatements, projectID string) (*domain.JSONSchema, error) {
 	schemabs := schemas.DefaultHumanUserSchema(s.serverURL)
 	schema, err := domain.NewJSONSchema(projectID, schemabs)
 	if err != nil {
@@ -163,10 +167,13 @@ func (s *projectService) createDefaultUserSchemas(ctx context.Context, stmts JSO
 	if err := stmts.CreateJSONSchema(ctx, schema); err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to save default human schema to project")
 	}
+	if err := emitSchemaCreated(ctx, stmts, schema); err != nil {
+		return nil, err
+	}
 	return schema, nil
 }
 
-func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, stmts FlowDefinitionStatements, projectID string, userSchema *jsonschema.Schema) error {
+func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, stmts AllStatements, projectID string, userSchema *jsonschema.Schema) error {
 	flowDefs, err := flow_definitions.DefaultLoginFlowDefinitions(
 		s.serverURL,
 		projectID,
@@ -185,8 +192,56 @@ func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, 
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to save default login flow definition to project")
 		}
+		if err := emitFlowdefCreated(ctx, stmts, flowDef); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func emitProjectCreated(ctx context.Context, stmts EventStatements, project *domain.Project) error {
+	ev := audit.WithEntity(
+		audit.FromContext(ctx, domain.EventTypeProjectCreated, domain.EventCategoryEntity),
+		"project", project.ID,
+	)
+	if ev.ProjectID == "" {
+		ev.ProjectID = project.ID
+	}
+	ev, err := audit.WithPayload(ev, domain.ProjectCreatedPayload{Name: project.Name})
+	if err != nil {
+		return err
+	}
+	return audit.Insert(ctx, stmts, ev)
+}
+
+func emitSchemaCreated(ctx context.Context, stmts EventStatements, schema *domain.JSONSchema) error {
+	ev := audit.WithEntity(
+		audit.FromContext(ctx, domain.EventTypeSchemaCreated, domain.EventCategoryAdmin),
+		"json_schema", schema.URL,
+	)
+	if ev.ProjectID == "" {
+		ev.ProjectID = schema.ProjectID
+	}
+	ev, err := audit.WithPayload(ev, domain.SchemaPayload{SchemaID: schema.URL})
+	if err != nil {
+		return err
+	}
+	return audit.Insert(ctx, stmts, ev)
+}
+
+func emitFlowdefCreated(ctx context.Context, stmts EventStatements, flowDef *domain.FlowDefinition) error {
+	ev := audit.WithEntity(
+		audit.FromContext(ctx, domain.EventTypeFlowdefCreated, domain.EventCategoryAdmin),
+		"flow_definition", flowDef.ID,
+	)
+	if ev.ProjectID == "" {
+		ev.ProjectID = flowDef.ProjectID
+	}
+	ev, err := audit.WithPayload(ev, domain.FlowdefPayload{Name: flowDef.Name})
+	if err != nil {
+		return err
+	}
+	return audit.Insert(ctx, stmts, ev)
 }
 
 func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, error) {
@@ -244,9 +299,29 @@ func (s *projectService) Update(ctx context.Context, id, name string) (*domain.P
 		ID:   id,
 		Name: name,
 	}
-	if err := s.v2Pool.Statements().UpdateProject(ctx, project); err != nil {
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().UpdateProject(ctx, project); err != nil {
+			return err
+		}
+		ev := audit.WithEntity(
+			audit.FromContext(ctx, domain.EventTypeProjectUpdated, domain.EventCategoryEntity),
+			"project", project.ID,
+		)
+		if ev.ProjectID == "" {
+			ev.ProjectID = project.ID
+		}
+		ev, err := audit.WithPayload(ev, domain.ProjectUpdatedPayload{ChangedKeys: []string{"name"}})
+		if err != nil {
+			return err
+		}
+		return audit.Insert(ctx, tx.Statements(), ev)
+	})
+	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrProjectNotFound()
+		}
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to update project")
 	}
@@ -385,7 +460,23 @@ func (s *projectService) Delete(ctx context.Context, id string) error {
 	if id == "" {
 		return domain.ErrProjectMissingID()
 	}
-	if err := s.v2Pool.Statements().DeleteProjectByID(ctx, id); err != nil {
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().DeleteProjectByID(ctx, id); err != nil {
+			return err
+		}
+		ev := audit.WithEntity(
+			audit.FromContext(ctx, domain.EventTypeProjectDeleted, domain.EventCategoryEntity),
+			"project", id,
+		)
+		if ev.ProjectID == "" {
+			ev.ProjectID = id
+		}
+		return audit.Insert(ctx, tx.Statements(), ev)
+	})
+	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return de
+		}
 		return domain.ErrInternal(err).WithMessage("failed to delete project")
 	}
 	return nil

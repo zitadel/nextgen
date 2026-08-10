@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -46,12 +47,31 @@ func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.v2Pool.Statements().CreateBranding(ctx, entity); err != nil {
+	if err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().CreateBranding(ctx, entity); err != nil {
+			return err
+		}
+		ev := audit.WithEntity(
+			audit.FromContext(ctx, domain.EventTypeBrandingCreated, domain.EventCategoryAdmin),
+			"branding", entity.ID,
+		)
+		if ev.ProjectID == "" {
+			ev.ProjectID = entity.ProjectID
+		}
+		ev, err := audit.WithPayload(ev, domain.BrandingCreatedPayload{Layout: entity.Layout})
+		if err != nil {
+			return err
+		}
+		return audit.Insert(ctx, tx.Statements(), ev)
+	}); err != nil {
 		// The only integrity constraint reachable from user input is the FK to
 		// projects (the ULID primary key cannot realistically collide), so a
 		// violation means the referenced project does not exist.
 		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
 			return nil, domain.ErrBrandingInvalid("project does not exist", err)
+		}
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create branding revision in database")
 	}

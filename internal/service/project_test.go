@@ -50,6 +50,7 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 		}).
 		AnyTimes()
 	statementer.EXPECT().Statements().Return(statements).AnyTimes()
+	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	const baseURL = "https://example.com/api/schemas"
 

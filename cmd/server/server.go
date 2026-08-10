@@ -462,7 +462,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 
 	mux.Handle("/",
 		middleware.Chain(apiHandler,
-			func(next http.Handler) http.Handler { return middleware.WithRequestIdentification(reqIdGen, next) },
+			func(next http.Handler) http.Handler { return middleware.WithRequestContextMiddleware(reqIdGen, next) },
 			middleware.WithLogging,
 			api.WithRequestHostMiddleware,
 			middleware.WithUserAgentMiddleware,

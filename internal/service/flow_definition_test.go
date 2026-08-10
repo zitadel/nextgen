@@ -49,7 +49,18 @@ func v2PoolFromStatements(t *testing.T, stmts service.AllStatements) *service.DB
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
+	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	pool.EXPECT().
+		Transaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, statementer)
+		}).
+		AnyTimes()
+	statementer.EXPECT().Statements().Return(stmts).AnyTimes()
+	if mock, ok := stmts.(*servicemocks.MockAllStatements); ok {
+		mock.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	}
 	return service.NewPool(pool)
 }
 

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -223,7 +224,30 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 		return nil, err
 	}
 
-	if err = s.stmts.Statements().CreateAuthAttempt(ctx, attempt); err != nil {
+	if err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().CreateAuthAttempt(ctx, attempt); err != nil {
+			return err
+		}
+		ev := audit.WithEntity(
+			audit.FromContext(ctx, domain.EventTypeAuthAttemptCreated, domain.EventCategoryAuth),
+			"auth_attempt", attempt.ID,
+		)
+		if ev.ProjectID == "" {
+			ev.ProjectID = attempt.ProjectID
+		}
+		payload := domain.AuthAttemptCreatedPayload{}
+		if ev.FlowID != nil {
+			payload.FlowID = *ev.FlowID
+		}
+		ev, err := audit.WithPayload(ev, payload)
+		if err != nil {
+			return err
+		}
+		return audit.Insert(ctx, tx.Statements(), ev)
+	}); err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
+		}
 		return nil, domain.ErrInternal(err).WithMessage("Failed to create the auth attempt.")
 	}
 	return attempt, nil
@@ -276,12 +300,23 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		// Record the failure for rate-limiting — best effort, don't shadow
 		// the original error. Skip when verify couldn't identify a challenge row.
 		if challenge != nil {
-			_ = s.stmts.Statements().AuthAttemptChallengeFailed(ctx, input.ProjectID, input.AttemptID, challenge)
+			_ = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+				if err := tx.Statements().AuthAttemptChallengeFailed(ctx, input.ProjectID, input.AttemptID, challenge); err != nil {
+					return err
+				}
+				return emitAuthCheck(ctx, tx.Statements(), input.ProjectID, challenge, false)
+			})
 		}
 		return nil, err
 	}
 
-	if err = s.stmts.Statements().AuthAttemptChallengeSucceeded(ctx, input.ProjectID, input.AttemptID, factor, challenge.GetID()); err != nil {
+	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().AuthAttemptChallengeSucceeded(ctx, input.ProjectID, input.AttemptID, factor, challenge.GetID()); err != nil {
+			return err
+		}
+		return emitAuthCheck(ctx, tx.Statements(), input.ProjectID, challenge, true)
+	})
+	if err != nil {
 		return nil, err
 	}
 	attempt.SetCheck(factor) // Update the attempt with the successful factor for accurate state in the response
@@ -301,7 +336,28 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 		return nil, err
 	}
 
-	if err := s.stmts.Statements().HandoffAuthAttempt(ctx, attempt); err != nil {
+	err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().HandoffAuthAttempt(ctx, attempt); err != nil {
+			return err
+		}
+		ev := audit.WithEntity(
+			audit.FromContext(ctx, domain.EventTypeAuthAttemptHandedOff, domain.EventCategoryAuth),
+			"auth_attempt", attempt.ID,
+		)
+		if ev.ProjectID == "" {
+			ev.ProjectID = attempt.ProjectID
+		}
+		payload := domain.AuthAttemptHandedOffPayload{}
+		if attempt.SessionID != nil {
+			payload.SessionID = *attempt.SessionID
+		}
+		ev, err := audit.WithPayload(ev, payload)
+		if err != nil {
+			return err
+		}
+		return audit.Insert(ctx, tx.Statements(), ev)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return attempt, nil
@@ -313,11 +369,38 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 // can promote the user_id to the session.
 func (s *authAttemptService) RegisterCreatedUser(ctx context.Context, projectID, attemptID, userID string) error {
 	challenge := &domain.AuthChallengeUser{}
-	if err := s.stmts.Statements().SetAuthAttemptChallenge(ctx, projectID, attemptID, challenge); err != nil {
+	return s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().SetAuthAttemptChallenge(ctx, projectID, attemptID, challenge); err != nil {
+			return err
+		}
+		factor := &domain.AuthFactorUser{UserID: userID}
+		if err := tx.Statements().AuthAttemptChallengeSucceeded(ctx, projectID, attemptID, factor, challenge.GetID()); err != nil {
+			return err
+		}
+		return emitAuthCheck(ctx, tx.Statements(), projectID, challenge, true)
+	})
+}
+
+func emitAuthCheck(ctx context.Context, stmts EventStatements, projectID string, challenge domain.AuthChallenge, succeeded bool) error {
+	eventType := domain.EventTypeAuthCheckFailed
+	if succeeded {
+		eventType = domain.EventTypeAuthCheckSucceeded
+	}
+	ev := audit.WithEntity(
+		audit.FromContext(ctx, eventType, domain.EventCategoryAuth),
+		"check", challenge.GetID(),
+	)
+	if ev.ProjectID == "" {
+		ev.ProjectID = projectID
+	}
+	ev, err := audit.WithPayload(ev, domain.AuthCheckPayload{
+		CheckID:   challenge.GetID(),
+		CheckType: challenge.Type().String(),
+	})
+	if err != nil {
 		return err
 	}
-	factor := &domain.AuthFactorUser{UserID: userID}
-	return s.stmts.Statements().AuthAttemptChallengeSucceeded(ctx, projectID, attemptID, factor, challenge.GetID())
+	return audit.Insert(ctx, stmts, ev)
 }
 
 // buildChallenge constructs the challenge for the given check type.
