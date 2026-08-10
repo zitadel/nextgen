@@ -1,0 +1,178 @@
+package resolver_test
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
+
+	"github.com/zitadel/nextgen/internal/authz/resolver"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service/mocks"
+)
+
+func TestCheck_Orchestration(t *testing.T) {
+	t.Parallel()
+
+	base := resolver.Request{
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_alice",
+		ProjectID:     "proj_1",
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+
+	t.Run("allow", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+		stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
+		stmts.EXPECT().CheckAuthz(gomock.Any(), domain.AuthzCheckParams{
+			CatalogID:              domain.SystemCatalogID,
+			ProjectID:              base.ProjectID,
+			PrincipalHomeProjectID: base.ProjectID,
+			PrincipalType:          base.PrincipalType,
+			PrincipalID:            base.PrincipalID,
+			ObjectType:             base.ObjectType,
+			Relation:               base.Relation,
+		}).Return(true, nil)
+
+		d, err := resolver.New().Check(context.Background(), stmts, base)
+		require.NoError(t, err)
+		assert.Equal(t, resolver.DecisionAllow, d)
+	})
+
+	t.Run("forbidden with foothold", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+		stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
+		stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(false, nil)
+		stmts.EXPECT().HasAuthzProjectFoothold(gomock.Any(), base.ProjectID, base.PrincipalType, base.PrincipalID).Return(true, nil)
+
+		d, err := resolver.New().Check(context.Background(), stmts, base)
+		require.NoError(t, err)
+		assert.Equal(t, resolver.DecisionForbidden, d)
+	})
+
+	t.Run("not found without foothold", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+		stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
+		stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(false, nil)
+		stmts.EXPECT().HasAuthzProjectFoothold(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil)
+
+		d, err := resolver.New().Check(context.Background(), stmts, base)
+		require.NoError(t, err)
+		assert.Equal(t, resolver.DecisionNotFound, d)
+	})
+
+	t.Run("sk_team allowlist short circuit", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+		// No storage calls expected.
+
+		d, err := resolver.New().Check(context.Background(), stmts, resolver.Request{
+			PrincipalType:   domain.AuthzPrincipalTypeSKTeam,
+			PrincipalID:     "sk_team_1",
+			CredentialClass: domain.AuthzPrincipalTypeSKTeam,
+			ProjectID:       "proj_1",
+			ObjectType:      "project",
+			Relation:        "write",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, resolver.DecisionNotFound, d)
+	})
+
+	t.Run("sk_team allowed permission reaches storage", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+		stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
+		stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(true, nil)
+
+		d, err := resolver.New().Check(context.Background(), stmts, resolver.Request{
+			PrincipalType:   domain.AuthzPrincipalTypeSKTeam,
+			PrincipalID:     "sk_team_1",
+			CredentialClass: domain.AuthzPrincipalTypeSKTeam,
+			ProjectID:       "proj_1",
+			ObjectType:      "user",
+			Relation:        "read",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, resolver.DecisionAllow, d)
+	})
+
+	t.Run("invalid input", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+		_, err := resolver.New().Check(context.Background(), stmts, resolver.Request{})
+		require.Error(t, err)
+	})
+
+	t.Run("memoizes decision", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+		stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil).Times(1)
+		stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(true, nil).Times(1)
+
+		r := resolver.New()
+		d1, err := r.Check(context.Background(), stmts, base)
+		require.NoError(t, err)
+		d2, err := r.Check(context.Background(), stmts, base)
+		require.NoError(t, err)
+		assert.Equal(t, resolver.DecisionAllow, d1)
+		assert.Equal(t, resolver.DecisionAllow, d2)
+	})
+
+	t.Run("catalog lookup error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+		stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return("", errors.New("boom"))
+		_, err := resolver.New().Check(context.Background(), stmts, base)
+		require.Error(t, err)
+	})
+}
+
+func TestListObjects_Orchestration(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+	stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
+	stmts.EXPECT().ListAuthzObjectIDs(gomock.Any(), domain.AuthzListObjectsParams{
+		CatalogID:              domain.SystemCatalogID,
+		ProjectID:              "proj_1",
+		PrincipalHomeProjectID: "proj_1",
+		PrincipalType:          domain.AuthzPrincipalTypeUser,
+		PrincipalID:            "user_a",
+		ResourceKind:           domain.ResourceKindUser,
+		ObjectType:             "project",
+		Relation:               "viewer",
+	}).Return([]string{"u1", "u2"}, nil)
+
+	ids, err := resolver.New().ListObjects(context.Background(), stmts, resolver.ListRequest{
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_a",
+		ProjectID:     "proj_1",
+		ResourceKind:  domain.ResourceKindUser,
+		ObjectType:    "project",
+		Relation:      "viewer",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"u1", "u2"}, ids)
+}
+
+func TestListObjects_SKTeamDeny(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+	ids, err := resolver.New().ListObjects(context.Background(), stmts, resolver.ListRequest{
+		PrincipalType:   domain.AuthzPrincipalTypeSKTeam,
+		PrincipalID:     "sk",
+		CredentialClass: domain.AuthzPrincipalTypeSKTeam,
+		ProjectID:       "proj_1",
+		ResourceKind:    domain.ResourceKindUser,
+		ObjectType:      "project",
+		Relation:        "viewer",
+	})
+	require.NoError(t, err)
+	assert.Empty(t, ids)
+}

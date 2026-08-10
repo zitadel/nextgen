@@ -67,6 +67,7 @@ SELECT (
           AND a.catalog_id = @p1
           AND a.revoked_at IS NULL
           AND (a.expires_at IS NULL OR a.expires_at > CURRENT_TIMESTAMP())
+          AND a.scope_kind = 'project'
           AND (
                 (a.principal_type = @p3 AND a.principal_id = @p4)
              OR (

@@ -2,4 +2,4 @@
 "@zitadel/server": minor
 ---
 
-Add storage statements for authz permission check and object listing across Postgres, Spanner, and SQLite.
+Add the authz permission resolver library (Check / ListObjects), storage statements, and L4 oracle tests across Postgres, Spanner, and SQLite.

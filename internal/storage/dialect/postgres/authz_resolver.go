@@ -69,6 +69,7 @@ SELECT (
           AND a.catalog_id = $1
           AND a.revoked_at IS NULL
           AND (a.expires_at IS NULL OR a.expires_at > now())
+          AND a.scope_kind = 'project'
           AND (
                 (a.principal_type = $3 AND a.principal_id = $4)
              OR (
