@@ -239,13 +239,15 @@ var encryptionKeySchema = database.NewSchema(map[domain.EncryptionKeyField]datab
 	},
 	domain.EncryptionKeyFieldActivatedAt: {
 		SQLName:  "activated_at",
-		Accessor: func(k *domain.EncryptionKey) any { return k.ActivatedAt },
+		Accessor: func(k *domain.EncryptionKey) any { return database.NullableValue(k.ActivatedAt) },
 		Coerce:   database.CoerceTime,
+		Nullable: true,
 	},
 	domain.EncryptionKeyFieldRetiredAt: {
 		SQLName:  "retired_at",
-		Accessor: func(k *domain.EncryptionKey) any { return k.RetiredAt },
+		Accessor: func(k *domain.EncryptionKey) any { return database.NullableValue(k.RetiredAt) },
 		Coerce:   database.CoerceTime,
+		Nullable: true,
 	},
 	domain.EncryptionKeyFieldPurpose: {
 		SQLName:  "purpose",
@@ -287,13 +289,15 @@ var signingKeySchema = database.NewSchema(map[domain.SigningKeyField]database.Fi
 	},
 	domain.SigningKeyFieldActivatedAt: {
 		SQLName:  "activated_at",
-		Accessor: func(k *domain.SigningKey) any { return k.ActivatedAt },
+		Accessor: func(k *domain.SigningKey) any { return database.NullableValue(k.ActivatedAt) },
 		Coerce:   database.CoerceTime,
+		Nullable: true,
 	},
 	domain.SigningKeyFieldRetiredAt: {
 		SQLName:  "retired_at",
-		Accessor: func(k *domain.SigningKey) any { return k.RetiredAt },
+		Accessor: func(k *domain.SigningKey) any { return database.NullableValue(k.RetiredAt) },
 		Coerce:   database.CoerceTime,
+		Nullable: true,
 	},
 	domain.SigningKeyFieldPurpose: {
 		SQLName:  "purpose",

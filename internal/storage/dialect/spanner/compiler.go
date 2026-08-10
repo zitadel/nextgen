@@ -122,7 +122,7 @@ func compileOrFilter[F ~uint8, T any](c *statementCompiler, filter database.OrFi
 }
 
 func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *database.CompareFilter[F], schema database.Schema[F, T]) {
-	if compare.HasNilValue(filter.Terms) {
+	if compare.NeedsNullAware(filter, schema) {
 		compare.CompileNullAware(c, filter, schema, func(_ compare.Writer, arg any, _ database.Column[F]) {
 			writeArg(c, arg)
 		})
@@ -232,6 +232,9 @@ func compileOrderBy[F ~uint8, T any](c *statementCompiler, orderBy database.Orde
 			if i > 0 {
 				c.WriteString(", ")
 			}
+			// Spanner rejects explicit NULLS FIRST/LAST but always orders
+			// NULLs first on ASC and last on DESC, the policy the other
+			// dialects state via compare.WriteNullsOrder.
 			c.WriteString(schema.SQLName(column))
 			if orderBy.Direction == database.OrderDesc {
 				c.WriteString(" DESC")
