@@ -3,6 +3,7 @@ package domain
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/ianlancetaylor/jsonschema"
 )
@@ -115,7 +116,7 @@ func resolveAllStepFields(schema *jsonschema.Schema, steps []FlowDefinitionStep)
 	}
 
 	// validate that all required fields in the schema are present in the flow definition
-	if err := validateRequiredUserSchemaFields(sr.RequiredSet(), steps); err != nil {
+	if err := validateRequiredUserSchemaFields(sr.RequiredLeafPaths(), steps); err != nil {
 		return nil, err
 	}
 
@@ -179,28 +180,43 @@ func validatePasskeyActionsEnabled(sr schemaReader, steps []FlowDefinitionStep) 
 
 // validateRequiredUserSchemaFields checks that all required fields in the
 // user schema are present in the flow definition.
-func validateRequiredUserSchemaFields(required map[string]struct{}, steps []FlowDefinitionStep) error {
-	if len(required) == 0 {
+func validateRequiredUserSchemaFields(requiredPaths map[string]struct{}, steps []FlowDefinitionStep) error {
+	if len(requiredPaths) == 0 {
 		return nil
 	}
-	// gather all the fields set in the flow definition steps
-	fields := make(map[string]struct{})
+
+	// Collecting `address.street` covers the leaf and every object above
+	// it, since an object materializes once one of its children is
+	// collected.
+	covered := make(map[string]struct{})
+	cover := func(path string) {
+		for {
+			covered[path] = struct{}{}
+			dot := strings.LastIndex(path, ".")
+			if dot < 0 {
+				return
+			}
+			path = path[:dot]
+		}
+	}
 	for _, step := range steps {
-		for _, f := range step.Fields {
-			fields[string(f)] = struct{}{}
+		for _, field := range step.Fields {
+			cover(string(field))
 		}
 	}
-	missingFields := make([]string, 0, len(required))
-	for requiredField := range required {
-		if _, ok := fields[requiredField]; !ok {
-			missingFields = append(missingFields, requiredField)
+
+	missing := make([]string, 0, len(requiredPaths))
+	for path := range requiredPaths {
+		if _, ok := covered[path]; !ok {
+			missing = append(missing, path)
 		}
 	}
-	if len(missingFields) > 0 {
-		slices.Sort(missingFields)
-		return ErrFlowDefinitionInvalid(fmt.Sprintf("required fields %v in user schema are missing in the flow definition steps", missingFields), nil)
+	if len(missing) == 0 {
+		return nil
 	}
-	return nil
+
+	slices.Sort(missing)
+	return ErrFlowDefinitionInvalid(fmt.Sprintf("required fields %v in user schema are missing in the flow definition steps", missing), nil)
 }
 
 // validateSteps checks the structural shape of each step (terminal vs
