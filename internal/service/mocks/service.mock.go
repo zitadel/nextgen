@@ -18,7 +18,7 @@ import (
 	compiler "github.com/zitadel/nextgen/internal/authz/compiler"
 	domain "github.com/zitadel/nextgen/internal/domain"
 	service "github.com/zitadel/nextgen/internal/service"
-	database "github.com/zitadel/nextgen/internal/storage/v2/database"
+	database "github.com/zitadel/nextgen/internal/storage/database"
 	op "github.com/zitadel/oidc/v3/pkg/op"
 	gomock "go.uber.org/mock/gomock"
 )

@@ -18,7 +18,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 func mustJSONSchemaCache(t *testing.T, size int) *lru.TwoQueueCache[string, *jsonschema.Schema] {

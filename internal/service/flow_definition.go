@@ -11,7 +11,7 @@ import (
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 type FlowDefinitionService interface {
