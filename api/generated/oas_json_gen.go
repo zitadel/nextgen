@@ -24354,9 +24354,7 @@ func (s UserPropertyProperties) encodeFields(e *jx.Encoder) {
 	for k, elem := range s {
 		e.FieldStart(k)
 
-		if len(elem) != 0 {
-			e.Raw(elem)
-		}
+		elem.Encode(e)
 	}
 }
 
@@ -24367,11 +24365,9 @@ func (s *UserPropertyProperties) Decode(d *jx.Decoder) error {
 	}
 	m := s.init()
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem jx.Raw
+		var elem UserProperty
 		if err := func() error {
-			v, err := d.RawAppend(nil)
-			elem = jx.Raw(v)
-			if err != nil {
+			if err := elem.Decode(d); err != nil {
 				return err
 			}
 			return nil
