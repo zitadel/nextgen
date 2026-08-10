@@ -16,7 +16,7 @@ import {
 } from "@zitadel/config/defaults";
 import { consola } from "consola";
 
-import { claimAction, claimCommand, claimState, claimSummary } from "../../lib/claim-state";
+import { claimAction, claimCommand, claimState } from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import {
@@ -43,7 +43,6 @@ import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
   detectProjectFacts,
-  dim as styleDim,
   fileNameOf,
   formatFrameworkLine,
   id as styleId,
@@ -382,10 +381,16 @@ export default class Setup extends BaseCommand {
 
     const writtenRel = allFilesWritten.map((file) => relativeDisplay(cwd, file));
     // The nudge rides both surfaces from one decision: the box for humans, the
-    // envelope for agents. It lands after the install/verify actions because
-    // attaching a team is the step *after* the app demonstrably works, not a
-    // precondition for trying it. Empty off the cloud, where nothing can be
-    // attached.
+    // envelope for agents.
+    //
+    // It joins `boxActions` rather than being held back from it. That list is
+    // journey-staged by *omission* (customize/publish is absent until login
+    // works, see `install.ts`), and this is not part of that journey: attaching
+    // a team is orthogonal to whether login works yet, exactly as in `status`.
+    // Position in the list carries no staging meaning, so appending is not a
+    // way of deferring it.
+    //
+    // Empty off the cloud, where nothing can be attached.
     const claimNudge =
       claimState({ secret: {}, server: answers.server }).kind === "detached"
         ? {
@@ -760,14 +765,6 @@ function buildSummary(opts: {
     { label: "Server", value: styleUrl(server) },
     { label: "App will run", value: styleUrl(issuer) },
   ];
-
-  // A project this command just created is never attached to a team yet, so the
-  // only question here is whether attaching is a thing at all on this server.
-  // `claimSummary` returns undefined off the cloud, which drops the row.
-  const ownership = claimSummary(claimState({ secret: {}, server }));
-  if (ownership) {
-    projectRows.push({ label: "Ownership", value: styleDim(ownership) });
-  }
 
   return [
     { title: "Detected", rows: detected },

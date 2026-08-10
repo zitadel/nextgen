@@ -159,8 +159,13 @@ export function readUseCase(config: Record<string, unknown>): string | undefined
 
 /**
  * Reads the top-level `server` origin from a parsed `zitadel.json`, falling
- * back to {@link DEFAULT_SERVER} exactly as {@link resolveServer} does when the
- * key is absent.
+ * back to {@link DEFAULT_SERVER} when the key is absent.
+ *
+ * Top-level only, unlike `resolveServer`, which prefers the selected
+ * environment's `server` before falling back here. That is the point: an
+ * environment override says where one invocation should talk, not where the
+ * project lives. No practical difference today, since setup always writes a
+ * concrete top-level `server`.
  *
  * This is the server the project actually lives on, which is not always the one
  * a command is talking to: `doctor` pins its own source to the local runtime URL

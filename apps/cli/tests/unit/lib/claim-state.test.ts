@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { claimAction, claimState, claimSummary } from "../../../src/lib/claim-state";
+import { claimAction, claimState, isAttached } from "../../../src/lib/claim-state";
 
 const ATTACHED = { claimed_at: "2026-08-01T10:00:00.000Z", team_id: "team-001" };
 const DETACHED = {};
@@ -49,15 +49,18 @@ describe("claim state", () => {
   });
 });
 
-describe("claim copy", () => {
-  it("names the owning team once attached and nudges otherwise", () => {
-    expect(claimSummary({ kind: "attached", team_id: "team-001", claimed_at: ATTACHED.claimed_at })).toBe(
-      "attached to team team-001",
-    );
-    expect(claimSummary({ kind: "detached" })).toBe("temporary until you attach it to a team");
-    expect(claimSummary({ kind: "not-applicable" })).toBeUndefined();
+describe("attachment predicate", () => {
+  // `zitadel claim` shares this to decide whether to skip, so it has to answer
+  // on any server, not just the cloud ones the nudges care about.
+  it("answers from the record alone, ignoring the server", () => {
+    expect(isAttached(ATTACHED)).toBe(true);
+    expect(isAttached(DETACHED)).toBe(false);
+    expect(isAttached({ team_id: "team-001" })).toBe(false);
+    expect(isAttached({ claimed_at: ATTACHED.claimed_at })).toBe(false);
   });
+});
 
+describe("claim copy", () => {
   // The epic's 14-day lifetime is not enforced anywhere yet, so the nudge must
   // invite a claim without promising the project will actually be removed.
   it("promises no deletion", () => {
@@ -68,12 +71,6 @@ describe("claim copy", () => {
   // `unclaimed` is banned from the public docs by the vocabulary gate; keeping
   // it out of the strings themselves is what makes that gate easy to keep.
   it("stays on the vocabulary the claim command established", () => {
-    for (const copy of [
-      claimAction("0.1.0"),
-      claimSummary({ kind: "detached" }) ?? "",
-      claimSummary({ kind: "attached", team_id: "team-001", claimed_at: ATTACHED.claimed_at }) ?? "",
-    ]) {
-      expect(copy).not.toMatch(/\bunclaimed\b/i);
-    }
+    expect(claimAction("0.1.0")).not.toMatch(/\bunclaimed\b/i);
   });
 });

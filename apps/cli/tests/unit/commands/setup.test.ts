@@ -187,6 +187,12 @@ describe("setup command", () => {
 
   // Every project starts unattached, so setup is where the developer first
   // learns the project is temporary and that `zitadel claim` exists.
+  //
+  // Asserted through `--dry-run`, which previews the real output verbatim:
+  // the install, start, and verify actions all name a project dry run never
+  // created, so the claim nudge appearing alongside them is the consistent
+  // behaviour, not a leak. Suppressing only this one would make dry run a
+  // dishonest preview of the surface under test.
   it("tells a new cloud project it is temporary until a team is attached", async () => {
     const cwd = await makeNextProject();
 

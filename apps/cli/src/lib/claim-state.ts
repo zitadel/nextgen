@@ -15,6 +15,23 @@ export type ClaimState =
   | { kind: "not-applicable" };
 
 /**
+ * Whether the local record says a team owns this project.
+ *
+ * Both fields or neither: a half-written record is not an attachment, and
+ * treating it as one would hand callers a `team_id` with no idea when it
+ * landed. Shared with `zitadel claim`, which asks the same question before it
+ * decides to skip, so the two cannot drift as the record grows fields.
+ *
+ * Deliberately separate from {@link claimState}: the command must answer this
+ * on any server, while the nudges only ask it on the cloud.
+ */
+export function isAttached(
+  secret: Pick<ZitadelSecret, "claimed_at" | "team_id">,
+): secret is { claimed_at: string; team_id: string } {
+  return Boolean(secret.claimed_at && secret.team_id);
+}
+
+/**
  * Decides the attachment state from local state alone.
  *
  * **Why no network call.** The contract exposes no ambient claim-state read:
@@ -43,34 +60,24 @@ export function claimState(input: {
   if (serverKind.value(input.server) !== "cloud") {
     return { kind: "not-applicable" };
   }
-  const { claimed_at, team_id } = input.secret;
-  if (claimed_at && team_id) {
-    return { kind: "attached", team_id, claimed_at };
+  if (isAttached(input.secret)) {
+    return {
+      kind: "attached",
+      team_id: input.secret.team_id,
+      claimed_at: input.secret.claimed_at,
+    };
   }
   return { kind: "detached" };
 }
 
 /**
- * The one-line fact for a summary row or a status field.
+ * The nudge for `next_actions`, quoting the command the way `journey-guidance`
+ * does.
  *
- * Kept here next to {@link claimState} rather than in `journey-guidance` (which
- * holds copy only) so a new variant cannot be added without the wording for it.
  * Deliberately says nothing about deletion: unattached projects are framed as
  * temporary, but the epic's 14-day lifetime is not enforced anywhere yet, so
  * promising it would be a lie the product cannot keep.
  */
-export function claimSummary(state: ClaimState): string | undefined {
-  switch (state.kind) {
-    case "attached":
-      return `attached to team ${state.team_id}`;
-    case "detached":
-      return "temporary until you attach it to a team";
-    case "not-applicable":
-      return undefined;
-  }
-}
-
-/** The nudge for `next_actions`, quoting the command the way `journey-guidance` does. */
 export function claimAction(cliVersion: string): string {
   return (
     "This project is temporary until you attach it to a team: run " +
