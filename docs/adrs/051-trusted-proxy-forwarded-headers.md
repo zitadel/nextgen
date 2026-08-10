@@ -68,10 +68,30 @@ trusted_proxies:
 
 The trusted set is not always a fixed list of CIDRs an operator can paste once:
 
-- **Dynamic vendor ranges.** CDNs like Cloudflare publish their edge ranges
-  ([cloudflare.com/ips](https://www.cloudflare.com/ips/)) but rotate them; a
-  static copy goes stale and silently starts rejecting legitimate forwarded
-  headers (degrading real client IPs to the CDN's address).
+- **Rotating edge-provider CIDRs.** CDNs and clouds publish their edge ranges
+  as machine-readable lists — Cloudflare ([`/ips-v4`, `/ips-v6`](https://www.cloudflare.com/ips/)),
+  AWS (`ip-ranges.json`), GCP (`cloud.json`), Fastly, Akamai — but they add,
+  retire, and reassign ranges continuously and without individual notice. A
+  static copy pinned in config therefore drifts, and it fails in two opposite
+  and both-bad ways:
+  - **Stale-shrink → availability + data corruption.** The provider brings up a
+    new edge range we haven't listed. Requests through it fail the trust check,
+    so the real client IP silently collapses to the edge's address — every user
+    behind that edge now shares one IP, quietly corrupting rate limiting, audit
+    trails, geo, and risk signals with no error surfaced.
+  - **Stale-grow → spoofing.** The provider retires a range and it gets
+    reassigned (cloud IPs are recycled to other tenants). We keep trusting an
+    address a third party now controls, and they can forge forwarded headers.
+    This is the more dangerous direction — a security regression, not just a
+    correctness one.
+
+  So an edge-provider list is never "set once." Keeping it fresh is its own
+  mechanism with real concerns: refresh cadence; **source authenticity** (this
+  list decides who we trust, so it must be fetched over authenticated TLS and,
+  where offered, signature-verified); **fail-safe on fetch failure** (keep
+  last-known-good rather than fail open to an empty/all set); propagation across
+  replicas; and both IP families (v6 lists are large). It also means a runtime
+  dependency on the provider's endpoint, which is itself an availability edge.
 - **Ephemeral infra IPs.** Cloud load balancers (AWS ALB, GCP) and Kubernetes
   ingress/pods often have no stable address to pin at all.
 
