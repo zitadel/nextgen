@@ -41,25 +41,28 @@ func domainErrorDetails(err error) api.ErrorDetails {
 		Message: domErr.Message,
 	}
 
-	var wire api.ErrorDetailsDetails
-
-	if raw, ok := marshalErrorDetails(domErr.Details); ok {
-		wire = api.ErrorDetailsDetails{"details": raw}
+	raw, hasProducer := marshalErrorDetails(domErr.Details)
+	includeParent := FullErrorInResponse.Load() && domErr.Parent != nil
+	if !hasProducer && !includeParent {
+		return errDetails
 	}
-	if FullErrorInResponse.Load() && domErr.Parent != nil {
+
+	wire := api.ErrorDetailsDetails{}
+	if hasProducer {
+		wire["details"] = raw
+	}
+	if includeParent {
 		if errmap := createFullErrDetailsDetailsMap(domErr.Parent); errmap != nil {
 			if j, err := json.Marshal(errmap); err == nil {
-				if wire == nil {
-					wire = api.ErrorDetailsDetails{}
-				}
 				wire["parent"] = j
 			}
 		}
 	}
-
-	if wire != nil {
-		errDetails.Details = api.NewOptErrorDetailsDetails(wire)
+	if len(wire) == 0 {
+		return errDetails
 	}
+
+	errDetails.Details = api.NewOptErrorDetailsDetails(wire)
 	return errDetails
 }
 
