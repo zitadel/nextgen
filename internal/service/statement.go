@@ -9,7 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserPasskeyStatements,UserRecoveryCodesStatements,BrandingStatements,ClaimStatements,ResourceScopeStatements,AuthzAssignmentStatements,AuthzMembershipEdgeStatements,AuthzCatalogStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserPasskeyStatements,UserRecoveryCodesStatements,BrandingStatements,ClaimStatements,ResourceScopeStatements,AuthzAssignmentStatements,AuthzMembershipEdgeStatements,AuthzCatalogStatements,AuthzResolverStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -48,6 +48,7 @@ type AllStatements interface {
 	AuthzAssignmentStatements
 	AuthzMembershipEdgeStatements
 	AuthzCatalogStatements
+	AuthzResolverStatements
 	Statements
 }
 
@@ -400,4 +401,25 @@ type AuthzCatalogStatements interface {
 	PersistCatalogVersion(ctx context.Context, meta domain.AuthzCatalogVersion, mutations compiler.CatalogMutations) error
 	GetAuthzCatalog(ctx context.Context, catalogID string) (*domain.AuthzCatalog, error)
 	LoadCatalogMutations(ctx context.Context, catalogID string) (compiler.PersistedCatalog, error)
+}
+
+// AuthzResolverStatements is the storage surface for permission Check / list (#423).
+//
+// ActiveSystemCatalogID returns the currently active system catalog id
+// (catalog_kind=system, owner_id=system, status=active).
+//
+// HasAuthzProjectFoothold is true when the principal has any active assignment
+// in the project or any membership edge in the project (403 vs 404 foothold).
+//
+// CheckAuthz runs the indexed semi-join (assignments ⋈ closure, membership
+// expand, bounded TTU via expression edges). Returns true when allowed.
+//
+// ListAuthzObjectIDs returns resource_scope_index.resource_id values of the
+// given kind in the project that the principal is authorized to see.
+type AuthzResolverStatements interface {
+	Statements
+	ActiveSystemCatalogID(ctx context.Context) (string, error)
+	HasAuthzProjectFoothold(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
+	CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, error)
+	ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error)
 }

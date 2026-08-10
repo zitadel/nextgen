@@ -306,3 +306,30 @@ const (
 	AuthzMembershipEdgeFieldSetID
 	AuthzMembershipEdgeFieldCreatedAt
 )
+
+// AuthzCheckParams is the storage-level input for a single-resource permission check.
+// CatalogID must be the active catalog chosen by the resolver (never caller-supplied
+// to the public resolver API). PrincipalHomeProjectID is the project that owns the
+// principal's membership edges; MVP sets it equal to ProjectID (#333 deferred).
+type AuthzCheckParams struct {
+	CatalogID              string
+	ProjectID              string
+	PrincipalHomeProjectID string
+	PrincipalType          AuthzPrincipalType
+	PrincipalID            string
+	ObjectType             string
+	Relation               string
+}
+
+// AuthzListObjectsParams lists resource_scope_index ids the principal may see
+// for one resource kind under a required catalog relation.
+type AuthzListObjectsParams struct {
+	CatalogID              string
+	ProjectID              string
+	PrincipalHomeProjectID string
+	PrincipalType          AuthzPrincipalType
+	PrincipalID            string
+	ResourceKind           ResourceKind
+	ObjectType             string
+	Relation               string
+}
