@@ -294,11 +294,9 @@ func TestCursorBattle_DestructiveMidPage(t *testing.T) {
 
 		t.Run("sessions_delete_after_page1", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
-			sessions := []*domain.Session{
-				createAnonymousSession(t, d.stmts, projectID),
-				createAnonymousSession(t, d.stmts, projectID),
-				createAnonymousSession(t, d.stmts, projectID),
-			}
+			createAnonymousSession(t, d.stmts, projectID)
+			createAnonymousSession(t, d.stmts, projectID)
+			createAnonymousSession(t, d.stmts, projectID)
 			filter := database.Equal(database.Col(domain.SessionFieldProjectID), projectID)
 			order := database.OrderBy[domain.SessionField]{
 				Columns:   []database.Column[domain.SessionField]{database.Col(domain.SessionFieldID)},
@@ -324,7 +322,6 @@ func TestCursorBattle_DestructiveMidPage(t *testing.T) {
 			got := append([]string{first.Items[0].ID}, rest...)
 			assert.NotContains(t, got, deleted)
 			assert.Len(t, uniqueStrings(got), 2)
-			_ = sessions
 		})
 	})
 }
@@ -379,19 +376,18 @@ func TestCursorBattle_NullableEncryptionKeysActivatedAt(t *testing.T) {
 			want = append(want, key.ID)
 		}
 		filter := database.Equal(database.Col(domain.EncryptionKeyFieldProjectID), projectID)
-		order := database.OrderBy[domain.EncryptionKeyField]{
-			Columns: []database.Column[domain.EncryptionKeyField]{
-				database.Col(domain.EncryptionKeyFieldActivatedAt),
-				database.Col(domain.EncryptionKeyFieldID),
-			},
-			Direction: database.OrderAsc,
-		}
 		for name, direction := range map[string]database.OrderDirection{
 			"asc":  database.OrderAsc,
 			"desc": database.OrderDesc,
 		} {
 			t.Run(name, func(t *testing.T) {
-				order.Direction = direction
+				order := database.OrderBy[domain.EncryptionKeyField]{
+					Columns: []database.Column[domain.EncryptionKeyField]{
+						database.Col(domain.EncryptionKeyFieldActivatedAt),
+						database.Col(domain.EncryptionKeyFieldID),
+					},
+					Direction: direction,
+				}
 				got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.EncryptionKey], error) {
 					return d.stmts.ListEncryptionKeys(t.Context(), &database.ListOptions[domain.EncryptionKeyField]{
 						Filter: filter,

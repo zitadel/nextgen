@@ -57,10 +57,12 @@ func (ss sessionStatements) ListSessions(ctx context.Context, filter *database.L
 	if sessions == nil {
 		sessions = []*domain.Session{}
 	}
-	var nextCursor []byte
-	if filter.Pagination.Limit > 0 && len(sessions) == int(filter.Pagination.Limit) {
-		nextCursor = pagination.New(filter.Pagination.OrderBy, sessionSchema.ValuesFrom(sessions[len(sessions)-1], filter.Pagination.OrderBy.Columns)).Marshal()
-	}
+	nextCursor := pagination.MarshalNext(
+		filter.Pagination.OrderBy,
+		sessions,
+		sessionSchema,
+		filter.Pagination.Limit,
+	)
 	return &database.ListResult[*domain.Session]{Items: sessions, NextCursor: nextCursor}, nil
 }
 

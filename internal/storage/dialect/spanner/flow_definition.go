@@ -120,10 +120,12 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 		return nil, err
 	}
 
-	var nextCursor []byte
-	if opts.Pagination.Limit > 0 && len(defs) == int(opts.Pagination.Limit) {
-		nextCursor = pagination.New(opts.Pagination.OrderBy, flowdefinition.Schema.ValuesFrom(defs[len(defs)-1], opts.Pagination.OrderBy.Columns)).Marshal()
-	}
+	nextCursor := pagination.MarshalNext(
+		opts.Pagination.OrderBy,
+		defs,
+		flowdefinition.Schema,
+		opts.Pagination.Limit,
+	)
 
 	return &database.ListResult[*domain.FlowDefinition]{
 		Items:      defs,

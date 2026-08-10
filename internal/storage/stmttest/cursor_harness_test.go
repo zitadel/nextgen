@@ -69,3 +69,50 @@ func assertCursorEmission[T any](
 	assert.Less(t, len(shortPage.Items), int(limit))
 	assert.Empty(t, shortPage.NextCursor, "a short page must not carry a next cursor")
 }
+
+// drainIncarnation runs ASC+DESC keyset drains and asserts NextCursor emission
+// for one List* incarnation. Seed want/filter/orderAsc in the caller; list wraps
+// the dialect statement. emissionLimit must be >0 and smaller than len(want).
+func drainIncarnation[T any, F ~uint8](
+	t *testing.T,
+	want []string,
+	filter database.Filter[F],
+	orderAsc database.OrderBy[F],
+	list func(database.Page[F]) (*database.ListResult[T], error),
+	id func(T) string,
+	emissionLimit uint32,
+) {
+	t.Helper()
+	require.NotEmpty(t, want)
+	require.NotEmpty(t, orderAsc.Columns)
+	require.Greater(t, emissionLimit, uint32(0))
+	require.Less(t, int(emissionLimit), len(want), "emission needs a short trailing page")
+
+	orderDesc := orderAsc
+	orderDesc.Direction = database.OrderDesc
+
+	for name, order := range map[string]database.OrderBy[F]{"asc": orderAsc, "desc": orderDesc} {
+		t.Run(name, func(t *testing.T) {
+			got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[T], error) {
+				return list(database.Page[F]{
+					Limit:   emissionLimit,
+					OrderBy: order,
+					Cursor:  cursor,
+				})
+			}, id)
+			assertDrainMatch(t, want, got)
+		})
+	}
+
+	t.Run("emission", func(t *testing.T) {
+		full, err := list(database.Page[F]{Limit: emissionLimit, OrderBy: orderAsc})
+		require.NoError(t, err)
+		short, err := list(database.Page[F]{
+			Limit:   uint32(len(want)),
+			OrderBy: orderAsc,
+			Cursor:  full.NextCursor,
+		})
+		require.NoError(t, err)
+		assertCursorEmission(t, full, short, emissionLimit)
+	})
+}

@@ -111,10 +111,12 @@ func (ts teamStatements) ListTeams(ctx context.Context, filter *database.ListOpt
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	var nextCursor []byte
-	if filter.Pagination.Limit > 0 && len(teams) == int(filter.Pagination.Limit) {
-		nextCursor = pagination.New(filter.Pagination.OrderBy, teamSchema.ValuesFrom(teams[len(teams)-1], filter.Pagination.OrderBy.Columns)).Marshal()
-	}
+	nextCursor := pagination.MarshalNext(
+		filter.Pagination.OrderBy,
+		teams,
+		teamSchema,
+		filter.Pagination.Limit,
+	)
 	return &database.ListResult[*domain.Team]{Items: teams, NextCursor: nextCursor}, nil
 }
 
