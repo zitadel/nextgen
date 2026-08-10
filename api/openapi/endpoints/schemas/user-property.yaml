@@ -46,6 +46,10 @@ properties:
   properties:
     type: object
     description: |
-      A map of additional properties for the user definition, where the key is 
+      A map of additional properties for the user definition, where the key is
       the property name and the value is the property schema.
-    additionalProperties: true
+    propertyNames:
+      pattern: "^[^.]+$"
+      description: The name of a single user attribute.
+    additionalProperties:
+      "$ref": user-property.yaml
