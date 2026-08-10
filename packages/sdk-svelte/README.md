@@ -29,26 +29,14 @@ The widget's flow events are also surfaced as optional callbacks:
 ## Proxying to the backend (deployment)
 
 The widgets call `${proxyPath}/…` same-origin (default `/__nextgen`). A SPA has no
-server, so on Vercel use `@zitadel/edge-proxy` to forward those calls:
-
-```ts
-// api/__nextgen/[...path].ts  (Vercel Edge Function)
-import { handleProxy, resolveConfig } from '@zitadel/edge-proxy';
-export const config = { runtime: 'edge' };
-const proxyConfig = resolveConfig({
-  apiUrl: process.env.NEXTGEN_API_URL ?? '',
-});
-export default (req: Request) => handleProxy(req, proxyConfig);
-```
-
-```json
-// vercel.json
-{
-  "rewrites": [
-    { "source": "/__nextgen/(.*)", "destination": "/api/__nextgen/$1" }
-  ]
-}
-```
+server, so in production the path comes from your hosting platform — a
+`vercel.json` rewrite, a `netlify.toml` redirect, or a minimal Cloudflare
+worker — with no secrets on the platform, per
+[ADR 036](https://github.com/zitadel/nextgen/blob/main/docs/adrs/036-api-credential-planes.md).
+CLI scaffolding for these configs is tracked in
+[zitadel/nextgen#560](https://github.com/zitadel/nextgen/issues/560). **Until
+that work lands, production SPA deployment is not yet supported** — the CLI dev
+proxy covers local development.
 
 For local development you can skip the proxy and point `proxyPath` straight at the
 backend (cross-origin), e.g. `proxyPath: "http://localhost:4000"`.

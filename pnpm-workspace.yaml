@@ -110,6 +110,7 @@ catalog:
   vue-tsc: ^3.2.8
   waku: ^1.0.0-beta.3
   xstate: ^5.31.1
+  yaml: ^2.9.0
   zod: ^4.3.6
 
 catalogMode: strict

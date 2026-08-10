@@ -27,9 +27,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * does not exist". Also covers the theme toggle writing `data-theme` and
  * persisting the preference.
  */
-// Users is the only surface with a design hand-off, so it is the only thing the
-// sidebar offers.
+// Users is the only top-level surface with a design hand-off, so it is the only
+// thing the sidebar offers. `User schemas` nests beneath it (issue #712,
+// `Schema directory` frame) rather than adding a second top-level row.
 const NAV_ORDER = ["Users"];
+const NESTED_NAV = { parent: "Users", label: "User schemas" };
 // Absent for three different reasons, all of them deliberate:
 //   - the first four have no endpoint at all
 //   - Sessions was built, but `POST /sessions/query` answers 501 (#699)
@@ -67,13 +69,33 @@ describe("app shell navigation", () => {
     await screen.findByRole("link", { name: /^Users/ });
     const nav = within(screen.getByRole("navigation", { name: "Primary" }));
 
-    const items = nav.getAllByRole("listitem");
-    expect(items.map((li) => li.textContent?.trim())).toEqual(NAV_ORDER);
+    // Only the top level: nested entries render inside their parent's
+    // `<li>`, so `getAllByRole("listitem")` alone would conflate the two.
+    const items = nav
+      .getAllByRole("listitem")
+      .filter((li) => li.parentElement?.dataset.slot === "sidebar-menu");
+    expect(items.map((li) => within(li).getAllByRole("link")[0]?.textContent?.trim())).toEqual(
+      NAV_ORDER,
+    );
 
     // Every row navigates somewhere (the logo is a separate Home link outside
     // the list), so there is no row that looks like a destination but is not.
-    const linkedRows = items.filter((li) => within(li).queryByRole("link"));
+    const linkedRows = items.filter((li) => within(li).queryAllByRole("link").length > 0);
     expect(linkedRows).toHaveLength(NAV_ORDER.length);
+  });
+
+  it("nests User schemas under Users rather than adding a top-level row", async () => {
+    renderShell();
+    await screen.findByRole("link", { name: /^Users/ });
+    const nav = within(screen.getByRole("navigation", { name: "Primary" }));
+
+    const [parent] = nav
+      .getAllByRole("listitem")
+      .filter((li) => within(li).getAllByRole("link")[0]?.textContent?.trim() === NESTED_NAV.parent);
+    expect(parent).toBeDefined();
+    expect(
+      within(parent as HTMLElement).getByRole("link", { name: NESTED_NAV.label }),
+    ).toHaveAttribute("href", "/schemas");
   });
 
   it("does not advertise screens that have no endpoint behind them", async () => {

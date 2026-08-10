@@ -105,6 +105,8 @@ Canonical examples:
 | Org/project picker | `Popover` + `Badge` |
 | Users filters | `Tabs` |
 | Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button` |
+| Panel around a screen's content | `Card` |
+| Attribute chip / CLI command in prose | `InlineCode` |
 | Any searchable picker | `Combobox` (`src/components/ui/combobox.tsx`) |
 | Labelled form control | `Field` + `FieldLabel` (+ `FieldError` for invalid) |
 
