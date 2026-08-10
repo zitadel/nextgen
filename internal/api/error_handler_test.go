@@ -138,8 +138,8 @@ func TestDomainErrorDetails_requestInvalidField(t *testing.T) {
 }
 
 func TestDomainErrorDetails_fullErrorInResponseComposesWithProducerDetails(t *testing.T) {
-	t.Parallel()
-
+	// Mutates package-global FullErrorInResponse; must not run parallel with
+	// other tests that assume the default (false).
 	prev := FullErrorInResponse.Load()
 	FullErrorInResponse.Store(true)
 	t.Cleanup(func() { FullErrorInResponse.Store(prev) })
