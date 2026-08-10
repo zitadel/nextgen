@@ -1268,7 +1268,7 @@ func mergeCollected(state *FlowState, fields map[string]any) error {
 		// Field names are dotted paths for nested properties, so the
 		// collected document keeps the shape the user schema validates
 		// and the attribute store flattens back out.
-		if err := setNested(state.CollectedData.UserData, AttributeKey(k), v); err != nil {
+		if err := maputil.SetNested(state.CollectedData.UserData, k, v); err != nil {
 			return err
 		}
 	}
