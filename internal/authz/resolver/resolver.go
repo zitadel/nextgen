@@ -36,13 +36,43 @@ type ListRequest struct {
 	Relation        string
 }
 
-// ResourceColumns documents which resource-table columns carry scope ids for
-// future predicate injection. ListObjects today uses resource_scope_index via
-// statements and does not require these values at runtime.
+// ResourceColumns names the resource-table columns that carry scope ids for
+// list-predicate injection. ListObjects uses resource_scope_index; list SQL
+// correlates via ResourceIDCol (and ProjectIDCol for the outer project filter).
 type ResourceColumns struct {
 	ProjectIDCol  string
-	TeamIDCol     string
+	TeamIDCol     string // empty when the resource is project-scoped only
 	ResourceIDCol string
+}
+
+// ColumnsFor returns the registered column names for a resource kind.
+func ColumnsFor(kind domain.ResourceKind) (ResourceColumns, bool) {
+	cols, ok := resourceColumns[kind]
+	return cols, ok
+}
+
+var resourceColumns = map[domain.ResourceKind]ResourceColumns{
+	domain.ResourceKindUser: {
+		ProjectIDCol: "project_id", TeamIDCol: "", ResourceIDCol: "id",
+	},
+	domain.ResourceKindTeam: {
+		ProjectIDCol: "project_id", TeamIDCol: "id", ResourceIDCol: "id",
+	},
+	domain.ResourceKindSchema: {
+		ProjectIDCol: "project_id", TeamIDCol: "", ResourceIDCol: "url",
+	},
+	domain.ResourceKindBranding: {
+		ProjectIDCol: "project_id", TeamIDCol: "", ResourceIDCol: "id",
+	},
+	domain.ResourceKindFlowDefinition: {
+		ProjectIDCol: "project_id", TeamIDCol: "", ResourceIDCol: "id",
+	},
+	domain.ResourceKindSession: {
+		ProjectIDCol: "project_id", TeamIDCol: "", ResourceIDCol: "id",
+	},
+	domain.ResourceKindProject: {
+		ProjectIDCol: "id", TeamIDCol: "", ResourceIDCol: "id",
+	},
 }
 
 // Resolver evaluates checks with optional request-scoped memoization.

@@ -74,6 +74,10 @@ func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams)
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), schemaAccess, opRead); err != nil {
 		return nil, err
 	}
+	ctx, err := h.withAuthzListFilter(ctx, string(params.ProjectID), domain.ResourceKindSchema, opRead)
+	if err != nil {
+		return nil, err
+	}
 	schemas, err := h.schemaService.ListSchemas(ctx,
 		string(params.ProjectID),
 		params.ObjectType.Value,

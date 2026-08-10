@@ -593,9 +593,9 @@ bundles:
 - Implementing #333 identity binding, staff tiers, or break-glass
 - Hash-partitioning `resource_scope_index` (**D12**)
 - Fine-grained system catalog relations / auto-compile (#420)
-- SQL list-predicate injection into every repository
 - Permission grants management API / product UI
 - `#333` foreign home project, Leopard (**D11**)
+- QuerySessions list predicate (deferred until `sessionService.List` exists)
 
 ## See also
 

@@ -69,6 +69,10 @@ func (h *Handler) QueryTeams(ctx context.Context, req *api.QueryTeamsRequest, pa
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opRead); err != nil {
 		return nil, err
 	}
+	ctx, err := h.withAuthzListFilter(ctx, string(params.ProjectID), domain.ResourceKindTeam, opRead)
+	if err != nil {
+		return nil, err
+	}
 
 	listed, err := h.teamService.List(ctx, mapQueryTeamsToService(string(params.ProjectID), req))
 	if err != nil {

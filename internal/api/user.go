@@ -67,6 +67,10 @@ func (h *Handler) ListUsers(ctx context.Context, params api.ListUsersParams) (ap
 	if err := h.requireProjectAccess(ctx, scopeCtx.ProjectID, userAccess, opRead); err != nil {
 		return nil, err
 	}
+	ctx, err := h.withAuthzListFilter(ctx, scopeCtx.ProjectID, domain.ResourceKindUser, opRead)
+	if err != nil {
+		return nil, err
+	}
 
 	users, err := h.userService.ListUsers(ctx, service.ListUsersInput{
 		ProjectID: scopeCtx.ProjectID,

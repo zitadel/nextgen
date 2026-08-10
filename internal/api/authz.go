@@ -220,6 +220,33 @@ func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) er
 	}
 }
 
+// withAuthzListFilter attaches the SQL list-predicate filter for management
+// list endpoints after requireProjectAccess has already passed.
+func (h *Handler) withAuthzListFilter(ctx context.Context, projectID string, kind domain.ResourceKind, op accessOp) (context.Context, error) {
+	scope, ok := GetScopeContext(ctx)
+	if !ok || h == nil || h.pool == nil {
+		return ctx, nil
+	}
+	catalogID, err := h.pool.Statements().ActiveSystemCatalogID(ctx)
+	if err != nil {
+		return ctx, domain.ErrInternal(err).WithMessage("authz catalog lookup failed")
+	}
+	home := scope.ProjectID
+	if home == "" {
+		home = projectID
+	}
+	return service.WithAuthzListFilter(ctx, service.AuthzListFilter{
+		CatalogID:              catalogID,
+		ProjectID:              projectID,
+		PrincipalHomeProjectID: home,
+		PrincipalType:          scope.PrincipalType,
+		PrincipalID:            scope.PrincipalID,
+		ResourceKind:           kind,
+		ObjectType:             "project",
+		Relation:               projectRelation(op),
+	}), nil
+}
+
 // requireUserTeamsAccess gates listUserTeams via the parent user's RSI, then
 // checks both user and team read relations on the resolved project.
 func (h *Handler) requireUserTeamsAccess(ctx context.Context, userID string) (projectID string, err error) {

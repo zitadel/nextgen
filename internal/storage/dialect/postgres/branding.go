@@ -75,7 +75,7 @@ func (b brandingStatements) GetBrandingByID(ctx context.Context, projectID, id s
 // ListBrandings implements [service.BrandingStatements].
 func (b brandingStatements) ListBrandings(ctx context.Context, filter *database.ListOptions[domain.BrandingField]) (*database.ListResult[*domain.Branding], error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, brandingQuery, filter, branding.Schema); err != nil {
+	if err := compileList(ctx, &compiler, brandingQuery, filter, branding.Schema, "zitadel_nextgen.branding", "id"); err != nil {
 		return nil, err
 	}
 

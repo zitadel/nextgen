@@ -111,7 +111,7 @@ func (ts teamStatements) UpdateTeam(ctx context.Context, team *domain.Team) erro
 // ListTeams implements [service.TeamStatements].
 func (ts teamStatements) ListTeams(ctx context.Context, filter *database.ListOptions[domain.TeamField]) (*database.ListResult[*domain.Team], error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, teamQuery, filter, teamSchema); err != nil {
+	if err := compileList(ctx, &compiler, teamQuery, filter, teamSchema, "zitadel_nextgen.teams", "id"); err != nil {
 		return nil, err
 	}
 
