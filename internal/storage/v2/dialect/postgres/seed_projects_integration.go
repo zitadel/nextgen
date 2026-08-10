@@ -28,3 +28,17 @@ func SeedProjectsTiedAt(ctx context.Context, pool database.Pool, ids []string, c
 	}
 	return nil
 }
+
+// HardDeleteTeam deletes a team row so stmttest can assert ON DELETE CASCADE
+// behavior. There is no product DeleteTeam statement (only soft deactivate).
+func HardDeleteTeam(ctx context.Context, pool database.Pool, projectID, teamID string) error {
+	p, ok := pool.(*Pool)
+	if !ok {
+		return fmt.Errorf("postgres.HardDeleteTeam: expected *Pool, got %T", pool)
+	}
+	_, err := p.pool.Exec(ctx,
+		`DELETE FROM zitadel_nextgen.teams WHERE project_id = $1 AND id = $2`,
+		projectID, teamID,
+	)
+	return err
+}
