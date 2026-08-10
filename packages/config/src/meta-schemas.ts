@@ -21,6 +21,9 @@ import brandingMetaSchema from "../meta-schemas/branding.json" with {
 import flowDefinitionMetaSchema from "../meta-schemas/flow-definition.json" with {
   type: "json",
 };
+import propertyNameMetaSchema from "../meta-schemas/property-name.json" with {
+  type: "json",
+};
 import userPropertyMetaSchema from "../meta-schemas/user-property.json" with {
   type: "json",
 };
@@ -55,6 +58,7 @@ export function metaSchemaFiles(): ReadonlyArray<MetaSchemaFile> {
     { name: "flow-definition.json", body: flowDefinitionMetaSchema as object },
     { name: "user-schema.json", body: userSchemaMetaSchema as object },
     { name: "user-property.json", body: userPropertyMetaSchema as object },
+    { name: "property-name.json", body: propertyNameMetaSchema as object },
     { name: "auth-methods.json", body: authMethodsMetaSchema as object },
     { name: "auth-method.json", body: authMethodMetaSchema as object },
     { name: "branding.json", body: brandingMetaSchema as object },
