@@ -48,15 +48,42 @@ export async function goGenerate({ log = console.log } = {}) {
     await run("go", ["generate", "."], { cwd: join(ROOT, dir) });
   }
 
-  const limit = Math.max(1, Math.min(availableParallelism(), rest.length));
-  await mapWithConcurrency(rest, limit, async (dir) => {
+  // enumer writes .go files *into* a package; mockgen type-loads packages. So
+  // every enumer directive must finish before any mockgen one, or mockgen
+  // loads a package whose generated methods do not exist yet and fails. This
+  // is what lets generation bootstrap from a tree with no generated files at
+  // all (see scripts/clean-generated.mjs).
+  //
+  // The barrier is global rather than per-package on purpose: internal/service
+  // imports internal/domain, so its mockgen needs *domain's* enumer output,
+  // not just its own package's.
+  for (const phase of GENERATE_PHASES) {
+    await runPhase(rest, phase, log);
+  }
+}
+
+// `go generate -run` filters directives by matching against the command text.
+// A generator added later that neither writes into nor loads a package can go
+// in either phase; one that does both needs its own entry here.
+const GENERATE_PHASES = [
+  { name: "enumer", filter: "enumer" },
+  { name: "mockgen", filter: "mockgen" },
+];
+
+async function runPhase(dirs, phase, log) {
+  const limit = Math.max(1, Math.min(availableParallelism(), dirs.length));
+  await mapWithConcurrency(dirs, limit, async (dir) => {
     // Buffered per package so concurrent generators never interleave. On
     // failure runCapture folds both streams into the thrown error's message.
-    const { stdout, stderr } = await runCapture("go", ["generate", "."], {
+    const { stdout, stderr } = await runCapture("go", ["generate", "-run", phase.filter, "."], {
       cwd: join(ROOT, dir),
     });
     const output = `${stdout}${stderr}`.trim();
-    log(`--- ${dir}${output ? `\n${output}` : ""}`);
+    // Most packages have nothing to do in a given phase; only say so when
+    // something actually ran.
+    if (output) {
+      log(`--- ${dir} (${phase.name})\n${output}`);
+    }
   });
 }
 

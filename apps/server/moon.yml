@@ -54,6 +54,8 @@ tasks:
       - "@group(serverInputs)"
       - "/scripts/go-generate.mjs"
       - "/scripts/dev-process.mjs"
+    # Mirrored by GENERATED_GLOBS in scripts/generated-outputs.mjs, which is
+    # what `clean-generated` deletes. Change both together.
     outputs:
       - "/api/generated/**"
       - "/api/openapi/components/schemas/errors/**"
@@ -61,6 +63,19 @@ tasks:
       - "/internal/**/*_enumer.go"
       - "/internal/**/*.mock.go"
     options:
+      runFromWorkspaceRoot: true
+
+  # Generators only write; they never retract. Removing everything and
+  # regenerating is how orphaned output gets pruned — whatever does not come
+  # back was dead. Never cached: the whole point is to touch the filesystem.
+  clean-generated:
+    command: "node scripts/clean-generated.mjs"
+    inputs:
+      - "/scripts/clean-generated.mjs"
+      - "/scripts/generated-outputs.mjs"
+    options:
+      cache: false
+      runInCI: false
       runFromWorkspaceRoot: true
 
   check-generate:

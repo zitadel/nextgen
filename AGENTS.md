@@ -298,6 +298,23 @@ call `idgen` outside dialect packages. Full minting contract:
   produces the same output, but runs every directive serially — roughly 4x
   slower. Both go through the same `//go:generate` directives; the moon task
   just schedules them (`scripts/go-generate.mjs`).
+- Generating never deletes. A generated file whose directive stopped producing
+  it — a renamed destination, an interface no longer mocked — stays on disk and
+  stays committed, still compiling and still importable. `server:generate`
+  cannot tell you about it, because it only ever writes.
+
+  To prune, remove everything and regenerate:
+
+  ```sh
+  moon run server:clean-generated && moon run server:generate
+  ```
+
+  Whatever does not come back was orphaned; commit its deletion. Do this when
+  you change where a generator writes, drop an interface from a mockgen
+  directive, or delete a type that had an `enumer` directive.
+  `moon run server:clean-generated -- --dry-run` lists what would go without
+  touching anything. Generation bootstraps from an empty tree, so cleaning is
+  safe at any time.
 - Do not hand-edit generated package output under `dist/`.
 - Do not hand-edit `apps/console/src/routeTree.gen.ts`; update route files and
   let the TanStack Router plugin regenerate it.
