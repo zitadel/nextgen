@@ -45,8 +45,14 @@ func (ts teamStatements) CreateTeam(ctx context.Context, team *domain.Team) erro
 		return err
 	}
 	now := nowUnixNano()
-	row := ts.client.QueryRow(ctx, createTeamStmt, team.ProjectID, team.ID, team.Name, now, now)
-	return wrapError(scanTeamRow(row, team))
+	return withTransaction(ctx, ts.client, func(ctx context.Context, tx queryExecutor) error {
+		row := tx.QueryRow(ctx, createTeamStmt, team.ProjectID, team.ID, team.Name, now, now)
+		if err := scanTeamRow(row, team); err != nil {
+			return wrapError(err)
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.UpsertResourceScope(ctx, domain.NewTeamResourceScope(team.ProjectID, team.ID))
+	})
 }
 
 // GetTeamByID implements [service.TeamStatements].
@@ -152,7 +158,8 @@ func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id strin
 				return wrapError(err)
 			}
 		}
-		return nil
+		edges := newAuthzMembershipEdgeStatements(tx)
+		return edges.DeleteAuthzMembershipEdgesForTeamDeactivate(ctx, projectID, id)
 	})
 }
 

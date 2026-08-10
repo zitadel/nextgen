@@ -56,14 +56,17 @@ func (ts teamStatements) CreateTeam(ctx context.Context, team *domain.Team) erro
 	if err := ensureManagedID(&team.ID, domain.PrefixTeam); err != nil {
 		return err
 	}
-	var status string
-	err := ts.client.QueryRow(ctx, createTeamStmt, team.ProjectID, team.ID, team.Name).
-		Scan(&team.ProjectID, &team.ID, &team.Name, &status, &team.CreatedAt, &team.UpdatedAt)
-	if err != nil {
-		return wrapError(err)
-	}
-	team.Status = domain.TeamStatus(status)
-	return nil
+	return withTransaction(ctx, ts.client, func(ctx context.Context, tx queryExecutor) error {
+		var status string
+		err := tx.QueryRow(ctx, createTeamStmt, team.ProjectID, team.ID, team.Name).
+			Scan(&team.ProjectID, &team.ID, &team.Name, &status, &team.CreatedAt, &team.UpdatedAt)
+		if err != nil {
+			return wrapError(err)
+		}
+		team.Status = domain.TeamStatus(status)
+		rsi := newResourceScopeStatements(tx)
+		return rsi.UpsertResourceScope(ctx, domain.NewTeamResourceScope(team.ProjectID, team.ID))
+	})
 }
 
 // GetTeamByID implements [service.TeamStatements].
@@ -168,7 +171,8 @@ func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id strin
 				return wrapError(err)
 			}
 		}
-		return nil
+		edges := newAuthzMembershipEdgeStatements(tx)
+		return edges.DeleteAuthzMembershipEdgesForTeamDeactivate(ctx, projectID, id)
 	})
 }
 

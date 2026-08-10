@@ -29,3 +29,18 @@ func SeedProjectsTiedAt(ctx context.Context, pool database.Pool, ids []string, c
 	}
 	return nil
 }
+
+// HardDeleteTeam deletes a team row so stmttest can assert ON DELETE CASCADE
+// behavior. There is no product DeleteTeam statement (only soft deactivate).
+func HardDeleteTeam(ctx context.Context, pool database.Pool, projectID, teamID string) error {
+	c, ok := pool.(*Client)
+	if !ok {
+		return fmt.Errorf("spanner.HardDeleteTeam: expected *Client, got %T", pool)
+	}
+	db := newClientDB(c.client)
+	_, err := db.Update(ctx, buildStatement(
+		`DELETE FROM teams WHERE project_id = @p1 AND id = @p2`,
+		projectID, teamID,
+	).statement())
+	return err
+}

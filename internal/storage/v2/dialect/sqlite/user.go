@@ -9,6 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/v2/dialect/authz"
 	v2user "github.com/zitadel/nextgen/internal/storage/v2/user"
 )
 
@@ -96,15 +97,21 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 			}
 		}
 
-		if user.InitialMembershipTeamID != nil && *user.InitialMembershipTeamID != "" {
+		initialTeamID := ""
+		if user.InitialMembershipTeamID != nil {
+			initialTeamID = *user.InitialMembershipTeamID
+		}
+		if initialTeamID != "" {
 			if _, err := tx.Exec(ctx, createUserMembershipStmt,
-				user.ProjectID, *user.InitialMembershipTeamID, user.ID,
+				user.ProjectID, initialTeamID, user.ID,
 				domain.MembershipStatusActive.String(), now, now,
 			); err != nil {
 				return wrapError(err)
 			}
 		}
-		return nil
+		rsi := newResourceScopeStatements(tx)
+		edges := newAuthzMembershipEdgeStatements(tx)
+		return authz.UserCreated(ctx, &rsi, &edges, user.ProjectID, user.ID, initialTeamID)
 	})
 }
 
@@ -206,17 +213,25 @@ func (us userStatements) DeactivateUser(ctx context.Context, projectID, userID s
 		if n == 0 {
 			return database.NewNoRowFoundError(nil)
 		}
-		_, err = tx.Exec(ctx, deactivateUserMembershipsStmt,
+		if _, err = tx.Exec(ctx, deactivateUserMembershipsStmt,
 			domain.MembershipStatusRemoved.String(), now, projectID, userID,
 			domain.MembershipStatusRemoved.String(),
-		)
-		return wrapError(err)
+		); err != nil {
+			return wrapError(err)
+		}
+		edges := newAuthzMembershipEdgeStatements(tx)
+		return authz.UserDeactivated(ctx, &edges, projectID, userID)
 	})
 }
 
 // DeleteUserByID implements [service.UserStatements].
 func (us userStatements) DeleteUserByID(ctx context.Context, projectID, userID string) error {
 	return withTransaction(ctx, us.client, func(ctx context.Context, tx queryExecutor) error {
+		rsi := newResourceScopeStatements(tx)
+		edges := newAuthzMembershipEdgeStatements(tx)
+		if err := authz.UserDeleted(ctx, &rsi, &edges, projectID, userID); err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, deleteUserMembershipsStmt, projectID, userID); err != nil {
 			return wrapError(err)
 		}
