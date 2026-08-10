@@ -1,6 +1,7 @@
 import { Flags } from "@oclif/core";
 import consola from "consola";
 
+import { claimAction, claimCommand } from "../../lib/claim-state";
 import { ZitadelError } from "../../lib/errors";
 import { assertServerPackageAvailable } from "../../lib/local-server/binary";
 import { dockerAvailable, imageAvailable } from "../../lib/local-server/docker";
@@ -257,6 +258,11 @@ function advisoryForWarnings(
     const advice = dockerRuntimeGuidance("doctor", cliVersion);
     nextActions.push(...advice.nextActions);
     nextCommands.push(...advice.nextCommands);
+  }
+
+  if (warnings.some((check) => check.name === "claim")) {
+    nextActions.push(claimAction(cliVersion));
+    nextCommands.push(claimCommand(cliVersion));
   }
 
   const managedRuntimeWarning = warnings.find((check) => check.name === "managed-runtime-processes");

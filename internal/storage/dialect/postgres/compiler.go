@@ -122,7 +122,7 @@ func compileOrFilter[F ~uint8, T any](c *statementCompiler, filter database.OrFi
 }
 
 func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *database.CompareFilter[F], schema database.Schema[F, T]) {
-	if compare.HasNilValue(filter.Terms) {
+	if compare.NeedsNullAware(filter, schema) {
 		compare.CompileNullAware(c, filter, schema, func(_ compare.Writer, arg any, col database.Column[F]) {
 			writeArgWithParamCast(c, arg, schema, col)
 		})
@@ -226,6 +226,7 @@ func compileOrderBy[F ~uint8, T any](c *statementCompiler, orderBy database.Orde
 			if orderBy.Direction == database.OrderDesc {
 				c.WriteString(" DESC")
 			}
+			compare.WriteNullsOrder(c, column, orderBy.Direction, schema)
 		}
 	}
 }
