@@ -48,9 +48,17 @@ func SpannerDSN(ctx context.Context) (string, func(), error) {
 	}
 
 	req := testcontainers.ContainerRequest{
-		Image:        "gcr.io/cloud-spanner-emulator/emulator:latest",
-		ExposedPorts: []string{"9010/tcp", "9020/tcp"},
-		WaitingFor:   wait.ForListeningPort("9010/tcp"),
+		Image: "gcr.io/cloud-spanner-emulator/emulator:latest",
+		// Pin the platform: the arm64 emulator build returns commit timestamps at a
+		// different resolution than the amd64 one, which makes seven created_at
+		// assertions in stmttest and the spanner dialect fail on Apple Silicon while
+		// passing in CI. No-op on amd64 hosts (CI), Rosetta elsewhere, and worth the
+		// few seconds it costs to have one suite that behaves the same everywhere.
+		ImagePlatform: "linux/amd64",
+		ExposedPorts:  []string{"9010/tcp", "9020/tcp"},
+		// 120s to match postgres.go: the default 60s is not enough for a cold
+		// start under emulation, where the first run also pulls the image.
+		WaitingFor: wait.ForListeningPort("9010/tcp").WithStartupTimeout(120 * time.Second),
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,

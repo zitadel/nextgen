@@ -351,16 +351,13 @@ priority"), do not serialize the tests and do not move them to a real instance â
 both hide the bug. It means something on that code path stripped the gRPC status
 off the error, so Spanner's `ReadWriteTransaction` stopped recognising it as
 retryable. See the error-wrapping rules in
-[internal/storage/v2/AGENTS.md](internal/storage/v2/AGENTS.md) and #788.
+[internal/storage/AGENTS.md](internal/storage/AGENTS.md) and #788.
 
-**On Apple Silicon, expect 7 pre-existing failures.** `emulator:latest` has a
-native arm64 build, and it does not round commit timestamps the way the amd64
-build CI runs does. Six subtests in `internal/storage/v2/stmttest` and
-`TestJSONSchemaStatements_CRUD` compare a `created_at` read back after a second
-statement and see tens of microseconds of drift. They are deterministic, they
-are not caused by parallelism, and they pass in CI. Ignore them, or run the
-emulator under `linux/amd64` emulation if you want a clean local run. If you
-touch timestamp handling, verify on CI rather than trusting a local pass.
+The emulator container is pinned to `linux/amd64`. The arm64 build returns
+commit timestamps at a different resolution, which fails seven `created_at`
+assertions on Apple Silicon while passing in CI. Pinning costs a few seconds
+under Rosetta and is a no-op on amd64, so the suite behaves the same
+everywhere. Do not unpin it to make local runs faster.
 
 To run against a Spanner you manage instead of the emulator testcontainer, set
 `ZITADEL_TEST_SPANNER_URL` to its DSN.

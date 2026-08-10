@@ -127,7 +127,7 @@ jobs:
       #   if: ${{ … && steps.spanner-auth.outcome != 'success' }}
       # and set the `SPANNER_TEST_INSTANCE` variable plus the
       # `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_SERVICE_ACCOUNT` secrets.
-      # The Go side (internal/storage/v2/testdb) already supports this and needs
+      # The Go side (internal/storage/testdb) already supports this and needs
       # no change.
       #
       # Auth when SPANNER_TEST_INSTANCE is set (trusted runs). Vars are safe in
