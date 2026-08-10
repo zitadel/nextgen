@@ -64,6 +64,31 @@ trusted_proxies:
     # - header: CF-Connecting-IP  # single value from the CDN
 ```
 
+## Challenges
+
+The trusted set is not always a fixed list of CIDRs an operator can paste once:
+
+- **Dynamic vendor ranges.** CDNs like Cloudflare publish their edge ranges
+  ([cloudflare.com/ips](https://www.cloudflare.com/ips/)) but rotate them; a
+  static copy goes stale and silently starts rejecting legitimate forwarded
+  headers (degrading real client IPs to the CDN's address).
+- **Ephemeral infra IPs.** Cloud load balancers (AWS ALB, GCP) and Kubernetes
+  ingress/pods often have no stable address to pin at all.
+
+Three ways to absorb this, which the config must allow:
+
+1. **Refreshed lists**, not hardcoded — load vendor ranges from operator config
+   (or a periodic fetch), so they can be updated without a rebuild.
+2. **Trust by network position** — a private-subnet/VPC CIDR (e.g. `10.0.0.0/8`)
+   is stable even when the LB's own IP is not.
+3. **Trust by hop count** — trust *N* hops from the right of `X-Forwarded-For`
+   regardless of address (cf. Gitea's `REVERSE_PROXY_LIMIT`), sidestepping IPs
+   entirely at the cost of assuming a fixed chain length.
+
+The most robust default is often to terminate the dynamic edge upstream of a
+proxy **we** own, so `RemoteAddr` is that stable proxy and the CDN's changing
+ranges never need to be trusted directly.
+
 ## Consequences
 
 - Client IP and host are only believed when they come through a declared proxy;
@@ -71,5 +96,5 @@ trusted_proxies:
 - Operators behind a proxy must configure `trusted_proxies`; the default assumes
   our standard single-proxy topology, so misconfiguration degrades to
   `RemoteAddr` (the proxy's address) rather than to a spoofable value.
-- CDN vendor ranges (e.g. Cloudflare) change over time; they belong in operator
-  config, never hardcoded in the binary.
+- Vendor CIDR lists are dynamic (see Challenges); they live in operator config,
+  never hardcoded in the binary.
