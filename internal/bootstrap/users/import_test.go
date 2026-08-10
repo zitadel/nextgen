@@ -14,8 +14,8 @@ import (
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
-	"github.com/zitadel/nextgen/internal/storage/v2/dbtest"
+	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dbtest"
 )
 
 func TestMain(m *testing.M) {
