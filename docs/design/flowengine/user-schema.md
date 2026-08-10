@@ -134,6 +134,20 @@ Mapping rules:
 
 The schema is the **single source of truth** for field metadata. The flow definition only says _which_ fields to show and on _which_ step. Changing a field's label or validation in the schema automatically updates every flow that references it.
 
+### Property names
+
+A property name identifies one attribute, so it cannot contain a dot — a nested value is already
+stored and addressed by its dotted path. The meta-schema enforces this over the `properties`
+chain at every depth, and applies the annotation rules to nested properties along the way.
+
+A name reached by any other route is not covered: `$defs`, `allOf`, `oneOf`, `anyOf`, `items`,
+`patternProperties`, and `additionalProperties`-as-schema all describe subschemas the
+`properties` chain never walks, and `UserProperty` keeps `additionalProperties: true` at its
+root, so they are accepted. Making the constraint reach them means a `$dynamicAnchor: "meta"`
+dialect extension, which propagates it across every subschema position at once but relies on
+`$dynamicRef` support that not every editor has. Until then a dotted name declared under one of
+those keywords and pulled in by `$ref` still produces an ambiguous attribute key.
+
 ## Progressive Profiling
 
 Schemas enable progressive profiling by marking some fields as optional and deferring them to later flows:
