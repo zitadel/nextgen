@@ -1,6 +1,5 @@
 ---
 "@zitadel/server": minor
-"@zitadel/config": minor
 ---
 
 Flow steps can now collect nested user-schema properties by their dotted path,
