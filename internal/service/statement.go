@@ -4,11 +4,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/authz/compiler"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserPasskeyStatements,UserRecoveryCodesStatements,BrandingStatements,ClaimStatements
+//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserPasskeyStatements,UserRecoveryCodesStatements,BrandingStatements,ClaimStatements,ResourceScopeStatements,AuthzAssignmentStatements,AuthzMembershipEdgeStatements,AuthzCatalogStatements
 
 type StatementPool interface {
 	Statementer[AllStatements]
@@ -43,6 +44,10 @@ type AllStatements interface {
 	UserRecoveryCodesStatements
 	BrandingStatements
 	ClaimStatements
+	ResourceScopeStatements
+	AuthzAssignmentStatements
+	AuthzMembershipEdgeStatements
+	AuthzCatalogStatements
 	Statements
 }
 
@@ -321,4 +326,76 @@ type ClaimStatements interface {
 	// is not active. It never falls back to a later membership: a deactivated
 	// personal team is not silently replaced by another team the user belongs to.
 	GetPersonalTeamForUser(ctx context.Context, projectID, userID string) (*domain.Team, error)
+}
+
+// ResourceScopeStatements persists resource_scope_index rows (path.id → project/team).
+//
+// Use cases:
+//   - UpsertResourceScope: dual-write on project/team/user create (build via domain.New*ResourceScope).
+//   - GetResourceScope: scope resolution for middleware / resolver before a permission check.
+//   - DeleteResourceScope: explicit cleanup where FK cascade does not apply (user delete today;
+//     project delete cascades RSI via project_id FK).
+type ResourceScopeStatements interface {
+	Statements
+	UpsertResourceScope(ctx context.Context, scope *domain.ResourceScope) error
+	GetResourceScope(ctx context.Context, resourceID string) (*domain.ResourceScope, error)
+	DeleteResourceScope(ctx context.Context, resourceID string) error
+}
+
+// AuthzAssignmentStatements persists grants (principal → catalog relation at a scope).
+//
+// Use cases: grant/revoke product APIs and resolver reads — not dual-write from CreateUser.
+// Create/Revoke are the write path; Get/List support admin and check-time lookup.
+type AuthzAssignmentStatements interface {
+	Statements
+	CreateAuthzAssignment(ctx context.Context, assignment *domain.AuthzAssignment) error
+	GetAuthzAssignment(ctx context.Context, projectID, id string) (*domain.AuthzAssignment, error)
+	ListAuthzAssignments(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string, includeRevoked bool) ([]*domain.AuthzAssignment, error)
+	RevokeAuthzAssignment(ctx context.Context, projectID, id string) error
+}
+
+// AuthzMembershipEdgeStatements persists the authz projection of set membership.
+// The resolver reads these edges, not team_memberships (roster/lifecycle stays separate).
+//
+// Use cases:
+//   - Upsert: low-level row ops. Prefer [SyncUserTeamMembershipEdge] for roster status changes.
+//   - DeleteAuthzMembershipEdges: column-shaped deletes via Filter (single edge, by member, by set).
+//   - DeleteAuthzMembershipEdgesForTeamDeactivate: team deactivate (team set + lifecycle-owned users).
+//   - Get/ListByMember: resolver / dual-write test reads.
+type AuthzMembershipEdgeStatements interface {
+	Statements
+	UpsertAuthzMembershipEdge(ctx context.Context, edge *domain.AuthzMembershipEdge) error
+	GetAuthzMembershipEdge(ctx context.Context, key domain.AuthzMembershipEdgeKey) (*domain.AuthzMembershipEdge, error)
+	ListAuthzMembershipEdgesByMember(ctx context.Context, projectID string, memberType domain.AuthzMemberType, memberID string) ([]*domain.AuthzMembershipEdge, error)
+	DeleteAuthzMembershipEdges(ctx context.Context, filter database.Filter[domain.AuthzMembershipEdgeField]) error
+	DeleteAuthzMembershipEdgesForTeamDeactivate(ctx context.Context, projectID, teamID string) error
+}
+
+// SyncUserTeamMembershipEdge projects a team_memberships status change onto authz_membership_edges:
+// authz-active statuses upsert the user→team edge; otherwise the edge is deleted.
+func SyncUserTeamMembershipEdge(ctx context.Context, edges AuthzMembershipEdgeStatements, projectID, teamID, userID string, status domain.MembershipStatus) error {
+	if status.IsAuthzActive() {
+		return edges.UpsertAuthzMembershipEdge(ctx, domain.NewUserTeamMembershipEdge(projectID, teamID, userID))
+	}
+	return edges.DeleteAuthzMembershipEdges(ctx, database.And(
+		database.Equal(database.Col(domain.AuthzMembershipEdgeFieldProjectID), projectID),
+		database.Equal(database.Col(domain.AuthzMembershipEdgeFieldSetType), domain.AuthzSetTypeTeam),
+		database.Equal(database.Col(domain.AuthzMembershipEdgeFieldSetID), teamID),
+		database.Equal(database.Col(domain.AuthzMembershipEdgeFieldMemberType), domain.AuthzMemberTypeUser),
+		database.Equal(database.Col(domain.AuthzMembershipEdgeFieldMemberID), userID),
+	))
+}
+
+// AuthzCatalogStatements persists a compiled catalog version (#720 → Wave 1 tables).
+//
+// PersistCatalogVersion inserts authz_catalogs plus relations, relation
+// references, expression edges, and closure. It does not write RSI,
+// assignments, membership edges, or bundles. Retires any previously active
+// catalog for the same (catalog_kind, owner_id).
+//
+// GetAuthzCatalog loads one catalog version and its projected child rows by id.
+type AuthzCatalogStatements interface {
+	Statements
+	PersistCatalogVersion(ctx context.Context, meta domain.AuthzCatalogVersion, mutations compiler.CatalogMutations) error
+	GetAuthzCatalog(ctx context.Context, catalogID string) (*domain.AuthzCatalog, error)
 }

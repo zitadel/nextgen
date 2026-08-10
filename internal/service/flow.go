@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // FlowService is the flow engine's use-case surface. The API handler

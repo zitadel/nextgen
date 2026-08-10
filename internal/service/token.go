@@ -9,7 +9,7 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/op"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 //go:generate go tool mockgen -typed -package mocks -destination ./mocks/token.mock.go . TokenService
