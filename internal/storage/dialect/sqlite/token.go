@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -250,9 +249,16 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 		Coerce:   database.CoerceString,
 	},
 	domain.TokenFieldUserID: {
-		SQLName:  "user_id",
-		Accessor: func(t *domain.Token) any { return t.UserID },
+		SQLName: "user_id",
+		// user_id is NULL for anonymous session tokens; "" is never stored.
+		Accessor: func(t *domain.Token) any {
+			if t.UserID == "" {
+				return nil
+			}
+			return t.UserID
+		},
 		Coerce:   database.CoerceString,
+		Nullable: true,
 	},
 	domain.TokenFieldType: {
 		SQLName:  "token_type",
@@ -263,16 +269,19 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 		SQLName:  "session_id",
 		Accessor: func(t *domain.Token) any { return tokenOptionalString(t.SessionID) },
 		Coerce:   database.CoerceString,
+		Nullable: true,
 	},
 	domain.TokenFieldOIDCSessionID: {
 		SQLName:  "oidc_session_id",
 		Accessor: func(t *domain.Token) any { return tokenOptionalString(t.OIDCSessionID) },
 		Coerce:   database.CoerceString,
+		Nullable: true,
 	},
 	domain.TokenFieldSAMLSessionID: {
 		SQLName:  "saml_session_id",
 		Accessor: func(t *domain.Token) any { return tokenOptionalString(t.SAMLSessionID) },
 		Coerce:   database.CoerceString,
+		Nullable: true,
 	},
 	domain.TokenFieldScope: {
 		SQLName:  "scope",
@@ -280,14 +289,10 @@ var tokenSchema = database.NewSchema(map[domain.TokenField]database.FieldBinding
 		Coerce:   database.CoerceSliceAsAny(database.CoerceStringValue),
 	},
 	domain.TokenFieldExpiresAt: {
-		SQLName: "expires_at",
-		Accessor: func(t *domain.Token) any {
-			if t.ExpiresAt == nil {
-				return (*time.Time)(nil)
-			}
-			return *t.ExpiresAt
-		},
-		Coerce: database.CoerceTime,
+		SQLName:  "expires_at",
+		Accessor: func(t *domain.Token) any { return database.NullableValue(t.ExpiresAt) },
+		Coerce:   database.CoerceTime,
+		Nullable: true,
 	},
 	domain.TokenFieldCreatedAt: {
 		SQLName:  "created_at",

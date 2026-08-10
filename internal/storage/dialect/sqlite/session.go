@@ -470,15 +470,22 @@ var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBin
 		Accessor: func(s *domain.Session) any { return s.TimeToLive.Nanoseconds() },
 		Coerce:   coerceSessionDuration,
 	},
-	domain.SessionFieldTokenID: {SQLName: "s.token_id", Accessor: func(s *domain.Session) any { return s.TokenID }, Coerce: database.CoerceString},
-	domain.SessionFieldUserID: {
-		SQLName: "s.user_id",
+	// token_id is NULL until the session token is created; "" is never stored.
+	domain.SessionFieldTokenID: {
+		SQLName: "s.token_id",
 		Accessor: func(s *domain.Session) any {
-			if s.UserID == nil {
-				return ""
+			if s.TokenID == "" {
+				return nil
 			}
-			return *s.UserID
+			return s.TokenID
 		},
-		Coerce: database.CoerceString,
+		Coerce:   database.CoerceString,
+		Nullable: true,
+	},
+	domain.SessionFieldUserID: {
+		SQLName:  "s.user_id",
+		Accessor: func(s *domain.Session) any { return database.NullableValue(s.UserID) },
+		Coerce:   database.CoerceString,
+		Nullable: true,
 	},
 })

@@ -11,6 +11,19 @@ type FieldBinding[T any] struct {
 	// placeholders for this column (e.g. "::myschema.my_enum"). Empty means
 	// no cast. Spanner ignores this field.
 	ParamCast string
+	// Nullable marks columns that can hold SQL NULL. Keyset compares over
+	// nullable columns need null-aware SQL, and ORDER BY states their NULL
+	// position explicitly (ASC NULLS FIRST / DESC NULLS LAST on every dialect).
+	Nullable bool
+}
+
+// NullableValue flattens a nil pointer to untyped nil so it binds as SQL NULL.
+// Returning *p directly would box a typed nil that fails == nil checks.
+func NullableValue[V any](p *V) any {
+	if p == nil {
+		return nil
+	}
+	return *p
 }
 
 // Schema resolves domain fields to SQL names and entity values for one entity type.
@@ -40,6 +53,11 @@ func (s Schema[F, T]) SQLName(col Column[F]) string {
 // ParamCast returns the optional Postgres parameter cast for col.
 func (s Schema[F, T]) ParamCast(col Column[F]) string {
 	return s.binding(col.Field()).ParamCast
+}
+
+// Nullable reports whether col can hold SQL NULL.
+func (s Schema[F, T]) Nullable(col Column[F]) bool {
+	return s.binding(col.Field()).Nullable
 }
 
 // MustSQLName returns the SQL column name for field.
