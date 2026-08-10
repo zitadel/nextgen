@@ -5,8 +5,8 @@ import (
 	"errors"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/branding"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/branding"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // ---- Input types -------------------------------------------------------------

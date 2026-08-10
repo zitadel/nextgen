@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/v2/dbtest"
+	"github.com/zitadel/nextgen/internal/storage/dbtest"
 )
 
 // TestEnsureSQLiteIdempotent proves the DB-backed idempotency the issue
