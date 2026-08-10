@@ -403,30 +403,6 @@ func (r schemaReader) RequiredSet() map[string]struct{} {
 	return out
 }
 
-// RequiredLeafPaths returns the dotted paths a document must carry:
-// every name in `required`, recursed through the nested `required` of
-// each required object. A required object that declares no `required`
-// of its own ends the descent at the object itself — any leaf beneath
-// it satisfies the coverage check.
-func (r schemaReader) RequiredLeafPaths() map[string]struct{} {
-	out := map[string]struct{}{}
-	r.collectRequiredLeafPaths("", out)
-	return out
-}
-
-func (r schemaReader) collectRequiredLeafPaths(prefix AttributeKey, out map[string]struct{}) {
-	properties := r.Properties()
-	for name := range r.RequiredSet() {
-		path := prefix.AppendNode(name)
-		prop, ok := properties[name]
-		if !ok || len(prop.RequiredSet()) == 0 {
-			out[string(path)] = struct{}{}
-			continue
-		}
-		prop.collectRequiredLeafPaths(path, out)
-	}
-}
-
 // AuthMethods returns a reader over the root schema's `x-auth-methods`
 // keyword. An empty (no-op) reader is returned when the keyword is
 // absent. An error is returned only when the keyword is present but
