@@ -28,7 +28,7 @@ its own expiry passed. It no longer does.
   so revoking the preview secret retires the published key with it.
 
 Expired records are never honoured — verification checks `expires_at` too. There
-is no background sweeper yet, so records that expired without being revoked
+is no background sweeper yet (#803), so records that expired without being revoked
 accumulate; purging them once they are past `expires_at` is safe (verification
 already rejects them) and is tracked in zitadel/nextgen#800.
 
