@@ -134,3 +134,104 @@ func TestTeamMembershipStatements_DualWrite_StatusVariants(t *testing.T) {
 		})
 	})
 }
+
+func TestJSONSchemaStatements_CreateDelete_DualWriteResourceScope(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		schemaURL := "sch_" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.CreateJSONSchema(t.Context(), &domain.JSONSchema{
+			ProjectID: projectID,
+			URL:       schemaURL,
+			Schema:    []byte(`{"type":"object"}`),
+		}))
+
+		scope, err := d.stmts.GetResourceScope(t.Context(), schemaURL)
+		require.NoError(t, err)
+		assert.Equal(t, domain.ResourceKindSchema, scope.ResourceKind)
+		assert.Equal(t, projectID, scope.ProjectID)
+		assert.Nil(t, scope.TeamID)
+
+		require.NoError(t, d.stmts.DeleteJSONSchemaByID(t.Context(), projectID, schemaURL))
+		_, err = d.stmts.GetResourceScope(t.Context(), schemaURL)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}
+
+func TestBrandingStatements_Create_DualWriteResourceScope(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		brandingID := "brnd_" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.CreateBranding(t.Context(), sampleBranding(projectID, brandingID)))
+
+		scope, err := d.stmts.GetResourceScope(t.Context(), brandingID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.ResourceKindBranding, scope.ResourceKind)
+		assert.Equal(t, projectID, scope.ProjectID)
+		assert.Nil(t, scope.TeamID)
+	})
+}
+
+func TestFlowDefinitionStatements_CreateDelete_DualWriteResourceScope(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		flowID := "flowdef_" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.CreateFlowDefinition(t.Context(), sampleFlowDefinition(projectID, flowID)))
+
+		scope, err := d.stmts.GetResourceScope(t.Context(), flowID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.ResourceKindFlowDefinition, scope.ResourceKind)
+		assert.Equal(t, projectID, scope.ProjectID)
+
+		require.NoError(t, d.stmts.DeleteFlowDefinitionByID(t.Context(), projectID, flowID))
+		_, err = d.stmts.GetResourceScope(t.Context(), flowID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}
+
+func TestSessionStatements_CreateDelete_DualWriteResourceScope(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		session, err := domain.NewSession(projectID, nil)
+		require.NoError(t, err)
+		require.NoError(t, d.stmts.CreateSession(t.Context(), session))
+		require.NotEmpty(t, session.ID)
+
+		scope, err := d.stmts.GetResourceScope(t.Context(), session.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.ResourceKindSession, scope.ResourceKind)
+		assert.Equal(t, projectID, scope.ProjectID)
+
+		require.NoError(t, d.stmts.DeleteSessionByID(t.Context(), projectID, session.ID))
+		_, err = d.stmts.GetResourceScope(t.Context(), session.ID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}
+
+func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
+	return &domain.FlowDefinition{
+		ProjectID:     projectID,
+		ID:            id,
+		Name:          "Default Login",
+		SchemaVersion: "1.0.0",
+		Status:        domain.FlowDefinitionStatusDraft,
+		UserSchema:    "https://example.com/schemas/human-user.json",
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin: "identifier",
+		},
+		Audience: domain.FlowDefinitionAudience{
+			AppIDs: []string{"app-1"},
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "identifier",
+				Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, TextKey: "identifier.submit", Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "done"},
+				},
+			},
+		},
+	}
+}

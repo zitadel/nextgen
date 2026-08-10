@@ -32,6 +32,42 @@ func UserDeleted(ctx context.Context, rsi service.ResourceScopeStatements, edges
 	return rsi.DeleteResourceScope(ctx, userID)
 }
 
+// SchemaCreated dual-writes the schema URL into resource_scope_index.
+func SchemaCreated(ctx context.Context, rsi service.ResourceScopeStatements, projectID, schemaURL string) error {
+	return rsi.UpsertResourceScope(ctx, domain.NewSchemaResourceScope(projectID, schemaURL))
+}
+
+// SchemaDeleted removes the schema resource_scope_index row.
+func SchemaDeleted(ctx context.Context, rsi service.ResourceScopeStatements, schemaURL string) error {
+	return rsi.DeleteResourceScope(ctx, schemaURL)
+}
+
+// BrandingCreated dual-writes a branding revision into resource_scope_index.
+// Branding rows are immutable; project delete cascades RSI cleanup.
+func BrandingCreated(ctx context.Context, rsi service.ResourceScopeStatements, projectID, brandingID string) error {
+	return rsi.UpsertResourceScope(ctx, domain.NewBrandingResourceScope(projectID, brandingID))
+}
+
+// FlowDefinitionCreated dual-writes a flow definition into resource_scope_index.
+func FlowDefinitionCreated(ctx context.Context, rsi service.ResourceScopeStatements, projectID, flowDefinitionID string) error {
+	return rsi.UpsertResourceScope(ctx, domain.NewFlowDefinitionResourceScope(projectID, flowDefinitionID))
+}
+
+// FlowDefinitionDeleted removes the flow definition resource_scope_index row.
+func FlowDefinitionDeleted(ctx context.Context, rsi service.ResourceScopeStatements, flowDefinitionID string) error {
+	return rsi.DeleteResourceScope(ctx, flowDefinitionID)
+}
+
+// SessionCreated dual-writes a session into resource_scope_index.
+func SessionCreated(ctx context.Context, rsi service.ResourceScopeStatements, projectID, sessionID string) error {
+	return rsi.UpsertResourceScope(ctx, domain.NewSessionResourceScope(projectID, sessionID))
+}
+
+// SessionDeleted removes the session resource_scope_index row.
+func SessionDeleted(ctx context.Context, rsi service.ResourceScopeStatements, sessionID string) error {
+	return rsi.DeleteResourceScope(ctx, sessionID)
+}
+
 func edgesByMember(projectID, userID string) database.Filter[domain.AuthzMembershipEdgeField] {
 	return database.And(
 		database.Equal(database.Col(domain.AuthzMembershipEdgeFieldProjectID), projectID),

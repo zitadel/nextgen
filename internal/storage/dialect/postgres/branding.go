@@ -10,6 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 )
 
@@ -37,12 +38,15 @@ func (b brandingStatements) CreateBranding(ctx context.Context, entity *domain.B
 	if err != nil {
 		return err
 	}
-	if err := b.client.QueryRow(ctx, createBrandingStmt, entity.ProjectID, entity.ID, definition).
-		Scan(&entity.CreatedAt); err != nil {
-		return wrapError(err)
-	}
-	entity.CreatedAt = entity.CreatedAt.UTC()
-	return nil
+	return withTransaction(ctx, b.client, func(ctx context.Context, tx queryExecutor) error {
+		if err := tx.QueryRow(ctx, createBrandingStmt, entity.ProjectID, entity.ID, definition).
+			Scan(&entity.CreatedAt); err != nil {
+			return wrapError(err)
+		}
+		entity.CreatedAt = entity.CreatedAt.UTC()
+		rsi := newResourceScopeStatements(tx)
+		return authz.BrandingCreated(ctx, &rsi, entity.ProjectID, entity.ID)
+	})
 }
 
 // GetBrandingByID implements [service.BrandingStatements].

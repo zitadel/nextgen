@@ -10,6 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 )
 
@@ -47,16 +48,22 @@ func (b brandingStatements) CreateBranding(ctx context.Context, entity *domain.B
 		return err
 	}
 
-	stmt := buildStatement(createBrandingStmt, entity.ProjectID, entity.ID, definition).statement()
-	return b.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
-		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			if err := row.Columns(&entity.CreatedAt); err != nil {
-				return struct{}{}, err
-			}
-			entity.CreatedAt = entity.CreatedAt.UTC()
-			return struct{}{}, nil
-		})
-		return err
+	return withTransaction(ctx, b.db, func(ctx context.Context, tx queryExecutor) error {
+		stmt := buildStatement(createBrandingStmt, entity.ProjectID, entity.ID, definition).statement()
+		if err := tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+				if err := row.Columns(&entity.CreatedAt); err != nil {
+					return struct{}{}, err
+				}
+				entity.CreatedAt = entity.CreatedAt.UTC()
+				return struct{}{}, nil
+			})
+			return err
+		}); err != nil {
+			return err
+		}
+		rsi := newResourceScopeStatements(tx)
+		return authz.BrandingCreated(ctx, &rsi, entity.ProjectID, entity.ID)
 	})
 }
 

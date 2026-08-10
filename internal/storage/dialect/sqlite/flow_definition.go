@@ -7,6 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
 )
@@ -50,11 +51,16 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 		return wrapError(err)
 	}
 	now := nowUnixNano()
-	_, err = f.client.Exec(ctx, createFlowDefinitionStmt,
-		entity.ProjectID, entity.ID, entity.Name, entity.SchemaVersion,
-		entity.Status.String(), purposes, defStr, now, now,
-	)
-	return wrapError(err)
+	return withTransaction(ctx, f.client, func(ctx context.Context, tx queryExecutor) error {
+		if _, err := tx.Exec(ctx, createFlowDefinitionStmt,
+			entity.ProjectID, entity.ID, entity.Name, entity.SchemaVersion,
+			entity.Status.String(), purposes, defStr, now, now,
+		); err != nil {
+			return wrapError(err)
+		}
+		rsi := newResourceScopeStatements(tx)
+		return authz.FlowDefinitionCreated(ctx, &rsi, entity.ProjectID, entity.ID)
+	})
 }
 
 // GetFlowDefinitionByID implements [service.FlowDefinitionStatements].
@@ -132,8 +138,14 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 
 // DeleteFlowDefinitionByID implements [service.FlowDefinitionStatements].
 func (f flowDefinitionStatements) DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error {
-	_, err := f.client.Exec(ctx, deleteFlowDefinitionStmt, projectID, id)
-	return wrapError(err)
+	return withTransaction(ctx, f.client, func(ctx context.Context, tx queryExecutor) error {
+		rsi := newResourceScopeStatements(tx)
+		if err := authz.FlowDefinitionDeleted(ctx, &rsi, id); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, deleteFlowDefinitionStmt, projectID, id)
+		return wrapError(err)
+	})
 }
 
 func (f flowDefinitionStatements) scanFlowDefinition(rows *sql.Rows) (*domain.FlowDefinition, error) {

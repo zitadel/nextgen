@@ -17,9 +17,13 @@ const PrefixAuthzAssignment ResourcePrefix = "asgn"
 type ResourceKind string
 
 const (
-	ResourceKindProject ResourceKind = "project"
-	ResourceKindTeam    ResourceKind = "team"
-	ResourceKindUser    ResourceKind = "user"
+	ResourceKindProject        ResourceKind = "project"
+	ResourceKindTeam           ResourceKind = "team"
+	ResourceKindUser           ResourceKind = "user"
+	ResourceKindSchema         ResourceKind = "schema"
+	ResourceKindBranding       ResourceKind = "branding"
+	ResourceKindFlowDefinition ResourceKind = "flow_definition"
+	ResourceKindSession        ResourceKind = "session"
 )
 
 func (k ResourceKind) String() string { return string(k) }
@@ -196,6 +200,38 @@ func NewUserResourceScope(projectID, userID string) *ResourceScope {
 	return &ResourceScope{
 		ResourceID:   userID,
 		ResourceKind: ResourceKindUser,
+		ProjectID:    projectID,
+	}
+}
+
+func NewSchemaResourceScope(projectID, schemaID string) *ResourceScope {
+	return &ResourceScope{
+		ResourceID:   schemaID,
+		ResourceKind: ResourceKindSchema,
+		ProjectID:    projectID,
+	}
+}
+
+func NewBrandingResourceScope(projectID, brandingID string) *ResourceScope {
+	return &ResourceScope{
+		ResourceID:   brandingID,
+		ResourceKind: ResourceKindBranding,
+		ProjectID:    projectID,
+	}
+}
+
+func NewFlowDefinitionResourceScope(projectID, flowDefinitionID string) *ResourceScope {
+	return &ResourceScope{
+		ResourceID:   flowDefinitionID,
+		ResourceKind: ResourceKindFlowDefinition,
+		ProjectID:    projectID,
+	}
+}
+
+func NewSessionResourceScope(projectID, sessionID string) *ResourceScope {
+	return &ResourceScope{
+		ResourceID:   sessionID,
+		ResourceKind: ResourceKindSession,
 		ProjectID:    projectID,
 	}
 }

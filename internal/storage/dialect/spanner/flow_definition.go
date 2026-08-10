@@ -9,6 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
 )
@@ -57,17 +58,22 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 		return wrapError(err)
 	}
 	purposes := flowdefinition.PurposeStrings(entity)
-	stmt := buildStatement(createFlowDefinitionStmt,
-		entity.ProjectID,
-		entity.ID,
-		entity.Name,
-		entity.SchemaVersion,
-		entity.Status.String(),
-		purposes,
-		definition,
-	).statement()
-	_, err = f.db.Update(ctx, stmt)
-	return wrapError(err)
+	return withTransaction(ctx, f.db, func(ctx context.Context, tx queryExecutor) error {
+		stmt := buildStatement(createFlowDefinitionStmt,
+			entity.ProjectID,
+			entity.ID,
+			entity.Name,
+			entity.SchemaVersion,
+			entity.Status.String(),
+			purposes,
+			definition,
+		).statement()
+		if _, err := tx.Update(ctx, stmt); err != nil {
+			return wrapError(err)
+		}
+		rsi := newResourceScopeStatements(tx)
+		return authz.FlowDefinitionCreated(ctx, &rsi, entity.ProjectID, entity.ID)
+	})
 }
 
 func (f flowDefinitionStatements) GetFlowDefinitionByID(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {
@@ -136,9 +142,15 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 }
 
 func (f flowDefinitionStatements) DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error {
-	stmt := buildStatement(deleteFlowDefinitionStmt, projectID, id).statement()
-	_, err := f.db.Update(ctx, stmt)
-	return wrapError(err)
+	return withTransaction(ctx, f.db, func(ctx context.Context, tx queryExecutor) error {
+		rsi := newResourceScopeStatements(tx)
+		if err := authz.FlowDefinitionDeleted(ctx, &rsi, id); err != nil {
+			return err
+		}
+		stmt := buildStatement(deleteFlowDefinitionStmt, projectID, id).statement()
+		_, err := tx.Update(ctx, stmt)
+		return wrapError(err)
+	})
 }
 
 func (f flowDefinitionStatements) scanFlowDefinition(row *spanner.Row) (*domain.FlowDefinition, error) {

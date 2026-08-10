@@ -22,9 +22,9 @@ one-time backfill of `resource_scope_index` + active `authz_membership_edges`.
 Resolver library (`internal/authz/resolver`) and L4 oracle tests land in
 Wave 3 (#423). In-project HTTP management wiring (resolver gate + D10
 403/404 mapping + `sk_proj` seed on `CreateProject`) is shipped. Leopard
-remains later (**D11**). Full RSI-before-Check for every path-id resource
-kind (schema/branding/flow_definition/session) and fine-grained catalog
-relations (#420) remain follow-ups.
+remains later (**D11**). RSI dual-write now covers schema / branding /
+flow_definition / session path ids in addition to project / team / user.
+Fine-grained catalog relations (#420) remain a follow-up.
 
 ### Wave 1 vs OpenFGA compiler (#421 / PR #720)
 
@@ -153,9 +153,12 @@ CREATE INDEX idx_resource_scope_index_kind_project
 ```
 
 **Dual-write contract:** every globally addressable create/update/delete
-(project, team, user, …) updates this table in the **same transaction** as
-the resource. MVP kinds: `project`, `team`, `user`. For a project row:
-`resource_id = id`, `project_id = id`, `team_id NULL`.
+(project, team, user, schema, branding, flow_definition, session, …) updates
+this table in the **same transaction** as the resource. Covered kinds:
+`project`, `team`, `user`, `schema`, `branding`, `flow_definition`, `session`.
+For a project row: `resource_id = id`, `project_id = id`, `team_id NULL`.
+Schema rows use `resource_id = url`. Branding has no delete API; RSI rows are
+removed by the project FK cascade.
 
 **Dialect note:** the composite FK to `teams (project_id, id)` uses Postgres
 **MATCH SIMPLE**: when `team_id` is NULL, the FK is not enforced (project-scoped
@@ -589,7 +592,6 @@ bundles:
 - Hash-partitioning `resource_scope_index` (**D12**)
 - Fine-grained system catalog relations / auto-compile (#420)
 - SQL list-predicate injection into every repository
-- Full RSI dual-write for schema / branding / flow_definition / session path ids
 - Permission grants management API / product UI
 - `#333` foreign home project, Leopard (**D11**)
 

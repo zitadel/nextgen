@@ -329,10 +329,12 @@ type ClaimStatements interface {
 // ResourceScopeStatements persists resource_scope_index rows (path.id → project/team).
 //
 // Use cases:
-//   - UpsertResourceScope: dual-write on project/team/user create (build via domain.New*ResourceScope).
+//   - UpsertResourceScope: dual-write on project/team/user/schema/branding/
+//     flow_definition/session create (build via domain.New*ResourceScope).
 //   - GetResourceScope: scope resolution for middleware / resolver before a permission check.
-//   - DeleteResourceScope: explicit cleanup where FK cascade does not apply (user delete today;
-//     project delete cascades RSI via project_id FK).
+//   - DeleteResourceScope: explicit cleanup where FK cascade does not apply (user /
+//     schema / flow_definition / session delete today; branding relies on project
+//     cascade; project delete cascades RSI via project_id FK).
 type ResourceScopeStatements interface {
 	Statements
 	UpsertResourceScope(ctx context.Context, scope *domain.ResourceScope) error
