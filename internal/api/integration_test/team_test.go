@@ -222,8 +222,7 @@ func TestGetTeam(t *testing.T) {
 		require.NoError(t, err)
 
 		params := api.GetTeamParams{
-			ProjectID: api.ProjectID(project.ID),
-			TeamID:    api.TeamID(team.ID),
+			TeamID: api.TeamID(team.ID),
 		}
 
 		resp, err := client.GetTeam(t.Context(), params)
@@ -248,8 +247,7 @@ func TestGetTeam(t *testing.T) {
 		require.NoError(t, harness.EnsureServiceDB(t).Statements().DeactivateTeam(t.Context(), project.ID, team.ID))
 
 		params := api.GetTeamParams{
-			ProjectID: api.ProjectID(project.ID),
-			TeamID:    api.TeamID(team.ID),
+			TeamID: api.TeamID(team.ID),
 		}
 
 		resp, err := client.GetTeam(t.Context(), params)
@@ -267,8 +265,7 @@ func TestGetTeam(t *testing.T) {
 			t.Parallel()
 
 			params := api.GetTeamParams{
-				ProjectID: api.ProjectID(project.ID),
-				TeamID:    api.TeamID("does-not-exist"),
+				TeamID: api.TeamID("does-not-exist"),
 			}
 
 			resp, err := client.GetTeam(t.Context(), params)
@@ -306,8 +303,7 @@ func TestUpdateTeam(t *testing.T) {
 
 		name := helpers.TeamName()
 		params := api.UpdateTeamParams{
-			ProjectID: api.ProjectID(project.ID),
-			TeamID:    api.TeamID(team.ID),
+			TeamID: api.TeamID(team.ID),
 		}
 
 		resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(name)}, params)
@@ -331,8 +327,7 @@ func TestUpdateTeam(t *testing.T) {
 
 		name := helpers.TeamName()
 		params := api.UpdateTeamParams{
-			ProjectID: api.ProjectID(project.ID),
-			TeamID:    api.TeamID(team.ID),
+			TeamID: api.TeamID(team.ID),
 		}
 
 		resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString("  " + name + "  ")}, params)
@@ -366,8 +361,7 @@ func TestUpdateTeam(t *testing.T) {
 		require.NoError(t, err)
 
 		params := api.UpdateTeamParams{
-			ProjectID: api.ProjectID(project.ID),
-			TeamID:    api.TeamID(team.ID),
+			TeamID: api.TeamID(team.ID),
 		}
 
 		resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(name)}, params)
@@ -388,8 +382,7 @@ func TestUpdateTeam(t *testing.T) {
 			require.NoError(t, err)
 
 			params := api.UpdateTeamParams{
-				ProjectID: api.ProjectID(project.ID),
-				TeamID:    api.TeamID(team.ID),
+				TeamID: api.TeamID(team.ID),
 			}
 
 			resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString("   ")}, params)
@@ -410,8 +403,7 @@ func TestUpdateTeam(t *testing.T) {
 			require.NoError(t, err)
 
 			params := api.UpdateTeamParams{
-				ProjectID: api.ProjectID(project.ID),
-				TeamID:    api.TeamID(team.ID),
+				TeamID: api.TeamID(team.ID),
 			}
 
 			resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{}, params)
@@ -426,8 +418,7 @@ func TestUpdateTeam(t *testing.T) {
 			t.Parallel()
 
 			params := api.UpdateTeamParams{
-				ProjectID: api.ProjectID(project.ID),
-				TeamID:    api.TeamID("does-not-exist"),
+				TeamID: api.TeamID("does-not-exist"),
 			}
 
 			resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, params)
@@ -450,8 +441,7 @@ func TestUpdateTeam(t *testing.T) {
 			require.NoError(t, harness.EnsureServiceDB(t).Statements().DeactivateTeam(t.Context(), project.ID, team.ID))
 
 			params := api.UpdateTeamParams{
-				ProjectID: api.ProjectID(project.ID),
-				TeamID:    api.TeamID(team.ID),
+				TeamID: api.TeamID(team.ID),
 			}
 
 			resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, params)
@@ -486,8 +476,7 @@ func TestUpdateTeam(t *testing.T) {
 				require.NoError(t, err)
 
 				params := api.UpdateTeamParams{
-					ProjectID: api.ProjectID(project.ID),
-					TeamID:    api.TeamID(team.ID),
+					TeamID: api.TeamID(team.ID),
 				}
 
 				resp, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(tc.teamName)}, params)
@@ -512,8 +501,7 @@ func TestUpdateTeam(t *testing.T) {
 				t.Parallel()
 
 				params := api.UpdateTeamParams{
-					ProjectID: api.ProjectID(project.ID),
-					TeamID:    api.TeamID("does-not-exist"),
+					TeamID: api.TeamID("does-not-exist"),
 				}
 
 				_, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(tc.teamName)}, params)
@@ -550,8 +538,7 @@ func TestDeleteTeam(t *testing.T) {
 	deleteTeam := func(t *testing.T, teamID string) {
 		t.Helper()
 		resp, err := client.DeleteTeam(t.Context(), api.DeleteTeamParams{
-			ProjectID: api.ProjectID(project.ID),
-			TeamID:    api.TeamID(teamID),
+			TeamID: api.TeamID(teamID),
 		})
 		require.NoError(t, err)
 		require.IsType(t, &api.DeleteTeamNoContent{}, resp, helpers.MustMarshal(t, resp))
@@ -560,8 +547,7 @@ func TestDeleteTeam(t *testing.T) {
 	teamStatus := func(t *testing.T, teamID string) api.TeamStatus {
 		t.Helper()
 		resp, err := client.GetTeam(t.Context(), api.GetTeamParams{
-			ProjectID: api.ProjectID(project.ID),
-			TeamID:    api.TeamID(teamID),
+			TeamID: api.TeamID(teamID),
 		})
 		require.NoError(t, err)
 		require.IsType(t, &api.TeamResponse{}, resp, helpers.MustMarshal(t, resp))
@@ -620,7 +606,7 @@ func TestDeleteTeam(t *testing.T) {
 				t.Parallel()
 
 				req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete,
-					harness.EnsureTestServer(t).URL+"/teams/"+tc.teamID+"?project_id="+url.QueryEscape(project.ID),
+					harness.EnsureTestServer(t).URL+"/teams/"+tc.teamID,
 					nil,
 				)
 				require.NoError(t, err)
@@ -651,8 +637,7 @@ func TestDeleteTeam(t *testing.T) {
 		})
 
 		resp, err := client.DeleteTeam(t.Context(), api.DeleteTeamParams{
-			ProjectID: api.ProjectID(other.ID),
-			TeamID:    api.TeamID(createTeam(t).ID),
+			TeamID: api.TeamID(createTeam(t).ID),
 		})
 		require.NoError(t, err)
 
@@ -909,7 +894,7 @@ func TestUpdateTeamRawRequest(t *testing.T) {
 
 			body := helpers.MustMarshal(t, api.UpdateTeamRequest{Name: api.NewOptString(tc.teamName)})
 			req, err := http.NewRequestWithContext(t.Context(), http.MethodPatch,
-				harness.EnsureTestServer(t).URL+"/teams/"+url.PathEscape(team.ID)+"?project_id="+url.QueryEscape(project.ID),
+				harness.EnsureTestServer(t).URL+"/teams/"+url.PathEscape(team.ID),
 				strings.NewReader(body),
 			)
 			require.NoError(t, err)

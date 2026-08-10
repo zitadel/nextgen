@@ -2,15 +2,21 @@ package api
 
 import (
 	"context"
+	"errors"
 
 	"github.com/zitadel/nextgen/internal/authz/resolver"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // The management API (the operator plane of ADR 036: schemas, flow
 // definitions, users, teams, project queries) is gated by the authz
 // permission resolver after credential → resolved project scope.
+//
+// Path-id operations resolve scope via resource_scope_index
+// (requireResourceAccess) before Check. Create/list keep an explicit
+// project_id and use requireProjectAccess.
 //
 // MVP checks use the seeded system catalog's coarse project.{viewer,editor,admin}
 // relations (#420 will expand to fine-grained user.read / schema.write, etc.).
@@ -97,7 +103,47 @@ var projectAccess = resourceAccess{
 	denied:    domain.ErrProjectPermissionDenied,
 }
 
-// requireProjectAccess gates a management operation via resolver.Check.
+// resourceAccessStmts is the statement surface requireResourceAccess needs:
+// RSI lookup plus the authz resolver Check path.
+type resourceAccessStmts interface {
+	service.AuthzResolverStatements
+	GetResourceScope(ctx context.Context, resourceID string) (*domain.ResourceScope, error)
+}
+
+// requireResourceAccess resolves path.id via resource_scope_index, then runs
+// the project-scoped Check. RSI miss → resource not-found shape (404). Returns
+// the resolved project_id for scope-bound DAL calls. team_id from RSI is
+// available on the scope row for future sk_team team-scope tightening.
+func (h *Handler) requireResourceAccess(ctx context.Context, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
+	if h == nil || h.pool == nil {
+		return "", resourceMiss(res, op)
+	}
+	return requireResourceAccess(ctx, h.pool.Statements(), resourceID, res, op)
+}
+
+func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resourceID string, res resourceAccess, op accessOp) (string, error) {
+	scope, err := stmts.GetResourceScope(ctx, resourceID)
+	if err != nil {
+		if errors.Is(err, new(database.NoRowFoundError)) {
+			return "", resourceMiss(res, op)
+		}
+		return "", domain.ErrInternal(err).WithMessage("resource scope lookup failed")
+	}
+	if err := requireProjectAccess(ctx, stmts, scope.ProjectID, res, op); err != nil {
+		return "", err
+	}
+	return scope.ProjectID, nil
+}
+
+func resourceMiss(res resourceAccess, op accessOp) error {
+	if op == opWrite {
+		return res.writeMiss()
+	}
+	return res.readMiss()
+}
+
+// requireProjectAccess gates a management operation via resolver.Check when
+// project_id is already known (create/list/query, or after RSI resolution).
 // DecisionNotFound → resource not-found / invalid-project shapes (404).
 // DecisionForbidden → permission_denied (403).
 func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
@@ -174,25 +220,28 @@ func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) er
 	}
 }
 
-// requireUserTeamsAccess gates listUserTeams, which is a read of two resources
-// at once: the membership rows belong to the user, and each entry carries the
-// team's name. Both reads are required rather than either.
-func (h *Handler) requireUserTeamsAccess(ctx context.Context, projectID string) error {
-	if err := h.requireProjectAccess(ctx, projectID, userAccess, opRead); err != nil {
-		return err
+// requireUserTeamsAccess gates listUserTeams via the parent user's RSI, then
+// checks both user and team read relations on the resolved project.
+func (h *Handler) requireUserTeamsAccess(ctx context.Context, userID string) (projectID string, err error) {
+	projectID, err = h.requireResourceAccess(ctx, userID, userAccess, opRead)
+	if err != nil {
+		return "", err
 	}
-	return h.requireProjectAccess(ctx, projectID, teamAccess, opRead)
+	if err := h.requireProjectAccess(ctx, projectID, teamAccess, opRead); err != nil {
+		return "", err
+	}
+	return projectID, nil
 }
 
-// requireTeamDelete gates deleteTeam. Deleting an unknown team answers 204, so
-// the endpoint has no not-found to report: a project the credentials are not
-// authorized for is refused as the permission failure it is when foothold
-// exists; no foothold stays a not-found-shaped miss mapped through denied for
-// delete (see requireTeamDelete historical contract).
-func (h *Handler) requireTeamDelete(ctx context.Context, projectID string) error {
-	if err := h.requireProjectAccess(ctx, projectID, teamAccess, opDelete); err != nil {
-		// Preserve deleteTeam's permission_denied wrapper for any denial.
-		return domain.ErrTeamPermissionDenied().WithParent(err)
+// requireTeamDelete gates deleteTeam via the team's RSI. Deleting an unknown
+// team answers 204, so the endpoint has no not-found to report: a project the
+// credentials are not authorized for is refused as the permission failure it
+// is when foothold exists; no foothold stays a not-found-shaped miss mapped
+// through denied for delete (see requireTeamDelete historical contract).
+func (h *Handler) requireTeamDelete(ctx context.Context, teamID string) (projectID string, err error) {
+	projectID, err = h.requireResourceAccess(ctx, teamID, teamAccess, opDelete)
+	if err != nil {
+		return "", domain.ErrTeamPermissionDenied().WithParent(err)
 	}
-	return nil
+	return projectID, nil
 }

@@ -30,10 +30,11 @@ func (h *Handler) CreateBranding(ctx context.Context, req *api.Branding, params 
 }
 
 func (h *Handler) GetBrandingById(ctx context.Context, params api.GetBrandingByIdParams) (api.GetBrandingByIdRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), brandingAccess, opRead); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, params.ID, brandingAccess, opRead)
+	if err != nil {
 		return nil, err
 	}
-	branding, err := h.brandingService.Get(ctx, string(params.ProjectID), params.ID)
+	branding, err := h.brandingService.Get(ctx, projectID, params.ID)
 	if err != nil {
 		return nil, err
 	}

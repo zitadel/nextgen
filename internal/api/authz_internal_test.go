@@ -6,6 +6,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/authz/resolver"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // stubAuthzStmts is a minimal AuthzResolverStatements for gate unit tests.
@@ -15,6 +16,8 @@ type stubAuthzStmts struct {
 	// allowCheck overrides CheckAuthz when set; nil means default foothold rule.
 	allowCheck *bool
 	foothold   *bool
+	// scopes maps resource_id → project_id for GetResourceScope; missing → NoRowFoundError.
+	scopes map[string]string
 }
 
 func (stubAuthzStmts) IsStatements() {}
@@ -39,6 +42,17 @@ func (s stubAuthzStmts) CheckAuthz(_ context.Context, params domain.AuthzCheckPa
 
 func (s stubAuthzStmts) ListAuthzObjectIDs(context.Context, domain.AuthzListObjectsParams) ([]string, error) {
 	return nil, nil
+}
+
+func (s stubAuthzStmts) GetResourceScope(_ context.Context, resourceID string) (*domain.ResourceScope, error) {
+	if s.scopes == nil {
+		return nil, new(database.NoRowFoundError)
+	}
+	projectID, ok := s.scopes[resourceID]
+	if !ok {
+		return nil, new(database.NoRowFoundError)
+	}
+	return &domain.ResourceScope{ResourceID: resourceID, ProjectID: projectID, ResourceKind: domain.ResourceKindUser}, nil
 }
 
 func TestProjectRelation(t *testing.T) {
@@ -238,6 +252,35 @@ func TestRequireTeamDelete(t *testing.T) {
 		domain.ErrTeamPermissionDenied().Code)
 	assertDomainCode(t, wrap(requireProjectAccess(context.Background(), stmts, "proj_a", teamAccess, opDelete)),
 		domain.ErrTeamPermissionDenied().Code)
+}
+
+func TestRequireResourceAccess(t *testing.T) {
+	stmts := stubAuthzStmts{scopes: map[string]string{"usr_a": "proj_a", "usr_b": "proj_b"}}
+	operator := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+	})
+	preview := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID: "proj_a", Scope: []string{"project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+	})
+
+	projectID, err := requireResourceAccess(operator, stmts, "usr_a", userAccess, opRead)
+	if err != nil {
+		t.Fatalf("own-project resource: %v", err)
+	}
+	if projectID != "proj_a" {
+		t.Fatalf("projectID = %q, want proj_a", projectID)
+	}
+
+	_, err = requireResourceAccess(operator, stmts, "usr_missing", userAccess, opRead)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	_, err = requireResourceAccess(operator, stmts, "usr_b", userAccess, opRead)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	_, err = requireResourceAccess(preview, stmts, "usr_a", userAccess, opRead)
+	assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
 }
 
 func assertDomainCode(t *testing.T, err error, wantCode string) {
