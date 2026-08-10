@@ -105,6 +105,110 @@ export function schemaColumns(schemas: UserSchema[]): SchemaField[] {
   return [...columns.values()];
 }
 
+/**
+ * Every property a schema declares, including the nested objects
+ * {@link schemaFields} drops.
+ *
+ * `schemaFields` exists to build a *form*, so it filters out `type: object` —
+ * there is no single control that writes one. The schema screens read the
+ * document instead of writing to it, and the design's field table renders an
+ * object as a row you drill into, so this keeps them.
+ *
+ * Sorted by key for the same reason `schemaFields` is: `GET /schemas/{id}`
+ * serialises `properties` from a Go map, so the response order is randomised
+ * and an unsorted table reshuffles between loads.
+ */
+export function schemaProperties(node: UserSchema): SchemaProperty[] {
+  const required = new Set(readRequiredOrder(node));
+  return Object.entries(readProperties(node))
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, property]) => ({
+      key,
+      type: propertyTypeLabel(property),
+      required: required.has(key),
+      isObject: isObjectProperty(property),
+    }));
+}
+
+/** One row of the detail screen's `FIELD | TYPE | REQ.` table. */
+export interface SchemaProperty {
+  key: string;
+  /** Capitalised JSON Schema `type` (`String`, `Object`, …), or `—`. */
+  type: string;
+  required: boolean;
+  /** Whether the row drills into a nested property table. */
+  isObject: boolean;
+}
+
+/**
+ * Walk into a nested object property, e.g. `["address", "geo"]`.
+ *
+ * Returns `undefined` when any segment is missing or is not an object, so a
+ * stale drill-in path (a bookmarked URL, a schema that changed underneath)
+ * falls back to the root rather than rendering an empty table.
+ */
+export function resolveSchemaPath(schema: UserSchema, path: string[]): UserSchema | undefined {
+  let node: UserSchema = schema;
+  for (const segment of path) {
+    const next = readProperties(node)[segment];
+    if (!next || !isObjectProperty(next)) return undefined;
+    node = next;
+  }
+  return node;
+}
+
+/** A sign-in method as the schema's `x-auth-methods` annotation declares it. */
+export interface SchemaAuthMethod {
+  /** Annotation key — `password`, `passkey`, `magic_link`, `sso`, `otp`. */
+  key: string;
+  label: string;
+  enabled: boolean;
+}
+
+/**
+ * The sign-in methods a schema declares, in the order the schema puts them in.
+ *
+ * `x-auth-methods` is an object keyed by method with an explicit `position`
+ * (`api/openapi/endpoints/schemas/auth-methods.json`), so the order is authored
+ * rather than incidental — the `passkey-first` preset puts passkey at position
+ * 1 and password at 2, which is why the design's chip reads "Passkey +
+ * Password". Sorting by position preserves that; ties fall back to the key so
+ * the list is stable.
+ *
+ * Every declared method is returned, not just the two the backend supports
+ * today (D10). A schema that turns on `otp` should show `otp`, not silently
+ * drop it.
+ */
+export function schemaAuthMethods(schema: UserSchema): SchemaAuthMethod[] {
+  const methods = schema["x-auth-methods"];
+  if (!methods || typeof methods !== "object") return [];
+  return Object.entries(methods as Record<string, unknown>)
+    .map(([key, value]) => {
+      const entry = (value ?? {}) as Record<string, unknown>;
+      return {
+        key,
+        label: AUTH_METHOD_LABELS[key] ?? key,
+        enabled: entry.enabled === true,
+        position: typeof entry.position === "number" ? entry.position : Number.MAX_SAFE_INTEGER,
+      };
+    })
+    .sort((a, b) => a.position - b.position || a.key.localeCompare(b.key))
+    .map(({ key, label, enabled }) => ({ key, label, enabled }));
+}
+
+/**
+ * Human-readable names for the methods the meta-schema enumerates. A key
+ * outside this set renders verbatim rather than being hidden — the annotation
+ * is customer-authored and `additionalProperties` may grow.
+ */
+const AUTH_METHOD_LABELS: Record<string, string> = {
+  password: "Password",
+  passkey: "Passkey",
+  magic_link: "Magic link",
+  sso: "SSO",
+  otp: "One-time code",
+};
+
 function readProperties(schema: UserSchema): Record<string, Record<string, unknown>> {
   const properties = schema.properties;
   if (!properties || typeof properties !== "object") return {};
@@ -115,6 +219,29 @@ function readRequiredOrder(schema: UserSchema): string[] {
   return Array.isArray(schema.required)
     ? schema.required.filter((key): key is string => typeof key === "string")
     : [];
+}
+
+/**
+ * A property is drillable when it is an object *and* declares properties.
+ * `type: object` with no `properties` is an open bag — there is nothing to
+ * drill into, so it renders as a leaf row instead of a dead-end chevron.
+ */
+function isObjectProperty(property: Record<string, unknown>): boolean {
+  if (field(property, "type") !== "object") return false;
+  const properties = property.properties;
+  return !!properties && typeof properties === "object" && Object.keys(properties).length > 0;
+}
+
+/** `"string"` → `String`. JSON Schema also allows a type union; join those. */
+function propertyTypeLabel(property: Record<string, unknown>): string {
+  const type = property.type;
+  const names = Array.isArray(type)
+    ? type.filter((entry): entry is string => typeof entry === "string")
+    : typeof type === "string"
+      ? [type]
+      : [];
+  if (names.length === 0) return "—";
+  return names.map((name) => name.charAt(0).toUpperCase() + name.slice(1)).join(" | ");
 }
 
 /**
