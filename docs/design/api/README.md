@@ -31,8 +31,9 @@ Individual decisions are marked inline in each doc:
 5. [`authn-and-auth-flows.md`](authn-and-auth-flows.md) — auth_attempts state machine, OIDC adapter, SSR handoff.
 6. [`authz.md`](authz.md) — credential × scope × permission.
 7. [`permission-storage.md`](permission-storage.md) — Wave 0 relational DDL for catalogs, assignments, membership edges, and `resource_scope_index` (feeds issue #422).
-8. [`security-and-origins.md`](security-and-origins.md) — environment-gated origin wildcards, CORS, CSRF.
-9. [`resource-map.md`](resource-map.md) — the full endpoint surface grouped by concern.
+8. [`authz-testing.md`](authz-testing.md) — L1–L4 fuzzy/property strategy for compiler, persist, and (later) resolver oracles.
+9. [`security-and-origins.md`](security-and-origins.md) — environment-gated origin wildcards, CORS, CSRF.
+10. [`resource-map.md`](resource-map.md) — the full endpoint surface grouped by concern.
 
 ## Sibling doc sets
 

@@ -391,8 +391,13 @@ func SyncUserTeamMembershipEdge(ctx context.Context, edges AuthzMembershipEdgeSt
 // catalog for the same (catalog_kind, owner_id).
 //
 // GetAuthzCatalog loads one catalog version and its projected child rows by id.
+//
+// LoadCatalogMutations reads the child rows PersistCatalogVersion wrote as
+// compiler.PersistedCatalog for persist round-trip verification in stmttest;
+// product check/list paths are not callers yet (#423).
 type AuthzCatalogStatements interface {
 	Statements
 	PersistCatalogVersion(ctx context.Context, meta domain.AuthzCatalogVersion, mutations compiler.CatalogMutations) error
 	GetAuthzCatalog(ctx context.Context, catalogID string) (*domain.AuthzCatalog, error)
+	LoadCatalogMutations(ctx context.Context, catalogID string) (compiler.PersistedCatalog, error)
 }
