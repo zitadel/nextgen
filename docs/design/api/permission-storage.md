@@ -588,5 +588,5 @@ bundles:
 - [ADR 033 — Internal Permission Management](../../adrs/033-internal-permission-management.md)
 - [ADR 034 — External Permission Management](../../adrs/034-external-permission-management.md)
 - [ADR 024 — User/Team Lifecycle Ownership](../../adrs/024-user-team-lifecycle-ownership.md)
-- [`authz.md`](authz.md) · [`url-architecture.md`](url-architecture.md) · [`system-permission-catalog.md`](system-permission-catalog.md) · [`../glossary.md`](../glossary.md)
+- [`authz.md`](authz.md) · [`authz-testing.md`](authz-testing.md) · [`url-architecture.md`](url-architecture.md) · [`system-permission-catalog.md`](system-permission-catalog.md) · [`../glossary.md`](../glossary.md)
 - Epic [#419](https://github.com/zitadel/nextgen/issues/419) · schema [#422](https://github.com/zitadel/nextgen/issues/422) · cross-project [#333](https://github.com/zitadel/nextgen/issues/333)
