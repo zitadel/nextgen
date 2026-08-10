@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // list-query translation for resource List endpoints.

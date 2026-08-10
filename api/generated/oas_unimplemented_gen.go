@@ -13,36 +13,6 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
-// ActivateFlowDefinition implements activateFlowDefinition operation.
-//
-// Activate a flow definition by transitioning it from a `draft` state to an `active` state.
-// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
-// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
-// definition payload.
-//
-// POST /flow_definitions/{id}/activate
-func (UnimplementedHandler) ActivateFlowDefinition(ctx context.Context, params ActivateFlowDefinitionParams) (r ActivateFlowDefinitionRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// AuthorizeDevice implements authorizeDevice operation.
-//
-// Authorize a device.
-//
-// GET /auth/device-authorization
-func (UnimplementedHandler) AuthorizeDevice(ctx context.Context, params AuthorizeDeviceParams) (r AuthorizeDeviceRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// AuthorizeGet implements authorizeGet operation.
-//
-// Authorize a user.
-//
-// GET /auth/authorize
-func (UnimplementedHandler) AuthorizeGet(ctx context.Context, params AuthorizeGetParams) (r AuthorizeGetRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
 // CompleteClaim implements completeClaim operation.
 //
 // Called by the browser after the developer authenticates on the claim page.
@@ -90,7 +60,7 @@ func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, p
 // the first capability step. Creates a new session implicitly unless
 // `session_id` is provided (for step-up / reauth on an existing session).
 // The response contains an `id` field — the flow handle. Use it as the path
-// parameter for all subsequent `/flow/{id}/submit` and `/flow/{id}/event` calls.
+// parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
 // the flow's orchestration state (current step, collected data, history).
 // The server is stateless between requests — all flow state lives in this
@@ -198,20 +168,6 @@ func (UnimplementedHandler) CreateUser(ctx context.Context, req *User, params Cr
 	return r, ht.ErrNotImplemented
 }
 
-// DeactivateFlowDefinition implements deactivateFlowDefinition operation.
-//
-// Deactivates a flow definition in the `active` state by transitioning it to the `draft` state.
-// Flow definitions in `draft` state cannot be used to start new flows. Existing flows that use the
-// deactivated flow definition must gracefully handle this.
-// Alternatively, the status of a flow definition can also be set via the `POST /flow_definitions`
-// and `PUT /flow_definitions/{id}` endpoints by setting the `status` attribute in the flow
-// definition payload.
-//
-// POST /flow_definitions/{id}/deactivate
-func (UnimplementedHandler) DeactivateFlowDefinition(ctx context.Context, params DeactivateFlowDefinitionParams) (r DeactivateFlowDefinitionRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
 // DeleteFlowDefinition implements deleteFlowDefinition operation.
 //
 // Delete a flow definition by id.
@@ -244,15 +200,6 @@ func (UnimplementedHandler) DeleteTeam(ctx context.Context, params DeleteTeamPar
 //
 // DELETE /users/{user_id}
 func (UnimplementedHandler) DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (r DeleteUserByIDRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// EndSession implements endSession operation.
-//
-// End a session.
-//
-// GET /auth/end-session
-func (UnimplementedHandler) EndSession(ctx context.Context, params EndSessionParams) (r EndSessionRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -340,15 +287,6 @@ func (UnimplementedHandler) GetHealth(ctx context.Context) (r GetHealthRes, _ er
 	return r, ht.ErrNotImplemented
 }
 
-// GetKeys implements getKeys operation.
-//
-// Get public keys.
-//
-// GET /auth/keys
-func (UnimplementedHandler) GetKeys(ctx context.Context) (r GetKeysRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
 // GetLive implements getLive operation.
 //
 // Check whether the server is started.
@@ -377,15 +315,6 @@ func (UnimplementedHandler) GetMySession(ctx context.Context) (r GetMySessionRes
 //
 // GET /users/me
 func (UnimplementedHandler) GetMyUser(ctx context.Context) (r GetMyUserRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// GetOpenIDConfiguration implements getOpenIDConfiguration operation.
-//
-// Retrieve the OpenID Connect configuration.
-//
-// GET /.well-known/openid-configuration
-func (UnimplementedHandler) GetOpenIDConfiguration(ctx context.Context) (r GetOpenIDConfigurationRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -438,30 +367,12 @@ func (UnimplementedHandler) GetTeam(ctx context.Context, params GetTeamParams) (
 	return r, ht.ErrNotImplemented
 }
 
-// GetToken implements getToken operation.
-//
-// Get access token.
-//
-// POST /auth/token
-func (UnimplementedHandler) GetToken(ctx context.Context, req *PostTokenRequest) (r GetTokenRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
 // GetUserByID implements GetUserByID operation.
 //
 // Get user by ID.
 //
 // GET /users/{user_id}
 func (UnimplementedHandler) GetUserByID(ctx context.Context, params GetUserByIDParams) (r GetUserByIDRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// GetUserInfo implements getUserInfo operation.
-//
-// Get user info.
-//
-// GET /auth/userinfo
-func (UnimplementedHandler) GetUserInfo(ctx context.Context) (r GetUserInfoRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -475,15 +386,6 @@ func (UnimplementedHandler) GetUserInfo(ctx context.Context) (r GetUserInfoRes, 
 //
 // POST /projects/{project_id}/claim/init
 func (UnimplementedHandler) InitClaim(ctx context.Context, params InitClaimParams) (r InitClaimRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// Introspect implements introspect operation.
-//
-// Introspect a token.
-//
-// POST /auth/introspect
-func (UnimplementedHandler) Introspect(ctx context.Context, req *IntrospectRequest) (r IntrospectRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -632,31 +534,12 @@ func (UnimplementedHandler) RevokeSession(ctx context.Context, params RevokeSess
 	return r, ht.ErrNotImplemented
 }
 
-// RevokeToken implements revokeToken operation.
-//
-// Revoke an access token or refresh token.
-//
-// POST /auth/revoke
-func (UnimplementedHandler) RevokeToken(ctx context.Context, req *RevokeRequest) (r RevokeTokenRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
 // SetUserPassword implements setUserPassword operation.
 //
 // Set user password.
 //
 // PUT /users/{user_id}/password
 func (UnimplementedHandler) SetUserPassword(ctx context.Context, req *SetUserPasswordRequest, params SetUserPasswordParams) (r SetUserPasswordRes, _ error) {
-	return r, ht.ErrNotImplemented
-}
-
-// SubmitFlowEvent implements submitFlowEvent operation.
-//
-// Submits telemetry or fingerprint data from the frontend.
-// Does not advance the state machine. Used for risk evaluation.
-//
-// POST /flow/{id}/event
-func (UnimplementedHandler) SubmitFlowEvent(ctx context.Context, req *FlowEventRequest, params SubmitFlowEventParams) (r SubmitFlowEventRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

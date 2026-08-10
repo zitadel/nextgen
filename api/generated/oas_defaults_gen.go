@@ -35,26 +35,6 @@ func (s *Field) setDefaults() {
 }
 
 // setDefaults set default value of fields.
-func (s *OpenidConfiguration) setDefaults() {
-	{
-		val := bool(false)
-		s.ClaimsParameterSupported.SetTo(val)
-	}
-	{
-		val := bool(false)
-		s.RequestParameterSupported.SetTo(val)
-	}
-	{
-		val := bool(true)
-		s.RequestURIParameterSupported.SetTo(val)
-	}
-	{
-		val := bool(false)
-		s.RequireRequestURIRegistration.SetTo(val)
-	}
-}
-
-// setDefaults set default value of fields.
 func (s *QueryProjectsRequest) setDefaults() {
 	{
 		val := int(20)
