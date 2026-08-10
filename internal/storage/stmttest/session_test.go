@@ -105,9 +105,6 @@ func createAnonymousSession(t *testing.T, stmts service.AllStatements, projectID
 	return session
 }
 
-// createUserBoundSession exchanges a user-only attempt so the session carries
-// a single check row: the joined page limit then counts sessions, keeping this
-// suite independent of the LIMIT-over-joins bug.
 func createUserBoundSession(t *testing.T, stmts service.AllStatements, projectID, userID string) *domain.Session {
 	t.Helper()
 	plain, _ := handoffCompletedAttempt(t, stmts, projectID, func(a *domain.AuthAttempt) {
