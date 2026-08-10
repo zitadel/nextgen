@@ -113,6 +113,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetClaimStatusOperation: []string{
 		"project.write",
 	},
+	GetEventOperation: []string{
+		"events.read",
+	},
 	GetFlowDefinitionOperation: []string{
 		"flow_definition.read",
 	},
@@ -139,6 +142,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListBrandingOperation: []string{
 		"branding.read",
+	},
+	ListEventsOperation: []string{
+		"events.read",
 	},
 	ListFlowDefinitionsOperation: []string{
 		"flow_definition.read",

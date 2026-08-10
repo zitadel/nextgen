@@ -145,6 +145,19 @@ var brandingAccess = resourceAccess{
 	denied:                     domain.ErrBrandingPermissionDenied,
 }
 
+// eventsAccess gates the operator audit stream (ADR 049). Matches branding's
+// transitional project.write umbrella until ADR 036 credential planes mint
+// events.read on operator secrets.
+var eventsAccess = resourceAccess{
+	scopes: map[accessOp][]string{
+		opRead: {"events.read"},
+	},
+	legacyProjectWriteUmbrella: true,
+	readMiss:                   domain.ErrEventNotFound,
+	writeMiss:                  domain.ErrEventNotFound,
+	denied:                     domain.ErrEventPermissionDenied,
+}
+
 // projectAccess deliberately lists no finer read scope: project.read is the
 // preview secret's scope — a browser-plane credential — so it cannot gate an
 // operator read. Until ADR 036 splits the schemes, project.write is the only

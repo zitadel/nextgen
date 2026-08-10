@@ -1,0 +1,10 @@
+title: UserCreatedPayload
+type: object
+description: Payload for `user.created` events.
+required:
+  - user_id
+properties:
+  user_id:
+    type: string
+  schema_id:
+    type: string

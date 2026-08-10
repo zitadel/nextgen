@@ -1,0 +1,6 @@
+title: FlowdefPayload
+type: object
+description: Payload for `flowdef.*` events.
+properties:
+  name:
+    type: string

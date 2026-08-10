@@ -1,0 +1,8 @@
+title: ProjectUpdatedPayload
+type: object
+description: Payload for `project.updated` events.
+properties:
+  changed_keys:
+    type: array
+    items:
+      type: string

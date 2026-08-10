@@ -1,0 +1,10 @@
+title: AuthCheckPayload
+type: object
+description: Payload for `auth.check.failed` / `auth.check.succeeded` events.
+required:
+  - check_id
+properties:
+  check_id:
+    type: string
+  check_type:
+    type: string

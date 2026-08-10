@@ -1,0 +1,21 @@
+title: RequestAPIPayload
+type: object
+description: Payload for `request.api` events.
+required:
+  - operation_id
+  - method
+  - route_template
+  - status
+  - duration_ms
+properties:
+  operation_id:
+    type: string
+  method:
+    type: string
+  route_template:
+    type: string
+  status:
+    type: integer
+  duration_ms:
+    type: integer
+    format: int64

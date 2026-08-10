@@ -1079,6 +1079,190 @@ func (s *CreateTeamRequest) Validate() error {
 	return nil
 }
 
+func (s *Event) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.ProjectID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.EventType.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "event_type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Category.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "category",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.ActorType.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "actor_type",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s EventActorType) Validate() error {
+	switch s {
+	case "human":
+		return nil
+	case "service":
+		return nil
+	case "system":
+		return nil
+	case "agent":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s EventCategory) Validate() error {
+	switch s {
+	case "request":
+		return nil
+	case "auth":
+		return nil
+	case "session":
+		return nil
+	case "admin":
+		return nil
+	case "entity":
+		return nil
+	case "signal":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s EventEventType) Validate() error {
+	switch s {
+	case "request.api":
+		return nil
+	case "project.created":
+		return nil
+	case "project.updated":
+		return nil
+	case "project.deleted":
+		return nil
+	case "user.created":
+		return nil
+	case "user.updated":
+		return nil
+	case "user.create.failed":
+		return nil
+	case "user.deactivated":
+		return nil
+	case "user.deleted":
+		return nil
+	case "team.created":
+		return nil
+	case "team.updated":
+		return nil
+	case "team.deactivated":
+		return nil
+	case "team.membership.updated":
+		return nil
+	case "auth.token.issued":
+		return nil
+	case "auth.token.revoked":
+		return nil
+	case "session.established":
+		return nil
+	case "session.deleted":
+		return nil
+	case "session.expired":
+		return nil
+	case "auth.attempt.created":
+		return nil
+	case "auth.attempt.handed_off":
+		return nil
+	case "auth.check.failed":
+		return nil
+	case "auth.check.succeeded":
+		return nil
+	case "claim.challenge_created":
+		return nil
+	case "claim.completed":
+		return nil
+	case "flowdef.created":
+		return nil
+	case "flowdef.updated":
+		return nil
+	case "flowdef.deleted":
+		return nil
+	case "schema.created":
+		return nil
+	case "schema.deleted":
+		return nil
+	case "branding.created":
+		return nil
+	case "authz.granted":
+		return nil
+	case "authz.revoked":
+		return nil
+	case "auth.factor.password.set":
+		return nil
+	case "auth.factor.password.removed":
+		return nil
+	case "auth.factor.totp.enrolled":
+		return nil
+	case "auth.factor.totp.removed":
+		return nil
+	case "auth.factor.passkey.enrolled":
+		return nil
+	case "auth.factor.passkey.removed":
+		return nil
+	case "auth.factor.recovery.created":
+		return nil
+	case "auth.factor.recovery.removed":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s FactorMethod) Validate() error {
 	switch s {
 	case "identifier":
@@ -2219,6 +2403,65 @@ func (s ListBrandingResponse) Validate() error {
 	alias := ([]ListBrandingResponseItem)(s)
 	if alias == nil {
 		return errors.New("nil is invalid value")
+	}
+	return nil
+}
+
+func (s ListEventsCategoryItem) Validate() error {
+	switch s {
+	case "request":
+		return nil
+	case "auth":
+		return nil
+	case "session":
+		return nil
+	case "admin":
+		return nil
+	case "entity":
+		return nil
+	case "signal":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s *ListEventsResponse) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.Data == nil {
+			return errors.New("nil is invalid value")
+		}
+		var failures []validate.FieldError
+		for i, elem := range s.Data {
+			if err := func() error {
+				if err := elem.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
+			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "data",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
 }

@@ -183,6 +183,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	)
 	teamService := service.NewTeamService(serviceDBPool)
 	brandingService := service.NewBrandingService(serviceDBPool)
+	eventService := service.NewEventService(serviceDBPool)
 	userService := service.NewUserService(
 		serviceDBPool,
 		schemaStore,
@@ -245,6 +246,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			flowDefinitionSvc,
 			teamService,
 			brandingService,
+			eventService,
 			tokenService,
 			keyService,
 			cfg.Platform.ProjectID,

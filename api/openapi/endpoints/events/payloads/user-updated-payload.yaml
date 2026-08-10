@@ -1,0 +1,10 @@
+title: UserUpdatedPayload
+type: object
+description: Payload for `user.updated` events.
+required:
+  - changed_keys
+properties:
+  changed_keys:
+    type: array
+    items:
+      type: string

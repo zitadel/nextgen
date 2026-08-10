@@ -259,6 +259,18 @@ func (UnimplementedHandler) GetClaimStatus(ctx context.Context, params GetClaimS
 	return r, ht.ErrNotImplemented
 }
 
+// GetEvent implements getEvent operation.
+//
+// Loads a single event by `(project_id, id)`. Requires `events.read`.
+// Events are not registered in `resource_scope_index`; project scope is
+// required on the query (ADR 049). Misses and cross-project ids return 404.
+// Pre-claim projects return 404 (stored events stay invisible until claim).
+//
+// GET /events/{id}
+func (UnimplementedHandler) GetEvent(ctx context.Context, params GetEventParams) (r GetEventRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetFlowDefinition implements getFlowDefinition operation.
 //
 // Get a flow definition by id.
@@ -412,6 +424,22 @@ func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChalle
 //
 // GET /branding
 func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandingParams) (r ListBrandingRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListEvents implements listEvents operation.
+//
+// Returns project-scoped audit events, newest-or-oldest by keyset on
+// `(created_at, id)` (ADR 027 / ADR 049). Requires `events.read`.
+// Pre-claim projects return an empty list (events are stored but not
+// visible until claim succeeds). Team-scoped credentials see only events
+// whose emit-time `team_id` matches the credential team (enforced when
+// team-scoped tokens exist).
+// Clients discriminate each item's `payload` via `event_type` — see
+// event-payload.yaml and docs/design/api/events-catalog.md.
+//
+// GET /events
+func (UnimplementedHandler) ListEvents(ctx context.Context, params ListEventsParams) (r ListEventsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

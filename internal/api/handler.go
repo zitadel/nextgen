@@ -22,6 +22,7 @@ type Handler struct {
 	flowDefinitionService service.FlowDefinitionService
 	teamService           *service.TeamService
 	brandingService       *service.BrandingService
+	eventService          *service.EventService
 	tokenService          service.TokenService
 	keyService            service.KeyService
 
@@ -41,6 +42,7 @@ func NewHandler(
 	flowDefinitionService service.FlowDefinitionService,
 	teamService *service.TeamService,
 	brandingService *service.BrandingService,
+	eventService *service.EventService,
 	tokenService service.TokenService,
 	keyService service.KeyService,
 	platformProjectID string,
@@ -55,6 +57,7 @@ func NewHandler(
 		flowDefinitionService: flowDefinitionService,
 		teamService:           teamService,
 		brandingService:       brandingService,
+		eventService:          eventService,
 		tokenService:          tokenService,
 		keyService:            keyService,
 		platformProjectID:     platformProjectID,

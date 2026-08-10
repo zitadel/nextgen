@@ -1,0 +1,6 @@
+title: AuthAttemptCreatedPayload
+type: object
+description: Payload for `auth.attempt.created` events.
+properties:
+  flow_id:
+    type: string

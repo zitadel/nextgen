@@ -1,0 +1,6 @@
+title: BrandingCreatedPayload
+type: object
+description: Payload for `branding.created` events.
+properties:
+  layout:
+    type: string

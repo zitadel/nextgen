@@ -1,0 +1,6 @@
+title: AuthAttemptHandedOffPayload
+type: object
+description: Payload for `auth.attempt.handed_off` events.
+properties:
+  session_id:
+    type: string

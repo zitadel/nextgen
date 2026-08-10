@@ -1,0 +1,6 @@
+title: TeamCreatedPayload
+type: object
+description: Payload for `team.created` events.
+properties:
+  name:
+    type: string

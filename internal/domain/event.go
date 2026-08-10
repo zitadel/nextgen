@@ -153,6 +153,10 @@ func ErrEventNotFound() Error {
 	return newError(PrefixEvent.ErrorCodePrefix("not_found"), "event: not found", nil, nil)
 }
 
+func ErrEventPermissionDenied() Error {
+	return newError(PrefixEvent.ErrorCodePrefix("permission_denied"), "event: permission denied", nil, nil)
+}
+
 func ErrEventInvalid(details any, parent error) Error {
 	return newError(PrefixEvent.ErrorCodePrefix("invalid"), "event: invalid", details, parent)
 }

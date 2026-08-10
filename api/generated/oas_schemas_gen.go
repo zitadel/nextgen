@@ -2765,6 +2765,7 @@ func (*ErrorDetailsStatusCode) deleteUserByIDRes()       {}
 func (*ErrorDetailsStatusCode) exchangeHandoffRes()      {}
 func (*ErrorDetailsStatusCode) getBrandingByIdRes()      {}
 func (*ErrorDetailsStatusCode) getClaimStatusRes()       {}
+func (*ErrorDetailsStatusCode) getEventRes()             {}
 func (*ErrorDetailsStatusCode) getFlowDefinitionRes()    {}
 func (*ErrorDetailsStatusCode) getFlowStepRes()          {}
 func (*ErrorDetailsStatusCode) getHealthRes()            {}
@@ -2777,6 +2778,7 @@ func (*ErrorDetailsStatusCode) getTeamRes()              {}
 func (*ErrorDetailsStatusCode) getUserByIDRes()          {}
 func (*ErrorDetailsStatusCode) initClaimRes()            {}
 func (*ErrorDetailsStatusCode) listBrandingRes()         {}
+func (*ErrorDetailsStatusCode) listEventsRes()           {}
 func (*ErrorDetailsStatusCode) listFlowDefinitionsRes()  {}
 func (*ErrorDetailsStatusCode) listSchemasRes()          {}
 func (*ErrorDetailsStatusCode) listUserPasskeysRes()     {}
@@ -2792,6 +2794,748 @@ func (*ErrorDetailsStatusCode) setUserPasswordRes()      {}
 func (*ErrorDetailsStatusCode) submitFlowStepRes()       {}
 func (*ErrorDetailsStatusCode) updateFlowDefinitionRes() {}
 func (*ErrorDetailsStatusCode) updateTeamRes()           {}
+
+// One append-only wide event (ADR 048 / ADR 049). Clients use `event_type`
+// to interpret `payload` — typed shapes are documented in
+// [event-payload.yaml](event-payload.yaml) (RequestAPIPayload,
+// UserCreatedPayload, EmptyEventPayload, etc.).
+// Ref: #
+type Event struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Semantic event name (dot-separated). Discriminator for `payload`
+	// shape — see docs/design/api/events-catalog.md.
+	EventType EventEventType `json:"event_type"`
+	// Wide-event category.
+	Category EventCategory `json:"category"`
+	// When the action happened (DB clock).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (DB clock).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (`direct`, etc.).
+	DelegationType OptString `json:"delegation_type"`
+	DelegationID   OptString `json:"delegation_id"`
+	Grantor        OptString `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID OptNilString `json:"flow_id"`
+	// Event-type-specific fields, already redacted at emit time (ADR 048).
+	// Clients MUST discriminate using `event_type`. Named property schemas
+	// (RequestAPIPayload, UserCreatedPayload, EmptyEventPayload, …) are
+	// declared in event-payload.yaml.
+	// Ogen workaround: the wire type is a free-form object rather than a
+	// payload oneOf. Several catalog payloads accept `{}`, so a true oneOf
+	// fails JSON Schema "exactly one" validation for empty payloads.
+	Payload EventPayload `json:"payload"`
+	// Additional emit-time metadata (already redacted).
+	Metadata OptEventMetadata `json:"metadata"`
+}
+
+// GetID returns the value of ID.
+func (s *Event) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *Event) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *Event) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *Event) GetEventType() EventEventType {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *Event) GetCategory() EventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *Event) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *Event) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *Event) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *Event) GetActorType() OptNilEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *Event) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *Event) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *Event) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *Event) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *Event) GetDelegationType() OptString {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *Event) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *Event) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *Event) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *Event) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *Event) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *Event) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetPayload returns the value of Payload.
+func (s *Event) GetPayload() EventPayload {
+	return s.Payload
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *Event) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// SetID sets the value of ID.
+func (s *Event) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *Event) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *Event) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *Event) SetEventType(val EventEventType) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *Event) SetCategory(val EventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *Event) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *Event) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *Event) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *Event) SetActorType(val OptNilEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *Event) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *Event) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *Event) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *Event) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *Event) SetDelegationType(val OptString) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *Event) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *Event) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *Event) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *Event) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *Event) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *Event) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *Event) SetPayload(val EventPayload) {
+	s.Payload = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *Event) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+func (*Event) getEventRes() {}
+
+type EventActorType string
+
+const (
+	EventActorTypeHuman   EventActorType = "human"
+	EventActorTypeService EventActorType = "service"
+	EventActorTypeSystem  EventActorType = "system"
+	EventActorTypeAgent   EventActorType = "agent"
+)
+
+// AllValues returns all EventActorType values.
+func (EventActorType) AllValues() []EventActorType {
+	return []EventActorType{
+		EventActorTypeHuman,
+		EventActorTypeService,
+		EventActorTypeSystem,
+		EventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s EventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case EventActorTypeHuman:
+		return []byte(s), nil
+	case EventActorTypeService:
+		return []byte(s), nil
+	case EventActorTypeSystem:
+		return []byte(s), nil
+	case EventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *EventActorType) UnmarshalText(data []byte) error {
+	switch EventActorType(data) {
+	case EventActorTypeHuman:
+		*s = EventActorTypeHuman
+		return nil
+	case EventActorTypeService:
+		*s = EventActorTypeService
+		return nil
+	case EventActorTypeSystem:
+		*s = EventActorTypeSystem
+		return nil
+	case EventActorTypeAgent:
+		*s = EventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type EventCategory string
+
+const (
+	EventCategoryRequest EventCategory = "request"
+	EventCategoryAuth    EventCategory = "auth"
+	EventCategorySession EventCategory = "session"
+	EventCategoryAdmin   EventCategory = "admin"
+	EventCategoryEntity  EventCategory = "entity"
+	EventCategorySignal  EventCategory = "signal"
+)
+
+// AllValues returns all EventCategory values.
+func (EventCategory) AllValues() []EventCategory {
+	return []EventCategory{
+		EventCategoryRequest,
+		EventCategoryAuth,
+		EventCategorySession,
+		EventCategoryAdmin,
+		EventCategoryEntity,
+		EventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s EventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case EventCategoryRequest:
+		return []byte(s), nil
+	case EventCategoryAuth:
+		return []byte(s), nil
+	case EventCategorySession:
+		return []byte(s), nil
+	case EventCategoryAdmin:
+		return []byte(s), nil
+	case EventCategoryEntity:
+		return []byte(s), nil
+	case EventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *EventCategory) UnmarshalText(data []byte) error {
+	switch EventCategory(data) {
+	case EventCategoryRequest:
+		*s = EventCategoryRequest
+		return nil
+	case EventCategoryAuth:
+		*s = EventCategoryAuth
+		return nil
+	case EventCategorySession:
+		*s = EventCategorySession
+		return nil
+	case EventCategoryAdmin:
+		*s = EventCategoryAdmin
+		return nil
+	case EventCategoryEntity:
+		*s = EventCategoryEntity
+		return nil
+	case EventCategorySignal:
+		*s = EventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Semantic event name (dot-separated). Discriminator for `payload`
+// shape — see docs/design/api/events-catalog.md.
+type EventEventType string
+
+const (
+	EventEventTypeRequestAPI                EventEventType = "request.api"
+	EventEventTypeProjectCreated            EventEventType = "project.created"
+	EventEventTypeProjectUpdated            EventEventType = "project.updated"
+	EventEventTypeProjectDeleted            EventEventType = "project.deleted"
+	EventEventTypeUserCreated               EventEventType = "user.created"
+	EventEventTypeUserUpdated               EventEventType = "user.updated"
+	EventEventTypeUserCreateFailed          EventEventType = "user.create.failed"
+	EventEventTypeUserDeactivated           EventEventType = "user.deactivated"
+	EventEventTypeUserDeleted               EventEventType = "user.deleted"
+	EventEventTypeTeamCreated               EventEventType = "team.created"
+	EventEventTypeTeamUpdated               EventEventType = "team.updated"
+	EventEventTypeTeamDeactivated           EventEventType = "team.deactivated"
+	EventEventTypeTeamMembershipUpdated     EventEventType = "team.membership.updated"
+	EventEventTypeAuthTokenIssued           EventEventType = "auth.token.issued"
+	EventEventTypeAuthTokenRevoked          EventEventType = "auth.token.revoked"
+	EventEventTypeSessionEstablished        EventEventType = "session.established"
+	EventEventTypeSessionDeleted            EventEventType = "session.deleted"
+	EventEventTypeSessionExpired            EventEventType = "session.expired"
+	EventEventTypeAuthAttemptCreated        EventEventType = "auth.attempt.created"
+	EventEventTypeAuthAttemptHandedOff      EventEventType = "auth.attempt.handed_off"
+	EventEventTypeAuthCheckFailed           EventEventType = "auth.check.failed"
+	EventEventTypeAuthCheckSucceeded        EventEventType = "auth.check.succeeded"
+	EventEventTypeClaimChallengeCreated     EventEventType = "claim.challenge_created"
+	EventEventTypeClaimCompleted            EventEventType = "claim.completed"
+	EventEventTypeFlowdefCreated            EventEventType = "flowdef.created"
+	EventEventTypeFlowdefUpdated            EventEventType = "flowdef.updated"
+	EventEventTypeFlowdefDeleted            EventEventType = "flowdef.deleted"
+	EventEventTypeSchemaCreated             EventEventType = "schema.created"
+	EventEventTypeSchemaDeleted             EventEventType = "schema.deleted"
+	EventEventTypeBrandingCreated           EventEventType = "branding.created"
+	EventEventTypeAuthzGranted              EventEventType = "authz.granted"
+	EventEventTypeAuthzRevoked              EventEventType = "authz.revoked"
+	EventEventTypeAuthFactorPasswordSet     EventEventType = "auth.factor.password.set"
+	EventEventTypeAuthFactorPasswordRemoved EventEventType = "auth.factor.password.removed"
+	EventEventTypeAuthFactorTotpEnrolled    EventEventType = "auth.factor.totp.enrolled"
+	EventEventTypeAuthFactorTotpRemoved     EventEventType = "auth.factor.totp.removed"
+	EventEventTypeAuthFactorPasskeyEnrolled EventEventType = "auth.factor.passkey.enrolled"
+	EventEventTypeAuthFactorPasskeyRemoved  EventEventType = "auth.factor.passkey.removed"
+	EventEventTypeAuthFactorRecoveryCreated EventEventType = "auth.factor.recovery.created"
+	EventEventTypeAuthFactorRecoveryRemoved EventEventType = "auth.factor.recovery.removed"
+)
+
+// AllValues returns all EventEventType values.
+func (EventEventType) AllValues() []EventEventType {
+	return []EventEventType{
+		EventEventTypeRequestAPI,
+		EventEventTypeProjectCreated,
+		EventEventTypeProjectUpdated,
+		EventEventTypeProjectDeleted,
+		EventEventTypeUserCreated,
+		EventEventTypeUserUpdated,
+		EventEventTypeUserCreateFailed,
+		EventEventTypeUserDeactivated,
+		EventEventTypeUserDeleted,
+		EventEventTypeTeamCreated,
+		EventEventTypeTeamUpdated,
+		EventEventTypeTeamDeactivated,
+		EventEventTypeTeamMembershipUpdated,
+		EventEventTypeAuthTokenIssued,
+		EventEventTypeAuthTokenRevoked,
+		EventEventTypeSessionEstablished,
+		EventEventTypeSessionDeleted,
+		EventEventTypeSessionExpired,
+		EventEventTypeAuthAttemptCreated,
+		EventEventTypeAuthAttemptHandedOff,
+		EventEventTypeAuthCheckFailed,
+		EventEventTypeAuthCheckSucceeded,
+		EventEventTypeClaimChallengeCreated,
+		EventEventTypeClaimCompleted,
+		EventEventTypeFlowdefCreated,
+		EventEventTypeFlowdefUpdated,
+		EventEventTypeFlowdefDeleted,
+		EventEventTypeSchemaCreated,
+		EventEventTypeSchemaDeleted,
+		EventEventTypeBrandingCreated,
+		EventEventTypeAuthzGranted,
+		EventEventTypeAuthzRevoked,
+		EventEventTypeAuthFactorPasswordSet,
+		EventEventTypeAuthFactorPasswordRemoved,
+		EventEventTypeAuthFactorTotpEnrolled,
+		EventEventTypeAuthFactorTotpRemoved,
+		EventEventTypeAuthFactorPasskeyEnrolled,
+		EventEventTypeAuthFactorPasskeyRemoved,
+		EventEventTypeAuthFactorRecoveryCreated,
+		EventEventTypeAuthFactorRecoveryRemoved,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s EventEventType) MarshalText() ([]byte, error) {
+	switch s {
+	case EventEventTypeRequestAPI:
+		return []byte(s), nil
+	case EventEventTypeProjectCreated:
+		return []byte(s), nil
+	case EventEventTypeProjectUpdated:
+		return []byte(s), nil
+	case EventEventTypeProjectDeleted:
+		return []byte(s), nil
+	case EventEventTypeUserCreated:
+		return []byte(s), nil
+	case EventEventTypeUserUpdated:
+		return []byte(s), nil
+	case EventEventTypeUserCreateFailed:
+		return []byte(s), nil
+	case EventEventTypeUserDeactivated:
+		return []byte(s), nil
+	case EventEventTypeUserDeleted:
+		return []byte(s), nil
+	case EventEventTypeTeamCreated:
+		return []byte(s), nil
+	case EventEventTypeTeamUpdated:
+		return []byte(s), nil
+	case EventEventTypeTeamDeactivated:
+		return []byte(s), nil
+	case EventEventTypeTeamMembershipUpdated:
+		return []byte(s), nil
+	case EventEventTypeAuthTokenIssued:
+		return []byte(s), nil
+	case EventEventTypeAuthTokenRevoked:
+		return []byte(s), nil
+	case EventEventTypeSessionEstablished:
+		return []byte(s), nil
+	case EventEventTypeSessionDeleted:
+		return []byte(s), nil
+	case EventEventTypeSessionExpired:
+		return []byte(s), nil
+	case EventEventTypeAuthAttemptCreated:
+		return []byte(s), nil
+	case EventEventTypeAuthAttemptHandedOff:
+		return []byte(s), nil
+	case EventEventTypeAuthCheckFailed:
+		return []byte(s), nil
+	case EventEventTypeAuthCheckSucceeded:
+		return []byte(s), nil
+	case EventEventTypeClaimChallengeCreated:
+		return []byte(s), nil
+	case EventEventTypeClaimCompleted:
+		return []byte(s), nil
+	case EventEventTypeFlowdefCreated:
+		return []byte(s), nil
+	case EventEventTypeFlowdefUpdated:
+		return []byte(s), nil
+	case EventEventTypeFlowdefDeleted:
+		return []byte(s), nil
+	case EventEventTypeSchemaCreated:
+		return []byte(s), nil
+	case EventEventTypeSchemaDeleted:
+		return []byte(s), nil
+	case EventEventTypeBrandingCreated:
+		return []byte(s), nil
+	case EventEventTypeAuthzGranted:
+		return []byte(s), nil
+	case EventEventTypeAuthzRevoked:
+		return []byte(s), nil
+	case EventEventTypeAuthFactorPasswordSet:
+		return []byte(s), nil
+	case EventEventTypeAuthFactorPasswordRemoved:
+		return []byte(s), nil
+	case EventEventTypeAuthFactorTotpEnrolled:
+		return []byte(s), nil
+	case EventEventTypeAuthFactorTotpRemoved:
+		return []byte(s), nil
+	case EventEventTypeAuthFactorPasskeyEnrolled:
+		return []byte(s), nil
+	case EventEventTypeAuthFactorPasskeyRemoved:
+		return []byte(s), nil
+	case EventEventTypeAuthFactorRecoveryCreated:
+		return []byte(s), nil
+	case EventEventTypeAuthFactorRecoveryRemoved:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *EventEventType) UnmarshalText(data []byte) error {
+	switch EventEventType(data) {
+	case EventEventTypeRequestAPI:
+		*s = EventEventTypeRequestAPI
+		return nil
+	case EventEventTypeProjectCreated:
+		*s = EventEventTypeProjectCreated
+		return nil
+	case EventEventTypeProjectUpdated:
+		*s = EventEventTypeProjectUpdated
+		return nil
+	case EventEventTypeProjectDeleted:
+		*s = EventEventTypeProjectDeleted
+		return nil
+	case EventEventTypeUserCreated:
+		*s = EventEventTypeUserCreated
+		return nil
+	case EventEventTypeUserUpdated:
+		*s = EventEventTypeUserUpdated
+		return nil
+	case EventEventTypeUserCreateFailed:
+		*s = EventEventTypeUserCreateFailed
+		return nil
+	case EventEventTypeUserDeactivated:
+		*s = EventEventTypeUserDeactivated
+		return nil
+	case EventEventTypeUserDeleted:
+		*s = EventEventTypeUserDeleted
+		return nil
+	case EventEventTypeTeamCreated:
+		*s = EventEventTypeTeamCreated
+		return nil
+	case EventEventTypeTeamUpdated:
+		*s = EventEventTypeTeamUpdated
+		return nil
+	case EventEventTypeTeamDeactivated:
+		*s = EventEventTypeTeamDeactivated
+		return nil
+	case EventEventTypeTeamMembershipUpdated:
+		*s = EventEventTypeTeamMembershipUpdated
+		return nil
+	case EventEventTypeAuthTokenIssued:
+		*s = EventEventTypeAuthTokenIssued
+		return nil
+	case EventEventTypeAuthTokenRevoked:
+		*s = EventEventTypeAuthTokenRevoked
+		return nil
+	case EventEventTypeSessionEstablished:
+		*s = EventEventTypeSessionEstablished
+		return nil
+	case EventEventTypeSessionDeleted:
+		*s = EventEventTypeSessionDeleted
+		return nil
+	case EventEventTypeSessionExpired:
+		*s = EventEventTypeSessionExpired
+		return nil
+	case EventEventTypeAuthAttemptCreated:
+		*s = EventEventTypeAuthAttemptCreated
+		return nil
+	case EventEventTypeAuthAttemptHandedOff:
+		*s = EventEventTypeAuthAttemptHandedOff
+		return nil
+	case EventEventTypeAuthCheckFailed:
+		*s = EventEventTypeAuthCheckFailed
+		return nil
+	case EventEventTypeAuthCheckSucceeded:
+		*s = EventEventTypeAuthCheckSucceeded
+		return nil
+	case EventEventTypeClaimChallengeCreated:
+		*s = EventEventTypeClaimChallengeCreated
+		return nil
+	case EventEventTypeClaimCompleted:
+		*s = EventEventTypeClaimCompleted
+		return nil
+	case EventEventTypeFlowdefCreated:
+		*s = EventEventTypeFlowdefCreated
+		return nil
+	case EventEventTypeFlowdefUpdated:
+		*s = EventEventTypeFlowdefUpdated
+		return nil
+	case EventEventTypeFlowdefDeleted:
+		*s = EventEventTypeFlowdefDeleted
+		return nil
+	case EventEventTypeSchemaCreated:
+		*s = EventEventTypeSchemaCreated
+		return nil
+	case EventEventTypeSchemaDeleted:
+		*s = EventEventTypeSchemaDeleted
+		return nil
+	case EventEventTypeBrandingCreated:
+		*s = EventEventTypeBrandingCreated
+		return nil
+	case EventEventTypeAuthzGranted:
+		*s = EventEventTypeAuthzGranted
+		return nil
+	case EventEventTypeAuthzRevoked:
+		*s = EventEventTypeAuthzRevoked
+		return nil
+	case EventEventTypeAuthFactorPasswordSet:
+		*s = EventEventTypeAuthFactorPasswordSet
+		return nil
+	case EventEventTypeAuthFactorPasswordRemoved:
+		*s = EventEventTypeAuthFactorPasswordRemoved
+		return nil
+	case EventEventTypeAuthFactorTotpEnrolled:
+		*s = EventEventTypeAuthFactorTotpEnrolled
+		return nil
+	case EventEventTypeAuthFactorTotpRemoved:
+		*s = EventEventTypeAuthFactorTotpRemoved
+		return nil
+	case EventEventTypeAuthFactorPasskeyEnrolled:
+		*s = EventEventTypeAuthFactorPasskeyEnrolled
+		return nil
+	case EventEventTypeAuthFactorPasskeyRemoved:
+		*s = EventEventTypeAuthFactorPasskeyRemoved
+		return nil
+	case EventEventTypeAuthFactorRecoveryCreated:
+		*s = EventEventTypeAuthFactorRecoveryCreated
+		return nil
+	case EventEventTypeAuthFactorRecoveryRemoved:
+		*s = EventEventTypeAuthFactorRecoveryRemoved
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Additional emit-time metadata (already redacted).
+type EventMetadata map[string]jx.Raw
+
+func (s *EventMetadata) init() EventMetadata {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Event-type-specific fields, already redacted at emit time (ADR 048).
+// Clients MUST discriminate using `event_type`. Named property schemas
+// (RequestAPIPayload, UserCreatedPayload, EmptyEventPayload, …) are
+// declared in event-payload.yaml.
+// Ogen workaround: the wire type is a free-form object rather than a
+// payload oneOf. Several catalog payloads accept `{}`, so a true oneOf
+// fails JSON Schema "exactly one" validation for empty payloads.
+type EventPayload map[string]jx.Raw
+
+func (s *EventPayload) init() EventPayload {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 type ExchangeHandoffBadRequest ErrorDetails
 
@@ -5026,6 +5770,18 @@ type GetClaimStatusUnauthorized ErrorDetails
 
 func (*GetClaimStatusUnauthorized) getClaimStatusRes() {}
 
+type GetEventForbidden ErrorDetails
+
+func (*GetEventForbidden) getEventRes() {}
+
+type GetEventNotFound ErrorDetails
+
+func (*GetEventNotFound) getEventRes() {}
+
+type GetEventUnauthorized ErrorDetails
+
+func (*GetEventUnauthorized) getEventRes() {}
+
 type GetFlowStepGone ErrorDetails
 
 func (*GetFlowStepGone) getFlowStepRes() {}
@@ -5864,6 +6620,118 @@ func (s *ListBrandingResponseItem) SetID(val string) {
 func (s *ListBrandingResponseItem) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
 }
+
+type ListEventsBadRequest ErrorDetails
+
+func (*ListEventsBadRequest) listEventsRes() {}
+
+type ListEventsCategoryItem string
+
+const (
+	ListEventsCategoryItemRequest ListEventsCategoryItem = "request"
+	ListEventsCategoryItemAuth    ListEventsCategoryItem = "auth"
+	ListEventsCategoryItemSession ListEventsCategoryItem = "session"
+	ListEventsCategoryItemAdmin   ListEventsCategoryItem = "admin"
+	ListEventsCategoryItemEntity  ListEventsCategoryItem = "entity"
+	ListEventsCategoryItemSignal  ListEventsCategoryItem = "signal"
+)
+
+// AllValues returns all ListEventsCategoryItem values.
+func (ListEventsCategoryItem) AllValues() []ListEventsCategoryItem {
+	return []ListEventsCategoryItem{
+		ListEventsCategoryItemRequest,
+		ListEventsCategoryItemAuth,
+		ListEventsCategoryItemSession,
+		ListEventsCategoryItemAdmin,
+		ListEventsCategoryItemEntity,
+		ListEventsCategoryItemSignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ListEventsCategoryItem) MarshalText() ([]byte, error) {
+	switch s {
+	case ListEventsCategoryItemRequest:
+		return []byte(s), nil
+	case ListEventsCategoryItemAuth:
+		return []byte(s), nil
+	case ListEventsCategoryItemSession:
+		return []byte(s), nil
+	case ListEventsCategoryItemAdmin:
+		return []byte(s), nil
+	case ListEventsCategoryItemEntity:
+		return []byte(s), nil
+	case ListEventsCategoryItemSignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ListEventsCategoryItem) UnmarshalText(data []byte) error {
+	switch ListEventsCategoryItem(data) {
+	case ListEventsCategoryItemRequest:
+		*s = ListEventsCategoryItemRequest
+		return nil
+	case ListEventsCategoryItemAuth:
+		*s = ListEventsCategoryItemAuth
+		return nil
+	case ListEventsCategoryItemSession:
+		*s = ListEventsCategoryItemSession
+		return nil
+	case ListEventsCategoryItemAdmin:
+		*s = ListEventsCategoryItemAdmin
+		return nil
+	case ListEventsCategoryItemEntity:
+		*s = ListEventsCategoryItemEntity
+		return nil
+	case ListEventsCategoryItemSignal:
+		*s = ListEventsCategoryItemSignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type ListEventsForbidden ErrorDetails
+
+func (*ListEventsForbidden) listEventsRes() {}
+
+// Paginated list of events (ADR 027 / ADR 049).
+// Ref: #
+type ListEventsResponse struct {
+	Data []Event `json:"data"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetData returns the value of Data.
+func (s *ListEventsResponse) GetData() []Event {
+	return s.Data
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListEventsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetData sets the value of Data.
+func (s *ListEventsResponse) SetData(val []Event) {
+	s.Data = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListEventsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListEventsResponse) listEventsRes() {}
+
+type ListEventsUnauthorized ErrorDetails
+
+func (*ListEventsUnauthorized) listEventsRes() {}
 
 type ListFlowDefinitionsPurpose string
 
@@ -7068,6 +7936,52 @@ func (o OptErrorDetailsDetails) Or(d ErrorDetailsDetails) ErrorDetailsDetails {
 	return d
 }
 
+// NewOptEventMetadata returns new OptEventMetadata with value set to v.
+func NewOptEventMetadata(v EventMetadata) OptEventMetadata {
+	return OptEventMetadata{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEventMetadata is optional EventMetadata.
+type OptEventMetadata struct {
+	Value EventMetadata
+	Set   bool
+}
+
+// IsSet returns true if OptEventMetadata was set.
+func (o OptEventMetadata) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEventMetadata) Reset() {
+	var v EventMetadata
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEventMetadata) SetTo(v EventMetadata) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEventMetadata) Get() (v EventMetadata, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEventMetadata) Or(d EventMetadata) EventMetadata {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFieldValidation returns new OptFieldValidation with value set to v.
 func NewOptFieldValidation(v FieldValidation) OptFieldValidation {
 	return OptFieldValidation{
@@ -8229,6 +9143,69 @@ func (o OptNilDateTime) Get() (v time.Time, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilDateTime) Or(d time.Time) time.Time {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilEventActorType returns new OptNilEventActorType with value set to v.
+func NewOptNilEventActorType(v EventActorType) OptNilEventActorType {
+	return OptNilEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilEventActorType is optional nullable EventActorType.
+type OptNilEventActorType struct {
+	Value EventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilEventActorType was set.
+func (o OptNilEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilEventActorType) Reset() {
+	var v EventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilEventActorType) SetTo(v EventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v EventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilEventActorType) Get() (v EventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilEventActorType) Or(d EventActorType) EventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
