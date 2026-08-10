@@ -119,3 +119,39 @@ func TestDomainErrorDetailsOmitsDiagnostics(t *testing.T) {
 	require.Equal(t, "An unexpected error occurred.", details.Message)
 	require.False(t, details.Details.Set, "parent/location diagnostics must not be serialized")
 }
+
+func TestDomainErrorDetails_requestInvalidField(t *testing.T) {
+	t.Parallel()
+
+	details := domainErrorDetails(
+		domain.ErrRequestInvalid().
+			WithMessage(`invalid value for field "age"`).
+			WithDetails(domain.RequestInvalidFieldDetails{Field: "age"}),
+	)
+
+	require.Equal(t, api.ErrorCode("req.invalid"), details.Code)
+	require.Equal(t, `invalid value for field "age"`, details.Message)
+	require.True(t, details.Details.Set)
+	require.JSONEq(t, `{"field":"age"}`, string(details.Details.Value["details"]))
+	_, hasParent := details.Details.Value["parent"]
+	require.False(t, hasParent, "parent must stay off when FullErrorInResponse is false")
+}
+
+func TestDomainErrorDetails_fullErrorInResponseComposesWithProducerDetails(t *testing.T) {
+	t.Parallel()
+
+	prev := FullErrorInResponse.Load()
+	FullErrorInResponse.Store(true)
+	t.Cleanup(func() { FullErrorInResponse.Store(prev) })
+
+	details := domainErrorDetails(
+		domain.ErrRequestInvalid().
+			WithMessage(`invalid value for field "age"`).
+			WithDetails(domain.RequestInvalidFieldDetails{Field: "age"}).
+			WithParent(errors.New("json: cannot unmarshal number")),
+	)
+
+	require.True(t, details.Details.Set)
+	require.JSONEq(t, `{"field":"age"}`, string(details.Details.Value["details"]))
+	require.Contains(t, string(details.Details.Value["parent"]), "json: cannot unmarshal number")
+}

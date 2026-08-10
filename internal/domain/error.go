@@ -120,3 +120,10 @@ func ErrInternal(err error) Error {
 func ErrRequestInvalid() Error {
 	return newError("req.invalid", "The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.", nil, nil)
 }
+
+// RequestInvalidFieldDetails names a request field that failed validation.
+// Producers must attach only the field path — never parser text or payload
+// fragments (ADR 030 Decision 4 + 6).
+type RequestInvalidFieldDetails struct {
+	Field string `json:"field"`
+}

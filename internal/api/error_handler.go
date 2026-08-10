@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/go-faster/errors"
+	"github.com/go-faster/jx"
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -40,31 +41,40 @@ func domainErrorDetails(err error) api.ErrorDetails {
 		Message: domErr.Message,
 	}
 
-	var details map[string]any
+	var wire api.ErrorDetailsDetails
 
-	if domErr.Details != nil {
-		details = map[string]any{
-			"details": domErr.Details,
-		}
+	if raw, ok := marshalErrorDetails(domErr.Details); ok {
+		wire = api.ErrorDetailsDetails{"details": raw}
 	}
 	if FullErrorInResponse.Load() && domErr.Parent != nil {
-		if details == nil {
-			details = make(map[string]any)
-		}
 		if errmap := createFullErrDetailsDetailsMap(domErr.Parent); errmap != nil {
-			details["parent"] = errmap
-		}
-	}
-
-	if details != nil {
-		errDetails.Details = api.NewOptErrorDetailsDetails(api.ErrorDetailsDetails{})
-		for k, v := range details {
-			if j, err := json.Marshal(v); err == nil {
-				errDetails.Details.Value[k] = j
+			if j, err := json.Marshal(errmap); err == nil {
+				if wire == nil {
+					wire = api.ErrorDetailsDetails{}
+				}
+				wire["parent"] = j
 			}
 		}
 	}
+
+	if wire != nil {
+		errDetails.Details = api.NewOptErrorDetailsDetails(wire)
+	}
 	return errDetails
+}
+
+// marshalErrorDetails encodes producer-attached Details for the wire envelope
+// under the legacy details.details slot (ADR 030). Returns false when there is
+// nothing to send or encoding fails.
+func marshalErrorDetails(details any) (jx.Raw, bool) {
+	if details == nil {
+		return nil, false
+	}
+	b, err := json.Marshal(details)
+	if err != nil {
+		return nil, false
+	}
+	return b, true
 }
 
 func createFullErrDetailsDetailsMap(err error) any {
