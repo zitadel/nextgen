@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { computeMode, forceFullReason, queryAffectedTargets, resolveGates } from "./ci-mode.mjs";
+import {
+  computeMode,
+  forceFullReason,
+  queryAffectedTargets,
+  resolveGates,
+} from "./ci-mode.mjs";
 
 // Affected sets below are real `moon query tasks --affected --downstream deep`
-// results captured on 2026-08-03 (post-#665 main) for one representative
-// touched file per change class.
+// results captured on main (2026-08-03/04) for one representative touched
+// file per change class. Constants named *_SLICE are hand-trimmed subsets
+// exercising one trigger path rather than full captures.
 
 const GO_CLASS = [
   "console-e2e:e2e-real", "demo-next-e2e:e2e-real", "release:snapshot",
@@ -24,13 +30,73 @@ const CONSOLE_CLASS = [
   "console:typecheck", "demo-next-e2e:e2e-real", "release:pack", "release:publish",
   "release:snapshot", "server:build", "testing:test-integration",
 ];
-const COMPONENTS_SLICE = ["components:build", "components:test-browser", "components:lint"];
+const SDK_VUE_CLASS = [
+  "release:build-public-packages", "release:pack", "release:publish", "release:snapshot",
+  "sdk-vue:build", "sdk-vue:build-release", "sdk-vue:lint", "sdk-vue:test",
+  "sdk-vue:typecheck",
+];
+const LOGIN_UI_CLASS = [
+  "console-e2e:e2e-real", "demo-next-e2e:e2e-real", "login-ui:build",
+  "login-ui:build-release", "login-ui:dev", "login-ui:lint", "login-ui:preview",
+  "login-ui:typecheck", "release:pack", "release:publish", "release:snapshot",
+  "server:build", "testing:test-integration",
+];
+const TESTING_KIT_CLASS = [
+  "cli-journey-e2e:e2e", "cli-journey-e2e:e2e-local", "cli-journey-e2e:e2e-testkit",
+  "console-e2e:e2e-real", "demo-next-e2e:e2e-real", "release:build-public-packages",
+  "release:pack", "release:publish", "release:snapshot", "testing:build",
+  "testing:build-release", "testing:lint", "testing:test", "testing:test-integration",
+  "testing:typecheck",
+];
+// Full capture, 2026-08-04: components feeds every SDK, both UIs, the CLI,
+// and the journey project — 91 tasks, correctly close to "everything".
+const COMPONENTS_CLASS = [
+  "cli-journey-e2e:e2e", "cli-journey-e2e:e2e-local", "cli-journey-e2e:e2e-testkit",
+  "cli:build", "cli:build-release", "cli:lint", "cli:readme", "cli:test", "cli:typecheck",
+  "components:build", "components:build-release", "components:lint", "components:test",
+  "components:test-browser", "components:typecheck",
+  "console-e2e:e2e", "console-e2e:e2e-real",
+  "console:build", "console:build-release", "console:lint", "console:preview",
+  "console:test", "console:typecheck",
+  "demo-next-e2e:e2e", "demo-next-e2e:e2e-real",
+  "demo-next:build", "demo-next:dev", "demo-next:lint", "demo-next:start", "demo-next:typecheck",
+  "demo-nuxt-e2e:e2e",
+  "demo-nuxt:build", "demo-nuxt:dev", "demo-nuxt:lint", "demo-nuxt:start", "demo-nuxt:typecheck",
+  "login-ui:build", "login-ui:build-release", "login-ui:lint", "login-ui:preview",
+  "login-ui:typecheck",
+  "release:build-public-packages", "release:pack", "release:publish", "release:snapshot",
+  "sdk-angular:build", "sdk-angular:build-release", "sdk-angular:lint", "sdk-angular:test",
+  "sdk-angular:typecheck",
+  "sdk-next:build", "sdk-next:build-release", "sdk-next:lint", "sdk-next:test",
+  "sdk-next:typecheck",
+  "sdk-nuxt:build", "sdk-nuxt:build-release", "sdk-nuxt:lint", "sdk-nuxt:test",
+  "sdk-nuxt:typecheck",
+  "sdk-qwik:build", "sdk-qwik:build-release", "sdk-qwik:lint", "sdk-qwik:test",
+  "sdk-qwik:typecheck",
+  "sdk-react:build", "sdk-react:build-release", "sdk-react:lint", "sdk-react:test",
+  "sdk-react:typecheck",
+  "sdk-solid:build", "sdk-solid:build-release", "sdk-solid:lint", "sdk-solid:test",
+  "sdk-solid:typecheck",
+  "sdk-svelte:build", "sdk-svelte:build-release", "sdk-svelte:lint", "sdk-svelte:test",
+  "sdk-svelte:typecheck",
+  "sdk-vue:build", "sdk-vue:build-release", "sdk-vue:lint", "sdk-vue:test",
+  "sdk-vue:typecheck",
+  "server:build",
+  "storybook:build", "storybook:lint", "storybook:test", "storybook:typecheck",
+  "testing:test-integration",
+];
+// Synthetic slice, NOT a class capture: isolates the `:test-browser`-alone
+// trigger for the browsers gate, which no real class produces in isolation.
+const TEST_BROWSER_SLICE = ["components:test-browser", "components:lint"];
 
 function allTrue(gates) {
   return Object.values(gates).every(Boolean);
 }
 function allFalse(gates) {
   return Object.values(gates).every((v) => v === false);
+}
+function journeys(gates) {
+  return [gates.journey_fresh_app, gates.journey_passkey, gates.journey_testkit];
 }
 
 test("mode: changeset/version files only is version-only", () => {
@@ -40,8 +106,13 @@ test("mode: changeset/version files only is version-only", () => {
 });
 
 test("version-only mode turns every gate off", () => {
-  const { gates } = resolveGates({ mode: "version-only", files: [".changeset/x.md"], targets: [] });
+  const { gates, matrix } = resolveGates({
+    mode: "version-only",
+    files: [".changeset/x.md"],
+    targets: [],
+  });
   assert.ok(allFalse(gates));
+  assert.equal(matrix, "full");
 });
 
 test("docs-only change gates everything off", () => {
@@ -54,58 +125,100 @@ test("docs-only change gates everything off", () => {
   assert.ok(allFalse(gates));
 });
 
-test("go change runs go suites, snapshot, journeys (via snapshot), and both suites", () => {
-  const { gates } = resolveGates({ mode: "full", files: ["internal/a.go"], targets: GO_CLASS });
-  assert.deepEqual(gates, {
-    go_tests: true,
-    snapshot: true,
-    journeys: true,
-    suites_testing_demo: true,
-    suites_console: true,
-    browsers: true,
-  });
+test("go change runs everything, but the journey matrix collapses to one framework", () => {
+  const { gates, matrix } = resolveGates({ mode: "full", files: ["internal/a.go"], targets: GO_CLASS });
+  assert.ok(allTrue(gates));
+  assert.equal(matrix, "single");
 });
 
-test("journey-only change runs journeys and the snapshot that feeds them, nothing else", () => {
-  const { gates } = resolveGates({
-    mode: "full",
-    files: ["apps/cli-journey-e2e/src/user-journey.spec.ts"],
-    targets: JOURNEY_CLASS,
-  });
-  assert.deepEqual(gates, {
-    go_tests: false,
-    snapshot: true,
-    journeys: true,
-    suites_testing_demo: false,
-    suites_console: false,
-    browsers: true,
-  });
-});
-
-test("console change runs suites and snapshot-coupled journeys but no go suites", () => {
+test("console change runs the suites but no journeys and no snapshot", () => {
   const { gates } = resolveGates({
     mode: "full",
     files: ["apps/console/src/api/zitadel.ts"],
     targets: CONSOLE_CLASS,
   });
+  assert.deepEqual(journeys(gates), [false, false, false]);
+  assert.equal(gates.snapshot, false);
   assert.equal(gates.go_tests, false);
   assert.equal(gates.suites_console, true);
   assert.equal(gates.suites_testing_demo, true);
-  assert.equal(gates.journeys, true);
-  assert.equal(gates.snapshot, true);
+  assert.equal(gates.browsers, true);
 });
 
-test(":test-browser affectedness alone keeps the browser install", () => {
-  const { gates } = resolveGates({
+test("single-SDK change runs the fresh-app matrix but not the next-scaffold journeys", () => {
+  const { gates, matrix } = resolveGates({
+    mode: "full",
+    files: ["packages/sdk-vue/src/index.ts"],
+    targets: SDK_VUE_CLASS,
+  });
+  assert.deepEqual(journeys(gates), [true, false, false]);
+  assert.equal(gates.snapshot, true);
+  assert.equal(matrix, "full");
+  assert.equal(gates.suites_testing_demo, false);
+  assert.equal(gates.go_tests, false);
+});
+
+test("login-ui change runs all journeys on a single framework", () => {
+  const { gates, matrix } = resolveGates({
+    mode: "full",
+    files: ["apps/login-ui/src/main.ts"],
+    targets: LOGIN_UI_CLASS,
+  });
+  assert.deepEqual(journeys(gates), [true, true, true]);
+  assert.equal(matrix, "single");
+  assert.equal(gates.go_tests, false);
+  assert.equal(gates.suites_console, true);
+});
+
+test("testing-kit change runs all journeys with the full matrix", () => {
+  const { gates, matrix } = resolveGates({
+    mode: "full",
+    files: ["packages/testing/src/index.ts"],
+    targets: TESTING_KIT_CLASS,
+  });
+  assert.deepEqual(journeys(gates), [true, true, true]);
+  assert.equal(gates.snapshot, true);
+  assert.equal(matrix, "full");
+});
+
+test("journey-project change runs all journeys, full matrix, and the snapshot that feeds them", () => {
+  const { gates, matrix } = resolveGates({
+    mode: "full",
+    files: ["apps/cli-journey-e2e/src/user-journey.spec.ts"],
+    targets: JOURNEY_CLASS,
+  });
+  assert.deepEqual(journeys(gates), [true, true, true]);
+  assert.equal(gates.snapshot, true);
+  assert.equal(matrix, "full");
+  assert.equal(gates.go_tests, false);
+});
+
+test("components change runs every journey and suite with the full matrix, but no Go suites", () => {
+  const { gates, matrix } = resolveGates({
     mode: "full",
     files: ["packages/components/src/atoms/index.ts"],
-    targets: COMPONENTS_SLICE,
+    targets: COMPONENTS_CLASS,
   });
+  assert.deepEqual(journeys(gates), [true, true, true]);
+  assert.equal(gates.snapshot, true);
+  assert.equal(gates.suites_testing_demo, true);
+  assert.equal(gates.suites_console, true);
   assert.equal(gates.browsers, true);
-  assert.equal(gates.journeys, false);
+  assert.equal(gates.go_tests, false);
+  assert.equal(matrix, "full");
 });
 
-test("unclaimed files force a full run", () => {
+test(":test-browser affectedness alone keeps the browser install without journeys", () => {
+  const { gates } = resolveGates({
+    mode: "full",
+    files: ["packages/components/src/atoms/zl-alert.spec.ts"],
+    targets: TEST_BROWSER_SLICE,
+  });
+  assert.equal(gates.browsers, true);
+  assert.deepEqual(journeys(gates), [false, false, false]);
+});
+
+test("unclaimed files force a full run with the full matrix", () => {
   for (const file of [
     ".github/workflows/ci.yml",
     "scripts/ci-mode.mjs",
@@ -116,8 +229,9 @@ test("unclaimed files force a full run", () => {
     ".nvmrc",
   ]) {
     assert.ok(forceFullReason([file]), `${file} should force full`);
-    const { gates } = resolveGates({ mode: "full", files: [file], targets: DOCS_CLASS });
+    const { gates, matrix } = resolveGates({ mode: "full", files: [file], targets: DOCS_CLASS });
     assert.ok(allTrue(gates), `${file} should gate everything on`);
+    assert.equal(matrix, "full");
   }
 });
 
@@ -146,8 +260,6 @@ test("an empty affected set skips only for allowlisted-inert files", () => {
 });
 
 test("an empty affected set for unallowlisted files fails open (tsconfig.base.json repro)", () => {
-  // moon's input graph does not claim these, yet they reach typechecks and
-  // release archives — unclaimed is not inert.
   for (const file of ["tsconfig.base.json", "LICENSE", "README.md", "VISION.md"]) {
     const { gates } = resolveGates({ mode: "full", files: [file], targets: [] });
     assert.ok(allTrue(gates), `${file} must force a full run on an empty set`);
@@ -155,8 +267,6 @@ test("an empty affected set for unallowlisted files fails open (tsconfig.base.js
 });
 
 test("known repo-wide inputs force full even when the rest of the diff is claimed", () => {
-  // Mixed diff: an ADR (claimed, selects check-adrs) plus tsconfig.base.json.
-  // The non-empty set must not mask the unclaimed dangerous file.
   const { gates, reason } = resolveGates({
     mode: "full",
     files: ["docs/adrs/001-server-cli-cobra-viper.md", "tsconfig.base.json"],
@@ -188,3 +298,4 @@ test("queryAffectedTargets fails open on schema drift, garbage output, and nonze
   assert.equal(queryAffectedTargets("HEAD", fakeSpawn({ stdout: "not json" })), null);
   assert.equal(queryAffectedTargets("HEAD", fakeSpawn({ status: 1, stderr: "boom" })), null);
 });
+
