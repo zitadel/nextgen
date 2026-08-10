@@ -64,6 +64,7 @@ the dialect generator is the only mint path, not that create always overwrites.
 | user TOTP row | `utotp` |
 | user recovery codes row | `urc` |
 | user passkey row | `upk` |
+| authz assignment | `asgn` |
 
 Existing style mix (`brnd` / `flowdef` / `enc_key` / `upw`) stays until a
 dedicated rename PR. Do not add more without the selection rules below.
