@@ -44,7 +44,7 @@ func userAgentFromRequest(r *http.Request) *domain.UserAgent {
 // clientIP is the first valid hop of X-Forwarded-For when set (the proxy is
 // trusted, as for X-Forwarded-Host), else RemoteAddr without its port.
 //
-// TODO: Expand logic with configurable list of additional headers to obtain 
+// TODO: Expand logic with configurable list of additional headers to obtain
 // the client IP from, for example: CF-Connecting-IP (Cloudflare).
 // Relates to: https://github.com/zitadel/nextgen/issues/802
 func clientIP(r *http.Request) string {
