@@ -45,6 +45,7 @@ describe("Next setup integration", () => {
         install: { status: string; package_manager: string; command: string };
         files_written: string[];
         files: Array<{ path: string; kind: string; action: string }>;
+        design: string | null;
         next_actions: string[];
         next_commands: string[];
       };
@@ -66,6 +67,11 @@ describe("Next setup integration", () => {
     expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/schemas/");
     expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/flows/");
     expect(setupJson.data.next_actions.join("\n")).toContain("See your changes before they go live");
+    // No --design: the built-in template stays untouched, and the envelope
+    // still points at the branding customization path.
+    expect(setupJson.data.design).toBeNull();
+    expect(setupJson.data.next_actions.join("\n")).toContain("branding eject");
+    expect(setupJson.data.files_written).not.toContain(".zitadel/branding/branding.json");
     expect(setupJson.data.files_written).toContain(".zitadel/schemas/default-human-user.json");
     expect(setupJson.data.files_written).toContain(".zitadel/flows/default-login.json");
     // files_written carries deduplicated file paths only: no directories,
@@ -585,6 +591,73 @@ describe("Next setup integration", () => {
     expect(fix.exitCode).toBe(0);
     const restored = await readFile(join(cwd, "app/login/page.tsx"), "utf8");
     expect(restored).toContain("element.locales = businessLocales");
+  });
+
+  it("ejects and publishes the selected design when --design is passed", async () => {
+    // The shared platform mock has no branding routes yet, so this test
+    // carries its own: capture the publish, echo the canonical envelope.
+    const brandingBodies: Array<Record<string, unknown>> = [];
+    server.use(
+      http.post("*/branding", async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        brandingBodies.push(body);
+        return HttpResponse.json(
+          { id: "brandrev_setup_1", created_at: "2026-08-04T00:00:00.000Z", branding: body },
+          { status: 201 },
+        );
+      }),
+      http.get("*/branding/:id", ({ params }) =>
+        HttpResponse.json({
+          id: params.id,
+          created_at: "2026-08-04T00:00:00.000Z",
+          branding: brandingBodies.at(-1) ?? {},
+        }),
+      ),
+    );
+
+    const cwd = await createNextProject();
+    const setup = await cli([
+      "setup",
+      "--cwd",
+      cwd,
+      "--design",
+      "split",
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
+    expect(setup.exitCode).toBe(0);
+    const setupJson = parseJson(setup.stdout) as {
+      data: { design: string | null; files_written: string[]; next_actions: string[] };
+    };
+
+    // The envelope reports the choice so agents can verify what setup
+    // published without diffing the repo.
+    expect(setupJson.data.design).toBe("split");
+    expect(setupJson.data.files_written).toContain(".zitadel/branding/branding.json");
+    expect(setupJson.data.files_written).toContain(".zitadel/branding/login.liquid");
+    expect(setupJson.data.next_actions.join("\n")).toContain(".zitadel/branding/login.liquid");
+
+    // The wire body inlines the template under `liquid_template`; the local
+    // descriptor keeps the file reference — the dialect's two carriers.
+    expect(brandingBodies).toHaveLength(1);
+    expect(brandingBodies[0]).toMatchObject({ layout: "split" });
+    expect(typeof brandingBodies[0]?.liquid_template).toBe("string");
+    expect(brandingBodies[0]).not.toHaveProperty("liquid_template_file");
+    const descriptor = JSON.parse(
+      await readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8"),
+    ) as Record<string, unknown>;
+    expect(descriptor.liquid_template_file).toBe("./login.liquid");
+
+    // Sync state pins the published revision, so the first plan is empty —
+    // the ejected design converges exactly like schemas and flows.
+    const state = JSON.parse(await readFile(join(cwd, ".zitadel/state.json"), "utf8")) as {
+      resources: Record<string, { id?: string }>;
+    };
+    expect(state.resources[".zitadel/branding/branding.json"]?.id).toBe("brandrev_setup_1");
+    const plan = await cli(["plan", "--cwd", cwd, "--json"]);
+    expect(plan.exitCode).toBe(0);
+    expect((parseJson(plan.stdout) as { data: { total: number } }).data.total).toBe(0);
   });
 
   it("catches server-side flow invariants at plan time, before any mutation", async () => {

@@ -56,6 +56,10 @@ Each invocation prints one JSON object:
   see what setup created versus merged into (your `package.json` is an
   `update`). `data.files_written` remains the flat list — deduplicated file
   paths only, covering both scaffolded and `.zitadel/` resource files.
+- `setup` also emits `data.design`: the starter login design it ejected and
+  published as branding revision 1, or `null` when the built-in template was
+  kept (no `.zitadel/branding/` files exist in that case). Use it to verify
+  the requested `--design` took effect without diffing the repo.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime with
   `npx @zitadel/cli@alpha start`, then retry with `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 from the target server. With the platform's
@@ -104,7 +108,12 @@ the CLI's help layer, not the envelope.
   email only; `consumer` adds given and family name; `business` also adds a
   `companyName` attribute and overlays work-email copy on the generated auth
   pages via the SDK's `businessLocales`; asked before `--preset` and recorded
-  in `zitadel.json`), `--skip-install`.
+  in `zitadel.json`), `--design centered|split|split-right|hero|minimal`
+  (starter login design: ejects the design's template into
+  `.zitadel/branding/` and publishes it as branding revision 1 during setup;
+  the interactive wizard asks this as its final question with the built-in
+  template preselected — omit the flag in non-interactive runs to keep the
+  built-in template and no branding files), `--skip-install`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
