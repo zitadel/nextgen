@@ -84,6 +84,11 @@ tasks:
       - "@group(serverInputs)"
       - "/scripts/go-generate.mjs"
       - "/scripts/dev-process.mjs"
+      # Imported at module scope, not only under --prune: GENERATED_GLOBS is
+      # what this task's git comparison looks at, so a glob edit that does not
+      # invalidate here would cache-hit and pass against the old pathspecs.
+      - "/scripts/clean-generated.mjs"
+      - "/scripts/generated-outputs.mjs"
     options:
       runFromWorkspaceRoot: true
 

@@ -169,7 +169,7 @@ func main() {
 		bootstrapGeneratedClient(moduleRoot, apiDir, func() {
 			allErrorFuncs := slices.Sorted(maps.Keys(errorMapping))
 			writeErrorResponses(endpoints, tmpl, errorMapping, openapiBasePath,
-				func(endpointOperation) ([]string, bool) { return allErrorFuncs, true })
+				func(endpointOperation) []string { return allErrorFuncs })
 		})
 	}
 
@@ -199,7 +199,7 @@ func main() {
 	fmt.Printf("📋 Reflected %d operation-to-service mappings from API handlers\n", len(serviceMethodByOperation))
 
 	// Step 5: Generate error response files for each endpoint
-	writeErrorResponses(endpoints, tmpl, errorMapping, openapiBasePath, func(endpoint endpointOperation) ([]string, bool) {
+	writeErrorResponses(endpoints, tmpl, errorMapping, openapiBasePath, func(endpoint endpointOperation) []string {
 		// The handler method is the real entry point: it raises errors of its
 		// own — the authorization guard answers a foreign project with the
 		// resource's not-found before any service is reached — and the walk
@@ -217,10 +217,6 @@ func main() {
 		// Operations whose handler could not be analyzed still fall back to the
 		// union of the services it was reflected as calling.
 		serviceMethods, hasServices := serviceMethodByOperation[endpoint.operationID]
-		if !hasHandler && !hasServices {
-			fmt.Printf("⚠️  No reflected service mapping for %s (%s), skipping\n", endpoint.operationID, endpoint.yamlPath)
-			return nil, false
-		}
 
 		var errFuncs []string
 		if hasHandler {
@@ -234,28 +230,47 @@ func main() {
 			}
 			errFuncs = append(errFuncs, method.errorFuncs...)
 		}
-		return errFuncs, true
+
+		// Nothing to walk — an operation specced before its handler exists, or
+		// one whose handler is not named after it. It still gets a file, holding
+		// what the boundary raises with no handler behind it.
+		//
+		// Writing nothing here would make the output depend on the starting
+		// state: on a pruned tree the operation would keep the bootstrap
+		// placeholder's every-code superset, on a populated one whatever was
+		// committed last. Deleting the file instead is not available either —
+		// most operations $ref it by name from methods.yaml, so a missing file
+		// is an unresolvable spec rather than a smaller one.
+		if !hasHandler && !hasServices {
+			fmt.Printf("⚠️  No handler or reflected service mapping for %s (%s); writing boundary errors only\n",
+				endpoint.operationID, endpoint.yamlPath)
+			errFuncs = append(errFuncs, boundaryErrors...)
+		}
+
+		return errFuncs
 	})
 
 	fmt.Println("\n💡 Generated operation-specific error response files")
 }
 
 // writeErrorResponses renders one <operationID>-error-response.yaml per
-// operation. errorFuncsFor supplies the operation's error constructors, or
-// false to leave the operation's file alone; the transport and security codes
-// every operation can raise are added here rather than by each caller.
+// operation, for every operation — never a subset. A pass that wrote files for
+// some operations and left others as it found them would produce output that
+// depends on what was already on disk, which is exactly the property
+// server:check-generate-pruned exists to deny.
+//
+// errorFuncsFor supplies the operation's error constructors; the transport and
+// security codes every operation can raise are added here rather than by each
+// caller.
 func writeErrorResponses(
 	endpoints []endpointOperation,
 	tmpl *template.Template,
 	errorMapping map[string]errorInfo,
 	openapiBasePath string,
-	errorFuncsFor func(endpointOperation) ([]string, bool),
+	errorFuncsFor func(endpointOperation) []string,
 ) {
 	for _, endpoint := range endpoints {
-		operationErrFuncs, ok := errorFuncsFor(endpoint)
-		if !ok {
-			continue
-		}
+		operationErrFuncs := errorFuncsFor(endpoint)
 
 		// Cloned: the bootstrap pass hands the same slice to every operation.
 		errFuncs := slices.Clone(operationErrFuncs)
@@ -280,9 +295,15 @@ func writeErrorResponses(
 			}
 		}
 
+		// Unreachable while transportErrors maps: every operation gets at least
+		// that. If it ever does not, the mapping is broken, and skipping the
+		// write would leave a stale file behind — the same starting-state
+		// dependence the loop is built to avoid. Fail instead.
 		if len(errorCodes) == 0 {
-			fmt.Printf("⚠️  No errors found for %s\n", endpoint.operationID)
-			continue
+			_, _ = fmt.Fprintf(os.Stderr,
+				"❌ No known error codes for %s (%s): none of %v resolve against the domain package.\n",
+				endpoint.operationID, endpoint.yamlPath, errFuncs)
+			os.Exit(1)
 		}
 
 		// Calculate relative path from endpoint directory to components/schemas/errors/

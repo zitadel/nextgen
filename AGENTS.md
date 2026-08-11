@@ -295,7 +295,9 @@ call `idgen` outside dialect packages. Full minting contract:
 - Do not hand-edit `api/generated/**`; update `api/openapi/**` and run
   `moon run server:generate`. CI enforces committed generated output through
   `server:check-generate` (via `server:test`). Bare `go generate ./...` produces
-  the same output, but runs every directive serially, roughly 4x slower. Both go
+  the same output, but runs every directive serially — slower, though not by the
+  multiple the parallelism suggests, because `./api` is itself a serial chain and
+  the larger half of the run (`scripts/go-generate.mjs` carries the numbers). Both go
   through the same `//go:generate` directives; the moon task just schedules them
   (`scripts/go-generate.mjs`). Either path works over a pruned tree. The one
   thing that makes that non-trivial lives in `api/cmd/gen_openapi_errors`, which
@@ -327,8 +329,9 @@ call `idgen` outside dialect packages. Full minting contract:
   you change where a generator writes, drop an interface from a mockgen
   directive, or delete a type that had an `enumer` directive.
   `moon run server:clean-generated -- --dry-run` lists what would go without
-  touching anything. Generation restores everything the clean removed, so
-  cleaning is safe at any time.
+  touching anything. Generation restores everything that is still generated —
+  which is the point: what stays missing was the orphan — so cleaning is safe at
+  any time.
 - Do not hand-edit generated package output under `dist/`.
 - Do not hand-edit `apps/console/src/routeTree.gen.ts`; update route files and
   let the TanStack Router plugin regenerate it.

@@ -7,8 +7,8 @@
  * generated `*_enumer.go`, so a directory-level pattern here would be a
  * destructive mistake waiting to happen.
  */
-import { closeSync, globSync, openSync, readSync } from "node:fs";
-import { join } from "node:path";
+import { closeSync, existsSync, openSync, readdirSync, readSync } from "node:fs";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -49,12 +49,51 @@ export function hasGeneratedMarker(absPath) {
 }
 
 /**
+ * Matches a glob the way git's `:(glob)` pathspecs do, which is what
+ * check-go-generate compares the worktree with — `**` spans directories, `*`
+ * stays inside one segment, and a leading dot is not special.
+ *
+ * That last part is why this is not `fs.globSync`: Node's glob silently skips
+ * dot-directories, and `api/openapi/endpoints/.well-known/` holds real
+ * generated output. Anything orphaned under one was invisible to both the
+ * prune and the check that depends on it.
+ */
+function globToRegExp(pattern) {
+  // Split on `**` first: the segments around it are escaped and expanded on
+  // their own, so a `*` this function emits is never mistaken for one the
+  // pattern wrote.
+  const source = pattern
+    .split("/**/")
+    .map((segment) => segment.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*"))
+    .join("/(?:.*/)?");
+  return new RegExp(`^${source}$`);
+}
+
+/** Every file under a repo-relative directory, itself repo-relative. */
+function filesUnder(dir) {
+  const absolute = join(ROOT, dir);
+  // api/generated is gone on a pruned tree, and internal/** always exists.
+  if (!existsSync(absolute)) {
+    return [];
+  }
+  return readdirSync(absolute, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => relative(ROOT, join(entry.parentPath, entry.name)));
+}
+
+/**
  * Splits everything the globs match into files carrying the marker and files
  * that do not. Callers decide what to do with the strays; nothing here
  * deletes anything.
  */
 export function collectGeneratedFiles() {
-  const matched = GENERATED_GLOBS.flatMap((pattern) => globSync(pattern, { cwd: ROOT }));
+  const matched = GENERATED_GLOBS.flatMap((pattern) => {
+    // Every glob is rooted at a literal directory before its first `**`, so the
+    // walk stays inside the trees that hold generated output.
+    const root = pattern.slice(0, pattern.indexOf("/**/"));
+    const matches = globToRegExp(pattern);
+    return filesUnder(root).filter((rel) => matches.test(rel));
+  });
   const unique = [...new Set(matched)].sort();
 
   const generated = [];
