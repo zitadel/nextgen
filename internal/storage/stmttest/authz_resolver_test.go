@@ -39,7 +39,7 @@ func TestAuthzResolverStatements_Smoke(t *testing.T) {
 			require.NoError(t, err)
 			assert.True(t, ok)
 
-			allowed, err := d.stmts.CheckAuthz(t.Context(), domain.AuthzCheckParams{
+			allowed, _, err := d.stmts.CheckAuthz(t.Context(), domain.AuthzCheckParams{
 				CatalogID:     domain.SystemCatalogID,
 				ProjectID:     projectID,
 				PrincipalType: domain.AuthzPrincipalTypeUser,
@@ -50,7 +50,7 @@ func TestAuthzResolverStatements_Smoke(t *testing.T) {
 			require.NoError(t, err)
 			assert.True(t, allowed)
 
-			denied, err := d.stmts.CheckAuthz(t.Context(), domain.AuthzCheckParams{
+			denied, _, err := d.stmts.CheckAuthz(t.Context(), domain.AuthzCheckParams{
 				CatalogID:     domain.SystemCatalogID,
 				ProjectID:     projectID,
 				PrincipalType: domain.AuthzPrincipalTypeUser,
@@ -62,7 +62,7 @@ func TestAuthzResolverStatements_Smoke(t *testing.T) {
 			assert.False(t, denied)
 
 			require.NoError(t, d.stmts.RevokeAuthzAssignment(t.Context(), projectID, a.ID))
-			afterRevoke, err := d.stmts.CheckAuthz(t.Context(), domain.AuthzCheckParams{
+			afterRevoke, _, err := d.stmts.CheckAuthz(t.Context(), domain.AuthzCheckParams{
 				CatalogID:     domain.SystemCatalogID,
 				ProjectID:     projectID,
 				PrincipalType: domain.AuthzPrincipalTypeUser,
@@ -80,7 +80,7 @@ func TestAuthzResolverStatements_Smoke(t *testing.T) {
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeTeam, teamID, "project", "viewer", domain.NewProjectAssignmentScope())))
 
-			allowed, err := d.stmts.CheckAuthz(t.Context(), domain.AuthzCheckParams{
+			allowed, _, err := d.stmts.CheckAuthz(t.Context(), domain.AuthzCheckParams{
 				CatalogID:     domain.SystemCatalogID,
 				ProjectID:     projectID,
 				PrincipalType: domain.AuthzPrincipalTypeUser,
@@ -104,7 +104,7 @@ func TestAuthzResolverStatements_Smoke(t *testing.T) {
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeTeam, ttuTeam, "project", "team", domain.NewProjectAssignmentScope())))
 
-			allowed, err := d.stmts.CheckAuthz(t.Context(), domain.AuthzCheckParams{
+			allowed, _, err := d.stmts.CheckAuthz(t.Context(), domain.AuthzCheckParams{
 				CatalogID:     domain.SystemCatalogID,
 				ProjectID:     projectID,
 				PrincipalType: domain.AuthzPrincipalTypeUser,
@@ -123,7 +123,7 @@ func TestAuthzResolverStatements_Smoke(t *testing.T) {
 			a.ExpiresAt = &past
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), a))
 
-			allowed, err := d.stmts.CheckAuthz(t.Context(), domain.AuthzCheckParams{
+			allowed, _, err := d.stmts.CheckAuthz(t.Context(), domain.AuthzCheckParams{
 				CatalogID:     domain.SystemCatalogID,
 				ProjectID:     projectID,
 				PrincipalType: domain.AuthzPrincipalTypeUser,
@@ -148,26 +148,30 @@ func TestAuthzResolverStatements_Smoke(t *testing.T) {
 				newTestAssignment(projectID, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeUser, listUser, "project", "viewer", domain.NewProjectAssignmentScope())))
 
 			ids, err := d.stmts.ListAuthzObjectIDs(t.Context(), domain.AuthzListObjectsParams{
-				CatalogID:     domain.SystemCatalogID,
-				ProjectID:     projectID,
-				PrincipalType: domain.AuthzPrincipalTypeUser,
-				PrincipalID:   listUser,
-				ResourceKind:  domain.ResourceKindUser,
-				ObjectType:    "project",
-				Relation:      "viewer",
+				AuthzCheckParams: domain.AuthzCheckParams{
+					CatalogID:     domain.SystemCatalogID,
+					ProjectID:     projectID,
+					PrincipalType: domain.AuthzPrincipalTypeUser,
+					PrincipalID:   listUser,
+					ObjectType:    "project",
+					Relation:      "viewer",
+				},
+				ResourceKind: domain.ResourceKindUser,
 			})
 			require.NoError(t, err)
 			assert.ElementsMatch(t, []string{u1, u2}, ids)
 
 			stranger := "user_stranger_" + uniqueSuffix(t)
 			empty, err := d.stmts.ListAuthzObjectIDs(t.Context(), domain.AuthzListObjectsParams{
-				CatalogID:     domain.SystemCatalogID,
-				ProjectID:     projectID,
-				PrincipalType: domain.AuthzPrincipalTypeUser,
-				PrincipalID:   stranger,
-				ResourceKind:  domain.ResourceKindUser,
-				ObjectType:    "project",
-				Relation:      "viewer",
+				AuthzCheckParams: domain.AuthzCheckParams{
+					CatalogID:     domain.SystemCatalogID,
+					ProjectID:     projectID,
+					PrincipalType: domain.AuthzPrincipalTypeUser,
+					PrincipalID:   stranger,
+					ObjectType:    "project",
+					Relation:      "viewer",
+				},
+				ResourceKind: domain.ResourceKindUser,
 			})
 			require.NoError(t, err)
 			assert.Empty(t, empty)
@@ -191,18 +195,20 @@ func TestAuthzResolverStatements_Smoke(t *testing.T) {
 				ObjectType:    "project",
 				Relation:      "viewer",
 			}
-			allowed, err := d.stmts.CheckAuthz(t.Context(), params)
+			allowed, _, err := d.stmts.CheckAuthz(t.Context(), params)
 			require.NoError(t, err)
 			require.True(t, allowed)
 
 			ids, err := d.stmts.ListAuthzObjectIDs(t.Context(), domain.AuthzListObjectsParams{
-				CatalogID:     domain.SystemCatalogID,
-				ProjectID:     projectID,
-				PrincipalType: domain.AuthzPrincipalTypeUser,
-				PrincipalID:   ttuUser,
-				ResourceKind:  domain.ResourceKindUser,
-				ObjectType:    "project",
-				Relation:      "viewer",
+				AuthzCheckParams: domain.AuthzCheckParams{
+					CatalogID:     domain.SystemCatalogID,
+					ProjectID:     projectID,
+					PrincipalType: domain.AuthzPrincipalTypeUser,
+					PrincipalID:   ttuUser,
+					ObjectType:    "project",
+					Relation:      "viewer",
+				},
+				ResourceKind: domain.ResourceKindUser,
 			})
 			require.NoError(t, err)
 			assert.Contains(t, ids, resID)

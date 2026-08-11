@@ -56,12 +56,8 @@ func (s authzResolverStatements) HasAuthzProjectFoothold(ctx context.Context, pr
 }
 
 // CheckAuthz implements [service.AuthzResolverStatements].
-func (s authzResolverStatements) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, error) {
-	home := params.PrincipalHomeProjectID
-	if home == "" {
-		home = params.ProjectID
-	}
-	var ok bool
+func (s authzResolverStatements) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, bool, error) {
+	var allowed, foothold bool
 	err := s.client.QueryRow(ctx, checkAuthzStmt,
 		params.CatalogID,
 		params.ProjectID,
@@ -69,20 +65,16 @@ func (s authzResolverStatements) CheckAuthz(ctx context.Context, params domain.A
 		params.PrincipalID,
 		params.ObjectType,
 		params.Relation,
-		home,
-	).Scan(&ok)
+		params.HomeProjectID(),
+	).Scan(&allowed, &foothold)
 	if err != nil {
-		return false, wrapError(err)
+		return false, false, wrapError(err)
 	}
-	return ok, nil
+	return allowed, foothold, nil
 }
 
 // ListAuthzObjectIDs implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error) {
-	home := params.PrincipalHomeProjectID
-	if home == "" {
-		home = params.ProjectID
-	}
 	rows, err := s.client.Query(ctx, listAuthzObjectIDsStmt,
 		params.CatalogID,
 		params.ProjectID,
@@ -90,7 +82,7 @@ func (s authzResolverStatements) ListAuthzObjectIDs(ctx context.Context, params 
 		params.PrincipalID,
 		params.ObjectType,
 		params.Relation,
-		home,
+		params.HomeProjectID(),
 		params.ResourceKind.String(),
 	)
 	if err != nil {

@@ -407,12 +407,13 @@ type AuthzCatalogStatements interface {
 // Use cases:
 //   - ActiveSystemCatalogID: active system catalog (kind=system, owner=system).
 //   - HasAuthzProjectFoothold: any active assignment or membership edge in project.
-//   - CheckAuthz: indexed semi-join (assignments, closure, membership, TTU).
-//   - ListAuthzObjectIDs: authorized resource_scope_index ids for one kind.
+//   - CheckAuthz: allowed + foothold in one round-trip (assignments, closure, membership, TTU).
+//   - ListAuthzObjectIDs: L4/oracle helper materializing authorized RSI ids for one kind.
+//     List *endpoints* compose an injectable SQL predicate (ADR 033); that lands with HTTP wiring.
 type AuthzResolverStatements interface {
 	Statements
 	ActiveSystemCatalogID(ctx context.Context) (string, error)
 	HasAuthzProjectFoothold(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
-	CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, error)
+	CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (allowed bool, foothold bool, err error)
 	ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error)
 }

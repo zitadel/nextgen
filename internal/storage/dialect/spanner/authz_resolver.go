@@ -65,12 +65,9 @@ func (s authzResolverStatements) HasAuthzProjectFoothold(ctx context.Context, pr
 }
 
 // CheckAuthz implements [service.AuthzResolverStatements].
-func (s authzResolverStatements) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, error) {
-	home := params.PrincipalHomeProjectID
-	if home == "" {
-		home = params.ProjectID
-	}
-	var ok bool
+func (s authzResolverStatements) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, bool, error) {
+	type outcome struct{ allowed, foothold bool }
+	var out outcome
 	err := s.db.Query(ctx, buildStatement(checkAuthzStmt,
 		params.CatalogID,
 		params.ProjectID,
@@ -78,27 +75,23 @@ func (s authzResolverStatements) CheckAuthz(ctx context.Context, params domain.A
 		params.PrincipalID,
 		params.ObjectType,
 		params.Relation,
-		home,
+		params.HomeProjectID(),
 	).statement(), func(iter *spanner.RowIterator) error {
 		var qErr error
-		ok, qErr = collectOneRow(iter, func(row *spanner.Row) (bool, error) {
-			var found bool
-			return found, row.Columns(&found)
+		out, qErr = collectOneRow(iter, func(row *spanner.Row) (outcome, error) {
+			var o outcome
+			return o, row.Columns(&o.allowed, &o.foothold)
 		})
 		return qErr
 	})
 	if err != nil {
-		return false, wrapError(err)
+		return false, false, wrapError(err)
 	}
-	return ok, nil
+	return out.allowed, out.foothold, nil
 }
 
 // ListAuthzObjectIDs implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error) {
-	home := params.PrincipalHomeProjectID
-	if home == "" {
-		home = params.ProjectID
-	}
 	var ids []string
 	err := s.db.Query(ctx, buildStatement(listAuthzObjectIDsStmt,
 		params.CatalogID,
@@ -107,7 +100,7 @@ func (s authzResolverStatements) ListAuthzObjectIDs(ctx context.Context, params 
 		params.PrincipalID,
 		params.ObjectType,
 		params.Relation,
-		home,
+		params.HomeProjectID(),
 		params.ResourceKind.String(),
 	).statement(), func(iter *spanner.RowIterator) error {
 		var qErr error

@@ -62,10 +62,12 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
   `dialect/authz.ExpressionEdgeKind` (not on the compiler IR).
 - **Grants API (later):** `CreateAuthzAssignment` / `RevokeAuthzAssignment` /
   list-by-principal — not dual-write from CreateUser.
-- **Resolver (#423 library):** `AuthzResolverStatements` (`CheckAuthz`,
-  `ListAuthzObjectIDs`, foothold, active system catalog) plus
+- **Resolver (#423 library):** `AuthzResolverStatements` (`CheckAuthz` returns
+  allowed+foothold in one round-trip, `ListAuthzObjectIDs` as an L4/oracle
+  materialization helper, foothold smoke helper, active system catalog) plus
   `internal/authz/resolver` orchestration (`sk_team_` allowlist, decision
-  kinds). HTTP pipeline wiring (after `GetResourceScope`) remains later.
+  kinds). HTTP pipeline wiring (after `GetResourceScope`) and ADR 033 list
+  **predicate injection** into resource queries remain later.
 
 ## Locked decisions
 

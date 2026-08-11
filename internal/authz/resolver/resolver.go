@@ -18,14 +18,10 @@ type Request struct {
 	Relation      string
 }
 
-// ListRequest is the public ListObjects input.
+// ListRequest is the public ListObjects input (L4 / oracle helper).
 type ListRequest struct {
-	PrincipalType domain.AuthzPrincipalType
-	PrincipalID   string
-	ProjectID     string
-	ResourceKind  domain.ResourceKind
-	ObjectType    string
-	Relation      string
+	Request
+	ResourceKind domain.ResourceKind
 }
 
 // Resolver evaluates checks with optional request-scoped memoization.
@@ -60,7 +56,7 @@ func (r *Resolver) Check(ctx context.Context, stmts service.AuthzResolverStateme
 		return DecisionUnspecified, err
 	}
 
-	allowed, err := stmts.CheckAuthz(ctx, domain.AuthzCheckParams{
+	allowed, foothold, err := stmts.CheckAuthz(ctx, domain.AuthzCheckParams{
 		CatalogID:              catalogID,
 		ProjectID:              req.ProjectID,
 		PrincipalHomeProjectID: req.ProjectID,
@@ -72,17 +68,11 @@ func (r *Resolver) Check(ctx context.Context, stmts service.AuthzResolverStateme
 	if err != nil {
 		return DecisionUnspecified, err
 	}
-	if allowed {
-		r.memo[key] = DecisionAllow
-		return DecisionAllow, nil
-	}
-
-	foothold, err := stmts.HasAuthzProjectFoothold(ctx, req.ProjectID, req.PrincipalType, req.PrincipalID)
-	if err != nil {
-		return DecisionUnspecified, err
-	}
 	d := DecisionNotFound
-	if foothold {
+	switch {
+	case allowed:
+		d = DecisionAllow
+	case foothold:
 		d = DecisionForbidden
 	}
 	r.memo[key] = d
@@ -91,8 +81,11 @@ func (r *Resolver) Check(ctx context.Context, stmts service.AuthzResolverStateme
 
 // ListObjects returns resource_scope_index ids of ResourceKind the principal may see.
 func (r *Resolver) ListObjects(ctx context.Context, stmts service.AuthzResolverStatements, req ListRequest) ([]string, error) {
-	if err := validateListRequest(req); err != nil {
+	if err := validateCheckRequest(req.Request); err != nil {
 		return nil, err
+	}
+	if req.ResourceKind == "" {
+		return nil, fmt.Errorf("resolver: resource kind is required")
 	}
 	if req.PrincipalType == domain.AuthzPrincipalTypeSKTeam &&
 		!skTeamPermissionAllowed(PermissionName(req.ObjectType, req.Relation)) {
@@ -103,14 +96,16 @@ func (r *Resolver) ListObjects(ctx context.Context, stmts service.AuthzResolverS
 		return nil, err
 	}
 	return stmts.ListAuthzObjectIDs(ctx, domain.AuthzListObjectsParams{
-		CatalogID:              catalogID,
-		ProjectID:              req.ProjectID,
-		PrincipalHomeProjectID: req.ProjectID,
-		PrincipalType:          req.PrincipalType,
-		PrincipalID:            req.PrincipalID,
-		ResourceKind:           req.ResourceKind,
-		ObjectType:             req.ObjectType,
-		Relation:               req.Relation,
+		AuthzCheckParams: domain.AuthzCheckParams{
+			CatalogID:              catalogID,
+			ProjectID:              req.ProjectID,
+			PrincipalHomeProjectID: req.ProjectID,
+			PrincipalType:          req.PrincipalType,
+			PrincipalID:            req.PrincipalID,
+			ObjectType:             req.ObjectType,
+			Relation:               req.Relation,
+		},
+		ResourceKind: req.ResourceKind,
 	})
 }
 
@@ -139,25 +134,6 @@ func validateCheckRequest(req Request) error {
 		return fmt.Errorf("resolver: principal id is required")
 	case req.ProjectID == "":
 		return fmt.Errorf("resolver: project id is required")
-	case req.ObjectType == "":
-		return fmt.Errorf("resolver: object type is required")
-	case req.Relation == "":
-		return fmt.Errorf("resolver: relation is required")
-	default:
-		return nil
-	}
-}
-
-func validateListRequest(req ListRequest) error {
-	switch {
-	case req.PrincipalType == "":
-		return fmt.Errorf("resolver: principal type is required")
-	case req.PrincipalID == "":
-		return fmt.Errorf("resolver: principal id is required")
-	case req.ProjectID == "":
-		return fmt.Errorf("resolver: project id is required")
-	case req.ResourceKind == "":
-		return fmt.Errorf("resolver: resource kind is required")
 	case req.ObjectType == "":
 		return fmt.Errorf("resolver: object type is required")
 	case req.Relation == "":

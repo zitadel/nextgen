@@ -319,15 +319,18 @@ type AuthzCheckParams struct {
 	Relation               string
 }
 
+// HomeProjectID returns PrincipalHomeProjectID, or ProjectID when unset.
+func (p AuthzCheckParams) HomeProjectID() string {
+	if p.PrincipalHomeProjectID != "" {
+		return p.PrincipalHomeProjectID
+	}
+	return p.ProjectID
+}
+
 // AuthzListObjectsParams lists resource_scope_index ids the principal may see
-// for one resource kind under a required catalog relation.
+// for one resource kind under a required catalog relation (L4 / oracle helper).
+// Endpoint wiring injects an authz predicate into the resource query (ADR 033).
 type AuthzListObjectsParams struct {
-	CatalogID              string
-	ProjectID              string
-	PrincipalHomeProjectID string
-	PrincipalType          AuthzPrincipalType
-	PrincipalID            string
-	ResourceKind           ResourceKind
-	ObjectType             string
-	Relation               string
+	AuthzCheckParams
+	ResourceKind ResourceKind
 }

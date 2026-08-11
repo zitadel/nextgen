@@ -110,12 +110,14 @@ func TestAuthzResolver_OracleAgreement(t *testing.T) {
 
 			wantList := g.OracleList(projectID, projectID, domain.AuthzPrincipalTypeUser, u, domain.ResourceKindUser, "project", "viewer")
 			gotList, err := r.ListObjects(t.Context(), d.stmts, resolver.ListRequest{
-				PrincipalType: domain.AuthzPrincipalTypeUser,
-				PrincipalID:   u,
-				ProjectID:     projectID,
-				ResourceKind:  domain.ResourceKindUser,
-				ObjectType:    "project",
-				Relation:      "viewer",
+				Request: resolver.Request{
+					PrincipalType: domain.AuthzPrincipalTypeUser,
+					PrincipalID:   u,
+					ProjectID:     projectID,
+					ObjectType:    "project",
+					Relation:      "viewer",
+				},
+				ResourceKind: domain.ResourceKindUser,
 			})
 			require.NoError(t, err)
 			assert.ElementsMatchf(t, wantList, gotList, "list user=%s", u)

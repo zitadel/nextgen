@@ -21,10 +21,12 @@ func TestSQLStyle_CheckAndListShareFullTTU(t *testing.T) {
 		list := style.ListAuthzObjectIDs()
 		require.Contains(t, check, "tuple_to_userset")
 		require.Contains(t, list, "tuple_to_userset")
+		// Check returns (allowed, foothold) in one SELECT.
+		assert.Contains(t, check, "authz_membership_edges")
+		assert.True(t, strings.Count(check, "SELECT") >= 1)
 		// List must include the general scoped-TTU branch, not only team.member membership.
 		assert.Contains(t, list, "a.scope_kind = 'team' AND a.scope_team_id = ts.principal_id")
 		assert.Contains(t, list, "a.scope_kind = 'resource' AND a.scope_resource_id = ts.principal_id")
-		assert.True(t, strings.Count(list, "tuple_to_userset") >= 1)
 	}
 }
 

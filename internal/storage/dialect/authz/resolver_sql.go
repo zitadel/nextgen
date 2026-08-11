@@ -35,10 +35,27 @@ WHERE catalog_kind = %s AND owner_id = %s AND status = %s`,
 }
 
 // HasAuthzProjectFoothold binds: 1=project_id, 2=principal_type, 3=principal_id
-// [+ Now bind if Now is a placeholder used here — foothold uses Now].
+// [+ Now bind if Now is a placeholder].
 func (s SQLStyle) HasAuthzProjectFoothold() string {
-	return fmt.Sprintf(`
-SELECT (
+	return "SELECT " + s.footholdExpr(1, 2, 3)
+}
+
+// CheckAuthz binds: 1=catalog, 2=project, 3=principal_type, 4=principal_id,
+// 5=object_type, 6=relation, 7=principal_home_project [, Now if bound].
+// Returns two columns: (allowed, foothold) in one round-trip.
+func (s SQLStyle) CheckAuthz() string {
+	return fmt.Sprintf(`SELECT (%s OR %s), %s`,
+		s.projectScopedClosureExists(),
+		s.fullTTUExists(),
+		s.footholdExpr(2, 3, 4),
+	)
+}
+
+// footholdExpr is true when the principal has an active assignment or membership
+// edge in the protected project. projectParam is also used as the membership home
+// (foothold is project-local; it does not use PrincipalHomeProjectID).
+func (s SQLStyle) footholdExpr(projectParam, typeParam, idParam int) string {
+	return fmt.Sprintf(`(
     EXISTS (
         SELECT 1
         FROM %s a
@@ -56,18 +73,9 @@ SELECT (
           AND %s = 'user'
     )
 )`,
-		s.table("authz_assignments"), s.p(1), s.Now,
-		s.principalMatch("a", 2, 3, 1),
-		s.table("authz_membership_edges"), s.p(1), s.p(3), s.p(2),
-	)
-}
-
-// CheckAuthz binds: 1=catalog, 2=project, 3=principal_type, 4=principal_id,
-// 5=object_type, 6=relation, 7=principal_home_project [, Now if bound].
-func (s SQLStyle) CheckAuthz() string {
-	return fmt.Sprintf(`SELECT (%s OR %s)`,
-		s.projectScopedClosureExists(),
-		s.fullTTUExists(),
+		s.table("authz_assignments"), s.p(projectParam), s.Now,
+		s.principalMatch("a", typeParam, idParam, projectParam),
+		s.table("authz_membership_edges"), s.p(projectParam), s.p(idParam), s.p(typeParam),
 	)
 }
 
