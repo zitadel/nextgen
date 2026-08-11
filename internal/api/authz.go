@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 
 	"github.com/zitadel/nextgen/internal/authz/resolver"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -107,7 +108,7 @@ var projectAccess = resourceAccess{
 // DecisionForbidden → permission_denied (403).
 func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
 	if h == nil || h.pool == nil {
-		return domain.ErrInternal(nil).WithMessage("authz statements not configured")
+		return domain.ErrInternal(errors.New("authz statements not configured"))
 	}
 	return requireProjectAccess(ctx, h.pool.Statements(), projectID, res, op)
 }
