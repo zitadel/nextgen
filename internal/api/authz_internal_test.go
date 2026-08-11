@@ -33,11 +33,15 @@ func (s stubAuthzStmts) HasAuthzProjectFoothold(_ context.Context, projectID str
 	return principalID == projectID, nil
 }
 
-func (s stubAuthzStmts) CheckAuthz(_ context.Context, params domain.AuthzCheckParams) (bool, error) {
-	if s.allowCheck != nil {
-		return *s.allowCheck, nil
+func (s stubAuthzStmts) CheckAuthz(_ context.Context, params domain.AuthzCheckParams) (bool, bool, error) {
+	foothold, err := s.HasAuthzProjectFoothold(context.Background(), params.ProjectID, params.PrincipalType, params.PrincipalID)
+	if err != nil {
+		return false, false, err
 	}
-	return params.PrincipalID == params.ProjectID, nil
+	if s.allowCheck != nil {
+		return *s.allowCheck, foothold, nil
+	}
+	return params.PrincipalID == params.ProjectID, foothold, nil
 }
 
 func (s stubAuthzStmts) ListAuthzObjectIDs(context.Context, domain.AuthzListObjectsParams) ([]string, error) {
