@@ -43,7 +43,8 @@ tags:
     description: |
       Project-scoped audit event list and get (ADR 049). Unified surface for
       identity, session, admin, and entity events; filter by `category` /
-      `event_type`. Clients discriminate typed `payload` fields via `event_type`.
+      `event_type`. Response items are a discriminated Event union on
+      `event_type` with typed payloads per docs/design/api/events-catalog.md.
 
 paths:
   /healthz:
@@ -126,11 +127,6 @@ paths:
     $ref: endpoints/events/by_id/methods.yaml
 
 components:
-  schemas:
-    # Documented payload oneOf (clients discriminate via Event.event_type).
-    # Wired here so named payload schemas stay part of the bundled contract.
-    EventPayload:
-      $ref: endpoints/events/event-payload.yaml
   securitySchemes:
     oauth2:
       $ref: security/oauth2.yaml

@@ -12,3 +12,8 @@ properties:
     type: string
   status:
     type: string
+    enum:
+      - pending
+      - active
+      - inactive
+      - removed

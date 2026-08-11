@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
-	"github.com/go-faster/jx"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -99,92 +99,75 @@ func (h *Handler) GetEvent(ctx context.Context, params api.GetEventParams) (api.
 	return eventToAPI(event)
 }
 
+// eventToAPI maps a domain event onto the OpenAPI Event sum type by encoding
+// the wire JSON and letting ogen's discriminator decode select the variant.
 func eventToAPI(e *domain.Event) (*api.Event, error) {
-	payload, err := rawObjectToEventPayload(e.Payload)
+	raw, err := marshalDomainEvent(e)
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to decode event payload")
+		return nil, domain.ErrInternal(err).WithMessage("failed to encode event for API")
 	}
-	out := &api.Event{
-		ID:         e.ID,
-		ProjectID:  api.ProjectID(e.ProjectID),
-		EventType:  api.EventEventType(e.EventType),
-		Category:   api.EventCategory(e.Category),
-		OccurredAt: e.OccurredAt,
-		CreatedAt:  e.CreatedAt,
-		ClientID:   e.ClientID,
-		Payload:    payload,
+	var out api.Event
+	if err := out.UnmarshalJSON(raw); err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to map event to API type")
+	}
+	return &out, nil
+}
+
+func marshalDomainEvent(e *domain.Event) ([]byte, error) {
+	m := map[string]any{
+		"id":          e.ID,
+		"project_id":  e.ProjectID,
+		"event_type":  string(e.EventType),
+		"category":    string(e.Category),
+		"occurred_at": e.OccurredAt.UTC().Format(time.RFC3339Nano),
+		"created_at":  e.CreatedAt.UTC().Format(time.RFC3339Nano),
+		"client_id":   e.ClientID,
+		"payload":     json.RawMessage(events.NormalizeJSON(e.Payload)),
 	}
 	if e.TeamID != nil {
-		out.TeamID = api.NewOptNilString(*e.TeamID)
+		m["team_id"] = *e.TeamID
 	}
 	if e.ActorID != nil {
-		out.ActorID = api.NewOptNilString(*e.ActorID)
+		m["actor_id"] = *e.ActorID
 	}
 	if e.ActorType != nil {
-		out.ActorType = api.NewOptNilEventActorType(api.EventActorType(*e.ActorType))
+		m["actor_type"] = string(*e.ActorType)
 	}
 	if e.EntityType != nil {
-		out.EntityType = api.NewOptNilString(*e.EntityType)
+		m["entity_type"] = *e.EntityType
 	}
 	if e.EntityID != nil {
-		out.EntityID = api.NewOptNilString(*e.EntityID)
+		m["entity_id"] = *e.EntityID
 	}
 	if e.TokenID != "" {
-		out.TokenID = api.NewOptString(e.TokenID)
+		m["token_id"] = e.TokenID
 	}
 	if e.DelegationType != "" {
-		out.DelegationType = api.NewOptString(e.DelegationType)
+		m["delegation_type"] = e.DelegationType
 	}
 	if e.DelegationID != "" {
-		out.DelegationID = api.NewOptString(e.DelegationID)
+		m["delegation_id"] = e.DelegationID
 	}
 	if e.Grantor != "" {
-		out.Grantor = api.NewOptString(e.Grantor)
+		m["grantor"] = e.Grantor
 	}
 	if e.Fingerprint != "" {
-		out.Fingerprint = api.NewOptString(e.Fingerprint)
+		m["fingerprint"] = e.Fingerprint
 	}
 	if e.RequestID != nil {
-		out.RequestID = api.NewOptNilString(*e.RequestID)
+		m["request_id"] = *e.RequestID
 	}
 	if e.SessionID != nil {
-		out.SessionID = api.NewOptNilString(*e.SessionID)
+		m["session_id"] = *e.SessionID
 	}
 	if e.FlowID != nil {
-		out.FlowID = api.NewOptNilString(*e.FlowID)
+		m["flow_id"] = *e.FlowID
 	}
-	if meta, ok, err := rawObjectToOptMetadata(e.Metadata); err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to decode event metadata")
-	} else if ok {
-		out.Metadata = api.NewOptEventMetadata(meta)
+	meta := events.NormalizeJSON(e.Metadata)
+	if len(meta) > 0 && string(meta) != "{}" && string(meta) != "null" {
+		m["metadata"] = json.RawMessage(meta)
 	}
-	return out, nil
-}
-
-func rawObjectToEventPayload(raw json.RawMessage) (api.EventPayload, error) {
-	raw = events.NormalizeJSON(raw)
-	var m map[string]jx.Raw
-	if err := json.Unmarshal(raw, &m); err != nil {
-		return nil, err
-	}
-	if m == nil {
-		m = map[string]jx.Raw{}
-	}
-	return api.EventPayload(m), nil
-}
-
-func rawObjectToOptMetadata(raw json.RawMessage) (api.EventMetadata, bool, error) {
-	if len(raw) == 0 || string(raw) == "null" || string(raw) == "{}" {
-		return nil, false, nil
-	}
-	var m map[string]jx.Raw
-	if err := json.Unmarshal(raw, &m); err != nil {
-		return nil, false, err
-	}
-	if len(m) == 0 {
-		return nil, false, nil
-	}
-	return api.EventMetadata(m), true, nil
+	return json.Marshal(m)
 }
 
 func eventErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {

@@ -12,10 +12,22 @@ properties:
     type: string
   method:
     type: string
+    description: HTTP method.
+    enum:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - HEAD
+      - OPTIONS
   route_template:
     type: string
   status:
     type: integer
+    minimum: 100
+    maximum: 599
   duration_ms:
     type: integer
     format: int64
+    minimum: 0
