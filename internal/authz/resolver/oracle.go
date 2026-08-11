@@ -18,25 +18,20 @@ type Graph struct {
 
 // OracleCheck applies MVP rules: direct+closure, team membership expand, bounded TTU.
 func (g *Graph) OracleCheck(projectID, principalHomeProjectID string, principalType domain.AuthzPrincipalType, principalID, objectType, relation string) bool {
-	if principalHomeProjectID == "" {
-		principalHomeProjectID = projectID
-	}
+	home := principalHomeOrProject(principalHomeProjectID, projectID)
 	now := time.Now()
-	if g.closureAllowsScoped(projectID, principalHomeProjectID, principalType, principalID, objectType, relation, domain.AuthzScopeKindProject, "", now) {
+	if g.closureAllowsScoped(projectID, home, principalType, principalID, objectType, relation, domain.AuthzScopeKindProject, "", now) {
 		return true
 	}
-	return g.ttuAllows(projectID, principalHomeProjectID, principalType, principalID, objectType, relation, now)
+	return g.ttuAllows(projectID, home, principalType, principalID, objectType, relation, now)
 }
 
-// OracleList returns resource ids of kind that OracleCheck would authorize under
-// project / team / resource scoped grants (mirrors ListAuthzObjectIDs).
+// OracleList returns resource ids of kind authorized under project / team / resource scopes.
 func (g *Graph) OracleList(projectID, principalHomeProjectID string, principalType domain.AuthzPrincipalType, principalID string, kind domain.ResourceKind, objectType, relation string) []string {
-	if principalHomeProjectID == "" {
-		principalHomeProjectID = projectID
-	}
+	home := principalHomeOrProject(principalHomeProjectID, projectID)
 	now := time.Now()
-	projectWide := g.closureAllowsScoped(projectID, principalHomeProjectID, principalType, principalID, objectType, relation, domain.AuthzScopeKindProject, "", now) ||
-		g.ttuAllows(projectID, principalHomeProjectID, principalType, principalID, objectType, relation, now)
+	projectWide := g.closureAllowsScoped(projectID, home, principalType, principalID, objectType, relation, domain.AuthzScopeKindProject, "", now) ||
+		g.ttuAllows(projectID, home, principalType, principalID, objectType, relation, now)
 
 	out := make([]string, 0)
 	seen := map[string]struct{}{}
@@ -44,19 +39,16 @@ func (g *Graph) OracleList(projectID, principalHomeProjectID string, principalTy
 		if r.ProjectID != projectID || r.ResourceKind != kind {
 			continue
 		}
-		allow := projectWide
-		if !allow && r.TeamID != nil {
-			allow = g.closureAllowsScoped(projectID, principalHomeProjectID, principalType, principalID, objectType, relation, domain.AuthzScopeKindTeam, *r.TeamID, now)
+		if !projectWide &&
+			!(r.TeamID != nil && g.closureAllowsScoped(projectID, home, principalType, principalID, objectType, relation, domain.AuthzScopeKindTeam, *r.TeamID, now)) &&
+			!g.closureAllowsScoped(projectID, home, principalType, principalID, objectType, relation, domain.AuthzScopeKindResource, r.ResourceID, now) {
+			continue
 		}
-		if !allow {
-			allow = g.closureAllowsScoped(projectID, principalHomeProjectID, principalType, principalID, objectType, relation, domain.AuthzScopeKindResource, r.ResourceID, now)
+		if _, ok := seen[r.ResourceID]; ok {
+			continue
 		}
-		if allow {
-			if _, ok := seen[r.ResourceID]; !ok {
-				seen[r.ResourceID] = struct{}{}
-				out = append(out, r.ResourceID)
-			}
-		}
+		seen[r.ResourceID] = struct{}{}
+		out = append(out, r.ResourceID)
 	}
 	return out
 }
@@ -72,11 +64,12 @@ func (g *Graph) OracleFoothold(projectID string, principalType domain.AuthzPrinc
 			return true
 		}
 	}
-	if principalType == domain.AuthzPrincipalTypeUser {
-		for _, e := range g.Memberships {
-			if e.ProjectID == projectID && e.MemberType == domain.AuthzMemberTypeUser && e.MemberID == principalID {
-				return true
-			}
+	if principalType != domain.AuthzPrincipalTypeUser {
+		return false
+	}
+	for _, e := range g.Memberships {
+		if e.ProjectID == projectID && e.MemberType == domain.AuthzMemberTypeUser && e.MemberID == principalID {
+			return true
 		}
 	}
 	return false
@@ -84,10 +77,7 @@ func (g *Graph) OracleFoothold(projectID string, principalType domain.AuthzPrinc
 
 func (g *Graph) closureAllowsScoped(projectID, home string, pType domain.AuthzPrincipalType, pID, objectType, relation string, scope domain.AuthzScopeKind, scopeID string, now time.Time) bool {
 	for _, a := range g.Assignments {
-		if a.ProjectID != projectID || !assignmentActive(a, now) {
-			continue
-		}
-		if a.ScopeKind != scope {
+		if a.ProjectID != projectID || !assignmentActive(a, now) || a.ScopeKind != scope {
 			continue
 		}
 		switch scope {
@@ -112,35 +102,25 @@ func (g *Graph) closureAllowsScoped(projectID, home string, pType domain.AuthzPr
 
 func (g *Graph) ttuAllows(projectID, home string, pType domain.AuthzPrincipalType, pID, objectType, relation string, now time.Time) bool {
 	for _, edge := range g.Edges {
-		if edge.Kind != compiler.TermTupleToUserset {
-			continue
-		}
-		if edge.Target.Type != objectType || edge.Target.Name != relation {
+		if edge.Kind != compiler.TermTupleToUserset ||
+			edge.Target.Type != objectType || edge.Target.Name != relation {
 			continue
 		}
 		for _, ts := range g.Assignments {
-			if ts.ProjectID != projectID || !assignmentActive(ts, now) {
+			if ts.ProjectID != projectID || !assignmentActive(ts, now) ||
+				ts.ObjectType != edge.Tupleset.Type || ts.Relation != edge.Tupleset.Name {
 				continue
 			}
-			if ts.ObjectType != edge.Tupleset.Type || ts.Relation != edge.Tupleset.Name {
-				continue
-			}
-			// Membership path for team.member source.
 			if edge.Source.Type == "team" && edge.Source.Name == "member" &&
 				ts.PrincipalType == domain.AuthzPrincipalTypeTeam &&
 				pType == domain.AuthzPrincipalTypeUser &&
 				g.isMember(home, ts.PrincipalID, pID) {
 				return true
 			}
-			// Assignment+closure path on intermediate.
 			for _, a := range g.Assignments {
-				if a.ProjectID != projectID || !assignmentActive(a, now) {
-					continue
-				}
-				if !g.implies(a.ObjectType, a.Relation, edge.Source.Type, edge.Source.Name) {
-					continue
-				}
-				if !g.principalMatches(home, pType, pID, a) {
+				if a.ProjectID != projectID || !assignmentActive(a, now) ||
+					!g.implies(a.ObjectType, a.Relation, edge.Source.Type, edge.Source.Name) ||
+					!g.principalMatches(home, pType, pID, a) {
 					continue
 				}
 				switch a.ScopeKind {
@@ -170,7 +150,6 @@ func (g *Graph) implies(fromType, fromRel, toType, toRel string) bool {
 			return true
 		}
 	}
-	// Reflexive fallback when closure omitted in hand tests.
 	return fromType == toType && fromRel == toRel
 }
 
@@ -203,6 +182,13 @@ func assignmentActive(a *domain.AuthzAssignment, now time.Time) bool {
 		return false
 	}
 	return true
+}
+
+func principalHomeOrProject(home, projectID string) string {
+	if home != "" {
+		return home
+	}
+	return projectID
 }
 
 // GraphFromPersisted builds an oracle graph catalog fragment from compiler output.

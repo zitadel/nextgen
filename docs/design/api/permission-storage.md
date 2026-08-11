@@ -67,10 +67,14 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
   list-by-principal — not dual-write from CreateUser. `CreateProject` does
   seed one `sk_proj` ↔ `project.viewer` assignment so the returned project
   secret can pass the HTTP gate.
-- **Resolver (#423):** `AuthzResolverStatements` plus `internal/authz/resolver`.
-  In-project management handlers call `resolver.Check` (coarse
+- **Resolver (#423 library):** `AuthzResolverStatements` (`CheckAuthz` returns
+  allowed+foothold in one round-trip, `ListAuthzObjectIDs` as an L4/oracle
+  materialization helper, foothold smoke helper, active system catalog) plus
+  `internal/authz/resolver` orchestration (`sk_team_` allowlist, decision
+  kinds). In-project management handlers call `resolver.Check` (coarse
   `project.{viewer,editor,admin}` until #420) after credential resolution;
-  list endpoints Check then keep `project_id`-scoped queries.
+  list endpoints Check then keep `project_id`-scoped queries. ADR 033 list
+  **predicate injection** into resource queries remains later.
 
 ## Locked decisions
 

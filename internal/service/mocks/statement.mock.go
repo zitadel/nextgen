@@ -321,12 +321,13 @@ func (c *MockAllStatementsAuthAttemptChallengeSucceededCall) DoAndReturn(f func(
 }
 
 // CheckAuthz mocks base method.
-func (m *MockAllStatements) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, error) {
+func (m *MockAllStatements) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CheckAuthz", ctx, params)
 	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // CheckAuthz indicates an expected call of CheckAuthz.
@@ -342,19 +343,19 @@ type MockAllStatementsCheckAuthzCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsCheckAuthzCall) Return(arg0 bool, arg1 error) *MockAllStatementsCheckAuthzCall {
-	c.Call = c.Call.Return(arg0, arg1)
+func (c *MockAllStatementsCheckAuthzCall) Return(allowed, foothold bool, err error) *MockAllStatementsCheckAuthzCall {
+	c.Call = c.Call.Return(allowed, foothold, err)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsCheckAuthzCall) Do(f func(context.Context, domain.AuthzCheckParams) (bool, error)) *MockAllStatementsCheckAuthzCall {
+func (c *MockAllStatementsCheckAuthzCall) Do(f func(context.Context, domain.AuthzCheckParams) (bool, bool, error)) *MockAllStatementsCheckAuthzCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsCheckAuthzCall) DoAndReturn(f func(context.Context, domain.AuthzCheckParams) (bool, error)) *MockAllStatementsCheckAuthzCall {
+func (c *MockAllStatementsCheckAuthzCall) DoAndReturn(f func(context.Context, domain.AuthzCheckParams) (bool, bool, error)) *MockAllStatementsCheckAuthzCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -9336,12 +9337,13 @@ func (c *MockAuthzResolverStatementsActiveSystemCatalogIDCall) DoAndReturn(f fun
 }
 
 // CheckAuthz mocks base method.
-func (m *MockAuthzResolverStatements) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, error) {
+func (m *MockAuthzResolverStatements) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CheckAuthz", ctx, params)
 	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // CheckAuthz indicates an expected call of CheckAuthz.
@@ -9357,19 +9359,19 @@ type MockAuthzResolverStatementsCheckAuthzCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAuthzResolverStatementsCheckAuthzCall) Return(arg0 bool, arg1 error) *MockAuthzResolverStatementsCheckAuthzCall {
-	c.Call = c.Call.Return(arg0, arg1)
+func (c *MockAuthzResolverStatementsCheckAuthzCall) Return(allowed, foothold bool, err error) *MockAuthzResolverStatementsCheckAuthzCall {
+	c.Call = c.Call.Return(allowed, foothold, err)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAuthzResolverStatementsCheckAuthzCall) Do(f func(context.Context, domain.AuthzCheckParams) (bool, error)) *MockAuthzResolverStatementsCheckAuthzCall {
+func (c *MockAuthzResolverStatementsCheckAuthzCall) Do(f func(context.Context, domain.AuthzCheckParams) (bool, bool, error)) *MockAuthzResolverStatementsCheckAuthzCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAuthzResolverStatementsCheckAuthzCall) DoAndReturn(f func(context.Context, domain.AuthzCheckParams) (bool, error)) *MockAuthzResolverStatementsCheckAuthzCall {
+func (c *MockAuthzResolverStatementsCheckAuthzCall) DoAndReturn(f func(context.Context, domain.AuthzCheckParams) (bool, bool, error)) *MockAuthzResolverStatementsCheckAuthzCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
