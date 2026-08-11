@@ -43,7 +43,7 @@ so elevated surfaces contrast against the canvas.
 | `--zl-color-text-secondary-gray` | `--zl-muted-foreground` |
 | `--zl-color-text-error` / `--zl-color-icon-error` | `--zl-destructive` |
 | `--zl-color-border-default-gray-*` | `--zl-border` / `--zl-input` |
-| `--zl-color-surface-hover-strong` / `-subtle`, `--zl-color-border-hover` | `--zl-accent` |
+| `--zl-color-surface-hover-strong` / `--zl-color-surface-hover-subtle` / `--zl-color-border-hover` | `--zl-accent` |
 | `--zl-color-gray-*` (raw ramp) | no 1:1 — use a semantic token |
 
 The raw ramp is **mode-independent by design**: a primitive is one shade, and
