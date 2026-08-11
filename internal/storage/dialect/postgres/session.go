@@ -92,10 +92,6 @@ func (ss sessionStatements) ListSessions(ctx context.Context, filter *database.L
 
 func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, sessionID string) error {
 	return withTransaction(ctx, ss.client, func(ctx context.Context, tx queryExecutor) error {
-		rsi := newResourceScopeStatements(tx)
-		if err := rsi.DeleteResourceScope(ctx, sessionID); err != nil {
-			return err
-		}
 		tag, err := tx.Exec(ctx, deleteSessionByIDStmt, projectID, sessionID)
 		if err != nil {
 			return wrapError(err)
@@ -103,7 +99,8 @@ func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, se
 		if tag.RowsAffected() == 0 {
 			return domain.ErrSessionNotFound()
 		}
-		return nil
+		rsi := newResourceScopeStatements(tx)
+		return rsi.DeleteResourceScope(ctx, sessionID)
 	})
 }
 

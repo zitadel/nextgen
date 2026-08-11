@@ -61,13 +61,15 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 // DeleteJSONSchemaByID implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error {
 	return withTransaction(ctx, js.db, func(ctx context.Context, tx queryExecutor) error {
-		rsi := newResourceScopeStatements(tx)
-		if err := rsi.DeleteResourceScope(ctx, schemaID); err != nil {
+		n, err := tx.Update(ctx, buildStatement(deleteByIDJSONSchemaStmt, projectID, schemaID).statement())
+		if err != nil {
 			return err
 		}
-		stmt := buildStatement(deleteByIDJSONSchemaStmt, projectID, schemaID).statement()
-		_, err := tx.Update(ctx, stmt)
-		return err
+		if n == 0 {
+			return nil
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.DeleteResourceScope(ctx, schemaID)
 	})
 }
 

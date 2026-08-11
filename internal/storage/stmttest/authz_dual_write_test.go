@@ -151,6 +151,12 @@ func TestJSONSchemaStatements_CreateDelete_DualWriteResourceScope(t *testing.T) 
 		assert.Equal(t, projectID, scope.ProjectID)
 		assert.Nil(t, scope.TeamID)
 
+		otherProjectID := ensureProject(t, d.stmts)
+		require.NoError(t, d.stmts.DeleteJSONSchemaByID(t.Context(), otherProjectID, schemaURL))
+		scope, err = d.stmts.GetResourceScope(t.Context(), schemaURL)
+		require.NoError(t, err)
+		assert.Equal(t, projectID, scope.ProjectID)
+
 		require.NoError(t, d.stmts.DeleteJSONSchemaByID(t.Context(), projectID, schemaURL))
 		_, err = d.stmts.GetResourceScope(t.Context(), schemaURL)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
@@ -175,11 +181,17 @@ func TestFlowDefinitionStatements_CreateDelete_DualWriteResourceScope(t *testing
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		flowID := "flowdef_" + uniqueSuffix(t)
-		require.NoError(t, d.stmts.CreateFlowDefinition(t.Context(), sampleFlowDefinition(projectID, flowID)))
+		require.NoError(t, d.stmts.CreateFlowDefinition(t.Context(), sampleFlowDefinition(projectID, flowID, "Default Login")))
 
 		scope, err := d.stmts.GetResourceScope(t.Context(), flowID)
 		require.NoError(t, err)
 		assert.Equal(t, domain.ResourceKindFlowDefinition, scope.ResourceKind)
+		assert.Equal(t, projectID, scope.ProjectID)
+
+		otherProjectID := ensureProject(t, d.stmts)
+		require.NoError(t, d.stmts.DeleteFlowDefinitionByID(t.Context(), otherProjectID, flowID))
+		scope, err = d.stmts.GetResourceScope(t.Context(), flowID)
+		require.NoError(t, err)
 		assert.Equal(t, projectID, scope.ProjectID)
 
 		require.NoError(t, d.stmts.DeleteFlowDefinitionByID(t.Context(), projectID, flowID))
@@ -201,37 +213,15 @@ func TestSessionStatements_CreateDelete_DualWriteResourceScope(t *testing.T) {
 		assert.Equal(t, domain.ResourceKindSession, scope.ResourceKind)
 		assert.Equal(t, projectID, scope.ProjectID)
 
+		otherProjectID := ensureProject(t, d.stmts)
+		err = d.stmts.DeleteSessionByID(t.Context(), otherProjectID, session.ID)
+		assert.ErrorIs(t, err, domain.ErrSessionNotFound())
+		scope, err = d.stmts.GetResourceScope(t.Context(), session.ID)
+		require.NoError(t, err)
+		assert.Equal(t, projectID, scope.ProjectID)
+
 		require.NoError(t, d.stmts.DeleteSessionByID(t.Context(), projectID, session.ID))
 		_, err = d.stmts.GetResourceScope(t.Context(), session.ID)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
-}
-
-func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
-	return &domain.FlowDefinition{
-		ProjectID:     projectID,
-		ID:            id,
-		Name:          "Default Login",
-		SchemaVersion: "1.0.0",
-		Status:        domain.FlowDefinitionStatusDraft,
-		UserSchema:    "https://example.com/schemas/human-user.json",
-		Purposes: map[domain.FlowDefinitionPurpose]string{
-			domain.FlowDefinitionPurposeLogin: "identifier",
-		},
-		Audience: domain.FlowDefinitionAudience{
-			AppIDs: []string{"app-1"},
-		},
-		Steps: []domain.FlowDefinitionStep{
-			{
-				Name:   "identifier",
-				Fields: []domain.Field{"email"},
-				Actions: []domain.FlowStepAction{
-					{Name: "submit", Kind: domain.FlowActionKindSubmit, TextKey: "identifier.submit", Primary: true},
-				},
-				Transitions: map[string]domain.FlowStepTransition{
-					"submit": {Target: "done"},
-				},
-			},
-		},
-	}
 }

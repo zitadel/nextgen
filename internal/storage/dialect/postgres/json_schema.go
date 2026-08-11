@@ -43,12 +43,15 @@ const deleteByIDJSONSchemaStmt = `DELETE FROM zitadel_nextgen.json_schemas WHERE
 // DeleteJSONSchemaByID implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error {
 	return withTransaction(ctx, js.client, func(ctx context.Context, tx queryExecutor) error {
-		rsi := newResourceScopeStatements(tx)
-		if err := rsi.DeleteResourceScope(ctx, schemaID); err != nil {
-			return err
+		tag, err := tx.Exec(ctx, deleteByIDJSONSchemaStmt, projectID, schemaID)
+		if err != nil {
+			return wrapError(err)
 		}
-		_, err := tx.Exec(ctx, deleteByIDJSONSchemaStmt, projectID, schemaID)
-		return wrapError(err)
+		if tag.RowsAffected() == 0 {
+			return nil
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.DeleteResourceScope(ctx, schemaID)
 	})
 }
 
