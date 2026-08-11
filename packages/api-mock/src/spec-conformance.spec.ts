@@ -231,7 +231,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect((body.id as string).startsWith("sch_")).toBe(true);
   });
 
-  test("GET and DELETE /schemas/:id are scoped to the owning project", async () => {
+  test("GET and DELETE /schemas/:id look up by id without project_id", async () => {
     const create = await fetch(`${BASE}/schemas?project_id=proj_schema_owner`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -243,19 +243,14 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     const { id } = (await create.json()) as { id: string };
 
-    // Another project can neither read nor delete the schema — the real
-    // repository looks rows up by (project_id, id).
-    const foreignGet = await fetch(`${BASE}/schemas/${id}?project_id=proj_other`);
-    expect(foreignGet.status).toBe(404);
-    const foreignDelete = await fetch(`${BASE}/schemas/${id}?project_id=proj_other`, {
-      method: "DELETE",
-    });
-    expect(foreignDelete.status).toBe(404);
+    // Flat-by-id: OpenAPI dropped the project_id query; ownership is an
+    // authz concern on the real server (RSI + Check).
+    const missing = await fetch(`${BASE}/schemas/sch_does_not_exist`);
+    expect(missing.status).toBe(404);
 
-    // The owner still can.
-    const ownerGet = await fetch(`${BASE}/schemas/${id}?project_id=proj_schema_owner`);
+    const ownerGet = await fetch(`${BASE}/schemas/${id}`);
     expect(ownerGet.status).toBe(200);
-    const ownerDelete = await fetch(`${BASE}/schemas/${id}?project_id=proj_schema_owner`, {
+    const ownerDelete = await fetch(`${BASE}/schemas/${id}`, {
       method: "DELETE",
     });
     expect(ownerDelete.status).toBe(204);
@@ -279,7 +274,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
     const { id } = (await create.json()) as { id: string };
 
-    const res = await fetch(`${BASE}/schemas/${id}?project_id=proj_schema_raw`);
+    const res = await fetch(`${BASE}/schemas/${id}`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(doc);
   });
@@ -355,7 +350,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       }),
     });
     const { id } = (await create.json()) as { id: string };
-    const res = await fetch(`${BASE}/flow_definitions/${id}?project_id=proj_conformance_get`);
+    const res = await fetch(`${BASE}/flow_definitions/${id}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
@@ -371,12 +366,11 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       }),
     });
     const { id } = (await create.json()) as { id: string };
-    // Spec: `updateFlowDefinition` is `PUT /flow_definitions/{id}` with a
-    // required `project_id` query param (the generated client and CLI
-    // syncer both call it that way). The body wraps the definition under
+    // Spec: `updateFlowDefinition` is flat-by-id `PUT /flow_definitions/{id}`
+    // (no project_id query). The body wraps the definition under
     // `flow_definition` (flow-definition-update-request.yaml), unlike the
     // create envelope.
-    const res = await fetch(`${BASE}/flow_definitions/${id}?project_id=proj_conformance_update`, {
+    const res = await fetch(`${BASE}/flow_definitions/${id}`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ flow_definition: validFlowDefinitionBody() }),
