@@ -9,17 +9,17 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// Stmts is the storage surface the resolver needs.
+// Stmts is the resolver's storage dependency.
 type Stmts interface {
 	service.AuthzResolverStatements
 }
 
-// Request is the public Check input. CatalogID is never accepted from callers;
-// the resolver looks up the active system catalog itself.
+// Request is the public Check input. The active system catalog is resolved
+// internally; callers must not supply a catalog id.
 type Request struct {
 	PrincipalType   domain.AuthzPrincipalType
 	PrincipalID     string
-	CredentialClass domain.AuthzPrincipalType // for allowlist; often equals PrincipalType
+	CredentialClass domain.AuthzPrincipalType
 	ProjectID       string
 	ObjectType      string
 	Relation        string
@@ -36,21 +36,11 @@ type ListRequest struct {
 	Relation        string
 }
 
-// ResourceColumns documents which resource-table columns carry scope ids for
-// future predicate injection. ListObjects today uses resource_scope_index via
-// statements and does not require these values at runtime.
-type ResourceColumns struct {
-	ProjectIDCol  string
-	TeamIDCol     string
-	ResourceIDCol string
-}
-
 // Resolver evaluates checks with optional request-scoped memoization.
 type Resolver struct {
-	mu           sync.Mutex
-	catalogID    string
-	catalogReady bool
-	memo         map[string]Decision
+	mu        sync.Mutex
+	catalogID string
+	memo      map[string]Decision
 }
 
 // New returns a request-scoped resolver (create one per request / test).
@@ -63,15 +53,9 @@ func (r *Resolver) Check(ctx context.Context, stmts Stmts, req Request) (Decisio
 	if err := validateCheckRequest(req); err != nil {
 		return DecisionUnspecified, err
 	}
-
-	cred := req.CredentialClass
-	if cred == "" {
-		cred = req.PrincipalType
-	}
-	if cred == domain.AuthzPrincipalTypeSKTeam {
-		if !skTeamPermissionAllowed(PermissionName(req.ObjectType, req.Relation)) {
-			return DecisionNotFound, nil
-		}
+	if credentialClass(req.CredentialClass, req.PrincipalType) == domain.AuthzPrincipalTypeSKTeam &&
+		!skTeamPermissionAllowed(PermissionName(req.ObjectType, req.Relation)) {
+		return DecisionNotFound, nil
 	}
 
 	key := checkMemoKey(req)
@@ -87,7 +71,7 @@ func (r *Resolver) Check(ctx context.Context, stmts Stmts, req Request) (Decisio
 	allowed, err := stmts.CheckAuthz(ctx, domain.AuthzCheckParams{
 		CatalogID:              catalogID,
 		ProjectID:              req.ProjectID,
-		PrincipalHomeProjectID: req.ProjectID, // MVP: local teams only (#333 deferred)
+		PrincipalHomeProjectID: req.ProjectID,
 		PrincipalType:          req.PrincipalType,
 		PrincipalID:            req.PrincipalID,
 		ObjectType:             req.ObjectType,
@@ -118,14 +102,9 @@ func (r *Resolver) ListObjects(ctx context.Context, stmts Stmts, req ListRequest
 	if err := validateListRequest(req); err != nil {
 		return nil, err
 	}
-	cred := req.CredentialClass
-	if cred == "" {
-		cred = req.PrincipalType
-	}
-	if cred == domain.AuthzPrincipalTypeSKTeam {
-		if !skTeamPermissionAllowed(PermissionName(req.ObjectType, req.Relation)) {
-			return []string{}, nil
-		}
+	if credentialClass(req.CredentialClass, req.PrincipalType) == domain.AuthzPrincipalTypeSKTeam &&
+		!skTeamPermissionAllowed(PermissionName(req.ObjectType, req.Relation)) {
+		return []string{}, nil
 	}
 	catalogID, err := r.activeCatalogID(ctx, stmts)
 	if err != nil {
@@ -145,16 +124,24 @@ func (r *Resolver) ListObjects(ctx context.Context, stmts Stmts, req ListRequest
 
 func (r *Resolver) activeCatalogID(ctx context.Context, stmts Stmts) (string, error) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.catalogReady {
-		return r.catalogID, nil
+	if r.catalogID != "" {
+		id := r.catalogID
+		r.mu.Unlock()
+		return id, nil
 	}
+	r.mu.Unlock()
+
 	id, err := stmts.ActiveSystemCatalogID(ctx)
 	if err != nil {
 		return "", err
 	}
-	r.catalogID = id
-	r.catalogReady = true
+
+	r.mu.Lock()
+	if r.catalogID == "" {
+		r.catalogID = id
+	}
+	id = r.catalogID
+	r.mu.Unlock()
 	return id, nil
 }
 
@@ -171,13 +158,18 @@ func (r *Resolver) memoSet(key string, d Decision) {
 	r.memo[key] = d
 }
 
-func checkMemoKey(req Request) string {
-	cred := req.CredentialClass
-	if cred == "" {
-		cred = req.PrincipalType
+func credentialClass(explicit, principalType domain.AuthzPrincipalType) domain.AuthzPrincipalType {
+	if explicit != "" {
+		return explicit
 	}
+	return principalType
+}
+
+func checkMemoKey(req Request) string {
 	return fmt.Sprintf("%s|%s|%s|%s|%s|%s",
-		req.PrincipalType, req.PrincipalID, cred, req.ProjectID, req.ObjectType, req.Relation)
+		req.PrincipalType, req.PrincipalID,
+		credentialClass(req.CredentialClass, req.PrincipalType),
+		req.ProjectID, req.ObjectType, req.Relation)
 }
 
 func validateCheckRequest(req Request) error {

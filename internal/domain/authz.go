@@ -308,9 +308,7 @@ const (
 )
 
 // AuthzCheckParams is the storage-level input for a single-resource permission check.
-// CatalogID must be the active catalog chosen by the resolver (never caller-supplied
-// to the public resolver API). PrincipalHomeProjectID is the project that owns the
-// principal's membership edges; MVP sets it equal to ProjectID (#333 deferred).
+// PrincipalHomeProjectID owns membership-edge lookup (#333 may differ later).
 type AuthzCheckParams struct {
 	CatalogID              string
 	ProjectID              string

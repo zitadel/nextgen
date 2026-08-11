@@ -52,8 +52,6 @@ SELECT (
     )
 )`
 
-	// checkAuthzStmt allows via (1) assignment ⋈ closure or (2) bounded TTU
-	// through authz_expression_edges + tupleset assignment + membership/source.
 	checkAuthzStmt = `
 SELECT (
     EXISTS (
@@ -162,7 +160,6 @@ FROM zitadel_nextgen.resource_scope_index r
 WHERE r.project_id = $2
   AND r.resource_kind = $8
   AND (
-    -- Project-scoped (or any) grant that CheckAuthz would accept for the project.
     EXISTS (
         SELECT 1
         FROM zitadel_nextgen.authz_assignments a
@@ -375,9 +372,6 @@ func (s authzResolverStatements) ListAuthzObjectIDs(ctx context.Context, params 
 	})
 	if err != nil {
 		return nil, wrapError(err)
-	}
-	if ids == nil {
-		ids = []string{}
 	}
 	return ids, nil
 }

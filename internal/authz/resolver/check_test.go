@@ -71,7 +71,6 @@ func TestCheck_Orchestration(t *testing.T) {
 	t.Run("sk_team allowlist short circuit", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
-		// No storage calls expected.
 
 		d, err := resolver.New().Check(context.Background(), stmts, resolver.Request{
 			PrincipalType:   domain.AuthzPrincipalTypeSKTeam,

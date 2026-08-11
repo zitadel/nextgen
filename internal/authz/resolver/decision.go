@@ -8,15 +8,9 @@ import "fmt"
 type Decision uint8
 
 const (
-	// DecisionUnspecified is the zero value and must not be returned by Check.
 	DecisionUnspecified Decision = iota
-	// DecisionAllow means the principal holds the required permission.
 	DecisionAllow
-	// DecisionNotFound means the principal has no foothold in the project scope
-	// (maps to HTTP 404 later).
 	DecisionNotFound
-	// DecisionForbidden means the principal has a project foothold but lacks the
-	// required permission (maps to HTTP 403 later).
 	DecisionForbidden
 )
 

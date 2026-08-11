@@ -101,7 +101,6 @@ func TestAuthzResolverStatements_Smoke(t *testing.T) {
 			ttuTeam := "team_ttu_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, ttuTeam)))
 			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(projectID, ttuTeam, ttuUser)))
-			// tupleset: project#team@team:ttuTeam
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeTeam, ttuTeam, "project", "team", domain.NewProjectAssignmentScope())))
 

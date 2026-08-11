@@ -35,7 +35,6 @@ func TestAuthzResolver_OracleAgreement(t *testing.T) {
 		var memberships []*domain.AuthzMembershipEdge
 		var resources []*domain.ResourceScope
 
-		// Seed RSI users (some team-scoped).
 		for i, u := range users {
 			scope := domain.NewUserResourceScope(projectID, u)
 			if i%2 == 1 {
@@ -46,7 +45,6 @@ func TestAuthzResolver_OracleAgreement(t *testing.T) {
 			resources = append(resources, scope)
 		}
 
-		// Random memberships into teamA / teamB.
 		for _, u := range users {
 			if rng.Intn(2) == 0 {
 				e := domain.NewUserTeamMembershipEdge(projectID, teamA, u)
@@ -60,7 +58,6 @@ func TestAuthzResolver_OracleAgreement(t *testing.T) {
 			}
 		}
 
-		// Direct user viewer grants.
 		for _, u := range users[:3] {
 			if rng.Intn(2) == 0 {
 				a := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())
@@ -68,19 +65,16 @@ func TestAuthzResolver_OracleAgreement(t *testing.T) {
 				assignments = append(assignments, a)
 			}
 		}
-		// Team grant on teamA.
 		aTeam := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, teamA, "project", "viewer", domain.NewProjectAssignmentScope())
 		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), aTeam))
 		assignments = append(assignments, aTeam)
 
-		// TTU tupleset: project#team@teamB for some runs.
 		if rng.Intn(2) == 0 {
 			aTS := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, teamB, "project", "team", domain.NewProjectAssignmentScope())
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), aTS))
 			assignments = append(assignments, aTS)
 		}
 
-		// Team-scoped grant for one user on teamA resources.
 		scopedUser := users[0]
 		aScoped := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, scopedUser, "project", "viewer", domain.NewTeamAssignmentScope(teamA))
 		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), aScoped))
