@@ -327,6 +327,17 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			assert.False(t, allowed)
 		})
 
+		t.Run("check ttu malformed tupleset principal type deny", func(t *testing.T) {
+			// Tupleset project.team must use principal_type=team; a user principal must not participate in TTU.
+			u := "user_ttu_badts_" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "team", domain.NewProjectAssignmentScope())))
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "team", "member", domain.NewResourceAssignmentScope(u))))
+			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
+			assert.False(t, allowed)
+		})
+
 		t.Run("check ttu general team scope allow", func(t *testing.T) {
 			// SQL arm: general TTU scope_kind=team AND scope_team_id = ts.principal_id.
 			u := "user_ttu_gteam_" + uniqueSuffix(t)
@@ -411,8 +422,8 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 		})
 
 		t.Run("list stranger empty", func(t *testing.T) {
-			_ = "usr_stranger_rsi_" + uniqueSuffix(t)
-			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), domain.NewUserResourceScope(projectID, "usr_str_"+uniqueSuffix(t))))
+			res := "usr_str_" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), domain.NewUserResourceScope(projectID, res)))
 			ids := listUsers(t, base(domain.AuthzPrincipalTypeUser, "user_stranger_"+uniqueSuffix(t), "project", "viewer"))
 			assert.Empty(t, ids)
 		})
