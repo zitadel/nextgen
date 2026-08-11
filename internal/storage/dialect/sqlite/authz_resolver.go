@@ -10,12 +10,11 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 )
 
-var (
-	activeSystemCatalogIDStmt   = authz.SQLiteSQL(0).ActiveSystemCatalogID()
-	hasAuthzProjectFootholdStmt = authz.SQLiteSQL(4).HasAuthzProjectFoothold()
-	checkAuthzStmt              = authz.SQLiteSQL(8).CheckAuthz()
-	listAuthzObjectIDsStmt      = authz.SQLiteSQL(9).ListAuthzObjectIDs()
-)
+func sqliteAuthzEnv() authz.Env {
+	return authz.Env{
+		Now: func(w authz.ArgWriter) { w.WriteArg(nowUnixNano()) },
+	}
+}
 
 type authzResolverStatements struct{ statement }
 
@@ -25,12 +24,10 @@ func newAuthzResolverStatements(client queryExecutor) authzResolverStatements {
 
 // ActiveSystemCatalogID implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) ActiveSystemCatalogID(ctx context.Context) (string, error) {
+	var c statementCompiler
+	authz.WriteActiveSystemCatalogID(&c, sqliteAuthzEnv())
 	var id string
-	err := s.client.QueryRow(ctx, activeSystemCatalogIDStmt,
-		domain.AuthzCatalogKindSystem.String(),
-		domain.SystemCatalogOwnerID,
-		domain.AuthzCatalogStatusActive.String(),
-	).Scan(&id)
+	err := s.client.QueryRow(ctx, c.String(), c.args...).Scan(&id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", database.NewNoRowFoundError(nil)
@@ -42,10 +39,10 @@ func (s authzResolverStatements) ActiveSystemCatalogID(ctx context.Context) (str
 
 // HasAuthzProjectFoothold implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) HasAuthzProjectFoothold(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error) {
+	var c statementCompiler
+	authz.WriteHasAuthzProjectFoothold(&c, sqliteAuthzEnv(), projectID, principalType, principalID)
 	var ok bool
-	err := s.client.QueryRow(ctx, hasAuthzProjectFootholdStmt,
-		projectID, principalType.String(), principalID, nowUnixNano(),
-	).Scan(&ok)
+	err := s.client.QueryRow(ctx, c.String(), c.args...).Scan(&ok)
 	if err != nil {
 		return false, wrapError(err)
 	}
@@ -54,17 +51,10 @@ func (s authzResolverStatements) HasAuthzProjectFoothold(ctx context.Context, pr
 
 // CheckAuthz implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, bool, error) {
+	var c statementCompiler
+	authz.WriteCheckAuthz(&c, sqliteAuthzEnv(), params)
 	var allowed, foothold bool
-	err := s.client.QueryRow(ctx, checkAuthzStmt,
-		params.CatalogID,
-		params.ProjectID,
-		params.PrincipalType.String(),
-		params.PrincipalID,
-		params.ObjectType,
-		params.Relation,
-		params.HomeProjectID(),
-		nowUnixNano(),
-	).Scan(&allowed, &foothold)
+	err := s.client.QueryRow(ctx, c.String(), c.args...).Scan(&allowed, &foothold)
 	if err != nil {
 		return false, false, wrapError(err)
 	}
@@ -73,17 +63,9 @@ func (s authzResolverStatements) CheckAuthz(ctx context.Context, params domain.A
 
 // ListAuthzObjectIDs implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error) {
-	rows, err := s.client.Query(ctx, listAuthzObjectIDsStmt,
-		params.CatalogID,
-		params.ProjectID,
-		params.PrincipalType.String(),
-		params.PrincipalID,
-		params.ObjectType,
-		params.Relation,
-		params.HomeProjectID(),
-		params.ResourceKind.String(),
-		nowUnixNano(),
-	)
+	var c statementCompiler
+	authz.WriteListAuthzObjectIDs(&c, sqliteAuthzEnv(), params)
+	rows, err := s.client.Query(ctx, c.String(), c.args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}

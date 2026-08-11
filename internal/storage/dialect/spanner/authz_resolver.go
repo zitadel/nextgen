@@ -10,13 +10,11 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 )
 
-var (
-	spAuthz                     = authz.SpannerSQL()
-	activeSystemCatalogIDStmt   = spAuthz.ActiveSystemCatalogID()
-	hasAuthzProjectFootholdStmt = spAuthz.HasAuthzProjectFoothold()
-	checkAuthzStmt              = spAuthz.CheckAuthz()
-	listAuthzObjectIDsStmt      = spAuthz.ListAuthzObjectIDs()
-)
+func spannerAuthzEnv() authz.Env {
+	return authz.Env{
+		Now: func(w authz.ArgWriter) { w.WriteString("CURRENT_TIMESTAMP()") },
+	}
+}
 
 type authzResolverStatements struct{ statement }
 
@@ -26,12 +24,10 @@ func newAuthzResolverStatements(db queryExecutor) authzResolverStatements {
 
 // ActiveSystemCatalogID implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) ActiveSystemCatalogID(ctx context.Context) (string, error) {
+	var c statementCompiler
+	authz.WriteActiveSystemCatalogID(&c, spannerAuthzEnv())
 	var id string
-	err := s.db.Query(ctx, buildStatement(activeSystemCatalogIDStmt,
-		domain.AuthzCatalogKindSystem.String(),
-		domain.SystemCatalogOwnerID,
-		domain.AuthzCatalogStatusActive.String(),
-	).statement(), func(iter *spanner.RowIterator) error {
+	err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
 		var qErr error
 		id, qErr = collectOneRow(iter, func(row *spanner.Row) (string, error) {
 			var v string
@@ -47,10 +43,10 @@ func (s authzResolverStatements) ActiveSystemCatalogID(ctx context.Context) (str
 
 // HasAuthzProjectFoothold implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) HasAuthzProjectFoothold(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error) {
+	var c statementCompiler
+	authz.WriteHasAuthzProjectFoothold(&c, spannerAuthzEnv(), projectID, principalType, principalID)
 	var ok bool
-	err := s.db.Query(ctx, buildStatement(hasAuthzProjectFootholdStmt,
-		projectID, principalType.String(), principalID,
-	).statement(), func(iter *spanner.RowIterator) error {
+	err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
 		var qErr error
 		ok, qErr = collectOneRow(iter, func(row *spanner.Row) (bool, error) {
 			var found bool
@@ -66,17 +62,11 @@ func (s authzResolverStatements) HasAuthzProjectFoothold(ctx context.Context, pr
 
 // CheckAuthz implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, bool, error) {
+	var c statementCompiler
+	authz.WriteCheckAuthz(&c, spannerAuthzEnv(), params)
 	type outcome struct{ allowed, foothold bool }
 	var out outcome
-	err := s.db.Query(ctx, buildStatement(checkAuthzStmt,
-		params.CatalogID,
-		params.ProjectID,
-		params.PrincipalType.String(),
-		params.PrincipalID,
-		params.ObjectType,
-		params.Relation,
-		params.HomeProjectID(),
-	).statement(), func(iter *spanner.RowIterator) error {
+	err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
 		var qErr error
 		out, qErr = collectOneRow(iter, func(row *spanner.Row) (outcome, error) {
 			var o outcome
@@ -92,17 +82,10 @@ func (s authzResolverStatements) CheckAuthz(ctx context.Context, params domain.A
 
 // ListAuthzObjectIDs implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error) {
+	var c statementCompiler
+	authz.WriteListAuthzObjectIDs(&c, spannerAuthzEnv(), params)
 	var ids []string
-	err := s.db.Query(ctx, buildStatement(listAuthzObjectIDsStmt,
-		params.CatalogID,
-		params.ProjectID,
-		params.PrincipalType.String(),
-		params.PrincipalID,
-		params.ObjectType,
-		params.Relation,
-		params.HomeProjectID(),
-		params.ResourceKind.String(),
-	).statement(), func(iter *spanner.RowIterator) error {
+	err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
 		var qErr error
 		ids, qErr = collectRows(iter, func(row *spanner.Row) (string, error) {
 			var id string
