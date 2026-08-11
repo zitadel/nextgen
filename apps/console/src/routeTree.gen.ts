@@ -13,12 +13,14 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedUsersIndexRouteImport } from './routes/_authed/users/index'
+import { Route as AuthedTeamsIndexRouteImport } from './routes/_authed/teams/index'
 import { Route as AuthedSystemIndexRouteImport } from './routes/_authed/system/index'
 import { Route as AuthedSessionsIndexRouteImport } from './routes/_authed/sessions/index'
 import { Route as AuthedSchemasIndexRouteImport } from './routes/_authed/schemas/index'
 import { Route as AuthedProjectsIndexRouteImport } from './routes/_authed/projects/index'
 import { Route as AuthedFlowDefinitionsIndexRouteImport } from './routes/_authed/flow-definitions/index'
 import { Route as AuthedUsersUserIdRouteImport } from './routes/_authed/users/$userId'
+import { Route as AuthedTeamsTeamIdRouteImport } from './routes/_authed/teams/$teamId'
 import { Route as AuthedSchemasSchemaIdRouteImport } from './routes/_authed/schemas/$schemaId'
 import { Route as AuthedFlowDefinitionsDefinitionIdRouteImport } from './routes/_authed/flow-definitions/$definitionId'
 
@@ -39,6 +41,11 @@ const AuthedIndexRoute = AuthedIndexRouteImport.update({
 const AuthedUsersIndexRoute = AuthedUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedTeamsIndexRoute = AuthedTeamsIndexRouteImport.update({
+  id: '/teams/',
+  path: '/teams/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedSystemIndexRoute = AuthedSystemIndexRouteImport.update({
@@ -72,6 +79,11 @@ const AuthedUsersUserIdRoute = AuthedUsersUserIdRouteImport.update({
   path: '/users/$userId',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedTeamsTeamIdRoute = AuthedTeamsTeamIdRouteImport.update({
+  id: '/teams/$teamId',
+  path: '/teams/$teamId',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedSchemasSchemaIdRoute = AuthedSchemasSchemaIdRouteImport.update({
   id: '/schemas/$schemaId',
   path: '/schemas/$schemaId',
@@ -89,12 +101,14 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
   '/schemas/$schemaId': typeof AuthedSchemasSchemaIdRoute
+  '/teams/$teamId': typeof AuthedTeamsTeamIdRoute
   '/users/$userId': typeof AuthedUsersUserIdRoute
   '/flow-definitions/': typeof AuthedFlowDefinitionsIndexRoute
   '/projects/': typeof AuthedProjectsIndexRoute
   '/schemas/': typeof AuthedSchemasIndexRoute
   '/sessions/': typeof AuthedSessionsIndexRoute
   '/system/': typeof AuthedSystemIndexRoute
+  '/teams/': typeof AuthedTeamsIndexRoute
   '/users/': typeof AuthedUsersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -102,12 +116,14 @@ export interface FileRoutesByTo {
   '/': typeof AuthedIndexRoute
   '/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
   '/schemas/$schemaId': typeof AuthedSchemasSchemaIdRoute
+  '/teams/$teamId': typeof AuthedTeamsTeamIdRoute
   '/users/$userId': typeof AuthedUsersUserIdRoute
   '/flow-definitions': typeof AuthedFlowDefinitionsIndexRoute
   '/projects': typeof AuthedProjectsIndexRoute
   '/schemas': typeof AuthedSchemasIndexRoute
   '/sessions': typeof AuthedSessionsIndexRoute
   '/system': typeof AuthedSystemIndexRoute
+  '/teams': typeof AuthedTeamsIndexRoute
   '/users': typeof AuthedUsersIndexRoute
 }
 export interface FileRoutesById {
@@ -117,12 +133,14 @@ export interface FileRoutesById {
   '/_authed/': typeof AuthedIndexRoute
   '/_authed/flow-definitions/$definitionId': typeof AuthedFlowDefinitionsDefinitionIdRoute
   '/_authed/schemas/$schemaId': typeof AuthedSchemasSchemaIdRoute
+  '/_authed/teams/$teamId': typeof AuthedTeamsTeamIdRoute
   '/_authed/users/$userId': typeof AuthedUsersUserIdRoute
   '/_authed/flow-definitions/': typeof AuthedFlowDefinitionsIndexRoute
   '/_authed/projects/': typeof AuthedProjectsIndexRoute
   '/_authed/schemas/': typeof AuthedSchemasIndexRoute
   '/_authed/sessions/': typeof AuthedSessionsIndexRoute
   '/_authed/system/': typeof AuthedSystemIndexRoute
+  '/_authed/teams/': typeof AuthedTeamsIndexRoute
   '/_authed/users/': typeof AuthedUsersIndexRoute
 }
 export interface FileRouteTypes {
@@ -132,12 +150,14 @@ export interface FileRouteTypes {
     | '/login'
     | '/flow-definitions/$definitionId'
     | '/schemas/$schemaId'
+    | '/teams/$teamId'
     | '/users/$userId'
     | '/flow-definitions/'
     | '/projects/'
     | '/schemas/'
     | '/sessions/'
     | '/system/'
+    | '/teams/'
     | '/users/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -145,12 +165,14 @@ export interface FileRouteTypes {
     | '/'
     | '/flow-definitions/$definitionId'
     | '/schemas/$schemaId'
+    | '/teams/$teamId'
     | '/users/$userId'
     | '/flow-definitions'
     | '/projects'
     | '/schemas'
     | '/sessions'
     | '/system'
+    | '/teams'
     | '/users'
   id:
     | '__root__'
@@ -159,12 +181,14 @@ export interface FileRouteTypes {
     | '/_authed/'
     | '/_authed/flow-definitions/$definitionId'
     | '/_authed/schemas/$schemaId'
+    | '/_authed/teams/$teamId'
     | '/_authed/users/$userId'
     | '/_authed/flow-definitions/'
     | '/_authed/projects/'
     | '/_authed/schemas/'
     | '/_authed/sessions/'
     | '/_authed/system/'
+    | '/_authed/teams/'
     | '/_authed/users/'
   fileRoutesById: FileRoutesById
 }
@@ -201,6 +225,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users/'
       preLoaderRoute: typeof AuthedUsersIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/teams/': {
+      id: '/_authed/teams/'
+      path: '/teams'
+      fullPath: '/teams/'
+      preLoaderRoute: typeof AuthedTeamsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/system/': {
@@ -245,6 +276,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedUsersUserIdRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/teams/$teamId': {
+      id: '/_authed/teams/$teamId'
+      path: '/teams/$teamId'
+      fullPath: '/teams/$teamId'
+      preLoaderRoute: typeof AuthedTeamsTeamIdRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/schemas/$schemaId': {
       id: '/_authed/schemas/$schemaId'
       path: '/schemas/$schemaId'
@@ -266,12 +304,14 @@ interface AuthedRouteChildren {
   AuthedIndexRoute: typeof AuthedIndexRoute
   AuthedFlowDefinitionsDefinitionIdRoute: typeof AuthedFlowDefinitionsDefinitionIdRoute
   AuthedSchemasSchemaIdRoute: typeof AuthedSchemasSchemaIdRoute
+  AuthedTeamsTeamIdRoute: typeof AuthedTeamsTeamIdRoute
   AuthedUsersUserIdRoute: typeof AuthedUsersUserIdRoute
   AuthedFlowDefinitionsIndexRoute: typeof AuthedFlowDefinitionsIndexRoute
   AuthedProjectsIndexRoute: typeof AuthedProjectsIndexRoute
   AuthedSchemasIndexRoute: typeof AuthedSchemasIndexRoute
   AuthedSessionsIndexRoute: typeof AuthedSessionsIndexRoute
   AuthedSystemIndexRoute: typeof AuthedSystemIndexRoute
+  AuthedTeamsIndexRoute: typeof AuthedTeamsIndexRoute
   AuthedUsersIndexRoute: typeof AuthedUsersIndexRoute
 }
 
@@ -280,12 +320,14 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedFlowDefinitionsDefinitionIdRoute:
     AuthedFlowDefinitionsDefinitionIdRoute,
   AuthedSchemasSchemaIdRoute: AuthedSchemasSchemaIdRoute,
+  AuthedTeamsTeamIdRoute: AuthedTeamsTeamIdRoute,
   AuthedUsersUserIdRoute: AuthedUsersUserIdRoute,
   AuthedFlowDefinitionsIndexRoute: AuthedFlowDefinitionsIndexRoute,
   AuthedProjectsIndexRoute: AuthedProjectsIndexRoute,
   AuthedSchemasIndexRoute: AuthedSchemasIndexRoute,
   AuthedSessionsIndexRoute: AuthedSessionsIndexRoute,
   AuthedSystemIndexRoute: AuthedSystemIndexRoute,
+  AuthedTeamsIndexRoute: AuthedTeamsIndexRoute,
   AuthedUsersIndexRoute: AuthedUsersIndexRoute,
 }
 

@@ -46,14 +46,24 @@ export function ContextSwitcher() {
           screen, which made the whole console look like it was scoped to a real
           organisation on a real plan.
 
-          Organisations are teams in this model, and there is no team list
-          endpoint: the API has `POST /teams` and `GET /teams/{team_id}` only, so
-          the current team cannot be resolved, let alone switched. Restore this
-          when `Team: List/Query` (#620) lands, and take the plan badge from
-          billing (#667) rather than a literal.
+          Organisations are teams in this model. `POST /teams/query` now lists
+          them, so the dropdown could be populated — but two things it needs are
+          still missing, and without them the control would look live while doing
+          nothing:
+
+            - **no current team.** Neither `GET /sessions/me` nor the runtime
+              document carries one, so there is nothing to show as selected.
+            - **nothing is team-scoped.** `GET /users` takes no `team_id`, and the
+              users and schemas lists are scoped by project, so choosing a team
+              would change nothing on screen. `team_id` exists only as an optional
+              param on create and get-by-id calls.
+
+          Restore this when a current team is resolvable and the list reads accept
+          it. The plan badge has since been dropped from the design; if it returns,
+          take it from billing (#667) rather than a literal.
 
           <Switcher
-            icon={Building2}
+            icon={Box}
             label={currentTeam?.label}
             shortLabel={currentTeam?.shortLabel}
             plan={currentTeam?.plan}
