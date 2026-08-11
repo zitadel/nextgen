@@ -4,7 +4,6 @@ content:
   application/json:
     schema:
       oneOf:
-        - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-not_found.yaml'
         - $ref: '../../../components/schemas/errors/flow-completed.yaml'
@@ -19,7 +18,6 @@ content:
       discriminator:
         propertyName: code
         mapping:
-          auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           enc_key.decrypt_failed: '../../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.not_found: '../../../components/schemas/errors/enc_key-not_found.yaml'
           flow.completed: '../../../components/schemas/errors/flow-completed.yaml'
@@ -32,11 +30,6 @@ content:
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
     examples:
-      auth.unauthorized:
-        summary: auth.unauthorized
-        value:
-          code: auth.unauthorized
-          message: 'The request lacks valid authentication credentials.'
       enc_key.decrypt_failed:
         summary: enc_key.decrypt_failed
         value:

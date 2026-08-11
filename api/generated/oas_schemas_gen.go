@@ -2293,7 +2293,6 @@ func (s *CreateFlowDefinitionRequest) SetFlowDefinition(val FlowDefinition) {
 type CreateFlowErrorResponse struct {
 	Type                   CreateFlowErrorResponseType // switch on this field
 	AttInvalidRequest      AttInvalidRequest
-	AuthUnauthorized       AuthUnauthorized
 	EncKeyDecryptFailed    EncKeyDecryptFailed
 	EncKeyEncryptFailed    EncKeyEncryptFailed
 	EncKeyNotFound         EncKeyNotFound
@@ -2314,7 +2313,6 @@ type CreateFlowErrorResponseType string
 // Possible values for CreateFlowErrorResponseType.
 const (
 	AttInvalidRequestCreateFlowErrorResponse      CreateFlowErrorResponseType = "att.invalid_request"
-	AuthUnauthorizedCreateFlowErrorResponse       CreateFlowErrorResponseType = "auth.unauthorized"
 	EncKeyDecryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.decrypt_failed"
 	EncKeyEncryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.encrypt_failed"
 	EncKeyNotFoundCreateFlowErrorResponse         CreateFlowErrorResponseType = "enc_key.not_found"
@@ -2332,11 +2330,6 @@ const (
 // IsAttInvalidRequest reports whether CreateFlowErrorResponse is AttInvalidRequest.
 func (s CreateFlowErrorResponse) IsAttInvalidRequest() bool {
 	return s.Type == AttInvalidRequestCreateFlowErrorResponse
-}
-
-// IsAuthUnauthorized reports whether CreateFlowErrorResponse is AuthUnauthorized.
-func (s CreateFlowErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedCreateFlowErrorResponse
 }
 
 // IsEncKeyDecryptFailed reports whether CreateFlowErrorResponse is EncKeyDecryptFailed.
@@ -2415,27 +2408,6 @@ func (s CreateFlowErrorResponse) GetAttInvalidRequest() (v AttInvalidRequest, ok
 func NewAttInvalidRequestCreateFlowErrorResponse(v AttInvalidRequest) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetAttInvalidRequest(v)
-	return s
-}
-
-// SetAuthUnauthorized sets CreateFlowErrorResponse to AuthUnauthorized.
-func (s *CreateFlowErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedCreateFlowErrorResponse
-	s.AuthUnauthorized = v
-}
-
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateFlowErrorResponse is AuthUnauthorized.
-func (s CreateFlowErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
-	if !s.IsAuthUnauthorized() {
-		return v, false
-	}
-	return s.AuthUnauthorized, true
-}
-
-// NewAuthUnauthorizedCreateFlowErrorResponse returns new CreateFlowErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedCreateFlowErrorResponse(v AuthUnauthorized) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetAuthUnauthorized(v)
 	return s
 }
 
@@ -3152,7 +3124,6 @@ func (*CreateHandoffErrorResponseStatusCode) createHandoffRes() {}
 // CreateProjectErrorResponse represents sum type.
 type CreateProjectErrorResponse struct {
 	Type                CreateProjectErrorResponseType // switch on this field
-	AuthUnauthorized    AuthUnauthorized
 	EncKeyDecryptFailed EncKeyDecryptFailed
 	EncKeyNotFound      EncKeyNotFound
 	Internal            Internal
@@ -3169,7 +3140,6 @@ type CreateProjectErrorResponseType string
 
 // Possible values for CreateProjectErrorResponseType.
 const (
-	AuthUnauthorizedCreateProjectErrorResponse    CreateProjectErrorResponseType = "auth.unauthorized"
 	EncKeyDecryptFailedCreateProjectErrorResponse CreateProjectErrorResponseType = "enc_key.decrypt_failed"
 	EncKeyNotFoundCreateProjectErrorResponse      CreateProjectErrorResponseType = "enc_key.not_found"
 	InternalCreateProjectErrorResponse            CreateProjectErrorResponseType = "internal"
@@ -3180,11 +3150,6 @@ const (
 	ReqInvalidCreateProjectErrorResponse          CreateProjectErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgCreateProjectErrorResponse    CreateProjectErrorResponseType = "enc_key.unknown_alg"
 )
-
-// IsAuthUnauthorized reports whether CreateProjectErrorResponse is AuthUnauthorized.
-func (s CreateProjectErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedCreateProjectErrorResponse
-}
 
 // IsEncKeyDecryptFailed reports whether CreateProjectErrorResponse is EncKeyDecryptFailed.
 func (s CreateProjectErrorResponse) IsEncKeyDecryptFailed() bool {
@@ -3229,27 +3194,6 @@ func (s CreateProjectErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether CreateProjectErrorResponse is EncKeyUnknownAlg.
 func (s CreateProjectErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgCreateProjectErrorResponse
-}
-
-// SetAuthUnauthorized sets CreateProjectErrorResponse to AuthUnauthorized.
-func (s *CreateProjectErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedCreateProjectErrorResponse
-	s.AuthUnauthorized = v
-}
-
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if CreateProjectErrorResponse is AuthUnauthorized.
-func (s CreateProjectErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
-	if !s.IsAuthUnauthorized() {
-		return v, false
-	}
-	return s.AuthUnauthorized, true
-}
-
-// NewAuthUnauthorizedCreateProjectErrorResponse returns new CreateProjectErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedCreateProjectErrorResponse(v AuthUnauthorized) CreateProjectErrorResponse {
-	var s CreateProjectErrorResponse
-	s.SetAuthUnauthorized(v)
-	return s
 }
 
 // SetEncKeyDecryptFailed sets CreateProjectErrorResponse to EncKeyDecryptFailed.
@@ -8990,7 +8934,6 @@ func (*GetFlowDefinitionErrorResponseStatusCode) getFlowDefinitionRes() {}
 // GetFlowStepErrorResponse represents sum type.
 type GetFlowStepErrorResponse struct {
 	Type                GetFlowStepErrorResponseType // switch on this field
-	AuthUnauthorized    AuthUnauthorized
 	EncKeyDecryptFailed EncKeyDecryptFailed
 	EncKeyNotFound      EncKeyNotFound
 	FlowCompleted       FlowCompleted
@@ -9009,7 +8952,6 @@ type GetFlowStepErrorResponseType string
 
 // Possible values for GetFlowStepErrorResponseType.
 const (
-	AuthUnauthorizedGetFlowStepErrorResponse    GetFlowStepErrorResponseType = "auth.unauthorized"
 	EncKeyDecryptFailedGetFlowStepErrorResponse GetFlowStepErrorResponseType = "enc_key.decrypt_failed"
 	EncKeyNotFoundGetFlowStepErrorResponse      GetFlowStepErrorResponseType = "enc_key.not_found"
 	FlowCompletedGetFlowStepErrorResponse       GetFlowStepErrorResponseType = "flow.completed"
@@ -9022,11 +8964,6 @@ const (
 	ReqInvalidGetFlowStepErrorResponse          GetFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgGetFlowStepErrorResponse    GetFlowStepErrorResponseType = "enc_key.unknown_alg"
 )
-
-// IsAuthUnauthorized reports whether GetFlowStepErrorResponse is AuthUnauthorized.
-func (s GetFlowStepErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedGetFlowStepErrorResponse
-}
 
 // IsEncKeyDecryptFailed reports whether GetFlowStepErrorResponse is EncKeyDecryptFailed.
 func (s GetFlowStepErrorResponse) IsEncKeyDecryptFailed() bool {
@@ -9081,27 +9018,6 @@ func (s GetFlowStepErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether GetFlowStepErrorResponse is EncKeyUnknownAlg.
 func (s GetFlowStepErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgGetFlowStepErrorResponse
-}
-
-// SetAuthUnauthorized sets GetFlowStepErrorResponse to AuthUnauthorized.
-func (s *GetFlowStepErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedGetFlowStepErrorResponse
-	s.AuthUnauthorized = v
-}
-
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetFlowStepErrorResponse is AuthUnauthorized.
-func (s GetFlowStepErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
-	if !s.IsAuthUnauthorized() {
-		return v, false
-	}
-	return s.AuthUnauthorized, true
-}
-
-// NewAuthUnauthorizedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedGetFlowStepErrorResponse(v AuthUnauthorized) GetFlowStepErrorResponse {
-	var s GetFlowStepErrorResponse
-	s.SetAuthUnauthorized(v)
-	return s
 }
 
 // SetEncKeyDecryptFailed sets GetFlowStepErrorResponse to EncKeyDecryptFailed.
@@ -21477,7 +21393,6 @@ type SubmitFlowStepErrorResponse struct {
 	AttNotFound         AttNotFound
 	AttProofRejected    AttProofRejected
 	AttStaleChallenge   AttStaleChallenge
-	AuthUnauthorized    AuthUnauthorized
 	EncKeyDecryptFailed EncKeyDecryptFailed
 	EncKeyEncryptFailed EncKeyEncryptFailed
 	EncKeyNotFound      EncKeyNotFound
@@ -21510,7 +21425,6 @@ const (
 	AttNotFoundSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "att.not_found"
 	AttProofRejectedSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "att.proof_rejected"
 	AttStaleChallengeSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "att.stale_challenge"
-	AuthUnauthorizedSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "auth.unauthorized"
 	EncKeyDecryptFailedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
 	EncKeyEncryptFailedSubmitFlowStepErrorResponse SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
 	EncKeyNotFoundSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "enc_key.not_found"
@@ -21564,11 +21478,6 @@ func (s SubmitFlowStepErrorResponse) IsAttProofRejected() bool {
 // IsAttStaleChallenge reports whether SubmitFlowStepErrorResponse is AttStaleChallenge.
 func (s SubmitFlowStepErrorResponse) IsAttStaleChallenge() bool {
 	return s.Type == AttStaleChallengeSubmitFlowStepErrorResponse
-}
-
-// IsAuthUnauthorized reports whether SubmitFlowStepErrorResponse is AuthUnauthorized.
-func (s SubmitFlowStepErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedSubmitFlowStepErrorResponse
 }
 
 // IsEncKeyDecryptFailed reports whether SubmitFlowStepErrorResponse is EncKeyDecryptFailed.
@@ -21805,27 +21714,6 @@ func (s SubmitFlowStepErrorResponse) GetAttStaleChallenge() (v AttStaleChallenge
 func NewAttStaleChallengeSubmitFlowStepErrorResponse(v AttStaleChallenge) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetAttStaleChallenge(v)
-	return s
-}
-
-// SetAuthUnauthorized sets SubmitFlowStepErrorResponse to AuthUnauthorized.
-func (s *SubmitFlowStepErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedSubmitFlowStepErrorResponse
-	s.AuthUnauthorized = v
-}
-
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if SubmitFlowStepErrorResponse is AuthUnauthorized.
-func (s SubmitFlowStepErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
-	if !s.IsAuthUnauthorized() {
-		return v, false
-	}
-	return s.AuthUnauthorized, true
-}
-
-// NewAuthUnauthorizedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedSubmitFlowStepErrorResponse(v AuthUnauthorized) SubmitFlowStepErrorResponse {
-	var s SubmitFlowStepErrorResponse
-	s.SetAuthUnauthorized(v)
 	return s
 }
 

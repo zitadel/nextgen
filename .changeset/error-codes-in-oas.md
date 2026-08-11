@@ -15,3 +15,7 @@ the transport's `auth.unauthorized` / `req.invalid`, raised before a handler
 runs at all. Because the generated client discriminates the error response on
 `code`, an omitted code made a real response fail to decode instead of
 surfacing as the error it is.
+
+`auth.unauthorized` is listed only where the operation declares a security
+requirement, so the health probes and the pre-authentication flow steps no
+longer advertise an answer they cannot give.

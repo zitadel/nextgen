@@ -18,11 +18,19 @@
 //     err := s.foo(); ...; return err pulls in s.foo's error set;
 //   - a returned call contributes that callee's error set, recursively;
 //   - errors.AsType[domain.Error](err) propagates err's set to its target,
-//     which is how the transaction-unwrap idiom keeps its inner errors.
+//     which is how the transaction-unwrap idiom keeps its inner errors, as does
+//     errors.As(err, &target) through its pointer argument.
 //
 // Errors only *inspected* (errors.Is(err, domain.ErrY())) never reach a return
 // position, so they are correctly excluded — that is the whole reason this is
 // a dataflow analysis and not a grep for "domain.Err".
+//
+// # Prerequisites
+//
+// The analysis type-checks the module, so it needs a tree that compiles: every
+// generated file the analyzed packages import — enumer output, ogen output —
+// must already exist. That makes this a real ordering constraint on code
+// generation, not just on the build.
 //
 // # Dynamic dispatch
 //
@@ -171,6 +179,9 @@ type analyzer struct {
 
 	cache  map[string]codeSet
 	active map[string]bool
+	// cycleHits records the active functions the current walk bottomed out on,
+	// so a result under-approximated by mutual recursion is never cached.
+	cycleHits map[string]bool
 }
 
 func newAnalyzer(cfg Config) (*analyzer, error) {
@@ -191,6 +202,7 @@ func newAnalyzer(cfg Config) (*analyzer, error) {
 		implCache: map[*types.Interface][]types.Type{},
 		cache:     map[string]codeSet{},
 		active:    map[string]bool{},
+		cycleHits: map[string]bool{},
 	}
 
 	if loadErrs := loadErrors(loaded); len(loadErrs) > 0 {

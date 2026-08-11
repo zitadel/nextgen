@@ -5143,22 +5143,6 @@ func (s CreateFlowErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AuthUnauthorizedCreateFlowErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case EncKeyDecryptFailedCreateFlowErrorResponse:
 		e.FieldStart("code")
 		e.Str("enc_key.decrypt_failed")
@@ -5380,9 +5364,6 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 				case "att.invalid_request":
 					s.Type = AttInvalidRequestCreateFlowErrorResponse
 					found = true
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedCreateFlowErrorResponse
-					found = true
 				case "enc_key.decrypt_failed":
 					s.Type = EncKeyDecryptFailedCreateFlowErrorResponse
 					found = true
@@ -5435,10 +5416,6 @@ func (s *CreateFlowErrorResponse) Decode(d *jx.Decoder) error {
 	switch s.Type {
 	case AttInvalidRequestCreateFlowErrorResponse:
 		if err := s.AttInvalidRequest.Decode(d); err != nil {
-			return err
-		}
-	case AuthUnauthorizedCreateFlowErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
 	case EncKeyDecryptFailedCreateFlowErrorResponse:
@@ -6041,22 +6018,6 @@ func (s CreateProjectErrorResponse) Encode(e *jx.Encoder) {
 
 func (s CreateProjectErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AuthUnauthorizedCreateProjectErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case EncKeyDecryptFailedCreateProjectErrorResponse:
 		e.FieldStart("code")
 		e.Str("enc_key.decrypt_failed")
@@ -6227,9 +6188,6 @@ func (s *CreateProjectErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedCreateProjectErrorResponse
-					found = true
 				case "enc_key.decrypt_failed":
 					s.Type = EncKeyDecryptFailedCreateProjectErrorResponse
 					found = true
@@ -6271,10 +6229,6 @@ func (s *CreateProjectErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AuthUnauthorizedCreateProjectErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
 	case EncKeyDecryptFailedCreateProjectErrorResponse:
 		if err := s.EncKeyDecryptFailed.Decode(d); err != nil {
 			return err
@@ -18028,22 +17982,6 @@ func (s GetFlowStepErrorResponse) Encode(e *jx.Encoder) {
 
 func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AuthUnauthorizedGetFlowStepErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case EncKeyDecryptFailedGetFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("enc_key.decrypt_failed")
@@ -18246,9 +18184,6 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedGetFlowStepErrorResponse
-					found = true
 				case "enc_key.decrypt_failed":
 					s.Type = EncKeyDecryptFailedGetFlowStepErrorResponse
 					found = true
@@ -18296,10 +18231,6 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AuthUnauthorizedGetFlowStepErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
-			return err
-		}
 	case EncKeyDecryptFailedGetFlowStepErrorResponse:
 		if err := s.EncKeyDecryptFailed.Decode(d); err != nil {
 			return err
@@ -36745,22 +36676,6 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AuthUnauthorizedSubmitFlowStepErrorResponse:
-		e.FieldStart("code")
-		e.Str("auth.unauthorized")
-		{
-			s := s.AuthUnauthorized
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case EncKeyDecryptFailedSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("enc_key.decrypt_failed")
@@ -37096,9 +37011,6 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "att.stale_challenge":
 					s.Type = AttStaleChallengeSubmitFlowStepErrorResponse
 					found = true
-				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedSubmitFlowStepErrorResponse
-					found = true
 				case "enc_key.decrypt_failed":
 					s.Type = EncKeyDecryptFailedSubmitFlowStepErrorResponse
 					found = true
@@ -37193,10 +37105,6 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case AttStaleChallengeSubmitFlowStepErrorResponse:
 		if err := s.AttStaleChallenge.Decode(d); err != nil {
-			return err
-		}
-	case AuthUnauthorizedSubmitFlowStepErrorResponse:
-		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
 	case EncKeyDecryptFailedSubmitFlowStepErrorResponse:

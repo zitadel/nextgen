@@ -5,7 +5,6 @@ content:
     schema:
       oneOf:
         - $ref: '../../components/schemas/errors/att-invalid_request.yaml'
-        - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-not_found.yaml'
@@ -22,7 +21,6 @@ content:
         propertyName: code
         mapping:
           att.invalid_request: '../../components/schemas/errors/att-invalid_request.yaml'
-          auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
           enc_key.decrypt_failed: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.encrypt_failed: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
           enc_key.not_found: '../../components/schemas/errors/enc_key-not_found.yaml'
@@ -41,11 +39,6 @@ content:
         value:
           code: att.invalid_request
           message: 'invalid request'
-      auth.unauthorized:
-        summary: auth.unauthorized
-        value:
-          code: auth.unauthorized
-          message: 'The request lacks valid authentication credentials.'
       enc_key.decrypt_failed:
         summary: enc_key.decrypt_failed
         value:

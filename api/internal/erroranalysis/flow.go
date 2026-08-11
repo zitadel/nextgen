@@ -37,10 +37,21 @@ func (a *analyzer) funcErrors(fn *types.Func, b bindings, depth int) codeSet {
 	if a.active[key] {
 		// Recursive call: contribute nothing this time round. The caller's
 		// fixpoint picks up whatever the base case produces.
+		a.cycleHits[key] = true
 		return nil
 	}
 	a.active[key] = true
 	defer delete(a.active, key)
+
+	// Collect which active functions this walk bottomed out on, so the result
+	// is only cached when it is not under-approximated. Direct recursion is
+	// exact — f's set is the least fixpoint of its own non-recursive
+	// contributions, which is what contributing nil computes — but mutual
+	// recursion is not: while A is active, B's call to A contributes nothing,
+	// so B's result is missing A's own errors. Caching that truncated set would
+	// hand it to every later caller of B, permanently.
+	outerHits := a.cycleHits
+	a.cycleHits = map[string]bool{}
 
 	f := newFrame(a, info, depth)
 	for v, bd := range b {
@@ -65,7 +76,18 @@ func (a *analyzer) funcErrors(fn *types.Func, b bindings, depth int) codeSet {
 		}
 	}
 
-	a.cache[key] = f.out
+	hits := a.cycleHits
+	delete(hits, key)
+	if len(hits) == 0 {
+		a.cache[key] = f.out
+	}
+	// A cycle this frame did not close still constrains its callers, so the
+	// hits travel up until the frame that opened the cycle absorbs them.
+	for hit := range hits {
+		outerHits[hit] = true
+	}
+	a.cycleHits = outerHits
+
 	return f.out
 }
 
@@ -210,6 +232,7 @@ func (f *frame) walkStmt(stmt ast.Stmt, sig *types.Signature, out codeSet) bool 
 		if call, ok := unparen(s.X).(*ast.CallExpr); ok {
 			f.callErrors(call)
 		}
+		mark(f.bindAsTargets(s.X))
 
 	case *ast.DeclStmt:
 		// var err error = ... — rare in this codebase; handled if it appears.
@@ -232,6 +255,7 @@ func (f *frame) walkStmt(stmt ast.Stmt, sig *types.Signature, out codeSet) bool 
 
 	case *ast.IfStmt:
 		mark(f.walkStmt(s.Init, sig, out))
+		mark(f.bindAsTargets(s.Cond))
 		// A guard that branches on a mode parameter the call site pinned to a
 		// constant only reaches one side. Walking both would credit this
 		// operation with the errors of every other caller's mode.
@@ -256,6 +280,7 @@ func (f *frame) walkStmt(stmt ast.Stmt, sig *types.Signature, out codeSet) bool 
 
 	case *ast.SwitchStmt:
 		mark(f.walkStmt(s.Init, sig, out))
+		mark(f.bindAsTargets(s.Tag))
 		mark(f.walkStmt(s.Body, sig, out))
 
 	case *ast.TypeSwitchStmt:
@@ -290,8 +315,14 @@ func (f *frame) walkStmt(stmt ast.Stmt, sig *types.Signature, out codeSet) bool 
 func (f *frame) assign(s *ast.AssignStmt) bool {
 	changed := false
 
-	// errors.AsType[T](err) / errors.As(err, &t) hand the underlying error to
-	// their target. Without this the transaction-unwrap idiom
+	// ok := errors.As(err, &de) binds through the argument, not the result, so
+	// it is handled before anything looks at the left-hand side.
+	for _, rhs := range s.Rhs {
+		changed = f.bindAsTargets(rhs) || changed
+	}
+
+	// errors.AsType[T](err) hands the underlying error to its target. Without
+	// this the transaction-unwrap idiom
 	//   if de, ok := errors.AsType[domain.Error](err); ok { return de }
 	// would drop every error raised inside the transaction.
 	if len(s.Rhs) == 1 {
@@ -850,20 +881,72 @@ func stringLiteral(e ast.Expr) (string, bool) {
 	return value, true
 }
 
-// errorUnwrapSource recognizes errors.AsType[T](err) and errors.As(err, &t) and
-// returns the error expression being unwrapped.
+// errorUnwrapSource recognizes the unwrap helpers whose target is the call's
+// first result — errors.AsType[T](err) and errors.Unwrap(err) — and returns the
+// error expression being unwrapped. errors.As is deliberately absent: its first
+// result is a bool and its target is the second argument, so it is handled by
+// [frame.bindAsTarget] instead.
 func (f *frame) errorUnwrapSource(call *ast.CallExpr) (ast.Expr, bool) {
 	fn, _ := f.callee(call)
 	if fn == nil || fn.Pkg() == nil || fn.Pkg().Path() != "errors" {
 		return nil, false
 	}
 	switch fn.Name() {
-	case "AsType", "As", "Unwrap":
+	case "AsType", "Unwrap":
 		if len(call.Args) > 0 {
 			return call.Args[0], true
 		}
 	}
 	return nil, false
+}
+
+// bindAsTarget propagates the inspected error's codes into the pointer target
+// of errors.As(err, &target), and reports whether that changed anything.
+//
+// The codebase idiom is errors.AsType, whose target is the call's first result,
+// but errors.As writes through its second argument instead — so neither the
+// assignment's LHS (a bool) nor the call's result carries the error, and the
+// call can appear where no assignment does at all:
+//
+//	if errors.As(err, &de) { return de }
+//
+// Missing that would silently drop de's codes from the operation's spec, which
+// is exactly the client decode failure this analysis exists to prevent.
+func (f *frame) bindAsTarget(call *ast.CallExpr) bool {
+	fn, _ := f.callee(call)
+	if fn == nil || fn.Pkg() == nil || fn.Pkg().Path() != "errors" || fn.Name() != "As" {
+		return false
+	}
+	if len(call.Args) < 2 {
+		return false
+	}
+	unary, ok := unparen(call.Args[1]).(*ast.UnaryExpr)
+	if !ok || unary.Op != token.AND {
+		return false
+	}
+	v := f.object(unary.X)
+	if v == nil {
+		return false
+	}
+	return f.varSet(v).union(f.evalErr(call.Args[0]))
+}
+
+// bindAsTargets binds every errors.As target inside expr. Expressions that are
+// not assignment right-hand sides — an if condition, a switch tag — are not
+// otherwise walked for calls, and errors.As binds through an argument rather
+// than through a result, so it has to be looked for explicitly.
+func (f *frame) bindAsTargets(expr ast.Expr) bool {
+	if expr == nil {
+		return false
+	}
+	changed := false
+	ast.Inspect(expr, func(n ast.Node) bool {
+		if call, ok := n.(*ast.CallExpr); ok && f.bindAsTarget(call) {
+			changed = true
+		}
+		return true
+	})
+	return changed
 }
 
 // resultImplementsError reports whether the i-th result of a call is an error.

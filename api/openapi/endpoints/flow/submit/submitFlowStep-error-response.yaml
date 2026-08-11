@@ -11,7 +11,6 @@ content:
         - $ref: '../../../components/schemas/errors/att-not_found.yaml'
         - $ref: '../../../components/schemas/errors/att-proof_rejected.yaml'
         - $ref: '../../../components/schemas/errors/att-stale_challenge.yaml'
-        - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-encrypt_failed.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-not_found.yaml'
@@ -40,7 +39,6 @@ content:
           att.not_found: '../../../components/schemas/errors/att-not_found.yaml'
           att.proof_rejected: '../../../components/schemas/errors/att-proof_rejected.yaml'
           att.stale_challenge: '../../../components/schemas/errors/att-stale_challenge.yaml'
-          auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           enc_key.decrypt_failed: '../../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.encrypt_failed: '../../../components/schemas/errors/enc_key-encrypt_failed.yaml'
           enc_key.not_found: '../../../components/schemas/errors/enc_key-not_found.yaml'
@@ -95,11 +93,6 @@ content:
         value:
           code: att.stale_challenge
           message: 'The challenge is stale or was re-issued.'
-      auth.unauthorized:
-        summary: auth.unauthorized
-        value:
-          code: auth.unauthorized
-          message: 'The request lacks valid authentication credentials.'
       enc_key.decrypt_failed:
         summary: enc_key.decrypt_failed
         value:

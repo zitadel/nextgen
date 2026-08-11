@@ -100,6 +100,12 @@ type userService struct {
 	hasher      crypto.Hasher
 }
 
+// NewUserService returns the interface rather than *userService, deliberately
+// against "accept interfaces, return structs". The OpenAPI error generator
+// reflects the API handler's fields to find which services an operation calls,
+// and only an interface-typed field gives it something to key on — a handler
+// holding *userService drops this service out of the reflected floor that
+// backstops the call-graph walk.
 func NewUserService(
 	v2Pool StatementPool,
 	schemaStore domain.JSONSchemaStore,
