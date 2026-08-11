@@ -321,10 +321,7 @@ func TestSessionStatements_List_LimitKeepsFactorsComplete(t *testing.T) {
 }
 
 // TestSessionStatements_List_StateColumnFilters exercises the filter shapes
-// sessionService.List builds for the state filter: nil compare values must
-// compile to IS NULL / IS NOT NULL in plain (non-keyset) filters on every
-// dialect. Building = live without user, active = live with user,
-// expired = expires_at passed.
+// sessionService.List builds for the state filter.
 func TestSessionStatements_List_StateColumnFilters(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
@@ -349,8 +346,19 @@ func TestSessionStatements_List_StateColumnFilters(t *testing.T) {
 		t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
 		activeID := createTwoCheckSession(t, d.stmts, projectID, userID).ID
 
+		// A password-only exchange promotes a verified factor but binds no
+		// user: the case the user_id proxy misclassified as building.
+		plainPw, _ := handoffCompletedAttempt(t, d.stmts, projectID, nil)
+		pwOnly, err := d.stmts.ExchangeSession(t.Context(), projectID, plainPw, nil, time.Hour)
+		require.NoError(t, err)
+		require.Nil(t, pwOnly.UserID)
+		require.NotEmpty(t, pwOnly.Factors)
+		pwOnlyID := pwOnly.ID
+		t.Cleanup(func() { _ = d.stmts.DeleteSessionByID(context.Background(), projectID, pwOnlyID) })
+
 		scope := database.Equal(database.Col(domain.SessionFieldProjectID), projectID)
 		expiresAt := database.Col(domain.SessionFieldExpiresAt)
+		hasFactors := database.Col(domain.SessionFieldHasVerifiedFactors)
 		sessUserID := database.Col(domain.SessionFieldUserID)
 
 		ctx := t.Context()
@@ -394,15 +402,23 @@ func TestSessionStatements_List_StateColumnFilters(t *testing.T) {
 		live := database.Or(database.GreaterThan(expiresAt, now), database.Equal(expiresAt, now))
 
 		expired := list(t, database.LessThan(expiresAt, now))
-		building := list(t, database.And(live, database.Equal(sessUserID, nil)))
-		active := list(t, database.And(live, database.GreaterThan(sessUserID, nil)))
+		// The has-verified-factors EXISTS must compile inside plain equality filters on every dialect.
+		building := list(t, database.And(live, database.Equal(hasFactors, false)))
+		active := list(t, database.And(live, database.Equal(hasFactors, true)))
 
 		assert.ElementsMatch(t, []string{expiredID}, ids(expired), "expired: expires_at before now")
-		assert.ElementsMatch(t, []string{buildingID}, ids(building), "building: live and user_id IS NULL")
-		assert.ElementsMatch(t, []string{activeID}, ids(active), "active: live and user_id IS NOT NULL")
+		assert.ElementsMatch(t, []string{buildingID}, ids(building), "building: live without verified factors")
+		assert.ElementsMatch(t, []string{activeID, pwOnlyID}, ids(active), "active: live with verified factors, user bound or not")
 
 		assertStates(t, expired, domain.SessionStateExpired)
 		assertStates(t, building, domain.SessionStateBuilding)
 		assertStates(t, active, domain.SessionStateActive)
+
+		// check that plain (non-keyset) nil values compile to
+		// IS NULL / IS NOT NULL on every dialect.
+		userless := list(t, database.And(live, database.Equal(sessUserID, nil)))
+		userBound := list(t, database.And(live, database.GreaterThan(sessUserID, nil)))
+		assert.ElementsMatch(t, []string{buildingID, pwOnlyID}, ids(userless), "live and user_id IS NULL")
+		assert.ElementsMatch(t, []string{activeID}, ids(userBound), "live and user_id IS NOT NULL")
 	})
 }

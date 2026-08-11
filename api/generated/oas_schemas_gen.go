@@ -11023,7 +11023,7 @@ type SessionResponse struct {
 	SessionID SessionID `json:"session_id"`
 	ProjectID ProjectID `json:"project_id"`
 	// Current lifecycle state of the session:
-	// - `building`: has a user factor but is still gathering authentication factors
+	// - `building`: no verified authentication factors yet
 	// - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
 	// factors age
 	// - `expired`: TTL elapsed.
@@ -11229,7 +11229,7 @@ func (s *SessionResponseMetadata) init() SessionResponseMetadata {
 }
 
 // Current lifecycle state of the session:
-// - `building`: has a user factor but is still gathering authentication factors
+// - `building`: no verified authentication factors yet
 // - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
 // factors age
 // - `expired`: TTL elapsed.

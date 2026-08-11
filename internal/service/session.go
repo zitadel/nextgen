@@ -226,10 +226,12 @@ func sessionFilter(f Filter, now time.Time) (database.Filter[domain.SessionField
 }
 
 // sessionStateFilter expresses [domain.Session.State], which is computed and
-// not stored, over stored columns:
+// not stored, over stored data:
 // expired = expires_at < now(),
-// building = user_id is NULL and expires_at >= now()
-// active = expires_at >= now() and user_id is not NULL
+// building = expires_at >= now() and no verified factors,
+// active = expires_at >= now() and at least one verified factor,
+// matching State()'s len(Factors) test. An unexpired session with factors but
+// no user (password-only exchange) is active, not building.
 func sessionStateFilter(op, state string, now time.Time) (database.Filter[domain.SessionField], error) {
 	switch op {
 	case filterOpEquals:
@@ -243,21 +245,17 @@ func sessionStateFilter(op, state string, now time.Time) (database.Filter[domain
 	}
 
 	expiresAt := database.Col(domain.SessionFieldExpiresAt)
-	userID := database.Col(domain.SessionFieldUserID)
+	hasVerifiedFactors := database.Col(domain.SessionFieldHasVerifiedFactors)
 	// todo (grvijayan): replace with a greater-or-equal compare once the filter layer supports it
-	activeSessionsFilter := database.Or(database.GreaterThan(expiresAt, now), database.Equal(expiresAt, now))
+	unexpiredSessions := database.Or(database.GreaterThan(expiresAt, now), database.Equal(expiresAt, now))
 
 	switch state {
 	case sessionStateExpired:
 		return database.LessThan(expiresAt, now), nil
 	case sessionStateBuilding:
-		// todo (@grvijayan) review: user_id stands in for State()'s factor test.
-		// A nil value binds SQL NULL: user_id IS NULL until the exchange.
-		return database.And(activeSessionsFilter, database.Equal(userID, nil)), nil
+		return database.And(unexpiredSessions, database.Equal(hasVerifiedFactors, false)), nil
 	case sessionStateActive:
-		// GreaterThan nil compiles to user_id IS NOT NULL: ordered compares
-		// place every value beyond the NULL block.
-		return database.And(activeSessionsFilter, database.GreaterThan(userID, nil)), nil
+		return database.And(unexpiredSessions, database.Equal(hasVerifiedFactors, true)), nil
 	default:
 		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown state %q", state))
 	}
