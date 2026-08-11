@@ -10,7 +10,8 @@ properties:
   next_page_token:
     description: |
       Token to pass as `page_token` in the next request to fetch the following page.
-      Absent when there are no more results.
+      Absent when there are no more results. The follow-up request must repeat the
+      same `sorting` that produced this token (omit only when both pages use the default).
     oneOf:
       - $ref: ../../../components/schemas/page-token.yaml
       - type: 'null'

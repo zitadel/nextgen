@@ -15,6 +15,7 @@ import { DependencyCheck } from "./dependency";
 import { ManagedFilesCheck } from "./managed-files";
 import { ProjectMatchCheck } from "./project-match";
 import { SchemaCheck } from "./schema";
+import { ClaimCheck } from "./claim";
 
 export type { SanityCheck, CheckContext, CheckOutcome } from "./types";
 export { AbstractSanityCheck } from "./types";
@@ -28,6 +29,7 @@ export { SchemaCheck } from "./schema";
 export { DependencyCheck } from "./dependency";
 export { ManagedFilesCheck } from "./managed-files";
 export { ProjectMatchCheck } from "./project-match";
+export { ClaimCheck } from "./claim";
 
 /** Every diagnostic the `doctor` command runs, in display order. */
 export const SANITY_CHECKS: ReadonlyArray<SanityCheck> = [
@@ -41,4 +43,5 @@ export const SANITY_CHECKS: ReadonlyArray<SanityCheck> = [
   new DependencyCheck(),
   new ManagedFilesCheck(),
   new ProjectMatchCheck(),
+  new ClaimCheck(),
 ];

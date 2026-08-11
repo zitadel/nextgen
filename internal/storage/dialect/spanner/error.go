@@ -1,6 +1,7 @@
 package spanner
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -17,12 +18,10 @@ func wrapError(err error) error {
 	if err == nil {
 		return nil
 	}
-	var de domain.Error
-	if errors.As(err, &de) {
+	if de, ok := errors.AsType[domain.Error](err); ok {
 		return de
 	}
-	var unimplemented *database.UnimplementedError
-	if errors.As(err, &unimplemented) {
+	if unimplemented, ok := errors.AsType[*database.UnimplementedError](err); ok {
 		return unimplemented
 	}
 	if errors.Is(err, spanner.ErrRowNotFound) {
@@ -31,8 +30,22 @@ func wrapError(err error) error {
 	if errors.Is(err, errTooManyRows) {
 		return database.NewMultipleRowsFoundError(err)
 	}
+	// The retry budget usually runs out while the client is backing off between
+	// aborts, and gax.Sleep returns the bare context error, which carries no gRPC
+	// status for the switch below to classify. This is the common shape of an
+	// exhausted budget, not an edge case.
+	if errors.Is(err, context.DeadlineExceeded) {
+		return database.NewUnavailableError(err)
+	}
 
 	switch spanner.ErrCode(err) {
+	// Retry is already exhausted by the time these arrive here:
+	// ReadWriteTransaction retries ABORTED internally until the budget set by
+	// [runBounded] runs out, and returns the last status (or the context error)
+	// only once it has given up. Classifying them keeps the caller from
+	// reporting a transient conflict as an unexplained internal failure.
+	case codes.Aborted, codes.DeadlineExceeded, codes.Unavailable:
+		return database.NewUnavailableError(err)
 	case codes.NotFound:
 		return database.NewNoRowFoundError(err)
 	case codes.AlreadyExists:

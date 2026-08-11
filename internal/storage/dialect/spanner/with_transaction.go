@@ -13,10 +13,12 @@ func withTransaction(ctx context.Context, db queryExecutor, fn func(ctx context.
 	case tx:
 		return fn(ctx, c)
 	case client:
-		_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, rwt *spanner.ReadWriteTransaction) error {
-			return fn(ctx, newTxnDB(rwt))
-		})
-		return returnQueryError(err)
+		return returnQueryError(runBounded(ctx, func(ctx context.Context) error {
+			_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, rwt *spanner.ReadWriteTransaction) error {
+				return fn(ctx, newTxnDB(rwt))
+			})
+			return err
+		}))
 	default:
 		return fn(ctx, db)
 	}

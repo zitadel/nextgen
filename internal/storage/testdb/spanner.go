@@ -32,6 +32,13 @@ const (
 // Cloud Spanner emulator testcontainer, creates the test instance/database,
 // sets SPANNER_EMULATOR_HOST, and returns the database DSN plus a stop func
 // that clears the env var and terminates the container.
+//
+// The emulator is deliberately the only bring-up CI uses: it serialises on one
+// transaction at a time, which is what forces the aborts that keep the
+// abort-retry path honest (#788). Running these tests against a real instance
+// would hide a missing retry rather than fix it. The instance branch below is
+// therefore live code that nothing sets, kept as a fast way back if the
+// emulator turns out not to hold; see [instanceEnv]. Removal: #793.
 func SpannerDSN(ctx context.Context) (string, func(), error) {
 	if strings.TrimSpace(os.Getenv(instanceEnv)) != "" {
 		return provision(ctx)
@@ -41,9 +48,17 @@ func SpannerDSN(ctx context.Context) (string, func(), error) {
 	}
 
 	req := testcontainers.ContainerRequest{
-		Image:        "gcr.io/cloud-spanner-emulator/emulator:latest",
-		ExposedPorts: []string{"9010/tcp", "9020/tcp"},
-		WaitingFor:   wait.ForListeningPort("9010/tcp"),
+		Image: "gcr.io/cloud-spanner-emulator/emulator:latest",
+		// Pin the platform: the arm64 emulator build returns commit timestamps at a
+		// different resolution than the amd64 one, which makes seven created_at
+		// assertions in stmttest and the spanner dialect fail on Apple Silicon while
+		// passing in CI. No-op on amd64 hosts (CI), Rosetta elsewhere, and worth the
+		// few seconds it costs to have one suite that behaves the same everywhere.
+		ImagePlatform: "linux/amd64",
+		ExposedPorts:  []string{"9010/tcp", "9020/tcp"},
+		// 120s to match postgres.go: the default 60s is not enough for a cold
+		// start under emulation, where the first run also pulls the image.
+		WaitingFor: wait.ForListeningPort("9010/tcp").WithStartupTimeout(120 * time.Second),
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,

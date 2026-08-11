@@ -4,6 +4,8 @@ CREATE TYPE zitadel_nextgen.token_types AS ENUM (
     , 'oidc_access_token'
     , 'saml_assertion'
     , 'personal_access_token'
+    , 'project_token'
+    , 'project_preview'
 );
 
 CREATE TABLE zitadel_nextgen.tokens (
@@ -36,9 +38,19 @@ CREATE TABLE zitadel_nextgen.tokens (
             AND session_id IS NULL AND oidc_session_id IS NULL)
         OR (token_type = 'personal_access_token'::zitadel_nextgen.token_types
             AND session_id IS NULL AND oidc_session_id IS NULL AND saml_session_id IS NULL)
+        OR (token_type IN (
+                'project_token'::zitadel_nextgen.token_types,
+                'project_preview'::zitadel_nextgen.token_types)
+            AND user_id IS NULL
+            AND session_id IS NULL AND oidc_session_id IS NULL AND saml_session_id IS NULL)
     )
 );
 
+CREATE INDEX idx_tokens_session
+    ON zitadel_nextgen.tokens (project_id, session_id)
+    WHERE session_id IS NOT NULL;
+
 -- +goose Down
+DROP INDEX IF EXISTS zitadel_nextgen.idx_tokens_session;
 DROP TABLE IF EXISTS zitadel_nextgen.tokens;
 DROP TYPE IF EXISTS zitadel_nextgen.token_types;

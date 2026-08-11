@@ -129,14 +129,12 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 		return nil, wrapError(err)
 	}
 
-	var nextCursor []byte
-	if opts.Pagination.Limit > 0 && len(defs) == int(opts.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.FlowDefinitionField]{
-			Columns: opts.Pagination.OrderBy.Columns,
-			Values:  flowdefinition.Schema.ValuesFrom(defs[len(defs)-1], opts.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
-	}
+	nextCursor := pagination.MarshalNext(
+		opts.Pagination.OrderBy,
+		defs,
+		flowdefinition.Schema,
+		opts.Pagination.Limit,
+	)
 
 	return &database.ListResult[*domain.FlowDefinition]{
 		Items:      defs,

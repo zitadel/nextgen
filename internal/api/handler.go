@@ -17,7 +17,7 @@ type Handler struct {
 	authAttemptService    service.AuthAttemptService
 	sessionService        service.SessionService
 	projectService        service.ProjectService
-	userService           *service.UserService
+	userService           service.UserService
 	schemaService         *service.SchemaService
 	flowDefinitionService service.FlowDefinitionService
 	teamService           *service.TeamService
@@ -37,7 +37,7 @@ func NewHandler(
 	authAttemptService service.AuthAttemptService,
 	sessionService service.SessionService,
 	projectService service.ProjectService,
-	userService *service.UserService,
+	userService service.UserService,
 	schemaService *service.SchemaService,
 	flowDefinitionService service.FlowDefinitionService,
 	teamService *service.TeamService,

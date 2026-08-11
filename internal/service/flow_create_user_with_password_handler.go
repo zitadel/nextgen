@@ -13,19 +13,22 @@ import (
 // persist a new user from validated identifier + password fields.
 type FlowCreateUserWithPasswordHandler struct {
 	hasher      crypto.Hasher
-	userService *UserService
+	userService UserService
 	schemaStore domain.JSONSchemaStore
+	db          StatementPool
 }
 
 func NewFlowCreateUserHandler(
 	hasher crypto.Hasher,
-	userService *UserService,
+	userService UserService,
 	schemaStore domain.JSONSchemaStore,
+	db StatementPool,
 ) *FlowCreateUserWithPasswordHandler {
 	return &FlowCreateUserWithPasswordHandler{
 		userService: userService,
 		schemaStore: schemaStore,
 		hasher:      hasher,
+		db:          db,
 	}
 }
 
@@ -39,7 +42,7 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
 	}
 
-	userID, err := h.userService.v2Pool.Statements().NewManagedID(string(domain.PrefixUser))
+	userID, err := h.db.Statements().NewManagedID(string(domain.PrefixUser))
 	if err != nil {
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("create_user: mint user id: %w", err)
 	}
