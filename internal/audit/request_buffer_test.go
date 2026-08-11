@@ -111,8 +111,27 @@ func TestStatusCapturingWriter(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, rec.status)
 }
 
+func TestStatusCapturingWriter_FlushAndUnwrap(t *testing.T) {
+	inner := &flushableWriter{}
+	rec := &statusCapturingWriter{ResponseWriter: inner}
+
+	assert.Equal(t, http.ResponseWriter(inner), rec.Unwrap())
+
+	flusher, ok := any(rec).(http.Flusher)
+	require.True(t, ok)
+	flusher.Flush()
+	assert.Equal(t, 1, inner.flushCalls)
+}
+
 type nopResponseWriter struct{}
 
 func (nopResponseWriter) Header() http.Header         { return http.Header{} }
 func (nopResponseWriter) Write(b []byte) (int, error) { return len(b), nil }
 func (nopResponseWriter) WriteHeader(int)             {}
+
+type flushableWriter struct {
+	nopResponseWriter
+	flushCalls int
+}
+
+func (w *flushableWriter) Flush() { w.flushCalls++ }

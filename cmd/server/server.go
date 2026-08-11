@@ -413,6 +413,8 @@ func loadConfig(configPath string) (Config, error) {
 	// (Console ADR 0004 §3); set NEXTGEN_PLATFORM_PROJECT_ID to pin an
 	// existing project instead. The server never creates a project itself,
 	// unless platform.bootstrap_project explicitly opts in (#605).
+	v.SetDefault("platform.project_id", "")
+	v.SetDefault("platform.bootstrap_project", false)
 	v.SetDefault("events.retention_days", 30)
 	v.SetDefault("events.retention_interval", time.Hour)
 	v.SetDefault("events.export_enabled", false)

@@ -9,15 +9,25 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+const listProjectIDsPageSize = 500
+
 // EventExportAdapter adapts AllStatements to audit retention/shipper interfaces.
 type EventExportAdapter struct {
 	Pool *DB
 }
 
 func (a EventExportAdapter) ListProjectIDs(ctx context.Context) ([]string, error) {
-	res, err := a.Pool.Statements().ListProjects(ctx, &database.ListOptions[domain.ProjectField]{
+	return collectProjectIDs(ctx, a.Pool.Statements().ListProjects)
+}
+
+// collectProjectIDs pages through ListProjects until NextCursor is empty.
+func collectProjectIDs(
+	ctx context.Context,
+	list func(context.Context, *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error),
+) ([]string, error) {
+	opts := &database.ListOptions[domain.ProjectField]{
 		Pagination: database.Page[domain.ProjectField]{
-			Limit: 10000,
+			Limit: listProjectIDsPageSize,
 			OrderBy: database.OrderBy[domain.ProjectField]{
 				Columns: []database.Column[domain.ProjectField]{
 					database.Col(domain.ProjectFieldCreatedAt),
@@ -26,13 +36,20 @@ func (a EventExportAdapter) ListProjectIDs(ctx context.Context) ([]string, error
 				Direction: database.OrderAsc,
 			},
 		},
-	})
+	}
+	res, err := list(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
 	ids := make([]string, 0, len(res.Items))
-	for _, p := range res.Items {
-		ids = append(ids, p.ID)
+	for project, err := range res.Iterate(func(cursor []byte) (*database.ListResult[*domain.Project], error) {
+		opts.Pagination.Cursor = cursor
+		return list(ctx, opts)
+	}) {
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, project.ID)
 	}
 	return ids, nil
 }
