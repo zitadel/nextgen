@@ -151,20 +151,30 @@ tasks:
       runInCI: true
 
   test-spanner:
-    # Serializes (-parallel 1 -p 1) when ZITADEL_TEST_SPANNER_INSTANCE is unset
-    # so the single-transaction emulator stays reliable.
-    script: |
-      set -euo pipefail
-      extra=()
-      if [ -z "${ZITADEL_TEST_SPANNER_INSTANCE:-}" ]; then
-        extra+=(-parallel 1 -p 1)
-      fi
-      go test -v -tags spanner_integration -timeout 10m "${extra[@]}" ./...
+    # -parallel is deliberately NOT pinned to 1. The emulator serves one
+    # transaction at a time, so tests running concurrently within a package force
+    # the aborts that prove the abort-retry path still works. Pinning it hid the
+    # missing retry rather than fixing it (#788); do not put it back.
+    #
+    # -p 1 stays: the suites share one emulator database, and packages like
+    # stmttest assert on global list results, so they still need to run one
+    # package at a time. That is test isolation, not contention avoidance.
+    command: "go"
+    args:
+      - "test"
+      - "-v"
+      - "-tags"
+      - "spanner_integration"
+      - "-timeout"
+      - "10m"
+      - "-p"
+      - "1"
+      - "./..."
     inputs:
       - "@group(serverInputs)"
     options:
       runFromWorkspaceRoot: true
-      # Invoked by the CI Spanner emulator / test-instance steps.
+      # Invoked by the CI Spanner emulator step.
       # runInCI must be true, otherwise moon hides the task from `moon run` in CI
       # ("No tasks found"). It is not pulled into `moon ci :...:test` because that
       # selects the `test` task by name, not `test-spanner`.

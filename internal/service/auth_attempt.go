@@ -434,7 +434,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		return passkeyChallenge, attempt.SetPasskeyFactor(verification), nil
 
 	default:
-		return nil, nil, domain.ErrAuthAttemptInvalidRequest().WithDetails("unsupported proof type")
+		return nil, nil, domain.ErrAuthAttemptInvalidRequest().WithMessage("unsupported proof type")
 	}
 }
 
