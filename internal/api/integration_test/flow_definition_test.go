@@ -1034,27 +1034,12 @@ func TestDeleteFlowDefinition(t *testing.T) {
 			wantResp: &api.DeleteFlowDefinitionNoContent{},
 		},
 		{
+			// Flat-by-id: missing RSI is indistinguishable from never existed → 204.
 			name: "delete non-existing flow definition",
 			req: api.DeleteFlowDefinitionParams{
 				ID: "non-existing-id",
 			},
 			wantResp: &api.DeleteFlowDefinitionNoContent{},
-		},
-		{
-			// A project the token is not bound to — existing or not — answers
-			// like a nonexistent flow definition (anti-oracle), instead of the
-			// blind 204 the unguarded handler used to return.
-			name: "invalid project id",
-			req: api.DeleteFlowDefinitionParams{
-				ID: "non-existing-id",
-			},
-			wantResp: &api.ErrorDetailsStatusCode{
-				StatusCode: http.StatusNotFound,
-				Response: api.ErrorDetails{
-					Code:    "flowdef.not_found",
-					Message: "flow definition: not found",
-				},
-			},
 		},
 	}
 	for _, tt := range tests {

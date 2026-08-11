@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -57,6 +58,9 @@ func (h *Handler) UpdateTeam(ctx context.Context, req *api.UpdateTeamRequest, pa
 func (h *Handler) DeleteTeam(ctx context.Context, params api.DeleteTeamParams) (api.DeleteTeamRes, error) {
 	projectID, err := h.requireTeamDelete(ctx, string(params.TeamID))
 	if err != nil {
+		if errors.Is(err, errResourceGone) {
+			return &api.DeleteTeamNoContent{}, nil
+		}
 		return nil, err
 	}
 	if err := h.teamService.Delete(ctx, projectID, string(params.TeamID)); err != nil {

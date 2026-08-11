@@ -7,7 +7,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 )
 
@@ -46,7 +45,7 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 		}
 		*schema = *scanned
 		rsi := newResourceScopeStatements(tx)
-		return authz.SchemaCreated(ctx, &rsi, schema.ProjectID, schema.URL)
+		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindSchema, schema.ProjectID, schema.URL))
 	})
 }
 
@@ -54,7 +53,7 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error {
 	return withTransaction(ctx, js.client, func(ctx context.Context, tx queryExecutor) error {
 		rsi := newResourceScopeStatements(tx)
-		if err := authz.SchemaDeleted(ctx, &rsi, schemaID); err != nil {
+		if err := rsi.DeleteResourceScope(ctx, schemaID); err != nil {
 			return err
 		}
 		_, err := tx.Exec(ctx, deleteByIDJSONSchemaStmt, projectID, schemaID)

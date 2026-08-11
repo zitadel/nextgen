@@ -626,7 +626,7 @@ func TestDeleteTeam(t *testing.T) {
 		}
 	})
 
-	// A project the credentials are not bound to returns a permission denied error.
+	// A team that lives in another project (RSI hit, no foothold) is denied.
 	t.Run("foreign project is denied", func(t *testing.T) {
 		t.Parallel()
 
@@ -635,9 +635,14 @@ func TestDeleteTeam(t *testing.T) {
 		t.Cleanup(func() {
 			_ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), other.ID)
 		})
+		foreignTeam, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+			ProjectID: other.ID,
+			Name:      helpers.TeamName(),
+		})
+		require.NoError(t, err)
 
 		resp, err := client.DeleteTeam(t.Context(), api.DeleteTeamParams{
-			TeamID: api.TeamID(createTeam(t).ID),
+			TeamID: api.TeamID(foreignTeam.ID),
 		})
 		require.NoError(t, err)
 

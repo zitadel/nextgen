@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/zitadel/nextgen/internal/authz/resolver"
@@ -59,6 +60,10 @@ func (s stubAuthzStmts) GetResourceScope(_ context.Context, resourceID string) (
 	return &domain.ResourceScope{ResourceID: resourceID, ProjectID: projectID, ResourceKind: domain.ResourceKindUser}, nil
 }
 
+func (stubAuthzStmts) UpsertResourceScope(context.Context, *domain.ResourceScope) error { return nil }
+
+func (stubAuthzStmts) DeleteResourceScope(context.Context, string) error { return nil }
+
 func TestProjectRelation(t *testing.T) {
 	if got := projectRelation(opRead); got != "viewer" {
 		t.Fatalf("opRead → %q, want viewer", got)
@@ -71,26 +76,21 @@ func TestProjectRelation(t *testing.T) {
 	}
 }
 
-func TestTokenScopeAllowsRelation(t *testing.T) {
+func TestHasOperatorProjectWrite(t *testing.T) {
 	tests := []struct {
-		name     string
-		granted  []string
-		relation string
-		want     bool
+		name    string
+		granted []string
+		want    bool
 	}{
-		{"project secret reads", []string{"project.write", "project.read"}, "viewer", true},
-		{"project secret writes", []string{"project.write", "project.read"}, "editor", true},
-		{"project secret deletes", []string{"project.write", "project.read"}, "admin", true},
-		{"preview cannot read management", []string{"project.read"}, "viewer", false},
-		{"preview cannot write", []string{"project.read"}, "editor", false},
-		{"preview cannot delete", []string{"project.read"}, "admin", false},
-		{"write alone unlocks", []string{"project.write"}, "viewer", true},
-		{"empty denies", nil, "viewer", false},
+		{"project secret", []string{"project.write", "project.read"}, true},
+		{"write alone", []string{"project.write"}, true},
+		{"preview", []string{"project.read"}, false},
+		{"empty", nil, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tokenScopeAllowsRelation(tt.granted, tt.relation); got != tt.want {
-				t.Fatalf("tokenScopeAllowsRelation(%v, %q) = %v, want %v", tt.granted, tt.relation, got, tt.want)
+			if got := hasOperatorProjectWrite(tt.granted); got != tt.want {
+				t.Fatalf("hasOperatorProjectWrite(%v) = %v, want %v", tt.granted, got, tt.want)
 			}
 		})
 	}
@@ -204,11 +204,8 @@ func TestRequireProjectAccess(t *testing.T) {
 	})
 }
 
-func TestRequireUserTeamsAccess(t *testing.T) {
+func TestListUserTeamsGateShape(t *testing.T) {
 	stmts := stubAuthzStmts{}
-	h := &Handler{pool: nil} // use package helper via local wrap
-	_ = h
-
 	both := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
@@ -218,11 +215,9 @@ func TestRequireUserTeamsAccess(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
 	})
 
+	// listUserTeams uses requireResourceAccess with the user miss shape.
 	if err := requireProjectAccess(both, stmts, "proj_a", userAccess, opRead); err != nil {
 		t.Fatalf("user read: %v", err)
-	}
-	if err := requireProjectAccess(both, stmts, "proj_a", teamAccess, opRead); err != nil {
-		t.Fatalf("team read: %v", err)
 	}
 	assertDomainCode(t, requireProjectAccess(preview, stmts, "proj_a", userAccess, opRead), domain.ErrUserPermissionDenied().Code)
 	assertDomainCode(t, requireProjectAccess(both, stmts, "proj_b", userAccess, opRead), domain.ErrUserNotFound().Code)
@@ -279,6 +274,14 @@ func TestRequireResourceAccess(t *testing.T) {
 
 	_, err = requireResourceAccess(operator, stmts, "usr_missing", userAccess, opRead)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	_, err = requireResourceAccess(operator, stmts, "usr_missing", userAccess, opWrite)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	_, err = requireResourceAccess(operator, stmts, "usr_missing", userAccess, opDelete)
+	if !errors.Is(err, errResourceGone) {
+		t.Fatalf("delete RSI miss: %v, want errResourceGone", err)
+	}
 
 	_, err = requireResourceAccess(operator, stmts, "usr_b", userAccess, opRead)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
