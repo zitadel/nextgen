@@ -3133,6 +3133,7 @@ type CreateProjectErrorResponse struct {
 	ProjNameInvalid     ProjNameInvalid
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
+	Unavailable         Unavailable
 }
 
 // CreateProjectErrorResponseType is oneOf type of CreateProjectErrorResponse.
@@ -3149,6 +3150,7 @@ const (
 	ProjNameInvalidCreateProjectErrorResponse     CreateProjectErrorResponseType = "proj.name_invalid"
 	ReqInvalidCreateProjectErrorResponse          CreateProjectErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgCreateProjectErrorResponse    CreateProjectErrorResponseType = "enc_key.unknown_alg"
+	UnavailableCreateProjectErrorResponse         CreateProjectErrorResponseType = "unavailable"
 )
 
 // IsEncKeyDecryptFailed reports whether CreateProjectErrorResponse is EncKeyDecryptFailed.
@@ -3194,6 +3196,11 @@ func (s CreateProjectErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether CreateProjectErrorResponse is EncKeyUnknownAlg.
 func (s CreateProjectErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgCreateProjectErrorResponse
+}
+
+// IsUnavailable reports whether CreateProjectErrorResponse is Unavailable.
+func (s CreateProjectErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateProjectErrorResponse
 }
 
 // SetEncKeyDecryptFailed sets CreateProjectErrorResponse to EncKeyDecryptFailed.
@@ -3382,6 +3389,27 @@ func (s CreateProjectErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, o
 func NewEncKeyUnknownAlgCreateProjectErrorResponse(v EncKeyUnknownAlg) CreateProjectErrorResponse {
 	var s CreateProjectErrorResponse
 	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// SetUnavailable sets CreateProjectErrorResponse to Unavailable.
+func (s *CreateProjectErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateProjectErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateProjectErrorResponse is Unavailable.
+func (s CreateProjectErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateProjectErrorResponse returns new CreateProjectErrorResponse from Unavailable.
+func NewUnavailableCreateProjectErrorResponse(v Unavailable) CreateProjectErrorResponse {
+	var s CreateProjectErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -9658,6 +9686,7 @@ type GetProjectErrorResponse struct {
 	ProjNotFound         ProjNotFound
 	ProjPermissionDenied ProjPermissionDenied
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 }
 
 // GetProjectErrorResponseType is oneOf type of GetProjectErrorResponse.
@@ -9671,6 +9700,7 @@ const (
 	ProjNotFoundGetProjectErrorResponse         GetProjectErrorResponseType = "proj.not_found"
 	ProjPermissionDeniedGetProjectErrorResponse GetProjectErrorResponseType = "proj.permission_denied"
 	ReqInvalidGetProjectErrorResponse           GetProjectErrorResponseType = "req.invalid"
+	UnavailableGetProjectErrorResponse          GetProjectErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetProjectErrorResponse is AuthUnauthorized.
@@ -9699,6 +9729,11 @@ func (s GetProjectErrorResponse) IsProjPermissionDenied() bool {
 // IsReqInvalid reports whether GetProjectErrorResponse is ReqInvalid.
 func (s GetProjectErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetProjectErrorResponse
+}
+
+// IsUnavailable reports whether GetProjectErrorResponse is Unavailable.
+func (s GetProjectErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetProjectErrorResponse
 }
 
 // SetAuthUnauthorized sets GetProjectErrorResponse to AuthUnauthorized.
@@ -9824,6 +9859,27 @@ func (s GetProjectErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetProjectErrorResponse(v ReqInvalid) GetProjectErrorResponse {
 	var s GetProjectErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetProjectErrorResponse to Unavailable.
+func (s *GetProjectErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetProjectErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetProjectErrorResponse is Unavailable.
+func (s GetProjectErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetProjectErrorResponse returns new GetProjectErrorResponse from Unavailable.
+func NewUnavailableGetProjectErrorResponse(v Unavailable) GetProjectErrorResponse {
+	var s GetProjectErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -17119,6 +17175,52 @@ func (o OptURI) Or(d url.URL) url.URL {
 	return d
 }
 
+// NewOptUnavailableDetails returns new OptUnavailableDetails with value set to v.
+func NewOptUnavailableDetails(v UnavailableDetails) OptUnavailableDetails {
+	return OptUnavailableDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUnavailableDetails is optional UnavailableDetails.
+type OptUnavailableDetails struct {
+	Value UnavailableDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUnavailableDetails was set.
+func (o OptUnavailableDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUnavailableDetails) Reset() {
+	var v UnavailableDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUnavailableDetails) SetTo(v UnavailableDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUnavailableDetails) Get() (v UnavailableDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUnavailableDetails) Or(d UnavailableDetails) UnavailableDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserAlreadyExistsDetails returns new OptUserAlreadyExistsDetails with value set to v.
 func NewOptUserAlreadyExistsDetails(v UserAlreadyExistsDetails) OptUserAlreadyExistsDetails {
 	return OptUserAlreadyExistsDetails{
@@ -21408,6 +21510,7 @@ type SubmitFlowStepErrorResponse struct {
 	PkregNotFound       PkregNotFound
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
+	Unavailable         Unavailable
 	UserAlreadyExists   UserAlreadyExists
 	UserInvalid         UserInvalid
 	UserNotFound        UserNotFound
@@ -21440,6 +21543,7 @@ const (
 	PkregNotFoundSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "pkreg.not_found"
 	ReqInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UnavailableSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "unavailable"
 	UserAlreadyExistsSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "user.already_exists"
 	UserInvalidSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "user.invalid"
 	UserNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "user.not_found"
@@ -21553,6 +21657,11 @@ func (s SubmitFlowStepErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether SubmitFlowStepErrorResponse is EncKeyUnknownAlg.
 func (s SubmitFlowStepErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgSubmitFlowStepErrorResponse
+}
+
+// IsUnavailable reports whether SubmitFlowStepErrorResponse is Unavailable.
+func (s SubmitFlowStepErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableSubmitFlowStepErrorResponse
 }
 
 // IsUserAlreadyExists reports whether SubmitFlowStepErrorResponse is UserAlreadyExists.
@@ -22032,6 +22141,27 @@ func NewEncKeyUnknownAlgSubmitFlowStepErrorResponse(v EncKeyUnknownAlg) SubmitFl
 	return s
 }
 
+// SetUnavailable sets SubmitFlowStepErrorResponse to Unavailable.
+func (s *SubmitFlowStepErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableSubmitFlowStepErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if SubmitFlowStepErrorResponse is Unavailable.
+func (s SubmitFlowStepErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from Unavailable.
+func NewUnavailableSubmitFlowStepErrorResponse(v Unavailable) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // SetUserAlreadyExists sets SubmitFlowStepErrorResponse to UserAlreadyExists.
 func (s *SubmitFlowStepErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
 	s.Type = UserAlreadyExistsSubmitFlowStepErrorResponse
@@ -22481,6 +22611,59 @@ func (s *TknInvalidTknid) SetDetails(val OptTknInvalidTknidDetails) {
 type TknInvalidTknidDetails map[string]jx.Raw
 
 func (s *TknInvalidTknidDetails) init() TknInvalidTknidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type Unavailable struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUnavailableDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *Unavailable) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *Unavailable) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *Unavailable) GetDetails() OptUnavailableDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *Unavailable) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *Unavailable) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *Unavailable) SetDetails(val OptUnavailableDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UnavailableDetails map[string]jx.Raw
+
+func (s *UnavailableDetails) init() UnavailableDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}

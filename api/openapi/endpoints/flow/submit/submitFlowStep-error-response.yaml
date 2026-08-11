@@ -26,6 +26,7 @@ content:
         - $ref: '../../../components/schemas/errors/pkreg-not_found.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
+        - $ref: '../../../components/schemas/errors/unavailable.yaml'
         - $ref: '../../../components/schemas/errors/user-already_exists.yaml'
         - $ref: '../../../components/schemas/errors/user-invalid.yaml'
         - $ref: '../../../components/schemas/errors/user-not_found.yaml'
@@ -54,6 +55,7 @@ content:
           pkreg.not_found: '../../../components/schemas/errors/pkreg-not_found.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
+          unavailable: '../../../components/schemas/errors/unavailable.yaml'
           user.already_exists: '../../../components/schemas/errors/user-already_exists.yaml'
           user.invalid: '../../../components/schemas/errors/user-invalid.yaml'
           user.not_found: '../../../components/schemas/errors/user-not_found.yaml'
@@ -168,6 +170,11 @@ content:
         value:
           code: enc_key.unknown_alg
           message: 'unsupported encryption algorithm'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'
       user.already_exists:
         summary: user.already_exists
         value:
