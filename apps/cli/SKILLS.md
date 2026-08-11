@@ -114,6 +114,17 @@ the CLI's help layer, not the envelope.
   the interactive wizard asks this as its final question with the built-in
   template preselected — omit the flag in non-interactive runs to keep the
   built-in template and no branding files), `--skip-install`.
+  On Next and Nuxt, the scaffolded auth/profile pages derive their embedding
+  posture from the app: a fresh scaffold (setup created the skeleton) pins
+  `variant="page"` full-page chrome, while a pre-existing app embeds
+  `variant="widget"` cards with `theme="auto"` in a layout-neutral wrapper.
+  `theme="auto"` follows the OS `prefers-color-scheme`, not the host app's
+  own theme — edit the generated page to set `theme="light"` or
+  `theme="dark"` when the app pins its scheme. Other frameworks always
+  scaffold the page posture. The chosen posture is recorded in the scaffold
+  manifest, `doctor --fix` restores managed pages in the recorded posture,
+  and editing the generated page is the supported way to change presentation
+  — there is no config knob.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
@@ -138,7 +149,14 @@ the CLI's help layer, not the envelope.
   files and never replaces an existing scaffolded app file; additive repairs
   (missing `.gitignore` entries, `.env.example` keys) still append to their
   targets, and the SDK dependency is re-added only when absent — an existing
-  version pin is never rewritten.
+  version pin is never rewritten. The `dependency-version` check warns when
+  an exactly-pinned `@zitadel/*` dependency does not match the CLI's own
+  version (the packages release as one train, and a floating
+  `npx @zitadel/cli@alpha` can run ahead of the app's pins); ranges,
+  dist-tags, and `file:`/`workspace:` specifiers express a deliberate choice
+  and are not compared. The repair — an exact-pin install command for the
+  project's detected package manager — is emitted in `data.next_commands`
+  and quoted in the warning message.
 - `claim` — attach the project to a team so it becomes permanent. Mints a
   short-lived link, opens it in a browser, and blocks until the developer
   finishes signing in there, then records `claimed_at` and `team_id` in
