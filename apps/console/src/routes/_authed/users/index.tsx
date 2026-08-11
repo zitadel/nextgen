@@ -1,9 +1,16 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { Loader2, MoreVertical, Plus, Search, Users } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AddUserSheet } from "@/components/add-user-sheet";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
+import {
+  RESOURCE_CELL,
+  RESOURCE_HEADER,
+  RESOURCE_PAGE,
+  RESOURCE_TABLE_WRAP,
+  ResourceHeadCell,
+} from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -220,10 +227,14 @@ function UsersScreen() {
   }, [users, query, columns]);
 
   return (
-    <div className="px-4 pt-9 pb-8 sm:px-8">
-      <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight">Users</h1>
+    <div className={`${RESOURCE_PAGE} pt-4`}>
+      <h1 className={`${RESOURCE_HEADER} text-foreground font-serif text-2xl leading-6 tracking-tight`}>
+        Users
+      </h1>
 
-      <div className="mt-6 flex flex-col gap-4 lg:h-10 lg:flex-row lg:items-center lg:justify-end">
+      <div
+        className={`${RESOURCE_HEADER} mt-6 flex flex-col gap-4 lg:h-10 lg:flex-row lg:items-center lg:justify-end`}
+      >
         <div className="flex w-full flex-col gap-2.5 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
           <div className="relative w-full lg:w-[373px]">
             <Search
@@ -256,16 +267,16 @@ function UsersScreen() {
       {/* The column set is schema-driven and so has no fixed width; the design
           scrolls the table horizontally rather than compressing cells (the
           `Filled` variant shows a scrollbar under the rows). */}
-      <div className="border-sidebar-border bg-card mt-6 overflow-x-auto rounded-2xl border">
+      <div className={`${RESOURCE_TABLE_WRAP} mt-6`}>
         <Table className="text-xs">
           <TableHeader>
             <TableRow className="border-border border-b hover:bg-transparent">
               {columns.map((column) => (
-                <HeadCell key={column.key}>{column.label}</HeadCell>
+                <ResourceHeadCell key={column.key}>{column.label}</ResourceHeadCell>
               ))}
-              <HeadCell>Status</HeadCell>
-              <HeadCell>ID</HeadCell>
-              <TableHead className="h-14 w-[60px] px-2" />
+              <ResourceHeadCell>Status</ResourceHeadCell>
+              <ResourceHeadCell>ID</ResourceHeadCell>
+              <TableHead className="h-14 w-[60px] px-6" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -284,7 +295,7 @@ function UsersScreen() {
                   {columns.map((column, index) => (
                     <TableCell
                       key={column.key}
-                      className="text-muted-foreground h-11 max-w-[280px] truncate px-2 py-0 first:px-4"
+                      className={`${RESOURCE_CELL} text-muted-foreground max-w-[280px] truncate text-sm`}
                     >
                       {/* The first column carries the link to the detail screen.
                           There is no separate name column to hang it on — the
@@ -303,13 +314,13 @@ function UsersScreen() {
                       )}
                     </TableCell>
                   ))}
-                  <TableCell className="h-11 px-2 py-0">
+                  <TableCell className={RESOURCE_CELL}>
                     <UserStatusBadge status={user.status} />
                   </TableCell>
-                  <TableCell className="text-foreground h-11 truncate px-2 py-0">
+                  <TableCell className={`${RESOURCE_CELL} text-foreground truncate text-sm`}>
                     {user.id}
                   </TableCell>
-                  <TableCell className="h-11 px-2 py-0">
+                  <TableCell className={RESOURCE_CELL}>
                     <RowActions
                       userId={user.id}
                       name={user.name}
@@ -379,26 +390,6 @@ function userStatus(user: Record<string, unknown>): string | undefined {
   return field(metadata as Record<string, unknown>, "status");
 }
 
-/**
- * Column header.
- *
- * Sorting was removed rather than left in place. The design decisions log (D5)
- * rules out filtering and sorting for the MVP, and the affordance was misleading
- * on its own terms: `GET /users` serves one page, so a client-side sort ordered
- * only the rows already fetched while presenting itself as a total order. It
- * comes back with the query endpoint that can sort the whole set (ADR 031).
- */
-function HeadCell({ children }: { children: ReactNode }) {
-  // Figma header labels use the display face (`font-serif` → APK Futural),
-  // uppercase 12px with 0.96px tracking, inset by a ghost-button (h-9, px-2.5).
-  return (
-    <TableHead className="h-14 px-2 align-middle">
-      <span className="text-muted-foreground inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 py-2 font-serif text-xs tracking-[0.96px] uppercase">
-        {children}
-      </span>
-    </TableHead>
-  );
-}
 
 /**
  * The row menu carries only actions that reach the API.

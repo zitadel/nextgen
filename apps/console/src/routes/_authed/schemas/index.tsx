@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Ellipsis, Lock } from "lucide-react";
 
+import { RESOURCE_HEADER, RESOURCE_PAGE } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -56,12 +57,18 @@ function SchemasScreen() {
   const schemas = Route.useLoaderData();
 
   return (
-    <div className="px-4 pt-9 pb-8 sm:px-8">
-      <h1 className="font-serif text-2xl leading-6 tracking-tight text-foreground">User schemas</h1>
+    <div className={`${RESOURCE_PAGE} pt-4`}>
+      <div className={`${RESOURCE_HEADER} flex h-9 items-center`}>
+        {/* The frame titles this screen `Schemas`; D8 keeps the noun qualified
+            everywhere it appears, which is also what the sidebar entry says. */}
+        <h1 className="font-serif text-2xl leading-6 tracking-tight text-foreground">
+          User schemas
+        </h1>
+      </div>
 
       {/* The design's `Card` — rows run edge to edge and carry their own
           `px-6`, so the dividers between them are full-bleed. */}
-      <Card className="mt-6 gap-0 overflow-hidden border-foreground/10 py-0 shadow-xs">
+      <Card className="mt-3 gap-0 overflow-hidden border-foreground/10 py-0 shadow-xs">
         {schemas.length === 0 ? (
           <p className="px-6 py-8 text-center text-sm text-muted-foreground">
             This project has no user schemas.

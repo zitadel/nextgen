@@ -53,7 +53,7 @@ export function ContextSwitcher() {
           billing (#667) rather than a literal.
 
           <Switcher
-            icon={Building2}
+            icon={Box}
             label={currentTeam?.label}
             shortLabel={currentTeam?.shortLabel}
             plan={currentTeam?.plan}

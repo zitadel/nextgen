@@ -27,23 +27,20 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * does not exist". Also covers the theme toggle writing `data-theme` and
  * persisting the preference.
  */
-// Users is the only top-level surface with a design hand-off, so it is the only
-// thing the sidebar offers. `User schemas` nests beneath it (issue #712,
-// `Schema directory` frame) rather than adding a second top-level row.
-const NAV_ORDER = ["Users"];
+// The top-level surfaces with a design hand-off, in the order the design puts
+// them. `User schemas` nests beneath `Users` (`Schema directory` frame) rather
+// than adding a second top-level row.
+const NAV_ORDER = ["Projects", "Users"];
 const NESTED_NAV = { parent: "Users", label: "User schemas" };
-// Absent for three different reasons, all of them deliberate:
+// Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
 //   - Sessions was built, but `POST /sessions/query` answers 501 (#699)
-//   - Projects works and stays reachable at its URL; it has simply never been
-//     designed, so it is not advertised as a finished screen
 const NEVER_SHOWN = [
   "App groups",
   "Applications",
   "Analytics",
   "Activity Log",
   "Sessions",
-  "Projects",
 ];
 
 // A path pattern rather than an absolute URL: this spec imports the router
