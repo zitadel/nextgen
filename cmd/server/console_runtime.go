@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -52,7 +53,12 @@ type runtimeResolver func(ctx context.Context) (consoleRuntime, error)
 // standaloneRuntimeResolver resolves the standalone runtime document from
 // the deployment's default project (configured pin or first-created),
 // including the project's publishable key derived from its token encryption key.
-func standaloneRuntimeResolver(projects service.ProjectService, keys service.KeyService, cfgProjectID string) runtimeResolver {
+func standaloneRuntimeResolver(
+	projects service.ProjectService,
+	tokens service.TokenService,
+	keys service.KeyService,
+	cfgProjectID string,
+) runtimeResolver {
 	return func(ctx context.Context) (consoleRuntime, error) {
 		project, err := projects.DefaultProject(ctx, cfgProjectID)
 		if err != nil {
@@ -64,17 +70,36 @@ func standaloneRuntimeResolver(projects service.ProjectService, keys service.Key
 		}
 		meta.ConsoleProjectID = project.ID
 
-		tokenCrypter, err := keys.GetProjectCrypter(ctx, project.ID, domain.EncryptionKeyPurposeToken)
+		key, err := publishableKey(ctx, tokens, keys, project)
 		if err != nil {
 			return consoleRuntime{}, err
 		}
-		publishableKey, err := project.PreviewSecret(tokenCrypter)
-		if err != nil {
-			return consoleRuntime{}, err
-		}
-		meta.PublishableKey = publishableKey
+		meta.PublishableKey = key
 		return meta, nil
 	}
+}
+
+func publishableKey(
+	ctx context.Context,
+	tokens service.TokenService,
+	keys service.KeyService,
+	project *domain.Project,
+) (string, error) {
+	previewToken, err := tokens.GetActivePreviewToken(ctx, project.ID)
+	if err != nil {
+		// No record yet (or none that still grants anything): mint one. Any
+		// other failure is a real one and must not silently issue a key.
+		if !errors.Is(err, domain.TokenNotFound()) {
+			return "", err
+		}
+		return tokens.GenerateJWE(ctx, project.PreviewToken())
+	}
+
+	tokenCrypter, err := keys.GetProjectCrypter(ctx, project.ID, domain.EncryptionKeyPurposeToken)
+	if err != nil {
+		return "", err
+	}
+	return previewToken.JWE(tokenCrypter)
 }
 
 // newConsoleRuntimeHandler serves the runtime document.

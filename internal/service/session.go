@@ -121,14 +121,18 @@ func (s *sessionService) List(ctx context.Context, input ListSessionInput) ([]*d
 }
 
 func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) error {
-	err := s.v2Pool.Statements().DeleteSessionByID(ctx, input.ProjectID, input.SessionID)
-	if err != nil {
-		if errors.Is(err, domain.ErrSessionNotFound()) {
-			return nil
+	return s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		err := tx.Statements().DeleteSessionByID(ctx, input.ProjectID, input.SessionID)
+		if err != nil && !errors.Is(err, domain.ErrSessionNotFound()) {
+			return domain.ErrInternal(err).WithMessage("Failed to delete the session.")
 		}
-		return domain.ErrInternal(err).WithMessage("Failed to delete the session.")
-	}
-	return nil
+
+		if err := tx.Statements().DeleteTokensBySessionID(ctx, input.ProjectID, input.SessionID); err != nil {
+			return domain.ErrInternal(err).WithMessage("Failed to revoke session tokens.")
+		}
+
+		return nil
+	})
 }
 
 func NewSessionService(v2Pool StatementPool, users UserIdentityReader, cfg SessionConfig) SessionService {

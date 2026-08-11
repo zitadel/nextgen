@@ -301,7 +301,8 @@ production peer. Postgres/Spanner integration tests bring up a **Postgres
 testcontainer** or a **Spanner emulator testcontainer** by default
 (`v2/testdb`); override with `ZITADEL_TEST_POSTGRES_URL` /
 `ZITADEL_TEST_SPANNER_URL`, or a real Spanner instance via
-`ZITADEL_TEST_SPANNER_INSTANCE`.
+`ZITADEL_TEST_SPANNER_INSTANCE` (kept but unwired — CI is emulator-only so
+aborts stay visible, see #788; removal tracked in #793).
 
 ## Pre-merge checklist
 
