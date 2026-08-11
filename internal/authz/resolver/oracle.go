@@ -108,7 +108,8 @@ func (g *Graph) ttuAllows(projectID, home string, pType domain.AuthzPrincipalTyp
 		}
 		for _, ts := range g.Assignments {
 			if ts.ProjectID != projectID || !assignmentActive(ts, now) ||
-				ts.ObjectType != edge.Tupleset.Type || ts.Relation != edge.Tupleset.Name {
+				ts.ObjectType != edge.Tupleset.Type || ts.Relation != edge.Tupleset.Name ||
+				ts.PrincipalType.String() != edge.Source.Type {
 				continue
 			}
 			if edge.Source.Type == "team" && edge.Source.Name == "member" &&

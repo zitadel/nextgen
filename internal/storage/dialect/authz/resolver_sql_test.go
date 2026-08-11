@@ -46,6 +46,7 @@ func TestWriteCheckAndListShareFullTTU(t *testing.T) {
 	require.Contains(t, sql, "tuple_to_userset")
 	assert.Contains(t, sql, "a.scope_kind = 'team' AND a.scope_team_id = ts.principal_id")
 	assert.Contains(t, sql, "a.scope_kind = 'resource' AND a.scope_resource_id = ts.principal_id")
+	assert.Contains(t, sql, "ts.principal_type = edge.source_object_type")
 	assert.Contains(t, sql, "NOW_SENTINEL")
 	assert.Contains(t, sql, "zitadel_nextgen.authz_assignments")
 
@@ -58,6 +59,7 @@ func TestWriteCheckAndListShareFullTTU(t *testing.T) {
 	require.Contains(t, listSQL, "tuple_to_userset")
 	assert.Contains(t, listSQL, "a.scope_kind = 'team' AND a.scope_team_id = ts.principal_id")
 	assert.Contains(t, listSQL, "a.scope_kind = 'resource' AND a.scope_resource_id = ts.principal_id")
+	assert.Contains(t, listSQL, "ts.principal_type = edge.source_object_type")
 	assert.Contains(t, listSQL, "NOW_SENTINEL")
 }
 
