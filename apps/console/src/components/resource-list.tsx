@@ -58,7 +58,12 @@ export const RESOURCE_ROW_LINK =
 export function opensRow(event: MouseEvent): boolean {
   if (event.defaultPrevented || event.button !== 0) return false;
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
-  return !(event.target as HTMLElement).closest("a, button, input, select, textarea, [role='menuitem']");
+  // `target` is typed `EventTarget`, and only an `Element` can be an interactive
+  // child or answer `closest`. Anything else is the row's own click to take,
+  // rather than a reason to throw.
+  const target = event.target;
+  if (!(target instanceof Element)) return true;
+  return !target.closest("a, button, input, select, textarea, [role='menuitem']");
 }
 
 /**

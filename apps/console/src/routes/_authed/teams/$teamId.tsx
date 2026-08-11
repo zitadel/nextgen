@@ -16,10 +16,6 @@ import { formatDate } from "../../../lib/date";
 import { getConsoleProjectId } from "../../../runtime/runtime";
 
 const PLATE = "flex size-9 items-center justify-center rounded-md bg-muted text-foreground";
-// The divider sits inside the body padding rather than spanning the card, and
-// `w-full` is applied by an orientation variant that out-specifies a plain
-// utility — so the override has to carry the same variant.
-const PANEL_RULE = "mx-6 w-auto data-[orientation=horizontal]:w-auto";
 
 /**
  * Team detail.
@@ -85,7 +81,7 @@ function TeamDetail() {
       <div className="flex flex-col gap-4 px-2 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-3">
           <span className={PLATE}>
-            <Box className="size-5" strokeWidth={1.5} aria-hidden />
+            <Box className="size-4" strokeWidth={1.5} aria-hidden />
           </span>
           <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight">
             {team.name}
@@ -100,15 +96,14 @@ function TeamDetail() {
         </Card>
       </div>
 
-      {/* Card top sits 23px under the header row; inside, the eyebrow is 20px
-          down, the rule 16px under it, and the field 17px under the rule. */}
+      {/* Card top sits 23px under the header row. */}
       <Card className="mt-[23px] gap-0 rounded-xl py-0">
-        <CardContent className="px-0 py-0">
-          <div className="px-6 pt-5 pb-4">
-            <span className={EYEBROW}>Details</span>
-          </div>
-          <Separator className={PANEL_RULE} />
-          <div className="flex flex-col gap-4 px-6 pt-[17px] pb-5">
+        {/* `Card Content`: inset 24px, 20px top and bottom, with a 16px gap
+            between the header, the rule and the grid. */}
+        <CardContent className="flex flex-col gap-4 px-6 py-5">
+          <span className={EYEBROW}>Details</span>
+          <Separator />
+          <div className="flex flex-col gap-[18px]">
             <Field>
               <FieldLabel htmlFor="team-tenant-name">Tenant name</FieldLabel>
               <Input

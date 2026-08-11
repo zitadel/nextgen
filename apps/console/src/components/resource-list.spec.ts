@@ -34,6 +34,13 @@ describe("opensRow", () => {
     expect(opensRow(click({ defaultPrevented: true }))).toBe(false);
   });
 
+  it("opens when the target is not an element", () => {
+    // `target` is typed `EventTarget`; anything without `closest` cannot be an
+    // interactive child, so the row takes the click rather than throwing.
+    expect(opensRow(click({ target: document }))).toBe(true);
+    expect(opensRow(click({ target: null }))).toBe(true);
+  });
+
   it("lets an interactive child own its own click", () => {
     for (const tag of ["a", "button", "input"]) {
       const row = document.createElement("div");
