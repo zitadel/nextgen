@@ -44,6 +44,25 @@ func TestSchemaSQLNameAndValuesFrom(t *testing.T) {
 	assert.Equal(t, createdAt, values[1])
 }
 
+func TestSchemaColumnNullability(t *testing.T) {
+	t.Parallel()
+	schema := database.NewSchema(map[domain.ProjectField]database.FieldBinding[domain.Project]{
+		domain.ProjectFieldID: {
+			SQLName:  "id",
+			Accessor: func(p *domain.Project) any { return p.ID },
+			Coerce:   database.CoerceString,
+		},
+		domain.ProjectFieldName: {
+			SQLName:  "name",
+			Accessor: func(p *domain.Project) any { return p.Name },
+			Coerce:   database.CoerceString,
+			Nullable: true,
+		},
+	})
+
+	assert.Equal(t, map[string]bool{"id": false, "name": true}, schema.ColumnNullability())
+}
+
 func TestSchemaCoerceCursorValues(t *testing.T) {
 	t.Parallel()
 	createdAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)

@@ -137,6 +137,13 @@ emission are owned by that helper). Nullable sort columns need an additional
 drain case; invalid/mismatched cursors and mid-page mutations are covered by
 the shared special suites for representative paths.
 
+`stmttest/schema_nullability_test.go` cross-checks every binding's `Nullable`
+flag against the live DDL (dialect `LiveColumnNullability` helpers walk
+`information_schema` / `pragma_table_xinfo`). A new nullable column fails that
+suite until its binding carries the flag; a new schema must be added to the
+suite's column list (shared schemas in `sharedSchemaColumns`, per-dialect
+schemas in the dialect's `SchemaColumnNullability`).
+
 Dialect packages keep **engine-specific** tests only: compiler SQL shape, error
 wrapping, `withTransaction` nesting, and migration/DDL smoke. Do not duplicate
 upward: if `stmttest` can assert the behavior, put it there — not a per-dialect

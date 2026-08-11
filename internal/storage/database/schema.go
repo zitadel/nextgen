@@ -60,6 +60,15 @@ func (s Schema[F, T]) Nullable(col Column[F]) bool {
 	return s.binding(col.Field()).Nullable
 }
 
+// ColumnNullability returns the Nullable flag per bound SQL column name.
+func (s Schema[F, T]) ColumnNullability() map[string]bool {
+	m := make(map[string]bool, len(s.fields))
+	for _, b := range s.fields {
+		m[b.SQLName] = b.Nullable
+	}
+	return m
+}
+
 // MustSQLName returns the SQL column name for field.
 func (s Schema[F, T]) MustSQLName(field F) string {
 	return s.binding(field).SQLName
