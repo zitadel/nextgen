@@ -234,6 +234,82 @@ test("passes the sign-in preset through to setup and records it", async () => {
   }
 });
 
+test("seeds the checked-in pre-existing app before any CLI step (ADR 044)", async () => {
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-journey-prepare-preexisting-test-"));
+  const registryUrl = "http://127.0.0.1:4873";
+  let appStateAtSetup;
+
+  try {
+    const metadata = await prepareApp({
+      env: {
+        JOURNEY_APP_URL: "http://localhost:3010",
+        JOURNEY_CLI_PACKAGE: "@zitadel/cli",
+        JOURNEY_FRAMEWORK: "next",
+        JOURNEY_PREEXISTING_APP: "1",
+        JOURNEY_REGISTRY_URL: registryUrl,
+        JOURNEY_SDK_PACKAGE: "@zitadel/sdk-next",
+        JOURNEY_WORK_DIR: workDir,
+      },
+      logMetadata: false,
+      runCapture: async (_command, args, options) => {
+        if (args.includes("setup")) {
+          // Setup must meet the seeded host app, not an empty directory —
+          // that is the hinge that flips the emitted pages to the widget
+          // posture. Capture what setup sees before the mock "generates".
+          appStateAtSetup = {
+            packageJson: JSON.parse(await readFile(join(options.cwd, "package.json"), "utf8")),
+            homepage: await readFile(join(options.cwd, "app/page.tsx"), "utf8"),
+          };
+          await writeGeneratedApp(options.cwd, registryUrl, "@zitadel/sdk-next");
+          await writeBoundaryFile(options.cwd);
+        }
+        // The Next suite's drift probe: doctor fails on the deleted
+        // boundary, and --fix restores it (same emulation as the preset test).
+        if (args.includes("doctor") && !args.includes("--fix")) {
+          if (appStateAtSetup && !(await fileExists(join(options.cwd, "proxy.ts")))) {
+            return { code: 3, stdout: `${JSON.stringify(driftEnvelope())}\n`, stderr: "" };
+          }
+        }
+        if (args.includes("doctor") && args.includes("--fix")) {
+          await writeBoundaryFile(options.cwd);
+        }
+        return { code: 0, stdout: `${JSON.stringify(okEnvelope(args))}\n`, stderr: "" };
+      },
+    });
+
+    assert.equal(metadata.preexistingApp, true);
+    assert.equal(appStateAtSetup.packageJson.name, "preexisting-next-app");
+    assert.ok(appStateAtSetup.packageJson.dependencies.next, "fixture declares next");
+    assert.ok(appStateAtSetup.homepage.includes("Welcome to Orbit Notes"));
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
+test("fails loudly when a framework has no pre-existing fixture", async () => {
+  const workDir = await mkdtemp(join(tmpdir(), "zitadel-journey-prepare-nofixture-test-"));
+  try {
+    await assert.rejects(
+      prepareApp({
+        env: {
+          JOURNEY_CLI_PACKAGE: "@zitadel/cli",
+          JOURNEY_FRAMEWORK: "react",
+          JOURNEY_PREEXISTING_APP: "1",
+          JOURNEY_SDK_PACKAGE: "@zitadel/sdk-react",
+          JOURNEY_WORK_DIR: workDir,
+        },
+        logMetadata: false,
+        runCapture: async () => {
+          throw new Error("no CLI step may run without a seeded app");
+        },
+      }),
+      /no pre-existing-app fixture for framework "react"/,
+    );
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
 test("accepts generated apps that use pnpm lockfiles", async () => {
   const workDir = await mkdtemp(join(tmpdir(), "zitadel-journey-prepare-pnpm-test-"));
   const registryUrl = "http://127.0.0.1:4873";
