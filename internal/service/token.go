@@ -74,7 +74,7 @@ func (s *tokenService) GetActivePreviewToken(ctx context.Context, projectID stri
 	}
 	now := time.Now()
 	for token, err := range result.Iterate(func(cursor []byte) (*database.ListResult[*domain.Token], error) {
-		result.NextCursor = cursor
+		opts.Pagination.Cursor = cursor
 		return s.v2Pool.Statements().ListTokens(ctx, opts)
 	}) {
 		if err != nil {
