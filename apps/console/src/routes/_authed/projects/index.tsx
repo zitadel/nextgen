@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Box, Loader2 } from "lucide-react";
+import { Box, Boxes, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -26,7 +26,7 @@ import { api } from "../../../api/zitadel";
 import { formatDate } from "../../../lib/date";
 
 export const Route = createFileRoute("/_authed/projects/")({
-  staticData: { nav: { label: "Projects", order: 1, icon: Box } },
+  staticData: { nav: { label: "Projects", order: 1, icon: Boxes } },
   loader: async () => {
     const page = await api.queryProjects({ limit: PAGE_SIZE });
     return { projects: page.projects, nextPageToken: page.next_page_token ?? undefined };

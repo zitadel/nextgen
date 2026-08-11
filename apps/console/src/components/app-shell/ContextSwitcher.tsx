@@ -1,5 +1,5 @@
 // `Building2` returns with the parked organisation switcher below.
-import { Box, ChevronsUpDown, type LucideIcon, Search } from "lucide-react";
+import { Boxes, ChevronsUpDown, type LucideIcon, Search } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -60,7 +60,7 @@ export function ContextSwitcher() {
             options={teams}
             ariaLabel="Switch organization"
           /> */}
-      <Switcher icon={Box} label={current?.label} options={projects} ariaLabel="Switch project" />
+      <Switcher icon={Boxes} label={current?.label} options={projects} ariaLabel="Switch project" />
     </div>
   );
 }
