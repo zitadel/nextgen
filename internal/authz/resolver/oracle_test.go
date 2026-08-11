@@ -77,6 +77,29 @@ func TestOracle_HandBuilt(t *testing.T) {
 		assert.False(t, g.OracleCheck("p1", "p1", domain.AuthzPrincipalTypeUser, "bob", "project", "viewer"))
 	})
 
+	t.Run("ttu malformed tupleset principal type", func(t *testing.T) {
+		scoped := &domain.AuthzAssignment{
+			ProjectID: "p1", CatalogID: "c1",
+			PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "alice",
+			ObjectType: "team", Relation: "member",
+		}
+		scoped.ApplyScope(domain.NewResourceAssignmentScope("alice"))
+		g := Graph{
+			Closure: closure,
+			Edges:   edges,
+			Assignments: []*domain.AuthzAssignment{
+				{
+					ProjectID: "p1", CatalogID: "c1",
+					PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "alice",
+					ObjectType: "project", Relation: "team",
+					ScopeKind: domain.AuthzScopeKindProject,
+				},
+				scoped,
+			},
+		}
+		assert.False(t, g.OracleCheck("p1", "p1", domain.AuthzPrincipalTypeUser, "alice", "project", "viewer"))
+	})
+
 	t.Run("revoked and expired", func(t *testing.T) {
 		revoked := time.Now()
 		past := time.Now().Add(-time.Hour)

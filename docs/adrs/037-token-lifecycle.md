@@ -72,8 +72,11 @@ the tokens are active.
 Keeping the data in the database at a minimum and trusting the data in the tokens
 allows for faster token validation in cases where high throughput is required.
 
-Once a token is revoked, we can mark the token as inactive in the database which
-will make future validations fail.
+Once a token is revoked, its record is deleted from the database. Validation
+resolves the `jti` against the record, so a token whose record is gone fails —
+the same answer an unknown token gets, which is what a bearer should learn
+either way. Deleting rather than marking also keeps the tokens table free of
+rows that grant nothing, so it does not need a sweeper to stay bounded.
 
 ### Refresh token Rotation & Replay detection
 

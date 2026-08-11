@@ -81,23 +81,17 @@ func (ss sessionStatements) ListSessions(ctx context.Context, filter *database.L
 	if sessions == nil {
 		sessions = []*domain.Session{}
 	}
-	var nextCursor []byte
-	if filter.Pagination.Limit > 0 && len(sessions) == int(filter.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.SessionField]{
-			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  sessionSchema.ValuesFrom(sessions[len(sessions)-1], filter.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
-	}
+	nextCursor := pagination.MarshalNext(
+		filter.Pagination.OrderBy,
+		sessions,
+		sessionSchema,
+		filter.Pagination.Limit,
+	)
 	return &database.ListResult[*domain.Session]{Items: sessions, NextCursor: nextCursor}, nil
 }
 
 func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, sessionID string) error {
 	return withTransaction(ctx, ss.client, func(ctx context.Context, tx queryExecutor) error {
-		rsi := newResourceScopeStatements(tx)
-		if err := rsi.DeleteResourceScope(ctx, sessionID); err != nil {
-			return err
-		}
 		tag, err := tx.Exec(ctx, deleteSessionByIDStmt, projectID, sessionID)
 		if err != nil {
 			return wrapError(err)
@@ -105,7 +99,8 @@ func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, se
 		if tag.RowsAffected() == 0 {
 			return domain.ErrSessionNotFound()
 		}
-		return nil
+		rsi := newResourceScopeStatements(tx)
+		return rsi.DeleteResourceScope(ctx, sessionID)
 	})
 }
 

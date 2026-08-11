@@ -17,11 +17,7 @@ get:
           schema:
             $ref: ../../../components/flows/flow-definition-detail-response.yaml
     default:
-      description: Unexpected error.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: getFlowDefinition-error-response.yaml
 
 put:
   operationId: updateFlowDefinition
@@ -62,11 +58,7 @@ put:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      description: Unexpected error.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: updateFlowDefinition-error-response.yaml
 
 delete:
   operationId: deleteFlowDefinition
@@ -92,8 +84,4 @@ delete:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      description: Unexpected error.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: deleteFlowDefinition-error-response.yaml

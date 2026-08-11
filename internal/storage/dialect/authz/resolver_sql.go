@@ -206,6 +206,7 @@ func writeFullTTUExists(w ArgWriter, env Env, params domain.AuthzCheckParams) {
           ON  ts.catalog_id  = edge.catalog_id
           AND ts.object_type = edge.tupleset_object_type
           AND ts.relation    = edge.tupleset_relation
+          AND ts.principal_type = edge.source_object_type
           AND ts.project_id  = `)
 	w.WriteArg(params.ProjectID)
 	w.WriteString(`

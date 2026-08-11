@@ -34,8 +34,8 @@ func (s stubAuthzStmts) HasAuthzProjectFoothold(_ context.Context, projectID str
 	return principalID == projectID, nil
 }
 
-func (s stubAuthzStmts) CheckAuthz(_ context.Context, params domain.AuthzCheckParams) (bool, bool, error) {
-	foothold, err := s.HasAuthzProjectFoothold(context.Background(), params.ProjectID, params.PrincipalType, params.PrincipalID)
+func (s stubAuthzStmts) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, bool, error) {
+	foothold, err := s.HasAuthzProjectFoothold(ctx, params.ProjectID, params.PrincipalType, params.PrincipalID)
 	if err != nil {
 		return false, false, err
 	}

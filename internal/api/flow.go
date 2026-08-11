@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-faster/jx"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -25,8 +26,7 @@ const (
 func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (api.CreateFlowRes, error) {
 	purpose, err := domain.FlowDefinitionPurposeString(string(req.Purpose))
 	if err != nil {
-		return errorResponseWithStatusCode(http.StatusBadRequest,
-			domain.ErrFlowInvalidPurpose().WithMessage(fmt.Sprintf("unknown purpose %q", req.Purpose))), nil
+		return nil, domain.ErrFlowInvalidPurpose().WithMessage(fmt.Sprintf("unknown purpose %q", req.Purpose))
 	}
 
 	resolveReq := service.ResolveFlowRequest{
@@ -46,7 +46,7 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 
 	def, err := h.flowService.Resolve(ctx, resolveReq)
 	if err != nil {
-		return errorResponse(err), nil
+		return nil, err
 	}
 
 	startReq := service.StartFlowRequest{
@@ -64,15 +64,18 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 	if id, ok := req.SessionID.Get(); ok {
 		startReq.SessionID = &id
 	}
+	if ua, ok := middleware.UserAgentFromContext(ctx); ok {
+		startReq.UserAgent = ua
+	}
 
 	result, err := h.flowService.Start(ctx, startReq)
 	if err != nil {
-		return mapFlowErrorStatus(err), nil
+		return nil, normalizeFlowError(err)
 	}
 
 	cookieValue, err := h.sealState(ctx, result.State)
 	if err != nil {
-		return internalErrorResponse(err), nil
+		return nil, err
 	}
 
 	resp := h.buildFlowResponse(ctx, result, false)
@@ -85,10 +88,10 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest, params api.SubmitFlowStepParams) (api.SubmitFlowStepRes, error) {
 	state, err := h.openState(ctx, params.Zflow)
 	if err != nil {
-		return mapFlowErrorStatus(err), nil
+		return nil, normalizeFlowError(err)
 	}
 	if state.ID != params.ID {
-		return mapFlowErrorStatus(domain.ErrFlowNotFound()), nil
+		return nil, domain.ErrFlowNotFound()
 	}
 
 	submitReq := service.SubmitFlowRequest{
@@ -99,9 +102,13 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		decoded, err := decodeFlowFields(fields)
 		if err != nil {
 			// Safe client message; Parent keeps a log-safe wrapper that still Unwraps
-			// to the json.Unmarshal cause for diagnostics (ADR 030).
-			return errorResponseWithStatusCode(http.StatusBadRequest,
-				domain.ErrRequestInvalid().WithMessage(err.Error()).WithParent(err)), nil
+			// to the json.Unmarshal cause for diagnostics (ADR 030). Field name goes
+			// in structured details — never parser text or payload fragments.
+			domErr := domain.ErrRequestInvalid().WithMessage(err.Error()).WithParent(err)
+			if decodeErr, ok := err.(*flowFieldDecodeError); ok {
+				domErr = domErr.WithDetails(domain.RequestInvalidFieldDetails{Field: decodeErr.field})
+			}
+			return nil, domErr
 		}
 		submitReq.Fields = decoded
 	}
@@ -116,7 +123,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		if p, ok := cr.Proof.Get(); ok {
 			b, err := json.Marshal(p)
 			if err != nil {
-				return errorResponseWithStatusCode(http.StatusBadRequest, domain.ErrRequestInvalid().WithMessage("invalid challenge_response proof")), nil
+				return nil, domain.ErrRequestInvalid().WithMessage("invalid challenge_response proof")
 			}
 			proof = b
 		}
@@ -142,11 +149,13 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 			if rp := passkeyRPFromOrigin(*originURL); rp != nil {
 				project, err := h.projectService.Get(ctx, state.ProjectID)
 				if err != nil {
-					return internalErrorResponse(err), nil
+					// A project lookup failing mid-submit is a server-side
+					// fault, not client input: keep it a 500 rather than
+					// letting proj.not_found surface as a 404 here.
+					return nil, domain.ErrInternal(err)
 				}
 				if err := validateOriginAgainstProject(originStr, project); err != nil {
-					return errorResponseWithStatusCode(http.StatusBadRequest,
-						domain.ErrRequestInvalid().WithMessage(err.Error())), nil
+					return nil, domain.ErrRequestInvalid().WithMessage(err.Error())
 				}
 				submitReq.PasskeyRP = rp
 			}
@@ -155,12 +164,12 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 
 	result, err := h.flowService.Submit(ctx, submitReq)
 	if err != nil {
-		return mapFlowErrorStatus(err), nil
+		return nil, normalizeFlowError(err)
 	}
 
 	cookieValue, err := h.sealState(ctx, result.State)
 	if err != nil {
-		return internalErrorResponse(err), nil
+		return nil, err
 	}
 
 	terminal := result.Step != nil && result.Step.Complete != nil
@@ -183,18 +192,18 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams) (api.GetFlowStepRes, error) {
 	state, err := h.openState(ctx, params.Zflow)
 	if err != nil {
-		return mapFlowGetError(err), nil
+		return mapFlowGetError(err)
 	}
 	if state.ID != params.ID {
-		return mapFlowGetError(domain.ErrFlowNotFound()), nil
+		return mapFlowGetError(domain.ErrFlowNotFound())
 	}
 
 	result, err := h.flowService.GetStep(ctx, service.GetFlowStepRequest{State: state})
 	if err != nil {
-		return errorResponse(err), nil
+		return nil, err
 	}
 	if result.Step != nil && result.Step.Complete != nil {
-		return mapFlowGetError(domain.ErrFlowCompleted()), nil
+		return mapFlowGetError(domain.ErrFlowCompleted())
 	}
 
 	resp := h.buildFlowResponse(ctx, result, false)
@@ -549,44 +558,46 @@ func isCookieOrIDError(err error) bool {
 		errors.Is(err, domain.ErrFlowNotFound())
 }
 
-func mapFlowErrorStatus(err error) *api.ErrorDetailsStatusCode {
+// normalizeFlowError replaces a wrapped flow sentinel with the sentinel itself,
+// so the response carries its fixed public Message rather than a wrapped
+// err.Error() chain (ADR 030). Non-flow errors pass through untouched.
+//
+// Status selection is not done here: errorResponse already routes flow-prefixed
+// codes to flowErrorResponse, which is the single place that maps a flow code
+// to its HTTP status.
+func normalizeFlowError(err error) error {
 	var domErr domain.Error
-	if errors.As(err, &domErr) && strings.HasPrefix(domErr.Code, domain.PrefixFlow.ErrorCodePrefix("")) {
-		// Always emit the sentinel's fixed public Message, not a wrapped
-		// err.Error() chain (ADR 030).
-		switch {
-		case errors.Is(err, domain.ErrFlowCookieInvalid()):
-			return flowErrorResponse(domain.ErrFlowCookieInvalid())
-		case errors.Is(err, domain.ErrFlowCookieExpired()):
-			return flowErrorResponse(domain.ErrFlowCookieExpired())
-		case errors.Is(err, domain.ErrFlowNotFound()):
-			return flowErrorResponse(domain.ErrFlowNotFound())
-		case errors.Is(err, domain.ErrFlowCompleted()):
-			return flowErrorResponse(domain.ErrFlowCompleted())
-		case errors.Is(err, domain.ErrFlowInvalidAction()):
-			return flowErrorResponse(domain.ErrFlowInvalidAction())
-		case errors.Is(err, domain.ErrFlowSessionConflict()):
-			return flowErrorResponse(domain.ErrFlowSessionConflict())
-		case errors.Is(err, domain.ErrFlowUnsupported()):
-			return flowErrorResponse(domain.ErrFlowUnsupported())
-		case errors.Is(err, domain.ErrFlowInvalidPurpose()):
-			return flowErrorResponse(domain.ErrFlowInvalidPurpose())
-		}
-		return flowErrorResponse(domErr)
+	if !errors.As(err, &domErr) || !strings.HasPrefix(domErr.Code, domain.PrefixFlow.ErrorCodePrefix("")) {
+		return err
 	}
-	return errorResponse(err)
+
+	for _, sentinel := range []domain.Error{
+		domain.ErrFlowCookieInvalid(),
+		domain.ErrFlowCookieExpired(),
+		domain.ErrFlowNotFound(),
+		domain.ErrFlowCompleted(),
+		domain.ErrFlowInvalidAction(),
+		domain.ErrFlowSessionConflict(),
+		domain.ErrFlowUnsupported(),
+		domain.ErrFlowInvalidPurpose(),
+	} {
+		if errors.Is(err, sentinel) {
+			return sentinel
+		}
+	}
+	return domErr
 }
 
-func mapFlowGetError(err error) api.GetFlowStepRes {
+func mapFlowGetError(err error) (api.GetFlowStepRes, error) {
 	switch {
 	case isCookieOrIDError(err):
 		notFound := api.GetFlowStepNotFound(domainErrorDetails(domain.ErrFlowNotFound()))
-		return &notFound
+		return &notFound, nil
 	case errors.Is(err, domain.ErrFlowCompleted()):
 		gone := api.GetFlowStepGone(domainErrorDetails(domain.ErrFlowCompleted()))
-		return &gone
+		return &gone, nil
 	}
-	return errorResponse(err)
+	return nil, err
 }
 
 func buildResolveHint(opt api.OptFlowHint) service.ResolveFlowHint {

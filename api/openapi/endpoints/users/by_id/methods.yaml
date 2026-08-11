@@ -33,11 +33,7 @@ get:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: GetUserByID-error-response.yaml
 
 delete:
     operationId: DeleteUserByID
@@ -69,8 +65,4 @@ delete:
             schema:
               $ref: ../../../components/error-details.yaml
       default:
-        description: Unexpected error response.
-        content:
-          application/json:
-            schema:
-              $ref: ../../../components/error-details.yaml
+        $ref: DeleteUserByID-error-response.yaml

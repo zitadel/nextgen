@@ -17,16 +17,11 @@ func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectReque
 		return nil, err
 	}
 
-	tokenCrypter, err := h.keyService.GetProjectCrypter(ctx, project.ID, domain.EncryptionKeyPurposeToken)
+	projectSecret, err := h.tokenService.GenerateJWE(ctx, project.Token())
 	if err != nil {
 		return nil, err
 	}
-
-	projectSecret, err := project.ProjectSecret(tokenCrypter)
-	if err != nil {
-		return nil, err
-	}
-	previewSecret, err := project.PreviewSecret(tokenCrypter)
+	previewSecret, err := h.tokenService.GenerateJWE(ctx, project.PreviewToken())
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +48,7 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrProjectNotFound()
 		}
-		return h.NewError(ctx, err), nil
+		return nil, err
 	}
 	return projectResponse(project), nil
 }

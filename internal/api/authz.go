@@ -120,7 +120,7 @@ type resourceAccessStmts interface {
 // errResourceGone (handlers map to 204). Returns project_id for DAL calls.
 func (h *Handler) requireResourceAccess(ctx context.Context, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
 	if h == nil || h.pool == nil {
-		return "", domain.ErrInternal(nil).WithMessage("authz statements not configured")
+		return "", domain.ErrInternal(errors.New("authz statements not configured"))
 	}
 	return requireResourceAccess(ctx, h.pool.Statements(), resourceID, res, op)
 }
@@ -149,7 +149,7 @@ func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resou
 // DecisionForbidden → permission_denied (403).
 func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
 	if h == nil || h.pool == nil {
-		return domain.ErrInternal(nil).WithMessage("authz statements not configured")
+		return domain.ErrInternal(errors.New("authz statements not configured"))
 	}
 	return requireProjectAccess(ctx, h.pool.Statements(), projectID, res, op)
 }
