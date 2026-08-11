@@ -37,7 +37,7 @@ func TestCheck_Orchestration(t *testing.T) {
 			PrincipalID:            base.PrincipalID,
 			ObjectType:             base.ObjectType,
 			Relation:               base.Relation,
-		}).Return(true, nil)
+		}).Return(true, true, nil)
 
 		d, err := resolver.New().Check(context.Background(), stmts, base)
 		require.NoError(t, err)
@@ -48,8 +48,7 @@ func TestCheck_Orchestration(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
 		stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
-		stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(false, nil)
-		stmts.EXPECT().HasAuthzProjectFoothold(gomock.Any(), base.ProjectID, base.PrincipalType, base.PrincipalID).Return(true, nil)
+		stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(false, true, nil)
 
 		d, err := resolver.New().Check(context.Background(), stmts, base)
 		require.NoError(t, err)
@@ -60,8 +59,7 @@ func TestCheck_Orchestration(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
 		stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
-		stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(false, nil)
-		stmts.EXPECT().HasAuthzProjectFoothold(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil)
+		stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(false, false, nil)
 
 		d, err := resolver.New().Check(context.Background(), stmts, base)
 		require.NoError(t, err)
@@ -71,15 +69,13 @@ func TestCheck_Orchestration(t *testing.T) {
 	t.Run("sk_team allowlist short circuit", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
-		// No storage calls expected.
 
 		d, err := resolver.New().Check(context.Background(), stmts, resolver.Request{
-			PrincipalType:   domain.AuthzPrincipalTypeSKTeam,
-			PrincipalID:     "sk_team_1",
-			CredentialClass: domain.AuthzPrincipalTypeSKTeam,
-			ProjectID:       "proj_1",
-			ObjectType:      "project",
-			Relation:        "write",
+			PrincipalType: domain.AuthzPrincipalTypeSKTeam,
+			PrincipalID:   "sk_team_1",
+			ProjectID:     "proj_1",
+			ObjectType:    "project",
+			Relation:      "write",
 		})
 		require.NoError(t, err)
 		assert.Equal(t, resolver.DecisionNotFound, d)
@@ -89,15 +85,14 @@ func TestCheck_Orchestration(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
 		stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
-		stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(true, nil)
+		stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(true, true, nil)
 
 		d, err := resolver.New().Check(context.Background(), stmts, resolver.Request{
-			PrincipalType:   domain.AuthzPrincipalTypeSKTeam,
-			PrincipalID:     "sk_team_1",
-			CredentialClass: domain.AuthzPrincipalTypeSKTeam,
-			ProjectID:       "proj_1",
-			ObjectType:      "user",
-			Relation:        "read",
+			PrincipalType: domain.AuthzPrincipalTypeSKTeam,
+			PrincipalID:   "sk_team_1",
+			ProjectID:     "proj_1",
+			ObjectType:    "user",
+			Relation:      "read",
 		})
 		require.NoError(t, err)
 		assert.Equal(t, resolver.DecisionAllow, d)
@@ -114,7 +109,7 @@ func TestCheck_Orchestration(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
 		stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil).Times(1)
-		stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(true, nil).Times(1)
+		stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(true, true, nil).Times(1)
 
 		r := resolver.New()
 		d1, err := r.Check(context.Background(), stmts, base)
@@ -139,23 +134,27 @@ func TestListObjects_Orchestration(t *testing.T) {
 	stmts := mocks.NewMockAuthzResolverStatements(ctrl)
 	stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
 	stmts.EXPECT().ListAuthzObjectIDs(gomock.Any(), domain.AuthzListObjectsParams{
-		CatalogID:              domain.SystemCatalogID,
-		ProjectID:              "proj_1",
-		PrincipalHomeProjectID: "proj_1",
-		PrincipalType:          domain.AuthzPrincipalTypeUser,
-		PrincipalID:            "user_a",
-		ResourceKind:           domain.ResourceKindUser,
-		ObjectType:             "project",
-		Relation:               "viewer",
+		AuthzCheckParams: domain.AuthzCheckParams{
+			CatalogID:              domain.SystemCatalogID,
+			ProjectID:              "proj_1",
+			PrincipalHomeProjectID: "proj_1",
+			PrincipalType:          domain.AuthzPrincipalTypeUser,
+			PrincipalID:            "user_a",
+			ObjectType:             "project",
+			Relation:               "viewer",
+		},
+		ResourceKind: domain.ResourceKindUser,
 	}).Return([]string{"u1", "u2"}, nil)
 
 	ids, err := resolver.New().ListObjects(context.Background(), stmts, resolver.ListRequest{
-		PrincipalType: domain.AuthzPrincipalTypeUser,
-		PrincipalID:   "user_a",
-		ProjectID:     "proj_1",
-		ResourceKind:  domain.ResourceKindUser,
-		ObjectType:    "project",
-		Relation:      "viewer",
+		Request: resolver.Request{
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   "user_a",
+			ProjectID:     "proj_1",
+			ObjectType:    "project",
+			Relation:      "viewer",
+		},
+		ResourceKind: domain.ResourceKindUser,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"u1", "u2"}, ids)
@@ -165,13 +164,14 @@ func TestListObjects_SKTeamDeny(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	stmts := mocks.NewMockAuthzResolverStatements(ctrl)
 	ids, err := resolver.New().ListObjects(context.Background(), stmts, resolver.ListRequest{
-		PrincipalType:   domain.AuthzPrincipalTypeSKTeam,
-		PrincipalID:     "sk",
-		CredentialClass: domain.AuthzPrincipalTypeSKTeam,
-		ProjectID:       "proj_1",
-		ResourceKind:    domain.ResourceKindUser,
-		ObjectType:      "project",
-		Relation:        "viewer",
+		Request: resolver.Request{
+			PrincipalType: domain.AuthzPrincipalTypeSKTeam,
+			PrincipalID:   "sk",
+			ProjectID:     "proj_1",
+			ObjectType:    "project",
+			Relation:      "viewer",
+		},
+		ResourceKind: domain.ResourceKindUser,
 	})
 	require.NoError(t, err)
 	assert.Empty(t, ids)

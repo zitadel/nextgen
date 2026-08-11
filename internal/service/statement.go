@@ -396,8 +396,7 @@ func SyncUserTeamMembershipEdge(ctx context.Context, edges AuthzMembershipEdgeSt
 // GetAuthzCatalog loads one catalog version and its projected child rows by id.
 //
 // LoadCatalogMutations reads the child rows PersistCatalogVersion wrote as
-// compiler.PersistedCatalog for persist round-trip verification in stmttest;
-// product check/list paths are not callers yet (#423).
+// compiler.PersistedCatalog (stmttest round-trip and L4 oracle catalog load).
 type AuthzCatalogStatements interface {
 	Statements
 	PersistCatalogVersion(ctx context.Context, meta domain.AuthzCatalogVersion, mutations compiler.CatalogMutations) error
@@ -407,21 +406,16 @@ type AuthzCatalogStatements interface {
 
 // AuthzResolverStatements is the storage surface for permission Check / list (#423).
 //
-// ActiveSystemCatalogID returns the currently active system catalog id
-// (catalog_kind=system, owner_id=system, status=active).
-//
-// HasAuthzProjectFoothold is true when the principal has any active assignment
-// in the project or any membership edge in the project (403 vs 404 foothold).
-//
-// CheckAuthz runs the indexed semi-join (assignments ⋈ closure, membership
-// expand, bounded TTU via expression edges). Returns true when allowed.
-//
-// ListAuthzObjectIDs returns resource_scope_index.resource_id values of the
-// given kind in the project that the principal is authorized to see.
+// Use cases:
+//   - ActiveSystemCatalogID: active system catalog (kind=system, owner=system).
+//   - HasAuthzProjectFoothold: any active assignment or membership edge in project.
+//   - CheckAuthz: allowed + foothold in one round-trip (assignments, closure, membership, TTU).
+//   - ListAuthzObjectIDs: L4/oracle helper materializing authorized RSI ids for one kind.
+//     List *endpoints* compose an injectable SQL predicate (ADR 033); that lands with HTTP wiring.
 type AuthzResolverStatements interface {
 	Statements
 	ActiveSystemCatalogID(ctx context.Context) (string, error)
 	HasAuthzProjectFoothold(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
-	CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, error)
+	CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (allowed bool, foothold bool, err error)
 	ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error)
 }
