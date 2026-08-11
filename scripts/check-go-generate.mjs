@@ -10,8 +10,7 @@
  * developer's worktree as a side effect of running tests would be rude.
  *
  * `--prune` also standing-guards the bootstrap property: generation has to work
- * against a tree stripped of its own output, or this fails. What the prune
- * leaves behind — and why — is in scripts/generated-outputs.mjs.
+ * against a tree with no generated files in it at all, or this fails.
  */
 import { runCapture } from "./dev-process.mjs";
 import { cleanGenerated } from "./clean-generated.mjs";

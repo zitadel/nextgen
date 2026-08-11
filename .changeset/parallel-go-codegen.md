@@ -37,5 +37,12 @@ import-path order does the sequencing. The parallel runner ignores that order,
 so it restates the same constraint as an explicit enumer-before-mockgen
 barrier.
 
+The `./api` chain needed the same treatment for a different reason: its error
+analysis type-loads a module that does not compile until ogen — the last link
+of that very chain — has written `api/generated`, and enumer's output, which
+`go generate ./...` reaches only after `api`. `gen_openapi_errors` now runs both
+of those directives itself, over a placeholder spec, whenever `api/generated` is
+absent, rather than the cycle being something the caller has to schedule around.
+
 On the previous layout 20 files failed to regenerate from an empty tree; now
 none do, by either path. `server:check-generate-pruned` keeps it that way.
