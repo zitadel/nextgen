@@ -27,7 +27,7 @@ func TestHandleNextgenSession(t *testing.T) {
 
 		mock := gomock.NewController(t)
 		tokenService := mocks.NewMockTokenService(mock)
-		tokenService.EXPECT().VerifyToken(gomock.Any(), gomock.Any()).Return(token, nil)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
 
 		handler := NewSecurityHandler(tokenService)
 		ctx, err := handler.HandleNextgenSession(t.Context(), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
@@ -43,7 +43,7 @@ func TestHandleNextgenSession(t *testing.T) {
 
 		mock := gomock.NewController(t)
 		tokenService := mocks.NewMockTokenService(mock)
-		tokenService.EXPECT().VerifyToken(gomock.Any(), gomock.Any()).Return(nil, errors.New("bad token"))
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
 
 		handler := NewSecurityHandler(tokenService)
 		_, err := handler.HandleNextgenSession(t.Context(), api.GetMySessionOperation, api.NextgenSession{APIKey: "garbage"})
@@ -57,7 +57,7 @@ func TestHandleNextgenSession(t *testing.T) {
 
 		mock := gomock.NewController(t)
 		tokenService := mocks.NewMockTokenService(mock)
-		tokenService.EXPECT().VerifyToken(gomock.Any(), gomock.Any()).Return(token, nil)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
 
 		handler := NewSecurityHandler(tokenService)
 		_, err := handler.HandleNextgenSession(t.Context(), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
