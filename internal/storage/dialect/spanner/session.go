@@ -11,7 +11,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	v2session "github.com/zitadel/nextgen/internal/storage/session"
 )
@@ -72,7 +71,7 @@ func (ss sessionStatements) ListSessions(ctx context.Context, filter *database.L
 func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, sessionID string) error {
 	return withTransaction(ctx, ss.db, func(ctx context.Context, tx queryExecutor) error {
 		rsi := newResourceScopeStatements(tx)
-		if err := authz.SessionDeleted(ctx, &rsi, sessionID); err != nil {
+		if err := rsi.DeleteResourceScope(ctx, sessionID); err != nil {
 			return err
 		}
 		n, err := tx.Update(ctx, buildStatement(`DELETE FROM sessions WHERE project_id = @p1 AND id = @p2`, projectID, sessionID).statement())
@@ -189,7 +188,7 @@ func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.S
 		return err
 	}
 	rsi := newResourceScopeStatements(ss.db)
-	return authz.SessionCreated(ctx, &rsi, session.ProjectID, session.ID)
+	return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindSession, session.ProjectID, session.ID))
 }
 
 func (ss sessionStatements) CreateSessionToken(ctx context.Context, session *domain.Session, previousTokenID string) error {

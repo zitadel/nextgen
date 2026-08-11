@@ -55,7 +55,7 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
 
 - **Writers (dual-write):** entity statements construct tx-bound RSI/edge
   statements inside `withTransaction` and call Upsert/Sync/Delete directly.
-  Multi-write user lifecycle helpers live in `internal/storage/v2/dialect/authz`.
+  Multi-write user lifecycle helpers live in `internal/storage/dialect/authz`.
   Membership status uses `service.SyncUserTeamMembershipEdge`;
   column-shaped edge deletes use `DeleteAuthzMembershipEdges(filter)`; team
   deactivate uses `DeleteAuthzMembershipEdgesForTeamDeactivate`.

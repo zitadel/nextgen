@@ -196,44 +196,17 @@ func NewTeamResourceScope(projectID, teamID string) *ResourceScope {
 	}
 }
 
+// NewResourceScope builds a project-scoped RSI row (no team).
+func NewResourceScope(kind ResourceKind, projectID, resourceID string) *ResourceScope {
+	return &ResourceScope{
+		ResourceID:   resourceID,
+		ResourceKind: kind,
+		ProjectID:    projectID,
+	}
+}
+
 func NewUserResourceScope(projectID, userID string) *ResourceScope {
-	return &ResourceScope{
-		ResourceID:   userID,
-		ResourceKind: ResourceKindUser,
-		ProjectID:    projectID,
-	}
-}
-
-func NewSchemaResourceScope(projectID, schemaID string) *ResourceScope {
-	return &ResourceScope{
-		ResourceID:   schemaID,
-		ResourceKind: ResourceKindSchema,
-		ProjectID:    projectID,
-	}
-}
-
-func NewBrandingResourceScope(projectID, brandingID string) *ResourceScope {
-	return &ResourceScope{
-		ResourceID:   brandingID,
-		ResourceKind: ResourceKindBranding,
-		ProjectID:    projectID,
-	}
-}
-
-func NewFlowDefinitionResourceScope(projectID, flowDefinitionID string) *ResourceScope {
-	return &ResourceScope{
-		ResourceID:   flowDefinitionID,
-		ResourceKind: ResourceKindFlowDefinition,
-		ProjectID:    projectID,
-	}
-}
-
-func NewSessionResourceScope(projectID, sessionID string) *ResourceScope {
-	return &ResourceScope{
-		ResourceID:   sessionID,
-		ResourceKind: ResourceKindSession,
-		ProjectID:    projectID,
-	}
+	return NewResourceScope(ResourceKindUser, projectID, userID)
 }
 
 // AuthzAssignmentScope encodes the CHECK-constrained scope columns.
