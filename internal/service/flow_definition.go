@@ -117,16 +117,14 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 		if err := tx.Statements().CreateFlowDefinition(ctx, flowDefinition); err != nil {
 			return err
 		}
-		ev := audit.WithEntity(
-			audit.FromContext(ctx, domain.EventTypeFlowdefCreated, domain.EventCategoryAdmin),
-			"flow_definition", flowDefinition.ID,
-		)
-		ev = audit.WithProjectID(ev, flowDefinition.ProjectID)
-		ev, err := audit.WithPayload(ev, domain.FlowdefPayload{Name: flowDefinition.Name})
-		if err != nil {
-			return err
-		}
-		return audit.Insert(ctx, tx.Statements(), ev)
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeFlowdefCreated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  flowDefinition.ProjectID,
+			EntityType: "flow_definition",
+			EntityID:   flowDefinition.ID,
+			Payload:    domain.FlowdefPayload{Name: flowDefinition.Name},
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -174,16 +172,14 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 		if err := tx.Statements().UpdateFlowDefinition(ctx, flowDefinition); err != nil {
 			return err
 		}
-		ev := audit.WithEntity(
-			audit.FromContext(ctx, domain.EventTypeFlowdefUpdated, domain.EventCategoryAdmin),
-			"flow_definition", flowDefinition.ID,
-		)
-		ev = audit.WithProjectID(ev, flowDefinition.ProjectID)
-		ev, err := audit.WithPayload(ev, domain.FlowdefPayload{Name: flowDefinition.Name})
-		if err != nil {
-			return err
-		}
-		return audit.Insert(ctx, tx.Statements(), ev)
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeFlowdefUpdated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  flowDefinition.ProjectID,
+			EntityType: "flow_definition",
+			EntityID:   flowDefinition.ID,
+			Payload:    domain.FlowdefPayload{Name: flowDefinition.Name},
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -381,11 +377,12 @@ func (fd *flowDefinitionService) Delete(ctx context.Context, projectID, id strin
 		if err := tx.Statements().DeleteFlowDefinitionByID(ctx, projectID, id); err != nil {
 			return err
 		}
-		ev := audit.WithEntity(
-			audit.FromContext(ctx, domain.EventTypeFlowdefDeleted, domain.EventCategoryAdmin),
-			"flow_definition", id,
-		)
-		ev = audit.WithProjectID(ev, projectID)
-		return audit.Insert(ctx, tx.Statements(), ev)
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeFlowdefDeleted,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  projectID,
+			EntityType: "flow_definition",
+			EntityID:   id,
+		})
 	})
 }

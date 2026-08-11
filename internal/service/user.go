@@ -141,16 +141,14 @@ func (s *UserService) emitUserCreateFailedBestEffort(ctx context.Context, action
 		return
 	}
 	_ = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		ev := audit.WithEntity(
-			audit.FromContext(ctx, domain.EventTypeUserCreateFailed, domain.EventCategoryEntity),
-			"user", create.CreateUser.ID,
-		)
-		ev = audit.WithProjectID(ev, create.ProjectID)
-		ev, err := audit.WithPayload(ev, domain.UserCreateFailedPayload{})
-		if err != nil {
-			return err
-		}
-		return audit.Insert(ctx, tx.Statements(), ev)
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeUserCreateFailed,
+			Category:   domain.EventCategoryEntity,
+			ProjectID:  create.ProjectID,
+			EntityType: "user",
+			EntityID:   create.CreateUser.ID,
+			Payload:    domain.UserCreateFailedPayload{},
+		})
 	})
 }
 
@@ -366,19 +364,17 @@ func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		return err
 	}
 	o.User["id"] = o.CreateUser.ID
-	ev := audit.WithEntity(
-		audit.FromContext(ctx, domain.EventTypeUserCreated, domain.EventCategoryEntity),
-		"user", o.CreateUser.ID,
-	)
-	ev = audit.WithProjectID(ev, o.CreateUser.ProjectID)
-	ev, err := audit.WithPayload(ev, domain.UserCreatedPayload{
-		UserID:   o.CreateUser.ID,
-		SchemaID: o.CreateUser.SchemaURL,
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeUserCreated,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  o.CreateUser.ProjectID,
+		EntityType: "user",
+		EntityID:   o.CreateUser.ID,
+		Payload: domain.UserCreatedPayload{
+			UserID:   o.CreateUser.ID,
+			SchemaID: o.CreateUser.SchemaURL,
+		},
 	})
-	if err != nil {
-		return err
-	}
-	return audit.Insert(ctx, stmts, ev)
 }
 
 func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.CreateUser) error {
@@ -427,16 +423,14 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) 
 		}
 		return domain.ErrInternal(err).WithMessage("failed to set password")
 	}
-	ev := audit.WithEntity(
-		audit.FromContext(ctx, domain.EventTypeAuthFactorPasswordSet, domain.EventCategoryAuth),
-		"user_password", o.UserID,
-	)
-	ev = audit.WithProjectID(ev, o.ProjectID)
-	ev, err = audit.WithPayload(ev, domain.AuthFactorPayload{UserID: o.UserID})
-	if err != nil {
-		return err
-	}
-	return audit.Insert(ctx, stmts, ev)
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeAuthFactorPasswordSet,
+		Category:   domain.EventCategoryAuth,
+		ProjectID:  o.ProjectID,
+		EntityType: "user_password",
+		EntityID:   o.UserID,
+		Payload:    domain.AuthFactorPayload{UserID: o.UserID},
+	})
 }
 
 // ---- Delete ACTION -------------------------------------------------------------
@@ -463,12 +457,13 @@ func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		}
 		return domain.ErrInternal(err).WithMessage("failed to delete user")
 	}
-	ev := audit.WithEntity(
-		audit.FromContext(ctx, domain.EventTypeUserDeleted, domain.EventCategoryEntity),
-		"user", o.UserID,
-	)
-	ev = audit.WithProjectID(ev, o.ProjectID)
-	return audit.Insert(ctx, stmts, ev)
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeUserDeleted,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  o.ProjectID,
+		EntityType: "user",
+		EntityID:   o.UserID,
+	})
 }
 
 // UserStatementsLookup adapts [UserStatements] to [UserLookup] for AuthAttemptService.

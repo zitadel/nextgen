@@ -51,16 +51,14 @@ func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput)
 		if err := tx.Statements().CreateBranding(ctx, entity); err != nil {
 			return err
 		}
-		ev := audit.WithEntity(
-			audit.FromContext(ctx, domain.EventTypeBrandingCreated, domain.EventCategoryAdmin),
-			"branding", entity.ID,
-		)
-		ev = audit.WithProjectID(ev, entity.ProjectID)
-		ev, err := audit.WithPayload(ev, domain.BrandingCreatedPayload{Layout: entity.Layout})
-		if err != nil {
-			return err
-		}
-		return audit.Insert(ctx, tx.Statements(), ev)
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeBrandingCreated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  entity.ProjectID,
+			EntityType: "branding",
+			EntityID:   entity.ID,
+			Payload:    domain.BrandingCreatedPayload{Layout: entity.Layout},
+		})
 	}); err != nil {
 		// The only integrity constraint reachable from user input is the FK to
 		// projects (the ULID primary key cannot realistically collide), so a

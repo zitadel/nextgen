@@ -49,7 +49,12 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 			status = http.StatusOK
 		}
 		operationID, _ := middleware.GetOperationIDContext(r.Context())
-		route := r.URL.Path
+		// Prefer ServeMux pattern when available; ogen mounts under "/" so fall
+		// back to operation_id (stable) instead of raw path (leaks resource ids).
+		route := r.Pattern
+		if route == "" || route == "/" {
+			route = operationID
+		}
 		payload, err := events.MarshalPayload(domain.RequestAPIPayload{
 			OperationID:   operationID,
 			Method:        r.Method,

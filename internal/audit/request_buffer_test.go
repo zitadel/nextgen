@@ -16,12 +16,14 @@ import (
 type channelInserter struct {
 	mu     sync.Mutex
 	events []*domain.Event
+	calls  int
 }
 
-func (c *channelInserter) InsertEvent(_ context.Context, event *domain.Event) error {
+func (c *channelInserter) InsertEvents(_ context.Context, events []*domain.Event) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.events = append(c.events, event)
+	c.calls++
+	c.events = append(c.events, events...)
 	return nil
 }
 
@@ -29,6 +31,12 @@ func (c *channelInserter) count() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return len(c.events)
+}
+
+func (c *channelInserter) batchCalls() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.calls
 }
 
 func TestRequestBuffer_FlushOnBatchSize(t *testing.T) {
@@ -52,10 +60,11 @@ func TestRequestBuffer_FlushOnBatchSize(t *testing.T) {
 	require.Eventually(t, func() bool { return buf.Flushed() >= 3 }, time.Second, 10*time.Millisecond)
 	assert.Equal(t, 0, buf.Len())
 	assert.GreaterOrEqual(t, ins.count(), 3)
+	assert.Equal(t, 1, ins.batchCalls())
 }
 
 func TestRequestBuffer_DropWhenFull(t *testing.T) {
-	ins := &noopInserter{}
+	ins := SequentialBatchInserter{Inner: noopInserter{}}
 	buf := NewRequestBuffer(ins, RequestBufferConfig{
 		BatchSize:       1000,
 		Capacity:        2,
@@ -93,6 +102,7 @@ func TestRequestBuffer_WatermarkFlush(t *testing.T) {
 		buf.Enqueue(&domain.Event{ProjectID: "proj_1", EventType: domain.EventTypeRequestAPI, Category: domain.EventCategoryRequest})
 	}
 	require.Eventually(t, func() bool { return buf.Flushed() >= 8 }, time.Second, 10*time.Millisecond)
+	assert.Equal(t, 1, ins.batchCalls())
 }
 
 func TestStatusCapturingWriter(t *testing.T) {

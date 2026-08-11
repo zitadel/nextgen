@@ -39,3 +39,21 @@ func TestInsert_CallsInsertEvent(t *testing.T) {
 	require.Equal(t, 1, cap.called)
 	require.Equal(t, ev, cap.last)
 }
+
+func TestEmit_BuildsAndInserts(t *testing.T) {
+	t.Parallel()
+	cap := &insertEventCapture{}
+	require.NoError(t, audit.Emit(t.Context(), cap, audit.EmitSpec{
+		Type:       domain.EventTypeUserCreated,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  "proj_1",
+		EntityType: "user",
+		EntityID:   "user_1",
+		Payload:    domain.UserCreatedPayload{},
+	}))
+	require.Equal(t, 1, cap.called)
+	require.Equal(t, "proj_1", cap.last.ProjectID)
+	require.Equal(t, domain.EventTypeUserCreated, cap.last.EventType)
+	require.NotNil(t, cap.last.EntityID)
+	require.Equal(t, "user_1", *cap.last.EntityID)
+}

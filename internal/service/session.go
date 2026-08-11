@@ -154,18 +154,16 @@ func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) e
 		if err := tx.Statements().DeleteSessionByID(ctx, input.ProjectID, input.SessionID); err != nil {
 			return err
 		}
-		ev := audit.WithEntity(
-			audit.FromContext(ctx, domain.EventTypeSessionDeleted, domain.EventCategorySession),
-			"session", input.SessionID,
-		)
-		ev = audit.WithProjectID(ev, input.ProjectID)
 		sid := input.SessionID
-		ev.SessionID = &sid
-		ev, err := audit.WithPayload(ev, domain.SessionDeletedPayload{})
-		if err != nil {
-			return err
-		}
-		return audit.Insert(ctx, tx.Statements(), ev)
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeSessionDeleted,
+			Category:   domain.EventCategorySession,
+			ProjectID:  input.ProjectID,
+			EntityType: "session",
+			EntityID:   input.SessionID,
+			SessionID:  &sid,
+			Payload:    domain.SessionDeletedPayload{},
+		})
 	})
 	if err != nil {
 		if errors.Is(err, domain.ErrSessionNotFound()) {
@@ -180,36 +178,32 @@ func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) e
 }
 
 func emitSessionEstablished(ctx context.Context, stmts EventStatements, session *domain.Session) error {
-	ev := audit.WithEntity(
-		audit.FromContext(ctx, domain.EventTypeSessionEstablished, domain.EventCategorySession),
-		"session", session.ID,
-	)
-	ev = audit.WithProjectID(ev, session.ProjectID)
-	sid := session.ID
-	ev.SessionID = &sid
 	payload := domain.SessionEstablishedPayload{}
 	if session.UserID != nil {
 		payload.UserID = *session.UserID
 	}
-	ev, err := audit.WithPayload(ev, payload)
-	if err != nil {
-		return err
-	}
-	return audit.Insert(ctx, stmts, ev)
+	sid := session.ID
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeSessionEstablished,
+		Category:   domain.EventCategorySession,
+		ProjectID:  session.ProjectID,
+		EntityType: "session",
+		EntityID:   session.ID,
+		SessionID:  &sid,
+		Payload:    payload,
+	})
 }
 
 func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, session *domain.Session) error {
-	ev := audit.WithEntity(
-		audit.FromContext(ctx, domain.EventTypeAuthTokenIssued, domain.EventCategoryAuth),
-		"token", session.TokenID,
-	)
-	ev = audit.WithProjectID(ev, session.ProjectID)
-	ev.TokenID = session.TokenID
-	ev, err := audit.WithPayload(ev, domain.AuthTokenIssuedPayload{})
-	if err != nil {
-		return err
-	}
-	return audit.Insert(ctx, stmts, ev)
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeAuthTokenIssued,
+		Category:   domain.EventCategoryAuth,
+		ProjectID:  session.ProjectID,
+		EntityType: "token",
+		EntityID:   session.TokenID,
+		TokenID:    session.TokenID,
+		Payload:    domain.AuthTokenIssuedPayload{},
+	})
 }
 
 func NewSessionService(v2Pool StatementPool, users UserIdentityReader, cfg SessionConfig) SessionService {

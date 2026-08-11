@@ -3,6 +3,8 @@ package audit
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -74,24 +76,17 @@ func (s *Shipper) Start(ctx context.Context) error {
 		close(s.done)
 		return nil
 	}
-	for i, sc := range s.cfg.Sinks {
+	for _, sc := range s.cfg.Sinks {
 		if sc.Type == "" {
 			continue
 		}
 		// v1 always enables configured sink types (Enabled flag is reserved).
 		sink := &domain.EventSink{
+			ID:      deploymentSinkID(sc.Type, sc.URL),
 			Type:    sc.Type,
 			Scope:   domain.EventSinkScopeDeployment,
 			URL:     sc.URL,
 			Enabled: true,
-		}
-		if sink.Type == domain.EventSinkTypeStdout {
-			sink.ID = "sink_deployment_stdout"
-		} else {
-			sink.ID = "sink_deployment_webhook"
-			if i > 0 {
-				sink.ID = "sink_deployment_webhook_" + string(rune('a'+i))
-			}
 		}
 		if err := s.src.EnsureSink(ctx, sink); err != nil {
 			return err
@@ -224,4 +219,12 @@ func (s *Shipper) Close() {
 		close(s.stop)
 	}
 	<-s.done
+}
+
+func deploymentSinkID(sinkType domain.EventSinkType, url string) string {
+	if sinkType == domain.EventSinkTypeStdout {
+		return "sink_deployment_stdout"
+	}
+	sum := sha256.Sum256([]byte(string(sinkType) + "\n" + url))
+	return "sink_deployment_" + hex.EncodeToString(sum[:8])
 }

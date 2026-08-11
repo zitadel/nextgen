@@ -37,16 +37,14 @@ func (s *TeamService) Create(ctx context.Context, input CreateTeamInput) (*domai
 		if err := tx.Statements().CreateTeam(ctx, model); err != nil {
 			return err
 		}
-		ev := audit.WithEntity(
-			audit.FromContext(ctx, domain.EventTypeTeamCreated, domain.EventCategoryAdmin),
-			"team", model.ID,
-		)
-		ev = audit.WithProjectID(ev, model.ProjectID)
-		ev, err := audit.WithPayload(ev, domain.TeamCreatedPayload{Name: model.Name})
-		if err != nil {
-			return err
-		}
-		return audit.Insert(ctx, tx.Statements(), ev)
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeTeamCreated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  model.ProjectID,
+			EntityType: "team",
+			EntityID:   model.ID,
+			Payload:    domain.TeamCreatedPayload{Name: model.Name},
+		})
 	})
 	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
@@ -223,16 +221,14 @@ func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (*domai
 		if err := tx.Statements().UpdateTeam(ctx, team); err != nil {
 			return err
 		}
-		ev := audit.WithEntity(
-			audit.FromContext(ctx, domain.EventTypeTeamUpdated, domain.EventCategoryAdmin),
-			"team", team.ID,
-		)
-		ev = audit.WithProjectID(ev, team.ProjectID)
-		ev, err := audit.WithPayload(ev, domain.TeamUpdatedPayload{ChangedKeys: []string{"name"}})
-		if err != nil {
-			return err
-		}
-		return audit.Insert(ctx, tx.Statements(), ev)
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeTeamUpdated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  team.ProjectID,
+			EntityType: "team",
+			EntityID:   team.ID,
+			Payload:    domain.TeamUpdatedPayload{ChangedKeys: []string{"name"}},
+		})
 	})
 	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
@@ -260,12 +256,13 @@ func (s *TeamService) Delete(ctx context.Context, projectID, teamID string) erro
 		if err := tx.Statements().DeactivateTeam(ctx, projectID, teamID); err != nil {
 			return err
 		}
-		ev := audit.WithEntity(
-			audit.FromContext(ctx, domain.EventTypeTeamDeactivated, domain.EventCategoryAdmin),
-			"team", teamID,
-		)
-		ev = audit.WithProjectID(ev, projectID)
-		return audit.Insert(ctx, tx.Statements(), ev)
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeTeamDeactivated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  projectID,
+			EntityType: "team",
+			EntityID:   teamID,
+		})
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {

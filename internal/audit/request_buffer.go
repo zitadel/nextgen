@@ -10,11 +10,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// EventInserter persists events (Path A flush target).
-type EventInserter interface {
-	InsertEvent(ctx context.Context, event *domain.Event) error
-}
-
 // RequestBufferConfig tunes Path A batching (ADR 048).
 type RequestBufferConfig struct {
 	BatchSize       int
@@ -42,20 +37,21 @@ type bufferedEvent struct {
 }
 
 // RequestBuffer is an in-process Path A queue with N/T/watermark flush.
+// A single background flusher owns all inserts (no per-enqueue goroutines).
 type RequestBuffer struct {
 	cfg     RequestBufferConfig
-	insert  EventInserter
+	insert  EventBatchInserter
 	mu      sync.Mutex
 	buf     []bufferedEvent
 	dropped atomic.Uint64
 	flushed atomic.Uint64
+	wake    chan struct{}
 	stop    chan struct{}
 	done    chan struct{}
-	wg      sync.WaitGroup
 }
 
 // NewRequestBuffer starts a background flusher. Call Close on shutdown.
-func NewRequestBuffer(insert EventInserter, cfg RequestBufferConfig) *RequestBuffer {
+func NewRequestBuffer(insert EventBatchInserter, cfg RequestBufferConfig) *RequestBuffer {
 	if cfg.BatchSize <= 0 {
 		cfg.BatchSize = 100
 	}
@@ -75,10 +71,10 @@ func NewRequestBuffer(insert EventInserter, cfg RequestBufferConfig) *RequestBuf
 		cfg:    cfg,
 		insert: insert,
 		buf:    make([]bufferedEvent, 0, cfg.BatchSize),
+		wake:   make(chan struct{}, 1),
 		stop:   make(chan struct{}),
 		done:   make(chan struct{}),
 	}
-	b.wg.Add(1)
 	go b.loop()
 	return b
 }
@@ -89,19 +85,27 @@ func (b *RequestBuffer) Enqueue(ev *domain.Event) {
 		return
 	}
 	b.mu.Lock()
-	defer b.mu.Unlock()
 	if len(b.buf) >= b.cfg.Capacity {
 		b.dropped.Add(1)
 		slog.Warn("audit request buffer full; dropping event",
 			slog.String("project_id", ev.ProjectID),
 			slog.Uint64("dropped_total", b.dropped.Load()),
 		)
+		b.mu.Unlock()
 		return
 	}
 	b.buf = append(b.buf, bufferedEvent{event: ev, enqueuedAt: time.Now()})
-	if b.shouldFlushLocked() {
-		batch := b.takeAllLocked()
-		go b.flush(batch)
+	shouldWake := b.shouldFlushLocked()
+	b.mu.Unlock()
+	if shouldWake {
+		b.signal()
+	}
+}
+
+func (b *RequestBuffer) signal() {
+	select {
+	case b.wake <- struct{}{}:
+	default:
 	}
 }
 
@@ -131,7 +135,6 @@ func (b *RequestBuffer) takeAllLocked() []bufferedEvent {
 }
 
 func (b *RequestBuffer) loop() {
-	defer b.wg.Done()
 	defer close(b.done)
 	ticker := time.NewTicker(b.cfg.FlushInterval)
 	defer ticker.Stop()
@@ -143,38 +146,44 @@ func (b *RequestBuffer) loop() {
 			b.mu.Unlock()
 			b.flush(batch)
 			return
+		case <-b.wake:
+			b.flushReady()
 		case <-ticker.C:
-			b.mu.Lock()
-			var batch []bufferedEvent
-			if b.shouldFlushLocked() {
-				batch = b.takeAllLocked()
-			}
-			b.mu.Unlock()
-			if len(batch) > 0 {
-				b.flush(batch)
-			}
+			b.flushReady()
 		}
 	}
+}
+
+func (b *RequestBuffer) flushReady() {
+	b.mu.Lock()
+	var batch []bufferedEvent
+	if b.shouldFlushLocked() {
+		batch = b.takeAllLocked()
+	}
+	b.mu.Unlock()
+	b.flush(batch)
 }
 
 func (b *RequestBuffer) flush(batch []bufferedEvent) {
 	if len(batch) == 0 {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	for _, item := range batch {
+	events := make([]*domain.Event, len(batch))
+	for i, item := range batch {
 		ev := item.event
 		ev.OccurredAtWait = time.Since(item.enqueuedAt)
-		if err := b.insert.InsertEvent(ctx, ev); err != nil {
-			slog.Error("failed to flush request audit event",
-				slog.String("project_id", ev.ProjectID),
-				slog.String("error", err.Error()),
-			)
-			continue
-		}
-		b.flushed.Add(1)
+		events[i] = ev
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := b.insert.InsertEvents(ctx, events); err != nil {
+		slog.Error("failed to flush request audit event batch",
+			slog.Int("batch_size", len(events)),
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+	b.flushed.Add(uint64(len(events)))
 }
 
 // Close drains the buffer and stops the flusher.
@@ -194,7 +203,6 @@ func (b *RequestBuffer) Close() {
 	case <-time.After(timeout):
 		slog.Warn("audit request buffer shutdown timed out")
 	}
-	b.wg.Wait()
 }
 
 func (b *RequestBuffer) Dropped() uint64 { return b.dropped.Load() }

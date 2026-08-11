@@ -236,11 +236,17 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	requestEventBuf := audit.NewRequestBuffer(audit.PoolInserter{
-		Insert: func(ctx context.Context, event *domain.Event) error {
-			return serviceDBPool.Statements().InsertEvent(ctx, event)
-		},
-	}, audit.DefaultRequestBufferConfig())
+	requestEventBuf := audit.NewRequestBuffer(audit.BatchInserter(func(ctx context.Context, events []*domain.Event) error {
+		return serviceDBPool.Transaction(ctx, func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+			stmts := tx.Statements()
+			for _, ev := range events {
+				if err := stmts.InsertEvent(ctx, ev); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	}), audit.DefaultRequestBufferConfig())
 	defer requestEventBuf.Close()
 
 	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool}

@@ -108,22 +108,7 @@ func (s *EventService) Get(ctx context.Context, projectID, id string) (*domain.E
 // for the project row when claim completes. Until that team stamp exists the
 // project is treated as pre-claim: list returns empty, get returns not found.
 func (s *EventService) projectEventsVisible(ctx context.Context, projectID string) (bool, error) {
-	_, err := s.v2Pool.Statements().GetProjectByID(ctx, projectID)
-	if err != nil {
-		if errors.Is(err, new(database.NoRowFoundError)) {
-			return false, nil
-		}
-		return false, domain.ErrInternal(err).WithMessage("failed to load project for events visibility")
-	}
-
-	scope, err := s.v2Pool.Statements().GetResourceScope(ctx, projectID)
-	if err != nil {
-		if errors.Is(err, new(database.NoRowFoundError)) {
-			return false, nil
-		}
-		return false, domain.ErrInternal(err).WithMessage("failed to load project scope for events visibility")
-	}
-	return scope.TeamID != nil && *scope.TeamID != "", nil
+	return projectIsClaimed(ctx, s.v2Pool.Statements(), projectID)
 }
 
 func listEventsOptions(req ListEventsRequest) (*database.ListOptions[domain.EventField], error) {

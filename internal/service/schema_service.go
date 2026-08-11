@@ -77,16 +77,14 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
 		}
-		ev := audit.WithEntity(
-			audit.FromContext(ctx, domain.EventTypeSchemaCreated, domain.EventCategoryAdmin),
-			"json_schema", model.URL,
-		)
-		ev = audit.WithProjectID(ev, model.ProjectID)
-		ev, err = audit.WithPayload(ev, domain.SchemaPayload{SchemaID: model.URL})
-		if err != nil {
-			return err
-		}
-		return audit.Insert(ctx, stmts, ev)
+		return audit.Emit(ctx, stmts, audit.EmitSpec{
+			Type:       domain.EventTypeSchemaCreated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  model.ProjectID,
+			EntityType: "json_schema",
+			EntityID:   model.URL,
+			Payload:    domain.SchemaPayload{SchemaID: model.URL},
+		})
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {

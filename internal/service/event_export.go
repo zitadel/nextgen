@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -45,17 +44,14 @@ func (a EventExportAdapter) ListClaimedProjectIDs(ctx context.Context) ([]string
 	if err != nil {
 		return nil, err
 	}
-	claimed := make([]string, 0, len(ids))
 	stmts := a.Pool.Statements()
+	claimed := make([]string, 0, len(ids))
 	for _, id := range ids {
-		scope, err := stmts.GetResourceScope(ctx, id)
+		ok, err := projectIsClaimed(ctx, stmts, id)
 		if err != nil {
-			if errors.Is(err, new(database.NoRowFoundError)) {
-				continue
-			}
 			return nil, err
 		}
-		if scope.TeamID != nil && *scope.TeamID != "" {
+		if ok {
 			claimed = append(claimed, id)
 		}
 	}

@@ -228,20 +228,18 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 		if err := tx.Statements().CreateAuthAttempt(ctx, attempt); err != nil {
 			return err
 		}
-		ev := audit.WithEntity(
-			audit.FromContext(ctx, domain.EventTypeAuthAttemptCreated, domain.EventCategoryAuth),
-			"auth_attempt", attempt.ID,
-		)
-		ev = audit.WithProjectID(ev, attempt.ProjectID)
 		payload := domain.AuthAttemptCreatedPayload{}
-		if ev.FlowID != nil {
-			payload.FlowID = *ev.FlowID
+		if ac, ok := audit.ActorFromContext(ctx); ok && ac.FlowID != nil {
+			payload.FlowID = *ac.FlowID
 		}
-		ev, err := audit.WithPayload(ev, payload)
-		if err != nil {
-			return err
-		}
-		return audit.Insert(ctx, tx.Statements(), ev)
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeAuthAttemptCreated,
+			Category:   domain.EventCategoryAuth,
+			ProjectID:  attempt.ProjectID,
+			EntityType: "auth_attempt",
+			EntityID:   attempt.ID,
+			Payload:    payload,
+		})
 	}); err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
@@ -338,20 +336,18 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 		if err := tx.Statements().HandoffAuthAttempt(ctx, attempt); err != nil {
 			return err
 		}
-		ev := audit.WithEntity(
-			audit.FromContext(ctx, domain.EventTypeAuthAttemptHandedOff, domain.EventCategoryAuth),
-			"auth_attempt", attempt.ID,
-		)
-		ev = audit.WithProjectID(ev, attempt.ProjectID)
 		payload := domain.AuthAttemptHandedOffPayload{}
 		if attempt.SessionID != nil {
 			payload.SessionID = *attempt.SessionID
 		}
-		ev, err := audit.WithPayload(ev, payload)
-		if err != nil {
-			return err
-		}
-		return audit.Insert(ctx, tx.Statements(), ev)
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeAuthAttemptHandedOff,
+			Category:   domain.EventCategoryAuth,
+			ProjectID:  attempt.ProjectID,
+			EntityType: "auth_attempt",
+			EntityID:   attempt.ID,
+			Payload:    payload,
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -382,19 +378,17 @@ func emitAuthCheck(ctx context.Context, stmts EventStatements, projectID string,
 	if succeeded {
 		eventType = domain.EventTypeAuthCheckSucceeded
 	}
-	ev := audit.WithEntity(
-		audit.FromContext(ctx, eventType, domain.EventCategoryAuth),
-		"check", challenge.GetID(),
-	)
-	ev = audit.WithProjectID(ev, projectID)
-	ev, err := audit.WithPayload(ev, domain.AuthCheckPayload{
-		CheckID:   challenge.GetID(),
-		CheckType: challenge.Type().String(),
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       eventType,
+		Category:   domain.EventCategoryAuth,
+		ProjectID:  projectID,
+		EntityType: "check",
+		EntityID:   challenge.GetID(),
+		Payload: domain.AuthCheckPayload{
+			CheckID:   challenge.GetID(),
+			CheckType: challenge.Type().String(),
+		},
 	})
-	if err != nil {
-		return err
-	}
-	return audit.Insert(ctx, stmts, ev)
 }
 
 // buildChallenge constructs the challenge for the given check type.

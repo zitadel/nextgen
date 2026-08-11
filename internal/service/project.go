@@ -200,42 +200,36 @@ func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, 
 }
 
 func emitProjectCreated(ctx context.Context, stmts EventStatements, project *domain.Project) error {
-	ev := audit.WithEntity(
-		audit.FromContext(ctx, domain.EventTypeProjectCreated, domain.EventCategoryEntity),
-		"project", project.ID,
-	)
-	ev = audit.WithProjectID(ev, project.ID)
-	ev, err := audit.WithPayload(ev, domain.ProjectCreatedPayload{Name: project.Name})
-	if err != nil {
-		return err
-	}
-	return audit.Insert(ctx, stmts, ev)
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeProjectCreated,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  project.ID,
+		EntityType: "project",
+		EntityID:   project.ID,
+		Payload:    domain.ProjectCreatedPayload{Name: project.Name},
+	})
 }
 
 func emitSchemaCreated(ctx context.Context, stmts EventStatements, schema *domain.JSONSchema) error {
-	ev := audit.WithEntity(
-		audit.FromContext(ctx, domain.EventTypeSchemaCreated, domain.EventCategoryAdmin),
-		"json_schema", schema.URL,
-	)
-	ev = audit.WithProjectID(ev, schema.ProjectID)
-	ev, err := audit.WithPayload(ev, domain.SchemaPayload{SchemaID: schema.URL})
-	if err != nil {
-		return err
-	}
-	return audit.Insert(ctx, stmts, ev)
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeSchemaCreated,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  schema.ProjectID,
+		EntityType: "json_schema",
+		EntityID:   schema.URL,
+		Payload:    domain.SchemaPayload{SchemaID: schema.URL},
+	})
 }
 
 func emitFlowdefCreated(ctx context.Context, stmts EventStatements, flowDef *domain.FlowDefinition) error {
-	ev := audit.WithEntity(
-		audit.FromContext(ctx, domain.EventTypeFlowdefCreated, domain.EventCategoryAdmin),
-		"flow_definition", flowDef.ID,
-	)
-	ev = audit.WithProjectID(ev, flowDef.ProjectID)
-	ev, err := audit.WithPayload(ev, domain.FlowdefPayload{Name: flowDef.Name})
-	if err != nil {
-		return err
-	}
-	return audit.Insert(ctx, stmts, ev)
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeFlowdefCreated,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  flowDef.ProjectID,
+		EntityType: "flow_definition",
+		EntityID:   flowDef.ID,
+		Payload:    domain.FlowdefPayload{Name: flowDef.Name},
+	})
 }
 
 func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, error) {
@@ -297,16 +291,14 @@ func (s *projectService) Update(ctx context.Context, id, name string) (*domain.P
 		if err := tx.Statements().UpdateProject(ctx, project); err != nil {
 			return err
 		}
-		ev := audit.WithEntity(
-			audit.FromContext(ctx, domain.EventTypeProjectUpdated, domain.EventCategoryEntity),
-			"project", project.ID,
-		)
-		ev = audit.WithProjectID(ev, project.ID)
-		ev, err := audit.WithPayload(ev, domain.ProjectUpdatedPayload{ChangedKeys: []string{"name"}})
-		if err != nil {
-			return err
-		}
-		return audit.Insert(ctx, tx.Statements(), ev)
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeProjectUpdated,
+			Category:   domain.EventCategoryEntity,
+			ProjectID:  project.ID,
+			EntityType: "project",
+			EntityID:   project.ID,
+			Payload:    domain.ProjectUpdatedPayload{ChangedKeys: []string{"name"}},
+		})
 	})
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -456,12 +448,13 @@ func (s *projectService) Delete(ctx context.Context, id string) error {
 		if err := tx.Statements().DeleteProjectByID(ctx, id); err != nil {
 			return err
 		}
-		ev := audit.WithEntity(
-			audit.FromContext(ctx, domain.EventTypeProjectDeleted, domain.EventCategoryEntity),
-			"project", id,
-		)
-		ev = audit.WithProjectID(ev, id)
-		return audit.Insert(ctx, tx.Statements(), ev)
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeProjectDeleted,
+			Category:   domain.EventCategoryEntity,
+			ProjectID:  id,
+			EntityType: "project",
+			EntityID:   id,
+		})
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {
