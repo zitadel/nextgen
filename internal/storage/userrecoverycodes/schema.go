@@ -10,7 +10,7 @@ var Schema = database.NewSchema(map[domain.UserRecoveryCodesField]database.Field
 	domain.UserRecoveryCodesFieldID: {
 		SQLName:  "id",
 		Accessor: func(c *domain.UserRecoveryCodes) any { return c.ID },
-		Coerce:   database.CoerceNumber[int64],
+		Coerce:   database.CoerceString,
 	},
 	domain.UserRecoveryCodesFieldProjectID: {
 		SQLName:  "project_id",

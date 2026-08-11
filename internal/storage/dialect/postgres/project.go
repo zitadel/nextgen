@@ -100,14 +100,12 @@ func (ps projectStatements) ListProjects(ctx context.Context, filter *database.L
 		return nil, wrapError(err)
 	}
 
-	var nextCursor []byte
-	if filter.Pagination.Limit > 0 && len(projects) == int(filter.Pagination.Limit) {
-		curser := &pagination.Cursor[domain.ProjectField]{
-			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  projectSchema.ValuesFrom(projects[len(projects)-1], filter.Pagination.OrderBy.Columns),
-		}
-		nextCursor = curser.Marshal()
-	}
+	nextCursor := pagination.MarshalNext(
+		filter.Pagination.OrderBy,
+		projects,
+		projectSchema,
+		filter.Pagination.Limit,
+	)
 
 	return &database.ListResult[*domain.Project]{
 		Items:      projects,
