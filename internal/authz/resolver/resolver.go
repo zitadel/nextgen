@@ -3,63 +3,55 @@ package resolver
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// Stmts is the resolver's storage dependency.
-type Stmts interface {
-	service.AuthzResolverStatements
-}
-
 // Request is the public Check input. The active system catalog is resolved
 // internally; callers must not supply a catalog id.
 type Request struct {
-	PrincipalType   domain.AuthzPrincipalType
-	PrincipalID     string
-	CredentialClass domain.AuthzPrincipalType
-	ProjectID       string
-	ObjectType      string
-	Relation        string
+	PrincipalType domain.AuthzPrincipalType
+	PrincipalID   string
+	ProjectID     string
+	ObjectType    string
+	Relation      string
 }
 
 // ListRequest is the public ListObjects input.
 type ListRequest struct {
-	PrincipalType   domain.AuthzPrincipalType
-	PrincipalID     string
-	CredentialClass domain.AuthzPrincipalType
-	ProjectID       string
-	ResourceKind    domain.ResourceKind
-	ObjectType      string
-	Relation        string
+	PrincipalType domain.AuthzPrincipalType
+	PrincipalID   string
+	ProjectID     string
+	ResourceKind  domain.ResourceKind
+	ObjectType    string
+	Relation      string
 }
 
 // Resolver evaluates checks with optional request-scoped memoization.
+// Create one per request; it is not safe for concurrent use.
 type Resolver struct {
-	mu        sync.Mutex
 	catalogID string
 	memo      map[string]Decision
 }
 
-// New returns a request-scoped resolver (create one per request / test).
+// New returns a request-scoped resolver.
 func New() *Resolver {
 	return &Resolver{memo: make(map[string]Decision)}
 }
 
 // Check returns Allow / NotFound / Forbidden for one permission check.
-func (r *Resolver) Check(ctx context.Context, stmts Stmts, req Request) (Decision, error) {
+func (r *Resolver) Check(ctx context.Context, stmts service.AuthzResolverStatements, req Request) (Decision, error) {
 	if err := validateCheckRequest(req); err != nil {
 		return DecisionUnspecified, err
 	}
-	if credentialClass(req.CredentialClass, req.PrincipalType) == domain.AuthzPrincipalTypeSKTeam &&
+	if req.PrincipalType == domain.AuthzPrincipalTypeSKTeam &&
 		!skTeamPermissionAllowed(PermissionName(req.ObjectType, req.Relation)) {
 		return DecisionNotFound, nil
 	}
 
 	key := checkMemoKey(req)
-	if d, ok := r.memoGet(key); ok {
+	if d, ok := r.memo[key]; ok {
 		return d, nil
 	}
 
@@ -81,7 +73,7 @@ func (r *Resolver) Check(ctx context.Context, stmts Stmts, req Request) (Decisio
 		return DecisionUnspecified, err
 	}
 	if allowed {
-		r.memoSet(key, DecisionAllow)
+		r.memo[key] = DecisionAllow
 		return DecisionAllow, nil
 	}
 
@@ -93,16 +85,16 @@ func (r *Resolver) Check(ctx context.Context, stmts Stmts, req Request) (Decisio
 	if foothold {
 		d = DecisionForbidden
 	}
-	r.memoSet(key, d)
+	r.memo[key] = d
 	return d, nil
 }
 
 // ListObjects returns resource_scope_index ids of ResourceKind the principal may see.
-func (r *Resolver) ListObjects(ctx context.Context, stmts Stmts, req ListRequest) ([]string, error) {
+func (r *Resolver) ListObjects(ctx context.Context, stmts service.AuthzResolverStatements, req ListRequest) ([]string, error) {
 	if err := validateListRequest(req); err != nil {
 		return nil, err
 	}
-	if credentialClass(req.CredentialClass, req.PrincipalType) == domain.AuthzPrincipalTypeSKTeam &&
+	if req.PrincipalType == domain.AuthzPrincipalTypeSKTeam &&
 		!skTeamPermissionAllowed(PermissionName(req.ObjectType, req.Relation)) {
 		return []string{}, nil
 	}
@@ -122,54 +114,21 @@ func (r *Resolver) ListObjects(ctx context.Context, stmts Stmts, req ListRequest
 	})
 }
 
-func (r *Resolver) activeCatalogID(ctx context.Context, stmts Stmts) (string, error) {
-	r.mu.Lock()
+func (r *Resolver) activeCatalogID(ctx context.Context, stmts service.AuthzResolverStatements) (string, error) {
 	if r.catalogID != "" {
-		id := r.catalogID
-		r.mu.Unlock()
-		return id, nil
+		return r.catalogID, nil
 	}
-	r.mu.Unlock()
-
 	id, err := stmts.ActiveSystemCatalogID(ctx)
 	if err != nil {
 		return "", err
 	}
-
-	r.mu.Lock()
-	if r.catalogID == "" {
-		r.catalogID = id
-	}
-	id = r.catalogID
-	r.mu.Unlock()
+	r.catalogID = id
 	return id, nil
 }
 
-func (r *Resolver) memoGet(key string) (Decision, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	d, ok := r.memo[key]
-	return d, ok
-}
-
-func (r *Resolver) memoSet(key string, d Decision) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.memo[key] = d
-}
-
-func credentialClass(explicit, principalType domain.AuthzPrincipalType) domain.AuthzPrincipalType {
-	if explicit != "" {
-		return explicit
-	}
-	return principalType
-}
-
 func checkMemoKey(req Request) string {
-	return fmt.Sprintf("%s|%s|%s|%s|%s|%s",
-		req.PrincipalType, req.PrincipalID,
-		credentialClass(req.CredentialClass, req.PrincipalType),
-		req.ProjectID, req.ObjectType, req.Relation)
+	return fmt.Sprintf("%s|%s|%s|%s|%s",
+		req.PrincipalType, req.PrincipalID, req.ProjectID, req.ObjectType, req.Relation)
 }
 
 func validateCheckRequest(req Request) error {

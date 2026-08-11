@@ -172,5 +172,40 @@ func TestAuthzResolverStatements_Smoke(t *testing.T) {
 			require.NoError(t, err)
 			assert.Empty(t, empty)
 		})
+
+		t.Run("list via TTU matches check", func(t *testing.T) {
+			ttuUser := "user_list_ttu_" + uniqueSuffix(t)
+			ttuTeam := "team_list_ttu_" + uniqueSuffix(t)
+			resID := "usr_list_ttu_" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, ttuTeam)))
+			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(projectID, ttuTeam, ttuUser)))
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+				newTestAssignment(projectID, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeTeam, ttuTeam, "project", "team", domain.NewProjectAssignmentScope())))
+			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), domain.NewUserResourceScope(projectID, resID)))
+
+			params := domain.AuthzCheckParams{
+				CatalogID:     domain.SystemCatalogID,
+				ProjectID:     projectID,
+				PrincipalType: domain.AuthzPrincipalTypeUser,
+				PrincipalID:   ttuUser,
+				ObjectType:    "project",
+				Relation:      "viewer",
+			}
+			allowed, err := d.stmts.CheckAuthz(t.Context(), params)
+			require.NoError(t, err)
+			require.True(t, allowed)
+
+			ids, err := d.stmts.ListAuthzObjectIDs(t.Context(), domain.AuthzListObjectsParams{
+				CatalogID:     domain.SystemCatalogID,
+				ProjectID:     projectID,
+				PrincipalType: domain.AuthzPrincipalTypeUser,
+				PrincipalID:   ttuUser,
+				ResourceKind:  domain.ResourceKindUser,
+				ObjectType:    "project",
+				Relation:      "viewer",
+			})
+			require.NoError(t, err)
+			assert.Contains(t, ids, resID)
+		})
 	})
 }

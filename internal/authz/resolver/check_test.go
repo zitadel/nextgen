@@ -73,12 +73,11 @@ func TestCheck_Orchestration(t *testing.T) {
 		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
 
 		d, err := resolver.New().Check(context.Background(), stmts, resolver.Request{
-			PrincipalType:   domain.AuthzPrincipalTypeSKTeam,
-			PrincipalID:     "sk_team_1",
-			CredentialClass: domain.AuthzPrincipalTypeSKTeam,
-			ProjectID:       "proj_1",
-			ObjectType:      "project",
-			Relation:        "write",
+			PrincipalType: domain.AuthzPrincipalTypeSKTeam,
+			PrincipalID:   "sk_team_1",
+			ProjectID:     "proj_1",
+			ObjectType:    "project",
+			Relation:      "write",
 		})
 		require.NoError(t, err)
 		assert.Equal(t, resolver.DecisionNotFound, d)
@@ -91,12 +90,11 @@ func TestCheck_Orchestration(t *testing.T) {
 		stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(true, nil)
 
 		d, err := resolver.New().Check(context.Background(), stmts, resolver.Request{
-			PrincipalType:   domain.AuthzPrincipalTypeSKTeam,
-			PrincipalID:     "sk_team_1",
-			CredentialClass: domain.AuthzPrincipalTypeSKTeam,
-			ProjectID:       "proj_1",
-			ObjectType:      "user",
-			Relation:        "read",
+			PrincipalType: domain.AuthzPrincipalTypeSKTeam,
+			PrincipalID:   "sk_team_1",
+			ProjectID:     "proj_1",
+			ObjectType:    "user",
+			Relation:      "read",
 		})
 		require.NoError(t, err)
 		assert.Equal(t, resolver.DecisionAllow, d)
@@ -164,13 +162,12 @@ func TestListObjects_SKTeamDeny(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	stmts := mocks.NewMockAuthzResolverStatements(ctrl)
 	ids, err := resolver.New().ListObjects(context.Background(), stmts, resolver.ListRequest{
-		PrincipalType:   domain.AuthzPrincipalTypeSKTeam,
-		PrincipalID:     "sk",
-		CredentialClass: domain.AuthzPrincipalTypeSKTeam,
-		ProjectID:       "proj_1",
-		ResourceKind:    domain.ResourceKindUser,
-		ObjectType:      "project",
-		Relation:        "viewer",
+		PrincipalType: domain.AuthzPrincipalTypeSKTeam,
+		PrincipalID:   "sk",
+		ProjectID:     "proj_1",
+		ResourceKind:  domain.ResourceKindUser,
+		ObjectType:    "project",
+		Relation:      "viewer",
 	})
 	require.NoError(t, err)
 	assert.Empty(t, ids)

@@ -308,7 +308,7 @@ const (
 )
 
 // AuthzCheckParams is the storage-level input for a single-resource permission check.
-// PrincipalHomeProjectID owns membership-edge lookup (#333 may differ later).
+// PrincipalHomeProjectID is the project used for membership-edge lookup (defaults to ProjectID).
 type AuthzCheckParams struct {
 	CatalogID              string
 	ProjectID              string
