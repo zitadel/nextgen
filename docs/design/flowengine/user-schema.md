@@ -12,12 +12,10 @@ What matters here is the contract: which schema annotations exist, how the flow 
 | Annotation | Scope | Consumer | Purpose |
 |---|---|---|---|
 | `x-identifier: true` | Field | Flow Engine | Field used for user resolution in the identifier step |
-| `x-mfa: "sms"` | Field | Policy Engine | Field can be used for OTP delivery |
 | `x-sensitive: true` | Field | Flow Engine | Value redacted in API / flow payloads (non-audit) |
 | `x-audit: true` | Field | Audit emitter | Field value may appear in audit event payloads (allowlist; deny-by-default) |
 | `x-editable: true` | Field | Flow Engine | Field appears in profiling / self-service flows |
 | `x-unique: "project"` | Field | Flow Engine | Server validates uniqueness on form submit (per-project scope) |
-| `x-claim: "claims.email"` | Field | Flow Engine | Maps to SSO/OIDC claim for auto-population |
 | `x-auth-methods` | Schema | Policy Engine | Which auth methods this user type supports (narrows what policy can require) |
 
 Audit event payloads use a **deny-by-default** PII policy: user attribute values
@@ -35,7 +33,7 @@ User Schema                     Flow Definition                   Policy Engine
 Defines fields:                 References schema fields:         Reads schema annotations:
   email (x-identifier)           step fields: [email, password]    x-auth-methods →
                                  step fields: [given_name, ...]     narrows available factors
-  phone (x-mfa: sms)
+  phone
   given_name                    user_schema: "human_user"         Reads user context:
   family_name                                                       user.roles, user.team →
   password                      Engine resolves field metadata      determines assurance level
@@ -57,10 +55,10 @@ The following is an example user schema showing the annotations that the flow en
   "type": "object",
   "title": "Human User",
   "x-auth-methods": {
-    "password":   { "enabled": true,  "position": 1 },
-    "passkey":    { "enabled": true,  "position": 0 },
-    "magic_link": { "enabled": true,  "position": 2 },
-    "sso":        { "enabled": true,  "position": 3 }
+    "password":   { "enabled": true },
+    "passkey":    { "enabled": true },
+    "magic_link": { "enabled": true },
+    "sso":        { "enabled": true }
   },
   "required": ["email", "given_name", "family_name"],
   "properties": {
@@ -70,13 +68,11 @@ The following is an example user schema showing the annotations that the flow en
       "title": "Email address",
       "x-identifier": true,
       "x-unique": "project",
-      "x-claim": "claims.email",
       "x-editable": true
     },
     "phone": {
       "type": "string",
       "title": "Phone number",
-      "x-mfa": "sms",
       "x-sensitive": true,
       "x-editable": true
     },
@@ -85,7 +81,6 @@ The following is an example user schema showing the annotations that the flow en
       "title": "First name",
       "minLength": 1,
       "maxLength": 200,
-      "x-claim": "claims.given_name",
       "x-editable": true
     },
     "family_name": {
@@ -93,7 +88,6 @@ The following is an example user schema showing the annotations that the flow en
       "title": "Last name",
       "minLength": 1,
       "maxLength": 200,
-      "x-claim": "claims.family_name",
       "x-editable": true
     },
     "address": {

@@ -32,7 +32,7 @@ const tempDirs: string[] = [];
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
   metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
-  "x-auth-methods": { passkey: { enabled: true, position: 0 } },
+  "x-auth-methods": { passkey: { enabled: true } },
   properties: { email: { type: "string" } },
 };
 

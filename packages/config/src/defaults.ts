@@ -162,10 +162,9 @@ const USE_CASE_FIELDS: Record<SetupUseCase, readonly string[]> = {
  * JSON-Schema bodies for the optional profile fields the CLI composes in per
  * use case. The shipped templates are an email-only baseline (shared verbatim
  * with the Go server fallback), so this catalog owns every field beyond
- * `email`. Authored in the templates' style — no `x-claim`, since the backend
- * maps identity by attribute name and the user-property meta-schema defines no
- * claim keyword. `givenName`/`familyName` are the attributes the backend reads
- * for a user's identity (`internal/domain/user.go`).
+ * `email`. Authored in the templates' style — the backend maps identity by
+ * attribute name, so `givenName`/`familyName` are the attributes it reads for
+ * a user's identity (`internal/domain/user.go`).
  */
 const EXTRA_FIELD_BODIES: Record<string, Record<string, unknown>> = {
   givenName: {

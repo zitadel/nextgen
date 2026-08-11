@@ -71,9 +71,9 @@ describe("use-case selection", () => {
       properties: Record<string, Record<string, unknown>>;
     };
     expect(schema.properties.companyName).toMatchObject({ type: "string" });
-    // companyName is not required and carries no identity/claim wiring yet.
+    // companyName is not required and carries no identity wiring.
     // (The line above asserts presence, so the assertion here is safe.)
-    expect(schema.properties.companyName!["x-claim"]).toBeUndefined();
+    expect(schema.properties.companyName!["x-unique"]).toBeUndefined();
   });
 
   it("keeps the field set identical across sign-in presets (schema owns fields, not the flow)", () => {

@@ -24,7 +24,6 @@
 export const USER_PROPERTY_DEFAULTS: Readonly<Record<string, boolean>> = {
   "x-editable": true,
   "x-sensitive": false,
-  "x-mfa": false,
 };
 
 /**

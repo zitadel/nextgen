@@ -76,8 +76,4 @@ func (s *UserProperty) setDefaults() {
 		val := bool(false)
 		s.XMinusSensitive.SetTo(val)
 	}
-	{
-		val := bool(false)
-		s.XMinusMfa.SetTo(val)
-	}
 }

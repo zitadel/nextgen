@@ -11,11 +11,6 @@ description: |
     status,... in a return object
 additionalProperties: true
 properties:
-  x-verify:
-    oneOf:
-      - type: string
-      - type: 'null'
-    description: The verification method for this property, if applicable
   x-unique:
     oneOf:
       - type: string
@@ -25,11 +20,6 @@ properties:
           - team
       - type: 'null'
     description: The level of uniqueness for this property, if applicable
-  x-claim:
-    oneOf:
-      - type: string
-      - type: 'null'
-    description: The claim name for this property, if applicable
   x-editable:
     type: boolean
     default: true
@@ -38,11 +28,6 @@ properties:
     type: boolean
     default: false
     description: Whether this property contains sensitive information or not
-  x-mfa:
-    type: boolean
-    default: false
-    description: |
-      Whether this property is used for multi-factor authentication or not
   properties:
     type: object
     description: |

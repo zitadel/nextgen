@@ -166,14 +166,13 @@ export interface SchemaAuthMethod {
 }
 
 /**
- * The sign-in methods a schema declares, in the order the schema puts them in.
+ * The sign-in methods a schema declares.
  *
- * `x-auth-methods` is an object keyed by method with an explicit `position`
- * (`api/openapi/endpoints/schemas/auth-methods.json`), so the order is authored
- * rather than incidental — the `passkey-first` preset puts passkey at position
- * 1 and password at 2, which is why the design's chip reads "Passkey +
- * Password". Sorting by position preserves that; ties fall back to the key so
- * the list is stable.
+ * `x-auth-methods` says which methods a user type supports, not the order they
+ * are offered in — that is the flow definition's, from the order of its steps'
+ * actions. So the row orders by the meta-schema's own enumeration
+ * (`api/openapi/endpoints/schemas/auth-methods.json`), with any key outside it
+ * after, alphabetical, so the chip is stable across renders and schemas.
  *
  * Every declared method is returned, not just the two the backend supports
  * today (D10). A schema that turns on `otp` should show `otp`, not silently
@@ -182,6 +181,11 @@ export interface SchemaAuthMethod {
 export function schemaAuthMethods(schema: UserSchema): SchemaAuthMethod[] {
   const methods = schema["x-auth-methods"];
   if (!methods || typeof methods !== "object") return [];
+  const order = Object.keys(AUTH_METHOD_LABELS);
+  const rank = (key: string) => {
+    const index = order.indexOf(key);
+    return index === -1 ? order.length : index;
+  };
   return Object.entries(methods as Record<string, unknown>)
     .map(([key, value]) => {
       const entry = (value ?? {}) as Record<string, unknown>;
@@ -189,11 +193,9 @@ export function schemaAuthMethods(schema: UserSchema): SchemaAuthMethod[] {
         key,
         label: AUTH_METHOD_LABELS[key] ?? key,
         enabled: entry.enabled === true,
-        position: typeof entry.position === "number" ? entry.position : Number.MAX_SAFE_INTEGER,
       };
     })
-    .sort((a, b) => a.position - b.position || a.key.localeCompare(b.key))
-    .map(({ key, label, enabled }) => ({ key, label, enabled }));
+    .sort((a, b) => rank(a.key) - rank(b.key) || a.key.localeCompare(b.key));
 }
 
 /**

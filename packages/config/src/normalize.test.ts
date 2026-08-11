@@ -62,7 +62,7 @@ describe("normalizeSchemaBody", () => {
     const normalized = normalizeSchemaBody({
       objectType: "human-user",
       properties: {
-        email: { type: "string", "x-editable": true, "x-sensitive": false, "x-mfa": false },
+        email: { type: "string", "x-editable": true, "x-sensitive": false },
         givenName: { type: "string" },
       },
     });
@@ -75,11 +75,11 @@ describe("normalizeSchemaBody", () => {
     });
   });
 
-  it("keeps non-default values, including non-boolean x-mfa", () => {
+  it("keeps non-default values and annotations the meta-schema does not declare", () => {
     const body = {
       properties: {
         email: { type: "string", "x-editable": false },
-        phone: { type: "string", "x-mfa": "sms" },
+        phone: { type: "string", "x-custom": "sms" },
         secret: { type: "string", "x-sensitive": true },
       },
     };
@@ -90,7 +90,7 @@ describe("normalizeSchemaBody", () => {
     const body = {
       $id: "https://example.test/schemas/human.json",
       objectType: "human-user",
-      "x-auth-methods": { password: { enabled: true, position: 1 } },
+      "x-auth-methods": { password: { enabled: true } },
       required: ["email"],
       properties: { email: { type: "string" } },
     };

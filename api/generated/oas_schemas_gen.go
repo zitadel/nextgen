@@ -689,8 +689,6 @@ func (s *AuthAttemptResponseState) UnmarshalText(data []byte) error {
 type AuthMethod struct {
 	// Whether the authentication method is enabled or not.
 	Enabled bool `json:"enabled"`
-	// The position of the authentication method in the list of supported methods.
-	Position int `json:"position"`
 }
 
 // GetEnabled returns the value of Enabled.
@@ -698,19 +696,9 @@ func (s *AuthMethod) GetEnabled() bool {
 	return s.Enabled
 }
 
-// GetPosition returns the value of Position.
-func (s *AuthMethod) GetPosition() int {
-	return s.Position
-}
-
 // SetEnabled sets the value of Enabled.
 func (s *AuthMethod) SetEnabled(val bool) {
 	s.Enabled = val
-}
-
-// SetPosition sets the value of Position.
-func (s *AuthMethod) SetPosition(val int) {
-	s.Position = val
 }
 
 // A list of authentication methods supported by the user definition.
@@ -12146,37 +12134,21 @@ func (s *UserNotFoundDetails) init() UserNotFoundDetails {
 // status,... in a return object.
 // Ref: #
 type UserProperty struct {
-	// The verification method for this property, if applicable.
-	XMinusVerify OptNilString `json:"x-verify"`
 	// The level of uniqueness for this property, if applicable.
 	XMinusUnique OptNilUserPropertyXMinusUnique `json:"x-unique"`
-	// The claim name for this property, if applicable.
-	XMinusClaim OptNilString `json:"x-claim"`
 	// Whether this property is editable by the user or not.
 	XMinusEditable OptBool `json:"x-editable"`
 	// Whether this property contains sensitive information or not.
 	XMinusSensitive OptBool `json:"x-sensitive"`
-	// Whether this property is used for multi-factor authentication or not.
-	XMinusMfa OptBool `json:"x-mfa"`
 	// A map of additional properties for the user definition, where the key is
 	// the property name and the value is the property schema.
 	Properties      OptUserPropertyProperties `json:"properties"`
 	AdditionalProps UserPropertyAdditional
 }
 
-// GetXMinusVerify returns the value of XMinusVerify.
-func (s *UserProperty) GetXMinusVerify() OptNilString {
-	return s.XMinusVerify
-}
-
 // GetXMinusUnique returns the value of XMinusUnique.
 func (s *UserProperty) GetXMinusUnique() OptNilUserPropertyXMinusUnique {
 	return s.XMinusUnique
-}
-
-// GetXMinusClaim returns the value of XMinusClaim.
-func (s *UserProperty) GetXMinusClaim() OptNilString {
-	return s.XMinusClaim
 }
 
 // GetXMinusEditable returns the value of XMinusEditable.
@@ -12189,11 +12161,6 @@ func (s *UserProperty) GetXMinusSensitive() OptBool {
 	return s.XMinusSensitive
 }
 
-// GetXMinusMfa returns the value of XMinusMfa.
-func (s *UserProperty) GetXMinusMfa() OptBool {
-	return s.XMinusMfa
-}
-
 // GetProperties returns the value of Properties.
 func (s *UserProperty) GetProperties() OptUserPropertyProperties {
 	return s.Properties
@@ -12204,19 +12171,9 @@ func (s *UserProperty) GetAdditionalProps() UserPropertyAdditional {
 	return s.AdditionalProps
 }
 
-// SetXMinusVerify sets the value of XMinusVerify.
-func (s *UserProperty) SetXMinusVerify(val OptNilString) {
-	s.XMinusVerify = val
-}
-
 // SetXMinusUnique sets the value of XMinusUnique.
 func (s *UserProperty) SetXMinusUnique(val OptNilUserPropertyXMinusUnique) {
 	s.XMinusUnique = val
-}
-
-// SetXMinusClaim sets the value of XMinusClaim.
-func (s *UserProperty) SetXMinusClaim(val OptNilString) {
-	s.XMinusClaim = val
 }
 
 // SetXMinusEditable sets the value of XMinusEditable.
@@ -12227,11 +12184,6 @@ func (s *UserProperty) SetXMinusEditable(val OptBool) {
 // SetXMinusSensitive sets the value of XMinusSensitive.
 func (s *UserProperty) SetXMinusSensitive(val OptBool) {
 	s.XMinusSensitive = val
-}
-
-// SetXMinusMfa sets the value of XMinusMfa.
-func (s *UserProperty) SetXMinusMfa(val OptBool) {
-	s.XMinusMfa = val
 }
 
 // SetProperties sets the value of Properties.

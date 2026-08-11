@@ -63,7 +63,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"password": { "kind": "auth-method", "enabled": true, "position": 0 }
+					"password": { "kind": "auth-method", "enabled": true }
 				}
 			}`),
 		},
@@ -76,7 +76,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"title": "My User",
 				"description": "A user schema",
 				"x-auth-methods": {
-					"passkey": { "kind": "auth-method", "enabled": true, "position": 1 }
+					"passkey": { "kind": "auth-method", "enabled": true }
 				},
 				"required": ["email"],
 				"properties": {
@@ -92,7 +92,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind":    "user-schema",
 				"title":   "My User",
 				"x-auth-methods": {
-					"password": { "enabled": true, "position": 0 }
+					"password": { "enabled": true }
 				},
 				"properties": {
 					"address": {
@@ -113,7 +113,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"password": { "enabled": true, "position": 0 }
+					"password": { "enabled": true }
 				},
 				"properties": {
 					"address.street": { "type": "string" }
@@ -131,7 +131,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"password": { "enabled": true, "position": 0 }
+					"password": { "enabled": true }
 				},
 				"properties": {
 					"address": {
@@ -160,7 +160,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"password": { "enabled": true, "position": 0 }
+					"password": { "enabled": true }
 				},
 				"properties": {
 					"address": {
@@ -180,7 +180,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"password": { "enabled": true, "position": 0 }
+					"password": { "enabled": true }
 				}
 			}`),
 			wantErr: domain.ErrMissingSchemaID,
@@ -209,22 +209,6 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid auth method — missing position",
-			input: []byte(`{
-				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
-				"$id": "https://example.test/schemas/my-user.json",
-				"kind": "user-schema",
-				"title": "My User",
-				"x-auth-methods": {
-					"password": { "enabled": true }
-				}
-			}`),
-			wantErr: domain.ErrSchemaValidationFailed,
-			wantValidationErrors: map[string]string{
-				"/properties/x-auth-methods/properties/password/required/position": `missing required field "position"`,
-			},
-		},
-		{
 			name: "invalid auth method — missing enabled",
 			input: []byte(`{
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
@@ -232,7 +216,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"password": { "position": 0 }
+					"password": {}
 				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
@@ -248,7 +232,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"totp": { "enabled": true, "position": 0 }
+					"totp": { "enabled": true }
 				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
