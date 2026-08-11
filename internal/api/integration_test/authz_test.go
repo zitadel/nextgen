@@ -5,6 +5,7 @@ package integration_test
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -49,12 +50,22 @@ func TestManagementAuthz(t *testing.T) {
 	t.Run("schemas", func(t *testing.T) {
 		t.Parallel()
 
-		// Real data in the victim project: the foreign read of its real id
-		// must be indistinguishable from a nonexistent one.
-		realSchemaID := harness.CreateUserSchema(t, victim, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
+		// Omit $id so CreateSchema mints a slash-free sch_* id. Flat-by-id
+		// GET /schemas/{id} cannot round-trip URL-shaped $id values: Go
+		// decodes %2F before routing, so the path splits and RSI misses
+		// before the preview ceiling can answer permission_denied.
+		schemaJSON := []byte(harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
+		var schemaObj map[string]any
+		require.NoError(t, json.Unmarshal(schemaJSON, &schemaObj))
+		delete(schemaObj, "$id")
+		schemaJSON, err := json.Marshal(schemaObj)
+		require.NoError(t, err)
+
+		realSchemaID := harness.CreateUserSchema(t, victim, string(schemaJSON))
+		require.True(t, strings.HasPrefix(realSchemaID, "sch_"), "want managed sch_* id, got %q", realSchemaID)
 
 		apiSchema := api.UserSchema{}
-		require.NoError(t, apiSchema.UnmarshalJSON([]byte(harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)))
+		require.NoError(t, apiSchema.UnmarshalJSON(schemaJSON))
 		createReq := api.CreateSchemaReq{Type: api.UserSchemaCreateSchemaReq, UserSchema: apiSchema}
 
 		t.Run("bound to the token's project", func(t *testing.T) {
