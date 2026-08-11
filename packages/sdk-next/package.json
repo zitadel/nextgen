@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-next",
-  "version": "0.1.0-alpha.17",
+  "version": "0.1.0-alpha.18",
   "description": "Next.js helpers and mock auth UI for Zitadel",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-next#readme",
   "bugs": {
