@@ -42,7 +42,7 @@ export class DesignPrompt implements SetupPrompt {
         },
         { value: "centered", label: "Centered", hint: "card centred on the page" },
         { value: "split", label: "Split", hint: "brand panel left, form right" },
-        { value: "split-right", label: "Split (right)", hint: "form left, brand panel right" },
+        { value: "split-right", label: "Split (reversed)", hint: "form left, brand panel right" },
         { value: "hero", label: "Hero", hint: "landing-style brand pane left, form right" },
         {
           value: "minimal",
