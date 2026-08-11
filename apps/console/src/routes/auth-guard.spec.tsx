@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { makeTestSession } from "../auth/session.fixture";
 import { createAppRouter } from "../router";
+import { THEME_STORAGE_KEY } from "../theme";
 
 /**
  * Console authentication guard (Console ADR 0003): the `_authed` pathless
@@ -32,11 +33,16 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 vi.mock("@zitadel/sdk-react", () => ({
-  ZitadelLogin: (props: { postSignInUrl?: string; project?: { projectId?: string } }) => (
+  ZitadelLogin: (props: {
+    postSignInUrl?: string;
+    theme?: string;
+    project?: { projectId?: string };
+  }) => (
     <div
       data-testid="zitadel-login"
       data-post-sign-in-url={props.postSignInUrl}
       data-project-id={props.project?.projectId}
+      data-widget-theme={props.theme}
     />
   ),
 }));
@@ -69,6 +75,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  localStorage.removeItem(THEME_STORAGE_KEY);
 });
 
 describe("authentication guard", () => {
@@ -85,6 +92,21 @@ describe("authentication guard", () => {
     // app-wide configureZitadel() call, whose project id is empty.
     expect(screen.getByTestId("zitadel-login")).toHaveAttribute("data-post-sign-in-url", "/users");
     expect(screen.getByTestId("zitadel-login")).toHaveAttribute("data-project-id", "proj_test");
+  });
+
+  /**
+   * The widget resolves its own colour mode and, as a widget-variant embed,
+   * paints no surface of its own. Left to itself it defaults to dark, so on
+   * a light console its text landed on the console's light background and
+   * the sign-in screen was unreadable. The console owns this page's surface,
+   * so it must declare the mode.
+   */
+  it.each(["light", "dark"] as const)("hands the widget the console's %s theme", async (theme) => {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+    fetchSession.mockResolvedValue(null);
+    await renderAt("/login");
+
+    expect(await screen.findByTestId("zitadel-login")).toHaveAttribute("data-widget-theme", theme);
   });
 
   it("omits ?next= when the root path was requested", async () => {

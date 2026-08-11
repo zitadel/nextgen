@@ -65,7 +65,7 @@
   height: 1.25rem;
 }
 .zr-alert__close:hover {
-  background: var(--zl-color-gray-200, #484a57);
+  background: var(--zl-color-surface-hover-subtle, #484a57);
 }
 .zr-alert__close:focus-visible {
   outline: var(--zl-focus-width, 2px) solid var(--zl-focus-color, #f4f4f6);
