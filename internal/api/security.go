@@ -130,8 +130,8 @@ type ScopeContext struct {
 	ProjectID string
 	// Scope carries the token's minted scopes verbatim (domain.Token.Scope):
 	// project secrets hold project.write + project.read, preview secrets hold
-	// project.read only. The authz gate uses this as a credential-class ceiling
-	// (preview may only satisfy viewer-mapped reads) on top of resolver checks.
+	// project.read only. The authz gate requires project.write as a ceiling on
+	// top of resolver.Check — preview cannot call management APIs at all.
 	Scope []string
 	// PrincipalType / PrincipalID identify the authz principal for resolver.Check.
 	// OAuth2 project secrets are sk_proj with PrincipalID == ProjectID.
