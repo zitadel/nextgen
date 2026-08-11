@@ -1,7 +1,7 @@
 # ADR 044: Scaffold Embedding Posture Defaults
 
-> **Status:** Proposed
-> **Date:** 2026-08-02
+> **Status:** Accepted
+> **Date:** 2026-08-02 (accepted 2026-08-11)
 > **Context:** The `zitadel` CLI's scaffolded auth pages and the `<zitadel-login>`/`<zitadel-session>` `variant` surface contract.
 > **Relates to:** [ADR 042](042-scaffolded-file-ownership-and-drift-detection.md)
 
@@ -27,7 +27,7 @@ in the scaffold manifest, ADR 042):
   (the demo shop rebuilt the generated pages around the widget surface by
   hand).
 
-## Decision (proposed)
+## Decision
 
 **Scope: route-based integrations only** — frameworks whose patchers add
 route files without owning the app shell (today: Next, Nuxt). The SPA
@@ -59,14 +59,19 @@ ADR 042 — no config knob is introduced).
 
 ## Consequences
 
-- Templates branch on `PatchContext.scaffoldedFramework`; the manifest
-  gains the posture record, and restoration reads it rather than
-  re-deriving the hinge (which a manifest-less legacy scaffold could not
-  answer).
+- Templates branch on `PatchContext.posture`, derived once at setup time
+  (`derivePosture`) from `scaffoldedFramework`; the manifest gains the
+  posture record, and restoration reads it rather than re-deriving the
+  hinge (which a manifest-less legacy scaffold could not answer).
+- Nuxt's `app.vue` and `pages/index.vue` become conditional on the fresh
+  scaffold, mirroring Next's homepage — a pre-existing app keeps its own
+  shell instead of conflicting with (or being overwritten by) the CLI's
+  dark app shell.
 - The journey matrix needs a pre-existing-app lane (Next, Nuxt) to cover
   the widget posture end to end (today's journeys always scaffold fresh).
-- Copy in the generated pages' comments and the scaffold guidance must
-  describe both postures rather than assuming full-page.
+- Copy in the generated pages' comments and the scaffold guidance
+  describes the emitted posture and names the other one rather than
+  assuming full-page.
 
 ## Open questions
 

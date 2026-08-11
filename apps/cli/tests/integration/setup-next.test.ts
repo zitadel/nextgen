@@ -179,6 +179,7 @@ describe("Next setup integration", () => {
         scaffold: {
           files: Record<string, { hash: string; class: string }>;
           scaffolded_framework?: boolean;
+          posture?: string;
         };
       }
     ).scaffold;
@@ -191,6 +192,8 @@ describe("Next setup integration", () => {
     expect(scaffold.files["app/login/page.tsx"]?.class).toBe("presentation");
     expect(scaffold.files).not.toHaveProperty("app/page.tsx");
     expect(scaffold.scaffolded_framework).toBeUndefined();
+    // Pre-existing app ⇒ widget posture, recorded for doctor --fix (ADR 044).
+    expect(scaffold.posture).toBe("widget");
     expect(state.resources[".zitadel/flows/default-login.json"]).toMatchObject({
       id: expect.stringMatching(/^flow_/),
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),
@@ -222,9 +225,12 @@ describe("Next setup integration", () => {
     const profilePage = await readFile(join(cwd, "app/profile/page.tsx"), "utf8");
     expect(profilePage).toContain("zitadel-cli: managed-file v1");
     expect(profilePage).toContain("<zitadel-session");
-    // The session card is widget-first; the dedicated /profile route must opt
-    // into the full-page surface explicitly.
-    expect(profilePage).toContain('variant="page"');
+    // The fixture is a pre-existing app, so the pages embed widget cards in
+    // the app's own layout instead of painting full-page chrome over it
+    // (ADR 044); the element pins the posture explicitly.
+    expect(profilePage).toContain('variant="widget"\n          theme="auto"');
+    expect(profilePage).not.toContain('colorScheme: "dark"');
+    expect(loginPage).toContain('variant="widget"\n          theme="auto"');
     expect(profilePage).toContain("configureZitadel");
     expect(profilePage).toContain("project={project}");
     expect(profilePage).toContain('post-sign-out-url="/login"');
