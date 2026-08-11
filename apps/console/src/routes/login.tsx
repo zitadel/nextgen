@@ -6,6 +6,7 @@ import { apiBase } from "../api/zitadel";
 import { fetchSession, sanitizeNextPath } from "../auth/session";
 import { ZitadelMark } from "../components/app-shell/icons";
 import { getConsoleProjectId, getPublishableKey } from "../runtime/runtime";
+import { useTheme } from "../theme";
 
 /**
  * Console sign-in screen (Console ADR 0003).
@@ -30,10 +31,12 @@ import { getConsoleProjectId, getPublishableKey } from "../runtime/runtime";
  * `BASE_URL` so the widget's document-level navigation lands inside the
  * deployed prefix (`/ui/console` in production, `/` in dev).
  *
- * Known caveat (recorded in ADR 0003): the widget's surface CSS still uses
- * the legacy dark-only login tokens, so this screen renders the dark login
- * treatment regardless of the console theme until the shared component
- * styles migrate to the semantic token taxonomy.
+ * The widget resolves its own colour mode (element `theme` → tenant branding
+ * → dark) and, in the widget variant, paints no surface of its own. A page
+ * that fixes its background — as this one does with `bg-background` — must
+ * therefore declare the mode on the element, or the widget's text lands on a
+ * surface it wasn't coloured for. We pass the console's *resolved* theme so
+ * the sign-in screen follows the same preference as the rest of the console.
  */
 export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>): { next?: string } => ({
@@ -53,6 +56,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginScreen() {
   const { next } = Route.useSearch();
+  const { resolved: theme } = useTheme();
   const projectId = getConsoleProjectId();
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const postSignInUrl = `${base}${next ?? "/"}` || "/";
@@ -74,7 +78,12 @@ function LoginScreen() {
       <ZitadelMark size={40} className="text-foreground" aria-hidden />
       <h1 className="sr-only">Sign in to the Zitadel console</h1>
       {project ? (
-        <ZitadelLogin project={project} purpose="login" postSignInUrl={postSignInUrl} />
+        <ZitadelLogin
+          project={project}
+          purpose="login"
+          theme={theme}
+          postSignInUrl={postSignInUrl}
+        />
       ) : (
         <NoProjectYet />
       )}

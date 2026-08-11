@@ -45,25 +45,24 @@ func (c client) Query(ctx context.Context, stmt spanner.Statement, consume func(
 
 // Write implements [queryExecutor].
 func (c client) Write(ctx context.Context, stmt spanner.Statement, consume func(*spanner.RowIterator) error) error {
-	ctx, cancel := boundRetry(ctx)
-	defer cancel()
-
-	_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, rwt *spanner.ReadWriteTransaction) error {
-		iter := rwt.Query(ctx, stmt)
-		defer iter.Stop()
-		return consume(iter)
-	})
-	return returnQueryError(err)
+	return returnQueryError(runBounded(ctx, func(ctx context.Context) error {
+		_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, rwt *spanner.ReadWriteTransaction) error {
+			iter := rwt.Query(ctx, stmt)
+			defer iter.Stop()
+			return consume(iter)
+		})
+		return err
+	}))
 }
 
 // Update implements [queryExecutor].
 func (c client) Update(ctx context.Context, stmt spanner.Statement) (rowCount int64, _ error) {
-	ctx, cancel := boundRetry(ctx)
-	defer cancel()
-
-	_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
-		n, err := txn.Update(ctx, stmt)
-		rowCount = n
+	err := runBounded(ctx, func(ctx context.Context) error {
+		_, err := c.client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+			n, err := txn.Update(ctx, stmt)
+			rowCount = n
+			return err
+		})
 		return err
 	})
 	return rowCount, wrapError(err)
@@ -146,18 +145,20 @@ func returnQueryError(err error) error {
 
 func isWrappedStorageError(err error) bool {
 	var (
-		noRow   *database.NoRowFoundError
-		multi   *database.MultipleRowsFoundError
-		unique  *database.UniqueError
-		check   *database.CheckError
-		scan    *database.ScanError
-		unknown *database.UnknownError
+		noRow       *database.NoRowFoundError
+		multi       *database.MultipleRowsFoundError
+		unique      *database.UniqueError
+		check       *database.CheckError
+		scan        *database.ScanError
+		unavailable *database.UnavailableError
+		unknown     *database.UnknownError
 	)
 	return errors.As(err, &noRow) ||
 		errors.As(err, &multi) ||
 		errors.As(err, &unique) ||
 		errors.As(err, &check) ||
 		errors.As(err, &scan) ||
+		errors.As(err, &unavailable) ||
 		errors.As(err, &unknown)
 }
 

@@ -33,7 +33,7 @@ func newPasswordHandlerFixture(t *testing.T) *passwordHandlerFixture {
 
 	v2Pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	userService := service.NewUserService(service.NewPool(v2Pool), schemaStore, hasher)
-	handler := service.NewFlowCreateUserHandler(hasher, userService, schemaStore)
+	handler := service.NewFlowCreateUserHandler(hasher, userService, schemaStore, v2Pool)
 
 	return &passwordHandlerFixture{
 		handler:     handler,

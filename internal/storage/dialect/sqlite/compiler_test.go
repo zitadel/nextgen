@@ -253,3 +253,17 @@ func TestCompileCompareFilterNullableKeyset(t *testing.T) {
 		})
 	}
 }
+
+func compileReadExpectError[F ~uint8, T any](t *testing.T, stmt string, opts *database.ListOptions[F], schema database.Schema[F, T]) error {
+	t.Helper()
+	var compiler statementCompiler
+	return compileRead(&compiler, stmt, opts, schema)
+}
+
+func assertDatabaseErrorCode(t *testing.T, err error, code string) {
+	t.Helper()
+	require.Error(t, err)
+	var dbErr database.Error
+	require.ErrorAs(t, err, &dbErr)
+	assert.Equal(t, code, dbErr.Code)
+}

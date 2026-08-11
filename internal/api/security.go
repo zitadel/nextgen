@@ -29,7 +29,7 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 
-	payload, err := s.tokenService.VerifyToken(ctx, t.Token)
+	payload, err := s.tokenService.IntrospectToken(ctx, t.Token)
 	if err != nil {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
@@ -49,7 +49,7 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 // It verifies that the cookie value decrypts to a session token and stashes
 // the parsed token in the context for the handlers.
 func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName api.OperationName, t api.NextgenSession) (context.Context, error) {
-	token, err := s.tokenService.VerifyToken(ctx, t.APIKey)
+	token, err := s.tokenService.IntrospectToken(ctx, t.APIKey)
 	if err != nil {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}

@@ -150,10 +150,20 @@ func (s *sessionService) List(ctx context.Context, input ListSessionInput) ([]*d
 }
 
 func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) error {
-	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().DeleteSessionByID(ctx, input.ProjectID, input.SessionID); err != nil {
-			return err
+	return s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		err := tx.Statements().DeleteSessionByID(ctx, input.ProjectID, input.SessionID)
+		if err != nil && !errors.Is(err, domain.ErrSessionNotFound()) {
+			return domain.ErrInternal(err).WithMessage("Failed to delete the session.")
 		}
+		sessionMissing := errors.Is(err, domain.ErrSessionNotFound())
+
+		if err := tx.Statements().DeleteTokensBySessionID(ctx, input.ProjectID, input.SessionID); err != nil {
+			return domain.ErrInternal(err).WithMessage("Failed to revoke session tokens.")
+		}
+		if sessionMissing {
+			return nil
+		}
+
 		sid := input.SessionID
 		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
 			Type:       domain.EventTypeSessionDeleted,
@@ -165,16 +175,6 @@ func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) e
 			Payload:    domain.SessionDeletedPayload{},
 		})
 	})
-	if err != nil {
-		if errors.Is(err, domain.ErrSessionNotFound()) {
-			return nil
-		}
-		if de, ok := errors.AsType[domain.Error](err); ok {
-			return de
-		}
-		return domain.ErrInternal(err).WithMessage("Failed to delete the session.")
-	}
-	return nil
 }
 
 func emitSessionEstablished(ctx context.Context, stmts EventStatements, session *domain.Session) error {
