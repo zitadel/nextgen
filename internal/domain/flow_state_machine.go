@@ -1269,7 +1269,7 @@ func mergeCollected(state *FlowState, fields map[string]any) error {
 		// the shape the user schema validates and the attribute store
 		// flattens back out.
 		if err := maputil.SetNested(state.CollectedData.UserData, AttributeKey(k).Nodes(), v); err != nil {
-			return err
+			return fmt.Errorf("merge collected field %q: %w", k, err)
 		}
 	}
 	return nil
