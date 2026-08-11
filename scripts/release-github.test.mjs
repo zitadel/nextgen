@@ -9,8 +9,11 @@ import {
   GENERATED_BLOCK_START,
   GITHUB_RELEASE_BODY_MAX_CHARS,
   PRODUCT_NOTES_PLACEHOLDER,
+  collectPackageChangeSections,
   createInitialReleaseBody,
+  extractVersionSection,
   fitGeneratedReleaseFacts,
+  normalizeChangelogSection,
   renderGeneratedReleaseFacts,
   upsertGeneratedBlock,
   upsertProductGithubRelease,
@@ -65,6 +68,112 @@ const GITHUB_ENV = {
   GITHUB_REPOSITORY: "zitadel/nextgen",
   GITHUB_SHA: "deadbeef",
 };
+
+test("collectPackageChangeSections extracts one version and skips dependency-only or platform package noise", async () => {
+  const repoRoot = await mkdtemp(join(tmpdir(), "release-github-test-"));
+  const write = async (path, source) => {
+    await mkdir(join(repoRoot, path), { recursive: true });
+    await writeFile(join(repoRoot, path, "CHANGELOG.md"), source);
+  };
+
+  await write(
+    "apps/cli",
+    `# @zitadel/cli
+
+## 0.1.0-alpha.9
+
+### Minor Changes
+
+- [#321](https://github.com/zitadel/nextgen/pull/321) - Add product release drafts.
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.9
+
+## 0.1.0-alpha.8
+
+### Patch Changes
+
+- Older entry.
+`,
+  );
+  await write(
+    "apps/server-linux-x64",
+    `# @zitadel/server-linux-x64
+
+## 0.1.0-alpha.9
+
+### Patch Changes
+
+- Platform package implementation detail.
+`,
+  );
+  await write(
+    "packages/sdk-next",
+    `# @zitadel/sdk-next
+
+## 0.1.0-alpha.9
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @zitadel/api@0.1.0-alpha.9
+`,
+  );
+
+  const sections = await collectPackageChangeSections({
+    repoRoot,
+    metadata: fakeMetadata([
+      { name: "@zitadel/cli", version: "0.1.0-alpha.9", path: "apps/cli" },
+      { name: "@zitadel/server-linux-x64", version: "0.1.0-alpha.9", path: "apps/server-linux-x64" },
+      { name: "@zitadel/sdk-next", version: "0.1.0-alpha.9", path: "packages/sdk-next" },
+    ]),
+  });
+
+  assert.equal(sections.length, 1);
+  assert.equal(sections[0].name, "@zitadel/cli");
+  assert.ok(sections[0].content.includes("Add product release drafts"));
+  assert.ok(!sections[0].content.includes("Updated dependencies"));
+  assert.ok(!sections[0].content.includes("Older entry"));
+});
+
+test("extractVersionSection returns only the requested version's lines", () => {
+  const source = "# package\n\n## 1.1.0\n\nCurrent entry\n\n## 1.0.0\n\nOld entry";
+  const section = extractVersionSection(source, "1.1.0");
+  assert.ok(section.includes("Current entry"));
+  assert.ok(!section.includes("Old entry"));
+});
+
+test("normalizeChangelogSection keeps only meaningful change groups", () => {
+  assert.equal(
+    normalizeChangelogSection("### Patch Changes\n\n- Updated dependencies []:\n  - @zitadel/api@0.1.0-alpha.9\n"),
+    "",
+  );
+  assert.equal(
+    normalizeChangelogSection(
+      "### Minor Changes\n\n- Add a useful product change.\n\n### Patch Changes\n\n- Updated dependencies []:\n  - @zitadel/api@0.1.0-alpha.9\n",
+    ),
+    "### Minor Changes\n\n- Add a useful product change.",
+  );
+});
+
+test("upsertGeneratedBlock replaces only the managed block and preserves human prose", () => {
+  const oldBody = `Human intro.\n\n${GENERATED_BLOCK_START}\nold generated facts\n${GENERATED_BLOCK_END}\n\nHuman tail.`;
+  const nextBlock = `${GENERATED_BLOCK_START}\nnew generated facts\n${GENERATED_BLOCK_END}`;
+
+  const nextBody = upsertGeneratedBlock(oldBody, nextBlock);
+
+  assert.ok(nextBody.includes("Human intro."));
+  assert.ok(nextBody.includes("Human tail."));
+  assert.ok(nextBody.includes("new generated facts"));
+  assert.ok(!nextBody.includes("old generated facts"));
+});
+
+test("upsertGeneratedBlock appends a block when an existing body has none", () => {
+  const nextBlock = `${GENERATED_BLOCK_START}\ngenerated facts\n${GENERATED_BLOCK_END}`;
+  assert.equal(upsertGeneratedBlock("Human release notes.", nextBlock), `Human release notes.\n\n${nextBlock}`);
+});
 
 test("fitGeneratedReleaseFacts keeps every section when the block fits", () => {
   const metadata = fakeMetadata([]);
@@ -211,6 +320,126 @@ test("update path fails loudly when product notes alone exceed the limit", async
   await assert.rejects(
     upsertProductGithubRelease({ repoRoot, metadata, env: GITHUB_ENV, fetchImpl, log: () => {} }),
     /even with every package changelog omitted/,
+  );
+});
+
+test("create path posts a draft prerelease when no release exists for the tag", async () => {
+  const packages = [
+    { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
+  ];
+  const repoRoot = await writeChangelogFixture(packages);
+  const metadata = fakeMetadata(packages.map(({ name, path, version }) => ({ name, path, version })));
+
+  const calls = [];
+  const fetchImpl = async (url, init = {}) => {
+    calls.push({ url, init });
+    return calls.length === 1 ? jsonResponse([]) : jsonResponse({ id: 123 });
+  };
+
+  const result = await upsertProductGithubRelease({
+    repoRoot,
+    metadata,
+    env: GITHUB_ENV,
+    fetchImpl,
+    log: () => {},
+  });
+
+  assert.equal(result.action, "create");
+  assert.equal(calls[0].init.method, "GET");
+  assert.ok(calls[0].url.includes("/releases?per_page=100&page=1"));
+  assert.equal(calls[1].init.method, "POST");
+  const createBody = JSON.parse(calls[1].init.body);
+  assert.equal(createBody.tag_name, TAG);
+  assert.equal(createBody.target_commitish, GITHUB_ENV.GITHUB_SHA);
+  assert.equal(createBody.draft, true);
+  assert.equal(createBody.prerelease, true);
+  assert.ok(createBody.body.includes(GENERATED_BLOCK_START));
+});
+
+test("existing releases are found by scanning paginated release listings", async () => {
+  const packages = [
+    { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
+  ];
+  const repoRoot = await writeChangelogFixture(packages);
+  const metadata = fakeMetadata(packages.map(({ name, path, version }) => ({ name, path, version })));
+
+  const firstPage = Array.from({ length: 100 }, (_, index) => ({
+    id: index + 1,
+    tag_name: `v0.0.0-alpha.${index}`,
+    body: "",
+  }));
+  const existingBody = `${GENERATED_BLOCK_START}\nstale facts\n${GENERATED_BLOCK_END}`;
+  const calls = [];
+  const fetchImpl = async (url, init = {}) => {
+    calls.push({ url, init });
+    if (calls.length === 1) {
+      return jsonResponse(firstPage);
+    }
+    if (calls.length === 2) {
+      return jsonResponse([{ id: 789, tag_name: TAG, body: existingBody }]);
+    }
+    return jsonResponse({ id: 789 });
+  };
+
+  const result = await upsertProductGithubRelease({
+    repoRoot,
+    metadata,
+    env: GITHUB_ENV,
+    fetchImpl,
+    log: () => {},
+  });
+
+  assert.equal(result.action, "update");
+  assert.deepEqual(
+    calls.map((call) => call.url),
+    [
+      "https://api.github.com/repos/zitadel/nextgen/releases?per_page=100&page=1",
+      "https://api.github.com/repos/zitadel/nextgen/releases?per_page=100&page=2",
+      "https://api.github.com/repos/zitadel/nextgen/releases/789",
+    ],
+  );
+  assert.equal(calls[2].init.method, "PATCH");
+});
+
+test("dry runs never call GitHub", async () => {
+  const packages = [
+    { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
+  ];
+  const repoRoot = await writeChangelogFixture(packages);
+  const metadata = fakeMetadata(packages.map(({ name, path, version }) => ({ name, path, version })));
+
+  let called = false;
+  const result = await upsertProductGithubRelease({
+    repoRoot,
+    metadata,
+    dryRun: true,
+    fetchImpl: async () => {
+      called = true;
+      return jsonResponse({});
+    },
+    log: () => {},
+  });
+
+  assert.equal(result.action, "dry-run");
+  assert.equal(called, false);
+});
+
+test("real release creation fails clearly when required env is missing", async () => {
+  const packages = [
+    { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
+  ];
+  const repoRoot = await writeChangelogFixture(packages);
+  const metadata = fakeMetadata(packages.map(({ name, path, version }) => ({ name, path, version })));
+
+  await assert.rejects(
+    upsertProductGithubRelease({
+      repoRoot,
+      metadata,
+      env: { GITHUB_REPOSITORY: "zitadel/nextgen", GITHUB_SHA: "deadbeef" },
+      fetchImpl: async () => jsonResponse({}),
+      log: () => {},
+    }),
+    /GITHUB_TOKEN/,
   );
 });
 
