@@ -71,7 +71,39 @@ SELECT r.resource_id
 FROM `)
 	writeTable(w, env, "resource_scope_index")
 	w.WriteString(` r
-WHERE r.project_id = `)
+WHERE `)
+	writeListAuthzRSIMatch(w, env, params, "")
+	w.WriteString(`
+ORDER BY r.resource_id`)
+}
+
+// WriteListAuthzExistsPredicate emits EXISTS (SELECT 1 FROM RSI r WHERE
+// r.resource_id = <outer> AND …) using the same assignment/closure/TTU
+// branches as WriteListAuthzObjectIDs. outerResourceIDExpr is a raw SQL
+// column reference (e.g. "zitadel_nextgen.teams.id").
+func WriteListAuthzExistsPredicate(w ArgWriter, env Env, outerResourceIDExpr string, params domain.AuthzListObjectsParams) {
+	w.WriteString(`EXISTS (
+SELECT 1
+FROM `)
+	writeTable(w, env, "resource_scope_index")
+	w.WriteString(` r
+WHERE `)
+	writeListAuthzRSIMatch(w, env, params, outerResourceIDExpr)
+	w.WriteString(`
+)`)
+}
+
+// writeListAuthzRSIMatch writes the RSI WHERE body shared by list materialization
+// and EXISTS injection. When outerResourceIDExpr is non-empty, correlates
+// r.resource_id to that outer column.
+func writeListAuthzRSIMatch(w ArgWriter, env Env, params domain.AuthzListObjectsParams, outerResourceIDExpr string) {
+	if outerResourceIDExpr != "" {
+		w.WriteString(`r.resource_id = `)
+		w.WriteString(outerResourceIDExpr)
+		w.WriteString(`
+  AND `)
+	}
+	w.WriteString(`r.project_id = `)
 	w.WriteArg(params.ProjectID)
 	w.WriteString(`
   AND r.resource_kind = `)
@@ -93,8 +125,7 @@ WHERE r.project_id = `)
     OR `)
 	writeScopedClosureExists(w, env, params.AuthzCheckParams, "resource", "r.resource_id")
 	w.WriteString(`
-  )
-ORDER BY r.resource_id`)
+  )`)
 }
 
 func writeFoothold(w ArgWriter, env Env, projectID string, principalType domain.AuthzPrincipalType, principalID string) {

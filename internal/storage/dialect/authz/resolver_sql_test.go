@@ -49,16 +49,26 @@ func TestWriteCheckAndListShareFullTTU(t *testing.T) {
 	assert.Contains(t, sql, "NOW_SENTINEL")
 	assert.Contains(t, sql, "zitadel_nextgen.authz_assignments")
 
-	var list recordingWriter
-	authz.WriteListAuthzObjectIDs(&list, testEnv(&list), domain.AuthzListObjectsParams{
+	listParams := domain.AuthzListObjectsParams{
 		AuthzCheckParams: params,
 		ResourceKind:     domain.ResourceKindUser,
-	})
+	}
+	var list recordingWriter
+	authz.WriteListAuthzObjectIDs(&list, testEnv(&list), listParams)
 	listSQL := list.b.String()
 	require.Contains(t, listSQL, "tuple_to_userset")
 	assert.Contains(t, listSQL, "a.scope_kind = 'team' AND a.scope_team_id = ts.principal_id")
 	assert.Contains(t, listSQL, "a.scope_kind = 'resource' AND a.scope_resource_id = ts.principal_id")
 	assert.Contains(t, listSQL, "NOW_SENTINEL")
+
+	var exists recordingWriter
+	authz.WriteListAuthzExistsPredicate(&exists, testEnv(&exists), "zitadel_nextgen.users.id", listParams)
+	existsSQL := exists.b.String()
+	require.Contains(t, existsSQL, "EXISTS (")
+	assert.Contains(t, existsSQL, "r.resource_id = zitadel_nextgen.users.id")
+	assert.Contains(t, existsSQL, "tuple_to_userset")
+	assert.Contains(t, existsSQL, "a.scope_kind = 'team' AND a.scope_team_id = ts.principal_id")
+	assert.Contains(t, existsSQL, "a.scope_kind = 'resource' AND a.scope_resource_id = ts.principal_id")
 }
 
 func TestWriteCheckAuthzBindOrder(t *testing.T) {

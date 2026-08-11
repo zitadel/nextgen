@@ -7,18 +7,10 @@ import (
 )
 
 // AuthzListFilter is the portable authz conjunct injected into resource list
-// SQL (EXISTS over assignments ⋈ closure / membership / RSI), not an IN (ids)
-// post-filter. When absent from context, list methods keep project_id scoping only.
-type AuthzListFilter struct {
-	CatalogID              string
-	ProjectID              string
-	PrincipalHomeProjectID string
-	PrincipalType          domain.AuthzPrincipalType
-	PrincipalID            string
-	ResourceKind           domain.ResourceKind
-	ObjectType             string
-	Relation               string
-}
+// SQL (EXISTS over the same RSI/assignment/closure/TTU branches as
+// ListAuthzObjectIDs). When absent from context, list methods keep project_id
+// scoping only.
+type AuthzListFilter = domain.AuthzListObjectsParams
 
 type authzListFilterCtxKey struct{}
 

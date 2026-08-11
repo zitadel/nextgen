@@ -14,7 +14,8 @@ import (
 // project queries, branding, operator sessions) is gated by resolver.Check after
 // credential → ScopeContext. Path-id ops resolve scope via resource_scope_index
 // (requireResourceAccess) before Check; create/list keep an explicit project_id
-// and use requireProjectAccess. MVP uses coarse project.{viewer,editor,admin}
+// and use requireProjectAccess, then inject an EXISTS list predicate via
+// withAuthzListFilter. MVP uses coarse project.{viewer,editor,admin}
 // (#420 expands to fine-grained catalog relations). Preview secrets
 // (project.read only) cannot call management APIs (ADR 037).
 
@@ -210,8 +211,11 @@ func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) er
 // list endpoints after requireProjectAccess has already passed.
 func (h *Handler) withAuthzListFilter(ctx context.Context, projectID string, kind domain.ResourceKind, op accessOp) (context.Context, error) {
 	scope, ok := GetScopeContext(ctx)
-	if !ok || h == nil || h.pool == nil {
-		return ctx, nil
+	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
+		return ctx, domain.ErrInternal(nil).WithMessage("authz list filter requires credential scope")
+	}
+	if h == nil || h.pool == nil {
+		return ctx, domain.ErrInternal(nil).WithMessage("authz statements not configured")
 	}
 	catalogID, err := h.pool.Statements().ActiveSystemCatalogID(ctx)
 	if err != nil {
@@ -222,14 +226,16 @@ func (h *Handler) withAuthzListFilter(ctx context.Context, projectID string, kin
 		home = projectID
 	}
 	return service.WithAuthzListFilter(ctx, service.AuthzListFilter{
-		CatalogID:              catalogID,
-		ProjectID:              projectID,
-		PrincipalHomeProjectID: home,
-		PrincipalType:          scope.PrincipalType,
-		PrincipalID:            scope.PrincipalID,
-		ResourceKind:           kind,
-		ObjectType:             "project",
-		Relation:               projectRelation(op),
+		AuthzCheckParams: domain.AuthzCheckParams{
+			CatalogID:              catalogID,
+			ProjectID:              projectID,
+			PrincipalHomeProjectID: home,
+			PrincipalType:          scope.PrincipalType,
+			PrincipalID:            scope.PrincipalID,
+			ObjectType:             "project",
+			Relation:               projectRelation(op),
+		},
+		ResourceKind: kind,
 	}), nil
 }
 

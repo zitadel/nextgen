@@ -43,9 +43,12 @@ func TestAuthzListPredicate_Teams(t *testing.T) {
 
 		t.Run("empty authz yields empty page", func(t *testing.T) {
 			ctx := service.WithAuthzListFilter(t.Context(), service.AuthzListFilter{
-				CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
-				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: viewer,
-				ResourceKind: domain.ResourceKindTeam, ObjectType: "project", Relation: "viewer",
+				AuthzCheckParams: domain.AuthzCheckParams{
+					CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
+					PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: viewer,
+					ObjectType: "project", Relation: "viewer",
+				},
+				ResourceKind: domain.ResourceKindTeam,
 			})
 			assert.Empty(t, listTeams(ctx))
 		})
@@ -54,9 +57,12 @@ func TestAuthzListPredicate_Teams(t *testing.T) {
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeUser, viewer, "project", "viewer", domain.NewProjectAssignmentScope())))
 			ctx := service.WithAuthzListFilter(t.Context(), service.AuthzListFilter{
-				CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
-				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: viewer,
-				ResourceKind: domain.ResourceKindTeam, ObjectType: "project", Relation: "viewer",
+				AuthzCheckParams: domain.AuthzCheckParams{
+					CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
+					PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: viewer,
+					ObjectType: "project", Relation: "viewer",
+				},
+				ResourceKind: domain.ResourceKindTeam,
 			})
 			assert.ElementsMatch(t, []string{teamIn, teamOut}, listTeams(ctx))
 		})
@@ -68,9 +74,12 @@ func TestAuthzListPredicate_Teams(t *testing.T) {
 				newTestAssignment(projectID, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeUser, scoped, "project", "viewer", domain.NewTeamAssignmentScope(teamIn))))
 
 			ctx := service.WithAuthzListFilter(t.Context(), service.AuthzListFilter{
-				CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
-				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: scoped,
-				ResourceKind: domain.ResourceKindTeam, ObjectType: "project", Relation: "viewer",
+				AuthzCheckParams: domain.AuthzCheckParams{
+					CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
+					PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: scoped,
+					ObjectType: "project", Relation: "viewer",
+				},
+				ResourceKind: domain.ResourceKindTeam,
 			})
 			assert.Equal(t, []string{teamIn}, listTeams(ctx))
 		})
@@ -106,9 +115,12 @@ func TestAuthzListPredicate_Users(t *testing.T) {
 
 		t.Run("empty authz yields empty page", func(t *testing.T) {
 			ctx := service.WithAuthzListFilter(t.Context(), service.AuthzListFilter{
-				CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
-				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: principal,
-				ResourceKind: domain.ResourceKindUser, ObjectType: "project", Relation: "viewer",
+				AuthzCheckParams: domain.AuthzCheckParams{
+					CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
+					PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: principal,
+					ObjectType: "project", Relation: "viewer",
+				},
+				ResourceKind: domain.ResourceKindUser,
 			})
 			assert.Empty(t, listUsers(ctx))
 		})
@@ -117,9 +129,12 @@ func TestAuthzListPredicate_Users(t *testing.T) {
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeUser, principal, "project", "viewer", domain.NewProjectAssignmentScope())))
 			ctx := service.WithAuthzListFilter(t.Context(), service.AuthzListFilter{
-				CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
-				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: principal,
-				ResourceKind: domain.ResourceKindUser, ObjectType: "project", Relation: "viewer",
+				AuthzCheckParams: domain.AuthzCheckParams{
+					CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
+					PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: principal,
+					ObjectType: "project", Relation: "viewer",
+				},
+				ResourceKind: domain.ResourceKindUser,
 			})
 			got := listUsers(ctx)
 			assert.Contains(t, got, u1)
