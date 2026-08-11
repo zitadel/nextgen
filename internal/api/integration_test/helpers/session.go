@@ -26,8 +26,10 @@ func (h *Harness) EnsureSessionService(t *testing.T) service.SessionService {
 }
 
 // CreateSession seeds a session directly in storage. No user is bound, so it
-// reads as building until the TTL elapses; a one-nanosecond TTL is valid and
-// has elapsed by the next statement on both PostgreSQL and Spanner.
+// reads as building until the TTL elapses. The database clock stamps
+// expires_at while the state filter compares it against the service clock,
+// so a test that needs the session expired must wait until that is
+// observable rather than assume a tiny TTL has already elapsed.
 func (h *Harness) CreateSession(t *testing.T, projectID string, ttl time.Duration) *domain.Session {
 	t.Helper()
 	session := &domain.Session{ProjectID: projectID, TimeToLive: ttl}

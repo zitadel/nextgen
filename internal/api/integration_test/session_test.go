@@ -48,6 +48,20 @@ func TestQuerySessions(t *testing.T) {
 		return ids
 	}
 
+	// expires_at is stamped by the database clock while the state filter
+	// compares against the service clock, so wait until the seeded session is
+	// observably expired. Expiry is monotonic, so every later query agrees.
+	require.Eventually(t, func() bool {
+		sessions := querySessions(t, &api.QuerySessionsRequest{
+			Filter: []api.QuerySessionsRequestFilterItem{{
+				Field:     api.SessionFilterFieldState,
+				Operation: api.FilterOperationEquals,
+				Value:     api.NewOptFilterValue(api.NewStringFilterValue("expired")),
+			}},
+		}).Sessions
+		return len(sessions) == 1 && string(sessions[0].SessionID) == expired.ID
+	}, 5*time.Second, 50*time.Millisecond, "the seeded session must become observably expired")
+
 	// The scope matrix and binding anti-oracle live in authz_internal_test.go;
 	// this only pins that the endpoint invokes the guard at all.
 	t.Run("project secret is denied", func(t *testing.T) {
