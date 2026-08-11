@@ -196,6 +196,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		passwordHasher,
 		userService,
 		schemaStore,
+		serviceDBPool,
 	)
 	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaStore)
 	passkeyRegSvc := service.NewPasskeyRegistrationService(serviceDBPool)

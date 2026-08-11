@@ -14,6 +14,7 @@ func (h *Harness) EnsureCreateUserHandler(t *testing.T) *service.FlowCreateUserW
 		h.EnsureHasher(t),
 		h.EnsureUserService(t),
 		h.EnsureSchemaStore(t),
+		h.EnsureServiceDB(t),
 	)
 }
 
