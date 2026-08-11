@@ -6333,8 +6333,8 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 // visible until claim succeeds). Team-scoped credentials see only events
 // whose emit-time `team_id` matches the credential team (enforced when
 // team-scoped tokens exist).
-// Clients discriminate each item's `payload` via `event_type` — see
-// event-payload.yaml and docs/design/api/events-catalog.md.
+// Clients discriminate each item via `event_type` (OpenAPI Event oneOf) —
+// see docs/design/api/events-catalog.md.
 //
 // GET /events
 func (s *Server) handleListEventsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

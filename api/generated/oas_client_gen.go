@@ -348,8 +348,8 @@ type Invoker interface {
 	// visible until claim succeeds). Team-scoped credentials see only events
 	// whose emit-time `team_id` matches the credential team (enforced when
 	// team-scoped tokens exist).
-	// Clients discriminate each item's `payload` via `event_type` — see
-	// event-payload.yaml and docs/design/api/events-catalog.md.
+	// Clients discriminate each item via `event_type` (OpenAPI Event oneOf) —
+	// see docs/design/api/events-catalog.md.
 	//
 	// GET /events
 	ListEvents(ctx context.Context, params ListEventsParams) (ListEventsRes, error)
@@ -5074,8 +5074,8 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 // visible until claim succeeds). Team-scoped credentials see only events
 // whose emit-time `team_id` matches the credential team (enforced when
 // team-scoped tokens exist).
-// Clients discriminate each item's `payload` via `event_type` — see
-// event-payload.yaml and docs/design/api/events-catalog.md.
+// Clients discriminate each item via `event_type` (OpenAPI Event oneOf) —
+// see docs/design/api/events-catalog.md.
 //
 // GET /events
 func (c *Client) ListEvents(ctx context.Context, params ListEventsParams) (ListEventsRes, error) {
