@@ -43,10 +43,20 @@ so elevated surfaces contrast against the canvas.
 | `--zl-color-text-secondary-gray` | `--zl-muted-foreground` |
 | `--zl-color-text-error` / `--zl-color-icon-error` | `--zl-destructive` |
 | `--zl-color-border-default-gray-*` | `--zl-border` / `--zl-input` |
+| `--zl-color-surface-hover-strong` / `-subtle`, `--zl-color-border-hover` | `--zl-accent` |
 | `--zl-color-gray-*` (raw ramp) | no 1:1 — use a semantic token |
+
+The raw ramp is **mode-independent by design**: a primitive is one shade, and
+the semantic tokens above do the light/dark flip by pointing at a different
+rung per mode. A surface that reads `--zl-color-gray-*` directly therefore
+keeps its dark-mode shade in light mode — which is how every interactive state
+came to be unreadable on a light page. Reach for a semantic token; if none
+fits, add one rather than the primitive.
 
 ### Gaps (shadcn ships no source)
 
 `--zl-color-text-success` / `status-positive` (no success ramp — keep legacy
-`#33a779` or add a Figma variable) and interaction states like
-hover/pressed fills that Figma expresses as opacity overlays.
+`#33a779` or add a Figma variable). Interaction states are covered on the
+legacy side by the three `hover` tokens above; Figma expresses them as opacity
+overlays and publishes no variable, so those entries stay hand-authored in
+`legacy.tokens.json` until it does.

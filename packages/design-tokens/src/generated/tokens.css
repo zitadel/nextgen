@@ -8,6 +8,8 @@
   --zl-color-surface-default-white: #f4f4f6;
   --zl-color-surface-default-primary-gray: #252528;
   --zl-color-surface-default-secondary-gray: #37373a;
+  --zl-color-surface-hover-strong: #cfcfde;
+  --zl-color-surface-hover-subtle: #484a57;
   --zl-color-text-primary-white: #f4f4f6;
   --zl-color-text-secondary-gray: #bfbfcf;
   --zl-color-text-button-default: #0f0f11;
@@ -34,6 +36,7 @@
   --zl-color-border-default-gray-200: #484a57;
   --zl-color-border-default-gray-300: #686883;
   --zl-color-border-default-gray-400: #82829c;
+  --zl-color-border-hover: #9e9eb2;
   --zl-color-border-error: #ea4f70;
   --zl-color-border-success: #33a779;
   --zl-accent: #404040;
@@ -144,6 +147,8 @@
   --zl-color-surface-default-white: #0f0f11;
   --zl-color-surface-default-primary-gray: #ffffff;
   --zl-color-surface-default-secondary-gray: #e1e1e7;
+  --zl-color-surface-hover-strong: #37373a;
+  --zl-color-surface-hover-subtle: #cfcfde;
   --zl-color-text-primary-white: #0f0f11;
   --zl-color-text-secondary-gray: #686883;
   --zl-color-text-button-default: #f4f4f6;
@@ -169,6 +174,7 @@
   --zl-color-border-default-gray-100: #e1e1e7;
   --zl-color-border-default-gray-200: #cfcfde;
   --zl-color-border-default-gray-300: #9e9eb2;
+  --zl-color-border-hover: #686883;
   --zl-color-border-error: #c52247;
   --zl-color-border-success: #217a55;
   --zl-accent: #f5f5f5;
