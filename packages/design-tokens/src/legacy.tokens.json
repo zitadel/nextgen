@@ -73,7 +73,9 @@
         "default-black": { "dark": { "primitive": "color.gray.50" }, "light": { "primitive": "color.gray.900" } },
         "default-white": { "dark": { "primitive": "color.gray.900" }, "light": { "primitive": "color.gray.50" } },
         "default-primary-gray": { "dark": { "primitive": "color.gray.75" }, "light": { "primitive": "color.white" } },
-        "default-secondary-gray": { "dark": { "primitive": "color.gray.100" }, "light": { "primitive": "color.gray.800" } }
+        "default-secondary-gray": { "dark": { "primitive": "color.gray.100" }, "light": { "primitive": "color.gray.800" } },
+        "hover-strong": { "dark": { "primitive": "color.gray.600" }, "light": { "primitive": "color.gray.100" } },
+        "hover-subtle": { "dark": { "primitive": "color.gray.200" }, "light": { "primitive": "color.gray.600" } }
       },
       "text": {
         "primary-white": { "dark": { "primitive": "color.gray.900" }, "light": { "primitive": "color.gray.50" } },
@@ -106,6 +108,7 @@
         "default-gray-200": { "dark": { "primitive": "color.gray.200" }, "light": { "primitive": "color.gray.600" } },
         "default-gray-300": { "dark": { "primitive": "color.gray.300" }, "light": { "primitive": "color.gray.500" } },
         "default-gray-400": { "primitive": "color.gray.400" },
+        "hover": { "dark": { "primitive": "color.gray.500" }, "light": { "primitive": "color.gray.300" } },
         "error": { "dark": { "primitive": "color.pink.500" }, "light": { "primitive": "color.pink.600" } },
         "success": { "dark": "#33a779", "light": "#217a55" }
       }

@@ -51,9 +51,5 @@ post:
           schema:
             $ref: ../../components/error-details.yaml
     default:
-      description: Unexpected error.
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
+      $ref: createSession-error-response.yaml
 
