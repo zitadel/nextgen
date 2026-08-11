@@ -37,7 +37,7 @@ func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stm
 		if err != nil {
 			return database.ErrInvalidCursor()
 		}
-		if !cursor.MatchesOrderBy(opt.Pagination.OrderBy.Columns) {
+		if !cursor.MatchesOrderBy(opt.Pagination.OrderBy) {
 			return database.ErrCursorOrderMismatch()
 		}
 		values, err := schema.CoerceCursorValues(cursor.Columns, cursor.Values)

@@ -125,14 +125,12 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 		return nil, err
 	}
 
-	var nextCursor []byte
-	if opts.Pagination.Limit > 0 && len(defs) == int(opts.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.FlowDefinitionField]{
-			Columns: opts.Pagination.OrderBy.Columns,
-			Values:  flowdefinition.Schema.ValuesFrom(defs[len(defs)-1], opts.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
-	}
+	nextCursor := pagination.MarshalNext(
+		opts.Pagination.OrderBy,
+		defs,
+		flowdefinition.Schema,
+		opts.Pagination.Limit,
+	)
 
 	return &database.ListResult[*domain.FlowDefinition]{
 		Items:      defs,
@@ -142,13 +140,15 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 
 func (f flowDefinitionStatements) DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error {
 	return withTransaction(ctx, f.db, func(ctx context.Context, tx queryExecutor) error {
-		rsi := newResourceScopeStatements(tx)
-		if err := rsi.DeleteResourceScope(ctx, id); err != nil {
-			return err
+		n, err := tx.Update(ctx, buildStatement(deleteFlowDefinitionStmt, projectID, id).statement())
+		if err != nil {
+			return wrapError(err)
 		}
-		stmt := buildStatement(deleteFlowDefinitionStmt, projectID, id).statement()
-		_, err := tx.Update(ctx, stmt)
-		return wrapError(err)
+		if n == 0 {
+			return nil
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.DeleteResourceScope(ctx, id)
 	})
 }
 

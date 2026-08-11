@@ -34,7 +34,7 @@ func ApplyCursor(filter database.Filter[domain.UserField], page database.Page[do
 	if err != nil {
 		return nil, database.ErrInvalidCursor()
 	}
-	if !cursor.MatchesOrderBy(page.OrderBy.Columns) {
+	if !cursor.MatchesOrderBy(page.OrderBy) {
 		return nil, database.ErrCursorOrderMismatch()
 	}
 	values, err := Schema.CoerceCursorValues(cursor.Columns, cursor.Values)
@@ -53,14 +53,7 @@ func ApplyCursor(filter database.Filter[domain.UserField], page database.Page[do
 
 // NextCursor returns a marshaled keyset cursor when the page is full; otherwise nil.
 func NextCursor(users []*domain.User, page database.Page[domain.UserField]) []byte {
-	if page.Limit == 0 || len(users) != int(page.Limit) {
-		return nil
-	}
-	cursor := &pagination.Cursor[domain.UserField]{
-		Columns: page.OrderBy.Columns,
-		Values:  Schema.ValuesFrom(users[len(users)-1], page.OrderBy.Columns),
-	}
-	return cursor.Marshal()
+	return pagination.MarshalNext(page.OrderBy, users, Schema, page.Limit)
 }
 
 // ProjectGroup is one project's users prepared for attribute hydration.

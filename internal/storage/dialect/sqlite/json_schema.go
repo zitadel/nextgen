@@ -52,12 +52,15 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 // DeleteJSONSchemaByID implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error {
 	return withTransaction(ctx, js.client, func(ctx context.Context, tx queryExecutor) error {
-		rsi := newResourceScopeStatements(tx)
-		if err := rsi.DeleteResourceScope(ctx, schemaID); err != nil {
+		n, err := execAffected(ctx, tx, deleteByIDJSONSchemaStmt, projectID, schemaID)
+		if err != nil {
 			return err
 		}
-		_, err := tx.Exec(ctx, deleteByIDJSONSchemaStmt, projectID, schemaID)
-		return wrapError(err)
+		if n == 0 {
+			return nil
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.DeleteResourceScope(ctx, schemaID)
 	})
 }
 
@@ -99,14 +102,12 @@ func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *data
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	var nextCursor []byte
-	if filter.Pagination.Limit > 0 && len(schemas) == int(filter.Pagination.Limit) {
-		cursor := &pagination.Cursor[domain.JSONSchemaField]{
-			Columns: filter.Pagination.OrderBy.Columns,
-			Values:  jsonSchemaSchema.ValuesFrom(schemas[len(schemas)-1], filter.Pagination.OrderBy.Columns),
-		}
-		nextCursor = cursor.Marshal()
-	}
+	nextCursor := pagination.MarshalNext(
+		filter.Pagination.OrderBy,
+		schemas,
+		jsonSchemaSchema,
+		filter.Pagination.Limit,
+	)
 	return &database.ListResult[*domain.JSONSchema]{Items: schemas, NextCursor: nextCursor}, nil
 }
 

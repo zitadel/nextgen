@@ -11,7 +11,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-func (h *Harness) EnsureUserService(t *testing.T) *service.UserService {
+func (h *Harness) EnsureUserService(t *testing.T) service.UserService {
 	t.Helper()
 	h.userService.mutex.Lock()
 	defer h.userService.mutex.Unlock()
