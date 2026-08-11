@@ -9,8 +9,9 @@
  * default path because `vet` and `test` depend on this task, and rewriting a
  * developer's worktree as a side effect of running tests would be rude.
  *
- * `--prune` also standing-guards the bootstrap property: generation has to
- * work against a tree with no generated files in it, or this fails.
+ * `--prune` also standing-guards the bootstrap property: generation has to work
+ * against a tree stripped of its own output, or this fails. What the prune
+ * leaves behind — and why — is in scripts/generated-outputs.mjs.
  */
 import { runCapture } from "./dev-process.mjs";
 import { cleanGenerated } from "./clean-generated.mjs";

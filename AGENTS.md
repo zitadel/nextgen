@@ -295,10 +295,12 @@ call `idgen` outside dialect packages. Full minting contract:
 - Do not hand-edit `api/generated/**`; update `api/openapi/**` and run
   `moon run server:generate`. CI enforces committed generated output through
   `server:check-generate` (via `server:test`). Bare `go generate ./...` produces
-  the same output — including from a tree with no generated files in it — but
-  runs every directive serially, roughly 4x slower. Both go through the same
-  `//go:generate` directives; the moon task just schedules them
-  (`scripts/go-generate.mjs`).
+  the same output, but runs every directive serially, roughly 4x slower. Both go
+  through the same `//go:generate` directives; the moon task just schedules them
+  (`scripts/go-generate.mjs`). Regenerating over a pruned tree is the one case
+  where the schedule matters and bare `./...` will not do: it walks `api` before
+  `internal`, and `api/cmd/gen_openapi_errors` type-loads `./internal/...`, which
+  does not compile until enumer has run.
 - The consolidated `mockgen` directives live in the mock packages
   (`internal/domain/mock`, `internal/service/mocks`, `internal/crypto/mock`),
   not beside the interfaces they mock. mockgen has to type-check the source
@@ -321,8 +323,14 @@ call `idgen` outside dialect packages. Full minting contract:
   you change where a generator writes, drop an interface from a mockgen
   directive, or delete a type that had an `enumer` directive.
   `moon run server:clean-generated -- --dry-run` lists what would go without
-  touching anything. Generation bootstraps from an empty tree, so cleaning is
-  safe at any time.
+  touching anything. Generation restores everything the clean removed, so
+  cleaning is safe at any time.
+
+  One tree is exempt: `api/generated` is kept, because ogen only produces it
+  from a spec whose error responses are written by a generator that type-loads
+  the packages importing it — a cycle no ordering breaks. It needs no pruning
+  anyway, since ogen runs with `--clean` and drops its own stale files.
+  `scripts/generated-outputs.mjs` is where that exemption lives.
 - Do not hand-edit generated package output under `dist/`.
 - Do not hand-edit `apps/console/src/routeTree.gen.ts`; update route files and
   let the TanStack Router plugin regenerate it.

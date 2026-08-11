@@ -4,18 +4,31 @@
  *
  * `go generate ./...` is strictly serial, and the directives are almost pure
  * per-invocation overhead — mockgen spends ~800ms type-loading a package
- * whether it mocks one interface or twenty. Running packages concurrently is
- * therefore nearly a free 4x.
+ * whether it mocks one interface or twenty. Running the four mockgen packages
+ * concurrently collapses 4.3s into 1.4s, and the five enumer ones 2.2s into
+ * 1.6s.
  *
- * The ordering that matters is a phase boundary, not a package-internal one:
- * `api/cmd/gen_error_schemas` and `api/cmd/gen_openapi_errors` parse
- * `internal/domain` and `internal/service` *source* to discover error codes,
- * so they must observe those trees at rest. `./api` therefore runs alone in
- * phase 1, before any generator writes into the trees it reads. Within a
- * package `go generate` keeps directives in file order, which is what keeps
- * api's own chain (error schemas -> openapi errors -> ogen) intact.
+ * That is ~21% end to end (6.4s against 8.1s), not the 4x the arithmetic
+ * suggests, because `./api` is a serial chain and now the larger half of the
+ * run: `gen_openapi_errors` type-loads the whole module to infer error sets,
+ * and 2.6s of the 3.5s api phase is that one analysis. It parallelizes against
+ * nothing — see the ordering below — so it sets the floor. Worth knowing
+ * before optimizing the phases around it.
  *
- * Today that race would be benign — enumer writes via a same-directory
+ * The ordering that matters is a phase boundary, not a package-internal one.
+ * `./api` runs alone between the two `rest` phases, for a reason on each side:
+ *
+ *   - after enumer, because `api/cmd/gen_openapi_errors` type-loads
+ *     `./internal/...` to infer each handler's error set, and `internal/domain`
+ *     does not type-check until its `*_enumer.go` files exist.
+ *   - before mockgen, because that same load — and `gen_error_schemas` parsing
+ *     `internal/domain` source — must observe those trees at rest, rather than
+ *     while mockgen is writing `.go` files into them.
+ *
+ * Within a package `go generate` keeps directives in file order, which is what
+ * keeps api's own chain (error schemas -> openapi errors -> ogen) intact.
+ *
+ * Today the mockgen race would be benign — enumer writes via a same-directory
  * `os.Rename` and its temp files carry no `.go` suffix, and the generated
  * `*_enumer.go` files declare no error constructors — but that is a property
  * of the current tools, not an invariant anyone declared. The phase boundary
@@ -33,47 +46,47 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 // Never hold Go sources, and walking them dwarfs the rest of discovery.
 const SKIP_DIRS = new Set(["node_modules", ".git", ".moon", "dist", "target", ".next", ".turbo"]);
 
-// Runs alone in phase 1 — see the module comment.
-const ORDERED_FIRST = "api";
+// Runs alone, between the enumer and mockgen phases — see the module comment.
+const ORDERED_PACKAGE = "api";
 
 const DIRECTIVE = /^\/\/go:generate /m;
 
 export async function goGenerate({ log = console.log } = {}) {
   const packages = findGeneratePackages();
-  const first = packages.filter((dir) => dir === ORDERED_FIRST);
-  const rest = packages.filter((dir) => dir !== ORDERED_FIRST);
+  const ordered = packages.filter((dir) => dir === ORDERED_PACKAGE);
+  const rest = packages.filter((dir) => dir !== ORDERED_PACKAGE);
 
-  for (const dir of first) {
-    log(`--- ${dir}`);
-    await run("go", ["generate", "."], { cwd: join(ROOT, dir) });
-  }
-
-  // enumer writes .go files *into* a package; mockgen type-loads packages. So
-  // every enumer directive must finish before any mockgen one, or mockgen
-  // loads a package whose generated methods do not exist yet and fails.
+  // enumer writes .go files *into* a package; mockgen and the api generators
+  // type-load packages. So every enumer directive must finish before any of
+  // them runs, or a package whose generated methods do not exist yet is loaded
+  // and the load fails.
   //
   // Under `go generate ./...` that ordering comes for free, because the
   // mockgen directives live in the mock subpackages and `./...` walks packages
   // in import-path order. This runner deliberately ignores that order — it
   // runs packages concurrently — so it has to restate the constraint as an
-  // explicit barrier. Both paths bootstrap from a tree with no generated files
-  // in it; there is a standing check for that (server:check-generate-pruned).
+  // explicit barrier. Both paths bootstrap from a tree holding no generated
+  // file that can be regenerated from one; there is a standing check for that
+  // (server:check-generate-pruned).
   //
   // The barrier is global rather than per-package on purpose: internal/service
   // imports internal/domain, so its mockgen needs *domain's* enumer output,
   // not just its own package's.
-  for (const phase of GENERATE_PHASES) {
-    await runPhase(rest, phase, log);
+  await runPhase(rest, ENUMER_PHASE, log);
+
+  for (const dir of ordered) {
+    log(`--- ${dir}`);
+    await run("go", ["generate", "."], { cwd: join(ROOT, dir) });
   }
+
+  await runPhase(rest, MOCKGEN_PHASE, log);
 }
 
 // `go generate -run` filters directives by matching against the command text.
 // A generator added later that neither writes into nor loads a package can go
 // in either phase; one that does both needs its own entry here.
-const GENERATE_PHASES = [
-  { name: "enumer", filter: "enumer" },
-  { name: "mockgen", filter: "mockgen" },
-];
+const ENUMER_PHASE = { name: "enumer", filter: "enumer" };
+const MOCKGEN_PHASE = { name: "mockgen", filter: "mockgen" };
 
 async function runPhase(dirs, phase, log) {
   const limit = Math.max(1, Math.min(availableParallelism(), dirs.length));
