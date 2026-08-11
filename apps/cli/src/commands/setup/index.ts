@@ -36,6 +36,7 @@ import {
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
+import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import {
   materializeSetupResources,
@@ -285,6 +286,9 @@ export default class Setup extends BaseCommand {
     consola.success(`Created project ${project.id}`);
     this.recordTelemetry({ step: "project_created" });
 
+    // Fresh scaffolds keep the widgets' full-page chrome; a pre-existing
+    // route-based app gets embeddable cards inside its own layout (ADR 044).
+    const posture = derivePosture(framework.id, scaffoldedFramework);
     const ctx: PatchContext = {
       framework,
       rendererId: flags.renderer ?? "react",
@@ -293,6 +297,7 @@ export default class Setup extends BaseCommand {
       server: answers.server,
       cliVersion: this.meta.cliVersion,
       scaffoldedFramework,
+      posture,
       preset: answers.preset,
       useCase: answers.useCase,
     };
@@ -367,6 +372,7 @@ export default class Setup extends BaseCommand {
           written: [...result.filesWritten, ...result.filesSkipped],
           scaffoldedFramework,
           devPort: answers.devPort,
+          posture,
         });
       } catch (error) {
         consola.debug("Failed to record the scaffold manifest", error);
