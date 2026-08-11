@@ -9,7 +9,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
 )
@@ -72,7 +71,7 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 			return wrapError(err)
 		}
 		rsi := newResourceScopeStatements(tx)
-		return authz.FlowDefinitionCreated(ctx, &rsi, entity.ProjectID, entity.ID)
+		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindFlowDefinition, entity.ProjectID, entity.ID))
 	})
 }
 
@@ -144,7 +143,7 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 func (f flowDefinitionStatements) DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error {
 	return withTransaction(ctx, f.db, func(ctx context.Context, tx queryExecutor) error {
 		rsi := newResourceScopeStatements(tx)
-		if err := authz.FlowDefinitionDeleted(ctx, &rsi, id); err != nil {
+		if err := rsi.DeleteResourceScope(ctx, id); err != nil {
 			return err
 		}
 		stmt := buildStatement(deleteFlowDefinitionStmt, projectID, id).statement()

@@ -10,19 +10,15 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// The management API (the operator plane of ADR 036: schemas, flow
-// definitions, users, teams, project queries) is gated by the authz
-// permission resolver after credential → resolved project scope.
-//
-// Path-id operations resolve scope via resource_scope_index
-// (requireResourceAccess) before Check. Create/list keep an explicit
-// project_id and use requireProjectAccess.
-//
-// MVP checks use the seeded system catalog's coarse project.{viewer,editor,admin}
-// relations (#420 will expand to fine-grained user.read / schema.write, etc.).
-// Preview secrets keep a token-scope ceiling so project.read cannot write.
+// The management API (operator plane: schemas, flow definitions, users, teams,
+// project queries, branding, operator sessions) is gated by resolver.Check after
+// credential → ScopeContext. Path-id ops resolve scope via resource_scope_index
+// (requireResourceAccess) before Check; create/list keep an explicit project_id
+// and use requireProjectAccess. MVP uses coarse project.{viewer,editor,admin}
+// (#420 expands to fine-grained catalog relations). Preview secrets
+// (project.read only) cannot call management APIs (ADR 037).
 
-// accessOp classifies a management operation for permission mapping.
+// accessOp classifies a management operation for relation mapping and miss shaping.
 type accessOp int
 
 const (
@@ -32,6 +28,7 @@ const (
 )
 
 // projectRelation is the catalog relation checked for an accessOp.
+// Until #420, the seeded viewer grant satisfies viewer/editor/admin Checks.
 func projectRelation(op accessOp) string {
 	switch op {
 	case opRead:
@@ -46,15 +43,20 @@ func projectRelation(op accessOp) string {
 }
 
 // resourceAccess is one resource's row in the management access model: the
-// resource-flavored errors the gate answers with. Fine OpenAPI scopes remain
-// documentation / future catalog expansion; enforcement is resolver.Check.
+// resource-flavored errors the gate answers with.
 type resourceAccess struct {
-	// readMiss and writeMiss are the anti-oracle answers for a project the
-	// principal has no foothold in; writeMiss doubles as the nonexistent-project
-	// answer since the gate cannot (and must not) tell the two apart.
+	// readMiss / writeMiss are anti-oracle answers when the principal has no
+	// foothold; writeMiss also covers nonexistent projects.
 	readMiss  func() domain.Error
 	writeMiss func() domain.Error
 	denied    func() domain.Error
+}
+
+func (res resourceAccess) miss(op accessOp) error {
+	if op == opWrite {
+		return res.writeMiss()
+	}
+	return res.readMiss()
 }
 
 var schemaAccess = resourceAccess{
@@ -77,14 +79,15 @@ var userAccess = resourceAccess{
 
 var teamAccess = resourceAccess{
 	readMiss: domain.ErrTeamNotFound,
-	// The team service already answers nonexistent projects with
-	// team.project_not_found; foreign projects must be indistinguishable.
+	// team.project_not_found matches the service's nonexistent-project answer.
 	writeMiss: domain.ErrTeamProjectNotFound,
 	denied:    domain.ErrTeamPermissionDenied,
 }
 
-// sessionAccess gates operator session management (get/list/revoke by id).
-// Create and exchange stay on the runtime/app plane and are not checked here.
+// sessionAccess gates operator session get/list/revoke. Create/exchange stay
+// on the runtime plane. MVP: same project.write ceiling + project relation
+// Check as other management resources (replacing the old fail-closed session.*
+// scope gate until #420).
 var sessionAccess = resourceAccess{
 	readMiss:  domain.ErrSessionNotFound,
 	writeMiss: domain.ErrSessionNotFound,
@@ -112,11 +115,10 @@ type resourceAccessStmts interface {
 
 // requireResourceAccess resolves path.id via resource_scope_index, then runs
 // the project-scoped Check. RSI miss → resource not-found shape (404). Returns
-// the resolved project_id for scope-bound DAL calls. team_id from RSI is
-// available on the scope row for future sk_team team-scope tightening.
+// the resolved project_id for scope-bound DAL calls.
 func (h *Handler) requireResourceAccess(ctx context.Context, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
 	if h == nil || h.pool == nil {
-		return "", resourceMiss(res, op)
+		return "", domain.ErrInternal(nil).WithMessage("authz statements not configured")
 	}
 	return requireResourceAccess(ctx, h.pool.Statements(), resourceID, res, op)
 }
@@ -125,7 +127,7 @@ func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resou
 	scope, err := stmts.GetResourceScope(ctx, resourceID)
 	if err != nil {
 		if errors.Is(err, new(database.NoRowFoundError)) {
-			return "", resourceMiss(res, op)
+			return "", res.miss(op)
 		}
 		return "", domain.ErrInternal(err).WithMessage("resource scope lookup failed")
 	}
@@ -135,20 +137,13 @@ func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resou
 	return scope.ProjectID, nil
 }
 
-func resourceMiss(res resourceAccess, op accessOp) error {
-	if op == opWrite {
-		return res.writeMiss()
-	}
-	return res.readMiss()
-}
-
 // requireProjectAccess gates a management operation via resolver.Check when
 // project_id is already known (create/list/query, or after RSI resolution).
 // DecisionNotFound → resource not-found / invalid-project shapes (404).
 // DecisionForbidden → permission_denied (403).
 func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
 	if h == nil || h.pool == nil {
-		return res.readMiss()
+		return domain.ErrInternal(nil).WithMessage("authz statements not configured")
 	}
 	return requireProjectAccess(ctx, h.pool.Statements(), projectID, res, op)
 }
@@ -156,20 +151,13 @@ func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, re
 func requireProjectAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp) error {
 	scope, ok := GetScopeContext(ctx)
 	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
-		if op == opWrite {
-			return res.writeMiss()
-		}
-		return res.readMiss()
+		return res.miss(op)
 	}
 
-	relation := projectRelation(op)
-	if !tokenScopeAllowsRelation(scope.Scope, relation) {
-		// Bound to another project → anti-oracle miss; same project → denied.
+	if !hasOperatorProjectWrite(scope.Scope) {
+		// Foreign / unbound → anti-oracle miss; same project → denied (preview).
 		if scope.ProjectID == "" || scope.ProjectID != projectID {
-			if op == opWrite {
-				return res.writeMiss()
-			}
-			return res.readMiss()
+			return res.miss(op)
 		}
 		return res.denied()
 	}
@@ -179,7 +167,7 @@ func requireProjectAccess(ctx context.Context, stmts service.AuthzResolverStatem
 		PrincipalID:   scope.PrincipalID,
 		ProjectID:     projectID,
 		ObjectType:    "project",
-		Relation:      relation,
+		Relation:      projectRelation(op),
 	})
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("authz permission check failed")
@@ -187,11 +175,10 @@ func requireProjectAccess(ctx context.Context, stmts service.AuthzResolverStatem
 	return mapAuthzDecision(dec, res, op)
 }
 
-// tokenScopeAllowsRelation is the credential-plane ceiling for management
-// ops: the full project secret (project.write) unlocks viewer/editor/admin
-// checks. The preview/origin-scoped secret (project.read only) is
-// browser-plane and cannot call the management API at all (ADR 037).
-func tokenScopeAllowsRelation(granted []string, _ string) bool {
+// hasOperatorProjectWrite is the credential-plane ceiling: only the full
+// project secret (project.write) may call management APIs. Preview
+// (project.read only) is browser-plane (ADR 037).
+func hasOperatorProjectWrite(granted []string) bool {
 	for _, s := range granted {
 		if s == "project.write" {
 			return true
@@ -207,36 +194,20 @@ func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) er
 	case resolver.DecisionForbidden:
 		return res.denied()
 	case resolver.DecisionNotFound, resolver.DecisionUnspecified:
-		if op == opWrite {
-			return res.writeMiss()
-		}
-		return res.readMiss()
+		return res.miss(op)
 	default:
-		if op == opWrite {
-			return res.writeMiss()
-		}
-		return res.readMiss()
+		return res.miss(op)
 	}
 }
 
 // requireUserTeamsAccess gates listUserTeams via the parent user's RSI, then
-// checks both user and team read relations on the resolved project.
+// Checks project.viewer on the resolved project (user miss shape for 404).
 func (h *Handler) requireUserTeamsAccess(ctx context.Context, userID string) (projectID string, err error) {
-	projectID, err = h.requireResourceAccess(ctx, userID, userAccess, opRead)
-	if err != nil {
-		return "", err
-	}
-	if err := h.requireProjectAccess(ctx, projectID, teamAccess, opRead); err != nil {
-		return "", err
-	}
-	return projectID, nil
+	return h.requireResourceAccess(ctx, userID, userAccess, opRead)
 }
 
-// requireTeamDelete gates deleteTeam via the team's RSI. Deleting an unknown
-// team answers 204, so the endpoint has no not-found to report: a project the
-// credentials are not authorized for is refused as the permission failure it
-// is when foothold exists; no foothold stays a not-found-shaped miss mapped
-// through denied for delete (see requireTeamDelete historical contract).
+// requireTeamDelete gates deleteTeam via the team's RSI. Unknown teams answer
+// 204, so every denial is wrapped as permission_denied.
 func (h *Handler) requireTeamDelete(ctx context.Context, teamID string) (projectID string, err error) {
 	projectID, err = h.requireResourceAccess(ctx, teamID, teamAccess, opDelete)
 	if err != nil {

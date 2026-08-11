@@ -10,7 +10,6 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/database"
-	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 )
 
@@ -45,7 +44,7 @@ func (b brandingStatements) CreateBranding(ctx context.Context, entity *domain.B
 		}
 		entity.CreatedAt = entity.CreatedAt.UTC()
 		rsi := newResourceScopeStatements(tx)
-		return authz.BrandingCreated(ctx, &rsi, entity.ProjectID, entity.ID)
+		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindBranding, entity.ProjectID, entity.ID))
 	})
 }
 

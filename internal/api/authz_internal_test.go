@@ -71,26 +71,21 @@ func TestProjectRelation(t *testing.T) {
 	}
 }
 
-func TestTokenScopeAllowsRelation(t *testing.T) {
+func TestHasOperatorProjectWrite(t *testing.T) {
 	tests := []struct {
-		name     string
-		granted  []string
-		relation string
-		want     bool
+		name    string
+		granted []string
+		want    bool
 	}{
-		{"project secret reads", []string{"project.write", "project.read"}, "viewer", true},
-		{"project secret writes", []string{"project.write", "project.read"}, "editor", true},
-		{"project secret deletes", []string{"project.write", "project.read"}, "admin", true},
-		{"preview cannot read management", []string{"project.read"}, "viewer", false},
-		{"preview cannot write", []string{"project.read"}, "editor", false},
-		{"preview cannot delete", []string{"project.read"}, "admin", false},
-		{"write alone unlocks", []string{"project.write"}, "viewer", true},
-		{"empty denies", nil, "viewer", false},
+		{"project secret", []string{"project.write", "project.read"}, true},
+		{"write alone", []string{"project.write"}, true},
+		{"preview", []string{"project.read"}, false},
+		{"empty", nil, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tokenScopeAllowsRelation(tt.granted, tt.relation); got != tt.want {
-				t.Fatalf("tokenScopeAllowsRelation(%v, %q) = %v, want %v", tt.granted, tt.relation, got, tt.want)
+			if got := hasOperatorProjectWrite(tt.granted); got != tt.want {
+				t.Fatalf("hasOperatorProjectWrite(%v) = %v, want %v", tt.granted, got, tt.want)
 			}
 		})
 	}
@@ -206,9 +201,6 @@ func TestRequireProjectAccess(t *testing.T) {
 
 func TestRequireUserTeamsAccess(t *testing.T) {
 	stmts := stubAuthzStmts{}
-	h := &Handler{pool: nil} // use package helper via local wrap
-	_ = h
-
 	both := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
@@ -218,11 +210,9 @@ func TestRequireUserTeamsAccess(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
 	})
 
+	// Coarse project.viewer: one Check with the user miss shape.
 	if err := requireProjectAccess(both, stmts, "proj_a", userAccess, opRead); err != nil {
 		t.Fatalf("user read: %v", err)
-	}
-	if err := requireProjectAccess(both, stmts, "proj_a", teamAccess, opRead); err != nil {
-		t.Fatalf("team read: %v", err)
 	}
 	assertDomainCode(t, requireProjectAccess(preview, stmts, "proj_a", userAccess, opRead), domain.ErrUserPermissionDenied().Code)
 	assertDomainCode(t, requireProjectAccess(both, stmts, "proj_b", userAccess, opRead), domain.ErrUserNotFound().Code)
