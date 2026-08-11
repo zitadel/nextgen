@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import semver from "semver";
 
+import { addExactCommandFor, detectPackageManager } from "../../../lib/package-manager";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
 /**
@@ -54,20 +55,27 @@ export class DependencyVersionCheck implements SanityCheck {
       ([, version]) => !semver.eq(version.trim(), ctx.cliVersion),
     );
     if (mismatched.length > 0) {
-      const remedy = mismatched.map(([name]) => `${name}@${ctx.cliVersion}`).join(" ");
+      // Repair with the project's own package manager and an exact-save flag:
+      // a bare `npm install` would switch managers on a pnpm/yarn/bun project
+      // and write a caret range — exactly the float this check ignores.
+      const remedy = addExactCommandFor(
+        await detectPackageManager(ctx.cwd),
+        mismatched.map(([name]) => `${name}@${ctx.cliVersion}`),
+      ).display;
       return {
         ...base,
         status: "warn",
         message:
           `${mismatched.map(([name, version]) => `${name}@${version}`).join(", ")} ` +
           `does not match this CLI's version (${ctx.cliVersion}); scaffolded files and ` +
-          `guidance target the CLI's train — update with e.g. \`npm install ${remedy}\``,
+          `guidance target the CLI's train — update with \`${remedy}\``,
         details: {
           mismatched: mismatched.map(([name, version]) => ({
             name,
             declared: version,
             expected: ctx.cliVersion,
           })),
+          remedy_command: remedy,
         },
       };
     }
@@ -83,8 +91,10 @@ export class DependencyVersionCheck implements SanityCheck {
 
   /**
    * No auto-fix: repair's dependency op is deliberately additive-only (it
-   * never rewrites a version the user declared), so the warn message carries
-   * the exact install command instead.
+   * never rewrites a version the user declared), so the repair ships as the
+   * package-manager-aware install command in `details.remedy_command` — the
+   * doctor command surfaces it in the envelope's `next_commands` — with the
+   * same command quoted in the warn message for human readers.
    */
   async fix(_ctx: CheckContext): Promise<void> {
     return;

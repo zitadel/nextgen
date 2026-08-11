@@ -58,9 +58,12 @@ function authPage(purpose: "login" | "register", ctx: PatchContext): string {
   const widget = ctx.posture === "widget";
   const variantAttrs = widget ? 'variant="widget"\n        theme="auto"' : 'variant="page"';
   const postureComment = widget
-    ? `<!-- variant="widget" embeds the card in this app's own layout, and
-           theme="auto" follows its color scheme; variant="page" would paint
-           the widget's full-page chrome instead. -->`
+    ? `<!-- variant="widget" embeds the card in this app's own layout.
+           theme="auto" follows the OS light/dark preference
+           (prefers-color-scheme), not the app's own theme — set
+           theme="light" or theme="dark" to match an app that pins its
+           scheme. variant="page" would paint the widget's full-page
+           chrome instead. -->`
     : `<!-- variant="page" paints the widget's full-page chrome from design
            tokens; variant="widget" embeds the card inside a layout you own. -->`;
   const wrapperOpen = widget
@@ -103,11 +106,14 @@ export function profilePageTemplate(ctx: PatchContext): string {
   const widget = ctx.posture === "widget";
   const variantAttrs = widget ? 'variant="widget"\n        theme="auto"' : 'variant="page"';
   const postureComment = widget
-    ? `<!-- variant="widget" embeds the session card in this app's own layout,
-           and theme="auto" follows its color scheme; variant="page" would
-           paint the card's full-page chrome instead. Your own components (a
-           header, an account menu) read the same session state with the
-           auto-imported useAuth() composable. -->`
+    ? `<!-- variant="widget" embeds the session card in this app's own layout.
+           theme="auto" follows the OS light/dark preference
+           (prefers-color-scheme), not the app's own theme — set
+           theme="light" or theme="dark" to match an app that pins its
+           scheme. variant="page" would paint the card's full-page chrome
+           instead. Your own components (a header, an account menu) read
+           the same session state with the auto-imported useAuth()
+           composable. -->`
     : `<!-- variant="page" paints the session card's full-page chrome from design
            tokens; variant="widget" embeds the card inside a layout you own.
            Your own components (a header, an account menu) read the same session

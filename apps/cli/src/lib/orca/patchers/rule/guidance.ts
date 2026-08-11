@@ -71,8 +71,8 @@ export function agentsGuidanceSection(ctx: PatchContext): string {
   // the guidance never claims full-page chrome an embedded card doesn't have.
   const presentationParagraph =
     ctx.posture === "widget"
-      ? 'Presentation, by contrast, is edited in the generated pages: this app pre-dates setup, so they embed the sign-in widgets as `variant="widget"` cards (with `theme="auto"`) inside your existing layout; switch to `variant="page"` for the widget\'s own full-page chrome, and set `theme` (`light` | `dark` | `auto`) to pick the color scheme.'
-      : 'Presentation, by contrast, is edited in the generated pages: they pin the sign-in widgets to `variant="page"` (full-page chrome); switch to `variant="widget"` to embed a card inside your own layout, and set `theme` (`light` | `dark` | `auto`) to pick the color scheme.';
+      ? 'Presentation, by contrast, is edited in the generated pages: this app pre-dates setup, so they embed the sign-in widgets as `variant="widget"` cards (with `theme="auto"`) inside your existing layout; switch to `variant="page"` for the widget\'s own full-page chrome, and set `theme` (`light` | `dark` | `auto`) to pick the color scheme — `auto` follows the OS `prefers-color-scheme`, not this app\'s own theme, so pin `light` or `dark` when the app fixes its scheme.'
+      : 'Presentation, by contrast, is edited in the generated pages: they pin the sign-in widgets to `variant="page"` (full-page chrome); switch to `variant="widget"` to embed a card inside your own layout, and set `theme` (`light` | `dark` | `auto`) to pick the color scheme — `auto` follows the OS `prefers-color-scheme`, not this app\'s own theme, so pin `light` or `dark` when the app fixes its scheme.';
   // The app's own chrome (header nav, account menus) needs a session read of
   // its own — the widgets render their surfaces but never tell the host page
   // whether someone is signed in. Name the framework's supported read path;

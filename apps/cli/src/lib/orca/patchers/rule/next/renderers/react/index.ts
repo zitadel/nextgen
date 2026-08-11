@@ -69,11 +69,13 @@ export const reactRenderer: RendererSpec = {
       const widget = context.posture === "widget";
       const variantAttrs = widget ? `variant="widget"\n          theme="auto"` : `variant="page"`;
       const postureComment = widget
-        ? `  // variant="widget" embeds the sign-in card in this app's existing layout,
-  // and theme="auto" follows its color scheme; the wrapper below only centers
-  // the card — restyle or replace it freely. Switch to variant="page" for the
-  // widget's own full-page chrome (viewport height, surface background from
-  // design tokens).`
+        ? `  // variant="widget" embeds the sign-in card in this app's existing layout.
+  // theme="auto" follows the OS light/dark preference (prefers-color-scheme),
+  // not this app's own theme — set theme="light" or theme="dark" to match an
+  // app that pins its scheme. The wrapper below only centers the card —
+  // restyle or replace it freely. Switch to variant="page" for the widget's
+  // own full-page chrome (viewport height, surface background from design
+  // tokens).`
         : `  // variant="page" makes the widget paint the full-page chrome itself
   // (viewport height, surface background) from design tokens; switch to
   // variant="widget" to embed the sign-in card inside a layout you own.`;
@@ -131,11 +133,13 @@ ${postureComment}
       const widget = context.posture === "widget";
       const variantAttrs = widget ? `variant="widget"\n          theme="auto"` : `variant="page"`;
       const postureComment = widget
-        ? `  // variant="widget" embeds the session card in this app's existing layout,
-  // and theme="auto" follows its color scheme; the wrapper below only centers
-  // the card — restyle or replace it freely. Switch to variant="page" for the
-  // card's own full-page chrome (viewport height, surface background from
-  // design tokens).`
+        ? `  // variant="widget" embeds the session card in this app's existing layout.
+  // theme="auto" follows the OS light/dark preference (prefers-color-scheme),
+  // not this app's own theme — set theme="light" or theme="dark" to match an
+  // app that pins its scheme. The wrapper below only centers the card —
+  // restyle or replace it freely. Switch to variant="page" for the card's
+  // own full-page chrome (viewport height, surface background from design
+  // tokens).`
         : `  // variant="page" makes the session card paint the full-page chrome itself
   // (viewport height, surface background) from design tokens; switch to
   // variant="widget" to embed the card inside a layout you own.`;
