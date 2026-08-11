@@ -59,6 +59,16 @@ describe("team detail", () => {
     expect(screen.getByText("Created")).toBeInTheDocument();
   });
 
+  it("shows the team's status beside its name", async () => {
+    server.use(http.get(TEAM_URL, () => HttpResponse.json(team({ status: "deactivated" }))));
+    await renderDetail();
+
+    // The status sits on the detail as well as the list, so a deactivated team
+    // reads as deactivated on its own screen.
+    await screen.findByRole("heading", { name: "Acme Web" });
+    expect(screen.getByText("deactivated")).toBeInTheDocument();
+  });
+
   it("leaves out the primary domain the API does not carry", async () => {
     server.use(http.get(TEAM_URL, () => HttpResponse.json(team())));
     await renderDetail();

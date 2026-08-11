@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { Building2, Home, Loader2, Plus } from "lucide-react";
+import { Box, Loader2, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { AddTeamSheet } from "@/components/add-team-sheet";
@@ -29,7 +29,7 @@ import { formatDate } from "../../../lib/date";
 import { getConsoleProjectId } from "../../../runtime/runtime";
 
 export const Route = createFileRoute("/_authed/teams/")({
-  staticData: { nav: { label: "Teams", order: 2, icon: Home } },
+  staticData: { nav: { label: "Teams", order: 2, icon: Box } },
   loader: async () => {
     const page = await api.queryTeams(
       { limit: PAGE_SIZE },
@@ -170,7 +170,7 @@ function TeamsScreen() {
                       params={{ teamId: team.id }}
                       className={RESOURCE_ROW_LINK}
                     >
-                      <Building2 aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
+                      <Box aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
                       {team.name}
                     </Link>
                   </TableCell>

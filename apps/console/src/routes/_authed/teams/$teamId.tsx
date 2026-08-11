@@ -3,6 +3,7 @@ import { AlertCircle, Box, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { EYEBROW, MetaRule, MetaValue } from "@/components/detail-meta";
+import { StatusBadge } from "@/components/status-badge";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,14 +22,11 @@ const PLATE = "flex size-9 items-center justify-center rounded-md bg-muted text-
  * Team detail.
  *
  * The header card carries `TEAM ID` and `CREATED`. The design draws a third cell,
- * `PRIMARY DOMAIN` — a real concept in the platform design (the claim flow's
- * `GET /teams/domain-match` resolves a team by "the primary domain matching the
- * email's domain") but not an implemented one: `team-response` carries no domain
- * and no such endpoint exists in `api/openapi`. The cell is left out rather than
- * shown empty, and returns as one `MetaValue` when the field lands.
+ * `PRIMARY DOMAIN`, which is deliberately not built: a domain that discovers and
+ * claims a team is security-relevant, so it needs its own model — verification,
+ * and more than one domain per team — rather than a string on `team-response`.
+ * That model is not defined yet, so the cell is left out rather than shown empty.
  *
- * The design also shows no status pill here, so a deactivated team reads as
- * deactivated on the list but not on its own screen. Rendered as drawn.
  */
 export const Route = createFileRoute("/_authed/teams/$teamId")({
   loader: ({ params }) => api.getTeam(params.teamId, { project_id: getConsoleProjectId() }),
@@ -86,6 +84,7 @@ function TeamDetail() {
           <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight">
             {team.name}
           </h1>
+          <StatusBadge status={team.status} />
         </div>
         <Card className="max-w-full gap-0 overflow-x-auto rounded-xl py-0">
           <CardContent className="flex flex-col px-5 py-3 sm:flex-row sm:flex-wrap sm:items-center">
