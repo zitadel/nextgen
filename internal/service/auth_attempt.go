@@ -232,9 +232,7 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 			audit.FromContext(ctx, domain.EventTypeAuthAttemptCreated, domain.EventCategoryAuth),
 			"auth_attempt", attempt.ID,
 		)
-		if ev.ProjectID == "" {
-			ev.ProjectID = attempt.ProjectID
-		}
+		ev = audit.WithProjectID(ev, attempt.ProjectID)
 		payload := domain.AuthAttemptCreatedPayload{}
 		if ev.FlowID != nil {
 			payload.FlowID = *ev.FlowID
@@ -344,9 +342,7 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 			audit.FromContext(ctx, domain.EventTypeAuthAttemptHandedOff, domain.EventCategoryAuth),
 			"auth_attempt", attempt.ID,
 		)
-		if ev.ProjectID == "" {
-			ev.ProjectID = attempt.ProjectID
-		}
+		ev = audit.WithProjectID(ev, attempt.ProjectID)
 		payload := domain.AuthAttemptHandedOffPayload{}
 		if attempt.SessionID != nil {
 			payload.SessionID = *attempt.SessionID
@@ -390,9 +386,7 @@ func emitAuthCheck(ctx context.Context, stmts EventStatements, projectID string,
 		audit.FromContext(ctx, eventType, domain.EventCategoryAuth),
 		"check", challenge.GetID(),
 	)
-	if ev.ProjectID == "" {
-		ev.ProjectID = projectID
-	}
+	ev = audit.WithProjectID(ev, projectID)
 	ev, err := audit.WithPayload(ev, domain.AuthCheckPayload{
 		CheckID:   challenge.GetID(),
 		CheckType: challenge.Type().String(),

@@ -8,9 +8,7 @@ import (
 
 // Insert persists a Path B event via stmts.InsertEvent.
 // When ProjectID is empty the insert is skipped (optional / no actor scope yet).
-func Insert(ctx context.Context, stmts interface {
-	InsertEvent(context.Context, *domain.Event) error
-}, ev *domain.Event) error {
+func Insert(ctx context.Context, stmts EventInserter, ev *domain.Event) error {
 	if ev == nil || ev.ProjectID == "" {
 		return nil
 	}

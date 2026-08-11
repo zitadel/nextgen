@@ -121,9 +121,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 			audit.FromContext(ctx, domain.EventTypeFlowdefCreated, domain.EventCategoryAdmin),
 			"flow_definition", flowDefinition.ID,
 		)
-		if ev.ProjectID == "" {
-			ev.ProjectID = flowDefinition.ProjectID
-		}
+		ev = audit.WithProjectID(ev, flowDefinition.ProjectID)
 		ev, err := audit.WithPayload(ev, domain.FlowdefPayload{Name: flowDefinition.Name})
 		if err != nil {
 			return err
@@ -180,9 +178,7 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 			audit.FromContext(ctx, domain.EventTypeFlowdefUpdated, domain.EventCategoryAdmin),
 			"flow_definition", flowDefinition.ID,
 		)
-		if ev.ProjectID == "" {
-			ev.ProjectID = flowDefinition.ProjectID
-		}
+		ev = audit.WithProjectID(ev, flowDefinition.ProjectID)
 		ev, err := audit.WithPayload(ev, domain.FlowdefPayload{Name: flowDefinition.Name})
 		if err != nil {
 			return err
@@ -389,9 +385,7 @@ func (fd *flowDefinitionService) Delete(ctx context.Context, projectID, id strin
 			audit.FromContext(ctx, domain.EventTypeFlowdefDeleted, domain.EventCategoryAdmin),
 			"flow_definition", id,
 		)
-		if ev.ProjectID == "" {
-			ev.ProjectID = projectID
-		}
+		ev = audit.WithProjectID(ev, projectID)
 		return audit.Insert(ctx, tx.Statements(), ev)
 	})
 }

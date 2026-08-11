@@ -4,8 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"time"
-
-	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // ProjectLister lists project IDs for retention sweeps.
@@ -35,12 +33,11 @@ func DefaultRetentionConfig() RetentionConfig {
 
 // RetentionJob periodically deletes events older than the retention window.
 type RetentionJob struct {
-	cfg    RetentionConfig
-	list   ProjectLister
-	purge  EventPurger
-	stop   chan struct{}
-	done   chan struct{}
-	purged uint64
+	cfg   RetentionConfig
+	list  ProjectLister
+	purge EventPurger
+	stop  chan struct{}
+	done  chan struct{}
 }
 
 func NewRetentionJob(list ProjectLister, purge EventPurger, cfg RetentionConfig) *RetentionJob {
@@ -59,7 +56,6 @@ func NewRetentionJob(list ProjectLister, purge EventPurger, cfg RetentionConfig)
 	}
 }
 
-// Start runs the job in the background.
 func (j *RetentionJob) Start() {
 	if !j.cfg.Enabled {
 		close(j.done)
@@ -109,7 +105,6 @@ func (j *RetentionJob) runOnce() {
 	}
 }
 
-// Close stops the job.
 func (j *RetentionJob) Close() {
 	select {
 	case <-j.stop:
@@ -118,6 +113,3 @@ func (j *RetentionJob) Close() {
 	}
 	<-j.done
 }
-
-// Ensure domain.Event is referenced for goimports if needed.
-var _ = domain.EventTypeRequestAPI

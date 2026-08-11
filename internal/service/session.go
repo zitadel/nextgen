@@ -158,9 +158,7 @@ func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) e
 			audit.FromContext(ctx, domain.EventTypeSessionDeleted, domain.EventCategorySession),
 			"session", input.SessionID,
 		)
-		if ev.ProjectID == "" {
-			ev.ProjectID = input.ProjectID
-		}
+		ev = audit.WithProjectID(ev, input.ProjectID)
 		sid := input.SessionID
 		ev.SessionID = &sid
 		ev, err := audit.WithPayload(ev, domain.SessionDeletedPayload{})
@@ -186,9 +184,7 @@ func emitSessionEstablished(ctx context.Context, stmts EventStatements, session 
 		audit.FromContext(ctx, domain.EventTypeSessionEstablished, domain.EventCategorySession),
 		"session", session.ID,
 	)
-	if ev.ProjectID == "" {
-		ev.ProjectID = session.ProjectID
-	}
+	ev = audit.WithProjectID(ev, session.ProjectID)
 	sid := session.ID
 	ev.SessionID = &sid
 	payload := domain.SessionEstablishedPayload{}
@@ -207,9 +203,7 @@ func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, session *do
 		audit.FromContext(ctx, domain.EventTypeAuthTokenIssued, domain.EventCategoryAuth),
 		"token", session.TokenID,
 	)
-	if ev.ProjectID == "" {
-		ev.ProjectID = session.ProjectID
-	}
+	ev = audit.WithProjectID(ev, session.ProjectID)
 	ev.TokenID = session.TokenID
 	ev, err := audit.WithPayload(ev, domain.AuthTokenIssuedPayload{})
 	if err != nil {

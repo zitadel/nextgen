@@ -81,9 +81,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 			audit.FromContext(ctx, domain.EventTypeSchemaCreated, domain.EventCategoryAdmin),
 			"json_schema", model.URL,
 		)
-		if ev.ProjectID == "" {
-			ev.ProjectID = model.ProjectID
-		}
+		ev = audit.WithProjectID(ev, model.ProjectID)
 		ev, err = audit.WithPayload(ev, domain.SchemaPayload{SchemaID: model.URL})
 		if err != nil {
 			return err

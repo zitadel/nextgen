@@ -131,7 +131,6 @@ func ListOptions(projectID string, limit uint32) *database.ListOptions[domain.Ev
 	}
 }
 
-// NormalizeJSON returns raw or "{}".
 func NormalizeJSON(raw json.RawMessage) json.RawMessage {
 	if len(raw) == 0 {
 		return json.RawMessage("{}")
@@ -139,7 +138,6 @@ func NormalizeJSON(raw json.RawMessage) json.RawMessage {
 	return raw
 }
 
-// MarshalPayload marshals a typed payload into RawMessage, defaulting to {}.
 func MarshalPayload(v any) (json.RawMessage, error) {
 	if v == nil {
 		return json.RawMessage("{}"), nil

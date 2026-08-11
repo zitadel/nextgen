@@ -38,7 +38,6 @@ func WithActorSlot(ctx context.Context) context.Context {
 	return context.WithValue(ctx, actorSlotKey{}, &ActorContext{})
 }
 
-// ActorSlotFromContext returns the mutable slot when present.
 func ActorSlotFromContext(ctx context.Context) (*ActorContext, bool) {
 	v, ok := ctx.Value(actorSlotKey{}).(*ActorContext)
 	return v, ok && v != nil
@@ -52,13 +51,12 @@ func WithActorContext(ctx context.Context, ac ActorContext) context.Context {
 	return context.WithValue(ctx, contextKey{}, ac)
 }
 
-// ActorFromContext returns ActorContext when present.
 func ActorFromContext(ctx context.Context) (ActorContext, bool) {
 	v, ok := ctx.Value(contextKey{}).(ActorContext)
 	return v, ok
 }
 
-// FromContext builds a domain.Event skeleton from actor + correlation context.
+// FromContext builds a domain.Event skeleton from ActorContext when present.
 func FromContext(ctx context.Context, eventType domain.EventType, category domain.EventCategory) *domain.Event {
 	ev := &domain.Event{
 		EventType:      eventType,
@@ -87,7 +85,6 @@ func FromContext(ctx context.Context, eventType domain.EventType, category domai
 	return ev
 }
 
-// WithEntity sets entity_type / entity_id on the event.
 func WithEntity(ev *domain.Event, entityType, entityID string) *domain.Event {
 	if entityType != "" {
 		ev.EntityType = &entityType
@@ -98,7 +95,6 @@ func WithEntity(ev *domain.Event, entityType, entityID string) *domain.Event {
 	return ev
 }
 
-// WithPayload marshals a typed payload onto the event.
 func WithPayload(ev *domain.Event, payload any) (*domain.Event, error) {
 	raw, err := events.MarshalPayload(payload)
 	if err != nil {
@@ -108,16 +104,10 @@ func WithPayload(ev *domain.Event, payload any) (*domain.Event, error) {
 	return ev, nil
 }
 
-// NewSystemEvent builds an event for background/system actors (no request context).
-func NewSystemEvent(projectID string, eventType domain.EventType, category domain.EventCategory) *domain.Event {
-	actorType := domain.EventActorTypeSystem
-	return &domain.Event{
-		ProjectID:      projectID,
-		EventType:      eventType,
-		Category:       category,
-		ActorType:      &actorType,
-		DelegationType: "direct",
-		Payload:        json.RawMessage("{}"),
-		Metadata:       json.RawMessage("{}"),
+// WithProjectID sets ProjectID when the actor context did not supply one.
+func WithProjectID(ev *domain.Event, projectID string) *domain.Event {
+	if ev != nil && ev.ProjectID == "" {
+		ev.ProjectID = projectID
 	}
+	return ev
 }

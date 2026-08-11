@@ -55,9 +55,7 @@ func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput)
 			audit.FromContext(ctx, domain.EventTypeBrandingCreated, domain.EventCategoryAdmin),
 			"branding", entity.ID,
 		)
-		if ev.ProjectID == "" {
-			ev.ProjectID = entity.ProjectID
-		}
+		ev = audit.WithProjectID(ev, entity.ProjectID)
 		ev, err := audit.WithPayload(ev, domain.BrandingCreatedPayload{Layout: entity.Layout})
 		if err != nil {
 			return err

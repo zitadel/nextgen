@@ -145,9 +145,7 @@ func (s *UserService) emitUserCreateFailedBestEffort(ctx context.Context, action
 			audit.FromContext(ctx, domain.EventTypeUserCreateFailed, domain.EventCategoryEntity),
 			"user", create.CreateUser.ID,
 		)
-		if ev.ProjectID == "" {
-			ev.ProjectID = create.ProjectID
-		}
+		ev = audit.WithProjectID(ev, create.ProjectID)
 		ev, err := audit.WithPayload(ev, domain.UserCreateFailedPayload{})
 		if err != nil {
 			return err
@@ -372,9 +370,7 @@ func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		audit.FromContext(ctx, domain.EventTypeUserCreated, domain.EventCategoryEntity),
 		"user", o.CreateUser.ID,
 	)
-	if ev.ProjectID == "" {
-		ev.ProjectID = o.CreateUser.ProjectID
-	}
+	ev = audit.WithProjectID(ev, o.CreateUser.ProjectID)
 	ev, err := audit.WithPayload(ev, domain.UserCreatedPayload{
 		UserID:   o.CreateUser.ID,
 		SchemaID: o.CreateUser.SchemaURL,
@@ -435,9 +431,7 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) 
 		audit.FromContext(ctx, domain.EventTypeAuthFactorPasswordSet, domain.EventCategoryAuth),
 		"user_password", o.UserID,
 	)
-	if ev.ProjectID == "" {
-		ev.ProjectID = o.ProjectID
-	}
+	ev = audit.WithProjectID(ev, o.ProjectID)
 	ev, err = audit.WithPayload(ev, domain.AuthFactorPayload{UserID: o.UserID})
 	if err != nil {
 		return err
@@ -473,9 +467,7 @@ func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		audit.FromContext(ctx, domain.EventTypeUserDeleted, domain.EventCategoryEntity),
 		"user", o.UserID,
 	)
-	if ev.ProjectID == "" {
-		ev.ProjectID = o.ProjectID
-	}
+	ev = audit.WithProjectID(ev, o.ProjectID)
 	return audit.Insert(ctx, stmts, ev)
 }
 

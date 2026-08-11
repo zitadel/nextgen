@@ -212,8 +212,6 @@ func extractEventTypes(path string) ([]string, error) {
 			if !ok {
 				continue
 			}
-			// Typed as EventType, or untyped in an EventType iota/const block
-			// where values are string literals assigned to EventType* names.
 			for i, name := range valueSpec.Names {
 				if !strings.HasPrefix(name.Name, "EventType") || name.Name == "EventType" {
 					continue
@@ -247,7 +245,6 @@ func eventTypeTitle(et string) string {
 		if p == "" {
 			continue
 		}
-		// Keep common acronyms uppercase when whole segment is short.
 		switch p {
 		case "api":
 			b.WriteString("API")

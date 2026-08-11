@@ -41,9 +41,7 @@ func (s *TeamService) Create(ctx context.Context, input CreateTeamInput) (*domai
 			audit.FromContext(ctx, domain.EventTypeTeamCreated, domain.EventCategoryAdmin),
 			"team", model.ID,
 		)
-		if ev.ProjectID == "" {
-			ev.ProjectID = model.ProjectID
-		}
+		ev = audit.WithProjectID(ev, model.ProjectID)
 		ev, err := audit.WithPayload(ev, domain.TeamCreatedPayload{Name: model.Name})
 		if err != nil {
 			return err
@@ -229,9 +227,7 @@ func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (*domai
 			audit.FromContext(ctx, domain.EventTypeTeamUpdated, domain.EventCategoryAdmin),
 			"team", team.ID,
 		)
-		if ev.ProjectID == "" {
-			ev.ProjectID = team.ProjectID
-		}
+		ev = audit.WithProjectID(ev, team.ProjectID)
 		ev, err := audit.WithPayload(ev, domain.TeamUpdatedPayload{ChangedKeys: []string{"name"}})
 		if err != nil {
 			return err
@@ -268,9 +264,7 @@ func (s *TeamService) Delete(ctx context.Context, projectID, teamID string) erro
 			audit.FromContext(ctx, domain.EventTypeTeamDeactivated, domain.EventCategoryAdmin),
 			"team", teamID,
 		)
-		if ev.ProjectID == "" {
-			ev.ProjectID = projectID
-		}
+		ev = audit.WithProjectID(ev, projectID)
 		return audit.Insert(ctx, tx.Statements(), ev)
 	})
 	if err != nil {

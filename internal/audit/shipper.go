@@ -69,7 +69,6 @@ func NewShipper(src EventExportSource, cfg ExportConfig) *Shipper {
 	}
 }
 
-// Start ensures sinks and runs the shipper loop.
 func (s *Shipper) Start(ctx context.Context) error {
 	if !s.cfg.Enabled {
 		close(s.done)
@@ -79,12 +78,12 @@ func (s *Shipper) Start(ctx context.Context) error {
 		if sc.Type == "" {
 			continue
 		}
-		enabled := sc.Enabled
+		// v1 always enables configured sink types (Enabled flag is reserved).
 		sink := &domain.EventSink{
 			Type:    sc.Type,
 			Scope:   domain.EventSinkScopeDeployment,
 			URL:     sc.URL,
-			Enabled: enabled || sc.Type != "",
+			Enabled: true,
 		}
 		if sink.Type == domain.EventSinkTypeStdout {
 			sink.ID = "sink_deployment_stdout"
@@ -97,9 +96,7 @@ func (s *Shipper) Start(ctx context.Context) error {
 		if err := s.src.EnsureSink(ctx, sink); err != nil {
 			return err
 		}
-		if sink.Enabled {
-			s.sinks = append(s.sinks, sink)
-		}
+		s.sinks = append(s.sinks, sink)
 	}
 	go s.loop()
 	return nil
@@ -220,7 +217,6 @@ type httpError struct{ status int }
 
 func (e *httpError) Error() string { return http.StatusText(e.status) }
 
-// Close stops the shipper.
 func (s *Shipper) Close() {
 	select {
 	case <-s.stop:

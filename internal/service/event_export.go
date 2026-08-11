@@ -79,9 +79,6 @@ func (a EventExportAdapter) UpsertEventSinkCursor(ctx context.Context, cursor *d
 }
 
 func (a EventExportAdapter) ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit int) ([]*domain.Event, error) {
-	if limit < 0 {
-		limit = 0
-	}
 	return a.Pool.Statements().ListEventsAfterCursor(ctx, projectID, afterCreatedAt, afterID, uint32(limit))
 }
 

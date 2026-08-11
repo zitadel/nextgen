@@ -204,9 +204,7 @@ func emitProjectCreated(ctx context.Context, stmts EventStatements, project *dom
 		audit.FromContext(ctx, domain.EventTypeProjectCreated, domain.EventCategoryEntity),
 		"project", project.ID,
 	)
-	if ev.ProjectID == "" {
-		ev.ProjectID = project.ID
-	}
+	ev = audit.WithProjectID(ev, project.ID)
 	ev, err := audit.WithPayload(ev, domain.ProjectCreatedPayload{Name: project.Name})
 	if err != nil {
 		return err
@@ -219,9 +217,7 @@ func emitSchemaCreated(ctx context.Context, stmts EventStatements, schema *domai
 		audit.FromContext(ctx, domain.EventTypeSchemaCreated, domain.EventCategoryAdmin),
 		"json_schema", schema.URL,
 	)
-	if ev.ProjectID == "" {
-		ev.ProjectID = schema.ProjectID
-	}
+	ev = audit.WithProjectID(ev, schema.ProjectID)
 	ev, err := audit.WithPayload(ev, domain.SchemaPayload{SchemaID: schema.URL})
 	if err != nil {
 		return err
@@ -234,9 +230,7 @@ func emitFlowdefCreated(ctx context.Context, stmts EventStatements, flowDef *dom
 		audit.FromContext(ctx, domain.EventTypeFlowdefCreated, domain.EventCategoryAdmin),
 		"flow_definition", flowDef.ID,
 	)
-	if ev.ProjectID == "" {
-		ev.ProjectID = flowDef.ProjectID
-	}
+	ev = audit.WithProjectID(ev, flowDef.ProjectID)
 	ev, err := audit.WithPayload(ev, domain.FlowdefPayload{Name: flowDef.Name})
 	if err != nil {
 		return err
@@ -307,9 +301,7 @@ func (s *projectService) Update(ctx context.Context, id, name string) (*domain.P
 			audit.FromContext(ctx, domain.EventTypeProjectUpdated, domain.EventCategoryEntity),
 			"project", project.ID,
 		)
-		if ev.ProjectID == "" {
-			ev.ProjectID = project.ID
-		}
+		ev = audit.WithProjectID(ev, project.ID)
 		ev, err := audit.WithPayload(ev, domain.ProjectUpdatedPayload{ChangedKeys: []string{"name"}})
 		if err != nil {
 			return err
@@ -468,9 +460,7 @@ func (s *projectService) Delete(ctx context.Context, id string) error {
 			audit.FromContext(ctx, domain.EventTypeProjectDeleted, domain.EventCategoryEntity),
 			"project", id,
 		)
-		if ev.ProjectID == "" {
-			ev.ProjectID = id
-		}
+		ev = audit.WithProjectID(ev, id)
 		return audit.Insert(ctx, tx.Statements(), ev)
 	})
 	if err != nil {

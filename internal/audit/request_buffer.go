@@ -15,13 +15,13 @@ type EventInserter interface {
 	InsertEvent(ctx context.Context, event *domain.Event) error
 }
 
-// RequestBufferConfig tunes Path A batching (ADR 048 + plan watermark).
+// RequestBufferConfig tunes Path A batching (ADR 048).
 type RequestBufferConfig struct {
-	BatchSize       int           // N — flush when this many events are buffered
-	MaxAge          time.Duration // T — flush when oldest event age reaches T
-	Capacity        int           // C — max buffered events (C ≫ N)
-	HighWatermark   float64       // fraction of C that triggers flush (e.g. 0.8)
-	FlushInterval   time.Duration // ticker to check MaxAge
+	BatchSize       int
+	MaxAge          time.Duration
+	Capacity        int
+	HighWatermark   float64
+	FlushInterval   time.Duration
 	ShutdownTimeout time.Duration
 }
 
@@ -158,7 +158,7 @@ func (b *RequestBuffer) loop() {
 }
 
 func (b *RequestBuffer) flush(batch []bufferedEvent) {
-	if len(batch) == 0 || b.insert == nil {
+	if len(batch) == 0 {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -197,13 +197,10 @@ func (b *RequestBuffer) Close() {
 	b.wg.Wait()
 }
 
-// Dropped returns how many events were dropped due to overflow.
 func (b *RequestBuffer) Dropped() uint64 { return b.dropped.Load() }
 
-// Flushed returns how many events were successfully inserted.
 func (b *RequestBuffer) Flushed() uint64 { return b.flushed.Load() }
 
-// Len returns the current buffered count (test helper).
 func (b *RequestBuffer) Len() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
