@@ -1119,15 +1119,40 @@ describe("DependencyVersionCheck", () => {
     });
     expect(outcome.status).toBe("warn");
     expect(outcome.message).toContain("@zitadel/sdk-next@0.1.0-alpha.17");
-    expect(outcome.message).toContain(
-      "npm install @zitadel/sdk-next@0.1.0-alpha.18 @zitadel/testing@0.1.0-alpha.18",
-    );
+    // No lockfile or packageManager field in the fixture, so npm is the
+    // detected fallback; the remedy must pin exactly, not caret-float.
+    const remedy =
+      "npm install --save-exact @zitadel/sdk-next@0.1.0-alpha.18 @zitadel/testing@0.1.0-alpha.18";
+    expect(outcome.message).toContain(remedy);
     expect(outcome.details).toEqual({
       mismatched: [
         { name: "@zitadel/sdk-next", declared: "0.1.0-alpha.17", expected: "0.1.0-alpha.18" },
         { name: "@zitadel/testing", declared: "0.1.0-alpha.17", expected: "0.1.0-alpha.18" },
       ],
+      remedy_command: remedy,
     });
+  });
+
+  it("writes the remedy with the project's own package manager", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { "@zitadel/sdk-next": "0.1.0-alpha.17" },
+      }),
+    );
+    await writeFile(join(cwd, "pnpm-lock.yaml"), "");
+    const outcome = await new DependencyVersionCheck().run({
+      ...ctxFor(cwd),
+      cliVersion: "0.1.0-alpha.18",
+    });
+    expect(outcome.status).toBe("warn");
+    // A bare `npm install` on a pnpm project would switch package managers.
+    expect(outcome.message).toContain("pnpm add --save-exact @zitadel/sdk-next@0.1.0-alpha.18");
+    expect((outcome.details as { remedy_command?: string }).remedy_command).toBe(
+      "pnpm add --save-exact @zitadel/sdk-next@0.1.0-alpha.18",
+    );
   });
 
   it("ignores ranges, dist-tags, and file specifiers", async () => {
