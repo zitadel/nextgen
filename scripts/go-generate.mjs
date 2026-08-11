@@ -54,12 +54,15 @@ const SKIP_DIRS = new Set(["node_modules", ".git", ".moon", "dist", "target", ".
 // Runs alone, between the enumer and mockgen phases — see the module comment.
 const ORDERED_PACKAGE = "api";
 
-const DIRECTIVE = /^\/\/go:generate /m;
+const DIRECTIVE = /^\/\/go:generate .*$/gm;
 
 export async function goGenerate({ log = console.log } = {}) {
   const packages = findGeneratePackages();
-  const ordered = packages.filter((dir) => dir === ORDERED_PACKAGE);
-  const rest = packages.filter((dir) => dir !== ORDERED_PACKAGE);
+  assertEveryDirectiveHasAPhase(packages);
+
+  const dirs = [...packages.keys()];
+  const ordered = dirs.filter((dir) => dir === ORDERED_PACKAGE);
+  const rest = dirs.filter((dir) => dir !== ORDERED_PACKAGE);
 
   // enumer writes .go files *into* a package; mockgen and the api generators
   // type-load packages. So every enumer directive must finish before any of
@@ -70,8 +73,8 @@ export async function goGenerate({ log = console.log } = {}) {
   // mockgen directives live in the mock subpackages and `./...` walks packages
   // in import-path order. This runner deliberately ignores that order — it
   // runs packages concurrently — so it has to restate the constraint as an
-  // explicit barrier. Both paths bootstrap from a tree holding no generated
-  // file that can be regenerated from one; there is a standing check for that
+  // explicit barrier. Both paths generate from a tree with no generated files
+  // in it at all; there is a standing check for that
   // (server:check-generate-pruned).
   //
   // The barrier is global rather than per-package on purpose: internal/service
@@ -87,11 +90,48 @@ export async function goGenerate({ log = console.log } = {}) {
   await runPhase(rest, MOCKGEN_PHASE, log);
 }
 
-// `go generate -run` filters directives by matching against the command text.
-// A generator added later that neither writes into nor loads a package can go
-// in either phase; one that does both needs its own entry here.
+// `go generate -run` filters directives by matching against the command text,
+// so between them these two decide what this runner runs at all — see
+// assertEveryDirectiveHasAPhase.
 const ENUMER_PHASE = { name: "enumer", filter: "enumer" };
 const MOCKGEN_PHASE = { name: "mockgen", filter: "mockgen" };
+const PHASES = [ENUMER_PHASE, MOCKGEN_PHASE];
+
+/**
+ * Fails when a directive belongs to no phase.
+ *
+ * Every phase runs `go generate -run <filter>`, so a directive matching neither
+ * filter — a `stringer` added next year — is not deferred to some later phase,
+ * it is never run. Silently: `check-generate` cannot see the drift either,
+ * because the output it would compare against simply never comes into
+ * existence, while bare `go generate ./...` would have produced it.
+ *
+ * The files were read to find the directories anyway, so the check is free.
+ */
+function assertEveryDirectiveHasAPhase(packages) {
+  const unclaimed = [];
+  for (const [dir, directives] of packages) {
+    // Runs unfiltered, as its whole chain in file order.
+    if (dir === ORDERED_PACKAGE) {
+      continue;
+    }
+    for (const directive of directives) {
+      if (!PHASES.some((phase) => new RegExp(phase.filter).test(directive))) {
+        unclaimed.push(`  ${dir}: ${directive}`);
+      }
+    }
+  }
+
+  if (unclaimed.length > 0) {
+    const filters = PHASES.map((phase) => `-run ${phase.filter}`).join(", ");
+    throw new Error(
+      `No generation phase claims these //go:generate directives:\n${unclaimed.join("\n")}\n\n` +
+        `This runner only ever runs ${filters}, so a directive matching none of them never\n` +
+        `runs here — and never shows up as drift, because its output is never written.\n` +
+        `Add a phase for it in scripts/go-generate.mjs, ordered against the existing ones.`,
+    );
+  }
+}
 
 async function runPhase(dirs, phase, log) {
   const limit = Math.max(1, Math.min(availableParallelism(), dirs.length));
@@ -111,7 +151,8 @@ async function runPhase(dirs, phase, log) {
 }
 
 /**
- * Every directory holding a `//go:generate` directive, repo-relative.
+ * Every directory holding a `//go:generate` directive, repo-relative, mapped to
+ * the directives it holds.
  *
  * Each is generated with `go generate .` rather than `./...`, so a directory
  * whose subdirectories also hold directives (`internal/instrumentation` over
@@ -119,7 +160,7 @@ async function runPhase(dirs, phase, log) {
  * put two processes on the same output file concurrently.
  */
 function findGeneratePackages() {
-  const found = new Set();
+  const found = new Map();
 
   const walk = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -132,14 +173,17 @@ function findGeneratePackages() {
       if (!entry.name.endsWith(".go")) {
         continue;
       }
-      if (DIRECTIVE.test(readFileSync(join(dir, entry.name), "utf8"))) {
-        found.add(relative(ROOT, dir));
+      const directives = readFileSync(join(dir, entry.name), "utf8").match(DIRECTIVE);
+      if (!directives) {
+        continue;
       }
+      const pkg = relative(ROOT, dir);
+      found.set(pkg, [...(found.get(pkg) ?? []), ...directives]);
     }
   };
 
   walk(ROOT);
-  return [...found].sort();
+  return new Map([...found].sort(([a], [b]) => a.localeCompare(b)));
 }
 
 if (isDirectRun(import.meta.url)) {
