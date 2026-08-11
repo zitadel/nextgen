@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/zitadel/nextgen/internal/authz/resolver"
@@ -58,6 +59,10 @@ func (s stubAuthzStmts) GetResourceScope(_ context.Context, resourceID string) (
 	}
 	return &domain.ResourceScope{ResourceID: resourceID, ProjectID: projectID, ResourceKind: domain.ResourceKindUser}, nil
 }
+
+func (stubAuthzStmts) UpsertResourceScope(context.Context, *domain.ResourceScope) error { return nil }
+
+func (stubAuthzStmts) DeleteResourceScope(context.Context, string) error { return nil }
 
 func TestProjectRelation(t *testing.T) {
 	if got := projectRelation(opRead); got != "viewer" {
@@ -199,7 +204,7 @@ func TestRequireProjectAccess(t *testing.T) {
 	})
 }
 
-func TestRequireUserTeamsAccess(t *testing.T) {
+func TestListUserTeamsGateShape(t *testing.T) {
 	stmts := stubAuthzStmts{}
 	both := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
@@ -210,7 +215,7 @@ func TestRequireUserTeamsAccess(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
 	})
 
-	// Coarse project.viewer: one Check with the user miss shape.
+	// listUserTeams uses requireResourceAccess with the user miss shape.
 	if err := requireProjectAccess(both, stmts, "proj_a", userAccess, opRead); err != nil {
 		t.Fatalf("user read: %v", err)
 	}
@@ -269,6 +274,14 @@ func TestRequireResourceAccess(t *testing.T) {
 
 	_, err = requireResourceAccess(operator, stmts, "usr_missing", userAccess, opRead)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	_, err = requireResourceAccess(operator, stmts, "usr_missing", userAccess, opWrite)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	_, err = requireResourceAccess(operator, stmts, "usr_missing", userAccess, opDelete)
+	if !errors.Is(err, errResourceGone) {
+		t.Fatalf("delete RSI miss: %v, want errResourceGone", err)
+	}
 
 	_, err = requireResourceAccess(operator, stmts, "usr_b", userAccess, opRead)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)

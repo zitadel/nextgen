@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -41,6 +42,9 @@ func (h *Handler) CreateUser(ctx context.Context, req *api.User, params api.Crea
 func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDParams) (api.DeleteUserByIDRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opDelete)
 	if err != nil {
+		if errors.Is(err, errResourceGone) {
+			return &api.DeleteUserByIDNoContent{}, nil
+		}
 		return nil, err
 	}
 
@@ -133,7 +137,7 @@ func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPassk
 // page without resolving ids one by one. Lifecycle ownership is a different
 // question and stays on the user itself (ADR 024).
 func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsParams) (api.ListUserTeamsRes, error) {
-	projectID, err := h.requireUserTeamsAccess(ctx, string(params.UserID))
+	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
 	if err != nil {
 		return nil, err
 	}

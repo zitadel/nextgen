@@ -27,6 +27,9 @@ const (
 	opDelete
 )
 
+// errResourceGone means path.id has no RSI row. Idempotent deletes map this to 204.
+var errResourceGone = errors.New("authz: resource gone")
+
 // projectRelation is the catalog relation checked for an accessOp.
 // Until #420, the seeded viewer grant satisfies viewer/editor/admin Checks.
 func projectRelation(op accessOp) string {
@@ -45,8 +48,8 @@ func projectRelation(op accessOp) string {
 // resourceAccess is one resource's row in the management access model: the
 // resource-flavored errors the gate answers with.
 type resourceAccess struct {
-	// readMiss / writeMiss are anti-oracle answers when the principal has no
-	// foothold; writeMiss also covers nonexistent projects.
+	// readMiss / writeMiss are anti-oracle answers when Check finds no foothold;
+	// writeMiss also covers nonexistent projects on create/list.
 	readMiss  func() domain.Error
 	writeMiss func() domain.Error
 	denied    func() domain.Error
@@ -106,16 +109,15 @@ var projectAccess = resourceAccess{
 	denied:    domain.ErrProjectPermissionDenied,
 }
 
-// resourceAccessStmts is the statement surface requireResourceAccess needs:
-// RSI lookup plus the authz resolver Check path.
+// resourceAccessStmts is the statement surface requireResourceAccess needs.
 type resourceAccessStmts interface {
 	service.AuthzResolverStatements
-	GetResourceScope(ctx context.Context, resourceID string) (*domain.ResourceScope, error)
+	service.ResourceScopeStatements
 }
 
 // requireResourceAccess resolves path.id via resource_scope_index, then runs
-// the project-scoped Check. RSI miss → resource not-found shape (404). Returns
-// the resolved project_id for scope-bound DAL calls.
+// the project-scoped Check. RSI miss on read/write → resource 404; on delete →
+// errResourceGone (handlers map to 204). Returns project_id for DAL calls.
 func (h *Handler) requireResourceAccess(ctx context.Context, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
 	if h == nil || h.pool == nil {
 		return "", domain.ErrInternal(nil).WithMessage("authz statements not configured")
@@ -127,7 +129,11 @@ func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resou
 	scope, err := stmts.GetResourceScope(ctx, resourceID)
 	if err != nil {
 		if errors.Is(err, new(database.NoRowFoundError)) {
-			return "", res.miss(op)
+			if op == opDelete {
+				return "", errResourceGone
+			}
+			// Flat-by-id: unknown path id is always the resource 404 shape.
+			return "", res.readMiss()
 		}
 		return "", domain.ErrInternal(err).WithMessage("resource scope lookup failed")
 	}
@@ -138,7 +144,7 @@ func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resou
 }
 
 // requireProjectAccess gates a management operation via resolver.Check when
-// project_id is already known (create/list/query, or after RSI resolution).
+// project_id is already known (create/list/query, project by-id, or after RSI).
 // DecisionNotFound → resource not-found / invalid-project shapes (404).
 // DecisionForbidden → permission_denied (403).
 func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
@@ -200,17 +206,15 @@ func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) er
 	}
 }
 
-// requireUserTeamsAccess gates listUserTeams via the parent user's RSI, then
-// Checks project.viewer on the resolved project (user miss shape for 404).
-func (h *Handler) requireUserTeamsAccess(ctx context.Context, userID string) (projectID string, err error) {
-	return h.requireResourceAccess(ctx, userID, userAccess, opRead)
-}
-
-// requireTeamDelete gates deleteTeam via the team's RSI. Unknown teams answer
-// 204, so every denial is wrapped as permission_denied.
+// requireTeamDelete gates deleteTeam via the team's RSI. Unknown teams are
+// gone (204). Check denials (including foreign foothold misses) stay
+// permission_denied for the historical deleteTeam contract.
 func (h *Handler) requireTeamDelete(ctx context.Context, teamID string) (projectID string, err error) {
 	projectID, err = h.requireResourceAccess(ctx, teamID, teamAccess, opDelete)
 	if err != nil {
+		if errors.Is(err, errResourceGone) {
+			return "", err
+		}
 		return "", domain.ErrTeamPermissionDenied().WithParent(err)
 	}
 	return projectID, nil

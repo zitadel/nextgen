@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -84,6 +85,9 @@ func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefiniti
 func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlowDefinitionParams) (api.DeleteFlowDefinitionRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, params.ID, flowDefinitionAccess, opDelete)
 	if err != nil {
+		if errors.Is(err, errResourceGone) {
+			return &api.DeleteFlowDefinitionNoContent{}, nil
+		}
 		return nil, err
 	}
 	err = h.flowDefinitionService.Delete(ctx, projectID, params.ID)

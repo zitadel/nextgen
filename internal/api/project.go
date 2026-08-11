@@ -41,8 +41,8 @@ func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectReque
 }
 
 func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (api.GetProjectRes, error) {
-	projectID, err := h.requireResourceAccess(ctx, string(params.ProjectID), projectAccess, opRead)
-	if err != nil {
+	projectID := string(params.ProjectID)
+	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opRead); err != nil {
 		return nil, err
 	}
 	project, err := h.projectService.Get(ctx, projectID)
@@ -59,8 +59,8 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 }
 
 func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest, params api.PatchProjectParams) (api.PatchProjectRes, error) {
-	projectID, err := h.requireResourceAccess(ctx, string(params.ProjectID), projectAccess, opWrite)
-	if err != nil {
+	projectID := string(params.ProjectID)
+	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opWrite); err != nil {
 		return nil, err
 	}
 	// An absent or null name leaves nothing to write; Update rejects the empty

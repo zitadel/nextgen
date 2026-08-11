@@ -131,6 +131,9 @@ func (h Handler) QuerySessions(ctx context.Context, req *api.QuerySessionsReques
 func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionParams) (api.RevokeSessionRes, error) {
 	projectID, err := h.requireResourceAccess(ctx, string(params.SessionID), sessionAccess, opDelete)
 	if err != nil {
+		if errors.Is(err, errResourceGone) {
+			return &api.RevokeSessionNoContent{}, nil
+		}
 		return nil, err
 	}
 	input := service.DeleteSessionInput{
