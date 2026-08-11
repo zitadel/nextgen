@@ -15,6 +15,7 @@ import (
 // compiler's nil checks and binds NULL into an ordered compare.
 func TestSchemaNullableBindings(t *testing.T) {
 	cols := []database.Column[domain.UserPasskeyField]{
+		database.Col(domain.UserPasskeyFieldName),
 		database.Col(domain.UserPasskeyFieldVerifiedAt),
 		database.Col(domain.UserPasskeyFieldLastUsedAt),
 	}
@@ -27,6 +28,6 @@ func TestSchemaNullableBindings(t *testing.T) {
 
 	verified := time.Unix(1700000000, 0).UTC()
 	used := verified.Add(time.Hour)
-	passkey := &domain.UserPasskey{VerifiedAt: &verified, LastUsedAt: &used}
-	assert.Equal(t, []any{verified, used}, userpasskey.Schema.ValuesFrom(passkey, cols))
+	passkey := &domain.UserPasskey{Name: "Laptop", VerifiedAt: &verified, LastUsedAt: &used}
+	assert.Equal(t, []any{"Laptop", verified, used}, userpasskey.Schema.ValuesFrom(passkey, cols))
 }

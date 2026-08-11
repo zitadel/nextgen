@@ -43,9 +43,18 @@ var Schema = database.NewSchema(map[domain.UserPasskeyField]database.FieldBindin
 		Coerce:   database.CoerceBool,
 	},
 	domain.UserPasskeyFieldName: {
-		SQLName:  "name",
-		Accessor: func(p *domain.UserPasskey) any { return p.Name },
+		SQLName: "name",
+		// name is NULL only for rows written outside the product path; the
+		// registration flow generates a name when none is given, so "" is
+		// never stored.
+		Accessor: func(p *domain.UserPasskey) any {
+			if p.Name == "" {
+				return nil
+			}
+			return p.Name
+		},
 		Coerce:   database.CoerceString,
+		Nullable: true,
 	},
 	domain.UserPasskeyFieldVerifiedAt: {
 		SQLName:  "verified_at",
