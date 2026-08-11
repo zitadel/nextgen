@@ -122,8 +122,6 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 			return domain.ErrInternal(err).WithMessage("failed to create project token signing key in the database")
 		}
 
-		// Seed sk_proj ↔ project.viewer so the CreateProject secret can call
-		// in-project management APIs through the authz resolver gate.
 		if err := tx.Statements().CreateAuthzAssignment(ctx, domain.NewSKProjProjectSetupAssignment(project.ID)); err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to seed project secret authz assignment")
 		}
