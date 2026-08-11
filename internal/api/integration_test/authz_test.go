@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -367,21 +368,54 @@ func TestManagementAuthz(t *testing.T) {
 	})
 }
 
-// authzErrorParts extracts (status, code) from any error-shaped response the
-// generated client returns: declared statuses decode into typed
-// ErrorDetails-shaped values (status not carried, reported as 0), undeclared
-// ones into *api.ErrorDetailsStatusCode.
+// errorResponseParts pulls the status and error body out of any error-shaped
+// response the generated client returns. Three shapes exist:
+//
+//   - an operation whose contract declares an operation-specific default
+//     response decodes into a <Operation>ErrorResponseStatusCode wrapper, which
+//     carries the status beside a discriminated union of that operation's
+//     errors;
+//   - an operation still on the shared default decodes into the generic
+//     *api.ErrorDetailsStatusCode;
+//   - a declared status decodes into a bare ErrorDetails-shaped value that does
+//     not carry its status at all, reported here as 0.
+//
+// The wrapper is matched structurally rather than by listing its types, so
+// wiring another operation to an operation-specific response needs no case
+// added here.
+func errorResponseParts(t *testing.T, resp any) (status int, code, message string, ok bool) {
+	t.Helper()
+
+	if e, isGeneric := resp.(*api.ErrorDetailsStatusCode); isGeneric {
+		return e.StatusCode, string(e.Response.Code), e.Response.Message, true
+	}
+
+	body := resp
+	if v := reflect.Indirect(reflect.ValueOf(resp)); v.Kind() == reflect.Struct {
+		statusField := v.FieldByName("StatusCode")
+		responseField := v.FieldByName("Response")
+		if statusField.IsValid() && statusField.Kind() == reflect.Int && responseField.IsValid() {
+			status = int(statusField.Int())
+			body = responseField.Interface()
+		}
+	}
+
+	var parsed struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
+	if json.Unmarshal([]byte(helpers.MustMarshal(t, body)), &parsed) != nil || parsed.Code == "" {
+		return 0, "", "", false
+	}
+	return status, parsed.Code, parsed.Message, true
+}
+
+// authzErrorParts extracts (status, code) from any error-shaped response.
 func authzErrorParts(t *testing.T, resp any) (status int, code string) {
 	t.Helper()
-	if e, ok := resp.(*api.ErrorDetailsStatusCode); ok {
-		return e.StatusCode, string(e.Response.Code)
-	}
-	var body struct {
-		Code string `json:"code"`
-	}
-	require.NoError(t, json.Unmarshal([]byte(helpers.MustMarshal(t, resp)), &body), "response is not error-shaped: %T", resp)
-	require.NotEmpty(t, body.Code, "response is not error-shaped: %T: %s", resp, helpers.MustMarshal(t, resp))
-	return 0, body.Code
+	status, code, _, ok := errorResponseParts(t, resp)
+	require.True(t, ok, "response is not error-shaped: %T: %s", resp, helpers.MustMarshal(t, resp))
+	return status, code
 }
 
 // assertAuthzError asserts the response is the error with the given code,

@@ -205,6 +205,38 @@ func (e *ScanError) Unwrap() error {
 	return e.original
 }
 
+// UnavailableError is returned when the database could not complete an
+// operation for a transient reason and the caller may retry: a transaction that
+// exhausted its abort retries under contention, a deadline reached while
+// retrying, a backend that went away. Distinct from [UnknownError], which the
+// caller has no reason to retry.
+//
+// Unwrap must keep returning the original: on Spanner the dialect wraps errors
+// that are still inside a retrying transaction, and ReadWriteTransaction only
+// retries while it can still find the gRPC status on the error (#788).
+type UnavailableError struct {
+	original error
+}
+
+func NewUnavailableError(original error) error {
+	return &UnavailableError{
+		original: original,
+	}
+}
+
+func (e *UnavailableError) Error() string {
+	return fmt.Sprintf("database unavailable: %v", e.original)
+}
+
+func (e *UnavailableError) Is(target error) bool {
+	_, ok := target.(*UnavailableError)
+	return ok
+}
+
+func (e *UnavailableError) Unwrap() error {
+	return e.original
+}
+
 // UnknownError is returned when an unknown error occurs.
 type UnknownError struct {
 	original error
