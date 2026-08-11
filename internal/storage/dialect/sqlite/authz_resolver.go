@@ -7,289 +7,14 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 )
 
-const (
-	activeSystemCatalogIDStmt = `
-SELECT id
-FROM authz_catalogs
-WHERE catalog_kind = ?1 AND owner_id = ?2 AND status = ?3`
-
-	hasAuthzProjectFootholdStmt = `
-SELECT (
-    EXISTS (
-        SELECT 1
-        FROM authz_assignments a
-        WHERE a.project_id = ?1
-          AND a.revoked_at IS NULL
-          AND (a.expires_at IS NULL OR a.expires_at > ?4)
-          AND (
-                (a.principal_type = ?2 AND a.principal_id = ?3)
-             OR (
-                    ?2 = 'user'
-                AND a.principal_type = 'team'
-                AND EXISTS (
-                    SELECT 1
-                    FROM authz_membership_edges e
-                    WHERE e.project_id = ?1
-                      AND e.set_type = 'team'
-                      AND e.set_id = a.principal_id
-                      AND e.member_type = 'user'
-                      AND e.member_id = ?3
-                )
-             )
-          )
-    )
-    OR EXISTS (
-        SELECT 1
-        FROM authz_membership_edges e
-        WHERE e.project_id = ?1
-          AND e.member_type = 'user'
-          AND e.member_id = ?3
-          AND ?2 = 'user'
-    )
-)`
-
-	// checkAuthzStmt allows via (1) assignment ⋈ closure or (2) bounded TTU
-	// through authz_expression_edges + tupleset assignment + membership/source.
-	checkAuthzStmt = `
-SELECT (
-    EXISTS (
-        SELECT 1
-        FROM authz_assignments a
-        JOIN authz_relation_closure c
-          ON  c.catalog_id       = a.catalog_id
-          AND c.from_object_type = a.object_type
-          AND c.from_relation    = a.relation
-          AND c.to_object_type   = ?5
-          AND c.to_relation      = ?6
-        WHERE a.project_id = ?2
-          AND a.catalog_id = ?1
-          AND a.revoked_at IS NULL
-          AND (a.expires_at IS NULL OR a.expires_at > ?8)
-          AND a.scope_kind = 'project'
-          AND (
-                (a.principal_type = ?3 AND a.principal_id = ?4)
-             OR (
-                    ?3 = 'user'
-                AND a.principal_type = 'team'
-                AND EXISTS (
-                    SELECT 1
-                    FROM authz_membership_edges e
-                    WHERE e.project_id = ?7
-                      AND e.set_type = 'team'
-                      AND e.set_id = a.principal_id
-                      AND e.member_type = 'user'
-                      AND e.member_id = ?4
-                )
-             )
-          )
-    )
-    OR EXISTS (
-        SELECT 1
-        FROM authz_expression_edges edge
-        JOIN authz_assignments ts
-          ON  ts.catalog_id  = edge.catalog_id
-          AND ts.object_type = edge.tupleset_object_type
-          AND ts.relation    = edge.tupleset_relation
-          AND ts.project_id  = ?2
-          AND ts.revoked_at IS NULL
-          AND (ts.expires_at IS NULL OR ts.expires_at > ?8)
-        WHERE edge.catalog_id = ?1
-          AND edge.object_type = ?5
-          AND edge.relation = ?6
-          AND edge.kind = 'tuple_to_userset'
-          AND (
-                (
-                    edge.source_object_type = 'team'
-                AND edge.source_relation = 'member'
-                AND ts.principal_type = 'team'
-                AND ?3 = 'user'
-                AND EXISTS (
-                    SELECT 1
-                    FROM authz_membership_edges e
-                    WHERE e.project_id = ?7
-                      AND e.set_type = 'team'
-                      AND e.set_id = ts.principal_id
-                      AND e.member_type = 'user'
-                      AND e.member_id = ?4
-                )
-                )
-             OR EXISTS (
-                    SELECT 1
-                    FROM authz_assignments a
-                    JOIN authz_relation_closure c
-                      ON  c.catalog_id       = a.catalog_id
-                      AND c.from_object_type = a.object_type
-                      AND c.from_relation    = a.relation
-                      AND c.to_object_type   = edge.source_object_type
-                      AND c.to_relation      = edge.source_relation
-                    WHERE a.project_id = ?2
-                      AND a.catalog_id = ?1
-                      AND a.revoked_at IS NULL
-                      AND (a.expires_at IS NULL OR a.expires_at > ?8)
-                      AND (
-                            (a.principal_type = ?3 AND a.principal_id = ?4)
-                         OR (
-                                ?3 = 'user'
-                            AND a.principal_type = 'team'
-                            AND EXISTS (
-                                SELECT 1
-                                FROM authz_membership_edges e
-                                WHERE e.project_id = ?7
-                                  AND e.set_type = 'team'
-                                  AND e.set_id = a.principal_id
-                                  AND e.member_type = 'user'
-                                  AND e.member_id = ?4
-                            )
-                         )
-                      )
-                      AND (
-                            (a.scope_kind = 'team' AND a.scope_team_id = ts.principal_id)
-                         OR (a.scope_kind = 'resource' AND a.scope_resource_id = ts.principal_id)
-                         OR (a.scope_kind = 'project' AND a.object_type = edge.source_object_type)
-                      )
-                )
-          )
-    )
-)`
-
-	listAuthzObjectIDsStmt = `
-SELECT r.resource_id
-FROM resource_scope_index r
-WHERE r.project_id = ?2
-  AND r.resource_kind = ?8
-  AND (
-    -- Project-scoped (or any) grant that CheckAuthz would accept for the project.
-    EXISTS (
-        SELECT 1
-        FROM authz_assignments a
-        JOIN authz_relation_closure c
-          ON  c.catalog_id       = a.catalog_id
-          AND c.from_object_type = a.object_type
-          AND c.from_relation    = a.relation
-          AND c.to_object_type   = ?5
-          AND c.to_relation      = ?6
-        WHERE a.project_id = ?2
-          AND a.catalog_id = ?1
-          AND a.revoked_at IS NULL
-          AND (a.expires_at IS NULL OR a.expires_at > ?9)
-          AND a.scope_kind = 'project'
-          AND (
-                (a.principal_type = ?3 AND a.principal_id = ?4)
-             OR (
-                    ?3 = 'user'
-                AND a.principal_type = 'team'
-                AND EXISTS (
-                    SELECT 1
-                    FROM authz_membership_edges e
-                    WHERE e.project_id = ?7
-                      AND e.set_type = 'team'
-                      AND e.set_id = a.principal_id
-                      AND e.member_type = 'user'
-                      AND e.member_id = ?4
-                )
-             )
-          )
-    )
-    OR EXISTS (
-        SELECT 1
-        FROM authz_expression_edges edge
-        JOIN authz_assignments ts
-          ON  ts.catalog_id  = edge.catalog_id
-          AND ts.object_type = edge.tupleset_object_type
-          AND ts.relation    = edge.tupleset_relation
-          AND ts.project_id  = ?2
-          AND ts.revoked_at IS NULL
-          AND (ts.expires_at IS NULL OR ts.expires_at > ?9)
-        WHERE edge.catalog_id = ?1
-          AND edge.object_type = ?5
-          AND edge.relation = ?6
-          AND edge.kind = 'tuple_to_userset'
-          AND edge.source_object_type = 'team'
-          AND edge.source_relation = 'member'
-          AND ts.principal_type = 'team'
-          AND ?3 = 'user'
-          AND EXISTS (
-                SELECT 1
-                FROM authz_membership_edges e
-                WHERE e.project_id = ?7
-                  AND e.set_type = 'team'
-                  AND e.set_id = ts.principal_id
-                  AND e.member_type = 'user'
-                  AND e.member_id = ?4
-          )
-    )
-    OR (
-        r.team_id IS NOT NULL
-        AND EXISTS (
-            SELECT 1
-            FROM authz_assignments a
-            JOIN authz_relation_closure c
-              ON  c.catalog_id       = a.catalog_id
-              AND c.from_object_type = a.object_type
-              AND c.from_relation    = a.relation
-              AND c.to_object_type   = ?5
-              AND c.to_relation      = ?6
-            WHERE a.project_id = ?2
-              AND a.catalog_id = ?1
-              AND a.revoked_at IS NULL
-              AND (a.expires_at IS NULL OR a.expires_at > ?9)
-              AND a.scope_kind = 'team'
-              AND a.scope_team_id = r.team_id
-              AND (
-                    (a.principal_type = ?3 AND a.principal_id = ?4)
-                 OR (
-                        ?3 = 'user'
-                    AND a.principal_type = 'team'
-                    AND EXISTS (
-                        SELECT 1
-                        FROM authz_membership_edges e
-                        WHERE e.project_id = ?7
-                          AND e.set_type = 'team'
-                          AND e.set_id = a.principal_id
-                          AND e.member_type = 'user'
-                          AND e.member_id = ?4
-                    )
-                 )
-              )
-        )
-    )
-    OR EXISTS (
-        SELECT 1
-        FROM authz_assignments a
-        JOIN authz_relation_closure c
-          ON  c.catalog_id       = a.catalog_id
-          AND c.from_object_type = a.object_type
-          AND c.from_relation    = a.relation
-          AND c.to_object_type   = ?5
-          AND c.to_relation      = ?6
-        WHERE a.project_id = ?2
-          AND a.catalog_id = ?1
-          AND a.revoked_at IS NULL
-          AND (a.expires_at IS NULL OR a.expires_at > ?9)
-          AND a.scope_kind = 'resource'
-          AND a.scope_resource_id = r.resource_id
-          AND (
-                (a.principal_type = ?3 AND a.principal_id = ?4)
-             OR (
-                    ?3 = 'user'
-                AND a.principal_type = 'team'
-                AND EXISTS (
-                    SELECT 1
-                    FROM authz_membership_edges e
-                    WHERE e.project_id = ?7
-                      AND e.set_type = 'team'
-                      AND e.set_id = a.principal_id
-                      AND e.member_type = 'user'
-                      AND e.member_id = ?4
-                )
-             )
-          )
-    )
-  )
-ORDER BY r.resource_id`
-)
+func sqliteAuthzEnv() authz.Env {
+	return authz.Env{
+		Now: func(w authz.ArgWriter) { w.WriteArg(nowUnixNano()) },
+	}
+}
 
 type authzResolverStatements struct{ statement }
 
@@ -299,12 +24,10 @@ func newAuthzResolverStatements(client queryExecutor) authzResolverStatements {
 
 // ActiveSystemCatalogID implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) ActiveSystemCatalogID(ctx context.Context) (string, error) {
+	var c statementCompiler
+	authz.WriteActiveSystemCatalogID(&c, sqliteAuthzEnv())
 	var id string
-	err := s.client.QueryRow(ctx, activeSystemCatalogIDStmt,
-		domain.AuthzCatalogKindSystem.String(),
-		domain.SystemCatalogOwnerID,
-		domain.AuthzCatalogStatusActive.String(),
-	).Scan(&id)
+	err := s.client.QueryRow(ctx, c.String(), c.args...).Scan(&id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", database.NewNoRowFoundError(nil)
@@ -316,10 +39,10 @@ func (s authzResolverStatements) ActiveSystemCatalogID(ctx context.Context) (str
 
 // HasAuthzProjectFoothold implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) HasAuthzProjectFoothold(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error) {
+	var c statementCompiler
+	authz.WriteHasAuthzProjectFoothold(&c, sqliteAuthzEnv(), projectID, principalType, principalID)
 	var ok bool
-	err := s.client.QueryRow(ctx, hasAuthzProjectFootholdStmt,
-		projectID, principalType.String(), principalID, nowUnixNano(),
-	).Scan(&ok)
+	err := s.client.QueryRow(ctx, c.String(), c.args...).Scan(&ok)
 	if err != nil {
 		return false, wrapError(err)
 	}
@@ -327,45 +50,22 @@ func (s authzResolverStatements) HasAuthzProjectFoothold(ctx context.Context, pr
 }
 
 // CheckAuthz implements [service.AuthzResolverStatements].
-func (s authzResolverStatements) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, error) {
-	home := params.PrincipalHomeProjectID
-	if home == "" {
-		home = params.ProjectID
-	}
-	var ok bool
-	err := s.client.QueryRow(ctx, checkAuthzStmt,
-		params.CatalogID,
-		params.ProjectID,
-		params.PrincipalType.String(),
-		params.PrincipalID,
-		params.ObjectType,
-		params.Relation,
-		home,
-		nowUnixNano(),
-	).Scan(&ok)
+func (s authzResolverStatements) CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (bool, bool, error) {
+	var c statementCompiler
+	authz.WriteCheckAuthz(&c, sqliteAuthzEnv(), params)
+	var allowed, foothold bool
+	err := s.client.QueryRow(ctx, c.String(), c.args...).Scan(&allowed, &foothold)
 	if err != nil {
-		return false, wrapError(err)
+		return false, false, wrapError(err)
 	}
-	return ok, nil
+	return allowed, foothold, nil
 }
 
 // ListAuthzObjectIDs implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error) {
-	home := params.PrincipalHomeProjectID
-	if home == "" {
-		home = params.ProjectID
-	}
-	rows, err := s.client.Query(ctx, listAuthzObjectIDsStmt,
-		params.CatalogID,
-		params.ProjectID,
-		params.PrincipalType.String(),
-		params.PrincipalID,
-		params.ObjectType,
-		params.Relation,
-		home,
-		params.ResourceKind.String(),
-		nowUnixNano(),
-	)
+	var c statementCompiler
+	authz.WriteListAuthzObjectIDs(&c, sqliteAuthzEnv(), params)
+	rows, err := s.client.Query(ctx, c.String(), c.args...)
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -376,9 +76,6 @@ func (s authzResolverStatements) ListAuthzObjectIDs(ctx context.Context, params 
 	})
 	if err != nil {
 		return nil, wrapError(err)
-	}
-	if ids == nil {
-		ids = []string{}
 	}
 	return ids, nil
 }

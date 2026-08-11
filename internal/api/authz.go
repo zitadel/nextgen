@@ -175,12 +175,11 @@ func requireProjectAccess(ctx context.Context, stmts service.AuthzResolverStatem
 	}
 
 	dec, err := resolver.New().Check(ctx, stmts, resolver.Request{
-		PrincipalType:   scope.PrincipalType,
-		PrincipalID:     scope.PrincipalID,
-		CredentialClass: scope.PrincipalType,
-		ProjectID:       projectID,
-		ObjectType:      "project",
-		Relation:        relation,
+		PrincipalType: scope.PrincipalType,
+		PrincipalID:   scope.PrincipalID,
+		ProjectID:     projectID,
+		ObjectType:    "project",
+		Relation:      relation,
 	})
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("authz permission check failed")
