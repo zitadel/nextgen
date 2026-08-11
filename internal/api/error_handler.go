@@ -125,6 +125,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return projectErrorResponse(e)
 	case e.Code == domain.ErrNotImplemented().Code:
 		return errorResponseWithStatusCode(http.StatusNotImplemented, e)
+	case e.Code == domain.ErrUnavailable().Code:
+		return errorResponseWithStatusCode(http.StatusServiceUnavailable, e)
 	case e.Code == domain.ErrRequestInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, e)
 	default:

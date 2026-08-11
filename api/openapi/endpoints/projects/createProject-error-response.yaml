@@ -13,6 +13,7 @@ content:
         - $ref: '../../components/schemas/errors/proj-name_invalid.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+        - $ref: '../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
@@ -25,6 +26,7 @@ content:
           proj.name_invalid: '../../components/schemas/errors/proj-name_invalid.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+          unavailable: '../../components/schemas/errors/unavailable.yaml'
     examples:
       enc_key.decrypt_failed:
         summary: enc_key.decrypt_failed
@@ -71,3 +73,8 @@ content:
         value:
           code: enc_key.unknown_alg
           message: 'unsupported encryption algorithm'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'
