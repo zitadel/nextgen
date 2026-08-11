@@ -29,7 +29,7 @@ func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *databa
 		if err != nil {
 			return database.ErrInvalidCursor()
 		}
-		if !cursor.MatchesOrderBy(opt.Pagination.OrderBy.Columns) {
+		if !cursor.MatchesOrderBy(opt.Pagination.OrderBy) {
 			return database.ErrCursorOrderMismatch()
 		}
 		values, err := schema.CoerceCursorValues(cursor.Columns, cursor.Values)

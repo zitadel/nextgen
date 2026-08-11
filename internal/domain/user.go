@@ -164,10 +164,10 @@ func (c *CreateUser) AttributeTeamScope() string {
 // Empty id is filled by the dialect on create; non-empty id is for ceremony only.
 func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
 	if _, ok := muser["id"]; ok {
-		return nil, ErrUserInvalid().WithDetails("client cannot choose user id")
+		return nil, ErrUserInvalid().WithMessage("client cannot choose user id")
 	}
 	if _, ok := muser["metadata"]; ok {
-		return nil, ErrUserInvalid().WithDetails("metadata is readonly and cannot be set")
+		return nil, ErrUserInvalid().WithMessage("metadata is readonly and cannot be set")
 	}
 
 	schemaURL, err := SchemaFromUserMap(muser)
@@ -210,7 +210,7 @@ func SchemaFromUserMap(user map[string]any) (string, error) {
 	schemaURL, ok := maputil.Get[string](user, "$schema")
 	if !ok {
 		return "", ErrUserInvalid().
-			WithDetails("No $schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
+			WithMessage("No $schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
 	}
 	return schemaURL, nil
 }

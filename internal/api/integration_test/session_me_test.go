@@ -27,9 +27,7 @@ func TestGetMySession_Identity(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
-	tokenCrypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
-	require.NoError(t, err)
-	projectSecret, err := project.ProjectSecret(tokenCrypter)
+	projectSecret, err := harness.EnsureTokenService(t).GenerateJWE(t.Context(), project.Token())
 	require.NoError(t, err)
 
 	harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
@@ -131,9 +129,7 @@ func TestGetMySession_ExpiredSessionIsSignedOut(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
-	tokenCrypter, err := harness.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
-	require.NoError(t, err)
-	projectSecret, err := project.ProjectSecret(tokenCrypter)
+	projectSecret, err := harness.EnsureTokenService(t).GenerateJWE(t.Context(), project.Token())
 	require.NoError(t, err)
 
 	attempt := &domain.AuthAttempt{ProjectID: project.ID}

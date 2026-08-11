@@ -10,7 +10,7 @@ var Schema = database.NewSchema(map[domain.UserTOTPField]database.FieldBinding[d
 	domain.UserTOTPFieldID: {
 		SQLName:  "id",
 		Accessor: func(t *domain.UserTOTP) any { return t.ID },
-		Coerce:   database.CoerceNumber[int64],
+		Coerce:   database.CoerceString,
 	},
 	domain.UserTOTPFieldProjectID: {
 		SQLName:  "project_id",

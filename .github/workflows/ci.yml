@@ -20,9 +20,9 @@ jobs:
     timeout-minutes: 120
     permissions:
       contents: read
-      # Required to mint the OIDC token for Workload Identity Federation when
-      # authenticating to the Spanner test instance (trusted runs only).
-      id-token: write
+      # Uncomment together with the Spanner test-instance steps below to mint the
+      # OIDC token for Workload Identity Federation (trusted runs only).
+      # id-token: write
     env:
       # Moon marks failed tasks by color alone, so a failed `moon ci` can end at
       # "Tasks: 1 failed" with no named target. The summary names them in plain
@@ -107,26 +107,47 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
         run: moon run server:test-postgres
 
+      # The emulator is the canary: its one-transaction-at-a-time limit forces the
+      # aborts that prove the retry path still works. Do not move these off it.
+      - name: Run Go integration tests (spanner emulator)
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
+        run: moon run server:test-spanner
+
+      # ---------------------------------------------------------------------
+      # Spanner test instance — kept, deliberately not wired (#788, removal #793).
+      #
+      # The flake this was built for turned out to be an application bug, not an
+      # emulator limitation, so CI runs the emulator only: it is what forces the
+      # aborts that keep the abort-retry path honest. Re-enable ONLY if the
+      # emulator is shown to be inadequate, never to make a failing test pass.
+      #
+      # To re-wire: uncomment `id-token: write` in permissions above, uncomment
+      # the two steps below, add the `if` guard back to the emulator step so the
+      # two do not both run:
+      #   if: ${{ … && steps.spanner-auth.outcome != 'success' }}
+      # and set the `SPANNER_TEST_INSTANCE` variable plus the
+      # `GCP_WORKLOAD_IDENTITY_PROVIDER` / `GCP_SERVICE_ACCOUNT` secrets.
+      # The Go side (internal/storage/testdb) already supports this and needs
+      # no change.
+      #
       # Auth when SPANNER_TEST_INSTANCE is set (trusted runs). Vars are safe in
       # if:; secrets stay only in with:. Unset var / forks → emulator step.
       # Auth hard-fails if the var is set but WIF is broken (no silent fallback).
-      - name: Authenticate to Google Cloud (Spanner test instance)
-        id: spanner-auth
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && vars.SPANNER_TEST_INSTANCE != '' }}
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-
-      - name: Run Go integration tests (spanner emulator)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.spanner-auth.outcome != 'success' }}
-        run: moon run server:test-spanner
-
-      - name: Run Go integration tests (spanner test instance)
-        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.spanner-auth.outcome == 'success' }}
-        env:
-          ZITADEL_TEST_SPANNER_INSTANCE: ${{ vars.SPANNER_TEST_INSTANCE }}
-        run: moon run server:test-spanner
+      #
+      # - name: Authenticate to Google Cloud (Spanner test instance)
+      #   id: spanner-auth
+      #   if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && (github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork) && vars.SPANNER_TEST_INSTANCE != '' }}
+      #   uses: google-github-actions/auth@v2
+      #   with:
+      #     workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      #     service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      #
+      # - name: Run Go integration tests (spanner test instance)
+      #   if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' && steps.spanner-auth.outcome == 'success' }}
+      #   env:
+      #     ZITADEL_TEST_SPANNER_INSTANCE: ${{ vars.SPANNER_TEST_INSTANCE }}
+      #   run: moon run server:test-spanner
+      # ---------------------------------------------------------------------
 
       - name: Run Go integration tests (sqlite)
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
