@@ -12,27 +12,20 @@ CREATE TABLE event_sinks (
 -- +goose StatementEnd
 
 -- +goose StatementBegin
-CREATE TABLE event_deliveries (
-    project_id      TEXT NOT NULL,
-    event_id        TEXT NOT NULL,
-    sink_id         TEXT NOT NULL,
-    delivered_at    INTEGER NOT NULL,
-    PRIMARY KEY (project_id, event_id, sink_id),
-    FOREIGN KEY (project_id, event_id) REFERENCES events (project_id, id) ON DELETE CASCADE
+CREATE TABLE event_sink_cursors (
+    sink_id          TEXT NOT NULL,
+    project_id       TEXT NOT NULL,
+    last_created_at  INTEGER NOT NULL,
+    last_event_id    TEXT NOT NULL,
+    PRIMARY KEY (sink_id, project_id),
+    FOREIGN KEY (sink_id) REFERENCES event_sinks (id),
+    FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
 );
--- +goose StatementEnd
-
--- +goose StatementBegin
-CREATE INDEX idx_event_deliveries_sink
-    ON event_deliveries (sink_id, project_id, event_id);
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
-DROP INDEX IF EXISTS idx_event_deliveries_sink;
--- +goose StatementEnd
--- +goose StatementBegin
-DROP TABLE IF EXISTS event_deliveries;
+DROP TABLE IF EXISTS event_sink_cursors;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS event_sinks;

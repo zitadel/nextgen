@@ -162,3 +162,59 @@ func TestEventStatements_DeleteOlderThan(t *testing.T) {
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
+
+func TestEventStatements_SinkCursor(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, _ := uniqueEventIDs(t)
+		ensureEventProject(t, d.stmts, projectID)
+
+		sink := &domain.EventSink{
+			ID:      "sink_test_" + uniqueSuffix(t),
+			Type:    domain.EventSinkTypeStdout,
+			Scope:   domain.EventSinkScopeDeployment,
+			Enabled: true,
+		}
+		require.NoError(t, d.stmts.EnsureEventSink(t.Context(), sink))
+
+		_, err := d.stmts.GetEventSinkCursor(t.Context(), sink.ID, projectID)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		first := sampleEvent(projectID, "evt-cursor-001")
+		require.NoError(t, d.stmts.InsertEvent(t.Context(), first))
+		second := sampleEvent(projectID, "evt-cursor-002")
+		second.EventType = domain.EventTypeUserUpdated
+		require.NoError(t, d.stmts.InsertEvent(t.Context(), second))
+
+		all, err := d.stmts.ListEventsAfterCursor(t.Context(), projectID, time.Time{}, "", 10)
+		require.NoError(t, err)
+		require.Len(t, all, 2)
+		assert.Equal(t, "evt-cursor-001", all[0].ID)
+		assert.Equal(t, "evt-cursor-002", all[1].ID)
+
+		require.NoError(t, d.stmts.UpsertEventSinkCursor(t.Context(), &domain.EventSinkCursor{
+			SinkID:        sink.ID,
+			ProjectID:     projectID,
+			LastCreatedAt: first.CreatedAt,
+			LastEventID:   first.ID,
+		}))
+		got, err := d.stmts.GetEventSinkCursor(t.Context(), sink.ID, projectID)
+		require.NoError(t, err)
+		assert.Equal(t, first.ID, got.LastEventID)
+
+		rest, err := d.stmts.ListEventsAfterCursor(t.Context(), projectID, first.CreatedAt, first.ID, 10)
+		require.NoError(t, err)
+		require.Len(t, rest, 1)
+		assert.Equal(t, "evt-cursor-002", rest[0].ID)
+
+		require.NoError(t, d.stmts.UpsertEventSinkCursor(t.Context(), &domain.EventSinkCursor{
+			SinkID:        sink.ID,
+			ProjectID:     projectID,
+			LastCreatedAt: second.CreatedAt,
+			LastEventID:   second.ID,
+		}))
+		got, err = d.stmts.GetEventSinkCursor(t.Context(), sink.ID, projectID)
+		require.NoError(t, err)
+		assert.Equal(t, second.ID, got.LastEventID)
+	})
+}

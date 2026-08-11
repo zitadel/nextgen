@@ -28,10 +28,11 @@ type EventSink struct {
 	Enabled   bool
 }
 
-// EventDelivery records at-least-once delivery of an event to a sink.
-type EventDelivery struct {
-	ProjectID   string
-	EventID     string
-	SinkID      string
-	DeliveredAt time.Time
+// EventSinkCursor is a per-(sink, project) watermark for export (ADR 049).
+// Progress is keyset-ordered on (last_created_at, last_event_id).
+type EventSinkCursor struct {
+	SinkID        string
+	ProjectID     string
+	LastCreatedAt time.Time
+	LastEventID   string
 }

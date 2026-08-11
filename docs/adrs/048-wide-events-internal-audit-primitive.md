@@ -124,8 +124,8 @@ small map for durable globally-addressable resources
 [url-architecture.md](../design/api/url-architecture.md)); high-volume TTL audit
 rows do not belong there. `GET /events/{id}` is **project-scoped** (see ADR 049).
 
-Per-sink export delivery is tracked in a separate `event_deliveries` table; see
-[ADR 049 §3](049-events-api-retention-export.md).
+Per-sink export delivery is tracked with per-(sink, project) watermark cursors;
+see [ADR 049 §3](049-events-api-retention-export.md).
 
 **Indexes:**
 
@@ -525,7 +525,7 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 
 | ADR | Relationship |
 |-----|--------------|
-| [049 Events API, Retention, and Export](049-events-api-retention-export.md) | HTTP surface, `event_deliveries`, retention purge, external export; project-scoped get |
+| [049 Events API, Retention, and Export](049-events-api-retention-export.md) | HTTP surface, sink cursors, retention purge, external export; project-scoped get |
 | [028 Storage v2 Statements](028-storage-v2-statements-and-dialects.md) | `AllStatements` / `EventStatements` is the emission boundary |
 | [041 Storage Statement Contract Tests](041-storage-statement-contract-tests.md) | `InsertEvent` coverage belongs in `stmttest` when implemented |
 | [033 Internal Permission Management](033-internal-permission-management.md) | Actor/delegation metadata; `resource_scope_index` is **not** used for events |

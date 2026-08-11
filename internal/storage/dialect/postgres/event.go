@@ -58,20 +58,17 @@ ON CONFLICT (id) DO UPDATE SET
     url = EXCLUDED.url,
     enabled = EXCLUDED.enabled`
 
-	recordEventDeliveryStmt = `
-INSERT INTO zitadel_nextgen.event_deliveries (project_id, event_id, sink_id)
-VALUES ($1, $2, $3)
-ON CONFLICT DO NOTHING`
+	getEventSinkCursorStmt = `
+SELECT sink_id, project_id, last_created_at, last_event_id
+FROM zitadel_nextgen.event_sink_cursors
+WHERE sink_id = $1 AND project_id = $2`
 
-	listUndeliveredEventsStmt = eventQuery + `
- WHERE NOT EXISTS (
-    SELECT 1 FROM zitadel_nextgen.event_deliveries d
-    WHERE d.project_id = zitadel_nextgen.events.project_id
-      AND d.event_id = zitadel_nextgen.events.id
-      AND d.sink_id = $1
- )
- ORDER BY created_at, id
- LIMIT $2`
+	upsertEventSinkCursorStmt = `
+INSERT INTO zitadel_nextgen.event_sink_cursors (sink_id, project_id, last_created_at, last_event_id)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (sink_id, project_id) DO UPDATE SET
+    last_created_at = EXCLUDED.last_created_at,
+    last_event_id = EXCLUDED.last_event_id`
 )
 
 type eventStatements struct{ statement }
@@ -189,26 +186,61 @@ func (e eventStatements) EnsureEventSink(ctx context.Context, sink *domain.Event
 	return wrapError(err)
 }
 
-// RecordEventDelivery implements [service.EventStatements].
-func (e eventStatements) RecordEventDelivery(ctx context.Context, projectID, eventID, sinkID string) error {
-	_, err := e.client.Exec(ctx, recordEventDeliveryStmt, projectID, eventID, sinkID)
+// GetEventSinkCursor implements [service.EventStatements].
+func (e eventStatements) GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error) {
+	var c domain.EventSinkCursor
+	err := e.client.QueryRow(ctx, getEventSinkCursorStmt, sinkID, projectID).Scan(
+		&c.SinkID, &c.ProjectID, &c.LastCreatedAt, &c.LastEventID,
+	)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	c.LastCreatedAt = c.LastCreatedAt.UTC()
+	return &c, nil
+}
+
+// UpsertEventSinkCursor implements [service.EventStatements].
+func (e eventStatements) UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error {
+	if cursor == nil {
+		return domain.ErrEventInvalid("missing cursor", nil)
+	}
+	_, err := e.client.Exec(ctx, upsertEventSinkCursorStmt,
+		cursor.SinkID, cursor.ProjectID, cursor.LastCreatedAt.UTC(), cursor.LastEventID,
+	)
 	return wrapError(err)
 }
 
-// ListUndeliveredEvents implements [service.EventStatements].
-func (e eventStatements) ListUndeliveredEvents(ctx context.Context, sinkID string, limit uint32) ([]*domain.Event, error) {
+// ListEventsAfterCursor implements [service.EventStatements].
+func (e eventStatements) ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit uint32) ([]*domain.Event, error) {
 	if limit == 0 {
 		limit = 100
 	}
-	rows, err := e.client.Query(ctx, listUndeliveredEventsStmt, sinkID, limit)
-	if err != nil {
-		return nil, wrapError(err)
+	filters := []database.Filter[domain.EventField]{
+		database.Equal(database.Col(domain.EventFieldProjectID), projectID),
 	}
-	items, err := pgx.CollectRows(rows, e.scanEvent)
-	if err != nil {
-		return nil, wrapError(err)
+	if !afterCreatedAt.IsZero() || afterID != "" {
+		filters = append(filters, database.CompareGreater(
+			database.Term(database.Col(domain.EventFieldCreatedAt), afterCreatedAt.UTC()),
+			database.Term(database.Col(domain.EventFieldID), afterID),
+		))
 	}
-	return items, nil
+	res, err := e.ListEvents(ctx, &database.ListOptions[domain.EventField]{
+		Filter: database.And(filters...),
+		Pagination: database.Page[domain.EventField]{
+			Limit: limit,
+			OrderBy: database.OrderBy[domain.EventField]{
+				Columns: []database.Column[domain.EventField]{
+					database.Col(domain.EventFieldCreatedAt),
+					database.Col(domain.EventFieldID),
+				},
+				Direction: database.OrderAsc,
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res.Items, nil
 }
 
 func (e eventStatements) scanEvent(row pgx.CollectableRow) (*domain.Event, error) {

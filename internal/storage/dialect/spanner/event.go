@@ -40,26 +40,17 @@ ON CONFLICT (id) DO UPDATE SET
     url = EXCLUDED.url,
     enabled = EXCLUDED.enabled`
 
-	recordEventDeliveryStmt = `
-INSERT INTO event_deliveries (project_id, event_id, sink_id) VALUES (@p1, @p2, @p3)
-ON CONFLICT (project_id, event_id, sink_id) DO NOTHING`
+	getEventSinkCursorStmt = `
+SELECT sink_id, project_id, last_created_at, last_event_id
+FROM event_sink_cursors
+WHERE sink_id = @p1 AND project_id = @p2`
 
-	listUndeliveredEventsStmt = `
-SELECT
-    e.project_id, e.id, e.event_type, e.category,
-    e.occurred_at, e.created_at,
-    e.team_id, e.actor_id, e.actor_type,
-    e.entity_type, e.entity_id,
-    e.client_id, e.token_id, e.delegation_type, e.delegation_id, e.grantor, e.fingerprint,
-    e.request_id, e.session_id, e.flow_id,
-    e.payload, e.metadata
-FROM events e
-WHERE NOT EXISTS (
-    SELECT 1 FROM event_deliveries d
-    WHERE d.project_id = e.project_id AND d.event_id = e.id AND d.sink_id = @p1
-)
-ORDER BY e.created_at, e.id
-LIMIT @p2`
+	upsertEventSinkCursorStmt = `
+INSERT INTO event_sink_cursors (sink_id, project_id, last_created_at, last_event_id)
+VALUES (@p1, @p2, @p3, @p4)
+ON CONFLICT (sink_id, project_id) DO UPDATE SET
+    last_created_at = EXCLUDED.last_created_at,
+    last_event_id = EXCLUDED.last_event_id`
 )
 
 var eventColumns = []string{
@@ -206,24 +197,69 @@ func (e eventStatements) EnsureEventSink(ctx context.Context, sink *domain.Event
 	return err
 }
 
-// RecordEventDelivery implements [service.EventStatements].
-func (e eventStatements) RecordEventDelivery(ctx context.Context, projectID, eventID, sinkID string) error {
-	_, err := e.db.Update(ctx, buildStatement(recordEventDeliveryStmt, projectID, eventID, sinkID).statement())
+// GetEventSinkCursor implements [service.EventStatements].
+func (e eventStatements) GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error) {
+	var cursor *domain.EventSinkCursor
+	err := e.db.Query(ctx, buildStatement(getEventSinkCursorStmt, sinkID, projectID).statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		cursor, err = collectOneRow(iter, func(row *spanner.Row) (*domain.EventSinkCursor, error) {
+			var c domain.EventSinkCursor
+			if err := row.Columns(&c.SinkID, &c.ProjectID, &c.LastCreatedAt, &c.LastEventID); err != nil {
+				return nil, err
+			}
+			c.LastCreatedAt = c.LastCreatedAt.UTC()
+			return &c, nil
+		})
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return cursor, nil
+}
+
+// UpsertEventSinkCursor implements [service.EventStatements].
+func (e eventStatements) UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error {
+	if cursor == nil {
+		return domain.ErrEventInvalid("missing cursor", nil)
+	}
+	_, err := e.db.Update(ctx, buildStatement(upsertEventSinkCursorStmt,
+		cursor.SinkID, cursor.ProjectID, cursor.LastCreatedAt.UTC(), cursor.LastEventID,
+	).statement())
 	return err
 }
 
-// ListUndeliveredEvents implements [service.EventStatements].
-func (e eventStatements) ListUndeliveredEvents(ctx context.Context, sinkID string, limit uint32) ([]*domain.Event, error) {
+// ListEventsAfterCursor implements [service.EventStatements].
+func (e eventStatements) ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit uint32) ([]*domain.Event, error) {
 	if limit == 0 {
 		limit = 100
 	}
-	var items []*domain.Event
-	err := e.db.Query(ctx, buildStatement(listUndeliveredEventsStmt, sinkID, int64(limit)).statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		items, err = collectRows(iter, e.scanEvent)
-		return err
+	filters := []database.Filter[domain.EventField]{
+		database.Equal(database.Col(domain.EventFieldProjectID), projectID),
+	}
+	if !afterCreatedAt.IsZero() || afterID != "" {
+		filters = append(filters, database.CompareGreater(
+			database.Term(database.Col(domain.EventFieldCreatedAt), afterCreatedAt.UTC()),
+			database.Term(database.Col(domain.EventFieldID), afterID),
+		))
+	}
+	res, err := e.ListEvents(ctx, &database.ListOptions[domain.EventField]{
+		Filter: database.And(filters...),
+		Pagination: database.Page[domain.EventField]{
+			Limit: limit,
+			OrderBy: database.OrderBy[domain.EventField]{
+				Columns: []database.Column[domain.EventField]{
+					database.Col(domain.EventFieldCreatedAt),
+					database.Col(domain.EventFieldID),
+				},
+				Direction: database.OrderAsc,
+			},
+		},
 	})
-	return items, err
+	if err != nil {
+		return nil, err
+	}
+	return res.Items, nil
 }
 
 func (e eventStatements) scanEvent(row *spanner.Row) (*domain.Event, error) {

@@ -2078,6 +2078,45 @@ func (c *MockAllStatementsGetEventByIDCall) DoAndReturn(f func(context.Context, 
 	return c
 }
 
+// GetEventSinkCursor mocks base method.
+func (m *MockAllStatements) GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEventSinkCursor", ctx, sinkID, projectID)
+	ret0, _ := ret[0].(*domain.EventSinkCursor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEventSinkCursor indicates an expected call of GetEventSinkCursor.
+func (mr *MockAllStatementsMockRecorder) GetEventSinkCursor(ctx, sinkID, projectID any) *MockAllStatementsGetEventSinkCursorCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEventSinkCursor", reflect.TypeOf((*MockAllStatements)(nil).GetEventSinkCursor), ctx, sinkID, projectID)
+	return &MockAllStatementsGetEventSinkCursorCall{Call: call}
+}
+
+// MockAllStatementsGetEventSinkCursorCall wrap *gomock.Call
+type MockAllStatementsGetEventSinkCursorCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetEventSinkCursorCall) Return(arg0 *domain.EventSinkCursor, arg1 error) *MockAllStatementsGetEventSinkCursorCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetEventSinkCursorCall) Do(f func(context.Context, string, string) (*domain.EventSinkCursor, error)) *MockAllStatementsGetEventSinkCursorCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetEventSinkCursorCall) DoAndReturn(f func(context.Context, string, string) (*domain.EventSinkCursor, error)) *MockAllStatementsGetEventSinkCursorCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetFlowDefinitionByID mocks base method.
 func (m *MockAllStatements) GetFlowDefinitionByID(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {
 	m.ctrl.T.Helper()
@@ -3009,6 +3048,45 @@ func (c *MockAllStatementsListEventsCall) DoAndReturn(f func(context.Context, *d
 	return c
 }
 
+// ListEventsAfterCursor mocks base method.
+func (m *MockAllStatements) ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit uint32) ([]*domain.Event, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEventsAfterCursor", ctx, projectID, afterCreatedAt, afterID, limit)
+	ret0, _ := ret[0].([]*domain.Event)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEventsAfterCursor indicates an expected call of ListEventsAfterCursor.
+func (mr *MockAllStatementsMockRecorder) ListEventsAfterCursor(ctx, projectID, afterCreatedAt, afterID, limit any) *MockAllStatementsListEventsAfterCursorCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEventsAfterCursor", reflect.TypeOf((*MockAllStatements)(nil).ListEventsAfterCursor), ctx, projectID, afterCreatedAt, afterID, limit)
+	return &MockAllStatementsListEventsAfterCursorCall{Call: call}
+}
+
+// MockAllStatementsListEventsAfterCursorCall wrap *gomock.Call
+type MockAllStatementsListEventsAfterCursorCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListEventsAfterCursorCall) Return(arg0 []*domain.Event, arg1 error) *MockAllStatementsListEventsAfterCursorCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListEventsAfterCursorCall) Do(f func(context.Context, string, time.Time, string, uint32) ([]*domain.Event, error)) *MockAllStatementsListEventsAfterCursorCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListEventsAfterCursorCall) DoAndReturn(f func(context.Context, string, time.Time, string, uint32) ([]*domain.Event, error)) *MockAllStatementsListEventsAfterCursorCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListFlowDefinitions mocks base method.
 func (m *MockAllStatements) ListFlowDefinitions(ctx context.Context, filter *database.ListOptions[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
 	m.ctrl.T.Helper()
@@ -3278,45 +3356,6 @@ func (c *MockAllStatementsListTokensCall) Do(f func(context.Context, *database.L
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsListTokensCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.TokenField]) (*database.ListResult[*domain.Token], error)) *MockAllStatementsListTokensCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// ListUndeliveredEvents mocks base method.
-func (m *MockAllStatements) ListUndeliveredEvents(ctx context.Context, sinkID string, limit uint32) ([]*domain.Event, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListUndeliveredEvents", ctx, sinkID, limit)
-	ret0, _ := ret[0].([]*domain.Event)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListUndeliveredEvents indicates an expected call of ListUndeliveredEvents.
-func (mr *MockAllStatementsMockRecorder) ListUndeliveredEvents(ctx, sinkID, limit any) *MockAllStatementsListUndeliveredEventsCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUndeliveredEvents", reflect.TypeOf((*MockAllStatements)(nil).ListUndeliveredEvents), ctx, sinkID, limit)
-	return &MockAllStatementsListUndeliveredEventsCall{Call: call}
-}
-
-// MockAllStatementsListUndeliveredEventsCall wrap *gomock.Call
-type MockAllStatementsListUndeliveredEventsCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsListUndeliveredEventsCall) Return(arg0 []*domain.Event, arg1 error) *MockAllStatementsListUndeliveredEventsCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListUndeliveredEventsCall) Do(f func(context.Context, string, uint32) ([]*domain.Event, error)) *MockAllStatementsListUndeliveredEventsCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListUndeliveredEventsCall) DoAndReturn(f func(context.Context, string, uint32) ([]*domain.Event, error)) *MockAllStatementsListUndeliveredEventsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -3705,44 +3744,6 @@ func (c *MockAllStatementsPersistCatalogVersionCall) Do(f func(context.Context, 
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsPersistCatalogVersionCall) DoAndReturn(f func(context.Context, domain.AuthzCatalogVersion, compiler.CatalogMutations) error) *MockAllStatementsPersistCatalogVersionCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// RecordEventDelivery mocks base method.
-func (m *MockAllStatements) RecordEventDelivery(ctx context.Context, projectID, eventID, sinkID string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RecordEventDelivery", ctx, projectID, eventID, sinkID)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RecordEventDelivery indicates an expected call of RecordEventDelivery.
-func (mr *MockAllStatementsMockRecorder) RecordEventDelivery(ctx, projectID, eventID, sinkID any) *MockAllStatementsRecordEventDeliveryCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordEventDelivery", reflect.TypeOf((*MockAllStatements)(nil).RecordEventDelivery), ctx, projectID, eventID, sinkID)
-	return &MockAllStatementsRecordEventDeliveryCall{Call: call}
-}
-
-// MockAllStatementsRecordEventDeliveryCall wrap *gomock.Call
-type MockAllStatementsRecordEventDeliveryCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsRecordEventDeliveryCall) Return(arg0 error) *MockAllStatementsRecordEventDeliveryCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsRecordEventDeliveryCall) Do(f func(context.Context, string, string, string) error) *MockAllStatementsRecordEventDeliveryCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsRecordEventDeliveryCall) DoAndReturn(f func(context.Context, string, string, string) error) *MockAllStatementsRecordEventDeliveryCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -4257,6 +4258,44 @@ func (c *MockAllStatementsUpsertAuthzMembershipEdgeCall) Do(f func(context.Conte
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsUpsertAuthzMembershipEdgeCall) DoAndReturn(f func(context.Context, *domain.AuthzMembershipEdge) error) *MockAllStatementsUpsertAuthzMembershipEdgeCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// UpsertEventSinkCursor mocks base method.
+func (m *MockAllStatements) UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertEventSinkCursor", ctx, cursor)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpsertEventSinkCursor indicates an expected call of UpsertEventSinkCursor.
+func (mr *MockAllStatementsMockRecorder) UpsertEventSinkCursor(ctx, cursor any) *MockAllStatementsUpsertEventSinkCursorCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertEventSinkCursor", reflect.TypeOf((*MockAllStatements)(nil).UpsertEventSinkCursor), ctx, cursor)
+	return &MockAllStatementsUpsertEventSinkCursorCall{Call: call}
+}
+
+// MockAllStatementsUpsertEventSinkCursorCall wrap *gomock.Call
+type MockAllStatementsUpsertEventSinkCursorCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsUpsertEventSinkCursorCall) Return(arg0 error) *MockAllStatementsUpsertEventSinkCursorCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsUpsertEventSinkCursorCall) Do(f func(context.Context, *domain.EventSinkCursor) error) *MockAllStatementsUpsertEventSinkCursorCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsUpsertEventSinkCursorCall) DoAndReturn(f func(context.Context, *domain.EventSinkCursor) error) *MockAllStatementsUpsertEventSinkCursorCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -9526,6 +9565,45 @@ func (c *MockEventStatementsGetEventByIDCall) DoAndReturn(f func(context.Context
 	return c
 }
 
+// GetEventSinkCursor mocks base method.
+func (m *MockEventStatements) GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEventSinkCursor", ctx, sinkID, projectID)
+	ret0, _ := ret[0].(*domain.EventSinkCursor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEventSinkCursor indicates an expected call of GetEventSinkCursor.
+func (mr *MockEventStatementsMockRecorder) GetEventSinkCursor(ctx, sinkID, projectID any) *MockEventStatementsGetEventSinkCursorCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEventSinkCursor", reflect.TypeOf((*MockEventStatements)(nil).GetEventSinkCursor), ctx, sinkID, projectID)
+	return &MockEventStatementsGetEventSinkCursorCall{Call: call}
+}
+
+// MockEventStatementsGetEventSinkCursorCall wrap *gomock.Call
+type MockEventStatementsGetEventSinkCursorCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockEventStatementsGetEventSinkCursorCall) Return(arg0 *domain.EventSinkCursor, arg1 error) *MockEventStatementsGetEventSinkCursorCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockEventStatementsGetEventSinkCursorCall) Do(f func(context.Context, string, string) (*domain.EventSinkCursor, error)) *MockEventStatementsGetEventSinkCursorCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockEventStatementsGetEventSinkCursorCall) DoAndReturn(f func(context.Context, string, string) (*domain.EventSinkCursor, error)) *MockEventStatementsGetEventSinkCursorCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // InsertEvent mocks base method.
 func (m *MockEventStatements) InsertEvent(ctx context.Context, event *domain.Event) error {
 	m.ctrl.T.Helper()
@@ -9639,79 +9717,79 @@ func (c *MockEventStatementsListEventsCall) DoAndReturn(f func(context.Context, 
 	return c
 }
 
-// ListUndeliveredEvents mocks base method.
-func (m *MockEventStatements) ListUndeliveredEvents(ctx context.Context, sinkID string, limit uint32) ([]*domain.Event, error) {
+// ListEventsAfterCursor mocks base method.
+func (m *MockEventStatements) ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit uint32) ([]*domain.Event, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListUndeliveredEvents", ctx, sinkID, limit)
+	ret := m.ctrl.Call(m, "ListEventsAfterCursor", ctx, projectID, afterCreatedAt, afterID, limit)
 	ret0, _ := ret[0].([]*domain.Event)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListUndeliveredEvents indicates an expected call of ListUndeliveredEvents.
-func (mr *MockEventStatementsMockRecorder) ListUndeliveredEvents(ctx, sinkID, limit any) *MockEventStatementsListUndeliveredEventsCall {
+// ListEventsAfterCursor indicates an expected call of ListEventsAfterCursor.
+func (mr *MockEventStatementsMockRecorder) ListEventsAfterCursor(ctx, projectID, afterCreatedAt, afterID, limit any) *MockEventStatementsListEventsAfterCursorCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUndeliveredEvents", reflect.TypeOf((*MockEventStatements)(nil).ListUndeliveredEvents), ctx, sinkID, limit)
-	return &MockEventStatementsListUndeliveredEventsCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEventsAfterCursor", reflect.TypeOf((*MockEventStatements)(nil).ListEventsAfterCursor), ctx, projectID, afterCreatedAt, afterID, limit)
+	return &MockEventStatementsListEventsAfterCursorCall{Call: call}
 }
 
-// MockEventStatementsListUndeliveredEventsCall wrap *gomock.Call
-type MockEventStatementsListUndeliveredEventsCall struct {
+// MockEventStatementsListEventsAfterCursorCall wrap *gomock.Call
+type MockEventStatementsListEventsAfterCursorCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockEventStatementsListUndeliveredEventsCall) Return(arg0 []*domain.Event, arg1 error) *MockEventStatementsListUndeliveredEventsCall {
+func (c *MockEventStatementsListEventsAfterCursorCall) Return(arg0 []*domain.Event, arg1 error) *MockEventStatementsListEventsAfterCursorCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockEventStatementsListUndeliveredEventsCall) Do(f func(context.Context, string, uint32) ([]*domain.Event, error)) *MockEventStatementsListUndeliveredEventsCall {
+func (c *MockEventStatementsListEventsAfterCursorCall) Do(f func(context.Context, string, time.Time, string, uint32) ([]*domain.Event, error)) *MockEventStatementsListEventsAfterCursorCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockEventStatementsListUndeliveredEventsCall) DoAndReturn(f func(context.Context, string, uint32) ([]*domain.Event, error)) *MockEventStatementsListUndeliveredEventsCall {
+func (c *MockEventStatementsListEventsAfterCursorCall) DoAndReturn(f func(context.Context, string, time.Time, string, uint32) ([]*domain.Event, error)) *MockEventStatementsListEventsAfterCursorCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
-// RecordEventDelivery mocks base method.
-func (m *MockEventStatements) RecordEventDelivery(ctx context.Context, projectID, eventID, sinkID string) error {
+// UpsertEventSinkCursor mocks base method.
+func (m *MockEventStatements) UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RecordEventDelivery", ctx, projectID, eventID, sinkID)
+	ret := m.ctrl.Call(m, "UpsertEventSinkCursor", ctx, cursor)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// RecordEventDelivery indicates an expected call of RecordEventDelivery.
-func (mr *MockEventStatementsMockRecorder) RecordEventDelivery(ctx, projectID, eventID, sinkID any) *MockEventStatementsRecordEventDeliveryCall {
+// UpsertEventSinkCursor indicates an expected call of UpsertEventSinkCursor.
+func (mr *MockEventStatementsMockRecorder) UpsertEventSinkCursor(ctx, cursor any) *MockEventStatementsUpsertEventSinkCursorCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordEventDelivery", reflect.TypeOf((*MockEventStatements)(nil).RecordEventDelivery), ctx, projectID, eventID, sinkID)
-	return &MockEventStatementsRecordEventDeliveryCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertEventSinkCursor", reflect.TypeOf((*MockEventStatements)(nil).UpsertEventSinkCursor), ctx, cursor)
+	return &MockEventStatementsUpsertEventSinkCursorCall{Call: call}
 }
 
-// MockEventStatementsRecordEventDeliveryCall wrap *gomock.Call
-type MockEventStatementsRecordEventDeliveryCall struct {
+// MockEventStatementsUpsertEventSinkCursorCall wrap *gomock.Call
+type MockEventStatementsUpsertEventSinkCursorCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockEventStatementsRecordEventDeliveryCall) Return(arg0 error) *MockEventStatementsRecordEventDeliveryCall {
+func (c *MockEventStatementsUpsertEventSinkCursorCall) Return(arg0 error) *MockEventStatementsUpsertEventSinkCursorCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockEventStatementsRecordEventDeliveryCall) Do(f func(context.Context, string, string, string) error) *MockEventStatementsRecordEventDeliveryCall {
+func (c *MockEventStatementsUpsertEventSinkCursorCall) Do(f func(context.Context, *domain.EventSinkCursor) error) *MockEventStatementsUpsertEventSinkCursorCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockEventStatementsRecordEventDeliveryCall) DoAndReturn(f func(context.Context, string, string, string) error) *MockEventStatementsRecordEventDeliveryCall {
+func (c *MockEventStatementsUpsertEventSinkCursorCall) DoAndReturn(f func(context.Context, *domain.EventSinkCursor) error) *MockEventStatementsUpsertEventSinkCursorCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

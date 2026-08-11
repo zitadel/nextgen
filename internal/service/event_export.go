@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -37,24 +38,55 @@ func (a EventExportAdapter) ListProjectIDs(ctx context.Context) ([]string, error
 	return ids, nil
 }
 
+// ListClaimedProjectIDs returns project IDs that have completed claim
+// (resource_scope_index.team_id set), matching ADR 049 export visibility.
+func (a EventExportAdapter) ListClaimedProjectIDs(ctx context.Context) ([]string, error) {
+	ids, err := a.ListProjectIDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	claimed := make([]string, 0, len(ids))
+	stmts := a.Pool.Statements()
+	for _, id := range ids {
+		scope, err := stmts.GetResourceScope(ctx, id)
+		if err != nil {
+			if errors.Is(err, new(database.NoRowFoundError)) {
+				continue
+			}
+			return nil, err
+		}
+		if scope.TeamID != nil && *scope.TeamID != "" {
+			claimed = append(claimed, id)
+		}
+	}
+	return claimed, nil
+}
+
 func (a EventExportAdapter) DeleteEventsOlderThan(ctx context.Context, projectID string, createdBefore time.Time) (int64, error) {
 	return a.Pool.Statements().DeleteEventsOlderThan(ctx, projectID, createdBefore)
-}
-
-func (a EventExportAdapter) ListUndeliveredEvents(ctx context.Context, sinkID string, limit int) ([]*domain.Event, error) {
-	return a.Pool.Statements().ListUndeliveredEvents(ctx, sinkID, uint32(limit))
-}
-
-func (a EventExportAdapter) RecordDelivery(ctx context.Context, projectID, eventID, sinkID string) error {
-	return a.Pool.Statements().RecordEventDelivery(ctx, projectID, eventID, sinkID)
 }
 
 func (a EventExportAdapter) EnsureSink(ctx context.Context, sink *domain.EventSink) error {
 	return a.Pool.Statements().EnsureEventSink(ctx, sink)
 }
 
+func (a EventExportAdapter) GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error) {
+	return a.Pool.Statements().GetEventSinkCursor(ctx, sinkID, projectID)
+}
+
+func (a EventExportAdapter) UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error {
+	return a.Pool.Statements().UpsertEventSinkCursor(ctx, cursor)
+}
+
+func (a EventExportAdapter) ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit int) ([]*domain.Event, error) {
+	if limit < 0 {
+		limit = 0
+	}
+	return a.Pool.Statements().ListEventsAfterCursor(ctx, projectID, afterCreatedAt, afterID, uint32(limit))
+}
+
 var (
-	_ audit.ProjectLister          = EventExportAdapter{}
-	_ audit.EventPurger            = EventExportAdapter{}
-	_ audit.UndeliveredEventSource = EventExportAdapter{}
+	_ audit.ProjectLister     = EventExportAdapter{}
+	_ audit.EventPurger       = EventExportAdapter{}
+	_ audit.EventExportSource = EventExportAdapter{}
 )

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // SinkConfig is a deployment-configured event sink (no project CRUD in v1).
@@ -35,24 +37,26 @@ func DefaultExportConfig() ExportConfig {
 	}
 }
 
-// UndeliveredEventSource loads events missing a delivery row for a sink.
-type UndeliveredEventSource interface {
-	ListUndeliveredEvents(ctx context.Context, sinkID string, limit int) ([]*domain.Event, error)
-	RecordDelivery(ctx context.Context, projectID, eventID, sinkID string) error
+// EventExportSource backs the shipper with claimed projects and sink cursors.
+type EventExportSource interface {
+	ListClaimedProjectIDs(ctx context.Context) ([]string, error)
 	EnsureSink(ctx context.Context, sink *domain.EventSink) error
+	GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error)
+	UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error
+	ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit int) ([]*domain.Event, error)
 }
 
 // Shipper delivers events to deployment-configured sinks (ADR 049).
 type Shipper struct {
 	cfg    ExportConfig
-	src    UndeliveredEventSource
+	src    EventExportSource
 	client *http.Client
 	sinks  []*domain.EventSink
 	stop   chan struct{}
 	done   chan struct{}
 }
 
-func NewShipper(src UndeliveredEventSource, cfg ExportConfig) *Shipper {
+func NewShipper(src EventExportSource, cfg ExportConfig) *Shipper {
 	if cfg.Interval <= 0 {
 		cfg.Interval = 5 * time.Second
 	}
@@ -72,13 +76,10 @@ func (s *Shipper) Start(ctx context.Context) error {
 		return nil
 	}
 	for i, sc := range s.cfg.Sinks {
-		if !sc.Enabled && sc.Type == "" {
-			continue
-		}
-		enabled := sc.Enabled
 		if sc.Type == "" {
 			continue
 		}
+		enabled := sc.Enabled
 		sink := &domain.EventSink{
 			Type:    sc.Type,
 			Scope:   domain.EventSinkScopeDeployment,
@@ -121,31 +122,66 @@ func (s *Shipper) loop() {
 func (s *Shipper) shipOnce() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	projects, err := s.src.ListClaimedProjectIDs(ctx)
+	if err != nil {
+		slog.Error("event shipper: list claimed projects failed",
+			slog.String("error", err.Error()),
+		)
+		return
+	}
 	for _, sink := range s.sinks {
-		events, err := s.src.ListUndeliveredEvents(ctx, sink.ID, 100)
-		if err != nil {
-			slog.Error("event shipper: list undelivered failed",
+		for _, projectID := range projects {
+			s.shipProject(ctx, sink, projectID)
+		}
+	}
+}
+
+func (s *Shipper) shipProject(ctx context.Context, sink *domain.EventSink, projectID string) {
+	cursor, err := s.src.GetEventSinkCursor(ctx, sink.ID, projectID)
+	if err != nil {
+		if !errors.Is(err, new(database.NoRowFoundError)) {
+			slog.Error("event shipper: get cursor failed",
 				slog.String("sink_id", sink.ID),
+				slog.String("project_id", projectID),
 				slog.String("error", err.Error()),
 			)
-			continue
+			return
 		}
-		for _, ev := range events {
-			if err := s.deliver(ctx, sink, ev); err != nil {
-				slog.Error("event shipper: deliver failed",
-					slog.String("sink_id", sink.ID),
-					slog.String("event_id", ev.ID),
-					slog.String("error", err.Error()),
-				)
-				continue
-			}
-			if err := s.src.RecordDelivery(ctx, ev.ProjectID, ev.ID, sink.ID); err != nil {
-				slog.Error("event shipper: record delivery failed",
-					slog.String("sink_id", sink.ID),
-					slog.String("event_id", ev.ID),
-					slog.String("error", err.Error()),
-				)
-			}
+		cursor = &domain.EventSinkCursor{
+			SinkID:    sink.ID,
+			ProjectID: projectID,
+		}
+	}
+
+	events, err := s.src.ListEventsAfterCursor(ctx, projectID, cursor.LastCreatedAt, cursor.LastEventID, 100)
+	if err != nil {
+		slog.Error("event shipper: list after cursor failed",
+			slog.String("sink_id", sink.ID),
+			slog.String("project_id", projectID),
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+	for _, ev := range events {
+		if err := s.deliver(ctx, sink, ev); err != nil {
+			slog.Error("event shipper: deliver failed",
+				slog.String("sink_id", sink.ID),
+				slog.String("project_id", projectID),
+				slog.String("event_id", ev.ID),
+				slog.String("error", err.Error()),
+			)
+			return
+		}
+		cursor.LastCreatedAt = ev.CreatedAt
+		cursor.LastEventID = ev.ID
+		if err := s.src.UpsertEventSinkCursor(ctx, cursor); err != nil {
+			slog.Error("event shipper: upsert cursor failed",
+				slog.String("sink_id", sink.ID),
+				slog.String("project_id", projectID),
+				slog.String("event_id", ev.ID),
+				slog.String("error", err.Error()),
+			)
+			return
 		}
 	}
 }

@@ -9,20 +9,16 @@ CREATE TABLE zitadel_nextgen.event_sinks (
     , PRIMARY KEY (id)
 );
 
-CREATE TABLE zitadel_nextgen.event_deliveries (
-    project_id      TEXT        NOT NULL
-    , event_id      TEXT        NOT NULL
-    , sink_id       TEXT        NOT NULL
-    , delivered_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-    , PRIMARY KEY (project_id, event_id, sink_id)
-    , FOREIGN KEY (project_id, event_id)
-        REFERENCES zitadel_nextgen.events (project_id, id)
-        ON DELETE CASCADE
+CREATE TABLE zitadel_nextgen.event_sink_cursors (
+    sink_id          TEXT        NOT NULL
+        REFERENCES zitadel_nextgen.event_sinks (id)
+    , project_id     TEXT        NOT NULL
+        REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE
+    , last_created_at TIMESTAMPTZ NOT NULL
+    , last_event_id  TEXT        NOT NULL
+    , PRIMARY KEY (sink_id, project_id)
 );
 
-CREATE INDEX idx_event_deliveries_sink
-    ON zitadel_nextgen.event_deliveries (sink_id, project_id, event_id);
-
 -- +goose Down
-DROP TABLE IF EXISTS zitadel_nextgen.event_deliveries;
+DROP TABLE IF EXISTS zitadel_nextgen.event_sink_cursors;
 DROP TABLE IF EXISTS zitadel_nextgen.event_sinks;

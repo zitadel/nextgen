@@ -412,6 +412,7 @@ type EventStatements interface {
 	// DeleteEventsOlderThan removes events with created_at before cutoff (retention job).
 	DeleteEventsOlderThan(ctx context.Context, projectID string, createdBefore time.Time) (int64, error)
 	EnsureEventSink(ctx context.Context, sink *domain.EventSink) error
-	RecordEventDelivery(ctx context.Context, projectID, eventID, sinkID string) error
-	ListUndeliveredEvents(ctx context.Context, sinkID string, limit uint32) ([]*domain.Event, error)
+	GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error)
+	UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error
+	ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit uint32) ([]*domain.Event, error)
 }

@@ -56,17 +56,17 @@ ON CONFLICT(id) DO UPDATE SET
     url = excluded.url,
     enabled = excluded.enabled`
 
-	recordEventDeliveryStmt = `
-INSERT OR IGNORE INTO event_deliveries (project_id, event_id, sink_id, delivered_at)
-VALUES (?, ?, ?, ?)`
+	getEventSinkCursorStmt = `
+SELECT sink_id, project_id, last_created_at, last_event_id
+FROM event_sink_cursors
+WHERE sink_id = ? AND project_id = ?`
 
-	listUndeliveredEventsStmt = eventQuery + `
- WHERE NOT EXISTS (
-    SELECT 1 FROM event_deliveries d
-    WHERE d.project_id = events.project_id AND d.event_id = events.id AND d.sink_id = ?
- )
- ORDER BY created_at, id
- LIMIT ?`
+	upsertEventSinkCursorStmt = `
+INSERT INTO event_sink_cursors (sink_id, project_id, last_created_at, last_event_id)
+VALUES (?, ?, ?, ?)
+ON CONFLICT(sink_id, project_id) DO UPDATE SET
+    last_created_at = excluded.last_created_at,
+    last_event_id = excluded.last_event_id`
 )
 
 type eventStatements struct{ statement }
@@ -193,23 +193,64 @@ func (e eventStatements) EnsureEventSink(ctx context.Context, sink *domain.Event
 	return wrapError(err)
 }
 
-// RecordEventDelivery implements [service.EventStatements].
-func (e eventStatements) RecordEventDelivery(ctx context.Context, projectID, eventID, sinkID string) error {
-	_, err := e.client.Exec(ctx, recordEventDeliveryStmt, projectID, eventID, sinkID, nowUnixNano())
-	return wrapError(err)
-}
-
-// ListUndeliveredEvents implements [service.EventStatements].
-func (e eventStatements) ListUndeliveredEvents(ctx context.Context, sinkID string, limit uint32) ([]*domain.Event, error) {
-	if limit == 0 {
-		limit = 100
-	}
-	rows, err := e.client.Query(ctx, listUndeliveredEventsStmt, sinkID, limit)
+// GetEventSinkCursor implements [service.EventStatements].
+func (e eventStatements) GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error) {
+	var (
+		c           domain.EventSinkCursor
+		lastCreated int64
+	)
+	err := e.client.QueryRow(ctx, getEventSinkCursorStmt, sinkID, projectID).Scan(
+		&c.SinkID, &c.ProjectID, &lastCreated, &c.LastEventID,
+	)
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	defer rows.Close()
-	return collectRows(rows, scanEvent)
+	c.LastCreatedAt = timeFromUnixNano(lastCreated)
+	return &c, nil
+}
+
+// UpsertEventSinkCursor implements [service.EventStatements].
+func (e eventStatements) UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error {
+	if cursor == nil {
+		return domain.ErrEventInvalid("missing cursor", nil)
+	}
+	_, err := e.client.Exec(ctx, upsertEventSinkCursorStmt,
+		cursor.SinkID, cursor.ProjectID, cursor.LastCreatedAt.UTC().UnixNano(), cursor.LastEventID,
+	)
+	return wrapError(err)
+}
+
+// ListEventsAfterCursor implements [service.EventStatements].
+func (e eventStatements) ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit uint32) ([]*domain.Event, error) {
+	if limit == 0 {
+		limit = 100
+	}
+	filters := []database.Filter[domain.EventField]{
+		database.Equal(database.Col(domain.EventFieldProjectID), projectID),
+	}
+	if !afterCreatedAt.IsZero() || afterID != "" {
+		filters = append(filters, database.CompareGreater(
+			database.Term(database.Col(domain.EventFieldCreatedAt), afterCreatedAt.UTC()),
+			database.Term(database.Col(domain.EventFieldID), afterID),
+		))
+	}
+	res, err := e.ListEvents(ctx, &database.ListOptions[domain.EventField]{
+		Filter: database.And(filters...),
+		Pagination: database.Page[domain.EventField]{
+			Limit: limit,
+			OrderBy: database.OrderBy[domain.EventField]{
+				Columns: []database.Column[domain.EventField]{
+					database.Col(domain.EventFieldCreatedAt),
+					database.Col(domain.EventFieldID),
+				},
+				Direction: database.OrderAsc,
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res.Items, nil
 }
 
 func scanEvent(row *sql.Rows) (*domain.Event, error) {
