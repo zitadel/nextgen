@@ -225,10 +225,10 @@ export abstract class AbstractRulePatcher implements Patcher {
         mode: 0o600,
         contents: `${stableStringify({
           project_id: ctx.project.id,
-          project_secret: ctx.project.projectSecret,
-          preview_secret: ctx.project.previewSecret,
-          preview_origins: ctx.project.previewOrigins,
-          created_at: ctx.project.createdAt,
+          project_secret: ctx.project.project_secret,
+          preview_secret: ctx.project.preview_secret,
+          preview_origins: ctx.project.preview_origins,
+          created_at: ctx.project.created_at,
         })}\n`,
       },
       { kind: "write", path: "zitadel.json", contents: `${stableStringify(projectConfig(ctx))}\n` },
@@ -248,7 +248,7 @@ export abstract class AbstractRulePatcher implements Patcher {
         path: ".env.local",
         entries: {
           ZITADEL_PROJECT_ID: ctx.project.id,
-          ZITADEL_PROJECT_SECRET: ctx.project.projectSecret,
+          ZITADEL_PROJECT_SECRET: ctx.project.project_secret,
           ZITADEL_ENVIRONMENT: "development",
           ZITADEL_ISSUER: ctx.issuer,
           ZITADEL_URL: ctx.server,
@@ -311,11 +311,11 @@ async function readTextIfExists(path: string): Promise<string | undefined> {
 /** Builds the `zitadel.json` body persisted at the project root. */
 function projectConfig(ctx: PatchContext): Record<string, unknown> {
   const environments: Record<string, unknown> = { development: { issuer: ctx.issuer } };
-  if (ctx.project.previewOrigins.length > 0) {
-    // previewOrigins are already full origins (scheme://host[:port]); don't
+  if (ctx.project.preview_origins.length > 0) {
+    // preview_origins are already full origins (scheme://host[:port]); don't
     // prepend a scheme or it doubles up (https://http://localhost:3000).
     environments.preview = {
-      issuer_pattern: [...ctx.project.previewOrigins],
+      issuer_pattern: [...ctx.project.preview_origins],
     };
   }
   return {

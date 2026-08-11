@@ -191,7 +191,7 @@ func TestManagementAuthz(t *testing.T) {
 
 			getResp, err := ownClient.GetUserByID(t.Context(), api.GetUserByIDParams{ProjectID: victimID, UserID: victimUserID})
 			require.NoError(t, err)
-			assert.IsType(t, &api.GetUserByIDOK{}, getResp, helpers.MustMarshal(t, getResp))
+			assert.IsType(t, &api.User{}, getResp, helpers.MustMarshal(t, getResp))
 
 			// The owner's secret does reach the delete: project.write implies
 			// user.delete, so the rejection above was the binding, not the op.

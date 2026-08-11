@@ -18,7 +18,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 func mustJSONSchemaCache(t *testing.T, size int) *lru.TwoQueueCache[string, *jsonschema.Schema] {
@@ -357,5 +357,165 @@ func TestJSONSchemaResolver_BuiltinEmbedded(t *testing.T) {
 		schema, err := r.Resolve(ctx, store, "proj-1", userSchemaURL, nil)
 		require.NoError(t, err)
 		require.NotNil(t, schema)
+	})
+}
+
+func TestNewJSONSchema_ReservedProperties(t *testing.T) {
+	const projectID = "proj-1"
+
+	// The user object carries `id` and `metadata` as system-managed fields
+	// (see api/openapi/endpoints/users/user.yaml), so a tenant schema must not
+	// declare them itself.
+	t.Run("rejected", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			schema  string
+			message string
+		}{
+			{
+				name:    "id",
+				schema:  `{"type":"object","properties":{"id":{"type":"string"}}}`,
+				message: "schema cannot have property id",
+			},
+			{
+				name:    "metadata",
+				schema:  `{"type":"object","properties":{"metadata":{"type":"object"}}}`,
+				message: "schema cannot have property metadata",
+			},
+			{
+				name:    "id alongside legitimate properties",
+				schema:  `{"type":"object","properties":{"email":{"type":"string"},"id":{"type":"string"}}}`,
+				message: "schema cannot have property id",
+			},
+			{
+				name:    "metadata alongside legitimate properties",
+				schema:  `{"type":"object","properties":{"email":{"type":"string"},"metadata":{"type":"object"}}}`,
+				message: "schema cannot have property metadata",
+			},
+			{
+				// id is checked first, so it is the one reported.
+				name:    "both reserved properties reports id",
+				schema:  `{"type":"object","properties":{"id":{"type":"string"},"metadata":{"type":"object"}}}`,
+				message: "schema cannot have property id",
+			},
+			{
+				// The check tests for the key, not for a well-formed subschema.
+				name:    "id holding a non-schema value",
+				schema:  `{"type":"object","properties":{"id":true}}`,
+				message: "schema cannot have property id",
+			},
+			{
+				name:    "metadata holding a non-schema value",
+				schema:  `{"type":"object","properties":{"metadata":"reserved"}}`,
+				message: "schema cannot have property metadata",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				schema, err := domain.NewJSONSchema(projectID, []byte(tt.schema))
+				require.Error(t, err)
+				assert.Nil(t, schema)
+				assert.ErrorIs(t, err, domain.ErrJSONSchemaInvalid())
+				assert.EqualError(t, err, tt.message)
+			})
+		}
+	})
+
+	t.Run("accepted", func(t *testing.T) {
+		tests := []struct {
+			name   string
+			schema string
+		}{
+			{
+				name:   "no properties at all",
+				schema: `{"type":"object"}`,
+			},
+			{
+				name:   "empty properties",
+				schema: `{"type":"object","properties":{}}`,
+			},
+			{
+				name:   "only customer-defined properties",
+				schema: `{"type":"object","properties":{"email":{"type":"string"},"givenName":{"type":"string"}}}`,
+			},
+			{
+				// Only the top level is reserved: a nested object may still
+				// carry its own id, e.g. an address with its own identifier.
+				name:   "id nested inside another property",
+				schema: `{"type":"object","properties":{"address":{"type":"object","properties":{"id":{"type":"string"},"metadata":{"type":"object"}}}}}`,
+			},
+			{
+				// The reserved keys are matched exactly, so differently-cased
+				// names remain available to customers.
+				name:   "differently cased names",
+				schema: `{"type":"object","properties":{"ID":{"type":"string"},"Id":{"type":"string"},"Metadata":{"type":"object"}}}`,
+			},
+			{
+				name:   "names merely containing the reserved words",
+				schema: `{"type":"object","properties":{"identifier":{"type":"string"},"metadataUrl":{"type":"string"}}}`,
+			},
+			{
+				// properties is not an object, so there are no keys to reserve;
+				// such a schema fails later, at JSON Schema compilation.
+				name:   "properties is not an object",
+				schema: `{"type":"object","properties":"nonsense"}`,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				schema, err := domain.NewJSONSchema(projectID, []byte(tt.schema))
+				require.NoError(t, err)
+				require.NotNil(t, schema)
+				assert.Equal(t, projectID, schema.ProjectID)
+				assert.Equal(t, []byte(tt.schema), schema.Schema)
+			})
+		}
+	})
+
+	t.Run("a reserved key with a null value is not rejected", func(t *testing.T) {
+		// Characterisation test, not an endorsement: maputil.Get[any] reports a
+		// JSON null as absent, because a type assertion on a nil interface
+		// fails. Switching the check to a plain `_, ok := props["id"]` lookup
+		// would close this gap — flip these to require.Error if that happens.
+		for _, schema := range []string{
+			`{"type":"object","properties":{"id":null}}`,
+			`{"type":"object","properties":{"metadata":null}}`,
+		} {
+			got, err := domain.NewJSONSchema(projectID, []byte(schema))
+			require.NoError(t, err)
+			require.NotNil(t, got)
+		}
+	})
+}
+
+func TestNewJSONSchema_Metadata(t *testing.T) {
+	const projectID = "proj-1"
+
+	t.Run("uses $id as the URL when present", func(t *testing.T) {
+		schema, err := domain.NewJSONSchema(projectID, []byte(`{"$id":"https://example.test/user.json","type":"object"}`))
+		require.NoError(t, err)
+		assert.Equal(t, "https://example.test/user.json", schema.URL)
+	})
+
+	t.Run("carries objectType through when present", func(t *testing.T) {
+		schema, err := domain.NewJSONSchema(projectID, []byte(`{"type":"object","objectType":"human-user"}`))
+		require.NoError(t, err)
+		require.NotNil(t, schema.ObjectType)
+		assert.Equal(t, "human-user", *schema.ObjectType)
+	})
+
+	t.Run("leaves objectType nil when absent", func(t *testing.T) {
+		schema, err := domain.NewJSONSchema(projectID, []byte(`{"type":"object"}`))
+		require.NoError(t, err)
+		assert.Nil(t, schema.ObjectType)
+	})
+
+	t.Run("rejects a payload that is not JSON", func(t *testing.T) {
+		schema, err := domain.NewJSONSchema(projectID, []byte(`{not json`))
+		require.Error(t, err)
+		assert.Nil(t, schema)
+		assert.ErrorIs(t, err, domain.ErrJSONSchemaInvalid())
 	})
 }

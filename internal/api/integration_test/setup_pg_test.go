@@ -9,8 +9,9 @@ import (
 	"testing"
 
 	slogctx "github.com/veqryn/slog-context"
+	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/v2/dbtest"
+	"github.com/zitadel/nextgen/internal/storage/dbtest"
 )
 
 func TestMain(m *testing.M) {
@@ -19,6 +20,7 @@ func TestMain(m *testing.M) {
 
 func runTests(m *testing.M) int {
 	ctx := context.Background()
+	api.FullErrorInResponse.Store(true)
 
 	pool, stop, err := dbtest.Postgres(ctx)
 	if err != nil {

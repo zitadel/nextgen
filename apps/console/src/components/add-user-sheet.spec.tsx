@@ -53,11 +53,11 @@ function stubSchemas(
   projects: { id: string; name: string }[] = [],
 ) {
   server.use(
-    http.get(USERS_URL, () => HttpResponse.json([])),
+    http.get(USERS_URL, () => HttpResponse.json({ users: [] })),
     http.post(PROJECTS_QUERY_URL, () => HttpResponse.json({ projects })),
     http.get(SCHEMAS_URL, () =>
       HttpResponse.json(
-        Object.keys(schemas).map((id) => ({ id, createdAt: "2026-07-01T00:00:00Z" })),
+        Object.keys(schemas).map((id) => ({ id, created_at: "2026-07-01T00:00:00Z" })),
       ),
     ),
     ...Object.entries(schemas).map(([id, body]) =>

@@ -8,6 +8,7 @@ export const cliPackageRoot = fileURLToPath(new URL("../../", import.meta.url));
 
 const commandIds = [
   "apply",
+  "claim",
   "doctor",
   "eject",
   "logs",

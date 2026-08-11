@@ -152,9 +152,9 @@ the corresponding resource permission.
 | Permission | Endpoints | Notes |
 |---|---|---|
 | `team.create` | `POST /teams` | |
-| `team.read` | `GET /teams/{id}` | Team resource only. Does **not** imply `team_membership.*` or `user.*`. Collection list (`GET /teams`) is **not yet exposed**. |
-| `team.write` | `PATCH /teams/{id}` | Team attributes only. Does **not** imply `team_membership.*`, invitations, or billing. **Not yet exposed**. |
-| `team.delete` | `DELETE /teams/{id}` | **Not yet exposed**. |
+| `team.read` | `POST /teams/query`, `GET /teams/{id}` | Team resource only. Does **not** imply `team_membership.*` or `user.*`. |
+| `team.write` | `PATCH /teams/{id}` | Team attributes only. Does **not** imply `team_membership.*`, invitations, or billing. |
+| `team.delete` | `DELETE /teams/{id}` | Deactivates and tombstones the team, cascading to memberships and lifecycle-owned users (ADR 024). |
 
 ### Users
 
@@ -317,7 +317,7 @@ not yet exposed.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
-| `session.read` | `GET /sessions`, `GET /sessions/{id}` | Operator list + get. |
+| `session.read` | `POST /sessions/query`, `GET /sessions/{id}` | Operator list + get. |
 | `session.write` | `POST /sessions`, `POST /sessions/exchange` | App plane: optional anonymous shell; handoff exchange (create or upgrade authenticated session). |
 | `session.delete` | `DELETE /sessions/{id}` | Operator revoke. |
 

@@ -98,10 +98,10 @@ func TestOgenErrorHandlerSecurityErrorNormalizedMessage(t *testing.T) {
 	t.Parallel()
 	srv := newErrorHandlerTestServer(t, nil)
 
-	// listSessions requires oauth2; without credentials the security check
-	// fails before parameter decode and before any handler method runs.
+	// querySessions requires oauth2; without credentials the security check
+	// fails before body and parameter decode and before any handler method runs.
 	rec := httptest.NewRecorder()
-	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/sessions", nil))
+	srv.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/sessions/query", nil))
 
 	require.Equal(t, http.StatusUnauthorized, rec.Code)
 	require.JSONEq(t,
@@ -118,4 +118,40 @@ func TestDomainErrorDetailsOmitsDiagnostics(t *testing.T) {
 	require.Equal(t, api.ErrorCode("internal"), details.Code)
 	require.Equal(t, "An unexpected error occurred.", details.Message)
 	require.False(t, details.Details.Set, "parent/location diagnostics must not be serialized")
+}
+
+func TestDomainErrorDetails_requestInvalidField(t *testing.T) {
+	t.Parallel()
+
+	details := domainErrorDetails(
+		domain.ErrRequestInvalid().
+			WithMessage(`invalid value for field "age"`).
+			WithDetails(domain.RequestInvalidFieldDetails{Field: "age"}),
+	)
+
+	require.Equal(t, api.ErrorCode("req.invalid"), details.Code)
+	require.Equal(t, `invalid value for field "age"`, details.Message)
+	require.True(t, details.Details.Set)
+	require.JSONEq(t, `{"field":"age"}`, string(details.Details.Value["details"]))
+	_, hasParent := details.Details.Value["parent"]
+	require.False(t, hasParent, "parent must stay off when FullErrorInResponse is false")
+}
+
+func TestDomainErrorDetails_fullErrorInResponseComposesWithProducerDetails(t *testing.T) {
+	// Mutates package-global FullErrorInResponse; must not run parallel with
+	// other tests that assume the default (false).
+	prev := FullErrorInResponse.Load()
+	FullErrorInResponse.Store(true)
+	t.Cleanup(func() { FullErrorInResponse.Store(prev) })
+
+	details := domainErrorDetails(
+		domain.ErrRequestInvalid().
+			WithMessage(`invalid value for field "age"`).
+			WithDetails(domain.RequestInvalidFieldDetails{Field: "age"}).
+			WithParent(errors.New("json: cannot unmarshal number")),
+	)
+
+	require.True(t, details.Details.Set)
+	require.JSONEq(t, `{"field":"age"}`, string(details.Details.Value["details"]))
+	require.Contains(t, string(details.Details.Value["parent"]), "json: cannot unmarshal number")
 }

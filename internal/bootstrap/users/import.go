@@ -10,7 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // Import loads bootstrap users from JSON files into the database.
@@ -104,8 +104,8 @@ func importFile(
 	return nil
 }
 
-func buildCreateAttributes(attrs map[string]json.RawMessage) ([]*domain.CreateAttribute, error) {
-	out := make([]*domain.CreateAttribute, 0, len(attrs))
+func buildCreateAttributes(attrs map[domain.AttributeKey]json.RawMessage) (domain.CreateAttributes, error) {
+	out := make(domain.CreateAttributes, 0, len(attrs))
 	for key, raw := range attrs {
 		value, err := decodeScalar(raw, key)
 		if err != nil {
@@ -119,7 +119,7 @@ func buildCreateAttributes(attrs map[string]json.RawMessage) ([]*domain.CreateAt
 		if err != nil {
 			return nil, fmt.Errorf("attribute %q: %w", key, err)
 		}
-		out = append(out, attr)
+		out = append(out, *attr)
 	}
 	return out, nil
 }

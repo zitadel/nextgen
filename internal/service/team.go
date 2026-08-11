@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-const teamFieldCreatedAt = "createdAt"
+const teamFieldCreatedAt = "created_at"
 
 type TeamService struct {
 	v2Pool *DB
@@ -210,4 +210,17 @@ func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (*domai
 		return nil, domain.ErrInternal(err).WithMessage("failed to update team")
 	}
 	return team, nil
+}
+
+// Delete deactivates the team and cascades to its memberships and the users
+// whose lifecycle it owns (ADR 024). The team is tombstoned, not erased, so it
+// stays readable through [TeamService.Get] with status deactivated.
+//
+// Delete is idempotent: DeactivateTeam only touches an active team, so an
+// unknown or already-deactivated team reports success without persisting any changes.
+func (s *TeamService) Delete(ctx context.Context, projectID, teamID string) error {
+	if err := s.v2Pool.Statements().DeactivateTeam(ctx, projectID, teamID); err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to delete team")
+	}
+	return nil
 }

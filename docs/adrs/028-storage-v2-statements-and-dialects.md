@@ -301,7 +301,8 @@ production peer. Postgres/Spanner integration tests bring up a **Postgres
 testcontainer** or a **Spanner emulator testcontainer** by default
 (`v2/testdb`); override with `ZITADEL_TEST_POSTGRES_URL` /
 `ZITADEL_TEST_SPANNER_URL`, or a real Spanner instance via
-`ZITADEL_TEST_SPANNER_INSTANCE`.
+`ZITADEL_TEST_SPANNER_INSTANCE` (kept but unwired — CI is emulator-only so
+aborts stay visible, see #788; removal tracked in #793).
 
 ## Pre-merge checklist
 
@@ -330,6 +331,7 @@ items off as work lands; remove completed entries when no longer useful.
 | [011 Resource Identifiers](011-resource-identifiers.md) | ADR 027 refines § Package roles: `Identity` + ID generation move to v2 dialects |
 | [008 Users EAV Store](008-users-eav-store.md) | EAV SQL may remain specialized; port to v2 statements |
 | [010 Session/Auth Attempt](010-session-auth-attempt-check-model.md) | Session/auth-attempt entity SQL lives in v2 statements; model still authoritative |
+| [048 Wide Events](048-wide-events-internal-audit-primitive.md) | Event emission on `AllStatements` mutations; `EventStatements.InsertEvent` |
 
 ## Consequences
 

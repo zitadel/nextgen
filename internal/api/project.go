@@ -8,7 +8,7 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectRequest) (api.CreateProjectRes, error) {
@@ -160,6 +160,10 @@ func projectErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	case domain.ErrProjectNameInvalid().Code, domain.ErrProjectMissingID().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case domain.ErrProjectAlreadyClaimed().Code:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
+	case domain.ErrProjectClaimExpired().Code:
+		return errorResponseWithStatusCode(http.StatusGone, err)
 	default:
 		return internalErrorResponse(err)
 	}

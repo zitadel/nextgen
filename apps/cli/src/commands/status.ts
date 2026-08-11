@@ -1,5 +1,6 @@
 import { createZitadelClient } from "@zitadel/api/client";
 
+import { claimAction, claimCommand, claimState, type ClaimState } from "../lib/claim-state";
 import { isProcessRunning } from "../lib/local-server/binary";
 import { inspectContainer } from "../lib/local-server/docker";
 import { customizeAndPublishActions, verifyLoginAction } from "../lib/journey-guidance";
@@ -15,6 +16,7 @@ import {
   hasZitadelConfig,
   hasZitadelSecret,
   readDevelopmentIssuer,
+  readProjectServer,
   readZitadelConfig,
   readZitadelSecret,
 } from "../lib/project";
@@ -60,12 +62,7 @@ export default class Status extends BaseCommand {
       project.lifecycle === "configured"
         ? await detectUserPresence(this.meta.cwd, this.meta.source)
         : "unknown";
-    const nextCommands = nextCommandsFor(
-      serverLifecycle,
-      project.lifecycle,
-      users,
-      this.meta.cliVersion,
-    );
+    const nextCommands = nextCommandsFor(serverLifecycle, project, users, this.meta.cliVersion);
     const nextActions = nextActionsFor(project, users, this.meta.cliVersion);
 
     return this.emit({
@@ -139,6 +136,12 @@ type ProjectStatus =
       lifecycle: "configured";
       project_id: string;
       issuer?: string;
+      /**
+       * Whether the project is attached to a team, from the local
+       * `.zitadel/secret`. Omitted entirely off the cloud, where there is
+       * nothing to attach and the field would only invite agents to act on it.
+       */
+      claim?: ClaimState;
     };
 
 async function projectStatus(cwd: string): Promise<ProjectStatus> {
@@ -159,10 +162,15 @@ async function projectStatus(cwd: string): Promise<ProjectStatus> {
   }
 
   const secret = await readZitadelSecret(cwd);
+  // Gated on the server recorded in `zitadel.json`, not `this.meta.source`:
+  // `status --server local` rewrites the source for the health probe, but it
+  // does not move the project, so the source would answer the wrong question.
+  const claim = claimState({ secret, server: readProjectServer(config) });
   return {
     lifecycle: "configured",
     project_id: String(config.project ?? secret.project_id ?? ""),
     issuer: readDevelopmentIssuer(config),
+    ...(claim.kind === "not-applicable" ? {} : { claim }),
   };
 }
 
@@ -186,7 +194,7 @@ async function detectUserPresence(cwd: string, source: string): Promise<UserPres
     });
     const probe = client
       .listUsers({ limit: 1 }, { signal: AbortSignal.timeout(PRESENCE_PROBE_TIMEOUT_MS) })
-      .then((users): UserPresence => (users.length > 0 ? "some" : "none"))
+      .then(({ users }): UserPresence => (users.length > 0 ? "some" : "none"))
       .catch((): UserPresence => "unknown");
     // The abort signal alone is not enough: DNS resolution can outlive it
     // (getaddrinfo runs on the threadpool and some environments take many
@@ -213,18 +221,22 @@ function nextActionsFor(project: ProjectStatus, users: UserPresence, cliVersion:
   if (project.lifecycle !== "configured") {
     return [];
   }
+  // Additive to the journey staging rather than a stage of its own: attaching a
+  // team is orthogonal to whether login works yet, so it appends to whichever
+  // stage the user is in instead of displacing it.
+  const claim = project.claim?.kind === "detached" ? [claimAction(cliVersion)] : [];
   if (users === "none") {
-    return [verifyLoginAction(project.issuer)];
+    return [verifyLoginAction(project.issuer), ...claim];
   }
   if (users === "some") {
-    return customizeAndPublishActions(cliVersion);
+    return [...customizeAndPublishActions(cliVersion), ...claim];
   }
-  return [];
+  return claim;
 }
 
 function nextCommandsFor(
   serverLifecycle: string,
-  projectLifecycle: ProjectStatus["lifecycle"],
+  project: ProjectStatus,
   users: UserPresence,
   cliVersion: string,
 ): string[] {
@@ -232,15 +244,18 @@ function nextCommandsFor(
   if (serverLifecycle !== "running") {
     commands.push(publicCliCommand("start", cliVersion));
   }
-  if (projectLifecycle === "not-configured") {
+  if (project.lifecycle === "not-configured") {
     commands.push(publicCliCommand("setup --server local", cliVersion));
-  } else if (projectLifecycle === "orphaned-config") {
+  } else if (project.lifecycle === "orphaned-config") {
     commands.push(
       publicCliCommand("setup --force", cliVersion),
       publicCliCommand("doctor --fix", cliVersion),
     );
   } else {
     commands.push(publicCliCommand("doctor", cliVersion));
+    if (project.claim?.kind === "detached") {
+      commands.push(claimCommand(cliVersion));
+    }
     if (users === "none") {
       // Staged like next_actions: before the first login is proven in a
       // browser, publishing is premature — `plan` previews safely and the

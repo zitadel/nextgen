@@ -19,6 +19,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
@@ -102,12 +105,15 @@ function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => v
                       title={`${label} — not available yet`}
                       onClick={(event) => event.preventDefault()}
                     >
-                      <Icon aria-hidden />
+                      {Icon && <Icon aria-hidden />}
                       <span>{label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
               }
+              // A parent with children highlights only on an exact match: the
+              // child paths sit under it (`/schemas` is a sibling route, but
+              // `Users` fuzzy-matching its own subtree would light both rows).
               const active = !!matchRoute({ to: item.to, fuzzy: item.to !== "/" });
               return (
                 <SidebarMenuItem key={label}>
@@ -118,10 +124,27 @@ function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => v
                     className="font-serif"
                   >
                     <Link to={item.to} title={label}>
-                      <Icon aria-hidden />
+                      {Icon && <Icon aria-hidden />}
                       <span>{label}</span>
                     </Link>
                   </SidebarMenuButton>
+                  {item.children.length > 0 && (
+                    <SidebarMenuSub>
+                      {item.children.map((child) => (
+                        <SidebarMenuSubItem key={child.nav.label}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={!!matchRoute({ to: child.to, fuzzy: true })}
+                            className="font-serif"
+                          >
+                            <Link to={child.to} title={child.nav.label}>
+                              <span>{child.nav.label}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  )}
                 </SidebarMenuItem>
               );
             })}

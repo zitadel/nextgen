@@ -11,8 +11,7 @@ get:
       content:
         application/json:
           schema:
-            type: object
-            additionalProperties: true
+            $ref: ../user.yaml
     '401':
       description: Client was not authorized or the session is anonymous
       content:

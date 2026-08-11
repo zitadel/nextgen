@@ -1,8 +1,9 @@
-import { readFile, stat } from "node:fs/promises";
+import { chmod, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "./errors";
-import { isObject, parseJsonObject } from "./json";
+import { isObject, parseJsonObject, stableStringify } from "./json";
+import { DEFAULT_SERVER } from "./server";
 
 /**
  * Reports whether `cwd` has already been initialized, i.e. a committed
@@ -43,6 +44,15 @@ export type ZitadelSecret = {
   preview_secret: string;
   preview_origins: string[];
   created_at: string;
+  /**
+   * When the project was attached to an owning team, recorded by
+   * `zitadel claim`. Absent until then. The durable record lives on the
+   * platform (the team's project grant); this is a local cache so commands can
+   * answer "is this already attached?" without a round trip.
+   */
+  claimed_at?: string;
+  /** The team that owns the project, recorded alongside {@link claimed_at}. */
+  team_id?: string;
 };
 
 /**
@@ -98,6 +108,27 @@ export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
 }
 
 /**
+ * Writes `.zitadel/secret` back after a command mutated it (today only
+ * `zitadel claim`, which records `claimed_at` and `team_id`).
+ *
+ * Atomic by construction: the bytes land in a sibling temp file that is
+ * `chmod`ed and then `rename`d over the target, so a crash mid-write can never
+ * leave a truncated or world-readable credentials file — the same
+ * temp-then-rename the file-writer uses for managed files. Serialised with
+ * {@link stableStringify} at mode `0600` to match exactly how setup's patcher
+ * first wrote it, so a claim does not churn the file's formatting or loosen
+ * the permissions `doctor` asserts.
+ */
+export async function writeZitadelSecret(cwd: string, secret: ZitadelSecret): Promise<void> {
+  const path = join(cwd, ".zitadel/secret");
+  const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
+  await writeFile(tmp, `${stableStringify(secret)}\n`, { mode: 0o600 });
+  // `writeFile`'s mode is masked by the process umask, so re-assert it.
+  await chmod(tmp, 0o600).catch(() => undefined);
+  await rename(tmp, path);
+}
+
+/**
  * Reads the configured renderer id from a parsed `zitadel.json`, normalising the
  * legacy `default` alias to `react` and falling back to `react` when unset. The
  * value is validated downstream by `getRenderer`, so callers need not re-check.
@@ -124,6 +155,25 @@ export function readPreset(config: Record<string, unknown>): string | undefined 
  */
 export function readUseCase(config: Record<string, unknown>): string | undefined {
   return typeof config.useCase === "string" ? config.useCase : undefined;
+}
+
+/**
+ * Reads the top-level `server` origin from a parsed `zitadel.json`, falling
+ * back to {@link DEFAULT_SERVER} when the key is absent.
+ *
+ * Top-level only, unlike `resolveServer`, which prefers the selected
+ * environment's `server` before falling back here. That is the point: an
+ * environment override says where one invocation should talk, not where the
+ * project lives. No practical difference today, since setup always writes a
+ * concrete top-level `server`.
+ *
+ * This is the server the project actually lives on, which is not always the one
+ * a command is talking to: `doctor` pins its own source to the local runtime URL
+ * and `status --server local` overrides it. Anything reasoning about the
+ * project itself (rather than about this invocation) has to read it from here.
+ */
+export function readProjectServer(config: Record<string, unknown>): string {
+  return typeof config.server === "string" ? config.server : DEFAULT_SERVER;
 }
 
 /** Reads `environments.development.issuer` from a parsed `zitadel.json`, if present. */

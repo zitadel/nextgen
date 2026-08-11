@@ -17,6 +17,7 @@ import {
 } from "@zitadel/config/defaults";
 import { consola } from "consola";
 
+import { claimAction, claimCommand, claimState } from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
@@ -310,7 +311,7 @@ export default class Setup extends BaseCommand {
         ? { filesWritten: [] }
         : await materializeSetupResources({
             cwd,
-            client: createZitadelClient({ baseUrl: answers.server, token: project.projectSecret }),
+            client: createZitadelClient({ baseUrl: answers.server, token: project.project_secret }),
             projectId: project.id,
             force,
             preset: answers.preset,
@@ -390,6 +391,24 @@ export default class Setup extends BaseCommand {
     });
 
     const writtenRel = allFilesWritten.map((file) => relativeDisplay(cwd, file));
+    // The nudge rides both surfaces from one decision: the box for humans, the
+    // envelope for agents.
+    //
+    // It joins `boxActions` rather than being held back from it. That list is
+    // journey-staged by *omission* (customize/publish is absent until login
+    // works, see `install.ts`), and this is not part of that journey: attaching
+    // a team is orthogonal to whether login works yet, exactly as in `status`.
+    // Position in the list carries no staging meaning, so appending is not a
+    // way of deferring it.
+    //
+    // Empty off the cloud, where nothing can be attached.
+    const claimNudge =
+      claimState({ secret: {}, server: answers.server }).kind === "detached"
+        ? {
+            actions: [claimAction(this.meta.cliVersion)],
+            commands: [claimCommand(this.meta.cliVersion)],
+          }
+        : { actions: [], commands: [] };
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -410,7 +429,11 @@ export default class Setup extends BaseCommand {
       // pre-coloured rows (path/url/id helpers) survive intact.
       consola.box({
         title: "Zitadel is ready",
-        message: [renderSummary(sections), "", installOutcome.boxActions.join("\n")].join("\n"),
+        message: [
+          renderSummary(sections),
+          "",
+          [...installOutcome.boxActions, ...claimNudge.actions].join("\n"),
+        ].join("\n"),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
     }
@@ -442,11 +465,14 @@ export default class Setup extends BaseCommand {
         // The chosen login design, or null for the built-in template — so
         // agents can verify what setup published without diffing the repo.
         design: answers.design ?? null,
+        // Branding guidance before the claim nudge: make it yours, then
+        // claim to keep it (the same order the manifesto's journey walks).
         next_actions: [
           ...installOutcome.nextActions,
           brandingGuidanceAction(answers.design, this.meta.cliVersion),
+          ...claimNudge.actions,
         ],
-        next_commands: installOutcome.nextCommands,
+        next_commands: [...installOutcome.nextCommands, ...claimNudge.commands],
       },
     });
   }
@@ -494,10 +520,10 @@ async function resolveScaffoldFramework(
 function dryRunProject(issuer: string): CreateProject201 {
   return {
     id: "dry-run-0000",
-    projectSecret: "sk_proj_dry_run_full",
-    previewSecret: "sk_proj_dry_run_preview",
-    previewOrigins: [issuer],
-    createdAt: "2026-04-21T14:03:11.000Z",
+    project_secret: "sk_proj_dry_run_full",
+    preview_secret: "sk_proj_dry_run_preview",
+    preview_origins: [issuer],
+    created_at: "2026-04-21T14:03:11.000Z",
   };
 }
 
@@ -584,10 +610,10 @@ async function createProjectWithLocalHint(
   try {
     // API contract requires a project name; generated TS models may lag
     // briefly until `packages/api` regeneration catches up.
-    const payload = { name: projectName, previewOrigins: [issuer], seedDefaults: false } as {
+    const payload = { name: projectName, preview_origins: [issuer], seed_defaults: false } as {
       name: string;
-      previewOrigins: string[];
-      seedDefaults: false;
+      preview_origins: string[];
+      seed_defaults: false;
     };
     // Register the app's own origin so the backend's origin check allows the
     // requests the dev proxy forwards from it.

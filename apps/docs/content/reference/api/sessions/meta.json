@@ -5,7 +5,7 @@
     "exchangeHandoff",
     "getMySession",
     "getSession",
-    "listSessions",
+    "querySessions",
     "revokeMySession",
     "revokeSession"
   ]

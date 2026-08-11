@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"errors"
+	"reflect"
 	"slices"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // userReaderStub implements service.UserIdentityReader and records the
@@ -88,8 +89,9 @@ func TestSessionService_Create(t *testing.T) {
 					if gotSession.ProjectID != tt.input.ProjectID {
 						t.Fatalf("Create session.ProjectID = %q, want %q", gotSession.ProjectID, tt.input.ProjectID)
 					}
-					if gotSession.UserAgent != tt.input.UserAgent {
-						t.Fatalf("Create session.UserAgent = %p, want %p", gotSession.UserAgent, tt.input.UserAgent)
+					// NewSession clones the user agent, so compare by value, not identity.
+					if !reflect.DeepEqual(gotSession.UserAgent, tt.input.UserAgent) {
+						t.Fatalf("Create session.UserAgent = %+v, want %+v", gotSession.UserAgent, tt.input.UserAgent)
 					}
 					if gotSession.TimeToLive != domain.SessionAnonymousTTL {
 						t.Fatalf("Create session.TimeToLive = %v, want %v", gotSession.TimeToLive, domain.SessionAnonymousTTL)

@@ -3,14 +3,25 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
+	"sync/atomic"
 
 	"github.com/go-faster/errors"
+	"github.com/go-faster/jx"
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
+
+// FullErrorInResponse attaches the unwrapped cause of an error to the response
+// body under `details.parent`. It is a **test-only** aid: it turns an opaque
+// "an unexpected error occurred" into the chain that produced it, which is what
+// makes a red integration run diagnosable. Never enable it on a served
+// instance — the chain carries internals (SQL, validation paths, wrapped
+// library errors) that the client has no business seeing.
+var FullErrorInResponse = atomic.Bool{}
 
 // domainErrorDetails extracts a domain.Error from err and returns it as an
 // api.ErrorDetails. If err is not a domain.Error, ErrInternal is used as
@@ -30,16 +41,62 @@ func domainErrorDetails(err error) api.ErrorDetails {
 		Message: domErr.Message,
 	}
 
-	if domErr.Details != nil {
-		if j, err := json.Marshal(domErr.Details); err == nil {
-			errDetails.Details = api.NewOptErrorDetailsDetails(api.ErrorDetailsDetails{
-				"details": j,
-			})
-		}
+	raw, hasProducer := marshalErrorDetails(domErr.Details)
+	includeParent := FullErrorInResponse.Load() && domErr.Parent != nil
+	if !hasProducer && !includeParent {
+		return errDetails
 	}
 
+	wire := api.ErrorDetailsDetails{}
+	if hasProducer {
+		wire["details"] = raw
+	}
+	if includeParent {
+		if errmap := createFullErrDetailsDetailsMap(domErr.Parent); errmap != nil {
+			if j, err := json.Marshal(errmap); err == nil {
+				wire["parent"] = j
+			}
+		}
+	}
+	if len(wire) == 0 {
+		return errDetails
+	}
+
+	errDetails.Details = api.NewOptErrorDetailsDetails(wire)
 	return errDetails
 }
+
+// marshalErrorDetails encodes producer-attached Details for the wire envelope
+// under the legacy details.details slot (ADR 030). Returns false when there is
+// nothing to send or encoding fails.
+func marshalErrorDetails(details any) (jx.Raw, bool) {
+	if details == nil {
+		return nil, false
+	}
+	b, err := json.Marshal(details)
+	if err != nil {
+		return nil, false
+	}
+	return b, true
+}
+
+func createFullErrDetailsDetailsMap(err error) any {
+	if err == nil {
+		return nil
+	}
+
+	errmap := make(map[string]any)
+	errmap["message"] = err.Error()
+	errmap["type"] = fmt.Sprintf("%T", err)
+
+	var domerr domain.Error
+	if errors.As(err, &domerr) && domerr.Parent != nil {
+		errmap["parent"] = createFullErrDetailsDetailsMap(domerr.Parent)
+	}
+
+	return errmap
+}
+
 func errorResponse(err error) *api.ErrorDetailsStatusCode {
 	var e domain.Error
 	if !errors.As(err, &e) {

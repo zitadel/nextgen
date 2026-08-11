@@ -90,6 +90,71 @@ describe("status command", () => {
     expect(json.data.next_commands).toContain(expectedPublicCliCommand("doctor"));
   });
 
+  it("reports a project with no owning team as temporary and points at claim", async () => {
+    const cwd = await configuredProject();
+
+    const res = await status(cwd);
+
+    const json = parseJson(res.stdout) as {
+      data: {
+        project: { claim?: { kind: string } };
+        next_actions: string[];
+        next_commands: string[];
+      };
+    };
+    expect(json.data.project.claim).toEqual({ kind: "detached" });
+    expect(json.data.next_actions.join("\n")).toContain("temporary until you attach it to a team");
+    expect(json.data.next_commands).toContain(expectedPublicCliCommand("claim"));
+  });
+
+  it("reports the owning team once claimed, and stops nudging", async () => {
+    const cwd = await configuredProject();
+    await writeFile(
+      join(cwd, ".zitadel/secret"),
+      JSON.stringify({ ...SECRET, claimed_at: "2026-01-02T00:00:00.000Z", team_id: "team-001" }),
+    );
+
+    const res = await status(cwd);
+
+    const json = parseJson(res.stdout) as {
+      data: {
+        project: { claim?: { kind: string; team_id?: string; claimed_at?: string } };
+        next_actions: string[];
+        next_commands: string[];
+      };
+    };
+    expect(json.data.project.claim).toEqual({
+      kind: "attached",
+      team_id: "team-001",
+      claimed_at: "2026-01-02T00:00:00.000Z",
+    });
+    expect(json.data.next_actions.join("\n")).not.toContain("temporary until you attach");
+    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("claim"));
+  });
+
+  // The project lives wherever `zitadel.json` says, not wherever this
+  // invocation is pointed: `--server local` retargets the health probe only.
+  it("omits claim state for a local project, whatever --server says", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({
+        project: "proj-001",
+        server: "http://localhost:8080",
+        environments: { development: { issuer: "http://localhost:3000" } },
+      }),
+    );
+    await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
+
+    const res = await status(cwd);
+
+    const json = parseJson(res.stdout) as {
+      data: { project: { claim?: unknown }; next_commands: string[] };
+    };
+    expect(json.data.project.claim).toBeUndefined();
+    expect(json.data.next_commands).not.toContain(expectedPublicCliCommand("claim"));
+  });
+
   it("reports orphaned-config when zitadel.json exists but secret is missing", async () => {
     const cwd = await makeProject();
     await writeFile(
@@ -186,7 +251,7 @@ describe("status command", () => {
 
   it("stages verify-login guidance while the project has no users", async () => {
     const cwd = await configuredProject();
-    server.use(http.get("*/users", () => HttpResponse.json([])));
+    server.use(http.get("*/users", () => HttpResponse.json({ users: [] })));
 
     const res = await status(cwd);
 
@@ -206,7 +271,7 @@ describe("status command", () => {
 
   it("switches to customize/publish guidance once users exist", async () => {
     const cwd = await configuredProject();
-    server.use(http.get("*/users", () => HttpResponse.json([{ id: "usr_1" }])));
+    server.use(http.get("*/users", () => HttpResponse.json({ users: [{ id: "usr_1" }] })));
 
     const res = await status(cwd);
 
@@ -234,7 +299,14 @@ describe("status command", () => {
     const json = parseJson(res.stdout) as {
       data: { next_actions: string[]; next_commands: string[] };
     };
-    expect(json.data.next_actions).toEqual([]);
+    // The journey guidance is staged on the user-presence probe, so an
+    // unreachable platform withholds it. The claim nudge is not: it reads
+    // `.zitadel/secret`, so it survives being offline — which is the point of
+    // reading it locally rather than asking the platform.
+    const actions = json.data.next_actions.join("\n");
+    expect(actions).not.toContain("register a user");
+    expect(actions).not.toContain("Customize what you ask for");
+    expect(actions).toContain("temporary until you attach it to a team");
     expect(json.data.next_commands).toContain(expectedPublicCliCommand("apply"));
   });
 });

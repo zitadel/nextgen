@@ -8,7 +8,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // ---- Service interface -------------------------------------------------------
@@ -368,7 +368,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			return nil, nil, err
 		}
 		user, err := s.users.GetByAttributes(ctx, attempt.ProjectID, []domain.Attribute{{
-			Key:   p.AttributeName,
+			Key:   domain.AttributeKey(p.AttributeName),
 			Value: p.LoginName,
 		}})
 		if err != nil {
@@ -436,7 +436,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		return passkeyChallenge, attempt.SetPasskeyFactor(verification), nil
 
 	default:
-		return nil, nil, domain.ErrAuthAttemptInvalidRequest().WithDetails("unsupported proof type")
+		return nil, nil, domain.ErrAuthAttemptInvalidRequest().WithMessage("unsupported proof type")
 	}
 }
 
