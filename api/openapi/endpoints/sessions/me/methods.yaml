@@ -71,8 +71,4 @@ delete:
             $ref: ../../../components/schemas/errors/auth-unauthorized.yaml
 
     default:
-      description: Unexpected error.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: revokeMySession-error-response.yaml
