@@ -82,7 +82,7 @@ func (attrs *Attributes) UnmarshalJSON(data []byte) error {
 func (attrs Attributes) ToMap() (map[string]any, error) {
 	tree := make(map[string]any)
 	for _, attr := range attrs {
-		if err := maputil.SetNested(tree, string(attr.Key), attr.Value); err != nil {
+		if err := maputil.SetNested(tree, attr.Key.Nodes(), attr.Value); err != nil {
 			return nil, err
 		}
 	}
@@ -150,14 +150,14 @@ func (attrs *CreateAttributes) fromMap(m map[string]any, schema map[string]any, 
 
 		switch tp := value.(type) {
 		case map[string]any:
-			props, _ := maputil.GetNested[map[string]any](schema, "properties."+key)
+			props, _ := maputil.GetNested[map[string]any](schema, []string{"properties", key})
 			err := attrs.fromMap(tp, props, fullKey)
 			if err != nil {
 				return err
 			}
 		default:
 			var unique AttributeUniqueness
-			strUnique, _ := maputil.GetNested[string](schema, "properties."+key+".x-unique")
+			strUnique, _ := maputil.GetNested[string](schema, []string{"properties", key, "x-unique"})
 			switch strUnique {
 			case "project":
 				unique = AttributeUniquenessProject

@@ -12,22 +12,27 @@ import (
 func TestSetNested(t *testing.T) {
 	t.Parallel()
 
+	type write struct {
+		path  []string
+		value any
+	}
+
 	t.Run("ok", func(t *testing.T) {
 		t.Parallel()
 
 		tcs := []struct {
 			name     string
-			writes   map[string]any
+			writes   []write
 			expected map[string]any
 		}{
 			{
 				name:     "leaf",
-				writes:   map[string]any{"name": "dummy"},
+				writes:   []write{{path: []string{"name"}, value: "dummy"}},
 				expected: map[string]any{"name": "dummy"},
 			},
 			{
 				name:   "builds the intermediate maps",
-				writes: map[string]any{"address.geo.latitude": 45.0},
+				writes: []write{{path: []string{"address", "geo", "latitude"}, value: 45.0}},
 				expected: map[string]any{
 					"address": map[string]any{
 						"geo": map[string]any{"latitude": 45.0},
@@ -36,9 +41,9 @@ func TestSetNested(t *testing.T) {
 			},
 			{
 				name: "merges into a map an earlier write created",
-				writes: map[string]any{
-					"address.street": "main street",
-					"address.city":   "examplus",
+				writes: []write{
+					{path: []string{"address", "street"}, value: "main street"},
+					{path: []string{"address", "city"}, value: "examplus"},
 				},
 				expected: map[string]any{
 					"address": map[string]any{
@@ -47,6 +52,13 @@ func TestSetNested(t *testing.T) {
 					},
 				},
 			},
+			{
+				// The caller owns the separator, so a segment that contains a
+				// dot addresses one key rather than two levels.
+				name:     "a dot inside a segment is part of the key",
+				writes:   []write{{path: []string{"address.street"}, value: "main street"}},
+				expected: map[string]any{"address.street": "main street"},
+			},
 		}
 
 		for _, tc := range tcs {
@@ -54,36 +66,44 @@ func TestSetNested(t *testing.T) {
 				t.Parallel()
 
 				m := map[string]any{}
-				for path, value := range tc.writes {
-					require.NoError(t, maputil.SetNested(m, path, value))
+				for _, w := range tc.writes {
+					require.NoError(t, maputil.SetNested(m, w.path, w.value))
 				}
 				assert.Equal(t, tc.expected, m)
 			})
 		}
 	})
 
-	t.Run("error", func(t *testing.T) {
+	t.Run("descends through a value that is not a map", func(t *testing.T) {
 		t.Parallel()
 
-		// The path descends through a value that is not a map, so there is
-		// nowhere to write without discarding it.
+		// There is nowhere to write without discarding the existing value.
 		m := map[string]any{}
-		require.NoError(t, maputil.SetNested(m, "address", "main street"))
+		require.NoError(t, maputil.SetNested(m, []string{"address"}, "main street"))
 
-		err := maputil.SetNested(m, "address.city", "examplus")
+		err := maputil.SetNested(m, []string{"address", "city"}, "examplus")
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "address")
 		assert.Equal(t, map[string]any{"address": "main street"}, m, "the existing value survives")
+	})
+
+	t.Run("empty path", func(t *testing.T) {
+		t.Parallel()
+
+		m := map[string]any{}
+		require.Error(t, maputil.SetNested(m, nil, "dummy"))
+		assert.Empty(t, m)
 	})
 
 	// SetNested writes what GetNested reads.
 	t.Run("round-trips with GetNested", func(t *testing.T) {
 		t.Parallel()
 
+		path := []string{"address", "geo", "label"}
 		m := map[string]any{}
-		require.NoError(t, maputil.SetNested(m, "address.geo.label", "downtown"))
+		require.NoError(t, maputil.SetNested(m, path, "downtown"))
 
-		got, ok := maputil.GetNested[string](m, "address.geo.label")
+		got, ok := maputil.GetNested[string](m, path)
 		require.True(t, ok)
 		assert.Equal(t, "downtown", got)
 	})

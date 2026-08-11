@@ -1,19 +1,20 @@
 package maputil
 
-import "strings"
-
-func GetNested[T any](m map[string]any, path string) (value T, ok bool) {
-	i := strings.Index(path, ".")
-	if i < 0 {
-		return Get[T](m, path)
+// GetNested reads the value at path, descending one map per segment. An
+// empty path addresses nothing and reports false.
+func GetNested[T any](m map[string]any, path []string) (value T, ok bool) {
+	if len(path) == 0 {
+		return *new(T), false
+	}
+	if len(path) == 1 {
+		return Get[T](m, path[0])
 	}
 
-	key, rest := path[:i], path[i+1:]
-	v, ok := Get[map[string]any](m, key)
+	v, ok := Get[map[string]any](m, path[0])
 	if !ok {
 		return *new(T), false
 	}
-	return GetNested[T](v, rest)
+	return GetNested[T](v, path[1:])
 }
 
 func Get[T any](m map[string]any, key string) (value T, ok bool) {
