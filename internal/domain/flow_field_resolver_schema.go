@@ -120,16 +120,13 @@ func resolveUserPropertyField(root schemaReader, field Field, stepName string) (
 func walkUserProperty(root schemaReader, field Field) (schemaReader, bool, error) {
 	segments := AttributeKey(field.String()).Nodes()
 	parent, required := root, true
-	for i, segment := range segments {
+	for _, segment := range segments {
 		prop, ok := parent.Properties()[segment]
 		if !ok {
 			return schemaReader{}, false, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, field.String())
 		}
 		if _, ok := parent.RequiredSet()[segment]; !ok {
 			required = false
-		}
-		if i < len(segments)-1 && prop.Properties() == nil {
-			return schemaReader{}, false, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, field.String())
 		}
 		parent = prop
 	}
