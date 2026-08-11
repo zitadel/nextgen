@@ -212,7 +212,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	)
 
 	flowService := service.NewFlowService(serviceDBPool, stateMachine)
-	tokenService := service.NewTokenService(keyService)
+	tokenService := service.NewTokenService(keyService, serviceDBPool)
 
 	// ── Default project resolution ──
 	// Console ADR 0004 §3 (standalone): the deployment tracks exactly one
@@ -262,7 +262,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
-		standaloneRuntimeResolver(projectService, keyService, cfg.Platform.ResolvedProjectID()))
+		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()))
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
