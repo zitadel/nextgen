@@ -379,7 +379,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				return def
 			}()),
 			params: api.UpdateFlowDefinitionParams{ID: loginRegisterFlowDef.ID},
-			wantResp: &api.ErrorDetailsStatusCode{
+			wantResp: &api.UpdateFlowDefinitionErrorResponseStatusCode{
 				StatusCode: http.StatusConflict,
 				Response: api.NewFlowdefUpdateConflictUpdateFlowDefinitionErrorResponse(api.FlowdefUpdateConflict{
 					Code:    "flowdef.update_conflict",
@@ -404,7 +404,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				return def
 			}()),
 			params: api.UpdateFlowDefinitionParams{ID: loginRegisterFlowDef.ID},
-			wantResp: &api.ErrorDetailsStatusCode{
+			wantResp: &api.UpdateFlowDefinitionErrorResponseStatusCode{
 				StatusCode: http.StatusConflict,
 				Response: api.NewFlowdefUpdateConflictUpdateFlowDefinitionErrorResponse(api.FlowdefUpdateConflict{
 					Code:    "flowdef.update_conflict",
