@@ -11,6 +11,7 @@ import {
   RESOURCE_ROW_LINK,
   RESOURCE_TABLE_WRAP,
   ResourceHeadCell,
+  opensRow,
 } from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -152,11 +153,16 @@ function TeamsScreen() {
               teams.map((team) => (
                 // The whole row opens the team. The name is a real link so the
                 // row is reachable by keyboard and the target shows in the status
-                // bar; the row handler is the pointer affordance on top of it.
+                // bar; the row handler is the pointer affordance on top of it,
+                // and `opensRow` keeps it out of the link's way.
                 <TableRow
                   key={team.id}
                   className="hover:bg-muted/40 cursor-pointer border-0"
-                  onClick={() => void navigate({ to: "/teams/$teamId", params: { teamId: team.id } })}
+                  onClick={(event) => {
+                    if (opensRow(event)) {
+                      void navigate({ to: "/teams/$teamId", params: { teamId: team.id } });
+                    }
+                  }}
                 >
                   <TableCell className={`${RESOURCE_CELL} truncate`}>
                     <Link

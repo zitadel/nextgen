@@ -40,9 +40,6 @@ export function MetaValue({
         </span>
         {/* Sized under the 19px value line so the copy affordance never drives
             the row height — the card is 61px tall in the design, and a 24px
-            button pushed it to 69. */}
-        {/* Sized under the 19px value line so the copy affordance never drives
-            the row height — the card is 61px tall in the design, and a 24px
             button pushes it to 69. */}
         {copyable && (
           <CopyButton

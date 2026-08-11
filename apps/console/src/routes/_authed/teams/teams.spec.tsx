@@ -94,6 +94,17 @@ describe("teams screen", () => {
     expect(await screen.findByText("No teams yet.")).toBeInTheDocument();
   });
 
+  it("opens the team when the row is clicked", async () => {
+    server.use(http.post(TEAMS_URL, () => HttpResponse.json({ teams: [team()] })));
+    const router = await renderTeams();
+
+    const row = (await screen.findByRole("link", { name: "Acme Web" })).closest("tr");
+    expect(row).not.toBeNull();
+    await userEvent.click(row as HTMLElement);
+
+    expect(router.state.location.pathname).toBe(`/teams/${team().id}`);
+  });
+
   it("creates a team from the Add drawer", async () => {
     const created: unknown[] = [];
     server.use(

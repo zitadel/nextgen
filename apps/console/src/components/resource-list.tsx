@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 
 import { TableHead } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
@@ -46,6 +46,20 @@ export const RESOURCE_ROW_ICON = "text-muted-foreground size-4 shrink-0";
 /** The link in a row's first cell, with the design's 10px icon gap. */
 export const RESOURCE_ROW_LINK =
   "text-foreground inline-flex items-center gap-[10px] truncate text-sm font-medium underline-offset-2 hover:underline";
+
+/**
+ * Whether a click on a resource row should open it.
+ *
+ * The row is a pointer affordance layered over a real link, and the link owns
+ * the modified clicks: cmd/ctrl-click opens a new tab, and letting the row
+ * handler run as well would navigate the current one at the same time. A click
+ * that lands on any interactive child belongs to that child.
+ */
+export function opensRow(event: MouseEvent): boolean {
+  if (event.defaultPrevented || event.button !== 0) return false;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false;
+  return !(event.target as HTMLElement).closest("a, button, input, select, textarea, [role='menuitem']");
+}
 
 /**
  * Column header. Plain text in the display face — deliberately not wrapped in a
