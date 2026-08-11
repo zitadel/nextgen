@@ -145,10 +145,15 @@ func (s *sessionService) List(ctx context.Context, input ListSessionInput) (*Lis
 		return nil, domain.ErrProjectMissingID()
 	}
 
+	// One expiry cutoff for all state predicates in this request. Session state
+	// is computed from a clock, never stored, so other readers still disagree
+	// near expiry: the next page binds a fresh now, and serialization
+	// recomputes State() later.
+	now := time.Now().UTC()
 	filters := make([]database.Filter[domain.SessionField], 0, len(input.Filters)+1)
 	filters = append(filters, database.Equal(database.Col(domain.SessionFieldProjectID), input.ProjectID))
 	for _, f := range input.Filters {
-		filter, err := sessionFilter(f)
+		filter, err := sessionFilter(f, now)
 		if err != nil {
 			return nil, err
 		}
@@ -199,7 +204,7 @@ func sessionSortField(field string) (domain.SessionField, error) {
 // sessionFilter maps an API filter predicate to a storage filter. Operations
 // the filter layer cannot express return [domain.ErrNotImplemented]; invalid
 // field/operation/value combinations return [domain.ErrRequestInvalid].
-func sessionFilter(f Filter) (database.Filter[domain.SessionField], error) {
+func sessionFilter(f Filter, now time.Time) (database.Filter[domain.SessionField], error) {
 	switch f.Field {
 	case sessionFieldUserID:
 		value, ok := f.Value.(string)
@@ -214,7 +219,7 @@ func sessionFilter(f Filter) (database.Filter[domain.SessionField], error) {
 		if !ok {
 			return nil, domain.ErrRequestInvalid().WithDetails("state filter value must be a string")
 		}
-		return sessionStateFilter(f.Operation, value)
+		return sessionStateFilter(f.Operation, value, now)
 	default:
 		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", f.Field))
 	}
@@ -225,7 +230,7 @@ func sessionFilter(f Filter) (database.Filter[domain.SessionField], error) {
 // expired = expires_at < now(),
 // building = user_id is NULL and expires_at >= now()
 // active = expires_at >= now() and user_id is not NULL
-func sessionStateFilter(op, state string) (database.Filter[domain.SessionField], error) {
+func sessionStateFilter(op, state string, now time.Time) (database.Filter[domain.SessionField], error) {
 	switch op {
 	case filterOpEquals:
 	case filterOpNotEquals:
@@ -237,8 +242,6 @@ func sessionStateFilter(op, state string) (database.Filter[domain.SessionField],
 		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown operation %q", op))
 	}
 
-	// now is bound per request, so state can drift between pages of a paginated run.
-	now := time.Now().UTC()
 	expiresAt := database.Col(domain.SessionFieldExpiresAt)
 	userID := database.Col(domain.SessionFieldUserID)
 	// todo (grvijayan): replace with a greater-or-equal compare once the filter layer supports it
@@ -248,8 +251,7 @@ func sessionStateFilter(op, state string) (database.Filter[domain.SessionField],
 	case sessionStateExpired:
 		return database.LessThan(expiresAt, now), nil
 	case sessionStateBuilding:
-		// user_id stands in for State()'s factor test for SessionStateBuilding: the exchange promotes
-		// factors and binds user_id together, so one implies the other.
+		// todo (@grvijayan) review: user_id stands in for State()'s factor test.
 		// A nil value binds SQL NULL: user_id IS NULL until the exchange.
 		return database.And(activeSessionsFilter, database.Equal(userID, nil)), nil
 	case sessionStateActive:

@@ -62,7 +62,7 @@ func TestQuerySessions(t *testing.T) {
 
 	t.Run("unfiltered lists every state newest first", func(t *testing.T) {
 		ids := sessionIDs(querySessions(t, &api.QuerySessionsRequest{}).Sessions)
-		assert.ElementsMatch(t, []string{building.ID, expired.ID, active.ID}, ids)
+		require.ElementsMatch(t, []string{building.ID, expired.ID, active.ID}, ids)
 		assert.Equal(t, active.ID, ids[0], "the last-created session must sort first")
 	})
 

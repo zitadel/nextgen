@@ -67,10 +67,9 @@ func mapListError(err error, internalMsg string) error {
 }
 
 // parseSortDirection maps an API sort direction to a storage order direction.
-// An empty direction defaults to ascending.
 func parseSortDirection(direction string) (database.OrderDirection, error) {
 	switch direction {
-	case "", sortAsc:
+	case sortAsc:
 		return database.OrderAsc, nil
 	case sortDesc:
 		return database.OrderDesc, nil
@@ -96,11 +95,13 @@ func listOrderBy[F ~uint8](sorting *Sorting, defaultField F, defaultDirection da
 			}
 			sortField = f
 		}
-		dir, err := parseSortDirection(sorting.Direction)
-		if err != nil {
-			return database.OrderBy[F]{}, err
+		if sorting.Direction != "" {
+			dir, err := parseSortDirection(sorting.Direction)
+			if err != nil {
+				return database.OrderBy[F]{}, err
+			}
+			direction = dir
 		}
-		direction = dir
 	}
 
 	columns := []database.Column[F]{database.Col(sortField)}
