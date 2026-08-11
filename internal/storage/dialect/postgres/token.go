@@ -25,6 +25,8 @@ const createTokenStmt = `INSERT INTO zitadel_nextgen.tokens (
 
 const deleteByIDTokenStmt = `DELETE FROM zitadel_nextgen.tokens WHERE project_id = $1 AND token_id = $2`
 
+const deleteBySessionIDTokenStmt = `DELETE FROM zitadel_nextgen.tokens WHERE project_id = $1 AND session_id = $2`
+
 const tokenQuery = `SELECT project_id, token_id, user_id, token_type,
 	session_id, oidc_session_id, saml_session_id,
 	scope, expires_at, created_at
@@ -77,6 +79,12 @@ func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) 
 // DeleteTokenByID implements [service.TokenStatements].
 func (ts tokenStatements) DeleteTokenByID(ctx context.Context, projectID, tokenID string) error {
 	_, err := ts.client.Exec(ctx, deleteByIDTokenStmt, projectID, tokenID)
+	return wrapError(err)
+}
+
+// DeleteTokensBySessionID implements [service.TokenStatements].
+func (ts tokenStatements) DeleteTokensBySessionID(ctx context.Context, projectID, sessionID string) error {
+	_, err := ts.client.Exec(ctx, deleteBySessionIDTokenStmt, projectID, sessionID)
 	return wrapError(err)
 }
 
@@ -170,8 +178,11 @@ func (ts tokenStatements) scanToken(row pgx.CollectableRow) (*domain.Token, erro
 	return token, nil
 }
 
-func tokenUserIDArg(userID string, tokenType domain.TokenType) any {
-	if tokenType == domain.TokenTypeSessionToken && userID == "" {
+// tokenUserIDArg keeps an absent user NULL rather than "": the column carries a
+// foreign key to users, and project credentials authenticate software, not a
+// user, so they have none at all.
+func tokenUserIDArg(userID string, _ domain.TokenType) any {
+	if userID == "" {
 		return nil
 	}
 	return userID

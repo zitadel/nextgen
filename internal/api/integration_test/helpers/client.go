@@ -75,9 +75,8 @@ func (c *ApiClient) SetSessionToken(token string) {
 func (h *Harness) SetProjectSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
 	t.Helper()
 
-	tokenCrypter, err := h.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
-	require.NoError(t, err)
-	secret, err := project.ProjectSecret(tokenCrypter)
+	token := project.Token()
+	secret, err := h.EnsureTokenService(t).GenerateJWE(t.Context(), token)
 	require.NoError(t, err)
 
 	client.SetToken(secret)
@@ -101,9 +100,8 @@ func (h *Harness) SetScopedTokenOnApiClient(t *testing.T, client *ApiClient, pro
 func (h *Harness) SetPreviewSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
 	t.Helper()
 
-	tokenCrypter, err := h.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
-	require.NoError(t, err)
-	secret, err := project.PreviewSecret(tokenCrypter)
+	token := project.PreviewToken()
+	secret, err := h.EnsureTokenService(t).GenerateJWE(t.Context(), token)
 	require.NoError(t, err)
 
 	client.SetToken(secret)
