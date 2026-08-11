@@ -1,9 +1,11 @@
 package spanner
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -253,4 +255,44 @@ func TestRunBounded(t *testing.T) {
 		}))
 		assert.Equal(t, want, got)
 	})
+}
+
+// captureLogs redirects the default logger for the duration of a test. Not
+// parallel-safe, so its callers must not call t.Parallel.
+func captureLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	buf := new(bytes.Buffer)
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(buf, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	return buf
+}
+
+// A cancelled context means the caller went away, which is ordinary traffic. If
+// that warned, the one line this package logs would be buried in noise from
+// every abandoned request.
+func TestRunBoundedStaysQuietWhenTheCallerGoesAway(t *testing.T) {
+	logs := captureLogs(t)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	require.Error(t, runBounded(ctx, func(ctx context.Context) error { return ctx.Err() }))
+	assert.Empty(t, logs.String(), "a cancelled caller is not a transaction that ran out of retries")
+}
+
+func TestRunBoundedWarnsWhenADeadlineEndsIt(t *testing.T) {
+	logs := captureLogs(t)
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond)
+	defer cancel()
+
+	err := runBounded(ctx, func(ctx context.Context) error {
+		<-ctx.Done()
+		return ctx.Err()
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, logs.String(), "hit its deadline while retrying")
+	assert.Contains(t, logs.String(), "elapsed=", "the elapsed time is what makes the warning actionable")
 }

@@ -2,6 +2,7 @@ package spanner
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"time"
@@ -112,18 +113,23 @@ func boundRetry(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, retryBudget())
 }
 
-// runBounded runs fn under the retry budget and reports when the budget is what
+// runBounded runs fn under the retry budget and reports when a deadline is what
 // ended it. Every site in this package that opens a ReadWriteTransaction goes
 // through here, so exhaustion is logged once and in one place: without it the
 // only trace a spent budget leaves is a request's wall-clock duration.
+//
+// Only a deadline is worth a warning. A cancelled context means the caller went
+// away, which is ordinary traffic and would drown this line in noise. The
+// deadline may be the budget or one the caller set; `elapsed` tells them apart
+// and both mean the same thing operationally, a transaction that never landed.
 func runBounded(ctx context.Context, fn func(context.Context) error) error {
 	ctx, cancel := boundRetry(ctx)
 	defer cancel()
 
 	start := time.Now()
 	err := fn(ctx)
-	if err != nil && ctx.Err() != nil {
-		slog.WarnContext(ctx, "spanner transaction gave up retrying",
+	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		slog.WarnContext(ctx, "spanner transaction hit its deadline while retrying",
 			"elapsed", time.Since(start), "error", err)
 	}
 	return err
