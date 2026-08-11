@@ -57,10 +57,10 @@ The following is an example user schema showing the annotations that the flow en
   "type": "object",
   "title": "Human User",
   "x-auth-methods": {
-    "password":   { "enabled": true,  "position": 1 },
-    "passkey":    { "enabled": true,  "position": 0 },
-    "magic_link": { "enabled": true,  "position": 2 },
-    "sso":        { "enabled": true,  "position": 3 }
+    "password":   { "enabled": true },
+    "passkey":    { "enabled": true },
+    "magic_link": { "enabled": true },
+    "sso":        { "enabled": true }
   },
   "required": ["email", "given_name", "family_name"],
   "properties": {

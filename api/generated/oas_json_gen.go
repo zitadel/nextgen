@@ -2209,15 +2209,10 @@ func (s *AuthMethod) encodeFields(e *jx.Encoder) {
 		e.FieldStart("enabled")
 		e.Bool(s.Enabled)
 	}
-	{
-		e.FieldStart("position")
-		e.Int(s.Position)
-	}
 }
 
-var jsonFieldsNameOfAuthMethod = [2]string{
+var jsonFieldsNameOfAuthMethod = [1]string{
 	0: "enabled",
-	1: "position",
 }
 
 // Decode decodes AuthMethod from json.
@@ -2241,18 +2236,6 @@ func (s *AuthMethod) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"enabled\"")
 			}
-		case "position":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Int()
-				s.Position = int(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"position\"")
-			}
 		default:
 			return d.Skip()
 		}
@@ -2263,7 +2246,7 @@ func (s *AuthMethod) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

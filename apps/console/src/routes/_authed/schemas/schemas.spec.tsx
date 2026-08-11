@@ -17,16 +17,15 @@ vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 const SCHEMAS_URL = "http://localhost/api/schemas";
 
 /**
- * Shaped like the shipped presets: `x-auth-methods` positions passkey first
- * (the `passkey-first` preset), one required property, and one nested object to
- * drill into.
+ * Shaped like the shipped presets: `x-auth-methods` with passkey on and
+ * password off, one required property, and one nested object to drill into.
  */
 const BUSINESS = {
   title: "Business",
   objectType: "human-user",
   "x-auth-methods": {
-    password: { enabled: false, position: 2 },
-    passkey: { enabled: true, position: 1 },
+    password: { enabled: false },
+    passkey: { enabled: true },
   },
   required: ["email"],
   properties: {
@@ -100,8 +99,7 @@ describe("user schemas list", () => {
       expect(screen.getByText(attribute)).toBeInTheDocument();
     }
 
-    // Only the enabled methods, ordered by the schema's own `position`, which
-    // is why passkey leads here.
+    // Only the enabled methods — password is declared but off.
     expect(screen.getByText("Passkey")).toBeInTheDocument();
     expect(screen.queryByText(/Password/)).not.toBeInTheDocument();
   });

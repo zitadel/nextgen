@@ -61,7 +61,7 @@ var tenantUserSchemaDisabledAuthMethod = []byte(`{
   "type": "object",
   "required": ["email"],
   "x-auth-methods": {
-    "password": { "enabled": false, "position": 0 }
+    "password": { "enabled": false }
   },
   "properties": {
     "email":    { "type": "string", "format": "email", "x-unique": "team" }
@@ -74,7 +74,7 @@ var userSchemaIDAndPassword = []byte(`{
   "type": "object",
   "required": ["email"],
   "x-auth-methods": {
-    "password": { "enabled": true, "position": 0 }
+    "password": { "enabled": true }
   },
   "properties": {
     "email":    { "type": "string", "format": "email", "x-unique": "team" }
@@ -87,8 +87,8 @@ var userSchemaPasskeyEnabled = []byte(`{
   "type": "object",
   "required": ["email"],
   "x-auth-methods": {
-    "password": { "enabled": true, "position": 0 },
-    "passkey":  { "enabled": true, "position": 1 }
+    "password": { "enabled": true },
+    "passkey":  { "enabled": true }
   },
   "properties": {
     "email":    { "type": "string", "format": "email", "x-unique": "team" }
@@ -101,8 +101,8 @@ var userSchemaPasskeyDisabled = []byte(`{
   "type": "object",
   "required": ["email"],
   "x-auth-methods": {
-    "password": { "enabled": true, "position": 0 },
-    "passkey":  { "enabled": false, "position": 1 }
+    "password": { "enabled": true },
+    "passkey":  { "enabled": false }
   },
   "properties": {
     "email":    { "type": "string", "format": "email", "x-unique": "team" }
@@ -115,7 +115,7 @@ var userSchemaRequiredProps = []byte(`{
   "type": "object",
   "required": ["email", "first_name", "last_name"],
   "x-auth-methods": {
-    "password": { "enabled": true, "position": 0 }
+    "password": { "enabled": true }
   },
   "properties": {
     "email":    { "type": "string", "format": "email", "x-unique": "team" },
@@ -136,8 +136,7 @@ var tenantUserSchema = []byte(`{
   ],
   "x-auth-methods": {
     "password": {
-      "enabled": true,
-      "position": 0
+      "enabled": true
     }
   },
   "properties": {
@@ -162,8 +161,7 @@ var tenantUserSchemaNoProps = []byte(`{
   ],
   "x-auth-methods": {
     "password": {
-      "enabled": true,
-      "position": 0
+      "enabled": true
     }
   }
 }`)
