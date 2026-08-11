@@ -181,7 +181,7 @@ type FlowDefinitionAudience struct {
 
 // authMethodPrefix marks a step.fields entry as referring to an entry
 // under the user schema's `x-auth-methods` keyword (e.g.
-// "x-auth-methods#password") rather than to a top-level user property.
+// "x-auth-methods#password") rather than to a user property.
 const authMethodPrefix = "x-auth-methods#"
 
 // Field carries the raw field name from a flow-definition step.
@@ -192,7 +192,7 @@ func (f Field) String() string {
 	return string(f)
 }
 
-// IsUserProperty reports whether the field names a top-level user-schema property.
+// IsUserProperty reports whether the field names a user-schema property.
 func (f Field) IsUserProperty() bool {
 	return !f.IsAuthMethod()
 }

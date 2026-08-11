@@ -363,9 +363,9 @@ func (r schemaReader) Int(keyword string) int {
 	return 0
 }
 
-// Properties returns each top-level property of an object schema as
-// its own [schemaReader], or nil when `properties` is absent or
-// malformed.
+// Properties returns each property listed in this level's `properties`
+// keyword as its own [schemaReader], or nil when the keyword is absent
+// or malformed.
 func (r schemaReader) Properties() map[string]schemaReader {
 	v, ok := r.s.LookupKeyword("properties")
 	if !ok {
