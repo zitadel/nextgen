@@ -41,7 +41,7 @@ Those reframings drive the ordering below.
 
 **A.2** — Align local flow resources with `flow-api.yaml` (frontend-adr-001 shape): `fields` / `actions` / `gates` as dicts keyed by name, `texts: { title_key }`, `template_name`, transitions. Default scaffold ships one `FlowDefinition` with `purposes: ["login", "register"]`. ✅
 
-**A.3** — Land user schema annotation vocabulary in the CLI: `x-identifier`, `x-verify`, `x-mfa`, `x-sensitive`, `x-editable`, `x-unique`, `x-claim` (OIDC token claim mapping), `x-auth-methods`. Warn on unknown `x-*` attrs. Presets: `--preset email`, `phone-mfa-sms`, `full-name`, `date-of-birth`. ✅
+**A.3** — Land user schema annotation vocabulary in the CLI: `x-verify`, `x-mfa`, `x-sensitive`, `x-editable`, `x-unique`, `x-claim` (OIDC token claim mapping), `x-auth-methods`. Warn on unknown `x-*` attrs. Presets: `--preset email`, `phone-mfa-sms`, `full-name`, `date-of-birth`. ✅
 
 **A.4** — Locale + Liquid template tooling:
 - `.zitadel/locales/<lang>.json` flat `text_key → string` maps. Setup seeds `en.json`.

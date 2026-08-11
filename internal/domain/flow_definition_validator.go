@@ -285,7 +285,8 @@ func validateSteps(steps []FlowDefinitionStep) error {
 			}
 		}
 
-		// todo (grvijayan): a step with an x-identifier field defines a user_not_found transition or return an error
+		// todo (grvijayan): a step with an identifier field (a property carrying
+		// a non-empty x-unique scope) defines a user_not_found transition or return an error
 	}
 	return nil
 }

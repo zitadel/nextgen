@@ -682,7 +682,7 @@ func decodeCreateFlowResponse(resp *http.Response) (res CreateFlowRes, _ error) 
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response CreateFlowErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -699,7 +699,7 @@ func decodeCreateFlowResponse(resp *http.Response) (res CreateFlowRes, _ error) 
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &CreateFlowErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -844,7 +844,7 @@ func decodeCreateFlowDefinitionResponse(resp *http.Response) (res CreateFlowDefi
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response CreateFlowDefinitionErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -861,7 +861,7 @@ func decodeCreateFlowDefinitionResponse(resp *http.Response) (res CreateFlowDefi
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &CreateFlowDefinitionErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -1054,7 +1054,7 @@ func decodeCreateProjectResponse(resp *http.Response) (res CreateProjectRes, _ e
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response CreateProjectErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -1071,7 +1071,7 @@ func decodeCreateProjectResponse(resp *http.Response) (res CreateProjectRes, _ e
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &CreateProjectErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -1369,7 +1369,7 @@ func decodeCreateSessionResponse(resp *http.Response) (res CreateSessionRes, _ e
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response CreateSessionErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -1386,7 +1386,7 @@ func decodeCreateSessionResponse(resp *http.Response) (res CreateSessionRes, _ e
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &CreateSessionErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -1894,7 +1894,7 @@ func decodeCreateUserResponse(resp *http.Response) (res CreateUserRes, _ error) 
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response CreateUserErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -1911,7 +1911,7 @@ func decodeCreateUserResponse(resp *http.Response) (res CreateUserRes, _ error) 
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &CreateUserErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -1980,7 +1980,7 @@ func decodeDeleteFlowDefinitionResponse(resp *http.Response) (res DeleteFlowDefi
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response DeleteFlowDefinitionErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -1997,7 +1997,7 @@ func decodeDeleteFlowDefinitionResponse(resp *http.Response) (res DeleteFlowDefi
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &DeleteFlowDefinitionErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -2257,7 +2257,7 @@ func decodeDeleteUserByIDResponse(resp *http.Response) (res DeleteUserByIDRes, _
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response DeleteUserByIDErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -2274,7 +2274,7 @@ func decodeDeleteUserByIDResponse(resp *http.Response) (res DeleteUserByIDRes, _
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &DeleteUserByIDErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -2489,7 +2489,7 @@ func decodeExchangeHandoffResponse(resp *http.Response) (res ExchangeHandoffRes,
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response ExchangeHandoffErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -2506,7 +2506,7 @@ func decodeExchangeHandoffResponse(resp *http.Response) (res ExchangeHandoffRes,
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &ExchangeHandoffErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -3067,7 +3067,7 @@ func decodeGetFlowDefinitionResponse(resp *http.Response) (res GetFlowDefinition
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response GetFlowDefinitionErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -3084,7 +3084,7 @@ func decodeGetFlowDefinitionResponse(resp *http.Response) (res GetFlowDefinition
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &GetFlowDefinitionErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -3229,7 +3229,7 @@ func decodeGetFlowStepResponse(resp *http.Response) (res GetFlowStepRes, _ error
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response GetFlowStepErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -3246,7 +3246,7 @@ func decodeGetFlowStepResponse(resp *http.Response) (res GetFlowStepRes, _ error
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &GetFlowStepErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -3899,7 +3899,7 @@ func decodeGetMyUserResponse(resp *http.Response) (res GetMyUserRes, _ error) {
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response GetMyUserErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -3916,7 +3916,7 @@ func decodeGetMyUserResponse(resp *http.Response) (res GetMyUserRes, _ error) {
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &GetMyUserErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -4052,7 +4052,7 @@ func decodeGetProjectResponse(resp *http.Response) (res GetProjectRes, _ error) 
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response GetProjectErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -4069,7 +4069,7 @@ func decodeGetProjectResponse(resp *http.Response) (res GetProjectRes, _ error) 
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &GetProjectErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -4848,7 +4848,7 @@ func decodeGetUserByIDResponse(resp *http.Response) (res GetUserByIDRes, _ error
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response GetUserByIDErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -4865,7 +4865,7 @@ func decodeGetUserByIDResponse(resp *http.Response) (res GetUserByIDRes, _ error
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &GetUserByIDErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -5365,7 +5365,7 @@ func decodeListFlowDefinitionsResponse(resp *http.Response) (res ListFlowDefinit
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response ListFlowDefinitionsErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5382,7 +5382,7 @@ func decodeListFlowDefinitionsResponse(resp *http.Response) (res ListFlowDefinit
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &ListFlowDefinitionsErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -5724,7 +5724,7 @@ func decodeListUserPasskeysResponse(resp *http.Response) (res ListUserPasskeysRe
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response ListUserPasskeysErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -5741,7 +5741,7 @@ func decodeListUserPasskeysResponse(resp *http.Response) (res ListUserPasskeysRe
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &ListUserPasskeysErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -5991,7 +5991,7 @@ func decodeListUserTeamsResponse(resp *http.Response) (res ListUserTeamsRes, _ e
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response ListUserTeamsErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -6008,7 +6008,7 @@ func decodeListUserTeamsResponse(resp *http.Response) (res ListUserTeamsRes, _ e
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &ListUserTeamsErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -6153,7 +6153,7 @@ func decodeListUsersResponse(resp *http.Response) (res ListUsersRes, _ error) {
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response ListUsersErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -6170,7 +6170,7 @@ func decodeListUsersResponse(resp *http.Response) (res ListUsersRes, _ error) {
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &ListUsersErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -6341,7 +6341,7 @@ func decodePatchProjectResponse(resp *http.Response) (res PatchProjectRes, _ err
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response PatchProjectErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -6358,7 +6358,7 @@ func decodePatchProjectResponse(resp *http.Response) (res PatchProjectRes, _ err
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &PatchProjectErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -6573,7 +6573,7 @@ func decodeQueryProjectsResponse(resp *http.Response) (res QueryProjectsRes, _ e
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response QueryProjectsErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -6590,7 +6590,7 @@ func decodeQueryProjectsResponse(resp *http.Response) (res QueryProjectsRes, _ e
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &QueryProjectsErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -6770,7 +6770,7 @@ func decodeQuerySessionsResponse(resp *http.Response) (res QuerySessionsRes, _ e
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response QuerySessionsErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -6787,7 +6787,7 @@ func decodeQuerySessionsResponse(resp *http.Response) (res QuerySessionsRes, _ e
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &QuerySessionsErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -7157,7 +7157,7 @@ func decodeRevokeMySessionResponse(resp *http.Response) (res RevokeMySessionRes,
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response RevokeMySessionErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -7174,7 +7174,7 @@ func decodeRevokeMySessionResponse(resp *http.Response) (res RevokeMySessionRes,
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &RevokeMySessionErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -7278,7 +7278,7 @@ func decodeRevokeSessionResponse(resp *http.Response) (res RevokeSessionRes, _ e
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response RevokeSessionErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -7295,7 +7295,7 @@ func decodeRevokeSessionResponse(resp *http.Response) (res RevokeSessionRes, _ e
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &RevokeSessionErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -7434,7 +7434,7 @@ func decodeSetUserPasswordResponse(resp *http.Response) (res SetUserPasswordRes,
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response SetUserPasswordErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -7451,7 +7451,7 @@ func decodeSetUserPasswordResponse(resp *http.Response) (res SetUserPasswordRes,
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &SetUserPasswordErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -7685,7 +7685,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response SubmitFlowStepErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -7702,7 +7702,7 @@ func decodeSubmitFlowStepResponse(resp *http.Response) (res SubmitFlowStepRes, _
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &SubmitFlowStepErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil
@@ -7847,7 +7847,7 @@ func decodeUpdateFlowDefinitionResponse(resp *http.Response) (res UpdateFlowDefi
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response ErrorDetails
+			var response UpdateFlowDefinitionErrorResponse
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -7864,7 +7864,7 @@ func decodeUpdateFlowDefinitionResponse(resp *http.Response) (res UpdateFlowDefi
 				}
 				return res, err
 			}
-			return &ErrorDetailsStatusCode{
+			return &UpdateFlowDefinitionErrorResponseStatusCode{
 				StatusCode: resp.StatusCode,
 				Response:   response,
 			}, nil

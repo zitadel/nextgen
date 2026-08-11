@@ -4,7 +4,10 @@
   max-width: var(--zl-container-auth-card, 24rem);
   margin-inline: auto;
   background: transparent;
-  border: 1px solid var(--zl-color-surface-default-primary-gray, #252528);
+  /* A border token, not the card's own surface token: the two share a value in
+     dark mode (#252528), but in light the surface resolves to the card fill
+     (#ffffff) and the edge disappears into the page. */
+  border: 1px solid var(--zl-color-border-default-black, #252528);
   border-radius: var(--zl-radius-l, 1rem);
   padding: var(--zl-spacing-05, 2rem);
   display: flex;
