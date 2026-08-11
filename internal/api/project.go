@@ -47,7 +47,7 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrProjectNotFound()
 		}
-		return h.NewError(ctx, err), nil
+		return nil, err
 	}
 	return projectResponse(project), nil
 }
