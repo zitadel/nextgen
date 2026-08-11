@@ -10,6 +10,7 @@ content:
         - $ref: '../../../components/schemas/errors/proj-not_found.yaml'
         - $ref: '../../../components/schemas/errors/proj-permission_denied.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
@@ -19,6 +20,7 @@ content:
           proj.not_found: '../../../components/schemas/errors/proj-not_found.yaml'
           proj.permission_denied: '../../../components/schemas/errors/proj-permission_denied.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
+          unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.unauthorized:
         summary: auth.unauthorized
@@ -50,3 +52,8 @@ content:
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'
