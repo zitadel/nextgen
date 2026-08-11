@@ -4,12 +4,24 @@ import { expectNoErrorBoundary, signIn } from "./support";
 
 test.describe.configure({ mode: "parallel" });
 
-test("shows the bootstrapped project", async ({ page, zitadel, seed }) => {
+test("shows the bootstrapped project in the list and detail views", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
   await signIn(page, await seed.user());
 
   await page.goto("/projects");
-
   await expect(page.getByRole("heading", { name: "Projects", exact: true })).toBeVisible();
+
+  // The directory lists name and creation date. The id identifies the project on
+  // its detail screen, which the row opens — it is no longer on the list, where
+  // the screen used to be a key/value view of the one scoped project.
+  const projectLink = page.getByRole("table").getByRole("link").first();
+  await expect(projectLink).toBeVisible();
+  await projectLink.click();
+
+  await expect(page).toHaveURL(new RegExp(`/projects/${zitadel.handle.projectId}$`));
   await expect(page.getByText(zitadel.handle.projectId, { exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
 });
