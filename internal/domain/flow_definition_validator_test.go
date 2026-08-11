@@ -1677,6 +1677,17 @@ func TestValidator_RequiredNestedUserSchemaFields(t *testing.T) {
 			`required fields [billing] in user schema are missing in the flow definition steps`, nil))
 	})
 
+	// The resolver's own fixture, driven through the save path: the
+	// resolver cases prove a dotted field resolves, this proves the
+	// definition carrying it is accepted.
+	t.Run("the resolver's nested fixture saves", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(
+			mustSchema(t, []byte(nestedSchemaContent)),
+			nestedRequiredFlow([]domain.Field{"address.street"}),
+		)
+		require.NoError(t, err)
+	})
+
 	// Naming the object itself used to resolve as a text input and only
 	// fail once the user submitted it, at create_user.
 	t.Run("naming the object itself is rejected at definition time", func(t *testing.T) {
