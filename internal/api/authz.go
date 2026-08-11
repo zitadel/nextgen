@@ -215,7 +215,7 @@ func (h *Handler) withAuthzListFilter(ctx context.Context, projectID string, kin
 		return ctx, domain.ErrInternal(nil).WithMessage("authz list filter requires credential scope")
 	}
 	if h == nil || h.pool == nil {
-		return ctx, domain.ErrInternal(nil).WithMessage("authz statements not configured")
+		return ctx, domain.ErrInternal(errors.New("authz statements not configured"))
 	}
 	catalogID, err := h.pool.Statements().ActiveSystemCatalogID(ctx)
 	if err != nil {
