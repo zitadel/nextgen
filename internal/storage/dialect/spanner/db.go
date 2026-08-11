@@ -129,18 +129,20 @@ func returnQueryError(err error) error {
 
 func isWrappedStorageError(err error) bool {
 	var (
-		noRow   *database.NoRowFoundError
-		multi   *database.MultipleRowsFoundError
-		unique  *database.UniqueError
-		check   *database.CheckError
-		scan    *database.ScanError
-		unknown *database.UnknownError
+		noRow       *database.NoRowFoundError
+		multi       *database.MultipleRowsFoundError
+		unique      *database.UniqueError
+		check       *database.CheckError
+		scan        *database.ScanError
+		unavailable *database.UnavailableError
+		unknown     *database.UnknownError
 	)
 	return errors.As(err, &noRow) ||
 		errors.As(err, &multi) ||
 		errors.As(err, &unique) ||
 		errors.As(err, &check) ||
 		errors.As(err, &scan) ||
+		errors.As(err, &unavailable) ||
 		errors.As(err, &unknown)
 }
 

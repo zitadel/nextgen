@@ -3,6 +3,7 @@ package spanner
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -98,6 +99,29 @@ func TestWrapError(t *testing.T) {
 			name: "unknown error",
 			err:  errors.New("driver exploded"),
 			want: new(database.UnknownError),
+		},
+		{
+			name: "grpc aborted after retries are spent",
+			err:  status.Error(codes.Aborted, "Transaction: 1 aborted due to another transaction getting priority."),
+			want: new(database.UnavailableError),
+		},
+		{
+			name: "grpc deadline exceeded",
+			err:  status.Error(codes.DeadlineExceeded, "context deadline exceeded"),
+			want: new(database.UnavailableError),
+		},
+		{
+			// What the retry budget actually produces: it usually expires while
+			// gax is backing off between aborts, and gax.Sleep returns ctx.Err()
+			// with no gRPC status attached.
+			name: "bare context deadline exceeded",
+			err:  fmt.Errorf("giving up: %w", context.DeadlineExceeded),
+			want: new(database.UnavailableError),
+		},
+		{
+			name: "grpc unavailable",
+			err:  status.Error(codes.Unavailable, "backend unavailable"),
+			want: new(database.UnavailableError),
 		},
 		{
 			name: "preserves domain error",
