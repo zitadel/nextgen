@@ -305,7 +305,7 @@ Schema fields can have `x-*` annotations that tell the engine how to handle them
 
 | Annotation | Effect |
 |---|---|
-| `x-unique: "project"` | Value must be unique at the given scope. A non-empty scope makes the field an identifier: the engine looks up the user on submit, which implies a `user_not_found` outcome in transitions. |
+| `x-unique: "<scope>"` | Value must be unique at the given scope (`project` or `team`). A non-empty scope makes the field an identifier: the engine looks up the user on submit, which implies the `user_not_found` and `user_already_exists` outcomes in transitions. |
 | `x-credential: "password"` | Engine verifies the credential via auth_attempt. |
 
 This means the flow definition stays simple — field names only — while the engine derives all the complex behavior from the schema.

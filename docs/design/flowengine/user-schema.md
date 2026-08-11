@@ -15,7 +15,7 @@ What matters here is the contract: which schema annotations exist, how the flow 
 | `x-sensitive: true` | Field | Flow Engine | Value redacted in API / flow payloads (non-audit) |
 | `x-audit: true` | Field | Audit emitter | Field value may appear in audit event payloads (allowlist; deny-by-default) |
 | `x-editable: true` | Field | Flow Engine | Field appears in profiling / self-service flows |
-| `x-unique: "project"` | Field | Flow Engine | Server validates uniqueness on form submit (per-project scope); a non-empty scope also marks the field as an identifier used for user resolution |
+| `x-unique: "<scope>"` | Field | Flow Engine | Server validates uniqueness on form submit at the given scope (`project` or `team`); a non-empty scope also marks the field as an identifier used for user resolution |
 | `x-claim: "claims.email"` | Field | Flow Engine | Maps to SSO/OIDC claim for auto-population |
 | `x-auth-methods` | Schema | Policy Engine | Which auth methods this user type supports (narrows what policy can require) |
 
