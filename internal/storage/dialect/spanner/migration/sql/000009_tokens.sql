@@ -32,12 +32,23 @@ CREATE TABLE tokens (
             AND session_id IS NULL AND oidc_session_id IS NULL)
         OR (token_type = 'personal_access_token'
             AND session_id IS NULL AND oidc_session_id IS NULL AND saml_session_id IS NULL)
+        OR (token_type IN ('project_token', 'project_preview')
+            AND user_id IS NULL
+            AND session_id IS NULL AND oidc_session_id IS NULL AND saml_session_id IS NULL)
     ),
 ) PRIMARY KEY (project_id, token_id)
 -- +goose StatementEnd
 
+-- +goose StatementBegin
+CREATE NULL_FILTERED INDEX idx_tokens_session ON tokens (project_id, session_id)
+-- +goose StatementEnd
+
 -- +goose Down
 -- +goose NO TRANSACTION
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_tokens_session
+-- +goose StatementEnd
+
 -- +goose StatementBegin
 DROP TABLE IF EXISTS tokens
 -- +goose StatementEnd

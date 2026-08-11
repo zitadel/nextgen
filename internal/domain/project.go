@@ -6,7 +6,6 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/nextgen/internal/crypto"
-	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 const (
@@ -71,26 +70,20 @@ func NewProject(name string, previewOrigins []string) (*Project, error) {
 	}, nil
 }
 
-func (p *Project) ProjectSecret(encrypter op.Encrypter) (string, error) {
-	projectSecret, err := (&Token{
+func (p *Project) Token() *Token {
+	return &Token{
 		ProjectID: p.ID,
+		Type:      TokenTypeProjectToken,
 		Scope:     []string{"project.write", "project.read"},
-	}).JWE(encrypter)
-	if err != nil {
-		return "", ErrInternal(err).WithMessage("failed to generate project secret")
 	}
-	return projectSecret, nil
 }
 
-func (p *Project) PreviewSecret(encrypter op.Encrypter) (string, error) {
-	previewSecret, err := (&Token{
+func (p *Project) PreviewToken() *Token {
+	return &Token{
 		ProjectID: p.ID,
+		Type:      TokenTypeProjectPreview,
 		Scope:     []string{"project.read"},
-	}).JWE(encrypter)
-	if err != nil {
-		return "", ErrInternal(err).WithMessage("failed to generate preview secret")
 	}
-	return previewSecret, nil
 }
 
 // GenerateNewKeySet creates the project's key encryption key, wrapped by the
