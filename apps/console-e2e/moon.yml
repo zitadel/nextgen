@@ -10,6 +10,15 @@ tasks:
   lint:
     command: "corepack pnpm exec oxlint ."
 
+  # The e2e tasks themselves are opt-in (`runInCI: false`), which would leave
+  # the specs entirely outside CI's type surface — API contract drift in a
+  # spec would only surface when someone next ran the suite. Typechecking is
+  # cheap, so it runs in CI even though the suite does not.
+  typecheck:
+    command: "corepack pnpm run typecheck"
+    deps:
+      - "testing:build"
+
   e2e:
     command: "corepack pnpm exec playwright test"
     deps:
