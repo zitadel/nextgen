@@ -10,6 +10,8 @@ import (
 
 	"go.uber.org/mock/gomock"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
@@ -389,5 +391,295 @@ func assertSessionResult(t *testing.T, operation string, got *domain.Session, er
 	}
 	if got != want {
 		t.Fatalf("%s = %v, want %v", operation, got, want)
+	}
+}
+
+func TestSessionService_List(t *testing.T) {
+	t.Parallel()
+
+	createdAt := time.Now().UTC().Truncate(time.Second)
+
+	tests := []struct {
+		name         string
+		input        service.ListSessionInput
+		result       *database.ListResult[*domain.Session]
+		statementErr error
+		wantErr      error
+		checkOpts    func(t *testing.T, opts *database.ListOptions[domain.SessionField])
+		checkResp    func(t *testing.T, resp *service.ListSessionsResponse)
+	}{
+		{
+			name:  "defaults to newest first",
+			input: service.ListSessionInput{ProjectID: "proj_a"},
+			result: &database.ListResult[*domain.Session]{
+				Items:      []*domain.Session{{ID: "sess_b"}, {ID: "sess_a"}},
+				NextCursor: []byte("next"),
+			},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, uint32(20), opts.Pagination.Limit)
+				assert.Empty(t, opts.Pagination.Cursor)
+				assert.Equal(t, database.OrderDesc, opts.Pagination.OrderBy.Direction)
+				assert.Equal(t, []database.Column[domain.SessionField]{
+					database.Col(domain.SessionFieldCreatedAt),
+					database.Col(domain.SessionFieldID),
+				}, opts.Pagination.OrderBy.Columns)
+				assert.Equal(t, database.And(
+					database.Equal(database.Col(domain.SessionFieldProjectID), "proj_a"),
+				), opts.Filter)
+			},
+			checkResp: func(t *testing.T, resp *service.ListSessionsResponse) {
+				assert.Len(t, resp.Sessions, 2)
+				assert.Equal(t, "next", resp.NextPageToken)
+			},
+		},
+		{
+			name:   "limit clamped to max",
+			input:  service.ListSessionInput{ProjectID: "proj_a", Limit: 500},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, uint32(100), opts.Pagination.Limit)
+			},
+		},
+		{
+			name:   "zero limit uses default",
+			input:  service.ListSessionInput{ProjectID: "proj_a", Limit: 0},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, uint32(20), opts.Pagination.Limit)
+			},
+		},
+		{
+			name: "sort direction respected",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Sorting:   &service.Sorting{Field: "created_at", Direction: "asc"},
+			},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
+			},
+		},
+		{
+			name: "sort by user_id appends id tiebreaker",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Sorting:   &service.Sorting{Field: "user_id", Direction: "desc"},
+			},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, database.OrderDesc, opts.Pagination.OrderBy.Direction)
+				assert.Equal(t, []database.Column[domain.SessionField]{
+					database.Col(domain.SessionFieldUserID),
+					database.Col(domain.SessionFieldID),
+				}, opts.Pagination.OrderBy.Columns)
+			},
+		},
+		{
+			name: "filter by user_id",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "user_id", Operation: "equals", Value: "usr_1"}},
+			},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, database.And(
+					database.Equal(database.Col(domain.SessionFieldProjectID), "proj_a"),
+					database.StringEqual(database.Col(domain.SessionFieldUserID), "usr_1"),
+				), opts.Filter)
+			},
+		},
+		{
+			name: "filter greater_than createdAt parses RFC3339",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "created_at", Operation: "greater_than", Value: createdAt.Format(time.RFC3339)}},
+			},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, database.And(
+					database.Equal(database.Col(domain.SessionFieldProjectID), "proj_a"),
+					database.GreaterThan(database.Col(domain.SessionFieldCreatedAt), createdAt),
+				), opts.Filter)
+			},
+		},
+		{
+			name:   "page token passed through as cursor",
+			input:  service.ListSessionInput{ProjectID: "proj_a", PageToken: "tok"},
+			result: &database.ListResult[*domain.Session]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
+				assert.Equal(t, []byte("tok"), opts.Pagination.Cursor)
+			},
+		},
+		{
+			name:         "statement error is wrapped",
+			input:        service.ListSessionInput{ProjectID: "proj_a"},
+			statementErr: errors.New("boom"),
+			wantErr:      domain.ErrInternal(nil),
+		},
+		{
+			name:         "invalid cursor maps to request invalid",
+			input:        service.ListSessionInput{ProjectID: "proj_a", PageToken: "bad"},
+			statementErr: database.ErrInvalidCursor(),
+			wantErr:      domain.ErrRequestInvalid(),
+		},
+		{
+			name:         "cursor order mismatch maps to request invalid",
+			input:        service.ListSessionInput{ProjectID: "proj_a", PageToken: "bad"},
+			statementErr: database.ErrCursorOrderMismatch(),
+			wantErr:      domain.ErrRequestInvalid(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			svc, statements := newMockedSessionService(t, &userReaderStub{}, sessionConfigForTest())
+
+			var gotOpts *database.ListOptions[domain.SessionField]
+			statements.EXPECT().ListSessions(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(_ context.Context, opts *database.ListOptions[domain.SessionField]) (*database.ListResult[*domain.Session], error) {
+					gotOpts = opts
+					return tc.result, tc.statementErr
+				})
+
+			resp, err := svc.List(context.Background(), tc.input)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			if tc.checkOpts != nil {
+				tc.checkOpts(t, gotOpts)
+			}
+			if tc.checkResp != nil {
+				tc.checkResp(t, resp)
+			}
+		})
+	}
+}
+
+func TestSessionService_List_ValidationErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		input   service.ListSessionInput
+		wantErr error
+	}{
+		{
+			name:    "missing project id is refused",
+			input:   service.ListSessionInput{},
+			wantErr: domain.ErrProjectMissingID(),
+		},
+		{
+			name: "unknown filter field is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "token_id", Operation: "equals", Value: "x"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unknown sort field is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Sorting:   &service.Sorting{Field: "state"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unknown sort direction is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Sorting:   &service.Sorting{Field: "created_at", Direction: "sideways"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "missing sort direction is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Sorting:   &service.Sorting{Field: "created_at"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "non-string user_id value is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "user_id", Operation: "equals", Value: 42}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "ordering operation on user_id is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "user_id", Operation: "less_than", Value: "usr_1"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unparseable createdAt value is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "created_at", Operation: "equals", Value: "not-a-time"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unknown state value is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "state", Operation: "equals", Value: "revoked"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "non-string state value is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "state", Operation: "equals", Value: 1}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "state not_equals not implemented",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "state", Operation: "not_equals", Value: "active"}},
+			},
+			wantErr: domain.ErrNotImplemented(),
+		},
+		{
+			name: "ordering operation on state is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "state", Operation: "greater_than", Value: "active"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unknown operation on state is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Filters:   []service.Filter{{Field: "state", Operation: "like", Value: "active"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// The statement must never be reached: validation fails first, so no
+			// ListSessions expectation is set and gomock would flag an unexpected call.
+			svc, _ := newMockedSessionService(t, &userReaderStub{}, sessionConfigForTest())
+
+			_, err := svc.List(context.Background(), tc.input)
+			require.ErrorIs(t, err, tc.wantErr)
+		})
 	}
 }

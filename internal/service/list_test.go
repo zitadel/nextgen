@@ -75,7 +75,7 @@ func TestParseSortDirection(t *testing.T) {
 		want      database.OrderDirection
 		wantErr   error
 	}{
-		{name: "empty defaults to ascending", direction: "", want: database.OrderAsc},
+		{name: "empty is invalid", direction: "", want: database.OrderAsc, wantErr: domain.ErrRequestInvalid()},
 		{name: "asc", direction: sortAsc, want: database.OrderAsc},
 		{name: "desc", direction: sortDesc, want: database.OrderDesc},
 		{name: "unknown is invalid", direction: "sideways", want: database.OrderAsc, wantErr: domain.ErrRequestInvalid()},
