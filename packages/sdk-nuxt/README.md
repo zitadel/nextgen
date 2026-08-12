@@ -51,13 +51,15 @@ composables — no `server/middleware/auth.ts`, no manual plugin.
 | `protectedRoutes` | `string[]` | `[]` | Paths requiring a valid session. Trailing `*` matches sub-paths |
 | `loginPath` | `string` | `"/login"` | Where to redirect unauthenticated users |
 
-The module's registered handler forwards only the options above. The
-fine-tuning options of the direct-middleware surface (`ignoredRoutes`,
-`allowedAlgorithms`, `allowedTokenTypes`, `clockSkewMs`, `jwksTimeoutMs`,
-`opaqueTokenTimeoutMs`, `proxyTimeoutMs`, `audience`) are **not currently
-forwarded by the module** — if you need them, use Surface 2. The module also
-loads the server-only project secret into runtime config
-(override at deploy time via `NUXT_NEXTGEN_PROJECT_SECRET`).
+The module's registered handler reads only `url`, `protectedRoutes`, and
+`loginPath` from runtime config; `proxyPath` configures the client side only
+(see its row above). The fine-tuning options of the direct-middleware surface
+(`ignoredRoutes`, `allowedAlgorithms`, `allowedTokenTypes`, `clockSkewMs`,
+`jwksTimeoutMs`, `opaqueTokenTimeoutMs`, `proxyTimeoutMs`, `audience`) are
+**not currently forwarded by the module** — if you need them, use Surface 2.
+The module also loads the server-only project secret into runtime config at
+startup, from the `ZITADEL_PROJECT_SECRET` environment variable or the
+scaffolded `.env.local`.
 
 ### Reading auth state
 
