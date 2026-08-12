@@ -154,8 +154,10 @@ func lookupResourceScope(ctx context.Context, stmts resourceAccessStmts, resourc
 				return nil, err
 			}
 			// Same-project row under a different kind (e.g. schema id on a user route).
-			if global, gerr := stmts.GetResourceScope(ctx, resourceID); gerr == nil && global.ProjectID == cred.ProjectID {
-				return global, nil
+			if same, gerr := stmts.GetResourceScopeByIDInProject(ctx, cred.ProjectID, resourceID); gerr == nil {
+				return same, nil
+			} else if !errors.Is(gerr, new(database.NoRowFoundError)) {
+				return nil, gerr
 			}
 			return nil, new(database.NoRowFoundError)
 		}
@@ -170,17 +172,15 @@ func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resou
 			if op == opDelete {
 				cred, ok := GetScopeContext(ctx)
 				if ok && hasOperatorProjectWrite(cred.Scope) {
-					// Idempotent 204 only when the id is gone everywhere. A row in
-					// another project must not 204 — map through Check (foreign
-					// delete probes expect 404/403, not NoContent).
-					if global, gerr := stmts.GetResourceScope(ctx, resourceID); gerr == nil && global.ProjectID != cred.ProjectID {
-						if res.kind != "" && global.ResourceKind != res.kind {
-							return "", res.readMiss()
-						}
-						if err := requireProjectAccessAfterRSI(ctx, stmts, global.ProjectID, res, op); err != nil {
-							return "", err
-						}
-						return global.ProjectID, nil
+					// Idempotent 204 only when the id is gone everywhere. Foreign
+					// presence (any other project) must not 204 — readMiss matches
+					// Check NotFound for a foreign sk_proj.
+					elsewhere, xerr := stmts.ExistsResourceScopeElsewhere(ctx, res.kind, resourceID, cred.ProjectID)
+					if xerr != nil {
+						return "", domain.ErrInternal(xerr).WithMessage("resource scope lookup failed")
+					}
+					if elsewhere {
+						return "", res.readMiss()
 					}
 					return "", errResourceGone
 				}

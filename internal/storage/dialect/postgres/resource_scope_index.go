@@ -28,6 +28,17 @@ SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
 FROM zitadel_nextgen.resource_scope_index
 WHERE resource_kind = $1 AND project_id = $2 AND resource_id = $3`
 
+	getResourceScopeByIDInProjectStmt = `
+SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
+FROM zitadel_nextgen.resource_scope_index
+WHERE project_id = $1 AND resource_id = $2`
+
+	existsResourceScopeElsewhereStmt = `
+SELECT EXISTS (
+    SELECT 1 FROM zitadel_nextgen.resource_scope_index
+    WHERE resource_kind = $1 AND resource_id = $2 AND project_id <> $3
+)`
+
 	deleteResourceScopeStmt = `DELETE FROM zitadel_nextgen.resource_scope_index WHERE resource_kind = $1 AND project_id = $2 AND resource_id = $3`
 )
 
@@ -72,6 +83,28 @@ func (s resourceScopeStatements) GetResourceScopeInProject(ctx context.Context, 
 		return nil, wrapError(err)
 	}
 	return scope, nil
+}
+
+// GetResourceScopeByIDInProject implements [service.ResourceScopeStatements].
+func (s resourceScopeStatements) GetResourceScopeByIDInProject(ctx context.Context, projectID, resourceID string) (*domain.ResourceScope, error) {
+	rows, err := s.client.Query(ctx, getResourceScopeByIDInProjectStmt, projectID, resourceID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	scope, err := pgx.CollectExactlyOneRow(rows, scanResourceScope)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return scope, nil
+}
+
+// ExistsResourceScopeElsewhere implements [service.ResourceScopeStatements].
+func (s resourceScopeStatements) ExistsResourceScopeElsewhere(ctx context.Context, kind domain.ResourceKind, resourceID, excludeProjectID string) (bool, error) {
+	var exists bool
+	if err := s.client.QueryRow(ctx, existsResourceScopeElsewhereStmt, kind.String(), resourceID, excludeProjectID).Scan(&exists); err != nil {
+		return false, wrapError(err)
+	}
+	return exists, nil
 }
 
 // DeleteResourceScope implements [service.ResourceScopeStatements].
