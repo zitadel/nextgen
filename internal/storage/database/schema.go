@@ -15,6 +15,9 @@ type FieldBinding[T any] struct {
 	// nullable columns need null-aware SQL, and ORDER BY states their NULL
 	// position explicitly (ASC NULLS FIRST / DESC NULLS LAST on every dialect).
 	Nullable bool
+	// Computed marks SQLName as a SQL expression rather than a column
+	// reference, so it has no DDL nullability of its own.
+	Computed bool
 }
 
 // NullableValue flattens a nil pointer to untyped nil so it binds as SQL NULL.
@@ -60,10 +63,14 @@ func (s Schema[F, T]) Nullable(col Column[F]) bool {
 	return s.binding(col.Field()).Nullable
 }
 
-// ColumnNullability returns the Nullable flag per bound SQL column name.
+// ColumnNullability returns the Nullable flag per bound SQL column name,
+// skipping computed bindings, which name no column.
 func (s Schema[F, T]) ColumnNullability() map[string]bool {
 	m := make(map[string]bool, len(s.fields))
 	for _, b := range s.fields {
+		if b.Computed {
+			continue
+		}
 		m[b.SQLName] = b.Nullable
 	}
 	return m

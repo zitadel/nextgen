@@ -489,6 +489,7 @@ var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBin
 	// Not a column: a correlated EXISTS over the session's verified checks,
 	// backing the computed state filter.
 	domain.SessionFieldHasVerifiedFactors: {
-		SQLName: "EXISTS (SELECT 1 FROM checks vc WHERE vc.project_id = s.project_id AND vc.session_id = s.id AND vc.last_verified_at IS NOT NULL)",
+		SQLName:  "EXISTS (SELECT 1 FROM checks vc WHERE vc.project_id = s.project_id AND vc.session_id = s.id AND vc.last_verified_at IS NOT NULL)",
+		Computed: true,
 	},
 })

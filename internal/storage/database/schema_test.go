@@ -58,6 +58,10 @@ func TestSchemaColumnNullability(t *testing.T) {
 			Coerce:   database.CoerceString,
 			Nullable: true,
 		},
+		domain.ProjectFieldCreatedAt: {
+			SQLName:  "name IS NOT NULL",
+			Computed: true,
+		},
 	})
 
 	assert.Equal(t, map[string]bool{"id": false, "name": true}, schema.ColumnNullability())
