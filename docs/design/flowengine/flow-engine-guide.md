@@ -68,17 +68,17 @@ Every step the server returns has the same shape:
 **Fields** are resolved by the engine from the user schema:
 
 ```json
-{ "type": "email", "text_key": "login.field.email", "required": true }
+{ "name": "email", "type": "email", "text_key": "login.field.email", "required": true }
 ```
 
 **Actions** are an ordered array of `{name, kind, …}` entries:
 
 ```json
-{
-  "submit": { "text_key": "login.action.submit", "primary": true },
-  "register": { "text_key": "login.action.register" },
-  "recover": { "text_key": "login.action.recover" }
-}
+[
+  { "name": "submit", "kind": "submit", "text_key": "login.action.submit", "primary": true },
+  { "name": "register", "kind": "navigate", "text_key": "login.action.register" },
+  { "name": "recover", "kind": "navigate", "text_key": "login.action.recover" }
+]
 ```
 
 The array order is a stable default, but the LiquidJS template owns layout — it iterates in order, reorders, or looks entries up by name (`where: "name"`).
@@ -130,8 +130,8 @@ The template receives the full step payload as its rendering context:
 // What the orchestrator passes to LiquidJS
 {
   step: { name, texts, complete },
-  fields: { email: { type, required, text_key } },
-  actions: { submit: { primary, text_key }, recover: { text_key } },
+  fields: [ { name, type, required, text_key } ],
+  actions: [ { name, kind, primary, text_key } ],
   gates: { captcha: { provider, config } },
   sso_providers: [ { id, name, template } ],
   identity: { display_name, avatar_url },
@@ -163,10 +163,11 @@ All human-readable text is resolved client-side. The backend sends `text_key` st
 
 ```liquid
 <!-- The filter looks up "login.field.email" in the active locale dictionary -->
+{% assign email = fields | where: "name", "email" | first %}
 <zl-field
   name="email"
-  label="{{ fields.email.text_key | t }}"
-  type="{{ fields.email.type }}"
+  label="{{ email.text_key | t }}"
+  type="{{ email.type }}"
 ></zl-field>
 
 <!-- Interpolation: "Hi, {{displayName}}" becomes "Hi, Alice" -->
