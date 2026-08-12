@@ -90,7 +90,7 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
 | **D3** | Dual-write membership: `team_memberships` remains roster/lifecycle; `authz_membership_edges` is the authz projection; the resolver does **not** read `team_memberships`. |
 | **D4** | Bundle tables remain in DDL; v1 mapper does not fill them. Product bundle grants can still use a bundle relation name once populated. |
 | **D5** | `authz_expression_edges` + `authz_relation_references` store compiled OR terms and direct-assignment type restrictions from #720. Relation identity is `(object_type, relation)` everywhere (including assignments). |
-| **D6** | `resource_scope_index` PK = `(resource_id)` only. |
+| **D6** | `resource_scope_index` PK = `(resource_kind, project_id, resource_id)`. Prefixed managed path ids (`usr_*`, `team_*`, minted `sch_*`, …) remain globally unique in practice; schema `$id` URLs are unique per `(project_id, url)` and scoped by the composite PK. |
 | **D7** | Assignment PK = `(project_id, id)`. |
 | **D8** | Soft revoke via `revoked_at`; unique active-grant index ignores revoked rows. |
 | **D9** | App-group / `app_grants` tables deferred (same physical catalog model later; [ADR 034](../../adrs/034-external-permission-management.md)). |
@@ -98,6 +98,7 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
 | **D11** | Dual-write membership **without** Leopard in Wave 1; Leopard remains an additive derived index later ([ADR 032 §3](../../adrs/032-permission-catalogs.md#3-canonical-relational-storage)). |
 | **D12** | Hash-partitioning `resource_scope_index` (Postgres) **deferred until proven**; revisit only with vacuum/bloat/hot-spot measurements. |
 | **D13** | Cross-project ([#333](https://github.com/zitadel/nextgen/issues/333)) depiction: same `authz_assignments` row on the **protected** `project_id`, with a **foreign** `user`/`team` principal (no `principal_type = project`); principal integrity by stable prefixed ids ([ADR 011](../../adrs/011-resource-identifiers.md)), not a composite FK to local `(project_id, user_id)`. |
+| **D14** | No backfill for pre-stack authz data. Enforcement assumes instances bootstrapped at or after Wave 1 + #807: `sk_proj` assignments are seeded only by `CreateProject`, and RSI rows for schema/branding/flow_definition/session exist only via dual-write. (Pre)alpha status is the justification; revisit only if a supported upgrade path from pre-stack data ever becomes a requirement. |
 
 ## Entity picture
 
@@ -148,7 +149,7 @@ CREATE TABLE zitadel_nextgen.resource_scope_index (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    PRIMARY KEY (resource_id),
+    PRIMARY KEY (resource_kind, project_id, resource_id),
     FOREIGN KEY (project_id, team_id)
         REFERENCES zitadel_nextgen.teams (project_id, id)
         ON DELETE CASCADE
@@ -166,7 +167,8 @@ CREATE INDEX idx_resource_scope_index_kind_project
 this table in the **same transaction** as the resource. Covered kinds:
 `project`, `team`, `user`, `schema`, `branding`, `flow_definition`, `session`.
 For a project row: `resource_id = id`, `project_id = id`, `team_id NULL`.
-Schema rows use `resource_id = url`. Branding has no delete API; RSI rows are
+Schema rows use `resource_id = url` with `resource_kind = schema` (composite PK
+scopes URL reuse per project). Branding has no delete API; RSI rows are
 removed by the project FK cascade.
 
 **Dialect note:** the composite FK to `teams (project_id, id)` uses Postgres
@@ -180,7 +182,7 @@ explicit, not an index cascade.
 
 **D12:** do not hash-partition this table in Wave 1.
 
-**Spanner:** same columns; PK `(resource_id)`; prefer matching existing FK
+**Spanner:** same columns; PK `(resource_kind, project_id, resource_id)`; prefer matching existing FK
 delete semantics on teams. Composite PK / interleave for locality is a separate
 dialect decision, also deferred until measured.
 

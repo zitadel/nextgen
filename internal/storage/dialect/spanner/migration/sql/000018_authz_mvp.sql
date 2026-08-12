@@ -36,7 +36,7 @@ CREATE TABLE resource_scope_index (
         FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
     CONSTRAINT fk_resource_scope_index_team
         FOREIGN KEY (project_id, team_id) REFERENCES teams (project_id, id) ON DELETE CASCADE
-) PRIMARY KEY (resource_id)
+) PRIMARY KEY (resource_kind, project_id, resource_id)
 -- +goose StatementEnd
 
 -- +goose StatementBegin
