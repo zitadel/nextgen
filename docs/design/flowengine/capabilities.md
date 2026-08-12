@@ -67,7 +67,7 @@ These contracts exist on the wire and in the state machine but reject at runtime
 - **SSO submissions.** Submitting an action with an `sso_provider_id` is rejected.
 - **Gate proofs.** Submitting a `gate_proofs` map is rejected.
 
-`ErrUnsupported` maps to HTTP 400 with `code: "unsupported"`.
+`ErrFlowUnsupported` maps to HTTP 400 with `code: "flow.unsupported"`.
 
 ## Missing
 
