@@ -112,6 +112,10 @@ tasks:
     command: "go vet ./..."
     deps:
       - "check-generate"
+      # Same embed race as test/build: go vet compiles //go:embed all:dist while
+      # a concurrent console/login-ui build can emptyOutDir the placeholder.
+      - "console:build"
+      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
     options:
@@ -130,6 +134,12 @@ tasks:
       - "format"
       - "check-generate"
       - "vet"
+      # Order UI builds before go test so a batched moon graph cannot compile
+      # //go:embed all:dist while vite emptyOutDir has cleared .gitkeep.
+      # Intentionally deps-only (not inputs): UI-only changes must not invalidate
+      # the Go test cache — see build.inputs note below.
+      - "console:build"
+      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
     options:
