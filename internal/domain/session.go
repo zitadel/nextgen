@@ -192,4 +192,8 @@ const (
 	SessionFieldTimeToLive
 	SessionFieldTokenID
 	SessionFieldUserID
+	// SessionFieldHasVerifiedFactors is computed, not stored: it reflects
+	// whether the session has verified factors, the test State() uses to
+	// separate building from active. Filter only; not sortable.
+	SessionFieldHasVerifiedFactors
 )
