@@ -1,6 +1,6 @@
 import { test as base, type Page } from "@playwright/test";
 
-import { readHandshakeSync } from "./handshake";
+import { waitForHandshake } from "./handshake";
 import { connectZitadel } from "./index";
 import { enableVirtualPasskey, type VirtualPasskey } from "./passkey";
 import type {
@@ -63,7 +63,15 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
             "written by the script that boots the instance (see @zitadel/testing docs).",
         );
       }
-      await use(connectZitadel(readHandshakeSync(handshakePath)));
+      // Wait, don't read-once: the supervisor's Playwright readiness URL is
+      // the instance's /healthz, which answers as soon as the *server* is up
+      // — the handshake lands only after *bootstrap* (project, schema,
+      // flows) completes a moment later. Suites with an `app` entry never
+      // see the gap (the app runner waits for the handshake before the app
+      // reports ready), but in app-less mode the first worker can get here
+      // first. Bootstrap after health is seconds at most, so the default
+      // wait is generous; a bootstrap failure surfaces as this timeout.
+      await use(connectZitadel(await waitForHandshake(handshakePath)));
     },
     { scope: "worker" },
   ],
