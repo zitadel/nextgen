@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -395,6 +396,54 @@ func TestManagementAuthz(t *testing.T) {
 			})
 		})
 	})
+}
+
+// TestListAuthzTeamScopedOnlyForbidden documents that today's HTTP gate
+// requireProjectAccess Checks project-level relations only: a principal whose
+// only grant is team-scoped project.viewer gets 403 before withAuthzListFilter
+// can narrow rows (#834).
+func TestListAuthzTeamScopedOnlyForbidden(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
+	})
+	require.NoError(t, err)
+
+	stmts := harness.EnsureServiceDB(t).Statements()
+	asgns, err := stmts.ListAuthzAssignments(t.Context(), project.ID, domain.AuthzPrincipalTypeSKProj, project.ID, false)
+	require.NoError(t, err)
+	require.NotEmpty(t, asgns, "CreateProject seeds sk_proj → project.viewer")
+	for _, a := range asgns {
+		require.NoError(t, stmts.RevokeAuthzAssignment(t.Context(), project.ID, a.ID))
+	}
+
+	scoped := &domain.AuthzAssignment{
+		ProjectID:     project.ID,
+		CatalogID:     domain.SystemCatalogID,
+		PrincipalType: domain.AuthzPrincipalTypeSKProj,
+		PrincipalID:   project.ID,
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+	scoped.ApplyScope(domain.NewTeamAssignmentScope(team.ID))
+	require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), scoped))
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	listResp, err := client.ListSchemas(t.Context(), api.ListSchemasParams{ProjectID: api.ProjectID(project.ID)})
+	require.NoError(t, err)
+	assertAuthzStatus(t, listResp, 403, "sch.permission_denied")
+
+	teamsResp, err := client.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: api.ProjectID(project.ID)})
+	require.NoError(t, err)
+	assertAuthzError(t, teamsResp, "team.permission_denied")
 }
 
 // errorResponseParts pulls the status and error body out of any error-shaped
