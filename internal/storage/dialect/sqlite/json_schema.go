@@ -35,21 +35,33 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 	if payload == "" {
 		payload = "{}"
 	}
-	row := js.client.QueryRow(ctx, createJSONSchemaStmt,
-		schema.ProjectID, schema.URL, schema.ObjectType, payload, now,
-	)
-	scanned, err := scanJSONSchemaRow(row)
-	if err != nil {
-		return wrapError(err)
-	}
-	*schema = *scanned
-	return nil
+	return withTransaction(ctx, js.client, func(ctx context.Context, tx queryExecutor) error {
+		row := tx.QueryRow(ctx, createJSONSchemaStmt,
+			schema.ProjectID, schema.URL, schema.ObjectType, payload, now,
+		)
+		scanned, err := scanJSONSchemaRow(row)
+		if err != nil {
+			return wrapError(err)
+		}
+		*schema = *scanned
+		rsi := newResourceScopeStatements(tx)
+		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindSchema, schema.ProjectID, schema.URL))
+	})
 }
 
 // DeleteJSONSchemaByID implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error {
-	_, err := js.client.Exec(ctx, deleteByIDJSONSchemaStmt, projectID, schemaID)
-	return wrapError(err)
+	return withTransaction(ctx, js.client, func(ctx context.Context, tx queryExecutor) error {
+		n, err := execAffected(ctx, tx, deleteByIDJSONSchemaStmt, projectID, schemaID)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return nil
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.DeleteResourceScope(ctx, domain.ResourceKindSchema, projectID, schemaID)
+	})
 }
 
 // GetJSONSchemaByID implements [service.JSONSchemaStatements].

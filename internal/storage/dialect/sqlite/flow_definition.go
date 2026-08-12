@@ -50,11 +50,16 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 		return wrapError(err)
 	}
 	now := nowUnixNano()
-	_, err = f.client.Exec(ctx, createFlowDefinitionStmt,
-		entity.ProjectID, entity.ID, entity.Name, entity.SchemaVersion,
-		entity.Status.String(), purposes, defStr, now, now,
-	)
-	return wrapError(err)
+	return withTransaction(ctx, f.client, func(ctx context.Context, tx queryExecutor) error {
+		if _, err := tx.Exec(ctx, createFlowDefinitionStmt,
+			entity.ProjectID, entity.ID, entity.Name, entity.SchemaVersion,
+			entity.Status.String(), purposes, defStr, now, now,
+		); err != nil {
+			return wrapError(err)
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindFlowDefinition, entity.ProjectID, entity.ID))
+	})
 }
 
 // GetFlowDefinitionByID implements [service.FlowDefinitionStatements].
@@ -130,8 +135,17 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 
 // DeleteFlowDefinitionByID implements [service.FlowDefinitionStatements].
 func (f flowDefinitionStatements) DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error {
-	_, err := f.client.Exec(ctx, deleteFlowDefinitionStmt, projectID, id)
-	return wrapError(err)
+	return withTransaction(ctx, f.client, func(ctx context.Context, tx queryExecutor) error {
+		n, err := execAffected(ctx, tx, deleteFlowDefinitionStmt, projectID, id)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return nil
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.DeleteResourceScope(ctx, domain.ResourceKindFlowDefinition, projectID, id)
+	})
 }
 
 func (f flowDefinitionStatements) scanFlowDefinition(rows *sql.Rows) (*domain.FlowDefinition, error) {

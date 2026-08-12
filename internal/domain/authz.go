@@ -17,9 +17,13 @@ const PrefixAuthzAssignment ResourcePrefix = "asgn"
 type ResourceKind string
 
 const (
-	ResourceKindProject ResourceKind = "project"
-	ResourceKindTeam    ResourceKind = "team"
-	ResourceKindUser    ResourceKind = "user"
+	ResourceKindProject        ResourceKind = "project"
+	ResourceKindTeam           ResourceKind = "team"
+	ResourceKindUser           ResourceKind = "user"
+	ResourceKindSchema         ResourceKind = "schema"
+	ResourceKindBranding       ResourceKind = "branding"
+	ResourceKindFlowDefinition ResourceKind = "flow_definition"
+	ResourceKindSession        ResourceKind = "session"
 )
 
 func (k ResourceKind) String() string { return string(k) }
@@ -192,12 +196,17 @@ func NewTeamResourceScope(projectID, teamID string) *ResourceScope {
 	}
 }
 
-func NewUserResourceScope(projectID, userID string) *ResourceScope {
+// NewResourceScope builds a project-scoped RSI row (no team).
+func NewResourceScope(kind ResourceKind, projectID, resourceID string) *ResourceScope {
 	return &ResourceScope{
-		ResourceID:   userID,
-		ResourceKind: ResourceKindUser,
+		ResourceID:   resourceID,
+		ResourceKind: kind,
 		ProjectID:    projectID,
 	}
+}
+
+func NewUserResourceScope(projectID, userID string) *ResourceScope {
+	return NewResourceScope(ResourceKindUser, projectID, userID)
 }
 
 // AuthzAssignmentScope encodes the CHECK-constrained scope columns.

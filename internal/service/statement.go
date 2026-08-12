@@ -328,15 +328,19 @@ type ClaimStatements interface {
 // ResourceScopeStatements persists resource_scope_index rows (path.id → project/team).
 //
 // Use cases:
-//   - UpsertResourceScope: dual-write on project/team/user create (build via domain.New*ResourceScope).
-//   - GetResourceScope: scope resolution for middleware / resolver before a permission check.
-//   - DeleteResourceScope: explicit cleanup where FK cascade does not apply (user delete today;
-//     project delete cascades RSI via project_id FK).
+//   - UpsertResourceScope: dual-write on project/team/user/schema/branding/
+//     flow_definition/session create (build via domain.New*ResourceScope).
+//   - GetResourceScope: scope resolution when resource_id is globally unique (tests, oracle).
+//   - GetResourceScopeInProject: scope resolution for management gate (kind + credential project + path.id).
+//   - DeleteResourceScope: explicit cleanup where FK cascade does not apply (user /
+//     schema / flow_definition / session delete today; branding relies on project
+//     cascade; project delete cascades RSI via project_id FK).
 type ResourceScopeStatements interface {
 	Statements
 	UpsertResourceScope(ctx context.Context, scope *domain.ResourceScope) error
 	GetResourceScope(ctx context.Context, resourceID string) (*domain.ResourceScope, error)
-	DeleteResourceScope(ctx context.Context, resourceID string) error
+	GetResourceScopeInProject(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) (*domain.ResourceScope, error)
+	DeleteResourceScope(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) error
 }
 
 // AuthzAssignmentStatements persists grants (principal → catalog relation at a scope).
