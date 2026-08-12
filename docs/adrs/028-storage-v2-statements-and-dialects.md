@@ -109,8 +109,8 @@ token signing and opaqueness stay upstream of storage.
 ### 6. Unified dialect target (end state on `new-repo`)
 
 v2 dialect implementations
-(`internal/storage/v2/dialect/postgres`, `internal/storage/v2/dialect/spanner`,
-`internal/storage/v2/dialect/sqlite`)
+(`internal/storage/dialect/postgres`, `internal/storage/dialect/spanner`,
+`internal/storage/dialect/sqlite`)
 must eventually own pool, migrations, Identity, and ID generation alongside
 statement execution. Entity and application paths already use statements only;
 v2 transactions are `Statementer`-only and no longer implement v1
@@ -129,17 +129,17 @@ flowchart TB
         StatementIfaces["ProjectStatements / FlowDefinitionStatements"]
         serviceDB["service.DB"]
     end
-    subgraph v2core [internal/storage/v2/database]
+    subgraph storageCore [internal/storage/database]
         CoreTypes["Filter + ListOptions + dialect registry"]
         DialectReg["Dialect registry + Config.Build"]
     end
-    subgraph dialects [internal/storage/v2/dialect]
+    subgraph dialects [internal/storage/dialect]
         pg["postgres: statement_*.go + compiler.go"]
         sp["spanner: statement_*.go"]
         sq["sqlite: statement_*.go + compiler.go"]
     end
     subgraph endState [End state on new-repo]
-        v2Only["v2 dialects own pool tx migrations Identity ID gen"]
+        v2Only["dialects own pool tx migrations Identity ID gen"]
     end
 
     ProjectService --> serviceDB
@@ -209,7 +209,7 @@ These previously lived under v1 and are now owned by v2 (C3–C6):
 
 - Migrations (postgres + spanner DDL) — **done**
 - Test DSN bring-up — **done** (`v2/testdb` + `v2/dbtest`; Postgres/Spanner emulator via testcontainers, or env-provided DSNs / real Spanner instance)
-- Zero-config local SQLite — **done** (`v2/dialect/sqlite`; file under `server.data_dir`)
+- Zero-config local SQLite — **done** (`dialect/sqlite`; file under `server.data_dir`)
 - [`database.Identity`](../../internal/storage/v2/database/identity.go) (ADR 011) — **done**
 - Dialect-specific integrity error types — **done** (`v2/database/integrity_errors.go`)
 - Single pool at production startup — **done** (C5)
@@ -234,7 +234,7 @@ everywhere until generics land.
 ## Package layout
 
 ```
-internal/storage/v2/
+internal/storage/
   database/           # Dialect registry, Filter, ListOptions, ListResult
   dialect/
     all/              # Blank-import registration (postgres + spanner + sqlite)

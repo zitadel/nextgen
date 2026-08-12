@@ -60,8 +60,9 @@ moon run workspace:cli -- start
 ```
 
 This builds the embedded console and login UIs, then starts the Go server on
-`http://localhost:8080` with SQLite at `nextgen-data/zitadel.db`. The server is
-ready when you see `Local Zitadel server is ready.`
+`http://localhost:8080` with SQLite at
+`.zitadel/local/nextgen-data/zitadel.db`. The server is ready when you see
+`Local Zitadel server is ready.`
 
 #### 2. Create a project
 

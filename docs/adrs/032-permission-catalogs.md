@@ -65,7 +65,7 @@ Resources.
 | **Catalog** | A versioned collection of relation/permission definitions, their expressions, and optional bundles. Zitadel has two: the **system catalog** ([ADR 033](033-internal-permission-management.md)) and the **app-group catalog** ([ADR 034](034-external-permission-management.md)). |
 | **Grant / assignment** | A stored row binding a principal to a permission or relation at an explicit scope. See [`docs/design/glossary.md`](../design/glossary.md#4-resources) for the canonical **grant** definition; "assignment" is this ADR's storage-layer term for the same row. |
 | **OpenFGA DSL / JSON** | The human-authorable and machine-interchange syntax used to describe a permission schema — the input to the compiler pipeline in §2. |
-| **Profile** | The bounded subset of OpenFGA's modeling language Zitadel supports, chosen so checks stay portable and predictable on PostgreSQL and Spanner (production peers), with SQLite also exercising the same contract locally. |
+| **Profile** | The bounded subset of OpenFGA's modeling language Zitadel supports, chosen so checks stay portable and predictable on both PostgreSQL and Spanner. |
 | **Contextual tuple** | An OpenFGA fact supplied at check time rather than stored ahead of time. Not supported on request hot paths in our profile (see §2's Unsupported constructs). |
 | **Caveat / condition** | An OpenFGA construct that attaches a runtime-evaluated condition to a relationship. Arbitrary caveats are unsupported in our profile when they need non-indexed attribute evaluation. |
 | **IR (intermediate representation)** | The normalized internal shape produced after parsing and validating a policy, before it is compiled into relational rows and query plans. |
@@ -99,8 +99,7 @@ The current design docs already lock several adjacent invariants:
 - [`docs/design/api/authz.md`](../design/api/authz.md) frames authorization
   as `credential x resolved scope x required permission -> decision`.
 - [`internal/storage/AGENTS.md`](../../internal/storage/AGENTS.md) requires
-  SQL-first storage that works on PostgreSQL and Spanner (production) and
-  SQLite (local default).
+  SQL-first storage that works on both PostgreSQL and Spanner.
 
 Three related issue areas constrain the decision:
 
@@ -342,8 +341,8 @@ versioned the same way regardless of which catalog they belong to.
 
 - One authorization model covers platform administrators, customer project
   admins, service credentials, and end-user app permissions.
-- PostgreSQL and Spanner remain first-class production peers; SQLite is the
-  local/homelab dialect. Database RLS is optional, not required.
+- PostgreSQL and Spanner remain first-class; database RLS is optional, not
+  required.
 - OpenFGA remains useful for customer-facing policy literacy and future
   interoperability without forcing an external consistency boundary into
   the hot path.

@@ -7,7 +7,7 @@
 
 Sessions and flows have fundamentally different lifetimes and purposes:
 
-- A **session** is durable server-side state: factors, assurance_levels, user identity. It lives in the configured storage dialect (SQLite locally; PostgreSQL or Spanner in production) and persists for hours or days.
+- A **session** is durable server-side state: factors, assurance_levels, user identity. It lives in the configured storage dialect and persists for hours or days.
 - A **flow** is ephemeral orchestration: which step the user is on, what data they've entered so far, where to redirect on completion. It lives only while the user is actively clicking through screens.
 
 A single session can have **many flows over its lifetime**:
