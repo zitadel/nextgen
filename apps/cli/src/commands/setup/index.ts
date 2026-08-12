@@ -418,6 +418,18 @@ export default class Setup extends BaseCommand {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
+    // Widget-posture embeds render at card width, where the split-family
+    // brand pane is collapsed to the compact brand mark — which is empty
+    // until branding.json names an asset. Say so at setup time instead of
+    // letting the pane's absence read as a rendering bug. Scoped to the
+    // designs whose wide layout is mostly brand pane; `hero` keeps its
+    // editable text fallback and stays quiet.
+    const designWarnings =
+      posture === "widget" && (answers.design === "split" || answers.design === "split-right")
+        ? [
+            `The ${answers.design} design renders its brand pane only at wide container widths; this app embeds the login as a card, which shows the compact brand mark instead. Set logo_url (or hero_url) in .zitadel/branding/branding.json so the mark isn't empty.`,
+          ]
+        : [];
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, framework.id);
       const sections = buildSummary({
@@ -442,20 +454,13 @@ export default class Setup extends BaseCommand {
         ].join("\n"),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
+      // The envelope's `warnings` never render in non-JSON mode (setup
+      // passes `pretty: ""`), so surface them to humans here.
+      for (const warning of designWarnings) {
+        consola.warn(warning);
+      }
     }
 
-    // Widget-posture embeds render at card width, where the split-family
-    // brand pane is collapsed to the compact brand mark — which is empty
-    // until branding.json names an asset. Say so at setup time instead of
-    // letting the pane's absence read as a rendering bug. Scoped to the
-    // designs whose wide layout is mostly brand pane; `hero` keeps its
-    // editable text fallback and stays quiet.
-    const designWarnings =
-      posture === "widget" && (answers.design === "split" || answers.design === "split-right")
-        ? [
-            `The ${answers.design} design renders its brand pane only at wide container widths; this app embeds the login as a card, which shows the compact brand mark instead. Set logo_url (or hero_url) in .zitadel/branding/branding.json so the mark isn't empty.`,
-          ]
-        : [];
     return this.emit({
       status: "ok",
       warnings: designWarnings,
