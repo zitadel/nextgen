@@ -8,7 +8,11 @@ import { withZitadel, type WithZitadelOptions } from "../../src/playwright-confi
 
 const fakeResolve = (name: "supervisor" | "app-runner"): string => `/kit/dist/${name}.mjs`;
 
-const options = (): WithZitadelOptions => ({
+/** `app` is optional on the type (the instance may serve the app itself) but
+ * always present here, so the cases below can reach into it without guards. */
+type OptionsWithApp = WithZitadelOptions & { app: NonNullable<WithZitadelOptions["app"]> };
+
+const options = (): OptionsWithApp => ({
   configDir: "/repo/apps/my-e2e",
   port: 8092,
   appOrigin: "http://localhost:3002",
@@ -141,6 +145,46 @@ describe("withZitadel", () => {
     expect(() => withZitadel(relHandshake, fakeResolve)).toThrow(
       /handshakePath must be an absolute path/,
     );
+  });
+
+  // The Zitadel binary embeds the console and hosted login shells, so a suite
+  // testing those has no app server to boot — and booting one would defeat the
+  // point, since a dev server's proxy rewrites the API requests the binary
+  // serves directly.
+  describe("when the instance serves the app itself", () => {
+    const embedded = (): WithZitadelOptions => {
+      const { app: _app, ...rest } = options();
+      return { ...rest, appOrigin: "http://localhost:8092" };
+    };
+
+    it("generates the boot entry alone", () => {
+      const { webServer } = withZitadel(embedded(), fakeResolve);
+      expect(webServer).toHaveLength(1);
+      const boot = webServer[0]!;
+      expect(boot.command).toBe('node "/kit/dist/supervisor.mjs"');
+      expect(boot.url).toBe("http://localhost:8092/healthz");
+      // The fixtures still resolve the instance through the handshake.
+      const expected = join("/repo/apps/my-e2e", ".zitadel-testing", "handshake.json");
+      expect(process.env.ZITADEL_TESTING_HANDSHAKE).toBe(expected);
+      expect(boot.env?.ZITADEL_TESTING_HANDSHAKE).toBe(expected);
+      // The instance's own origin is still registered as a preview origin.
+      expect(parseSupervisorConfig(boot.env?.ZITADEL_TESTING_SUPERVISOR).appOrigins).toEqual([
+        "http://localhost:8092",
+      ]);
+    });
+
+    it("rejects an appOrigin nothing will serve", () => {
+      // Left at the app-server origin by mistake: with no app entry, Playwright
+      // would poll :3002 forever (or, worse, hit a stale server there).
+      expect(() => withZitadel({ ...embedded(), appOrigin: "http://localhost:3002" }, fakeResolve))
+        .toThrow(/appOrigin must point at the instance's own port \(8092\)/);
+    });
+
+    it("accepts any hostname that reaches the instance's port", () => {
+      expect(() =>
+        withZitadel({ ...embedded(), appOrigin: "http://127.0.0.1:8092" }, fakeResolve),
+      ).not.toThrow();
+    });
   });
 
   it("demands the built package when resolving executables for real", () => {

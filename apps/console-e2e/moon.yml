@@ -50,3 +50,28 @@ tasks:
     options:
       cache: false
       runInCI: false
+
+  # The embedded surfaces, served by the binary itself — no Vite, no proxy.
+  # The other two lanes each hide the production path: `e2e` serves a preview
+  # build with no backend, `e2e-real` goes through the dev proxy that rewrites
+  # /api -> /. This is the only lane where the console's API base and the Go
+  # mux's routing table have to agree (Console ADR 0002 §4).
+  e2e-embedded:
+    command: "corepack pnpm exec playwright test --config playwright.embedded.config.mts"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      # Embeds the current console and login-ui dists (server:build deps), so
+      # the suite always drives the working tree's UI.
+      - "server:build"
+    env:
+      # Fixed pin, same reasoning as REAL_ZITADEL_PORT above (withZitadel needs
+      # the port at config-evaluation time). Neighbors: 8092 demo-next-e2e
+      # e2e-real, 8093 console-e2e e2e-real, 8094 console dev-real.
+      EMBEDDED_ZITADEL_PORT: "8095"
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      # Both surfaces stay on (the server defaults): they are what this lane
+      # tests. Contrast e2e-real above, which switches them off.
+    options:
+      cache: false
+      runInCI: false
