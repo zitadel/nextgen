@@ -6,7 +6,7 @@ export const tokens = {
   "color": {
     "surface": {
       "defaultBlack": "#0f0f11",
-      "defaultWhite": "var(--zl-primary)",
+      "defaultWhite": "#f4f4f6",
       "defaultPrimaryGray": "#252528",
       "defaultSecondaryGray": "#37373a",
       "hoverStrong": "#cfcfde",
@@ -15,7 +15,7 @@ export const tokens = {
     "text": {
       "primaryWhite": "#f4f4f6",
       "secondaryGray": "#bfbfcf",
-      "buttonDefault": "var(--zl-primary-foreground)",
+      "buttonDefault": "#0f0f11",
       "buttonInvert": "#f4f4f6",
       "disabled": "#686883",
       "error": "#ea4f70",
@@ -24,7 +24,7 @@ export const tokens = {
       "subtitlePurple": "#bba5e4",
       "subtitleGray": "#bfbfcf",
       "subtitleOrange": "#f25543",
-      "link": "var(--zl-color-icon-default-purple)"
+      "link": "#bba5e4"
     },
     "icon": {
       "defaultBlack": "#0f0f11",

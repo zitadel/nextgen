@@ -152,7 +152,9 @@ describe("<zitadel-session>", () => {
     expect(title.classList.contains("sr-only")).toBe(true);
     expect(title.textContent?.trim()).toBe("Signed in as");
     // The identity line is content, not header — it stays visible.
-    expect(shadowQuery<HTMLElement>(element, ".identity").classList.contains("sr-only")).toBe(false);
+    const identity = shadowQuery<HTMLElement>(element, ".identity");
+    expect(identity.classList.contains("sr-only")).toBe(false);
+    expect(identity.hasAttribute("slot")).toBe(false);
   });
 
   it("renders the heading normally without suppress-header", async () => {
@@ -163,6 +165,7 @@ describe("<zitadel-session>", () => {
     expect(
       shadowQuery<HTMLElement>(element, ".title").classList.contains("sr-only"),
     ).toBe(false);
+    expect(shadowQuery<HTMLElement>(element, ".identity").getAttribute("slot")).toBe("header");
   });
 
   it("renders a single primary Sign out action", async () => {

@@ -235,7 +235,9 @@ export class ZitadelSession extends ZitadelSurface {
             ${this.heading}
           </h1>
           ${this.identityLabel
-            ? html`<p slot="header" class="identity">${this.identityLabel}</p>`
+            ? html`<p slot=${this.suppressHeader ? nothing : "header"} class="identity">
+                ${this.identityLabel}
+              </p>`
             : nothing}
 
           <zl-button

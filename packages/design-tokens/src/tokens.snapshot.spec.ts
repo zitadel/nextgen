@@ -26,6 +26,12 @@ function collectKeys(prefix: string, value: unknown, into: string[]): void {
 }
 
 describe("design-tokens public surface", () => {
+  it("keeps typed token values resolved when CSS variables alias other roles", () => {
+    expect(tokens.color.surface.defaultWhite).not.toContain("var(");
+    expect(tokens.color.text.buttonDefault).not.toContain("var(");
+    expect(tokens.color.text.link).toBe(tokens.color.icon.defaultPurple);
+  });
+
   it("token tree keys match snapshot", () => {
     const keys: string[] = [];
     collectKeys("", tokens, keys);

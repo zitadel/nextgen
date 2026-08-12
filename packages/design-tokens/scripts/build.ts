@@ -207,28 +207,30 @@ function build(): BuildResult {
   //    checked state) follows the Figma `primary` values, while host-page
   //    overrides of EITHER name keep working — overriding the legacy name
   //    beats the alias, and overriding `--zl-primary` flows through it.
-  const aliasBoth = (cssVar: string, reference: string, path: string[]): void => {
+  // Keep these aliases CSS-only: `tokens` is the resolved-value API, while
+  // `cssVars` already points consumers at the overridable custom properties.
+  const aliasBoth = (cssVar: string, reference: string): void => {
     cssVars.push([cssVar, reference]);
     lightVars.push([cssVar, reference]);
-    setDeep(tsTree, path, reference);
-    setDeep(refTree, path, `var(${cssVar})`);
   };
-  aliasBoth("--zl-color-surface-default-white", "var(--zl-primary)", [
-    "color",
-    "surface",
-    "defaultWhite",
-  ]);
-  aliasBoth("--zl-color-text-button-default", "var(--zl-primary-foreground)", [
-    "color",
-    "text",
-    "buttonDefault",
-  ]);
+  aliasBoth("--zl-color-surface-default-white", "var(--zl-primary)");
+  aliasBoth("--zl-color-text-button-default", "var(--zl-primary-foreground)");
   // 2. The link role: aliases the purple accent until Figma publishes a
   //    dedicated `link` semantic. `branding.palette.link` and host pages
   //    override this name to recolor exactly the link surfaces (card nav,
   //    forgot-password, field links). New name, no per-theme literal to
   //    shadow — a single :root declaration resolves per theme.
-  push("--zl-color-text-link", "var(--zl-color-icon-default-purple)", ["color", "text", "link"]);
+  const linkSource = figma.tokens.color.icon?.["default-purple"];
+  if (linkSource === undefined) {
+    throw new Error("legacy token color.icon.default-purple is required for the link alias");
+  }
+  cssVars.push(["--zl-color-text-link", "var(--zl-color-icon-default-purple)"]);
+  setDeep(
+    tsTree,
+    ["color", "text", "link"],
+    resolveSemantic(isModeValue(linkSource) ? linkSource.dark : linkSource),
+  );
+  setDeep(refTree, ["color", "text", "link"], "var(--zl-color-text-link)");
 
   // ---- spacing (in rem) — sorted by step number so 01..16 always emit in order ----
   for (const [step, px] of sortedNumeric(figma.primitives.spacing)) {
