@@ -5,6 +5,7 @@
   "required": [
     "enabled"
   ],
+  "additionalProperties": false,
   "properties": {
     "enabled": {
       "type": "boolean",

@@ -63,7 +63,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"password": { "kind": "auth-method", "enabled": true }
+					"password": { "enabled": true }
 				}
 			}`),
 		},
@@ -76,7 +76,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"title": "My User",
 				"description": "A user schema",
 				"x-auth-methods": {
-					"passkey": { "kind": "auth-method", "enabled": true }
+					"passkey": { "enabled": true }
 				},
 				"required": ["email"],
 				"properties": {
@@ -238,6 +238,22 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			wantErr: domain.ErrSchemaValidationFailed,
 			wantValidationErrors: map[string]string{
 				"/properties/x-auth-methods/additionalProperties/totp": `false schema never matches`,
+			},
+		},
+		{
+			name: "unknown auth method field rejected",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true, "position": 0 }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/properties/x-auth-methods/properties/password/additionalProperties/position": `false schema never matches`,
 			},
 		},
 		{
