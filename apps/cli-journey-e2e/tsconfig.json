@@ -2,14 +2,15 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "allowJs": true,
+    // Playwright specs run in Node, but `page.evaluate` callbacks execute in
+    // the browser and reference DOM globals.
+    "lib": ["ES2022", "DOM"],
     "outDir": "out-tsc/playwright",
     "sourceMap": false,
     "types": ["node"]
   },
-  "include": [
-    "playwright.config.mts",
-    "scripts/**/*.mjs",
-    "src/**/*.spec.ts",
-    "src/**/*.d.ts"
-  ]
+  // The .mjs runner scripts stay out: they import root workspace scripts
+  // (outside this composite project's rootDir) and are covered at runtime by
+  // the `test` task's node --test suite.
+  "include": ["playwright*.config.mts", "src/**/*.ts"]
 }
