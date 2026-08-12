@@ -1,9 +1,10 @@
 # ADR 051: Anonymous Session-Probe Contract
 
 > **Status:** Proposed
-> **Date:** 2026-08-12 (revised same day after review: the platform already
-> has valid anonymous sessions — the contract must carry three states, not
-> two)
+> **Date:** 2026-08-12 (revised twice same day after review: the platform
+> already has valid anonymous sessions, including factor-verified ones with
+> no bound user — the discriminator keys on `user_id` alone, and the plan
+> covers the api-mock browser path and all three dialects)
 > **Context:** `GET /sessions/me`, `@zitadel/sdk-*` session reads, `<zitadel-session>`, header chrome
 
 ## Problem
@@ -17,11 +18,16 @@ can only express two of them:
 
 1. **No session** — no `__nextgen_session` cookie at all. The request
    dies at the security layer with `401 auth.unauthorized`.
-2. **Valid anonymous session** — `POST /sessions` mints a session shell
-   with no user and no factors (pre-auth correlation, bot-detection and
-   device signals, 10-minute TTL); its cookie authorises `/sessions/me`,
-   which returns `200` with the full session body and `user_id: null`.
-   `getSession()` already reads this correctly as signed out.
+2. **Valid session without a resolved user** — `200` with the full
+   session body and `user_id: null`. Two shapes produce it: the pure
+   shell `POST /sessions` mints (no user, no factors; pre-auth
+   correlation, bot-detection and device signals, 10-minute TTL), and a
+   mid-flow session holding verified factors but no bound user — a
+   password-only exchange promotes the factor without resolving a user,
+   and its computed lifecycle state is `active`, not `building`
+   (`sessionStateFilter` in `internal/service/session.go`; exercised in
+   `internal/storage/stmttest/session_test.go`). `getSession()` already
+   reads both as signed out.
 3. **Authenticated session** — `200` with the session body and its user.
 
 State 1 is the wrong-shaped one, twice over:
@@ -50,15 +56,19 @@ What must NOT change:
 
 ### A. Discriminated 200 on `GET /sessions/me` (recommended)
 
-Add a `session_state` discriminator across three `200` variants:
+Add a `session_state` discriminator across three `200` variants. The
+mapping is exhaustive and keys on `user_id` alone — never on factors or
+the computed lifecycle state:
 
-- `{ "session_state": "none" }` — absent credential; no session body
-  (there is no session to describe). **New.**
-- `{ "session_state": "anonymous", ...session }` — valid session shell;
-  today's full body with `user_id: null`, unchanged apart from the
-  discriminator.
-- `{ "session_state": "authenticated", ...session }` — today's
-  authenticated body, unchanged apart from the discriminator.
+- `{ "session_state": "none" }` — no credential presented; no session
+  body (there is no session to describe). **New.**
+- `{ "session_state": "anonymous", ...session }` — any resolved session
+  whose `user_id` is null: the `building` shell and the `active`
+  password-only session alike. Today's full body, unchanged apart from
+  the discriminator.
+- `{ "session_state": "authenticated", ...session }` — any resolved
+  session with a non-null `user_id`; today's authenticated body,
+  unchanged apart from the discriminator.
 
 `401` narrows to invalid credentials; `404 sess.not_found` is untouched.
 
@@ -114,11 +124,27 @@ Option A. Sequence:
    discriminator and the body-less `none` variant (components
    `getSession`, sdk-core/session helpers, console session views,
    integration harness).
-4. Contract tests (service-backed, both dialects): absent cookie → `200
-   none`; valid anonymous-shell cookie → `200 anonymous` with the full
-   body and `user_id: null`; authenticated cookie → `200 authenticated`;
-   garbage, tampered, expired, and revoked tokens → `401`; a cookie
-   referencing a pruned session → `404 sess.not_found`.
+4. Mock parity: `packages/api-mock`'s `GET /sessions/me` (today: `401`
+   without a cookie, undiscriminated body with one) implements the same
+   three-variant contract, with direct conformance specs in the mock's
+   own suite. This layer is load-bearing, not a courtesy: both framework
+   demo journeys run against the mock while their e2e tasks are excluded
+   from CI, so without it the Go contract tests could pass while the
+   exact public-page chrome path motivating this ADR stays broken.
+5. A representative browser journey (framework demo e2e against the
+   mock) asserting cookieless public-page chrome renders signed-out with
+   zero console errors — run at least on demand until those lanes join
+   CI; the mock conformance specs above are the always-on gate.
+6. Contract tests, service-backed on **all three dialects** — PostgreSQL,
+   Spanner, and SQLite (the zero-config default with its own CI lane;
+   the session-me integration suite currently builds only for the first
+   two and gains the `sqlite_integration` tag as part of this work):
+   absent cookie → `200 none`; valid shell cookie → `200 anonymous` with
+   the full body and `user_id: null`; password-only exchange cookie
+   (verified factors, no bound user) → `200 anonymous` with factors
+   intact; authenticated cookie → `200 authenticated`; garbage,
+   tampered, expired, and revoked tokens → `401`; a cookie referencing a
+   pruned session → `404 sess.not_found`.
 
 ## Consequences
 
