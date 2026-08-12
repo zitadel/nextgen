@@ -290,9 +290,10 @@ No generic `/batch`. Resource-specific bulk endpoints only when demand is real.
 ## Caller convenience
 
 ```http
+# Target design — none of these are shipped yet.
 GET /me
 GET /me/memberships
-GET /capabilities                        # split public/authenticated — see conventions.md
+GET /capabilities                        # split public/authenticated — direction, see conventions.md
 ```
 
 ---
@@ -338,7 +339,7 @@ Quick lookup for which project a given use case targets.
 
 | Use case | Project context | Notes |
 |---|---|---|
-| A developer signs in to the console | Platform project | Resolves via `/capabilities` `defaults.project_id`. |
+| A developer signs in to the console | Platform project | Would resolve via the planned `/capabilities` `defaults.project_id` (direction); today the console reads `GET /console/runtime.json`. |
 | A paying team adds a developer | Platform project | `POST /team_memberships` with `team_id` pointing at the paying team. |
 | A customer creates a project | Customer project (the new one) | `POST /projects` mints the resource; claim later attaches it to a platform-project team. |
 | A customer adds a B2B tenant | Customer project | `POST /teams` with `project_id` = the customer project. |

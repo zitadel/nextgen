@@ -54,8 +54,8 @@ to be a fast answer to "can I build flow X right now?"
 ### Step response shape
 
 - `name`, `texts` (`title_key`, `description_key`), optional `error`, optional `complete`.
-- `fields` map keyed by name, per-field `type` / `text_key` / `required` / optional `value` / optional `validation`.
-- `actions` map with `text_key` and `primary` flag. Actions are unordered — the LiquidJS template decides layout.
+- `fields` **ordered array** of entries carrying `name`, `type`, `text_key`, `required`, optional `value`, optional `validation` ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)).
+- `actions` **ordered array** of entries carrying `name`, `kind`, `text_key`, and a `primary` flag. The LiquidJS template iterates the arrays in order and builds name-keyed indexes locally for lookup.
 - `challenge` populated on the issue leg of a two-phase ceremony (passkey today): `method`, `challenge_id`, ceremony-specific `options`.
 - `gates` and `sso_providers` are part of the contract but not yet emitted with content (see below).
 

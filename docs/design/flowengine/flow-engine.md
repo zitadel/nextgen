@@ -1,11 +1,11 @@
 # Flow Engine
 
 > **Status:** Draft
-> **See also:** [Overview](README.md) · [Step Response Shape](flow-engine-nodes.md) · [Storage](flow-engine-storage.md) · [OpenAPI spec (draft)](api/flow-api.yaml)
+> **See also:** [Overview](README.md) · [Step Response Shape](flow-engine-nodes.md) · [Storage](flow-engine-storage.md)
 >
 > **Canonical OpenAPI spec:** [`api/openapi/openapi-spec.yaml`](../../../api/openapi/openapi-spec.yaml) — endpoints under `/flow`. Schemas in [`api/openapi/components/flows/`](../../../api/openapi/components/flows/).
 
-The flow engine is a **server-side state machine** that produces **Capability payloads** (semantic descriptions of fields, actions, and gates) alongside a **LiquidJS template** for rendering. It does **not** hold authentication primitives; those live in [`auth_attempts`](../api/authn-and-auth-flows.md). A flow step that says "collect password" internally invokes the auth_attempt **Go service layer** (never via HTTP), but `/flows/{session_id}` remains the flow engine's session-scoped UI handle rather than an alias for `auth_attempt_id`.
+The flow engine is a **server-side state machine** that produces **Capability payloads** (semantic descriptions of fields, actions, and gates) alongside a **LiquidJS template** for rendering. It does **not** hold authentication primitives; those live in [`auth_attempts`](../api/authn-and-auth-flows.md). A flow step that says "collect password" internally invokes the auth_attempt **Go service layer** (never via HTTP), but the `/flow/{id}` handle remains the flow engine's session-scoped UI handle rather than an alias for `auth_attempt_id`.
 
 It is used by web/frontend clients that want a ready-made login and registration experience. Clients that want full control skip the flow engine entirely and drive the auth_attempt primitives (and the Session API) directly.
 
@@ -15,7 +15,6 @@ It is used by web/frontend clients that want a ready-made login and registration
 POST   /flow              Start a flow (creates a session internally)
 GET    /flow/{id}          Get current step (re-render)
 POST   /flow/{id}/submit   Submit step data, advance state machine
-POST   /flow/{id}/event    Client-side event (fingerprint, telemetry)
 ```
 
 The `{id}` is a flow handle returned by `POST /flow` or the latest `POST /flow/{id}/submit`. It may change between responses on pivot or pop — the frontend must always use the `id` from the latest response. The underlying `session_id` remains stable across stacked flows. Flow state itself is stored in an encrypted cookie — see [Storage](flow-engine-storage.md).
@@ -23,7 +22,7 @@ The `{id}` is a flow handle returned by `POST /flow` or the latest `POST /flow/{
 ## Starting a Flow
 
 ```http
-POST /flows
+POST /flow
 {
   "purpose": "login",
   "auth_request_id": "oidc-123",
@@ -60,16 +59,15 @@ The server resolves which flow definition to use:
 A flow definition is a directed graph of steps, managed as an API resource. Each definition references a **user schema** via `user_schema` — step fields are property names from that schema, and the engine resolves field metadata (type, validation, implicit outcomes) from schema annotations at runtime.
 
 ```
-POST   /flow-definitions             Create
-GET    /flow-definitions/{id}        Get
-PATCH  /flow-definitions/{id}        Update
-DELETE /flow-definitions/{id}        Delete
-GET    /flow-definitions              List
+POST   /flow_definitions             Create
+GET    /flow_definitions             List
+GET    /flow_definitions/{id}        Get
+PUT    /flow_definitions/{id}        Update (full replacement)
+DELETE /flow_definitions/{id}        Delete
 
-POST   /flow-definitions/{id}/activate    Draft → Active
-POST   /flow-definitions/{id}/archive     Active → Archived
-POST   /flow-definitions/{id}/validate    Check for dead ends, missing transitions
-POST   /flow-definitions/{id}/simulate    Dry-run with mock input
+# planned (not in the shipped spec):
+POST   /flow_definitions/{id}/validate    Check for dead ends, missing transitions
+POST   /flow_definitions/{id}/simulate    Dry-run with mock input
 ```
 
 ## Schema-Driven Steps
@@ -127,11 +125,11 @@ Transitions with `"action": "pivot"` push a new flow onto the stack. Transitions
 {
   "name": "login",
   "fields": ["email", "password"],
-  "actions": {
-    "submit": { "primary": true },
-    "register": {},
-    "recover": {}
-  },
+  "actions": [
+    {"name": "submit", "primary": true},
+    {"name": "register"},
+    {"name": "recover"}
+  ],
   "transitions": {
     "submit": { "target": "done" },
     "register": { "target": "default-register", "action": "switch" },
@@ -144,7 +142,7 @@ After a pivoted flow completes, the engine auto-pops back to the parent. Since t
 
 ## Step Response Shape
 
-See [Flow Engine — Step Response Shape](flow-engine-nodes.md) for the decided response structure. Steps emit **unordered capability dictionaries** (`fields`, `actions`, `gates`) — the LiquidJS template controls all visual ordering and layout.
+See [Flow Engine — Step Response Shape](flow-engine-nodes.md) for the decided response structure. Steps emit **ordered capability arrays** for `fields` and `actions` (each entry carries a `name`; see [ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)) — the LiquidJS template iterates them and may look entries up by name (`where: "name"`). `gates` remains keyed.
 
 ## Storage
 
@@ -169,11 +167,11 @@ See [Flow Engine — Storage](flow-engine-storage.md) for the encrypted cookie m
     {
       "name": "login",
       "fields": ["email", "password"],
-      "actions": {
-        "submit": { "primary": true },
-        "register": {},
-        "recover": {}
-      },
+      "actions": [
+        {"name": "submit", "primary": true},
+        {"name": "register"},
+        {"name": "recover"}
+      ],
       "transitions": {
         "submit": { "target": "done" },
         "register": { "target": "default-register", "action": "switch" },
@@ -188,7 +186,7 @@ See [Flow Engine — Storage](flow-engine-storage.md) for the encrypted cookie m
 **Frontend interaction:**
 
 ```http
-POST /flows
+POST /flow
 { "purpose": "login", "auth_request_id": "oidc-123", "redirect_uri": "https://app.com/cb" }
 ```
 ```json
@@ -202,18 +200,18 @@ POST /flows
       "email": { "type": "email", "text_key": "login.field.email", "required": true },
       "password": { "type": "password", "text_key": "login.field.password", "required": true }
     },
-    "actions": {
-      "submit": { "text_key": "login.action.submit", "primary": true },
-      "register": { "text_key": "login.action.register" },
-      "recover": { "text_key": "login.action.recover" }
-    },
+    "actions": [
+      {"name": "submit", "text_key": "login.action.submit", "primary": true},
+      {"name": "register", "text_key": "login.action.register"},
+      {"name": "recover", "text_key": "login.action.recover"}
+    ],
     "gates": {}
   }
 }
 ```
 
 ```http
-POST /flows/sess_1/submit
+POST /flow/sess_1/submit
 { "session_token": "tok_1", "action": "submit", "data": { "email": "alice@acme.com", "password": "correct-horse" } }
 ```
 ```json
@@ -250,10 +248,10 @@ If the policy requires MFA, the engine would instead respond with a dynamically 
     {
       "name": "profile",
       "fields": ["email", "given_name", "family_name"],
-      "actions": {
-        "submit": { "primary": true },
-        "login": {}
-      },
+      "actions": [
+        {"name": "submit", "primary": true},
+        {"name": "login"}
+      ],
       "transitions": {
         "submit": { "target": "set_password" },
         "login": { "target": "default-login", "action": "switch" }
@@ -277,7 +275,7 @@ If the policy requires MFA, the engine would instead respond with a dynamically 
 User was on the login flow, clicked "Create account":
 
 ```http
-POST /flows/sess_1/submit
+POST /flow/sess_1/submit
 { "session_token": "tok_1", "action": "register" }
 ```
 ```json
@@ -292,17 +290,17 @@ POST /flows/sess_1/submit
       "given_name": { "type": "text", "text_key": "profile.field.given_name", "required": true },
       "family_name": { "type": "text", "text_key": "profile.field.family_name", "required": true }
     },
-    "actions": {
-      "submit": { "text_key": "profile.action.submit", "primary": true },
-      "login": { "text_key": "profile.action.login" }
-    },
+    "actions": [
+      {"name": "submit", "text_key": "profile.action.submit", "primary": true},
+      {"name": "login", "text_key": "profile.action.login"}
+    ],
     "gates": {}
   }
 }
 ```
 
 ```http
-POST /flows/sess_1/submit
+POST /flow/sess_1/submit
 { "session_token": "tok_2", "action": "submit", "data": { "email": "alice@acme.com", "given_name": "Alice", "family_name": "Smith" } }
 ```
 ```json
@@ -315,16 +313,16 @@ POST /flows/sess_1/submit
     "fields": {
       "password": { "type": "password", "text_key": "set_password.field.password", "required": true, "validation": { "min_length": 8 } }
     },
-    "actions": {
-      "submit": { "text_key": "set_password.action.submit", "primary": true }
-    },
+    "actions": [
+      {"name": "submit", "text_key": "set_password.action.submit", "primary": true}
+    ],
     "gates": {}
   }
 }
 ```
 
 ```http
-POST /flows/sess_1/submit
+POST /flow/sess_1/submit
 { "session_token": "tok_3", "action": "submit", "data": { "password": "strong-pass-123!" } }
 ```
 ```json
@@ -368,10 +366,10 @@ A single flow that handles both login and registration using implicit outcomes f
     {
       "name": "signin",
       "fields": ["password"],
-      "actions": {
-        "submit": { "primary": true },
-        "recover": {}
-      },
+      "actions": [
+        {"name": "submit", "primary": true},
+        {"name": "recover"}
+      ],
       "transitions": {
         "submit": { "target": "done" },
         "recover": { "target": "default-recovery", "action": "pivot" }
@@ -446,7 +444,7 @@ The `email` field has `x-unique: "project"` in the user schema, which makes it a
 **Frontend interaction:**
 
 ```http
-POST /flows
+POST /flow
 { "purpose": "login", "auth_request_id": "oidc-789" }
 ```
 ```json
@@ -459,9 +457,9 @@ POST /flows
     "fields": {
       "email": { "type": "email", "text_key": "login.field.email", "required": true }
     },
-    "actions": {
-      "submit": { "text_key": "login.action.submit", "primary": true }
-    },
+    "actions": [
+      {"name": "submit", "text_key": "login.action.submit", "primary": true}
+    ],
     "gates": {},
     "sso_providers": [
       { "id": "google", "name": "Google" },
@@ -474,7 +472,7 @@ POST /flows
 User clicks "Continue with Google":
 
 ```http
-POST /flows/sess_2/submit
+POST /flow/sess_2/submit
 { "session_token": "tok_1", "action": "google" }
 ```
 ```json
@@ -492,7 +490,7 @@ POST /flows/sess_2/submit
 Frontend navigates to `redirect_url`. After Google callback, the engine processes it and evaluates policy:
 
 ```http
-GET /flows/sess_2
+GET /flow/sess_2
 ```
 ```json
 ← 200  (SSO callback processed → implicit policy: ACR met → complete)
@@ -551,7 +549,7 @@ The `gates.captcha` on the profile step means the frontend must solve a captcha 
 When a submission fails validation or proof verification, the flow does **not** advance. The same step is returned with an `error` field:
 
 ```http
-POST /flows/sess_1/submit
+POST /flow/sess_1/submit
 { "session_token": "tok_2", "action": "submit", "data": { "password": "wrong" } }
 ```
 ```json
@@ -565,10 +563,10 @@ POST /flows/sess_1/submit
     "fields": {
       "password": { "type": "password", "text_key": "signin.field.password", "required": true }
     },
-    "actions": {
-      "submit": { "text_key": "signin.action.submit", "primary": true },
-      "recover": { "text_key": "signin.action.recover" }
-    },
+    "actions": [
+      {"name": "submit", "text_key": "signin.action.submit", "primary": true},
+      {"name": "recover", "text_key": "signin.action.recover"}
+    ],
     "gates": {}
   }
 }

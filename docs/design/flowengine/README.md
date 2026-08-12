@@ -39,9 +39,6 @@ This directory holds its design and architecture docs.
 | **Research / Proposals** | | |
 | [External Auth Factors](flow-engine-external-auth-factors.md) | Research | Generic extensibility for third-party MFA providers (Duo, Futurae, …). Not a design decision. |
 | [Capability Handshake](capability-handshake.md) | Research | Client/SDK ↔ server SemVer negotiation. Not implemented. |
-| **Design API sketches** | | |
-| [Session API sketch](api/session-api.yaml) | Preliminary | Design-facing OpenAPI sketch; implementation source of truth lives under `api/openapi/`. |
-| [Flow API sketch](api/flow-api.yaml) | In Review | Design-facing OpenAPI sketch; implementation source of truth lives under `api/openapi/`. |
 | **Tooling** | | |
 | [Flow visualizer](visualizer.html) | Living | Self-contained HTML tool for previewing flow payloads — diagram, simulator, and API log views. Open `visualizer.html` directly in a browser; no dev server required. |
 
@@ -63,9 +60,9 @@ The flow engine orchestrates **which step renders when** (UI layer). The underly
 Web/frontend client                    Any other client (mobile, backend, CLI)
 ─────────────────────                  ─────────────────────────────────────────
 
-POST /flows                         POST /auth_attempts
+POST /flow                          POST /auth_attempts
   → get capabilities + template          → drive primitives directly
-POST /flows/{id}/submit             POST /auth_attempts/{id}/challenges
+POST /flow/{id}/submit             POST /auth_attempts/{id}/challenges
   → server advances state machine        + /challenges/{cid}/verify
   → internally invokes auth_attempt      → submit factor proofs
     Go service layer (no HTTP)           → server verifies, re-evaluates assurance

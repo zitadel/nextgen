@@ -19,7 +19,7 @@ participant Server
     Client->>Server: POST /flows<br/>{"purpose": "login", "supported_versions": "^1.1.0"}
     Note right of Server: Server parses SemVer constraint.<br/>Selects optimal schema (v1.2.0).
     Server-->>Client: Returns initial step for v1.2.0 login flow
-    Client->>Server: POST /flows/session_id_1234/submit<br/>{"identifier": "user@example.com"}
+    Client->>Server: POST /flow/flow_1234/submit<br/>{"identifier": "user@example.com"}
 ```
 
 ### Bootstrapping Phase

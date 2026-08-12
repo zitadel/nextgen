@@ -176,7 +176,7 @@ If the project is already claimed when `POST /projects/{projectId}/claim/init` i
   "error": "already_claimed",
   "message": "This project is already claimed by team Acme.",
   "team_id": "team_acme",
-  "dashboard_url": "https://dashboard.zitadel.cloud/team_acme/projects/river-8421"
+  "dashboard_url": "https://dashboard.zitadel.cloud/team_acme/projects/proj_01hexample"
 }
 ```
 

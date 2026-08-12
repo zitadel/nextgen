@@ -1,7 +1,7 @@
 # Flow Definition — Shape & Rules
 
 > **Status:** Current
-> **See also:** [Flow Engine](flow-engine.md) · [Architecture](architecture.md) · [OpenAPI schema](../../../api/openapi/endpoints/schemas/flow-definition.yaml)
+> **See also:** [Flow Engine](flow-engine.md) · [Architecture](architecture.md) · [OpenAPI schema](../../../api/openapi/endpoints/schemas/flow-definition.json)
 
 A flow definition is a directed graph of steps stored as an API resource and
 executed by the [flow engine](architecture.md). This document describes the

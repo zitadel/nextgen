@@ -1,5 +1,5 @@
 {
-  "_comment": "Illustrative only. First five keys match flow-api.yaml Branding baseline; rest is proposed extension (schema.md).",
+  "_comment": "Illustrative only. First five keys match the shipped Branding baseline (api/openapi/endpoints/branding/); rest is proposed extension (schema.md).",
 
   "layout": "centered",
   "liquid_template": null,

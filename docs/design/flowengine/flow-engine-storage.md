@@ -78,10 +78,16 @@ Flow state is stored as an **encrypted, HttpOnly cookie** set by the server on e
 ### Cookie shape
 
 ```
-Set-Cookie: _zflow=<encrypted-payload>; HttpOnly; Secure; SameSite=Strict; Path=/flows
+Set-Cookie: _zflow=<encrypted-payload>; HttpOnly; Secure; SameSite=Strict; Path=/
 ```
 
-The cookie is scoped to `/flows` — it's never sent to Session API or other endpoints.
+The cookie is set with `Path=/` so that each `Set-Cookie` replaces the previous
+one in the browser's cookie jar instead of accumulating per-path copies (the
+flow endpoints span `/flow` and `/flow/{id}/submit`, which would otherwise
+derive different paths — see the rationale in `internal/api/flow.go`). It is
+therefore sent to other endpoints on the same origin; confidentiality and
+integrity rest on the AES-GCM encryption and authentication, not on path
+scoping.
 
 ## Cookie Contents
 

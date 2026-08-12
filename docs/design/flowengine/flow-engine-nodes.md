@@ -1,19 +1,19 @@
 # Flow Engine — Step Response Shape
 
 > **Status:** Decided — Capability Payloads + LiquidJS Templates
-> **See also:** [Flow Engine](flow-engine.md) · [User Schema Integration](user-schema.md) · [ADR-048](https://github.com/zitadel/oxidel/blob/main/docs/adr/048-capability-driven-login-payloads.md)
+> **See also:** [Flow Engine](flow-engine.md) · [User Schema Integration](user-schema.md) · [ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)
 
 ## Resolution
 
 The original question — how to structure interactive elements and who controls their visual order — is resolved by **separating data from presentation entirely**.
 
-The backend emits **unordered semantic capabilities** (what the user can/must do). A **LiquidJS template** controls the visual structure, element ordering, labels, and layout. The frontend is a dumb renderer that parses the template and mounts Lit Web Components.
+The backend emits **semantic capabilities** (what the user can/must do). Per [ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md), `fields` and `actions` are **ordered arrays** whose entries carry a `name`; `gates` remains keyed by gate type. A **LiquidJS template** controls the visual structure, labels, and layout — it iterates the arrays in order or looks entries up by name, and it may reorder freely. The frontend is a dumb renderer that parses the template and mounts Lit Web Components.
 
-This eliminates the need to choose between Options A, B, or C. The backend never expresses ordering. The template handles it.
+This eliminates the need to choose between Options A, B, or C. The definition's array order gives templates a stable default; the template owns the final layout.
 
 ## Step Response Structure
 
-Every step response contains three capability dictionaries and step-level metadata:
+Every step response contains the capability collections and step-level metadata:
 
 ```json
 {
@@ -24,26 +24,33 @@ Every step response contains three capability dictionaries and step-level metada
       "description_key": "login.description"
     },
 
-    "fields": {
-      "email": {
+    "fields": [
+      {
+        "name": "email",
         "type": "email",
         "required": true,
         "text_key": "login.field.email"
       }
-    },
+    ],
 
-    "actions": {
-      "submit": {
+    "actions": [
+      {
+        "name": "submit",
+        "kind": "submit",
         "primary": true,
         "text_key": "login.action.submit"
       },
-      "register": {
+      {
+        "name": "register",
+        "kind": "navigate",
         "text_key": "login.action.register"
       },
-      "passkey": {
+      {
+        "name": "passkey",
+        "kind": "passkey",
         "text_key": "login.action.passkey"
       }
-    },
+    ],
 
     "gates": {
       "captcha": {
@@ -77,9 +84,9 @@ Every step response contains three capability dictionaries and step-level metada
 
 | Property | Type | Purpose |
 |---|---|---|
-| `fields` | `Record<string, FlowField>` | Data the user must provide. Keyed by field name. Unordered. Resolved from user schema at runtime. |
-| `actions` | `Record<string, FlowAction>` | Available user actions. Keyed by action name. Unordered. |
-| `gates` | `Record<string, FlowGate>` | Security gates (captcha, passkey ceremony). Keyed by gate type. Unordered. |
+| `fields` | `FlowField[]` | Data the user must provide. Ordered array; each entry carries `name`. Resolved from user schema at runtime. |
+| `actions` | `FlowAction[]` | Available user actions. Ordered array; each entry carries `name` and `kind`. |
+| `gates` | `Record<string, FlowGate>` | Security gates (captcha, passkey ceremony). Keyed by gate type. |
 | `sso_providers` | `SSOProvider[]` | Available SSO identity providers. |
 | `texts` | `Record<string, string>` | Step-level text keys for localization (resolved client-side via `| t` filter). |
 | `complete` | `string \| null` | Terminal step indicator: `"redirect"` or `"show"`. Null for non-terminal steps. |
@@ -87,18 +94,19 @@ Every step response contains three capability dictionaries and step-level metada
 
 ## How Ordering Works
 
-The backend **never** controls element order. The LiquidJS template does.
+The array order gives templates a stable default, but the LiquidJS template owns the final layout — it can iterate in order, reorder, or pull individual entries by name.
 
 **Default login (email first, SSO below):**
 ```liquid
 <h2>{{ step.texts.title_key | t }}</h2>
 
-{% for field in fields %}
-  <zl-field name="{{ field[0] }}" label="{{ field[1].text_key | t }}" type="{{ field[1].type }}"></zl-field>
+{% for f in fields %}
+  <zl-field name="{{ f.name }}" label="{{ f.text_key | t }}" type="{{ f.type }}"></zl-field>
 {% endfor %}
 
-{% if actions.submit %}
-  <zl-submit label="{{ actions.submit.text_key | t }}"></zl-submit>
+{% assign submit = actions | where: "name", "submit" | first %}
+{% if submit %}
+  <zl-submit label="{{ submit.text_key | t }}"></zl-submit>
 {% endif %}
 
 {% if sso_providers.size > 0 %}
@@ -116,12 +124,13 @@ The backend **never** controls element order. The LiquidJS template does.
   <div class="divider">or use email</div>
 {% endif %}
 
-{% for field in fields %}
-  <zl-field name="{{ field[0] }}" label="{{ field[1].text_key | t }}" type="{{ field[1].type }}"></zl-field>
+{% for f in fields %}
+  <zl-field name="{{ f.name }}" label="{{ f.text_key | t }}" type="{{ f.type }}"></zl-field>
 {% endfor %}
 
-{% if actions.submit %}
-  <zl-submit label="{{ actions.submit.text_key | t }}"></zl-submit>
+{% assign submit = actions | where: "name", "submit" | first %}
+{% if submit %}
+  <zl-submit label="{{ submit.text_key | t }}"></zl-submit>
 {% endif %}
 ```
 
@@ -138,15 +147,15 @@ Registration steps use the same structure. Schema fields are emitted as capabili
     "texts": {
       "title_key": "profile.title"
     },
-    "fields": {
-      "email": { "type": "email", "required": true, "text_key": "profile.field.email" },
-      "given_name": { "type": "text", "required": true, "text_key": "profile.field.given_name" },
-      "family_name": { "type": "text", "required": true, "text_key": "profile.field.family_name" }
-    },
-    "actions": {
-      "submit": { "primary": true, "text_key": "profile.action.submit" },
-      "login": { "text_key": "profile.action.login" }
-    },
+    "fields": [
+      { "name": "email", "type": "email", "required": true, "text_key": "profile.field.email" },
+      { "name": "given_name", "type": "text", "required": true, "text_key": "profile.field.given_name" },
+      { "name": "family_name", "type": "text", "required": true, "text_key": "profile.field.family_name" }
+    ],
+    "actions": [
+      { "name": "submit", "kind": "submit", "primary": true, "text_key": "profile.action.submit" },
+      { "name": "login", "kind": "navigate", "text_key": "profile.action.login" }
+    ],
     "gates": {}
   }
 }
@@ -154,11 +163,14 @@ Registration steps use the same structure. Schema fields are emitted as capabili
 
 The template decides whether first/last name are side-by-side or stacked:
 ```liquid
+{% assign given = fields | where: "name", "given_name" | first %}
+{% assign family = fields | where: "name", "family_name" | first %}
+{% assign email = fields | where: "name", "email" | first %}
 <div class="grid-2">
-  <zl-field name="given_name" label="{{ fields.given_name.text_key | t }}"></zl-field>
-  <zl-field name="family_name" label="{{ fields.family_name.text_key | t }}"></zl-field>
+  <zl-field name="given_name" label="{{ given.text_key | t }}"></zl-field>
+  <zl-field name="family_name" label="{{ family.text_key | t }}"></zl-field>
 </div>
-<zl-field name="email" label="{{ fields.email.text_key | t }}"></zl-field>
+<zl-field name="email" label="{{ email.text_key | t }}"></zl-field>
 ```
 
 ## Captcha / Bot Detection
@@ -242,7 +254,7 @@ The original debate centered on **who controls element ordering** — the backen
 | "Can admins put SSO above the email field?" | Yes — edit the template. Backend is unchanged. |
 | "Can fields be interleaved with non-fields?" | Yes — the template places elements arbitrarily. |
 | "Does the frontend need `switch(element.kind)`?" | No — the template emits explicit `<zl-*>` components. No type discrimination. |
-| "How do we extract fields for a `<form>` tag?" | Trivially — `fields` is its own dictionary. |
-| "Schema validation complexity?" | Minimal — three uniform dictionaries, no discriminated unions. |
+| "How do we extract fields for a `<form>` tag?" | Trivially — `fields` is its own array. |
+| "Schema validation complexity?" | Minimal — uniform arrays plus a keyed gate map, no discriminated unions. |
 
 The capability payload is simpler than any of the three original options, while providing more flexibility than all of them combined.

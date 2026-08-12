@@ -39,7 +39,7 @@ Server response from `POST /projects`:
 
 ```json
 {
-  "project_id": "river-8421",
+  "project_id": "proj_01hexample",
   "project_secret": "sk_proj_7kR2pXq9vN3wLmYhT4cB8A",
   "preview_secret": "sk_proj_c3f7a8b2vL4nYwH6...",
   "preview_origins": ["*.vercel.app", "*.netlify.app"],
@@ -51,7 +51,7 @@ The setup CLI maps that response to `.zitadel/secret`:
 
 ```json
 {
-  "project": "river-8421",
+  "project": "proj_01hexample",
   "secret": "sk_proj_7kR2pXq9vN3wLmYhT4cB8A",
   "preview_secret": "sk_proj_c3f7a8b2vL4nYwH6...",
   "preview_origins": ["*.vercel.app", "*.netlify.app"],
@@ -136,7 +136,7 @@ Post-claim `.zitadel/secret`:
 
 ```json
 {
-  "project": "river-8421",
+  "project": "proj_01hexample",
   "secret": "sk_proj_9f2Hx8LqT4vRmYpN2wCbVa",
   "preview_secret": "sk_proj_c3f7a8b2vL4nYwH6...",
   "preview_origins": ["*.vercel.app", "*.netlify.app"],
@@ -149,7 +149,7 @@ Post-claim `.zitadel/secret`:
 
 ## Failure modes
 
-**Laptop swap.** A developer pulls the repo on a second machine; `.zitadel/secret` is gitignored and therefore absent. If `zitadel.json` references a project slug, the SDK prompts:
+**Laptop swap.** A developer pulls the repo on a second machine; `.zitadel/secret` is gitignored and therefore absent. If `zitadel.json` references a project_id, the SDK prompts:
 
 ```
 Zitadel is configured in this project but no secret was found on this machine.
@@ -185,7 +185,7 @@ sequenceDiagram
     Srv-->>CLI: { project_id, secret, preview_secret, preview_origins }
     CLI->>Secret: write file (0600, gitignored)
     CLI->>Deploy: upload preview_secret to env store<br>(if deploy tool detected)
-    CLI->>Dev: print project slug + scratch URL + dev inbox
+    CLI->>Dev: print project_id + scratch URL + dev inbox
 
     Note over Dev,Srv: Days/weeks of development.<br>Every API request carries a bearer secret.
 
@@ -205,7 +205,7 @@ Full CLI spec is deferred. The commands that touch `.zitadel/secret`:
 | Command | Purpose |
 |---|---|
 | `npx @zitadel/setup` | Create project, write `.zitadel/secret`, upload preview secret to deploy platform. |
-| `npx zitadel secret show` | Print project slug, claim state, declared issuer origins. Never prints the secret values. |
+| `npx zitadel secret show` | Print project_id, claim state, declared issuer origins. Never prints the secret values. |
 | `npx zitadel secret restore` | Post-claim only. Authenticate as a human; refresh both secrets. |
 | `npx zitadel secret new` | Create a fresh pre-claim project, replacing the current secret file. Prompts if one exists. |
 | `npx zitadel secret rotate` | Post-claim only. Rotate the project secret without touching `project_id`. Use after a suspected leak. |

@@ -161,7 +161,7 @@ Captcha is configured per flow via `x-captcha` in the flow definition or schema:
 Browser fingerprinting collects device signals for risk correlation. It does not block — it feeds the risk evaluator.
 
 - **Provider:** ThumbmarkJS (open-source, self-hosted) with fallback to a minimal built-in collector.
-- **Collection:** Flow engine emits a fingerprint collection action. Frontend submits via `POST /flows/{session_id}/event`.
+- **Collection:** Flow engine emits a fingerprint collection action. Frontend submits via `POST /flow/{id}/event` (direction — the event endpoint is not in the shipped spec).
 - **Persistence:** Fingerprint hash stored on the session. Repeat visitors with the same fingerprint on the same user are lower risk.
 
 ## Behavioral Telemetry
@@ -173,7 +173,7 @@ Browser fingerprinting collects device signals for risk correlation. It does not
 | Time on step | Step transition timestamps | Bots complete forms in <100ms |
 | Copy/paste of credentials | Event endpoint | Unusual for real users on password fields |
 
-Signals are submitted via `POST /flows/{session_id}/event`. They are **observation-only** — never blocking on their own.
+Signals are submitted via `POST /flow/{id}/event` (direction — the event endpoint is not in the shipped spec). They are **observation-only** — never blocking on their own.
 
 ## Rate Limiting
 

@@ -30,7 +30,7 @@ All three variants carry the same prefix and differ only by metadata bound at cr
 | Variant | Metadata | When minted | What can it do |
 |---|---|---|---|
 | **Pre-claim** | `pre_claim: true` | `POST /projects` (anonymous; no human yet) | Full project authority against an unclaimed project. See [`../platform/claim-flow.md`](../platform/claim-flow.md). |
-| **Claimed** | `pre_claim: false`, bound to a team | At claim — the pre-claim token is replaced by a first claimed `sk_proj_…` bound to a team in the platform project. | Full project authority, audited under the team. |
+| **Claimed** | `pre_claim: false`, bound to a team | Target design: at claim, the pre-claim token is replaced by a first claimed `sk_proj_…` bound to a team in the platform project. **Not shipped** — [ADR 046](../../adrs/046-claim-lifecycle-v2.md) lists secret rotation at claim as an explicit MVP non-goal, so today the pre-claim secret stays valid after claim (accepted, ADR-documented risk until a dedicated rotation epic). | Full project authority, audited under the team. |
 | **Origin-scoped** | `origin_patterns: [...]` | Minted at `POST /projects` alongside pre-claim token, or later for preview deploys once a management API exists. | Restricted to calls whose `Origin` matches one of the declared patterns. Replaces what used to be called the "preview secret". |
 
 > **Note:** The old `zp_…` / `zpp_…` prefixes are retired. Any cross-reference in older design notes maps: `zp_` → `sk_proj_`; `zpp_` → origin-scoped `sk_proj_`.

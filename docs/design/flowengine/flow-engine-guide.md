@@ -107,7 +107,7 @@ sequenceDiagram
     ZL->>ZL: Inject HTML into Shadow DOM
     ZL->>Atoms: Browser upgrades <zl-field>, <zl-submit>, etc.
     Atoms-->>ZL: User interacts → dispatches CustomEvent
-    ZL->>ZL: POST /flows/{id}/submit → receives next step
+    ZL->>ZL: POST /flow/{id}/submit → receives next step
     ZL->>Liquid: Re-render with new capabilities
 ```
 
@@ -221,7 +221,7 @@ loop:
 
   { action, data } = waitForCustomEvent()
 
-  response = POST /flows/{session_id}/submit {
+  response = POST /flow/{id}/submit {
     session_token: response.session_token,
     action: action,
     data: data
@@ -629,7 +629,7 @@ Flow definitions go through a lifecycle before they're used in production:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> draft: POST /flow-definitions
+    [*] --> draft: POST /flow_definitions
     draft --> draft: PATCH (edit)
     draft --> active: POST .../activate
     active --> archived: POST .../archive
