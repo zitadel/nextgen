@@ -22,8 +22,15 @@ func TestSchemaNullableBindings(t *testing.T) {
 	for _, col := range cols {
 		assert.True(t, userpasskey.Schema.Nullable(col), userpasskey.Schema.SQLName(col))
 	}
-	for i, v := range userpasskey.Schema.ValuesFrom(&domain.UserPasskey{}, cols) {
-		assert.True(t, v == nil, "%s must bind untyped nil", userpasskey.Schema.SQLName(cols[i]))
+
+	// name is nullable in the DDL, but the domain has no absent name: "" binds
+	// as "", so only the pointer fields carry an absent state.
+	absent := []database.Column[domain.UserPasskeyField]{
+		database.Col(domain.UserPasskeyFieldVerifiedAt),
+		database.Col(domain.UserPasskeyFieldLastUsedAt),
+	}
+	for i, v := range userpasskey.Schema.ValuesFrom(&domain.UserPasskey{}, absent) {
+		assert.True(t, v == nil, "%s must bind untyped nil", userpasskey.Schema.SQLName(absent[i]))
 	}
 
 	verified := time.Unix(1700000000, 0).UTC()
