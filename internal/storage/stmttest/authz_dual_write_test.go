@@ -145,7 +145,7 @@ func TestJSONSchemaStatements_CreateDelete_DualWriteResourceScope(t *testing.T) 
 			Schema:    []byte(`{"type":"object"}`),
 		}))
 
-		scope, err := d.stmts.GetResourceScope(t.Context(), schemaURL)
+		scope, err := d.stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindSchema, projectID, schemaURL)
 		require.NoError(t, err)
 		assert.Equal(t, domain.ResourceKindSchema, scope.ResourceKind)
 		assert.Equal(t, projectID, scope.ProjectID)
@@ -153,13 +153,48 @@ func TestJSONSchemaStatements_CreateDelete_DualWriteResourceScope(t *testing.T) 
 
 		otherProjectID := ensureProject(t, d.stmts)
 		require.NoError(t, d.stmts.DeleteJSONSchemaByID(t.Context(), otherProjectID, schemaURL))
-		scope, err = d.stmts.GetResourceScope(t.Context(), schemaURL)
+		scope, err = d.stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindSchema, projectID, schemaURL)
 		require.NoError(t, err)
 		assert.Equal(t, projectID, scope.ProjectID)
 
 		require.NoError(t, d.stmts.DeleteJSONSchemaByID(t.Context(), projectID, schemaURL))
-		_, err = d.stmts.GetResourceScope(t.Context(), schemaURL)
+		_, err = d.stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindSchema, projectID, schemaURL)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}
+
+func TestJSONSchemaStatements_SharedPublicURL_ScopedPerProject(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		sharedURL := "https://example.com/schemas/shared-user.json"
+		projectA := ensureProject(t, d.stmts)
+		projectB := ensureProject(t, d.stmts)
+
+		require.NoError(t, d.stmts.CreateJSONSchema(t.Context(), &domain.JSONSchema{
+			ProjectID: projectA,
+			URL:       sharedURL,
+			Schema:    []byte(`{"type":"object","$id":"` + sharedURL + `"}`),
+		}))
+		require.NoError(t, d.stmts.CreateJSONSchema(t.Context(), &domain.JSONSchema{
+			ProjectID: projectB,
+			URL:       sharedURL,
+			Schema:    []byte(`{"type":"object","$id":"` + sharedURL + `"}`),
+		}))
+
+		scopeA, err := d.stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindSchema, projectA, sharedURL)
+		require.NoError(t, err)
+		assert.Equal(t, projectA, scopeA.ProjectID)
+
+		scopeB, err := d.stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindSchema, projectB, sharedURL)
+		require.NoError(t, err)
+		assert.Equal(t, projectB, scopeB.ProjectID)
+
+		require.NoError(t, d.stmts.DeleteJSONSchemaByID(t.Context(), projectB, sharedURL))
+		_, err = d.stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindSchema, projectB, sharedURL)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		scopeA, err = d.stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindSchema, projectA, sharedURL)
+		require.NoError(t, err)
+		assert.Equal(t, projectA, scopeA.ProjectID)
 	})
 }
 

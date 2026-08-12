@@ -26,7 +26,7 @@ CREATE TABLE zitadel_nextgen.resource_scope_index (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    PRIMARY KEY (resource_id),
+    PRIMARY KEY (resource_kind, project_id, resource_id),
     FOREIGN KEY (project_id, team_id)
         REFERENCES zitadel_nextgen.teams (project_id, id)
         ON DELETE CASCADE

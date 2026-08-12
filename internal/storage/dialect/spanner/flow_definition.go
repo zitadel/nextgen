@@ -148,7 +148,7 @@ func (f flowDefinitionStatements) DeleteFlowDefinitionByID(ctx context.Context, 
 			return nil
 		}
 		rsi := newResourceScopeStatements(tx)
-		return rsi.DeleteResourceScope(ctx, id)
+		return rsi.DeleteResourceScope(ctx, domain.ResourceKindFlowDefinition, projectID, id)
 	})
 }
 
