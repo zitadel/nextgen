@@ -60,7 +60,7 @@
     "eslint-plugin-perfectionist": "catalog:",
     "eslint-plugin-prettier": "catalog:",
     "h3": "^1.15.3",
-    "nuxt": "^4.4.8",
+    "nuxt": "^4.5.1",
     "prettier": "catalog:",
     "tsup": "catalog:",
     "typescript": "^5.7.3",
