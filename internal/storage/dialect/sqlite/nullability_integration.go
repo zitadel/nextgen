@@ -5,6 +5,7 @@ package sqlite
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/schematest"
@@ -22,15 +23,12 @@ func SchemaColumnNullability() []schematest.ColumnNullability {
 	cols = append(cols, schematest.Columns("encryption_keys", encryptionKeySchema)...)
 	cols = append(cols, schematest.Columns("signing_keys", signingKeySchema)...)
 	cols = append(cols, schematest.Columns("json_schemas", jsonSchemaSchema)...)
-	for i := range cols {
-		// sessions.expires_at is generated from NOT NULL operands and never
-		// holds NULL, but the DDL omits NOT NULL, so introspection reports it
-		// nullable. The binding correctly stays non-nullable.
-		if cols[i].Table == "sessions" && cols[i].Column == "expires_at" {
-			cols[i].Nullable = true
-		}
-	}
-	return cols
+	// Introspection always reports the generated sessions.expires_at as
+	// nullable, so the flag is only checkable on postgres, where it is a
+	// plain column.
+	return slices.DeleteFunc(cols, func(c schematest.ColumnNullability) bool {
+		return c.Table == "sessions" && c.Column == "expires_at"
+	})
 }
 
 // LiveColumnNullability reads column nullability per table from the live
