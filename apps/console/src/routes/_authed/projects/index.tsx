@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Box, Boxes, Loader2 } from "lucide-react";
+import { Box, Boxes, Ellipsis, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -13,6 +13,12 @@ import {
   opensRow,
 } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -41,7 +47,7 @@ export const Route = createFileRoute("/_authed/projects/")({
  */
 const PAGE_SIZE = 25;
 
-/** Three equal columns; the trailing one holds the place the design reserves for the row menu. */
+/** Three equal columns; the trailing one carries the row menu. */
 const COLUMN = "w-1/3";
 
 type Project = Awaited<ReturnType<typeof api.queryProjects>>["projects"][number];
@@ -97,10 +103,8 @@ function ProjectsScreen() {
       </div>
 
       <div className={`${RESOURCE_TABLE_WRAP} mt-5`}>
-        {/* Three equal columns, as the design lays them out. The trailing one is
-            the column the design reserves for the row menu: the menu itself is
-            not built, but the grid keeps its place so `Created` lands where the
-            design puts it. */}
+        {/* Three equal columns, as the design lays them out; the trailing one
+            carries the row menu. */}
         <Table className="table-fixed text-xs">
           <TableHeader>
             <TableRow className="border-border border-b hover:bg-transparent">
@@ -144,7 +148,9 @@ function ProjectsScreen() {
                   <TableCell className={`${RESOURCE_CELL} text-muted-foreground truncate text-sm`}>
                     {formatDate(project.created_at)}
                   </TableCell>
-                  <TableCell className={RESOURCE_CELL} />
+                  <TableCell className={`${RESOURCE_CELL} text-right`}>
+                    <RowActions projectId={project.id} name={project.name} />
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -169,3 +175,30 @@ function ProjectsScreen() {
   );
 }
 
+
+/**
+ * The row menu.
+ *
+ * One item — the same shape the schema list ships. `View project` is the only
+ * action the API can serve from here: there is no project delete endpoint. The
+ * row itself opens the project as well; the menu keeps this list consistent with
+ * the others, and is where a second action lands when there is one.
+ */
+function RowActions({ projectId, name }: { projectId: string; name: string }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={`Actions for ${name}`}>
+          <Ellipsis aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuItem asChild>
+          <Link to="/projects/$projectId" params={{ projectId }}>
+            View project
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

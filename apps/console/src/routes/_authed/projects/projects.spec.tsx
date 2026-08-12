@@ -64,6 +64,23 @@ describe("projects screen", () => {
     expect(table.getByText(expectedDate("2026-07-08T09:00:00Z"))).toBeInTheDocument();
   });
 
+  it("offers View project from the row menu", async () => {
+    server.use(
+      http.post(PROJECTS_URL, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River", created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" },
+          ],
+        }),
+      ),
+    );
+    await renderProjects();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Actions for River" }));
+    const item = await screen.findByRole("menuitem", { name: "View project" });
+    expect(item).toHaveAttribute("href", "/projects/proj_1");
+  });
+
   it("says so when there are no projects", async () => {
     server.use(http.post(PROJECTS_URL, () => HttpResponse.json({ projects: [] })));
     await renderProjects();
