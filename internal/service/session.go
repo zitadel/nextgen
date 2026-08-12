@@ -164,17 +164,12 @@ func (s *sessionService) List(ctx context.Context, input ListSessionInput) (*Lis
 		return nil, err
 	}
 
-	var cursor []byte
-	if input.PageToken != "" {
-		cursor = []byte(input.PageToken)
-	}
-
 	result, err := s.v2Pool.Statements().ListSessions(ctx, &database.ListOptions[domain.SessionField]{
 		Filter: database.And(filters...),
 		Pagination: database.Page[domain.SessionField]{
 			Limit:   uint32(normalizeLimit(input.Limit)),
 			OrderBy: orderBy,
-			Cursor:  cursor,
+			Cursor:  []byte(input.PageToken),
 		},
 	})
 	if err != nil {
@@ -243,17 +238,15 @@ func sessionStateFilter(op, state string, now time.Time) (database.Filter[domain
 	}
 
 	expiresAt := database.Col(domain.SessionFieldExpiresAt)
-	hasVerifiedFactors := database.Col(domain.SessionFieldHasVerifiedFactors)
-	// todo (grvijayan): replace with a greater-or-equal compare once the filter layer supports it
-	unexpiredSessions := database.Or(database.GreaterThan(expiresAt, now), database.Equal(expiresAt, now))
 
 	switch state {
 	case sessionStateExpired:
 		return database.LessThan(expiresAt, now), nil
-	case sessionStateBuilding:
-		return database.And(unexpiredSessions, database.Equal(hasVerifiedFactors, false)), nil
-	case sessionStateActive:
-		return database.And(unexpiredSessions, database.Equal(hasVerifiedFactors, true)), nil
+	case sessionStateBuilding, sessionStateActive:
+		// todo (grvijayan): replace with a greater-or-equal compare once the filter layer supports it
+		unexpiredSessions := database.Or(database.GreaterThan(expiresAt, now), database.Equal(expiresAt, now))
+		hasVerifiedFactors := database.Col(domain.SessionFieldHasVerifiedFactors)
+		return database.And(unexpiredSessions, database.Equal(hasVerifiedFactors, state == sessionStateActive)), nil
 	default:
 		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown state %q", state))
 	}

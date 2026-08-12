@@ -417,7 +417,7 @@ func TestSessionService_List(t *testing.T) {
 			},
 			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.SessionField]) {
 				assert.Equal(t, uint32(20), opts.Pagination.Limit)
-				assert.Nil(t, opts.Pagination.Cursor)
+				assert.Empty(t, opts.Pagination.Cursor)
 				assert.Equal(t, database.OrderDesc, opts.Pagination.OrderBy.Direction)
 				assert.Equal(t, []database.Column[domain.SessionField]{
 					database.Col(domain.SessionFieldCreatedAt),
@@ -593,6 +593,14 @@ func TestSessionService_List_ValidationErrors(t *testing.T) {
 			input: service.ListSessionInput{
 				ProjectID: "proj_a",
 				Sorting:   &service.Sorting{Field: "created_at", Direction: "sideways"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "missing sort direction is invalid",
+			input: service.ListSessionInput{
+				ProjectID: "proj_a",
+				Sorting:   &service.Sorting{Field: "created_at"},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},

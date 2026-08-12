@@ -20719,7 +20719,8 @@ func (s *SessTokenInvalidDetails) init() SessTokenInvalidDetails {
 // Field to filter sessions by:
 // - `created_at`: RFC3339 timestamp
 // - `user_id`: user id
-// - `state`: one of `building`, `active`, `expired`.
+// - `state`: one of `building`, `active`, `expired`. State is computed at read
+// time, so a session expiring mid-request can match `active` but return `expired`.
 // Ref: #
 type SessionFilterField string
 

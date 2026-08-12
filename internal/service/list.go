@@ -78,30 +78,26 @@ func parseSortDirection(direction string) (database.OrderDirection, error) {
 	}
 }
 
-// listOrderBy builds the sort order from the request, falling back to the
-// given defaults, and appends idField as a tiebreaker: id is unique, so it
-// gives the sort a total order. Without it, rows sharing a sort-key value
-// (e.g. equal createdAt) have no stable order, and cursor pagination could
-// skip or repeat them across pages.
+// listOrderBy builds the sort order from the request, using the given
+// defaults when no sorting is requested, and appends idField as a tiebreaker:
+// id is unique, so it gives the sort a total order. Without it, rows sharing
+// a sort-key value (e.g. equal createdAt) have no stable order, and cursor
+// pagination could skip or repeat them across pages.
 func listOrderBy[F ~uint8](sorting *Sorting, defaultField F, defaultDirection database.OrderDirection, parseField func(string) (F, error), idField F) (database.OrderBy[F], error) {
 	sortField := defaultField
 	direction := defaultDirection
 
 	if sorting != nil {
-		if sorting.Field != "" {
-			f, err := parseField(sorting.Field)
-			if err != nil {
-				return database.OrderBy[F]{}, err
-			}
-			sortField = f
+		f, err := parseField(sorting.Field)
+		if err != nil {
+			return database.OrderBy[F]{}, err
 		}
-		if sorting.Direction != "" {
-			dir, err := parseSortDirection(sorting.Direction)
-			if err != nil {
-				return database.OrderBy[F]{}, err
-			}
-			direction = dir
+		sortField = f
+		dir, err := parseSortDirection(sorting.Direction)
+		if err != nil {
+			return database.OrderBy[F]{}, err
 		}
+		direction = dir
 	}
 
 	columns := []database.Column[F]{database.Col(sortField)}
