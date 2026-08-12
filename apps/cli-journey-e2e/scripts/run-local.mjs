@@ -354,7 +354,7 @@ async function runTestkitJourney(context) {
     await cp(join(projectRoot, "fixtures", "testkit"), context.appDir, { recursive: true });
 
     log("[testkit] running the app's @zitadel/testing suite");
-    await run("npx", ["playwright", "test", "--config", "playwright.testkit.config.mjs"], {
+    await run("npx", ["playwright", "test", "--config", "playwright.testkit.config.mts"], {
       cwd: context.appDir,
       env: {
         ...scrubRepoOverrides(npxEnv(context)),

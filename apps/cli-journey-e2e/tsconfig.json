@@ -19,6 +19,7 @@
   "include": [
     "playwright*.config.mts",
     "src/**/*.ts",
-    "fixtures/testkit/**/*.ts"
+    "fixtures/testkit/**/*.ts",
+    "fixtures/testkit/**/*.mts"
   ]
 }
