@@ -13047,11 +13047,18 @@ func (s *FlowDefinitionStepTransitionsItem) encodeFields(e *jx.Encoder) {
 			s.Action.Encode(e)
 		}
 	}
+	{
+		if s.Purpose.Set {
+			e.FieldStart("purpose")
+			s.Purpose.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfFlowDefinitionStepTransitionsItem = [2]string{
+var jsonFieldsNameOfFlowDefinitionStepTransitionsItem = [3]string{
 	0: "target",
 	1: "action",
+	2: "purpose",
 }
 
 // Decode decodes FlowDefinitionStepTransitionsItem from json.
@@ -13084,6 +13091,16 @@ func (s *FlowDefinitionStepTransitionsItem) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"action\"")
+			}
+		case "purpose":
+			if err := func() error {
+				s.Purpose.Reset()
+				if err := s.Purpose.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"purpose\"")
 			}
 		default:
 			return errors.Errorf("unexpected field %q", k)
@@ -13177,6 +13194,54 @@ func (s FlowDefinitionStepTransitionsItemAction) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *FlowDefinitionStepTransitionsItemAction) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FlowDefinitionStepTransitionsItemPurpose as json.
+func (s FlowDefinitionStepTransitionsItemPurpose) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes FlowDefinitionStepTransitionsItemPurpose from json.
+func (s *FlowDefinitionStepTransitionsItemPurpose) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode FlowDefinitionStepTransitionsItemPurpose to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch FlowDefinitionStepTransitionsItemPurpose(v) {
+	case FlowDefinitionStepTransitionsItemPurposeLogin:
+		*s = FlowDefinitionStepTransitionsItemPurposeLogin
+	case FlowDefinitionStepTransitionsItemPurposeRegister:
+		*s = FlowDefinitionStepTransitionsItemPurposeRegister
+	case FlowDefinitionStepTransitionsItemPurposeRecovery:
+		*s = FlowDefinitionStepTransitionsItemPurposeRecovery
+	case FlowDefinitionStepTransitionsItemPurposeProfiling:
+		*s = FlowDefinitionStepTransitionsItemPurposeProfiling
+	case FlowDefinitionStepTransitionsItemPurposeReauth:
+		*s = FlowDefinitionStepTransitionsItemPurposeReauth
+	case FlowDefinitionStepTransitionsItemPurposeLinkAccount:
+		*s = FlowDefinitionStepTransitionsItemPurposeLinkAccount
+	default:
+		*s = FlowDefinitionStepTransitionsItemPurpose(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s FlowDefinitionStepTransitionsItemPurpose) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *FlowDefinitionStepTransitionsItemPurpose) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -25604,6 +25669,55 @@ func (s OptNilFlowDefinitionStepTransitionsItemAction) MarshalJSON() ([]byte, er
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptNilFlowDefinitionStepTransitionsItemAction) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes FlowDefinitionStepTransitionsItemPurpose as json.
+func (o OptNilFlowDefinitionStepTransitionsItemPurpose) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes FlowDefinitionStepTransitionsItemPurpose from json.
+func (o *OptNilFlowDefinitionStepTransitionsItemPurpose) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilFlowDefinitionStepTransitionsItemPurpose to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v FlowDefinitionStepTransitionsItemPurpose
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilFlowDefinitionStepTransitionsItemPurpose) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilFlowDefinitionStepTransitionsItemPurpose) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

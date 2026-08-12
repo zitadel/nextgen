@@ -10,8 +10,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/session.mock.go . SessionService
-
 const (
 	sessionFieldCreatedAt = "created_at"
 	sessionFieldUserID    = "user_id"
