@@ -366,6 +366,10 @@ Per [ADR 046](046-claim-lifecycle-v2.md) and
 - **Webhook reliability:** at-least-once delivery requires consumer idempotency;
   document clearly. Head-of-line blocking means one poison event stalls that
   `(sink, project)` until retention drops it or ops intervenes.
+- **Deployment sink identity:** v1 mints deployment sink ids as a stable hash of
+  `(type, url)`. Changing a webhook URL re-keys the sink and re-ships retained
+  history from epoch for that new id. Sinks removed from config leave their
+  `event_sinks` row and cursors behind (no auto-disable in v1).
 - **Request event volume:** high-traffic projects generate large `/events`
   result sets when filtering `category=request`; operators should prefer SIEM
   export over repeated full scans.

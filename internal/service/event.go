@@ -95,7 +95,7 @@ func (s *EventService) Get(ctx context.Context, projectID, id string) (*domain.E
 
 	event, err := s.v2Pool.Statements().GetEventByID(ctx, projectID, id)
 	if err != nil {
-		if errors.Is(err, new(database.NoRowFoundError)) {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrEventNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get event")

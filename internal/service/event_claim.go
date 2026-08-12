@@ -16,14 +16,14 @@ func projectIsClaimed(ctx context.Context, stmts interface {
 }, projectID string) (bool, error) {
 	_, err := stmts.GetProjectByID(ctx, projectID)
 	if err != nil {
-		if errors.Is(err, new(database.NoRowFoundError)) {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return false, nil
 		}
 		return false, domain.ErrInternal(err).WithMessage("failed to load project for events visibility")
 	}
 	scope, err := stmts.GetResourceScope(ctx, projectID)
 	if err != nil {
-		if errors.Is(err, new(database.NoRowFoundError)) {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return false, nil
 		}
 		return false, domain.ErrInternal(err).WithMessage("failed to load project scope for events visibility")

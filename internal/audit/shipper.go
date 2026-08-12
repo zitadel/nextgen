@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/events"
 )
 
 // SinkConfig is a deployment-configured event sink (no project CRUD in v1).
@@ -131,7 +131,7 @@ func (s *Shipper) shipOnce() {
 func (s *Shipper) shipProject(ctx context.Context, sink *domain.EventSink, projectID string) {
 	cursor, err := s.src.GetEventSinkCursor(ctx, sink.ID, projectID)
 	if err != nil {
-		if !errors.Is(err, new(database.NoRowFoundError)) {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
 			slog.Error("event shipper: get cursor failed",
 				slog.String("sink_id", sink.ID),
 				slog.String("project_id", projectID),
@@ -145,7 +145,7 @@ func (s *Shipper) shipProject(ctx context.Context, sink *domain.EventSink, proje
 		}
 	}
 
-	events, err := s.src.ListEventsAfterCursor(ctx, projectID, cursor.LastCreatedAt, cursor.LastEventID, 100)
+	batch, err := s.src.ListEventsAfterCursor(ctx, projectID, cursor.LastCreatedAt, cursor.LastEventID, 100)
 	if err != nil {
 		slog.Error("event shipper: list after cursor failed",
 			slog.String("sink_id", sink.ID),
@@ -154,7 +154,7 @@ func (s *Shipper) shipProject(ctx context.Context, sink *domain.EventSink, proje
 		)
 		return
 	}
-	for _, ev := range events {
+	for _, ev := range batch {
 		if err := s.deliver(ctx, sink, ev); err != nil {
 			slog.Error("event shipper: deliver failed",
 				slog.String("sink_id", sink.ID),
@@ -179,7 +179,7 @@ func (s *Shipper) shipProject(ctx context.Context, sink *domain.EventSink, proje
 }
 
 func (s *Shipper) deliver(ctx context.Context, sink *domain.EventSink, ev *domain.Event) error {
-	body, err := json.Marshal(ev)
+	body, err := events.MarshalWire(ev)
 	if err != nil {
 		return err
 	}

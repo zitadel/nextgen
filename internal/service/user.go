@@ -160,15 +160,12 @@ func (s *userService) emitUserCreateFailedBestEffort(ctx context.Context, action
 	if create == nil || create.CreateUser == nil {
 		return
 	}
-	_ = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
-			Type:       domain.EventTypeUserCreateFailed,
-			Category:   domain.EventCategoryEntity,
-			ProjectID:  create.ProjectID,
-			EntityType: "user",
-			EntityID:   create.CreateUser.ID,
-			Payload:    domain.UserCreateFailedPayload{},
-		})
+	_ = audit.Emit(ctx, s.v2Pool.Statements(), audit.EmitSpec{
+		Type:       domain.EventTypeUserCreateFailed,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  create.ProjectID,
+		EntityType: "user",
+		Payload:    domain.UserCreateFailedPayload{KeyName: unique.Constraint()},
 	})
 }
 

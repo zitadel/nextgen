@@ -41,11 +41,11 @@ properties:
   occurred_at:
     type: string
     format: date-time
-    description: When the action happened (DB clock).
+    description: When the action happened (server/storage clock, dialect-owned).
   created_at:
     type: string
     format: date-time
-    description: When the row was inserted (DB clock).
+    description: When the row was inserted (server/storage clock, dialect-owned).
   actor_id:
     description: Who triggered the event.
     oneOf:
