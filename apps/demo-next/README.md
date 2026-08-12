@@ -25,7 +25,7 @@ Or pass them inline when starting the dev server (step 2).
 | Variable                          | Default                 | Description                                        |
 | --------------------------------- | ----------------------- | -------------------------------------------------- |
 | `ZITADEL_URL`                      | `http://localhost:8080` | URL of the Zitadel auth server                     |
-| `NEXT_PUBLIC_ZITADEL_PROJECT_ID`  | `demo`                  | Project ID passed to `<zitadel-login project-id>`  |
+| `NEXT_PUBLIC_ZITADEL_PROJECT_ID`  | `demo`                  | Project ID handed to `configureZitadel()` in `src/zitadel.ts` |
 
 ### 2. Start
 
@@ -47,9 +47,9 @@ Open [http://localhost:3002/login](http://localhost:3002/login). Any email/passw
 
 ### Running against the Go server
 
-Instead of the mock, you can run against the real Go server with embedded
-Postgres. This gives you persistent state, real user creation, and the full
-flow engine.
+Instead of the mock, you can run against the real Go server (SQLite by
+default — no Docker or Postgres needed). This gives you persistent state,
+real user creation, and the full flow engine.
 
 #### 1. Start the server
 
@@ -60,8 +60,8 @@ moon run workspace:cli -- start
 ```
 
 This builds the embedded console and login UIs, then starts the Go server on
-`http://localhost:8080` with embedded Postgres (data stored in
-`nextgen-data/`). The server is ready when you see
+`http://localhost:8080` with its default SQLite storage (runtime state under
+`.zitadel/local/`). The server is ready when you see
 `Local Zitadel server is ready.`
 
 #### 2. Create a project
