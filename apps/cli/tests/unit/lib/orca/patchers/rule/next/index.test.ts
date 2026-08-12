@@ -115,6 +115,44 @@ describe("NextPatcher.plan", () => {
     expect(homePage).not.toContain("Sign in, create an account");
   });
 
+  it("embeds widget cards with theme=auto for the widget posture (ADR 044)", () => {
+    const plan = new NextPatcher().plan({ ...ctxFor("app"), posture: "widget" });
+    for (const path of ["app/login/page.tsx", "app/register/page.tsx"]) {
+      const page = writeContents(plan, path);
+      expect(page).toContain('variant="widget"\n          theme="auto"');
+      // Layout-neutral wrapper: no forced color scheme, no <main> that would
+      // nest inside the host app's own landmark.
+      expect(page).not.toContain('colorScheme: "dark"');
+      expect(page).not.toContain("<main");
+      expect(page).toContain('justifyContent: "center"');
+      // The full-page alternative stays named for discoverability.
+      expect(page).toContain('variant="page"');
+    }
+    const profile = writeContents(plan, "app/profile/page.tsx");
+    expect(profile).toContain('variant="widget"\n          theme="auto"');
+    expect(profile).not.toContain('colorScheme: "dark"');
+    expect(profile).toContain('justifyContent: "center"');
+  });
+
+  it("keeps the business overlay ref wiring in the widget posture", () => {
+    const plan = new NextPatcher().plan({
+      ...ctxFor("app"),
+      useCase: "business",
+      posture: "widget",
+    });
+    const page = writeContents(plan, "app/login/page.tsx");
+    expect(page).toContain('variant="widget"');
+    expect(page).toContain("element.locales = businessLocales");
+  });
+
+  it("treats absent posture as the page posture (legacy restores)", () => {
+    const dflt = new NextPatcher().plan(ctxFor("app"));
+    const paged = new NextPatcher().plan({ ...ctxFor("app"), posture: "page" });
+    for (const path of ["app/login/page.tsx", "app/register/page.tsx", "app/profile/page.tsx"]) {
+      expect(writeContents(paged, path)).toBe(writeContents(dflt, path));
+    }
+  });
+
   it("emits proxy.ts for Next 16 projects", () => {
     const plan = new NextPatcher().plan(ctxFor("app", 16));
     expect(writeContents(plan, "proxy.ts")).toContain(MANAGED_MARKER);

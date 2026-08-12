@@ -4,8 +4,6 @@ import (
 	"context"
 )
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_on_success.mock.go . FlowOnSuccessHandler,FlowPasskeyUserCreater
-
 // FlowOnSuccessHandler is the contract every on_success mutation
 // satisfies. The state machine calls Handle after a step's fields
 // validate and before its transition fires.
