@@ -36,10 +36,22 @@ registration:
 
 ### State on navigation
 
-A `navigate` action does not touch the state machine's input memory.
-It does abandon a pending ceremony: any `PendingChallenge` (an issued
-passkey prompt the user walked away from) is cleared when a navigate
-action fires, so the stale challenge cannot re-attach on the next render.
+A plain `navigate` action does not touch the state machine's input
+memory. It does abandon a pending ceremony: any `PendingChallenge` (an
+issued passkey prompt the user walked away from) is cleared when a
+navigate action fires, so the stale challenge cannot re-attach on the
+next render.
+
+**Purpose-changing navigation is stricter.** When the transition declares
+a `purpose` (see the amendment below), the engine additionally purges
+user-bound state — the resolved user id, collected password material, and
+the provisional passkey marker — and, if a user had been resolved,
+rotates the auth attempt (the persisted attempt carries the user as a
+factor and refuses a second user challenge). Collected non-credential
+field values (e.g. the typed email) survive for prefill. Toggling between
+purpose entries is coalesced as an undo of the previous navigation, so
+the flow-state cookie stays bounded no matter how often the links are
+clicked.
 
 ### Amendment (2026-08-11): local `purpose` on transitions
 

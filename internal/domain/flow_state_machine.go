@@ -482,13 +482,53 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 	// leak across. A login-resolved user surviving into register would
 	// let passkey registration attach a credential to an existing account
 	// without proving a factor.
+	repurposeUndo := false
 	if transition.Purpose != nil {
+		hadResolvedUser := pc.state.CollectedData.UserID != ""
 		clearUserBoundState(pc.state)
 		pc.state.CollectedData.AuthMethods.Password = ""
+		if hadResolvedUser {
+			// The persisted attempt carries the resolved user as a factor,
+			// and PrepareUserChallenge refuses a second user challenge on a
+			// session-linked attempt. The flow-state reset must rotate the
+			// attempt in lockstep or the next identifier submission dies on
+			// "The user was already authenticated". The abandoned attempt
+			// ages out like any abandoned flow. No resolved user → nothing
+			// on the attempt to escape → no rotation (idle purpose toggles
+			// must not mint attempt rows).
+			attemptInput := FlowCreateAttemptInput{ProjectID: pc.state.ProjectID}
+			if pc.state.SessionID != "" {
+				sid := pc.state.SessionID
+				attemptInput.SessionID = &sid
+			}
+			attemptID, err := r.authAttempts.Start(pc.ctx, attemptInput)
+			if err != nil {
+				return FlowStepResult{}, fmt.Errorf("flow state machine: rotate auth attempt on re-purpose: %w", err)
+			}
+			pc.state.AuthAttemptID = attemptID
+		}
 		pc.state.CurrentPurpose = *transition.Purpose
+
+		// Purpose entries link to each other, forming a zero-input loop.
+		// An exact undo of the previous navigation pops the back stack
+		// instead of pushing, so toggling Sign up / Sign in cannot grow
+		// History/BackStack past one entry (unbounded growth overflows
+		// the 4 KiB encrypted-cookie budget). Anything else falls through
+		// to the normal advance.
+		if top, ok := pc.state.PeekBackStack(); ok &&
+			top.StepName == nextStep.Name && top.Purpose == *transition.Purpose &&
+			len(pc.state.History) > 0 && pc.state.History[len(pc.state.History)-1] == top.StepName {
+			pc.state.PopBackStack()
+			pc.state.History = pc.state.History[:len(pc.state.History)-1]
+			pc.state.CurrentStep = nextStep.Name
+			pc.state.IssuedAt = r.now()
+			repurposeUndo = true
+		}
 	}
 
-	r.advance(pc.state, pc.currentStep, prevPurpose, nextStep.Name)
+	if !repurposeUndo {
+		r.advance(pc.state, pc.currentStep, prevPurpose, nextStep.Name)
+	}
 
 	// after irreversible actions, clear the back stack so the user can't navigate back in the flow.
 	if irreversible {

@@ -3121,11 +3121,24 @@ func TestFlowStateMachine_Process_NavPurposeSwitchDropsResolvedUser(t *testing.T
 		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 		AnyTimes()
-	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
-	w.authAttemptService.EXPECT().
-		SubmitIdentifier(gomock.Any(), gomock.Any()).
-		Return("user_alice", nil).
-		Times(2)
+	// The re-purpose must rotate the attempt: the first attempt carries
+	// alice as a user factor and would reject a second user challenge
+	// ("The user was already authenticated"). Each identify lands on its
+	// own attempt.
+	gomock.InOrder(
+		w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil),
+		w.authAttemptService.EXPECT().
+			SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+				return in.AttemptID == "attempt-1"
+			})).
+			Return("user_alice", nil),
+		w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-2", nil),
+		w.authAttemptService.EXPECT().
+			SubmitIdentifier(gomock.Any(), gomock.Cond(func(in domain.FlowSubmitIdentifierInput) bool {
+				return in.AttemptID == "attempt-2"
+			})).
+			Return("user_alice", nil),
+	)
 	// The register leg must never issue a passkey registration or create a
 	// user for the login-resolved account.
 	w.authAttemptService.EXPECT().IssuePasskeyChallenge(gomock.Any(), gomock.Any()).Times(0)
@@ -3162,6 +3175,8 @@ func TestFlowStateMachine_Process_NavPurposeSwitchDropsResolvedUser(t *testing.T
 	require.NoError(t, err)
 	assert.Equal(t, "register", toRegister.State.CurrentStep)
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, toRegister.State.CurrentPurpose)
+	assert.Equal(t, "attempt-2", toRegister.State.AuthAttemptID,
+		"a re-purpose after identification must rotate the auth attempt")
 	assert.Empty(t, toRegister.State.CollectedData.UserID,
 		"the login-resolved user must not survive a declared re-purpose")
 	assert.Empty(t, toRegister.State.CollectedData.AuthMethods.Password)
@@ -3177,4 +3192,53 @@ func TestFlowStateMachine_Process_NavPurposeSwitchDropsResolvedUser(t *testing.T
 	assert.Equal(t, "password", guarded.State.CurrentStep)
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, guarded.State.CurrentPurpose,
 		"user_already_exists must flip back to login for verification")
+}
+
+// Purpose-entry toggling is a zero-input loop; without coalescing, every
+// Sign up / Sign in click appends History + BackStack and the encrypted
+// state cookie blows past the 4 KiB browser budget (review measured
+// 4,215 bytes after 50 toggles). An exact undo of the previous purposed
+// navigation pops instead of pushing, so the state stays O(1) — and idle
+// toggling (no user resolved) must not mint auth-attempt rows either.
+func TestFlowStateMachine_Process_PurposeToggleDoesNotGrowState(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := purposeNavDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	// Exactly one attempt for the whole toggle storm: no resolved user,
+	// no rotation.
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil).Times(1)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	state := start.State
+	for i := 0; i < 50; i++ {
+		action := "register"
+		if state.CurrentStep == "register" {
+			action = "sign_in"
+		}
+		result, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{Action: action})
+		require.NoError(t, err)
+		state = result.State
+		require.LessOrEqual(t, len(state.BackStack), 1, "toggle %d must not grow the back stack", i)
+		require.LessOrEqual(t, len(state.History), 1, "toggle %d must not grow the history", i)
+	}
+
+	// The loop ran an even number of toggles, so we are back on the login
+	// entry with the state shaped exactly like a fresh start.
+	assert.Equal(t, "identifier", state.CurrentStep)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, state.CurrentPurpose)
+	assert.Empty(t, state.BackStack)
+	assert.Empty(t, state.History)
+	assert.Equal(t, "attempt-1", state.AuthAttemptID)
 }
