@@ -27,6 +27,28 @@ export function installCommandFor(packageManager: PackageManager): PackageComman
   return command(packageManager, ["install"]);
 }
 
+/**
+ * Adds (or re-pins) the given `name@version` specs at exactly those versions.
+ * Every manager saves a caret range by default, which would silently turn an
+ * exact pin into a float — the exact-save flag keeps the written specifier
+ * identical to the requested version.
+ */
+export function addExactCommandFor(
+  packageManager: PackageManager,
+  packages: ReadonlyArray<string>,
+): PackageCommand {
+  switch (packageManager) {
+    case "npm":
+      return command("npm", ["install", "--save-exact", ...packages]);
+    case "pnpm":
+      return command("pnpm", ["add", "--save-exact", ...packages]);
+    case "yarn":
+      return command("yarn", ["add", "--exact", ...packages]);
+    case "bun":
+      return command("bun", ["add", "--exact", ...packages]);
+  }
+}
+
 export function devCommandFor(packageManager: PackageManager): PackageCommand {
   switch (packageManager) {
     case "npm":

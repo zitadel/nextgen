@@ -8,8 +8,6 @@ import (
 	"github.com/ianlancetaylor/jsonschema/types"
 )
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_field_resolver.schema.mock.go . SchemaResolver
-
 // SchemaResolver loads a compiled JSON schema by URL. It is the
 // loader [FlowStateMachineRuntime] depends on for runtime schema
 // access; [SchemaFieldResolver] is the translator that runs on top of

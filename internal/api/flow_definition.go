@@ -201,15 +201,25 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 		if step.GetTransitions().IsSet() {
 			transitions := make(map[string]domain.FlowStepTransition, len(step.GetTransitions().Value))
 			for name, apiTransition := range step.GetTransitions().Value {
+				// Get() is false for both absent and explicit-null values;
+				// IsSet() alone would map an explicit `null` to the zero
+				// enum. Non-null strings are enum-validated by the
+				// generated request decoder.
 				var transitionAction *domain.FlowDefinitionTransitionAction
-				if apiTransition.Action.IsSet() {
-					a, _ := domain.FlowDefinitionTransitionActionString(string(apiTransition.GetAction().Value)) // validated in the domain
+				if value, ok := apiTransition.Action.Get(); ok {
+					a, _ := domain.FlowDefinitionTransitionActionString(string(value))
 					transitionAction = &a
+				}
+				var transitionPurpose *domain.FlowDefinitionPurpose
+				if value, ok := apiTransition.Purpose.Get(); ok {
+					p, _ := domain.FlowDefinitionPurposeString(string(value))
+					transitionPurpose = &p
 				}
 
 				t := domain.FlowStepTransition{
-					Action: transitionAction,
-					Target: apiTransition.GetTarget(),
+					Action:  transitionAction,
+					Purpose: transitionPurpose,
+					Target:  apiTransition.GetTarget(),
 				}
 				transitions[name] = t
 			}
@@ -384,12 +394,21 @@ func mapTransitionsToAPI(domainTransitions map[string]domain.FlowStepTransition)
 		if transition.Action != nil {
 			action = transition.Action.String()
 		}
+		var purpose string
+		if transition.Purpose != nil {
+			purpose = transition.Purpose.String()
+		}
 		transitions[n] = api.FlowDefinitionStepTransitionsItem{
 			Target: transition.Target,
 			Action: api.OptNilFlowDefinitionStepTransitionsItemAction{
 				Value: api.FlowDefinitionStepTransitionsItemAction(action),
 				Set:   transition.Action != nil,
 				Null:  transition.Action == nil,
+			},
+			Purpose: api.OptNilFlowDefinitionStepTransitionsItemPurpose{
+				Value: api.FlowDefinitionStepTransitionsItemPurpose(purpose),
+				Set:   transition.Purpose != nil,
+				Null:  transition.Purpose == nil,
 			},
 		}
 	}

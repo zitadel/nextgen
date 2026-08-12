@@ -4,7 +4,6 @@ import (
 	"context"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/database.mock.go . Pool,Transactioner,Statementer
 type Pool interface {
 	Transactioner[AllStatements]
 	Statementer[AllStatements]

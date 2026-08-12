@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-solid",
-  "version": "0.1.0-alpha.17",
+  "version": "0.1.0-alpha.18",
   "description": "Solid components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-solid#readme",
   "bugs": {

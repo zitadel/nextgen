@@ -76,7 +76,7 @@ POST   /flow-definitions/{id}/simulate    Dry-run with mock input
 
 Steps do not have a `type`. Instead, the engine derives behavior from the step's properties:
 
-- **`fields`** — array of schema property names. The engine resolves each field's type, validation, and implicit outcomes from the user schema's `x-*` annotations. For example, a field with `x-identifier: true` implies a `user_not_found` outcome in transitions.
+- **`fields`** — array of schema property names. The engine resolves each field's type, validation, and implicit outcomes from the user schema's `x-*` annotations. For example, a field with a non-empty `x-unique` scope is an identifier and implies a `user_not_found` outcome in transitions.
 - **`action`** — server-side mutation to run after the step succeeds (e.g. `"create_user"`). Executes before the transition fires.
 - **`complete`** — marks the step as terminal (`"redirect"` or `"show"`).
 - **`gates`** — array of gate types (`"captcha"`, `"passkey"`) required before submission. The engine may also inject gates dynamically based on policy.
@@ -397,7 +397,7 @@ A single flow that handles both login and registration using implicit outcomes f
 }
 ```
 
-The `email` field has `x-identifier: true` in the user schema. When the user submits their email, the engine looks up the user. If found, it follows the `submit` transition to `signin`. If not found, it follows the `user_not_found` transition to `profile` (registration path).
+The `email` field has `x-unique: "project"` in the user schema, which makes it an identifier. When the user submits their email, the engine looks up the user. If found, it follows the `submit` transition to `signin`. If not found, it follows the `user_not_found` transition to `profile` (registration path).
 
 ---
 
