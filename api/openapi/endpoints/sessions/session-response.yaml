@@ -22,7 +22,7 @@ properties:
     type: string
     description: |
       Current lifecycle state of the session:
-      - `building`: has a user factor but is still gathering authentication factors
+      - `building`: no verified authentication factors yet
       - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as factors age
       - `expired`: TTL elapsed
     enum:

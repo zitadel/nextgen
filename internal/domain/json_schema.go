@@ -95,8 +95,6 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 	}, nil
 }
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/json_schema.mock.go . JSONSchemaStore
-
 // JSONSchemaStore is the persistence port for JSON schemas used by
 // [JSONSchemaResolver] and service callers that only need get/create.
 // Because schema validation happens on data writes in domain logic,

@@ -1,5 +1,19 @@
 # @zitadel/server-linux-x64
 
+## 0.1.0-alpha.18
+
+### Patch Changes
+
+- [#404](https://github.com/zitadel/nextgen/pull/404) [`ca91e8f`](https://github.com/zitadel/nextgen/commit/ca91e8f0368a59f9b96df2f380ec708b3b678f6c) Thanks [@vitorbari](https://github.com/vitorbari)! - Flow engine: validate boolean and enum (select) user-schema fields at the flow step.
+
+  The field validator now accepts a real JSON boolean for `checkbox` fields (and
+  rejects a string), enforces a property's `const` (e.g. a must-accept terms
+  checkbox pinned to `true`), and enforces `required` fields — both on the submit
+  action and on the passkey-register issue leg. Previously these only failed later
+  when `create_user` validated the user against the schema; a missing required
+  field, an unticked must-accept box, or an unselected required dropdown now
+  surfaces as a per-field step error instead.
+
 ## 0.1.0-alpha.17
 
 ## 0.1.0-alpha.16

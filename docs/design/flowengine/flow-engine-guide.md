@@ -305,9 +305,8 @@ Schema fields can have `x-*` annotations that tell the engine how to handle them
 
 | Annotation | Effect |
 |---|---|
-| `x-identifier: true` | Engine looks up the user on submit. Implies `user_not_found` outcome in transitions. |
+| `x-unique: "<scope>"` | Value must be unique at the given scope (`project` or `team`). A non-empty scope makes the field an identifier: the engine looks up the user on submit, which implies the `user_not_found` and `user_already_exists` outcomes in transitions. |
 | `x-credential: "password"` | Engine verifies the credential via auth_attempt. |
-| `x-unique: true` | Engine checks uniqueness before proceeding. |
 
 This means the flow definition stays simple — field names only — while the engine derives all the complex behavior from the schema.
 
@@ -549,7 +548,7 @@ A session and a flow are different things with different lifetimes:
 |---|---|---|
 | **What it is** | Accumulated authentication factors | Orchestration state (current step, collected data) |
 | **Lifetime** | Hours to days | Seconds to minutes |
-| **Storage** | Postgres (durable) | Encrypted cookie (ephemeral) |
+| **Storage** | Configured dialect (SQLite / PostgreSQL / Spanner) | Encrypted cookie (ephemeral) |
 | **One or many?** | One session can have many flows over time | Each flow operates on one session |
 | **What it knows** | user, factors, assurance_levels | definition, step, history, collected data |
 

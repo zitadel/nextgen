@@ -2,63 +2,75 @@
   "$metadata": {
     "collection": "Syntax",
     "modes": [
-      "Light",
-      "Dark"
+      "Dark",
+      "Light"
     ]
-  },
-  "Light": {
-    "syntax": {
-      "key": {
-        "$value": "#401889",
-        "$type": "color"
-      },
-      "string": {
-        "$value": "#bd2514",
-        "$type": "color"
-      },
-      "number": {
-        "$value": "#c52247",
-        "$type": "color"
-      },
-      "boolean": {
-        "$value": "#5a23bd",
-        "$type": "color"
-      },
-      "punctuation": {
-        "$value": "#686883",
-        "$type": "color"
-      },
-      "comment": {
-        "$value": "#71718b",
-        "$type": "color"
-      }
-    }
   },
   "Dark": {
     "syntax": {
       "key": {
-        "$value": "#9066da",
-        "$type": "color"
+        "$value": "{brand.purple.500}",
+        "$type": "color",
+        "$description": "sky-400 / sky-600"
       },
       "string": {
-        "$value": "#f25543",
-        "$type": "color"
+        "$value": "{brand.orange.400}",
+        "$type": "color",
+        "$description": "emerald-400 / emerald-600"
       },
       "number": {
-        "$value": "#e25f7d",
-        "$type": "color"
+        "$value": "{brand.pink.400}",
+        "$type": "color",
+        "$description": "amber-400 / amber-600"
       },
       "boolean": {
-        "$value": "#bba5e4",
-        "$type": "color"
+        "$value": "{brand.purple.700}",
+        "$type": "color",
+        "$description": "violet-400 / violet-600"
       },
       "punctuation": {
-        "$value": "#82829c",
-        "$type": "color"
+        "$value": "{brand.gray.500}",
+        "$type": "color",
+        "$description": "slate-400 / slate-500"
       },
       "comment": {
-        "$value": "#7c7c95",
-        "$type": "color"
+        "$value": "{brand.gray.400}",
+        "$type": "color",
+        "$description": "slate-500 / slate-400"
+      }
+    }
+  },
+  "Light": {
+    "syntax": {
+      "key": {
+        "$value": "{brand.purple.100}",
+        "$type": "color",
+        "$description": "sky-400 / sky-600"
+      },
+      "string": {
+        "$value": "{brand.orange.200}",
+        "$type": "color",
+        "$description": "emerald-400 / emerald-600"
+      },
+      "number": {
+        "$value": "{brand.pink.200}",
+        "$type": "color",
+        "$description": "amber-400 / amber-600"
+      },
+      "boolean": {
+        "$value": "{brand.purple.300}",
+        "$type": "color",
+        "$description": "violet-400 / violet-600"
+      },
+      "punctuation": {
+        "$value": "{brand.gray.400}",
+        "$type": "color",
+        "$description": "slate-400 / slate-500"
+      },
+      "comment": {
+        "$value": "{brand.gray.500}",
+        "$type": "color",
+        "$description": "slate-500 / slate-400"
       }
     }
   }

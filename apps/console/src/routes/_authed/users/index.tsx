@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { Loader2, MoreVertical, Plus, Search, Users } from "lucide-react";
+import { Loader2, MoreVertical, Plus, Search, User } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AddUserSheet } from "@/components/add-user-sheet";
@@ -28,7 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { UserStatusBadge } from "@/components/user-status-badge";
+import { StatusBadge } from "@/components/status-badge";
 
 import { api } from "../../../api/zitadel";
 import { displayValue, field } from "../../../lib/record";
@@ -37,7 +37,10 @@ import { userDisplayName } from "../../../lib/user";
 import { getConsoleProjectId } from "../../../runtime/runtime";
 
 export const Route = createFileRoute("/_authed/users/")({
-  staticData: { nav: { label: "Users", order: 2, icon: Users } },
+  // `User`, not `Users`: the sidebar frame's row carries `lucide/User`, the
+  // single-person glyph. The plural two-person one reads as a group.
+  // Order 3: Teams sits at 2.
+  staticData: { nav: { label: "Users", order: 3, icon: User } },
   loader: async () => {
     const page = await api.listUsers({ limit: PAGE_SIZE });
     return {
@@ -315,7 +318,7 @@ function UsersScreen() {
                     </TableCell>
                   ))}
                   <TableCell className={RESOURCE_CELL}>
-                    <UserStatusBadge status={user.status} />
+                    <StatusBadge status={user.status} />
                   </TableCell>
                   <TableCell className={`${RESOURCE_CELL} text-foreground truncate text-sm`}>
                     {user.id}

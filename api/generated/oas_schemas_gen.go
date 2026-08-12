@@ -742,8 +742,6 @@ func (s *AuthAttemptResponseState) UnmarshalText(data []byte) error {
 type AuthMethod struct {
 	// Whether the authentication method is enabled or not.
 	Enabled bool `json:"enabled"`
-	// The position of the authentication method in the list of supported methods.
-	Position int `json:"position"`
 }
 
 // GetEnabled returns the value of Enabled.
@@ -751,19 +749,9 @@ func (s *AuthMethod) GetEnabled() bool {
 	return s.Enabled
 }
 
-// GetPosition returns the value of Position.
-func (s *AuthMethod) GetPosition() int {
-	return s.Position
-}
-
 // SetEnabled sets the value of Enabled.
 func (s *AuthMethod) SetEnabled(val bool) {
 	s.Enabled = val
-}
-
-// SetPosition sets the value of Position.
-func (s *AuthMethod) SetPosition(val int) {
-	s.Position = val
 }
 
 // A list of authentication methods supported by the user definition.
@@ -3133,6 +3121,7 @@ type CreateProjectErrorResponse struct {
 	ProjNameInvalid     ProjNameInvalid
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
+	Unavailable         Unavailable
 }
 
 // CreateProjectErrorResponseType is oneOf type of CreateProjectErrorResponse.
@@ -3149,6 +3138,7 @@ const (
 	ProjNameInvalidCreateProjectErrorResponse     CreateProjectErrorResponseType = "proj.name_invalid"
 	ReqInvalidCreateProjectErrorResponse          CreateProjectErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgCreateProjectErrorResponse    CreateProjectErrorResponseType = "enc_key.unknown_alg"
+	UnavailableCreateProjectErrorResponse         CreateProjectErrorResponseType = "unavailable"
 )
 
 // IsEncKeyDecryptFailed reports whether CreateProjectErrorResponse is EncKeyDecryptFailed.
@@ -3194,6 +3184,11 @@ func (s CreateProjectErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether CreateProjectErrorResponse is EncKeyUnknownAlg.
 func (s CreateProjectErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgCreateProjectErrorResponse
+}
+
+// IsUnavailable reports whether CreateProjectErrorResponse is Unavailable.
+func (s CreateProjectErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateProjectErrorResponse
 }
 
 // SetEncKeyDecryptFailed sets CreateProjectErrorResponse to EncKeyDecryptFailed.
@@ -3382,6 +3377,27 @@ func (s CreateProjectErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, o
 func NewEncKeyUnknownAlgCreateProjectErrorResponse(v EncKeyUnknownAlg) CreateProjectErrorResponse {
 	var s CreateProjectErrorResponse
 	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// SetUnavailable sets CreateProjectErrorResponse to Unavailable.
+func (s *CreateProjectErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateProjectErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateProjectErrorResponse is Unavailable.
+func (s CreateProjectErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateProjectErrorResponse returns new CreateProjectErrorResponse from Unavailable.
+func NewUnavailableCreateProjectErrorResponse(v Unavailable) CreateProjectErrorResponse {
+	var s CreateProjectErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -6937,6 +6953,16 @@ type FlowDefinitionStepTransitionsItem struct {
 	// is paused and resumes when the target flow completes (auto-pop).
 	// Example: login → recovery → back to login.
 	Action OptNilFlowDefinitionStepTransitionsItemAction `json:"action"`
+	// Local re-purposing. When set, taking this transition changes the
+	// flow's current purpose to this value — the dispatch mode a step's
+	// challenges run under — while the flow's original purpose stays
+	// pinned. Must be a purpose this definition serves, and `target`
+	// must be that purpose's entry step. Mutually exclusive with
+	// `action`: a transition either re-purposes within this flow or
+	// targets another flow, never both.
+	// Example: a "Sign up" navigation on the login identifier step
+	// (`{ target: register, purpose: register }`).
+	Purpose OptNilFlowDefinitionStepTransitionsItemPurpose `json:"purpose"`
 }
 
 // GetTarget returns the value of Target.
@@ -6949,6 +6975,11 @@ func (s *FlowDefinitionStepTransitionsItem) GetAction() OptNilFlowDefinitionStep
 	return s.Action
 }
 
+// GetPurpose returns the value of Purpose.
+func (s *FlowDefinitionStepTransitionsItem) GetPurpose() OptNilFlowDefinitionStepTransitionsItemPurpose {
+	return s.Purpose
+}
+
 // SetTarget sets the value of Target.
 func (s *FlowDefinitionStepTransitionsItem) SetTarget(val string) {
 	s.Target = val
@@ -6957,6 +6988,11 @@ func (s *FlowDefinitionStepTransitionsItem) SetTarget(val string) {
 // SetAction sets the value of Action.
 func (s *FlowDefinitionStepTransitionsItem) SetAction(val OptNilFlowDefinitionStepTransitionsItemAction) {
 	s.Action = val
+}
+
+// SetPurpose sets the value of Purpose.
+func (s *FlowDefinitionStepTransitionsItem) SetPurpose(val OptNilFlowDefinitionStepTransitionsItemPurpose) {
+	s.Purpose = val
 }
 
 type FlowDefinitionStepTransitionsItemAction string
@@ -6994,6 +7030,75 @@ func (s *FlowDefinitionStepTransitionsItemAction) UnmarshalText(data []byte) err
 		return nil
 	case FlowDefinitionStepTransitionsItemActionPivot:
 		*s = FlowDefinitionStepTransitionsItemActionPivot
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type FlowDefinitionStepTransitionsItemPurpose string
+
+const (
+	FlowDefinitionStepTransitionsItemPurposeLogin       FlowDefinitionStepTransitionsItemPurpose = "login"
+	FlowDefinitionStepTransitionsItemPurposeRegister    FlowDefinitionStepTransitionsItemPurpose = "register"
+	FlowDefinitionStepTransitionsItemPurposeRecovery    FlowDefinitionStepTransitionsItemPurpose = "recovery"
+	FlowDefinitionStepTransitionsItemPurposeProfiling   FlowDefinitionStepTransitionsItemPurpose = "profiling"
+	FlowDefinitionStepTransitionsItemPurposeReauth      FlowDefinitionStepTransitionsItemPurpose = "reauth"
+	FlowDefinitionStepTransitionsItemPurposeLinkAccount FlowDefinitionStepTransitionsItemPurpose = "link_account"
+)
+
+// AllValues returns all FlowDefinitionStepTransitionsItemPurpose values.
+func (FlowDefinitionStepTransitionsItemPurpose) AllValues() []FlowDefinitionStepTransitionsItemPurpose {
+	return []FlowDefinitionStepTransitionsItemPurpose{
+		FlowDefinitionStepTransitionsItemPurposeLogin,
+		FlowDefinitionStepTransitionsItemPurposeRegister,
+		FlowDefinitionStepTransitionsItemPurposeRecovery,
+		FlowDefinitionStepTransitionsItemPurposeProfiling,
+		FlowDefinitionStepTransitionsItemPurposeReauth,
+		FlowDefinitionStepTransitionsItemPurposeLinkAccount,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowDefinitionStepTransitionsItemPurpose) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowDefinitionStepTransitionsItemPurposeLogin:
+		return []byte(s), nil
+	case FlowDefinitionStepTransitionsItemPurposeRegister:
+		return []byte(s), nil
+	case FlowDefinitionStepTransitionsItemPurposeRecovery:
+		return []byte(s), nil
+	case FlowDefinitionStepTransitionsItemPurposeProfiling:
+		return []byte(s), nil
+	case FlowDefinitionStepTransitionsItemPurposeReauth:
+		return []byte(s), nil
+	case FlowDefinitionStepTransitionsItemPurposeLinkAccount:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowDefinitionStepTransitionsItemPurpose) UnmarshalText(data []byte) error {
+	switch FlowDefinitionStepTransitionsItemPurpose(data) {
+	case FlowDefinitionStepTransitionsItemPurposeLogin:
+		*s = FlowDefinitionStepTransitionsItemPurposeLogin
+		return nil
+	case FlowDefinitionStepTransitionsItemPurposeRegister:
+		*s = FlowDefinitionStepTransitionsItemPurposeRegister
+		return nil
+	case FlowDefinitionStepTransitionsItemPurposeRecovery:
+		*s = FlowDefinitionStepTransitionsItemPurposeRecovery
+		return nil
+	case FlowDefinitionStepTransitionsItemPurposeProfiling:
+		*s = FlowDefinitionStepTransitionsItemPurposeProfiling
+		return nil
+	case FlowDefinitionStepTransitionsItemPurposeReauth:
+		*s = FlowDefinitionStepTransitionsItemPurposeReauth
+		return nil
+	case FlowDefinitionStepTransitionsItemPurposeLinkAccount:
+		*s = FlowDefinitionStepTransitionsItemPurposeLinkAccount
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -9658,6 +9763,7 @@ type GetProjectErrorResponse struct {
 	ProjNotFound         ProjNotFound
 	ProjPermissionDenied ProjPermissionDenied
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 }
 
 // GetProjectErrorResponseType is oneOf type of GetProjectErrorResponse.
@@ -9671,6 +9777,7 @@ const (
 	ProjNotFoundGetProjectErrorResponse         GetProjectErrorResponseType = "proj.not_found"
 	ProjPermissionDeniedGetProjectErrorResponse GetProjectErrorResponseType = "proj.permission_denied"
 	ReqInvalidGetProjectErrorResponse           GetProjectErrorResponseType = "req.invalid"
+	UnavailableGetProjectErrorResponse          GetProjectErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetProjectErrorResponse is AuthUnauthorized.
@@ -9699,6 +9806,11 @@ func (s GetProjectErrorResponse) IsProjPermissionDenied() bool {
 // IsReqInvalid reports whether GetProjectErrorResponse is ReqInvalid.
 func (s GetProjectErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetProjectErrorResponse
+}
+
+// IsUnavailable reports whether GetProjectErrorResponse is Unavailable.
+func (s GetProjectErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetProjectErrorResponse
 }
 
 // SetAuthUnauthorized sets GetProjectErrorResponse to AuthUnauthorized.
@@ -9824,6 +9936,27 @@ func (s GetProjectErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetProjectErrorResponse(v ReqInvalid) GetProjectErrorResponse {
 	var s GetProjectErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetProjectErrorResponse to Unavailable.
+func (s *GetProjectErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetProjectErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetProjectErrorResponse is Unavailable.
+func (s GetProjectErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetProjectErrorResponse returns new GetProjectErrorResponse from Unavailable.
+func NewUnavailableGetProjectErrorResponse(v Unavailable) GetProjectErrorResponse {
+	var s GetProjectErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -15206,6 +15339,69 @@ func (o OptNilFlowDefinitionStepTransitionsItemAction) Or(d FlowDefinitionStepTr
 	return d
 }
 
+// NewOptNilFlowDefinitionStepTransitionsItemPurpose returns new OptNilFlowDefinitionStepTransitionsItemPurpose with value set to v.
+func NewOptNilFlowDefinitionStepTransitionsItemPurpose(v FlowDefinitionStepTransitionsItemPurpose) OptNilFlowDefinitionStepTransitionsItemPurpose {
+	return OptNilFlowDefinitionStepTransitionsItemPurpose{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilFlowDefinitionStepTransitionsItemPurpose is optional nullable FlowDefinitionStepTransitionsItemPurpose.
+type OptNilFlowDefinitionStepTransitionsItemPurpose struct {
+	Value FlowDefinitionStepTransitionsItemPurpose
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilFlowDefinitionStepTransitionsItemPurpose was set.
+func (o OptNilFlowDefinitionStepTransitionsItemPurpose) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilFlowDefinitionStepTransitionsItemPurpose) Reset() {
+	var v FlowDefinitionStepTransitionsItemPurpose
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilFlowDefinitionStepTransitionsItemPurpose) SetTo(v FlowDefinitionStepTransitionsItemPurpose) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilFlowDefinitionStepTransitionsItemPurpose) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilFlowDefinitionStepTransitionsItemPurpose) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v FlowDefinitionStepTransitionsItemPurpose
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilFlowDefinitionStepTransitionsItemPurpose) Get() (v FlowDefinitionStepTransitionsItemPurpose, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilFlowDefinitionStepTransitionsItemPurpose) Or(d FlowDefinitionStepTransitionsItemPurpose) FlowDefinitionStepTransitionsItemPurpose {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilPageToken returns new OptNilPageToken with value set to v.
 func NewOptNilPageToken(v PageToken) OptNilPageToken {
 	return OptNilPageToken{
@@ -17119,6 +17315,52 @@ func (o OptURI) Or(d url.URL) url.URL {
 	return d
 }
 
+// NewOptUnavailableDetails returns new OptUnavailableDetails with value set to v.
+func NewOptUnavailableDetails(v UnavailableDetails) OptUnavailableDetails {
+	return OptUnavailableDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUnavailableDetails is optional UnavailableDetails.
+type OptUnavailableDetails struct {
+	Value UnavailableDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUnavailableDetails was set.
+func (o OptUnavailableDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUnavailableDetails) Reset() {
+	var v UnavailableDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUnavailableDetails) SetTo(v UnavailableDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUnavailableDetails) Get() (v UnavailableDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUnavailableDetails) Or(d UnavailableDetails) UnavailableDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserAlreadyExistsDetails returns new OptUserAlreadyExistsDetails with value set to v.
 func NewOptUserAlreadyExistsDetails(v UserAlreadyExistsDetails) OptUserAlreadyExistsDetails {
 	return OptUserAlreadyExistsDetails{
@@ -18916,6 +19158,7 @@ type QuerySessionsErrorResponse struct {
 	AuthUnauthorized     AuthUnauthorized
 	Internal             Internal
 	NotImplemented       NotImplemented
+	ProjMissingID        ProjMissingID
 	ReqInvalid           ReqInvalid
 	SessNotFound         SessNotFound
 	SessPermissionDenied SessPermissionDenied
@@ -18929,6 +19172,7 @@ const (
 	AuthUnauthorizedQuerySessionsErrorResponse     QuerySessionsErrorResponseType = "auth.unauthorized"
 	InternalQuerySessionsErrorResponse             QuerySessionsErrorResponseType = "internal"
 	NotImplementedQuerySessionsErrorResponse       QuerySessionsErrorResponseType = "not_implemented"
+	ProjMissingIDQuerySessionsErrorResponse        QuerySessionsErrorResponseType = "proj.missing_id"
 	ReqInvalidQuerySessionsErrorResponse           QuerySessionsErrorResponseType = "req.invalid"
 	SessNotFoundQuerySessionsErrorResponse         QuerySessionsErrorResponseType = "sess.not_found"
 	SessPermissionDeniedQuerySessionsErrorResponse QuerySessionsErrorResponseType = "sess.permission_denied"
@@ -18947,6 +19191,11 @@ func (s QuerySessionsErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether QuerySessionsErrorResponse is NotImplemented.
 func (s QuerySessionsErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedQuerySessionsErrorResponse
+}
+
+// IsProjMissingID reports whether QuerySessionsErrorResponse is ProjMissingID.
+func (s QuerySessionsErrorResponse) IsProjMissingID() bool {
+	return s.Type == ProjMissingIDQuerySessionsErrorResponse
 }
 
 // IsReqInvalid reports whether QuerySessionsErrorResponse is ReqInvalid.
@@ -19024,6 +19273,27 @@ func (s QuerySessionsErrorResponse) GetNotImplemented() (v NotImplemented, ok bo
 func NewNotImplementedQuerySessionsErrorResponse(v NotImplemented) QuerySessionsErrorResponse {
 	var s QuerySessionsErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjMissingID sets QuerySessionsErrorResponse to ProjMissingID.
+func (s *QuerySessionsErrorResponse) SetProjMissingID(v ProjMissingID) {
+	s.Type = ProjMissingIDQuerySessionsErrorResponse
+	s.ProjMissingID = v
+}
+
+// GetProjMissingID returns ProjMissingID and true boolean if QuerySessionsErrorResponse is ProjMissingID.
+func (s QuerySessionsErrorResponse) GetProjMissingID() (v ProjMissingID, ok bool) {
+	if !s.IsProjMissingID() {
+		return v, false
+	}
+	return s.ProjMissingID, true
+}
+
+// NewProjMissingIDQuerySessionsErrorResponse returns new QuerySessionsErrorResponse from ProjMissingID.
+func NewProjMissingIDQuerySessionsErrorResponse(v ProjMissingID) QuerySessionsErrorResponse {
+	var s QuerySessionsErrorResponse
+	s.SetProjMissingID(v)
 	return s
 }
 
@@ -20437,7 +20707,8 @@ func (s *SessTokenInvalidDetails) init() SessTokenInvalidDetails {
 // Field to filter sessions by:
 // - `created_at`: RFC3339 timestamp
 // - `user_id`: user id
-// - `state`: one of `building`, `active`, `expired`.
+// - `state`: one of `building`, `active`, `expired`. State is computed at read
+// time, so a session expiring mid-request can match `active` but return `expired`.
 // Ref: #
 type SessionFilterField string
 
@@ -20499,7 +20770,7 @@ type SessionResponse struct {
 	SessionID SessionID `json:"session_id"`
 	ProjectID ProjectID `json:"project_id"`
 	// Current lifecycle state of the session:
-	// - `building`: has a user factor but is still gathering authentication factors
+	// - `building`: no verified authentication factors yet
 	// - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
 	// factors age
 	// - `expired`: TTL elapsed.
@@ -20705,7 +20976,7 @@ func (s *SessionResponseMetadata) init() SessionResponseMetadata {
 }
 
 // Current lifecycle state of the session:
-// - `building`: has a user factor but is still gathering authentication factors
+// - `building`: no verified authentication factors yet
 // - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
 // factors age
 // - `expired`: TTL elapsed.
@@ -21408,6 +21679,7 @@ type SubmitFlowStepErrorResponse struct {
 	PkregNotFound       PkregNotFound
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
+	Unavailable         Unavailable
 	UserAlreadyExists   UserAlreadyExists
 	UserInvalid         UserInvalid
 	UserNotFound        UserNotFound
@@ -21440,6 +21712,7 @@ const (
 	PkregNotFoundSubmitFlowStepErrorResponse       SubmitFlowStepErrorResponseType = "pkreg.not_found"
 	ReqInvalidSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgSubmitFlowStepErrorResponse    SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UnavailableSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "unavailable"
 	UserAlreadyExistsSubmitFlowStepErrorResponse   SubmitFlowStepErrorResponseType = "user.already_exists"
 	UserInvalidSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "user.invalid"
 	UserNotFoundSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "user.not_found"
@@ -21553,6 +21826,11 @@ func (s SubmitFlowStepErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether SubmitFlowStepErrorResponse is EncKeyUnknownAlg.
 func (s SubmitFlowStepErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgSubmitFlowStepErrorResponse
+}
+
+// IsUnavailable reports whether SubmitFlowStepErrorResponse is Unavailable.
+func (s SubmitFlowStepErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableSubmitFlowStepErrorResponse
 }
 
 // IsUserAlreadyExists reports whether SubmitFlowStepErrorResponse is UserAlreadyExists.
@@ -22032,6 +22310,27 @@ func NewEncKeyUnknownAlgSubmitFlowStepErrorResponse(v EncKeyUnknownAlg) SubmitFl
 	return s
 }
 
+// SetUnavailable sets SubmitFlowStepErrorResponse to Unavailable.
+func (s *SubmitFlowStepErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableSubmitFlowStepErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if SubmitFlowStepErrorResponse is Unavailable.
+func (s SubmitFlowStepErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from Unavailable.
+func NewUnavailableSubmitFlowStepErrorResponse(v Unavailable) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // SetUserAlreadyExists sets SubmitFlowStepErrorResponse to UserAlreadyExists.
 func (s *SubmitFlowStepErrorResponse) SetUserAlreadyExists(v UserAlreadyExists) {
 	s.Type = UserAlreadyExistsSubmitFlowStepErrorResponse
@@ -22481,6 +22780,59 @@ func (s *TknInvalidTknid) SetDetails(val OptTknInvalidTknidDetails) {
 type TknInvalidTknidDetails map[string]jx.Raw
 
 func (s *TknInvalidTknidDetails) init() TknInvalidTknidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type Unavailable struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUnavailableDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *Unavailable) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *Unavailable) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *Unavailable) GetDetails() OptUnavailableDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *Unavailable) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *Unavailable) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *Unavailable) SetDetails(val OptUnavailableDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UnavailableDetails map[string]jx.Raw
+
+func (s *UnavailableDetails) init() UnavailableDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
