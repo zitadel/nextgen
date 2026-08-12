@@ -1,11 +1,18 @@
 import { frameworkForId, frameworkIds } from "./frameworks.mjs";
 
+// The pre-existing-app lane covers the widget posture (ADR 044), which is
+// scoped to the route-based frameworks: only their patchers leave the host
+// app a shell for the widget to embed into. Mirrors ROUTE_BASED_FRAMEWORKS
+// in apps/cli/src/lib/orca/patchers/posture.ts.
+const PREEXISTING_FRAMEWORK_IDS = ["next", "nuxt"];
+
 export function parseLocalJourneyArgs(args) {
   const parsed = {
     concurrency: 5,
     frameworkIds: [...frameworkIds],
     image: "",
     keep: false,
+    preexistingApp: false,
     preset: "",
     runtime: "binary",
     suite: "frameworks",
@@ -63,6 +70,10 @@ export function parseLocalJourneyArgs(args) {
         parsed.tarballsDir = readValue(args, ++index, arg);
         break;
       }
+      case "--preexisting-app": {
+        parsed.preexistingApp = true;
+        break;
+      }
       case "--keep": {
         parsed.keep = true;
         break;
@@ -90,9 +101,29 @@ export function parseLocalJourneyArgs(args) {
         "--suite testkit runs a fixed next app; drop --framework (the SDK matrix is the frameworks suite's job)",
       );
     }
+    if (parsed.preexistingApp) {
+      throw new Error(
+        "--preexisting-app applies to the frameworks suite only; the testkit suite always scaffolds fresh",
+      );
+    }
     // The testkit consumer journey scaffolds one next app and runs the
     // @zitadel/testing suite inside it.
     parsed.frameworkIds = ["next"];
+  }
+  if (parsed.preexistingApp) {
+    if (explicitFramework) {
+      const unsupported = parsed.frameworkIds.filter(
+        (id) => !PREEXISTING_FRAMEWORK_IDS.includes(id),
+      );
+      if (unsupported.length > 0) {
+        throw new Error(
+          `--preexisting-app supports ${PREEXISTING_FRAMEWORK_IDS.join(" and ")} only ` +
+            `(the widget posture is scoped to route-based frameworks, ADR 044), got ${unsupported.join(", ")}`,
+        );
+      }
+    } else {
+      parsed.frameworkIds = [...PREEXISTING_FRAMEWORK_IDS];
+    }
   }
 
   return parsed;

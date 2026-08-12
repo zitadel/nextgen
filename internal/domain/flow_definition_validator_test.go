@@ -145,7 +145,6 @@ var tenantUserSchema = []byte(`{
       "title": "Email Address",
       "type": "string",
       "format": "email",
-      "x-identifier": true,
       "x-unique": "project"
     }
   }
@@ -1651,4 +1650,91 @@ func TestValidator_PasskeyActionsAcceptedWhenSchemaEnablesPasskey(t *testing.T) 
 	assert.NoError(t, err)
 	_, err = domain.ValidateFlowDefinition(schema, passkeyActionFlow("enroll", domain.FlowActionKindPasskeyRegister))
 	assert.NoError(t, err)
+}
+
+// purposedNavDef builds a two-purpose definition whose identifier step
+// carries a navigate action with a purposed transition; mutate overrides
+// the transition before validation.
+func purposedNavDef(mutate func(t *domain.FlowStepTransition)) domain.FlowDefinition {
+	tr := domain.FlowStepTransition{
+		Target:  "register",
+		Purpose: gu.Ptr(domain.FlowDefinitionPurposeRegister),
+	}
+	if mutate != nil {
+		mutate(&tr)
+	}
+	return domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/idpw-user.json",
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeLogin:    "identifier",
+			domain.FlowDefinitionPurposeRegister: "register",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "identifier", Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: "register", Kind: domain.FlowActionKindNavigate},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit":                               {Target: "done"},
+					"register":                             tr,
+					domain.FlowImplicitOutcomeUserNotFound: {Target: "register"},
+				},
+			},
+			{
+				Name: "register", Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					"submit": {Target: "done"},
+					domain.FlowImplicitOutcomeUserAlreadyExists: {Target: "identifier"},
+				},
+			},
+			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
+		},
+	}
+}
+
+// A well-formed purposed navigation — to a served purpose, targeting its
+// entry step, without a cross-flow action — validates.
+func TestValidator_TransitionPurposeAccepted(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	_, err := domain.ValidateFlowDefinition(schema, purposedNavDef(nil))
+	require.NoError(t, err)
+}
+
+// A transition cannot both re-purpose locally and target another flow.
+func TestValidator_TransitionPurposeWithActionRejected(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := purposedNavDef(func(tr *domain.FlowStepTransition) {
+		tr.Action = gu.Ptr(domain.Switch)
+	})
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), "declares both purpose and action")
+}
+
+// The declared purpose must be one this definition serves.
+func TestValidator_TransitionPurposeNotServedRejected(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := purposedNavDef(func(tr *domain.FlowStepTransition) {
+		tr.Purpose = gu.Ptr(domain.FlowDefinitionPurposeRecovery)
+	})
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), `re-purposes to "recovery", which this definition does not serve`)
+}
+
+// The purposed transition must land on the declared purpose's entry step.
+func TestValidator_TransitionPurposeWrongTargetRejected(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := purposedNavDef(func(tr *domain.FlowStepTransition) {
+		tr.Target = "done"
+	})
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), `must target that purpose's entry step "register"`)
 }

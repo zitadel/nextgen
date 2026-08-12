@@ -66,7 +66,7 @@ x-auth-methods:
   passkey:  { enabled: true, position: 0 }
 required: [email, given_name, family_name, password]
 properties:
-  email:       { type: string, format: email, x-unique: project, x-identifier: true }
+  email:       { type: string, format: email, x-unique: project }
   given_name:  { type: string }
   family_name: { type: string }
   password:    { type: string, minLength: 8, x-password: true }   # ← credential as attribute
@@ -85,7 +85,7 @@ x-auth-methods:
   passkey:  { enabled: true, position: 0 }
 required: [email, given_name, family_name]
 properties:
-  email:       { type: string, format: email, x-unique: project, x-identifier: true }
+  email:       { type: string, format: email, x-unique: project }
   given_name:  { type: string }
   family_name: { type: string }
 ```

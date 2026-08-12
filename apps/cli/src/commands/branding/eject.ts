@@ -129,7 +129,7 @@ export default class BrandingEject extends BaseCommand {
       options: [
         { value: "centered", label: "Centered", hint: "the bundled default, card centred on page" },
         { value: "split", label: "Split", hint: "brand panel left, form right" },
-        { value: "split-right", label: "Split (right)", hint: "form left, brand panel right" },
+        { value: "split-right", label: "Split (reversed)", hint: "form left, brand panel right" },
         { value: "hero", label: "Hero", hint: "landing-style brand pane left, form right" },
         { value: "minimal", label: "Minimal", hint: "no card chrome, fields straight on the page" },
       ],

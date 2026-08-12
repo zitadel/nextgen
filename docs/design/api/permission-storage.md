@@ -78,8 +78,11 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
 - **Resolver (#423 library):** `AuthzResolverStatements` (`CheckAuthz` returns
   allowed+foothold in one round-trip, `ListAuthzObjectIDs` as an L4/oracle
   materialization helper, foothold smoke helper, active system catalog) plus
-  `internal/authz/resolver` orchestration (`sk_team_` allowlist, decision
-  kinds). In-project management handlers call `resolver.Check` (coarse
+  `internal/authz/resolver` orchestration (`sk_team_` permission-name
+  allowlist, decision kinds). Resolver-enforced `sk_team_` **team scope**
+  (token `team_id` + outside-team deny suite) is deferred —
+  [#831](https://github.com/zitadel/nextgen/issues/831). In-project
+  management handlers call `resolver.Check` (coarse
   `project.{viewer,editor,admin}` until #420) after credential resolution.
   Management list endpoints inject an authz EXISTS **predicate** (same
   assignment/closure branches as `ListObjects`) via `service.AuthzListFilter`

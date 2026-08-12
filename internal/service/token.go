@@ -12,8 +12,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/token.mock.go . TokenService
-
 // ---- Interface -------------------------------------------------------------
 
 type TokenService interface {

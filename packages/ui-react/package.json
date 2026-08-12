@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/ui-react",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "private": true,
   "description": "Paired React implementations of @zitadel/components Lit atoms. Visually identical, consume @zitadel/design-tokens, used by the internal Zitadel console.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/ui-react#readme",

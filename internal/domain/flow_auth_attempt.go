@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_auth_attempt.mock.go . FlowAuthAttemptService
-
 // FlowAuthAttemptService is the [FlowStateMachine]'s narrow view of the
 // auth-attempt domain. Submit* calls collapse the underlying
 // issue-then-verify cycle so the state machine never sees challenge
