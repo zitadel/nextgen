@@ -9,3 +9,19 @@
 .zr-card ::slotted([slot="footer"]) {
   margin: 0;
 }
+
+/* suppress-header (stamped by the orchestrator / bound by zitadel-session):
+   pull the header region out of the flex flow so the card keeps no blank
+   header band, while the slotted heading stays in the accessibility tree —
+   screen-reader-only, not display:none. */
+:host([data-suppress-header]) .zr-card__header {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
