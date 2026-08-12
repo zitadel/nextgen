@@ -89,7 +89,9 @@ export default defineConfig(({ command, mode, isPreview }) => ({
 
 function devApiProxy(mode: string): Record<string, ProxyOptions> {
   // Public, browser-safe var (VITE_ prefixed): the API base the SDK client
-  // targets (`VITE_CONSOLE_API_BASE`, default `/api`).
+  // targets. `/api` is this proxy's own path and applies to the dev server
+  // only — the built console targets the origin root, where the Go binary
+  // serves the API (`src/api/zitadel.ts`, Console ADR 0002 §4).
   const env = loadEnv(mode, import.meta.dirname, "VITE_");
   const apiBase = env.VITE_CONSOLE_API_BASE || defaultApiBase;
   // Node-only vars — deliberately NOT VITE_ prefixed, so they are never

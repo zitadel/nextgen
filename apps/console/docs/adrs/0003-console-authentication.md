@@ -1,8 +1,9 @@
 # Console ADR 0003: Console authentication via the embedded login widget
 
 > **Status:** Proposed
-> **Date:** 2026-07-23
-> **Scope:** `apps/console` (plus one recorded Go-server dependency). See
+> **Date:** 2026-07-23 (revised 2026-08-12 — §4/Consequences: the ADR 0002
+> `/api` shim this ADR narrowed was withdrawn, not built)
+> **Scope:** `apps/console`. See
 > [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Follows the forward-looking slot recorded in
 > [Console ADR 0002 §5](0002-console-api-access.md).
@@ -109,12 +110,15 @@ until the permission model (root ADRs 032/033/036) lands. Consequences:
   because the request then carries an `Authorization` header, the dev proxy
   never stamps the secret onto the sign-in path. The injected secret
   remains for operator-plane (management) requests only.
-- The production Go `/api` shim (the ADR 0002 "dependency to track", still
-  open) should follow the same interim shape: validate the
-  `__nextgen_session` cookie, then attach the server-held project secret for
-  management routes. When session-derived, permission-checked authority
-  ships server-side, the secret disappears from both proxies — that switch
-  is a config change in the proxies, not a console rewrite.
+- ~~The production Go `/api` shim should follow the same interim shape~~
+  *(Revised 2026-08-12: the shim was withdrawn — ADR 0002 §1, revised. There
+  is no production proxy to attach the secret: the deployed console reaches
+  the API at the origin root with the session cookie, plus the publishable
+  key on the sign-in path. Management routes stay unauthorized in a deployed
+  build until session-derived, permission-checked authority ships
+  server-side (root ADRs 032/033); the dev proxy remains the only
+  secret-injection point, and when that authority lands the secret
+  disappears from it — a config change, not a console rewrite.)*
 
 ### 5. Recorded caveats
 
@@ -140,12 +144,13 @@ until the permission model (root ADRs 032/033/036) lands. Consequences:
   client only.
 - `AppShell` moves from `__root` to `_authed`; screens keep their URLs
   (pathless layout) and their loaders/boundaries (ADR 0001) untouched.
-- The secret's remaining uses are both server-side (dev proxy env, future Go
-  shim config); the browser bundle still never contains it (ADR 005 holds).
-- **Dependency to track (unchanged from ADR 0002):** a deployed console
-  still needs the Go `/api` mount. This ADR narrows its spec: strip the
-  `/api` prefix, forward the cookie, attach the management bearer server-side
-  until session-scoped authorization exists.
+- The secret's remaining use is server-side (dev proxy env); the browser
+  bundle still never contains it (ADR 005 holds).
+- **~~Dependency to track~~ resolved 2026-08-12 by withdrawal (ADR 0002):**
+  no Go `/api` mount exists or is planned — the deployed console calls the
+  API at the origin root. The deployed management surface now waits on
+  session-derived permissions (root ADRs 032/033) rather than on a
+  secret-injecting mount.
 - Tests: the `_authed` guard is covered by `src/routes/auth-guard.spec.tsx`;
   existing screen specs mock `@/auth/session` and run as signed-in.
 
