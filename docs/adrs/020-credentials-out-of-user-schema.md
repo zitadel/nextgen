@@ -62,8 +62,8 @@ $schema: https://json-schema.org/draft/2020-12/schema
 kind: user-schema
 metaSchema: https://nextgen.com/api/schemas/user-schema-v1.0.json
 x-auth-methods:
-  password: { enabled: true, position: 1 }
-  passkey:  { enabled: true, position: 0 }
+  password: { enabled: true }
+  passkey:  { enabled: true }
 required: [email, given_name, family_name, password]
 properties:
   email:       { type: string, format: email, x-unique: project, x-identifier: true }
@@ -81,8 +81,8 @@ $schema: https://json-schema.org/draft/2020-12/schema
 kind: user-schema
 metaSchema: https://nextgen.com/api/schemas/user-schema-v1.1.json
 x-auth-methods:
-  password: { enabled: true, position: 1 }
-  passkey:  { enabled: true, position: 0 }
+  password: { enabled: true }
+  passkey:  { enabled: true }
 required: [email, given_name, family_name]
 properties:
   email:       { type: string, format: email, x-unique: project, x-identifier: true }
