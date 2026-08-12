@@ -143,15 +143,15 @@ func teamFilter(f Filter) (database.Filter[domain.TeamField], error) {
 	case teamFieldCreatedAt:
 		return createdAtFilter(f.Operation, database.Col(domain.TeamFieldCreatedAt), f.Value)
 	case teamFieldName:
-		value, ok := f.Value.(string)
-		if !ok {
-			return nil, domain.ErrRequestInvalid().WithDetails("name filter value must be a string")
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
 		}
 		return stringFilter(f.Operation, database.Col(domain.TeamFieldName), value)
 	case teamFieldStatus:
-		value, ok := f.Value.(string)
-		if !ok {
-			return nil, domain.ErrRequestInvalid().WithDetails("status filter value must be a string")
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
 		}
 		return teamStatusFilter(f.Operation, value)
 	default:

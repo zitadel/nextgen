@@ -143,6 +143,16 @@ func compareFilter[F ~uint8](op string, col database.Column[F], value any) (data
 	}
 }
 
+// stringFilterValue asserts the filter's value is a string, naming the field
+// in the error detail.
+func stringFilterValue(f Filter) (string, error) {
+	value, ok := f.Value.(string)
+	if !ok {
+		return "", domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("%s filter value must be a string", f.Field))
+	}
+	return value, nil
+}
+
 // stringFilter maps an operation to a text filter.
 func stringFilter[F ~uint8](op string, col database.Column[F], value string) (database.Filter[F], error) {
 	switch op {
