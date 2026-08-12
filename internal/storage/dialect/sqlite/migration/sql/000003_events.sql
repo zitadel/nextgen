@@ -1,7 +1,9 @@
 -- +goose Up
 -- +goose StatementBegin
+-- project_id is an opaque tenancy scope (ADR 048), not a live FK: hard-deleting
+-- a project must leave audit history (incl. project.deleted) for retention to purge.
 CREATE TABLE events (
-    project_id          TEXT    NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
+    project_id          TEXT    NOT NULL,
     id                  TEXT    NOT NULL CHECK (id <> ''),
     event_type          TEXT    NOT NULL,
     category            TEXT    NOT NULL,

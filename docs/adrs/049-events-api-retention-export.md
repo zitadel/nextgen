@@ -370,6 +370,9 @@ Per [ADR 046](046-claim-lifecycle-v2.md) and
   `(type, url)`. Changing a webhook URL re-keys the sink and re-ships retained
   history from epoch for that new id. Sinks removed from config leave their
   `event_sinks` row and cursors behind (no auto-disable in v1).
+- **Deleted-project export gap:** `events.project_id` is not a live FK, so audit
+  rows survive hard delete, but the shipper only walks claimed live projects —
+  post-delete history is not re-exported in v1 (retention still purges by age).
 - **Request event volume:** high-traffic projects generate large `/events`
   result sets when filtering `category=request`; operators should prefer SIEM
   export over repeated full scans.

@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -80,6 +81,11 @@ func (s *Shipper) Start(ctx context.Context) error {
 		if sc.Type == "" {
 			continue
 		}
+		switch sc.Type {
+		case domain.EventSinkTypeStdout, domain.EventSinkTypeWebhook:
+		default:
+			return fmt.Errorf("unsupported event sink type %q", sc.Type)
+		}
 		// v1 always enables configured sink types (Enabled flag is reserved).
 		sink := &domain.EventSink{
 			ID:      deploymentSinkID(sc.Type, sc.URL),
@@ -145,34 +151,46 @@ func (s *Shipper) shipProject(ctx context.Context, sink *domain.EventSink, proje
 		}
 	}
 
-	batch, err := s.src.ListEventsAfterCursor(ctx, projectID, cursor.LastCreatedAt, cursor.LastEventID, 100)
-	if err != nil {
-		slog.Error("event shipper: list after cursor failed",
-			slog.String("sink_id", sink.ID),
-			slog.String("project_id", projectID),
-			slog.String("error", err.Error()),
-		)
-		return
-	}
-	for _, ev := range batch {
-		if err := s.deliver(ctx, sink, ev); err != nil {
-			slog.Error("event shipper: deliver failed",
+	const pageSize = 100
+	for {
+		if err := ctx.Err(); err != nil {
+			return
+		}
+		batch, err := s.src.ListEventsAfterCursor(ctx, projectID, cursor.LastCreatedAt, cursor.LastEventID, pageSize)
+		if err != nil {
+			slog.Error("event shipper: list after cursor failed",
 				slog.String("sink_id", sink.ID),
 				slog.String("project_id", projectID),
-				slog.String("event_id", ev.ID),
 				slog.String("error", err.Error()),
 			)
 			return
 		}
-		cursor.LastCreatedAt = ev.CreatedAt
-		cursor.LastEventID = ev.ID
-		if err := s.src.UpsertEventSinkCursor(ctx, cursor); err != nil {
-			slog.Error("event shipper: upsert cursor failed",
-				slog.String("sink_id", sink.ID),
-				slog.String("project_id", projectID),
-				slog.String("event_id", ev.ID),
-				slog.String("error", err.Error()),
-			)
+		if len(batch) == 0 {
+			return
+		}
+		for _, ev := range batch {
+			if err := s.deliver(ctx, sink, ev); err != nil {
+				slog.Error("event shipper: deliver failed",
+					slog.String("sink_id", sink.ID),
+					slog.String("project_id", projectID),
+					slog.String("event_id", ev.ID),
+					slog.String("error", err.Error()),
+				)
+				return
+			}
+			cursor.LastCreatedAt = ev.CreatedAt
+			cursor.LastEventID = ev.ID
+			if err := s.src.UpsertEventSinkCursor(ctx, cursor); err != nil {
+				slog.Error("event shipper: upsert cursor failed",
+					slog.String("sink_id", sink.ID),
+					slog.String("project_id", projectID),
+					slog.String("event_id", ev.ID),
+					slog.String("error", err.Error()),
+				)
+				return
+			}
+		}
+		if len(batch) < pageSize {
 			return
 		}
 	}
@@ -204,7 +222,7 @@ func (s *Shipper) deliver(ctx context.Context, sink *domain.EventSink, ev *domai
 		}
 		return nil
 	default:
-		return nil
+		return fmt.Errorf("unsupported event sink type %q", sink.Type)
 	}
 }
 

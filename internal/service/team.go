@@ -209,8 +209,12 @@ func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (*domai
 // unknown or already-deactivated team reports success without persisting any changes.
 func (s *TeamService) Delete(ctx context.Context, projectID, teamID string) error {
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().DeactivateTeam(ctx, projectID, teamID); err != nil {
+		changed, err := tx.Statements().DeactivateTeam(ctx, projectID, teamID)
+		if err != nil {
 			return err
+		}
+		if !changed {
+			return nil
 		}
 		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
 			Type:       domain.EventTypeTeamDeactivated,

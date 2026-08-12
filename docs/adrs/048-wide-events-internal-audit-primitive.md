@@ -509,6 +509,10 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 - **Best-effort Path A:** crash before drain, overflow drop, or flush give-up
   can lose `request` events; Path B remains TX-safe. Metrics and alerts are
   required.
+- **No live project FK on `events`:** `project_id` is an opaque tenancy scope.
+  Hard-deleting a project leaves audit rows (including `project.deleted`) for
+  retention to purge. The shipper iterates **live claimed projects**, so
+  post-delete rows are not re-exported after the project disappears (v1).
 - **Missing InsertEvent:** statement methods that mutate state but forget
   `InsertEvent` create coverage gaps — catch via review and
   [`stmttest`](041-storage-statement-contract-tests.md) contract coverage when

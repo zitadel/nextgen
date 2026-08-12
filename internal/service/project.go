@@ -406,16 +406,19 @@ func (s *projectService) Delete(ctx context.Context, id string) error {
 		return domain.ErrProjectMissingID()
 	}
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().DeleteProjectByID(ctx, id); err != nil {
-			return err
-		}
-		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+		// Emit before hard-delete: events.project_id is not an FK (audit must
+		// outlive the project row). Order still matters if a future migration
+		// reintroduces a non-cascade FK.
+		if err := audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
 			Type:       domain.EventTypeProjectDeleted,
 			Category:   domain.EventCategoryEntity,
 			ProjectID:  id,
 			EntityType: "project",
 			EntityID:   id,
-		})
+		}); err != nil {
+			return err
+		}
+		return tx.Statements().DeleteProjectByID(ctx, id)
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {

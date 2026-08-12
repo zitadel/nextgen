@@ -122,10 +122,10 @@ type TeamStatements interface {
 	// via Statements(), joins an outer pool.Transaction when already nested).
 	//
 	// Only an active team is deactivated: the team UPDATE is guarded on the status,
-	// and a zero-row result skips the cascade and reports success. An unknown or
-	// already-deactivated team is therefore a no-op;
+	// and a zero-row result skips the cascade and reports success with changed=false.
+	// An unknown or already-deactivated team is therefore a no-op;
 	// updated_at records when the team was first deactivated.
-	DeactivateTeam(ctx context.Context, projectID, id string) error
+	DeactivateTeam(ctx context.Context, projectID, id string) (changed bool, err error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

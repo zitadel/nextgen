@@ -135,3 +135,32 @@ type flushableWriter struct {
 }
 
 func (w *flushableWriter) Flush() { w.flushCalls++ }
+
+type failingInserter struct {
+	calls int
+}
+
+func (f *failingInserter) InsertEvents(context.Context, []*domain.Event) error {
+	f.calls++
+	return assert.AnError
+}
+
+func TestRequestBuffer_FlushFailureDropsAndCounts(t *testing.T) {
+	ins := &failingInserter{}
+	buf := NewRequestBuffer(ins, RequestBufferConfig{
+		BatchSize:     2,
+		Capacity:      100,
+		HighWatermark: 0.9,
+		MaxAge:        time.Hour,
+		FlushInterval: time.Hour,
+	})
+	defer buf.Close()
+
+	buf.Enqueue(&domain.Event{ProjectID: "proj_1", EventType: domain.EventTypeRequestAPI, Category: domain.EventCategoryRequest})
+	buf.Enqueue(&domain.Event{ProjectID: "proj_1", EventType: domain.EventTypeRequestAPI, Category: domain.EventCategoryRequest})
+
+	require.Eventually(t, func() bool { return buf.Dropped() >= 2 }, 2*time.Second, 20*time.Millisecond)
+	assert.Equal(t, uint64(0), buf.Flushed())
+	assert.Equal(t, 0, buf.Len())
+	assert.Equal(t, 3, ins.calls)
+}

@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -212,4 +213,74 @@ func TestShipper_SkipsWhenNoClaimedProjects(t *testing.T) {
 	}}
 	s.shipOnce()
 	assert.Empty(t, src.upserts)
+}
+
+func TestShipper_StartRejectsUnsupportedSinkType(t *testing.T) {
+	t.Parallel()
+	src := newFakeExportSource(nil, nil)
+	s := NewShipper(src, ExportConfig{
+		Enabled:  true,
+		Interval: time.Hour,
+		Sinks:    []SinkConfig{{Type: "webhkok", URL: "https://example.invalid/hook"}},
+	})
+	err := s.Start(t.Context())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported event sink type")
+	assert.Empty(t, s.sinks)
+}
+
+func TestShipper_UnsupportedSinkTypeDoesNotAdvanceCursor(t *testing.T) {
+	t.Parallel()
+	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	src := newFakeExportSource([]string{"proj_a"}, map[string][]*domain.Event{
+		"proj_a": {
+			{ProjectID: "proj_a", ID: "evt_1", CreatedAt: t0, EventType: domain.EventTypeUserCreated, Category: domain.EventCategoryEntity},
+		},
+	})
+	s := NewShipper(src, ExportConfig{Enabled: true, Interval: time.Hour})
+	s.sinks = []*domain.EventSink{{
+		ID:      "sink_bad",
+		Type:    domain.EventSinkType("webhkok"),
+		Enabled: true,
+	}}
+	s.shipOnce()
+	assert.Empty(t, src.upserts)
+}
+
+func TestShipper_DrainsMultiplePagesInOneTick(t *testing.T) {
+	t.Parallel()
+	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	events := make([]*domain.Event, 0, 150)
+	for i := 0; i < 150; i++ {
+		events = append(events, &domain.Event{
+			ProjectID:  "proj_a",
+			ID:         fmt.Sprintf("evt_%03d", i),
+			CreatedAt:  t0.Add(time.Duration(i) * time.Millisecond),
+			EventType:  domain.EventTypeUserCreated,
+			Category:   domain.EventCategoryEntity,
+		})
+	}
+	src := newFakeExportSource([]string{"proj_a"}, map[string][]*domain.Event{"proj_a": events})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := NewShipper(src, ExportConfig{Enabled: true, Interval: time.Hour})
+	s.client = srv.Client()
+	s.sinks = []*domain.EventSink{{
+		ID:      "sink_deployment_webhook",
+		Type:    domain.EventSinkTypeWebhook,
+		Scope:   domain.EventSinkScopeDeployment,
+		URL:     srv.URL,
+		Enabled: true,
+	}}
+
+	s.shipOnce()
+
+	got, err := src.GetEventSinkCursor(t.Context(), "sink_deployment_webhook", "proj_a")
+	require.NoError(t, err)
+	assert.Equal(t, "evt_149", got.LastEventID)
+	require.Len(t, src.upserts, 150)
 }

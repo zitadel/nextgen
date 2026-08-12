@@ -254,21 +254,29 @@ func TestTeamService_Delete(t *testing.T) {
 			name:   "ok",
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(nil)
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(true, nil)
+			},
+		},
+		{
+			name:   "already deactivated does not emit",
+			teamID: "team_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(false, nil)
+				// InsertEvent must not be required; AnyTimes helper still allows zero calls.
 			},
 		},
 		{
 			name:   "unknown team",
 			teamID: "missing",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "missing").Return(nil)
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "missing").Return(false, nil)
 			},
 		},
 		{
 			name:   "deactivate fails",
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(assert.AnError)
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(false, assert.AnError)
 			},
 			wantErr: domain.ErrInternal(assert.AnError),
 		},

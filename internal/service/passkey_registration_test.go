@@ -84,7 +84,16 @@ func buildTestRegistrationSvc(t *testing.T, regState *passkeyRegState, userState
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockStatementPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
+	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
+	pool.EXPECT().
+		Transaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, tx func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return tx(ctx, statementer)
+		}).
+		AnyTimes()
+	statementer.EXPECT().Statements().Return(statements).AnyTimes()
+	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	regState.expectCRUD(statements)
 	userState.expectUserPasskeys(statements)
 	return service.NewPasskeyRegistrationService(pool)

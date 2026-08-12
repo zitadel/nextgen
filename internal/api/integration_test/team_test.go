@@ -244,7 +244,8 @@ func TestGetTeam(t *testing.T) {
 			Name:      helpers.TeamName(),
 		})
 		require.NoError(t, err)
-		require.NoError(t, harness.EnsureServiceDB(t).Statements().DeactivateTeam(t.Context(), project.ID, team.ID))
+		_, err := harness.EnsureServiceDB(t).Statements().DeactivateTeam(t.Context(), project.ID, team.ID)
+		require.NoError(t, err)
 
 		params := api.GetTeamParams{
 			TeamID: api.TeamID(team.ID),
@@ -271,7 +272,8 @@ func TestGetTeam(t *testing.T) {
 			resp, err := client.GetTeam(t.Context(), params)
 			require.NoError(t, err)
 
-			require.IsType(t, &api.GetTeamNotFound{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.GetTeamNotFound{}, resp, helpers.MustMarshal(t, resp)
+		require.NoError(t, err)
 			notFound := resp.(*api.GetTeamNotFound)
 			assert.Equal(t, api.ErrorCode("team.team_not_found"), notFound.Code)
 		})
@@ -438,7 +440,8 @@ func TestUpdateTeam(t *testing.T) {
 				Name:      helpers.TeamName(),
 			})
 			require.NoError(t, err)
-			require.NoError(t, harness.EnsureServiceDB(t).Statements().DeactivateTeam(t.Context(), project.ID, team.ID))
+			_, err := harness.EnsureServiceDB(t).Statements().DeactivateTeam(t.Context(), project.ID, team.ID)
+			require.NoError(t, err)
 
 			params := api.UpdateTeamParams{
 				TeamID: api.TeamID(team.ID),
@@ -505,7 +508,8 @@ func TestUpdateTeam(t *testing.T) {
 				}
 
 				_, err := client.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(tc.teamName)}, params)
-				require.ErrorAs(t, err, new(*validate.Error))
+				require.ErrorAs(t, err, new(*validate.Error)
+			require.NoError(t, err)
 			})
 		}
 	})
@@ -723,7 +727,8 @@ func TestQueryTeams(t *testing.T) {
 		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
-	require.NoError(t, harness.EnsureServiceDB(t).Statements().DeactivateTeam(t.Context(), project.ID, deactivated.ID))
+	_, err := harness.EnsureServiceDB(t).Statements().DeactivateTeam(t.Context(), project.ID, deactivated.ID)
+	require.NoError(t, err)
 
 	queryTeams := func(t *testing.T, req *api.QueryTeamsRequest) *api.QueryTeamsResponse {
 		t.Helper()
@@ -913,7 +918,8 @@ func TestUpdateTeamRawRequest(t *testing.T) {
 			raw, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 
-			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(raw))
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(raw)
+	require.NoError(t, err)
 			details := helpers.MustUnmarshal[api.ErrorDetails](t, raw)
 			assert.Equal(t, api.ErrorCode("req.invalid"), details.Code)
 		})

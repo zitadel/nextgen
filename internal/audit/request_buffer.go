@@ -174,16 +174,28 @@ func (b *RequestBuffer) flush(batch []bufferedEvent) {
 		ev.OccurredAtWait = time.Since(item.enqueuedAt)
 		events[i] = ev
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := b.insert.InsertEvents(ctx, events); err != nil {
-		slog.Error("failed to flush request audit event batch",
-			slog.Int("batch_size", len(events)),
-			slog.String("error", err.Error()),
-		)
-		return
+	const maxAttempts = 3
+	backoff := 50 * time.Millisecond
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		lastErr = b.insert.InsertEvents(ctx, events)
+		cancel()
+		if lastErr == nil {
+			b.flushed.Add(uint64(len(events)))
+			return
+		}
+		if attempt < maxAttempts {
+			time.Sleep(backoff)
+			backoff *= 2
+		}
 	}
-	b.flushed.Add(uint64(len(events)))
+	b.dropped.Add(uint64(len(events)))
+	slog.Error("failed to flush request audit event batch; dropping after retries",
+		slog.Int("batch_size", len(events)),
+		slog.Uint64("dropped_total", b.dropped.Load()),
+		slog.String("error", lastErr.Error()),
+	)
 }
 
 // Close drains the buffer and stops the flusher.

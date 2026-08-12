@@ -1047,11 +1047,12 @@ func (c *MockAllStatementsCreateUserTOTPCall) DoAndReturn(f func(context.Context
 }
 
 // DeactivateTeam mocks base method.
-func (m *MockAllStatements) DeactivateTeam(ctx context.Context, projectID, id string) error {
+func (m *MockAllStatements) DeactivateTeam(ctx context.Context, projectID, id string) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeactivateTeam", ctx, projectID, id)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // DeactivateTeam indicates an expected call of DeactivateTeam.
@@ -1067,19 +1068,19 @@ type MockAllStatementsDeactivateTeamCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsDeactivateTeamCall) Return(arg0 error) *MockAllStatementsDeactivateTeamCall {
-	c.Call = c.Call.Return(arg0)
+func (c *MockAllStatementsDeactivateTeamCall) Return(changed bool, err error) *MockAllStatementsDeactivateTeamCall {
+	c.Call = c.Call.Return(changed, err)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeactivateTeamCall) Do(f func(context.Context, string, string) error) *MockAllStatementsDeactivateTeamCall {
+func (c *MockAllStatementsDeactivateTeamCall) Do(f func(context.Context, string, string) (bool, error)) *MockAllStatementsDeactivateTeamCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeactivateTeamCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsDeactivateTeamCall {
+func (c *MockAllStatementsDeactivateTeamCall) DoAndReturn(f func(context.Context, string, string) (bool, error)) *MockAllStatementsDeactivateTeamCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -5763,11 +5764,12 @@ func (c *MockTeamStatementsCreateTeamCall) DoAndReturn(f func(context.Context, *
 }
 
 // DeactivateTeam mocks base method.
-func (m *MockTeamStatements) DeactivateTeam(ctx context.Context, projectID, id string) error {
+func (m *MockTeamStatements) DeactivateTeam(ctx context.Context, projectID, id string) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeactivateTeam", ctx, projectID, id)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // DeactivateTeam indicates an expected call of DeactivateTeam.
@@ -5783,19 +5785,19 @@ type MockTeamStatementsDeactivateTeamCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockTeamStatementsDeactivateTeamCall) Return(arg0 error) *MockTeamStatementsDeactivateTeamCall {
-	c.Call = c.Call.Return(arg0)
+func (c *MockTeamStatementsDeactivateTeamCall) Return(changed bool, err error) *MockTeamStatementsDeactivateTeamCall {
+	c.Call = c.Call.Return(changed, err)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockTeamStatementsDeactivateTeamCall) Do(f func(context.Context, string, string) error) *MockTeamStatementsDeactivateTeamCall {
+func (c *MockTeamStatementsDeactivateTeamCall) Do(f func(context.Context, string, string) (bool, error)) *MockTeamStatementsDeactivateTeamCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockTeamStatementsDeactivateTeamCall) DoAndReturn(f func(context.Context, string, string) error) *MockTeamStatementsDeactivateTeamCall {
+func (c *MockTeamStatementsDeactivateTeamCall) DoAndReturn(f func(context.Context, string, string) (bool, error)) *MockTeamStatementsDeactivateTeamCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

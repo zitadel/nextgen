@@ -218,3 +218,39 @@ func TestEventStatements_SinkCursor(t *testing.T) {
 		assert.Equal(t, second.ID, got.LastEventID)
 	})
 }
+
+func TestEventStatements_SurviveProjectHardDelete(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, eventID := uniqueEventIDs(t)
+		project := newTestProject(projectID)
+		require.NoError(t, d.stmts.CreateProject(t.Context(), project))
+
+		prior := sampleEvent(projectID, eventID)
+		require.NoError(t, d.stmts.InsertEvent(t.Context(), prior))
+
+		deleted := &domain.Event{
+			ProjectID:  projectID,
+			EventType:  domain.EventTypeProjectDeleted,
+			Category:   domain.EventCategoryEntity,
+			EntityType: ptr("project"),
+			EntityID:   ptr(projectID),
+			ClientID:   "app_test",
+			Payload:    json.RawMessage(`{}`),
+			Metadata:   json.RawMessage(`{}`),
+		}
+		require.NoError(t, d.stmts.InsertEvent(t.Context(), deleted))
+		require.NotEmpty(t, deleted.ID)
+
+		require.NoError(t, d.stmts.DeleteProjectByID(t.Context(), projectID))
+
+		gotPrior, err := d.stmts.GetEventByID(t.Context(), projectID, eventID)
+		require.NoError(t, err)
+		assert.Equal(t, prior.EventType, gotPrior.EventType)
+
+		gotDeleted, err := d.stmts.GetEventByID(t.Context(), projectID, deleted.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.EventTypeProjectDeleted, gotDeleted.EventType)
+	})
+}
+
+func ptr[T any](v T) *T { return &v }

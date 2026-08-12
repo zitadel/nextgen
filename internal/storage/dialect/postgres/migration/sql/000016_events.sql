@@ -1,7 +1,8 @@
 -- +goose Up
+-- project_id is an opaque tenancy scope (ADR 048), not a live FK: hard-deleting
+-- a project must leave audit history (incl. project.deleted) for retention to purge.
 CREATE TABLE zitadel_nextgen.events (
     project_id          TEXT        NOT NULL
-        REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE
     , id                TEXT        NOT NULL CHECK (id <> '')
     , event_type        TEXT        NOT NULL
     , category          TEXT        NOT NULL

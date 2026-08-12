@@ -23,11 +23,9 @@ CREATE TABLE events (
     session_id          STRING(MAX),
     flow_id             STRING(MAX),
     payload             JSON        NOT NULL,
-    metadata            JSON        NOT NULL,
-    CONSTRAINT fk_events_project
-        FOREIGN KEY (project_id)
-        REFERENCES projects (id)
-        ON DELETE CASCADE
+    metadata            JSON        NOT NULL
+    -- project_id is opaque tenancy scope (ADR 048), not a live FK: hard-deleting
+    -- a project must leave audit history (incl. project.deleted) for retention.
 ) PRIMARY KEY (project_id, id)
 -- +goose StatementEnd
 
