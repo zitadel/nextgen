@@ -11,6 +11,7 @@ import {
   DEFAULT_SETUP_USE_CASE,
   SETUP_PRESETS,
   SETUP_USE_CASES,
+  type BrandingDesign,
   type SetupPreset,
   type SetupUseCase,
 } from "@zitadel/config/defaults";
@@ -18,6 +19,7 @@ import { consola } from "consola";
 
 import { claimAction, claimCommand, claimState } from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
+import { brandingGuidanceAction } from "../../lib/journey-guidance";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import {
   createOrca,
@@ -34,6 +36,7 @@ import {
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import { publicCliCommand } from "../../lib/public-cli";
+import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import {
   materializeSetupResources,
@@ -43,6 +46,7 @@ import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
   detectProjectFacts,
+  dim as styleDim,
   fileNameOf,
   formatFrameworkLine,
   id as styleId,
@@ -122,7 +126,7 @@ export default class Setup extends BaseCommand {
     }),
     design: Flags.string({
       description:
-        "Login design to eject into .zitadel/branding/ and publish as branding revision 1. When omitted, the login uses the built-in template; run the `branding eject` command later to customize.",
+        "Login design to eject into .zitadel/branding/ and publish as branding revision 1. Skips the wizard's design question. When omitted in non-interactive runs, the login uses the built-in template; run the `branding eject` command later to customize.",
       options: [...BRANDING_DESIGNS],
     }),
   };
@@ -184,6 +188,7 @@ export default class Setup extends BaseCommand {
       dev_port_explicit: flags["dev-port"] !== undefined,
       preset: flags.preset ?? DEFAULT_SETUP_PRESET,
       use_case: flags["use-case"] ?? DEFAULT_SETUP_USE_CASE,
+      design: flags.design ?? "built-in",
       step: "framework_resolved",
     });
 
@@ -213,6 +218,7 @@ export default class Setup extends BaseCommand {
       devPort: framework.devPort,
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
       useCase: (flags["use-case"] as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,
+      design: flags.design as BrandingDesign | undefined,
     };
 
     if (!nonInteractive && !dryRun) {
@@ -224,6 +230,7 @@ export default class Setup extends BaseCommand {
         devPortFromFlag: flags["dev-port"] !== undefined,
         presetFromFlag: flags.preset !== undefined,
         useCaseFromFlag: flags["use-case"] !== undefined,
+        designFromFlag: flags.design !== undefined,
       };
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);
@@ -231,10 +238,14 @@ export default class Setup extends BaseCommand {
       outro("Configuration captured");
     }
 
-    // The interactive prompts can override the flag/default preset and use
-    // case recorded at framework_resolved — re-record so telemetry carries
-    // the values that actually scaffold.
-    this.recordTelemetry({ preset: answers.preset, use_case: answers.useCase });
+    // The interactive prompts can override the flag/default preset, use
+    // case, and design recorded at framework_resolved — re-record so
+    // telemetry carries the values that actually scaffold.
+    this.recordTelemetry({
+      preset: answers.preset,
+      use_case: answers.useCase,
+      design: answers.design ?? "built-in",
+    });
 
     const issuer = issuerFromPort(answers.devPort);
     // The DevPortPrompt can change the port interactively, so fold the answer
@@ -261,19 +272,23 @@ export default class Setup extends BaseCommand {
           issuer,
           {
             // Resolved values, not raw flags: the wizard may have picked the
-            // preset or dev port interactively, and the retry must reproduce
-            // those choices — the issuer registered with the project derives
-            // from the port.
+            // preset, design, or dev port interactively, and the retry must
+            // reproduce those choices — the issuer registered with the
+            // project derives from the port.
             ...retryOptionsFromFlags(flags),
             framework: framework.id,
             preset: answers.preset,
             useCase: answers.useCase,
+            design: answers.design,
             devPort: answers.devPort,
           },
         );
     consola.success(`Created project ${project.id}`);
     this.recordTelemetry({ step: "project_created" });
 
+    // Fresh scaffolds keep the widgets' full-page chrome; a pre-existing
+    // route-based app gets embeddable cards inside its own layout (ADR 044).
+    const posture = derivePosture(framework.id, scaffoldedFramework);
     const ctx: PatchContext = {
       framework,
       rendererId: flags.renderer ?? "react",
@@ -282,6 +297,7 @@ export default class Setup extends BaseCommand {
       server: answers.server,
       cliVersion: this.meta.cliVersion,
       scaffoldedFramework,
+      posture,
       preset: answers.preset,
       useCase: answers.useCase,
     };
@@ -305,7 +321,7 @@ export default class Setup extends BaseCommand {
             force,
             preset: answers.preset,
             useCase: answers.useCase,
-            design: flags.design,
+            design: answers.design,
           });
     } catch (error) {
       // Setup is not atomic: the patcher already wrote `zitadel.json` (the
@@ -356,6 +372,7 @@ export default class Setup extends BaseCommand {
           written: [...result.filesWritten, ...result.filesSkipped],
           scaffoldedFramework,
           devPort: answers.devPort,
+          posture,
         });
       } catch (error) {
         consola.debug("Failed to record the scaffold manifest", error);
@@ -410,6 +427,7 @@ export default class Setup extends BaseCommand {
         server: answers.server,
         issuer,
         scaffoldedFramework,
+        design: answers.design,
       });
       // Frame the report in a consola box so it reads as a distinct
       // status panel separate from the per-step narration above it.
@@ -450,7 +468,16 @@ export default class Setup extends BaseCommand {
         })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
-        next_actions: [...installOutcome.nextActions, ...claimNudge.actions],
+        // The chosen login design, or null for the built-in template — so
+        // agents can verify what setup published without diffing the repo.
+        design: answers.design ?? null,
+        // Branding guidance before the claim nudge: make it yours, then
+        // claim to keep it (the same order the manifesto's journey walks).
+        next_actions: [
+          ...installOutcome.nextActions,
+          brandingGuidanceAction(answers.design, this.meta.cliVersion),
+          ...claimNudge.actions,
+        ],
         next_commands: [...installOutcome.nextCommands, ...claimNudge.commands],
       },
     });
@@ -729,8 +756,9 @@ function buildSummary(opts: {
   server: string;
   issuer: string;
   scaffoldedFramework: boolean;
+  design?: BrandingDesign;
 }): Section[] {
-  const { projectFacts, writtenRel, project, server, issuer, scaffoldedFramework } = opts;
+  const { projectFacts, writtenRel, project, server, issuer, scaffoldedFramework, design } = opts;
   const sdkPackage = "@zitadel/sdk-next";
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
@@ -764,6 +792,9 @@ function buildSummary(opts: {
     { label: "Project id", value: styleId(project.id) },
     { label: "Server", value: styleUrl(server) },
     { label: "App will run", value: styleUrl(issuer) },
+    design
+      ? { label: "Login design", value: design, secondary: stylePath(".zitadel/branding/") }
+      : { label: "Login design", value: styleDim("built-in template") },
   ];
 
   return [

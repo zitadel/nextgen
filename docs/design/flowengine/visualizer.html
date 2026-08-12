@@ -718,7 +718,6 @@ const USER_SCHEMAS = {
         "type": "string",
         "format": "email",
         "title": "Email address",
-        "x-identifier": true,
         "x-unique": "project",
         "x-editable": true
       },
@@ -765,7 +764,6 @@ const USER_SCHEMAS = {
         "type": "string",
         "format": "email",
         "title": "Email address",
-        "x-identifier": true,
         "x-unique": "project",
         "x-editable": true
       },
@@ -1424,7 +1422,7 @@ async function renderDiagram() {
       const schemaName = currentFlow?.user_schema;
       const fieldLabels = fieldNames.map(f => {
         const annots = getAnnotations(schemaName, f);
-        if (annots['x-identifier']) return f + ' (id)';
+        if (annots['x-unique']) return f + ' (id)';
         if (annots['x-credential']) return f + ' (cred)';
         return f;
       });
@@ -1979,9 +1977,11 @@ function renderResolvedPayload() {
   // Build implied outcomes from annotations
   const impliedOutcomes = [];
   for (const [name, annots] of Object.entries(annotations)) {
-    if (annots['x-identifier']) impliedOutcomes.push({ field: name, outcome: 'user_not_found', reason: 'x-identifier: true' });
+    if (annots['x-unique']) {
+      impliedOutcomes.push({ field: name, outcome: 'user_not_found', reason: `x-unique: "${annots['x-unique']}"` });
+      impliedOutcomes.push({ field: name, outcome: 'already_exists', reason: `x-unique: "${annots['x-unique']}"` });
+    }
     if (annots['x-credential']) impliedOutcomes.push({ field: name, outcome: 'invalid_credential', reason: `x-credential: "${annots['x-credential']}"` });
-    if (annots['x-unique']) impliedOutcomes.push({ field: name, outcome: 'already_exists', reason: `x-unique: "${annots['x-unique']}"` });
   }
 
   const definitionJson = highlightInline(JSON.stringify(fieldNames, null, 2));

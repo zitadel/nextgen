@@ -1,5 +1,84 @@
 # @zitadel/config
 
+## 0.1.0-alpha.18
+
+### Minor Changes
+
+- [#783](https://github.com/zitadel/nextgen/pull/783) [`418457f`](https://github.com/zitadel/nextgen/commit/418457f7407c712f3ff02b30df014fbf12e03d23) Thanks [@vitorbari](https://github.com/vitorbari)! - A user schema property name must be a single attribute name and cannot contain
+  a dot. The rule lives in the user-schema meta-schema and its OpenAPI mirror, so
+  an editor validating against the shipped dialect flags it while authoring, and
+  the server rejects it on create.
+
+  Nested properties are validated as properties: each is an object describing one
+  attribute, with its annotations checked. Generated clients type a user
+  property's nested `properties` map as a map of user properties.
+
+- [#563](https://github.com/zitadel/nextgen/pull/563) [`41a2de2`](https://github.com/zitadel/nextgen/commit/41a2de240cb446cd12b438a442a55e7b90287e80) Thanks [@fforootd](https://github.com/fforootd)! - Tenant-customizable login templates land end to end (ADR 040): eject a
+  design, edit real Liquid, `plan`/`apply` publishes it, and the login
+  renders it.
+  - `@zitadel/server`: new Branding API (`POST /branding`,
+    `GET /branding`, `GET /branding/{id}`) storing immutable per-project
+    branding revisions with a lexical template gate (size, encoding,
+    `<script>`/`<style>`, inline handlers, `javascript:` URLs, `| raw`).
+    Flow responses now resolve the latest revision per project instead of
+    the hardcoded default.
+  - `@zitadel/api`: generated client and zod schemas for the Branding API.
+  - `@zitadel/config`: the authoritative LiquidJS template validator
+    (`@zitadel/config/template`), the `branding.json` config dialect
+    meta-schema, and the ejectable design catalog (`centered`, `split`,
+    `split-right`, `minimal`) with `getDefaultBrandingConfig`.
+  - `@zitadel/components`: split/minimal layout chrome for the design
+    catalog; the `{% mandatory_gates %}` tag name is now single-sourced
+    from `@zitadel/config/template`.
+  - `@zitadel/cli`: `.zitadel/branding/` becomes a synced resource — a
+    `branding.json` descriptor plus a sibling `login.liquid` the CLI
+    inlines on upload. `zitadel branding eject [--design <name>]`
+    scaffolds it, `zitadel setup --design <name>` does so at setup and
+    publishes revision 1, and `plan`/`apply` validate templates with the
+    authoritative validator and publish edits as new revisions.
+
+### Patch Changes
+
+- [#259](https://github.com/zitadel/nextgen/pull/259) [`ff66683`](https://github.com/zitadel/nextgen/commit/ff66683eeb0daa3a12e7d11fed01076ac8c2ba58) Thanks [@peintnermax](https://github.com/peintnermax)! - `<zitadel-login>` maps the browser's back gesture to a step's `kind: "back"` action via a single re-armed History API sentinel entry (no URL changes). Back-navigation is gesture-only: the default template and all shipped branding designs render no visible control for the action, and the kind-based exclusion keeps it out of the generic secondary-button loop. Tenant templates can still render an explicit control from the wire action.
+
+- [#603](https://github.com/zitadel/nextgen/pull/603) [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c) Thanks [@fforootd](https://github.com/fforootd)! - Add the `hero` landing design, a mobile compact brand header for split-family designs, split layout knobs (`--zl-split-columns`, `--zl-split-align`, `--zl-split-brand-mobile`), and a warn-once console signal for missing text keys.
+
+- [#558](https://github.com/zitadel/nextgen/pull/558) [`d2bca36`](https://github.com/zitadel/nextgen/commit/d2bca36bdaa09168363e8e581cc4f0ef5db7eeb8) Thanks [@fforootd](https://github.com/fforootd)! - Strip trailing slashes from base URLs with an `endsWith` loop instead of a
+  regex CodeQL flags as polynomial on uncontrolled input.
+
+- [#660](https://github.com/zitadel/nextgen/pull/660) [`1395911`](https://github.com/zitadel/nextgen/commit/1395911519a40ceb4e06e8b68729376553d2768d) Thanks [@fforootd](https://github.com/fforootd)! - Update `liquidjs` to 10.27.2. 10.27.1 charges the `pop` filter against
+  `memoryLimit` (CVE-2026-55575); 10.27.2 extends that accounting to the
+  `join`, `json`, and `inspect` filters.
+
+- [#551](https://github.com/zitadel/nextgen/pull/551) [`2cf426e`](https://github.com/zitadel/nextgen/commit/2cf426e0bbe9d27059d748f16272bd1674408dc0) Thanks [@vitorbari](https://github.com/vitorbari)! - `zitadel setup` now asks "Who will sign in to your app?" and scaffolds the
+  matching schema fields: `minimal` (email only), `consumer` (email, given and
+  family name), or `business` (adds a `companyName` attribute). `minimal` is the
+  default, so the no-flag scaffold now collects **email only** — a deliberate
+  slim-down from today's output: given/family name move to `consumer`/`business`,
+  and `dateOfBirth` is no longer scaffolded by any use case. The default schema
+  and login-flow templates (embedded as the server-side fallback for projects
+  created without the CLI) are slimmed to the same email-only baseline, so the
+  no-CLI default and the `minimal` use case now agree; the per-field bodies for
+  `givenName`/`familyName`/`companyName` move into the config field catalog the
+  CLI composes from. This is a second axis alongside the sign-in
+  preset ([#448](https://github.com/zitadel/nextgen/issues/448)): the use case owns
+  the schema field set, the sign-in preset owns the flow, and the login flow's
+  register step is derived from the chosen fields instead of a hard-coded list —
+  so the two compose instead of multiplying into a bundle per pair. The
+  question is asked before the sign-in preset; non-interactive and scripted
+  runs use `--use-case` (defaults to `minimal`, never blocks); the choice is
+  recorded in `zitadel.json` for guidance/status only, never behavior. `business`
+  is a field set only for now — `companyName` is a plain user attribute with no
+  org/team model behind it yet. Every (use case × sign-in preset) pair is
+  hygiene-tested against the flow validator.
+  The unused, divergent `buildUserSchema`/`fieldPreset` helpers are removed in
+  favor of a single source of field defaults.
+
+- [#603](https://github.com/zitadel/nextgen/pull/603) [`2ece0b1`](https://github.com/zitadel/nextgen/commit/2ece0b1242b07b7e369668bd4d313b44d56e553c) Thanks [@fforootd](https://github.com/fforootd)! - Flip `<zitadel-login>` to widget-first: the default `variant="widget"` is content-sized, transparent through every layer, injects no default font into the host document, and never steals focus on load — the embedding app owns the page. Dedicated login routes (hosted shell, scaffolded pages) opt into the previous full-page behavior with `variant="page"`. Split-family responsive chrome now keys off the widget's own width via container queries (baseline 2023 browsers), the hero design ships neutral placeholder copy instead of fabricated claims, and split tenants with only a `hero_url` keep a compact banner fallback on narrow widths.
+
+- Updated dependencies [[`7120ce3`](https://github.com/zitadel/nextgen/commit/7120ce328eb9c63bbc6ff0bad0465c7f1f49e602), [`7ea32f8`](https://github.com/zitadel/nextgen/commit/7ea32f82b582e37944535b537940f035bdda8cde), [`2c63b47`](https://github.com/zitadel/nextgen/commit/2c63b47c025e1255683b0b8cd2c48a3e25f79b3a), [`1f66979`](https://github.com/zitadel/nextgen/commit/1f6697956ee81a5a28812905283ddb94f649250f), [`d2bca36`](https://github.com/zitadel/nextgen/commit/d2bca36bdaa09168363e8e581cc4f0ef5db7eeb8), [`e0b8d3d`](https://github.com/zitadel/nextgen/commit/e0b8d3d66356f80d658198edccca3d6d77077c29), [`97470b2`](https://github.com/zitadel/nextgen/commit/97470b2d51fdf815463336ffe7999f864e510f13), [`e58a4c1`](https://github.com/zitadel/nextgen/commit/e58a4c1161d11d519d04cb944ab2875270ddc8c2), [`4b984af`](https://github.com/zitadel/nextgen/commit/4b984afbbde622b6f86d90ff327f4b21f9526785), [`40c8537`](https://github.com/zitadel/nextgen/commit/40c8537efc12203fce05855b9536500a4a78621a), [`f2cec14`](https://github.com/zitadel/nextgen/commit/f2cec1417437c4f7d33dc4bd2281b802cfebe406), [`41a2de2`](https://github.com/zitadel/nextgen/commit/41a2de240cb446cd12b438a442a55e7b90287e80), [`2975c4d`](https://github.com/zitadel/nextgen/commit/2975c4dabec68ac1a8569d6a34960de50dced1b8)]:
+  - @zitadel/api@0.1.0-alpha.18
+
 ## 0.1.0-alpha.17
 
 ### Patch Changes
