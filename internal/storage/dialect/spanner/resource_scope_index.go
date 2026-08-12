@@ -25,6 +25,17 @@ SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
 FROM resource_scope_index
 WHERE resource_id = @p1`
 
+	getResourceScopeByIDInProjectStmt = `
+SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
+FROM resource_scope_index
+WHERE project_id = @p1 AND resource_id = @p2`
+
+	existsResourceScopeElsewhereStmt = `
+SELECT EXISTS (
+    SELECT 1 FROM resource_scope_index
+    WHERE resource_kind = @p1 AND resource_id = @p2 AND project_id <> @p3
+)`
+
 	deleteResourceScopeStmt = `DELETE FROM resource_scope_index WHERE resource_kind = @p1 AND project_id = @p2 AND resource_id = @p3`
 )
 
@@ -81,6 +92,39 @@ func (s resourceScopeStatements) GetResourceScopeInProject(ctx context.Context, 
 		return nil, err
 	}
 	return scanResourceScope(row)
+}
+
+// GetResourceScopeByIDInProject implements [service.ResourceScopeStatements].
+func (s resourceScopeStatements) GetResourceScopeByIDInProject(ctx context.Context, projectID, resourceID string) (*domain.ResourceScope, error) {
+	var scope *domain.ResourceScope
+	err := s.db.Query(ctx, buildStatement(getResourceScopeByIDInProjectStmt, projectID, resourceID).statement(), func(iter *spanner.RowIterator) error {
+		updated, err := collectOneRow(iter, scanResourceScope)
+		if err != nil {
+			return err
+		}
+		scope = updated
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return scope, nil
+}
+
+// ExistsResourceScopeElsewhere implements [service.ResourceScopeStatements].
+func (s resourceScopeStatements) ExistsResourceScopeElsewhere(ctx context.Context, kind domain.ResourceKind, resourceID, excludeProjectID string) (bool, error) {
+	var exists bool
+	err := s.db.Query(ctx, buildStatement(existsResourceScopeElsewhereStmt, kind.String(), resourceID, excludeProjectID).statement(), func(iter *spanner.RowIterator) error {
+		row, err := iter.Next()
+		if err != nil {
+			return err
+		}
+		return row.Columns(&exists)
+	})
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
 }
 
 // DeleteResourceScope implements [service.ResourceScopeStatements].

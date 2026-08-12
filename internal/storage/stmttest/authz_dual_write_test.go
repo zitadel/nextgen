@@ -188,6 +188,18 @@ func TestJSONSchemaStatements_SharedPublicURL_ScopedPerProject(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, projectB, scopeB.ProjectID)
 
+		elsewhere, err := d.stmts.ExistsResourceScopeElsewhere(t.Context(), domain.ResourceKindSchema, sharedURL, "proj_caller_absent")
+		require.NoError(t, err)
+		assert.True(t, elsewhere)
+
+		elsewhere, err = d.stmts.ExistsResourceScopeElsewhere(t.Context(), domain.ResourceKindSchema, sharedURL, projectA)
+		require.NoError(t, err)
+		assert.True(t, elsewhere, "project B still holds the URL")
+
+		scopeByID, err := d.stmts.GetResourceScopeByIDInProject(t.Context(), projectA, sharedURL)
+		require.NoError(t, err)
+		assert.Equal(t, domain.ResourceKindSchema, scopeByID.ResourceKind)
+
 		require.NoError(t, d.stmts.DeleteJSONSchemaByID(t.Context(), projectB, sharedURL))
 		_, err = d.stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindSchema, projectB, sharedURL)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
@@ -195,6 +207,10 @@ func TestJSONSchemaStatements_SharedPublicURL_ScopedPerProject(t *testing.T) {
 		scopeA, err = d.stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindSchema, projectA, sharedURL)
 		require.NoError(t, err)
 		assert.Equal(t, projectA, scopeA.ProjectID)
+
+		elsewhere, err = d.stmts.ExistsResourceScopeElsewhere(t.Context(), domain.ResourceKindSchema, sharedURL, projectA)
+		require.NoError(t, err)
+		assert.False(t, elsewhere, "only project A remains")
 	})
 }
 

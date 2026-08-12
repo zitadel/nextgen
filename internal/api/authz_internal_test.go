@@ -2,10 +2,12 @@ package api
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/zitadel/nextgen/internal/authz/resolver"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // stubAuthzStmts is a minimal AuthzResolverStatements for gate unit tests.
@@ -15,6 +17,12 @@ type stubAuthzStmts struct {
 	// allowCheck overrides CheckAuthz when set; nil means default foothold rule.
 	allowCheck *bool
 	foothold   *bool
+	// scopes maps resource_id → project_id for GetResourceScope; missing → NoRowFoundError.
+	scopes map[string]string
+	// kinds maps resource_id → ResourceKind; when absent, ResourceKindUser is used.
+	kinds map[string]domain.ResourceKind
+	// elsewhere forces ExistsResourceScopeElsewhere for a resource_id (shared URL across foreign projects).
+	elsewhere map[string]bool
 }
 
 func (stubAuthzStmts) IsStatements() {}
@@ -43,6 +51,70 @@ func (s stubAuthzStmts) CheckAuthz(ctx context.Context, params domain.AuthzCheck
 
 func (s stubAuthzStmts) ListAuthzObjectIDs(context.Context, domain.AuthzListObjectsParams) ([]string, error) {
 	return nil, nil
+}
+
+func (s stubAuthzStmts) GetResourceScope(_ context.Context, resourceID string) (*domain.ResourceScope, error) {
+	if s.scopes == nil {
+		return nil, new(database.NoRowFoundError)
+	}
+	projectID, ok := s.scopes[resourceID]
+	if !ok {
+		return nil, new(database.NoRowFoundError)
+	}
+	kind := domain.ResourceKindUser
+	if s.kinds != nil {
+		if k, ok := s.kinds[resourceID]; ok {
+			kind = k
+		}
+	}
+	return &domain.ResourceScope{ResourceID: resourceID, ProjectID: projectID, ResourceKind: kind}, nil
+}
+
+func (s stubAuthzStmts) GetResourceScopeInProject(_ context.Context, kind domain.ResourceKind, projectID, resourceID string) (*domain.ResourceScope, error) {
+	scope, err := s.GetResourceScopeByIDInProject(context.Background(), projectID, resourceID)
+	if err != nil {
+		return nil, err
+	}
+	if scope.ResourceKind != kind {
+		return nil, new(database.NoRowFoundError)
+	}
+	return scope, nil
+}
+
+func (s stubAuthzStmts) GetResourceScopeByIDInProject(_ context.Context, projectID, resourceID string) (*domain.ResourceScope, error) {
+	scope, err := s.GetResourceScope(context.Background(), resourceID)
+	if err != nil {
+		return nil, err
+	}
+	if scope.ProjectID != projectID {
+		return nil, new(database.NoRowFoundError)
+	}
+	return scope, nil
+}
+
+func (s stubAuthzStmts) ExistsResourceScopeElsewhere(_ context.Context, kind domain.ResourceKind, resourceID, excludeProjectID string) (bool, error) {
+	if s.elsewhere != nil {
+		if v, ok := s.elsewhere[resourceID]; ok {
+			return v, nil
+		}
+	}
+	scope, err := s.GetResourceScope(context.Background(), resourceID)
+	if err != nil {
+		if errors.Is(err, new(database.NoRowFoundError)) {
+			return false, nil
+		}
+		return false, err
+	}
+	if kind != "" && scope.ResourceKind != kind {
+		return false, nil
+	}
+	return scope.ProjectID != excludeProjectID, nil
+}
+
+func (stubAuthzStmts) UpsertResourceScope(context.Context, *domain.ResourceScope) error { return nil }
+
+func (stubAuthzStmts) DeleteResourceScope(context.Context, domain.ResourceKind, string, string) error {
+	return nil
 }
 
 func TestProjectRelation(t *testing.T) {
@@ -85,6 +157,9 @@ func TestMapAuthzDecision(t *testing.T) {
 	assertDomainCode(t, mapAuthzDecision(resolver.DecisionForbidden, res, opRead), domain.ErrUserPermissionDenied().Code)
 	assertDomainCode(t, mapAuthzDecision(resolver.DecisionNotFound, res, opRead), domain.ErrUserNotFound().Code)
 	assertDomainCode(t, mapAuthzDecision(resolver.DecisionNotFound, res, opWrite), domain.ErrUserInvalid().Code)
+
+	assertDomainCode(t, mapAuthzDecisionAfterRSI(resolver.DecisionNotFound, res), domain.ErrUserNotFound().Code)
+	assertDomainCode(t, mapAuthzDecisionAfterRSI(resolver.DecisionForbidden, res), domain.ErrUserPermissionDenied().Code)
 }
 
 func TestRequireProjectAccess(t *testing.T) {
@@ -185,7 +260,7 @@ func TestRequireProjectAccess(t *testing.T) {
 	})
 }
 
-func TestRequireUserTeamsAccess(t *testing.T) {
+func TestListUserTeamsGateShape(t *testing.T) {
 	stmts := stubAuthzStmts{}
 	both := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
@@ -196,7 +271,7 @@ func TestRequireUserTeamsAccess(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
 	})
 
-	// Coarse project.viewer: one Check with the user miss shape.
+	// listUserTeams uses requireResourceAccess with the user miss shape.
 	if err := requireProjectAccess(both, stmts, "proj_a", userAccess, opRead); err != nil {
 		t.Fatalf("user read: %v", err)
 	}
@@ -215,12 +290,15 @@ func TestRequireTeamDelete(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
 	})
 
-	// Mirror Handler.requireTeamDelete wrapping.
+	// Mirror Handler.requireTeamDelete wrapping (pass ErrInternal through).
 	wrap := func(err error) error {
-		if err != nil {
-			return domain.ErrTeamPermissionDenied().WithParent(err)
+		if err == nil {
+			return nil
 		}
-		return nil
+		if errors.Is(err, errResourceGone) || errors.Is(err, domain.ErrInternal(nil)) {
+			return err
+		}
+		return domain.ErrTeamPermissionDenied().WithParent(err)
 	}
 
 	if err := wrap(requireProjectAccess(operator, stmts, "proj_a", teamAccess, opDelete)); err != nil {
@@ -232,6 +310,97 @@ func TestRequireTeamDelete(t *testing.T) {
 		domain.ErrTeamPermissionDenied().Code)
 	assertDomainCode(t, wrap(requireProjectAccess(context.Background(), stmts, "proj_a", teamAccess, opDelete)),
 		domain.ErrTeamPermissionDenied().Code)
+
+	internal := domain.ErrInternal(errors.New("db down")).WithMessage("authz permission check failed")
+	if got := wrap(internal); !errors.Is(got, domain.ErrInternal(nil)) {
+		t.Fatalf("wrap(%v) = %v, want ErrInternal passthrough", internal, got)
+	}
+}
+
+func TestRequireResourceAccess(t *testing.T) {
+	stmts := stubAuthzStmts{scopes: map[string]string{"usr_a": "proj_a", "usr_b": "proj_b"}}
+	operator := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+	})
+	preview := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID: "proj_a", Scope: []string{"project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+	})
+
+	projectID, err := requireResourceAccess(operator, stmts, "usr_a", userAccess, opRead)
+	if err != nil {
+		t.Fatalf("own-project resource: %v", err)
+	}
+	if projectID != "proj_a" {
+		t.Fatalf("projectID = %q, want proj_a", projectID)
+	}
+
+	_, err = requireResourceAccess(operator, stmts, "usr_missing", userAccess, opRead)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	_, err = requireResourceAccess(operator, stmts, "usr_missing", userAccess, opWrite)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	_, err = requireResourceAccess(operator, stmts, "usr_missing", userAccess, opDelete)
+	if !errors.Is(err, errResourceGone) {
+		t.Fatalf("operator delete RSI miss: %v, want errResourceGone", err)
+	}
+
+	_, err = requireResourceAccess(preview, stmts, "usr_missing", userAccess, opDelete)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	_, err = requireResourceAccess(context.Background(), stmts, "usr_missing", userAccess, opDelete)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	_, err = requireResourceAccess(operator, stmts, "usr_b", userAccess, opRead)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	// Foreign delete of a real id must not 204 — anti-oracle readMiss.
+	_, err = requireResourceAccess(operator, stmts, "usr_b", userAccess, opDelete)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	_, err = requireResourceAccess(operator, stmts, "usr_b", userAccess, opWrite)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	_, err = requireResourceAccess(preview, stmts, "usr_a", userAccess, opRead)
+	assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
+
+	_, err = requireResourceAccess(preview, stmts, "usr_a", userAccess, opDelete)
+	assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
+}
+
+func TestRequireResourceAccessWrongKind(t *testing.T) {
+	stmts := stubAuthzStmts{
+		scopes: map[string]string{"id_shared": "proj_a"},
+		kinds:  map[string]domain.ResourceKind{"id_shared": domain.ResourceKindSchema},
+	}
+	operator := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+	})
+
+	_, err := requireResourceAccess(operator, stmts, "id_shared", userAccess, opRead)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	_, err = requireResourceAccess(operator, stmts, "id_shared", userAccess, opDelete)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+}
+
+func TestRequireResourceAccessDeleteSharedURLElsewhere(t *testing.T) {
+	// Schema $id shared by two foreign projects: ExistsResourceScopeElsewhere is
+	// true even though GetResourceScope would be ambiguous. Operator delete must
+	// readMiss (never 204).
+	stmts := stubAuthzStmts{
+		elsewhere: map[string]bool{"https://example.com/x.json": true},
+	}
+	operator := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+	})
+
+	_, err := requireResourceAccess(operator, stmts, "https://example.com/x.json", schemaAccess, opDelete)
+	assertDomainCode(t, err, domain.ErrJSONSchemaNotFound().Code)
 }
 
 func assertDomainCode(t *testing.T, err error, wantCode string) {

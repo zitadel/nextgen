@@ -73,11 +73,12 @@ func exchangeInputFromRequest(req *api.ExchangeRequest, params api.ExchangeHando
 }
 
 func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (api.GetSessionRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opRead); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, string(params.SessionID), sessionAccess, opRead)
+	if err != nil {
 		return nil, err
 	}
 	input := service.GetSessionInput{
-		ProjectID: string(params.ProjectID),
+		ProjectID: projectID,
 		SessionID: string(params.SessionID),
 	}
 
@@ -143,15 +144,19 @@ func mapQuerySessionsToService(projectID string, req *api.QuerySessionsRequest) 
 }
 
 func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionParams) (api.RevokeSessionRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opDelete); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, string(params.SessionID), sessionAccess, opDelete)
+	if err != nil {
+		if errors.Is(err, errResourceGone) {
+			return &api.RevokeSessionNoContent{}, nil
+		}
 		return nil, err
 	}
 	input := service.DeleteSessionInput{
-		ProjectID: string(params.ProjectID),
+		ProjectID: projectID,
 		SessionID: string(params.SessionID),
 	}
 
-	err := h.sessionService.Delete(ctx, input)
+	err = h.sessionService.Delete(ctx, input)
 	if err != nil {
 		return nil, err
 	}

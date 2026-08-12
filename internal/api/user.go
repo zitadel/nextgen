@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -39,12 +40,16 @@ func (h *Handler) CreateUser(ctx context.Context, req *api.User, params api.Crea
 }
 
 func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDParams) (api.DeleteUserByIDRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), userAccess, opDelete); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opDelete)
+	if err != nil {
+		if errors.Is(err, errResourceGone) {
+			return &api.DeleteUserByIDNoContent{}, nil
+		}
 		return nil, err
 	}
 
-	err := h.userService.DeleteUser(ctx, service.DeleteUserInput{
-		ProjectID: string(params.ProjectID),
+	err = h.userService.DeleteUser(ctx, service.DeleteUserInput{
+		ProjectID: projectID,
 		UserID:    string(params.UserID),
 	})
 	if err != nil {
@@ -94,12 +99,13 @@ func (h *Handler) ListUsers(ctx context.Context, params api.ListUsersParams) (ap
 }
 
 func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPasskeysParams) (api.ListUserPasskeysRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), userAccess, opRead); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
+	if err != nil {
 		return nil, err
 	}
 
 	passkeys, nextPage, err := h.userService.ListPasskeys(ctx, service.ListPasskeysInput{
-		ProjectID: string(params.ProjectID),
+		ProjectID: projectID,
 		UserID:    string(params.UserID),
 		PageToken: string(params.PageToken.Value),
 		Limit:     int(params.Limit.Value),
@@ -131,12 +137,13 @@ func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPassk
 // page without resolving ids one by one. Lifecycle ownership is a different
 // question and stays on the user itself (ADR 024).
 func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsParams) (api.ListUserTeamsRes, error) {
-	if err := h.requireUserTeamsAccess(ctx, string(params.ProjectID)); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
+	if err != nil {
 		return nil, err
 	}
 
 	teams, err := h.userService.ListUserTeams(ctx, service.ListUserTeamsInput{
-		ProjectID: string(params.ProjectID),
+		ProjectID: projectID,
 		UserID:    string(params.UserID),
 		PageToken: string(params.PageToken.Value),
 		Limit:     int(params.Limit.Value),
@@ -165,7 +172,8 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 }
 
 func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams) (api.GetUserByIDRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), userAccess, opRead); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
+	if err != nil {
 		return nil, err
 	}
 	var teamID *string
@@ -174,7 +182,7 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 	}
 
 	user, err := h.userService.GetUserByID(ctx, service.GetUserInput{
-		ProjectID: string(params.ProjectID),
+		ProjectID: projectID,
 		TeamID:    teamID,
 		UserID:    string(params.UserID),
 	})
@@ -186,11 +194,12 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 }
 
 func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordRequest, params api.SetUserPasswordParams) (api.SetUserPasswordRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), userAccess, opWrite); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opWrite)
+	if err != nil {
 		return nil, err
 	}
-	err := h.userService.SetPassword(ctx, service.SetPasswordInput{
-		ProjectID:                string(params.ProjectID),
+	err = h.userService.SetPassword(ctx, service.SetPasswordInput{
+		ProjectID:                projectID,
 		UserID:                   string(params.UserID),
 		Password:                 req.Password,
 		IsPasswordChangeRequired: req.IsChangeRequired.Value,

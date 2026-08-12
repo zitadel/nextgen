@@ -1769,6 +1769,45 @@ func (c *MockAllStatementsExchangeSessionCall) DoAndReturn(f func(context.Contex
 	return c
 }
 
+// ExistsResourceScopeElsewhere mocks base method.
+func (m *MockAllStatements) ExistsResourceScopeElsewhere(ctx context.Context, kind domain.ResourceKind, resourceID, excludeProjectID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExistsResourceScopeElsewhere", ctx, kind, resourceID, excludeProjectID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ExistsResourceScopeElsewhere indicates an expected call of ExistsResourceScopeElsewhere.
+func (mr *MockAllStatementsMockRecorder) ExistsResourceScopeElsewhere(ctx, kind, resourceID, excludeProjectID any) *MockAllStatementsExistsResourceScopeElsewhereCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExistsResourceScopeElsewhere", reflect.TypeOf((*MockAllStatements)(nil).ExistsResourceScopeElsewhere), ctx, kind, resourceID, excludeProjectID)
+	return &MockAllStatementsExistsResourceScopeElsewhereCall{Call: call}
+}
+
+// MockAllStatementsExistsResourceScopeElsewhereCall wrap *gomock.Call
+type MockAllStatementsExistsResourceScopeElsewhereCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsExistsResourceScopeElsewhereCall) Return(arg0 bool, arg1 error) *MockAllStatementsExistsResourceScopeElsewhereCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsExistsResourceScopeElsewhereCall) Do(f func(context.Context, domain.ResourceKind, string, string) (bool, error)) *MockAllStatementsExistsResourceScopeElsewhereCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsExistsResourceScopeElsewhereCall) DoAndReturn(f func(context.Context, domain.ResourceKind, string, string) (bool, error)) *MockAllStatementsExistsResourceScopeElsewhereCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetAuthAttemptByHandoffToken mocks base method.
 func (m *MockAllStatements) GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffToken []byte) (*domain.AuthAttempt, error) {
 	m.ctrl.T.Helper()
@@ -2311,6 +2350,45 @@ func (c *MockAllStatementsGetResourceScopeCall) Do(f func(context.Context, strin
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsGetResourceScopeCall) DoAndReturn(f func(context.Context, string) (*domain.ResourceScope, error)) *MockAllStatementsGetResourceScopeCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetResourceScopeByIDInProject mocks base method.
+func (m *MockAllStatements) GetResourceScopeByIDInProject(ctx context.Context, projectID, resourceID string) (*domain.ResourceScope, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetResourceScopeByIDInProject", ctx, projectID, resourceID)
+	ret0, _ := ret[0].(*domain.ResourceScope)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetResourceScopeByIDInProject indicates an expected call of GetResourceScopeByIDInProject.
+func (mr *MockAllStatementsMockRecorder) GetResourceScopeByIDInProject(ctx, projectID, resourceID any) *MockAllStatementsGetResourceScopeByIDInProjectCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResourceScopeByIDInProject", reflect.TypeOf((*MockAllStatements)(nil).GetResourceScopeByIDInProject), ctx, projectID, resourceID)
+	return &MockAllStatementsGetResourceScopeByIDInProjectCall{Call: call}
+}
+
+// MockAllStatementsGetResourceScopeByIDInProjectCall wrap *gomock.Call
+type MockAllStatementsGetResourceScopeByIDInProjectCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetResourceScopeByIDInProjectCall) Return(arg0 *domain.ResourceScope, arg1 error) *MockAllStatementsGetResourceScopeByIDInProjectCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetResourceScopeByIDInProjectCall) Do(f func(context.Context, string, string) (*domain.ResourceScope, error)) *MockAllStatementsGetResourceScopeByIDInProjectCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetResourceScopeByIDInProjectCall) DoAndReturn(f func(context.Context, string, string) (*domain.ResourceScope, error)) *MockAllStatementsGetResourceScopeByIDInProjectCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -8635,6 +8713,45 @@ func (c *MockResourceScopeStatementsDeleteResourceScopeCall) DoAndReturn(f func(
 	return c
 }
 
+// ExistsResourceScopeElsewhere mocks base method.
+func (m *MockResourceScopeStatements) ExistsResourceScopeElsewhere(ctx context.Context, kind domain.ResourceKind, resourceID, excludeProjectID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExistsResourceScopeElsewhere", ctx, kind, resourceID, excludeProjectID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ExistsResourceScopeElsewhere indicates an expected call of ExistsResourceScopeElsewhere.
+func (mr *MockResourceScopeStatementsMockRecorder) ExistsResourceScopeElsewhere(ctx, kind, resourceID, excludeProjectID any) *MockResourceScopeStatementsExistsResourceScopeElsewhereCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExistsResourceScopeElsewhere", reflect.TypeOf((*MockResourceScopeStatements)(nil).ExistsResourceScopeElsewhere), ctx, kind, resourceID, excludeProjectID)
+	return &MockResourceScopeStatementsExistsResourceScopeElsewhereCall{Call: call}
+}
+
+// MockResourceScopeStatementsExistsResourceScopeElsewhereCall wrap *gomock.Call
+type MockResourceScopeStatementsExistsResourceScopeElsewhereCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockResourceScopeStatementsExistsResourceScopeElsewhereCall) Return(arg0 bool, arg1 error) *MockResourceScopeStatementsExistsResourceScopeElsewhereCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockResourceScopeStatementsExistsResourceScopeElsewhereCall) Do(f func(context.Context, domain.ResourceKind, string, string) (bool, error)) *MockResourceScopeStatementsExistsResourceScopeElsewhereCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockResourceScopeStatementsExistsResourceScopeElsewhereCall) DoAndReturn(f func(context.Context, domain.ResourceKind, string, string) (bool, error)) *MockResourceScopeStatementsExistsResourceScopeElsewhereCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetResourceScope mocks base method.
 func (m *MockResourceScopeStatements) GetResourceScope(ctx context.Context, resourceID string) (*domain.ResourceScope, error) {
 	m.ctrl.T.Helper()
@@ -8670,6 +8787,45 @@ func (c *MockResourceScopeStatementsGetResourceScopeCall) Do(f func(context.Cont
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockResourceScopeStatementsGetResourceScopeCall) DoAndReturn(f func(context.Context, string) (*domain.ResourceScope, error)) *MockResourceScopeStatementsGetResourceScopeCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetResourceScopeByIDInProject mocks base method.
+func (m *MockResourceScopeStatements) GetResourceScopeByIDInProject(ctx context.Context, projectID, resourceID string) (*domain.ResourceScope, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetResourceScopeByIDInProject", ctx, projectID, resourceID)
+	ret0, _ := ret[0].(*domain.ResourceScope)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetResourceScopeByIDInProject indicates an expected call of GetResourceScopeByIDInProject.
+func (mr *MockResourceScopeStatementsMockRecorder) GetResourceScopeByIDInProject(ctx, projectID, resourceID any) *MockResourceScopeStatementsGetResourceScopeByIDInProjectCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResourceScopeByIDInProject", reflect.TypeOf((*MockResourceScopeStatements)(nil).GetResourceScopeByIDInProject), ctx, projectID, resourceID)
+	return &MockResourceScopeStatementsGetResourceScopeByIDInProjectCall{Call: call}
+}
+
+// MockResourceScopeStatementsGetResourceScopeByIDInProjectCall wrap *gomock.Call
+type MockResourceScopeStatementsGetResourceScopeByIDInProjectCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockResourceScopeStatementsGetResourceScopeByIDInProjectCall) Return(arg0 *domain.ResourceScope, arg1 error) *MockResourceScopeStatementsGetResourceScopeByIDInProjectCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockResourceScopeStatementsGetResourceScopeByIDInProjectCall) Do(f func(context.Context, string, string) (*domain.ResourceScope, error)) *MockResourceScopeStatementsGetResourceScopeByIDInProjectCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockResourceScopeStatementsGetResourceScopeByIDInProjectCall) DoAndReturn(f func(context.Context, string, string) (*domain.ResourceScope, error)) *MockResourceScopeStatementsGetResourceScopeByIDInProjectCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -22,9 +22,11 @@ one-time backfill of `resource_scope_index` + active `authz_membership_edges`.
 Resolver library (`internal/authz/resolver`) and L4 oracle tests land in
 Wave 3 (#423). In-project HTTP management wiring (resolver gate + D10
 403/404 mapping + `sk_proj` seed on `CreateProject`) is shipped. Leopard
-remains later (**D11**). RSI dual-write now covers schema / branding /
+remains later (**D11**). RSI dual-write covers schema / branding /
 flow_definition / session path ids in addition to project / team / user.
-Fine-grained catalog relations (#420) remain a follow-up.
+Path-id management handlers resolve RSI before Check (flat-by-id; no
+required query `project_id`). Fine-grained catalog relations (#420) and
+SQL list-predicate injection remain follow-ups.
 
 ### Wave 1 vs OpenFGA compiler (#421 / PR #720)
 
@@ -92,7 +94,7 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
 | **D7** | Assignment PK = `(project_id, id)`. |
 | **D8** | Soft revoke via `revoked_at`; unique active-grant index ignores revoked rows. |
 | **D9** | App-group / `app_grants` tables deferred (same physical catalog model later; [ADR 034](../../adrs/034-external-permission-management.md)). |
-| **D10** | Library resolver returns **Allow** / **Forbidden** (foothold, wrong permission) / **NotFound** (no foothold). HTTP mapping at the API gate: **Forbidden → 403**, **NotFound → 404** ([ADR 033](../../adrs/033-internal-permission-management.md)). Preview/`project.read`-only secrets remain browser-plane and cannot call management APIs (operator ceiling still requires `project.write`). |
+| **D10** | Library resolver returns **Allow** / **Forbidden** (foothold, wrong permission) / **NotFound** (no foothold). HTTP mapping at the API gate: **Forbidden → 403**, **NotFound → 404** ([ADR 033](../../adrs/033-internal-permission-management.md)). Preview/`project.read`-only secrets remain browser-plane and cannot call management APIs (operator ceiling still requires `project.write`). **Delete idempotency:** RSI miss on delete → `204` for operators (`project.write`) only; preview/anonymous get the resource readMiss shape. This preserves HTTP delete idempotency for operators but leaves a residual confirmation oracle (fabricated id → 204 vs real foreign resource → 404/403 after RSI hit) for any principal holding a project secret; full close would drop operator 204s on miss. |
 | **D11** | Dual-write membership **without** Leopard in Wave 1; Leopard remains an additive derived index later ([ADR 032 §3](../../adrs/032-permission-catalogs.md#3-canonical-relational-storage)). |
 | **D12** | Hash-partitioning `resource_scope_index` (Postgres) **deferred until proven**; revisit only with vacuum/bloat/hot-spot measurements. |
 | **D13** | Cross-project ([#333](https://github.com/zitadel/nextgen/issues/333)) depiction: same `authz_assignments` row on the **protected** `project_id`, with a **foreign** `user`/`team` principal (no `principal_type = project`); principal integrity by stable prefixed ids ([ADR 011](../../adrs/011-resource-identifiers.md)), not a composite FK to local `(project_id, user_id)`. |

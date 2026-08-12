@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
@@ -24,10 +25,11 @@ func (h *Handler) CreateTeam(ctx context.Context, req *api.CreateTeamRequest, pa
 }
 
 func (h *Handler) GetTeam(ctx context.Context, params api.GetTeamParams) (api.GetTeamRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opRead); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, string(params.TeamID), teamAccess, opRead)
+	if err != nil {
 		return nil, err
 	}
-	team, err := h.teamService.Get(ctx, string(params.ProjectID), string(params.TeamID))
+	team, err := h.teamService.Get(ctx, projectID, string(params.TeamID))
 	if err != nil {
 		return nil, err
 	}
@@ -35,11 +37,12 @@ func (h *Handler) GetTeam(ctx context.Context, params api.GetTeamParams) (api.Ge
 }
 
 func (h *Handler) UpdateTeam(ctx context.Context, req *api.UpdateTeamRequest, params api.UpdateTeamParams) (api.UpdateTeamRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opWrite); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, string(params.TeamID), teamAccess, opWrite)
+	if err != nil {
 		return nil, err
 	}
 	input := service.UpdateTeamInput{
-		ProjectID: string(params.ProjectID),
+		ProjectID: projectID,
 		TeamID:    string(params.TeamID),
 	}
 	if name, ok := req.Name.Get(); ok {
@@ -53,10 +56,14 @@ func (h *Handler) UpdateTeam(ctx context.Context, req *api.UpdateTeamRequest, pa
 }
 
 func (h *Handler) DeleteTeam(ctx context.Context, params api.DeleteTeamParams) (api.DeleteTeamRes, error) {
-	if err := h.requireTeamDelete(ctx, string(params.ProjectID)); err != nil {
+	projectID, err := h.requireTeamDelete(ctx, string(params.TeamID))
+	if err != nil {
+		if errors.Is(err, errResourceGone) {
+			return &api.DeleteTeamNoContent{}, nil
+		}
 		return nil, err
 	}
-	if err := h.teamService.Delete(ctx, string(params.ProjectID), string(params.TeamID)); err != nil {
+	if err := h.teamService.Delete(ctx, projectID, string(params.TeamID)); err != nil {
 		return nil, err
 	}
 	return &api.DeleteTeamNoContent{}, nil

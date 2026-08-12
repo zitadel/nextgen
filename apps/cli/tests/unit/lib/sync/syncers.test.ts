@@ -133,7 +133,7 @@ describe("SchemaSyncer", () => {
     expect(schema.revisioned).toBe(true);
   });
 
-  it("fetch dispatches GET /schemas/:id?project_id=... and returns the body", async () => {
+  it("fetch dispatches GET /schemas/:id without project_id and returns the body", async () => {
     let receivedUrl = "";
     server.use(
       http.get(`${BASE}/schemas/schema-id-1`, ({ request }) => {
@@ -145,7 +145,7 @@ describe("SchemaSyncer", () => {
 
     const body = await schema.fetch?.("schema-id-1");
 
-    expect(new URL(receivedUrl).searchParams.get("project_id")).toBe("proj-1");
+    expect(new URL(receivedUrl).searchParams.get("project_id")).toBeNull();
     expect(body).toEqual({ kind: "user-schema", version: 1 });
   });
 });
@@ -227,9 +227,9 @@ describe("FlowDefinitionSyncer", () => {
     });
   });
 
-  it("update PUTs the `{flow_definition}` envelope with the project_id query param", async () => {
+  it("update PUTs the `{flow_definition}` envelope without a project_id query param", async () => {
     let receivedBody: unknown;
-    let receivedProjectId: string | null = null;
+    let receivedProjectId: string | null = "unset";
     server.use(
       http.put(`${BASE}/flow_definitions/flow-id-1`, async ({ request }) => {
         receivedProjectId = new URL(request.url).searchParams.get("project_id");
@@ -244,14 +244,14 @@ describe("FlowDefinitionSyncer", () => {
 
     const result = await flow.update("flow-id-1", { status: "active", version: 3 });
 
-    expect(receivedProjectId).toBe("proj-1");
+    expect(receivedProjectId).toBeNull();
     expect(receivedBody).toEqual({ flow_definition: { status: "active", version: 3 } });
     expect(result.canonical).toEqual({ status: "active", version: 3, audience: {} });
   });
 
-  it("delete DELETEs /flow_definitions/:id with the project_id query param", async () => {
+  it("delete DELETEs /flow_definitions/:id without a project_id query param", async () => {
     let hits = 0;
-    let receivedProjectId: string | null = null;
+    let receivedProjectId: string | null = "unset";
     server.use(
       http.delete(`${BASE}/flow_definitions/flow-id-1`, ({ request }) => {
         receivedProjectId = new URL(request.url).searchParams.get("project_id");
@@ -264,10 +264,10 @@ describe("FlowDefinitionSyncer", () => {
     await flow.delete("flow-id-1");
 
     expect(hits).toBe(1);
-    expect(receivedProjectId).toBe("proj-1");
+    expect(receivedProjectId).toBeNull();
   });
 
-  it("fetch unwraps the detail envelope and sends project_id", async () => {
+  it("fetch unwraps the detail envelope without sending project_id", async () => {
     let receivedUrl = "";
     server.use(
       http.get(`${BASE}/flow_definitions/flow-id-1`, ({ request }) => {
@@ -289,7 +289,7 @@ describe("FlowDefinitionSyncer", () => {
 
     const body = await flow.fetch?.("flow-id-1");
 
-    expect(new URL(receivedUrl).searchParams.get("project_id")).toBe("proj-1");
+    expect(new URL(receivedUrl).searchParams.get("project_id")).toBeNull();
     expect(body).toEqual({ name: "Default", status: "active", version: 2 });
   });
 });
@@ -517,11 +517,11 @@ describe("BrandingSyncer", () => {
     await expect(branding.delete("brnd-1")).rejects.toThrow(ZitadelError);
   });
 
-  it("fetch unwraps the revision envelope", async () => {
+  it("fetch unwraps the revision envelope without project_id", async () => {
     const cwd = await makeBrandingProject();
     server.use(
       http.get(`${BASE}/branding/brnd-1`, ({ request }) => {
-        expect(new URL(request.url).searchParams.get("project_id")).toBe("proj-1");
+        expect(new URL(request.url).searchParams.get("project_id")).toBeNull();
         return HttpResponse.json({
           id: "brnd-1",
           created_at: "2026-07-20T00:00:00Z",
