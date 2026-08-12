@@ -95,11 +95,11 @@ function wrap(
  * meant every consumer of this mock was exercising a screen the server never
  * emits; see this package's AGENTS.md.
  *
- * `register` and `recover` are mock-only affordances: the real flow reaches
- * `register` through the engine's `user_not_found` transition rather than a link,
- * and defines no recovery step yet. They are kept so those screens stay
- * reachable for Storybook and tests — but they are the one place this fixture
- * knowingly exceeds the real definition.
+ * `register` is real: the default flow declares it as a navigate action whose
+ * transition re-purposes to register (alongside the engine's `user_not_found`
+ * fallback). `recover` remains the one mock-only affordance on this step — the
+ * default defines no recovery step yet, and the screen is kept reachable for
+ * Storybook and tests. `default-conformance.spec.ts` enforces that split.
  */
 export function identifierStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {

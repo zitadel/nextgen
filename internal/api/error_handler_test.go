@@ -120,6 +120,26 @@ func TestDomainErrorDetailsOmitsDiagnostics(t *testing.T) {
 	require.False(t, details.Details.Set, "parent/location diagnostics must not be serialized")
 }
 
+// A transaction that exhausted its abort retries is transient, so the caller
+// needs a status that says "retry", not the 500 it used to get.
+func TestErrorResponseUnavailableIs503(t *testing.T) {
+	t.Parallel()
+
+	got := errorResponse(domain.ErrUnavailable().WithParent(errors.New("transaction aborted")))
+
+	require.Equal(t, http.StatusServiceUnavailable, got.StatusCode)
+	require.Equal(t, api.ErrorCode("unavailable"), got.Response.Code)
+}
+
+func TestErrorResponseInternalStays500(t *testing.T) {
+	t.Parallel()
+
+	got := errorResponse(domain.ErrInternal(errors.New("boom")))
+
+	require.Equal(t, http.StatusInternalServerError, got.StatusCode,
+		"only transient failures may claim 503")
+}
+
 func TestDomainErrorDetails_requestInvalidField(t *testing.T) {
 	t.Parallel()
 

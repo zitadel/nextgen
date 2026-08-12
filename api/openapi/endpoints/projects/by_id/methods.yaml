@@ -37,11 +37,7 @@ get:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: getProject-error-response.yaml
 
 patch:
   operationId: patchProject
@@ -92,8 +88,4 @@ patch:
           schema:
             $ref: ../../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: patchProject-error-response.yaml

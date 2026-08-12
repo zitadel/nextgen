@@ -39,6 +39,20 @@ Typical edits:
 - **Rewire transitions** — edit `steps[].transitions` to point at a
   different next step, or use `action: switch` / `pivot` to jump to
   another flow.
+- **Offer a purpose switch in the card** — pair a `kind: navigate`
+  action with a transition that declares a local `purpose`. The default
+  login flow ships this in both directions:
+
+  ```json
+  "register": { "target": "register", "purpose": "register" }
+  ```
+
+  Navigation skips field validation (an empty email box can't block the
+  link), and the declared purpose is what makes the landing leg run with
+  the right semantics — register creates the user instead of trying to
+  verify one. Rules: the purpose must be one this flow's `purposes`
+  serves, the target must be that purpose's entry step, and `purpose`
+  never combines with `action` (which targets another flow instead).
 - **Add another flow** — drop a new JSON file with its own `purposes`
   and a distinct `name` (e.g. a per-team login). See
   [Multiple flows](#multiple-flows) for how it gets selected at runtime.

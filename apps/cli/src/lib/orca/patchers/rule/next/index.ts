@@ -148,7 +148,8 @@ function nextInfrastructureFilePaths(
 /** The Next route/request-boundary write ops plus the SDK dependency. */
 function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
   const appDir = ctx.framework.appDir;
-  const profile = renderer.templates.profilePage?.();
+  const pageContext = { useCase: ctx.useCase, posture: ctx.posture };
+  const profile = renderer.templates.profilePage?.(pageContext);
   const provider = renderer.templates.provider;
   const dts = renderer.templates.customElementsDts?.();
   const boundary = requestBoundaryFile(ctx.framework);
@@ -166,12 +167,12 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     {
       kind: "write",
       path: join(appDir, "login/page.tsx"),
-      contents: renderer.templates.authPage("login", { useCase: ctx.useCase }).contents,
+      contents: renderer.templates.authPage("login", pageContext).contents,
     },
     {
       kind: "write",
       path: join(appDir, "register/page.tsx"),
-      contents: renderer.templates.authPage("register", { useCase: ctx.useCase }).contents,
+      contents: renderer.templates.authPage("register", pageContext).contents,
     },
     profile
       ? { kind: "write", path: join(appDir, "profile/page.tsx"), contents: profile.contents }

@@ -9,6 +9,11 @@ const defaultRepoRoot = fileURLToPath(new URL("..", import.meta.url));
 const GITHUB_API_VERSION = "2022-11-28";
 const RELEASE_TITLE_PREFIX = "Zitadel NextGen";
 
+// GitHub rejects release bodies longer than this with a 422. JS string
+// lengths count UTF-16 units and never undercount characters, so comparing
+// `.length` against this limit stays on the safe side.
+export const GITHUB_RELEASE_BODY_MAX_CHARS = 125000;
+
 export const GENERATED_BLOCK_START = "<!-- nextgen-release-facts:start -->";
 export const GENERATED_BLOCK_END = "<!-- nextgen-release-facts:end -->";
 export const PRODUCT_NOTES_PLACEHOLDER =
@@ -17,21 +22,22 @@ export const PRODUCT_NOTES_PLACEHOLDER =
 export async function upsertProductGithubRelease(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
   const metadata = options.metadata ?? (await readReleaseMetadata({ outDir: options.outDir }));
-  const generatedBlock =
-    options.generatedBlock ?? (await renderGeneratedReleaseFacts({ repoRoot, metadata }));
-  const body = createInitialReleaseBody(generatedBlock);
+  const sections = await collectPackageChangeSections({ repoRoot, metadata });
   const tag = releaseTag(metadata);
 
   if (options.dryRun) {
+    const { body, omitted } = fitInitialReleaseBody({ metadata, sections, tag });
     options.log?.(`dry run: would create or update draft GitHub Release ${tag}`);
     options.log?.(body);
-    return { action: "dry-run", tag, body };
+    logOmittedPackageChanges(options.log, tag, omitted);
+    return { action: "dry-run", tag, body, omittedPackages: omitted };
   }
 
   const github = githubReleaseConfig(options.env ?? process.env, options.fetchImpl ?? globalThis.fetch);
   const existing = await findGithubReleaseByTag({ ...github, tag });
 
   if (!existing) {
+    const { body, omitted } = fitInitialReleaseBody({ metadata, sections, tag });
     const created = await createGithubRelease({
       ...github,
       metadata,
@@ -39,17 +45,52 @@ export async function upsertProductGithubRelease(options = {}) {
       body,
     });
     options.log?.(`created draft GitHub Release ${tag}`);
-    return { action: "create", tag, release: created, body };
+    logOmittedPackageChanges(options.log, tag, omitted);
+    return { action: "create", tag, release: created, body, omittedPackages: omitted };
   }
 
-  const updatedBody = upsertGeneratedBlock(existing.body ?? "", generatedBlock);
+  const fitted = fitGeneratedReleaseFacts({
+    metadata,
+    sections,
+    fits: (block) => upsertGeneratedBlock(existing.body ?? "", block).length <= GITHUB_RELEASE_BODY_MAX_CHARS,
+  });
+  if (!fitted.fits) {
+    throw new Error(
+      `GitHub Release ${tag} body exceeds ${GITHUB_RELEASE_BODY_MAX_CHARS} characters even with every package changelog omitted; shorten the product notes above the generated facts block`,
+    );
+  }
+  const updatedBody = upsertGeneratedBlock(existing.body ?? "", fitted.block);
   const updated = await patchGithubRelease({
     ...github,
     releaseId: existing.id,
     body: updatedBody,
   });
   options.log?.(`updated GitHub Release ${tag} generated facts block`);
-  return { action: "update", tag, release: updated, body: updatedBody };
+  logOmittedPackageChanges(options.log, tag, fitted.omitted);
+  return { action: "update", tag, release: updated, body: updatedBody, omittedPackages: fitted.omitted };
+}
+
+function fitInitialReleaseBody({ metadata, sections, tag }) {
+  const fitted = fitGeneratedReleaseFacts({
+    metadata,
+    sections,
+    fits: (block) => createInitialReleaseBody(block).length <= GITHUB_RELEASE_BODY_MAX_CHARS,
+  });
+  if (!fitted.fits) {
+    throw new Error(
+      `GitHub Release ${tag} body exceeds ${GITHUB_RELEASE_BODY_MAX_CHARS} characters even with every package changelog omitted`,
+    );
+  }
+  return { body: createInitialReleaseBody(fitted.block), omitted: fitted.omitted };
+}
+
+function logOmittedPackageChanges(log, tag, omitted) {
+  if (omitted.length === 0) {
+    return;
+  }
+  log?.(
+    `omitted ${omitted.length} package changelog section(s) from GitHub Release ${tag} to stay under ${GITHUB_RELEASE_BODY_MAX_CHARS} characters: ${omitted.join(", ")}`,
+  );
 }
 
 export async function readReleaseMetadata(options = {}) {
@@ -66,7 +107,15 @@ export async function renderGeneratedReleaseFacts(options = {}) {
     throw new Error("release facts require metadata");
   }
 
-  const packageChanges = await renderPackageChanges({ repoRoot, metadata });
+  const sections = await collectPackageChangeSections({ repoRoot, metadata });
+  return assembleGeneratedReleaseFacts(metadata, sections.map(renderPackageChangeSection));
+}
+
+export function assembleGeneratedReleaseFacts(metadata, renderedSections) {
+  const packageChanges =
+    renderedSections.length > 0
+      ? renderedSections.join("\n\n")
+      : "_No package-specific changelog entries beyond version or dependency updates._";
   return `${GENERATED_BLOCK_START}
 ## Generated Release Facts
 
@@ -92,7 +141,7 @@ ${packageChanges}
 ${GENERATED_BLOCK_END}`;
 }
 
-export async function renderPackageChanges(options = {}) {
+export async function collectPackageChangeSections(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
   const sections = [];
   for (const pkg of options.metadata?.packages ?? []) {
@@ -111,12 +160,53 @@ export async function renderPackageChanges(options = {}) {
       continue;
     }
 
-    sections.push(`#### \`${pkg.name}\`\n\n${normalized}`);
+    sections.push({ name: pkg.name, path: pkg.path, content: normalized });
   }
 
-  return sections.length > 0
-    ? sections.join("\n\n")
-    : "_No package-specific changelog entries beyond version or dependency updates._";
+  return sections;
+}
+
+export function renderPackageChangeSection(section) {
+  return `#### \`${section.name}\`\n\n${section.content}`;
+}
+
+// Replaces the largest package changelog sections with pointers to their
+// CHANGELOG.md files until `fits(block)` accepts the assembled facts block.
+// Dropping largest-first keeps the most sections intact for the fewest
+// characters shed. `fits: false` in the result means even a fully stubbed
+// block is rejected — the space is consumed outside the generated block.
+export function fitGeneratedReleaseFacts({ metadata, sections, fits }) {
+  const rendered = sections.map(renderPackageChangeSection);
+  let block = assembleGeneratedReleaseFacts(metadata, rendered);
+  if (fits(block)) {
+    return { block, omitted: [], fits: true };
+  }
+
+  const bySizeDesc = sections
+    .map((section, index) => ({ index, size: rendered[index].length }))
+    .sort((a, b) => b.size - a.size || a.index - b.index);
+
+  const omitted = [];
+  for (const { index } of bySizeDesc) {
+    const stub = omittedPackageChangeStub(sections[index], metadata);
+    if (stub.length >= rendered[index].length) {
+      // Sections are visited largest-first, so every remaining section is
+      // already smaller than its stub and omitting it cannot shrink the block.
+      break;
+    }
+    rendered[index] = stub;
+    omitted.push(sections[index].name);
+    block = assembleGeneratedReleaseFacts(metadata, rendered);
+    if (fits(block)) {
+      return { block, omitted, fits: true };
+    }
+  }
+
+  return { block, omitted, fits: false };
+}
+
+export function omittedPackageChangeStub(section, metadata) {
+  return `#### \`${section.name}\`\n\n_Changelog omitted to keep this release body under GitHub's ${GITHUB_RELEASE_BODY_MAX_CHARS}-character limit; see \`${section.path}/CHANGELOG.md\` at tag \`${releaseTag(metadata)}\`._`;
 }
 
 export function extractVersionSection(source, version) {

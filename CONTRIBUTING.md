@@ -353,6 +353,23 @@ off the error, so Spanner's `ReadWriteTransaction` stopped recognising it as
 retryable. See the error-wrapping rules in
 [internal/storage/AGENTS.md](internal/storage/AGENTS.md) and #788.
 
+A stalled transaction is a different failure and has a different fix. Read-write
+transactions run under a retry budget, and because the emulator serializes
+process-wide and hands priority to the newest transaction, a transaction
+spanning several statements can be starved by any concurrent write regardless of
+which rows it touches. So the emulator gets a much looser budget (2 minutes)
+than production (30 seconds). Tell the two apart by timing:
+
+- **Fails immediately** with a raw `ABORTED`: the status was stripped, see
+  above. Fix the wrapping.
+- **Stalls, then fails** with `unavailable` / HTTP 503 and a
+  `spanner transaction gave up retrying` warning naming the elapsed time: it was
+  starved. Do not raise the budget; shorten the transaction, or reduce how many
+  statements it holds open.
+
+Before that budget existed the second case surfaced as an opaque 500 with no log
+line, and had to be diagnosed from a test's wall-clock duration (#794).
+
 The emulator container is pinned to `linux/amd64`. The arm64 build returns
 commit timestamps at a different resolution, which fails seven `created_at`
 assertions on Apple Silicon while passing in CI. Pinning costs a few seconds

@@ -1,0 +1,77 @@
+---
+title: Customize the login design
+description: Choose a starter login design, add your branding, and publish it as a revision.
+---
+
+The hosted login ships with a built-in template that follows your project without any files in your repo. When you want to change how it looks, you take ownership of the template: the CLI copies a starter design into `.zitadel/branding/`, and from then on the login renders your files.
+
+## Starter designs
+
+| Design | Layout | Uses logo | Uses hero image |
+| --- | --- | --- | --- |
+| `centered` | Form in a card, centred on the page | yes | no |
+| `split` | Brand panel left, form right | yes | yes |
+| `split-right` | Form left, brand panel right | yes | yes |
+| `hero` | Landing-style brand pane left, form right | yes | no |
+| `minimal` | No card chrome, fields straight on the page | no | no |
+
+All five render every step of your login flow — sign-in, registration, passkey ceremonies, and their error states — because they template the flow engine's step responses rather than individual screens.
+
+## Choose a design during setup
+
+The interactive setup wizard asks how the login should look as its final question. Keeping the preselected **Built-in** answer writes nothing; picking a design ejects its template and publishes it as branding revision 1 before setup finishes.
+
+Scripted and non-interactive runs pass the design directly:
+
+```sh
+npx @zitadel/cli@alpha setup --design split --non-interactive
+```
+
+Without `--design`, non-interactive setup keeps the built-in template.
+
+## Choose a design later
+
+An existing project takes ownership at any time:
+
+```sh
+npx @zitadel/cli@alpha branding eject
+```
+
+`branding eject` offers the same five designs, then scaffolds `.zitadel/branding/` locally — nothing is uploaded until you apply:
+
+- `branding.json` — the descriptor: layout, brand asset URLs, and the template reference.
+- `login.liquid` — the LiquidJS template the login renders for every step.
+- `README.md` — the template rules and workflow, kept next to the files.
+
+## Add your branding
+
+Brand assets live in `branding.json` and must be hosted `https://` URLs — the CLI validates them at plan time, and the platform rejects anything else:
+
+```json
+{
+  "$schema": "../meta/branding.json",
+  "layout": "split",
+  "logo_url": "https://cdn.example.com/logo.svg",
+  "hero_url": "https://cdn.example.com/hero.jpg",
+  "liquid_template_file": "./login.liquid"
+}
+```
+
+Only some designs render each asset (see the table above); a URL configured for a design that does not use it is simply ignored. Custom fonts are not configurable yet — load fonts from the page embedding the login instead.
+
+## Publish and iterate
+
+Branding follows the same loop as schemas and flows:
+
+```sh
+npx @zitadel/cli@alpha plan
+npx @zitadel/cli@alpha apply
+```
+
+`plan` validates the descriptor and the template (LiquidJS parse, banned patterns, required tags) and shows the pending change; `apply` publishes it. Every publish creates an immutable revision — there is no in-place update, and rolling back means re-applying an earlier template. The live login picks up the newest revision on its next step response.
+
+The scaffolded `README.md` in `.zitadel/branding/` documents the template rules (compose `zl-*` components, no scripts or inline styles, copy through translation keys).
+
+## Ownership trade-off
+
+An ejected template is yours: it stops receiving improvements to the built-in designs. Eject when you want to change the login's structure and look; to change only wording, the `locales` prop covers copy without touching templates (see Customize copy). Staying on the built-in template costs nothing — `branding eject` is always one command away.

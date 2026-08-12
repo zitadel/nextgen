@@ -7,8 +7,6 @@ import (
 	"github.com/ianlancetaylor/jsonschema"
 )
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_field_resolver.mock.go . FlowFieldResolver
-
 // FlowFieldResolver maps property names referenced by a flow step to
 // fully-resolved [FlowField] payloads, surfaces the implicit transition
 // outcomes the schema implies (a property with `x-unique` set implies a

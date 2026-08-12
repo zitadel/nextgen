@@ -15,8 +15,15 @@
   line-height: 1.25rem;
   letter-spacing: 0;
   text-transform: none;
+  /* The neutral sheen comes from the design system's gradient pair, which is
+     mode-aware — hardcoding its dark values here painted a dark slab on a
+     light page. `color-mix` carries the 60% stop opacity a hex token can't. */
   background:
-    linear-gradient(182deg, rgb(72 74 87 / 0.6) 28.65%, rgb(15 15 17 / 0.6) 81.82%),
+    linear-gradient(
+      182deg,
+      color-mix(in srgb, var(--zl-gradient-neutral-start, #484a57) 60%, transparent) 28.65%,
+      color-mix(in srgb, var(--zl-gradient-base-end, #0f0f11) 60%, transparent) 81.82%
+    ),
     var(--zl-color-surface-default-primary-gray, #252528);
   color: var(--zl-color-text-primary-white, #f4f4f6);
   border: 1px solid var(--zl-color-border-default-gray-200, #484a57);

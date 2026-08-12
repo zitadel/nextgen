@@ -42,6 +42,24 @@ function luminance(color: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+/** WCAG relative luminance of a `rgb(r, g, b)` string. */
+function relativeLuminance(color: string): number {
+  const [r, g, b] = (color.match(/[\d.]+/g) ?? ["0", "0", "0"]).slice(0, 3).map((part) => {
+    const channel = Number(part) / 255;
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  }) as [number, number, number];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** WCAG contrast ratio between two `rgb()` strings, 1 (identical) – 21. */
+function contrast(a: string, b: string): number {
+  const [high, low] = [relativeLuminance(a), relativeLuminance(b)].sort((x, y) => y - x) as [
+    number,
+    number,
+  ];
+  return (high + 0.05) / (low + 0.05);
+}
+
 function installFlowFetchStub(responses: readonly CreateFlow201[]): { restore: () => void } {
   let cursor = 0;
   const fetchStub = vi.fn(async (): Promise<Response> => {
@@ -132,6 +150,116 @@ describe("<zitadel-login> theming (chromium)", () => {
     const card = element.shadowRoot?.querySelector(".zl-card-title") as HTMLElement;
     expect(luminance(getComputedStyle(card).color)).toBeLessThan(60);
   });
+
+  /**
+   * Interactive states are where light mode actually broke: the resting
+   * tokens above all flipped, but the hover/pressed fills read the raw grey
+   * ramp, which is mode-independent — so a light page kept dark-mode fills
+   * under dark-mode text (primary hover measured 1.4:1). Asserting resting
+   * colours alone never caught it, so drive the states and measure contrast.
+   */
+  for (const theme of ["light", "dark"] as const) {
+    it(`theme=${theme} keeps every button state legible`, async () => {
+      const element = await mount((el) => {
+        el.theme = theme;
+        el.variant = "page";
+      });
+      // The step gates its submit action on the required field, and the
+      // hover/pressed rules are all `:not(:disabled)` — measuring a gated
+      // button silently reads the resting colours instead.
+      const field = element.shadowRoot?.querySelector("zl-field") as HTMLElement;
+      const input = field.shadowRoot?.querySelector(".zr-field__input") as HTMLInputElement;
+      input.value = "user@example.com";
+      input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+
+      const button = element.shadowRoot?.querySelector("zl-button") as HTMLElement & {
+        updateComplete: Promise<boolean>;
+      };
+      await button.updateComplete;
+      const painted = button.shadowRoot?.querySelector(".zr-btn") as HTMLButtonElement;
+      expect(painted.disabled, `${theme}: submit still gated, states would not paint`).toBe(false);
+      // The surface transitions `background-color` over `--zl-duration-fast`,
+      // so a computed read straight after the state flip samples the *old*
+      // colour mid-interpolation — and the assertion passes on the resting
+      // fill it was meant to look past.
+      painted.style.transition = "none";
+
+      for (const state of ["hovered", "pressed", "focused"]) {
+        button.setAttribute("data-state", state);
+        // The atom mirrors `data-state` onto the painted element on its next
+        // render, so wait for it rather than measuring the previous paint.
+        await button.updateComplete;
+        const surface = button.shadowRoot?.querySelector(`.zr-btn[data-state="${state}"]`);
+        expect(surface, `${theme} / ${state}: atom did not mirror data-state`).toBeTruthy();
+
+        const style = getComputedStyle(surface as HTMLElement);
+        expect(
+          contrast(style.backgroundColor, style.color),
+          `${theme} / ${state}: ${style.backgroundColor} on ${style.color}`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+  }
+
+  /**
+   * The attribution pill painted its sheen from hardcoded dark literals, so
+   * it stayed a dark slab on a light page whatever the theme resolved to.
+   * The gradient stops are tokens now; assert the painted stops follow.
+   */
+  it("theme=light lightens the attribution pill's gradient", async () => {
+    const element = await mount((el) => {
+      el.theme = "light";
+      el.variant = "page";
+    });
+    const pill = element.shadowRoot?.querySelector("zl-pill") as HTMLElement;
+    const surface = pill.shadowRoot?.querySelector(".zr-pill") as HTMLElement;
+    const style = getComputedStyle(surface);
+
+    // Both stops sit on the light end of the ramp, so the pill reads as a
+    // light chip and its dark text stays legible. Chrome serialises a
+    // `color-mix()` result as `color(srgb r g b / a)` with 0–1 channels.
+    const stops = style.backgroundImage.match(/color\(srgb[^)]*\)|rgba?\([^)]*\)/g) ?? [];
+    expect(stops.length).toBeGreaterThanOrEqual(2);
+    for (const stop of stops) {
+      const scale = stop.startsWith("color(") ? 255 : 1;
+      const channels = (stop.match(/[\d.]+/g) ?? []).slice(0, 3);
+      const rgb = `rgb(${channels.map((channel) => Math.round(Number(channel) * scale)).join(", ")})`;
+      expect(luminance(rgb), `${stop} in ${style.backgroundImage}`).toBeGreaterThan(150);
+    }
+    expect(contrast(style.backgroundColor, style.color)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  /**
+   * The card drew its edge from its own *surface* token, which happens to
+   * differ from the page in dark mode but resolves to the card fill in light
+   * — a white border on a white card, invisible against the page.
+   */
+  for (const theme of ["light", "dark"] as const) {
+    it(`theme=${theme} keeps the card edge distinct from the surfaces it separates`, async () => {
+      const element = await mount((el) => {
+        el.theme = theme;
+        el.variant = "page";
+      });
+      const card = element.shadowRoot?.querySelector("zl-card") as HTMLElement;
+      const surface = card.shadowRoot?.querySelector(".zr-card") as HTMLElement;
+      const shell = element.shadowRoot?.querySelector("zl-page-shell") as HTMLElement;
+      const page = shell.shadowRoot?.querySelector(".zr-page-shell") as HTMLElement;
+
+      const border = luminance(getComputedStyle(surface).borderTopColor);
+      const pageBg = luminance(getComputedStyle(page).backgroundColor);
+
+      // Direction, not distance: the edge has to step *away* from the page —
+      // darker on a light page, lighter on a dark one. A distance check would
+      // have passed the regression, whose white border sat 11 points off a
+      // near-white page. Dark mode hid the bug because the card's surface and
+      // border tokens happen to share a value there (#252528).
+      const separation = theme === "light" ? pageBg - border : border - pageBg;
+      expect(
+        separation,
+        `${theme}: card border (${border.toFixed(0)}) does not step away from the page (${pageBg.toFixed(0)})`,
+      ).toBeGreaterThan(4);
+    });
+  }
 
   it("theme=dark keeps the design system's primary surface", async () => {
     const element = await mount((el) => {

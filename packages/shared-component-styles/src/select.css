@@ -128,7 +128,7 @@
 
 /* Hover — match the text field box. */
 .zr-select:not(.zr-select--disabled):not(.zr-select--open) .zr-select__trigger:hover {
-  border-color: var(--zl-color-gray-500, #9e9eb2);
+  border-color: var(--zl-color-border-hover, #9e9eb2);
   background-color: color-mix(in srgb, var(--zl-color-text-primary-white, #f4f4f6) 10%, transparent);
 }
 /* Focus / open — single white border, no outer ring (Figma Focused). Focus

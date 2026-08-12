@@ -96,7 +96,12 @@ function allFalse(gates) {
   return Object.values(gates).every((v) => v === false);
 }
 function journeys(gates) {
-  return [gates.journey_fresh_app, gates.journey_passkey, gates.journey_testkit];
+  return [
+    gates.journey_fresh_app,
+    gates.journey_passkey,
+    gates.journey_preexisting,
+    gates.journey_testkit,
+  ];
 }
 
 test("mode: changeset/version files only is version-only", () => {
@@ -137,7 +142,7 @@ test("console change runs the suites but no journeys and no snapshot", () => {
     files: ["apps/console/src/api/zitadel.ts"],
     targets: CONSOLE_CLASS,
   });
-  assert.deepEqual(journeys(gates), [false, false, false]);
+  assert.deepEqual(journeys(gates), [false, false, false, false]);
   assert.equal(gates.snapshot, false);
   assert.equal(gates.go_tests, false);
   assert.equal(gates.suites_console, true);
@@ -151,11 +156,24 @@ test("single-SDK change runs the fresh-app matrix but not the next-scaffold jour
     files: ["packages/sdk-vue/src/index.ts"],
     targets: SDK_VUE_CLASS,
   });
-  assert.deepEqual(journeys(gates), [true, false, false]);
+  assert.deepEqual(journeys(gates), [true, false, false, false]);
   assert.equal(gates.snapshot, true);
   assert.equal(matrix, "full");
   assert.equal(gates.suites_testing_demo, false);
   assert.equal(gates.go_tests, false);
+});
+
+test("nuxt-SDK change additionally runs the pre-existing-app lane", () => {
+  // Synthetic slice on the SDK_VUE_CLASS shape: sdk-nuxt:build is the one
+  // per-framework surface the pre-existing lane answers to beyond the shared
+  // next-scaffold triggers (it drives Next AND Nuxt widget-posture apps).
+  const { gates } = resolveGates({
+    mode: "full",
+    files: ["packages/sdk-nuxt/src/module.ts"],
+    targets: SDK_VUE_CLASS.map((t) => t.replace("sdk-vue", "sdk-nuxt")),
+  });
+  assert.deepEqual(journeys(gates), [true, false, true, false]);
+  assert.equal(gates.snapshot, true);
 });
 
 test("login-ui change runs all journeys on a single framework", () => {
@@ -164,7 +182,7 @@ test("login-ui change runs all journeys on a single framework", () => {
     files: ["apps/login-ui/src/main.ts"],
     targets: LOGIN_UI_CLASS,
   });
-  assert.deepEqual(journeys(gates), [true, true, true]);
+  assert.deepEqual(journeys(gates), [true, true, true, true]);
   assert.equal(matrix, "single");
   assert.equal(gates.go_tests, false);
   assert.equal(gates.suites_console, true);
@@ -176,7 +194,7 @@ test("testing-kit change runs all journeys with the full matrix", () => {
     files: ["packages/testing/src/index.ts"],
     targets: TESTING_KIT_CLASS,
   });
-  assert.deepEqual(journeys(gates), [true, true, true]);
+  assert.deepEqual(journeys(gates), [true, true, true, true]);
   assert.equal(gates.snapshot, true);
   assert.equal(matrix, "full");
 });
@@ -187,7 +205,7 @@ test("journey-project change runs all journeys, full matrix, and the snapshot th
     files: ["apps/cli-journey-e2e/src/user-journey.spec.ts"],
     targets: JOURNEY_CLASS,
   });
-  assert.deepEqual(journeys(gates), [true, true, true]);
+  assert.deepEqual(journeys(gates), [true, true, true, true]);
   assert.equal(gates.snapshot, true);
   assert.equal(matrix, "full");
   assert.equal(gates.go_tests, false);
@@ -199,7 +217,7 @@ test("components change runs every journey and suite with the full matrix, but n
     files: ["packages/components/src/atoms/index.ts"],
     targets: COMPONENTS_CLASS,
   });
-  assert.deepEqual(journeys(gates), [true, true, true]);
+  assert.deepEqual(journeys(gates), [true, true, true, true]);
   assert.equal(gates.snapshot, true);
   assert.equal(gates.suites_testing_demo, true);
   assert.equal(gates.suites_console, true);
@@ -215,7 +233,7 @@ test(":test-browser affectedness alone keeps the browser install without journey
     targets: TEST_BROWSER_SLICE,
   });
   assert.equal(gates.browsers, true);
-  assert.deepEqual(journeys(gates), [false, false, false]);
+  assert.deepEqual(journeys(gates), [false, false, false, false]);
 });
 
 test("unclaimed files force a full run with the full matrix", () => {

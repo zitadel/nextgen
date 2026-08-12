@@ -35,3 +35,29 @@ export function customizeAndPublishActions(cliVersion: string): string[] {
       `then ${publicCliCommand("apply", cliVersion)} to publish.`,
   ];
 }
+
+/**
+ * How to change the login's look, depending on whether setup already ejected
+ * a starter design. With a design, revision 1 is already live and the
+ * template is repo-owned — point at the files and the plan/apply loop.
+ * Without one, point at `branding eject` so the built-in template's
+ * customization path stays discoverable after setup.
+ */
+export function brandingGuidanceAction(
+  design: string | undefined,
+  cliVersion: string,
+): string {
+  if (design) {
+    return (
+      `Make the login yours: the ${design} design is live as branding revision 1. ` +
+      "Edit .zitadel/branding/login.liquid (logo and hero image URLs live in " +
+      `branding.json), then ${publicCliCommand("plan", cliVersion)} and ` +
+      `${publicCliCommand("apply", cliVersion)} to publish the next revision.`
+    );
+  }
+  return (
+    "Change how the login looks: " +
+    `${publicCliCommand("branding eject", cliVersion)} scaffolds .zitadel/branding/ ` +
+    "from a starter design (centered, split, split-right, hero, minimal) for you to edit."
+  );
+}
