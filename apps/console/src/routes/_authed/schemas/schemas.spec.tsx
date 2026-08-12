@@ -104,6 +104,26 @@ describe("user schemas list", () => {
     expect(screen.queryByText(/Password/)).not.toBeInTheDocument();
   });
 
+  it("joins the enabled methods in a stable order", async () => {
+    // Alphabetical by annotation key, so the chip does not reshuffle between
+    // loads — `GET /schemas/{id}` serialises from a Go map and its key order is
+    // randomised. It is not a claim about which method is offered first: that
+    // is the flow's, from the order of its step's actions.
+    server.use(
+      http.get(SCHEMAS_URL, () =>
+        HttpResponse.json([{ id: "sch_both", created_at: "2026-07-12T16:59:04Z" }]),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_both`, () =>
+        HttpResponse.json({
+          ...BUSINESS,
+          "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
+        }),
+      ),
+    );
+    await renderAt("/schemas");
+    expect(await screen.findByText("Passkey + Password")).toBeInTheDocument();
+  });
+
   it("identifies a schema by its id and creation date (D10)", async () => {
     serveBusiness();
     await renderAt("/schemas");
@@ -227,6 +247,10 @@ describe("user schema detail", () => {
     // declares it, so hiding it would misreport the configuration.
     expect(panel.getByText("Passkey").nextSibling).toHaveTextContent("Enabled");
     expect(panel.getByText("Password").nextSibling).toHaveTextContent("Disabled");
+
+    // Same stable alphabetical order as the list chip, for the same reason.
+    const text = screen.getByRole("tabpanel").textContent ?? "";
+    expect(text.indexOf("Passkey")).toBeLessThan(text.indexOf("Password"));
   });
 
   it("renders the document as JSON and as YAML", async () => {

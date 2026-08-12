@@ -168,11 +168,11 @@ export interface SchemaAuthMethod {
 /**
  * The sign-in methods a schema declares.
  *
- * `x-auth-methods` says which methods a user type supports, not the order they
- * are offered in — presentation is the flow engine's, from the order of a
- * step's actions. So the row orders by the meta-schema's own enumeration
- * (`api/openapi/endpoints/schemas/auth-methods.json`), with any key outside it
- * after, alphabetical, so the chip is stable across renders and schemas.
+ * `x-auth-methods` says which methods a user type supports; the order they are
+ * offered in is the flow's, from the order of a step's actions. So the sort
+ * here claims nothing — it exists for the same reason {@link schemaFields}
+ * sorts: `GET /schemas/{id}` serialises from a Go map, so the response's key
+ * order is randomised and an unsorted list reshuffles between loads.
  *
  * Every declared method is returned, not just the two the backend supports
  * today (D10). A schema that turns on `otp` should show `otp`, not silently
@@ -181,11 +181,6 @@ export interface SchemaAuthMethod {
 export function schemaAuthMethods(schema: UserSchema): SchemaAuthMethod[] {
   const methods = schema["x-auth-methods"];
   if (!methods || typeof methods !== "object") return [];
-  const order = Object.keys(AUTH_METHOD_LABELS);
-  const rank = (key: string) => {
-    const index = order.indexOf(key);
-    return index === -1 ? order.length : index;
-  };
   return Object.entries(methods as Record<string, unknown>)
     .map(([key, value]) => {
       const entry = (value ?? {}) as Record<string, unknown>;
@@ -195,7 +190,7 @@ export function schemaAuthMethods(schema: UserSchema): SchemaAuthMethod[] {
         enabled: entry.enabled === true,
       };
     })
-    .sort((a, b) => rank(a.key) - rank(b.key) || a.key.localeCompare(b.key));
+    .sort((a, b) => a.key.localeCompare(b.key));
 }
 
 /**
