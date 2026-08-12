@@ -174,7 +174,7 @@ type FlowStep = {
   actions: { name: string; kind: string }[];
   gateCount: number;
   ssoProviderCount: number;
-  transitions: Map<string, { target: string; action: string | null }>;
+  transitions: Map<string, { target: string; action: string | null; purpose: string | null }>;
   onSuccess: string | undefined;
   terminal: boolean;
 };
@@ -212,13 +212,17 @@ function readFlow(flow: object): FlowDef {
   if (Array.isArray(raw.steps)) {
     for (const value of raw.steps) {
       if (!isPlainObject(value)) continue;
-      const transitions = new Map<string, { target: string; action: string | null }>();
+      const transitions = new Map<
+        string,
+        { target: string; action: string | null; purpose: string | null }
+      >();
       if (isPlainObject(value.transitions)) {
         for (const [key, t] of Object.entries(value.transitions)) {
           const entry = isPlainObject(t) ? t : {};
           transitions.set(key, {
             target: str(entry.target),
             action: typeof entry.action === "string" ? entry.action : null,
+            purpose: typeof entry.purpose === "string" ? entry.purpose : null,
           });
         }
       }
@@ -422,6 +426,47 @@ function validateGraph(def: FlowDef, stepNames: Set<string>): FlowValidationIssu
 
   for (const step of def.steps) {
     for (const [key, t] of step.transitions) {
+      if (t.purpose !== null) {
+        // Local re-purposing: never combined with a cross-flow action,
+        // only to a purpose this definition serves, and only to that
+        // purpose's entry step. Mirrors the server-side validator.
+        if (t.action !== null) {
+          issues.push(
+            error(
+              "graph",
+              `step ${q(step.name)}: transition ${q(key)} declares both purpose and action; a transition either re-purposes locally or targets another flow`,
+              step.name,
+            ),
+          );
+        } else if (!(FLOW_PURPOSES as readonly string[]).includes(t.purpose)) {
+          issues.push(
+            error(
+              "graph",
+              `step ${q(step.name)}: transition ${q(key)} has invalid purpose ${q(t.purpose)}`,
+              step.name,
+            ),
+          );
+        } else {
+          const entry = def.purposes.get(t.purpose);
+          if (entry === undefined) {
+            issues.push(
+              error(
+                "graph",
+                `step ${q(step.name)}: transition ${q(key)} re-purposes to ${q(t.purpose)}, which this definition does not serve`,
+                step.name,
+              ),
+            );
+          } else if (t.target !== entry) {
+            issues.push(
+              error(
+                "graph",
+                `step ${q(step.name)}: transition ${q(key)} re-purposes to ${q(t.purpose)} but targets ${q(t.target)}; it must target that purpose's entry step ${q(entry)}`,
+                step.name,
+              ),
+            );
+          }
+        }
+      }
       if (isCurrentFlow(t)) {
         if (!stepNames.has(t.target)) {
           issues.push(

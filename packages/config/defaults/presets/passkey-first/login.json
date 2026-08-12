@@ -23,6 +23,12 @@
           "kind": "navigate",
           "primary": false,
           "text_key": "passkey-first.action.email_fallback"
+        },
+        {
+          "name": "register",
+          "kind": "navigate",
+          "primary": false,
+          "text_key": "identifier.action.register.link"
         }
       ],
       "transitions": {
@@ -34,6 +40,10 @@
         },
         "user_not_found": {
           "target": "register"
+        },
+        "register": {
+          "target": "register",
+          "purpose": "register"
         }
       }
     },
@@ -54,6 +64,12 @@
           "kind": "passkey",
           "primary": false,
           "text_key": "identifier.action.passkey"
+        },
+        {
+          "name": "register",
+          "kind": "navigate",
+          "primary": false,
+          "text_key": "identifier.action.register.link"
         }
       ],
       "transitions": {
@@ -65,6 +81,10 @@
         },
         "user_not_found": {
           "target": "register"
+        },
+        "register": {
+          "target": "register",
+          "purpose": "register"
         }
       }
     },
@@ -113,6 +133,12 @@
           "kind": "submit",
           "primary": false,
           "text_key": "register.action.password"
+        },
+        {
+          "name": "sign_in",
+          "kind": "navigate",
+          "primary": false,
+          "text_key": "register.action.sign_in.link"
         }
       ],
       "transitions": {
@@ -124,6 +150,10 @@
         },
         "user_already_exists": {
           "target": "password"
+        },
+        "sign_in": {
+          "target": "passkey-first",
+          "purpose": "login"
         }
       }
     },

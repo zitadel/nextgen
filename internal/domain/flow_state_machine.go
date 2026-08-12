@@ -346,6 +346,10 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 		return r.processBack(pc)
 	}
 	if actionKind == FlowActionKindNavigate {
+		// Navigating abandons any pending ceremony; without this the
+		// stale challenge re-attaches on the next render (the mismatch
+		// cleanup below never runs on this early-return path).
+		state.ClearPendingChallenge()
 		return r.routeOutcome(pc, FlowResolvedFields{}, in.Action, false)
 	}
 
@@ -469,6 +473,11 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 	// Snapshot purpose before the flip so back can restore it.
 	prevPurpose := pc.state.CurrentPurpose
 	applyOutcomeFlip(pc.state, outcome)
+	// A declared transition purpose wins over the implicit outcome flip.
+	// Only CurrentPurpose moves; the pinned Purpose stays for telemetry/ACR.
+	if transition.Purpose != nil {
+		pc.state.CurrentPurpose = *transition.Purpose
+	}
 
 	r.advance(pc.state, pc.currentStep, prevPurpose, nextStep.Name)
 

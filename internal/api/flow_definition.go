@@ -206,10 +206,16 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 					a, _ := domain.FlowDefinitionTransitionActionString(string(apiTransition.GetAction().Value)) // validated in the domain
 					transitionAction = &a
 				}
+				var transitionPurpose *domain.FlowDefinitionPurpose
+				if apiTransition.Purpose.IsSet() {
+					p, _ := domain.FlowDefinitionPurposeString(string(apiTransition.GetPurpose().Value)) // validated in the domain
+					transitionPurpose = &p
+				}
 
 				t := domain.FlowStepTransition{
-					Action: transitionAction,
-					Target: apiTransition.GetTarget(),
+					Action:  transitionAction,
+					Purpose: transitionPurpose,
+					Target:  apiTransition.GetTarget(),
 				}
 				transitions[name] = t
 			}
@@ -384,12 +390,21 @@ func mapTransitionsToAPI(domainTransitions map[string]domain.FlowStepTransition)
 		if transition.Action != nil {
 			action = transition.Action.String()
 		}
+		var purpose string
+		if transition.Purpose != nil {
+			purpose = transition.Purpose.String()
+		}
 		transitions[n] = api.FlowDefinitionStepTransitionsItem{
 			Target: transition.Target,
 			Action: api.OptNilFlowDefinitionStepTransitionsItemAction{
 				Value: api.FlowDefinitionStepTransitionsItemAction(action),
 				Set:   transition.Action != nil,
 				Null:  transition.Action == nil,
+			},
+			Purpose: api.OptNilFlowDefinitionStepTransitionsItemPurpose{
+				Value: api.FlowDefinitionStepTransitionsItemPurpose(purpose),
+				Set:   transition.Purpose != nil,
+				Null:  transition.Purpose == nil,
 			},
 		}
 	}

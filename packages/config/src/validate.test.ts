@@ -23,7 +23,7 @@ type TestStep = {
   name: string;
   fields: string[];
   actions: Array<{ name: string; kind: string; primary?: boolean; text_key?: string }>;
-  transitions: Record<string, { target: string; action?: string }>;
+  transitions: Record<string, { target: string; action?: string; purpose?: string }>;
   sso_providers?: Array<Record<string, string>>;
   on_success?: string;
   complete?: string;
@@ -75,6 +75,12 @@ describe("validateFlowDefinition — valid flows", () => {
     const def = flow();
     def.purposes = { login: "identifier" };
     delete step(def, "identifier").transitions.user_not_found;
+    // A login-only flow has no register purpose to switch to: drop the
+    // default's purpose-switch navigation along with the register steps.
+    delete step(def, "identifier").transitions.register;
+    step(def, "identifier").actions = step(def, "identifier").actions.filter(
+      (a) => a.name !== "register",
+    );
     // register/register-password become unreachable; drop them.
     def.steps = def.steps.filter((s) =>
       ["identifier", "password", "done"].includes(s.name),
@@ -248,6 +254,63 @@ describe("graph / cycles / flip-table", () => {
     step(def, "password").transitions.submit = { target: "other-flow", action: "jump" };
     expect(messages(validateFlowDefinition(def))).toContain(
       'step "password": transition "submit" has invalid action "jump"',
+    );
+  });
+
+  it("accepts the default flow's purpose-switch navigations", () => {
+    // The default flow ships them (identifier → register, register →
+    // identifier); the blanket valid-flow test covers this, but pin the
+    // shape here so the graph rules keep accepting it explicitly.
+    const def = flow();
+    expect(step(def, "identifier").transitions.register).toEqual({
+      target: "register",
+      purpose: "register",
+    });
+    expect(errors(validateFlowDefinition(def, schema))).toEqual([]);
+  });
+
+  it("rejects a transition that declares both purpose and action", () => {
+    const def = flow();
+    step(def, "identifier").transitions.register = {
+      target: "register",
+      purpose: "register",
+      action: "switch",
+    };
+    expect(messages(validateFlowDefinition(def))).toContain(
+      'step "identifier": transition "register" declares both purpose and action; a transition either re-purposes locally or targets another flow',
+    );
+  });
+
+  it("rejects a purposed transition to a purpose the flow does not serve", () => {
+    const def = flow();
+    step(def, "identifier").transitions.register = {
+      target: "register",
+      purpose: "recovery",
+    };
+    expect(messages(validateFlowDefinition(def))).toContain(
+      'step "identifier": transition "register" re-purposes to "recovery", which this definition does not serve',
+    );
+  });
+
+  it("rejects a purposed transition that misses the purpose's entry step", () => {
+    const def = flow();
+    step(def, "identifier").transitions.register = {
+      target: "password",
+      purpose: "register",
+    };
+    expect(messages(validateFlowDefinition(def))).toContain(
+      'step "identifier": transition "register" re-purposes to "register" but targets "password"; it must target that purpose\'s entry step "register"',
+    );
+  });
+
+  it("rejects an unknown purpose value on a transition", () => {
+    const def = flow();
+    step(def, "identifier").transitions.register = {
+      target: "register",
+      purpose: "shopping",
+    };
+    expect(messages(validateFlowDefinition(def))).toContain(
+      'step "identifier": transition "register" has invalid purpose "shopping"',
     );
   });
 

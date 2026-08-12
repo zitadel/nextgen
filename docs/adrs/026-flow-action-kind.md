@@ -1,6 +1,6 @@
 # ADR 026: Flow Action Kind
 
-> **Status:** Proposed
+> **Status:** Accepted
 > **Date:** 2026-06-16
 > **Context:** Flow engine action dispatch, `<zitadel-login>` orchestrator, flow definitions
 
@@ -22,21 +22,59 @@ registration:
   actions:
     - { name: submit,   kind: submit, primary: true }
     - { name: passkey,  kind: passkey }
-    - { name: register, kind: navigate } # currently this not possible, because it would expect the `email` to be submitted
+    - { name: register, kind: navigate }
   transitions:
     submit:         { target: password }
     passkey:        { target: done }
-    register:       { target: default-register, action: switch }
+    register:       { target: register, purpose: register }
     user_not_found: { target: register }
 ```
 
 - Clicking `submit` validates the email, dispatches the identifier lookup, and follows `transitions.submit`.
 - Clicking `passkey` runs the ceremony.
-- Clicking `register` just navigates — the empty email box doesn't trigger a validation error, because `navigate` skips the input pipeline entirely.
+- Clicking `register` just navigates — the empty email box doesn't trigger a validation error, because `navigate` skips the input pipeline entirely. Its transition carries a local `purpose` (see the amendment below) so the register leg runs with register semantics. A definition that keeps registration in a separate flow would use `{ target: default-register, action: switch }` instead.
 
 ### State on navigation
 
-A `navigate` action does not touch the state machine's input memory. 
+A `navigate` action does not touch the state machine's input memory.
+It does abandon a pending ceremony: any `PendingChallenge` (an issued
+passkey prompt the user walked away from) is cleared when a navigate
+action fires, so the stale challenge cannot re-attach on the next render.
+
+### Amendment (2026-08-11): local `purpose` on transitions
+
+A transition may declare a `purpose`:
+
+```yaml
+transitions:
+  register: { target: register, purpose: register }
+```
+
+Taking it sets the flow state's `CurrentPurpose` — the dispatch mode a
+step's challenges run under (verify vs. skip, `on_success` semantics) —
+while the flow's original pinned `Purpose` stays untouched (telemetry and
+ACR read the pinned value). This is what makes an in-card "Sign up" link
+on a combined login/register definition semantically correct: without it,
+navigation reaches the registration step while the engine still dispatches
+in login mode.
+
+Constraints, enforced by the definition validators (Go and the ported
+`@zitadel/config` validator):
+
+- `purpose` must be one the definition serves (a key of `purposes`).
+- `target` must be that purpose's configured entry step. This fence keeps
+  re-purposing equivalent to "start this purpose from its entry"; it can
+  be loosened later if a real flow needs mid-flow entry.
+- `purpose` is mutually exclusive with `action`: `switch`/`pivot` target
+  **another flow definition** — that contract is unchanged, and a
+  transition either re-purposes locally or leaves the flow, never both.
+
+The implicit outcome flips (`user_not_found`, `user_already_exists`)
+remain; a declared transition purpose wins over the flip when both apply.
+Back navigation needs no amendment: the back stack already snapshots the
+purpose per entry (ADR 022), so `back` across a re-purposing transition
+restores the previous purpose.
+
 
 ### Engine-injected actions
 

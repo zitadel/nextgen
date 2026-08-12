@@ -2841,3 +2841,262 @@ func TestFlowStepErrorContract(t *testing.T) {
 		assert.False(t, domain.FlowStepErrorAllowed(key), "%q must not pass the contract", key)
 	}
 }
+
+// purposeNavDefinition mirrors the shipped default-login shape: separate
+// login and register entry steps joined by navigate-kind actions whose
+// transitions declare a local purpose (the ADR 026 amendment). "register"
+// on the identifier step re-purposes to register; "sign_in" on the
+// register step re-purposes back to login.
+func purposeNavDefinition() *domain.FlowDefinition {
+	createUser := domain.FlowOnSuccessCreateUser
+	show := domain.FlowStepCompleteShow
+	login := domain.FlowDefinitionPurposeLogin
+	register := domain.FlowDefinitionPurposeRegister
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-purpose-nav",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			login:    "identifier",
+			register: "register",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "identifier",
+				Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: domain.FlowActionPasskey, Kind: domain.FlowActionKindPasskey},
+					{Name: "register", Kind: domain.FlowActionKindNavigate},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit:  {Target: "password"},
+					domain.FlowActionPasskey: {Target: "done"},
+					"register":               {Target: "register", Purpose: &register},
+				},
+			},
+			{
+				Name:   "password",
+				Fields: []domain.Field{"x-auth-methods#password"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{
+				Name:   "register",
+				Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: "sign_in", Kind: domain.FlowActionKindNavigate},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "register-password"},
+					"sign_in":               {Target: "identifier", Purpose: &login},
+				},
+			},
+			{
+				Name:      "register-password",
+				Fields:    []domain.Field{"x-auth-methods#password"},
+				OnSuccess: &createUser,
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+// A navigate transition with a declared purpose moves CurrentPurpose in
+// both directions while the pinned Purpose stays untouched — and, being
+// navigate-kind, does so with empty fields and no validation.
+func TestFlowStateMachine_Process_NavigatePurposeSwitch_BothDirections(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := purposeNavDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	require.Equal(t, domain.FlowDefinitionPurposeLogin, start.State.CurrentPurpose)
+
+	toRegister, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: "register",
+		Fields: map[string]any{},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "register", toRegister.State.CurrentStep)
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, toRegister.State.CurrentPurpose)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, toRegister.State.Purpose,
+		"the pinned Purpose must not move on a local re-purpose")
+
+	toLogin, err := w.sm.Process(t.Context(), def, toRegister.State, domain.FlowSubmitInput{
+		Action: "sign_in",
+		Fields: map[string]any{},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "identifier", toLogin.State.CurrentStep)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, toLogin.State.CurrentPurpose)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, toLogin.State.Purpose)
+}
+
+// Regression: back restoration across a purposed navigation is existing
+// behavior (FlowBackEntry snapshots the purpose) — navigating to register
+// and going back must land on identifier with CurrentPurpose login again.
+func TestFlowStateMachine_Process_BackRestoresPurposeAcrossSwitch(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := purposeNavDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	toRegister, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: "register",
+	})
+	require.NoError(t, err)
+	require.Equal(t, domain.FlowDefinitionPurposeRegister, toRegister.State.CurrentPurpose)
+
+	back, err := w.sm.Process(t.Context(), def, toRegister.State, domain.FlowSubmitInput{
+		Action: "back",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "identifier", back.State.CurrentStep)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, back.State.CurrentPurpose,
+		"back across a purposed navigation must restore the snapshotted purpose")
+}
+
+// Navigating away abandons a pending passkey ceremony: without the
+// explicit clear on the navigate path the stale challenge survives in
+// state and re-attaches on the next render.
+func TestFlowStateMachine_Process_NavigateClearsPendingChallenge(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := purposeNavDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.authAttemptService.EXPECT().
+		IssuePasskeyChallenge(gomock.Any(), gomock.Any()).
+		Return(domain.FlowPasskeyChallengeOutput{ChallengeID: "ch-1", Options: []byte(`{"publicKey":{}}`)}, nil)
+	// navigation abandons the ceremony; no verification may run
+	w.authAttemptService.EXPECT().SubmitPasskey(gomock.Any(), gomock.Any()).Times(0)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	issued, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action:    domain.FlowActionPasskey,
+		PasskeyRP: &domain.FlowPasskeyRP{RPID: "example.com", Origins: []string{"https://example.com"}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, issued.State.PendingChallenge)
+
+	navigated, err := w.sm.Process(t.Context(), def, issued.State, domain.FlowSubmitInput{
+		Action: "register",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "register", navigated.State.CurrentStep)
+	assert.Nil(t, navigated.State.PendingChallenge,
+		"navigation must drop the abandoned ceremony from state")
+	assert.Nil(t, navigated.Step.Challenge,
+		"the rendered step must not re-attach the abandoned passkey challenge")
+}
+
+// After navigating login → register, the register leg must run with real
+// register semantics: the unknown identifier reads as "fresh email", the
+// password leg creates the user, and no password verification runs.
+func TestFlowStateMachine_Process_RegistrationCompletesAfterNavSwitch(t *testing.T) {
+	t.Parallel()
+	const email = "fresh@example.com"
+	w := newFlowTestWorld(t)
+	def := purposeNavDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("", domain.ErrAuthAttemptProofRejected(nil)).
+		Times(1)
+	w.createUser.EXPECT().
+		Handle(gomock.Any(), gomock.Cond(func(in domain.FlowOnSuccessInput) bool {
+			return in.State.CollectedData.UserData["email"] == email
+		})).
+		Return(domain.FlowOnSuccessResult{UserID: "user-id1"}, nil)
+	w.authAttemptService.EXPECT().RegisterCreatedUser(gomock.Any(), gomock.Any())
+	w.authAttemptService.EXPECT().
+		Handoff(gomock.Any(), gomock.Any()).
+		Return(domain.FlowHandoffOutput{
+			Token:     "handoff_01TEST",
+			ExpiresAt: time.Unix(1700000060, 0).UTC(),
+		}, nil)
+	// register mode never verifies a password
+	w.authAttemptService.EXPECT().SubmitPassword(gomock.Any(), gomock.Any()).Times(0)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	toRegister, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: "register",
+	})
+	require.NoError(t, err)
+	require.Equal(t, domain.FlowDefinitionPurposeRegister, toRegister.State.CurrentPurpose)
+
+	afterEmail, err := w.sm.Process(t.Context(), def, toRegister.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": email},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "register-password", afterEmail.State.CurrentStep)
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, afterEmail.State.CurrentPurpose)
+
+	done, err := w.sm.Process(t.Context(), def, afterEmail.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"x-auth-methods#password": "correct-horse-battery-staple"},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "done", done.State.CurrentStep)
+}
