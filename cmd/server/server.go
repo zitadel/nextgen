@@ -506,10 +506,16 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 		}
 		mux.Handle(cfg.ConsolePath, consoleHandler)
 		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
+	}
 
-		// Pre-session runtime metadata for the embedded console (Console
-		// ADR 0004 §2). Registered as an exact path, so it wins over the
-		// catch-all API mount below.
+	// Pre-session runtime metadata for the embedded UI surfaces (Console
+	// ADR 0004 §2). Named for the console, which carries it first, but it
+	// describes the deployment — the default project and its publishable key
+	// — and the hosted login shell resolves the project it signs into from
+	// the same two fields, so it is mounted for either surface rather than
+	// only alongside the console. Registered as an exact path, so it wins
+	// over the catch-all API mount below.
+	if cfg.ConsoleEnabled || cfg.LoginEnabled {
 		mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
 	}
 

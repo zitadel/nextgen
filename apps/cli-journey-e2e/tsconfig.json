@@ -2,14 +2,24 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "allowJs": true,
+    // Playwright specs run in Node, but `page.evaluate` callbacks execute in
+    // the browser and reference DOM globals.
+    "lib": ["ES2022", "DOM"],
     "outDir": "out-tsc/playwright",
     "sourceMap": false,
     "types": ["node"]
   },
+  // The testkit consumer suite is checked here against the workspace kit —
+  // inside the generated app it runs against the packed tarball, but the
+  // @zitadel/testing/playwright contract it pins is the same. Two families
+  // stay out: the .mjs runner scripts import root workspace scripts (outside
+  // this composite project's rootDir; covered by the `test` task's node
+  // --test suite), and fixtures/preexisting/ are app-posture skeletons whose
+  // framework globals (defineNuxtConfig) only exist inside the app.
   "include": [
-    "playwright.config.mts",
-    "scripts/**/*.mjs",
-    "src/**/*.spec.ts",
-    "src/**/*.d.ts"
+    "playwright*.config.mts",
+    "src/**/*.ts",
+    "fixtures/testkit/**/*.ts",
+    "fixtures/testkit/**/*.mts"
   ]
 }

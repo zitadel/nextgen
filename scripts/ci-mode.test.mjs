@@ -25,10 +25,11 @@ const JOURNEY_CLASS = [
   "cli-journey-e2e:lint", "cli-journey-e2e:test",
 ];
 const CONSOLE_CLASS = [
-  "console-e2e:e2e", "console-e2e:e2e-real", "console:build", "console:build-release",
-  "console:dev", "console:dev-real", "console:lint", "console:preview", "console:test",
-  "console:typecheck", "demo-next-e2e:e2e-real", "release:pack", "release:publish",
-  "release:snapshot", "server:build", "testing:test-integration",
+  "console-e2e:e2e", "console-e2e:e2e-embedded", "console-e2e:e2e-real", "console:build",
+  "console:build-release", "console:dev", "console:dev-real", "console:lint",
+  "console:preview", "console:test", "console:typecheck", "demo-next-e2e:e2e-real",
+  "release:pack", "release:publish", "release:snapshot", "server:build",
+  "testing:test-integration",
 ];
 const SDK_VUE_CLASS = [
   "release:build-public-packages", "release:pack", "release:publish", "release:snapshot",
@@ -224,6 +225,20 @@ test("components change runs every journey and suite with the full matrix, but n
   assert.equal(gates.browsers, true);
   assert.equal(gates.go_tests, false);
   assert.equal(matrix, "full");
+});
+
+test("embedded-lane affectedness alone trips the console gate", () => {
+  // Synthetic slice: a change that affects only the embedded suite (e.g. its
+  // own spec files) must still schedule the console gate — the gate answers
+  // to either console lane, not just e2e-real.
+  const { gates } = resolveGates({
+    mode: "full",
+    files: ["apps/console-e2e/src-embedded/embedded-console.spec.ts"],
+    targets: ["console-e2e:e2e-embedded"],
+  });
+  assert.equal(gates.suites_console, true);
+  assert.equal(gates.browsers, true);
+  assert.equal(gates.go_tests, false);
 });
 
 test(":test-browser affectedness alone keeps the browser install without journeys", () => {

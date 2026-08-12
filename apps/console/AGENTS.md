@@ -16,9 +16,12 @@ are the agreed direction for upcoming work (issue
   one router factory, `basepath` derived from the Vite `base`, route loaders +
   pending/error/not-found boundaries, `staticData`-driven sidebar.
 - [ADR 0002: API access and auth interceptors](docs/adrs/0002-console-api-access.md)
-  — server-side proxy injects the project secret; the console holds no
-  credential; reuse `configureZitadel()` / `getApi()` rather than a bespoke
-  client.
+  — the console holds no credential and calls the API same-origin; reuse
+  `configureZitadel()` / `getApi()` rather than a bespoke client. The base is
+  `/api` **only** under the dev server (whose proxy injects the project
+  secret); the embedded build talks to the origin root, where the Go binary
+  serves the API. The `/api` shim §1 once deferred to the server was withdrawn
+  in the 2026-08-12 revision — do not reintroduce it.
 - [ADR 0003: Console authentication](docs/adrs/0003-console-authentication.md)
   — `/login` embeds the login widget (`@zitadel/sdk-react`); the pathless
   `_authed` layout owns the session guard (`GET /sessions/me`) and the app

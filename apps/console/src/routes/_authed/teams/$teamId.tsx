@@ -14,7 +14,6 @@ import { Separator } from "@/components/ui/separator";
 import { api } from "../../../api/zitadel";
 import { describeError } from "../../../lib/api-error";
 import { formatDate } from "../../../lib/date";
-import { getConsoleProjectId } from "../../../runtime/runtime";
 
 const PLATE = "flex size-9 items-center justify-center rounded-md bg-muted text-foreground";
 
@@ -29,7 +28,7 @@ const PLATE = "flex size-9 items-center justify-center rounded-md bg-muted text-
  *
  */
 export const Route = createFileRoute("/_authed/teams/$teamId")({
-  loader: ({ params }) => api.getTeam(params.teamId, { project_id: getConsoleProjectId() }),
+  loader: ({ params }) => api.getTeam(params.teamId),
   component: TeamDetail,
 });
 
@@ -60,7 +59,7 @@ function TeamDetail() {
     setSaving(true);
     setError(undefined);
     try {
-      await api.updateTeam(team.id, { name: trimmed }, { project_id: getConsoleProjectId() });
+      await api.updateTeam(team.id, { name: trimmed });
       await router.invalidate();
     } catch (cause) {
       setError(describeError(cause, "Could not save the team."));
