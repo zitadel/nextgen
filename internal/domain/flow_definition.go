@@ -296,6 +296,13 @@ type FlowStepTransition struct {
 	// When Action == nil, Target refers to a step in the current flow
 	// When Action != nil, Target refers to another flow.
 	Target string
+	// Purpose, when non-nil, re-purposes the flow locally: taking this
+	// transition sets [FlowState.CurrentPurpose] to this purpose while the
+	// pinned [FlowState.Purpose] stays untouched. The purpose must be one
+	// the definition serves and Target must be that purpose's entry step
+	// (validated). Mutually exclusive with Action — a transition either
+	// pivots to another flow or re-purposes within this one, never both.
+	Purpose *FlowDefinitionPurpose
 }
 
 func (fst FlowStepTransition) IsCurrentFlow() bool {

@@ -96,6 +96,12 @@ block, the generated Changesets changelogs,
 inputs. Publish the draft GitHub Release only when the product needs an
 announcement.
 
+GitHub rejects release bodies over 125000 characters, so the generated facts
+block replaces its largest package changelog sections with pointers to the
+per-package `CHANGELOG.md` when the body would not fit. If the human-written
+product notes alone push past the limit, the facts update fails loudly instead
+of truncating maintainer prose — shorten the notes and rerun.
+
 ## Local checks
 
 ```sh

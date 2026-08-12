@@ -1730,6 +1730,24 @@ func (s *FlowDefinitionStepTransitionsItem) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if value, ok := s.Purpose.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "purpose",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -1741,6 +1759,25 @@ func (s FlowDefinitionStepTransitionsItemAction) Validate() error {
 	case "switch":
 		return nil
 	case "pivot":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s FlowDefinitionStepTransitionsItemPurpose) Validate() error {
+	switch s {
+	case "login":
+		return nil
+	case "register":
+		return nil
+	case "recovery":
+		return nil
+	case "profiling":
+		return nil
+	case "reauth":
+		return nil
+	case "link_account":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)

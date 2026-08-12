@@ -149,3 +149,46 @@ func TestValidateOriginAgainstProject(t *testing.T) {
 		})
 	}
 }
+
+// Explicit JSON `null` for a transition's action/purpose must map to "not
+// set" — IsSet() alone is also true for ogen's explicit-null state, and
+// reading .Value would silently yield the zero enum (switch / login).
+func TestMapFlowDefinitionRequest_NullTransitionActionAndPurpose(t *testing.T) {
+	t.Parallel()
+
+	definition := apigen.FlowDefinition{
+		Name:       "combined",
+		UserSchema: "sch_test",
+		Purposes:   apigen.FlowDefinitionPurposes{"login": "identifier"},
+		Steps: []apigen.FlowDefinitionStep{
+			{
+				Name: "identifier",
+				Transitions: apigen.NewOptFlowDefinitionStepTransitions(apigen.FlowDefinitionStepTransitions{
+					"next": {
+						Target:  "identifier",
+						Action:  apigen.OptNilFlowDefinitionStepTransitionsItemAction{Set: true, Null: true},
+						Purpose: apigen.OptNilFlowDefinitionStepTransitionsItemPurpose{Set: true, Null: true},
+					},
+					"purposed": {
+						Target: "identifier",
+						Purpose: apigen.NewOptNilFlowDefinitionStepTransitionsItemPurpose(
+							apigen.FlowDefinitionStepTransitionsItemPurposeRegister,
+						),
+					},
+				}),
+			},
+		},
+	}
+
+	svcReq, err := mapFlowDefinitionRequestToService("proj-1", apigen.OptSchemaURI{}, definition, "active")
+	require.NoError(t, err)
+	require.Len(t, svcReq.Steps, 1)
+
+	nullBoth := svcReq.Steps[0].Transitions["next"]
+	require.Nil(t, nullBoth.Action, "explicit null action must not map to the zero enum")
+	require.Nil(t, nullBoth.Purpose, "explicit null purpose must not map to login")
+
+	purposed := svcReq.Steps[0].Transitions["purposed"]
+	require.NotNil(t, purposed.Purpose)
+	require.Equal(t, domain.FlowDefinitionPurposeRegister, *purposed.Purpose)
+}

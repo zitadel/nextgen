@@ -44,13 +44,18 @@ tasks:
       runInCI: false
 
   # Matched by the `:test` target in the ci workflow's `moon ci` call, so the
-  # affected-gate logic never becomes a test file nothing executes.
+  # affected-gate and release-body logic never become test files nothing
+  # executes.
   test:
-    command: "node --test scripts/ci-mode.test.mjs"
+    command: "node --test scripts/ci-mode.test.mjs scripts/release-github.test.mjs"
     inputs:
       - "scripts/ci-mode.mjs"
       - "scripts/ci-mode.test.mjs"
       - "scripts/dev-process.mjs"
+      - "scripts/release-artifacts.mjs"
+      - "scripts/release-github.mjs"
+      - "scripts/release-github.test.mjs"
+      - "scripts/release-manifest.mjs"
     options:
       cache: true
       runInCI: true
