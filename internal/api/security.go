@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
@@ -120,6 +121,25 @@ func WithRequestHostMiddleware(next http.Handler) http.Handler {
 func requestOriginFromContext(ctx context.Context) (string, bool) {
 	v, ok := ctx.Value(requestHostKey{}).(string)
 	return v, ok && v != ""
+}
+
+// cookieSecureFromContext reports whether Set-Cookie should include Secure.
+//
+// HTTPS requests (including TLS terminated upstream with X-Forwarded-Proto)
+// keep Secure. Plain HTTP — including http://localhost used by the CLI local
+// runtime — omits it so Safari will store and send the cookie. Chrome and
+// Firefox already accept Secure cookies on localhost; Safari does not
+// (WebKit bug 232088).
+//
+// When the request host was never injected (callers that skip
+// WithRequestHostMiddleware), default to Secure=true so production-shaped
+// paths stay locked down.
+func cookieSecureFromContext(ctx context.Context) bool {
+	origin, ok := requestOriginFromContext(ctx)
+	if !ok {
+		return true
+	}
+	return strings.HasPrefix(strings.ToLower(origin), "https://")
 }
 
 type ScopeContext struct {
