@@ -41,9 +41,21 @@ export class DesignPrompt implements SetupPrompt {
           hint: "no files added; pick a design anytime later with `branding eject`",
         },
         { value: "centered", label: "Centered", hint: "card centred on the page" },
-        { value: "split", label: "Split", hint: "brand panel left, form right" },
-        { value: "split-right", label: "Split (reversed)", hint: "form left, brand panel right" },
-        { value: "hero", label: "Hero", hint: "landing-style brand pane left, form right" },
+        {
+          value: "split",
+          label: "Split",
+          hint: "brand panel left, form right; narrow containers show a compact brand mark",
+        },
+        {
+          value: "split-right",
+          label: "Split (reversed)",
+          hint: "form left, brand panel right; narrow containers show a compact brand mark",
+        },
+        {
+          value: "hero",
+          label: "Hero",
+          hint: "landing-style brand pane left, form right; editable text fallback when narrow",
+        },
         {
           value: "minimal",
           label: "Minimal",
