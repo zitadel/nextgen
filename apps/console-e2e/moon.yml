@@ -10,6 +10,15 @@ tasks:
   lint:
     command: "corepack pnpm exec oxlint ."
 
+  # The e2e tasks themselves are opt-in (`runInCI: false`), which would leave
+  # the specs entirely outside CI's type surface — API contract drift in a
+  # spec would only surface when someone next ran the suite. Typechecking is
+  # cheap, so it runs in CI even though the suite does not.
+  typecheck:
+    command: "corepack pnpm run typecheck"
+    deps:
+      - "testing:build"
+
   e2e:
     command: "corepack pnpm exec playwright test"
     deps:
@@ -47,6 +56,31 @@ tasks:
       # Vite-served console, so keep both server surfaces off.
       NEXTGEN_SERVER_LOGIN_ENABLED: "false"
       NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
+    options:
+      cache: false
+      runInCI: false
+
+  # The embedded surfaces, served by the binary itself — no Vite, no proxy.
+  # The other two lanes each hide the production path: `e2e` serves a preview
+  # build with no backend, `e2e-real` goes through the dev proxy that rewrites
+  # /api -> /. This is the only lane where the console's API base and the Go
+  # mux's routing table have to agree (Console ADR 0002 §4).
+  e2e-embedded:
+    command: "corepack pnpm exec playwright test --config playwright.embedded.config.mts"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      # Embeds the current console and login-ui dists (server:build deps), so
+      # the suite always drives the working tree's UI.
+      - "server:build"
+    env:
+      # Fixed pin, same reasoning as REAL_ZITADEL_PORT above (withZitadel needs
+      # the port at config-evaluation time). Neighbors: 8092 demo-next-e2e
+      # e2e-real, 8093 console-e2e e2e-real, 8094 console dev-real.
+      EMBEDDED_ZITADEL_PORT: "8095"
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      # Both surfaces stay on (the server defaults): they are what this lane
+      # tests. Contrast e2e-real above, which switches them off.
     options:
       cache: false
       runInCI: false

@@ -13,10 +13,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
-// The build-time override `getConsoleProjectId()` prefers (Console ADR 0004 §5),
-// so the scoping assertion below has a known value to check rather than the
-// empty string runtime discovery would leave it at under test.
-vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_console");
 
 const USERS_URL = "http://localhost/api/users";
 const USER = { id: "user_1", givenName: "Maya", familyName: "Patel", email: "maya@acme.com" };
@@ -95,7 +91,7 @@ describe("delete user dialog", () => {
     expect(screen.getByRole("button", { name: "Delete user" })).toBeDisabled();
   });
 
-  it("deletes the user, scoped to the console project, and reports success", async () => {
+  it("deletes the user by id and reports success", async () => {
     let deleted: URL | undefined;
     server.use(
       http.get(USERS_URL, () => HttpResponse.json({ users: deleted ? [] : [USER] })),
@@ -110,11 +106,10 @@ describe("delete user dialog", () => {
     await userEvent.type(screen.getByLabelText("Type DELETE to confirm"), "DELETE");
     await userEvent.click(screen.getByRole("button", { name: "Delete user" }));
 
-    // The delete must carry the project scope: `DELETE /users/{user_id}` takes
-    // `project_id`, and without it the request is not the one the operator
-    // thinks they are making.
+    // `DELETE /users/{user_id}` is flat-by-id: the server resolves the project
+    // scope from the id itself, so the request carries no query scope.
     await waitFor(() => expect(deleted).toBeDefined());
-    expect(deleted?.searchParams.get("project_id")).toBe("proj_console");
+    expect(deleted?.search).toBe("");
 
     // Success is confirmed to the operator (design decisions log D2) and the
     // row is gone from the invalidated list.
