@@ -4,8 +4,6 @@ import (
 	"context"
 )
 
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_passkey_registration.mock.go . FlowPasskeyRegistrationService
-
 // FlowPasskeyRegistrationService is the flow engine's narrow view of the
 // passkey registration ceremony. It is intentionally separate from
 // [FlowAuthAttemptService]: credential enrollment is distinct from identity

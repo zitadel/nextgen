@@ -6,6 +6,33 @@
 // truth; where one disagrees with the code, the generator reports the drift and
 // the code wins.
 //
+// # Bootstrapping a pruned tree
+//
+// That inference type-loads the module, and the module does not type-check
+// until ogen has written api/generated — which ogen produces from a spec whose
+// endpoints $ref the very files written here. On a tree that still holds its
+// generated output the cycle is invisible; on a pruned one no directive order
+// resolves it, because it closes through this generator's own chain.
+//
+// So the generator breaks it itself, rather than leaving it to whoever invokes
+// it. When api/generated is absent it runs two prerequisites before analyzing:
+//
+//   - the enumer directives, because the analysis also needs their output and
+//     `go generate ./...` reaches internal/ only after api/;
+//   - the ogen directive, over a placeholder spec written here that gives every
+//     operation every known error code. That spec is wrong but complete, which
+//     is all ogen needs, and it is deliberately a superset: whatever types the
+//     honest pass makes ogen generate, the placeholder made it generate too.
+//
+// The analysis then runs against a module that compiles, the real sets
+// overwrite the placeholders, and the ogen directive that follows this one in
+// api/generate.go regenerates the client from them. Both prerequisites shell
+// out to `go generate -run`, so their commands stay declared in one place
+// instead of being copied here.
+//
+// This is why bare `go generate ./...` and `moon run server:generate` both work
+// from a pruned tree: neither of them knows about the cycle.
+//
 // Paths are calculated relative to this generator's location:
 //   - Domain: ../../../internal/domain
 //   - Service: ../../../internal/service
@@ -18,7 +45,9 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"maps"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -33,6 +62,20 @@ import (
 
 	"github.com/zitadel/nextgen/api/internal/erroranalysis"
 )
+
+// Regexps for `go generate -run`, matched against a directive's full source
+// text. Keep them in step with the ogen directive in api/generate.go and the
+// enumer ones next to the enum type declarations.
+const (
+	enumerDirective = "go tool enumer"
+	ogenDirective   = "go tool ogen"
+)
+
+// bootstrapGuardEnv marks a `go generate` this generator spawned. The
+// directives it selects cannot reach this generator, so recursion should be
+// impossible; the guard turns a mis-typed filter into one clear failure rather
+// than an unbounded fork bomb.
+const bootstrapGuardEnv = "NEXTGEN_GENERATE_BOOTSTRAPPING"
 
 type ErrorCode struct {
 	Code     string
@@ -95,6 +138,8 @@ func main() {
 	// Calculate paths relative to generator location
 	// Generator is at: api/cmd/gen_openapi_errors/main.go
 	moduleRoot := filepath.Join(generatorDir, "../../..")
+	// Where api/generate.go lives, and so where its ogen directive runs.
+	apiDir := filepath.Join(generatorDir, "../..")
 	domainPath := filepath.Join(generatorDir, "../../../internal/domain")
 	servicePath := filepath.Join(generatorDir, "../../../internal/service")
 	internalAPIPath := filepath.Join(generatorDir, "../../../internal/api")
@@ -104,25 +149,47 @@ func main() {
 	errorMapping := buildErrorMapping(domainPath)
 	fmt.Printf("📋 Discovered %d error codes from domain package\n", len(errorMapping))
 
-	// Step 2: Infer each service method's error set from its implementation,
-	// then hold the hand-written "errors:" comments up against it.
-	analyzed, err := erroranalysis.Analyze(erroranalysis.Config{Dir: moduleRoot})
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "❌ Error analyzing service error paths: %v\n", err)
-		os.Exit(1)
-	}
-	allMethods := methodErrorsFromAnalysis(analyzed)
-	fmt.Printf("📋 Inferred error sets for %d service methods\n", len(allMethods))
-
-	reportCommentDrift(parseAllServiceFiles(servicePath), allMethods)
-
-	// Step 3: Define endpoint mappings
+	// Step 2: Define endpoint mappings
 	endpoints, err := discoverEndpointsWithDefaultErrorResponse(openapiBasePath)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "❌ Error discovering endpoint operations: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Printf("📋 Discovered %d endpoint operations with default error responses\n", len(endpoints))
+
+	tmpl := template.Must(template.New("default").
+		Funcs(template.FuncMap{"yamlScalar": yamlScalar}).
+		Parse(defaultResponseTemplate))
+
+	// Step 3: On a pruned tree the analysis below has nothing to analyze — the
+	// module does not type-check until ogen has run, and ogen cannot run until
+	// this generator has written a spec. Break the cycle with a placeholder
+	// pass; see the package comment.
+	if !generatedClientExists(moduleRoot) {
+		bootstrapGeneratedClient(moduleRoot, apiDir, func() {
+			allErrorFuncs := slices.Sorted(maps.Keys(errorMapping))
+			writeErrorResponses(endpoints, tmpl, errorMapping, openapiBasePath,
+				func(endpointOperation) []string { return allErrorFuncs })
+		})
+	}
+
+	// Step 4: Infer each service method's error set from its implementation,
+	// then hold the hand-written "errors:" comments up against it.
+	analyzed, err := erroranalysis.Analyze(erroranalysis.Config{Dir: moduleRoot})
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "❌ Error analyzing service error paths: %v\n", err)
+		if !generatedClientExists(moduleRoot) {
+			_, _ = fmt.Fprintf(os.Stderr,
+				"\napi/generated is still missing, so the module cannot type-check and this\n"+
+					"analysis cannot run. The bootstrap pass should have written it — check that\n"+
+					"the ogen directive in api/generate.go still matches the %q filter.\n", ogenDirective)
+		}
+		os.Exit(1)
+	}
+	allMethods := methodErrorsFromAnalysis(analyzed)
+	fmt.Printf("📋 Inferred error sets for %d service methods\n", len(allMethods))
+
+	reportCommentDrift(parseAllServiceFiles(servicePath), allMethods)
 
 	serviceMethodByOperation, err := discoverServiceMethodByOperation(internalAPIPath, endpoints)
 	if err != nil {
@@ -131,21 +198,8 @@ func main() {
 	}
 	fmt.Printf("📋 Reflected %d operation-to-service mappings from API handlers\n", len(serviceMethodByOperation))
 
-	tmpl := template.Must(template.New("default").
-		Funcs(template.FuncMap{"yamlScalar": yamlScalar}).
-		Parse(defaultResponseTemplate))
-
-	// Step 4: Generate error response files for each endpoint
-	for _, endpoint := range endpoints {
-		var errFuncs []string
-		addErrFuncs := func(codes []string) {
-			for _, errFunc := range codes {
-				if !slices.Contains(errFuncs, errFunc) {
-					errFuncs = append(errFuncs, errFunc)
-				}
-			}
-		}
-
+	// Step 5: Generate error response files for each endpoint
+	writeErrorResponses(endpoints, tmpl, errorMapping, openapiBasePath, func(endpoint endpointOperation) []string {
 		// The handler method is the real entry point: it raises errors of its
 		// own — the authorization guard answers a foreign project with the
 		// resource's not-found before any service is reached — and the walk
@@ -159,16 +213,14 @@ func main() {
 		// error it does send makes the generated client fail to decode it.
 		handlerKey := "Handler." + operationIDToHandlerMethod(endpoint.operationID)
 		handlerMethod, hasHandler := allMethods[handlerKey]
-		if hasHandler {
-			addErrFuncs(handlerMethod.errorFuncs)
-		}
 
 		// Operations whose handler could not be analyzed still fall back to the
 		// union of the services it was reflected as calling.
 		serviceMethods, hasServices := serviceMethodByOperation[endpoint.operationID]
-		if !hasHandler && !hasServices {
-			fmt.Printf("⚠️  No reflected service mapping for %s (%s), skipping\n", endpoint.operationID, endpoint.yamlPath)
-			continue
+
+		var errFuncs []string
+		if hasHandler {
+			errFuncs = append(errFuncs, handlerMethod.errorFuncs...)
 		}
 		for _, serviceMethod := range serviceMethods {
 			method, ok := allMethods[serviceMethod]
@@ -176,13 +228,58 @@ func main() {
 				fmt.Printf("⚠️  Service method %s not found, skipping it for %s\n", serviceMethod, endpoint.operationID)
 				continue
 			}
-			addErrFuncs(method.errorFuncs)
+			errFuncs = append(errFuncs, method.errorFuncs...)
 		}
-		addErrFuncs(transportErrors)
+
+		// Nothing to walk — an operation specced before its handler exists, or
+		// one whose handler is not named after it. It still gets a file, holding
+		// what the boundary raises with no handler behind it.
+		//
+		// Writing nothing here would make the output depend on the starting
+		// state: on a pruned tree the operation would keep the bootstrap
+		// placeholder's every-code superset, on a populated one whatever was
+		// committed last. Deleting the file instead is not available either —
+		// most operations $ref it by name from methods.yaml, so a missing file
+		// is an unresolvable spec rather than a smaller one.
+		if !hasHandler && !hasServices {
+			fmt.Printf("⚠️  No handler or reflected service mapping for %s (%s); writing boundary errors only\n",
+				endpoint.operationID, endpoint.yamlPath)
+			errFuncs = append(errFuncs, boundaryErrors...)
+		}
+
+		return errFuncs
+	})
+
+	fmt.Println("\n💡 Generated operation-specific error response files")
+}
+
+// writeErrorResponses renders one <operationID>-error-response.yaml per
+// operation, for every operation — never a subset. A pass that wrote files for
+// some operations and left others as it found them would produce output that
+// depends on what was already on disk, which is exactly the property
+// server:check-generate-pruned exists to deny.
+//
+// errorFuncsFor supplies the operation's error constructors; the transport and
+// security codes every operation can raise are added here rather than by each
+// caller.
+func writeErrorResponses(
+	endpoints []endpointOperation,
+	tmpl *template.Template,
+	errorMapping map[string]errorInfo,
+	openapiBasePath string,
+	errorFuncsFor func(endpointOperation) []string,
+) {
+	for _, endpoint := range endpoints {
+		operationErrFuncs := errorFuncsFor(endpoint)
+
+		// Cloned: the bootstrap pass hands the same slice to every operation.
+		errFuncs := slices.Clone(operationErrFuncs)
+		errFuncs = append(errFuncs, transportErrors...)
 		if endpoint.requiresAuth {
-			addErrFuncs(securityErrors)
+			errFuncs = append(errFuncs, securityErrors...)
 		}
 		sort.Strings(errFuncs)
+		errFuncs = slices.Compact(errFuncs)
 
 		// Convert error functions to error codes using the auto-discovered mapping
 		var errorCodes []ErrorCode
@@ -198,9 +295,15 @@ func main() {
 			}
 		}
 
+		// Unreachable while transportErrors maps: every operation gets at least
+		// that. If it ever does not, the mapping is broken, and skipping the
+		// write would leave a stale file behind — the same starting-state
+		// dependence the loop is built to avoid. Fail instead.
 		if len(errorCodes) == 0 {
-			fmt.Printf("⚠️  No errors found for %s\n", endpoint.operationID)
-			continue
+			_, _ = fmt.Fprintf(os.Stderr,
+				"❌ No known error codes for %s (%s): none of %v resolve against the domain package.\n",
+				endpoint.operationID, endpoint.yamlPath, errFuncs)
+			os.Exit(1)
 		}
 
 		// Calculate relative path from endpoint directory to components/schemas/errors/
@@ -229,8 +332,66 @@ func main() {
 
 		fmt.Printf("✅ Generated %s (%d errors)\n", filename, len(errorCodes))
 	}
+}
 
-	fmt.Println("\n💡 Generated operation-specific error response files")
+// bootstrapGeneratedClient produces the api/generated the error analysis needs
+// before that analysis is possible — the pruned-tree cycle described in the
+// package comment. writePlaceholderSpec fills every operation's error response
+// with every known code, which is wrong but complete, and is the only spec
+// available to generate a client from at this point.
+//
+// Nothing here is conditional on what is already on disk: both prerequisites
+// are idempotent, and keeping the path single means `moon run server:generate`
+// walks exactly the one `go generate ./...` does, so the standing pruned-tree
+// check (server:check-generate-pruned) covers both. The cost is one redundant
+// enumer run under the Moon runner, on the rare pruned path only.
+func bootstrapGeneratedClient(moduleRoot, apiDir string, writePlaceholderSpec func()) {
+	if os.Getenv(bootstrapGuardEnv) != "" {
+		_, _ = fmt.Fprintf(os.Stderr,
+			"❌ Bootstrapping recursively: a nested `go generate` re-entered this generator.\n"+
+				"   Check that the -run filters (%q, %q) still select only the directives they name.\n",
+			enumerDirective, ogenDirective)
+		os.Exit(1)
+	}
+
+	fmt.Println("🥾 api/generated is missing: bootstrapping it so the module type-checks.")
+
+	// The analysis type-loads internal/domain, which does not compile without
+	// its enumer output. `go generate ./...` walks api before internal, so that
+	// output cannot be assumed present — pull it forward.
+	runDirectives(moduleRoot, enumerDirective, "./internal/...")
+
+	writePlaceholderSpec()
+
+	runDirectives(apiDir, ogenDirective, ".")
+
+	fmt.Println("🥾 Bootstrap client generated; inferring the real error sets.")
+}
+
+// runDirectives re-runs a subset of the module's own //go:generate directives.
+// Selecting them by -run rather than spelling out the commands keeps each one
+// declared in a single place: api/generate.go for ogen, the enum type
+// declarations for enumer.
+func runDirectives(dir, filter, pattern string) {
+	fmt.Printf("🥾 go generate -run %q %s\n", filter, pattern)
+
+	cmd := exec.Command("go", "generate", "-run", filter, pattern)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = append(os.Environ(), bootstrapGuardEnv+"=1")
+	if err := cmd.Run(); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "❌ Bootstrap step `go generate -run %q %s` failed: %v\n", filter, pattern, err)
+		os.Exit(1)
+	}
+}
+
+// generatedClientExists reports whether ogen has written its output yet. It
+// separates "the analysis failed" from "the analysis could not have run" — the
+// second is the pruned-tree case the bootstrap pass exists for.
+func generatedClientExists(moduleRoot string) bool {
+	matches, err := filepath.Glob(filepath.Join(moduleRoot, "api", "generated", "*.go"))
+	return err == nil && len(matches) > 0
 }
 
 func discoverServiceMethodByOperation(internalAPIPath string, endpoints []endpointOperation) (map[string][]string, error) {
