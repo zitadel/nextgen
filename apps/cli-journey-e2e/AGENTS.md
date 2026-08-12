@@ -8,7 +8,10 @@ These instructions apply to `apps/cli-journey-e2e/**`. Defer to the root
 This project protects the customer local setup journey across every supported
 CLI framework. Tests must exercise a fresh app directory that runs the CLI local
 runtime path (`doctor`, `start`, `setup --server local`) before starting the
-generated app. It must not test the checked-in demo apps.
+generated app. It must not test the checked-in demo apps. The fresh directory
+starts empty (setup scaffolds the skeleton, page posture) or seeded from
+`fixtures/preexisting/<framework>` (`--preexisting-app`, widget posture per
+ADR 044) — both shapes run the same CLI path and browser journeys.
 
 ## Maintenance Rules
 
@@ -34,6 +37,11 @@ generated app. It must not test the checked-in demo apps.
   of the artifact set.
 - Keep the generated app on `localhost` for browser tests. WebAuthn rejects IP
   address relying-party IDs such as `127.0.0.1`.
+- The pre-existing-app fixtures (`fixtures/preexisting/<framework>`) must stay
+  minimal but real: exactly detectable by the CLI (ADR 044's posture hinge),
+  bootable via `npm run dev`, and carrying a distinctive shell and homepage the
+  specs assert survive setup. Only route-based frameworks (Next, Nuxt) belong
+  here — the SPA families keep the page posture.
 - The testkit suite (`--suite testkit`, moon task `e2e-testkit`) is the
   customer-configuration proof for `@zitadel/testing`: it scaffolds one next
   app, installs the kit from the journey registry, copies the checked-in

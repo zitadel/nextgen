@@ -174,6 +174,21 @@ describe("guidance content", () => {
     expect(reactAgents).not.toContain("useAuth()");
   });
 
+  it("describes the emitted posture in the presentation paragraph (ADR 044)", () => {
+    // Default (fresh scaffold / legacy): pages pin the full-page chrome.
+    const page = agentsGuidanceSection(ctx);
+    expect(page).toContain('pin the sign-in widgets to `variant="page"`');
+    // Widget posture: the guidance must not claim full-page chrome the
+    // embedded cards don't have, and still name the alternative.
+    const widget = agentsGuidanceSection({ ...ctx, posture: "widget" } as PatchContext);
+    expect(widget).toContain('embed the sign-in widgets as `variant="widget"` cards');
+    expect(widget).toContain('switch to `variant="page"`');
+    expect(widget).not.toContain('pin the sign-in widgets to `variant="page"`');
+    // The theme knob and (on Next) the JSX-types pointer survive both ways.
+    expect(widget).toContain("(`light` | `dark` | `auto`)");
+    expect(widget).toContain("@zitadel/sdk-next/jsx");
+  });
+
   it("names the presentation knobs and, on Next, the shipped JSX types", () => {
     const agents = agentsGuidanceSection(ctx);
     expect(agents).toContain('variant="widget"');

@@ -117,6 +117,7 @@ const ALL_GATES = [
   "snapshot",
   "journey_fresh_app",
   "journey_passkey",
+  "journey_preexisting",
   "journey_testkit",
   "suites_testing_demo",
   "suites_console",
@@ -173,9 +174,12 @@ export function resolveGates({ mode, files, targets }) {
 
   const journeyFreshApp = journeyProject || sharedSurface || anySdkBuild;
   const journeyNextScaffold = journeyProject || sharedSurface;
+  // The pre-existing-app lane covers the ADR 044 widget posture on Next and
+  // Nuxt, so it answers to the shared next-scaffold surface plus the Nuxt SDK.
+  const journeyPreexisting = journeyNextScaffold || set.has("sdk-nuxt:build");
   const suitesTestingDemo = TESTING_DEMO_TARGETS.some((t) => set.has(t));
   const suitesConsole = set.has(CONSOLE_E2E_TARGET);
-  const anyJourney = journeyFreshApp || journeyNextScaffold;
+  const anyJourney = journeyFreshApp || journeyNextScaffold || journeyPreexisting;
 
   const gates = {
     go_tests: GO_TEST_TARGETS.some((t) => set.has(t)),
@@ -184,6 +188,7 @@ export function resolveGates({ mode, files, targets }) {
     snapshot: anyJourney,
     journey_fresh_app: journeyFreshApp,
     journey_passkey: journeyNextScaffold,
+    journey_preexisting: journeyPreexisting,
     journey_testkit: journeyNextScaffold,
     suites_testing_demo: suitesTestingDemo,
     suites_console: suitesConsole,

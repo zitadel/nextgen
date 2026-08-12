@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/server-win32-x64",
-  "version": "0.1.0-alpha.17",
+  "version": "0.1.0-alpha.18",
   "description": "Windows x64 Zitadel server binary.",
   "homepage": "https://github.com/zitadel/nextgen#readme",
   "bugs": {

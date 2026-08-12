@@ -322,7 +322,7 @@ type Handler interface {
 	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
 	// ListEvents implements listEvents operation.
 	//
-	// Returns project-scoped audit events, newest-or-oldest by keyset on
+	// Returns project-scoped audit events, oldest-first by keyset on
 	// `(created_at, id)` (ADR 027 / ADR 049). Requires `events.read`.
 	// Pre-claim projects return an empty list (events are stored but not
 	// visible until claim succeeds). Team-scoped credentials see only events

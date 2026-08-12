@@ -543,9 +543,9 @@ type AuthAttemptCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthAttemptCreatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -1017,9 +1017,9 @@ type AuthAttemptHandedOffEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthAttemptHandedOffEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -1698,9 +1698,9 @@ type AuthCheckFailedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthCheckFailedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -2183,9 +2183,9 @@ type AuthCheckSucceededEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthCheckSucceededEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -2641,9 +2641,9 @@ type AuthFactorPasskeyEnrolledEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthFactorPasskeyEnrolledEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -3099,9 +3099,9 @@ type AuthFactorPasskeyRemovedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthFactorPasskeyRemovedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -3557,9 +3557,9 @@ type AuthFactorPasswordRemovedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthFactorPasswordRemovedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -4015,9 +4015,9 @@ type AuthFactorPasswordSetEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthFactorPasswordSetEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -4500,9 +4500,9 @@ type AuthFactorRecoveryCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthFactorRecoveryCreatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -4958,9 +4958,9 @@ type AuthFactorRecoveryRemovedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthFactorRecoveryRemovedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -5416,9 +5416,9 @@ type AuthFactorTotpEnrolledEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthFactorTotpEnrolledEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -5874,9 +5874,9 @@ type AuthFactorTotpRemovedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthFactorTotpRemovedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -6420,9 +6420,9 @@ type AuthTokenIssuedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthTokenIssuedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -6894,9 +6894,9 @@ type AuthTokenRevokedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthTokenRevokedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -7436,9 +7436,9 @@ type AuthzGrantedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthzGrantedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -7932,9 +7932,9 @@ type AuthzRevokedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category AuthzRevokedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -8510,9 +8510,9 @@ type BrandingCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category BrandingCreatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -9318,9 +9318,9 @@ type ClaimChallengeCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category ClaimChallengeCreatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -9776,9 +9776,9 @@ type ClaimCompletedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category ClaimCompletedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -17314,6 +17314,16 @@ type FlowDefinitionStepTransitionsItem struct {
 	// is paused and resumes when the target flow completes (auto-pop).
 	// Example: login → recovery → back to login.
 	Action OptNilFlowDefinitionStepTransitionsItemAction `json:"action"`
+	// Local re-purposing. When set, taking this transition changes the
+	// flow's current purpose to this value — the dispatch mode a step's
+	// challenges run under — while the flow's original purpose stays
+	// pinned. Must be a purpose this definition serves, and `target`
+	// must be that purpose's entry step. Mutually exclusive with
+	// `action`: a transition either re-purposes within this flow or
+	// targets another flow, never both.
+	// Example: a "Sign up" navigation on the login identifier step
+	// (`{ target: register, purpose: register }`).
+	Purpose OptNilFlowDefinitionStepTransitionsItemPurpose `json:"purpose"`
 }
 
 // GetTarget returns the value of Target.
@@ -17326,6 +17336,11 @@ func (s *FlowDefinitionStepTransitionsItem) GetAction() OptNilFlowDefinitionStep
 	return s.Action
 }
 
+// GetPurpose returns the value of Purpose.
+func (s *FlowDefinitionStepTransitionsItem) GetPurpose() OptNilFlowDefinitionStepTransitionsItemPurpose {
+	return s.Purpose
+}
+
 // SetTarget sets the value of Target.
 func (s *FlowDefinitionStepTransitionsItem) SetTarget(val string) {
 	s.Target = val
@@ -17334,6 +17349,11 @@ func (s *FlowDefinitionStepTransitionsItem) SetTarget(val string) {
 // SetAction sets the value of Action.
 func (s *FlowDefinitionStepTransitionsItem) SetAction(val OptNilFlowDefinitionStepTransitionsItemAction) {
 	s.Action = val
+}
+
+// SetPurpose sets the value of Purpose.
+func (s *FlowDefinitionStepTransitionsItem) SetPurpose(val OptNilFlowDefinitionStepTransitionsItemPurpose) {
+	s.Purpose = val
 }
 
 type FlowDefinitionStepTransitionsItemAction string
@@ -17371,6 +17391,75 @@ func (s *FlowDefinitionStepTransitionsItemAction) UnmarshalText(data []byte) err
 		return nil
 	case FlowDefinitionStepTransitionsItemActionPivot:
 		*s = FlowDefinitionStepTransitionsItemActionPivot
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type FlowDefinitionStepTransitionsItemPurpose string
+
+const (
+	FlowDefinitionStepTransitionsItemPurposeLogin       FlowDefinitionStepTransitionsItemPurpose = "login"
+	FlowDefinitionStepTransitionsItemPurposeRegister    FlowDefinitionStepTransitionsItemPurpose = "register"
+	FlowDefinitionStepTransitionsItemPurposeRecovery    FlowDefinitionStepTransitionsItemPurpose = "recovery"
+	FlowDefinitionStepTransitionsItemPurposeProfiling   FlowDefinitionStepTransitionsItemPurpose = "profiling"
+	FlowDefinitionStepTransitionsItemPurposeReauth      FlowDefinitionStepTransitionsItemPurpose = "reauth"
+	FlowDefinitionStepTransitionsItemPurposeLinkAccount FlowDefinitionStepTransitionsItemPurpose = "link_account"
+)
+
+// AllValues returns all FlowDefinitionStepTransitionsItemPurpose values.
+func (FlowDefinitionStepTransitionsItemPurpose) AllValues() []FlowDefinitionStepTransitionsItemPurpose {
+	return []FlowDefinitionStepTransitionsItemPurpose{
+		FlowDefinitionStepTransitionsItemPurposeLogin,
+		FlowDefinitionStepTransitionsItemPurposeRegister,
+		FlowDefinitionStepTransitionsItemPurposeRecovery,
+		FlowDefinitionStepTransitionsItemPurposeProfiling,
+		FlowDefinitionStepTransitionsItemPurposeReauth,
+		FlowDefinitionStepTransitionsItemPurposeLinkAccount,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowDefinitionStepTransitionsItemPurpose) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowDefinitionStepTransitionsItemPurposeLogin:
+		return []byte(s), nil
+	case FlowDefinitionStepTransitionsItemPurposeRegister:
+		return []byte(s), nil
+	case FlowDefinitionStepTransitionsItemPurposeRecovery:
+		return []byte(s), nil
+	case FlowDefinitionStepTransitionsItemPurposeProfiling:
+		return []byte(s), nil
+	case FlowDefinitionStepTransitionsItemPurposeReauth:
+		return []byte(s), nil
+	case FlowDefinitionStepTransitionsItemPurposeLinkAccount:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowDefinitionStepTransitionsItemPurpose) UnmarshalText(data []byte) error {
+	switch FlowDefinitionStepTransitionsItemPurpose(data) {
+	case FlowDefinitionStepTransitionsItemPurposeLogin:
+		*s = FlowDefinitionStepTransitionsItemPurposeLogin
+		return nil
+	case FlowDefinitionStepTransitionsItemPurposeRegister:
+		*s = FlowDefinitionStepTransitionsItemPurposeRegister
+		return nil
+	case FlowDefinitionStepTransitionsItemPurposeRecovery:
+		*s = FlowDefinitionStepTransitionsItemPurposeRecovery
+		return nil
+	case FlowDefinitionStepTransitionsItemPurposeProfiling:
+		*s = FlowDefinitionStepTransitionsItemPurposeProfiling
+		return nil
+	case FlowDefinitionStepTransitionsItemPurposeReauth:
+		*s = FlowDefinitionStepTransitionsItemPurposeReauth
+		return nil
+	case FlowDefinitionStepTransitionsItemPurposeLinkAccount:
+		*s = FlowDefinitionStepTransitionsItemPurposeLinkAccount
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -18398,9 +18487,9 @@ type FlowdefCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category FlowdefCreatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -18856,9 +18945,9 @@ type FlowdefDeletedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category FlowdefDeletedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -19754,9 +19843,9 @@ type FlowdefUpdatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category FlowdefUpdatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -30392,6 +30481,69 @@ func (o OptNilFlowDefinitionStepTransitionsItemAction) Or(d FlowDefinitionStepTr
 	return d
 }
 
+// NewOptNilFlowDefinitionStepTransitionsItemPurpose returns new OptNilFlowDefinitionStepTransitionsItemPurpose with value set to v.
+func NewOptNilFlowDefinitionStepTransitionsItemPurpose(v FlowDefinitionStepTransitionsItemPurpose) OptNilFlowDefinitionStepTransitionsItemPurpose {
+	return OptNilFlowDefinitionStepTransitionsItemPurpose{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilFlowDefinitionStepTransitionsItemPurpose is optional nullable FlowDefinitionStepTransitionsItemPurpose.
+type OptNilFlowDefinitionStepTransitionsItemPurpose struct {
+	Value FlowDefinitionStepTransitionsItemPurpose
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilFlowDefinitionStepTransitionsItemPurpose was set.
+func (o OptNilFlowDefinitionStepTransitionsItemPurpose) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilFlowDefinitionStepTransitionsItemPurpose) Reset() {
+	var v FlowDefinitionStepTransitionsItemPurpose
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilFlowDefinitionStepTransitionsItemPurpose) SetTo(v FlowDefinitionStepTransitionsItemPurpose) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilFlowDefinitionStepTransitionsItemPurpose) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilFlowDefinitionStepTransitionsItemPurpose) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v FlowDefinitionStepTransitionsItemPurpose
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilFlowDefinitionStepTransitionsItemPurpose) Get() (v FlowDefinitionStepTransitionsItemPurpose, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilFlowDefinitionStepTransitionsItemPurpose) Or(d FlowDefinitionStepTransitionsItemPurpose) FlowDefinitionStepTransitionsItemPurpose {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilFlowdefCreatedEventActorType returns new OptNilFlowdefCreatedEventActorType with value set to v.
 func NewOptNilFlowdefCreatedEventActorType(v FlowdefCreatedEventActorType) OptNilFlowdefCreatedEventActorType {
 	return OptNilFlowdefCreatedEventActorType{
@@ -36686,9 +36838,9 @@ type ProjectCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category ProjectCreatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -37160,9 +37312,9 @@ type ProjectDeletedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category ProjectDeletedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -37688,9 +37840,9 @@ type ProjectUpdatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category ProjectUpdatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -39151,9 +39303,9 @@ type RequestAPIEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category RequestAPIEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -40312,9 +40464,9 @@ type SchemaCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category SchemaCreatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -40770,9 +40922,9 @@ type SchemaDeletedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category SchemaDeletedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -41675,9 +41827,9 @@ type SessionDeletedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category SessionDeletedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -42149,9 +42301,9 @@ type SessionEstablishedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category SessionEstablishedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -42623,9 +42775,9 @@ type SessionExpiredEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category SessionExpiredEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -44858,9 +45010,9 @@ type TeamCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category TeamCreatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -45332,9 +45484,9 @@ type TeamDeactivatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category TeamDeactivatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -45827,9 +45979,9 @@ type TeamMembershipUpdatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category TeamMembershipUpdatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -46597,9 +46749,9 @@ type TeamUpdatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category TeamUpdatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -47775,9 +47927,9 @@ type UserCreateFailedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category UserCreateFailedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -48249,9 +48401,9 @@ type UserCreatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category UserCreatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -48734,9 +48886,9 @@ type UserDeactivatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category UserDeactivatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -49208,9 +49360,9 @@ type UserDeletedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category UserDeletedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
@@ -50353,9 +50505,9 @@ type UserUpdatedEvent struct {
 	EventType string `json:"event_type"`
 	// Wide-event category.
 	Category UserUpdatedEventCategory `json:"category"`
-	// When the action happened (DB clock).
+	// When the action happened (server/storage clock, dialect-owned).
 	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (DB clock).
+	// When the row was inserted (server/storage clock, dialect-owned).
 	CreatedAt time.Time `json:"created_at"`
 	// Who triggered the event.
 	ActorID OptNilString `json:"actor_id"`
