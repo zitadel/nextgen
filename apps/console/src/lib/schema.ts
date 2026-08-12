@@ -166,14 +166,13 @@ export interface SchemaAuthMethod {
 }
 
 /**
- * The sign-in methods a schema declares, in the order the schema puts them in.
+ * The sign-in methods a schema declares.
  *
- * `x-auth-methods` is an object keyed by method with an explicit `position`
- * (`api/openapi/endpoints/schemas/auth-methods.json`), so the order is authored
- * rather than incidental — the `passkey-first` preset puts passkey at position
- * 1 and password at 2, which is why the design's chip reads "Passkey +
- * Password". Sorting by position preserves that; ties fall back to the key so
- * the list is stable.
+ * `x-auth-methods` says which methods a user type supports; the order they are
+ * offered in is the flow's, from the order of a step's actions. So the sort
+ * here claims nothing — it exists for the same reason {@link schemaFields}
+ * sorts: `GET /schemas/{id}` serialises from a Go map, so the response's key
+ * order is randomised and an unsorted list reshuffles between loads.
  *
  * Every declared method is returned, not just the two the backend supports
  * today (D10). A schema that turns on `otp` should show `otp`, not silently
@@ -189,11 +188,9 @@ export function schemaAuthMethods(schema: UserSchema): SchemaAuthMethod[] {
         key,
         label: AUTH_METHOD_LABELS[key] ?? key,
         enabled: entry.enabled === true,
-        position: typeof entry.position === "number" ? entry.position : Number.MAX_SAFE_INTEGER,
       };
     })
-    .sort((a, b) => a.position - b.position || a.key.localeCompare(b.key))
-    .map(({ key, label, enabled }) => ({ key, label, enabled }));
+    .sort((a, b) => a.key.localeCompare(b.key));
 }
 
 /**

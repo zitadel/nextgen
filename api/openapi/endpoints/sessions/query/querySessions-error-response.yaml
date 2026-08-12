@@ -7,6 +7,7 @@ content:
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/proj-missing_id.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/sess-not_found.yaml'
         - $ref: '../../../components/schemas/errors/sess-permission_denied.yaml'
@@ -16,6 +17,7 @@ content:
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          proj.missing_id: '../../../components/schemas/errors/proj-missing_id.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           sess.not_found: '../../../components/schemas/errors/sess-not_found.yaml'
           sess.permission_denied: '../../../components/schemas/errors/sess-permission_denied.yaml'
@@ -35,6 +37,11 @@ content:
         value:
           code: not_implemented
           message: 'This feature is not implemented yet.'
+      proj.missing_id:
+        summary: proj.missing_id
+        value:
+          code: proj.missing_id
+          message: 'project: missing id'
       req.invalid:
         summary: req.invalid
         value:

@@ -152,7 +152,7 @@ describe("authentication guard", () => {
     // After sign-out the guard must see no session again.
     fetchSession.mockResolvedValue(null);
     await userEvent.click(screen.getByRole("button", { name: /Account: Test User/ }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Log out" }));
 
     expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
     expect(signOut).toHaveBeenCalledOnce();
