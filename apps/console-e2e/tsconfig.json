@@ -2,8 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "allowJs": true,
-    // `page.evaluate` callbacks are compiled here but run in the browser, so
-    // the specs need DOM types alongside the runner's Node ones.
+    // Playwright specs run in Node, but `page.evaluate` callbacks execute in
+    // the browser and reference DOM globals.
     "lib": ["ES2022", "DOM"],
     "outDir": "out-tsc/playwright",
     "sourceMap": false,
@@ -12,10 +12,8 @@
   "include": [
     "playwright*.config.mts",
     "scripts/**/*.mts",
-    "src/**/*.spec.ts",
-    "src/**/*.d.ts",
-    "src-real/**/*.spec.ts",
+    "src/**/*.ts",
     "src-real/**/*.ts",
-    "src-embedded/**/*.spec.ts"
+    "src-embedded/**/*.ts"
   ]
 }

@@ -627,6 +627,9 @@ importers:
       eslint-plugin-playwright:
         specifier: 'catalog:'
         version: 2.10.2(eslint@10.2.1(jiti@2.7.0))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
 
   apps/demo-next:
     dependencies:

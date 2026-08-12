@@ -1,12 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { api } from "../../../api/zitadel";
-import { getConsoleProjectId } from "../../../runtime/runtime";
 import { Page } from "../../../components/layout";
 import { PageHeader } from "../../../components/resource-page";
 
 export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")({
-  loader: ({ params }) => api.getFlowDefinition(params.definitionId, { project_id: getConsoleProjectId() }),
+  loader: ({ params }) => api.getFlowDefinition(params.definitionId),
   component: FlowDefinitionDetail,
 });
 
