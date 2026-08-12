@@ -1,7 +1,9 @@
 # Console ADR 0002: API access and auth interceptors
 
 > **Status:** Accepted
-> **Date:** 2026-06-29 (accepted 2026-06-30)
+> **Date:** 2026-06-29 (accepted 2026-06-30; revised 2026-08-12 — §1/§4: the
+> Go-side `/api` shim is withdrawn, the production API base is the origin
+> root)
 > **Scope:** `apps/console` only. See [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Console shell layout, navigation, and resource list pages
 > (issue [#440](https://github.com/zitadel/nextgen/issues/440)).
@@ -67,14 +69,18 @@ the project-secret bearer before the request reaches the API handler. The
 browser bundle contains no `sk_proj_...` value, upholding
 [ADR 005](../../../../docs/adrs/005-public-runtime-private-credentials.md).
 
+The diagram below is the shape as revised in 2026-08-12 (see the note under
+it): one rule, two same-origin paths, and no browser-held secret on either.
+
 ```mermaid
 flowchart LR
-  browser["Console SPA (browser)\nno credential"]
-  shim["Go server: console API shim\ninjects sk_proj_... bearer"]
-  apiHandler["ogen API handler\nOAuth2 bearer required"]
+  browser["Console SPA (browser)\nno secret"]
+  proxy["Vite dev server /api\ninjects sk_proj_... bearer"]
+  apiHandler["ogen API handler\n(Go binary, origin root)"]
 
-  browser -->|"GET (same-origin), no Authorization"| shim
-  shim -->|"+ Authorization: Bearer sk_proj_..."| apiHandler
+  browser -->|"dev: /api/... , no Authorization"| proxy
+  proxy -->|"+ Authorization: Bearer sk_proj_..."| apiHandler
+  browser -->|"prod: /... , publishable key + session cookie"| apiHandler
 ```
 
 The console's contract is therefore: **call the API at a same-origin base path
@@ -84,10 +90,25 @@ components authenticated by the platform send no client token (see the
 `createApi` / no-token path in
 [`packages/api/src/runtime/api-factory.ts`](../../../../packages/api/src/runtime/api-factory.ts)).
 
-The Go-side injection (a middleware/proxy step in `buildHTTPMux`, or a
-dedicated console API mount) is a **referenced dependency, owned by a
-follow-up server change**, not by this console-scoped ADR. What this ADR fixes
-is that the console assumes it and never embeds the secret itself.
+> **Revised 2026-08-12 — the Go-side shim is withdrawn, not deferred.** This
+> section recorded the injection step (a middleware in `buildHTTPMux` or a
+> dedicated console API mount) as a referenced dependency owned by a
+> follow-up server change. That change was never made, and the console
+> meanwhile stopped needing it: the sign-in path carries root
+> [ADR 036](../../../../docs/adrs/036-api-credential-planes.md)'s
+> **publishable key** (browser-safe by construction, served to the console in
+> `runtime.json` — ADR 0004 §2) and the signed-in path carries the
+> `__nextgen_session` cookie, which rides same-origin requests on its own. A
+> shim at `/api` would have no secret left to inject; it would be a bare
+> prefix strip republishing the entire ogen surface under a second path. The
+> `/api` base is therefore **dev-server-only**, and the deployed console
+> calls the API at the origin root — see §4.
+>
+> The shipped bug this fixes: the embedded console called `/api/*` against a
+> mux that mounts only `/ui/login`, `/ui/console`, `/console/runtime.json`,
+> and `/`, so every call 404'd and `/ui/console/` rendered
+> "POST /api/flow returned 404". It survived because no test lane served the
+> console the way the Go binary does — closed by `console-e2e:e2e-embedded`.
 
 ### 2. Reuse `configureZitadel()` + `getApi()`, not a bespoke `src/api/client.ts`
 
@@ -120,9 +141,12 @@ responsibilities are deliberately narrow:
 
 - **Base-URL binding** — requests target the same-origin proxy base
   (`getApi` binds it; no per-call URLs).
-- **No client token** — the console sets no bearer; `customFetch` leaves the
-  `Authorization` header alone when no token is configured, and the
-  server-side shim supplies it.
+- **No client token for management** — the app-wide client sets no bearer;
+  `customFetch` leaves the `Authorization` header alone when no token is
+  configured. *(Revised 2026-08-12: only the dev proxy supplies one
+  server-side; in production nothing does until session-derived permissions
+  land — see Consequences. The login screen's per-element handle is the one
+  exception: it carries the runtime-discovered publishable key, ADR 036.)*
 - **Error mapping** — non-2xx throws `ApiError`; loaders let it propagate to
   the route `errorComponent`. `ApiError.status` drives status-specific copy
   (e.g. a `401`/`403` "you don't have access" surface once auth lands).
@@ -132,12 +156,19 @@ there is no console-user credential to manage yet.
 
 ### 4. Dev story keeps the same shape as production
 
-In production the console and API are same-origin, so a relative API base
-(`/api` by default) reaches the console API shim, which injects the secret
-before the ogen handler. In dev the console runs on `:5174` (Vite) and the
-API on `:8080`; to keep request shape identical the console talks to a
-**same-origin `/api` path that the Vite dev server proxies** to the Go
-server, rather than calling the API host directly with a browser-held token:
+*Revised 2026-08-12; the original text assumed the §1 shim.*
+
+The invariant is **same-origin, no browser-held secret, in every
+environment**. What differs is only *where on that origin* the API sits, and
+that follows from who serves the console:
+
+- **Production** — the built console is embedded in the Go binary, which
+  serves the ogen API at the origin **root**. The base is `""`: the console
+  calls `/flow`, `/sessions/me`, … directly. Nothing is mounted at `/api`
+  and nothing needs to be (§1).
+- **Dev** — Vite serves the console on `:5174`, the API is on `:8080`. The
+  console calls a same-origin `/api` path that the Vite dev server proxies
+  to the Go server, so the browser still holds no credential:
 
 ```ts
 // vite.config.mts (dev only) — illustrative
@@ -149,10 +180,15 @@ server: {
 },
 ```
 
-So dev and prod differ only in *where* the proxy lives (Vite dev server vs Go
-shim), never in whether the browser holds a secret — it never does. The
-default API base is `/api` (overridable via `VITE_CONSOLE_API_BASE`); the rule
-is fixed: **same-origin, no browser-held credential, in every environment.**
+So dev and prod differ only in whether a proxy sits in front of the API, never
+in whether the browser holds a secret — it never does. The base resolves in
+`src/api/zitadel.ts` as `VITE_CONSOLE_API_BASE ?? (DEV ? "/api" : "")`: the
+env var is the escape hatch for a deployment that mounts the API elsewhere,
+`/api` is the dev-proxy path, and root is what the embedded build talks to.
+`vite preview` deliberately proxies nothing, so it cannot be mistaken for the
+production path — which also means it cannot *prove* it; that job belongs to
+the embedded lane (`console-e2e:e2e-embedded`), which serves the console from
+the Go binary.
 
 ### 5. Forward-looking slot for console-user auth
 
@@ -160,8 +196,9 @@ When console-user authentication arrives (a separate issue), it slots into
 this interceptor without re-architecting it:
 
 - A console-user **session cookie** rides along automatically on the
-  same-origin requests; the server-side shim can exchange/augment it. No
-  console code change needed for the cookie to flow.
+  same-origin requests — in production straight to the API handler, in dev
+  through the Vite proxy, which forwards it untouched. No console code
+  change needed for the cookie to flow. *(This landed as Console ADR 0003.)*
 - If a per-user **token** is ever needed client-side, it is set through the
   SDK's existing token mechanism (the `token` option on the client factory in
   [`api-factory.ts`](../../../../packages/api/src/runtime/api-factory.ts)),
@@ -183,16 +220,25 @@ while guaranteeing the auth-later work is an extension, not a rewrite.
   the error taxonomy (`ApiError`) is shared with the CLI and SDKs.
 - **Loaders get typed data + typed errors.** ADR 0001 loaders call `api.*` and
   rely on `ApiError.status` for boundary copy.
-- **Dev mirrors prod.** Same-origin, secret-free requests in both; only the
-  proxy's location changes.
+- **Dev mirrors prod.** Same-origin, secret-free requests in both; only
+  whether a proxy fronts the API changes (§4).
 - **Auth-later is additive.** Session cookie / token slots into the existing
   interceptor; no console rewrite.
-- **Dependency to track:** the console is now coupled to a server-side
-  inject/proxy step that does not exist yet. Until that Go change lands, the
-  console cannot reach a protected API in a deployed build without it — this
-  is an intentional, recorded dependency, not an oversight. The implementation
-  PR must land the Go shim (or a documented dev proxy) alongside the first
-  real data fetch.
+- **~~Dependency to track:~~ resolved 2026-08-12 by withdrawal.** This bullet
+  recorded a coupling to a server-side inject/proxy step that did not exist
+  yet, and warned that a deployed build could not reach the API without it.
+  The warning was accurate and the dependency was never discharged — the
+  embedded console shipped calling a path nothing served. It is closed by
+  removing the coupling rather than by building the shim (§1): the deployed
+  console targets the origin root and authenticates with the publishable key
+  and the session cookie. The lesson worth keeping is the second half — a
+  recorded cross-surface dependency needs a *test* that fails while it is
+  open, not only a note.
+- **Management calls still need more than the cookie.** The dev proxy's
+  secret is what carries `user.read` and friends today; the publishable key
+  is deliberately refused for them (`internal/api/user.go`). Root ADRs
+  032/033's session-derived permissions are what make the embedded console's
+  list screens work without a proxy — tracked there, not here.
 
 ## Related work
 

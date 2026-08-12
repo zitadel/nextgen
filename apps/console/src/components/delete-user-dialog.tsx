@@ -20,7 +20,6 @@ import { Label } from "@/components/ui/label";
 
 import { api } from "../api/zitadel";
 import { describeError } from "../lib/api-error";
-import { getConsoleProjectId } from "../runtime/runtime";
 
 /**
  * The word the operator has to type before the action unlocks. Compared
@@ -138,7 +137,7 @@ function DeleteUserForm({
     setDeleting(true);
     setError(undefined);
     try {
-      await api.deleteUserByID(userId, { project_id: getConsoleProjectId() });
+      await api.deleteUserByID(userId);
       // Raised before the dialog closes, from the root-mounted toaster, so it
       // outlives this subtree — the caller may navigate away on `onDeleted`.
       toast.success(`${name} deleted`);

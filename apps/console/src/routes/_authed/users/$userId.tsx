@@ -18,7 +18,6 @@ import { formatDate } from "../../../lib/date";
 import { displayValue, field } from "../../../lib/record";
 import { type UserSchema, schemaDisplayName, schemaFields } from "../../../lib/schema";
 import { userDisplayName } from "../../../lib/user";
-import { getConsoleProjectId } from "../../../runtime/runtime";
 
 /**
  * User detail (Figma `467:44362`, `Filled` and `Authentication` variants).
@@ -39,8 +38,7 @@ import { getConsoleProjectId } from "../../../runtime/runtime";
  */
 export const Route = createFileRoute("/_authed/users/$userId")({
   loader: async ({ params }) => {
-    const projectId = getConsoleProjectId();
-    const user = await api.getUserByID(params.userId, { project_id: projectId });
+    const user = await api.getUserByID(params.userId);
 
     // Both are chrome for the record rather than the record itself, so neither
     // is allowed to reject the loader: a failure costs a card, not the screen.
@@ -48,12 +46,12 @@ export const Route = createFileRoute("/_authed/users/$userId")({
     const [schema, passkeys] = await Promise.all([
       schemaId
         ? api
-            .getSchemaById(schemaId, { project_id: projectId })
+            .getSchemaById(schemaId)
             .then((value) => value as UserSchema)
             .catch(() => undefined)
         : Promise.resolve(undefined),
       api
-        .listUserPasskeys(params.userId, { project_id: projectId })
+        .listUserPasskeys(params.userId)
         .then((result) => result.passkeys)
         .catch(() => undefined),
     ]);
