@@ -24,19 +24,34 @@ type ListRequest struct {
 	ResourceKind domain.ResourceKind
 }
 
+// memoKey is the request-scoped Check cache key. A struct key avoids
+// delimiter aliasing that string joins can introduce.
+type memoKey struct {
+	PrincipalType domain.AuthzPrincipalType
+	PrincipalID   string
+	ProjectID     string
+	ObjectType    string
+	Relation      string
+}
+
 // Resolver evaluates checks with optional request-scoped memoization.
 // Create one per request; it is not safe for concurrent use.
 type Resolver struct {
 	catalogID string
-	memo      map[string]Decision
+	memo      map[memoKey]Decision
 }
 
 // New returns a request-scoped resolver.
 func New() *Resolver {
-	return &Resolver{memo: make(map[string]Decision)}
+	return &Resolver{memo: make(map[memoKey]Decision)}
 }
 
 // Check returns Allow / NotFound / Forbidden for one permission check.
+//
+// For sk_team_ principals, permissions outside the flat allowlist short-circuit
+// to DecisionNotFound without a foothold lookup (intentional masking; HTTP will
+// map like other NotFound). Allowed permissions still use storage Allow /
+// Forbidden / NotFound as usual.
 func (r *Resolver) Check(ctx context.Context, stmts service.AuthzResolverStatements, req Request) (Decision, error) {
 	if err := validateCheckRequest(req); err != nil {
 		return DecisionUnspecified, err
@@ -46,7 +61,13 @@ func (r *Resolver) Check(ctx context.Context, stmts service.AuthzResolverStateme
 		return DecisionNotFound, nil
 	}
 
-	key := checkMemoKey(req)
+	key := memoKey{
+		PrincipalType: req.PrincipalType,
+		PrincipalID:   req.PrincipalID,
+		ProjectID:     req.ProjectID,
+		ObjectType:    req.ObjectType,
+		Relation:      req.Relation,
+	}
 	if d, ok := r.memo[key]; ok {
 		return d, nil
 	}
@@ -119,11 +140,6 @@ func (r *Resolver) activeCatalogID(ctx context.Context, stmts service.AuthzResol
 	}
 	r.catalogID = id
 	return id, nil
-}
-
-func checkMemoKey(req Request) string {
-	return fmt.Sprintf("%s|%s|%s|%s|%s",
-		req.PrincipalType, req.PrincipalID, req.ProjectID, req.ObjectType, req.Relation)
 }
 
 func validateCheckRequest(req Request) error {

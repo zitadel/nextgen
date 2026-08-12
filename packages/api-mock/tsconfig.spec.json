@@ -2,6 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./out-tsc/vitest",
+    "resolveJsonModule": true,
     "types": ["vitest/globals", "vitest/importMeta", "vitest"],
     "lib": ["DOM", "DOM.Iterable"],
     "module": "esnext",

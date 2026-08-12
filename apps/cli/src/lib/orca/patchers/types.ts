@@ -1,6 +1,6 @@
 import type { FrameworkFacts } from "../detectors/types";
 import type { CreateProjectResponse } from "../../api/client";
-import type { ScaffoldFileClass } from "../../sync/types";
+import type { ScaffoldFileClass, ScaffoldPosture } from "../../sync/types";
 
 /**
  * The minimal, project-independent view a patcher needs to enumerate the files
@@ -43,6 +43,14 @@ export type PatchContext = PatchView &
      * pages) and guidance/status output. Absent means minimal.
      */
     useCase?: string;
+    /**
+     * Embedding posture of the generated auth/profile pages (ADR 044).
+     * Setup derives it via `derivePosture` (fresh scaffold → `page`,
+     * pre-existing route-based app → `widget`); `doctor --fix` reads it back
+     * from the scaffold manifest. Absent means `page` — the only posture
+     * that existed before the record, so legacy restores stay full-page.
+     */
+    posture?: ScaffoldPosture;
   }>;
 
 /** Where and how a patch is applied. Family-neutral (no file-op coupling). */
