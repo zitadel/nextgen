@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { Box, Loader2, Plus } from "lucide-react";
+import { Box, Ellipsis, Loader2, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { AddTeamSheet } from "@/components/add-team-sheet";
@@ -15,6 +15,12 @@ import {
 } from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -180,7 +186,9 @@ function TeamsScreen() {
                   <TableCell className={`${RESOURCE_CELL} text-muted-foreground truncate text-sm`}>
                     {formatDate(team.created_at)}
                   </TableCell>
-                  <TableCell className={RESOURCE_CELL} />
+                  <TableCell className={`${RESOURCE_CELL} text-right`}>
+                    <RowActions teamId={team.id} name={team.name} />
+                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -205,3 +213,31 @@ function TeamsScreen() {
   );
 }
 
+
+/**
+ * The row menu.
+ *
+ * One item today — the same shape the schema list ships — because `View team` is
+ * the only action the API can serve from here: `DELETE /teams/{team_id}`
+ * deactivates rather than deletes, and deactivating is deprioritised. The row
+ * itself opens the team as well; the menu is where a second action lands when
+ * there is one, and it keeps this list consistent with the others.
+ */
+function RowActions({ teamId, name }: { teamId: string; name: string }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={`Actions for ${name}`}>
+          <Ellipsis aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuItem asChild>
+          <Link to="/teams/$teamId" params={{ teamId }}>
+            View team
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

@@ -105,6 +105,15 @@ describe("teams screen", () => {
     expect(router.state.location.pathname).toBe(`/teams/${team().id}`);
   });
 
+  it("offers View team from the row menu", async () => {
+    server.use(http.post(TEAMS_URL, () => HttpResponse.json({ teams: [team()] })));
+    await renderTeams();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Actions for Acme Web" }));
+    const item = await screen.findByRole("menuitem", { name: "View team" });
+    expect(item).toHaveAttribute("href", `/teams/${team().id}`);
+  });
+
   it("creates a team from the Add drawer", async () => {
     const created: unknown[] = [];
     server.use(
