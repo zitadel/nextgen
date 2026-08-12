@@ -23,12 +23,12 @@ A flow runs on top of auth_attempt primitives without collapsing the resource mo
 
 ## Bootstrap challenge
 
-Every auth_attempt begins with a server-minted, origin-bound nonce. The client gets the nonce from `POST /bootstrap/challenge`:
+Every auth_attempt begins with a server-minted, origin-bound nonce. The client gets the nonce from `POST /bootstrap/challenge` (direction: the `challenge_nonce` request field is shipped on `POST /auth_attempts`, but the `/bootstrap/challenge` endpoint that mints it is not yet in the OpenAPI spec):
 
 ```http
 POST /bootstrap/challenge
 {
-  "project_id": "river-8421",
+  "project_id": "proj_01HEXAMPLE",
   "client_type": "browser" | "native_ios" | "native_android" | "server"
 }
 ```
@@ -53,7 +53,7 @@ nonce, and an optional existing session for step-up:
 ```http
 POST /auth_attempts
 {
-  "project_id": "river-8421",
+  "project_id": "proj_01HEXAMPLE",
   "challenge_nonce": "…",
   "session_id": "sess_existing"   // optional, for step-up
 }
@@ -99,7 +99,7 @@ Exchange requirements (also documented in [`credentials.md`](credentials.md#hand
 - Single-use (atomic GETDEL).
 - TTL ≤ 60 seconds.
 - Audience-bound: exchange requires an `sk_proj_…` whose project ID matches the handoff's minted project.
-- Idempotency-safe (Category B, 5-minute window — see [`conventions.md`](conventions.md#idempotency)). Packet loss on the success response must not lock out the user.
+- Idempotency-safe via the optional `Idempotency-Key` header (see [`conventions.md`](conventions.md#idempotency-shipped)). Packet loss on the success response must not lock out the user.
 
 ## Sessions
 
@@ -110,9 +110,11 @@ verified state:
 
 ```http
 POST   /sessions                         # pre-allocate anonymous session (optional, pre-auth)
-GET    /sessions/{id}                    # read state, factors, assurance_levels[]
-DELETE /sessions/{id}                    # revoke (logout), requires session_token
-GET    /sessions                         # list (admin / management)
+GET    /sessions/me                      # read the caller's session (__nextgen_session cookie)
+DELETE /sessions/me                      # end-user logout (__nextgen_session cookie)
+GET    /sessions/{id}                    # read state, factors, assurance_levels[] (operator, session.read)
+DELETE /sessions/{id}                    # operator revoke (session.delete; idempotent 204)
+POST   /sessions/query                   # operator list — cursor-paginated, structured filters
 ```
 
 `POST /sessions` is optional — it creates an anonymous shell (no user, no factors) for cases where a `session_id` must be pre-allocated before the user is known. Most clients skip this; the flow engine and direct `auth_attempts` callers create the session implicitly on first completion.

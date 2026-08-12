@@ -21,7 +21,7 @@ Three layers. Long-form in [`api/hierarchy.md`](api/hierarchy.md).
 | **Team** | A tenant-grouping inside any project. Two canonical shapes: (a) a team inside the **platform project** represents a paying customer / developer account; (b) a team inside a **customer project** represents a B2B end-customer tenant. Same resource, different project context. |
 | **User** | An identity inside any project. A user inside the platform project is what used to be called a "platform_user" (a developer/admin). A user inside a customer project is an end-user. Team participation attaches users to teams; lifecycle ownership is explicit policy. |
 
-The platform project's `project_id` is discoverable via the authenticated `/capabilities` response (`defaults.project_id`). Self-hosted returns a singleton; cloud returns whichever project is the caller's platform project.
+Discovering the platform project's `project_id` from the server is target design (the planned `/capabilities` endpoint — see [`api/conventions.md`](api/conventions.md#direction-not-shipped)); no discovery endpoint is shipped today. Self-hosted runs a singleton platform project; cloud resolves whichever project is the caller's platform project.
 
 ---
 

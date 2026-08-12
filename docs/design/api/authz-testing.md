@@ -32,7 +32,7 @@ Three related techniques, not one tool:
 | --- | --- | --- | --- |
 | **Crash fuzz** | Arbitrary bytes (DSL/JSON) | No panic; bounded runtime | `openfga.Parse*` |
 | **Property / generative fuzz** | Structured `authz.Model` (valid + near-valid) | Algebraic invariants on `CatalogMutations` / plans | `profile` + `compiler` |
-| **Differential / sequence fuzz** | Random mutation sequences + same payload across dialects | Dialects agree; dual-write stays consistent | storage v2 / `stmttest` |
+| **Differential / sequence fuzz** | Random mutation sequences + same payload across dialects | Dialects agree; dual-write stays consistent | storage `stmttest` |
 
 Go's built-in `testing.F` is enough for the first two. Prefer it over a new
 property-testing dependency until generators outgrow a small byte decoder.

@@ -28,7 +28,7 @@ to be a fast answer to "can I build flow X right now?"
 
 ### Definitions
 
-- `FlowDefinitionStatements` over Postgres and Spanner (storage v2).
+- `FlowDefinitionStatements` over Postgres and Spanner (the storage layer).
 - Status enum: `draft`, `active`, `deprecated`, `archived`.
 - Per-definition `user_schema` URL, captured into `FlowState` at `Start`.
 

@@ -16,8 +16,9 @@
 > **secret rotation at claim**, **domain-based team matching / team
 > resolution**, and **team creation at claim** describe the future target and
 > are **not part of MVP claim**; see ADR 046 for what ships and the accepted
-> risks. The checked-in CLI and server
-> do not yet expose these endpoints or a `zitadel claim` command.
+> risks. The MVP is shipped: the server serves
+> `/projects/{project_id}/claim/{init,status,complete}` and the CLI provides
+> `zitadel claim`.
 
 Claim is the transaction that attaches ownership and accountability to a project. Before claim, the project exists but has no accountable owner. After claim, it belongs to a **team** with at least one accountable human. The transition is atomic — nothing partial.
 

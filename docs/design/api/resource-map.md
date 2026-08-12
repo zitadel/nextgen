@@ -4,7 +4,7 @@
 
 ## How to read this page
 
-All paths are shown without a version segment — versioning is header-selected via `Zitadel-Version` (see [`conventions.md`](conventions.md#versioning)).
+All paths are shown without a version segment. Header-selected versioning (`Zitadel-Version`) is target design — the shipped API is unversioned (see [`conventions.md`](conventions.md#direction-not-shipped)).
 
 Standard REST semantics apply: `POST` on the collection creates, `GET` on the collection lists (scope required — see [`url-architecture.md`](url-architecture.md#scope-resolution-as-a-first-class-invariant)), and `GET`/`PATCH` on the item reads/updates. `DELETE` on managed resources runs the resource's lifecycle semantics first (usually deactivate/tombstone); it is not a blind SQL hard-delete. Action verbs use slash form (`POST /users/{id}/verify_email`).
 
@@ -12,7 +12,7 @@ Standard REST semantics apply: `POST` on the collection creates, `GET` on the co
 
 ## Projects
 
-A project is a tenant / deployment. One project is reserved as the **platform project** — discoverable via `/capabilities`.
+A project is a tenant / deployment. One project is reserved as the **platform project** (server-side discovery of its ID is target design — see [`conventions.md`](conventions.md#direction-not-shipped)).
 
 ```http
 /projects
@@ -69,7 +69,8 @@ Create/list with explicit scope:
 
 ```http
 POST /teams                     # body: { project_id, name, ... }
-GET  /teams?project_id=…
+POST /teams/query               # structured filters + cursor pagination (ADR 031)
+GET  /users/{user_id}/teams     # the teams a user belongs to
 ```
 
 `DELETE /teams/{id}` deactivates/tombstones the team, revokes team-scoped API
@@ -93,7 +94,7 @@ Create/list with explicit scope:
 
 ```http
 POST /users                     # body: { project_id, email, ... }
-GET  /users?project_id=…&q=…&limit=…
+GET  /users?limit=…&page_token=…   # cursor-paginated list
 ```
 
 `DELETE /users/{id}` deactivates/tombstones the user, revokes sessions, tokens,
@@ -111,6 +112,8 @@ as an authorization fact, but membership is not proof that the team owns the
 user's identity lifecycle.
 
 ```http
+# Target design — no membership endpoints are shipped yet.
+# The shipped read surface is GET /users/{user_id}/teams.
 /team_memberships/{id}
 POST /team_memberships          # body: { team_id, user_id, roles: [...] }
 DELETE /team_memberships/{id}
@@ -198,9 +201,9 @@ POST /sessions/exchange
 
 ```http
 POST   /sessions                         # optional anonymous pre-auth shell
-GET    /sessions                         # list (admin / management)
+POST   /sessions/query                   # operator list — structured filters + cursor pagination
 GET    /sessions/{id}                    # operator get
-DELETE /sessions/{id}                    # operator revoke (not logout)
+DELETE /sessions/{id}                    # operator revoke (not logout; idempotent 204)
 GET    /sessions/me                      # end-user get (`nextgenSession` cookie)
 DELETE /sessions/me                      # end-user logout (`nextgenSession` cookie)
 ```
@@ -216,13 +219,12 @@ sessions; factor changes flow through `auth_attempts`. Detail in
 The UI-orchestration layer that runs on top of auth_attempts. Detail in [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md).
 
 ```http
-POST /flows
-GET  /flows/{session_id}
-POST /flows/{session_id}/submit
-POST /flows/{session_id}/event
+POST /flow                      # start a flow run
+GET  /flow/{id}                 # read the current step
+POST /flow/{id}/submit          # submit the current step
 ```
 
-Flow definition management (uploaded via `npx zitadel push`):
+Flow definition management:
 
 ```http
 POST   /flow_definitions
@@ -230,8 +232,6 @@ GET    /flow_definitions
 GET    /flow_definitions/{id}
 PUT    /flow_definitions/{id}
 DELETE /flow_definitions/{id}
-POST   /flow_definitions/{id}/activate
-POST   /flow_definitions/{id}/deactivate
 # planned: POST /flow_definitions/{id}/validate
 # planned: POST /flow_definitions/{id}/simulate
 ```
@@ -362,8 +362,10 @@ Draft request/response sketches for this design PR:
 
 - [`../platform/api/claim-api.yaml`](../platform/api/claim-api.yaml) — projects, claim, team domain-match.
 - [`../platform/api/config-api.yaml`](../platform/api/config-api.yaml) — `npx zitadel push` upload, capability manifest, drift.
-- [`../flowengine/api/flow-api.yaml`](../flowengine/api/flow-api.yaml) — flow engine runtime.
-- [`../flowengine/api/session-api.yaml`](../flowengine/api/session-api.yaml) — sessions.
+
+The former flow-engine and session sketches (`flow-api.yaml`, `session-api.yaml`)
+were deleted once the shipped spec under `api/openapi/endpoints/{flow,sessions}/`
+took over as the contract of record.
 
 auth_attempts, api_keys (flat), imports, capabilities: **TODO — not yet specified.**
 

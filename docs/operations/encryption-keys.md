@@ -288,7 +288,7 @@ Startup errors from key configuration are plain `server: …` errors and abort t
 | Startup wiring and validation                                                | `cmd/server/server.go` (`buildMasterKey`)                                             |
 | Key lookup by purpose, crypter construction, rotation job                    | `internal/service/keys.go`                                                            |
 | Project key set creation                                                     | `internal/domain/project.go` (`GenerateNewKeySet`), `internal/service/project.go`     |
-| Schema                                                                       | `internal/storage/v2/dialect/{postgres,spanner}/migration/sql/000012_crypto_keys.sql` |
+| Schema                                                                       | `internal/storage/dialect/{postgres,spanner}/migration/sql/000012_crypto_keys.sql` |
 
 ## See also
 

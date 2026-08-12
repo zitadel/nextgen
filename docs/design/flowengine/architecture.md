@@ -240,7 +240,7 @@ Wired in as `FlowPasskeyRegistrationService` via `FlowPasskeyRegistrationAdapter
 ### `FlowDefinitionStatements`
 
 Postgres and Spanner implementations live under
-`internal/storage/v2/dialect/{postgres,spanner}/flow_definition.go` and back
+`internal/storage/dialect/{postgres,spanner}/flow_definition.go` and back
 `FlowService.Resolve` (list active definitions) and `FlowService.Submit` /
 `GetStep` (re-fetch by id) via `FlowDefinitionService`. Migrations both ship
 `000005_flow_definitions.sql`.
@@ -249,7 +249,7 @@ Postgres and Spanner implementations live under
 
 `FlowCreateUserHandler` depends on a narrow `flowUserWriter` (`Create`) and
 `flowUserPasswordWriter` (`Create`). Production wiring uses
-`UserStatements` / `UserPasswordStatements` (storage v2) through the user
+`UserStatements` / `UserPasswordStatements` (the storage layer) through the user
 service — the handler itself stays storage-agnostic.
 
 ### Password hasher

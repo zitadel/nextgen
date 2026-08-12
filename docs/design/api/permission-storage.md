@@ -26,7 +26,7 @@ Resolver wiring remains Wave 3 (#423). Leopard remains later (**D11**).
 | Layer | Owner | What it is |
 | --- | --- | --- |
 | Policy IR + compiler | [#421](https://github.com/zitadel/nextgen/issues/421) / `internal/authz` | OpenFGA DSL/JSON → profile → storage-neutral `CatalogMutations` + query plans |
-| Runtime facts + DDL | Wave 1 (#422) / `internal/domain` + storage v2 | RSI, assignments, membership edges, catalog DDL |
+| Runtime facts + DDL | Wave 1 (#422) / `internal/domain` + `internal/storage` | RSI, assignments, membership edges, catalog DDL |
 | Persist compiled catalog | Wave 1 mapper / `PersistCatalogVersion` | Maps `CatalogMutations` → `authz_*` rows (relations, references, expression edges, closure); does **not** fill bundles |
 
 Do **not** conflate `internal/domain` grant/scope/edge types with the compiler IR.
@@ -50,7 +50,7 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
 
 - **Writers (dual-write):** entity statements construct tx-bound RSI/edge
   statements inside `withTransaction` and call Upsert/Sync/Delete directly.
-  Multi-write user lifecycle helpers live in `internal/storage/v2/dialect/authz`.
+  Multi-write user lifecycle helpers live in `internal/storage/dialect/authz`.
   Membership status uses `service.SyncUserTeamMembershipEdge`;
   column-shaped edge deletes use `DeleteAuthzMembershipEdges(filter)`; team
   deactivate uses `DeleteAuthzMembershipEdgesForTeamDeactivate`.
