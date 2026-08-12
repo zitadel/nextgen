@@ -103,9 +103,9 @@ function SchemaRow({
 }) {
   const name = schema ? schemaDisplayName(schema, id) : id;
   const attributes = schema ? schemaProperties(schema).map((property) => property.key) : [];
-  // "Passkey + Password" reads off the document's own `x-auth-methods`, in the
-  // order the schema positions them — the `passkey-first` preset is why the
-  // design shows passkey first.
+  // "Passkey + Password" reads off the document's own `x-auth-methods`. The
+  // annotation says which methods the user type supports; the order they are
+  // offered in belongs to the flow, not to the schema.
   const signIn = schema
     ? schemaAuthMethods(schema)
         .filter((method) => method.enabled)
