@@ -330,8 +330,12 @@ type ClaimStatements interface {
 // Use cases:
 //   - UpsertResourceScope: dual-write on project/team/user/schema/branding/
 //     flow_definition/session create (build via domain.New*ResourceScope).
-//   - GetResourceScope: scope resolution when resource_id is globally unique (tests, oracle).
-//   - GetResourceScopeInProject: scope resolution for management gate (kind + credential project + path.id).
+//   - GetResourceScope: tests/oracle only when resource_id is known globally unique;
+//     must not be used by the HTTP management gate (schema $id URLs are not).
+//   - GetResourceScopeInProject: gate lookup by kind + credential project + path.id.
+//   - GetResourceScopeByIDInProject: gate wrong-kind fallback (same project, any kind).
+//   - ExistsResourceScopeElsewhere: gate delete path — foreign presence without
+//     requiring a unique global resource_id.
 //   - DeleteResourceScope: explicit cleanup where FK cascade does not apply (user /
 //     schema / flow_definition / session delete today; branding relies on project
 //     cascade; project delete cascades RSI via project_id FK).
@@ -340,6 +344,8 @@ type ResourceScopeStatements interface {
 	UpsertResourceScope(ctx context.Context, scope *domain.ResourceScope) error
 	GetResourceScope(ctx context.Context, resourceID string) (*domain.ResourceScope, error)
 	GetResourceScopeInProject(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) (*domain.ResourceScope, error)
+	GetResourceScopeByIDInProject(ctx context.Context, projectID, resourceID string) (*domain.ResourceScope, error)
+	ExistsResourceScopeElsewhere(ctx context.Context, kind domain.ResourceKind, resourceID, excludeProjectID string) (bool, error)
 	DeleteResourceScope(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) error
 }
 

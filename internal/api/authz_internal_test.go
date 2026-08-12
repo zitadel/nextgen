@@ -21,6 +21,8 @@ type stubAuthzStmts struct {
 	scopes map[string]string
 	// kinds maps resource_id → ResourceKind; when absent, ResourceKindUser is used.
 	kinds map[string]domain.ResourceKind
+	// elsewhere forces ExistsResourceScopeElsewhere for a resource_id (shared URL across foreign projects).
+	elsewhere map[string]bool
 }
 
 func (stubAuthzStmts) IsStatements() {}
@@ -69,14 +71,44 @@ func (s stubAuthzStmts) GetResourceScope(_ context.Context, resourceID string) (
 }
 
 func (s stubAuthzStmts) GetResourceScopeInProject(_ context.Context, kind domain.ResourceKind, projectID, resourceID string) (*domain.ResourceScope, error) {
+	scope, err := s.GetResourceScopeByIDInProject(context.Background(), projectID, resourceID)
+	if err != nil {
+		return nil, err
+	}
+	if scope.ResourceKind != kind {
+		return nil, new(database.NoRowFoundError)
+	}
+	return scope, nil
+}
+
+func (s stubAuthzStmts) GetResourceScopeByIDInProject(_ context.Context, projectID, resourceID string) (*domain.ResourceScope, error) {
 	scope, err := s.GetResourceScope(context.Background(), resourceID)
 	if err != nil {
 		return nil, err
 	}
-	if scope.ProjectID != projectID || scope.ResourceKind != kind {
+	if scope.ProjectID != projectID {
 		return nil, new(database.NoRowFoundError)
 	}
 	return scope, nil
+}
+
+func (s stubAuthzStmts) ExistsResourceScopeElsewhere(_ context.Context, kind domain.ResourceKind, resourceID, excludeProjectID string) (bool, error) {
+	if s.elsewhere != nil {
+		if v, ok := s.elsewhere[resourceID]; ok {
+			return v, nil
+		}
+	}
+	scope, err := s.GetResourceScope(context.Background(), resourceID)
+	if err != nil {
+		if errors.Is(err, new(database.NoRowFoundError)) {
+			return false, nil
+		}
+		return false, err
+	}
+	if kind != "" && scope.ResourceKind != kind {
+		return false, nil
+	}
+	return scope.ProjectID != excludeProjectID, nil
 }
 
 func (stubAuthzStmts) UpsertResourceScope(context.Context, *domain.ResourceScope) error { return nil }
@@ -353,6 +385,22 @@ func TestRequireResourceAccessWrongKind(t *testing.T) {
 
 	_, err = requireResourceAccess(operator, stmts, "id_shared", userAccess, opDelete)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+}
+
+func TestRequireResourceAccessDeleteSharedURLElsewhere(t *testing.T) {
+	// Schema $id shared by two foreign projects: ExistsResourceScopeElsewhere is
+	// true even though GetResourceScope would be ambiguous. Operator delete must
+	// readMiss (never 204).
+	stmts := stubAuthzStmts{
+		elsewhere: map[string]bool{"https://example.com/x.json": true},
+	}
+	operator := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+	})
+
+	_, err := requireResourceAccess(operator, stmts, "https://example.com/x.json", schemaAccess, opDelete)
+	assertDomainCode(t, err, domain.ErrJSONSchemaNotFound().Code)
 }
 
 func assertDomainCode(t *testing.T, err error, wantCode string) {
