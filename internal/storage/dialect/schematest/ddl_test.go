@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -32,12 +33,13 @@ func TestColumnsStripsAlias(t *testing.T) {
 }
 
 func TestJoinColumnsResolvesAlias(t *testing.T) {
+	cols, err := schematest.JoinColumns(map[string]string{"s": "sessions"}, schema)
+	require.NoError(t, err)
 	assert.Equal(t, []schematest.ColumnNullability{
 		{Table: "sessions", Column: "id"},
 		{Table: "sessions", Column: "user_id", Nullable: true},
-	}, schematest.JoinColumns(map[string]string{"s": "sessions"}, schema))
+	}, cols)
 
-	assert.Panics(t, func() {
-		schematest.JoinColumns(map[string]string{"x": "sessions"}, schema)
-	})
+	_, err = schematest.JoinColumns(map[string]string{"x": "sessions"}, schema)
+	assert.ErrorContains(t, err, `no table for alias "s"`)
 }

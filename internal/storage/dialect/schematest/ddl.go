@@ -33,21 +33,21 @@ func Columns[F ~uint8, T any](table string, schema database.Schema[F, T]) []Colu
 
 // JoinColumns lists a join schema's bound columns, resolving each SQL name's
 // alias qualifier to its table.
-func JoinColumns[F ~uint8, T any](tableByAlias map[string]string, schema database.Schema[F, T]) []ColumnNullability {
+func JoinColumns[F ~uint8, T any](tableByAlias map[string]string, schema database.Schema[F, T]) ([]ColumnNullability, error) {
 	var cols []ColumnNullability
 	for name, nullable := range schema.ColumnNullability() {
 		alias, column, ok := strings.Cut(name, ".")
 		if !ok {
-			panic(fmt.Sprintf("schematest: join schema column %q has no alias qualifier", name))
+			return nil, fmt.Errorf("schematest: join schema column %q has no alias qualifier", name)
 		}
 		table, ok := tableByAlias[alias]
 		if !ok {
-			panic(fmt.Sprintf("schematest: no table for alias %q in %q", alias, name))
+			return nil, fmt.Errorf("schematest: no table for alias %q in %q", alias, name)
 		}
 		cols = append(cols, ColumnNullability{Table: table, Column: column, Nullable: nullable})
 	}
 	sortColumns(cols)
-	return cols
+	return cols, nil
 }
 
 func sortColumns(cols []ColumnNullability) {

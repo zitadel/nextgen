@@ -21,7 +21,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/usertotp"
 )
 
-func sharedSchemaColumns() []schematest.ColumnNullability {
+func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
+	t.Helper()
 	var cols []schematest.ColumnNullability
 	cols = append(cols, schematest.Columns("users", user.Schema)...)
 	cols = append(cols, schematest.Columns("user_passkeys", userpasskey.Schema)...)
@@ -32,8 +33,9 @@ func sharedSchemaColumns() []schematest.ColumnNullability {
 	cols = append(cols, schematest.Columns("branding", branding.Schema)...)
 	cols = append(cols, schematest.Columns("flow_definitions", flowdefinition.Schema)...)
 	cols = append(cols, schematest.Columns("authz_membership_edges", authz.MembershipEdgeSchema)...)
-	cols = append(cols, schematest.JoinColumns(map[string]string{"m": "team_memberships", "t": "teams"}, userteam.Schema)...)
-	return cols
+	joined, err := schematest.JoinColumns(map[string]string{"m": "team_memberships", "t": "teams"}, userteam.Schema)
+	require.NoError(t, err)
+	return append(cols, joined...)
 }
 
 // A nullable column whose binding misses the Nullable flag silently drops its
@@ -43,7 +45,7 @@ func TestSchemaNullabilityMatchesDDL(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		live, err := d.liveNullability(t.Context())
 		require.NoError(t, err)
-		for _, col := range append(d.schemaNullability, sharedSchemaColumns()...) {
+		for _, col := range append(d.schemaNullability, sharedSchemaColumns(t)...) {
 			columns, ok := live[col.Table]
 			if !assert.True(t, ok, "table %s missing from live schema", col.Table) {
 				continue
