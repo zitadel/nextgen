@@ -22,7 +22,7 @@ func (r *recordingWriter) WriteArg(arg any) {
 	r.b.WriteString("?")
 }
 
-func testEnv(r *recordingWriter) authz.Env {
+func testEnv() authz.Env {
 	return authz.Env{
 		Schema: "zitadel_nextgen.",
 		Now:    func(w authz.ArgWriter) { w.WriteString("NOW_SENTINEL") },
@@ -41,7 +41,7 @@ func TestWriteCheckAndListShareFullTTU(t *testing.T) {
 	}
 
 	var check recordingWriter
-	authz.WriteCheckAuthz(&check, testEnv(&check), params)
+	authz.WriteCheckAuthz(&check, testEnv(), params)
 	sql := check.b.String()
 	require.Contains(t, sql, "tuple_to_userset")
 	assert.Contains(t, sql, "a.scope_kind = 'team' AND a.scope_team_id = ts.principal_id")
@@ -51,7 +51,7 @@ func TestWriteCheckAndListShareFullTTU(t *testing.T) {
 	assert.Contains(t, sql, "zitadel_nextgen.authz_assignments")
 
 	var list recordingWriter
-	authz.WriteListAuthzObjectIDs(&list, testEnv(&list), domain.AuthzListObjectsParams{
+	authz.WriteListAuthzObjectIDs(&list, testEnv(), domain.AuthzListObjectsParams{
 		AuthzCheckParams: params,
 		ResourceKind:     domain.ResourceKindUser,
 	})
@@ -75,7 +75,7 @@ func TestWriteCheckAuthzBindOrder(t *testing.T) {
 		Relation:               "viewer",
 	}
 	var w recordingWriter
-	authz.WriteCheckAuthz(&w, testEnv(&w), params)
+	authz.WriteCheckAuthz(&w, testEnv(), params)
 	require.NotEmpty(t, w.args)
 	assert.Equal(t, "project", w.args[0])
 	assert.Equal(t, "viewer", w.args[1])
@@ -89,7 +89,7 @@ func TestWriteCheckAuthzBindOrder(t *testing.T) {
 func TestWriteActiveSystemCatalogID(t *testing.T) {
 	t.Parallel()
 	var w recordingWriter
-	authz.WriteActiveSystemCatalogID(&w, testEnv(&w))
+	authz.WriteActiveSystemCatalogID(&w, testEnv())
 	assert.Equal(t, []any{
 		domain.AuthzCatalogKindSystem.String(),
 		domain.SystemCatalogOwnerID,
@@ -101,7 +101,7 @@ func TestWriteActiveSystemCatalogID(t *testing.T) {
 func TestWriteHasAuthzProjectFoothold(t *testing.T) {
 	t.Parallel()
 	var w recordingWriter
-	authz.WriteHasAuthzProjectFoothold(&w, testEnv(&w), "proj_1", domain.AuthzPrincipalTypeUser, "user_a")
+	authz.WriteHasAuthzProjectFoothold(&w, testEnv(), "proj_1", domain.AuthzPrincipalTypeUser, "user_a")
 	assert.Contains(t, w.b.String(), "NOW_SENTINEL")
 	assert.Contains(t, w.args, "proj_1")
 	assert.Contains(t, w.args, "user_a")

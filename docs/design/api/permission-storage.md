@@ -65,9 +65,12 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
 - **Resolver (#423 library):** `AuthzResolverStatements` (`CheckAuthz` returns
   allowed+foothold in one round-trip, `ListAuthzObjectIDs` as an L4/oracle
   materialization helper, foothold smoke helper, active system catalog) plus
-  `internal/authz/resolver` orchestration (`sk_team_` allowlist, decision
-  kinds). HTTP pipeline wiring (after `GetResourceScope`) and ADR 033 list
-  **predicate injection** into resource queries remain later.
+  `internal/authz/resolver` orchestration (`sk_team_` permission-name
+  allowlist, decision kinds). Resolver-enforced `sk_team_` **team scope**
+  (token `team_id` + outside-team deny suite) is deferred —
+  [#831](https://github.com/zitadel/nextgen/issues/831). HTTP pipeline wiring
+  (after `GetResourceScope`) and ADR 033 list **predicate injection** into
+  resource queries remain later.
 
 ## Locked decisions
 
