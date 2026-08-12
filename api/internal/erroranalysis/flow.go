@@ -537,7 +537,21 @@ func (f *frame) callErrors(call *ast.CallExpr) codeSet {
 		return codes
 	}
 
-	codes.union(f.a.funcErrors(fn, f.calleeBindings(fn, call), f.depth+1))
+	b := f.calleeBindings(fn, call)
+	// Method calls like res.miss(op) put the struct in the receiver, not in
+	// call.Args — bind its func-typed fields the same way as struct parameters
+	// so the callee can resolve res.readMiss() / res.writeMiss().
+	if sig != nil && sig.Recv() != nil && recv != nil {
+		if _, isStruct := deref(sig.Recv().Type()).Underlying().(*types.Struct); isStruct {
+			if fields := f.funcFieldCodes(recv); len(fields) > 0 {
+				if b == nil {
+					b = bindings{}
+				}
+				b.get(sig.Recv()).fields = fields
+			}
+		}
+	}
+	codes.union(f.a.funcErrors(fn, b, f.depth+1))
 	return codes
 }
 
@@ -760,7 +774,20 @@ func (f *frame) fieldCallCodes(call *ast.CallExpr) codeSet {
 // access rows use are handled: a bare constructor reference
 // (readMiss: domain.ErrUserNotFound) and a literal that decorates one
 // (writeMiss: func() domain.Error { return domain.ErrUserInvalid()... }).
+//
+// When arg is a parameter/local already bound with field codes (for example
+// Handler.requireProjectAccess forwarding its `res` into the package-level
+// helper), pass that binding through — compositeLit only resolves package-level
+// vars and inline literals.
 func (f *frame) funcFieldCodes(arg ast.Expr) map[string]codeSet {
+	if id, ok := unparen(arg).(*ast.Ident); ok {
+		if v := f.object(id); v != nil {
+			if fields := f.fieldEnv[v]; len(fields) > 0 {
+				return fields
+			}
+		}
+	}
+
 	pkg, lit := f.compositeLit(arg)
 	if lit == nil {
 		return nil

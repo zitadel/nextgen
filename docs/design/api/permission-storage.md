@@ -20,8 +20,11 @@ Wave 1 (#422) ships Goose migrations (Postgres `000015_authz_mvp`, Spanner
 same-tx dual-write hooks on project/team/user/membership mutations, and a
 one-time backfill of `resource_scope_index` + active `authz_membership_edges`.
 Resolver library (`internal/authz/resolver`) and L4 oracle tests land in
-Wave 3 (#423). HTTP/middleware wiring remains later. Leopard remains later
-(**D11**).
+Wave 3 (#423). In-project HTTP management wiring (resolver gate + D10
+403/404 mapping + `sk_proj` seed on `CreateProject`) is shipped. Leopard
+remains later (**D11**). Full RSI-before-Check for every path-id resource
+kind (schema/branding/flow_definition/session) and fine-grained catalog
+relations (#420) remain follow-ups.
 
 ### Wave 1 vs OpenFGA compiler (#421 / PR #720)
 
@@ -61,16 +64,20 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
   `(catalog_kind, owner_id)`. Expression-edge kinds are mapped via
   `dialect/authz.ExpressionEdgeKind` (not on the compiler IR).
 - **Grants API (later):** `CreateAuthzAssignment` / `RevokeAuthzAssignment` /
-  list-by-principal — not dual-write from CreateUser.
+  list-by-principal — not dual-write from CreateUser. `CreateProject` does
+  seed one `sk_proj` ↔ `project.viewer` assignment so the returned project
+  secret can pass the HTTP gate.
 - **Resolver (#423 library):** `AuthzResolverStatements` (`CheckAuthz` returns
   allowed+foothold in one round-trip, `ListAuthzObjectIDs` as an L4/oracle
   materialization helper, foothold smoke helper, active system catalog) plus
   `internal/authz/resolver` orchestration (`sk_team_` permission-name
   allowlist, decision kinds). Resolver-enforced `sk_team_` **team scope**
   (token `team_id` + outside-team deny suite) is deferred —
-  [#831](https://github.com/zitadel/nextgen/issues/831). HTTP pipeline wiring
-  (after `GetResourceScope`) and ADR 033 list **predicate injection** into
-  resource queries remain later.
+  [#831](https://github.com/zitadel/nextgen/issues/831). In-project
+  management handlers call `resolver.Check` (coarse
+  `project.{viewer,editor,admin}` until #420) after credential resolution;
+  list endpoints Check then keep `project_id`-scoped queries. ADR 033 list
+  **predicate injection** into resource queries remains later.
 
 ## Locked decisions
 
@@ -85,10 +92,11 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
 | **D7** | Assignment PK = `(project_id, id)`. |
 | **D8** | Soft revoke via `revoked_at`; unique active-grant index ignores revoked rows. |
 | **D9** | App-group / `app_grants` tables deferred (same physical catalog model later; [ADR 034](../../adrs/034-external-permission-management.md)). |
-| **D10** | Library resolver returns **Allow** / **Forbidden** (foothold, wrong permission) / **NotFound** (no foothold). HTTP mapping is later; ADR 033’s 403/404 split applies at the API layer. Flat “always 404” in [`authz.md`](authz.md) / [`url-architecture.md`](url-architecture.md) will be reconciled when endpoints wire. |
+| **D10** | Library resolver returns **Allow** / **Forbidden** (foothold, wrong permission) / **NotFound** (no foothold). HTTP mapping at the API gate: **Forbidden → 403**, **NotFound → 404** ([ADR 033](../../adrs/033-internal-permission-management.md)). Preview/`project.read`-only secrets remain browser-plane and cannot call management APIs (operator ceiling still requires `project.write`). |
 | **D11** | Dual-write membership **without** Leopard in Wave 1; Leopard remains an additive derived index later ([ADR 032 §3](../../adrs/032-permission-catalogs.md#3-canonical-relational-storage)). |
 | **D12** | Hash-partitioning `resource_scope_index` (Postgres) **deferred until proven**; revisit only with vacuum/bloat/hot-spot measurements. |
 | **D13** | Cross-project ([#333](https://github.com/zitadel/nextgen/issues/333)) depiction: same `authz_assignments` row on the **protected** `project_id`, with a **foreign** `user`/`team` principal (no `principal_type = project`); principal integrity by stable prefixed ids ([ADR 011](../../adrs/011-resource-identifiers.md)), not a composite FK to local `(project_id, user_id)`. |
+| **D14** | No backfill for pre-stack authz data. Enforcement assumes instances bootstrapped at or after Wave 1 + #807: `sk_proj` assignments are seeded only by `CreateProject`, and RSI rows for schema/branding/flow_definition/session exist only via dual-write. (Pre)alpha status is the justification; revisit only if a supported upgrade path from pre-stack data ever becomes a requirement. |
 
 ## Entity picture
 
@@ -587,9 +595,11 @@ bundles:
 - App-group catalog upload product UI and `app_grants` (**D9** / ADR 034)
 - Implementing #333 identity binding, staff tiers, or break-glass
 - Hash-partitioning `resource_scope_index` (**D12**)
-- Resolving HTTP 403 vs 404 at the API boundary (**D10** — library decisions exist)
-- HTTP permission middleware / endpoint wiring (#423 follow-up)
-- Permission resolver HTTP surface / grants API
+- Fine-grained system catalog relations / auto-compile (#420)
+- SQL list-predicate injection into every repository
+- Full RSI dual-write for schema / branding / flow_definition / session path ids
+- Permission grants management API / product UI
+- `#333` foreign home project, Leopard (**D11**)
 
 ## See also
 

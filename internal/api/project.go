@@ -36,7 +36,7 @@ func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectReque
 }
 
 func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (api.GetProjectRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), projectAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), projectAccess, opRead); err != nil {
 		return nil, err
 	}
 	project, err := h.projectService.Get(ctx, string(params.ProjectID))
@@ -53,7 +53,7 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 }
 
 func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest, params api.PatchProjectParams) (api.PatchProjectRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), projectAccess, opWrite); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), projectAccess, opWrite); err != nil {
 		return nil, err
 	}
 	// An absent or null name leaves nothing to write; Update rejects the empty
@@ -66,11 +66,11 @@ func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest
 }
 
 // QueryProjects has no project parameter: results are restricted to the
-// caller's project. requireProjectAccess rejects an unbound scope, so the
+// caller's project. The authz gate rejects an unbound / no-foothold scope, so the
 // ProjectID passed on is always set.
 func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsRequest) (api.QueryProjectsRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
-	if err := requireProjectAccess(ctx, scopeCtx.ProjectID, projectAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, scopeCtx.ProjectID, projectAccess, opRead); err != nil {
 		return nil, err
 	}
 
