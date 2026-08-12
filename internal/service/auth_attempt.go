@@ -165,8 +165,6 @@ func (PasskeyProof) proofCheckType() domain.AuthCheckType { return domain.AuthCh
 
 // ---- Secondary ports -------------------------------------------------------------
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/auth_attempt.mock.go . SessionResolver,UserLookup
-
 type SessionResolver interface {
 	Get(ctx context.Context, projectID, sessionID string) (*domain.Session, error)
 }
