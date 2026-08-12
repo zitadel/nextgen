@@ -310,7 +310,7 @@ describe("graph / cycles / flip-table", () => {
       purpose: "shopping",
     };
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "identifier": transition "register" has invalid purpose "shopping"',
+      'step "identifier": transition "register" has invalid purpose',
     );
   });
 

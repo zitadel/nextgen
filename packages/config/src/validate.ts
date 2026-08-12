@@ -439,10 +439,12 @@ function validateGraph(def: FlowDef, stepNames: Set<string>): FlowValidationIssu
             ),
           );
         } else if (!(FLOW_PURPOSES as readonly string[]).includes(t.purpose)) {
+          // Verbatim-identical to the Go validator's message (which cannot
+          // print the raw value — its parse layer rejects it earlier).
           issues.push(
             error(
               "graph",
-              `step ${q(step.name)}: transition ${q(key)} has invalid purpose ${q(t.purpose)}`,
+              `step ${q(step.name)}: transition ${q(key)} has invalid purpose`,
               step.name,
             ),
           );

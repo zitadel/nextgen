@@ -475,7 +475,16 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 	applyOutcomeFlip(pc.state, outcome)
 	// A declared transition purpose wins over the implicit outcome flip.
 	// Only CurrentPurpose moves; the pinned Purpose stays for telemetry/ACR.
+	// Unlike the implicit flips (which continue an in-flight resolution,
+	// e.g. register + user_already_exists verifying the found user), a
+	// declared re-purpose starts the target purpose fresh: the resolved
+	// user, collected credential material, and ceremony state must not
+	// leak across. A login-resolved user surviving into register would
+	// let passkey registration attach a credential to an existing account
+	// without proving a factor.
 	if transition.Purpose != nil {
+		clearUserBoundState(pc.state)
+		pc.state.CollectedData.AuthMethods.Password = ""
 		pc.state.CurrentPurpose = *transition.Purpose
 	}
 

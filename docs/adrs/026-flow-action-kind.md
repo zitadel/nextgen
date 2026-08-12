@@ -83,7 +83,10 @@ and those injected actions carry a `kind` set by the engine — not by the
 author. The only example today is the `back` action from
 [ADR 022](022-flow-back-navigation.md).
 
-`back` is `kind: navigate` with no state-revert semantics.
+`back` is `kind: navigate`. It does not revert collected input — but it
+does restore the step and the purpose snapshotted in the back stack
+(ADR 022), which is how back across a re-purposing transition returns to
+the previous purpose.
 
 ## Context
 

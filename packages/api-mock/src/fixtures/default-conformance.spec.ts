@@ -16,7 +16,11 @@
  *   the default — when one becomes real, this spec fails until the entry
  *   is removed, keeping the allowlist honest.
  */
-import { getDefaultLoginFlow } from "@zitadel/config/defaults";
+// The raw JSON export, not `@zitadel/config/defaults`: importing the TS
+// module would pull config source into this package's narrower TS program
+// (spec lib/target) via the `@zitadel/source` condition. Action names are
+// identical in the raw template.
+import defaultLogin from "@zitadel/config/defaults/default-login.json";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -59,7 +63,7 @@ const MOCK_ONLY: Record<string, readonly string[]> = {
   identifier: ["recover"],
 };
 
-const defaultFlow = getDefaultLoginFlow() as unknown as { steps: FlowStepShape[] };
+const defaultFlow = defaultLogin as unknown as { steps: FlowStepShape[] };
 
 function defaultStep(name: string): FlowStepShape {
   const step = defaultFlow.steps.find((s) => s.name === name);

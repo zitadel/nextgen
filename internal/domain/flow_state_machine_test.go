@@ -2870,9 +2870,10 @@ func purposeNavDefinition() *domain.FlowDefinition {
 					{Name: "register", Kind: domain.FlowActionKindNavigate},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					domain.FlowActionSubmit:  {Target: "password"},
-					domain.FlowActionPasskey: {Target: "done"},
-					"register":               {Target: "register", Purpose: &register},
+					domain.FlowActionSubmit:                {Target: "password"},
+					domain.FlowActionPasskey:               {Target: "done"},
+					"register":                             {Target: "register", Purpose: &register},
+					domain.FlowImplicitOutcomeUserNotFound: {Target: "register"},
 				},
 			},
 			{
@@ -2895,6 +2896,7 @@ func purposeNavDefinition() *domain.FlowDefinition {
 				Transitions: map[string]domain.FlowStepTransition{
 					domain.FlowActionSubmit: {Target: "register-password"},
 					"sign_in":               {Target: "identifier", Purpose: &login},
+					domain.FlowImplicitOutcomeUserAlreadyExists: {Target: "password"},
 				},
 			},
 			{
@@ -3099,4 +3101,80 @@ func TestFlowStateMachine_Process_RegistrationCompletesAfterNavSwitch(t *testing
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "done", done.State.CurrentStep)
+}
+
+// Security regression (review finding on #829): a declared re-purpose must
+// not carry the previously resolved user across. Resolving an existing
+// email in login mode, going back, and choosing "Sign up" used to leave
+// CollectedData.UserID bound to the existing account — passkey
+// registration would then attach a new credential to that account without
+// proving a factor. The purposed transition clears user-bound state, and
+// re-identifying the same email in register mode routes through
+// user_already_exists into password verification instead.
+func TestFlowStateMachine_Process_NavPurposeSwitchDropsResolvedUser(t *testing.T) {
+	t.Parallel()
+	const email = "alice@example.com"
+	w := newFlowTestWorld(t)
+	def := purposeNavDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("user_alice", nil).
+		Times(2)
+	// The register leg must never issue a passkey registration or create a
+	// user for the login-resolved account.
+	w.authAttemptService.EXPECT().IssuePasskeyChallenge(gomock.Any(), gomock.Any()).Times(0)
+	w.createUser.EXPECT().Handle(gomock.Any(), gomock.Any()).Times(0)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	// Login mode resolves the existing user.
+	afterIdentify, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": email},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "password", afterIdentify.State.CurrentStep)
+	require.Equal(t, "user_alice", afterIdentify.State.CollectedData.UserID)
+
+	back, err := w.sm.Process(t.Context(), def, afterIdentify.State, domain.FlowSubmitInput{
+		Action: "back",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "identifier", back.State.CurrentStep)
+
+	// "Sign up" must start register mode fresh: no resolved user, no
+	// collected credential material, no provisional passkey marker.
+	toRegister, err := w.sm.Process(t.Context(), def, back.State, domain.FlowSubmitInput{
+		Action: "register",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "register", toRegister.State.CurrentStep)
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, toRegister.State.CurrentPurpose)
+	assert.Empty(t, toRegister.State.CollectedData.UserID,
+		"the login-resolved user must not survive a declared re-purpose")
+	assert.Empty(t, toRegister.State.CollectedData.AuthMethods.Password)
+	assert.False(t, toRegister.State.CollectedData.AuthMethods.HasProvisionedUserIDForPasskey)
+
+	// Re-identifying the same existing email in register mode routes
+	// through user_already_exists into password verification.
+	guarded, err := w.sm.Process(t.Context(), def, toRegister.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": email},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "password", guarded.State.CurrentStep)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, guarded.State.CurrentPurpose,
+		"user_already_exists must flip back to login for verification")
 }

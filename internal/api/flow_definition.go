@@ -201,14 +201,18 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 		if step.GetTransitions().IsSet() {
 			transitions := make(map[string]domain.FlowStepTransition, len(step.GetTransitions().Value))
 			for name, apiTransition := range step.GetTransitions().Value {
+				// Get() is false for both absent and explicit-null values;
+				// IsSet() alone would map an explicit `null` to the zero
+				// enum. Non-null strings are enum-validated by the
+				// generated request decoder.
 				var transitionAction *domain.FlowDefinitionTransitionAction
-				if apiTransition.Action.IsSet() {
-					a, _ := domain.FlowDefinitionTransitionActionString(string(apiTransition.GetAction().Value)) // validated in the domain
+				if value, ok := apiTransition.Action.Get(); ok {
+					a, _ := domain.FlowDefinitionTransitionActionString(string(value))
 					transitionAction = &a
 				}
 				var transitionPurpose *domain.FlowDefinitionPurpose
-				if apiTransition.Purpose.IsSet() {
-					p, _ := domain.FlowDefinitionPurposeString(string(apiTransition.GetPurpose().Value)) // validated in the domain
+				if value, ok := apiTransition.Purpose.Get(); ok {
+					p, _ := domain.FlowDefinitionPurposeString(string(value))
 					transitionPurpose = &p
 				}
 
