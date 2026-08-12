@@ -7,7 +7,7 @@
 
 Sessions and flows have fundamentally different lifetimes and purposes:
 
-- A **session** is durable server-side state: factors, assurance_levels, user identity. It lives in Postgres and persists for hours or days.
+- A **session** is durable server-side state: factors, assurance_levels, user identity. It lives in the configured storage dialect and persists for hours or days.
 - A **flow** is ephemeral orchestration: which step the user is on, what data they've entered so far, where to redirect on completion. It lives only while the user is actively clicking through screens.
 
 A single session can have **many flows over its lifetime**:
@@ -16,7 +16,7 @@ A single session can have **many flows over its lifetime**:
 sequenceDiagram
     participant Browser
     participant Server
-    participant DB as Postgres (sessions)
+    participant DB as Storage dialect sessions
 
     Note over Browser,DB: Login Flow
     Browser->>Server: POST /flows (purpose: login)
@@ -164,4 +164,4 @@ For flow-only transitions (advancing steps without touching the session), there'
 | Create user (registration action) | Read session | Write session + write user |
 | Complete flow | Read session | None (cookie cleared) |
 
-Most step transitions are **zero-DB operations**. Only factor verifications and user mutations touch Postgres.
+Most step transitions are **zero-DB operations**. Only factor verifications and user mutations touch the storage dialect.
