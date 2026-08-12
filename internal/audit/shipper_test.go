@@ -253,11 +253,11 @@ func TestShipper_DrainsMultiplePagesInOneTick(t *testing.T) {
 	events := make([]*domain.Event, 0, 150)
 	for i := 0; i < 150; i++ {
 		events = append(events, &domain.Event{
-			ProjectID:  "proj_a",
-			ID:         fmt.Sprintf("evt_%03d", i),
-			CreatedAt:  t0.Add(time.Duration(i) * time.Millisecond),
-			EventType:  domain.EventTypeUserCreated,
-			Category:   domain.EventCategoryEntity,
+			ProjectID: "proj_a",
+			ID:        fmt.Sprintf("evt_%03d", i),
+			CreatedAt: t0.Add(time.Duration(i) * time.Millisecond),
+			EventType: domain.EventTypeUserCreated,
+			Category:  domain.EventCategoryEntity,
 		})
 	}
 	src := newFakeExportSource([]string{"proj_a"}, map[string][]*domain.Event{"proj_a": events})

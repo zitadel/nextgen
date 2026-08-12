@@ -271,7 +271,7 @@ func TestTeamStatements_Deactivate_RepeatDoesNotTouchUpdatedAt(t *testing.T) {
 		deactivated, err := d.stmts.GetTeamByID(t.Context(), projectID, teamID)
 		require.NoError(t, err)
 
-		_, err := d.stmts.DeactivateTeam(t.Context(), projectID, teamID)
+		_, err = d.stmts.DeactivateTeam(t.Context(), projectID, teamID)
 		require.NoError(t, err)
 		again, err := d.stmts.GetTeamByID(t.Context(), projectID, teamID)
 		require.NoError(t, err)
@@ -348,8 +348,8 @@ func TestTeamStatements_Deactivate_CascadesMembershipsAndOwnedUsers(t *testing.T
 			return user.Metadata.Status
 		}
 		assert.Equal(t, domain.UserStatusActive, userStatus(selfOwned.ID))
-		assert.Equal(t, domain.UserStatusDeactivated, userStatus(teamOwned.ID)
-			require.NoError(t, err)
+		assert.Equal(t, domain.UserStatusDeactivated, userStatus(teamOwned.ID))
+
 		for _, membership := range memberships {
 			stored, err := d.stmts.GetTeamMembership(t.Context(), projectID, membership.TeamID, membership.UserID)
 			require.NoError(t, err)
@@ -553,8 +553,7 @@ func TestTeamStatements_List(t *testing.T) {
 }
 
 func teamIDs(teams []*domain.Team) []string {
-	ids := make([]string, len(teams)
-			require.NoError(t, err)
+	ids := make([]string, len(teams))
 	for i, team := range teams {
 		ids[i] = team.ID
 	}

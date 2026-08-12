@@ -194,7 +194,7 @@ func TestClaimStatements_GetPersonalTeamForUser(t *testing.T) {
 			// Deactivating the earliest team must NOT fall back to the next active
 			// team: the earliest membership is selected unconditionally, so once its
 			// team is inactive the resolve returns not-found rather than teamB.
-			_, err := d.stmts.DeactivateTeam(t.Context(), projectID, teamA)
+			_, err = d.stmts.DeactivateTeam(t.Context(), projectID, teamA)
 			require.NoError(t, err)
 			_, err = d.stmts.GetPersonalTeamForUser(t.Context(), projectID, userID)
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
@@ -216,8 +216,8 @@ func TestClaimStatements_GetPersonalTeamForUser(t *testing.T) {
 		t.Run("removed_earliest_membership_does_not_fall_back", func(t *testing.T) {
 			projectID, schemaURL := ensureUserTestProject(t, d.stmts)
 			userID := "usr-pt-nofallback-" + uniqueSuffix(t)
-			require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "NoFallback"))
-			require.NoError(t, err)
+			require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "NoFallback")))
+
 			// team-a is joined first (earliest membership); team-b is a later
 			// membership on another team that stays fully active.
 			teamA := "team-a-" + uniqueSuffix(t)

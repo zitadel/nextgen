@@ -77,7 +77,7 @@ func TestTeamStatements_Deactivate_clearsMembershipEdges(t *testing.T) {
 		_, err := d.stmts.GetAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdgeKey(projectID, teamID, userID))
 		require.NoError(t, err)
 
-		_, err := d.stmts.DeactivateTeam(t.Context(), projectID, teamID)
+		_, err = d.stmts.DeactivateTeam(t.Context(), projectID, teamID)
 		require.NoError(t, err)
 		_, err = d.stmts.GetAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdgeKey(projectID, teamID, userID))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
@@ -94,9 +94,8 @@ func TestTeamMembershipStatements_DualWrite_StatusVariants(t *testing.T) {
 		teamID := "team-tm-" + uniqueSuffix(t)
 		userID := "usr-tm-" + uniqueSuffix(t)
 		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
-		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Member"))
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Member")))
 
-		require.NoError(t, err)
 		t.Run("active create writes edge; removed clears edge", func(t *testing.T) {
 			require.NoError(t, d.stmts.CreateTeamMembership(t.Context(), &domain.TeamMembership{
 				ProjectID: projectID, TeamID: teamID, UserID: userID, Status: domain.MembershipStatusActive,
