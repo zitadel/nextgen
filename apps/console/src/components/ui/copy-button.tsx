@@ -2,6 +2,7 @@ import { Check, Copy } from "lucide-react"
 import { useEffect, useState } from "react"
 
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 /** Icon size per button size — the design draws 14px in a toolbar, 12px inline. */
 const ICON_SIZE = { sm: "size-3.5", "icon-xs": "size-3" } as const
@@ -27,11 +28,14 @@ export function CopyButton({
   value,
   label,
   size = "icon-xs",
+  className,
 }: {
   value: string
   /** The button's full accessible name, e.g. `Copy User ID`. */
   label: string
   size?: keyof typeof ICON_SIZE
+  /** Escape hatch for call sites where the button must not drive row height. */
+  className?: string
 }) {
   const [copied, setCopied] = useState(false)
 
@@ -47,6 +51,7 @@ export function CopyButton({
         type="button"
         variant="ghost"
         size={size}
+        className={cn(className)}
         aria-label={label}
         onClick={() => {
           // `navigator.clipboard` is absent on an insecure origin. Guarded

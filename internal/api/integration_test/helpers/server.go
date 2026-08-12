@@ -58,6 +58,7 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 			h.EnsureEventService(t),
 			h.EnsureTokenService(t),
 			h.EnsureKeyService(t),
+			h.EnsureServiceDB(t),
 			"",
 		)
 	}

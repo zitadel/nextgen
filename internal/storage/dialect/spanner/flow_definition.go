@@ -57,17 +57,22 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 		return wrapError(err)
 	}
 	purposes := flowdefinition.PurposeStrings(entity)
-	stmt := buildStatement(createFlowDefinitionStmt,
-		entity.ProjectID,
-		entity.ID,
-		entity.Name,
-		entity.SchemaVersion,
-		entity.Status.String(),
-		purposes,
-		definition,
-	).statement()
-	_, err = f.db.Update(ctx, stmt)
-	return wrapError(err)
+	return withTransaction(ctx, f.db, func(ctx context.Context, tx queryExecutor) error {
+		stmt := buildStatement(createFlowDefinitionStmt,
+			entity.ProjectID,
+			entity.ID,
+			entity.Name,
+			entity.SchemaVersion,
+			entity.Status.String(),
+			purposes,
+			definition,
+		).statement()
+		if _, err := tx.Update(ctx, stmt); err != nil {
+			return wrapError(err)
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindFlowDefinition, entity.ProjectID, entity.ID))
+	})
 }
 
 func (f flowDefinitionStatements) GetFlowDefinitionByID(ctx context.Context, projectID, id string) (*domain.FlowDefinition, error) {
@@ -105,7 +110,7 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 	opts := flowdefinition.EnsureListOptions(filter)
 
 	var compiler statementCompiler
-	err := compileRead(&compiler, flowDefinitionQuery, opts, flowdefinition.Schema)
+	err := compileList(ctx, &compiler, flowDefinitionQuery, opts, flowdefinition.Schema, "flow_definitions", "id")
 	if err != nil {
 		return nil, err
 	}
@@ -134,9 +139,17 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 }
 
 func (f flowDefinitionStatements) DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error {
-	stmt := buildStatement(deleteFlowDefinitionStmt, projectID, id).statement()
-	_, err := f.db.Update(ctx, stmt)
-	return wrapError(err)
+	return withTransaction(ctx, f.db, func(ctx context.Context, tx queryExecutor) error {
+		n, err := tx.Update(ctx, buildStatement(deleteFlowDefinitionStmt, projectID, id).statement())
+		if err != nil {
+			return wrapError(err)
+		}
+		if n == 0 {
+			return nil
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.DeleteResourceScope(ctx, domain.ResourceKindFlowDefinition, projectID, id)
+	})
 }
 
 func (f flowDefinitionStatements) scanFlowDefinition(row *spanner.Row) (*domain.FlowDefinition, error) {

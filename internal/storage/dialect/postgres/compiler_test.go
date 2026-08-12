@@ -324,6 +324,21 @@ func TestCompileCompareFilterSingleColumn(t *testing.T) {
 	}
 }
 
+func TestCompileCompareFilterBoolEqual(t *testing.T) {
+	t.Parallel()
+
+	hasFactors := database.Col(domain.SessionFieldHasVerifiedFactors)
+	existsSQL := sessionSchema.MustSQLName(domain.SessionFieldHasVerifiedFactors)
+
+	sql, args := compileFilterOnly(t, database.Equal(hasFactors, true), sessionSchema)
+	assert.Equal(t, existsSQL, sql)
+	assert.Empty(t, args)
+
+	sql, args = compileFilterOnly(t, database.Equal(hasFactors, false), sessionSchema)
+	assert.Equal(t, "NOT "+existsSQL, sql)
+	assert.Empty(t, args)
+}
+
 func TestCompileCompareFilterTuple(t *testing.T) {
 	t.Parallel()
 

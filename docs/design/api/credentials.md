@@ -84,6 +84,12 @@ permission string (old `team.users.*` did). Compensating requirement: every
 `sk_team_` grant must carry a resolver-enforced team scope, and the deny-list
 suite must include "team token reads/writes a user outside its team".
 
+> **LOCKED / deferred:** Wave 3 (#423) ships the flat permission-name allowlist
+> only (`internal/authz/resolver/sk_team.go`). Resolver-enforced team scope and
+> the outside-team deny suite are **not** implemented yet — tracked in
+> [#831](https://github.com/zitadel/nextgen/issues/831). `sk_team_` is not
+> production-safe for `user.*` / `team_membership.*` until that lands.
+
 SCIM sync (`scim.sync`) is not listed yet — SCIM is a hosted interop surface
 (`/scim/v2/Users`, `/scim/v2/Groups` in [`resource-map.md`](resource-map.md))
 with no **management-permission** mapping yet. Park until that is designed.

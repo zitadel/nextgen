@@ -97,7 +97,7 @@ export default class SchemasList extends BaseCommand {
 
     const s = spinner();
     s.start(`Loading ${String(picked)}…`);
-    const body = await fetchSchemaRevision(client, String(picked), secret.project_id);
+    const body = await fetchSchemaRevision(client, String(picked));
     s.stop(`Loaded ${String(picked)}`);
 
     const pretty = JSON.stringify(body, null, 2);
@@ -122,12 +122,9 @@ export default class SchemasList extends BaseCommand {
  * and an unencoded URL would break the `/schemas/:id` path. Mirrors the
  * encoding the sync engine's schema syncer applies.
  */
-export async function fetchSchemaRevision(
-  client: ZitadelClient,
-  id: string,
-  projectId: string,
-): Promise<unknown> {
-  return client.getSchemaById(encodeURIComponent(id), { project_id: projectId });
+export async function fetchSchemaRevision(client: ZitadelClient, id: string): Promise<unknown> {
+  // Flat-by-id: authz resolves the project from RSI; no project_id query.
+  return client.getSchemaById(encodeURIComponent(id));
 }
 
 function renderTable(objectType: string, revisions: ReadonlyArray<ListSchemas200Item>): string {

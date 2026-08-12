@@ -2295,10 +2295,6 @@ func (s *Server) handleDeleteFlowDefinitionRequest(args [1]string, argsEscaped b
 					Name: "id",
 					In:   "path",
 				}: params.ID,
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
 			},
 			Raw: r,
 		}
@@ -2488,10 +2484,6 @@ func (s *Server) handleDeleteTeamRequest(args [1]string, argsEscaped bool, w htt
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
-				{
 					Name: "team_id",
 					In:   "path",
 				}: params.TeamID,
@@ -2678,10 +2670,6 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
 				{
 					Name: "user_id",
 					In:   "path",
@@ -3283,10 +3271,6 @@ func (s *Server) handleGetBrandingByIdRequest(args [1]string, argsEscaped bool, 
 					Name: "id",
 					In:   "path",
 				}: params.ID,
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
 			},
 			Raw: r,
 		}
@@ -3862,10 +3846,6 @@ func (s *Server) handleGetFlowDefinitionRequest(args [1]string, argsEscaped bool
 					Name: "id",
 					In:   "path",
 				}: params.ID,
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
 			},
 			Raw: r,
 		}
@@ -5109,10 +5089,6 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 					In:   "path",
 				}: params.ID,
 				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
-				{
 					Name: "team_id",
 					In:   "query",
 				}: params.TeamID,
@@ -5304,10 +5280,6 @@ func (s *Server) handleGetSessionRequest(args [1]string, argsEscaped bool, w htt
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
-				{
 					Name: "session_id",
 					In:   "path",
 				}: params.SessionID,
@@ -5495,10 +5467,6 @@ func (s *Server) handleGetTeamRequest(args [1]string, argsEscaped bool, w http.R
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
-				{
 					Name: "team_id",
 					In:   "path",
 				}: params.TeamID,
@@ -5685,10 +5653,6 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 			Body:             nil,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
 				{
 					Name: "team_id",
 					In:   "query",
@@ -7131,10 +7095,6 @@ func (s *Server) handleListUserPasskeysRequest(args [1]string, argsEscaped bool,
 					In:   "query",
 				}: params.PageToken,
 				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
-				{
 					Name: "user_id",
 					In:   "path",
 				}: params.UserID,
@@ -7334,10 +7294,6 @@ func (s *Server) handleListUserTeamsRequest(args [1]string, argsEscaped bool, w 
 					Name: "page_token",
 					In:   "query",
 				}: params.PageToken,
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
 				{
 					Name: "user_id",
 					In:   "path",
@@ -8695,10 +8651,6 @@ func (s *Server) handleRevokeSessionRequest(args [1]string, argsEscaped bool, w 
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
 				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
-				{
 					Name: "session_id",
 					In:   "path",
 				}: params.SessionID,
@@ -8900,10 +8852,6 @@ func (s *Server) handleSetUserPasswordRequest(args [1]string, argsEscaped bool, 
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
 				{
 					Name: "user_id",
 					In:   "path",
@@ -9297,10 +9245,6 @@ func (s *Server) handleUpdateFlowDefinitionRequest(args [1]string, argsEscaped b
 					Name: "id",
 					In:   "path",
 				}: params.ID,
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
 			},
 			Raw: r,
 		}
@@ -9499,10 +9443,6 @@ func (s *Server) handleUpdateTeamRequest(args [1]string, argsEscaped bool, w htt
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
-				{
-					Name: "project_id",
-					In:   "query",
-				}: params.ProjectID,
 				{
 					Name: "team_id",
 					In:   "path",

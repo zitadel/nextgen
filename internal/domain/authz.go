@@ -17,9 +17,13 @@ const PrefixAuthzAssignment ResourcePrefix = "asgn"
 type ResourceKind string
 
 const (
-	ResourceKindProject ResourceKind = "project"
-	ResourceKindTeam    ResourceKind = "team"
-	ResourceKindUser    ResourceKind = "user"
+	ResourceKindProject        ResourceKind = "project"
+	ResourceKindTeam           ResourceKind = "team"
+	ResourceKindUser           ResourceKind = "user"
+	ResourceKindSchema         ResourceKind = "schema"
+	ResourceKindBranding       ResourceKind = "branding"
+	ResourceKindFlowDefinition ResourceKind = "flow_definition"
+	ResourceKindSession        ResourceKind = "session"
 )
 
 func (k ResourceKind) String() string { return string(k) }
@@ -192,12 +196,17 @@ func NewTeamResourceScope(projectID, teamID string) *ResourceScope {
 	}
 }
 
-func NewUserResourceScope(projectID, userID string) *ResourceScope {
+// NewResourceScope builds a project-scoped RSI row (no team).
+func NewResourceScope(kind ResourceKind, projectID, resourceID string) *ResourceScope {
 	return &ResourceScope{
-		ResourceID:   userID,
-		ResourceKind: ResourceKindUser,
+		ResourceID:   resourceID,
+		ResourceKind: kind,
 		ProjectID:    projectID,
 	}
+}
+
+func NewUserResourceScope(projectID, userID string) *ResourceScope {
+	return NewResourceScope(ResourceKindUser, projectID, userID)
 }
 
 // AuthzAssignmentScope encodes the CHECK-constrained scope columns.
@@ -253,6 +262,26 @@ func (a *AuthzAssignment) ApplyScope(scope AuthzAssignmentScope) {
 	a.ScopeResourceID = scope.ResourceID
 }
 
+// NewSKProjProjectSetupAssignment is the grant seeded at CreateProject so the
+// returned full project secret can set up the project via resolver.Check.
+//
+// Relation is project.viewer (not admin): the seeded system catalog closure
+// treats viewer as the assigned relation that satisfies viewer/editor/admin
+// checks (placeholders pending #420). PrincipalID equals the project id so the
+// grant survives secret rotate/claim.
+func NewSKProjProjectSetupAssignment(projectID string) *AuthzAssignment {
+	a := &AuthzAssignment{
+		ProjectID:     projectID,
+		CatalogID:     SystemCatalogID,
+		PrincipalType: AuthzPrincipalTypeSKProj,
+		PrincipalID:   projectID,
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+	a.ApplyScope(NewProjectAssignmentScope())
+	return a
+}
+
 // AuthzMembershipEdge is the authz projection of set membership (not lifecycle).
 // The resolver expands team grants through these edges; team_memberships remains
 // the roster table and is not read at check time.
@@ -306,3 +335,31 @@ const (
 	AuthzMembershipEdgeFieldSetID
 	AuthzMembershipEdgeFieldCreatedAt
 )
+
+// AuthzCheckParams is the storage-level input for a single-resource permission check.
+// PrincipalHomeProjectID is the project used for membership-edge lookup (defaults to ProjectID).
+type AuthzCheckParams struct {
+	CatalogID              string
+	ProjectID              string
+	PrincipalHomeProjectID string
+	PrincipalType          AuthzPrincipalType
+	PrincipalID            string
+	ObjectType             string
+	Relation               string
+}
+
+// HomeProjectID returns PrincipalHomeProjectID, or ProjectID when unset.
+func (p AuthzCheckParams) HomeProjectID() string {
+	if p.PrincipalHomeProjectID != "" {
+		return p.PrincipalHomeProjectID
+	}
+	return p.ProjectID
+}
+
+// AuthzListObjectsParams lists resource_scope_index ids the principal may see
+// for one resource kind under a required catalog relation (L4 / oracle helper).
+// Endpoint wiring injects an authz predicate into the resource query (ADR 033).
+type AuthzListObjectsParams struct {
+	AuthzCheckParams
+	ResourceKind ResourceKind
+}

@@ -11,7 +11,7 @@ import (
 )
 
 func (h *Handler) ListEvents(ctx context.Context, params api.ListEventsParams) (api.ListEventsRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), eventsAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), eventsAccess, opRead); err != nil {
 		return nil, err
 	}
 
@@ -87,7 +87,7 @@ func (h *Handler) ListEvents(ctx context.Context, params api.ListEventsParams) (
 }
 
 func (h *Handler) GetEvent(ctx context.Context, params api.GetEventParams) (api.GetEventRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), eventsAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), eventsAccess, opRead); err != nil {
 		return nil, err
 	}
 	event, err := h.eventService.Get(ctx, string(params.ProjectID), params.ID)

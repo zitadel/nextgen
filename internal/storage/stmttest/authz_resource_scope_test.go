@@ -46,10 +46,10 @@ func TestResourceScopeStatements_UpsertGetDelete(t *testing.T) {
 
 		t.Run("delete removes row; missing delete is ok", func(t *testing.T) {
 			projectID := ensureProject(t, d.stmts)
-			require.NoError(t, d.stmts.DeleteResourceScope(t.Context(), projectID))
+			require.NoError(t, d.stmts.DeleteResourceScope(t.Context(), domain.ResourceKindProject, projectID, projectID))
 			_, err := d.stmts.GetResourceScope(t.Context(), projectID)
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
-			require.NoError(t, d.stmts.DeleteResourceScope(t.Context(), "missing-"+uniqueSuffix(t)))
+			require.NoError(t, d.stmts.DeleteResourceScope(t.Context(), domain.ResourceKindProject, projectID, "missing-"+uniqueSuffix(t)))
 		})
 	})
 }

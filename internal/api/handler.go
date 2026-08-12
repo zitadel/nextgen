@@ -25,6 +25,7 @@ type Handler struct {
 	eventService          *service.EventService
 	tokenService          service.TokenService
 	keyService            service.KeyService
+	pool                  *service.DB
 
 	// platformProjectID is the configured platform.project_id pin (ADR 046 §2).
 	// Empty means the platform project is unresolved, so claim/complete rejects
@@ -45,6 +46,7 @@ func NewHandler(
 	eventService *service.EventService,
 	tokenService service.TokenService,
 	keyService service.KeyService,
+	pool *service.DB,
 	platformProjectID string,
 ) *Handler {
 	return &Handler{
@@ -60,6 +62,7 @@ func NewHandler(
 		eventService:          eventService,
 		tokenService:          tokenService,
 		keyService:            keyService,
+		pool:                  pool,
 		platformProjectID:     platformProjectID,
 	}
 }

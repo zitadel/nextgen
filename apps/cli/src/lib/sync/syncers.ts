@@ -146,9 +146,8 @@ class SchemaSyncer implements ResourceSyncer {
   }
 
   async fetch(id: string): Promise<object> {
-    const body = await this.client.getSchemaById(encodeURIComponent(id), {
-      project_id: this.projectId,
-    });
+    // Flat-by-id: authz resolves the project from RSI; no project_id query.
+    const body = await this.client.getSchemaById(encodeURIComponent(id));
     return body as unknown as GetSchemaById200;
   }
 }
@@ -202,33 +201,29 @@ class FlowDefinitionSyncer implements ResourceSyncer {
   /**
    * PUT completely replaces the flow definition. The wire request wraps the
    * bare on-disk flow in the `{ flow_definition }` update envelope
-   * (`api/openapi/components/flows/flow-definition-update-request.yaml`) and
-   * carries `project_id` as a query parameter; the file on disk stays bare so
-   * it is human-editable.
+   * (`api/openapi/components/flows/flow-definition-update-request.yaml`); the
+   * file on disk stays bare so it is human-editable. Flat-by-id: no
+   * `project_id` query — authz resolves the project from RSI.
    */
   async update(id: string, data: object): Promise<{ canonical?: object }> {
-    const result = (await this.client.updateFlowDefinition(
-      id,
-      { flow_definition: data as UpdateFlowDefinitionBodyFlowDefinition },
-      { project_id: this.projectId },
-    )) as UpdateFlowDefinition200;
+    const result = (await this.client.updateFlowDefinition(id, {
+      flow_definition: data as UpdateFlowDefinitionBodyFlowDefinition,
+    })) as UpdateFlowDefinition200;
     return { canonical: result.flow_definition as object };
   }
 
   async delete(id: string): Promise<void> {
-    await this.client.deleteFlowDefinition(id, { project_id: this.projectId });
+    await this.client.deleteFlowDefinition(id);
   }
 
   /**
    * `GET /flow_definitions/:id` returns a detail envelope with metadata
    * (`id`, `project_id`, `created_at`, `updated_at`) plus `flow_definition`.
    * Return only `flow_definition` so diffs compare with the on-disk bare body.
+   * Flat-by-id: no `project_id` query — authz resolves the project from RSI.
    */
   async fetch(id: string): Promise<object> {
-    const envelope = (await this.client.getFlowDefinition(
-      id,
-      { project_id: this.projectId },
-    )) as GetFlowDefinition200;
+    const envelope = (await this.client.getFlowDefinition(id)) as GetFlowDefinition200;
 
     return envelope.flow_definition as object;
   }
@@ -318,11 +313,9 @@ class BrandingSyncer implements ResourceSyncer {
     throw new ZitadelError("E_NOT_IMPLEMENTED", `branding delete is not supported (${id})`);
   }
 
-  /** Wire form (template inlined); diffs compare in the normalized form. */
+  /** Wire form (template inlined); diffs compare in the normalized form. Flat-by-id: no project_id query. */
   async fetch(id: string): Promise<object> {
-    const envelope = (await this.client.getBrandingById(id, {
-      project_id: this.projectId,
-    })) as GetBrandingById200;
+    const envelope = (await this.client.getBrandingById(id)) as GetBrandingById200;
     return envelope.branding as object;
   }
 
