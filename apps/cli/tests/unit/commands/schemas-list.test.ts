@@ -130,7 +130,7 @@ describe("schemas list", () => {
     );
     const client = createZitadelClient({ baseUrl: "https://api.zitadel.cloud" });
 
-    const body = await fetchSchemaRevision(client, urlId, "proj_test");
+    const body = await fetchSchemaRevision(client, urlId);
 
     expect(receivedPath).toBe(`/schemas/${encodeURIComponent(urlId)}`);
     expect(body).toEqual({ kind: "user-schema" });

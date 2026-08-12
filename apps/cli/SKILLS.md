@@ -186,7 +186,8 @@ the CLI's help layer, not the envelope.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.
 - `start` — start the managed local Zitadel server and persist runtime metadata
-  under `.zitadel/local/runtime.json`. Use `--runtime docker` or `--image` for
+  under `.zitadel/local/runtime.json`. The binary runtime defaults to SQLite
+  under `.zitadel/local/nextgen-data/`. Use `--runtime docker` or `--image` for
   the Docker backend.
 - `stop` — stop the managed runtime while preserving
   `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered

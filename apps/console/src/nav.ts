@@ -49,12 +49,12 @@ export interface NavMeta {
  *   - Activity Log — no audit-log read API (#350)
  *
  * ```ts
- * import { Activity, AppWindow, BarChart3, Folder } from "lucide-react";
+ * import { Activity, AppWindow, Folder, LineChart } from "lucide-react";
  *
  * export const DESIGN_ONLY_NAV: NavMeta[] = [
  *   { label: "App groups", order: 3, icon: Folder },
  *   { label: "Applications", order: 4, icon: AppWindow },
- *   { label: "Analytics", order: 5, icon: BarChart3 },
+ *   { label: "Analytics", order: 5, icon: LineChart },
  *   { label: "Activity Log", order: 7, icon: Activity },
  * ];
  * ```

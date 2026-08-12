@@ -40,7 +40,22 @@ Typical edits:
   different next step. Cross-flow jumps (`action: switch` / `pivot`)
   validate in a definition but are **not yet executed by the runtime** —
   submitting through one fails with a 400 (`code: "flow.unsupported"`);
-  keep transitions within one flow for now.
+  keep transitions within one flow, using a purpose switch (next bullet)
+  for login ↔ register navigation.
+- **Offer a purpose switch in the card** — pair a `kind: navigate`
+  action with a transition that declares a local `purpose`. The default
+  login flow ships this in both directions:
+
+  ```json
+  "register": { "target": "register", "purpose": "register" }
+  ```
+
+  Navigation skips field validation (an empty email box can't block the
+  link), and the declared purpose is what makes the landing leg run with
+  the right semantics — register creates the user instead of trying to
+  verify one. Rules: the purpose must be one this flow's `purposes`
+  serves, the target must be that purpose's entry step, and `purpose`
+  never combines with `action` (which targets another flow instead).
 - **Add another flow** — drop a new JSON file with its own `purposes`
   and a distinct `name` (e.g. a per-team login). See
   [Multiple flows](#multiple-flows) for how it gets selected at runtime.

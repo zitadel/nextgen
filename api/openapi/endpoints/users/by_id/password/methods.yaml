@@ -4,7 +4,6 @@ put:
   tags:
     - Users
   parameters:
-    - $ref: ../../../../components/parameters/project-id.yaml
     - name: user_id
       in: path
       required: true
