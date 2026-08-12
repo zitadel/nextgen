@@ -149,7 +149,7 @@ func stringFilter[F ~uint8](op string, col database.Column[F], value string) (da
 	case filterOpEquals:
 		return database.StringEqual(col, value), nil
 	case filterOpContains:
-		return database.StringContains(col, value), nil
+		return database.StringContainsFold(col, value), nil
 	case filterOpNotEquals, filterOpNotContains:
 		// todo (grvijayan): update when these operations are supported
 		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
