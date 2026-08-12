@@ -31231,6 +31231,22 @@ func (s QuerySessionsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjMissingIDQuerySessionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.missing_id")
+		{
+			s := s.ProjMissingID
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidQuerySessionsErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -31314,6 +31330,9 @@ func (s *QuerySessionsErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedQuerySessionsErrorResponse
 					found = true
+				case "proj.missing_id":
+					s.Type = ProjMissingIDQuerySessionsErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidQuerySessionsErrorResponse
 					found = true
@@ -31347,6 +31366,10 @@ func (s *QuerySessionsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedQuerySessionsErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ProjMissingIDQuerySessionsErrorResponse:
+		if err := s.ProjMissingID.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidQuerySessionsErrorResponse:

@@ -19158,6 +19158,7 @@ type QuerySessionsErrorResponse struct {
 	AuthUnauthorized     AuthUnauthorized
 	Internal             Internal
 	NotImplemented       NotImplemented
+	ProjMissingID        ProjMissingID
 	ReqInvalid           ReqInvalid
 	SessNotFound         SessNotFound
 	SessPermissionDenied SessPermissionDenied
@@ -19171,6 +19172,7 @@ const (
 	AuthUnauthorizedQuerySessionsErrorResponse     QuerySessionsErrorResponseType = "auth.unauthorized"
 	InternalQuerySessionsErrorResponse             QuerySessionsErrorResponseType = "internal"
 	NotImplementedQuerySessionsErrorResponse       QuerySessionsErrorResponseType = "not_implemented"
+	ProjMissingIDQuerySessionsErrorResponse        QuerySessionsErrorResponseType = "proj.missing_id"
 	ReqInvalidQuerySessionsErrorResponse           QuerySessionsErrorResponseType = "req.invalid"
 	SessNotFoundQuerySessionsErrorResponse         QuerySessionsErrorResponseType = "sess.not_found"
 	SessPermissionDeniedQuerySessionsErrorResponse QuerySessionsErrorResponseType = "sess.permission_denied"
@@ -19189,6 +19191,11 @@ func (s QuerySessionsErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether QuerySessionsErrorResponse is NotImplemented.
 func (s QuerySessionsErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedQuerySessionsErrorResponse
+}
+
+// IsProjMissingID reports whether QuerySessionsErrorResponse is ProjMissingID.
+func (s QuerySessionsErrorResponse) IsProjMissingID() bool {
+	return s.Type == ProjMissingIDQuerySessionsErrorResponse
 }
 
 // IsReqInvalid reports whether QuerySessionsErrorResponse is ReqInvalid.
@@ -19266,6 +19273,27 @@ func (s QuerySessionsErrorResponse) GetNotImplemented() (v NotImplemented, ok bo
 func NewNotImplementedQuerySessionsErrorResponse(v NotImplemented) QuerySessionsErrorResponse {
 	var s QuerySessionsErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjMissingID sets QuerySessionsErrorResponse to ProjMissingID.
+func (s *QuerySessionsErrorResponse) SetProjMissingID(v ProjMissingID) {
+	s.Type = ProjMissingIDQuerySessionsErrorResponse
+	s.ProjMissingID = v
+}
+
+// GetProjMissingID returns ProjMissingID and true boolean if QuerySessionsErrorResponse is ProjMissingID.
+func (s QuerySessionsErrorResponse) GetProjMissingID() (v ProjMissingID, ok bool) {
+	if !s.IsProjMissingID() {
+		return v, false
+	}
+	return s.ProjMissingID, true
+}
+
+// NewProjMissingIDQuerySessionsErrorResponse returns new QuerySessionsErrorResponse from ProjMissingID.
+func NewProjMissingIDQuerySessionsErrorResponse(v ProjMissingID) QuerySessionsErrorResponse {
+	var s QuerySessionsErrorResponse
+	s.SetProjMissingID(v)
 	return s
 }
 
@@ -20679,7 +20707,8 @@ func (s *SessTokenInvalidDetails) init() SessTokenInvalidDetails {
 // Field to filter sessions by:
 // - `created_at`: RFC3339 timestamp
 // - `user_id`: user id
-// - `state`: one of `building`, `active`, `expired`.
+// - `state`: one of `building`, `active`, `expired`. State is computed at read
+// time, so a session expiring mid-request can match `active` but return `expired`.
 // Ref: #
 type SessionFilterField string
 
@@ -20741,7 +20770,7 @@ type SessionResponse struct {
 	SessionID SessionID `json:"session_id"`
 	ProjectID ProjectID `json:"project_id"`
 	// Current lifecycle state of the session:
-	// - `building`: has a user factor but is still gathering authentication factors
+	// - `building`: no verified authentication factors yet
 	// - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
 	// factors age
 	// - `expired`: TTL elapsed.
@@ -20947,7 +20976,7 @@ func (s *SessionResponseMetadata) init() SessionResponseMetadata {
 }
 
 // Current lifecycle state of the session:
-// - `building`: has a user factor but is still gathering authentication factors
+// - `building`: no verified authentication factors yet
 // - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as
 // factors age
 // - `expired`: TTL elapsed.
