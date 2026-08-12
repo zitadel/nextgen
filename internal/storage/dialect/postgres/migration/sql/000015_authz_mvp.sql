@@ -280,17 +280,17 @@ INSERT INTO zitadel_nextgen.authz_relation_closure (
 INSERT INTO zitadel_nextgen.resource_scope_index (resource_id, resource_kind, project_id, team_id)
 SELECT id, 'project', id, NULL
 FROM zitadel_nextgen.projects
-ON CONFLICT (resource_id) DO NOTHING;
+ON CONFLICT (resource_kind, project_id, resource_id) DO NOTHING;
 
 INSERT INTO zitadel_nextgen.resource_scope_index (resource_id, resource_kind, project_id, team_id)
 SELECT id, 'team', project_id, id
 FROM zitadel_nextgen.teams
-ON CONFLICT (resource_id) DO NOTHING;
+ON CONFLICT (resource_kind, project_id, resource_id) DO NOTHING;
 
 INSERT INTO zitadel_nextgen.resource_scope_index (resource_id, resource_kind, project_id, team_id)
 SELECT id, 'user', project_id, NULL
 FROM zitadel_nextgen.users
-ON CONFLICT (resource_id) DO NOTHING;
+ON CONFLICT (resource_kind, project_id, resource_id) DO NOTHING;
 
 INSERT INTO zitadel_nextgen.authz_membership_edges (project_id, member_type, member_id, set_type, set_id)
 SELECT project_id, 'user', user_id, 'team', team_id
