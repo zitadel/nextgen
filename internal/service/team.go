@@ -141,18 +141,7 @@ func (s *TeamService) List(ctx context.Context, req ListTeamsRequest) (*ListTeam
 func teamFilter(f Filter) (database.Filter[domain.TeamField], error) {
 	switch f.Field {
 	case teamFieldCreatedAt:
-		raw, ok := f.Value.(string)
-		if !ok {
-			return nil, domain.ErrRequestInvalid().WithDetails("createdAt filter value must be an RFC3339 string")
-		}
-		// The createdAt filter value arrives as an untyped string (the filter-value union in the openapi contract
-		// does not specify a format for a timestamp); parse it into the time.Time needed for the comparison.
-		value, err := database.CoerceTimeValue(raw)
-		if err != nil {
-			return nil, domain.ErrRequestInvalid().WithDetails(
-				fmt.Sprintf("createdAt filter value %q is not a valid RFC3339 timestamp", raw))
-		}
-		return compareFilter(f.Operation, database.Col(domain.TeamFieldCreatedAt), value)
+		return createdAtFilter(f.Operation, database.Col(domain.TeamFieldCreatedAt), f.Value)
 	case teamFieldName:
 		value, ok := f.Value.(string)
 		if !ok {
