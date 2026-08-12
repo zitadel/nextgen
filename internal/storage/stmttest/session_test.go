@@ -319,3 +319,106 @@ func TestSessionStatements_List_LimitKeepsFactorsComplete(t *testing.T) {
 			"the paged session must carry its complete factor list")
 	})
 }
+
+// TestSessionStatements_List_StateColumnFilters exercises the filter shapes
+// sessionService.List builds for the state filter.
+func TestSessionStatements_List_StateColumnFilters(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+
+		newAnonymousSession := func(ttl time.Duration) string {
+			session, err := domain.NewSession(projectID, nil)
+			require.NoError(t, err)
+			session.TimeToLive = ttl
+			require.NoError(t, d.stmts.CreateSession(t.Context(), session))
+			sessionID := session.ID
+			t.Cleanup(func() {
+				_ = d.stmts.DeleteSessionByID(context.Background(), projectID, sessionID)
+			})
+			return sessionID
+		}
+
+		buildingID := newAnonymousSession(time.Hour)
+		expiredID := newAnonymousSession(time.Millisecond)
+
+		userID := "usr-state-" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "State User")))
+		t.Cleanup(func() { _ = d.stmts.DeleteUserByID(context.Background(), projectID, userID) })
+		activeID := createTwoCheckSession(t, d.stmts, projectID, userID).ID
+
+		// A password-only exchange promotes a verified factor but binds no
+		// user: the case the user_id proxy misclassified as building.
+		plainPw, _ := handoffCompletedAttempt(t, d.stmts, projectID, nil)
+		pwOnly, err := d.stmts.ExchangeSession(t.Context(), projectID, plainPw, nil, time.Hour)
+		require.NoError(t, err)
+		require.Nil(t, pwOnly.UserID)
+		require.NotEmpty(t, pwOnly.Factors)
+		pwOnlyID := pwOnly.ID
+		t.Cleanup(func() { _ = d.stmts.DeleteSessionByID(context.Background(), projectID, pwOnlyID) })
+
+		scope := database.Equal(database.Col(domain.SessionFieldProjectID), projectID)
+		expiresAt := database.Col(domain.SessionFieldExpiresAt)
+		hasFactors := database.Col(domain.SessionFieldHasVerifiedFactors)
+		sessUserID := database.Col(domain.SessionFieldUserID)
+
+		ctx := t.Context()
+		// list takes require.TestingT so the EventuallyWithT poll can pass its
+		// *assert.CollectT: require on the outer t would FailNow off the test
+		// goroutine and kill the retry loop instead of retrying.
+		list := func(t require.TestingT, filter database.Filter[domain.SessionField]) []*domain.Session {
+			result, err := d.stmts.ListSessions(ctx, &database.ListOptions[domain.SessionField]{
+				Filter: database.And(scope, filter),
+				Pagination: database.Page[domain.SessionField]{
+					OrderBy: database.OrderBy[domain.SessionField]{
+						Columns: []database.Column[domain.SessionField]{database.Col(domain.SessionFieldID)},
+					},
+				},
+			})
+			require.NoError(t, err)
+			return result.Items
+		}
+		ids := func(sessions []*domain.Session) []string {
+			out := make([]string, 0, len(sessions))
+			for _, session := range sessions {
+				out = append(out, session.ID)
+			}
+			return out
+		}
+		// The column predicates are a proxy; domain.Session.State() is the
+		// authority they must agree with.
+		assertStates := func(t *testing.T, sessions []*domain.Session, want domain.SessionState) {
+			for _, session := range sessions {
+				assert.Equal(t, want, session.State(), "session %s: filter disagrees with State()", session.ID)
+			}
+		}
+
+		// The 1ms TTL session expires relative to the database clock; poll
+		// until the expired predicate sees it rather than trusting clock skew.
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.Contains(c, ids(list(c, database.LessThan(expiresAt, time.Now().UTC()))), expiredID)
+		}, 5*time.Second, 50*time.Millisecond, "session with 1ms TTL must show up as expired")
+
+		now := time.Now().UTC()
+		live := database.Or(database.GreaterThan(expiresAt, now), database.Equal(expiresAt, now))
+
+		expired := list(t, database.LessThan(expiresAt, now))
+		// The has-verified-factors EXISTS must compile inside plain equality filters on every dialect.
+		building := list(t, database.And(live, database.Equal(hasFactors, false)))
+		active := list(t, database.And(live, database.Equal(hasFactors, true)))
+
+		assert.ElementsMatch(t, []string{expiredID}, ids(expired), "expired: expires_at before now")
+		assert.ElementsMatch(t, []string{buildingID}, ids(building), "building: live without verified factors")
+		assert.ElementsMatch(t, []string{activeID, pwOnlyID}, ids(active), "active: live with verified factors, user bound or not")
+
+		assertStates(t, expired, domain.SessionStateExpired)
+		assertStates(t, building, domain.SessionStateBuilding)
+		assertStates(t, active, domain.SessionStateActive)
+
+		// check that plain (non-keyset) nil values compile to
+		// IS NULL / IS NOT NULL on every dialect.
+		userless := list(t, database.And(live, database.Equal(sessUserID, nil)))
+		userBound := list(t, database.And(live, database.GreaterThan(sessUserID, nil)))
+		assert.ElementsMatch(t, []string{buildingID, pwOnlyID}, ids(userless), "live and user_id IS NULL")
+		assert.ElementsMatch(t, []string{activeID}, ids(userBound), "live and user_id IS NOT NULL")
+	})
+}

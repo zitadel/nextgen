@@ -47,9 +47,9 @@ Open [http://localhost:3001/login](http://localhost:3001/login). Any email/passw
 
 ### Running against the Go server
 
-Instead of the mock, you can run against the real Go server with embedded
-Postgres. This gives you persistent state, real user creation, and the full
-flow engine.
+Instead of the mock, you can run against the real Go server with its default
+SQLite database. This gives you persistent state, real user creation, and the
+full flow engine.
 
 #### 1. Start the server
 
@@ -60,8 +60,8 @@ moon run workspace:cli -- start
 ```
 
 This builds the embedded console and login UIs, then starts the Go server on
-`http://localhost:8080` with embedded Postgres (data stored in
-`nextgen-data/`). The server is ready when you see
+`http://localhost:8080` with SQLite at
+`.zitadel/local/nextgen-data/zitadel.db`. The server is ready when you see
 `Local Zitadel server is ready.`
 
 #### 2. Create a project

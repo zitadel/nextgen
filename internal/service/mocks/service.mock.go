@@ -10206,10 +10206,10 @@ func (c *MockSessionServiceGetCall) DoAndReturn(f func(context.Context, service.
 }
 
 // List mocks base method.
-func (m *MockSessionService) List(ctx context.Context, input service.ListSessionInput) ([]*domain.Session, error) {
+func (m *MockSessionService) List(ctx context.Context, input service.ListSessionInput) (*service.ListSessionsResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List", ctx, input)
-	ret0, _ := ret[0].([]*domain.Session)
+	ret0, _ := ret[0].(*service.ListSessionsResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -10227,19 +10227,19 @@ type MockSessionServiceListCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockSessionServiceListCall) Return(arg0 []*domain.Session, arg1 error) *MockSessionServiceListCall {
+func (c *MockSessionServiceListCall) Return(arg0 *service.ListSessionsResponse, arg1 error) *MockSessionServiceListCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockSessionServiceListCall) Do(f func(context.Context, service.ListSessionInput) ([]*domain.Session, error)) *MockSessionServiceListCall {
+func (c *MockSessionServiceListCall) Do(f func(context.Context, service.ListSessionInput) (*service.ListSessionsResponse, error)) *MockSessionServiceListCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockSessionServiceListCall) DoAndReturn(f func(context.Context, service.ListSessionInput) ([]*domain.Session, error)) *MockSessionServiceListCall {
+func (c *MockSessionServiceListCall) DoAndReturn(f func(context.Context, service.ListSessionInput) (*service.ListSessionsResponse, error)) *MockSessionServiceListCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
