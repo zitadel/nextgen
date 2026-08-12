@@ -39,8 +39,8 @@ Typical edits:
 - **Rewire transitions** — edit `steps[].transitions` to point at a
   different next step. Cross-flow jumps (`action: switch` / `pivot`)
   validate in a definition but are **not yet executed by the runtime** —
-  submitting through one fails with a 400 (`code: "unsupported"`); keep
-  transitions within one flow for now.
+  submitting through one fails with a 400 (`code: "flow.unsupported"`);
+  keep transitions within one flow for now.
 - **Add another flow** — drop a new JSON file with its own `purposes`
   and a distinct `name` (e.g. a per-team login). See
   [Multiple flows](#multiple-flows) for how it gets selected at runtime.

@@ -204,16 +204,18 @@ export default async function LoginPage() {
 // app/login/widget.tsx (client)
 'use client';
 import dynamic from 'next/dynamic';
-import { configureZitadel } from '@zitadel/api/config';
-
-const project = configureZitadel({
-  projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID!,
-  proxyPath: '/__nextgen',
-});
 
 const ZitadelLogin = dynamic(
   async () => {
-    await import('@zitadel/components');
+    // The /client entry registers the custom elements AND re-exports
+    // configureZitadel, so an app that only declares @zitadel/sdk-next
+    // resolves everything it needs (strict package managers would not
+    // resolve @zitadel/api or @zitadel/components transitively).
+    const { configureZitadel } = await import('@zitadel/sdk-next/client');
+    configureZitadel({
+      projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID!,
+      proxyPath: '/__nextgen',
+    });
     return function ZitadelLoginElement() {
       return <zitadel-login post-sign-in-url="/admin" />;
     };

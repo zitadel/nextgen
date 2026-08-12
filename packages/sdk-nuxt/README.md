@@ -14,7 +14,10 @@ for hand-rolled setups.
 
 ## Surface 1 — the Nuxt module (recommended, CLI-scaffolded)
 
-Register the module under the `nextgen` config key:
+Register the module under the `nextgen` config key, and give the client
+plugin your project id via `runtimeConfig.public.zitadelProjectId` — without
+it the plugin skips `configureZitadel()`, `useZitadelProject()` returns
+`null`, and the login widget cannot initialize:
 
 ```ts
 export default defineNuxtConfig({
@@ -24,20 +27,27 @@ export default defineNuxtConfig({
     protectedRoutes: ['/admin', '/dashboard*'],
     loginPath: '/login',
   },
+  runtimeConfig: {
+    public: {
+      zitadelProjectId: process.env.NUXT_PUBLIC_ZITADEL_PROJECT_ID ?? '',
+    },
+  },
 });
 ```
 
+(This mirrors what `zitadel setup` writes into `nuxt.config.ts`.)
+
 The module registers the Nitro server middleware, the auth plugin (which
-seeds server-side auth state and hydrates it on the client), and
-auto-imports the composables — no `server/middleware/auth.ts`, no manual
-plugin.
+seeds server-side auth state, hydrates it on the client, and calls
+`configureZitadel()` from the runtime config above), and auto-imports the
+composables — no `server/middleware/auth.ts`, no manual plugin.
 
 ### Module options (what the module actually forwards)
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `url` | `string` | `ZITADEL_URL` env, else `http://localhost:8080` | Full URL of the Zitadel auth backend |
-| `proxyPath` | `string` | `"/__nextgen"` | Path prefix proxied to the auth backend (also exposed to the client plugin) |
+| `proxyPath` | `string` | `"/__nextgen"` | The path the **client** widgets call (exposed via public runtime config). The registered server handler currently always serves `/__nextgen` regardless of this option — to actually move the server prefix, use the direct-middleware surface |
 | `protectedRoutes` | `string[]` | `[]` | Paths requiring a valid session. Trailing `*` matches sub-paths |
 | `loginPath` | `string` | `"/login"` | Where to redirect unauthenticated users |
 
@@ -80,7 +90,13 @@ export default defineEventHandler((event) => {
 
 Register the shared components in a client-only plugin
 (`plugins/zitadel-components.client.ts` — do **not** import
-`@zitadel/components` from page `<script setup>`, that runs during SSR):
+`@zitadel/components` from page `<script setup>`, that runs during SSR).
+Under strict package managers (pnpm, Yarn PnP) `@zitadel/components` is not
+resolvable as a transitive dependency, so declare it in your app first:
+
+```bash
+pnpm add @zitadel/components
+```
 
 ```ts
 import "@zitadel/components";

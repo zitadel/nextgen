@@ -12,9 +12,9 @@ building your own middleware or need the types without a framework wrapper.
 | Import | What it carries |
 | --- | --- |
 | `@zitadel/sdk-core` | Everything below in one namespace |
-| `@zitadel/sdk-core/types` | `NextgenSession`, `AuthResult`, and the other shared session/auth types the SDKs re-export |
+| `@zitadel/sdk-core/types` | The SPA widget contract (`ZitadelFlowStepDetail` and the other widget event/config/handler/props types the SPA SDKs re-export) |
 | `@zitadel/sdk-core/jwt` | `verifyJwt`, `decodeJwt`, `isJwtShaped`, `JWKS_TTL_MS` |
-| `@zitadel/sdk-core/middleware` | `createNextgenMiddleware`-style primitives: `NextgenMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`) |
+| `@zitadel/sdk-core/middleware` | The middleware layer: `NextgenSession`, `AuthResult`, `NextgenMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`) |
 
 It also exports `resolveZitadelRuntime` / `resolveZitadelRuntimeEnv` and
 `ZitadelRuntimeError` for resolving the runtime environment
