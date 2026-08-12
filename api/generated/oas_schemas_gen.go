@@ -742,8 +742,6 @@ func (s *AuthAttemptResponseState) UnmarshalText(data []byte) error {
 type AuthMethod struct {
 	// Whether the authentication method is enabled or not.
 	Enabled bool `json:"enabled"`
-	// The position of the authentication method in the list of supported methods.
-	Position int `json:"position"`
 }
 
 // GetEnabled returns the value of Enabled.
@@ -751,19 +749,9 @@ func (s *AuthMethod) GetEnabled() bool {
 	return s.Enabled
 }
 
-// GetPosition returns the value of Position.
-func (s *AuthMethod) GetPosition() int {
-	return s.Position
-}
-
 // SetEnabled sets the value of Enabled.
 func (s *AuthMethod) SetEnabled(val bool) {
 	s.Enabled = val
-}
-
-// SetPosition sets the value of Position.
-func (s *AuthMethod) SetPosition(val int) {
-	s.Position = val
 }
 
 // A list of authentication methods supported by the user definition.

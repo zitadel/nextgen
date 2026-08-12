@@ -541,8 +541,8 @@ describe("Next setup integration", () => {
 
     const schema = JSON.parse(
       await readFile(join(cwd, ".zitadel/schemas/default-human-user.json"), "utf8"),
-    ) as { "x-auth-methods": Record<string, { position: number }> };
-    expect(schema["x-auth-methods"].passkey?.position).toBe(1);
+    ) as { "x-auth-methods": Record<string, { enabled: boolean }> };
+    expect(schema["x-auth-methods"].passkey?.enabled).toBe(true);
 
     // The chosen preset is recorded for later tooling.
     const zitadelJson = JSON.parse(await readFile(join(cwd, "zitadel.json"), "utf8")) as {

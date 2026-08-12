@@ -222,7 +222,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       body: JSON.stringify({
         kind: "user-schema",
         metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
-        "x-auth-methods": { password: { enabled: true, position: 0 } },
+        "x-auth-methods": { password: { enabled: true } },
       }),
     });
     expect(res.status).toBe(201);
@@ -238,7 +238,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       body: JSON.stringify({
         kind: "user-schema",
         metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
-        "x-auth-methods": { password: { enabled: true, position: 0 } },
+        "x-auth-methods": { password: { enabled: true } },
       }),
     });
     const { id } = (await create.json()) as { id: string };
@@ -268,7 +268,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const doc = {
       kind: "user-schema",
       metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
-      "x-auth-methods": { password: { enabled: true, position: 0 } },
+      "x-auth-methods": { password: { enabled: true } },
       title: "CustomTitle",
       "x-custom-extension": { keep: true },
     };
