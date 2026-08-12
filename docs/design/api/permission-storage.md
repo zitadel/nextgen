@@ -96,6 +96,7 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
 | **D11** | Dual-write membership **without** Leopard in Wave 1; Leopard remains an additive derived index later ([ADR 032 §3](../../adrs/032-permission-catalogs.md#3-canonical-relational-storage)). |
 | **D12** | Hash-partitioning `resource_scope_index` (Postgres) **deferred until proven**; revisit only with vacuum/bloat/hot-spot measurements. |
 | **D13** | Cross-project ([#333](https://github.com/zitadel/nextgen/issues/333)) depiction: same `authz_assignments` row on the **protected** `project_id`, with a **foreign** `user`/`team` principal (no `principal_type = project`); principal integrity by stable prefixed ids ([ADR 011](../../adrs/011-resource-identifiers.md)), not a composite FK to local `(project_id, user_id)`. |
+| **D14** | No backfill for pre-stack authz data. Enforcement assumes instances bootstrapped at or after Wave 1 + #807: `sk_proj` assignments are seeded only by `CreateProject`, and RSI rows for schema/branding/flow_definition/session exist only via dual-write. (Pre)alpha status is the justification; revisit only if a supported upgrade path from pre-stack data ever becomes a requirement. |
 
 ## Entity picture
 
