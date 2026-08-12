@@ -148,6 +148,61 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     expect(getComputedStyle(title).color).toBe(HOST_RED);
   });
 
+  it("the primary button consumes the --zl-primary pair from the host", async () => {
+    // The semantic brand knob: setting the Figma `primary` pair on the host
+    // element restyles the primary CTA through both shadow boundaries.
+    const HOST_BLUE = "rgb(0, 0, 255)";
+    appStylesheet(
+      `zitadel-login { --zl-primary: ${HOST_RED}; --zl-primary-foreground: ${HOST_BLUE}; }`,
+    );
+    const element = await mount(identifierStep);
+    const atom = element.shadowRoot?.querySelector("zl-button") as HTMLElement;
+    expect(atom).toBeTruthy();
+    const button = atom.shadowRoot?.querySelector(".zr-btn--primary") as HTMLElement;
+    expect(button).toBeTruthy();
+    expect(getComputedStyle(button).backgroundColor).toBe(HOST_RED);
+    expect(getComputedStyle(button).color).toBe(HOST_BLUE);
+  });
+
+  it("tenant palette.link recolors card links and nothing else", async () => {
+    // Regression for the broken bridge: `palette.link` used to target the
+    // pill token while the links kept a hard-coded purple accent.
+    const linkedStep = {
+      ...identifierStep,
+      step: {
+        ...identifierStep.step,
+        actions: [
+          ...identifierStep.step.actions,
+          { name: "register", kind: "navigate", text_key: "identifier.action.register.link" },
+        ],
+      },
+      branding: { palette: { link: "#ff0000" } },
+    } as unknown as CreateFlow201;
+    const element = await mount(linkedStep);
+    const link = element.shadowRoot?.querySelector(".zl-card-nav__link") as HTMLElement;
+    expect(link).toBeTruthy();
+    expect(getComputedStyle(link).color).toBe(HOST_RED);
+  });
+
+  it("suppress-header hides the card heading visually but keeps it accessible", async () => {
+    const element = await mount(identifierStep, (el) => {
+      el.suppressHeader = true;
+    });
+    // Reflected on the host and stamped onto the template shell, so the
+    // CSS covers user-ejected templates too.
+    expect(element.hasAttribute("suppress-header")).toBe(true);
+    const shell = element.shadowRoot?.querySelector("zl-page-shell") as HTMLElement;
+    expect(shell.hasAttribute("data-suppress-header")).toBe(true);
+    const title = element.shadowRoot?.querySelector(".zl-card-title") as HTMLElement;
+    expect(title).toBeTruthy();
+    expect(title.textContent?.trim()).not.toBe("");
+    // Screen-reader-only, not display:none.
+    const style = getComputedStyle(title);
+    expect(style.position).toBe("absolute");
+    expect(style.width).toBe("1px");
+    expect(style.display).not.toBe("none");
+  });
+
   it("the host page owns placement, width, and flow position", async () => {
     // A widget must lay out as a normal block in its parent — no viewport
     // claim, no breaking out of the container, no forced width.

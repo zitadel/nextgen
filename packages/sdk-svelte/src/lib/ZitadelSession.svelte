@@ -13,6 +13,7 @@
     logoutLabel,
     variant,
     theme,
+    suppressHeader,
     onSignout,
   }: ZitadelSessionProps = $props();
 
@@ -51,4 +52,5 @@
   logout-label={logoutLabel}
   {variant}
   {theme}
+  {suppressHeader}
 ></zitadel-session>

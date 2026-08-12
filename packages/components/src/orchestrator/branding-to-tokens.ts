@@ -51,15 +51,26 @@ const DENSITY_MAP: Record<NonNullable<BrandingShape["density"]>, Record<string, 
 // `--zl-color-surface-default-black`; they say "background", "surface",
 // "primary", "text", etc. The orchestrator translates here.
 const PALETTE_MAP: Record<keyof BrandingPalette, string[]> = {
-  primary: ["--zl-color-surface-default-white"],
-  on_primary: ["--zl-color-text-button-default"],
+  // Dual-mapped during the primary-button migration: the button consumes
+  // the Figma `--zl-primary` pair (with the legacy role tokens as
+  // fallback), and other legacy consumers still read the old names. Drop
+  // the legacy entries once nothing consumes them.
+  primary: ["--zl-primary", "--zl-color-surface-default-white"],
+  on_primary: ["--zl-primary-foreground", "--zl-color-text-button-default"],
   background: ["--zl-color-surface-default-black"],
   surface: ["--zl-color-surface-default-primary-gray"],
   muted: ["--zl-color-surface-default-secondary-gray"],
   border: ["--zl-color-border-default-gray-200", "--zl-color-border-default-gray-100"],
   text: ["--zl-color-text-primary-white"],
   text_muted: ["--zl-color-text-secondary-gray"],
-  link: ["--zl-color-text-subtitle-pink"],
+  // `--zl-color-text-link` is a styles-layer contract variable, not a
+  // generated token: it has no default of its own, and every link surface
+  // (card-nav, forgot-password, field link) consumes it with the legacy
+  // purple accent as fallback. Unset → today's purple per theme; set (here,
+  // or by a host page) → exactly the links change, not the pills that the
+  // previous `--zl-color-text-subtitle-pink` mapping accidentally hit, and
+  // not the decorative accents that share the purple token.
+  link: ["--zl-color-text-link"],
   success: ["--zl-color-text-success", "--zl-color-border-success", "--zl-color-icon-success"],
   warning: ["--zl-color-text-subtitle-orange"],
   error: ["--zl-color-text-error", "--zl-color-border-error", "--zl-color-icon-error"],

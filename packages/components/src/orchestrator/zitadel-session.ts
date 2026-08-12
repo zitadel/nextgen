@@ -84,6 +84,18 @@ export class ZitadelSession extends ZitadelSurface {
         line-height: 1.25rem;
         color: ${t.color.text.error};
       }
+      /* suppress-header: visually hidden, kept in the accessibility tree. */
+      .title.sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        border: 0;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
     `,
   ];
 
@@ -219,7 +231,9 @@ export class ZitadelSession extends ZitadelSurface {
     return html`
       <zl-page-shell ?data-widget=${this.variant !== "page"}>
         <zl-card>
-          <h1 slot="header" class="title">${this.heading}</h1>
+          <h1 slot="header" class="title ${this.suppressHeader ? "sr-only" : ""}">
+            ${this.heading}
+          </h1>
           ${this.identityLabel
             ? html`<p slot="header" class="identity">${this.identityLabel}</p>`
             : nothing}

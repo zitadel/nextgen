@@ -42,9 +42,15 @@
   line-height: 1.25rem;
 }
 
+/* Primary consumes the Figma semantic `primary` pair (the values differ
+   slightly from the legacy role tokens — deliberate migration, not drift).
+   The legacy tokens remain as fallback for consumers loading these styles
+   without the design-tokens sheet. Hover stays on the legacy hover role
+   until Figma publishes a `primary`-scoped hover value — a tenant override
+   of `--zl-primary` therefore keeps the stock hover color. */
 .zr-btn--primary {
-  background: var(--zl-color-surface-default-white, #f4f4f6);
-  color: var(--zl-color-text-button-default, #0f0f11);
+  background: var(--zl-primary, var(--zl-color-surface-default-white, #f4f4f6));
+  color: var(--zl-primary-foreground, var(--zl-color-text-button-default, #0f0f11));
 }
 .zr-btn--primary:hover:not(:disabled),
 .zr-btn--primary:active:not(:disabled),

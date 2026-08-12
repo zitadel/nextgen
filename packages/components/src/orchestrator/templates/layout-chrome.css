@@ -74,6 +74,22 @@
   font-weight: 400;
   color: var(--zl-color-text-primary-white, #f4f4f6);
 }
+/* suppress-header: the host asked for the heading block to be visually
+   hidden (its page already carries one). Stamped by the orchestrator on the
+   shell so it covers user-ejected templates too. Screen-reader-only rather
+   than display:none — the step keeps its accessible name. */
+[data-suppress-header] .zl-card-title,
+[data-suppress-header] .zl-card-subtitle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 /* Figma 6593:141989 / 6594:12882 — left-aligned in Field+CTAs (x=0, items-start). */
 .zl-card-nav {
   margin: 0;
@@ -92,7 +108,7 @@
   background: transparent;
   font: inherit;
   line-height: inherit;
-  color: var(--zl-color-icon-default-purple, #bba5e4);
+  color: var(--zl-color-text-link, var(--zl-color-icon-default-purple, #bba5e4));
   text-decoration: none;
   cursor: pointer;
 }
@@ -118,7 +134,7 @@
   font-size: 1rem;
   line-height: 1.5rem;
   font-weight: 400;
-  color: var(--zl-color-icon-default-purple, #bba5e4);
+  color: var(--zl-color-text-link, var(--zl-color-icon-default-purple, #bba5e4));
   text-decoration: none;
   cursor: pointer;
 }
