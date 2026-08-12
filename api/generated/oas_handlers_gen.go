@@ -7721,7 +7721,9 @@ func (s *Server) handleQuerySessionsRequest(args [0]string, argsEscaped bool, w 
 // handleQueryTeamsRequest handles queryTeams operation.
 //
 // Returns the teams of a project, paginated with a cursor.
-// Teams of every lifecycle status are returned; each carries its `status`.
+// Teams of every lifecycle status are returned by default; each carries its
+// `status`. A `name` filter matches exactly with `equals` and
+// case-insensitively with `contains`.
 //
 // POST /teams/query
 func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
