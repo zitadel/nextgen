@@ -27,6 +27,8 @@ server:
 #   sqlite: ./nextgen-data/zitadel.db
 #   # or:
 #   # postgres: postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable
+#   # or:
+#   # spanner: projects/PROJECT/instances/INSTANCE/databases/DATABASE
 
 password_hasher:
   # Algorithm used to hash new passwords/secrets. Defaults to argon2id

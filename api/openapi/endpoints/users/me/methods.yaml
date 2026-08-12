@@ -25,8 +25,4 @@ get:
           schema:
             $ref: ../../../components/schemas/errors/user-not_found.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
+      $ref: getMyUser-error-response.yaml

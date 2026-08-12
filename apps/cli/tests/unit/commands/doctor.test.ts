@@ -16,7 +16,7 @@ const servers: Server[] = [];
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
   metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
-  "x-auth-methods": { password: { enabled: true, position: 0 } },
+  "x-auth-methods": { password: { enabled: true } },
   properties: { email: { type: "string" } },
 };
 
@@ -231,6 +231,36 @@ describe("doctor command", () => {
     };
     expect(json.data.checks.find((check) => check.name === "claim")?.status).toBe("pass");
     expect(json.data.next_commands ?? []).not.toContain(expectedPublicCliCommand("claim"));
+  });
+
+  // The skew stays advisory (the app keeps working on its pinned train), and
+  // the repair must be a structured next_command — the agent contract prefers
+  // that field over prose — using the project's package manager with an
+  // exact-save flag so the repair cannot float the pin.
+  it("warns on a trailing SDK pin and emits the exact-pin repair in next_commands", async () => {
+    const cwd = await makeHealthyProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^15", "@zitadel/sdk-next": "0.0.1" },
+      }),
+    );
+
+    const res = await doctor(cwd);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      cli_version: string;
+      data: { ok: boolean; checks: Check[]; next_commands?: string[] };
+    };
+    expect(json.data.ok).toBe(true);
+    expect(json.data.checks.find((check) => check.name === "dependency-version")?.status).toBe(
+      "warn",
+    );
+    expect(json.data.next_commands).toContain(
+      `npm install --save-exact @zitadel/sdk-next@${json.cli_version}`,
+    );
   });
 
   it("warns (but passes) when .zitadel/schemas is empty — legacy or interrupted projects", async () => {

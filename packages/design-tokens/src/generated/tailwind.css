@@ -9,6 +9,8 @@
   --color-zl-surface-default-white: var(--zl-color-surface-default-white);
   --color-zl-surface-default-primary-gray: var(--zl-color-surface-default-primary-gray);
   --color-zl-surface-default-secondary-gray: var(--zl-color-surface-default-secondary-gray);
+  --color-zl-surface-hover-strong: var(--zl-color-surface-hover-strong);
+  --color-zl-surface-hover-subtle: var(--zl-color-surface-hover-subtle);
   --color-zl-text-primary-white: var(--zl-color-text-primary-white);
   --color-zl-text-secondary-gray: var(--zl-color-text-secondary-gray);
   --color-zl-text-button-default: var(--zl-color-text-button-default);
@@ -35,6 +37,7 @@
   --color-zl-border-default-gray-200: var(--zl-color-border-default-gray-200);
   --color-zl-border-default-gray-300: var(--zl-color-border-default-gray-300);
   --color-zl-border-default-gray-400: var(--zl-color-border-default-gray-400);
+  --color-zl-border-hover: var(--zl-color-border-hover);
   --color-zl-border-error: var(--zl-color-border-error);
   --color-zl-border-success: var(--zl-color-border-success);
   --color-zl-gray-50: var(--zl-color-gray-50);

@@ -78,8 +78,7 @@ func TestCreateSchema(t *testing.T) {
 				"title":      "an invalid user schema",
 				"x-auth-methods": map[string]any{
 					"password": map[string]any{
-						"enabled":  true,
-						"position": 0,
+						"enabled": true,
 					},
 				},
 			})
@@ -114,7 +113,7 @@ func TestCreateSchema(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true, "position": 1 }
+                    "password": { "enabled": true }
                   },
                   "properties": {
                     "givenName": { "type": "string" }
@@ -223,7 +222,7 @@ func TestSchemaRevisions(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true, "position": 1 }
+                    "password": { "enabled": true }
                   },
                   "properties": {
                     "givenName": { "type": "string" }
@@ -239,7 +238,7 @@ func TestSchemaRevisions(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true, "position": 1 }
+                    "password": { "enabled": true }
                   },
                   "properties": {
                     "firstName": { "type": "string" }
@@ -255,7 +254,7 @@ func TestSchemaRevisions(t *testing.T) {
                   "kind": "user-schema",
                   "type": "object",
                   "x-auth-methods": {
-                    "password": { "enabled": true, "position": 0 }
+                    "password": { "enabled": true }
                   },
                   "properties": {
                     "givenName": { "type": "string" }

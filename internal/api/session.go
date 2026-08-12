@@ -116,15 +116,30 @@ func (h Handler) QuerySessions(ctx context.Context, req *api.QuerySessionsReques
 	if err := requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opRead); err != nil {
 		return nil, err
 	}
-	input := service.ListSessionInput{
-		ProjectID: string(params.ProjectID),
-		// TODO: handle req
-	}
-	sessions, err := h.sessionService.List(ctx, input)
+	listed, err := h.sessionService.List(ctx, mapQuerySessionsToService(string(params.ProjectID), req))
 	if err != nil {
 		return nil, err
 	}
-	return sessionsToAPI(sessions), nil
+	resp := sessionsToAPI(listed.Sessions)
+	if listed.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
+	}
+	return resp, nil
+}
+
+func mapQuerySessionsToService(projectID string, req *api.QuerySessionsRequest) service.ListSessionInput {
+	input := service.ListSessionInput{
+		ProjectID: projectID,
+		Limit:     int(req.Limit.Or(0)), // if not defined, set to default value in the service layer
+		PageToken: string(req.PageToken.Or("")),
+	}
+	if sorting, ok := req.Sorting.Get(); ok {
+		input.Sorting = sortingToService(sorting.Field, sorting.Direction)
+	}
+	for _, filter := range req.Filter {
+		input.Filters = append(input.Filters, filterToService(filter.Field, filter.Operation, filter.Value))
+	}
+	return input
 }
 
 func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionParams) (api.RevokeSessionRes, error) {

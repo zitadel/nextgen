@@ -10,6 +10,7 @@ test("local journey defaults to the full framework matrix", () => {
     frameworkIds: ["next", "nuxt", "react", "vue", "angular", "solid", "svelte", "qwik"],
     image: "",
     keep: false,
+    preexistingApp: false,
     preset: "",
     runtime: "binary",
     suite: "frameworks",
@@ -38,6 +39,7 @@ test("local journey can select one framework and tune concurrency", () => {
       frameworkIds: ["vue"],
       image: "nextgen:test",
       keep: true,
+      preexistingApp: false,
       preset: "",
       runtime: "docker",
       suite: "frameworks",
@@ -55,6 +57,7 @@ test("local journey can scaffold with a sign-in preset", () => {
       frameworkIds: ["next"],
       image: "",
       keep: false,
+      preexistingApp: false,
       preset: "passkey-first",
       runtime: "binary",
       suite: "frameworks",
@@ -71,6 +74,7 @@ test("the testkit suite pins the next framework and rejects an explicit one", ()
     frameworkIds: ["next"],
     image: "",
     keep: false,
+    preexistingApp: false,
     preset: "",
     runtime: "binary",
     suite: "testkit",
@@ -90,12 +94,33 @@ test("local journey can request the binary runtime explicitly", () => {
     frameworkIds: ["next"],
     image: "",
     keep: false,
+    preexistingApp: false,
     preset: "",
     runtime: "binary",
     suite: "frameworks",
     tarballsDir: "",
     workDir: "",
   });
+});
+
+test("the pre-existing-app lane defaults to the route-based matrix", () => {
+  // No explicit framework: the lane runs exactly the ADR 044 posture scope.
+  assert.deepEqual(parseLocalJourneyArgs(["--preexisting-app"]).frameworkIds, ["next", "nuxt"]);
+  assert.equal(parseLocalJourneyArgs(["--preexisting-app"]).preexistingApp, true);
+  // An explicit route-based framework narrows the lane.
+  assert.deepEqual(
+    parseLocalJourneyArgs(["--preexisting-app", "--framework", "nuxt"]).frameworkIds,
+    ["nuxt"],
+  );
+  // SPA families keep the page posture (ADR 044) — the lane refuses them.
+  assert.throws(
+    () => parseLocalJourneyArgs(["--preexisting-app", "--framework", "react"]),
+    /route-based frameworks/,
+  );
+  assert.throws(
+    () => parseLocalJourneyArgs(["--suite", "testkit", "--preexisting-app"]),
+    /testkit suite always scaffolds fresh/,
+  );
 });
 
 test("local journey rejects invalid options", () => {

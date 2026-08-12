@@ -58,8 +58,8 @@ const server = setupServer(
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterAll(() => server.close());
 
-function renderShell() {
-  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: ["/"] }) });
+function renderShell(path = "/") {
+  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
   render(<RouterProvider router={router} />);
 }
 
@@ -106,6 +106,36 @@ describe("app shell navigation", () => {
     for (const label of NEVER_SHOWN) {
       expect(nav.queryByText(label)).not.toBeInTheDocument();
     }
+  });
+});
+
+/**
+ * The sidebar has two views and the route picks between them, so a settings URL
+ * restores the Settings view rather than dropping the operator back into Portal
+ * chrome. The account dropdown is the way in; `Back to app` is the way out.
+ */
+describe("settings view", () => {
+  it("shows the portal nav and the account dropdown's entry point by default", async () => {
+    renderShell();
+    await screen.findByRole("link", { name: /^Users/ });
+    expect(screen.getByRole("navigation", { name: "Primary" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Account:/ }));
+    // Log out, not Sign out, and Settings alongside it — both per the design.
+    expect(await screen.findByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Settings" })).toHaveAttribute(
+      "href",
+      "/settings",
+    );
+  });
+
+  it("swaps the portal nav for the settings view on a settings URL", async () => {
+    renderShell("/settings");
+    // The way back out is present...
+    expect(await screen.findByRole("link", { name: "Back to app" })).toHaveAttribute("href", "/");
+    // ...and the portal list is gone rather than sitting underneath it.
+    expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^Users/ })).not.toBeInTheDocument();
   });
 });
 

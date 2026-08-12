@@ -92,7 +92,7 @@ describe("apply command pre-flight", () => {
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
   metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
-  "x-auth-methods": { password: { enabled: true, position: 0 } },
+  "x-auth-methods": { password: { enabled: true } },
   properties: { email: { type: "string" } },
 };
 

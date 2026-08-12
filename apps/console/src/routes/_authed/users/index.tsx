@@ -37,6 +37,9 @@ import { userDisplayName } from "../../../lib/user";
 import { getConsoleProjectId } from "../../../runtime/runtime";
 
 export const Route = createFileRoute("/_authed/users/")({
+  // `User`, not `Users`: the sidebar frame's row carries `lucide/User`, the
+  // single-person glyph. The plural two-person one reads as a group.
+  // Order 3: Teams sits at 2.
   staticData: { nav: { label: "Users", order: 3, icon: User } },
   loader: async () => {
     const page = await api.listUsers({ limit: PAGE_SIZE });

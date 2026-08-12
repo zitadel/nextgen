@@ -56,6 +56,10 @@ Each invocation prints one JSON object:
   see what setup created versus merged into (your `package.json` is an
   `update`). `data.files_written` remains the flat list — deduplicated file
   paths only, covering both scaffolded and `.zitadel/` resource files.
+- `setup` also emits `data.design`: the starter login design it ejected and
+  published as branding revision 1, or `null` when the built-in template was
+  kept (no `.zitadel/branding/` files exist in that case). Use it to verify
+  the requested `--design` took effect without diffing the repo.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime with
   `npx @zitadel/cli@alpha start`, then retry with `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 from the target server. With the platform's
@@ -104,7 +108,23 @@ the CLI's help layer, not the envelope.
   email only; `consumer` adds given and family name; `business` also adds a
   `companyName` attribute and overlays work-email copy on the generated auth
   pages via the SDK's `businessLocales`; asked before `--preset` and recorded
-  in `zitadel.json`), `--skip-install`.
+  in `zitadel.json`), `--design centered|split|split-right|hero|minimal`
+  (starter login design: ejects the design's template into
+  `.zitadel/branding/` and publishes it as branding revision 1 during setup;
+  the interactive wizard asks this as its final question with the built-in
+  template preselected — omit the flag in non-interactive runs to keep the
+  built-in template and no branding files), `--skip-install`.
+  On Next and Nuxt, the scaffolded auth/profile pages derive their embedding
+  posture from the app: a fresh scaffold (setup created the skeleton) pins
+  `variant="page"` full-page chrome, while a pre-existing app embeds
+  `variant="widget"` cards with `theme="auto"` in a layout-neutral wrapper.
+  `theme="auto"` follows the OS `prefers-color-scheme`, not the host app's
+  own theme — edit the generated page to set `theme="light"` or
+  `theme="dark"` when the app pins its scheme. Other frameworks always
+  scaffold the page posture. The chosen posture is recorded in the scaffold
+  manifest, `doctor --fix` restores managed pages in the recorded posture,
+  and editing the generated page is the supported way to change presentation
+  — there is no config knob.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
@@ -129,7 +149,14 @@ the CLI's help layer, not the envelope.
   files and never replaces an existing scaffolded app file; additive repairs
   (missing `.gitignore` entries, `.env.example` keys) still append to their
   targets, and the SDK dependency is re-added only when absent — an existing
-  version pin is never rewritten.
+  version pin is never rewritten. The `dependency-version` check warns when
+  an exactly-pinned `@zitadel/*` dependency does not match the CLI's own
+  version (the packages release as one train, and a floating
+  `npx @zitadel/cli@alpha` can run ahead of the app's pins); ranges,
+  dist-tags, and `file:`/`workspace:` specifiers express a deliberate choice
+  and are not compared. The repair — an exact-pin install command for the
+  project's detected package manager — is emitted in `data.next_commands`
+  and quoted in the warning message.
 - `claim` — attach the project to a team so it becomes permanent. Mints a
   short-lived link, opens it in a browser, and blocks until the developer
   finishes signing in there, then records `claimed_at` and `team_id` in
@@ -159,7 +186,8 @@ the CLI's help layer, not the envelope.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.
 - `start` — start the managed local Zitadel server and persist runtime metadata
-  under `.zitadel/local/runtime.json`. Use `--runtime docker` or `--image` for
+  under `.zitadel/local/runtime.json`. The binary runtime defaults to SQLite
+  under `.zitadel/local/nextgen-data/`. Use `--runtime docker` or `--image` for
   the Docker backend.
 - `stop` — stop the managed runtime while preserving
   `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered

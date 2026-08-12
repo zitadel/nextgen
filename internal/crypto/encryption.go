@@ -7,8 +7,6 @@ import (
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
-//go:generate go tool mockgen -typed -package cryptomock -destination ./mock/encryption.mock.go . Encrypter,Decrypter,Crypter
-
 type DecrypterFunc = func(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Decrypter, error)
 
 type Encrypter interface {
