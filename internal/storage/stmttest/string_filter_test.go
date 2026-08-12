@@ -52,6 +52,7 @@ func TestProjectStatements_StringFilters(t *testing.T) {
 		t.Run("contains escapes percent underscore and backslash", func(t *testing.T) {
 			assert.Equal(t, []string{special.ID}, list(t, database.StringContains(nameCol, `100%_a\b`)))
 			assert.Empty(t, list(t, database.StringContains(nameCol, "100Ya")))
+			assert.Equal(t, []string{special.ID}, list(t, database.StringContainsFold(nameCol, `100%_A\b`)))
 		})
 
 		t.Run("starts with and ends with match literals", func(t *testing.T) {
@@ -96,6 +97,23 @@ func TestProjectStatements_StringFilters(t *testing.T) {
 			})
 			require.NoError(t, err)
 			assert.Equal(t, []string{uebung.ID}, projectIDs(res.Items))
+		})
+
+		t.Run("non-ASCII contains fold matches itself", func(t *testing.T) {
+			// Go's ToLower folds İ to a plain i, but SQLite's LOWER keeps it and
+			// a full-Unicode LOWER yields i plus a combining dot. Only folding
+			// the needle in the database matches the stored row on every dialect.
+			ist := &domain.Project{ID: uniqueProjectID(t), Name: "İstanbul", PreviewOrigins: []string{}}
+			require.NoError(t, d.stmts.CreateProject(t.Context(), ist))
+			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), ist.ID) })
+
+			only := database.Equal(idCol, ist.ID)
+			res, err := d.stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
+				Filter:     database.And(only, database.StringContainsFold(nameCol, "İstanbul")),
+				Pagination: orderByID,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, []string{ist.ID}, projectIDs(res.Items))
 		})
 	})
 }

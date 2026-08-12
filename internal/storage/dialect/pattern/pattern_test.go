@@ -66,3 +66,18 @@ func TestCompileLikePattern(t *testing.T) {
 	assert.Equal(t, `'%' || ? || '%'`, c.String())
 	assert.Equal(t, []any{"100\\%"}, c.args)
 }
+
+func TestCompileLikeMatch(t *testing.T) {
+	t.Parallel()
+
+	var c testCompiler
+	CompileLikeMatch(&c, "name", database.StringMatchContains, "login", false)
+	assert.Equal(t, `name LIKE '%' || ? || '%'`, c.String())
+	assert.Equal(t, []any{"login"}, c.args)
+
+	c.Reset()
+	c.args = nil
+	CompileLikeMatch(&c, "name", database.StringMatchContains, "100%", true)
+	assert.Equal(t, `LOWER(name) LIKE LOWER('%' || ? || '%')`, c.String())
+	assert.Equal(t, []any{`100\%`}, c.args)
+}

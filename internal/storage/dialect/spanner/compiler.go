@@ -212,24 +212,7 @@ func compileStringFilter[F ~uint8, T any](c *statementCompiler, filter *database
 			writeArg(c, filter.Value)
 		}
 	case database.StringMatchStartsWith, database.StringMatchContains, database.StringMatchEndsWith:
-		// Ignore-case folds both sides in SQL: Go's ToLower and the database's
-		// LOWER disagree on non-ASCII (e.g. under a C locale), so a Go-folded
-		// pattern can miss rows LOWER(col) would match.
-		if filter.IgnoreCase {
-			c.WriteString("LOWER(")
-			c.WriteString(col)
-			c.WriteString(")")
-		} else {
-			c.WriteString(col)
-		}
-		c.WriteString(" LIKE ")
-		if filter.IgnoreCase {
-			c.WriteString("LOWER(")
-		}
-		pattern.CompileLikePattern(c, filter.Match, filter.Value)
-		if filter.IgnoreCase {
-			c.WriteString(")")
-		}
+		pattern.CompileLikeMatch(c, col, filter.Match, filter.Value, filter.IgnoreCase)
 	default:
 		panic("unknown string match")
 	}

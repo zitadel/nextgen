@@ -453,6 +453,12 @@ func TestCompileStringFilter(t *testing.T) {
 			wantSQL: "LOWER(name) LIKE LOWER('%' || @p1)",
 			wantArg: "Suffix",
 		},
+		{
+			name:    "contains fold escapes wildcards",
+			filter:  database.StringContainsFold(col, `100%`),
+			wantSQL: "LOWER(name) LIKE LOWER('%' || @p1 || '%')",
+			wantArg: `100\%`,
+		},
 	}
 
 	for _, tt := range tests {
