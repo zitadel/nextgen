@@ -54,8 +54,7 @@ func TestManagementAuthz(t *testing.T) {
 		// Omit $id so CreateSchema mints a slash-free sch_* id. URL-shaped
 		// $id values become the schema id (Create returns schema.URL), and
 		// /schemas/{id} is an ogen leaf path param that forbids embedded '/'
-		// in the routed segment. That makes URL ids a bad fixture for this
-		// authz gate (routing/RSI noise instead of a clean permission_denied).
+		// in the routed segment — unrelated to RSI (composite PK scopes URLs per project).
 		schemaJSON := []byte(harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 		var schemaObj map[string]any
 		require.NoError(t, json.Unmarshal(schemaJSON, &schemaObj))

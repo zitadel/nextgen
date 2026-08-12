@@ -168,9 +168,8 @@ func TestGetSchema(t *testing.T) {
 			t.Parallel()
 
 			// Omit $id so Create mints a unique sch_* id. The shared fixture's
-			// URL-shaped $id is a global resource_scope_index key; parallel
-			// creates in other projects overwrite that RSI row and this Get
-			// then returns sch.not_found after requireResourceAccess.
+			// URL-shaped $id contains '/' segments that ogen rejects as a leaf
+			// path param; composite RSI PK (#809) scopes URL reuse per project.
 			schemaJSON := []byte(harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 			var schemaObj map[string]any
 			require.NoError(t, json.Unmarshal(schemaJSON, &schemaObj))
