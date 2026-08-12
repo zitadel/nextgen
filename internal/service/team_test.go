@@ -126,6 +126,20 @@ func TestTeamService_Get(t *testing.T) {
 			},
 			wantErr: domain.ErrTeamNotFound(),
 		},
+		{
+			name:   "pending_purge team reads as not found",
+			teamID: "team_purge",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_purge").
+					Return(&domain.Team{
+						ProjectID: "proj_1",
+						ID:        "team_purge",
+						Name:      "doomed",
+						Status:    domain.TeamStatusPendingPurge,
+					}, nil)
+			},
+			wantErr: domain.ErrTeamNotFound(),
+		},
 	}
 
 	for _, tc := range tests {
@@ -295,6 +309,11 @@ func TestTeamService_List(t *testing.T) {
 
 	createdAt := time.Now().UTC().Truncate(time.Second)
 	inProject := database.Equal(database.Col(domain.TeamFieldProjectID), "proj_1")
+	// List hides pending_purge teams; every query carries this guard.
+	visibleStatuses := database.Or(
+		database.Equal(database.Col(domain.TeamFieldStatus), "active"),
+		database.Equal(database.Col(domain.TeamFieldStatus), "deactivated"),
+	)
 
 	tests := []struct {
 		name         string
@@ -320,7 +339,7 @@ func TestTeamService_List(t *testing.T) {
 					database.Col(domain.TeamFieldCreatedAt),
 					database.Col(domain.TeamFieldID),
 				}, opts.Pagination.OrderBy.Columns)
-				assert.Equal(t, database.And(inProject), opts.Filter)
+				assert.Equal(t, database.And(inProject, visibleStatuses), opts.Filter)
 			},
 			checkResp: func(t *testing.T, resp *service.ListTeamsResponse) {
 				assert.Len(t, resp.Teams, 2)
@@ -361,6 +380,7 @@ func TestTeamService_List(t *testing.T) {
 			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
 				assert.Equal(t, database.And(
 					inProject,
+					visibleStatuses,
 					database.Equal(database.Col(domain.TeamFieldCreatedAt), createdAt),
 				), opts.Filter)
 			},
@@ -375,6 +395,7 @@ func TestTeamService_List(t *testing.T) {
 			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
 				assert.Equal(t, database.And(
 					inProject,
+					visibleStatuses,
 					database.GreaterThan(database.Col(domain.TeamFieldCreatedAt), createdAt),
 				), opts.Filter)
 			},
@@ -392,6 +413,7 @@ func TestTeamService_List(t *testing.T) {
 			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
 				assert.Equal(t, database.And(
 					inProject,
+					visibleStatuses,
 					database.GreaterThan(database.Col(domain.TeamFieldCreatedAt), createdAt),
 					database.LessThan(database.Col(domain.TeamFieldCreatedAt), createdAt.Add(time.Hour)),
 				), opts.Filter)
