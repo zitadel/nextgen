@@ -3,7 +3,7 @@
 > **Status:** Accepted  
 > **Date:** 2026-05-15  
 > **Updated:** 2026-08-03  
-> **Context:** Multi-dialect storage (PostgreSQL and Spanner) for nextgen  
+> **Context:** Multi-dialect storage (PostgreSQL, Spanner, and SQLite) for nextgen  
 > **Amended by:** [ADR 047](047-dialect-id-generation.md) (dialect ownership, generators)
 
 ## Context
@@ -27,14 +27,17 @@ flowchart LR
     Ensure[idgen.Ensure / NewManagedID]
     PG[Postgres ULID]
     SP[Spanner UUID v4]
+    SQ[SQLite ULID]
   end
   subgraph sql [SQL]
     Col["TEXT / STRING PK no DEFAULT"]
   end
   Ensure --> PG
   Ensure --> SP
+  Ensure --> SQ
   PG --> Col
   SP --> Col
+  SQ --> Col
   Col --> Go["Go string / database.Identity string"]
 ```
 
@@ -72,10 +75,10 @@ as string only (no decimal→`int64` coercion for resource PKs).
 | `internal/domain` | Prefix constants and validation — no ID minting |
 | `internal/storage/v2/database` | `Identity` string bind/scan helpers |
 | `internal/storage/v2/dialect/idgen` | Shared `Generator`, `Ensure`, ULID + UUID implementations |
-| `internal/storage/v2/dialect/{postgres,spanner}` | Choose generator; call `Ensure` / `NewManagedID` on create |
+| `internal/storage/v2/dialect/{postgres,spanner,sqlite}` | Choose generator; call `Ensure` / `NewManagedID` on create |
 
 ## Consequences
 
 - One mental model for agents and reviewers.
-- Spanner write distribution uses UUID v4 bodies; Postgres keeps ULIDs.
+- Spanner write distribution uses UUID v4 bodies; Postgres and SQLite keep ULIDs.
 - Breaking for alpha: existing BIGINT identity tables are rewritten in place.

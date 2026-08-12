@@ -17,7 +17,7 @@ npx @zitadel/cli@alpha start
 npx @zitadel/cli@alpha setup --server local
 ```
 
-`zitadel start` runs the released `@zitadel/server` npm binary by default. It does not require Docker, Go, Moon, or a source checkout. Docker is still available explicitly with `zitadel start --runtime docker`.
+`zitadel start` runs the released `@zitadel/server` npm binary by default. It does not require Docker, Go, Moon, or a source checkout. The binary runtime defaults to SQLite under the local data directory. Docker is still available explicitly with `zitadel start --runtime docker`.
 
 Create-first, claim-later remains product direction, but `zitadel claim` is not shipped in this repository yet. Do not build automation or docs around it until the CLI and server contract exists.
 
@@ -25,7 +25,8 @@ Create-first, claim-later remains product direction, but `zitadel claim` is not 
 
 - [Quickstart](/docs/get-started/quickstart) for the local CLI path.
 - [Agent setup](/docs/get-started/agents) for `--non-interactive --json` and browser proof expectations.
-- [Concepts](/docs/concepts) for project, team, user, local runtime, repo config, flows, schemas, SDK proxy, sessions, and auth attempts.
+- [Concepts](/docs/concepts) for project, team, user, local runtime, databases, repo config, flows, schemas, SDK proxy, sessions, and auth attempts.
+- [Databases](/docs/concepts/databases) for SQLite (local default), PostgreSQL, and Spanner.
 - [CLI](/docs/cli) for command groups and troubleshooting.
 - [SDKs](/docs/sdks) for framework package entrypoints.
 - [API reference](/reference/api) for OpenAPI-generated endpoint docs.

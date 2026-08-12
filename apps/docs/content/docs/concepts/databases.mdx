@@ -1,0 +1,36 @@
+---
+title: Databases
+description: Choose SQLite, PostgreSQL, or Spanner for the Zitadel server.
+---
+
+Zitadel persists projects, users, sessions, and related state in a SQL database. Configure exactly one dialect under `database:` (or the matching `NEXTGEN_DATABASE_*` environment variable). When `database:` is omitted, the server uses **SQLite**.
+
+## When to use which
+
+| Backend | Use when | Notes |
+| ------- | -------- | ----- |
+| **SQLite** | Local development, CLI `zitadel start`, small single-node / homelab | Zero-config default at `<data_dir>/zitadel.db`. Single-writer limits apply. |
+| **PostgreSQL** | Production and the Docker Compose operator stack | Connection URL via `database.postgres` / `NEXTGEN_DATABASE_POSTGRES`. |
+| **Spanner** | Production on Google Cloud Spanner | Database path via `database.spanner` / `NEXTGEN_DATABASE_SPANNER`. |
+
+PostgreSQL and Spanner are the production peers. SQLite is not a production substitute for multi-writer or highly concurrent deployments.
+
+## Local runtime default
+
+`zitadel start` (npm binary runtime) stores runtime data under `.zitadel/local/nextgen-data` and, with no database override, uses SQLite at:
+
+```text
+.zitadel/local/nextgen-data/zitadel.db
+```
+
+No Docker or external database is required for that path. See [Local runtime](/docs/concepts/local-runtime).
+
+## Configuration
+
+Migrations run automatically when the server starts.
+
+Operator YAML and environment examples (including Spanner) live in the repository quick-start configuration guide:
+
+- [Configuration](https://github.com/zitadel/nextgen/blob/main/docs/quick-start/configuration.md)
+- [Example `nextgen.yaml`](https://github.com/zitadel/nextgen/blob/main/docs/operations/nextgen.example.yaml)
+- [Docker Compose (PostgreSQL)](https://github.com/zitadel/nextgen/blob/main/docs/quick-start/docker-compose.md)

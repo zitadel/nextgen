@@ -10,7 +10,8 @@ Zitadel runtime.
   fallback (`start --runtime docker`)
 
 The default `start` runs the released `@zitadel/server` npm binary and does
-not need Docker. Remote-server setup can skip the local runtime entirely by
+not need Docker. With no database override it uses SQLite under the local
+data directory. Remote-server setup can skip the local runtime entirely by
 passing `--server <url>` instead of `--server local`.
 
 ## Steps
@@ -38,7 +39,8 @@ logout, and login across the supported frameworks.
 
 The managed local Zitadel server listens on http://localhost:8080 by default.
 The CLI stores runtime metadata in `.zitadel/local/runtime.json` and keeps the
-server data under `.zitadel/local/` (the Docker fallback mounts
+server data under `.zitadel/local/` (SQLite at
+`.zitadel/local/nextgen-data/zitadel.db` by default; the Docker fallback mounts
 `.zitadel/local/nextgen-data` into the container). If you start from a fresh
 directory, `setup --server local` walks through the scaffold choices (such as
 which framework and use case) and writes the app into the current directory.
@@ -73,7 +75,8 @@ failures.
 ## Manual Docker Compose
 
 Use Docker Compose when you want to inspect the operator-style stack directly
-or run Zitadel with a separate PostgreSQL container:
+or run Zitadel with a separate PostgreSQL container (Compose is Postgres-by-design;
+for SQLite vs PostgreSQL vs Spanner, see [configuration.md](./configuration.md)):
 
 - [docker-compose.md](./docker-compose.md) — image tags, volumes, bootstrap users
 - [configuration.md](./configuration.md) — `nextgen.yaml` and environment variables

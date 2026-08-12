@@ -71,7 +71,8 @@ must respect:
 - [`docs/design/api/authz.md`](../design/api/authz.md) frames authorization
   as `credential x resolved scope x required permission -> decision`.
 - [`internal/storage/AGENTS.md`](../../internal/storage/AGENTS.md) requires
-  SQL-first storage that works on both PostgreSQL and Spanner.
+  SQL-first storage that works on PostgreSQL and Spanner (production) and
+  SQLite (local default).
 
 Two related issue areas constrain the decision:
 

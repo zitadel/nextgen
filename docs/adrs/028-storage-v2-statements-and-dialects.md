@@ -2,12 +2,14 @@
 
 > **Status:** Proposed (partially implemented; pre-merge checklist tracks remaining work on `new-repo`)
 > **Date:** 2026-06-23
-> **Context:** Multi-dialect SQL storage for nextgen (PostgreSQL and Spanner)
+> **Context:** Multi-dialect SQL storage for nextgen (PostgreSQL, Spanner, and SQLite)
 > **Supersedes:** docs/design/storage-v2.md (removed sketch)
 
 ## Context
 
-nextgen storage is SQL-first and must work on PostgreSQL and Spanner. The
+nextgen storage is SQL-first and must work on PostgreSQL, Spanner, and SQLite.
+PostgreSQL and Spanner are production peers; SQLite is the zero-config local /
+homelab default. The
 historical v1 stack under `internal/storage/database/` used generic CRUD helpers
 (`getOne`, `updateOne`, `deleteOne`) with repository metadata structs, shared
 `Condition`/`QueryOpts` writers, and dialect type switches inside repository
@@ -107,7 +109,8 @@ token signing and opaqueness stay upstream of storage.
 ### 6. Unified dialect target (end state on `new-repo`)
 
 v2 dialect implementations
-(`internal/storage/v2/dialect/postgres`, `internal/storage/v2/dialect/spanner`)
+(`internal/storage/v2/dialect/postgres`, `internal/storage/v2/dialect/spanner`,
+`internal/storage/v2/dialect/sqlite`)
 must eventually own pool, migrations, Identity, and ID generation alongside
 statement execution. Entity and application paths already use statements only;
 v2 transactions are `Statementer`-only and no longer implement v1
@@ -116,7 +119,8 @@ v2 transactions are `Statementer`-only and no longer implement v1
 Production startup connects a **single v2 pool** (connect → migrate → close).
 A v1 pool is no longer created for production, and the v1 dialect tree has been
 retired (C6). The goal is a **single v2 dialect layer**, not permanent dual
-dialect code.
+dialect code. When no `database:` dialect is configured, startup uses SQLite
+under `server.data_dir`.
 
 ```mermaid
 flowchart TB
@@ -131,7 +135,8 @@ flowchart TB
     end
     subgraph dialects [internal/storage/v2/dialect]
         pg["postgres: statement_*.go + compiler.go"]
-        sp["spanner: statement_*.go partial"]
+        sp["spanner: statement_*.go"]
+        sq["sqlite: statement_*.go + compiler.go"]
     end
     subgraph endState [End state on new-repo]
         v2Only["v2 dialects own pool tx migrations Identity ID gen"]
@@ -141,10 +146,14 @@ flowchart TB
     serviceDB --> StatementIfaces
     StatementIfaces --> pg
     StatementIfaces --> sp
+    StatementIfaces --> sq
     pg --> CoreTypes
     DialectReg --> pg
+    DialectReg --> sp
+    DialectReg --> sq
     pg -.-> endState
     sp -.-> endState
+    sq -.-> endState
 ```
 
 ### 7. Error continuity during migration
@@ -228,10 +237,11 @@ everywhere until generics land.
 internal/storage/v2/
   database/           # Dialect registry, Filter, ListOptions, ListResult
   dialect/
-    all/              # Blank-import registration (postgres + spanner)
+    all/              # Blank-import registration (postgres + spanner + sqlite)
     pagination/       # Cursor marshal/unmarshal for keyset pagination
-    postgres/         # Working reference: pool, tx, compiler, statement_*.go
-    spanner/          # Early stub: native @param SQL, partial execution
+    postgres/         # Production peer: pool, tx, compiler, statement_*.go
+    spanner/          # Production peer: native @param SQL, statements
+    sqlite/           # Local / homelab default: pool, tx, compiler, statement_*.go
 ```
 
 Service wiring lives outside v2:
@@ -245,8 +255,8 @@ Service wiring lives outside v2:
 
 | Area | Status |
 |---|---|
-| Dialect registry + config decode | Postgres and Spanner registered for v2 connect paths |
-| Entity statements | All product entities on `AllStatements` (projects, flows, schemas, teams, sessions, users/auth factors, branding, …) in postgres + spanner |
+| Dialect registry + config decode | Postgres, Spanner, and SQLite registered; omit `database:` → SQLite default |
+| Entity statements | All product entities on `AllStatements` (projects, flows, schemas, teams, sessions, users/auth factors, branding, …) in postgres, spanner, and sqlite |
 | v1 package (`internal/storage/database/`) | Removed (repositories, dialects, query-builder, aliases) |
 | Production usage | Services use `service.DB` / statements; startup owns a single v2 pool |
 | Tests | Service-layer mocks; dialect integration tests; API harness builds v2 pool |

@@ -31,7 +31,8 @@ npm run dev
 ```
 
 `start` runs the `@zitadel/server` npm binary by default and stores runtime data
-under `.zitadel/local/`. Remote-server setup can use `--server <url>` without
+under `.zitadel/local/` (SQLite at `.zitadel/local/nextgen-data/zitadel.db` when
+no database is configured). Remote-server setup can use `--server <url>` without
 starting a local runtime. Use `--runtime docker`, `--image`, or
 `ZITADEL_LOCAL_IMAGE` for advanced Docker backend debugging.
 `setup --server local` creates a project on that local server, asks which
