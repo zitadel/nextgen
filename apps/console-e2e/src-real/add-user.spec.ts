@@ -47,12 +47,13 @@ function uniqueEmail(prefix: string): string {
 
 /** The schema the console is scoped to, straight from the API. */
 async function projectSchema(zitadel: {
-  api: { getSchemaById: (id: string, params: { project_id: string }) => Promise<unknown> };
-  handle: { schemaId: string; projectId: string };
+  api: { getSchemaById: (id: string) => Promise<unknown> };
+  handle: { schemaId: string };
 }) {
-  const schema = (await zitadel.api.getSchemaById(zitadel.handle.schemaId, {
-    project_id: zitadel.handle.projectId,
-  })) as { properties?: Record<string, unknown>; required?: string[] };
+  const schema = (await zitadel.api.getSchemaById(zitadel.handle.schemaId)) as {
+    properties?: Record<string, unknown>;
+    required?: string[];
+  };
   return {
     properties: Object.keys(schema.properties ?? {}).sort(),
     required: new Set(schema.required ?? []),

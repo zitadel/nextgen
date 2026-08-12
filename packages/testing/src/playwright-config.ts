@@ -53,8 +53,20 @@ export interface WithZitadelOptions {
     /** webServer readiness timeout for the boot; cold boot dominates it. */
     bootTimeoutMs?: number;
   };
-  /** The app dev server to run against the instance. */
-  app: {
+  /**
+   * The app dev server to run against the instance.
+   *
+   * Omit it when the **instance itself serves the app** — the Zitadel binary
+   * embeds the console and hosted login shells at `/ui/console/` and
+   * `/ui/login/`, so there is no second server to boot and no env to hand it.
+   * Only the supervisor entry is generated, and `appOrigin` must then be the
+   * instance's own local origin — `http://localhost:<port>` (or another
+   * loopback alias); nothing else is served in this mode. This is the only
+   * configuration that exercises the production path — under a dev server,
+   * the app's proxy rewrites API requests that the binary would serve
+   * directly.
+   */
+  app?: {
     /** Spawn argv (no shell), e.g. ["corepack", "pnpm", "--filter", "my-app", "dev"]. */
     command: string[];
     /** Working directory for the app command. */
@@ -88,6 +100,10 @@ export interface WithZitadelOptions {
  * });
  * ```
  *
+ * Omit `app` when the instance serves the app itself (the binary's embedded
+ * `/ui/console/` and `/ui/login/` surfaces): only the boot entry is
+ * generated, and `appOrigin` must be the instance's own origin.
+ *
  * Also points ZITADEL_TESTING_HANDSHAKE at the handshake file so the
  * `@zitadel/testing/playwright` fixtures resolve the instance — Playwright
  * workers re-evaluate the config, which re-applies this for every process
@@ -118,14 +134,34 @@ export function withZitadel(
       `withZitadel: appOrigin must be an origin like "http://localhost:3002", got "${appOrigin}"`,
     );
   }
-  if (!app.readyPath.startsWith("/")) {
-    throw new Error(`withZitadel: app.readyPath must start with "/", got "${app.readyPath}"`);
-  }
-  if (app.command.length === 0) {
-    throw new Error("withZitadel: app.command must not be empty");
-  }
-  if (!isAbsolute(app.cwd)) {
-    throw new Error(`withZitadel: app.cwd must be absolute, got "${app.cwd}"`);
+  if (app === undefined) {
+    // Nothing else will bind appOrigin in this mode: the instance is the app
+    // server, and it listens on plain HTTP at localhost:<port>. Anything
+    // else — another port, a real hostname, https — is an origin nobody
+    // serves, so Playwright's readiness wait would hang (or, worse, pass
+    // against an unrelated stale server). Loopback aliases are the only
+    // freedom; the scheme and port are the instance's.
+    const loopbackHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
+    if (
+      origin.protocol !== "http:" ||
+      !loopbackHosts.has(origin.hostname) ||
+      (origin.port || "80") !== String(port)
+    ) {
+      throw new Error(
+        `withZitadel: with no \`app\`, the instance itself serves the app, so appOrigin ` +
+          `must be its local origin (http://localhost:${port}); got "${appOrigin}".`,
+      );
+    }
+  } else {
+    if (!app.readyPath.startsWith("/")) {
+      throw new Error(`withZitadel: app.readyPath must start with "/", got "${app.readyPath}"`);
+    }
+    if (app.command.length === 0) {
+      throw new Error("withZitadel: app.command must not be empty");
+    }
+    if (!isAbsolute(app.cwd)) {
+      throw new Error(`withZitadel: app.cwd must be absolute, got "${app.cwd}"`);
+    }
   }
   // Path options are consumed by the executables, whose cwd is configDir —
   // a relative path would silently resolve against that, not the project.
@@ -155,6 +191,28 @@ export function withZitadel(
     preset: options.zitadel?.preset,
     useCase: options.zitadel?.useCase,
   };
+  const supervisorEntry: WebServerEntry = {
+    command: `node ${JSON.stringify(resolveEntry("supervisor"))}`,
+    url: `http://localhost:${port}/healthz`,
+    reuseExistingServer: false,
+    cwd: configDir,
+    stdout: "pipe",
+    stderr: "pipe",
+    // Cold boot (fresh data dir: migrations + health wait) dominates.
+    timeout: options.zitadel?.bootTimeoutMs ?? 120_000,
+    env: {
+      [HANDSHAKE_ENV]: handshakePath,
+      [SUPERVISOR_CONFIG_ENV]: JSON.stringify(supervisorConfig),
+    },
+    // SIGTERM first so the supervisor can stop the instance; the default
+    // hard kill would orphan the server process group.
+    gracefulShutdown: { signal: "SIGTERM", timeout: 30_000 },
+  };
+
+  if (app === undefined) {
+    return { webServer: [supervisorEntry] };
+  }
+
   const appRunnerConfig: AppRunnerConfig = {
     command: app.command,
     cwd: app.cwd,
@@ -164,23 +222,7 @@ export function withZitadel(
 
   return {
     webServer: [
-      {
-        command: `node ${JSON.stringify(resolveEntry("supervisor"))}`,
-        url: `http://localhost:${port}/healthz`,
-        reuseExistingServer: false,
-        cwd: configDir,
-        stdout: "pipe",
-        stderr: "pipe",
-        // Cold boot (fresh data dir: migrations + health wait) dominates.
-        timeout: options.zitadel?.bootTimeoutMs ?? 120_000,
-        env: {
-          [HANDSHAKE_ENV]: handshakePath,
-          [SUPERVISOR_CONFIG_ENV]: JSON.stringify(supervisorConfig),
-        },
-        // SIGTERM first so the supervisor can stop the instance; the default
-        // hard kill would orphan the server process group.
-        gracefulShutdown: { signal: "SIGTERM", timeout: 30_000 },
-      },
+      supervisorEntry,
       {
         command: `node ${JSON.stringify(resolveEntry("app-runner"))}`,
         url: new URL(app.readyPath, appOrigin).toString(),

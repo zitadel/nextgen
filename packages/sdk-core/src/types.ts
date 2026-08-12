@@ -140,6 +140,13 @@ export interface ZitadelLoginConfig {
    * fixed so the widget doesn't render a dark card on a light page.
    */
   readonly theme?: "light" | "dark" | "auto";
+  /**
+   * Visually hide the widget's own heading block while keeping it in the
+   * accessibility tree — for embeds whose page already carries the heading
+   * (a brand-voice title above the card) so the card doesn't repeat it.
+   * @default false
+   */
+  readonly suppressHeader?: boolean;
   /** Flow purpose. @default "login" */
   readonly purpose?: CreateFlowBodyPurpose;
   /**
@@ -212,6 +219,13 @@ export interface ZitadelSessionConfig {
    * app's surface is fixed so the card doesn't render dark on a light page.
    */
   readonly theme?: "light" | "dark" | "auto";
+  /**
+   * Visually hide the widget's own heading block while keeping it in the
+   * accessibility tree — for embeds whose page already carries the heading
+   * (a brand-voice title above the card) so the card doesn't repeat it.
+   * @default false
+   */
+  readonly suppressHeader?: boolean;
 }
 
 /**

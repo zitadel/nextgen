@@ -5,7 +5,7 @@
  * The console manages an instance, so its screens are only honest against a
  * real backend — `@zitadel/api-mock` has no user store, so a users list read
  * from it is a fiction. This script boots the packaged server (binary runtime +
- * embedded Postgres, no Docker) via `@zitadel/testing`, bootstraps a project
+ * SQLite by default, no Docker) via `@zitadel/testing`, bootstraps a project
  * with the default schema and login flow, seeds users, and then starts
  * `console:dev` with the dev proxy pointed at that instance:
  *

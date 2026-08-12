@@ -48,7 +48,7 @@ Open [http://localhost:3001/login](http://localhost:3001/login). Any email/passw
 ### Running against the Go server
 
 The full walkthrough (start the server with `moon run workspace:cli -- start`
-— SQLite by default, runtime state under `.zitadel/local/` — create a project,
+— SQLite by default, at `.zitadel/local/nextgen-data/zitadel.db` — create a project,
 configure the env, start the demo) is documented once in
 [`apps/demo-next/README.md`](../demo-next/README.md#running-against-the-go-server).
 The nuxt differences:
