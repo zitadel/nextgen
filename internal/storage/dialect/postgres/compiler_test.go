@@ -422,20 +422,22 @@ func TestCompileStringFilter(t *testing.T) {
 		{
 			name:    "starts with fold",
 			filter:  database.StringStartsWithFold(col, "Acme"),
-			wantSQL: "LOWER(name) LIKE $1 || '%'",
-			wantArg: "acme",
+			wantSQL: "LOWER(name) LIKE LOWER($1 || '%')",
+			wantArg: "Acme",
 		},
 		{
+			// The needle keeps its case: folding happens in SQL on both sides,
+			// because Go's ToLower and the database's LOWER disagree on non-ASCII.
 			name:    "contains fold",
-			filter:  database.StringContainsFold(col, "Flow"),
-			wantSQL: "LOWER(name) LIKE '%' || $1 || '%'",
-			wantArg: "flow",
+			filter:  database.StringContainsFold(col, "Übung"),
+			wantSQL: "LOWER(name) LIKE LOWER('%' || $1 || '%')",
+			wantArg: "Übung",
 		},
 		{
 			name:    "ends with fold",
 			filter:  database.StringEndsWithFold(col, "Suffix"),
-			wantSQL: "LOWER(name) LIKE '%' || $1",
-			wantArg: "suffix",
+			wantSQL: "LOWER(name) LIKE LOWER('%' || $1)",
+			wantArg: "Suffix",
 		},
 	}
 
