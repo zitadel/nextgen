@@ -7,12 +7,10 @@
   "description": "This is an example of a user schema definition.",
   "x-auth-methods": {
     "password": {
-      "enabled": false,
-      "position": 1
+      "enabled": false
     },
     "passkey": {
-      "enabled": true,
-      "position": 2
+      "enabled": true
     }
   },
   "required": [

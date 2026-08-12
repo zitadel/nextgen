@@ -62,7 +62,7 @@ describe("SchemaSyncer", () => {
       schema.validate({
         kind: "user-schema",
         metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
-        "x-auth-methods": { password: { enabled: true, position: 0 } },
+        "x-auth-methods": { password: { enabled: true } },
         properties: { email: { type: "string" } },
       }),
     ).not.toThrow();
