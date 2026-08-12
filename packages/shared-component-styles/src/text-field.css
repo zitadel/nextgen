@@ -28,7 +28,7 @@
   font-size: 0.875rem;
   font-weight: 400;
   line-height: 1.25rem;
-  color: var(--zl-color-icon-default-purple, #bba5e4);
+  color: var(--zl-color-text-link, var(--zl-color-icon-default-purple, #bba5e4));
   text-decoration: none;
 }
 .zr-field__link:hover {

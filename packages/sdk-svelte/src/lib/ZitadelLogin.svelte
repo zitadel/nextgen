@@ -21,6 +21,7 @@
     lang,
     variant,
     theme,
+    suppressHeader,
     onFlowStep,
     onFlowInput,
     onFlowComplete,
@@ -76,4 +77,5 @@
   flow-name={flowName}
   variant={variant}
   theme={theme}
+  suppressHeader={suppressHeader}
 ></zitadel-login>

@@ -162,4 +162,26 @@ describe("<zitadel-session> surface (chromium)", () => {
     const identity = element.shadowRoot?.querySelector(".identity") as HTMLElement;
     expect(luminance(getComputedStyle(identity).color)).toBeLessThan(150);
   });
+
+  it("suppress-header clips only the heading and keeps the identity visible", async () => {
+    const element = await mount((el) => {
+      el.suppressHeader = true;
+    });
+
+    const card = element.shadowRoot?.querySelector("zl-card") as HTMLElement;
+    const header = card.shadowRoot?.querySelector(".zr-card__header") as HTMLElement;
+    const identity = element.shadowRoot?.querySelector(".identity") as HTMLElement;
+    const body = card.shadowRoot?.querySelector(".zr-card__body") as HTMLElement;
+
+    expect(header.getBoundingClientRect().width).toBeLessThanOrEqual(1);
+    expect(identity.hasAttribute("slot")).toBe(false);
+    expect(identity.assignedSlot).toBe(card.shadowRoot?.querySelector("slot:not([name])"));
+
+    const identityRect = identity.getBoundingClientRect();
+    const bodyRect = body.getBoundingClientRect();
+    expect(identityRect.width).toBeGreaterThan(1);
+    expect(identityRect.height).toBeGreaterThan(1);
+    expect(identityRect.top).toBeGreaterThanOrEqual(bodyRect.top);
+    expect(identityRect.bottom).toBeLessThanOrEqual(bodyRect.bottom);
+  });
 });
