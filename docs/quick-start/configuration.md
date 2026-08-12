@@ -19,10 +19,19 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 
 ## Database
 
+Configure exactly one dialect under `database:`, or omit it for the local
+default.
+
+| Backend | When to use | Config key / env |
+| ------- | ----------- | ---------------- |
+| **SQLite** | Local development, CLI binary runtime, small single-node / homelab | `database.sqlite` / `NEXTGEN_DATABASE_SQLITE` |
+| **PostgreSQL** | Production and Docker Compose | `database.postgres` / `NEXTGEN_DATABASE_POSTGRES` |
+| **Spanner** | Production on Google Cloud Spanner | `database.spanner` / `NEXTGEN_DATABASE_SPANNER` |
+
 When `database:` is omitted, the server uses **SQLite** at
 `<server.data_dir>/zitadel.db` (local / homelab default).
 
-Configure exactly one dialect to override:
+Override examples:
 
 ```yaml
 database:
@@ -34,18 +43,27 @@ database:
   postgres: postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable
 ```
 
+```yaml
+database:
+  spanner: projects/PROJECT/instances/INSTANCE/databases/DATABASE
+```
+
 Or via environment:
 
 ```sh
 export NEXTGEN_DATABASE_SQLITE='./nextgen-data/zitadel.db'
 # or
 export NEXTGEN_DATABASE_POSTGRES='postgres://zitadel:zitadel@localhost:5432/nextgen?sslmode=disable'
+# or
+export NEXTGEN_DATABASE_SPANNER='projects/PROJECT/instances/INSTANCE/databases/DATABASE'
 ```
 
 SQLite is intended for local development and small single-node deployments
 (single-writer limits apply). Use PostgreSQL or Spanner for production.
 `IgnoreCase` string filters use SQLite's `LOWER()`, which only folds ASCII —
 non-ASCII case folding (for example `Ü`/`ü`) can diverge from Postgres.
+Spanner authentication uses Application Default Credentials (ADC); this guide
+does not cover IAM setup.
 
 Migrations run automatically when the server starts.
 

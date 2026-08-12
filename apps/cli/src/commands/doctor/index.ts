@@ -273,6 +273,16 @@ function advisoryForWarnings(
     nextCommands.push(publicCliCommand("stop --all", cliVersion));
   }
 
+  const dependencyRemedy = remedyCommandOf(
+    warnings.find((check) => check.name === "dependency-version"),
+  );
+  if (dependencyRemedy !== undefined) {
+    nextActions.push(
+      "Align the exactly-pinned @zitadel/* dependencies with the CLI version; scaffolded files and guidance target the CLI's train.",
+    );
+    nextCommands.push(dependencyRemedy);
+  }
+
   if (nextActions.length === 0 && nextCommands.length === 0) {
     return undefined;
   }
@@ -470,6 +480,24 @@ function formatListeners(listeners: Awaited<ReturnType<typeof listenersForPort>>
         .join(" "),
     )
     .join(", ");
+}
+
+/**
+ * A warning may carry its own repair as `details.remedy_command` (today: the
+ * dependency-version check's package-manager-aware exact-pin install).
+ * Surfacing that string keeps the structured advisory identical to the
+ * command quoted in the warning's prose.
+ */
+function remedyCommandOf(check: CheckOutcome | undefined): string | undefined {
+  if (check?.status !== "warn") {
+    return undefined;
+  }
+  const details = check.details;
+  if (typeof details !== "object" || details === null) {
+    return undefined;
+  }
+  const remedy = (details as { remedy_command?: unknown }).remedy_command;
+  return typeof remedy === "string" && remedy.length > 0 ? remedy : undefined;
 }
 
 function hasManagedRuntimeProcesses(check: CheckOutcome | undefined): boolean {

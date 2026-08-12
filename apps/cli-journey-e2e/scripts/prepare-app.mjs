@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { appendFile, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,8 +26,10 @@ export async function prepareApp(options = {}) {
   const zitadelPort = optionalPort(env.JOURNEY_ZITADEL_PORT, "JOURNEY_ZITADEL_PORT");
   const runtime = localRuntime(env.JOURNEY_RUNTIME);
   const preset = options.preset ?? env.JOURNEY_PRESET ?? "";
+  const preexistingApp = options.preexistingApp ?? env.JOURNEY_PREEXISTING_APP === "1";
   const fs = {
     appendFile: options.appendFile ?? appendFile,
+    cp: options.cp ?? cp,
     mkdir: options.mkdir ?? mkdir,
     readFile: options.readFile ?? readFile,
     rm: options.rm ?? rm,
@@ -47,6 +49,15 @@ export async function prepareApp(options = {}) {
   await fs.rm(appDir, { recursive: true, force: true });
   await fs.mkdir(appDir, { recursive: true });
   await fs.mkdir(outputDir, { recursive: true });
+
+  if (preexistingApp) {
+    // The pre-existing-app lane (ADR 044): seed a minimal host app before any
+    // CLI step so setup meets a detectable framework instead of an empty,
+    // scaffoldable directory — the hinge that flips the emitted pages to the
+    // widget posture. The fixture is the checked-in source of truth for what
+    // "minimal pre-existing" means per framework.
+    await seedPreexistingApp({ appDir, cp: fs.cp, frameworkId: framework.id, readFile: fs.readFile });
+  }
 
   let startJson;
   let setupJson;
@@ -129,6 +140,7 @@ export async function prepareApp(options = {}) {
     framework: framework.id,
     frameworkDisplayName: framework.displayName,
     localRuntimeUrl: startJson?.data?.urls?.api ?? null,
+    preexistingApp,
     preset: preset || null,
     runtime,
     outputDir,
@@ -148,6 +160,9 @@ export async function prepareApp(options = {}) {
   await exportEnv("JOURNEY_FRAMEWORK", framework.id, fs.appendFile, env);
   if (preset) {
     await exportEnv("JOURNEY_PRESET", preset, fs.appendFile, env);
+  }
+  if (preexistingApp) {
+    await exportEnv("JOURNEY_PREEXISTING_APP", "1", fs.appendFile, env);
   }
   await exportEnv("JOURNEY_OUTPUT_DIR", outputDir, fs.appendFile, env);
   await exportOutput("app_dir", appDir, fs.appendFile, env);
@@ -245,6 +260,27 @@ async function runManagedFileDriftProbe(input) {
   if (!restored.includes("zitadel-cli: managed-file")) {
     throw new Error(`doctor --fix did not restore the managed ${boundary}`);
   }
+}
+
+/**
+ * Copies the checked-in minimal pre-existing app for `frameworkId` into the
+ * app directory. The fixture must stay exactly detectable (for Next: a `next`
+ * dependency plus an `app/` directory; for Nuxt: a `nuxt` dependency) and
+ * bootable via `npm run dev`, so setup exercises the ADR 044 widget-posture
+ * path against a realistic host app.
+ */
+async function seedPreexistingApp(input) {
+  const fixtureDir = resolve(here, "../fixtures/preexisting", input.frameworkId);
+  try {
+    await input.readFile(join(fixtureDir, "package.json"), "utf8");
+  } catch (error) {
+    throw new Error(
+      `no pre-existing-app fixture for framework "${input.frameworkId}" ` +
+        `(expected ${fixtureDir}); the lane covers the route-based frameworks only (ADR 044)`,
+      { cause: error },
+    );
+  }
+  await input.cp(fixtureDir, input.appDir, { recursive: true });
 }
 
 async function firstExistingFile(dir, candidates, readFileFn) {
