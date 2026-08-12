@@ -1,3 +1,7 @@
 type: string
+description: |
+  Field to filter or sort teams by.
 enum:
   - created_at
+  - name
+  - status

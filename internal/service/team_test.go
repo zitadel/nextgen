@@ -420,6 +420,96 @@ func TestTeamService_List(t *testing.T) {
 			},
 		},
 		{
+			name: "name contains matches case-insensitively",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "name", Operation: "contains", Value: "acme"}},
+			},
+			result: &database.ListResult[*domain.Team]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
+				assert.Equal(t, database.And(
+					inProject,
+					visibleStatuses,
+					database.StringContainsFold(database.Col(domain.TeamFieldName), "acme"),
+				), opts.Filter)
+			},
+		},
+		{
+			name: "name equals matches exactly",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "name", Operation: "equals", Value: "Acme"}},
+			},
+			result: &database.ListResult[*domain.Team]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
+				assert.Equal(t, database.And(
+					inProject,
+					visibleStatuses,
+					database.StringEqual(database.Col(domain.TeamFieldName), "Acme"),
+				), opts.Filter)
+			},
+		},
+		{
+			name: "status equals active",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "status", Operation: "equals", Value: "active"}},
+			},
+			result: &database.ListResult[*domain.Team]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
+				assert.Equal(t, database.And(
+					inProject,
+					visibleStatuses,
+					database.Equal(database.Col(domain.TeamFieldStatus), "active"),
+				), opts.Filter)
+			},
+		},
+		{
+			name: "status equals deactivated",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "status", Operation: "equals", Value: "deactivated"}},
+			},
+			result: &database.ListResult[*domain.Team]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
+				assert.Equal(t, database.And(
+					inProject,
+					visibleStatuses,
+					database.Equal(database.Col(domain.TeamFieldStatus), "deactivated"),
+				), opts.Filter)
+			},
+		},
+		{
+			name: "sort by name keeps the id tiebreaker",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Sorting:   &service.Sorting{Field: "name", Direction: "asc"},
+			},
+			result: &database.ListResult[*domain.Team]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
+				assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
+				assert.Equal(t, []database.Column[domain.TeamField]{
+					database.Col(domain.TeamFieldName),
+					database.Col(domain.TeamFieldID),
+				}, opts.Pagination.OrderBy.Columns)
+			},
+		},
+		{
+			name: "sort by status keeps the id tiebreaker",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Sorting:   &service.Sorting{Field: "status", Direction: "desc"},
+			},
+			result: &database.ListResult[*domain.Team]{},
+			checkOpts: func(t *testing.T, opts *database.ListOptions[domain.TeamField]) {
+				assert.Equal(t, database.OrderDesc, opts.Pagination.OrderBy.Direction)
+				assert.Equal(t, []database.Column[domain.TeamField]{
+					database.Col(domain.TeamFieldStatus),
+					database.Col(domain.TeamFieldID),
+				}, opts.Pagination.OrderBy.Columns)
+			},
+		},
+		{
 			name: "sort by createdAt desc keeps the id tiebreaker",
 			req: service.ListTeamsRequest{
 				ProjectID: "proj_1",
@@ -517,23 +607,71 @@ func TestTeamService_List_ValidationErrors(t *testing.T) {
 			name: "unknown filter field is invalid",
 			req: service.ListTeamsRequest{
 				ProjectID: "proj_1",
-				Filters:   []service.Filter{{Field: "name", Operation: "equals", Value: "x"}},
+				Filters:   []service.Filter{{Field: "owner", Operation: "equals", Value: "x"}},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},
 		{
-			name: "status is not filterable yet",
+			name: "non-string name value is invalid",
 			req: service.ListTeamsRequest{
 				ProjectID: "proj_1",
-				Filters:   []service.Filter{{Field: "status", Operation: "equals", Value: "active"}},
+				Filters:   []service.Filter{{Field: "name", Operation: "equals", Value: 42}},
 			},
 			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "ordering operation on name is invalid",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "name", Operation: "greater_than", Value: "x"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "non-string status value is invalid",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "status", Operation: "equals", Value: 42}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "unknown status value is invalid",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "status", Operation: "equals", Value: "suspended"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "pending_purge is not a filterable status",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "status", Operation: "equals", Value: "pending_purge"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "contains on status is invalid",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "status", Operation: "contains", Value: "act"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "not_equals on status not implemented",
+			req: service.ListTeamsRequest{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "status", Operation: "not_equals", Value: "active"}},
+			},
+			wantErr: domain.ErrNotImplemented(),
 		},
 		{
 			name: "unknown sort field is invalid",
 			req: service.ListTeamsRequest{
 				ProjectID: "proj_1",
-				Sorting:   &service.Sorting{Field: "name", Direction: "asc"},
+				Sorting:   &service.Sorting{Field: "owner", Direction: "asc"},
 			},
 			wantErr: domain.ErrRequestInvalid(),
 		},

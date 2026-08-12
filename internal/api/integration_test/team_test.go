@@ -724,13 +724,13 @@ func TestQueryTeams(t *testing.T) {
 
 	active, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
-		Name:      helpers.TeamName(),
+		Name:      "Payments Alpha",
 	})
 	require.NoError(t, err)
 
 	deactivated, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
-		Name:      helpers.TeamName(),
+		Name:      "payments beta",
 	})
 	require.NoError(t, err)
 	require.NoError(t, harness.EnsureServiceDB(t).Statements().DeactivateTeam(t.Context(), project.ID, deactivated.ID))
@@ -810,6 +810,108 @@ func TestQueryTeams(t *testing.T) {
 		assert.Equal(t, asc.Teams[1].ID, desc.Teams[0].ID)
 	})
 
+	t.Run("filters by name case-insensitively", func(t *testing.T) {
+		nameFilter := func(value string) []api.QueryTeamsRequestFilterItem {
+			return []api.QueryTeamsRequestFilterItem{{
+				Field:     api.TeamFilterFieldName,
+				Operation: api.FilterOperationContains,
+				Value:     api.NewOptFilterValue(api.NewStringFilterValue(value)),
+			}}
+		}
+
+		// The uppercase needle only matches the mixed-case names folded.
+		both := queryTeams(t, &api.QueryTeamsRequest{Filter: nameFilter("PAYMENTS")})
+		assert.Len(t, both.Teams, 2)
+
+		one := queryTeams(t, &api.QueryTeamsRequest{Filter: nameFilter("beta")})
+		require.Len(t, one.Teams, 1)
+		assert.Equal(t, deactivated.ID, one.Teams[0].ID)
+	})
+
+	t.Run("filters by status", func(t *testing.T) {
+		statusFilter := func(value string) []api.QueryTeamsRequestFilterItem {
+			return []api.QueryTeamsRequestFilterItem{{
+				Field:     api.TeamFilterFieldStatus,
+				Operation: api.FilterOperationEquals,
+				Value:     api.NewOptFilterValue(api.NewStringFilterValue(value)),
+			}}
+		}
+
+		activeTeams := queryTeams(t, &api.QueryTeamsRequest{Filter: statusFilter("active")})
+		require.Len(t, activeTeams.Teams, 1)
+		assert.Equal(t, active.ID, activeTeams.Teams[0].ID)
+		assert.Equal(t, api.TeamStatusActive, activeTeams.Teams[0].Status)
+		assert.Equal(t, "Payments Alpha", activeTeams.Teams[0].Name)
+
+		deactivatedTeams := queryTeams(t, &api.QueryTeamsRequest{Filter: statusFilter("deactivated")})
+		require.Len(t, deactivatedTeams.Teams, 1)
+		assert.Equal(t, deactivated.ID, deactivatedTeams.Teams[0].ID)
+		assert.Equal(t, api.TeamStatusDeactivated, deactivatedTeams.Teams[0].Status)
+		assert.Equal(t, "payments beta", deactivatedTeams.Teams[0].Name)
+	})
+
+	t.Run("name and status filters combine", func(t *testing.T) {
+		got := queryTeams(t, &api.QueryTeamsRequest{
+			Filter: []api.QueryTeamsRequestFilterItem{
+				{
+					Field:     api.TeamFilterFieldName,
+					Operation: api.FilterOperationContains,
+					Value:     api.NewOptFilterValue(api.NewStringFilterValue("payments")),
+				},
+				{
+					Field:     api.TeamFilterFieldStatus,
+					Operation: api.FilterOperationEquals,
+					Value:     api.NewOptFilterValue(api.NewStringFilterValue("active")),
+				},
+			},
+		})
+		require.Len(t, got.Teams, 1)
+		assert.Equal(t, active.ID, got.Teams[0].ID)
+	})
+
+	t.Run("sorts by name and pages through the cursor", func(t *testing.T) {
+		sorted := func(direction api.SortDirection) *api.QueryTeamsResponse {
+			return queryTeams(t, &api.QueryTeamsRequest{
+				Sorting: api.NewOptQueryTeamsRequestSorting(api.QueryTeamsRequestSorting{
+					Field:     api.TeamFilterFieldName,
+					Direction: direction,
+				}),
+			})
+		}
+
+		asc := sorted(api.SortDirectionAsc)
+		require.Len(t, asc.Teams, 2)
+		assert.Equal(t, active.ID, asc.Teams[0].ID)
+		assert.Equal(t, active.Name, asc.Teams[0].Name)
+		assert.Equal(t, deactivated.ID, asc.Teams[1].ID)
+		assert.Equal(t, deactivated.Name, asc.Teams[1].Name)
+
+		desc := sorted(api.SortDirectionDesc)
+		require.Len(t, desc.Teams, 2)
+		assert.Equal(t, deactivated.ID, desc.Teams[0].ID)
+		assert.Equal(t, deactivated.Name, desc.Teams[0].Name)
+		assert.Equal(t, active.ID, desc.Teams[1].ID)
+		assert.Equal(t, active.Name, desc.Teams[1].Name)
+
+		var paged []string
+		req := &api.QueryTeamsRequest{
+			Limit: api.NewOptLimit(1),
+			Sorting: api.NewOptQueryTeamsRequestSorting(api.QueryTeamsRequestSorting{
+				Field:     api.TeamFilterFieldName,
+				Direction: api.SortDirectionAsc,
+			}),
+		}
+		for range 2 {
+			page := queryTeams(t, req)
+			require.Len(t, page.Teams, 1)
+			paged = append(paged, page.Teams[0].ID)
+			token, ok := page.NextPageToken.Get()
+			require.True(t, ok, "a full page carries a cursor")
+			req.PageToken = api.NewOptNilPageToken(token)
+		}
+		assert.Equal(t, []string{active.ID, deactivated.ID}, paged)
+	})
+
 	t.Run("pages with the cursor token", func(t *testing.T) {
 		req := &api.QueryTeamsRequest{Limit: api.NewOptLimit(1)}
 		firstPage := queryTeams(t, req)
@@ -859,6 +961,38 @@ func TestQueryTeams(t *testing.T) {
 			{
 				name: "malformed page token",
 				req:  &api.QueryTeamsRequest{PageToken: api.NewOptNilPageToken("not-a-cursor")},
+			},
+			{
+				name: "non-string name value",
+				req: &api.QueryTeamsRequest{Filter: []api.QueryTeamsRequestFilterItem{{
+					Field:     api.TeamFilterFieldName,
+					Operation: api.FilterOperationContains,
+					Value:     api.NewOptFilterValue(api.NewBoolFilterValue(true)),
+				}}},
+			},
+			{
+				name: "ordering operation on name",
+				req: &api.QueryTeamsRequest{Filter: []api.QueryTeamsRequestFilterItem{{
+					Field:     api.TeamFilterFieldName,
+					Operation: api.FilterOperationGreaterThan,
+					Value:     api.NewOptFilterValue(api.NewStringFilterValue("a")),
+				}}},
+			},
+			{
+				name: "unknown status value",
+				req: &api.QueryTeamsRequest{Filter: []api.QueryTeamsRequestFilterItem{{
+					Field:     api.TeamFilterFieldStatus,
+					Operation: api.FilterOperationEquals,
+					Value:     api.NewOptFilterValue(api.NewStringFilterValue("suspended")),
+				}}},
+			},
+			{
+				name: "contains on status",
+				req: &api.QueryTeamsRequest{Filter: []api.QueryTeamsRequestFilterItem{{
+					Field:     api.TeamFilterFieldStatus,
+					Operation: api.FilterOperationContains,
+					Value:     api.NewOptFilterValue(api.NewStringFilterValue("act")),
+				}}},
 			},
 		}
 

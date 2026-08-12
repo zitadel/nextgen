@@ -3442,6 +3442,10 @@ func (s TeamFilterField) Validate() error {
 	switch s {
 	case "created_at":
 		return nil
+	case "name":
+		return nil
+	case "status":
+		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}

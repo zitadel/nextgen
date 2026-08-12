@@ -9,7 +9,11 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-const teamFieldCreatedAt = "created_at"
+const (
+	teamFieldCreatedAt = "created_at"
+	teamFieldName      = "name"
+	teamFieldStatus    = "status"
+)
 
 type TeamService struct {
 	v2Pool *DB
@@ -135,11 +139,56 @@ func (s *TeamService) List(ctx context.Context, req ListTeamsRequest) (*ListTeam
 // v2 filter layer cannot express return [domain.ErrNotImplemented];
 // invalid field/operation/value combinations return [domain.ErrRequestInvalid].
 func teamFilter(f Filter) (database.Filter[domain.TeamField], error) {
-	field, err := teamField(f.Field)
-	if err != nil {
-		return nil, err
+	switch f.Field {
+	case teamFieldCreatedAt:
+		raw, ok := f.Value.(string)
+		if !ok {
+			return nil, domain.ErrRequestInvalid().WithDetails("createdAt filter value must be an RFC3339 string")
+		}
+		// The createdAt filter value arrives as an untyped string (the filter-value union in the openapi contract
+		// does not specify a format for a timestamp); parse it into the time.Time needed for the comparison.
+		value, err := database.CoerceTimeValue(raw)
+		if err != nil {
+			return nil, domain.ErrRequestInvalid().WithDetails(
+				fmt.Sprintf("createdAt filter value %q is not a valid RFC3339 timestamp", raw))
+		}
+		return compareFilter(f.Operation, database.Col(domain.TeamFieldCreatedAt), value)
+	case teamFieldName:
+		value, ok := f.Value.(string)
+		if !ok {
+			return nil, domain.ErrRequestInvalid().WithDetails("name filter value must be a string")
+		}
+		return stringFilter(f.Operation, database.Col(domain.TeamFieldName), value)
+	case teamFieldStatus:
+		value, ok := f.Value.(string)
+		if !ok {
+			return nil, domain.ErrRequestInvalid().WithDetails("status filter value must be a string")
+		}
+		return teamStatusFilter(f.Operation, value)
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", f.Field))
 	}
-	return createdAtFilter(f.Operation, database.Col(field), f.Value)
+}
+
+// teamStatusFilter filters on the team's two status values.
+func teamStatusFilter(op, status string) (database.Filter[domain.TeamField], error) {
+	switch op {
+	case filterOpEquals:
+	case filterOpNotEquals:
+		// todo (grvijayan): update when the operation is supported
+		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
+	case filterOpContains, filterOpNotContains, filterOpLessThan, filterOpGreaterThan, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for this field", op))
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown operation %q", op))
+	}
+
+	switch status {
+	case domain.TeamStatusActive.String(), domain.TeamStatusDeactivated.String():
+		return database.Equal(database.Col(domain.TeamFieldStatus), status), nil
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown status %q", status))
+	}
 }
 
 // teamField maps an API field name to its [domain.TeamField].
@@ -147,6 +196,10 @@ func teamField(field string) (domain.TeamField, error) {
 	switch field {
 	case teamFieldCreatedAt:
 		return domain.TeamFieldCreatedAt, nil
+	case teamFieldName:
+		return domain.TeamFieldName, nil
+	case teamFieldStatus:
+		return domain.TeamFieldStatus, nil
 	default:
 		return domain.TeamFieldUnspecified, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", field))
 	}

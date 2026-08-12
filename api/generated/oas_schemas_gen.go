@@ -22438,17 +22438,22 @@ type SubmitFlowStepOK FlowResponseHeaders
 
 func (*SubmitFlowStepOK) submitFlowStepRes() {}
 
+// Field to filter or sort teams by.
 // Ref: #
 type TeamFilterField string
 
 const (
 	TeamFilterFieldCreatedAt TeamFilterField = "created_at"
+	TeamFilterFieldName      TeamFilterField = "name"
+	TeamFilterFieldStatus    TeamFilterField = "status"
 )
 
 // AllValues returns all TeamFilterField values.
 func (TeamFilterField) AllValues() []TeamFilterField {
 	return []TeamFilterField{
 		TeamFilterFieldCreatedAt,
+		TeamFilterFieldName,
+		TeamFilterFieldStatus,
 	}
 }
 
@@ -22456,6 +22461,10 @@ func (TeamFilterField) AllValues() []TeamFilterField {
 func (s TeamFilterField) MarshalText() ([]byte, error) {
 	switch s {
 	case TeamFilterFieldCreatedAt:
+		return []byte(s), nil
+	case TeamFilterFieldName:
+		return []byte(s), nil
+	case TeamFilterFieldStatus:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -22467,6 +22476,12 @@ func (s *TeamFilterField) UnmarshalText(data []byte) error {
 	switch TeamFilterField(data) {
 	case TeamFilterFieldCreatedAt:
 		*s = TeamFilterFieldCreatedAt
+		return nil
+	case TeamFilterFieldName:
+		*s = TeamFilterFieldName
+		return nil
+	case TeamFilterFieldStatus:
+		*s = TeamFilterFieldStatus
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
