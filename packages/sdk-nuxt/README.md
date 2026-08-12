@@ -1,6 +1,6 @@
 # @zitadel/sdk-nuxt
 
-Nuxt middleware and helpers for Nextgen Auth.
+Nuxt module, Nitro middleware, and helpers for Nextgen Auth.
 
 ## Installation
 
@@ -8,11 +8,108 @@ Nuxt middleware and helpers for Nextgen Auth.
 pnpm add @zitadel/sdk-nuxt
 ```
 
-## Setup
+There are two ways to wire the SDK. **The module is what `zitadel setup`
+scaffolds** and the recommended path; the direct-middleware surface remains
+for hand-rolled setups.
 
-### 1. Server middleware
+## Surface 1 — the Nuxt module (recommended, CLI-scaffolded)
 
-Create `server/middleware/auth.ts`:
+Register the module under the `nextgen` config key:
+
+```ts
+export default defineNuxtConfig({
+  modules: ['@zitadel/sdk-nuxt/module'],
+  nextgen: {
+    url: process.env.ZITADEL_URL ?? 'http://localhost:8080',
+    protectedRoutes: ['/admin', '/dashboard*'],
+    loginPath: '/login',
+  },
+});
+```
+
+The module registers the Nitro server middleware, the auth plugin (which
+seeds server-side auth state and hydrates it on the client), and
+auto-imports the composables — no `server/middleware/auth.ts`, no manual
+plugin.
+
+### Module options (what the module actually forwards)
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `url` | `string` | `ZITADEL_URL` env, else `http://localhost:8080` | Full URL of the Zitadel auth backend |
+| `proxyPath` | `string` | `"/__nextgen"` | Path prefix proxied to the auth backend (also exposed to the client plugin) |
+| `protectedRoutes` | `string[]` | `[]` | Paths requiring a valid session. Trailing `*` matches sub-paths |
+| `loginPath` | `string` | `"/login"` | Where to redirect unauthenticated users |
+
+The module's registered handler forwards only the options above. The
+fine-tuning options of the direct-middleware surface (`ignoredRoutes`,
+`allowedAlgorithms`, `allowedTokenTypes`, `clockSkewMs`, `jwksTimeoutMs`,
+`opaqueTokenTimeoutMs`, `proxyTimeoutMs`, `audience`) are **not currently
+forwarded by the module** — if you need them, use Surface 2. The module also
+loads the server-only project secret into runtime config
+(override at deploy time via `NUXT_NEXTGEN_PROJECT_SECRET`).
+
+### Reading auth state
+
+`useAuth()` is auto-imported:
+
+```vue
+<script setup lang="ts">
+const auth = useAuth();
+</script>
+
+<template>
+  <p>{{ auth.isAuthenticated ? auth.session.email : 'Not signed in' }}</p>
+</template>
+```
+
+The returned state intentionally omits the raw JWT — use `getAuth(event)` in
+a server route when you need the token to call upstream APIs:
+
+```ts
+import { getAuth } from '@zitadel/sdk-nuxt/server';
+
+export default defineEventHandler((event) => {
+  const auth = getAuth(event);
+  if (!auth.isAuthenticated) throw createError({ statusCode: 401 });
+  return { userId: auth.session.userId };
+});
+```
+
+### Login page
+
+Register the shared components in a client-only plugin
+(`plugins/zitadel-components.client.ts` — do **not** import
+`@zitadel/components` from page `<script setup>`, that runs during SSR):
+
+```ts
+import "@zitadel/components";
+
+export default defineNuxtPlugin(() => {});
+```
+
+Then render `<zitadel-login>` inside `<ClientOnly>`, binding the project
+handle from the auto-imported `useZitadelProject()` composable — there is no
+`api-base` attribute:
+
+```vue
+<script setup lang="ts">
+const project = useZitadelProject();
+</script>
+
+<template>
+  <main>
+    <ClientOnly>
+      <zitadel-login :project="project" post-sign-in-url="/admin" />
+    </ClientOnly>
+  </main>
+</template>
+```
+
+## Surface 2 — direct middleware (hand-rolled)
+
+Create `server/middleware/auth.ts` yourself when you need the full option
+set:
 
 ```ts
 import { createNextgenMiddleware } from '@zitadel/sdk-nuxt/server';
@@ -32,92 +129,7 @@ The middleware runs on every request and does three things in one pass:
 2. **Verifies** the session JWT via JWKS using the Web Crypto API
 3. **Redirects** unauthenticated requests to `loginPath` for protected routes
 
-Add the issuer URL to `nuxt.config.ts`:
-
-```ts
-export default defineNuxtConfig({
-  runtimeConfig: {
-    nextgen: {
-      url: process.env.ZITADEL_URL ?? 'http://localhost:4000',
-    },
-  },
-});
-```
-
-### 2. Plugin
-
-Create `plugins/auth.server.ts` to make auth state available in pages:
-
-```ts
-import { defineNuxtPlugin, useRequestEvent, useState } from '#imports';
-
-export default defineNuxtPlugin(() => {
-  const event = useRequestEvent();
-  const auth = event?.context.nextgenAuth ?? {
-    isAuthenticated: false as const,
-    session: null,
-  };
-  useState('nextgen-auth', () => auth);
-});
-```
-
-### 3. Reading auth in a page
-
-```vue
-<script setup lang="ts">
-const auth = useState('nextgen-auth');
-if (auth.value?.isAuthenticated) {
-  await navigateTo('/admin');
-}
-</script>
-
-<template>
-  <p>{{ auth.isAuthenticated ? auth.session.email : 'Not signed in' }}</p>
-</template>
-```
-
-### 4. Register components (client only)
-
-Create `plugins/zitadel-components.client.ts` — do **not** import
-`@zitadel/components` from page `<script setup>` (that runs during SSR):
-
-```ts
-import "@zitadel/components";
-
-export default defineNuxtPlugin(() => {});
-```
-
-Set `body { margin: 0; font-family: sans-serif; }` in `app.vue` (see
-[`apps/demo-nuxt`](../../apps/demo-nuxt/README.md)). Arimo loads from
-`branding.font_url` inside `<zitadel-login>` when the mock/API supplies it.
-
-### 5. Login page
-
-Render `<zitadel-login>` inside `<ClientOnly>`:
-
-```vue
-<template>
-  <main>
-    <ClientOnly>
-      <zitadel-login api-base="/__nextgen" project-id="demo" post-sign-in-url="/admin" />
-    </ClientOnly>
-  </main>
-</template>
-```
-
-### 6. Reading auth in a server route
-
-```ts
-import { getAuth } from '@zitadel/sdk-nuxt/server';
-
-export default defineEventHandler((event) => {
-  const auth = getAuth(event);
-  if (!auth.isAuthenticated) throw createError({ statusCode: 401 });
-  return { userId: auth.session.userId };
-});
-```
-
-## Middleware options
+### Direct-middleware options
 
 | Option              | Type                 | Default                  | Description                                                                                                                |
 | ------------------- | -------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
@@ -130,17 +142,13 @@ export default defineEventHandler((event) => {
 | `allowedTokenTypes` | `string[]`           | `["JWT", "at+JWT"]`      | Accepted `typ` header values (case-insensitive). Set to `[]` to disable this check                                         |
 | `clockSkewMs`       | `number`             | `5000`                   | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                                                                         |
 | `jwksTimeoutMs`     | `number`             | `5000`                   | Timeout in ms for JWKS endpoint requests. Token is rejected if the fetch exceeds this window                               |
+| `opaqueTokenTimeoutMs` | `number`          | `5000`                   | Timeout in ms for opaque (non-JWT) session validation via `GET /sessions/me`                                               |
+| `proxyTimeoutMs`    | `number`             | `5000`                   | Timeout in ms for upstream proxy requests; requests exceeding it abort with a network error                                |
 | `audience`          | `string \| string[]` | not validated            | Expected `aud` claim value(s). When omitted, audience is not checked                                                       |
 
 ## How JWT verification works
 
-1. Bearer token from `Authorization` header is checked first; `__nextgen_session` cookie is the fallback
-2. The JWT header is decoded to extract `kid` and `alg`
-3. Tokens with an `alg` not in `allowedAlgorithms` (`RS256`, `ES256` by default) are rejected immediately — no JWKS fetch
-4. Tokens with a `typ` not in `allowedTokenTypes` are rejected immediately
-5. The public key is fetched from `{url}/auth/keys` (JWKS) using the Web Crypto API, with a 5 s timeout, and cached for 5 minutes per `kid`
-6. The signature is verified **before** any claim checks
-7. `iss` must be present and must equal `url` — tokens without an issuer are rejected
-8. `exp` must be present and must be in the future (with `clockSkewMs` tolerance) — tokens without an expiry are rejected
-9. `nbf` and `iat` are validated with `clockSkewMs` tolerance when present
-10. The `x-nextgen-auth-token` header is stripped from all proxied requests to prevent internal state leakage
+The verification pipeline is shared across SDKs and documented once in
+[`@zitadel/sdk-core`](https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#how-jwt-verification-works).
+On top of it, the Nitro middleware strips the `x-nextgen-auth-token` header
+from all proxied requests to prevent internal state leakage.

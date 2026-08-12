@@ -204,18 +204,18 @@ export default async function LoginPage() {
 // app/login/widget.tsx (client)
 'use client';
 import dynamic from 'next/dynamic';
+import { configureZitadel } from '@zitadel/api/config';
+
+const project = configureZitadel({
+  projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID!,
+  proxyPath: '/__nextgen',
+});
 
 const ZitadelLogin = dynamic(
   async () => {
     await import('@zitadel/components');
     return function ZitadelLoginElement() {
-      return (
-        <zitadel-login
-          api-base="/__nextgen"
-          project-id="demo"
-          post-sign-in-url="/admin"
-        />
-      );
+      return <zitadel-login post-sign-in-url="/admin" />;
     };
   },
   { ssr: false },
@@ -225,6 +225,10 @@ export function LoginWidget() {
   return <ZitadelLogin />;
 }
 ```
+
+There is no `api-base` attribute — the element reads the global handle from
+`configureZitadel()` (or you can assign the returned handle to the element's
+`project` property).
 
 ## Middleware options
 
@@ -240,18 +244,15 @@ export function LoginWidget() {
 | `clockSkewMs`       | `number`             | `5000`                   | Clock skew tolerance in ms for `exp`, `nbf`, `iat`                                                                         |
 | `jwksTimeoutMs`     | `number`             | `5000`                   | Timeout in ms for JWKS endpoint requests. Token is rejected if the fetch exceeds this window                               |
 | `opaqueTokenTimeoutMs` | `number`          | `5000`                   | Timeout in ms for opaque (non-JWT) session validation via `GET /sessions/me`. Also accepted by `auth()`                    |
+| `proxyTimeoutMs`    | `number`             | `5000`                   | Timeout in ms for upstream proxy requests; requests exceeding it abort with a network error                                |
+| `jwtKey`            | `string`             | unset                    | Reserved for future use — local PEM public key for offline JWT verification                                                |
 | `audience`          | `string \| string[]` | not validated            | Expected `aud` claim value(s). When omitted, audience is not checked                                                       |
 
 ## How JWT verification works
 
-1. Bearer token from `Authorization` header is checked first; `__nextgen_session` cookie is the fallback
-2. The JWT header is decoded to extract `kid` and `alg`
-3. Tokens with an `alg` not in `allowedAlgorithms` (`RS256`, `ES256` by default) are rejected immediately — no JWKS fetch
-4. Tokens with a `typ` not in `allowedTokenTypes` are rejected immediately
-5. The public key is fetched from `{url}/auth/keys` (JWKS) using the Web Crypto API, with a 5 s timeout, and cached for 5 minutes per `kid`
-6. The signature is verified **before** any claim checks
-7. `iss` must be present and must equal `url` — tokens without an issuer are rejected
-8. `exp` must be present and must be in the future (with `clockSkewMs` tolerance) — tokens without an expiry are rejected
-9. `nbf` and `iat` are validated with `clockSkewMs` tolerance when present
-10. The `x-nextgen-auth-token` header is stripped from all proxied requests to prevent internal state leakage
-11. `auth()` re-applies the same verification to the tunnelled token in the server runtime — the header alone is never treated as proof of a session
+The verification pipeline is shared across SDKs and documented once in
+[`@zitadel/sdk-core`](https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#how-jwt-verification-works).
+On top of that pipeline, the Next.js middleware adds:
+
+1. The `x-nextgen-auth-token` header is stripped from all proxied requests to prevent internal state leakage
+2. `auth()` re-applies the same verification to the tunnelled token in the server runtime — the header alone is never treated as proof of a session

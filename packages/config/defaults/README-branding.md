@@ -38,7 +38,7 @@ by re-applying an earlier template.
 - The split chrome is tunable from your template root's `style` attribute
   (`--zl-split-columns`, `--zl-split-align`, `--zl-split-brand-mobile`), and
   `zl-split--right` on the wrapper mirrors the panes. Knob reference:
-  `docs/design/branding/templates.md` in the Zitadel repo.
+  [`docs/design/branding/templates.md`](https://github.com/zitadel/nextgen/blob/main/docs/design/branding/templates.md).
 - The "Secured with Zitadel" attribution is licence-gated and on by default.
 - Back-navigation: the engine injects a `kind: "back"` action on steps
   that can return to their predecessor, and the browser's back gesture
