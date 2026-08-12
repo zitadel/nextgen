@@ -26,8 +26,7 @@ var tenantUserSchema = []byte(`{
   ],
   "x-auth-methods": {
     "password": {
-      "enabled": true,
-      "position": 0
+      "enabled": true
     }
   },
   "properties": {

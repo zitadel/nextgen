@@ -90,7 +90,7 @@ describe("normalizeSchemaBody", () => {
     const body = {
       $id: "https://example.test/schemas/human.json",
       objectType: "human-user",
-      "x-auth-methods": { password: { enabled: true, position: 1 } },
+      "x-auth-methods": { password: { enabled: true } },
       required: ["email"],
       properties: { email: { type: "string" } },
     };

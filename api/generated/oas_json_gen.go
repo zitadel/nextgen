@@ -2209,15 +2209,10 @@ func (s *AuthMethod) encodeFields(e *jx.Encoder) {
 		e.FieldStart("enabled")
 		e.Bool(s.Enabled)
 	}
-	{
-		e.FieldStart("position")
-		e.Int(s.Position)
-	}
 }
 
-var jsonFieldsNameOfAuthMethod = [2]string{
+var jsonFieldsNameOfAuthMethod = [1]string{
 	0: "enabled",
-	1: "position",
 }
 
 // Decode decodes AuthMethod from json.
@@ -2241,20 +2236,8 @@ func (s *AuthMethod) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"enabled\"")
 			}
-		case "position":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Int()
-				s.Position = int(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"position\"")
-			}
 		default:
-			return d.Skip()
+			return errors.Errorf("unexpected field %q", k)
 		}
 		return nil
 	}); err != nil {
@@ -2263,7 +2246,7 @@ func (s *AuthMethod) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -31248,6 +31231,22 @@ func (s QuerySessionsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjMissingIDQuerySessionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.missing_id")
+		{
+			s := s.ProjMissingID
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidQuerySessionsErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -31331,6 +31330,9 @@ func (s *QuerySessionsErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedQuerySessionsErrorResponse
 					found = true
+				case "proj.missing_id":
+					s.Type = ProjMissingIDQuerySessionsErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidQuerySessionsErrorResponse
 					found = true
@@ -31364,6 +31366,10 @@ func (s *QuerySessionsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedQuerySessionsErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ProjMissingIDQuerySessionsErrorResponse:
+		if err := s.ProjMissingID.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidQuerySessionsErrorResponse:

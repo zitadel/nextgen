@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -24,6 +25,31 @@ func (h *Harness) EnsureUserService(t *testing.T) service.UserService {
 		)
 	}
 	return h.userService.value
+}
+
+// CreateUserWithTeam seeds a builtin-schema user in a team of its own and returns
+// its id. The id and email are randomized, so repeated calls in one project
+// stay unique.
+func (h *Harness) CreateUserWithTeam(t *testing.T, projectID string) string {
+	t.Helper()
+
+	team, err := h.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+		ProjectID: projectID,
+		Name:      TeamName(),
+	})
+	require.NoError(t, err)
+
+	userID := "user_" + RandString(8)
+	emailAttr, err := domain.NewCreateAttribute("email", RandString(8)+"@example.com", domain.AttributeUniquenessProject)
+	require.NoError(t, err)
+	require.NoError(t, h.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
+		ProjectID:               projectID,
+		SchemaURL:               apischemas.DefaultHumanUserSchemaURL(BuiltinSchemaBaseURL),
+		ID:                      userID,
+		InitialMembershipTeamID: &team.ID,
+		Attributes:              domain.CreateAttributes{*emailAttr},
+	}))
+	return userID
 }
 
 // UserFixture exposes UserStatements helpers for integration tests.
