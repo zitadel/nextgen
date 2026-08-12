@@ -112,7 +112,7 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 	opts := flowdefinition.EnsureListOptions(filter)
 
 	var compiler statementCompiler
-	if err := compileRead(&compiler, flowDefinitionQuery, opts, flowdefinition.Schema); err != nil {
+	if err := compileList(ctx, &compiler, flowDefinitionQuery, opts, flowdefinition.Schema, "flow_definitions", "id"); err != nil {
 		return nil, err
 	}
 	rows, err := f.client.Query(ctx, compiler.String(), compiler.args...)

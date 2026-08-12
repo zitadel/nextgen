@@ -46,6 +46,10 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opRead); err != nil {
 		return nil, err
 	}
+	ctx, err := h.withAuthzListFilter(ctx, string(params.ProjectID), domain.ResourceKindFlowDefinition, opRead)
+	if err != nil {
+		return nil, err
+	}
 	svcReq := mapListRequestToService(params)
 
 	listed, err := h.flowDefinitionService.List(ctx, svcReq)

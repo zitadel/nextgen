@@ -115,7 +115,7 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 	opts := flowdefinition.EnsureListOptions(filter)
 
 	var compiler statementCompiler
-	err := compileRead(&compiler, flowDefinitionQuery, opts, flowdefinition.Schema)
+	err := compileList(ctx, &compiler, flowDefinitionQuery, opts, flowdefinition.Schema, "zitadel_nextgen.flow_definitions", "id")
 	if err != nil {
 		return nil, err
 	}

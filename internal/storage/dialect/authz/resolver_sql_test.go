@@ -22,7 +22,7 @@ func (r *recordingWriter) WriteArg(arg any) {
 	r.b.WriteString("?")
 }
 
-func testEnv() authz.Env {
+func testEnv(r *recordingWriter) authz.Env {
 	return authz.Env{
 		Schema: "zitadel_nextgen.",
 		Now:    func(w authz.ArgWriter) { w.WriteString("NOW_SENTINEL") },
@@ -41,7 +41,7 @@ func TestWriteCheckAndListShareFullTTU(t *testing.T) {
 	}
 
 	var check recordingWriter
-	authz.WriteCheckAuthz(&check, testEnv(), params)
+	authz.WriteCheckAuthz(&check, testEnv(&check), params)
 	sql := check.b.String()
 	require.Contains(t, sql, "tuple_to_userset")
 	assert.Contains(t, sql, "a.scope_kind = 'team' AND a.scope_team_id = ts.principal_id")
@@ -50,17 +50,27 @@ func TestWriteCheckAndListShareFullTTU(t *testing.T) {
 	assert.Contains(t, sql, "NOW_SENTINEL")
 	assert.Contains(t, sql, "zitadel_nextgen.authz_assignments")
 
-	var list recordingWriter
-	authz.WriteListAuthzObjectIDs(&list, testEnv(), domain.AuthzListObjectsParams{
+	listParams := domain.AuthzListObjectsParams{
 		AuthzCheckParams: params,
 		ResourceKind:     domain.ResourceKindUser,
-	})
+	}
+	var list recordingWriter
+	authz.WriteListAuthzObjectIDs(&list, testEnv(&list), listParams)
 	listSQL := list.b.String()
 	require.Contains(t, listSQL, "tuple_to_userset")
 	assert.Contains(t, listSQL, "a.scope_kind = 'team' AND a.scope_team_id = ts.principal_id")
 	assert.Contains(t, listSQL, "a.scope_kind = 'resource' AND a.scope_resource_id = ts.principal_id")
 	assert.Contains(t, listSQL, "ts.principal_type = edge.source_object_type")
 	assert.Contains(t, listSQL, "NOW_SENTINEL")
+
+	var exists recordingWriter
+	authz.WriteListAuthzExistsPredicate(&exists, testEnv(&exists), "zitadel_nextgen.users.id", listParams)
+	existsSQL := exists.b.String()
+	require.Contains(t, existsSQL, "EXISTS (")
+	assert.Contains(t, existsSQL, "r.resource_id = zitadel_nextgen.users.id")
+	assert.Contains(t, existsSQL, "tuple_to_userset")
+	assert.Contains(t, existsSQL, "a.scope_kind = 'team' AND a.scope_team_id = ts.principal_id")
+	assert.Contains(t, existsSQL, "a.scope_kind = 'resource' AND a.scope_resource_id = ts.principal_id")
 }
 
 func TestWriteCheckAuthzBindOrder(t *testing.T) {
@@ -75,7 +85,7 @@ func TestWriteCheckAuthzBindOrder(t *testing.T) {
 		Relation:               "viewer",
 	}
 	var w recordingWriter
-	authz.WriteCheckAuthz(&w, testEnv(), params)
+	authz.WriteCheckAuthz(&w, testEnv(&w), params)
 	require.NotEmpty(t, w.args)
 	assert.Equal(t, "project", w.args[0])
 	assert.Equal(t, "viewer", w.args[1])
@@ -89,7 +99,7 @@ func TestWriteCheckAuthzBindOrder(t *testing.T) {
 func TestWriteActiveSystemCatalogID(t *testing.T) {
 	t.Parallel()
 	var w recordingWriter
-	authz.WriteActiveSystemCatalogID(&w, testEnv())
+	authz.WriteActiveSystemCatalogID(&w, testEnv(&w))
 	assert.Equal(t, []any{
 		domain.AuthzCatalogKindSystem.String(),
 		domain.SystemCatalogOwnerID,
@@ -101,7 +111,7 @@ func TestWriteActiveSystemCatalogID(t *testing.T) {
 func TestWriteHasAuthzProjectFoothold(t *testing.T) {
 	t.Parallel()
 	var w recordingWriter
-	authz.WriteHasAuthzProjectFoothold(&w, testEnv(), "proj_1", domain.AuthzPrincipalTypeUser, "user_a")
+	authz.WriteHasAuthzProjectFoothold(&w, testEnv(&w), "proj_1", domain.AuthzPrincipalTypeUser, "user_a")
 	assert.Contains(t, w.b.String(), "NOW_SENTINEL")
 	assert.Contains(t, w.args, "proj_1")
 	assert.Contains(t, w.args, "user_a")

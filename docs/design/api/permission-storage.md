@@ -25,8 +25,14 @@ Wave 3 (#423). In-project HTTP management wiring (resolver gate + D10
 remains later (**D11**). RSI dual-write covers schema / branding /
 flow_definition / session path ids in addition to project / team / user.
 Path-id management handlers resolve RSI before Check (flat-by-id; no
-required query `project_id`). Fine-grained catalog relations (#420) and
-SQL list-predicate injection remain follow-ups.
+required query `project_id`). Management list endpoints inject an authz
+EXISTS predicate (same assignment/closure branches as `ListObjects`) into
+the resource SELECT **after** a successful **project-level** Check. That
+enforces RSI-backed visibility / TOCTOU for principals that already passed
+the gate; **team-scoped HTTP list narrowing is not live yet** (SQL +
+stmttest are the substrate — see #834). Fine-grained catalog relations
+(#420) remain a follow-up; `QuerySessions` list predicate waits on
+`sessionService.List`.
 
 ### Wave 1 vs OpenFGA compiler (#421 / PR #720)
 
@@ -77,9 +83,12 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
   (token `team_id` + outside-team deny suite) is deferred —
   [#831](https://github.com/zitadel/nextgen/issues/831). In-project
   management handlers call `resolver.Check` (coarse
-  `project.{viewer,editor,admin}` until #420) after credential resolution;
-  list endpoints Check then keep `project_id`-scoped queries. ADR 033 list
-  **predicate injection** into resource queries remains later.
+  `project.{viewer,editor,admin}` until #420) after credential resolution.
+  Management list endpoints inject an authz EXISTS **predicate** (same
+  assignment/closure branches as `ListObjects`) via `service.AuthzListFilter`
+  after a successful **project-level** Check (RSI-backed visibility / TOCTOU;
+  team-scoped HTTP narrowing deferred — #834); `QuerySessions` waits on
+  `sessionService.List`.
 
 ## Locked decisions
 
@@ -602,9 +611,9 @@ bundles:
 - Implementing #333 identity binding, staff tiers, or break-glass
 - Hash-partitioning `resource_scope_index` (**D12**)
 - Fine-grained system catalog relations / auto-compile (#420)
-- SQL list-predicate injection into every repository
 - Permission grants management API / product UI
 - `#333` foreign home project, Leopard (**D11**)
+- QuerySessions list predicate (deferred until `sessionService.List` exists)
 
 ## See also
 

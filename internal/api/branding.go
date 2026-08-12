@@ -45,6 +45,10 @@ func (h *Handler) ListBranding(ctx context.Context, params api.ListBrandingParam
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), brandingAccess, opRead); err != nil {
 		return nil, err
 	}
+	ctx, err := h.withAuthzListFilter(ctx, string(params.ProjectID), domain.ResourceKindBranding, opRead)
+	if err != nil {
+		return nil, err
+	}
 	brandings, err := h.brandingService.List(ctx, string(params.ProjectID))
 	if err != nil {
 		return nil, err

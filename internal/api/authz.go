@@ -14,7 +14,8 @@ import (
 // project queries, branding, operator sessions) is gated by resolver.Check after
 // credential → ScopeContext. Path-id ops resolve scope via resource_scope_index
 // (requireResourceAccess) before Check; create/list keep an explicit project_id
-// and use requireProjectAccess. MVP uses coarse project.{viewer,editor,admin}
+// and use requireProjectAccess, then inject an EXISTS list predicate via
+// withAuthzListFilter. MVP uses coarse project.{viewer,editor,admin}
 // (#420 expands to fine-grained catalog relations). Preview secrets
 // (project.read only) cannot call management APIs (ADR 037).
 
@@ -299,6 +300,41 @@ func mapAuthzDecisionAfterRSI(dec resolver.Decision, res resourceAccess) error {
 	default:
 		return res.readMiss()
 	}
+}
+
+// withAuthzListFilter attaches the SQL list-predicate filter for management
+// list endpoints after requireProjectAccess has already passed.
+// PrincipalHomeProjectID comes from the credential's home project while Check
+// uses the target projectID; those are equivalent until foreign footholds
+// (#333) land.
+func (h *Handler) withAuthzListFilter(ctx context.Context, projectID string, kind domain.ResourceKind, op accessOp) (context.Context, error) {
+	scope, ok := GetScopeContext(ctx)
+	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
+		return ctx, domain.ErrInternal(nil).WithMessage("authz list filter requires credential scope")
+	}
+	if h == nil || h.pool == nil {
+		return ctx, domain.ErrInternal(errors.New("authz statements not configured"))
+	}
+	catalogID, err := h.pool.Statements().ActiveSystemCatalogID(ctx)
+	if err != nil {
+		return ctx, domain.ErrInternal(err).WithMessage("authz catalog lookup failed")
+	}
+	home := scope.ProjectID
+	if home == "" {
+		home = projectID
+	}
+	return service.WithAuthzListFilter(ctx, service.AuthzListFilter{
+		AuthzCheckParams: domain.AuthzCheckParams{
+			CatalogID:              catalogID,
+			ProjectID:              projectID,
+			PrincipalHomeProjectID: home,
+			PrincipalType:          scope.PrincipalType,
+			PrincipalID:            scope.PrincipalID,
+			ObjectType:             "project",
+			Relation:               projectRelation(op),
+		},
+		ResourceKind: kind,
+	}), nil
 }
 
 // requireTeamDelete gates deleteTeam via the team's RSI. Unknown teams are
