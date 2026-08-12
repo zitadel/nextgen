@@ -60,10 +60,11 @@ export interface WithZitadelOptions {
    * embeds the console and hosted login shells at `/ui/console/` and
    * `/ui/login/`, so there is no second server to boot and no env to hand it.
    * Only the supervisor entry is generated, and `appOrigin` must then be the
-   * instance's own origin (a suite testing the embedded surfaces has no other
-   * origin to visit). This is the only configuration that exercises the
-   * production path — under a dev server, the app's proxy rewrites API
-   * requests that the binary would serve directly.
+   * instance's own local origin — `http://localhost:<port>` (or another
+   * loopback alias); nothing else is served in this mode. This is the only
+   * configuration that exercises the production path — under a dev server,
+   * the app's proxy rewrites API requests that the binary would serve
+   * directly.
    */
   app?: {
     /** Spawn argv (no shell), e.g. ["corepack", "pnpm", "--filter", "my-app", "dev"]. */
@@ -134,15 +135,21 @@ export function withZitadel(
     );
   }
   if (app === undefined) {
-    // Nothing else will bind appOrigin, so a mismatched port means the suite
-    // would poll an origin no one serves — Playwright's readiness wait would
-    // pass against a stale server or hang until timeout. Hostname is free
-    // (localhost / 127.0.0.1 both reach the instance); the port is the claim.
-    const originPort = origin.port || (origin.protocol === "https:" ? "443" : "80");
-    if (originPort !== String(port)) {
+    // Nothing else will bind appOrigin in this mode: the instance is the app
+    // server, and it listens on plain HTTP at localhost:<port>. Anything
+    // else — another port, a real hostname, https — is an origin nobody
+    // serves, so Playwright's readiness wait would hang (or, worse, pass
+    // against an unrelated stale server). Loopback aliases are the only
+    // freedom; the scheme and port are the instance's.
+    const loopbackHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
+    if (
+      origin.protocol !== "http:" ||
+      !loopbackHosts.has(origin.hostname) ||
+      (origin.port || "80") !== String(port)
+    ) {
       throw new Error(
-        `withZitadel: with no \`app\`, the instance serves the app itself, so appOrigin ` +
-          `must point at the instance's own port (${port}); got "${appOrigin}".`,
+        `withZitadel: with no \`app\`, the instance itself serves the app, so appOrigin ` +
+          `must be its local origin (http://localhost:${port}); got "${appOrigin}".`,
       );
     }
   } else {

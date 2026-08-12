@@ -29,9 +29,14 @@ import { configureZitadel, getApi } from "@zitadel/api/config";
  * calls that require a `project_id` query param) and is read from a public
  * `VITE_`-prefixed env var.
  */
-/** The same-origin API base every console request targets (Console ADR 0002). */
+/**
+ * The same-origin API base every console request targets (Console ADR 0002).
+ * `||`, not `??`: the dev proxy (`vite.config.mts`) treats an empty
+ * `VITE_CONSOLE_API_BASE` as unset, so the client must too — with `??`, a
+ * present-but-empty var in a shell or CI would silently bypass the dev proxy.
+ */
 export const apiBase =
-  import.meta.env.VITE_CONSOLE_API_BASE ?? (import.meta.env.DEV ? "/api" : "");
+  import.meta.env.VITE_CONSOLE_API_BASE || (import.meta.env.DEV ? "/api" : "");
 
 /**
  * The app-wide `ZitadelProject` handle — root ADR 016: configure once,

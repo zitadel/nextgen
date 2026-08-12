@@ -237,6 +237,14 @@ jobs:
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
         run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-real
 
+      # The embedded-surface suite: the binary serves console, hosted login,
+      # and the API from one origin — the only lane exercising the production
+      # request path (no Vite proxy rewriting /api). Its own step so the two
+      # console instances run sequentially, same rationale as above.
+      - name: Run console embedded-surface suite
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-embedded
+
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}
         run: env -u CI -u GITHUB_ACTIONS moon run release:version

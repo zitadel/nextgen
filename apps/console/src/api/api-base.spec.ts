@@ -36,4 +36,14 @@ describe("apiBase", () => {
     const { apiBase } = await import("./zitadel");
     expect(apiBase).toBe("/elsewhere");
   });
+
+  it("treats an empty VITE_CONSOLE_API_BASE as unset, matching the dev proxy", async () => {
+    // The dev proxy's `env.VITE_CONSOLE_API_BASE || "/api"` treats "" as
+    // unset; a `??` here would keep "" and bypass the proxy under the dev
+    // server whenever the var is present-but-empty.
+    vi.stubEnv("DEV", true);
+    vi.stubEnv("VITE_CONSOLE_API_BASE", "");
+    const { apiBase } = await import("./zitadel");
+    expect(apiBase).toBe("/api");
+  });
 });

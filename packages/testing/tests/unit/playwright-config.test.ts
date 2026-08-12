@@ -176,14 +176,27 @@ describe("withZitadel", () => {
     it("rejects an appOrigin nothing will serve", () => {
       // Left at the app-server origin by mistake: with no app entry, Playwright
       // would poll :3002 forever (or, worse, hit a stale server there).
-      expect(() => withZitadel({ ...embedded(), appOrigin: "http://localhost:3002" }, fakeResolve))
-        .toThrow(/appOrigin must point at the instance's own port \(8092\)/);
+      expect(() =>
+        withZitadel({ ...embedded(), appOrigin: "http://localhost:3002" }, fakeResolve),
+      ).toThrow(/appOrigin must be its local origin \(http:\/\/localhost:8092\)/);
+      // The instance serves plain HTTP on loopback only — a real hostname or
+      // https origin is equally unserved, whatever its port says.
+      expect(() =>
+        withZitadel({ ...embedded(), appOrigin: "https://example.invalid:8092" }, fakeResolve),
+      ).toThrow(/appOrigin must be its local origin/);
+      expect(() =>
+        withZitadel({ ...embedded(), appOrigin: "http://ci-runner.internal:8092" }, fakeResolve),
+      ).toThrow(/appOrigin must be its local origin/);
     });
 
-    it("accepts any hostname that reaches the instance's port", () => {
-      expect(() =>
-        withZitadel({ ...embedded(), appOrigin: "http://127.0.0.1:8092" }, fakeResolve),
-      ).not.toThrow();
+    it("accepts the loopback aliases on the instance's port", () => {
+      for (const appOrigin of [
+        "http://localhost:8092",
+        "http://127.0.0.1:8092",
+        "http://[::1]:8092",
+      ]) {
+        expect(() => withZitadel({ ...embedded(), appOrigin }, fakeResolve)).not.toThrow();
+      }
     });
   });
 
