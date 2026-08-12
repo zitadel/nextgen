@@ -116,7 +116,7 @@ From the configuration surface, flow engine, and branding. Long-form in [`platfo
 
 ## 7. URL shape
 
-**LOCKED: no version segment in paths.** All endpoints live directly under the root (`POST /users`, `GET /teams/{id}`). Versioning is header-selected via `Zitadel-Version: 2026-04-21`, pinned per API key and per webhook endpoint. See [`api/conventions.md`](api/conventions.md#versioning).
+**LOCKED: no version segment in paths.** All endpoints live directly under the root (`POST /users`, `GET /teams/{id}`). Header-selected versioning (`Zitadel-Version`, pinned per API key and per webhook endpoint) is target design — the shipped API is unversioned; breaking changes ride the alpha release train. See [`api/conventions.md`](api/conventions.md#direction-not-shipped).
 
 ---
 

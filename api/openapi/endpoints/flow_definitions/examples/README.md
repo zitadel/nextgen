@@ -26,9 +26,13 @@ For the shape and validation rules, see
 The server's embedded default project flow is
 `packages/config/defaults/default-login.json` (via `embed.go`) — that file is
 the authority for the default flow's shape. The
-`default-login-flow-definition.json` at the root of this folder is a
-historical copy kept for reference; it mirrors example 06 but uses terminal
-`show`, and it does not gate anything.
+`default-login-flow-definition.json` at the root of this folder is a separate
+copy that `POST /flow_definitions` still publishes as its `defaultLoginFlow`
+OpenAPI example (`externalValue` in `../methods.yaml`); it mirrors example 06
+but uses terminal `show`, differs from the embedded default, and — unlike the
+numbered examples — is not covered by `TestExampleFlowDefinitions`, so treat
+it as illustrative only. Repointing the OpenAPI example at the authoritative
+default (or bringing this copy under the test) is a tracked follow-up.
 
 ## Reading a definition
 

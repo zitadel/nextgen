@@ -19,7 +19,7 @@ sequenceDiagram
     participant DB as Storage dialect sessions
 
     Note over Browser,DB: Login Flow
-    Browser->>Server: POST /flows (purpose: login)
+    Browser->>Server: POST /flow (purpose: login)
     Server->>DB: Create session (factors: {})
     Server-->>Browser: session_id + Set-Cookie: flow=enc_1
     Browser->>Server: submit identifier (Cookie: flow=enc_1)
@@ -34,7 +34,7 @@ sequenceDiagram
     Note over Browser,DB: Session active at AAL2. Time passes...
 
     Note over Browser,DB: Step-Up Flow (AAL3 requested)
-    Browser->>Server: POST /flows (purpose: reauth)
+    Browser->>Server: POST /flow (purpose: reauth)
     Note right of Server: Reads existing session from DB
     Server-->>Browser: session_id + Set-Cookie: flow=enc_a
     Browser->>Server: submit passkey (Cookie: flow=enc_a)
@@ -44,7 +44,7 @@ sequenceDiagram
     Note over Browser,DB: Session now at AAL3
 
     Note over Browser,DB: Profiling Flow (policy requires phone)
-    Browser->>Server: POST /flows (purpose: profiling)
+    Browser->>Server: POST /flow (purpose: profiling)
     Server-->>Browser: session_id + Set-Cookie: flow=enc_x
     Browser->>Server: submit phone number (Cookie: flow=enc_x)
     Server->>DB: Update user profile
@@ -162,7 +162,7 @@ For flow-only transitions (advancing steps without touching the session), there'
 
 | Operation | DB read | DB write |
 |---|---|---|
-| Start flow (`POST /flows`) | Read session (if reauth/step-up) or create session | Create session (login/register) |
+| Start flow (`POST /flow`) | Read session (if reauth/step-up) or create session | Create session (login/register) |
 | Advance step (no factor change) | None | None |
 | Pivot to different purpose | None | None |
 | Submit identifier (resolve user) | Read user | None |

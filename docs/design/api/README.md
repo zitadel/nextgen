@@ -4,7 +4,7 @@
 
 ## Thesis
 
-One surface: `api.zitadel.cloud/*`. Stripe-shaped, Vercel-shaped. No frontend/backend/platform product split. One bearer-token auth model. Self-hosted exposes the identical API shape as cloud — the SDK does not branch on deployment mode. Versioning lives in the `Zitadel-Version` header, not in the URL.
+One surface: `api.zitadel.cloud/*`. Stripe-shaped, Vercel-shaped. No frontend/backend/platform product split. One bearer-token auth model. Self-hosted exposes the identical API shape as cloud — the SDK does not branch on deployment mode. No version segment in URLs; header-selected versioning (`Zitadel-Version`) is target design, not shipped ([`conventions.md`](conventions.md#direction-not-shipped)).
 
 Target properties:
 

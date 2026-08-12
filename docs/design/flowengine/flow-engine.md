@@ -126,9 +126,9 @@ Transitions with `"action": "pivot"` push a new flow onto the stack. Transitions
   "name": "login",
   "fields": ["email", "password"],
   "actions": [
-    {"name": "submit", "primary": true},
-    {"name": "register"},
-    {"name": "recover"}
+    {"name": "submit", "kind": "submit", "primary": true},
+    {"name": "register", "kind": "navigate"},
+    {"name": "recover", "kind": "navigate"}
   ],
   "transitions": {
     "submit": { "target": "done" },
@@ -168,9 +168,9 @@ See [Flow Engine — Storage](flow-engine-storage.md) for the encrypted cookie m
       "name": "login",
       "fields": ["email", "password"],
       "actions": [
-        {"name": "submit", "primary": true},
-        {"name": "register"},
-        {"name": "recover"}
+        {"name": "submit", "kind": "submit", "primary": true},
+        {"name": "register", "kind": "navigate"},
+        {"name": "recover", "kind": "navigate"}
       ],
       "transitions": {
         "submit": { "target": "done" },
@@ -192,18 +192,19 @@ POST /flow
 ```json
 ← 201
 {
+  "id": "flow_1",
   "session_id": "sess_1",
   "session_token": "tok_1",
   "step": {
     "name": "login",
-    "fields": {
-      "email": { "type": "email", "text_key": "login.field.email", "required": true },
-      "password": { "type": "password", "text_key": "login.field.password", "required": true }
-    },
+    "fields": [
+      {"name": "email", "kind": "navigate", "type": "email", "text_key": "login.field.email", "required": true},
+      {"name": "password", "kind": "navigate", "type": "password", "text_key": "login.field.password", "required": true}
+    ],
     "actions": [
-      {"name": "submit", "text_key": "login.action.submit", "primary": true},
-      {"name": "register", "text_key": "login.action.register"},
-      {"name": "recover", "text_key": "login.action.recover"}
+      {"name": "submit", "kind": "submit", "text_key": "login.action.submit", "primary": true},
+      {"name": "register", "kind": "navigate", "text_key": "login.action.register"},
+      {"name": "recover", "kind": "navigate", "text_key": "login.action.recover"}
     ],
     "gates": {}
   }
@@ -211,12 +212,13 @@ POST /flow
 ```
 
 ```http
-POST /flow/sess_1/submit
+POST /flow/flow_1/submit
 { "session_token": "tok_1", "action": "submit", "data": { "email": "alice@acme.com", "password": "correct-horse" } }
 ```
 ```json
 ← 200  (implicit policy check: session has password factor, ACR met → complete)
 {
+  "id": "flow_1",
   "session_id": "sess_1",
   "session_token": "tok_2",
   "step": {
@@ -249,8 +251,8 @@ If the policy requires MFA, the engine would instead respond with a dynamically 
       "name": "profile",
       "fields": ["email", "given_name", "family_name"],
       "actions": [
-        {"name": "submit", "primary": true},
-        {"name": "login"}
+        {"name": "submit", "kind": "submit", "primary": true},
+        {"name": "login", "kind": "navigate"}
       ],
       "transitions": {
         "submit": { "target": "set_password" },
@@ -275,24 +277,25 @@ If the policy requires MFA, the engine would instead respond with a dynamically 
 User was on the login flow, clicked "Create account":
 
 ```http
-POST /flow/sess_1/submit
+POST /flow/flow_1/submit
 { "session_token": "tok_1", "action": "register" }
 ```
 ```json
 ← 200  (switched to registration flow, email carried over)
 {
+  "id": "flow_1",
   "session_id": "sess_1",
   "session_token": "tok_2",
   "step": {
     "name": "profile",
-    "fields": {
-      "email": { "type": "email", "text_key": "profile.field.email", "required": true, "value": "alice@acme.com" },
-      "given_name": { "type": "text", "text_key": "profile.field.given_name", "required": true },
-      "family_name": { "type": "text", "text_key": "profile.field.family_name", "required": true }
-    },
+    "fields": [
+      {"name": "email", "kind": "navigate", "type": "email", "text_key": "profile.field.email", "required": true, "value": "alice@acme.com"},
+      {"name": "given_name", "kind": "navigate", "type": "text", "text_key": "profile.field.given_name", "required": true},
+      {"name": "family_name", "kind": "navigate", "type": "text", "text_key": "profile.field.family_name", "required": true}
+    ],
     "actions": [
-      {"name": "submit", "text_key": "profile.action.submit", "primary": true},
-      {"name": "login", "text_key": "profile.action.login"}
+      {"name": "submit", "kind": "submit", "text_key": "profile.action.submit", "primary": true},
+      {"name": "login", "kind": "navigate", "text_key": "profile.action.login"}
     ],
     "gates": {}
   }
@@ -300,21 +303,22 @@ POST /flow/sess_1/submit
 ```
 
 ```http
-POST /flow/sess_1/submit
+POST /flow/flow_1/submit
 { "session_token": "tok_2", "action": "submit", "data": { "email": "alice@acme.com", "given_name": "Alice", "family_name": "Smith" } }
 ```
 ```json
 ← 200
 {
+  "id": "flow_1",
   "session_id": "sess_1",
   "session_token": "tok_3",
   "step": {
     "name": "set_password",
-    "fields": {
-      "password": { "type": "password", "text_key": "set_password.field.password", "required": true, "validation": { "min_length": 8 } }
-    },
+    "fields": [
+      {"name": "password", "type": "password", "text_key": "set_password.field.password", "required": true, "validation": { "min_length": 8 }}
+    ],
     "actions": [
-      {"name": "submit", "text_key": "set_password.action.submit", "primary": true}
+      {"name": "submit", "kind": "submit", "text_key": "set_password.action.submit", "primary": true}
     ],
     "gates": {}
   }
@@ -322,12 +326,13 @@ POST /flow/sess_1/submit
 ```
 
 ```http
-POST /flow/sess_1/submit
+POST /flow/flow_1/submit
 { "session_token": "tok_3", "action": "submit", "data": { "password": "strong-pass-123!" } }
 ```
 ```json
 ← 200  (create_user action runs → done)
 {
+  "id": "flow_1",
   "session_id": "sess_1",
   "session_token": "tok_4",
   "step": {
@@ -367,8 +372,8 @@ A single flow that handles both login and registration using implicit outcomes f
       "name": "signin",
       "fields": ["password"],
       "actions": [
-        {"name": "submit", "primary": true},
-        {"name": "recover"}
+        {"name": "submit", "kind": "submit", "primary": true},
+        {"name": "recover", "kind": "navigate"}
       ],
       "transitions": {
         "submit": { "target": "done" },
@@ -450,15 +455,16 @@ POST /flow
 ```json
 ← 201
 {
+  "id": "flow_2",
   "session_id": "sess_2",
   "session_token": "tok_1",
   "step": {
     "name": "login",
-    "fields": {
-      "email": { "type": "email", "text_key": "login.field.email", "required": true }
-    },
+    "fields": [
+      {"name": "email", "kind": "navigate", "type": "email", "text_key": "login.field.email", "required": true}
+    ],
     "actions": [
-      {"name": "submit", "text_key": "login.action.submit", "primary": true}
+      {"name": "submit", "kind": "submit", "text_key": "login.action.submit", "primary": true}
     ],
     "gates": {},
     "sso_providers": [
@@ -472,12 +478,13 @@ POST /flow
 User clicks "Continue with Google":
 
 ```http
-POST /flow/sess_2/submit
+POST /flow/flow_2/submit
 { "session_token": "tok_1", "action": "google" }
 ```
 ```json
 ← 200
 {
+  "id": "flow_2",
   "session_id": "sess_2",
   "session_token": "tok_2",
   "step": {
@@ -490,11 +497,12 @@ POST /flow/sess_2/submit
 Frontend navigates to `redirect_url`. After Google callback, the engine processes it and evaluates policy:
 
 ```http
-GET /flow/sess_2
+GET /flow/flow_2
 ```
 ```json
 ← 200  (SSO callback processed → implicit policy: ACR met → complete)
 {
+  "id": "flow_2",
   "session_id": "sess_2",
   "session_token": "tok_3",
   "step": {
@@ -549,23 +557,24 @@ The `gates.captcha` on the profile step means the frontend must solve a captcha 
 When a submission fails validation or proof verification, the flow does **not** advance. The same step is returned with an `error` field:
 
 ```http
-POST /flow/sess_1/submit
+POST /flow/flow_1/submit
 { "session_token": "tok_2", "action": "submit", "data": { "password": "wrong" } }
 ```
 ```json
 ← 400
 {
+  "id": "flow_1",
   "session_id": "sess_1",
   "session_token": "tok_2b",
   "step": {
     "name": "signin",
     "error": "Invalid password. 2 attempts remaining.",
-    "fields": {
-      "password": { "type": "password", "text_key": "signin.field.password", "required": true }
-    },
+    "fields": [
+      {"name": "password", "kind": "navigate", "type": "password", "text_key": "signin.field.password", "required": true}
+    ],
     "actions": [
-      {"name": "submit", "text_key": "signin.action.submit", "primary": true},
-      {"name": "recover", "text_key": "signin.action.recover"}
+      {"name": "submit", "kind": "submit", "text_key": "signin.action.submit", "primary": true},
+      {"name": "recover", "kind": "navigate", "text_key": "signin.action.recover"}
     ],
     "gates": {}
   }

@@ -9,7 +9,7 @@
 - **flow engine** — orchestrates the *UI* around those primitives: which step renders when, which screen to show next, when to branch on policy. Does not hold primitives. See [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md).
 - **sessions** — durable post-auth container produced by a completed auth_attempt. Carries accumulated factors and `assurance_levels[]`. Detail in [`../flowengine/session-api.md`](../flowengine/session-api.md).
 
-A flow runs on top of auth_attempt primitives without collapsing the resource model. A flow decides *what screen to draw*; an auth_attempt decides *what primitive to offer and what proof to accept*; a session is the durable post-auth outcome. The flow docs keep using `session_id` as the frontend handle for `/flow/*`, but that handle is not a blanket alias for `auth_attempt_id`.
+A flow runs on top of auth_attempt primitives without collapsing the resource model. A flow decides *what screen to draw*; an auth_attempt decides *what primitive to offer and what proof to accept*; a session is the durable post-auth outcome. The `/flow/{id}` handle is the flow's own `id` from the latest response — it is distinct from the stable underlying `session_id` and from `auth_attempt_id`, and it may change on pivot or pop.
 
 ## Pre-session concepts
 
@@ -182,7 +182,7 @@ sequenceDiagram
 
     Note over Browser,CustomerBackend: Start auth attempt (flow engine path)
 
-    Browser->>FlowEngine: POST /flows { project_id, challenge_nonce, session_id? }
+    Browser->>FlowEngine: POST /flow { project_id, challenge_nonce, session_id? }
     FlowEngine->>AuthAttempts: svc.Create({ project_id, challenge_nonce, session_id? })
     AuthAttempts-->>FlowEngine: { attempt_id }
     FlowEngine->>AuthAttempts: svc.IssueChallenge(attempt_id, { method: "identifier" })
@@ -321,7 +321,7 @@ sequenceDiagram
 
     Note over Browser,DB: Flow engine drives login (same as Path 1, steps omitted)
 
-    Browser->>FlowEngine: POST /flows { attempt_id }
+    Browser->>FlowEngine: POST /flow { attempt_id }
     FlowEngine-->>Browser: { step: "identifier" }
     Note right of Browser: … identifier → password → totp steps …
     FlowEngine-->>Browser: { step: "complete" }
@@ -378,7 +378,7 @@ sequenceDiagram
 
     Note over Browser,DB: Flow engine resolves acr_values from auth_request, renders only missing factor
 
-    Browser->>FlowEngine: POST /flows { attempt_id }
+    Browser->>FlowEngine: POST /flow { attempt_id }
     Note right of FlowEngine: lookup auth_request via attempt_id → acr_values = aal:2<br/>policy_check: session has password, only totp missing
     FlowEngine-->>Browser: { step: "totp" }
 
@@ -413,6 +413,6 @@ sequenceDiagram
 - [`../glossary.md`](../glossary.md)
 - [`credentials.md`](credentials.md) — bootstrap nonce, handoff token hardening
 - [`authz.md`](authz.md) — who can create an auth_attempt
-- [`conventions.md`](conventions.md#idempotency) — Category B retry semantics
+- [`conventions.md`](conventions.md#idempotency-shipped) — Category B retry semantics
 - [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md) — UI orchestration on top of these primitives
 - [`../flowengine/session-api.md`](../flowengine/session-api.md) — durable sessions, ACR/AAL

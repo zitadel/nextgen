@@ -1,7 +1,7 @@
 # Building Flows
 
 > **Status:** Draft
-> **Note:** The step response shape is [decided](flow-engine-nodes.md) — steps emit unordered capability dictionaries (`fields`, `actions`, `gates`) and a LiquidJS template controls layout.
+> **Note:** The step response shape is [decided](flow-engine-nodes.md) — steps emit ordered capability arrays for `fields` and `actions` (entries carry a `name`, ADR 021), a keyed `gates` map, and a LiquidJS template controls layout.
 >
 > **Canonical OpenAPI spec:** [`api/openapi/openapi-spec.yaml`](../../../api/openapi/openapi-spec.yaml) — endpoints under `/flow`. Schemas in [`api/openapi/components/flows/`](../../../api/openapi/components/flows/).
 
@@ -22,7 +22,7 @@ sequenceDiagram
     participant Server
 
     User->>Frontend: Opens login page
-    Frontend->>Server: POST /flows { purpose: "login" }
+    Frontend->>Server: POST /flow { purpose: "login" }
     Server-->>Frontend: Step: fields=[email, password]
     User->>Frontend: Types email + password
     Frontend->>Server: submit { email: "alice@acme.com", password: "..." }
@@ -40,6 +40,7 @@ Every step the server returns has the same shape:
 
 ```json
 {
+  "id": "flow_1",
   "session_id": "sess_1",
   "session_token": "tok_1",
   "step": {
@@ -47,8 +48,8 @@ Every step the server returns has the same shape:
     "texts": { "title_key": "login.title", "description_key": "login.description" },
     "error": null,
     "complete": null,
-    "fields": { ... },
-    "actions": { ... },
+    "fields": [ ... ],
+    "actions": [ ... ],
     "gates": { ... }
   }
 }
@@ -60,8 +61,8 @@ Every step the server returns has the same shape:
 | `texts` | Localization keys for title and description |
 | `error` | Error message from a failed previous submission (null if none) |
 | `complete` | Only on terminal steps: `redirect` or `show` (null otherwise) |
-| `fields` | Input fields to render — keyed by field name |
-| `actions` | Things the user can do — keyed by action name |
+| `fields` | Input fields to render — an ordered array; each entry carries `name` |
+| `actions` | Things the user can do — an ordered array; each entry carries `name` and `kind` |
 | `gates` | Security gates that must be satisfied before submission |
 
 **Fields** are resolved by the engine from the user schema:
@@ -70,7 +71,7 @@ Every step the server returns has the same shape:
 { "type": "email", "text_key": "login.field.email", "required": true }
 ```
 
-**Actions** are keyed by name in an unordered dictionary:
+**Actions** are an ordered array of `{name, kind, …}` entries:
 
 ```json
 {
@@ -80,7 +81,7 @@ Every step the server returns has the same shape:
 }
 ```
 
-Actions are **unordered capabilities**. The LiquidJS template decides where and how to render them — the server never controls visual positioning.
+The array order is a stable default, but the LiquidJS template owns layout — it iterates in order, reorders, or looks entries up by name (`where: "name"`).
 
 ---
 
@@ -98,7 +99,7 @@ sequenceDiagram
     participant Atoms as <zl-*> Atoms
 
     App->>ZL: Mounts component
-    ZL->>ZL: POST /flows → receives capabilities + template
+    ZL->>ZL: POST /flow → receives capabilities + template
     ZL->>ZL: Loads locale dictionary (en.ts)
     ZL->>Liquid: Parse template string + inject capabilities as context
     Liquid->>Liquid: Resolve {{ field.text_key | t }} via translation filter
@@ -198,7 +199,7 @@ Customers who want full control "eject" this template — the Zitadel Console co
 ### The frontend loop (pseudocode)
 
 ```
-response = POST /flows { purpose, auth_request_id }
+response = POST /flow { purpose, auth_request_id }
 
 loop:
   step = response.step
@@ -488,11 +489,11 @@ Transitions support two cross-flow actions:
 {
   "name": "login",
   "fields": ["email", "password"],
-  "actions": {
-    "submit": { "primary": true },
-    "register": {},
-    "recover": {}
-  },
+  "actions": [
+    {"name": "submit", "primary": true, "kind": "submit"},
+    {"name": "register", "kind": "navigate"},
+    {"name": "recover", "kind": "navigate"}
+  ],
   "transitions": {
     "submit": { "target": "done" },
     "register": { "target": "default-register", "action": "switch" },
@@ -579,13 +580,13 @@ The session token still rotates on error (prevents replay). The step doesn't adv
   "step": {
     "name": "signin",
     "error": "Invalid password. 2 attempts remaining.",
-    "fields": {
-      "password": { "type": "password", "text_key": "signin.field.password", "required": true }
-    },
-    "actions": {
-      "submit": { "text_key": "signin.action.submit", "primary": true },
-      "recover": { "text_key": "signin.action.recover" }
-    },
+    "fields": [
+      {"name": "password", "kind": "navigate", "type": "password", "text_key": "signin.field.password", "required": true}
+    ],
+    "actions": [
+      {"name": "submit", "text_key": "signin.action.submit", "primary": true, "kind": "submit"},
+      {"name": "recover", "text_key": "signin.action.recover", "kind": "navigate"}
+    ],
     "gates": {}
   }
 }

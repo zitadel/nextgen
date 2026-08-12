@@ -345,7 +345,7 @@ Content-Type: application/json
     "session_id":        "sess_…",
     "state":             "active",
     "user_id":           "user_…",
-    "factors":           [ { "type": "password", "verified_at": "…" }, { "type": "totp", "verified_at": "…" } ],
+    "factors":           [ { "method": "identifier", "verified_at": "…", "payload": { "user_id": "user_…" } }, { "method": "password", "verified_at": "…" } ],
     "assurance_levels":  ["urn:nist:aal:1", "urn:nist:aal:2"],
     "created_at":        "…",
     "expires_at":        "…"
@@ -414,12 +414,11 @@ Example response:
     "session_id": "sess_abc",
     "state": "active",
     "factors": [
-      { "type": "user", "user_id": "user_123", "verified_at": "2026-04-17T10:00:00Z" },
-      { "type": "password", "verified_at": "2026-04-17T10:01:00Z" },
-      { "type": "otp", "verified_at": "2026-04-17T10:02:00Z" }
+      { "method": "identifier", "verified_at": "2026-04-17T10:00:00Z", "payload": { "user_id": "user_123" } },
+      { "method": "password", "verified_at": "2026-04-17T10:01:00Z" },
+      { "method": "passkey", "verified_at": "2026-04-17T10:02:00Z" }
     ],
-    "assurance_levels": ["urn:nist:aal:1", "urn:nist:aal:2"],
-    "amr": ["pwd", "otp", "mfa"]
+    "assurance_levels": ["urn:nist:aal:1", "urn:nist:aal:2"]
   },
   "session_token": "tok_final"
 }
