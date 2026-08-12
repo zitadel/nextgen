@@ -19,7 +19,9 @@ Wave 1 (#422) ships Goose migrations (Postgres `000015_authz_mvp`, Spanner
 `cat_sys_1` (OpenFGA-style model pending #420 auto-compile), statement helpers,
 same-tx dual-write hooks on project/team/user/membership mutations, and a
 one-time backfill of `resource_scope_index` + active `authz_membership_edges`.
-Resolver wiring remains Wave 3 (#423). Leopard remains later (**D11**).
+Resolver library (`internal/authz/resolver`) and L4 oracle tests land in
+Wave 3 (#423). HTTP/middleware wiring remains later. Leopard remains later
+(**D11**).
 
 ### Wave 1 vs OpenFGA compiler (#421 / PR #720)
 
@@ -60,9 +62,15 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
   `dialect/authz.ExpressionEdgeKind` (not on the compiler IR).
 - **Grants API (later):** `CreateAuthzAssignment` / `RevokeAuthzAssignment` /
   list-by-principal — not dual-write from CreateUser.
-- **Resolver (later, #423):** `GetResourceScope` plus SQL over assignments,
-  typed closure, expression edges (for TTU), and membership edges (see
-  [Check and list SQL](#check-and-list-sql-illustrative)).
+- **Resolver (#423 library):** `AuthzResolverStatements` (`CheckAuthz` returns
+  allowed+foothold in one round-trip, `ListAuthzObjectIDs` as an L4/oracle
+  materialization helper, foothold smoke helper, active system catalog) plus
+  `internal/authz/resolver` orchestration (`sk_team_` permission-name
+  allowlist, decision kinds). Resolver-enforced `sk_team_` **team scope**
+  (token `team_id` + outside-team deny suite) is deferred —
+  [#831](https://github.com/zitadel/nextgen/issues/831). HTTP pipeline wiring
+  (after `GetResourceScope`) and ADR 033 list **predicate injection** into
+  resource queries remain later.
 
 ## Locked decisions
 
@@ -77,7 +85,7 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
 | **D7** | Assignment PK = `(project_id, id)`. |
 | **D8** | Soft revoke via `revoked_at`; unique active-grant index ignores revoked rows. |
 | **D9** | App-group / `app_grants` tables deferred (same physical catalog model later; [ADR 034](../../adrs/034-external-permission-management.md)). |
-| **D10** | 403 vs 404 is **out of DDL scope** (resolver/API). Note tension: [ADR 033](../../adrs/033-internal-permission-management.md) uses 403 when in-scope but missing permission; [`url-architecture.md`](url-architecture.md) / [`authz.md`](authz.md) prefer 404 for anti-oracle. |
+| **D10** | Library resolver returns **Allow** / **Forbidden** (foothold, wrong permission) / **NotFound** (no foothold). HTTP mapping is later; ADR 033’s 403/404 split applies at the API layer. Flat “always 404” in [`authz.md`](authz.md) / [`url-architecture.md`](url-architecture.md) will be reconciled when endpoints wire. |
 | **D11** | Dual-write membership **without** Leopard in Wave 1; Leopard remains an additive derived index later ([ADR 032 §3](../../adrs/032-permission-catalogs.md#3-canonical-relational-storage)). |
 | **D12** | Hash-partitioning `resource_scope_index` (Postgres) **deferred until proven**; revisit only with vacuum/bloat/hot-spot measurements. |
 | **D13** | Cross-project ([#333](https://github.com/zitadel/nextgen/issues/333)) depiction: same `authz_assignments` row on the **protected** `project_id`, with a **foreign** `user`/`team` principal (no `principal_type = project`); principal integrity by stable prefixed ids ([ADR 011](../../adrs/011-resource-identifiers.md)), not a composite FK to local `(project_id, user_id)`. |
@@ -410,9 +418,9 @@ Authorization belongs **in SQL** (indexed semi-joins), not as an in-memory
 walk or per-row app checks. Prefer **one round-trip** for both get and list:
 fold the authz predicate into the resource query (same pattern as list). Under
 [`url-architecture.md`](url-architecture.md) / [`authz.md`](authz.md), empty or
-denied single-resource reads map to **404** (anti-oracle). ADR 033’s in-scope
-**403** vs **404** split remains product tension (**D10**); Wave 1 does not
-implement the resolver.
+denied single-resource reads historically mapped to **404** (anti-oracle). The
+library resolver (#423) distinguishes foothold (**Forbidden**) vs no foothold
+(**NotFound**); HTTP status mapping remains for endpoint wiring (**D10**).
 
 ### Single-resource check
 
@@ -454,8 +462,8 @@ LIMIT 1;
 ```
 
 Same-object computed-userset implications use closure. Tuple-to-userset terms
-(e.g. `member from team`) need `authz_expression_edges` in the resolver —
-still Wave 3 (#423), not Wave 1.
+(e.g. `member from team`) use `authz_expression_edges` in
+`CheckAuthz` / `internal/authz/resolver` (#423).
 
 For foreign team principals (#333), `$principal_home_project_id` is the **home**
 `project_id` of that team (platform), not necessarily `a.project_id`. The
@@ -579,8 +587,9 @@ bundles:
 - App-group catalog upload product UI and `app_grants` (**D9** / ADR 034)
 - Implementing #333 identity binding, staff tiers, or break-glass
 - Hash-partitioning `resource_scope_index` (**D12**)
-- Resolving 403 vs 404 (**D10**)
-- Permission resolver (#423)
+- Resolving HTTP 403 vs 404 at the API boundary (**D10** — library decisions exist)
+- HTTP permission middleware / endpoint wiring (#423 follow-up)
+- Permission resolver HTTP surface / grants API
 
 ## See also
 

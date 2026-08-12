@@ -306,3 +306,31 @@ const (
 	AuthzMembershipEdgeFieldSetID
 	AuthzMembershipEdgeFieldCreatedAt
 )
+
+// AuthzCheckParams is the storage-level input for a single-resource permission check.
+// PrincipalHomeProjectID is the project used for membership-edge lookup (defaults to ProjectID).
+type AuthzCheckParams struct {
+	CatalogID              string
+	ProjectID              string
+	PrincipalHomeProjectID string
+	PrincipalType          AuthzPrincipalType
+	PrincipalID            string
+	ObjectType             string
+	Relation               string
+}
+
+// HomeProjectID returns PrincipalHomeProjectID, or ProjectID when unset.
+func (p AuthzCheckParams) HomeProjectID() string {
+	if p.PrincipalHomeProjectID != "" {
+		return p.PrincipalHomeProjectID
+	}
+	return p.ProjectID
+}
+
+// AuthzListObjectsParams lists resource_scope_index ids the principal may see
+// for one resource kind under a required catalog relation (L4 / oracle helper).
+// Endpoint wiring injects an authz predicate into the resource query (ADR 033).
+type AuthzListObjectsParams struct {
+	AuthzCheckParams
+	ResourceKind ResourceKind
+}
