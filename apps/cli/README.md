@@ -31,9 +31,9 @@ npm run dev
 ```
 
 `start` runs the `@zitadel/server` npm binary by default and stores runtime data
-under `.zitadel/local/`. Remote-server setup can use `--server <url>` without
-starting a local runtime. Use `--runtime docker`, `--image`, or
-`ZITADEL_LOCAL_IMAGE` for advanced Docker backend debugging.
+under `.zitadel/local/` (SQLite by default). Remote-server setup can use
+`--server <url>` without starting a local runtime. Use `--runtime docker`,
+`--image`, or `ZITADEL_LOCAL_IMAGE` for advanced Docker backend debugging.
 `setup --server local` creates a project on that local server, asks which
 framework to scaffold when the directory is fresh, writes the Next.js app into
 the current directory, scaffolds `app/login`, `app/register`, `app/profile`, and
