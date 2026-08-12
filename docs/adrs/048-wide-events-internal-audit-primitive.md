@@ -28,7 +28,7 @@ are ephemeral and not tenant-queryable. We need a first-class, append-only,
 queryable audit stream stored in the database.
 
 **Scope boundary:** Event emission is defined on **v2 `AllStatements` / statement
-TX only** ([`internal/storage/v2/`](../../internal/storage/v2/),
+TX only** ([`internal/storage/`](../../internal/storage/),
 [`internal/service/statement.go`](../../internal/service/statement.go)). The v1
 repository and dialect tree under `internal/storage/database/` is **retired**
 ([ADR 028](028-storage-v2-statements-and-dialects.md)). Product persistence is
@@ -306,7 +306,7 @@ type EventStatements interface {
 interfaces.
 
 - `InsertEvent` executes on the same `queryExecutor` / transaction as entity SQL
-  ([`internal/storage/v2/dialect/postgres/tx.go`](../../internal/storage/v2/dialect/postgres/tx.go)).
+  ([`internal/storage/dialect/postgres/tx.go`](../../internal/storage/dialect/postgres/tx.go)).
 - Each `statement_<entity>.go` method that **mutates state** and needs an audit
   record calls `InsertEvent` with a **semantic** `event_type` (e.g.
   `project.created`, `user.deactivated`) — not row diffs or generic `UPDATE`

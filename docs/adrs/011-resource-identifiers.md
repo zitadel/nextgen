@@ -61,7 +61,7 @@ Prefer composite keys `(project_id, id)` where the resource is project-scoped.
 
 ### 3. Go type: `database.Identity`
 
-[`database.Identity`](../internal/storage/v2/database/identity.go) is a string
+[`database.Identity`](../internal/storage/database/identity.go) is a string
 alias used at the storage boundary. After the alpha cutover it binds and scans
 as string only (no decimal→`int64` coercion for resource PKs).
 
@@ -70,9 +70,9 @@ as string only (no decimal→`int64` coercion for resource PKs).
 | Package | Role |
 |---------|------|
 | `internal/domain` | Prefix constants and validation — no ID minting |
-| `internal/storage/v2/database` | `Identity` string bind/scan helpers |
-| `internal/storage/v2/dialect/idgen` | Shared `Generator`, `Ensure`, ULID + UUID implementations |
-| `internal/storage/v2/dialect/{postgres,spanner}` | Choose generator; call `Ensure` / `NewManagedID` on create |
+| `internal/storage/database` | `Identity` string bind/scan helpers |
+| `internal/storage/dialect/idgen` | Shared `Generator`, `Ensure`, ULID + UUID implementations |
+| `internal/storage/dialect/{postgres,spanner}` | Choose generator; call `Ensure` / `NewManagedID` on create |
 
 ## Consequences
 
