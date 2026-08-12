@@ -19,6 +19,8 @@ type stubAuthzStmts struct {
 	foothold   *bool
 	// scopes maps resource_id → project_id for GetResourceScope; missing → NoRowFoundError.
 	scopes map[string]string
+	// kinds maps resource_id → ResourceKind; when absent, ResourceKindUser is used.
+	kinds map[string]domain.ResourceKind
 }
 
 func (stubAuthzStmts) IsStatements() {}
@@ -57,7 +59,13 @@ func (s stubAuthzStmts) GetResourceScope(_ context.Context, resourceID string) (
 	if !ok {
 		return nil, new(database.NoRowFoundError)
 	}
-	return &domain.ResourceScope{ResourceID: resourceID, ProjectID: projectID, ResourceKind: domain.ResourceKindUser}, nil
+	kind := domain.ResourceKindUser
+	if s.kinds != nil {
+		if k, ok := s.kinds[resourceID]; ok {
+			kind = k
+		}
+	}
+	return &domain.ResourceScope{ResourceID: resourceID, ProjectID: projectID, ResourceKind: kind}, nil
 }
 
 func (stubAuthzStmts) UpsertResourceScope(context.Context, *domain.ResourceScope) error { return nil }
@@ -104,6 +112,9 @@ func TestMapAuthzDecision(t *testing.T) {
 	assertDomainCode(t, mapAuthzDecision(resolver.DecisionForbidden, res, opRead), domain.ErrUserPermissionDenied().Code)
 	assertDomainCode(t, mapAuthzDecision(resolver.DecisionNotFound, res, opRead), domain.ErrUserNotFound().Code)
 	assertDomainCode(t, mapAuthzDecision(resolver.DecisionNotFound, res, opWrite), domain.ErrUserInvalid().Code)
+
+	assertDomainCode(t, mapAuthzDecisionAfterRSI(resolver.DecisionNotFound, res), domain.ErrUserNotFound().Code)
+	assertDomainCode(t, mapAuthzDecisionAfterRSI(resolver.DecisionForbidden, res), domain.ErrUserPermissionDenied().Code)
 }
 
 func TestRequireProjectAccess(t *testing.T) {
@@ -234,12 +245,15 @@ func TestRequireTeamDelete(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
 	})
 
-	// Mirror Handler.requireTeamDelete wrapping.
+	// Mirror Handler.requireTeamDelete wrapping (pass ErrInternal through).
 	wrap := func(err error) error {
-		if err != nil {
-			return domain.ErrTeamPermissionDenied().WithParent(err)
+		if err == nil {
+			return nil
 		}
-		return nil
+		if errors.Is(err, errResourceGone) || errors.Is(err, domain.ErrInternal(nil)) {
+			return err
+		}
+		return domain.ErrTeamPermissionDenied().WithParent(err)
 	}
 
 	if err := wrap(requireProjectAccess(operator, stmts, "proj_a", teamAccess, opDelete)); err != nil {
@@ -251,6 +265,11 @@ func TestRequireTeamDelete(t *testing.T) {
 		domain.ErrTeamPermissionDenied().Code)
 	assertDomainCode(t, wrap(requireProjectAccess(context.Background(), stmts, "proj_a", teamAccess, opDelete)),
 		domain.ErrTeamPermissionDenied().Code)
+
+	internal := domain.ErrInternal(errors.New("db down")).WithMessage("authz permission check failed")
+	if got := wrap(internal); !errors.Is(got, domain.ErrInternal(nil)) {
+		t.Fatalf("wrap(%v) = %v, want ErrInternal passthrough", internal, got)
+	}
 }
 
 func TestRequireResourceAccess(t *testing.T) {
@@ -280,14 +299,44 @@ func TestRequireResourceAccess(t *testing.T) {
 
 	_, err = requireResourceAccess(operator, stmts, "usr_missing", userAccess, opDelete)
 	if !errors.Is(err, errResourceGone) {
-		t.Fatalf("delete RSI miss: %v, want errResourceGone", err)
+		t.Fatalf("operator delete RSI miss: %v, want errResourceGone", err)
 	}
+
+	_, err = requireResourceAccess(preview, stmts, "usr_missing", userAccess, opDelete)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	_, err = requireResourceAccess(context.Background(), stmts, "usr_missing", userAccess, opDelete)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 
 	_, err = requireResourceAccess(operator, stmts, "usr_b", userAccess, opRead)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 
+	// Foreign write-by-id after RSI hit must use readMiss, not writeMiss.
+	_, err = requireResourceAccess(operator, stmts, "usr_b", userAccess, opWrite)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
 	_, err = requireResourceAccess(preview, stmts, "usr_a", userAccess, opRead)
 	assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
+
+	_, err = requireResourceAccess(preview, stmts, "usr_a", userAccess, opDelete)
+	assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
+}
+
+func TestRequireResourceAccessWrongKind(t *testing.T) {
+	stmts := stubAuthzStmts{
+		scopes: map[string]string{"id_shared": "proj_a"},
+		kinds:  map[string]domain.ResourceKind{"id_shared": domain.ResourceKindSchema},
+	}
+	operator := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+	})
+
+	_, err := requireResourceAccess(operator, stmts, "id_shared", userAccess, opRead)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	_, err = requireResourceAccess(operator, stmts, "id_shared", userAccess, opDelete)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 }
 
 func assertDomainCode(t *testing.T, err error, wantCode string) {

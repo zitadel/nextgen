@@ -28,7 +28,8 @@ const (
 	opDelete
 )
 
-// errResourceGone means path.id has no RSI row. Idempotent deletes map this to 204.
+// errResourceGone means path.id has no RSI row. Idempotent deletes map this to 204
+// only for credential-plane operators (project.write); others get readMiss.
 var errResourceGone = errors.New("authz: resource gone")
 
 // projectRelation is the catalog relation checked for an accessOp.
@@ -47,8 +48,12 @@ func projectRelation(op accessOp) string {
 }
 
 // resourceAccess is one resource's row in the management access model: the
-// resource-flavored errors the gate answers with.
+// resource-flavored errors the gate answers with, plus the RSI kind the route
+// expects for path-id ops.
 type resourceAccess struct {
+	// kind is the expected resource_scope_index.resource_kind for path-id ops.
+	// Empty means no kind check (project-scoped create/list only).
+	kind domain.ResourceKind
 	// readMiss / writeMiss are anti-oracle answers when Check finds no foothold;
 	// writeMiss also covers nonexistent projects on create/list.
 	readMiss  func() domain.Error
@@ -64,24 +69,28 @@ func (res resourceAccess) miss(op accessOp) error {
 }
 
 var schemaAccess = resourceAccess{
+	kind:      domain.ResourceKindSchema,
 	readMiss:  domain.ErrJSONSchemaNotFound,
 	writeMiss: func() domain.Error { return domain.ErrJSONSchemaInvalid().WithDetails("project does not exist") },
 	denied:    domain.ErrJSONSchemaPermissionDenied,
 }
 
 var flowDefinitionAccess = resourceAccess{
+	kind:      domain.ResourceKindFlowDefinition,
 	readMiss:  domain.ErrFlowDefinitionNotFound,
 	writeMiss: func() domain.Error { return domain.ErrFlowDefinitionInvalid("project does not exist", nil) },
 	denied:    domain.ErrFlowDefinitionPermissionDenied,
 }
 
 var userAccess = resourceAccess{
+	kind:      domain.ResourceKindUser,
 	readMiss:  domain.ErrUserNotFound,
 	writeMiss: func() domain.Error { return domain.ErrUserInvalid().WithDetails("project does not exist") },
 	denied:    domain.ErrUserPermissionDenied,
 }
 
 var teamAccess = resourceAccess{
+	kind:     domain.ResourceKindTeam,
 	readMiss: domain.ErrTeamNotFound,
 	// team.project_not_found matches the service's nonexistent-project answer.
 	writeMiss: domain.ErrTeamProjectNotFound,
@@ -93,18 +102,21 @@ var teamAccess = resourceAccess{
 // Check as other management resources (replacing the old fail-closed session.*
 // scope gate until #420).
 var sessionAccess = resourceAccess{
+	kind:      domain.ResourceKindSession,
 	readMiss:  domain.ErrSessionNotFound,
 	writeMiss: domain.ErrSessionNotFound,
 	denied:    domain.ErrSessionPermissionDenied,
 }
 
 var brandingAccess = resourceAccess{
+	kind:      domain.ResourceKindBranding,
 	readMiss:  domain.ErrBrandingNotFound,
 	writeMiss: func() domain.Error { return domain.ErrBrandingInvalid("project does not exist", nil) },
 	denied:    domain.ErrBrandingPermissionDenied,
 }
 
 var projectAccess = resourceAccess{
+	kind:      domain.ResourceKindProject,
 	readMiss:  domain.ErrProjectNotFound,
 	writeMiss: domain.ErrProjectNotFound,
 	denied:    domain.ErrProjectPermissionDenied,
@@ -118,7 +130,8 @@ type resourceAccessStmts interface {
 
 // requireResourceAccess resolves path.id via resource_scope_index, then runs
 // the project-scoped Check. RSI miss on read/write → resource 404; on delete →
-// errResourceGone (handlers map to 204). Returns project_id for DAL calls.
+// errResourceGone for operators (handlers map to 204), else readMiss. Returns
+// project_id for DAL calls.
 func (h *Handler) requireResourceAccess(ctx context.Context, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
 	if h == nil || h.pool == nil {
 		return "", domain.ErrInternal(errors.New("authz statements not configured"))
@@ -131,14 +144,22 @@ func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resou
 	if err != nil {
 		if errors.Is(err, new(database.NoRowFoundError)) {
 			if op == opDelete {
-				return "", errResourceGone
+				cred, ok := GetScopeContext(ctx)
+				if ok && hasOperatorProjectWrite(cred.Scope) {
+					return "", errResourceGone
+				}
+				return "", res.readMiss()
 			}
 			// Flat-by-id: unknown path id is always the resource 404 shape.
 			return "", res.readMiss()
 		}
 		return "", domain.ErrInternal(err).WithMessage("resource scope lookup failed")
 	}
-	if err := requireProjectAccess(ctx, stmts, scope.ProjectID, res, op); err != nil {
+	if res.kind != "" && scope.ResourceKind != res.kind {
+		// Wrong kind for this route: same anti-oracle shape as unknown id.
+		return "", res.readMiss()
+	}
+	if err := requireProjectAccessAfterRSI(ctx, stmts, scope.ProjectID, res, op); err != nil {
 		return "", err
 	}
 	return scope.ProjectID, nil
@@ -156,19 +177,38 @@ func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, re
 }
 
 func requireProjectAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp) error {
+	return requireProjectAccessMapped(ctx, stmts, projectID, res, op, false)
+}
+
+// requireProjectAccessAfterRSI is requireProjectAccess for by-id ops after an
+// RSI hit: DecisionNotFound always uses readMiss (not writeMiss) so PATCH routes
+// do not leak existence via mismatched codes.
+func requireProjectAccessAfterRSI(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp) error {
+	return requireProjectAccessMapped(ctx, stmts, projectID, res, op, true)
+}
+
+func requireProjectAccessMapped(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp, afterRSI bool) error {
 	scope, ok := GetScopeContext(ctx)
 	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
+		if afterRSI {
+			return res.readMiss()
+		}
 		return res.miss(op)
 	}
 
 	if !hasOperatorProjectWrite(scope.Scope) {
 		// Foreign / unbound → anti-oracle miss; same project → denied (preview).
 		if scope.ProjectID == "" || scope.ProjectID != projectID {
+			if afterRSI {
+				return res.readMiss()
+			}
 			return res.miss(op)
 		}
 		return res.denied()
 	}
 
+	// MVP: Check ObjectType "project" only — team-/resource-scoped Allow is out
+	// of scope until a later gate (#833).
 	dec, err := resolver.New().Check(ctx, stmts, resolver.Request{
 		PrincipalType: scope.PrincipalType,
 		PrincipalID:   scope.PrincipalID,
@@ -178,6 +218,9 @@ func requireProjectAccess(ctx context.Context, stmts service.AuthzResolverStatem
 	})
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("authz permission check failed")
+	}
+	if afterRSI {
+		return mapAuthzDecisionAfterRSI(dec, res)
 	}
 	return mapAuthzDecision(dec, res, op)
 }
@@ -207,8 +250,27 @@ func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) er
 	}
 }
 
+// mapAuthzDecisionAfterRSI maps Check results after RSI already located the
+// resource. NotFound/Unspecified always use readMiss so write ops do not
+// advertise a different code than reads.
+func mapAuthzDecisionAfterRSI(dec resolver.Decision, res resourceAccess) error {
+	switch dec {
+	case resolver.DecisionAllow:
+		return nil
+	case resolver.DecisionForbidden:
+		return res.denied()
+	case resolver.DecisionNotFound, resolver.DecisionUnspecified:
+		return res.readMiss()
+	default:
+		return res.readMiss()
+	}
+}
+
 // withAuthzListFilter attaches the SQL list-predicate filter for management
 // list endpoints after requireProjectAccess has already passed.
+// PrincipalHomeProjectID comes from the credential's home project while Check
+// uses the target projectID; those are equivalent until foreign footholds
+// (#333) land.
 func (h *Handler) withAuthzListFilter(ctx context.Context, projectID string, kind domain.ResourceKind, op accessOp) (context.Context, error) {
 	scope, ok := GetScopeContext(ctx)
 	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
@@ -240,12 +302,16 @@ func (h *Handler) withAuthzListFilter(ctx context.Context, projectID string, kin
 }
 
 // requireTeamDelete gates deleteTeam via the team's RSI. Unknown teams are
-// gone (204). Check denials (including foreign foothold misses) stay
-// permission_denied for the historical deleteTeam contract.
+// gone (204) for operators. Check denials (including foreign foothold misses)
+// stay permission_denied for the historical deleteTeam contract. Internal
+// errors pass through unwrapped so operators see 500, not a false 403.
 func (h *Handler) requireTeamDelete(ctx context.Context, teamID string) (projectID string, err error) {
 	projectID, err = h.requireResourceAccess(ctx, teamID, teamAccess, opDelete)
 	if err != nil {
 		if errors.Is(err, errResourceGone) {
+			return "", err
+		}
+		if errors.Is(err, domain.ErrInternal(nil)) {
 			return "", err
 		}
 		return "", domain.ErrTeamPermissionDenied().WithParent(err)

@@ -211,14 +211,40 @@ func TestManagementAuthz(t *testing.T) {
 			t.Parallel()
 
 			// Preview ceiling (403) on list; fabricated by-id misses RSI before
-			// the ceiling (write → not_found, delete → 204).
+			// the ceiling (write → not_found; delete without project.write → not_found, not 204).
 			pwResp, err := preview.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "hijacked-password"}, api.SetUserPasswordParams{UserID: "user_irrelevant"})
 			require.NoError(t, err)
 			assertAuthzError(t, pwResp, "user.not_found")
 
+			delResp, err := preview.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: "user_irrelevant"})
+			require.NoError(t, err)
+			assertAuthzError(t, delResp, "user.not_found")
+
 			listResp, err := preview.ListUsers(t.Context(), api.ListUsersParams{})
 			require.NoError(t, err)
 			assertAuthzStatus(t, listResp, 403, "user.permission_denied")
+		})
+
+		t.Run("preview secret cannot delete a real user", func(t *testing.T) {
+			t.Parallel()
+
+			victimUser, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+				ProjectID: victim.ID,
+				User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "authz-preview-delete@example.com"),
+			})
+			require.NoError(t, err)
+			victimUserID := api.UserID(victimUser["id"].(string))
+
+			delResp, err := preview.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: victimUserID})
+			require.NoError(t, err)
+			assertAuthzError(t, delResp, "user.permission_denied")
+
+			ownClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+			require.NoError(t, err)
+			harness.SetProjectSecretOnApiClient(t, ownClient, victim)
+			getResp, err := ownClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: victimUserID})
+			require.NoError(t, err)
+			assert.IsType(t, &api.User{}, getResp, helpers.MustMarshal(t, getResp))
 		})
 	})
 
