@@ -4,35 +4,64 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 )
 
 func TestCookieSecureFromContext(t *testing.T) {
 	t.Parallel()
 
-	t.Run("defaults to secure when host was never injected", func(t *testing.T) {
-		t.Parallel()
-		if !cookieSecureFromContext(context.Background()) {
-			t.Fatal("expected Secure=true when request host is absent")
-		}
-	})
+	cases := []struct {
+		name   string
+		origin string // empty means no host injected
+		secure bool
+	}{
+		{name: "defaults to secure when host was never injected", secure: true},
+		{name: "omits secure for http localhost", origin: "http://localhost:3000", secure: false},
+		{name: "omits secure for http 127.0.0.1", origin: "http://127.0.0.1:3000", secure: false},
+		{name: "omits secure for http ipv6 loopback", origin: "http://[::1]:3000", secure: false},
+		{name: "keeps secure for https origins", origin: "https://app.example.com", secure: true},
+		{name: "keeps secure for non-loopback http", origin: "http://app.example.com", secure: true},
+		{name: "keeps secure on unparseable origin", origin: "://bad", secure: true},
+	}
 
-	t.Run("omits secure for http origins", func(t *testing.T) {
-		t.Parallel()
-		ctx := context.WithValue(context.Background(), requestHostKey{}, "http://localhost:3000")
-		if cookieSecureFromContext(ctx) {
-			t.Fatal("expected Secure=false for http://localhost")
-		}
-	})
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.Background()
+			if tc.origin != "" {
+				ctx = context.WithValue(ctx, requestHostKey{}, tc.origin)
+			}
+			if got := cookieSecureFromContext(ctx); got != tc.secure {
+				t.Fatalf("cookieSecureFromContext(%q) = %v, want %v", tc.origin, got, tc.secure)
+			}
+		})
+	}
+}
 
-	t.Run("keeps secure for https origins", func(t *testing.T) {
-		t.Parallel()
-		ctx := context.WithValue(context.Background(), requestHostKey{}, "https://app.example.com")
-		if !cookieSecureFromContext(ctx) {
-			t.Fatal("expected Secure=true for https origins")
-		}
-	})
+func TestIsLoopbackHost(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		host string
+		want bool
+	}{
+		{host: "localhost", want: true},
+		{host: "LOCALHOST", want: true},
+		{host: "127.0.0.1", want: true},
+		{host: "127.0.0.42", want: true},
+		{host: "::1", want: true},
+		{host: "app.example.com", want: false},
+		{host: "192.168.1.1", want: false},
+		{host: "", want: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.host, func(t *testing.T) {
+			t.Parallel()
+			if got := isLoopbackHost(tc.host); got != tc.want {
+				t.Fatalf("isLoopbackHost(%q) = %v, want %v", tc.host, got, tc.want)
+			}
+		})
+	}
 }
 
 func TestFlowSetCookie_SecureFollowsScheme(t *testing.T) {
@@ -41,17 +70,23 @@ func TestFlowSetCookie_SecureFollowsScheme(t *testing.T) {
 	httpCtx := context.WithValue(context.Background(), requestHostKey{}, "http://localhost:3000")
 	httpsCtx := context.WithValue(context.Background(), requestHostKey{}, "https://app.example.com")
 
-	httpCookie := flowSetCookie(httpCtx, "payload", false)
-	if strings.Contains(httpCookie, "Secure") {
-		t.Fatalf("http cookie must omit Secure for Safari on localhost, got %q", httpCookie)
+	httpCookie, err := http.ParseSetCookie(flowSetCookie(httpCtx, "payload", false))
+	if err != nil {
+		t.Fatalf("parse http cookie: %v", err)
 	}
-	if !strings.Contains(httpCookie, "HttpOnly") || !strings.Contains(httpCookie, "SameSite=Strict") {
-		t.Fatalf("http cookie missing expected attrs: %q", httpCookie)
+	if httpCookie.Secure {
+		t.Fatalf("http cookie must omit Secure for Safari on localhost, got %+v", httpCookie)
+	}
+	if !httpCookie.HttpOnly || httpCookie.SameSite != http.SameSiteStrictMode {
+		t.Fatalf("http cookie missing expected attrs: %+v", httpCookie)
 	}
 
-	httpsCookie := flowSetCookie(httpsCtx, "payload", false)
-	if !strings.Contains(httpsCookie, "Secure") {
-		t.Fatalf("https cookie must include Secure, got %q", httpsCookie)
+	httpsCookie, err := http.ParseSetCookie(flowSetCookie(httpsCtx, "payload", false))
+	if err != nil {
+		t.Fatalf("parse https cookie: %v", err)
+	}
+	if !httpsCookie.Secure {
+		t.Fatalf("https cookie must include Secure, got %+v", httpsCookie)
 	}
 }
 
@@ -61,14 +96,20 @@ func TestSessionCookie_SecureFollowsScheme(t *testing.T) {
 	httpCtx := context.WithValue(context.Background(), requestHostKey{}, "http://localhost:3000")
 	httpsCtx := context.WithValue(context.Background(), requestHostKey{}, "https://app.example.com")
 
-	httpCookie := sessionCookie(httpCtx, "tok", 60)
-	if strings.Contains(httpCookie, "Secure") {
-		t.Fatalf("http session cookie must omit Secure, got %q", httpCookie)
+	httpCookie, err := http.ParseSetCookie(sessionCookie(httpCtx, "tok", 60))
+	if err != nil {
+		t.Fatalf("parse http session cookie: %v", err)
+	}
+	if httpCookie.Secure {
+		t.Fatalf("http session cookie must omit Secure, got %+v", httpCookie)
 	}
 
-	httpsCookie := sessionCookie(httpsCtx, "tok", 60)
-	if !strings.Contains(httpsCookie, "Secure") {
-		t.Fatalf("https session cookie must include Secure, got %q", httpsCookie)
+	httpsCookie, err := http.ParseSetCookie(sessionCookie(httpsCtx, "tok", 60))
+	if err != nil {
+		t.Fatalf("parse https session cookie: %v", err)
+	}
+	if !httpsCookie.Secure {
+		t.Fatalf("https session cookie must include Secure, got %+v", httpsCookie)
 	}
 }
 
@@ -82,13 +123,23 @@ func TestWithRequestHostMiddleware_DrivesCookieSecure(t *testing.T) {
 	})
 	handler := WithRequestHostMiddleware(inner)
 
-	t.Run("plain http", func(t *testing.T) {
+	t.Run("plain http localhost", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/flow", nil)
 		req.Host = "localhost:8080"
 		rr := httptest.NewRecorder()
 		handler.ServeHTTP(rr, req)
 		if sawSecure {
-			t.Fatal("expected Secure=false for plain HTTP request")
+			t.Fatal("expected Secure=false for plain HTTP localhost")
+		}
+	})
+
+	t.Run("plain http non-loopback keeps secure", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "http://app.example.com/flow", nil)
+		req.Host = "app.example.com"
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+		if !sawSecure {
+			t.Fatal("expected Secure=true for non-loopback HTTP")
 		}
 	})
 
