@@ -4,7 +4,6 @@ get:
   tags:
     - Users
   parameters:
-    - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/team-id.yaml
     - name: user_id
       in: path
@@ -42,7 +41,6 @@ delete:
     tags:
       - Users
     parameters:
-      - $ref: ../../../components/parameters/project-id.yaml
       - name: user_id
         in: path
         required: true

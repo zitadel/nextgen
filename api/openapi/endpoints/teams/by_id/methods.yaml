@@ -6,7 +6,6 @@ get:
   tags:
     - Teams
   parameters:
-    - $ref: ../../../components/parameters/project-id.yaml
     - name: team_id
       in: path
       required: true
@@ -56,7 +55,6 @@ delete:
   tags:
     - Teams
   parameters:
-    - $ref: ../../../components/parameters/project-id.yaml
     - name: team_id
       in: path
       required: true
@@ -103,7 +101,6 @@ patch:
   tags:
     - Teams
   parameters:
-    - $ref: ../../../components/parameters/project-id.yaml
     - name: team_id
       in: path
       required: true

@@ -109,6 +109,23 @@ func TestCompileCompareFilterNilLeadingValue(t *testing.T) {
 	assert.Equal(t, "10", c.args[0])
 }
 
+func TestCompileCompareFilterBoolEqual(t *testing.T) {
+	t.Parallel()
+
+	hasFactors := database.Col(domain.SessionFieldHasVerifiedFactors)
+	existsSQL := sessionSchema.MustSQLName(domain.SessionFieldHasVerifiedFactors)
+
+	var c statementCompiler
+	compileFilter(&c, database.Equal(hasFactors, true), sessionSchema)
+	assert.Equal(t, existsSQL, c.String())
+	assert.Empty(t, c.args)
+
+	var cNot statementCompiler
+	compileFilter(&cNot, database.Equal(hasFactors, false), sessionSchema)
+	assert.Equal(t, "NOT "+existsSQL, cNot.String())
+	assert.Empty(t, cNot.args)
+}
+
 func TestCompileStringFilterLikeUsesEscape(t *testing.T) {
 	t.Parallel()
 

@@ -51,16 +51,21 @@ func (f flowDefinitionStatements) CreateFlowDefinition(ctx context.Context, enti
 		return err
 	}
 	purposes := flowdefinition.PurposeStrings(entity)
-	_, err = f.client.Exec(ctx, createFlowDefinitionStmt,
-		entity.ProjectID,
-		entity.ID,
-		entity.Name,
-		entity.SchemaVersion,
-		entity.Status.String(),
-		purposes,
-		content,
-	)
-	return wrapError(err)
+	return withTransaction(ctx, f.client, func(ctx context.Context, tx queryExecutor) error {
+		if _, err := tx.Exec(ctx, createFlowDefinitionStmt,
+			entity.ProjectID,
+			entity.ID,
+			entity.Name,
+			entity.SchemaVersion,
+			entity.Status.String(),
+			purposes,
+			content,
+		); err != nil {
+			return wrapError(err)
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindFlowDefinition, entity.ProjectID, entity.ID))
+	})
 }
 
 // GetFlowDefinitionByID implements [service.FlowDefinitionStatements].
@@ -110,7 +115,7 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 	opts := flowdefinition.EnsureListOptions(filter)
 
 	var compiler statementCompiler
-	err := compileRead(&compiler, flowDefinitionQuery, opts, flowdefinition.Schema)
+	err := compileList(ctx, &compiler, flowDefinitionQuery, opts, flowdefinition.Schema, "zitadel_nextgen.flow_definitions", "id")
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +144,17 @@ func (f flowDefinitionStatements) ListFlowDefinitions(ctx context.Context, filte
 
 // DeleteFlowDefinitionByID implements [service.FlowDefinitionStatements].
 func (f flowDefinitionStatements) DeleteFlowDefinitionByID(ctx context.Context, projectID, id string) error {
-	_, err := f.client.Exec(ctx, deleteFlowDefinitionStmt, projectID, id)
-	return wrapError(err)
+	return withTransaction(ctx, f.client, func(ctx context.Context, tx queryExecutor) error {
+		tag, err := tx.Exec(ctx, deleteFlowDefinitionStmt, projectID, id)
+		if err != nil {
+			return wrapError(err)
+		}
+		if tag.RowsAffected() == 0 {
+			return nil
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.DeleteResourceScope(ctx, domain.ResourceKindFlowDefinition, projectID, id)
+	})
 }
 
 func (f flowDefinitionStatements) scanFlowDefinition(row pgx.CollectableRow) (*domain.FlowDefinition, error) {

@@ -81,11 +81,14 @@ The colon form is unambiguous to parsers and prevents namespace collisions betwe
 
 **Collision mitigation:** verb names are always imperative-mood and never plural nouns. `verify_email`, `rotate`, `revoke`, `transfer` — never `verifications`, `rotations`. If a legitimate nested resource called `verifications` ever becomes necessary, the verb gets renamed (e.g. `send_verification_email`) before that resource ships.
 
-## The 404-not-403 rule
+## 404 vs 403
 
-Both "ID does not exist" and "authorization fails" return **404 Not Found**. Returning 403 for existing-but-forbidden resources leaks existence and enables ID-enumeration oracles. 404 everywhere keeps the surface opaque. The error message should still be useful without disclosing which case happened, for example: "resource not found or not permitted."
-
-Exception: calls on your own resources (e.g. `PATCH /me`) return 403 when the operation is disallowed, because existence is already disclosed by the call itself.
+Cross-project / no-foothold denials return **404 Not Found** so callers cannot
+probe which project ids exist. Inside a project the principal already has a
+foothold in, missing permission returns **403 Forbidden**
+([ADR 033](../../adrs/033-internal-permission-management.md)). Self resources
+the caller already knows exist (e.g. `PATCH /me`) also return 403 when
+disallowed.
 
 ## Continuity note
 
