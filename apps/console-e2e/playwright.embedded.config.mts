@@ -45,6 +45,12 @@ export default defineConfig({
     baseURL: origin,
     trace: "on-first-retry",
   },
+  // Two workers cold-start Chromium and cold-load the console SPA
+  // concurrently on a shared CI runner; the first visibility assertions sat
+  // right at the 5s default (a 5.2s pass, then a 5.1s flake). Product
+  // latency is not under test here — reachability is — so give readiness
+  // assertions headroom.
+  expect: { timeout: 10_000 },
   ...withZitadel({
     configDir: appDir,
     port: zitadelPort,

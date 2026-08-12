@@ -73,7 +73,13 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
       // wait is generous; a bootstrap failure surfaces as this timeout.
       await use(connectZitadel(await waitForHandshake(handshakePath)));
     },
-    { scope: "worker" },
+    // `auto`: every worker waits for the bootstrapped instance before its
+    // first test, including tests that use no fixture. Without it, a
+    // `page`-only test in an app-less suite can navigate during the
+    // bootstrap window and observe a project-less deployment — truthful,
+    // rendered as the setup hint, and not what any suite means to test.
+    // For app-ful suites this is a one-time handshake file read per worker.
+    { scope: "worker", auto: true },
   ],
   seed: async ({ zitadel, baseURL }, use) => {
     await use({
