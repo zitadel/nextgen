@@ -26,8 +26,7 @@ var tenantUserSchema = []byte(`{
   ],
   "x-auth-methods": {
     "password": {
-      "enabled": true,
-      "position": 0
+      "enabled": true
     }
   },
   "properties": {
@@ -35,7 +34,6 @@ var tenantUserSchema = []byte(`{
       "title": "Email Address",
       "type": "string",
       "format": "email",
-      "x-identifier": true,
       "x-unique": "project"
     }
   }

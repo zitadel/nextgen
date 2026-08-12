@@ -143,6 +143,9 @@ Options:
   --runtime <binary|docker> Local runtime backend (default: binary)
   --image <docker-tag>     Use an existing local runtime image instead of building one
   --preset <id>            Pass a sign-in preset to setup (e.g. passkey-first)
+  --preexisting-app        Seed a minimal pre-existing app before setup so the
+                           scaffolded pages take the widget posture (ADR 044);
+                           defaults the matrix to next and nuxt
   --tarballs-dir <path>    Use prebuilt release npm tarballs
   --keep                   Keep the temp work directory after success
   --work-dir <path>        Use an explicit work directory
@@ -228,6 +231,9 @@ async function runFrameworkJourney(context) {
         JOURNEY_APP_DIR: context.appDir,
         JOURNEY_APP_URL: context.appUrl,
         JOURNEY_FRAMEWORK: framework.id,
+        // Always explicit ("" = scaffold fresh) for the same GITHUB_ENV
+        // leak-proofing as JOURNEY_PRESET above.
+        JOURNEY_PREEXISTING_APP: options.preexistingApp ? "1" : "",
         JOURNEY_PRESET: options.preset,
         JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
         JOURNEY_REGISTRY_URL: registryUrl,
@@ -274,7 +280,9 @@ async function runFrameworkJourney(context) {
           JOURNEY_OUTPUT_DIR: context.frameworkWorkDir,
           JOURNEY_PLAYWRIGHT_OUTPUT_DIR: context.playwrightOutputDir,
           JOURNEY_PLAYWRIGHT_REPORT_DIR: context.playwrightReportDir,
-          // Always explicit ("" = default preset): see the prepare-app note.
+          // Always explicit ("" = default preset / fresh scaffold): see the
+          // prepare-app note.
+          JOURNEY_PREEXISTING_APP: options.preexistingApp ? "1" : "",
           JOURNEY_PRESET: options.preset,
         },
       },
@@ -305,6 +313,9 @@ async function runTestkitJourney(context) {
         JOURNEY_APP_DIR: context.appDir,
         JOURNEY_APP_URL: context.appUrl,
         JOURNEY_FRAMEWORK: framework.id,
+        // The testkit suite always scaffolds fresh; pin the flag off so a
+        // preceding CI journey step's GITHUB_ENV export cannot leak in.
+        JOURNEY_PREEXISTING_APP: "",
         JOURNEY_PRESET: options.preset,
         JOURNEY_ZITADEL_PORT: String(context.zitadelPort),
         JOURNEY_REGISTRY_URL: registryUrl,

@@ -90,7 +90,7 @@ func (s *TeamService) List(ctx context.Context, req ListTeamsRequest) (*ListTeam
 		filters = append(filters, filter)
 	}
 
-	orderBy, err := teamOrderBy(req.Sorting)
+	orderBy, err := listOrderBy(req.Sorting, domain.TeamFieldCreatedAt, database.OrderAsc, teamField, domain.TeamFieldID)
 	if err != nil {
 		return nil, err
 	}
@@ -118,38 +118,6 @@ func (s *TeamService) List(ctx context.Context, req ListTeamsRequest) (*ListTeam
 	}, nil
 }
 
-// teamOrderBy builds the sort order, defaulting to createdAt ascending, and
-// appends id as a tiebreaker so equal sort keys page deterministically.
-func teamOrderBy(sorting *Sorting) (database.OrderBy[domain.TeamField], error) {
-	sortField := domain.TeamFieldCreatedAt
-	direction := database.OrderAsc
-
-	if sorting != nil {
-		if sorting.Field != "" {
-			f, err := teamField(sorting.Field)
-			if err != nil {
-				return database.OrderBy[domain.TeamField]{}, err
-			}
-			sortField = f
-		}
-		dir, err := parseSortDirection(sorting.Direction)
-		if err != nil {
-			return database.OrderBy[domain.TeamField]{}, err
-		}
-		direction = dir
-	}
-
-	columns := []database.Column[domain.TeamField]{database.Col(sortField)}
-	// id is unique within a project, so appending it gives the sort a total
-	// order. Without it, rows sharing a sort-key value (e.g. equal createdAt)
-	// have no stable order, and cursor pagination could skip or repeat them
-	// across pages.
-	if sortField != domain.TeamFieldID {
-		columns = append(columns, database.Col(domain.TeamFieldID))
-	}
-	return database.OrderBy[domain.TeamField]{Columns: columns, Direction: direction}, nil
-}
-
 // teamFilter maps an API filter predicate to a storage filter. Operations the
 // v2 filter layer cannot express return [domain.ErrNotImplemented];
 // invalid field/operation/value combinations return [domain.ErrRequestInvalid].
@@ -158,19 +126,7 @@ func teamFilter(f Filter) (database.Filter[domain.TeamField], error) {
 	if err != nil {
 		return nil, err
 	}
-
-	raw, ok := f.Value.(string)
-	if !ok {
-		return nil, domain.ErrRequestInvalid().WithDetails("createdAt filter value must be an RFC3339 string")
-	}
-	// The createdAt filter value arrives as an untyped string (the filter-value union in the openapi contract
-	// does not specify a format for a timestamp); parse it into the time.Time needed for the comparison.
-	value, err := database.CoerceTimeValue(raw)
-	if err != nil {
-		return nil, domain.ErrRequestInvalid().WithDetails(
-			fmt.Sprintf("createdAt filter value %q is not a valid RFC3339 timestamp", raw))
-	}
-	return compareFilter(f.Operation, database.Col(field), value)
+	return createdAtFilter(f.Operation, database.Col(field), f.Value)
 }
 
 // teamField maps an API field name to its [domain.TeamField].

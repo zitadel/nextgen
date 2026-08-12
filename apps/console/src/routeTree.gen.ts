@@ -14,6 +14,7 @@ import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as AuthedUsersIndexRouteImport } from './routes/_authed/users/index'
 import { Route as AuthedSystemIndexRouteImport } from './routes/_authed/system/index'
+import { Route as AuthedSettingsIndexRouteImport } from './routes/_authed/settings/index'
 import { Route as AuthedSessionsIndexRouteImport } from './routes/_authed/sessions/index'
 import { Route as AuthedSchemasIndexRouteImport } from './routes/_authed/schemas/index'
 import { Route as AuthedProjectsIndexRouteImport } from './routes/_authed/projects/index'
@@ -44,6 +45,11 @@ const AuthedUsersIndexRoute = AuthedUsersIndexRouteImport.update({
 const AuthedSystemIndexRoute = AuthedSystemIndexRouteImport.update({
   id: '/system/',
   path: '/system/',
+  getParentRoute: () => AuthedRoute,
+} as any)
+const AuthedSettingsIndexRoute = AuthedSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
   getParentRoute: () => AuthedRoute,
 } as any)
 const AuthedSessionsIndexRoute = AuthedSessionsIndexRouteImport.update({
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/projects/': typeof AuthedProjectsIndexRoute
   '/schemas/': typeof AuthedSchemasIndexRoute
   '/sessions/': typeof AuthedSessionsIndexRoute
+  '/settings/': typeof AuthedSettingsIndexRoute
   '/system/': typeof AuthedSystemIndexRoute
   '/users/': typeof AuthedUsersIndexRoute
 }
@@ -107,6 +114,7 @@ export interface FileRoutesByTo {
   '/projects': typeof AuthedProjectsIndexRoute
   '/schemas': typeof AuthedSchemasIndexRoute
   '/sessions': typeof AuthedSessionsIndexRoute
+  '/settings': typeof AuthedSettingsIndexRoute
   '/system': typeof AuthedSystemIndexRoute
   '/users': typeof AuthedUsersIndexRoute
 }
@@ -122,6 +130,7 @@ export interface FileRoutesById {
   '/_authed/projects/': typeof AuthedProjectsIndexRoute
   '/_authed/schemas/': typeof AuthedSchemasIndexRoute
   '/_authed/sessions/': typeof AuthedSessionsIndexRoute
+  '/_authed/settings/': typeof AuthedSettingsIndexRoute
   '/_authed/system/': typeof AuthedSystemIndexRoute
   '/_authed/users/': typeof AuthedUsersIndexRoute
 }
@@ -137,6 +146,7 @@ export interface FileRouteTypes {
     | '/projects/'
     | '/schemas/'
     | '/sessions/'
+    | '/settings/'
     | '/system/'
     | '/users/'
   fileRoutesByTo: FileRoutesByTo
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
     | '/projects'
     | '/schemas'
     | '/sessions'
+    | '/settings'
     | '/system'
     | '/users'
   id:
@@ -164,6 +175,7 @@ export interface FileRouteTypes {
     | '/_authed/projects/'
     | '/_authed/schemas/'
     | '/_authed/sessions/'
+    | '/_authed/settings/'
     | '/_authed/system/'
     | '/_authed/users/'
   fileRoutesById: FileRoutesById
@@ -208,6 +220,13 @@ declare module '@tanstack/react-router' {
       path: '/system'
       fullPath: '/system/'
       preLoaderRoute: typeof AuthedSystemIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
+    '/_authed/settings/': {
+      id: '/_authed/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AuthedSettingsIndexRouteImport
       parentRoute: typeof AuthedRoute
     }
     '/_authed/sessions/': {
@@ -271,6 +290,7 @@ interface AuthedRouteChildren {
   AuthedProjectsIndexRoute: typeof AuthedProjectsIndexRoute
   AuthedSchemasIndexRoute: typeof AuthedSchemasIndexRoute
   AuthedSessionsIndexRoute: typeof AuthedSessionsIndexRoute
+  AuthedSettingsIndexRoute: typeof AuthedSettingsIndexRoute
   AuthedSystemIndexRoute: typeof AuthedSystemIndexRoute
   AuthedUsersIndexRoute: typeof AuthedUsersIndexRoute
 }
@@ -285,6 +305,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedProjectsIndexRoute: AuthedProjectsIndexRoute,
   AuthedSchemasIndexRoute: AuthedSchemasIndexRoute,
   AuthedSessionsIndexRoute: AuthedSessionsIndexRoute,
+  AuthedSettingsIndexRoute: AuthedSettingsIndexRoute,
   AuthedSystemIndexRoute: AuthedSystemIndexRoute,
   AuthedUsersIndexRoute: AuthedUsersIndexRoute,
 }

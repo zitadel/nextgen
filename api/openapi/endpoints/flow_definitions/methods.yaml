@@ -60,11 +60,7 @@ post:
           schema:
             $ref: ../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
+      $ref: createFlowDefinition-error-response.yaml
 
 get:
   operationId: listFlowDefinitions
@@ -107,8 +103,4 @@ get:
           schema:
             $ref: ../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
+      $ref: listFlowDefinitions-error-response.yaml

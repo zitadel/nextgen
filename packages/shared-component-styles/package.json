@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/shared-component-styles",
-  "version": "0.0.0",
+  "version": "0.0.1-alpha.0",
   "private": true,
   "description": "Shared surface CSS for paired Lit atoms and React components that ship the same Figma look. Opt-in per component — Lit-only and React-only UI do not live here.",
   "license": "MIT",

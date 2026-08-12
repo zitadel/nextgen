@@ -11,12 +11,11 @@ What matters here is the contract: which schema annotations exist, how the flow 
 
 | Annotation | Scope | Consumer | Purpose |
 |---|---|---|---|
-| `x-identifier: true` | Field | Flow Engine | Field used for user resolution in the identifier step |
 | `x-mfa: "sms"` | Field | Policy Engine | Field can be used for OTP delivery |
 | `x-sensitive: true` | Field | Flow Engine | Value redacted in API / flow payloads (non-audit) |
 | `x-audit: true` | Field | Audit emitter | Field value may appear in audit event payloads (allowlist; deny-by-default) |
 | `x-editable: true` | Field | Flow Engine | Field appears in profiling / self-service flows |
-| `x-unique: "project"` | Field | Flow Engine | Server validates uniqueness on form submit (per-project scope) |
+| `x-unique: "<scope>"` | Field | Flow Engine | Server validates uniqueness on form submit at the given scope (`project` or `team`); a non-empty scope also marks the field as an identifier used for user resolution |
 | `x-claim: "claims.email"` | Field | Flow Engine | Maps to SSO/OIDC claim for auto-population |
 | `x-auth-methods` | Schema | Policy Engine | Which auth methods this user type supports (narrows what policy can require) |
 
@@ -33,7 +32,7 @@ it uses deny-by-default + `x-audit`. The two annotations are complementary.
 User Schema                     Flow Definition                   Policy Engine
 ─────────────                   ───────────────                   ─────────────
 Defines fields:                 References schema fields:         Reads schema annotations:
-  email (x-identifier)           step fields: [email, password]    x-auth-methods →
+  email (x-unique: project)      step fields: [email, password]    x-auth-methods →
                                  step fields: [given_name, ...]     narrows available factors
   phone (x-mfa: sms)
   given_name                    user_schema: "human_user"         Reads user context:
@@ -57,10 +56,10 @@ The following is an example user schema showing the annotations that the flow en
   "type": "object",
   "title": "Human User",
   "x-auth-methods": {
-    "password":   { "enabled": true,  "position": 1 },
-    "passkey":    { "enabled": true,  "position": 0 },
-    "magic_link": { "enabled": true,  "position": 2 },
-    "sso":        { "enabled": true,  "position": 3 }
+    "password":   { "enabled": true },
+    "passkey":    { "enabled": true },
+    "magic_link": { "enabled": true },
+    "sso":        { "enabled": true }
   },
   "required": ["email", "given_name", "family_name"],
   "properties": {
@@ -68,7 +67,6 @@ The following is an example user schema showing the annotations that the flow en
       "type": "string",
       "format": "email",
       "title": "Email address",
-      "x-identifier": true,
       "x-unique": "project",
       "x-claim": "claims.email",
       "x-editable": true
@@ -120,7 +118,7 @@ Schema property:                 Step field:
     "type": "string",                "name": "email",
     "format": "email",               "label": "Email address",
     "title": "Email address",        "type": "email",
-    "x-identifier": true             "required": true,
+    "x-unique": "project"            "required": true,
   }                                  "validation": { "format": "email" }
                                    }
 ```
