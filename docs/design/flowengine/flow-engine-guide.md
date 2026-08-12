@@ -548,7 +548,7 @@ A session and a flow are different things with different lifetimes:
 |---|---|---|
 | **What it is** | Accumulated authentication factors | Orchestration state (current step, collected data) |
 | **Lifetime** | Hours to days | Seconds to minutes |
-| **Storage** | Postgres (durable) | Encrypted cookie (ephemeral) |
+| **Storage** | Configured dialect (SQLite / PostgreSQL / Spanner) | Encrypted cookie (ephemeral) |
 | **One or many?** | One session can have many flows over time | Each flow operates on one session |
 | **What it knows** | user, factors, assurance_levels | definition, step, history, collected data |
 

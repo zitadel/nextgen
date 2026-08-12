@@ -42,6 +42,7 @@ declare module "solid-js" {
         "post-sign-in-url"?: string;
         variant?: "widget" | "page";
         theme?: "light" | "dark" | "auto";
+        "prop:suppressHeader"?: boolean;
         "on:zitadel-flow-step"?: (event: CustomEvent<ZitadelFlowStepDetail>) => void;
         "on:zitadel-flow-input"?: (event: CustomEvent<ZitadelFlowInputDetail>) => void;
         "on:zitadel-flow-complete"?: (event: CustomEvent<ZitadelFlowCompleteDetail>) => void;
@@ -66,6 +67,7 @@ declare module "solid-js" {
         "logout-label"?: string;
         variant?: "widget" | "page";
         theme?: "light" | "dark" | "auto";
+        "prop:suppressHeader"?: boolean;
         "on:zitadel-signout"?: (event: CustomEvent<ZitadelSignoutDetail>) => void;
       };
     }
@@ -107,6 +109,7 @@ export function ZitadelLogin(
       post-sign-in-url={props.postSignInUrl}
       variant={props.variant}
       theme={props.theme}
+      prop:suppressHeader={props.suppressHeader}
       on:zitadel-flow-step={(event) => props.onFlowStep?.(event.detail)}
       on:zitadel-flow-input={(event) => props.onFlowInput?.(event.detail)}
       on:zitadel-flow-complete={(event) => props.onFlowComplete?.(event.detail)}
@@ -166,6 +169,7 @@ export function ZitadelSession(
       logout-label={props.logoutLabel}
       variant={props.variant}
       theme={props.theme}
+      prop:suppressHeader={props.suppressHeader}
       on:zitadel-signout={(event) => props.onSignout?.(event.detail)}
     />
   );

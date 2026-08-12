@@ -6,7 +6,6 @@ get:
   parameters:
     - $ref: ../../../../components/parameters/limit.yaml
     - $ref: ../../../../components/parameters/page-token.yaml
-    - $ref: ../../../../components/parameters/project-id.yaml
     - name: user_id
       in: path
       required: true

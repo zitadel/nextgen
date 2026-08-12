@@ -325,6 +325,28 @@ func validateGraph(flowDefinition FlowDefinition) ([]PivotingTarget, error) {
 	// 1. validate all transition targets
 	for _, step := range flowDefinition.Steps {
 		for key, t := range step.Transitions {
+			if t.Purpose != nil {
+				// Local re-purposing: never combined with a cross-flow
+				// action, only to a purpose this definition serves, and
+				// only to that purpose's entry step.
+				if t.Action != nil {
+					return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
+						"step %q: transition %q declares both purpose and action; a transition either re-purposes locally or targets another flow", step.Name, key), nil)
+				}
+				if !t.Purpose.IsAFlowDefinitionPurpose() {
+					return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
+						"step %q: transition %q has invalid purpose", step.Name, key), nil)
+				}
+				entry, ok := flowDefinition.Purposes[*t.Purpose]
+				if !ok {
+					return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
+						"step %q: transition %q re-purposes to %q, which this definition does not serve", step.Name, key, t.Purpose.String()), nil)
+				}
+				if t.Target != entry {
+					return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
+						"step %q: transition %q re-purposes to %q but targets %q; it must target that purpose's entry step %q", step.Name, key, t.Purpose.String(), t.Target, entry), nil)
+				}
+			}
 			if t.IsCurrentFlow() {
 				// target must be a step in this flow definition
 				if _, ok := stepNames[t.Target]; !ok {

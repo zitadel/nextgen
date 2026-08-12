@@ -9,3 +9,48 @@ body {
 #app {
   min-height: 100vh;
 }
+
+/*
+ * Shown instead of the widget when the deployment has no project yet
+ * (`src/main.ts`). The widget paints its own page chrome, so this branch has
+ * to bring its own surface — dark-only, like the rest of the login surface
+ * (ADR 014 §5).
+ */
+.setup-hint {
+  box-sizing: border-box;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2.5rem 1rem;
+  background: var(--zl-color-surface-default-black);
+  color: var(--zl-color-text-primary-white);
+  font-family: var(--zl-font-family-sans);
+  text-align: center;
+}
+
+.setup-hint h1 {
+  margin: 0;
+  font-family: var(--zl-font-family-heading);
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.setup-hint p {
+  margin: 0;
+  max-width: 32rem;
+  color: var(--zl-color-text-secondary-gray);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.setup-hint code {
+  border-radius: 4px;
+  background: var(--zl-color-surface-hover-subtle);
+  padding: 0.1rem 0.35rem;
+  color: var(--zl-color-text-primary-white);
+  font-family: var(--zl-font-family-mono);
+  font-size: 0.85em;
+}

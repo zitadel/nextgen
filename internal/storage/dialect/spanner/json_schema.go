@@ -38,25 +38,39 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 	if err := ensureManagedID(&schema.URL, domain.PrefixJSONSchema); err != nil {
 		return err
 	}
-	stmt := buildStatement(createJSONSchemaStmt, schema.ProjectID, schema.URL, schema.ObjectType, encodeJSONSchemaPayload(schema.Schema)).statement()
-	return js.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
-		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
-			scanned, err := js.scanJSONSchema(row)
-			if err != nil {
-				return struct{}{}, err
-			}
-			*schema = *scanned
-			return struct{}{}, nil
-		})
-		return err
+	return withTransaction(ctx, js.db, func(ctx context.Context, tx queryExecutor) error {
+		stmt := buildStatement(createJSONSchemaStmt, schema.ProjectID, schema.URL, schema.ObjectType, encodeJSONSchemaPayload(schema.Schema)).statement()
+		if err := tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
+				scanned, err := js.scanJSONSchema(row)
+				if err != nil {
+					return struct{}{}, err
+				}
+				*schema = *scanned
+				return struct{}{}, nil
+			})
+			return err
+		}); err != nil {
+			return err
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindSchema, schema.ProjectID, schema.URL))
 	})
 }
 
 // DeleteJSONSchemaByID implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, projectID, schemaID string) error {
-	stmt := buildStatement(deleteByIDJSONSchemaStmt, projectID, schemaID).statement()
-	_, err := js.db.Update(ctx, stmt)
-	return err
+	return withTransaction(ctx, js.db, func(ctx context.Context, tx queryExecutor) error {
+		n, err := tx.Update(ctx, buildStatement(deleteByIDJSONSchemaStmt, projectID, schemaID).statement())
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return nil
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.DeleteResourceScope(ctx, domain.ResourceKindSchema, projectID, schemaID)
+	})
 }
 
 // GetJSONSchemaByID implements [service.JSONSchemaStatements].
@@ -71,7 +85,7 @@ func (js jsonSchemaStatements) GetJSONSchemaByID(ctx context.Context, projectID,
 // ListJSONSchemas implements [service.JSONSchemaStatements].
 func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, jsonSchemaQuery, filter, jsonSchemaSchema); err != nil {
+	if err := compileList(ctx, &compiler, jsonSchemaQuery, filter, jsonSchemaSchema, "json_schemas", "url"); err != nil {
 		return nil, err
 	}
 

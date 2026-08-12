@@ -111,8 +111,9 @@ For product direction and the four pillars, see [VISION.md](VISION.md).
 Pull requests are gated by the GitHub Actions context `full-pr`, shown in the
 pull request UI as `ci / full-pr`. On a 16-core runner it runs a Go
 generated-file drift check, lint, type checks, builds, unit and browser
-tests, Go tests including Postgres integration, a non-publishing release
-snapshot, and fresh-app journeys against the snapshot's npm tarballs.
+tests, Go tests including Postgres/Spanner/SQLite dialect integration, a
+non-publishing release snapshot, and fresh-app journeys against the snapshot's
+npm tarballs.
 Changesets version PRs run a smaller release validation path instead, and
 Changesets comments give release-intent feedback without adding a blocking
 gate. The full step list lives in
