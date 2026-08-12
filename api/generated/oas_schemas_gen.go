@@ -742,8 +742,6 @@ func (s *AuthAttemptResponseState) UnmarshalText(data []byte) error {
 type AuthMethod struct {
 	// Whether the authentication method is enabled or not.
 	Enabled bool `json:"enabled"`
-	// The position of the authentication method in the list of supported methods.
-	Position int `json:"position"`
 }
 
 // GetEnabled returns the value of Enabled.
@@ -751,19 +749,9 @@ func (s *AuthMethod) GetEnabled() bool {
 	return s.Enabled
 }
 
-// GetPosition returns the value of Position.
-func (s *AuthMethod) GetPosition() int {
-	return s.Position
-}
-
 // SetEnabled sets the value of Enabled.
 func (s *AuthMethod) SetEnabled(val bool) {
 	s.Enabled = val
-}
-
-// SetPosition sets the value of Position.
-func (s *AuthMethod) SetPosition(val int) {
-	s.Position = val
 }
 
 // A list of authentication methods supported by the user definition.
@@ -11638,8 +11626,6 @@ type ListUserTeamsErrorResponse struct {
 	AuthUnauthorized     AuthUnauthorized
 	Internal             Internal
 	ReqInvalid           ReqInvalid
-	TeamTeamNotFound     TeamTeamNotFound
-	TeamPermissionDenied TeamPermissionDenied
 	UserNotFound         UserNotFound
 	UserPermissionDenied UserPermissionDenied
 }
@@ -11652,8 +11638,6 @@ const (
 	AuthUnauthorizedListUserTeamsErrorResponse     ListUserTeamsErrorResponseType = "auth.unauthorized"
 	InternalListUserTeamsErrorResponse             ListUserTeamsErrorResponseType = "internal"
 	ReqInvalidListUserTeamsErrorResponse           ListUserTeamsErrorResponseType = "req.invalid"
-	TeamTeamNotFoundListUserTeamsErrorResponse     ListUserTeamsErrorResponseType = "team.team_not_found"
-	TeamPermissionDeniedListUserTeamsErrorResponse ListUserTeamsErrorResponseType = "team.permission_denied"
 	UserNotFoundListUserTeamsErrorResponse         ListUserTeamsErrorResponseType = "user.not_found"
 	UserPermissionDeniedListUserTeamsErrorResponse ListUserTeamsErrorResponseType = "user.permission_denied"
 )
@@ -11671,16 +11655,6 @@ func (s ListUserTeamsErrorResponse) IsInternal() bool {
 // IsReqInvalid reports whether ListUserTeamsErrorResponse is ReqInvalid.
 func (s ListUserTeamsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListUserTeamsErrorResponse
-}
-
-// IsTeamTeamNotFound reports whether ListUserTeamsErrorResponse is TeamTeamNotFound.
-func (s ListUserTeamsErrorResponse) IsTeamTeamNotFound() bool {
-	return s.Type == TeamTeamNotFoundListUserTeamsErrorResponse
-}
-
-// IsTeamPermissionDenied reports whether ListUserTeamsErrorResponse is TeamPermissionDenied.
-func (s ListUserTeamsErrorResponse) IsTeamPermissionDenied() bool {
-	return s.Type == TeamPermissionDeniedListUserTeamsErrorResponse
 }
 
 // IsUserNotFound reports whether ListUserTeamsErrorResponse is UserNotFound.
@@ -11753,48 +11727,6 @@ func (s ListUserTeamsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidListUserTeamsErrorResponse(v ReqInvalid) ListUserTeamsErrorResponse {
 	var s ListUserTeamsErrorResponse
 	s.SetReqInvalid(v)
-	return s
-}
-
-// SetTeamTeamNotFound sets ListUserTeamsErrorResponse to TeamTeamNotFound.
-func (s *ListUserTeamsErrorResponse) SetTeamTeamNotFound(v TeamTeamNotFound) {
-	s.Type = TeamTeamNotFoundListUserTeamsErrorResponse
-	s.TeamTeamNotFound = v
-}
-
-// GetTeamTeamNotFound returns TeamTeamNotFound and true boolean if ListUserTeamsErrorResponse is TeamTeamNotFound.
-func (s ListUserTeamsErrorResponse) GetTeamTeamNotFound() (v TeamTeamNotFound, ok bool) {
-	if !s.IsTeamTeamNotFound() {
-		return v, false
-	}
-	return s.TeamTeamNotFound, true
-}
-
-// NewTeamTeamNotFoundListUserTeamsErrorResponse returns new ListUserTeamsErrorResponse from TeamTeamNotFound.
-func NewTeamTeamNotFoundListUserTeamsErrorResponse(v TeamTeamNotFound) ListUserTeamsErrorResponse {
-	var s ListUserTeamsErrorResponse
-	s.SetTeamTeamNotFound(v)
-	return s
-}
-
-// SetTeamPermissionDenied sets ListUserTeamsErrorResponse to TeamPermissionDenied.
-func (s *ListUserTeamsErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
-	s.Type = TeamPermissionDeniedListUserTeamsErrorResponse
-	s.TeamPermissionDenied = v
-}
-
-// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if ListUserTeamsErrorResponse is TeamPermissionDenied.
-func (s ListUserTeamsErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
-	if !s.IsTeamPermissionDenied() {
-		return v, false
-	}
-	return s.TeamPermissionDenied, true
-}
-
-// NewTeamPermissionDeniedListUserTeamsErrorResponse returns new ListUserTeamsErrorResponse from TeamPermissionDenied.
-func NewTeamPermissionDeniedListUserTeamsErrorResponse(v TeamPermissionDenied) ListUserTeamsErrorResponse {
-	var s ListUserTeamsErrorResponse
-	s.SetTeamPermissionDenied(v)
 	return s
 }
 
@@ -17097,98 +17029,6 @@ func (o OptTeamID) Or(d TeamID) TeamID {
 	return d
 }
 
-// NewOptTeamPermissionDeniedDetails returns new OptTeamPermissionDeniedDetails with value set to v.
-func NewOptTeamPermissionDeniedDetails(v TeamPermissionDeniedDetails) OptTeamPermissionDeniedDetails {
-	return OptTeamPermissionDeniedDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptTeamPermissionDeniedDetails is optional TeamPermissionDeniedDetails.
-type OptTeamPermissionDeniedDetails struct {
-	Value TeamPermissionDeniedDetails
-	Set   bool
-}
-
-// IsSet returns true if OptTeamPermissionDeniedDetails was set.
-func (o OptTeamPermissionDeniedDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptTeamPermissionDeniedDetails) Reset() {
-	var v TeamPermissionDeniedDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptTeamPermissionDeniedDetails) SetTo(v TeamPermissionDeniedDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptTeamPermissionDeniedDetails) Get() (v TeamPermissionDeniedDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptTeamPermissionDeniedDetails) Or(d TeamPermissionDeniedDetails) TeamPermissionDeniedDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptTeamTeamNotFoundDetails returns new OptTeamTeamNotFoundDetails with value set to v.
-func NewOptTeamTeamNotFoundDetails(v TeamTeamNotFoundDetails) OptTeamTeamNotFoundDetails {
-	return OptTeamTeamNotFoundDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptTeamTeamNotFoundDetails is optional TeamTeamNotFoundDetails.
-type OptTeamTeamNotFoundDetails struct {
-	Value TeamTeamNotFoundDetails
-	Set   bool
-}
-
-// IsSet returns true if OptTeamTeamNotFoundDetails was set.
-func (o OptTeamTeamNotFoundDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptTeamTeamNotFoundDetails) Reset() {
-	var v TeamTeamNotFoundDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptTeamTeamNotFoundDetails) SetTo(v TeamTeamNotFoundDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptTeamTeamNotFoundDetails) Get() (v TeamTeamNotFoundDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptTeamTeamNotFoundDetails) Or(d TeamTeamNotFoundDetails) TeamTeamNotFoundDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptTknInvalidDetails returns new OptTknInvalidDetails with value set to v.
 func NewOptTknInvalidDetails(v TknInvalidDetails) OptTknInvalidDetails {
 	return OptTknInvalidDetails{
@@ -22475,59 +22315,6 @@ func (s *TeamFilterField) UnmarshalText(data []byte) error {
 
 type TeamID string
 
-// Merged schema.
-// Ref: #
-type TeamPermissionDenied struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptTeamPermissionDeniedDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *TeamPermissionDenied) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *TeamPermissionDenied) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *TeamPermissionDenied) GetDetails() OptTeamPermissionDeniedDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *TeamPermissionDenied) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *TeamPermissionDenied) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *TeamPermissionDenied) SetDetails(val OptTeamPermissionDeniedDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type TeamPermissionDeniedDetails map[string]jx.Raw
-
-func (s *TeamPermissionDeniedDetails) init() TeamPermissionDeniedDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
 // Details of a team.
 // Ref: #
 type TeamResponse struct {
@@ -22639,59 +22426,6 @@ func (s *TeamStatus) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
-}
-
-// Merged schema.
-// Ref: #
-type TeamTeamNotFound struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptTeamTeamNotFoundDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *TeamTeamNotFound) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *TeamTeamNotFound) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *TeamTeamNotFound) GetDetails() OptTeamTeamNotFoundDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *TeamTeamNotFound) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *TeamTeamNotFound) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *TeamTeamNotFound) SetDetails(val OptTeamTeamNotFoundDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type TeamTeamNotFoundDetails map[string]jx.Raw
-
-func (s *TeamTeamNotFoundDetails) init() TeamTeamNotFoundDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
 }
 
 // Merged schema.

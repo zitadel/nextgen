@@ -36,10 +36,11 @@ func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectReque
 }
 
 func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (api.GetProjectRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), projectAccess, opRead); err != nil {
+	projectID := string(params.ProjectID)
+	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opRead); err != nil {
 		return nil, err
 	}
-	project, err := h.projectService.Get(ctx, string(params.ProjectID))
+	project, err := h.projectService.Get(ctx, projectID)
 	if err != nil {
 		// The guard already bound the request to the token's own project, so
 		// this only fires if that project vanished mid-request; answer with
@@ -53,12 +54,13 @@ func (h *Handler) GetProject(ctx context.Context, params api.GetProjectParams) (
 }
 
 func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest, params api.PatchProjectParams) (api.PatchProjectRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), projectAccess, opWrite); err != nil {
+	projectID := string(params.ProjectID)
+	if err := h.requireProjectAccess(ctx, projectID, projectAccess, opWrite); err != nil {
 		return nil, err
 	}
 	// An absent or null name leaves nothing to write; Update rejects the empty
 	// string with proj.name_invalid, the 400 the contract declares.
-	project, err := h.projectService.Update(ctx, string(params.ProjectID), req.Name.Or(""))
+	project, err := h.projectService.Update(ctx, projectID, req.Name.Or(""))
 	if err != nil {
 		return nil, err
 	}
@@ -66,11 +68,11 @@ func (h *Handler) PatchProject(ctx context.Context, req *api.PatchProjectRequest
 }
 
 // QueryProjects has no project parameter: results are restricted to the
-// caller's project. requireProjectAccess rejects an unbound scope, so the
+// caller's project. The authz gate rejects an unbound / no-foothold scope, so the
 // ProjectID passed on is always set.
 func (h *Handler) QueryProjects(ctx context.Context, req *api.QueryProjectsRequest) (api.QueryProjectsRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
-	if err := requireProjectAccess(ctx, scopeCtx.ProjectID, projectAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, scopeCtx.ProjectID, projectAccess, opRead); err != nil {
 		return nil, err
 	}
 

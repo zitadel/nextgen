@@ -55,14 +55,16 @@ describe("preset selection", () => {
 
 describe("passkey-first preset shape", () => {
   const schema = getDefaultHumanUserSchema({ preset: "passkey-first" }) as unknown as {
-    "x-auth-methods": Record<string, { enabled: boolean; position: number }>;
+    "x-auth-methods": Record<string, { enabled: boolean }>;
     required: string[];
   };
   const flow = getDefaultLoginFlow({ preset: "passkey-first", userSchemaUrl: "sch_TEST" });
 
-  it("puts passkey first and keeps password as the fallback method", () => {
-    expect(schema["x-auth-methods"].passkey).toEqual({ enabled: true, position: 1 });
-    expect(schema["x-auth-methods"].password).toEqual({ enabled: true, position: 2 });
+  // The schema says which methods exist; the order they are offered in is the
+  // flow's, from its entry step (asserted below).
+  it("enables passkey and keeps password as the fallback method", () => {
+    expect(schema["x-auth-methods"].passkey).toEqual({ enabled: true });
+    expect(schema["x-auth-methods"].password).toEqual({ enabled: true });
   });
 
   it("keeps email required so the fallback path always works", () => {

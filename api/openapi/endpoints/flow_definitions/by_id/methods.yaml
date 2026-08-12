@@ -9,12 +9,6 @@ get:
         - flow_definition.read
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
-    - name: project_id
-      in: query
-      description: The project id to filter by.
-      required: true
-      schema:
-        $ref: ../../../components/schemas/project-id.yaml
   responses:
     '200':
       description: Flow definition found.
@@ -38,12 +32,6 @@ put:
         - flow_definition.write
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
-    - name: project_id
-      in: query
-      description: The project id to filter by.
-      required: true
-      schema:
-        $ref: ../../../components/schemas/project-id.yaml
   requestBody:
     required: true
     content:
@@ -86,12 +74,6 @@ delete:
         - flow_definition.delete
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
-    - name: project_id
-      in: query
-      description: The project id to filter by.
-      required: true
-      schema:
-        $ref: ../../../components/schemas/project-id.yaml
   responses:
     '204':
       description: Flow definition deleted successfully. This is an idempotent operation, so if the flow definition does not exist, it will still return a 204 status code.

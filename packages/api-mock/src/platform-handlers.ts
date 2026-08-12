@@ -58,7 +58,6 @@ import {
   ListUsersQueryParams,
   UpdateFlowDefinitionBody,
   UpdateFlowDefinitionParams,
-  UpdateFlowDefinitionQueryParams,
   UpdateFlowDefinitionResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { validateFlowDefinition } from "@zitadel/config/validate";
@@ -308,21 +307,6 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
 function schemaObjectType(body: GetSchemaById200): string | undefined {
   const value = (body as unknown as { objectType?: unknown }).objectType;
   return typeof value === "string" ? value : undefined;
-}
-
-function requiredProjectID(
-  request: Request,
-): { ok: true; data: string } | { ok: false; response: HttpResponse<ErrorBody> } {
-  const projectID = new URL(request.url).searchParams.get("project_id");
-  if (projectID) {
-    return { ok: true, data: projectID };
-  }
-  return {
-    ok: false,
-    response: HttpResponse.json(errorBody("invalid_query", "project_id is required"), {
-      status: 400,
-    }),
-  };
 }
 
 function schemaID(id: string): string {
@@ -729,15 +713,15 @@ export function setupPlatformHandlers() {
       if (!path.ok) {
         return path.response;
       }
+      // Flat-by-id: OpenAPI dropped required project_id; optional team_id may
+      // still appear. Authz on the real server resolves ownership via RSI.
       const query = parse(GetSchemaByIdQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
 
-      // Scoped by (project_id, id) like the real repository (GetByID takes
-      // both); a schema belonging to another project reads as absent.
       const record = store.schemas.get(schemaID(path.data.id));
-      if (!record || record.projectId !== query.data.project_id) {
+      if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
       return HttpResponse.json(record.body);
@@ -753,10 +737,9 @@ export function setupPlatformHandlers() {
         return query.response;
       }
 
-      // Same project scoping as GET: never delete another project's schema.
       const key = schemaID(path.data.id);
       const record = store.schemas.get(key);
-      if (!record || record.projectId !== query.data.project_id) {
+      if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
       store.schemas.delete(key);
@@ -820,18 +803,16 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data);
     }),
 
-    http.get("*/flow_definitions/:id", ({ params, request }) => {
+    http.get("*/flow_definitions/:id", ({ params }) => {
       const path = parse(GetFlowDefinitionParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
-      const query = requiredProjectID(request);
-      if (!query.ok) {
-        return query.response;
-      }
 
+      // Flat-by-id: no project_id query — ownership is resolved via RSI+Check
+      // on the real server.
       const record = store.flowDefinitions.get(path.data.id);
-      if (!record || record.projectId !== query.data) {
+      if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
       const responseBody: GetFlowDefinition200 = flowDetailResponse(record);
@@ -847,17 +828,9 @@ export function setupPlatformHandlers() {
       if (!path.ok) {
         return path.response;
       }
-      const query = parse(
-        UpdateFlowDefinitionQueryParams,
-        queryRecord(request),
-        "invalid_query",
-      );
-      if (!query.ok) {
-        return query.response;
-      }
 
       const record = store.flowDefinitions.get(path.data.id);
-      if (!record || record.projectId !== query.data.project_id) {
+      if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
       const raw = await readJson(request);
@@ -890,24 +863,17 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data, { status: 200 });
     }),
 
-    http.delete("*/flow_definitions/:id", ({ params, request }) => {
+    http.delete("*/flow_definitions/:id", ({ params }) => {
       const path = parse(DeleteFlowDefinitionParams, params, "invalid_request");
       if (!path.ok) {
         return path.response;
       }
-      const query = requiredProjectID(request);
-      if (!query.ok) {
-        return query.response;
-      }
 
       const record = store.flowDefinitions.get(path.data.id);
-      if (!record || record.projectId !== query.data) {
+      if (!record) {
         return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
       }
-      const existed = store.flowDefinitions.delete(path.data.id);
-      if (!existed) {
-        return HttpResponse.json(errorBody("not_found", "resource not found"), { status: 404 });
-      }
+      store.flowDefinitions.delete(path.data.id);
       return new HttpResponse(null, { status: 204 });
     }),
   ];

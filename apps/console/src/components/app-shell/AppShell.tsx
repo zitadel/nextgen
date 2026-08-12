@@ -58,7 +58,12 @@ export function AppShell({
   return (
     <SidebarProvider defaultOpen={readSidebarOpen()}>
       <AppSidebar user={user} onSignOut={onSignOut} />
-      <SidebarInset>
+      {/* `min-w-0` because the inset is a flex item, and a flex item's default
+          `min-width: auto` makes it grow to fit its widest content instead of
+          letting that content scroll. Without it a table wider than the viewport
+          stretches the whole page and the window scrolls sideways, rather than
+          the table scrolling inside its own card. */}
+      <SidebarInset className="min-w-0">
         <ContextBar />
         {children}
       </SidebarInset>
@@ -341,7 +346,10 @@ function ContextBar() {
   const { state } = useSidebar();
 
   return (
-    <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-background px-2 pt-3 md:items-center md:px-4 md:pt-7">
+    // 64px tall with its content centred, per the navbar every screen frame
+    // draws. `pt-7` bottom-aligned a 40px row into 68px, which pushed every
+    // page 4px down the screen.
+    <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-background px-2 py-3 md:items-center md:px-4">
       <div className="flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:items-center">
         {/* Desktop only — mobile keeps the persistent Sidebar 07. icon rail. */}
         {state === "expanded" && <SidebarTrigger className="hidden text-foreground md:inline-flex" />}

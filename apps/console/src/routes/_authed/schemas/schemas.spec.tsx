@@ -17,16 +17,15 @@ vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 const SCHEMAS_URL = "http://localhost/api/schemas";
 
 /**
- * Shaped like the shipped presets: `x-auth-methods` positions passkey first
- * (the `passkey-first` preset), one required property, and one nested object to
- * drill into.
+ * Shaped like the shipped presets: `x-auth-methods` with passkey on and
+ * password off, one required property, and one nested object to drill into.
  */
 const BUSINESS = {
   title: "Business",
   objectType: "human-user",
   "x-auth-methods": {
-    password: { enabled: false, position: 2 },
-    passkey: { enabled: true, position: 1 },
+    password: { enabled: false },
+    passkey: { enabled: true },
   },
   required: ["email"],
   properties: {
@@ -100,10 +99,29 @@ describe("user schemas list", () => {
       expect(screen.getByText(attribute)).toBeInTheDocument();
     }
 
-    // Only the enabled methods, ordered by the schema's own `position`, which
-    // is why passkey leads here.
+    // Only the enabled methods — password is declared but off.
     expect(screen.getByText("Passkey")).toBeInTheDocument();
     expect(screen.queryByText(/Password/)).not.toBeInTheDocument();
+  });
+
+  it("joins the enabled methods in a stable order", async () => {
+    // Alphabetical by annotation key, so the chip does not reshuffle between
+    // loads — `GET /schemas/{id}` serialises from a Go map and its key order is
+    // randomised. It is not a claim about which method is offered first: that
+    // is the flow's, from the order of its step's actions.
+    server.use(
+      http.get(SCHEMAS_URL, () =>
+        HttpResponse.json([{ id: "sch_both", created_at: "2026-07-12T16:59:04Z" }]),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_both`, () =>
+        HttpResponse.json({
+          ...BUSINESS,
+          "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
+        }),
+      ),
+    );
+    await renderAt("/schemas");
+    expect(await screen.findByText("Passkey + Password")).toBeInTheDocument();
   });
 
   it("identifies a schema by its id and creation date (D10)", async () => {
@@ -229,6 +247,10 @@ describe("user schema detail", () => {
     // declares it, so hiding it would misreport the configuration.
     expect(panel.getByText("Passkey").nextSibling).toHaveTextContent("Enabled");
     expect(panel.getByText("Password").nextSibling).toHaveTextContent("Disabled");
+
+    // Same stable alphabetical order as the list chip, for the same reason.
+    const text = screen.getByRole("tabpanel").textContent ?? "";
+    expect(text.indexOf("Passkey")).toBeLessThan(text.indexOf("Password"));
   });
 
   it("renders the document as JSON and as YAML", async () => {
