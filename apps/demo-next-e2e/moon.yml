@@ -11,6 +11,13 @@ tasks:
   lint:
     command: "corepack pnpm exec oxlint ."
 
+  typecheck:
+    command: "corepack pnpm run typecheck"
+    deps:
+      # The real-instance config and src-real specs import
+      # @zitadel/testing/playwright.
+      - "testing:build"
+
   e2e:
     command: "corepack pnpm exec playwright test"
     deps:

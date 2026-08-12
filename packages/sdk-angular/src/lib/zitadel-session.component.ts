@@ -41,6 +41,7 @@ import "@zitadel/components";
     [attr.logout-label]="logoutLabel"
     [attr.variant]="variant ?? null"
     [attr.theme]="theme ?? null"
+    [suppressHeader]="suppressHeader"
     (zitadel-signout)="onSignout($event)"
   ></zitadel-session>`,
 })
@@ -53,6 +54,7 @@ export class ZitadelSessionComponent {
   @Input() logoutLabel?: string;
   @Input() variant?: "widget" | "page";
   @Input() theme?: "light" | "dark" | "auto";
+  @Input() suppressHeader?: boolean;
   @Output() signout = new EventEmitter<ZitadelSignoutDetail>();
 
   @ViewChild("el") private elementRef?: ElementRef<ZitadelSessionElement>;

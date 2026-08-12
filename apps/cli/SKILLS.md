@@ -186,7 +186,8 @@ the CLI's help layer, not the envelope.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.
 - `start` — start the managed local Zitadel server and persist runtime metadata
-  under `.zitadel/local/runtime.json`. Use `--runtime docker` or `--image` for
+  under `.zitadel/local/runtime.json`. The binary runtime defaults to SQLite
+  under `.zitadel/local/nextgen-data/`. Use `--runtime docker` or `--image` for
   the Docker backend.
 - `stop` — stop the managed runtime while preserving
   `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered
@@ -281,9 +282,9 @@ validator (`E_VALIDATION` lists rule ids such as `no-script-tag` and
 must be absolute `https://`. Keep exactly one descriptor in
 `.zitadel/branding/` — extra `*.json` files there fail the scan.
 Server-provisioned defaults remain a fallback for non-CLI project
-creation, but CLI-created projects are authored from local files first. Flow create, read, list, and
-update are available, while the server enforces lifecycle rules such as
-draft-only edits. Managed files carry a marker comment; `eject` removes only
+creation, but CLI-created projects are authored from local files first. Flow create, read, list,
+update, and delete are available, while the server enforces lifecycle rules
+such as draft-only edits. Managed files carry a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
 requires a healthy

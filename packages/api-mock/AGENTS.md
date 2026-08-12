@@ -40,14 +40,20 @@ properties it fixes, both of which this mock got wrong until they were corrected
   name let the orchestrator send a key the real backend refuses — invisible to
   every mock-backed test.
 
-Two knowing, documented exceptions: the `identifier` step keeps `register` and
-`recover` navigate actions (the real flow reaches register via the engine's
-`user_not_found` transition and has no recovery step yet) so those screens stay
-reachable, and the `passkey-upsell`/`passkey-setup` pair is retained for direct
-actor injection though the default flow no longer routes through it.
+Two knowing, documented exceptions: the `identifier` step keeps a `recover`
+navigate action (the default flow defines no recovery step yet) so that screen
+stays reachable, and the `passkey-upsell`/`passkey-setup` pair is retained for
+direct actor injection though the default flow no longer routes through it.
+(`register` on identifier and `sign_in` on register used to be listed here;
+they are real now — the default declares them as navigate actions with
+purposed transitions.)
 
-**Before changing a step fixture, diff it against that JSON.** If a design or
-test needs a shape the server does not emit, the flow definition changes first.
+**Before changing a step fixture, diff it against that JSON.** The per-step
+action surface is enforced automatically by
+`src/fixtures/default-conformance.spec.ts` — a fixture can neither miss a
+declared action nor grow an extra beyond its documented allowlist. If a design
+or test needs a shape the server does not emit, the flow definition changes
+first.
 
 ## Architecture
 

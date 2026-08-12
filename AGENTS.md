@@ -304,11 +304,48 @@ minting contract (`Ensure` / `NewManagedID`, the `idgen` boundary) lives in
 ## Generated Files
 
 - Do not hand-edit `api/generated/**`; update `api/openapi/**` and run
-  `moon run server:generate` or `go generate ./...`. CI enforces committed
-  generated output through `server:check-generate` (via `server:test`).
+  `moon run server:generate`. CI enforces committed generated output through
+  `server:check-generate` (via `server:test`). Bare `go generate ./...` produces
+  the same output, but runs every directive serially — slower, though not by the
+  multiple the parallelism suggests, because `./api` is itself a serial chain and
+  the larger half of the run (`scripts/go-generate.mjs` carries the numbers). Both go
+  through the same `//go:generate` directives; the moon task just schedules them
+  (`scripts/go-generate.mjs`). Either path works over a pruned tree. The one
+  thing that makes that non-trivial lives in `api/cmd/gen_openapi_errors`, which
+  type-loads `./internal/...` to infer each operation's error set: the load needs
+  `api/generated`, which only ogen — the last link of api's own chain — writes,
+  and it needs enumer's output, which `./...` reaches only after `api`. The
+  generator resolves both itself, running those two directives (`go generate
+  -run`) over a placeholder spec before analyzing. Neither caller knows about the
+  cycle; do not reintroduce a scheduler-side bootstrap pass.
   Wire fields are `snake_case`, enforced by the redocly rules and
   `workspace:check-openapi-rules` — the wire contract rules live in
   [api/openapi/AGENTS.md](api/openapi/AGENTS.md).
+- The consolidated `mockgen` directives live in the mock packages
+  (`internal/domain/mock`, `internal/service/mocks`, `internal/crypto/mock`),
+  not beside the interfaces they mock. mockgen has to type-check the source
+  package, which does not compile until its `*_enumer.go` files exist, so the
+  directive has to run after them. `go generate ./...` walks packages in
+  import-path order, which sequences it correctly. Moving one of these
+  directives back next to its interfaces breaks generation from a clean tree.
+- Generating never deletes. A generated file whose directive stopped producing
+  it — a renamed destination, an interface no longer mocked — stays on disk and
+  stays committed, still compiling and still importable. `server:generate`
+  cannot tell you about it, because it only ever writes.
+
+  To prune, remove everything and regenerate:
+
+  ```sh
+  moon run server:clean-generated && moon run server:generate
+  ```
+
+  Whatever does not come back was orphaned; commit its deletion. Do this when
+  you change where a generator writes, drop an interface from a mockgen
+  directive, or delete a type that had an `enumer` directive.
+  `moon run server:clean-generated -- --dry-run` lists what would go without
+  touching anything. Generation restores everything that is still generated —
+  which is the point: what stays missing was the orphan — so cleaning is safe at
+  any time.
 - Do not hand-edit generated package output under `dist/`.
 - Do not hand-edit `apps/console/src/routeTree.gen.ts`; update route files and
   let the TanStack Router plugin regenerate it.
