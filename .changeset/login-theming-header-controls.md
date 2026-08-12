@@ -14,10 +14,10 @@ Theming and header controls for the login surface:
 - The primary button now consumes the semantic `--zl-primary` /
   `--zl-primary-foreground` pair (Figma-owned values; the previous legacy
   role tokens remain as fallback). Expect a slight visual shift on stock
-  buttons; setting the pair on the host element — or `branding.palette.
-  primary`/`on_primary`, which now feed both vocabularies — restyles the
-  CTA. Hover intentionally stays on the legacy hover role until Figma
-  publishes a primary-scoped hover value.
+  buttons; setting the pair on the host element — or
+  `branding.palette.primary` / `branding.palette.on_primary`, which now
+  feed both vocabularies — restyles the CTA. Hover intentionally stays on
+  the legacy hover role until Figma publishes a primary-scoped hover value.
 - `branding.palette.link` finally reaches the links: card navigation,
   forgot-password, and field links consume a new `--zl-color-text-link`
   contract variable (unset by default, falling back to the existing purple
