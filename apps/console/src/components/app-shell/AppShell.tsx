@@ -1,12 +1,14 @@
 import { Link, useMatchRoute } from "@tanstack/react-router";
 // `BookOpen` / `Search` return with the parked footer items below.
-import { ChevronsUpDown, LogOut, Monitor, Moon, Sun } from "lucide-react";
+import { ArrowLeft, ChevronsUpDown, Monitor, Moon, Sun } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useRef } from "react";
 
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -25,11 +27,12 @@ import {
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 import { type ThemePreference, useTheme } from "../../theme";
 import { ContextSwitcher } from "./ContextSwitcher";
-import { ZitadelMark } from "./icons";
+import { ZitadelLogo } from "./icons";
 import { useNavItems } from "./use-nav-items";
 
 /**
@@ -77,83 +80,45 @@ function readSidebarOpen(): boolean {
   return match ? match[1] === "true" : true;
 }
 
+/** Route prefix that puts the shell into its Settings view. */
+const SETTINGS_PATH = "/settings";
+
+/**
+ * The collapsed rail's 44px header band. The rail owns the collapse toggle —
+ * the context bar hides its own while collapsed, so the two never compete.
+ */
+const RAIL_HEADER = "hidden h-11 items-center justify-center group-data-[collapsible=icon]:flex";
+
+/** Both header buttons are 28px square in the rail, per the design. */
+const RAIL_BUTTON = "size-7!";
+
+/**
+ * The back row is a full-width 32px row while extended and a 28px square in the
+ * rail, so its collapsed size is a variant rather than a flat override.
+ */
+const BACK_BUTTON = "group-data-[collapsible=icon]:size-7!";
+
+/**
+ * The sidebar has two views and the **route** decides which is showing:
+ * `/settings` and anything beneath it render Settings, everything else renders
+ * Portal. Deriving the view from the route rather than from component state is
+ * what lets a settings URL survive a refresh, and it keeps the shell consistent
+ * with ADR 0001's route-driven nav.
+ *
+ * Both views collapse to the same 48px icon rail.
+ */
 function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
-  const items = useNavItems();
   const matchRoute = useMatchRoute();
+  const inSettings = !!matchRoute({ to: SETTINGS_PATH, fuzzy: true });
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="h-[108px] flex-row items-center gap-2 px-6 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-        <Link to="/" aria-label="Home" className="inline-flex items-center">
-          <ZitadelMark size={32} className="text-sidebar-foreground" aria-hidden />
-        </Link>
-      </SidebarHeader>
+      {inSettings ? <SettingsHeader /> : <PortalHeader />}
 
-      <SidebarContent>
-        <SidebarGroup role="navigation" aria-label="Primary" className="py-0">
-          <SidebarMenu className="gap-3 px-4 group-data-[collapsible=icon]:px-0">
-            {items.map((item) => {
-              const Icon = item.nav.icon;
-              const label = item.nav.label;
-              if (!item.to) {
-                return (
-                  <SidebarMenuItem key={label}>
-                    <SidebarMenuButton
-                      tooltip={label}
-                      className="cursor-default font-serif"
-                      aria-disabled="true"
-                      title={`${label} — not available yet`}
-                      onClick={(event) => event.preventDefault()}
-                    >
-                      {Icon && <Icon aria-hidden />}
-                      <span>{label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              }
-              // A parent with children highlights only on an exact match: the
-              // child paths sit under it (`/schemas` is a sibling route, but
-              // `Users` fuzzy-matching its own subtree would light both rows).
-              const active = !!matchRoute({ to: item.to, fuzzy: item.to !== "/" });
-              return (
-                <SidebarMenuItem key={label}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={active}
-                    tooltip={label}
-                    className="font-serif"
-                  >
-                    <Link to={item.to} title={label}>
-                      {Icon && <Icon aria-hidden />}
-                      <span>{label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                  {item.children.length > 0 && (
-                    <SidebarMenuSub>
-                      {item.children.map((child) => (
-                        <SidebarMenuSubItem key={child.nav.label}>
-                          <SidebarMenuSubButton
-                            asChild
-                            isActive={!!matchRoute({ to: child.to, fuzzy: true })}
-                            className="font-serif"
-                          >
-                            <Link to={child.to} title={child.nav.label}>
-                              <span>{child.nav.label}</span>
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
-                  )}
-                </SidebarMenuItem>
-              );
-            })}
-          </SidebarMenu>
-        </SidebarGroup>
-      </SidebarContent>
+      <SidebarContent>{inSettings ? <SettingsNav /> : <PortalNav />}</SidebarContent>
 
       <SidebarFooter>
-        <SidebarMenu className="gap-2">
+        <SidebarMenu>
           {/* Search and Documentation are parked: both rendered as ordinary
               enabled buttons with no handler, so clicking them did nothing at
               all — the worst of the three states, since they looked live.
@@ -161,20 +126,7 @@ function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => v
               Search needs a cross-resource query endpoint; ADR 031's
               `POST /{resource}/query` exists only for projects today, so there
               is nothing to search across. Documentation needs a published URL
-              for the docs site to point at.
-
-              <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Search" className="font-serif">
-                  <Search aria-hidden />
-                  <span>Search</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Documentation" className="font-serif">
-                  <BookOpen aria-hidden />
-                  <span>Documentation</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem> */}
+              for the docs site to point at. */}
           <UserMenuItem user={user} onSignOut={onSignOut} />
         </SidebarMenu>
       </SidebarFooter>
@@ -184,12 +136,172 @@ function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => v
   );
 }
 
+/** Portal header: the full logo lockup, replaced by the toggle in the rail. */
+function PortalHeader() {
+  return (
+    <SidebarHeader className="px-4 py-6 group-data-[collapsible=icon]:p-0">
+      <div className={RAIL_HEADER}>
+        <SidebarTrigger className={RAIL_BUTTON} />
+      </div>
+      <Link
+        to="/"
+        aria-label="Home"
+        className="inline-flex items-center text-sidebar-foreground group-data-[collapsible=icon]:hidden"
+      >
+        <ZitadelLogo aria-hidden />
+      </Link>
+    </SidebarHeader>
+  );
+}
+
 /**
- * Footer user entry: the signed-in identity from `GET /sessions/me`
- * (name → email → user id fallback, per the API's identity-hydration
- * contract) with a menu carrying the sign-out action (Console ADR 0003).
- * Console-local chrome by design — the dark-only `<zitadel-session>` pair is
- * not theme-portable yet (root AGENTS.md bucket rule).
+ * Settings header: the way back out of the view.
+ *
+ * D13 rules out back buttons and breadcrumbs console-wide, on the grounds that
+ * you move back up via the left-side nav. This row *is* the left-side nav — it
+ * switches the sidebar's view rather than walking a page hierarchy — so it is
+ * read as the mechanism D13 endorses rather than an exception to it. Worth
+ * confirming as a decision either way.
+ */
+function SettingsHeader() {
+  return (
+    <SidebarHeader className="group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0">
+      <div className={RAIL_HEADER}>
+        <SidebarTrigger className={RAIL_BUTTON} />
+      </div>
+      {/* One row, restyled per state — rendering a separate rail copy would put
+          two "Back to app" links in the accessibility tree at once, with only
+          CSS deciding which one is real. */}
+      <SidebarMenu className="group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center">
+        <SidebarMenuItem>
+          <SidebarMenuButton asChild tooltip="Back to app" className={BACK_BUTTON}>
+            <Link to="/">
+              <ArrowLeft aria-hidden />
+              <span>Back to app</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </SidebarHeader>
+  );
+}
+
+/**
+ * Settings nav — empty today, and that is the honest state.
+ *
+ * The design groups it as `PERSONAL` (Profile) and `WORKSPACE` (Teams,
+ * Members). None of those screens exists: Profile needs a call that updates a
+ * user (#693) and the two workspace rows need a team reference on the user read
+ * responses (#735). A group heading with nothing under it advertises a section
+ * that is not there, so the headings arrive with their first row.
+ *
+ * When they land they attach the same way Portal's do — `staticData.nav` on the
+ * route — plus whatever distinguishes the two views in `NavMeta`.
+ */
+function SettingsNav() {
+  return null;
+}
+
+/** Portal nav: the flat list, with `User schemas` nested under `Users`. */
+function PortalNav() {
+  const items = useNavItems();
+  const matchRoute = useMatchRoute();
+
+  return (
+    <SidebarGroup role="navigation" aria-label="Primary" className="py-0">
+      <SidebarMenu className="gap-0 group-data-[collapsible=icon]:gap-1">
+        {items.map((item) => {
+          const Icon = item.nav.icon;
+          const label = item.nav.label;
+          if (!item.to) {
+            return (
+              <SidebarMenuItem key={label}>
+                <SidebarMenuButton
+                  tooltip={label}
+                  className="cursor-default"
+                  aria-disabled="true"
+                  title={`${label} — not available yet`}
+                  onClick={(event) => event.preventDefault()}
+                >
+                  {Icon && <Icon aria-hidden />}
+                  <span>{label}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          }
+          // A parent with children highlights only on an exact match: the
+          // child paths sit under it (`/schemas` is a sibling route, but
+          // `Users` fuzzy-matching its own subtree would light both rows).
+          const active = !!matchRoute({ to: item.to, fuzzy: item.to !== "/" });
+          return (
+            <SidebarMenuItem key={label}>
+              <SidebarMenuButton asChild isActive={active} tooltip={label}>
+                <Link to={item.to} title={label}>
+                  {Icon && <Icon aria-hidden />}
+                  <span>{label}</span>
+                </Link>
+              </SidebarMenuButton>
+              {item.children.length > 0 && (
+                <SidebarMenuSub>
+                  {item.children.map((child) => (
+                    <SidebarMenuSubItem key={child.nav.label}>
+                      <SidebarMenuSubButton
+                        asChild
+                        isActive={!!matchRoute({ to: child.to, fuzzy: true })}
+                      >
+                        <Link to={child.to} title={child.nav.label}>
+                          <span>{child.nav.label}</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  ))}
+                </SidebarMenuSub>
+              )}
+            </SidebarMenuItem>
+          );
+        })}
+      </SidebarMenu>
+    </SidebarGroup>
+  );
+}
+
+/**
+ * The identity block: 32px avatar, name, email. It is drawn twice — as the
+ * footer trigger and again as the dropdown's header — so it lives in one place.
+ *
+ * The gradient is the design's `Gradient/Red` style rather than a token: it is
+ * a placeholder portrait, and no avatar image source exists on the session yet.
+ */
+function UserIdentity({ name, email }: { name: string; email?: string }) {
+  return (
+    <>
+      <span
+        aria-hidden
+        className="size-8 shrink-0 rounded-full bg-[linear-gradient(232deg,#f25543_17%,#0f0f11_75%)]"
+      />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-none">
+        <span className="truncate text-sm leading-none font-semibold">{name}</span>
+        {email && <span className="truncate text-xs leading-none">{email}</span>}
+      </span>
+    </>
+  );
+}
+
+/**
+ * Footer account entry: the signed-in identity from `GET /sessions/me`
+ * (name → email → user id fallback, per the API's identity-hydration contract),
+ * opening the account dropdown (Console ADR 0003).
+ *
+ * The dropdown is the entry point to the Settings view — `Settings` navigates
+ * to the route that switches the sidebar over. Console-local chrome by design:
+ * the dark-only `<zitadel-session>` pair is not theme-portable yet (root
+ * AGENTS.md bucket rule).
+ *
+ * Two details come from the design rather than from shadcn's defaults. The
+ * container hairline resolves to `foreground/10`, not `border` — the two are
+ * interchangeable on the light canvas and visibly are not on the dark one. And
+ * the separators sit flush against the rows, so the default `-mx-1 my-1` comes
+ * off.
  */
 function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
   const displayName = user?.name ?? user?.email ?? user?.userId ?? "Signed in";
@@ -200,29 +312,22 @@ function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () =>
     <SidebarMenuItem>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <SidebarMenuButton
-            size="lg"
-            tooltip={displayName}
-            className="font-serif"
-            aria-label={`Account: ${displayName}`}
-          >
-            <span
-              aria-hidden
-              className="size-8 shrink-0 rounded-lg bg-[linear-gradient(232deg,#f25543_17%,#0f0f11_75%)]"
-            />
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-none">
-              <span className="truncate text-[14px] text-sidebar-foreground">{displayName}</span>
-              {secondary && (
-                <span className="truncate text-[12px] text-muted-foreground">{secondary}</span>
-              )}
-            </span>
+          <SidebarMenuButton size="lg" tooltip={displayName} aria-label={`Account: ${displayName}`}>
+            <UserIdentity name={displayName} email={secondary} />
             <ChevronsUpDown className="ml-auto text-muted-foreground" aria-hidden />
           </SidebarMenuButton>
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="start" className="w-56">
+        <DropdownMenuContent side="top" align="start" className="w-56 border-foreground/10">
+          <DropdownMenuLabel className="flex h-11 items-center gap-2 font-normal">
+            <UserIdentity name={displayName} email={secondary} />
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator className="mx-px my-0" />
+          <DropdownMenuItem asChild>
+            <Link to={SETTINGS_PATH}>Settings</Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator className="mx-px my-0" />
           <DropdownMenuItem onSelect={() => onSignOut?.()} disabled={!onSignOut}>
-            <LogOut aria-hidden />
-            Sign out
+            Log out
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -231,11 +336,15 @@ function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () =>
 }
 
 function ContextBar() {
+  // While the sidebar is collapsed the rail carries the toggle in its header,
+  // per the design. Rendering this one as well would put two on screen.
+  const { state } = useSidebar();
+
   return (
     <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-background px-2 pt-3 md:items-center md:px-4 md:pt-7">
       <div className="flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:items-center">
         {/* Desktop only — mobile keeps the persistent Sidebar 07. icon rail. */}
-        <SidebarTrigger className="hidden text-foreground md:inline-flex" />
+        {state === "expanded" && <SidebarTrigger className="hidden text-foreground md:inline-flex" />}
         <ContextSwitcher />
       </div>
       <ThemeToggle />

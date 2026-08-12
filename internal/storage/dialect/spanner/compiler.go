@@ -128,6 +128,9 @@ func compileCompareFilter[F ~uint8, T any](c *statementCompiler, filter *databas
 		})
 		return
 	}
+	if compare.CompileBoolEqual(c, filter, schema) {
+		return
+	}
 
 	op := compareOpSQL(filter.Op)
 	if len(filter.Terms) == 1 {
