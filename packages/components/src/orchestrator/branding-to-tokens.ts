@@ -63,11 +63,11 @@ const PALETTE_MAP: Record<keyof BrandingPalette, string[]> = {
   border: ["--zl-color-border-default-gray-200", "--zl-color-border-default-gray-100"],
   text: ["--zl-color-text-primary-white"],
   text_muted: ["--zl-color-text-secondary-gray"],
-  // `--zl-color-text-link` is a styles-layer contract variable, not a
-  // generated token: it has no default of its own, and every link surface
-  // (card-nav, forgot-password, field link) consumes it with the legacy
-  // purple accent as fallback. Unset → today's purple per theme; set (here,
-  // or by a host page) → exactly the links change, not the pills that the
+  // `--zl-color-text-link` is emitted by design-tokens as an alias of the
+  // purple accent (per-theme via the reference) until Figma publishes a
+  // dedicated `link` semantic. Every link surface (card-nav,
+  // forgot-password, field link) consumes it — so setting it (here, or from
+  // a host page) recolors exactly the links, not the pills that the
   // previous `--zl-color-text-subtitle-pink` mapping accidentally hit, and
   // not the decorative accents that share the purple token.
   link: ["--zl-color-text-link"],

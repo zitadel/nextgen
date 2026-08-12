@@ -164,6 +164,46 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     expect(getComputedStyle(button).color).toBe(HOST_BLUE);
   });
 
+  it("legacy primary-token overrides from the host keep working", async () => {
+    // Upgrade path: embedders who override the documented legacy pair must
+    // not silently get the stock CTA — the design-tokens sheet emits the
+    // legacy names as aliases of `--zl-primary`, and a host override of the
+    // legacy name beats that alias.
+    const HOST_BLUE = "rgb(0, 0, 255)";
+    appStylesheet(
+      `zitadel-login {
+        --zl-color-surface-default-white: ${HOST_RED};
+        --zl-color-text-button-default: ${HOST_BLUE};
+      }`,
+    );
+    const element = await mount(identifierStep);
+    const atom = element.shadowRoot?.querySelector("zl-button") as HTMLElement;
+    const button = atom.shadowRoot?.querySelector(".zr-btn--primary") as HTMLElement;
+    expect(button).toBeTruthy();
+    expect(getComputedStyle(button).backgroundColor).toBe(HOST_RED);
+    expect(getComputedStyle(button).color).toBe(HOST_BLUE);
+  });
+
+  it("suppress-header collapses the card's header region, not just the text", async () => {
+    // The headings going sr-only is not enough: the card's flex layout kept
+    // a blank 32px header band while the header slot stayed assigned. The
+    // stamped attribute pulls the header region out of the flow.
+    const plain = await mount(identifierStep);
+    const plainCard = plain.shadowRoot?.querySelector("zl-card") as HTMLElement;
+    const plainHeight = plainCard.getBoundingClientRect().height;
+    plain.remove();
+    stub?.restore();
+
+    const suppressed = await mount(identifierStep, (el) => {
+      el.suppressHeader = true;
+    });
+    const suppressedCard = suppressed.shadowRoot?.querySelector("zl-card") as HTMLElement;
+    const suppressedHeight = suppressedCard.getBoundingClientRect().height;
+    // Title (2rem line) + the 32px header/body gap must be gone — well over
+    // 40px shorter, not merely equal.
+    expect(suppressedHeight).toBeLessThan(plainHeight - 40);
+  });
+
   it("tenant palette.link recolors card links and nothing else", async () => {
     // Regression for the broken bridge: `palette.link` used to target the
     // pill token while the links kept a hard-coded purple accent.

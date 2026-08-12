@@ -78,6 +78,7 @@ describe("design-tokens public surface", () => {
         "color.text.buttonInvert",
         "color.text.disabled",
         "color.text.error",
+        "color.text.link",
         "color.text.primaryWhite",
         "color.text.secondaryGray",
         "color.text.subtitleGray",

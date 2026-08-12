@@ -230,7 +230,7 @@ export class ZitadelSession extends ZitadelSurface {
     // markup and needs the imperative re-stamp loop.
     return html`
       <zl-page-shell ?data-widget=${this.variant !== "page"}>
-        <zl-card>
+        <zl-card ?data-suppress-header=${this.suppressHeader}>
           <h1 slot="header" class="title ${this.suppressHeader ? "sr-only" : ""}">
             ${this.heading}
           </h1>

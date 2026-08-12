@@ -349,6 +349,12 @@ export class ZitadelLogin extends ZitadelSurface {
         // visually while keeping the step's accessible name.
         shell.toggleAttribute("data-suppress-header", this.suppressHeader);
       }
+      // Stamped on the card too: its header REGION must leave the flex flow
+      // (card-host.css) or the card keeps a blank 32px header band — the
+      // slotted headings alone going sr-only doesn't collapse the region.
+      for (const card of this.shadowRoot.querySelectorAll("zl-card")) {
+        card.toggleAttribute("data-suppress-header", this.suppressHeader);
+      }
     }
     const props = changed as Map<string, unknown>;
     if (!props.has("response")) return;

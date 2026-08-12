@@ -195,6 +195,41 @@ function build(): BuildResult {
     }
   }
 
+  // ---- semantic aliases (migration bridges) ----
+  // Emitted AFTER the literals so the alias wins within each theme block.
+  // References resolve against the theme-active value of the referenced
+  // variable, so one declaration covers both modes — but the two legacy
+  // names below also carry per-theme literals above, so the alias must land
+  // in the light block too (hence the explicit lightVars append).
+  //
+  // 1. The legacy primary-accent pair now aliases the shadcn `primary`
+  //    semantic: every consumer of the old names (primary button, checkbox
+  //    checked state) follows the Figma `primary` values, while host-page
+  //    overrides of EITHER name keep working — overriding the legacy name
+  //    beats the alias, and overriding `--zl-primary` flows through it.
+  const aliasBoth = (cssVar: string, reference: string, path: string[]): void => {
+    cssVars.push([cssVar, reference]);
+    lightVars.push([cssVar, reference]);
+    setDeep(tsTree, path, reference);
+    setDeep(refTree, path, `var(${cssVar})`);
+  };
+  aliasBoth("--zl-color-surface-default-white", "var(--zl-primary)", [
+    "color",
+    "surface",
+    "defaultWhite",
+  ]);
+  aliasBoth("--zl-color-text-button-default", "var(--zl-primary-foreground)", [
+    "color",
+    "text",
+    "buttonDefault",
+  ]);
+  // 2. The link role: aliases the purple accent until Figma publishes a
+  //    dedicated `link` semantic. `branding.palette.link` and host pages
+  //    override this name to recolor exactly the link surfaces (card nav,
+  //    forgot-password, field links). New name, no per-theme literal to
+  //    shadow — a single :root declaration resolves per theme.
+  push("--zl-color-text-link", "var(--zl-color-icon-default-purple)", ["color", "text", "link"]);
+
   // ---- spacing (in rem) — sorted by step number so 01..16 always emit in order ----
   for (const [step, px] of sortedNumeric(figma.primitives.spacing)) {
     push(cssVarName("spacing", step), pxToRem(px), ["spacing", step]);
