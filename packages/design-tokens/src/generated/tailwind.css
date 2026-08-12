@@ -51,6 +51,9 @@
   --color-zl-gray-700: var(--zl-color-gray-700);
   --color-zl-gray-800: var(--zl-color-gray-800);
   --color-zl-gray-900: var(--zl-color-gray-900);
+  --color-zl-surface-default-white: var(--zl-color-surface-default-white);
+  --color-zl-text-button-default: var(--zl-color-text-button-default);
+  --color-zl-text-link: var(--zl-color-text-link);
   --spacing-zl-01: var(--zl-spacing-01);
   --spacing-zl-02: var(--zl-spacing-02);
   --spacing-zl-03: var(--zl-spacing-03);
