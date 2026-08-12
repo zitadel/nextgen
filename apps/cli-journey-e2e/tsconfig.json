@@ -9,8 +9,16 @@
     "sourceMap": false,
     "types": ["node"]
   },
-  // The .mjs runner scripts stay out: they import root workspace scripts
-  // (outside this composite project's rootDir) and are covered at runtime by
-  // the `test` task's node --test suite.
-  "include": ["playwright*.config.mts", "src/**/*.ts"]
+  // The testkit consumer suite is checked here against the workspace kit —
+  // inside the generated app it runs against the packed tarball, but the
+  // @zitadel/testing/playwright contract it pins is the same. Two families
+  // stay out: the .mjs runner scripts import root workspace scripts (outside
+  // this composite project's rootDir; covered by the `test` task's node
+  // --test suite), and fixtures/preexisting/ are app-posture skeletons whose
+  // framework globals (defineNuxtConfig) only exist inside the app.
+  "include": [
+    "playwright*.config.mts",
+    "src/**/*.ts",
+    "fixtures/testkit/**/*.ts"
+  ]
 }
