@@ -379,6 +379,7 @@ items off as work lands; remove completed entries when no longer useful.
 | [008 Users EAV Store](008-users-eav-store.md) | EAV SQL may remain specialized; port to v2 statements |
 | [010 Session/Auth Attempt](010-session-auth-attempt-check-model.md) | Session/auth-attempt entity SQL lives in v2 statements; model still authoritative |
 | [048 Wide Events](048-wide-events-internal-audit-primitive.md) | Event emission on `AllStatements` mutations; `EventStatements.InsertEvent` |
+| [051 Causal Read-Consistency](051-causal-read-consistency-via-session-tokens.md) | Read replicas need a replica-aware `Pool` and per-dialect commit-watermark/wait primitives on top of this dialect architecture; not yet designed here |
 
 ## Consequences
 

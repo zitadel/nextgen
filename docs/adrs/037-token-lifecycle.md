@@ -129,3 +129,11 @@ possible right now.
 
 PATs are out of scope for now as well. They do not provide any extra value yet
 in the MVP.
+
+### Read-replica causal consistency
+
+[ADR 051](051-causal-read-consistency-via-session-tokens.md) considered and
+rejected carrying a database consistency watermark (Postgres LSN / Spanner
+commit timestamp) inside the session token defined here. The session token's
+structure, minting, and validation are unaffected — the watermark travels
+through a separate mechanism.
