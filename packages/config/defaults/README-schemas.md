@@ -28,8 +28,8 @@ Here's a simplified example:
     "firstName"
   ],
   "x-auth-methods": {
-    "password": { "enabled": true, "position": 1 },
-    "passkey": { "enabled": true, "position": 2 }
+    "password": { "enabled": true },
+    "passkey": { "enabled": true }
   }
 }
 ```

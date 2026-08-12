@@ -99,17 +99,10 @@ func mapQueryTeamsToService(projectID string, req *api.QueryTeamsRequest) servic
 		PageToken: string(req.PageToken.Or("")),
 	}
 	if sorting, ok := req.Sorting.Get(); ok {
-		svcReq.Sorting = &service.Sorting{
-			Field:     string(sorting.Field),
-			Direction: string(sorting.Direction),
-		}
+		svcReq.Sorting = sortingToService(sorting.Field, sorting.Direction)
 	}
 	for _, filter := range req.Filter {
-		svcReq.Filters = append(svcReq.Filters, service.Filter{
-			Field:     string(filter.Field),
-			Operation: string(filter.Operation),
-			Value:     filterValue(filter.Value),
-		})
+		svcReq.Filters = append(svcReq.Filters, filterToService(filter.Field, filter.Operation, filter.Value))
 	}
 	return svcReq
 }

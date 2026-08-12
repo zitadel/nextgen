@@ -26,8 +26,8 @@ var exampleUserSchema = []byte(`{
   "type": "object",
   "required": ["email"],
   "x-auth-methods": {
-    "password": { "enabled": true, "position": 1 },
-    "passkey":  { "enabled": true, "position": 2 }
+    "password": { "enabled": true },
+    "passkey":  { "enabled": true }
   },
   "properties": {
     "email":       { "type": "string", "format": "email", "x-unique": "project" },

@@ -139,7 +139,7 @@
   --zl-syntax-number: #e25f7d;
   --zl-syntax-boolean: #bba5e4;
   --zl-syntax-punctuation: #82829c;
-  --zl-syntax-comment: #7c7c95;
+  --zl-syntax-comment: #686883;
 }
 
 [data-theme="light"] {
@@ -216,5 +216,5 @@
   --zl-syntax-number: #c52247;
   --zl-syntax-boolean: #5a23bd;
   --zl-syntax-punctuation: #686883;
-  --zl-syntax-comment: #71718b;
+  --zl-syntax-comment: #82829c;
 }

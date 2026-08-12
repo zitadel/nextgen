@@ -1,47 +1,204 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Alert } from "@zitadel/ui-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Box, Boxes, Ellipsis, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+
+import {
+  RESOURCE_CELL,
+  RESOURCE_HEADER,
+  RESOURCE_PAGE,
+  RESOURCE_ROW_ICON,
+  RESOURCE_ROW_LINK,
+  RESOURCE_TABLE_WRAP,
+  ResourceHeadCell,
+  opensRow,
+} from "@/components/resource-list";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 import { api } from "../../../api/zitadel";
-import { getConsoleProjectId } from "../../../runtime/runtime";
-import { Page } from "../../../components/layout";
-import { KeyValueTable, PageHeader } from "../../../components/resource-page";
+import { formatDate } from "../../../lib/date";
 
-/**
- * The scoped project, read from `GET /projects/{project_id}`.
- *
- * **Reachable by URL, deliberately not in the sidebar.** The data is real, but
- * this screen has had no design hand-off — Users is the only designed surface —
- * and the layout here is a developer's key/value table, not a designed one. In
- * the nav it read as a finished feature; at a URL it is what it is, a way to see
- * the project the console is bound to.
- *
- * Restore `staticData: { nav: { label: "Projects", order: 1, icon: Boxes } }`
- * when a design for it lands.
- */
 export const Route = createFileRoute("/_authed/projects/")({
-  loader: () => api.getProject(getConsoleProjectId()),
-  component: ProjectView,
+  staticData: { nav: { label: "Projects", order: 1, icon: Boxes } },
+  loader: async () => {
+    const page = await api.queryProjects({ limit: PAGE_SIZE });
+    return { projects: page.projects, nextPageToken: page.next_page_token ?? undefined };
+  },
+  component: ProjectsScreen,
 });
 
-function ProjectView() {
-  const project = Route.useLoaderData();
+/**
+ * One page of projects. `POST /projects/query` is cursor-paginated, so this is a
+ * page size rather than a cap on what the operator can reach — `Load more` walks
+ * the rest (design decisions log D5: a button, not pagination controls).
+ */
+const PAGE_SIZE = 25;
+
+/** Three equal columns; the trailing one carries the row menu. */
+const COLUMN = "w-1/3";
+
+type Project = Awaited<ReturnType<typeof api.queryProjects>>["projects"][number];
+
+function ProjectsScreen() {
+  const loaded = Route.useLoaderData();
+  const navigate = useNavigate();
+
+  // Pages fetched after the first live here rather than in the loader, so `Load
+  // more` appends without re-running it and a route invalidation resets to the
+  // first page — the honest thing to show once the set has changed underneath.
+  const [extra, setExtra] = useState<Project[]>([]);
+  const [nextPageToken, setNextPageToken] = useState(loaded.nextPageToken);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  useEffect(() => {
+    setExtra([]);
+    setNextPageToken(loaded.nextPageToken);
+  }, [loaded]);
+
+  // The loader hands back a new object on every invalidation, so its identity is
+  // the generation of the list on screen. `loadMore` reads it after awaiting to
+  // tell whether the page it fetched still belongs to the set it asked for.
+  const loadedRef = useRef(loaded);
+  useEffect(() => {
+    loadedRef.current = loaded;
+  }, [loaded]);
+
+  const projects = [...loaded.projects, ...extra];
+
+  async function loadMore() {
+    if (!nextPageToken || loadingMore) return;
+    const generation = loaded;
+    setLoadingMore(true);
+    try {
+      const page = await api.queryProjects({ limit: PAGE_SIZE, page_token: nextPageToken });
+      // A page that lands after the list was invalidated answers a question about
+      // the previous set; appending it would re-add rows the server may no longer
+      // return. It is dropped, leaving the button ready to fetch the current
+      // page 2.
+      if (loadedRef.current !== generation) return;
+      setExtra((current) => [...current, ...page.projects]);
+      setNextPageToken(page.next_page_token ?? undefined);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   return (
-    <Page>
-      <PageHeader title="Projects" description="The project this console is scoped to." />
-      <Alert severity="info" heading="Single project view">
-        The API exposes the current project only — there is no multi-project list endpoint yet, so
-        this page shows the scoped project rather than a browsable list.
-      </Alert>
-      <div className="mt-6">
-        <KeyValueTable
-          rows={[
-            ["ID", project.id],
-            ["Created", project.created_at],
-            ["Updated", project.updated_at],
-          ]}
-        />
+    <div className={`${RESOURCE_PAGE} pt-4`}>
+      <div className={`${RESOURCE_HEADER} flex h-9 items-center`}>
+        <h1 className="text-foreground font-serif text-2xl leading-6 tracking-tight">Projects</h1>
       </div>
-    </Page>
+
+      <div className={`${RESOURCE_TABLE_WRAP} mt-5`}>
+        {/* Three equal columns, as the design lays them out; the trailing one
+            carries the row menu. */}
+        <Table className="table-fixed text-xs">
+          <TableHeader>
+            <TableRow className="border-border border-b hover:bg-transparent">
+              <ResourceHeadCell className={COLUMN}>Name</ResourceHeadCell>
+              <ResourceHeadCell className={COLUMN}>Created</ResourceHeadCell>
+              <TableHead className={`${COLUMN} h-14 px-6`} />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {projects.length === 0 ? (
+              <TableRow className="border-0 hover:bg-transparent">
+                <TableCell colSpan={3} className="text-muted-foreground h-24 text-center">
+                  No projects yet.
+                </TableCell>
+              </TableRow>
+            ) : (
+              projects.map((project) => (
+                // The whole row opens the project. The name is a real link so the
+                // row is reachable by keyboard and the target shows in the status
+                // bar; the row handler is the pointer affordance on top of it,
+                // and `opensRow` keeps it out of the link's way.
+                <TableRow
+                  key={project.id}
+                  className="hover:bg-muted/40 cursor-pointer border-0"
+                  onClick={(event) => {
+                    if (opensRow(event)) {
+                      void navigate({ to: "/projects/$projectId", params: { projectId: project.id } });
+                    }
+                  }}
+                >
+                  <TableCell className={`${RESOURCE_CELL} truncate`}>
+                    <Link
+                      to="/projects/$projectId"
+                      params={{ projectId: project.id }}
+                      className={RESOURCE_ROW_LINK}
+                    >
+                      <Box aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
+                      {project.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell className={`${RESOURCE_CELL} text-muted-foreground truncate text-sm`}>
+                    {formatDate(project.created_at)}
+                  </TableCell>
+                  <TableCell className={`${RESOURCE_CELL} text-right`}>
+                    <RowActions projectId={project.id} name={project.name} />
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* D5: `Load more` rather than pagination controls. The button's presence
+          means there is more; its absence means the list is complete. */}
+      {nextPageToken && (
+        <Button
+          variant="secondary"
+          className="mt-6 h-9 w-full gap-1.5 px-2.5"
+          onClick={() => void loadMore()}
+          disabled={loadingMore}
+        >
+          {loadingMore && <Loader2 className="size-3 animate-spin" aria-hidden />}
+          Load more
+        </Button>
+      )}
+    </div>
+  );
+}
+
+
+/**
+ * The row menu.
+ *
+ * One item — the same shape the schema list ships. `View project` is the only
+ * action the API can serve from here: there is no project delete endpoint. The
+ * row itself opens the project as well; the menu keeps this list consistent with
+ * the others, and is where a second action lands when there is one.
+ */
+function RowActions({ projectId, name }: { projectId: string; name: string }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={`Actions for ${name}`}>
+          <Ellipsis aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuItem asChild>
+          <Link to="/projects/$projectId" params={{ projectId }}>
+            View project
+          </Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
