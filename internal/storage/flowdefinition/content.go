@@ -54,8 +54,9 @@ type SSOProviderJSON struct {
 }
 
 type TransitionJSON struct {
-	Action *string `json:"action,omitempty"`
-	Target string  `json:"target"`
+	Action  *string `json:"action,omitempty"`
+	Purpose *string `json:"purpose,omitempty"`
+	Target  string  `json:"target"`
 }
 
 // Marshal converts the domain aggregate's nested fields into JSON for the
@@ -94,6 +95,10 @@ func marshalStep(s domain.FlowDefinitionStep) StepJSON {
 			if t.Action != nil {
 				action := t.Action.String()
 				tr.Action = &action
+			}
+			if t.Purpose != nil {
+				purpose := t.Purpose.String()
+				tr.Purpose = &purpose
 			}
 			out.Transitions[name] = tr
 		}
@@ -226,6 +231,13 @@ func unmarshalStep(s StepJSON) (domain.FlowDefinitionStep, error) {
 					return step, err
 				}
 				tr.Action = &action
+			}
+			if t.Purpose != nil {
+				purpose, err := domain.FlowDefinitionPurposeString(*t.Purpose)
+				if err != nil {
+					return step, fmt.Errorf("step %q: transition %q has invalid purpose %q: %w", s.Name, name, *t.Purpose, err)
+				}
+				tr.Purpose = &purpose
 			}
 			step.Transitions[name] = tr
 		}
