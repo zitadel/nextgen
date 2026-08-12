@@ -169,6 +169,18 @@ func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resou
 			if op == opDelete {
 				cred, ok := GetScopeContext(ctx)
 				if ok && hasOperatorProjectWrite(cred.Scope) {
+					// Idempotent 204 only when the id is gone everywhere. A row in
+					// another project must not 204 — map through Check (foreign
+					// delete probes expect 404/403, not NoContent).
+					if global, gerr := stmts.GetResourceScope(ctx, resourceID); gerr == nil && global.ProjectID != cred.ProjectID {
+						if res.kind != "" && global.ResourceKind != res.kind {
+							return "", res.readMiss()
+						}
+						if err := requireProjectAccessAfterRSI(ctx, stmts, global.ProjectID, res, op); err != nil {
+							return "", err
+						}
+						return global.ProjectID, nil
+					}
 					return "", errResourceGone
 				}
 				return "", res.readMiss()

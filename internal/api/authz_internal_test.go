@@ -324,7 +324,10 @@ func TestRequireResourceAccess(t *testing.T) {
 	_, err = requireResourceAccess(operator, stmts, "usr_b", userAccess, opRead)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 
-	// Foreign write-by-id after RSI hit must use readMiss, not writeMiss.
+	// Foreign delete of a real id must not 204 — anti-oracle readMiss.
+	_, err = requireResourceAccess(operator, stmts, "usr_b", userAccess, opDelete)
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
 	_, err = requireResourceAccess(operator, stmts, "usr_b", userAccess, opWrite)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 
