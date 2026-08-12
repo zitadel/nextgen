@@ -3,7 +3,7 @@
 > **Status:** Accepted  
 > **Date:** 2026-05-15  
 > **Updated:** 2026-08-03  
-> **Context:** Multi-dialect storage (PostgreSQL and Spanner) for nextgen  
+> **Context:** Multi-dialect storage (PostgreSQL, Spanner, and SQLite) for nextgen  
 > **Amended by:** [ADR 047](047-dialect-id-generation.md) (dialect ownership, generators)
 
 ## Context
@@ -27,14 +27,17 @@ flowchart LR
     Ensure[idgen.Ensure / NewManagedID]
     PG[Postgres ULID]
     SP[Spanner UUID v4]
+    SQ[SQLite ULID]
   end
   subgraph sql [SQL]
     Col["TEXT / STRING PK no DEFAULT"]
   end
   Ensure --> PG
   Ensure --> SP
+  Ensure --> SQ
   PG --> Col
   SP --> Col
+  SQ --> Col
   Col --> Go["Go string / database.Identity string"]
 ```
 
@@ -51,6 +54,13 @@ PostgreSQL:
 id TEXT COLLATE "C" NOT NULL CHECK (id <> '')
 ```
 
+SQLite (TEXT PK like PostgreSQL; see [ADR 047](047-dialect-id-generation.md)):
+
+```sql
+id TEXT NOT NULL
+-- PRIMARY KEY (id) or composite (project_id, id)
+```
+
 Spanner:
 
 ```sql
@@ -61,7 +71,7 @@ Prefer composite keys `(project_id, id)` where the resource is project-scoped.
 
 ### 3. Go type: `database.Identity`
 
-[`database.Identity`](../internal/storage/database/identity.go) is a string
+[`database.Identity`](../../internal/storage/database/identity.go) is a string
 alias used at the storage boundary. After the alpha cutover it binds and scans
 as string only (no decimal→`int64` coercion for resource PKs).
 
@@ -72,10 +82,10 @@ as string only (no decimal→`int64` coercion for resource PKs).
 | `internal/domain` | Prefix constants and validation — no ID minting |
 | `internal/storage/database` | `Identity` string bind/scan helpers |
 | `internal/storage/dialect/idgen` | Shared `Generator`, `Ensure`, ULID + UUID implementations |
-| `internal/storage/dialect/{postgres,spanner}` | Choose generator; call `Ensure` / `NewManagedID` on create |
+| `internal/storage/dialect/{postgres,spanner,sqlite}` | Choose generator; call `Ensure` / `NewManagedID` on create |
 
 ## Consequences
 
 - One mental model for agents and reviewers.
-- Spanner write distribution uses UUID v4 bodies; Postgres keeps ULIDs.
+- Spanner write distribution uses UUID v4 bodies; Postgres and SQLite keep ULIDs.
 - Breaking for alpha: existing BIGINT identity tables are rewritten in place.

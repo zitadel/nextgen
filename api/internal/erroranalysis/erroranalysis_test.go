@@ -178,6 +178,41 @@ func TestMutualRecursionDoesNotPoisonTheCache(t *testing.T) {
 	}
 }
 
+// TestHandlerAuthzGatePropagatesResourceAccessErrors pins the call-site path
+// this PR relies on: Handler methods call requireProjectAccess with a package
+// resourceAccess row, the Handler wrapper forwards that row into the package
+// helper, and miss/denied select func-typed fields. Losing any hop drops
+// permission_denied / not_found from the generated OpenAPI oneOf.
+func TestHandlerAuthzGatePropagatesResourceAccessErrors(t *testing.T) {
+	methods := analyzeRepo(t)
+
+	cases := map[string][]string{
+		"Handler.GetBrandingById": {
+			"domain.ErrBrandingNotFound",
+			"domain.ErrBrandingPermissionDenied",
+		},
+		"Handler.CreateBranding": {
+			"domain.ErrBrandingPermissionDenied",
+		},
+		"Handler.ListUsers": {
+			"domain.ErrUserNotFound",
+			"domain.ErrUserPermissionDenied",
+		},
+	}
+	for key, want := range cases {
+		method, ok := methods[key]
+		if !ok {
+			t.Errorf("%s: not analyzed", key)
+			continue
+		}
+		for _, code := range want {
+			if !slices.Contains(method.Errors, code) {
+				t.Errorf("%s: missing %s (got %v)", key, code, method.Errors)
+			}
+		}
+	}
+}
+
 // TestDumpAnalysis is a reporting aid, not a test: go test -run TestDump -v
 // prints every analyzed method so the inferred sets can be eyeballed against
 // the spec. It asserts nothing, so it stays out of the way of a plain run.

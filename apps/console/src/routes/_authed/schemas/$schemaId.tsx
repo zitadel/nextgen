@@ -11,13 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type UserSchema, schemaAuthMethods, schemaDisplayName } from "@/lib/schema";
 
 import { api } from "../../../api/zitadel";
-import { getConsoleProjectId } from "../../../runtime/runtime";
 
 export const Route = createFileRoute("/_authed/schemas/$schemaId")({
-  loader: ({ params }) =>
-    api.getSchemaById(params.schemaId, {
-      project_id: getConsoleProjectId(),
-    }) as Promise<UserSchema>,
+  loader: ({ params }) => api.getSchemaById(params.schemaId) as Promise<UserSchema>,
   component: SchemaDetail,
 });
 

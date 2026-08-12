@@ -91,14 +91,17 @@ func (ss sessionStatements) ListSessions(ctx context.Context, filter *database.L
 }
 
 func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, sessionID string) error {
-	tag, err := ss.client.Exec(ctx, deleteSessionByIDStmt, projectID, sessionID)
-	if err != nil {
-		return wrapError(err)
-	}
-	if tag.RowsAffected() == 0 {
-		return domain.ErrSessionNotFound()
-	}
-	return nil
+	return withTransaction(ctx, ss.client, func(ctx context.Context, tx queryExecutor) error {
+		tag, err := tx.Exec(ctx, deleteSessionByIDStmt, projectID, sessionID)
+		if err != nil {
+			return wrapError(err)
+		}
+		if tag.RowsAffected() == 0 {
+			return domain.ErrSessionNotFound()
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.DeleteResourceScope(ctx, domain.ResourceKindSession, projectID, sessionID)
+	})
 }
 
 func (ss sessionStatements) ExchangeSession(ctx context.Context, projectID, handoffToken string, _ *string, ttl time.Duration) (*domain.Session, error) {
@@ -190,7 +193,11 @@ func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.S
 	if err != nil {
 		return fmt.Errorf("failed to insert session: %w", wrapError(err))
 	}
-	return ss.CreateSessionToken(ctx, session, "")
+	if err := ss.CreateSessionToken(ctx, session, ""); err != nil {
+		return err
+	}
+	rsi := newResourceScopeStatements(ss.client)
+	return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindSession, session.ProjectID, session.ID))
 }
 
 func (ss sessionStatements) CreateSessionToken(ctx context.Context, session *domain.Session, previousTokenID string) error {
@@ -428,4 +435,9 @@ var sessionSchema = database.NewSchema(map[domain.SessionField]database.FieldBin
 		return s.TokenID
 	}, Coerce: database.CoerceString, Nullable: true},
 	domain.SessionFieldUserID: {SQLName: "s.user_id", Accessor: func(s *domain.Session) any { return database.NullableValue(s.UserID) }, Coerce: database.CoerceString, Nullable: true},
+	// Not a column: a correlated EXISTS over the session's verified checks,
+	// backing the computed state filter.
+	domain.SessionFieldHasVerifiedFactors: {
+		SQLName: "EXISTS (SELECT 1 FROM zitadel_nextgen.checks vc WHERE vc.project_id = s.project_id AND vc.session_id = s.id AND vc.last_verified_at IS NOT NULL)",
+	},
 })

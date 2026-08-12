@@ -7,10 +7,8 @@ objectType: human-user
 x-auth-methods:
   password:
     enabled: false
-    position: 1
   passkey:
     enabled: true
-    position: 2
 required:
   - email
   - password

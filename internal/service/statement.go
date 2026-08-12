@@ -9,8 +9,6 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/statement.mock.go . StatementPool,Statements,AllStatements,ProjectStatements,FlowDefinitionStatements,CryptoKeyStatements,JSONSchemaStatements,TeamStatements,TeamMembershipStatements,TokenStatements,PasskeyRegistrationStatements,SessionStatements,AuthAttemptStatements,UserStatements,UserPasswordStatements,UserTOTPStatements,UserPasskeyStatements,UserRecoveryCodesStatements,BrandingStatements,ClaimStatements,ResourceScopeStatements,AuthzAssignmentStatements,AuthzMembershipEdgeStatements,AuthzCatalogStatements
-
 type StatementPool interface {
 	Statementer[AllStatements]
 	Transactioner[AllStatements]
@@ -48,6 +46,7 @@ type AllStatements interface {
 	AuthzAssignmentStatements
 	AuthzMembershipEdgeStatements
 	AuthzCatalogStatements
+	AuthzResolverStatements
 	Statements
 }
 
@@ -329,15 +328,25 @@ type ClaimStatements interface {
 // ResourceScopeStatements persists resource_scope_index rows (path.id → project/team).
 //
 // Use cases:
-//   - UpsertResourceScope: dual-write on project/team/user create (build via domain.New*ResourceScope).
-//   - GetResourceScope: scope resolution for middleware / resolver before a permission check.
-//   - DeleteResourceScope: explicit cleanup where FK cascade does not apply (user delete today;
-//     project delete cascades RSI via project_id FK).
+//   - UpsertResourceScope: dual-write on project/team/user/schema/branding/
+//     flow_definition/session create (build via domain.New*ResourceScope).
+//   - GetResourceScope: tests/oracle only when resource_id is known globally unique;
+//     must not be used by the HTTP management gate (schema $id URLs are not).
+//   - GetResourceScopeInProject: gate lookup by kind + credential project + path.id.
+//   - GetResourceScopeByIDInProject: gate wrong-kind fallback (same project, any kind).
+//   - ExistsResourceScopeElsewhere: gate delete path — foreign presence without
+//     requiring a unique global resource_id.
+//   - DeleteResourceScope: explicit cleanup where FK cascade does not apply (user /
+//     schema / flow_definition / session delete today; branding relies on project
+//     cascade; project delete cascades RSI via project_id FK).
 type ResourceScopeStatements interface {
 	Statements
 	UpsertResourceScope(ctx context.Context, scope *domain.ResourceScope) error
 	GetResourceScope(ctx context.Context, resourceID string) (*domain.ResourceScope, error)
-	DeleteResourceScope(ctx context.Context, resourceID string) error
+	GetResourceScopeInProject(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) (*domain.ResourceScope, error)
+	GetResourceScopeByIDInProject(ctx context.Context, projectID, resourceID string) (*domain.ResourceScope, error)
+	ExistsResourceScopeElsewhere(ctx context.Context, kind domain.ResourceKind, resourceID, excludeProjectID string) (bool, error)
+	DeleteResourceScope(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) error
 }
 
 // AuthzAssignmentStatements persists grants (principal → catalog relation at a scope).
@@ -394,11 +403,26 @@ func SyncUserTeamMembershipEdge(ctx context.Context, edges AuthzMembershipEdgeSt
 // GetAuthzCatalog loads one catalog version and its projected child rows by id.
 //
 // LoadCatalogMutations reads the child rows PersistCatalogVersion wrote as
-// compiler.PersistedCatalog for persist round-trip verification in stmttest;
-// product check/list paths are not callers yet (#423).
+// compiler.PersistedCatalog (stmttest round-trip and L4 oracle catalog load).
 type AuthzCatalogStatements interface {
 	Statements
 	PersistCatalogVersion(ctx context.Context, meta domain.AuthzCatalogVersion, mutations compiler.CatalogMutations) error
 	GetAuthzCatalog(ctx context.Context, catalogID string) (*domain.AuthzCatalog, error)
 	LoadCatalogMutations(ctx context.Context, catalogID string) (compiler.PersistedCatalog, error)
+}
+
+// AuthzResolverStatements is the storage surface for permission Check / list (#423).
+//
+// Use cases:
+//   - ActiveSystemCatalogID: active system catalog (kind=system, owner=system).
+//   - HasAuthzProjectFoothold: any active assignment or membership edge in project.
+//   - CheckAuthz: allowed + foothold in one round-trip (assignments, closure, membership, TTU).
+//   - ListAuthzObjectIDs: L4/oracle helper materializing authorized RSI ids for one kind.
+//     List *endpoints* compose an injectable SQL predicate (ADR 033); that lands with HTTP wiring.
+type AuthzResolverStatements interface {
+	Statements
+	ActiveSystemCatalogID(ctx context.Context) (string, error)
+	HasAuthzProjectFoothold(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
+	CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (allowed bool, foothold bool, err error)
+	ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error)
 }

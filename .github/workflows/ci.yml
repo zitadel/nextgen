@@ -75,9 +75,13 @@ jobs:
         id: ci-mode
         run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
 
+      # Pruning variant: deletes every generated file before regenerating, so
+      # output that no directive produces any more fails here instead of
+      # living on in the tree. Subsumes plain `check-generate`, and keeps the
+      # generators honest about bootstrapping from an empty tree.
       - name: Check Go generated files
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.go_tests == 'true' }}
-        run: moon run server:check-generate
+        run: moon run server:check-generate-pruned
 
       - name: Cache Playwright browsers
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.browsers == 'true' }}
@@ -232,6 +236,14 @@ jobs:
       - name: Run console real-instance suite
         if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
         run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-real
+
+      # The embedded-surface suite: the binary serves console, hosted login,
+      # and the API from one origin — the only lane exercising the production
+      # request path (no Vite proxy rewriting /api). Its own step so the two
+      # console instances run sequentially, same rationale as above.
+      - name: Run console embedded-surface suite
+        if: ${{ steps.ci-mode.outputs.mode == 'full' && steps.ci-mode.outputs.suites_console == 'true' }}
+        run: env -u CI -u GITHUB_ACTIONS moon run console-e2e:e2e-embedded
 
       - name: Validate version PR
         if: ${{ steps.ci-mode.outputs.mode == 'version-only' }}

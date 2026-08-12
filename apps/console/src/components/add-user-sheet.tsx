@@ -129,9 +129,7 @@ function AddUserForm({
         // document — the properties this form renders — needs its own fetch.
         const options = await Promise.all(
           listed.map(async (entry) => {
-            const schema = (await api.getSchemaById(entry.id, {
-              project_id: projectId,
-            })) as UserSchema;
+            const schema = (await api.getSchemaById(entry.id)) as UserSchema;
             return {
               id: entry.id,
               schema,

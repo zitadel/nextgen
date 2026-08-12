@@ -37,12 +37,15 @@ func (b brandingStatements) CreateBranding(ctx context.Context, entity *domain.B
 	if err != nil {
 		return err
 	}
-	if err := b.client.QueryRow(ctx, createBrandingStmt, entity.ProjectID, entity.ID, definition).
-		Scan(&entity.CreatedAt); err != nil {
-		return wrapError(err)
-	}
-	entity.CreatedAt = entity.CreatedAt.UTC()
-	return nil
+	return withTransaction(ctx, b.client, func(ctx context.Context, tx queryExecutor) error {
+		if err := tx.QueryRow(ctx, createBrandingStmt, entity.ProjectID, entity.ID, definition).
+			Scan(&entity.CreatedAt); err != nil {
+			return wrapError(err)
+		}
+		entity.CreatedAt = entity.CreatedAt.UTC()
+		rsi := newResourceScopeStatements(tx)
+		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindBranding, entity.ProjectID, entity.ID))
+	})
 }
 
 // GetBrandingByID implements [service.BrandingStatements].
@@ -71,7 +74,7 @@ func (b brandingStatements) GetBrandingByID(ctx context.Context, projectID, id s
 // ListBrandings implements [service.BrandingStatements].
 func (b brandingStatements) ListBrandings(ctx context.Context, filter *database.ListOptions[domain.BrandingField]) (*database.ListResult[*domain.Branding], error) {
 	var compiler statementCompiler
-	if err := compileRead(&compiler, brandingQuery, filter, branding.Schema); err != nil {
+	if err := compileList(ctx, &compiler, brandingQuery, filter, branding.Schema, "zitadel_nextgen.branding", "id"); err != nil {
 		return nil, err
 	}
 

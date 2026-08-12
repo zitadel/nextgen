@@ -45,8 +45,7 @@ func TestBranding(t *testing.T) {
 
 	t.Run("get by id round-trips the stored configuration", func(t *testing.T) {
 		getResp, err := client.GetBrandingById(t.Context(), api.GetBrandingByIdParams{
-			ID:        rev1.ID,
-			ProjectID: api.ProjectID(project.ID),
+			ID: rev1.ID,
 		})
 		require.NoError(t, err)
 		require.IsType(t, &api.BrandingRevisionResponse{}, getResp, "get branding: %s", helpers.MustMarshal(t, getResp))
@@ -57,8 +56,7 @@ func TestBranding(t *testing.T) {
 
 	t.Run("unknown revision id is a 404", func(t *testing.T) {
 		getResp, err := client.GetBrandingById(t.Context(), api.GetBrandingByIdParams{
-			ID:        "brnd_does_not_exist",
-			ProjectID: api.ProjectID(project.ID),
+			ID: "brnd_does_not_exist",
 		})
 		require.NoError(t, err)
 		require.IsType(t, &api.ErrorDetails{}, getResp, "get branding: %s", helpers.MustMarshal(t, getResp))
@@ -96,8 +94,7 @@ func TestBranding(t *testing.T) {
 		assert.Equal(t, api.ErrorCode("brnd.invalid"), createErr.Code)
 
 		getResp, err := foreign.GetBrandingById(t.Context(), api.GetBrandingByIdParams{
-			ID:        "brnd_irrelevant",
-			ProjectID: api.ProjectID(project.ID),
+			ID: "brnd_irrelevant",
 		})
 		require.NoError(t, err)
 		require.IsType(t, &api.ErrorDetails{}, getResp, "cross-project get: %s", helpers.MustMarshal(t, getResp))

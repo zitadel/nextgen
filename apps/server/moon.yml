@@ -45,9 +45,17 @@ tasks:
       runFromWorkspaceRoot: true
 
   generate:
-    command: "go generate ./..."
+    # Not `go generate ./...`: that runs every directive serially, and the cost
+    # is per-invocation (mockgen type-loads a package whether it mocks one
+    # interface or twenty). The script runs packages in parallel behind the one
+    # ordering constraint that matters — see scripts/go-generate.mjs.
+    command: "node scripts/go-generate.mjs"
     inputs:
       - "@group(serverInputs)"
+      - "/scripts/go-generate.mjs"
+      - "/scripts/dev-process.mjs"
+    # Mirrored by GENERATED_GLOBS in scripts/generated-outputs.mjs, which is
+    # what `clean-generated` deletes. Change both together.
     outputs:
       - "/api/generated/**"
       - "/api/openapi/components/schemas/errors/**"
@@ -57,10 +65,46 @@ tasks:
     options:
       runFromWorkspaceRoot: true
 
+  # Generators only write; they never retract. Removing everything and
+  # regenerating is how orphaned output gets pruned — whatever does not come
+  # back was dead. Never cached: the whole point is to touch the filesystem.
+  clean-generated:
+    command: "node scripts/clean-generated.mjs"
+    inputs:
+      - "/scripts/clean-generated.mjs"
+      - "/scripts/generated-outputs.mjs"
+    options:
+      cache: false
+      runInCI: false
+      runFromWorkspaceRoot: true
+
   check-generate:
     command: "node scripts/check-go-generate.mjs"
     inputs:
       - "@group(serverInputs)"
+      - "/scripts/go-generate.mjs"
+      - "/scripts/dev-process.mjs"
+      # Imported at module scope, not only under --prune: GENERATED_GLOBS is
+      # what this task's git comparison looks at, so a glob edit that does not
+      # invalidate here would cache-hit and pass against the old pathspecs.
+      - "/scripts/clean-generated.mjs"
+      - "/scripts/generated-outputs.mjs"
+    options:
+      runFromWorkspaceRoot: true
+
+  # check-generate plus a prune, so output nothing generates any more fails the
+  # build instead of lingering. Deliberately not a dep of vet/test: it deletes
+  # every generated file before regenerating, which is fine on a CI runner and
+  # rude on a machine someone is working in. CI runs this in place of the plain
+  # check — it subsumes it.
+  check-generate-pruned:
+    command: "node scripts/check-go-generate.mjs --prune"
+    inputs:
+      - "@group(serverInputs)"
+      - "/scripts/go-generate.mjs"
+      - "/scripts/clean-generated.mjs"
+      - "/scripts/generated-outputs.mjs"
+      - "/scripts/dev-process.mjs"
     options:
       runFromWorkspaceRoot: true
 
@@ -68,6 +112,10 @@ tasks:
     command: "go vet ./..."
     deps:
       - "check-generate"
+      # Same embed race as test/build: go vet compiles //go:embed all:dist while
+      # a concurrent console/login-ui build can emptyOutDir the placeholder.
+      - "console:build"
+      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
     options:
@@ -86,6 +134,12 @@ tasks:
       - "format"
       - "check-generate"
       - "vet"
+      # Order UI builds before go test so a batched moon graph cannot compile
+      # //go:embed all:dist while vite emptyOutDir has cleared .gitkeep.
+      # Intentionally deps-only (not inputs): UI-only changes must not invalidate
+      # the Go test cache — see build.inputs note below.
+      - "console:build"
+      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
     options:
