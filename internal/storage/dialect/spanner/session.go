@@ -76,7 +76,7 @@ func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, se
 			return domain.ErrSessionNotFound()
 		}
 		rsi := newResourceScopeStatements(tx)
-		return rsi.DeleteResourceScope(ctx, sessionID)
+		return rsi.DeleteResourceScope(ctx, domain.ResourceKindSession, projectID, sessionID)
 	})
 }
 

@@ -28,8 +28,12 @@ const (
 	opDelete
 )
 
-// errResourceGone means path.id has no RSI row. Idempotent deletes map this to 204
-// only for credential-plane operators (project.write); others get readMiss.
+// errResourceGone means path.id has no RSI row in the caller's project scope.
+// Idempotent deletes map this to 204 only for credential-plane operators
+// (project.write); others get readMiss. Deliberate tradeoff: operators with any
+// project secret can still distinguish fabricated ids (204) from real foreign
+// resources (404/403 after RSI hit). Full oracle close would require RSI miss
+// → readMiss unless the principal has a foothold, at the cost of repeated-delete 204s.
 var errResourceGone = errors.New("authz: resource gone")
 
 // projectRelation is the catalog relation checked for an accessOp.
@@ -128,10 +132,10 @@ type resourceAccessStmts interface {
 	service.ResourceScopeStatements
 }
 
-// requireResourceAccess resolves path.id via resource_scope_index, then runs
-// the project-scoped Check. RSI miss on read/write → resource 404; on delete →
-// errResourceGone for operators (handlers map to 204), else readMiss. Returns
-// project_id for DAL calls.
+// requireResourceAccess resolves path.id via resource_scope_index (project-scoped
+// when the credential carries project_id), then runs the project-scoped Check.
+// RSI miss on read/write → resource 404; on delete → errResourceGone for
+// operators (handlers map to 204), else readMiss. Returns project_id for DAL calls.
 func (h *Handler) requireResourceAccess(ctx context.Context, resourceID string, res resourceAccess, op accessOp) (projectID string, err error) {
 	if h == nil || h.pool == nil {
 		return "", domain.ErrInternal(errors.New("authz statements not configured"))
@@ -139,8 +143,28 @@ func (h *Handler) requireResourceAccess(ctx context.Context, resourceID string, 
 	return requireResourceAccess(ctx, h.pool.Statements(), resourceID, res, op)
 }
 
+func lookupResourceScope(ctx context.Context, stmts resourceAccessStmts, resourceID string, res resourceAccess) (*domain.ResourceScope, error) {
+	if res.kind != "" {
+		if cred, ok := GetScopeContext(ctx); ok && cred.ProjectID != "" {
+			scope, err := stmts.GetResourceScopeInProject(ctx, res.kind, cred.ProjectID, resourceID)
+			if err == nil {
+				return scope, nil
+			}
+			if !errors.Is(err, new(database.NoRowFoundError)) {
+				return nil, err
+			}
+			// Same-project row under a different kind (e.g. schema id on a user route).
+			if global, gerr := stmts.GetResourceScope(ctx, resourceID); gerr == nil && global.ProjectID == cred.ProjectID {
+				return global, nil
+			}
+			return nil, new(database.NoRowFoundError)
+		}
+	}
+	return stmts.GetResourceScope(ctx, resourceID)
+}
+
 func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resourceID string, res resourceAccess, op accessOp) (string, error) {
-	scope, err := stmts.GetResourceScope(ctx, resourceID)
+	scope, err := lookupResourceScope(ctx, stmts, resourceID, res)
 	if err != nil {
 		if errors.Is(err, new(database.NoRowFoundError)) {
 			if op == opDelete {

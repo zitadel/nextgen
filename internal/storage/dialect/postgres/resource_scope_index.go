@@ -13,9 +13,7 @@ const (
 	upsertResourceScopeStmt = `
 INSERT INTO zitadel_nextgen.resource_scope_index (resource_id, resource_kind, project_id, team_id)
 VALUES ($1, $2, $3, $4)
-ON CONFLICT (resource_id) DO UPDATE SET
-    resource_kind = EXCLUDED.resource_kind,
-    project_id = EXCLUDED.project_id,
+ON CONFLICT (resource_kind, project_id, resource_id) DO UPDATE SET
     team_id = EXCLUDED.team_id,
     updated_at = now()
 RETURNING resource_id, resource_kind, project_id, team_id, created_at, updated_at`
@@ -25,7 +23,12 @@ SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
 FROM zitadel_nextgen.resource_scope_index
 WHERE resource_id = $1`
 
-	deleteResourceScopeStmt = `DELETE FROM zitadel_nextgen.resource_scope_index WHERE resource_id = $1`
+	getResourceScopeInProjectStmt = `
+SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
+FROM zitadel_nextgen.resource_scope_index
+WHERE resource_kind = $1 AND project_id = $2 AND resource_id = $3`
+
+	deleteResourceScopeStmt = `DELETE FROM zitadel_nextgen.resource_scope_index WHERE resource_kind = $1 AND project_id = $2 AND resource_id = $3`
 )
 
 type resourceScopeStatements struct{ statement }
@@ -58,9 +61,22 @@ func (s resourceScopeStatements) GetResourceScope(ctx context.Context, resourceI
 	return scope, nil
 }
 
+// GetResourceScopeInProject implements [service.ResourceScopeStatements].
+func (s resourceScopeStatements) GetResourceScopeInProject(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) (*domain.ResourceScope, error) {
+	rows, err := s.client.Query(ctx, getResourceScopeInProjectStmt, kind.String(), projectID, resourceID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	scope, err := pgx.CollectExactlyOneRow(rows, scanResourceScope)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return scope, nil
+}
+
 // DeleteResourceScope implements [service.ResourceScopeStatements].
-func (s resourceScopeStatements) DeleteResourceScope(ctx context.Context, resourceID string) error {
-	_, err := s.client.Exec(ctx, deleteResourceScopeStmt, resourceID)
+func (s resourceScopeStatements) DeleteResourceScope(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) error {
+	_, err := s.client.Exec(ctx, deleteResourceScopeStmt, kind.String(), projectID, resourceID)
 	return wrapError(err)
 }
 

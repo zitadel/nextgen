@@ -106,6 +106,12 @@ An `sk_team_…` hitting `PATCH /projects/{id}` gets 404 regardless of path. The
   Actionable for authorized callers ([ADR 033](../../adrs/033-internal-permission-management.md)).
 - Self resources the caller already knows exist (e.g. `PATCH /me`) also return
   403 when disallowed.
+- **Delete idempotency (operators):** when `path.id` has no RSI row in the
+  caller's project scope, operators (`project.write`) get **204 No Content**;
+  preview and other callers get the resource readMiss shape (404). This is a
+  deliberate tradeoff: operators with any project secret can still distinguish
+  fabricated ids from real foreign resources (404/403 after RSI hit). See D10 in
+  [`permission-storage.md`](permission-storage.md).
 
 ## See also
 

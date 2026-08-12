@@ -68,9 +68,22 @@ func (s stubAuthzStmts) GetResourceScope(_ context.Context, resourceID string) (
 	return &domain.ResourceScope{ResourceID: resourceID, ProjectID: projectID, ResourceKind: kind}, nil
 }
 
+func (s stubAuthzStmts) GetResourceScopeInProject(_ context.Context, kind domain.ResourceKind, projectID, resourceID string) (*domain.ResourceScope, error) {
+	scope, err := s.GetResourceScope(context.Background(), resourceID)
+	if err != nil {
+		return nil, err
+	}
+	if scope.ProjectID != projectID || scope.ResourceKind != kind {
+		return nil, new(database.NoRowFoundError)
+	}
+	return scope, nil
+}
+
 func (stubAuthzStmts) UpsertResourceScope(context.Context, *domain.ResourceScope) error { return nil }
 
-func (stubAuthzStmts) DeleteResourceScope(context.Context, string) error { return nil }
+func (stubAuthzStmts) DeleteResourceScope(context.Context, domain.ResourceKind, string, string) error {
+	return nil
+}
 
 func TestProjectRelation(t *testing.T) {
 	if got := projectRelation(opRead); got != "viewer" {

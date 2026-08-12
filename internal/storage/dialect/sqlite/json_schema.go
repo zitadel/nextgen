@@ -60,7 +60,7 @@ func (js jsonSchemaStatements) DeleteJSONSchemaByID(ctx context.Context, project
 			return nil
 		}
 		rsi := newResourceScopeStatements(tx)
-		return rsi.DeleteResourceScope(ctx, schemaID)
+		return rsi.DeleteResourceScope(ctx, domain.ResourceKindSchema, projectID, schemaID)
 	})
 }
 
