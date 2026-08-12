@@ -7,9 +7,10 @@ The package exports:
 
 - **Atoms** — `<zl-field>`, `<zl-button>`, `<zl-alert>`, `<zl-icon>`,
   `<zl-pill>`, `<zl-card>`, `<zl-checkbox>`, `<zl-select>`,
-  `<zl-page-shell>`. Form-associated, accessible, branding-aware Lit
-  elements that map 1:1 to the flow API field/action/error primitives and
-  the Figma design system.
+  `<zl-page-shell>`, and `<zl-passkey>` (an invisible WebAuthn ceremony
+  handler — no rendered surface). Form-associated, accessible,
+  branding-aware Lit elements that map 1:1 to the flow API
+  field/action/error primitives and the Figma design system.
 - **Orchestrators** — `<zitadel-login>`, a single drop-in element that calls
   the flow API, renders each step through a Liquid template, manages focus
   and form submission, and applies branding/theme/locale; `<zitadel-logout>`
@@ -348,7 +349,8 @@ See [`src/atoms/`](src/atoms) for full TypeScript types and JSDoc.
 packages/components/
 ├── src/
 │   ├── atoms/             zl-field, zl-button, zl-alert, zl-icon, zl-pill,
-│   │                       zl-card, zl-checkbox, zl-select, zl-page-shell + tests
+│   │                       zl-card, zl-checkbox, zl-select, zl-page-shell,
+│   │                       zl-passkey + tests
 │   ├── orchestrator/      <zitadel-login>, <zitadel-logout>, <zitadel-session>,
 │   │                       api-client, liquid, branding
 │   │   ├── locales/       bundled English fallback
