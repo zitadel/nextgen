@@ -46,7 +46,7 @@ FROM zitadel_nextgen.events`
 
 	deleteEventsOlderThanStmt = `
 DELETE FROM zitadel_nextgen.events
-WHERE project_id = $1 AND created_at < $2`
+WHERE created_at < $1`
 
 	ensureEventSinkStmt = `
 INSERT INTO zitadel_nextgen.event_sinks (id, type, scope, project_id, url, enabled)
@@ -165,8 +165,8 @@ func (e eventStatements) ListEvents(ctx context.Context, filter *database.ListOp
 }
 
 // DeleteEventsOlderThan implements [service.EventStatements].
-func (e eventStatements) DeleteEventsOlderThan(ctx context.Context, projectID string, createdBefore time.Time) (int64, error) {
-	tag, err := e.client.Exec(ctx, deleteEventsOlderThanStmt, projectID, createdBefore.UTC())
+func (e eventStatements) DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (int64, error) {
+	tag, err := e.client.Exec(ctx, deleteEventsOlderThanStmt, createdBefore.UTC())
 	if err != nil {
 		return 0, wrapError(err)
 	}

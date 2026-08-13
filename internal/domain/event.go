@@ -32,7 +32,9 @@ const (
 // EventType is a semantic event name (dot-separated), e.g. user.created.
 type EventType string
 
-// Path A / Path B event types (see docs/design/api/events-catalog.md).
+// Path A / Path B event types with live producers
+// (see docs/design/api/events-catalog.md). Deferred types live only in the
+// catalog Deferred section until follow-up issues land.
 const (
 	EventTypeRequestAPI EventType = "request.api"
 
@@ -41,51 +43,36 @@ const (
 	EventTypeProjectDeleted EventType = "project.deleted"
 
 	EventTypeUserCreated      EventType = "user.created"
-	EventTypeUserUpdated      EventType = "user.updated"
 	EventTypeUserCreateFailed EventType = "user.create.failed"
-	EventTypeUserDeactivated  EventType = "user.deactivated"
 	EventTypeUserDeleted      EventType = "user.deleted"
 
-	EventTypeTeamCreated           EventType = "team.created"
-	EventTypeTeamUpdated           EventType = "team.updated"
-	EventTypeTeamDeactivated       EventType = "team.deactivated"
-	EventTypeTeamMembershipUpdated EventType = "team.membership.updated"
+	EventTypeTeamCreated     EventType = "team.created"
+	EventTypeTeamUpdated     EventType = "team.updated"
+	EventTypeTeamDeactivated EventType = "team.deactivated"
 
 	EventTypeAuthTokenIssued  EventType = "auth.token.issued"
 	EventTypeAuthTokenRevoked EventType = "auth.token.revoked"
 
 	EventTypeSessionEstablished EventType = "session.established"
 	EventTypeSessionDeleted     EventType = "session.deleted"
-	EventTypeSessionExpired     EventType = "session.expired"
 
 	EventTypeAuthAttemptCreated   EventType = "auth.attempt.created"
 	EventTypeAuthAttemptHandedOff EventType = "auth.attempt.handed_off"
 	EventTypeAuthCheckFailed      EventType = "auth.check.failed"
 	EventTypeAuthCheckSucceeded   EventType = "auth.check.succeeded"
 
-	EventTypeClaimChallengeCreated EventType = "claim.challenge_created"
-	EventTypeClaimCompleted        EventType = "claim.completed"
-
 	EventTypeFlowdefCreated EventType = "flowdef.created"
 	EventTypeFlowdefUpdated EventType = "flowdef.updated"
 	EventTypeFlowdefDeleted EventType = "flowdef.deleted"
 
 	EventTypeSchemaCreated EventType = "schema.created"
-	EventTypeSchemaDeleted EventType = "schema.deleted"
 
 	EventTypeBrandingCreated EventType = "branding.created"
 
 	EventTypeAuthzGranted EventType = "authz.granted"
-	EventTypeAuthzRevoked EventType = "authz.revoked"
 
 	EventTypeAuthFactorPasswordSet     EventType = "auth.factor.password.set"
-	EventTypeAuthFactorPasswordRemoved EventType = "auth.factor.password.removed"
-	EventTypeAuthFactorTOTPEnrolled    EventType = "auth.factor.totp.enrolled"
-	EventTypeAuthFactorTOTPRemoved     EventType = "auth.factor.totp.removed"
 	EventTypeAuthFactorPasskeyEnrolled EventType = "auth.factor.passkey.enrolled"
-	EventTypeAuthFactorPasskeyRemoved  EventType = "auth.factor.passkey.removed"
-	EventTypeAuthFactorRecoveryCreated EventType = "auth.factor.recovery.created"
-	EventTypeAuthFactorRecoveryRemoved EventType = "auth.factor.recovery.removed"
 )
 
 // Event is one append-only wide-event row (ADR 048).

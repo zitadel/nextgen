@@ -90,7 +90,7 @@ func TestShipper_AdvancesCursorOnSuccess(t *testing.T) {
 	src := newFakeExportSource([]string{"proj_a"}, map[string][]*domain.Event{
 		"proj_a": {
 			{ProjectID: "proj_a", ID: "evt_1", CreatedAt: t0, EventType: domain.EventTypeUserCreated, Category: domain.EventCategoryEntity},
-			{ProjectID: "proj_a", ID: "evt_2", CreatedAt: t0.Add(time.Second), EventType: domain.EventTypeUserUpdated, Category: domain.EventCategoryEntity},
+			{ProjectID: "proj_a", ID: "evt_2", CreatedAt: t0.Add(time.Second), EventType: domain.EventTypeUserDeleted, Category: domain.EventCategoryEntity},
 		},
 	})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -124,7 +124,7 @@ func TestShipper_HeadOfLineStopsOnFailure(t *testing.T) {
 	src := newFakeExportSource([]string{"proj_a"}, map[string][]*domain.Event{
 		"proj_a": {
 			{ProjectID: "proj_a", ID: "evt_ok", CreatedAt: t0, EventType: domain.EventTypeUserCreated, Category: domain.EventCategoryEntity},
-			{ProjectID: "proj_a", ID: "evt_fail", CreatedAt: t0.Add(time.Second), EventType: domain.EventTypeUserUpdated, Category: domain.EventCategoryEntity},
+			{ProjectID: "proj_a", ID: "evt_fail", CreatedAt: t0.Add(time.Second), EventType: domain.EventTypeUserDeleted, Category: domain.EventCategoryEntity},
 			{ProjectID: "proj_a", ID: "evt_skip", CreatedAt: t0.Add(2 * time.Second), EventType: domain.EventTypeUserDeleted, Category: domain.EventCategoryEntity},
 		},
 	})

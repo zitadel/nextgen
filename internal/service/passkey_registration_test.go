@@ -74,6 +74,9 @@ func (s *passkeyUserState) expectUserPasskeys(stmts *servicemocks.MockAllStateme
 	stmts.EXPECT().
 		CreateUserPasskey(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, p *domain.CreateUserPasskey) error {
+			if p.ID == "" {
+				p.ID = "upk_test01"
+			}
 			s.created = append(s.created, p)
 			return nil
 		}).AnyTimes()
@@ -288,6 +291,64 @@ func TestPasskeyRegistrationService_Finish_StoresPasskeyName(t *testing.T) {
 			assert.Equal(t, tt.expectedName, userState.created[0].Name)
 		})
 	}
+}
+
+func TestPasskeyRegistrationService_Finish_EmitsCredentialEntity(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockStatementPool(ctrl)
+	statements := servicemocks.NewMockAllStatements(ctrl)
+	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
+	pool.EXPECT().Statements().Return(statements).AnyTimes()
+	pool.EXPECT().
+		Transaction(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, tx func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return tx(ctx, statementer)
+		}).
+		AnyTimes()
+	statementer.EXPECT().Statements().Return(statements).AnyTimes()
+
+	regState := &passkeyRegState{}
+	userState := &passkeyUserState{}
+	regState.expectCRUD(statements)
+	userState.expectUserPasskeys(statements)
+
+	var gotEvent *domain.Event
+	statements.EXPECT().
+		InsertEvent(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, ev *domain.Event) error {
+			gotEvent = ev
+			return nil
+		})
+
+	svc := service.NewPasskeyRegistrationService(pool)
+	out, err := svc.Begin(context.Background(), service.BeginRegistrationInput{
+		ProjectID:   "proj-1",
+		UserID:      "user-1",
+		Username:    "alice@example.com",
+		DisplayName: "Alice Example",
+		RPID:        passkeyRPID,
+		RPOrigins:   []string{passkeyOrigin},
+	})
+	require.NoError(t, err)
+
+	err = svc.Finish(context.Background(), service.FinishRegistrationInput{
+		ProjectID:      "proj-1",
+		RegistrationID: out.RegistrationID,
+		Attestation:    []byte(attestPasskeyRegistration(t, out.Options)),
+		PasskeyName:    "Work laptop",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, gotEvent)
+	assert.Equal(t, domain.EventTypeAuthFactorPasskeyEnrolled, gotEvent.EventType)
+	require.NotNil(t, gotEvent.EntityID)
+	assert.Equal(t, "upk_test01", *gotEvent.EntityID)
+	require.Len(t, userState.created, 1)
+	assert.Equal(t, "upk_test01", userState.created[0].ID)
+
+	var payload domain.AuthFactorPayload
+	require.NoError(t, json.Unmarshal(gotEvent.Payload, &payload))
+	assert.Equal(t, "user-1", payload.UserID)
+	assert.Equal(t, "upk_test01", payload.FactorID)
 }
 
 // attestPasskeyRegistration answers creation options with a real attestation

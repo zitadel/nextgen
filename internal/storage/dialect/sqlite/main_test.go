@@ -76,7 +76,8 @@ func TestProjectCRUD(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, list.Items, 1)
 
-	require.NoError(t, testPool.DeleteProjectByID(ctx, id))
+	_, err := testPool.DeleteProjectByID(ctx, id)
+	require.NoError(t, err)
 	_, err = testPool.GetProjectByID(ctx, id)
 	require.Error(t, err)
 }
@@ -85,7 +86,7 @@ func TestTeamNameUniqueness(t *testing.T) {
 	ctx := t.Context()
 	projectID := "proj-team-" + t.Name()
 	require.NoError(t, testPool.CreateProject(ctx, &domain.Project{ID: projectID, Name: "p"}))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 
 	require.NoError(t, testPool.CreateTeam(ctx, &domain.Team{ProjectID: projectID, ID: "t1", Name: "Engineering"}))
 	err := testPool.CreateTeam(ctx, &domain.Team{ProjectID: projectID, ID: "t2", Name: "engineering"})

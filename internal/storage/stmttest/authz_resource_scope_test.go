@@ -61,7 +61,8 @@ func TestProjectStatements_Delete_removesResourceScope(t *testing.T) {
 		_, err := d.stmts.GetResourceScope(t.Context(), project.ID)
 		require.NoError(t, err)
 
-		require.NoError(t, d.stmts.DeleteProjectByID(t.Context(), project.ID))
+		_, err = d.stmts.DeleteProjectByID(t.Context(), project.ID)
+		require.NoError(t, err)
 		_, err = d.stmts.GetResourceScope(t.Context(), project.ID)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})

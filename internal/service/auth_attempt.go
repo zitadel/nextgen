@@ -236,6 +236,7 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 			ProjectID:  attempt.ProjectID,
 			EntityType: "auth_attempt",
 			EntityID:   attempt.ID,
+			SessionID:  attempt.SessionID,
 			Payload:    payload,
 		})
 	}); err != nil {
@@ -298,7 +299,7 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 				if err := tx.Statements().AuthAttemptChallengeFailed(ctx, input.ProjectID, input.AttemptID, challenge); err != nil {
 					return err
 				}
-				return emitAuthCheck(ctx, tx.Statements(), input.ProjectID, challenge, false)
+				return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, false)
 			})
 		}
 		return nil, err
@@ -308,7 +309,7 @@ func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofI
 		if err := tx.Statements().AuthAttemptChallengeSucceeded(ctx, input.ProjectID, input.AttemptID, factor, challenge.GetID()); err != nil {
 			return err
 		}
-		return emitAuthCheck(ctx, tx.Statements(), input.ProjectID, challenge, true)
+		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, true)
 	})
 	if err != nil {
 		return nil, err
@@ -344,6 +345,7 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 			ProjectID:  attempt.ProjectID,
 			EntityType: "auth_attempt",
 			EntityID:   attempt.ID,
+			SessionID:  attempt.SessionID,
 			Payload:    payload,
 		})
 	})
@@ -358,6 +360,10 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 // synthetic user challenge and immediately marks it succeeded so the exchange
 // can promote the user_id to the session.
 func (s *authAttemptService) RegisterCreatedUser(ctx context.Context, projectID, attemptID, userID string) error {
+	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, projectID, attemptID)
+	if err != nil {
+		return err
+	}
 	challenge := &domain.AuthChallengeUser{}
 	return s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().SetAuthAttemptChallenge(ctx, projectID, attemptID, challenge); err != nil {
@@ -367,11 +373,11 @@ func (s *authAttemptService) RegisterCreatedUser(ctx context.Context, projectID,
 		if err := tx.Statements().AuthAttemptChallengeSucceeded(ctx, projectID, attemptID, factor, challenge.GetID()); err != nil {
 			return err
 		}
-		return emitAuthCheck(ctx, tx.Statements(), projectID, challenge, true)
+		return emitAuthCheck(ctx, tx.Statements(), attempt, challenge, true)
 	})
 }
 
-func emitAuthCheck(ctx context.Context, stmts EventStatements, projectID string, challenge domain.AuthChallenge, succeeded bool) error {
+func emitAuthCheck(ctx context.Context, stmts EventStatements, attempt *domain.AuthAttempt, challenge domain.AuthChallenge, succeeded bool) error {
 	eventType := domain.EventTypeAuthCheckFailed
 	if succeeded {
 		eventType = domain.EventTypeAuthCheckSucceeded
@@ -379,9 +385,10 @@ func emitAuthCheck(ctx context.Context, stmts EventStatements, projectID string,
 	return audit.Emit(ctx, stmts, audit.EmitSpec{
 		Type:       eventType,
 		Category:   domain.EventCategoryAuth,
-		ProjectID:  projectID,
+		ProjectID:  attempt.ProjectID,
 		EntityType: "check",
 		EntityID:   challenge.GetID(),
+		SessionID:  attempt.SessionID,
 		Payload: domain.AuthCheckPayload{
 			CheckID:   challenge.GetID(),
 			CheckType: challenge.Type().String(),

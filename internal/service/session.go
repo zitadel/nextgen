@@ -99,7 +99,14 @@ func (s *sessionService) Create(ctx context.Context, input CreateSessionInput) (
 		if err := tx.Statements().CreateSession(ctx, session); err != nil {
 			return err
 		}
-		return emitSessionEstablished(ctx, tx.Statements(), session)
+		if err := emitSessionEstablished(ctx, tx.Statements(), session); err != nil {
+			return err
+		}
+		// CreateSession mints a session token; emit the peer when TokenID is set.
+		if session.TokenID != "" {
+			return emitAuthTokenIssued(ctx, tx.Statements(), session, []string{})
+		}
+		return nil
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {
@@ -126,7 +133,8 @@ func (s *sessionService) Exchange(ctx context.Context, input ExchangeInput) (*do
 			return err
 		}
 		if session.TokenID != "" {
-			if err := emitAuthTokenIssued(ctx, tx.Statements(), session); err != nil {
+			// Session mint uses empty scopes today; pass through honestly.
+			if err := emitAuthTokenIssued(ctx, tx.Statements(), session, []string{}); err != nil {
 				return err
 			}
 		}
@@ -297,6 +305,18 @@ func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) e
 		}
 
 		sid := input.SessionID
+		// DeleteTokensBySessionID does not return deleted token ids; emit one
+		// peer with session_id set and empty entity_id (compound revoke).
+		if err := audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeAuthTokenRevoked,
+			Category:   domain.EventCategoryAuth,
+			ProjectID:  input.ProjectID,
+			EntityType: "token",
+			SessionID:  &sid,
+			Payload:    domain.AuthTokenRevokedPayload{},
+		}); err != nil {
+			return err
+		}
 		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
 			Type:       domain.EventTypeSessionDeleted,
 			Category:   domain.EventCategorySession,
@@ -304,7 +324,7 @@ func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) e
 			EntityType: "session",
 			EntityID:   input.SessionID,
 			SessionID:  &sid,
-			Payload:    domain.SessionDeletedPayload{},
+			Payload:    domain.SessionDeletedPayload{Reason: "revoked"},
 		})
 	})
 }
@@ -326,16 +346,24 @@ func emitSessionEstablished(ctx context.Context, stmts EventStatements, session 
 	})
 }
 
-func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, session *domain.Session) error {
-	return audit.Emit(ctx, stmts, audit.EmitSpec{
+func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, session *domain.Session, scopes []string) error {
+	sid := session.ID
+	spec := audit.EmitSpec{
 		Type:       domain.EventTypeAuthTokenIssued,
 		Category:   domain.EventCategoryAuth,
 		ProjectID:  session.ProjectID,
 		EntityType: "token",
 		EntityID:   session.TokenID,
 		TokenID:    session.TokenID,
-		Payload:    domain.AuthTokenIssuedPayload{},
-	})
+		SessionID:  &sid,
+		Payload:    domain.AuthTokenIssuedPayload{Scopes: scopes},
+	}
+	if session.UserID != nil {
+		spec.ActorID = session.UserID
+		actorType := domain.EventActorTypeHuman
+		spec.ActorType = &actorType
+	}
+	return audit.Emit(ctx, stmts, spec)
 }
 
 func NewSessionService(v2Pool StatementPool, users UserIdentityReader, cfg SessionConfig) SessionService {

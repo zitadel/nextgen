@@ -376,14 +376,22 @@ func TestProjectService_Delete(t *testing.T) {
 			name: "ok",
 			id:   "proj_aaa",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().DeleteProjectByID(gomock.Any(), "proj_aaa").Return(nil)
+				s.EXPECT().DeleteProjectByID(gomock.Any(), "proj_aaa").Return(true, nil)
+			},
+		},
+		{
+			name: "unknown id skips emit",
+			id:   "proj_aaa",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().DeleteProjectByID(gomock.Any(), "proj_aaa").Return(false, nil)
+				// InsertEvent must not be required.
 			},
 		},
 		{
 			name: "delete failed",
 			id:   "proj_aaa",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().DeleteProjectByID(gomock.Any(), "proj_aaa").Return(assert.AnError)
+				s.EXPECT().DeleteProjectByID(gomock.Any(), "proj_aaa").Return(false, assert.AnError)
 			},
 			wantErr: domain.ErrInternal(assert.AnError),
 		},

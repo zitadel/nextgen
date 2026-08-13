@@ -30,51 +30,36 @@ var payloadByEventType = map[string]string{
 	"project.deleted": "empty-event-payload.yaml",
 
 	"user.created":       "user-created-payload.yaml",
-	"user.updated":       "user-updated-payload.yaml",
 	"user.create.failed": "user-create-failed-payload.yaml",
-	"user.deactivated":   "user-deactivated-payload.yaml",
 	"user.deleted":       "empty-event-payload.yaml",
 
-	"team.created":            "team-created-payload.yaml",
-	"team.updated":            "team-updated-payload.yaml",
-	"team.deactivated":        "empty-event-payload.yaml",
-	"team.membership.updated": "team-membership-updated-payload.yaml",
+	"team.created":     "team-created-payload.yaml",
+	"team.updated":     "team-updated-payload.yaml",
+	"team.deactivated": "empty-event-payload.yaml",
 
 	"auth.token.issued":  "auth-token-issued-payload.yaml",
 	"auth.token.revoked": "empty-event-payload.yaml",
 
 	"session.established": "session-established-payload.yaml",
 	"session.deleted":     "session-deleted-payload.yaml",
-	"session.expired":     "empty-event-payload.yaml",
 
 	"auth.attempt.created":    "auth-attempt-created-payload.yaml",
 	"auth.attempt.handed_off": "auth-attempt-handed-off-payload.yaml",
 	"auth.check.failed":       "auth-check-payload.yaml",
 	"auth.check.succeeded":    "auth-check-payload.yaml",
 
-	"claim.challenge_created": "empty-event-payload.yaml",
-	"claim.completed":         "claim-completed-payload.yaml",
-
 	"flowdef.created": "flowdef-payload.yaml",
 	"flowdef.updated": "flowdef-payload.yaml",
 	"flowdef.deleted": "empty-event-payload.yaml",
 
 	"schema.created": "schema-payload.yaml",
-	"schema.deleted": "schema-payload.yaml",
 
 	"branding.created": "branding-created-payload.yaml",
 
 	"authz.granted": "authz-granted-payload.yaml",
-	"authz.revoked": "authz-revoked-payload.yaml",
 
 	"auth.factor.password.set":     "auth-factor-payload.yaml",
-	"auth.factor.password.removed": "auth-factor-payload.yaml",
-	"auth.factor.totp.enrolled":    "auth-factor-payload.yaml",
-	"auth.factor.totp.removed":     "auth-factor-payload.yaml",
 	"auth.factor.passkey.enrolled": "auth-factor-payload.yaml",
-	"auth.factor.passkey.removed":  "auth-factor-payload.yaml",
-	"auth.factor.recovery.created": "auth-factor-payload.yaml",
-	"auth.factor.recovery.removed": "auth-factor-payload.yaml",
 }
 
 func main() {

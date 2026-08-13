@@ -170,14 +170,17 @@ func (b *RequestBuffer) flush(batch []bufferedEvent) {
 	}
 	events := make([]*domain.Event, len(batch))
 	for i, item := range batch {
-		ev := item.event
-		ev.OccurredAtWait = time.Since(item.enqueuedAt)
-		events[i] = ev
+		events[i] = item.event
 	}
 	const maxAttempts = 3
 	backoff := 50 * time.Millisecond
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		// Recompute wait immediately before each insert attempt so retries
+		// include backoff time (review: OccurredAtWait on retry).
+		for i, item := range batch {
+			events[i].OccurredAtWait = time.Since(item.enqueuedAt)
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		lastErr = b.insert.InsertEvents(ctx, events)
 		cancel()

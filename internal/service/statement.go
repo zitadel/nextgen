@@ -63,7 +63,8 @@ type ProjectStatements interface {
 	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
 	UpdateProject(ctx context.Context, entity *domain.Project) error
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
-	DeleteProjectByID(ctx context.Context, id string) error
+	// DeleteProjectByID removes the project. changed is false when no row matched.
+	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -434,8 +435,9 @@ type EventStatements interface {
 	InsertEvent(ctx context.Context, event *domain.Event) error
 	GetEventByID(ctx context.Context, projectID, id string) (*domain.Event, error)
 	ListEvents(ctx context.Context, filter *database.ListOptions[domain.EventField]) (*database.ListResult[*domain.Event], error)
-	// DeleteEventsOlderThan removes events with created_at before cutoff (retention job).
-	DeleteEventsOlderThan(ctx context.Context, projectID string, createdBefore time.Time) (int64, error)
+	// DeleteEventsOlderThan removes events with created_at before cutoff across
+	// all projects (retention job; includes orphaned project_id rows).
+	DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (int64, error)
 	EnsureEventSink(ctx context.Context, sink *domain.EventSink) error
 	GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error)
 	UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error

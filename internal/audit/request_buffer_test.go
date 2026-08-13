@@ -164,3 +164,45 @@ func TestRequestBuffer_FlushFailureDropsAndCounts(t *testing.T) {
 	assert.Equal(t, 0, buf.Len())
 	assert.Equal(t, 3, ins.calls)
 }
+
+type failThenSucceedInserter struct {
+	mu        sync.Mutex
+	calls     int
+	lastWaits []time.Duration
+}
+
+func (f *failThenSucceedInserter) InsertEvents(_ context.Context, events []*domain.Event) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls++
+	f.lastWaits = make([]time.Duration, len(events))
+	for i, ev := range events {
+		f.lastWaits[i] = ev.OccurredAtWait
+	}
+	if f.calls == 1 {
+		return assert.AnError
+	}
+	return nil
+}
+
+func TestRequestBuffer_OccurredAtWaitIncludesRetryBackoff(t *testing.T) {
+	ins := &failThenSucceedInserter{}
+	buf := NewRequestBuffer(ins, RequestBufferConfig{
+		BatchSize:     1,
+		Capacity:      100,
+		HighWatermark: 0.9,
+		MaxAge:        time.Hour,
+		FlushInterval: time.Hour,
+	})
+	defer buf.Close()
+
+	buf.Enqueue(&domain.Event{ProjectID: "proj_1", EventType: domain.EventTypeRequestAPI, Category: domain.EventCategoryRequest})
+
+	require.Eventually(t, func() bool { return buf.Flushed() >= 1 }, 2*time.Second, 10*time.Millisecond)
+	ins.mu.Lock()
+	defer ins.mu.Unlock()
+	require.Equal(t, 2, ins.calls)
+	require.Len(t, ins.lastWaits, 1)
+	// First attempt failed; second attempt wait must include the 50ms backoff.
+	assert.GreaterOrEqual(t, ins.lastWaits[0], 50*time.Millisecond)
+}

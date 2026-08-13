@@ -22,7 +22,7 @@ func TestPayloadMapCoversDomainEventTypes(t *testing.T) {
 
 	eventTypes, err := extractEventTypes(domainEventPath)
 	require.NoError(t, err)
-	require.Len(t, eventTypes, 40, "domain EventType constant count changed; update payloadByEventType")
+	require.Len(t, eventTypes, 26, "domain EventType constant count changed; update payloadByEventType")
 	require.NoError(t, validateMappings(eventTypes, payloadsDir))
 }
 
@@ -43,10 +43,16 @@ func TestCatalogEventTypesMatchDomain(t *testing.T) {
 
 	catalogRaw, err := os.ReadFile(catalogPath)
 	require.NoError(t, err)
+	// Only Path A / Path B tables must match domain constants; Deferred may
+	// list future types that are not yet constants.
+	active := string(catalogRaw)
+	if i := strings.Index(active, "## Deferred"); i >= 0 {
+		active = active[:i]
+	}
 	// Match backtick-quoted event types in catalog tables, e.g. `user.created`.
 	re := regexp.MustCompile("`([a-z][a-z0-9_.]+)`")
 	catalogSet := map[string]struct{}{}
-	for _, m := range re.FindAllStringSubmatch(string(catalogRaw), -1) {
+	for _, m := range re.FindAllStringSubmatch(active, -1) {
 		et := m[1]
 		if _, ok := payloadByEventType[et]; ok {
 			catalogSet[et] = struct{}{}

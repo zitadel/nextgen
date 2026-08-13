@@ -205,7 +205,7 @@ func TestGetTeam(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		// Teams have no delete statement; they cascade with their project.
-		_ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
+		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
 	})
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -286,7 +286,7 @@ func TestUpdateTeam(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		_ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
+		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
 	})
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -345,7 +345,7 @@ func TestUpdateTeam(t *testing.T) {
 		otherProject, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			_ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), otherProject.ID)
+			_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), otherProject.ID)
 		})
 
 		name := helpers.TeamName()
@@ -520,7 +520,7 @@ func TestDeleteTeam(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		_ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
+		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
 	})
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -635,7 +635,7 @@ func TestDeleteTeam(t *testing.T) {
 		other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			_ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), other.ID)
+			_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), other.ID)
 		})
 		foreignTeam, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 			ProjectID: other.ID,
@@ -693,7 +693,7 @@ func TestQueryTeams(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		// Teams have no delete statement; they cascade with their project.
-		_ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
+		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
 	})
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -706,7 +706,7 @@ func TestQueryTeams(t *testing.T) {
 	otherProject, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		_ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), otherProject.ID)
+		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), otherProject.ID)
 	})
 	_, err = harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: otherProject.ID,
@@ -877,7 +877,7 @@ func TestUpdateTeamRawRequest(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		_ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
+		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
 	})
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)

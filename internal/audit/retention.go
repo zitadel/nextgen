@@ -6,14 +6,10 @@ import (
 	"time"
 )
 
-// ProjectLister lists project IDs for retention sweeps.
-type ProjectLister interface {
-	ListProjectIDs(ctx context.Context) ([]string, error)
-}
-
-// EventPurger deletes old events.
+// EventPurger deletes old events across all projects (including orphaned
+// project_id values after hard-delete).
 type EventPurger interface {
-	DeleteEventsOlderThan(ctx context.Context, projectID string, createdBefore time.Time) (int64, error)
+	DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (int64, error)
 }
 
 // RetentionConfig controls time-only event purge (ADR 049).
@@ -34,13 +30,12 @@ func DefaultRetentionConfig() RetentionConfig {
 // RetentionJob periodically deletes events older than the retention window.
 type RetentionJob struct {
 	cfg   RetentionConfig
-	list  ProjectLister
 	purge EventPurger
 	stop  chan struct{}
 	done  chan struct{}
 }
 
-func NewRetentionJob(list ProjectLister, purge EventPurger, cfg RetentionConfig) *RetentionJob {
+func NewRetentionJob(purge EventPurger, cfg RetentionConfig) *RetentionJob {
 	if cfg.Retention <= 0 {
 		cfg.Retention = 30 * 24 * time.Hour
 	}
@@ -49,7 +44,6 @@ func NewRetentionJob(list ProjectLister, purge EventPurger, cfg RetentionConfig)
 	}
 	return &RetentionJob{
 		cfg:   cfg,
-		list:  list,
 		purge: purge,
 		stop:  make(chan struct{}),
 		done:  make(chan struct{}),
@@ -82,26 +76,14 @@ func (j *RetentionJob) loop() {
 func (j *RetentionJob) runOnce() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	ids, err := j.list.ListProjectIDs(ctx)
+	cutoff := time.Now().UTC().Add(-j.cfg.Retention)
+	n, err := j.purge.DeleteEventsOlderThan(ctx, cutoff)
 	if err != nil {
-		slog.Error("event retention: list projects failed", slog.String("error", err.Error()))
+		slog.Error("event retention: purge failed", slog.String("error", err.Error()))
 		return
 	}
-	cutoff := time.Now().UTC().Add(-j.cfg.Retention)
-	var total int64
-	for _, id := range ids {
-		n, err := j.purge.DeleteEventsOlderThan(ctx, id, cutoff)
-		if err != nil {
-			slog.Error("event retention: purge failed",
-				slog.String("project_id", id),
-				slog.String("error", err.Error()),
-			)
-			continue
-		}
-		total += n
-	}
-	if total > 0 {
-		slog.Info("event retention: purged events", slog.Int64("deleted", total))
+	if n > 0 {
+		slog.Info("event retention: purged events", slog.Int64("deleted", n))
 	}
 }
 

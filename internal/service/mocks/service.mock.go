@@ -1238,18 +1238,18 @@ func (c *MockAllStatementsDeleteAuthzMembershipEdgesForTeamDeactivateCall) DoAnd
 }
 
 // DeleteEventsOlderThan mocks base method.
-func (m *MockAllStatements) DeleteEventsOlderThan(ctx context.Context, projectID string, createdBefore time.Time) (int64, error) {
+func (m *MockAllStatements) DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteEventsOlderThan", ctx, projectID, createdBefore)
+	ret := m.ctrl.Call(m, "DeleteEventsOlderThan", ctx, createdBefore)
 	ret0, _ := ret[0].(int64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DeleteEventsOlderThan indicates an expected call of DeleteEventsOlderThan.
-func (mr *MockAllStatementsMockRecorder) DeleteEventsOlderThan(ctx, projectID, createdBefore any) *MockAllStatementsDeleteEventsOlderThanCall {
+func (mr *MockAllStatementsMockRecorder) DeleteEventsOlderThan(ctx, createdBefore any) *MockAllStatementsDeleteEventsOlderThanCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteEventsOlderThan", reflect.TypeOf((*MockAllStatements)(nil).DeleteEventsOlderThan), ctx, projectID, createdBefore)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteEventsOlderThan", reflect.TypeOf((*MockAllStatements)(nil).DeleteEventsOlderThan), ctx, createdBefore)
 	return &MockAllStatementsDeleteEventsOlderThanCall{Call: call}
 }
 
@@ -1265,13 +1265,13 @@ func (c *MockAllStatementsDeleteEventsOlderThanCall) Return(arg0 int64, arg1 err
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeleteEventsOlderThanCall) Do(f func(context.Context, string, time.Time) (int64, error)) *MockAllStatementsDeleteEventsOlderThanCall {
+func (c *MockAllStatementsDeleteEventsOlderThanCall) Do(f func(context.Context, time.Time) (int64, error)) *MockAllStatementsDeleteEventsOlderThanCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeleteEventsOlderThanCall) DoAndReturn(f func(context.Context, string, time.Time) (int64, error)) *MockAllStatementsDeleteEventsOlderThanCall {
+func (c *MockAllStatementsDeleteEventsOlderThanCall) DoAndReturn(f func(context.Context, time.Time) (int64, error)) *MockAllStatementsDeleteEventsOlderThanCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1391,11 +1391,12 @@ func (c *MockAllStatementsDeletePasskeyRegistrationCall) DoAndReturn(f func(cont
 }
 
 // DeleteProjectByID mocks base method.
-func (m *MockAllStatements) DeleteProjectByID(ctx context.Context, id string) error {
+func (m *MockAllStatements) DeleteProjectByID(ctx context.Context, id string) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteProjectByID", ctx, id)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // DeleteProjectByID indicates an expected call of DeleteProjectByID.
@@ -1411,19 +1412,19 @@ type MockAllStatementsDeleteProjectByIDCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsDeleteProjectByIDCall) Return(arg0 error) *MockAllStatementsDeleteProjectByIDCall {
-	c.Call = c.Call.Return(arg0)
+func (c *MockAllStatementsDeleteProjectByIDCall) Return(changed bool, err error) *MockAllStatementsDeleteProjectByIDCall {
+	c.Call = c.Call.Return(changed, err)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeleteProjectByIDCall) Do(f func(context.Context, string) error) *MockAllStatementsDeleteProjectByIDCall {
+func (c *MockAllStatementsDeleteProjectByIDCall) Do(f func(context.Context, string) (bool, error)) *MockAllStatementsDeleteProjectByIDCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeleteProjectByIDCall) DoAndReturn(f func(context.Context, string) error) *MockAllStatementsDeleteProjectByIDCall {
+func (c *MockAllStatementsDeleteProjectByIDCall) DoAndReturn(f func(context.Context, string) (bool, error)) *MockAllStatementsDeleteProjectByIDCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -4755,11 +4756,12 @@ func (c *MockProjectStatementsCreateProjectCall) DoAndReturn(f func(context.Cont
 }
 
 // DeleteProjectByID mocks base method.
-func (m *MockProjectStatements) DeleteProjectByID(ctx context.Context, id string) error {
+func (m *MockProjectStatements) DeleteProjectByID(ctx context.Context, id string) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteProjectByID", ctx, id)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // DeleteProjectByID indicates an expected call of DeleteProjectByID.
@@ -4775,19 +4777,19 @@ type MockProjectStatementsDeleteProjectByIDCall struct {
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockProjectStatementsDeleteProjectByIDCall) Return(arg0 error) *MockProjectStatementsDeleteProjectByIDCall {
-	c.Call = c.Call.Return(arg0)
+func (c *MockProjectStatementsDeleteProjectByIDCall) Return(changed bool, err error) *MockProjectStatementsDeleteProjectByIDCall {
+	c.Call = c.Call.Return(changed, err)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockProjectStatementsDeleteProjectByIDCall) Do(f func(context.Context, string) error) *MockProjectStatementsDeleteProjectByIDCall {
+func (c *MockProjectStatementsDeleteProjectByIDCall) Do(f func(context.Context, string) (bool, error)) *MockProjectStatementsDeleteProjectByIDCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockProjectStatementsDeleteProjectByIDCall) DoAndReturn(f func(context.Context, string) error) *MockProjectStatementsDeleteProjectByIDCall {
+func (c *MockProjectStatementsDeleteProjectByIDCall) DoAndReturn(f func(context.Context, string) (bool, error)) *MockProjectStatementsDeleteProjectByIDCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -10138,18 +10140,18 @@ func (m *MockEventStatements) EXPECT() *MockEventStatementsMockRecorder {
 }
 
 // DeleteEventsOlderThan mocks base method.
-func (m *MockEventStatements) DeleteEventsOlderThan(ctx context.Context, projectID string, createdBefore time.Time) (int64, error) {
+func (m *MockEventStatements) DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteEventsOlderThan", ctx, projectID, createdBefore)
+	ret := m.ctrl.Call(m, "DeleteEventsOlderThan", ctx, createdBefore)
 	ret0, _ := ret[0].(int64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DeleteEventsOlderThan indicates an expected call of DeleteEventsOlderThan.
-func (mr *MockEventStatementsMockRecorder) DeleteEventsOlderThan(ctx, projectID, createdBefore any) *MockEventStatementsDeleteEventsOlderThanCall {
+func (mr *MockEventStatementsMockRecorder) DeleteEventsOlderThan(ctx, createdBefore any) *MockEventStatementsDeleteEventsOlderThanCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteEventsOlderThan", reflect.TypeOf((*MockEventStatements)(nil).DeleteEventsOlderThan), ctx, projectID, createdBefore)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteEventsOlderThan", reflect.TypeOf((*MockEventStatements)(nil).DeleteEventsOlderThan), ctx, createdBefore)
 	return &MockEventStatementsDeleteEventsOlderThanCall{Call: call}
 }
 
@@ -10165,13 +10167,13 @@ func (c *MockEventStatementsDeleteEventsOlderThanCall) Return(arg0 int64, arg1 e
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockEventStatementsDeleteEventsOlderThanCall) Do(f func(context.Context, string, time.Time) (int64, error)) *MockEventStatementsDeleteEventsOlderThanCall {
+func (c *MockEventStatementsDeleteEventsOlderThanCall) Do(f func(context.Context, time.Time) (int64, error)) *MockEventStatementsDeleteEventsOlderThanCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockEventStatementsDeleteEventsOlderThanCall) DoAndReturn(f func(context.Context, string, time.Time) (int64, error)) *MockEventStatementsDeleteEventsOlderThanCall {
+func (c *MockEventStatementsDeleteEventsOlderThanCall) DoAndReturn(f func(context.Context, time.Time) (int64, error)) *MockEventStatementsDeleteEventsOlderThanCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

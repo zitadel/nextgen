@@ -75,8 +75,8 @@ func (a EventExportAdapter) ListClaimedProjectIDs(ctx context.Context) ([]string
 	return claimed, nil
 }
 
-func (a EventExportAdapter) DeleteEventsOlderThan(ctx context.Context, projectID string, createdBefore time.Time) (int64, error) {
-	return a.Pool.Statements().DeleteEventsOlderThan(ctx, projectID, createdBefore)
+func (a EventExportAdapter) DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (int64, error) {
+	return a.Pool.Statements().DeleteEventsOlderThan(ctx, createdBefore)
 }
 
 func (a EventExportAdapter) EnsureSink(ctx context.Context, sink *domain.EventSink) error {
@@ -96,7 +96,6 @@ func (a EventExportAdapter) ListEventsAfterCursor(ctx context.Context, projectID
 }
 
 var (
-	_ audit.ProjectLister     = EventExportAdapter{}
 	_ audit.EventPurger       = EventExportAdapter{}
 	_ audit.EventExportSource = EventExportAdapter{}
 )

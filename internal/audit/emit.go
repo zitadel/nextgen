@@ -16,6 +16,10 @@ type EmitSpec struct {
 	Payload    any
 	SessionID  *string
 	TokenID    string
+	// Optional actor overrides when the request ActorContext is empty
+	// (anonymous session mint, token issue before AuthGate, etc.).
+	ActorID   *string
+	ActorType *domain.EventActorType
 }
 
 // Emit builds and inserts a Path B event. Empty ProjectID skips the insert
@@ -28,6 +32,12 @@ func Emit(ctx context.Context, stmts EventInserter, spec EmitSpec) error {
 	}
 	if spec.TokenID != "" {
 		ev.TokenID = spec.TokenID
+	}
+	if spec.ActorID != nil {
+		ev.ActorID = spec.ActorID
+	}
+	if spec.ActorType != nil {
+		ev.ActorType = spec.ActorType
 	}
 	ev, err := WithPayload(ev, spec.Payload)
 	if err != nil {

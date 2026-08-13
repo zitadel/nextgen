@@ -123,8 +123,12 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 			return domain.ErrInternal(err).WithMessage("failed to create project token signing key in the database")
 		}
 
-		if err := tx.Statements().CreateAuthzAssignment(ctx, domain.NewSKProjProjectSetupAssignment(project.ID)); err != nil {
+		asgn := domain.NewSKProjProjectSetupAssignment(project.ID)
+		if err := tx.Statements().CreateAuthzAssignment(ctx, asgn); err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to seed project secret authz assignment")
+		}
+		if err := emitAuthzGranted(ctx, tx.Statements(), asgn); err != nil {
+			return err
 		}
 
 		if !seedDefaults {
@@ -211,6 +215,21 @@ func emitProjectCreated(ctx context.Context, stmts EventStatements, project *dom
 		EntityType: "project",
 		EntityID:   project.ID,
 		Payload:    domain.ProjectCreatedPayload{Name: project.Name},
+	})
+}
+
+func emitAuthzGranted(ctx context.Context, stmts EventStatements, a *domain.AuthzAssignment) error {
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeAuthzGranted,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  a.ProjectID,
+		EntityType: "authz_assignment",
+		EntityID:   a.ID,
+		Payload: domain.AuthzGrantedPayload{
+			PrincipalType: a.PrincipalType.String(),
+			PrincipalID:   a.PrincipalID,
+			Relation:      a.Relation,
+		},
 	})
 }
 
@@ -406,19 +425,22 @@ func (s *projectService) Delete(ctx context.Context, id string) error {
 		return domain.ErrProjectMissingID()
 	}
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		// Emit before hard-delete: events.project_id is not an FK (audit must
-		// outlive the project row). Order still matters if a future migration
-		// reintroduces a non-cascade FK.
-		if err := audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+		changed, err := tx.Statements().DeleteProjectByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if !changed {
+			return nil
+		}
+		// Emit after confirmed delete: events.project_id is not an FK (audit
+		// must outlive the project row).
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
 			Type:       domain.EventTypeProjectDeleted,
 			Category:   domain.EventCategoryEntity,
 			ProjectID:  id,
 			EntityType: "project",
 			EntityID:   id,
-		}); err != nil {
-			return err
-		}
-		return tx.Statements().DeleteProjectByID(ctx, id)
+		})
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {

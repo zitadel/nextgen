@@ -8,6 +8,7 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/oidc/v3/pkg/op"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -39,7 +40,16 @@ func NewTokenService(
 }
 
 func (s *tokenService) GenerateJWE(ctx context.Context, data *domain.Token) (string, error) {
-	if err := s.v2Pool.Statements().CreateToken(ctx, data); err != nil {
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().CreateToken(ctx, data); err != nil {
+			return err
+		}
+		return emitAuthTokenIssuedFromToken(ctx, tx.Statements(), data)
+	})
+	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return "", de
+		}
 		return "", domain.ErrInternal(err).WithMessage("failed to persist token record")
 	}
 	tokenCrypter, err := s.keys.GetProjectCrypter(ctx, data.ProjectID, domain.EncryptionKeyPurposeToken)
@@ -90,10 +100,47 @@ func (s *tokenService) RevokeToken(ctx context.Context, projectID, tokenID strin
 	if tokenID == "" {
 		return nil
 	}
-	if err := s.v2Pool.Statements().DeleteTokenByID(ctx, projectID, tokenID); err != nil {
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().DeleteTokenByID(ctx, projectID, tokenID); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeAuthTokenRevoked,
+			Category:   domain.EventCategoryAuth,
+			ProjectID:  projectID,
+			EntityType: "token",
+			EntityID:   tokenID,
+			TokenID:    tokenID,
+			Payload:    domain.AuthTokenRevokedPayload{},
+		})
+	})
+	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return de
+		}
 		return domain.ErrInternal(err).WithMessage("failed to revoke token")
 	}
 	return nil
+}
+
+func emitAuthTokenIssuedFromToken(ctx context.Context, stmts EventStatements, tok *domain.Token) error {
+	spec := audit.EmitSpec{
+		Type:       domain.EventTypeAuthTokenIssued,
+		Category:   domain.EventCategoryAuth,
+		ProjectID:  tok.ProjectID,
+		EntityType: "token",
+		EntityID:   tok.TokenID,
+		TokenID:    tok.TokenID,
+		SessionID:  tok.SessionID,
+		Payload:    domain.AuthTokenIssuedPayload{Scopes: tok.Scope},
+	}
+	if tok.UserID != "" {
+		uid := tok.UserID
+		spec.ActorID = &uid
+		actorType := domain.EventActorTypeHuman
+		spec.ActorType = &actorType
+	}
+	return audit.Emit(ctx, stmts, spec)
 }
 
 func (s *tokenService) IntrospectToken(ctx context.Context, token string) (*domain.Token, error) {

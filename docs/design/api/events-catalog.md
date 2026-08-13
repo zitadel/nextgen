@@ -10,7 +10,7 @@ OpenAPI `GET /events` returns a discriminated `Event` union on `event_type`
 `api/cmd/gen_event_schemas` from those constants.
 
 **Naming:** dot-separated segments (`auth.factor.password.set`). Per-resource
-types — no generic `admin.config.pushed` bucket.
+types — no generic admin.config.pushed bucket.
 
 **Compound transactions:** emit one Path B event per semantic mutation in the
 same TX (shared `request_id`).
@@ -30,49 +30,55 @@ Path A buffer: flush on batch size **N≈100**, age **T≈1s**, or high-watermar
 
 ## Path B
 
+Only types with live Path A/B producers are listed here. Deferred types are
+tracked below.
+
 | Statement / operation | `event_type` | `category` | `entity_type` | Payload properties |
 |----------------------|--------------|------------|---------------|--------------------|
 | `CreateProject` | `project.created` | `entity` | `project` | `name` |
 | `UpdateProject` | `project.updated` | `entity` | `project` | `changed_keys[]` |
-| `DeleteProjectByID` | `project.deleted` | `entity` | `project` | _(empty)_ |
+| `DeleteProjectByID` (when a row was deleted) | `project.deleted` | `entity` | `project` | _(empty)_ |
 | `CreateUser` | `user.created` | `entity` | `user` | `user_id`, `schema_id` |
-| User attribute patch | `user.updated` | `entity` | `user` | `changed_keys[]` |
 | Unique violation on create | `user.create.failed` | `entity` | `user` | `key_name` |
-| `DeactivateUser` | `user.deactivated` | `entity` | `user` | `reason` |
 | `DeleteUserByID` | `user.deleted` | `entity` | `user` | _(empty)_ |
 | `CreateTeam` | `team.created` | `admin` | `team` | `name` |
 | `UpdateTeam` | `team.updated` | `admin` | `team` | `changed_keys[]` |
-| `DeactivateTeam` | `team.deactivated` | `admin` | `team` | _(empty)_ |
-| Membership create/status | `team.membership.updated` | `admin` | `team_membership` | `user_id`, `team_id`, `status` |
-| `CreateToken` | `auth.token.issued` | `auth` | `token` | `scopes[]` |
-| `DeleteTokenByID` | `auth.token.revoked` | `auth` | `token` | _(empty)_ |
-| `CreateSession` | `session.established` | `session` | `session` | `user_id` |
-| `ExchangeSession` / handoff | `session.established` (+ peers) | `session` | `session` | `user_id` |
-| `DeleteSessionByID` | `session.deleted` | `session` | `session` | `reason` |
-| Session reaper / TTL | `session.expired` | `session` | `session` | _(empty)_ |
+| `DeactivateTeam` (when status changed) | `team.deactivated` | `admin` | `team` | _(empty)_ |
+| `CreateToken` / session mint / `GenerateJWE` | `auth.token.issued` | `auth` | `token` | `scopes[]` |
+| `DeleteTokenByID` / `RevokeToken` | `auth.token.revoked` | `auth` | `token` | _(empty)_ |
+| Session delete token peers (`DeleteTokensBySessionID`; token ids unavailable) | `auth.token.revoked` | `auth` | `token` | _(empty; `session_id` column set, `entity_id` empty)_ |
+| `CreateSession` / `ExchangeSession` | `session.established` | `session` | `session` | `user_id` |
+| `DeleteSessionByID` (operator/API revoke) | `session.deleted` | `session` | `session` | `reason` (`revoked`) |
 | `CreateAuthAttempt` | `auth.attempt.created` | `auth` | `auth_attempt` | `flow_id` |
 | `HandoffAuthAttempt` | `auth.attempt.handed_off` | `auth` | `auth_attempt` | `session_id` |
 | Challenge failed | `auth.check.failed` | `auth` | `check` | `check_id`, `check_type` |
 | Challenge succeeded | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type` |
-| Claim challenge create | `claim.challenge_created` | `admin` | `claim_challenge` | _(empty)_ |
-| Claim complete | `claim.completed` | `admin` | `claim_challenge` | `team_id` |
 | Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name` |
 | Flow definition update | `flowdef.updated` | `admin` | `flow_definition` | `name` |
 | Flow definition delete | `flowdef.deleted` | `admin` | `flow_definition` | _(empty)_ |
 | JSON schema create | `schema.created` | `admin` | `json_schema` | `schema_id` |
-| JSON schema delete | `schema.deleted` | `admin` | `json_schema` | `schema_id` |
 | Branding create | `branding.created` | `admin` | `branding` | `layout` |
-| Authz grant | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
-| Authz revoke | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
+| Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | Set password | `auth.factor.password.set` | `auth` | `user_password` | `user_id`, `factor_id` |
-| Delete password | `auth.factor.password.removed` | `auth` | `user_password` | `user_id`, `factor_id` |
-| Create TOTP | `auth.factor.totp.enrolled` | `auth` | `user_totp` | `user_id`, `factor_id` |
-| Delete TOTP | `auth.factor.totp.removed` | `auth` | `user_totp` | `user_id`, `factor_id` |
-| Create passkey | `auth.factor.passkey.enrolled` | `auth` | `user_passkey` | `user_id`, `factor_id` |
-| Delete passkey | `auth.factor.passkey.removed` | `auth` | `user_passkey` | `user_id`, `factor_id` |
-| Create recovery codes | `auth.factor.recovery.created` | `auth` | `user_recovery_codes` | `user_id`, `factor_id` |
-| Delete recovery codes | `auth.factor.recovery.removed` | `auth` | `user_recovery_codes` | `user_id`, `factor_id` |
+| Create passkey (`entity_id` / `factor_id` = credential id) | `auth.factor.passkey.enrolled` | `auth` | `user_passkey` | `user_id`, `factor_id` |
 
 **Non-events:** pure reads; RSI upserts as create side-effects; crypto/catalog
 internals without a product mutate API; signal category deferred until ADR 019
 writers exist.
+
+## Deferred
+
+Types planned but not yet emitted by a live producer. Follow-up issues:
+
+| `event_type` | Follow-up |
+|--------------|-----------|
+| `user.updated` | attribute patch API |
+| `user.deactivated` | per-row emit from team cascade / UserService.Deactivate |
+| `team.membership.updated` | membership + claim CompleteClaim path |
+| `claim.challenge_created` / `claim.completed` | claim lifecycle emitters |
+| `session.expired` | session reaper |
+| `schema.deleted` | schema delete API |
+| `authz.revoked` | product revoke path |
+| `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | factor remove + TOTP/recovery APIs |
+
+Issue links are filled in the PR Notes when the deferred issues are filed.

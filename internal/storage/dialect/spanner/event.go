@@ -28,7 +28,7 @@ FROM events`
 
 	deleteEventsOlderThanStmt = `
 DELETE FROM events
-WHERE project_id = @p1 AND created_at < @p2`
+WHERE created_at < @p1`
 
 	ensureEventSinkStmt = `
 INSERT INTO event_sinks (id, type, scope, project_id, url, enabled)
@@ -176,8 +176,8 @@ func (e eventStatements) ListEvents(ctx context.Context, filter *database.ListOp
 }
 
 // DeleteEventsOlderThan implements [service.EventStatements].
-func (e eventStatements) DeleteEventsOlderThan(ctx context.Context, projectID string, createdBefore time.Time) (int64, error) {
-	n, err := e.db.Update(ctx, buildStatement(deleteEventsOlderThanStmt, projectID, createdBefore.UTC()).statement())
+func (e eventStatements) DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (int64, error) {
+	n, err := e.db.Update(ctx, buildStatement(deleteEventsOlderThanStmt, createdBefore.UTC()).statement())
 	if err != nil {
 		return 0, err
 	}

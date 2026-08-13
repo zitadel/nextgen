@@ -54,7 +54,7 @@ func TestFlowDefinitionStatements_CRUD(t *testing.T) {
 
 	project := newTestProject(uniqueProjectID(t))
 	require.NoError(t, stmts.CreateProject(ctx, project))
-	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 
 	def := sampleFlowDefinition(project.ID, uniqueFlowDefinitionID(t))
 	require.NoError(t, stmts.CreateFlowDefinition(ctx, def))
@@ -103,7 +103,8 @@ func TestFlowDefinitionStatements_DeleteProjectCascades(t *testing.T) {
 	def := sampleFlowDefinition(project.ID, uniqueFlowDefinitionID(t))
 	require.NoError(t, stmts.CreateFlowDefinition(ctx, def))
 
-	require.NoError(t, stmts.DeleteProjectByID(ctx, project.ID))
+	_, err := stmts.DeleteProjectByID(ctx, project.ID)
+	require.NoError(t, err)
 
 	_, err := stmts.GetFlowDefinitionByID(ctx, project.ID, def.ID)
 	require.Error(t, err)

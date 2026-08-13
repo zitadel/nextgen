@@ -161,8 +161,11 @@ func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegist
 			Category:   domain.EventCategoryAuth,
 			ProjectID:  in.ProjectID,
 			EntityType: "user_passkey",
-			EntityID:   reg.UserID,
-			Payload:    domain.AuthFactorPayload{UserID: reg.UserID},
+			EntityID:   newPasskey.ID,
+			Payload: domain.AuthFactorPayload{
+				UserID:   reg.UserID,
+				FactorID: newPasskey.ID,
+			},
 		}); err != nil {
 			return err
 		}

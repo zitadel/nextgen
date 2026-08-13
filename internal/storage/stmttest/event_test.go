@@ -28,7 +28,7 @@ func ensureEventProject(t *testing.T, stmts service.AllStatements, projectID str
 	t.Helper()
 	project := newTestProject(projectID)
 	require.NoError(t, stmts.CreateProject(t.Context(), project))
-	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
 }
 
 func sampleEvent(projectID, id string) *domain.Event {
@@ -116,7 +116,7 @@ func TestEventStatements_ListKeyset(t *testing.T) {
 		first := sampleEvent(projectID, "evt-001")
 		require.NoError(t, d.stmts.InsertEvent(t.Context(), first))
 		second := sampleEvent(projectID, "evt-002")
-		second.EventType = domain.EventTypeUserUpdated
+		second.EventType = domain.EventTypeUserDeleted
 		require.NoError(t, d.stmts.InsertEvent(t.Context(), second))
 
 		page1, err := d.stmts.ListEvents(t.Context(), events.ListOptions(projectID, 1))
@@ -153,11 +153,36 @@ func TestEventStatements_DeleteOlderThan(t *testing.T) {
 		entity := sampleEvent(projectID, "")
 		require.NoError(t, d.stmts.InsertEvent(t.Context(), entity))
 
-		n, err := d.stmts.DeleteEventsOlderThan(t.Context(), projectID, time.Now().UTC().Add(time.Hour))
+		n, err := d.stmts.DeleteEventsOlderThan(t.Context(), time.Now().UTC().Add(time.Hour))
 		require.NoError(t, err)
-		assert.Equal(t, int64(1), n)
+		// Unscoped purge may delete events from other tests sharing the DB.
+		assert.GreaterOrEqual(t, n, int64(1))
 
 		_, err = d.stmts.GetEventByID(t.Context(), projectID, entity.ID)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}
+
+func TestEventStatements_DeleteOlderThan_OrphanedProject(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, eventID := uniqueEventIDs(t)
+		project := newTestProject(projectID)
+		require.NoError(t, d.stmts.CreateProject(t.Context(), project))
+
+		entity := sampleEvent(projectID, eventID)
+		require.NoError(t, d.stmts.InsertEvent(t.Context(), entity))
+
+		changed, err := d.stmts.DeleteProjectByID(t.Context(), projectID)
+		require.NoError(t, err)
+		require.True(t, changed)
+
+		// Project gone from ListProjects, but unscoped retention still purges.
+		n, err := d.stmts.DeleteEventsOlderThan(t.Context(), time.Now().UTC().Add(time.Hour))
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, n, int64(1))
+
+		_, err = d.stmts.GetEventByID(t.Context(), projectID, eventID)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
@@ -183,7 +208,7 @@ func TestEventStatements_SinkCursor(t *testing.T) {
 		first := sampleEvent(projectID, "evt-cursor-001")
 		require.NoError(t, d.stmts.InsertEvent(t.Context(), first))
 		second := sampleEvent(projectID, "evt-cursor-002")
-		second.EventType = domain.EventTypeUserUpdated
+		second.EventType = domain.EventTypeUserDeleted
 		require.NoError(t, d.stmts.InsertEvent(t.Context(), second))
 
 		all, err := d.stmts.ListEventsAfterCursor(t.Context(), projectID, time.Time{}, "", 10)
@@ -241,8 +266,8 @@ func TestEventStatements_SurviveProjectHardDelete(t *testing.T) {
 		require.NoError(t, d.stmts.InsertEvent(t.Context(), deleted))
 		require.NotEmpty(t, deleted.ID)
 
-		require.NoError(t, d.stmts.DeleteProjectByID(t.Context(), projectID))
-
+		_, err := d.stmts.DeleteProjectByID(t.Context(), projectID)
+		require.NoError(t, err)
 		gotPrior, err := d.stmts.GetEventByID(t.Context(), projectID, eventID)
 		require.NoError(t, err)
 		assert.Equal(t, prior.EventType, gotPrior.EventType)

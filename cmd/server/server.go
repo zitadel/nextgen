@@ -258,7 +258,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	if cfg.Events.RetentionEvery > 0 {
 		retentionCfg.Interval = cfg.Events.RetentionEvery
 	}
-	retentionJob := audit.NewRetentionJob(exportAdapter, exportAdapter, retentionCfg)
+	retentionJob := audit.NewRetentionJob(exportAdapter, retentionCfg)
 	retentionJob.Start()
 	defer retentionJob.Close()
 

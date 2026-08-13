@@ -9,34 +9,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type fakeLister struct{ ids []string }
 type fakePurger struct {
-	calls []struct {
-		projectID string
-		before    time.Time
-	}
-	n int64
+	calls []time.Time
+	n     int64
+	err   error
 }
 
-func (f fakeLister) ListProjectIDs(context.Context) ([]string, error) { return f.ids, nil }
-func (f *fakePurger) DeleteEventsOlderThan(_ context.Context, projectID string, createdBefore time.Time) (int64, error) {
-	f.calls = append(f.calls, struct {
-		projectID string
-		before    time.Time
-	}{projectID, createdBefore})
-	return f.n, nil
+func (f *fakePurger) DeleteEventsOlderThan(_ context.Context, createdBefore time.Time) (int64, error) {
+	f.calls = append(f.calls, createdBefore)
+	return f.n, f.err
 }
 
 func TestRetentionJob_RunOnce(t *testing.T) {
 	p := &fakePurger{n: 2}
-	j := NewRetentionJob(fakeLister{ids: []string{"proj_a", "proj_b"}}, p, RetentionConfig{
+	j := NewRetentionJob(p, RetentionConfig{
 		Retention: time.Hour,
 		Interval:  time.Hour,
 		Enabled:   true,
 	})
 	j.runOnce()
-	require.Len(t, p.calls, 2)
-	assert.Equal(t, "proj_a", p.calls[0].projectID)
-	assert.Equal(t, "proj_b", p.calls[1].projectID)
-	assert.True(t, p.calls[0].before.Before(time.Now()))
+	require.Len(t, p.calls, 1)
+	assert.True(t, p.calls[0].Before(time.Now()))
+}
+
+func TestRetentionJob_RunOnce_PurgeError(t *testing.T) {
+	p := &fakePurger{err: assert.AnError}
+	j := NewRetentionJob(p, RetentionConfig{
+		Retention: time.Hour,
+		Interval:  time.Hour,
+		Enabled:   true,
+	})
+	j.runOnce()
+	require.Len(t, p.calls, 1)
 }

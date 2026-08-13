@@ -27,7 +27,7 @@ func ensureBrandingProject(t *testing.T, stmts service.AllStatements, projectID 
 	t.Helper()
 	project := newTestProject(projectID)
 	require.NoError(t, stmts.CreateProject(t.Context(), project))
-	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
 }
 
 func sampleBranding(projectID, id string) *domain.Branding {

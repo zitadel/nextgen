@@ -8,20 +8,11 @@ oneOf:
   - $ref: types/auth-check-failed-event.yaml
   - $ref: types/auth-check-succeeded-event.yaml
   - $ref: types/auth-factor-passkey-enrolled-event.yaml
-  - $ref: types/auth-factor-passkey-removed-event.yaml
-  - $ref: types/auth-factor-password-removed-event.yaml
   - $ref: types/auth-factor-password-set-event.yaml
-  - $ref: types/auth-factor-recovery-created-event.yaml
-  - $ref: types/auth-factor-recovery-removed-event.yaml
-  - $ref: types/auth-factor-totp-enrolled-event.yaml
-  - $ref: types/auth-factor-totp-removed-event.yaml
   - $ref: types/auth-token-issued-event.yaml
   - $ref: types/auth-token-revoked-event.yaml
   - $ref: types/authz-granted-event.yaml
-  - $ref: types/authz-revoked-event.yaml
   - $ref: types/branding-created-event.yaml
-  - $ref: types/claim-challenge_created-event.yaml
-  - $ref: types/claim-completed-event.yaml
   - $ref: types/flowdef-created-event.yaml
   - $ref: types/flowdef-deleted-event.yaml
   - $ref: types/flowdef-updated-event.yaml
@@ -30,19 +21,14 @@ oneOf:
   - $ref: types/project-updated-event.yaml
   - $ref: types/request-api-event.yaml
   - $ref: types/schema-created-event.yaml
-  - $ref: types/schema-deleted-event.yaml
   - $ref: types/session-deleted-event.yaml
   - $ref: types/session-established-event.yaml
-  - $ref: types/session-expired-event.yaml
   - $ref: types/team-created-event.yaml
   - $ref: types/team-deactivated-event.yaml
-  - $ref: types/team-membership-updated-event.yaml
   - $ref: types/team-updated-event.yaml
   - $ref: types/user-create-failed-event.yaml
   - $ref: types/user-created-event.yaml
-  - $ref: types/user-deactivated-event.yaml
   - $ref: types/user-deleted-event.yaml
-  - $ref: types/user-updated-event.yaml
 discriminator:
   propertyName: event_type
   mapping:
@@ -51,20 +37,11 @@ discriminator:
     auth.check.failed: types/auth-check-failed-event.yaml
     auth.check.succeeded: types/auth-check-succeeded-event.yaml
     auth.factor.passkey.enrolled: types/auth-factor-passkey-enrolled-event.yaml
-    auth.factor.passkey.removed: types/auth-factor-passkey-removed-event.yaml
-    auth.factor.password.removed: types/auth-factor-password-removed-event.yaml
     auth.factor.password.set: types/auth-factor-password-set-event.yaml
-    auth.factor.recovery.created: types/auth-factor-recovery-created-event.yaml
-    auth.factor.recovery.removed: types/auth-factor-recovery-removed-event.yaml
-    auth.factor.totp.enrolled: types/auth-factor-totp-enrolled-event.yaml
-    auth.factor.totp.removed: types/auth-factor-totp-removed-event.yaml
     auth.token.issued: types/auth-token-issued-event.yaml
     auth.token.revoked: types/auth-token-revoked-event.yaml
     authz.granted: types/authz-granted-event.yaml
-    authz.revoked: types/authz-revoked-event.yaml
     branding.created: types/branding-created-event.yaml
-    claim.challenge_created: types/claim-challenge_created-event.yaml
-    claim.completed: types/claim-completed-event.yaml
     flowdef.created: types/flowdef-created-event.yaml
     flowdef.deleted: types/flowdef-deleted-event.yaml
     flowdef.updated: types/flowdef-updated-event.yaml
@@ -73,16 +50,11 @@ discriminator:
     project.updated: types/project-updated-event.yaml
     request.api: types/request-api-event.yaml
     schema.created: types/schema-created-event.yaml
-    schema.deleted: types/schema-deleted-event.yaml
     session.deleted: types/session-deleted-event.yaml
     session.established: types/session-established-event.yaml
-    session.expired: types/session-expired-event.yaml
     team.created: types/team-created-event.yaml
     team.deactivated: types/team-deactivated-event.yaml
-    team.membership.updated: types/team-membership-updated-event.yaml
     team.updated: types/team-updated-event.yaml
     user.create.failed: types/user-create-failed-event.yaml
     user.created: types/user-created-event.yaml
-    user.deactivated: types/user-deactivated-event.yaml
     user.deleted: types/user-deleted-event.yaml
-    user.updated: types/user-updated-event.yaml

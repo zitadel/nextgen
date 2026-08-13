@@ -26,7 +26,7 @@ func uniqueTokenFixtureIDs(t *testing.T) (projectID, schemaURL, userID string) {
 func ensureTokenTestUser(t *testing.T, projectID, schemaURL, userID string) {
 	t.Helper()
 	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 
 	require.NoError(t, testPool.CreateJSONSchema(t.Context(), &domain.JSONSchema{
 		ProjectID: projectID,
