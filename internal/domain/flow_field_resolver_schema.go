@@ -170,9 +170,11 @@ func deriveUserPropertyType(prop schemaReader, field Field) (FlowFieldType, erro
 	if err != nil {
 		return "", err
 	}
-	// A property carrying `properties` is an object even when it omits
-	// the `type` keyword, which would otherwise fall through to text.
-	if jsonType == "object" || jsonType == "array" || prop.Properties() != nil {
+	// A property carrying `properties` is an object, and one carrying
+	// `items` is an array, even when it omits the `type` keyword — which
+	// would otherwise fall through to text and store a string where the
+	// author declared a composite.
+	if jsonType == "object" || jsonType == "array" || prop.Properties() != nil || prop.HasItems() {
 		return "", fmt.Errorf("%w: %q", ErrFlowFieldNotScalar, field.String())
 	}
 	if len(prop.StringEnum()) > 0 {
@@ -378,6 +380,13 @@ func (r schemaReader) Properties() map[string]schemaReader {
 		out[name] = newSchemaReader(prop)
 	}
 	return out
+}
+
+// HasItems reports whether this level carries an `items` keyword, the
+// array counterpart of [schemaReader.Properties] as an object tell.
+func (r schemaReader) HasItems() bool {
+	_, ok := r.s.LookupKeyword("items")
+	return ok
 }
 
 // RequiredSet returns the names listed in this level's `required`
