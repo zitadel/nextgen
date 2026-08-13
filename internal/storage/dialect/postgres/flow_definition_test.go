@@ -186,6 +186,6 @@ func TestFlowDefinitionStatements_DeleteProjectCascades(t *testing.T) {
 
 	_, err := testPool.DeleteProjectByID(t.Context(), projectID)
 	require.NoError(t, err)
-	_, err := testPool.GetFlowDefinitionByID(t.Context(), projectID, def.ID)
+	_, err = testPool.GetFlowDefinitionByID(t.Context(), projectID, def.ID)
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }

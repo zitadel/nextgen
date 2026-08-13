@@ -105,7 +105,7 @@ func TestProjectStatements_StringFilters(t *testing.T) {
 			// the needle in the database matches the stored row on every dialect.
 			ist := &domain.Project{ID: uniqueProjectID(t), Name: "İstanbul", PreviewOrigins: []string{}}
 			require.NoError(t, d.stmts.CreateProject(t.Context(), ist))
-			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), ist.ID) })
+			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), ist.ID) })
 
 			only := database.Equal(idCol, ist.ID)
 			res, err := d.stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
