@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/ianlancetaylor/jsonschema/types"
@@ -116,14 +117,13 @@ func resolveUserPropertyField(root schemaReader, field Field, stepName string) (
 // so the path cannot continue through it — yields
 // [ErrFlowFieldUnknown] naming the whole path.
 func walkUserProperty(root schemaReader, field Field) (schemaReader, bool, error) {
-	segments := AttributeKey(field.String()).Nodes()
 	parent, required := root, true
-	for _, segment := range segments {
-		prop, ok := parent.Properties()[segment]
+	for _, segment := range AttributeKey(field.String()).Nodes() {
+		prop, ok := parent.Property(segment)
 		if !ok {
 			return schemaReader{}, false, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, field.String())
 		}
-		if _, ok := parent.RequiredSet()[segment]; !ok {
+		if !parent.Requires(segment) {
 			required = false
 		}
 		parent = prop
@@ -174,7 +174,7 @@ func deriveUserPropertyType(prop schemaReader, field Field) (FlowFieldType, erro
 	// `items` is an array, even when it omits the `type` keyword — which
 	// would otherwise fall through to text and store a string where the
 	// author declared a composite.
-	if jsonType == "object" || jsonType == "array" || prop.Properties() != nil || prop.HasItems() {
+	if jsonType == "object" || jsonType == "array" || prop.HasProperties() || prop.HasItems() {
 		return "", fmt.Errorf("%w: %q", ErrFlowFieldNotScalar, field.String())
 	}
 	if len(prop.StringEnum()) > 0 {
@@ -367,11 +367,7 @@ func (r schemaReader) Int(keyword string) int {
 // keyword as its own [schemaReader], or nil when the keyword is absent
 // or malformed.
 func (r schemaReader) Properties() map[string]schemaReader {
-	v, ok := r.s.LookupKeyword("properties")
-	if !ok {
-		return nil
-	}
-	m, ok := v.(types.PartMapSchema)
+	m, ok := r.propertyMap()
 	if !ok {
 		return nil
 	}
@@ -382,11 +378,57 @@ func (r schemaReader) Properties() map[string]schemaReader {
 	return out
 }
 
+// Property answers for one name what [schemaReader.Properties] answers
+// for every name, without materializing a reader per sibling. The walk
+// down a field's path runs on every render, so it takes this route.
+func (r schemaReader) Property(name string) (schemaReader, bool) {
+	m, ok := r.propertyMap()
+	if !ok {
+		return schemaReader{}, false
+	}
+	prop, ok := m[name]
+	if !ok {
+		return schemaReader{}, false
+	}
+	return newSchemaReader(prop), true
+}
+
+// Requires reports whether name is listed in this level's `required`
+// keyword — the single-name counterpart of [schemaReader.RequiredSet].
+func (r schemaReader) Requires(name string) bool {
+	v, ok := r.s.LookupKeyword("required")
+	if !ok {
+		return false
+	}
+	names, ok := v.(types.PartStrings)
+	if !ok {
+		return false
+	}
+	return slices.Contains(names, name)
+}
+
+// HasProperties reports whether this level carries a well-formed
+// `properties` keyword, which marks it an object even when the `type`
+// keyword is absent.
+func (r schemaReader) HasProperties() bool {
+	_, ok := r.propertyMap()
+	return ok
+}
+
 // HasItems reports whether this level carries an `items` keyword, the
-// array counterpart of [schemaReader.Properties] as an object tell.
+// array counterpart of [schemaReader.HasProperties].
 func (r schemaReader) HasItems() bool {
 	_, ok := r.s.LookupKeyword("items")
 	return ok
+}
+
+func (r schemaReader) propertyMap() (types.PartMapSchema, bool) {
+	v, ok := r.s.LookupKeyword("properties")
+	if !ok {
+		return nil, false
+	}
+	m, ok := v.(types.PartMapSchema)
+	return m, ok
 }
 
 // RequiredSet returns the names listed in this level's `required`
