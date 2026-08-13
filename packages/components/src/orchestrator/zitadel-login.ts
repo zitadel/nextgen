@@ -25,6 +25,7 @@ import {
   startFlow as apiStartFlow,
   submitStep as apiSubmitStep,
 } from "./api-client.js";
+import { armAssetFallbacks } from "./asset-fallback.js";
 import { validateBranding } from "./branding-validator.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
@@ -343,6 +344,9 @@ export class ZitadelLogin extends ZitadelSurface {
     // `:host([variant])` selector.
     if (this.shadowRoot) {
       stampExportparts(this.shadowRoot);
+      // A configured-but-dead logo_url/hero_url is invisible everywhere else
+      // in the pipeline; this is the only layer that can see the image fail.
+      armAssetFallbacks(this.shadowRoot);
       const widget = this.variant !== "page";
       for (const shell of this.shadowRoot.querySelectorAll("zl-page-shell")) {
         shell.toggleAttribute("data-widget", widget);

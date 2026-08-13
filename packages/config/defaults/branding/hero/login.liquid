@@ -19,7 +19,8 @@
         <nav class="zl-hero__nav">
           <span class="zl-hero__brand">
             {% if branding.logo_url %}
-              <img class="zl-hero__brand-logo" src="{{ branding.logo_url }}" alt="" />
+              <img class="zl-hero__brand-logo" src="{{ branding.logo_url }}" alt="" data-zl-asset-fallback />
+              <span class="zl-hero__brand-mark" aria-hidden="true" hidden data-zl-asset-fallback-content></span>
             {% else %}
               <span class="zl-hero__brand-mark" aria-hidden="true"></span>
             {% endif %}
@@ -54,7 +55,8 @@
     </aside>
     <section class="zl-split__form">
     {% if branding.logo_url %}
-      <img class="zl-split__compact" src="{{ branding.logo_url }}" alt="" />
+      <img class="zl-split__compact" src="{{ branding.logo_url }}" alt="" data-zl-asset-fallback />
+      <p class="zl-split__compact zl-hero__compact-brand" hidden data-zl-asset-fallback-content>Your brand</p>
     {% else %}
       <p class="zl-split__compact zl-hero__compact-brand">Your brand</p>
     {% endif %}

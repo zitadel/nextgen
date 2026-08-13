@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   normalizePublicCliCommand,
+  normalizePublicCliJson,
   normalizePublicCliProse,
   npmDistTagForCliVersion,
   npmSelectorForCliVersion,
@@ -73,5 +74,48 @@ describe("normalizePublicCliProse", () => {
     expect(normalizePublicCliProse("`npm install` then `git push`", "0.1.0-alpha.1")).toBe(
       "`npm install` then `git push`",
     );
+  });
+});
+
+describe("normalizePublicCliJson", () => {
+  it("rewrites command spans in nested strings without mutating the input", () => {
+    const body = {
+      description: "`zitadel apply` publishes this as a revision.",
+      properties: { layout: { examples: ["run `zitadel branding eject --design split`"] } },
+    };
+    const before = JSON.stringify(body);
+
+    const out = normalizePublicCliJson(body, "0.1.0-alpha.1");
+
+    expect(out.description).toBe(
+      "`npx @zitadel/cli@0.1.0-alpha.1 apply` publishes this as a revision.",
+    );
+    expect(out.properties.layout.examples[0]).toBe(
+      "run `npx @zitadel/cli@0.1.0-alpha.1 branding eject --design split`",
+    );
+    expect(JSON.stringify(body)).toBe(before);
+  });
+
+  it("leaves non-string leaves and unspanned prose alone", () => {
+    const out = normalizePublicCliJson(
+      {
+        // A description is prose, not a command line: the fenced-block rule
+        // `normalizePublicCliProse` applies must not fire here.
+        description: "zitadel resolves the latest revision per project.",
+        maxLength: 131072,
+        additionalProperties: false,
+        pattern: "^https://",
+        nothing: null,
+      },
+      "0.1.0-alpha.1",
+    );
+
+    expect(out).toEqual({
+      description: "zitadel resolves the latest revision per project.",
+      maxLength: 131072,
+      additionalProperties: false,
+      pattern: "^https://",
+      nothing: null,
+    });
   });
 });

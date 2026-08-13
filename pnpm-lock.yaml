@@ -461,6 +461,9 @@ importers:
       semver:
         specifier: 'catalog:'
         version: 7.8.5
+      undici:
+        specifier: ^7.24.7
+        version: 7.24.7
       zod:
         specifier: 'catalog:'
         version: 4.4.3
