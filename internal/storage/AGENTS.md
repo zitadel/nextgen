@@ -114,6 +114,31 @@ allowed (including adjacent string literals / `+` only for line wrapping).
 Compiler-internal `WriteString(" WHERE ")` on a `statementCompiler` is the
 supported path for dynamic filters.
 
+## Authz persistence (Wave 1)
+
+[`dialect/authz/`](dialect/authz/) holds the dialect-independent Wave 1 authz
+persistence helpers (ADRs 032–034; storage design in
+[`docs/design/api/permission-storage.md`](../../docs/design/api/permission-storage.md)):
+
+- **Dual-write lifecycle projection** ([`dual_write.go`](dialect/authz/dual_write.go)):
+  user lifecycle events project into the resource-scope index (RSI) **and**
+  `authz_membership_edges` in the same transaction — `UserCreated` upserts
+  RSI + the initial team edge, `UserDeactivated` clears edges but keeps RSI,
+  `UserDeleted` clears both. Any new lifecycle path that touches users or
+  team membership must go through these helpers, not write edges directly;
+  a missed dual-write silently desynchronizes authorization from identity.
+- **Catalog rows** ([`catalog_rows.go`](dialect/authz/catalog_rows.go)) map
+  compiler mutations onto catalog tables; catalog versions persist via
+  `PersistCatalogVersion`.
+- **Identifiers**: authz assignments mint `asgn_<opaque>` ids
+  (`domain.PrefixAuthzAssignment`) through the same statements surface as
+  every other resource — the Identifier minting section above applies
+  unchanged.
+- The edge table carries FK + CHECK + cascade parity across all three
+  dialects; behavior changes need `stmttest` coverage like any other
+  statement (next section). The compiler/validator side lives in
+  [`internal/authz/`](../authz/).
+
 ## Statement contract tests
 
 Behavioral statement parity across dialects lives in

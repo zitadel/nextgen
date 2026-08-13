@@ -49,8 +49,9 @@ This API uses **cursor-based pagination** (`page_token` / `next_page_token`), no
 - Omit `page_token` to start from the beginning.
 - Treat `page_token` as opaque — do not attempt to decode or construct it.
 
-> **Note:** Some endpoints (e.g. `GET /users`) currently still use `offset`/`limit`.
-> These are marked with a `TODO` comment and will be migrated to `page_token` / `next_page_token`.
+> **Note:** `GET /schemas` currently accepts both the legacy `offset` parameter
+> and `page_token`, but its response is a bare array with no `next_page_token`.
+> It does not yet implement a complete pagination convention and should be normalized.
 > New list endpoints must use cursor-based pagination — see `POST /sessions/query` as the reference implementation.
 
 ### Nullable types
@@ -63,8 +64,9 @@ session_id:
   type: ["string", "null"]
 ```
 
-However, ogen v1.20.3 parses the `type` field as a plain string and cannot unmarshal
-a YAML sequence, causing generation to fail with `cannot unmarshal !!seq into string`.
+However, ogen (the pinned Go tool dependency in `go.mod`) parses the `type` field
+as a plain string and cannot unmarshal a YAML sequence, causing generation to fail
+with `cannot unmarshal !!seq into string`.
 This is tracked upstream at [ogen-go/ogen#1617](https://github.com/ogen-go/ogen/issues/1617).
 
 **Workaround:** Use `oneOf` with an explicit `null` type instead, which is still

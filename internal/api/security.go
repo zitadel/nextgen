@@ -2,7 +2,10 @@ package api
 
 import (
 	"context"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
@@ -124,6 +127,46 @@ func WithRequestHostMiddleware(next http.Handler) http.Handler {
 func requestOriginFromContext(ctx context.Context) (string, bool) {
 	v, ok := ctx.Value(requestHostKey{}).(string)
 	return v, ok && v != ""
+}
+
+// cookieSecureFromContext reports whether Set-Cookie should include Secure.
+//
+// HTTPS requests (including TLS terminated upstream with X-Forwarded-Proto)
+// keep Secure. Loopback HTTP — http://localhost / 127.0.0.0/8 / ::1 used by
+// the CLI local runtime — omits it so Safari will store and send the cookie.
+// Chrome and Firefox already accept Secure cookies on localhost; Safari does
+// not (WebKit bug 232088). Non-loopback HTTP keeps Secure so a mis-set
+// X-Forwarded-Proto fails closed rather than silently weakening cookies.
+//
+// When the request host was never injected (callers that skip
+// WithRequestHostMiddleware), or the origin cannot be parsed, default to
+// Secure=true so production-shaped paths stay locked down.
+func cookieSecureFromContext(ctx context.Context) bool {
+	origin, ok := requestOriginFromContext(ctx)
+	if !ok {
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil || u.Hostname() == "" {
+		return true
+	}
+	if strings.EqualFold(u.Scheme, "https") {
+		return true
+	}
+	if strings.EqualFold(u.Scheme, "http") && isLoopbackHost(u.Hostname()) {
+		return false
+	}
+	return true
+}
+
+// isLoopbackHost reports whether host is localhost or a loopback IP
+// (127.0.0.0/8, ::1). Host must already be stripped of any port.
+func isLoopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 type ScopeContext struct {

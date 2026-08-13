@@ -1,8 +1,6 @@
 # ADR 014: Design tokens and paired React components for the auth surface
 
-## Status
-
-Accepted — 2026-05-19
+> **Status:** Accepted — 2026-05-19
 
 ## Context
 
