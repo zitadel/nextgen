@@ -77,7 +77,7 @@ function requireHttpsUrl(
     ctx.addIssue({ code: "custom", message: `${field} is not a valid URL.` });
     return;
   }
-  if (!/^https:\/\//i.test(value)) {
+  if (!/^https?:\/\//i.test(value)) {
     ctx.addIssue({ code: "custom", message: `${field} must be an absolute https URL.` });
     return;
   }
@@ -88,7 +88,29 @@ function requireHttpsUrl(
     ctx.addIssue({ code: "custom", message: `${field} is not a valid URL.` });
     return;
   }
-  if (parsed.protocol !== "https:" || parsed.host === "") {
-    ctx.addIssue({ code: "custom", message: `${field} must be an absolute https URL.` });
+  // Loopback HTTP is the dev-posture carve-out (assets served from the
+  // app's own dev server); mirrors the Go gate and the component's
+  // paint-time sanitiser — keep the three predicates aligned.
+  if (parsed.protocol === "http:" && isLoopbackAssetHost(parsed.hostname)) {
+    return;
   }
+  if (parsed.protocol !== "https:" || parsed.host === "") {
+    ctx.addIssue({
+      code: "custom",
+      message: `${field} must be an absolute https URL (http is allowed for localhost only).`,
+    });
+  }
+}
+
+/**
+ * Loopback hosts (`localhost`, `127.0.0.0/8`, `::1`) where http asset URLs
+ * are allowed. Mirrors `isLoopbackAssetHost` in
+ * `internal/domain/branding_validator.go`.
+ */
+function isLoopbackAssetHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  if (host === "localhost" || host === "[::1]" || host === "::1") {
+    return true;
+  }
+  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
 }

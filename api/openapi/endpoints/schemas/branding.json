@@ -33,14 +33,14 @@
     "logo_url": {
       "type": "string",
       "format": "uri",
-      "pattern": "^[hH][tT][tT][pP][sS]://",
-      "description": "Logo URL (https required)."
+      "pattern": "^([hH][tT][tT][pP][sS]://|[hH][tT][tT][pP]://(localhost|127\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}|\\[::1\\])([:/?#]|$))",
+      "description": "Logo URL (https required; http is allowed for localhost/loopback dev hosts only)."
     },
     "hero_url": {
       "type": "string",
       "format": "uri",
-      "pattern": "^[hH][tT][tT][pP][sS]://",
-      "description": "Hero/background image URL (https required), used by split designs."
+      "pattern": "^([hH][tT][tT][pP][sS]://|[hH][tT][tT][pP]://(localhost|127\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}|\\[::1\\])([:/?#]|$))",
+      "description": "Hero/background image URL (https required; http is allowed for localhost/loopback dev hosts only), used by split designs."
     }
   },
   "not": {

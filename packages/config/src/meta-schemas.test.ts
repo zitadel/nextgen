@@ -173,6 +173,13 @@ describe("meta-schemas", () => {
     expect(check({ logo_url: "http://cdn.example.com/logo.svg" })).toBe(false);
     expect(check({ hero_url: "https://cdn.example.com/hero.png" })).toBe(true);
     expect(check({ hero_url: "HTTPS://cdn.example.com/hero.png" })).toBe(true);
+    // Loopback HTTP is the dev-posture carve-out, mirrored across the zod
+    // and Go gates: editors must not flag what plan/apply accept.
+    expect(check({ logo_url: "http://localhost:3000/logo.svg" })).toBe(true);
+    expect(check({ hero_url: "http://127.0.0.1:8080/hero.png" })).toBe(true);
+    expect(check({ logo_url: "http://[::1]:3000/logo.svg" })).toBe(true);
+    expect(check({ logo_url: "http://localhost.evil.example/logo.svg" })).toBe(false);
+    expect(check({ hero_url: "http://192.168.1.10/hero.png" })).toBe(false);
   });
 
   it("the branding $schema ref resolves from .zitadel/branding/ into the meta dir", () => {

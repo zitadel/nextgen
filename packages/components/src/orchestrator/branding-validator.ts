@@ -65,8 +65,17 @@ function sanitiseUrl(
   }
   try {
     const parsed = new URL(value);
+    // Loopback HTTP is the dev-posture carve-out (assets served from the
+    // app's own dev server). Mirrors the save gates in
+    // internal/domain/branding_validator.go and @zitadel/config schemas —
+    // keep the three predicates aligned.
+    if (parsed.protocol === "http:" && isLoopbackHost(parsed.hostname)) {
+      return parsed.toString();
+    }
     if (parsed.protocol !== "https:") {
-      issues.push(`${field} must use https (got "${parsed.protocol}") — dropped.`);
+      issues.push(
+        `${field} must use https (got "${parsed.protocol}"; http is allowed for localhost only) — dropped.`,
+      );
       return undefined;
     }
     return parsed.toString();
@@ -74,4 +83,13 @@ function sanitiseUrl(
     issues.push(`${field} is not a valid URL — dropped.`);
     return undefined;
   }
+}
+
+/** Loopback hosts (`localhost`, `127.0.0.0/8`, `::1`) allowed on http. */
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  if (host === "localhost" || host === "[::1]" || host === "::1") {
+    return true;
+  }
+  return /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
 }
