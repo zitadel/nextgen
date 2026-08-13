@@ -1,10 +1,11 @@
-import { z } from "zod";
-
 import {
   CreateBrandingBody,
   CreateFlowDefinitionBody,
   CreateSchemaBody,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { z } from "zod";
+
+import { isCanonicalLoopbackHttpUrl } from "./branding-url.js";
 
 export const schemaConfigSchema = CreateSchemaBody;
 export const flowConfigSchema = CreateFlowDefinitionBody.shape.flow_definition;
@@ -35,32 +36,32 @@ export const brandingConfigSchema = z
     liquid_template_file: z.string().min(1).optional(),
   })
   .superRefine((value, ctx) => {
-  if (value.liquid_template !== undefined && value.liquid_template_file !== undefined) {
-    ctx.addIssue({
-      code: "custom",
-      message: "Use either liquid_template_file or an inline liquid_template, not both.",
-    });
-  }
-  // font_url is read-only in v1: the login component loads it as a
-  // document-level stylesheet (shadow-scoped @font-face never registers
-  // faces), which would give branding.write arbitrary CSS over the embedding
-  // page. The server rejects it too; safe delivery is an ADR 040 follow-up.
-  if (value.font_url !== undefined) {
-    ctx.addIssue({
-      code: "custom",
-      message:
-        "font_url is not writable yet (tenant font delivery needs a safe design, see ADR 040); load fonts from the embedding page instead.",
-    });
-  }
-  // Mirror the server's https-only asset gate (validateBrandingAssetURL in
-  // internal/domain/branding_validator.go) so plan rejects what apply would —
-  // apply mutates schemas and flows before branding, so a late 400 here
-  // would leave a half-applied run.
-  requireHttpsUrl(value.logo_url, "logo_url", ctx);
-  requireHttpsUrl(value.hero_url, "hero_url", ctx);
-});
+    if (value.liquid_template !== undefined && value.liquid_template_file !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Use either liquid_template_file or an inline liquid_template, not both.",
+      });
+    }
+    // font_url is read-only in v1: the login component loads it as a
+    // document-level stylesheet (shadow-scoped @font-face never registers
+    // faces), which would give branding.write arbitrary CSS over the embedding
+    // page. The server rejects it too; safe delivery is an ADR 040 follow-up.
+    if (value.font_url !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "font_url is not writable yet (tenant font delivery needs a safe design, see ADR 040); load fonts from the embedding page instead.",
+      });
+    }
+    // Mirror the server's asset URL gate (validateBrandingAssetURL in
+    // internal/domain/branding_validator.go) so plan rejects what apply would.
+    // Apply mutates schemas and flows before branding, so a late 400 here would
+    // leave a half-applied run.
+    validateBrandingAssetUrl(value.logo_url, "logo_url", ctx);
+    validateBrandingAssetUrl(value.hero_url, "hero_url", ctx);
+  });
 
-function requireHttpsUrl(
+function validateBrandingAssetUrl(
   value: string | undefined,
   field: "logo_url" | "hero_url",
   ctx: z.RefinementCtx,
@@ -77,7 +78,7 @@ function requireHttpsUrl(
     ctx.addIssue({ code: "custom", message: `${field} is not a valid URL.` });
     return;
   }
-  if (!/^https:\/\//i.test(value)) {
+  if (!/^https?:\/\//i.test(value)) {
     ctx.addIssue({ code: "custom", message: `${field} must be an absolute https URL.` });
     return;
   }
@@ -88,7 +89,16 @@ function requireHttpsUrl(
     ctx.addIssue({ code: "custom", message: `${field} is not a valid URL.` });
     return;
   }
+  // Loopback HTTP is the dev-posture carve-out (assets served from the app's
+  // own dev server). Check the raw URL so WHATWG normalisation cannot make
+  // plan accept a host spelling that the Go save gate rejects.
+  if (parsed.protocol === "http:" && isCanonicalLoopbackHttpUrl(value)) {
+    return;
+  }
   if (parsed.protocol !== "https:" || parsed.host === "") {
-    ctx.addIssue({ code: "custom", message: `${field} must be an absolute https URL.` });
+    ctx.addIssue({
+      code: "custom",
+      message: `${field} must be an absolute https URL (http is allowed for canonical loopback development hosts only).`,
+    });
   }
 }
