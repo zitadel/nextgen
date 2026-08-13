@@ -367,10 +367,10 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /**
    * Apply captured values and move focus once the new step has fully
-   * rendered. This commit produces the step's `zl-field`/`zl-button` atoms,
-   * but those render their own shadow DOM on a later microtask — so await
-   * this element's update *and* the child atoms' first render before touching
-   * them, rather than guessing a frame with `requestAnimationFrame`.
+   * rendered. This commit produces the step's field/action atoms, but those
+   * render their own shadow DOM on a later microtask — so await this element's
+   * update *and* the child atoms' first render before touching them, rather
+   * than guessing a frame with `requestAnimationFrame`.
    *
    * Focus on the *initial* response is page-mode-only: a dedicated login
    * route should focus its first field, but a widget embedded further down
@@ -379,7 +379,9 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private async hydrateStepAfterRender(initial = false): Promise<void> {
     await this.updateComplete;
-    const atoms = this.shadowRoot?.querySelectorAll<LitElement>("zl-field, zl-button");
+    const atoms = this.shadowRoot?.querySelectorAll<LitElement>(
+      "zl-field, zl-select, zl-checkbox, zl-button",
+    );
     if (atoms) {
       await Promise.all(Array.from(atoms).map((atom) => atom.updateComplete));
     }
@@ -1025,9 +1027,17 @@ export class ZitadelLogin extends ZitadelSurface {
   private moveFocusToFirstField(fieldsOnly = false): void {
     const root = this.shadowRoot;
     if (!root) return;
-    const selector = fieldsOnly ? "zl-field" : "zl-field, zl-button";
-    const focusables = root.querySelectorAll<HTMLElement>(selector);
-    const target = Array.from(focusables).find((el) => !el.hasAttribute("disabled"));
+    const focusables = fieldsOnly
+      ? this.fieldAtoms()
+      : Array.from(
+          root.querySelectorAll<HTMLElement>("zl-field, zl-select, zl-checkbox, zl-button"),
+        );
+    const target = focusables.find(
+      (el) =>
+        !el.hasAttribute("disabled") &&
+        !el.hasAttribute("hidden") &&
+        el.getAttribute("type") !== "hidden",
+    );
     target?.focus();
   }
 

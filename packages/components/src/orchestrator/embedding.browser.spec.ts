@@ -42,6 +42,41 @@ const identifierStep: CreateFlow201 = {
   },
 };
 
+const selectOnlyStep: CreateFlow201 = {
+  ...identifierStep,
+  step: {
+    ...identifierStep.step,
+    name: "profile",
+    fields: [
+      {
+        name: "department",
+        type: "select",
+        text_key: "profile.field.department",
+        required: true,
+        validation: { enum: ["Engineering", "Support"] },
+      },
+    ],
+  },
+};
+
+const fieldlessStep: CreateFlow201 = {
+  ...identifierStep,
+  step: {
+    ...identifierStep.step,
+    name: "passkey-first",
+    texts: { title_key: "passkey-first.title" },
+    fields: [],
+    actions: [
+      {
+        name: "passkey",
+        kind: "passkey",
+        text_key: "passkey-first.action.passkey",
+        primary: true,
+      },
+    ],
+  },
+};
+
 /** The shipped split design carried as tenant branding, logo-less. */
 const splitHeroOnlyStep: CreateFlow201 = {
   ...identifierStep,
@@ -145,7 +180,11 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     element.project = project;
     configure?.(element);
     host.appendChild(element);
-    await waitFor(() => (element.shadowRoot?.querySelector("zl-field") ? element : null));
+    await waitFor(() =>
+      element.shadowRoot?.querySelector("zl-field, zl-select, zl-checkbox, zl-button")
+        ? element
+        : null,
+    );
     await waitFor(() => (element.getAttribute("aria-busy") === "false" ? element : null));
     // Let hydrate (values + focus pass) settle before asserting.
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -209,8 +248,27 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     );
     expect(getComputedStyle(element).backgroundColor).not.toBe(TRANSPARENT);
     expect(document.getElementById("zl-default-font-link")).not.toBeNull();
-    await waitFor(() => element.shadowRoot?.activeElement);
-    expect(element.shadowRoot?.activeElement).toBeTruthy();
+    const field = element.shadowRoot?.querySelector("zl-field");
+    await waitFor(() => (element.shadowRoot?.activeElement === field ? field : null));
+    expect(element.shadowRoot?.activeElement).toBe(field);
+  });
+
+  it("variant=page focuses a select when it is the first field", async () => {
+    const element = await mount(selectOnlyStep, (el) => {
+      el.variant = "page";
+    });
+    const select = element.shadowRoot?.querySelector("zl-select");
+    expect(select).toBeTruthy();
+    await waitFor(() => (element.shadowRoot?.activeElement === select ? select : null));
+    expect(element.shadowRoot?.activeElement).toBe(select);
+  });
+
+  it("variant=page leaves a fieldless initial step unfocused", async () => {
+    const element = await mount(fieldlessStep, (el) => {
+      el.variant = "page";
+    });
+    expect(element.shadowRoot?.querySelector("zl-button")).toBeTruthy();
+    expect(element.shadowRoot?.activeElement).toBeNull();
   });
 
   it("--zl-page-min-height still overrides the widget default", async () => {
