@@ -2,6 +2,8 @@
 "@zitadel/config": patch
 ---
 
-Schema normalization now descends into nested `properties`, so a default carried
-by a leaf of an object property is stripped the same way a top-level one is.
-Previously a nested `x-editable: true` produced a permanent phantom diff.
+Schema normalization descends into nested `properties` when comparing local
+config against the platform. Spelling out a property default (`x-editable: true`,
+`x-sensitive: false`, `x-mfa: false`), applying, then removing it is a no-op —
+but on a nested property the comparison could not tell, so `plan` reported a
+change on every run and `apply` republished a revision each time.
