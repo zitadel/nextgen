@@ -41,12 +41,6 @@
       "format": "uri",
       "pattern": "^[hH][tT][tT][pP][sS]://",
       "description": "Hero/background image URL (https required), used by split designs."
-    },
-    "font_url": {
-      "type": "string",
-      "format": "uri",
-      "pattern": "^[hH][tT][tT][pP][sS]://",
-      "description": "Font stylesheet URL (https required)."
     }
   },
   "not": {

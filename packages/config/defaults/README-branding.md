@@ -6,7 +6,7 @@ and asset URLs) plus `login.liquid`, the LiquidJS template the
 
 ## Workflow
 
-1. Edit `login.liquid` (and `branding.json` for logo/font/hero URLs).
+1. Edit `login.liquid` (and `branding.json` for logo/hero URLs).
 2. `zitadel plan` — validates the template (LiquidJS parse, banned patterns,
    the required `{% mandatory_gates %}` tag) and shows the pending revision.
 3. `zitadel apply` — publishes an immutable branding revision. The login UI
@@ -28,7 +28,8 @@ by re-applying an earlier template.
 ## Make it yours
 
 - Brand assets go in `branding.json` — the shipped templates render them
-  as soon as they are set (all asset URLs must be `https://`):
+  as soon as they are set (asset URLs must be `https://`). Custom fonts are
+  not configurable here yet; load them from the embedding page.
 
   ```json
   {
@@ -36,8 +37,7 @@ by re-applying an earlier template.
     "layout": "split",
     "liquid_template_file": "./login.liquid",
     "logo_url": "https://example.com/logo.svg",
-    "hero_url": "https://example.com/hero.jpg",
-    "font_url": "https://example.com/font.css"
+    "hero_url": "https://example.com/hero.jpg"
   }
   ```
 
