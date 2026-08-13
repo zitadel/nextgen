@@ -27,9 +27,12 @@ by re-applying an earlier template.
 
 ## Make it yours
 
-- Brand assets go in `branding.json` — the shipped templates render them
-  as soon as they are set (asset URLs must be `https://`). Custom fonts are
-  not configurable here yet; load them from the embedding page.
+- Brand asset URLs go in `branding.json` and must use `https://`. Each template
+  decides which fields it renders: `centered` and `hero` use `logo_url`; `split`
+  and `split-right` use both `logo_url` and `hero_url`; `minimal` uses neither
+  until you add them to `login.liquid`. The `hero` design's brand pane is
+  editable markup rather than a `hero_url` background. Custom fonts are not
+  configurable here yet; load them from the embedding page.
 
   ```json
   {
@@ -41,10 +44,11 @@ by re-applying an earlier template.
   }
   ```
 
-  `layout` is the degrade preset (`centered` or `split`), **not** the design
-  name — `split-right`, `hero`, and `minimal` are delivered as templates and
-  map onto those two values. Switch designs with
-  `zitadel branding eject --design <name>`, don't edit `layout`.
+  `layout` is the degrade preset (`centered` or `split`), **not** the complete
+  design catalog. All named designs (`centered`, `split`, `split-right`, `hero`,
+  `minimal`) are delivered as templates and map onto those two values. Switch
+  designs with `zitadel branding eject --design <name>`, don't edit `layout`.
+
 - In the split-family designs (`split`, `split-right`, `hero`) the
   `.zl-split__brand` pane is yours: structural HTML plus inline `style=""`
   attributes are allowed; `button`, `input`, and `form` tags are stripped —

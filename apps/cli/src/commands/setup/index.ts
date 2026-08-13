@@ -52,6 +52,7 @@ import {
   formatFrameworkLine,
   id as styleId,
   path as stylePath,
+  relativeDisplayPath as relativeDisplay,
   renderSummary,
   url as styleUrl,
   type Row,
@@ -688,11 +689,6 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
     ],
     details: normalized.details,
   });
-}
-
-/** Renders an absolute path relative to `cwd` for human-readable output. */
-function relativeDisplay(cwd: string, path: string): string {
-  return path.startsWith(cwd) ? path.slice(cwd.length + 1) : path;
 }
 
 /**
