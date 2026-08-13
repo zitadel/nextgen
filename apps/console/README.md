@@ -112,8 +112,8 @@ a fiction. **Default to the real-data loop.**
 moon run console:dev-real
 ```
 
-One command: boots an ephemeral real instance (binary runtime + embedded
-Postgres, no Docker) via `@zitadel/testing`, bootstraps a project with the
+One command: boots an ephemeral real instance (binary runtime + SQLite by
+default, no Docker) via `@zitadel/testing`, bootstraps a project with the
 default schema and login flow, seeds users, then starts the dev server with the
 proxy bound to that instance. It prints the sign-in credentials
 (`dev@zitadel.local` / `Console-dev-1` by default). HMR is the normal Vite loop.
