@@ -1,4 +1,4 @@
-# ADR 054: Cross-Project Principals
+# ADR 052: Cross-Project Principals
 
 > **Status:** Proposed
 > **Date:** 2026-08-13
@@ -44,7 +44,7 @@ The permission foundation already anticipates the correct shape:
   are equal.
 
 This ADR ratifies the cross-project mechanism and its security boundary. It does
-not define customer collaboration policy; [ADR 055](055-customer-collaboration-grants.md)
+not define customer collaboration policy; [ADR 053](053-customer-collaboration-grants.md)
 does that. Staff support tiers, customer consent, and break-glass governance are
 separate follow-up decisions.
 
@@ -197,6 +197,23 @@ cookie. Safe reads may omit it. This requirement includes
 `claim/complete` and supersedes ADR 046's SameSite-only CSRF conclusion if this
 ADR is accepted. SameSite remains defense in depth, not the only check.
 
+ADR 046 is already implemented, so this is a wire-contract change rather than
+documentation-only hardening. The implementation lands atomically across the
+first-party surfaces:
+
+- an authenticated same-origin session surface exposes an opaque,
+  session-bound CSRF token to browser code;
+- the Console and any browser claim-completion surface send it in the
+  `X-Zitadel-CSRF` header on unsafe requests;
+- the server validates the header, session binding, and exact Origin before
+  executing the mutation; and
+- the OpenAPI/generated client, API mock, testkit fixtures, and service-backed
+  Console/claim E2E change in the same product update.
+
+Server enforcement must not land before the first-party callers can supply the
+token. The CLI's secret-authenticated `claim/init` and `claim/status` legs are
+unchanged; only the cookie-authenticated browser leg it opens is affected.
+
 ### 6. Project discovery is an authorization query
 
 The Console and CLI need a query that means "projects on which this principal
@@ -296,7 +313,9 @@ across PostgreSQL, Spanner, and SQLite:
 5. Unauthorized and nonexistent target projects have the same HTTP result.
 6. Authorized-project listing equals the union of direct, team, and ownership
    paths and remains authorization-filtered under pagination.
-7. Cookie-authenticated mutations fail without valid Origin and CSRF proof.
+7. Cookie-authenticated mutations fail without valid Origin and CSRF proof,
+   while `claim/complete` and Console management mutations succeed with the
+   token issued for that session.
 8. No session token or project secret appears in Console-readable runtime data.
 9. Audit events identify the foreign actor and assignment path in the protected
    project.
@@ -354,7 +373,7 @@ synthetic `project:*` grant.
 
 ## Non-goals
 
-- Customer collaboration roles and ownership policy; see ADR 055.
+- Customer collaboration roles and ownership policy; see ADR 053.
 - Staff support tiers, self-grant policy, approval, impersonation, and
   break-glass governance.
 - Federated cross-deployment access tokens.
@@ -375,5 +394,6 @@ If accepted, follow-up documentation must:
   means home-project memberships, while authorized projects come from grants;
 - extend ADR 048's actor metadata with the assignment path that authorized the
   request;
-  and
-- amend ADR 046's SameSite-only CSRF conclusion.
+- amend ADR 046's SameSite-only CSRF conclusion; and
+- update the claim/Console OpenAPI, generated client, API mock, testkit, and E2E
+  surfaces for the session-bound CSRF header before server enforcement ships.

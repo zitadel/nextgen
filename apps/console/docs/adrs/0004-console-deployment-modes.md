@@ -43,16 +43,16 @@ complete bootstrap contract.
 
 The following repository-wide decisions constrain this ADR:
 
-- root [ADR 054](../../../../docs/adrs/054-cross-project-principals.md) keeps
+- root [ADR 052](../../../../docs/adrs/052-cross-project-principals.md) keeps
   the authenticated user's home project distinct from the protected customer
   project and authorizes every target explicitly;
-- root [ADR 055](../../../../docs/adrs/055-customer-collaboration-grants.md)
+- root [ADR 053](../../../../docs/adrs/053-customer-collaboration-grants.md)
   keeps team membership, team ownership, and project access as separate
   facts, and supports both direct-user and team-derived project grants;
 - root [ADR 046](../../../../docs/adrs/046-claim-lifecycle-v2.md) uses the
   platform project for registration and claim in hosted deployments;
 - root [ADR 036](../../../../docs/adrs/036-api-credential-planes.md), as
-  amended by ADR 054, permits operator-plane calls authenticated by a
+  amended by ADR 052, permits operator-plane calls authenticated by a
   confidential automation credential or a first-party human session; and
 - root [ADR 048](../../../../docs/adrs/048-wide-events-internal-audit-primitive.md)
   records the human actor and the assignment path that authorized a mutation.
@@ -70,8 +70,8 @@ The reserved project is a **control project**, not a super-project:
 
 - a role in it does not imply access to any customer project;
 - access to a customer project comes only from that project's owning-team,
-  direct-user, team, or confidential-project assignment under ADRs 054 and
-  055; and
+  direct-user, team, or confidential-project assignment under ADRs 052 and
+  053; and
 - it is never used as the hosted-login project for a customer's application.
 
 Standalone remains the default product posture, not a different authorization
@@ -120,6 +120,14 @@ keys. Because the product is alpha, the checked-in seed behavior and test
 fixtures may be corrected directly; no compatibility migration or backfill is
 required for pre-release development databases.
 
+**Cutover rule:** the implemented first-created-project fallback remains
+available until a human-usable replacement—such as the server-owned seed
+file—ships with the full provisioner and an end-to-end first-operator test. The
+testkit can prove the target shape before that point, but test infrastructure
+alone must not strand a self-hoster. Only after that replacement exists may the
+server stop resolving the first-created project and require the reserved
+platform-project seed.
+
 Bootstrap inputs are server-side configuration. Secrets from them never enter
 `runtime.json`, the Console bundle, or browser-readable storage.
 
@@ -158,10 +166,10 @@ The Console performs same-origin API calls with its HttpOnly
 `__nextgen_session` cookie. It does not receive a project secret and does not
 store a script-readable session bearer. The server resolves the platform user
 from that first-party session, then evaluates the target customer project with
-the same ADR 054 authorization resolver used for confidential automation.
+the same ADR 052 authorization resolver used for confidential automation.
 
 Cookie-authenticated unsafe methods require the exact-Origin and
-session-bound-CSRF protections in ADRs 046 and 054. A successful Console login
+session-bound-CSRF protections in ADRs 046 and 052. A successful Console login
 therefore establishes identity, not blanket management authority.
 
 The development proxy may temporarily inject a project secret while the
@@ -249,5 +257,5 @@ without changing its Console build or moving operator identities.
   [036](../../../../docs/adrs/036-api-credential-planes.md),
   [046](../../../../docs/adrs/046-claim-lifecycle-v2.md),
   [048](../../../../docs/adrs/048-wide-events-internal-audit-primitive.md),
-  [054](../../../../docs/adrs/054-cross-project-principals.md), and
-  [055](../../../../docs/adrs/055-customer-collaboration-grants.md).
+  [052](../../../../docs/adrs/052-cross-project-principals.md), and
+  [053](../../../../docs/adrs/053-customer-collaboration-grants.md).

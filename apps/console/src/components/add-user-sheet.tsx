@@ -263,9 +263,9 @@ function AddUserForm({
 
             The backend could not honour it anyway: granting needs a role
             catalogue (ADR 034's app-group catalog, epic #419) and a
-            multi-project scope, but `queryProjects` returns only the caller's
-            own project (ADR 0004) and `POST /users` accepts no grants, so the
-            block could select things it could never save.
+            multi-project scope, but `queryProjects` remains scope-pinned until
+            root ADR 052 lands and `POST /users` accepts no ADR 053 grants, so
+            the block could select things it could never save.
 
             The component, its unit spec and its e2e coverage are kept intact
             alongside this — restore all four together. */}
@@ -388,4 +388,3 @@ function SchemaInput({
     </Field>
   );
 }
-

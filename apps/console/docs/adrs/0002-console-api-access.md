@@ -69,7 +69,7 @@ issues same-origin API requests carrying its HttpOnly first-party
 `__nextgen_session` cookie. Browser JavaScript cannot read that credential.
 The API resolves the human principal and target-project permissions from the
 session as specified by root
-[ADR 054](../../../../docs/adrs/054-cross-project-principals.md). The browser
+[ADR 052](../../../../docs/adrs/052-cross-project-principals.md). The browser
 bundle contains no `sk_proj_...` value, upholding
 [ADR 005](../../../../docs/adrs/005-public-runtime-private-credentials.md).
 
@@ -105,7 +105,7 @@ elsewhere — components authenticated by the platform send no client token (see
 > meanwhile stopped needing it: the sign-in path carries root
 > [ADR 036](../../../../docs/adrs/036-api-credential-planes.md)'s
 > **publishable key** (browser-safe by construction, served to the console in
-> `runtime.json` — ADR 0004 §2) and the signed-in path carries the
+> `runtime.json` — ADR 0004 §3) and the signed-in path carries the
 > `__nextgen_session` cookie, which rides same-origin requests on its own. A
 > shim at `/api` would have no secret left to inject; it would be a bare
 > prefix strip republishing the entire ogen surface under a second path. The
@@ -215,7 +215,7 @@ re-architecting it:
 - The `401`/`403` handling from §3 becomes the "redirect to console login"
   trigger.
 
-Identity is already carried by the cookie. Root ADR 054 supplies the missing
+Identity is already carried by the cookie. Root ADR 052 supplies the missing
 target-project authorization contract, while ADR 046 supplies the CSRF
 requirements for unsafe cookie-authenticated requests.
 

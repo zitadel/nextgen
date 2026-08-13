@@ -6,7 +6,7 @@
 //      why this is parked rather than deleted.
 //   2. The backend cannot grant access anyway: roles need ADR 034's app-group
 //      catalog (epic #419), and `queryProjects` is scope-pinned to a single
-//      project (ADR 0004).
+//      project until root ADR 052's authorized-project query lands.
 //
 // The component and these specs are kept intact — un-comment this file, the
 // block in `add-user-sheet.tsx` and the parked cases in its spec together when

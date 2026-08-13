@@ -51,9 +51,9 @@ const SMALL = "h-8 gap-1 px-2.5 text-xs";
  * the list opens honestly empty.
  *
  * Nothing here is sent on submit, and nothing is lost by that: `POST /users`
- * accepts no grants, and `queryProjects` is scope-pinned to the caller's own
- * project (ADR 0004 keeps the Console single-project for now) — the same project
- * id the create call already passes.
+ * accepts no grants, and `queryProjects` remains scope-pinned until root ADR
+ * 052's authorized-project query lands — the same project id the create call
+ * already passes.
  */
 export function ProjectAccess({
   projects,

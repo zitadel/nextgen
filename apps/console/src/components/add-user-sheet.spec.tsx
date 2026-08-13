@@ -83,8 +83,8 @@ describe("add user sheet", () => {
   // The Projects block is out of the MVP: design removed the project selector
   // (design decisions log D6, 2026-07-31), and the backend could not grant
   // access regardless (roles need ADR 034's app-group catalog, epic #419;
-  // `queryProjects` is single-project per ADR 0004). D6 expects it back in a
-  // future version, so its specs are parked rather than deleted — restore the
+  // `queryProjects` remains scope-pinned until root ADR 052 lands). D6 expects
+  // it back later, so its specs are parked rather than deleted — restore the
   // block, this file's cases and `project-access.spec.tsx` together.
   it("builds the form from the selected schema's properties", async () => {
     // The whole point of the screen: controls come from the schema, not a

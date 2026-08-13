@@ -1,4 +1,4 @@
-# ADR 055: Customer Collaboration Grants
+# ADR 053: Customer Collaboration Grants
 
 > **Status:** Proposed
 > **Date:** 2026-08-13
@@ -9,7 +9,7 @@
 > [ADR 033](033-internal-permission-management.md),
 > [ADR 035](035-configuration-environments.md),
 > [ADR 046](046-claim-lifecycle-v2.md), and
-> [ADR 054](054-cross-project-principals.md).
+> [ADR 052](052-cross-project-principals.md).
 > **Amends if accepted:** [ADR 046 §4](046-claim-lifecycle-v2.md#4-the-personal-team-is-created-at-registration-not-at-claim)
 > so claim selects an explicitly authorized target team instead of always
 > reusing the claimer's personal team.
@@ -86,10 +86,13 @@ equally to an owning customer team and a team used as an access group.
 
 ### 2. Every customer project has one owning team
 
-The permission model has a direct `project.owning_team` relation. Exactly one
-active owning-team assignment may exist per claimed or account-owned project.
-It is stored as an `authz_assignments` row on the protected project, with the
-foreign platform team as principal.
+The target system catalog adds a direct `project.owning_team` relation and a
+separate `team.owner` relation. These replace the transitional
+`project.team`/`team.member` ownership derivation in the current MVP catalog;
+neither target relation exists in the checked-in seed yet. Exactly one active
+owning-team assignment may exist per claimed or account-owned project. It is
+stored as an `authz_assignments` row on the protected project, with the foreign
+platform team as principal.
 
 The owning team determines:
 
@@ -123,8 +126,8 @@ type project
   relations
     define owning_team: [team]
     define admin: [user, team#member, sk_proj] or owner from owning_team
-    define editor: [team#member] or admin
-    define viewer: [team#member] or editor
+    define editor: [user, team#member] or admin
+    define viewer: [user, team#member] or editor
 ```
 
 The fragment is semantic, not a replacement for the canonical system catalog.
@@ -143,13 +146,19 @@ Viewer never implies editor or administrator. The current MVP seed closes in
 the opposite direction and assigns project secrets to `project.viewer` so that
 placeholder closure satisfies administrator checks.
 
-This software is still alpha. Correct the checked-in seed, constructors, and
-tests together: a project secret receives `project.admin`, and `admin` satisfies
-`editor` and `viewer`. No compatibility migration or assignment backfill is
-required; existing pre-release development databases are recreated. Catalog
-rows remain immutable within a running database—do not patch an active catalog
-partially—but the alpha migration source is replaced before it becomes a
-supported upgrade boundary.
+This software is still alpha. Correct the checked-in PostgreSQL, SQLite, and
+Spanner seed migrations, constructors, and tests together: a project secret
+receives `project.admin`, and `admin` satisfies `editor` and `viewer`. No
+compatibility migration or assignment backfill is provided.
+
+That choice requires an explicit destructive reset: every database that has
+already applied the old Goose migration must be dropped and recreated before
+running the updated binary. Editing an already-applied migration source does
+not update its catalog, and reusing such a database would leave the permissive
+`viewer -> editor -> admin` closure active. CI lanes must use fresh databases,
+and the implementation handoff must give developers and alpha operators the
+exact reset procedure. Catalog rows remain immutable within a running
+database—never patch an active catalog partially.
 
 ### 4. Direct users and access teams are both v1 sharing primitives
 
@@ -332,7 +341,7 @@ issued service credentials.
 
 ### 9. Project listing returns effective access and its source
 
-The authorized-project query from ADR 054 returns only projects on which the
+The authorized-project query from ADR 052 returns only projects on which the
 principal has an effective role. For each result it may return:
 
 ```text
@@ -368,8 +377,9 @@ The stable service-backed test matrix must include:
    Contoso project.
 2. Bob is an Acme participant and sees no project before receiving a direct
    grant or joining a granted access team.
-3. A direct `project.admin` grant makes Bob administrator on Acme AI and has no
-   effect on other projects.
+3. Direct `project.viewer`, `project.editor`, and `project.admin` grants give
+   Bob exactly the corresponding monotonic role on Acme AI and have no effect
+   on other projects.
 4. Membership in `acme-ai-admins` makes Bob administrator on Acme AI;
    membership in `acme-prod-readers` makes him viewer on Acme Production, with
    no access elsewhere.
@@ -391,8 +401,12 @@ The stable service-backed test matrix must include:
 14. Owning an access team permits roster management but grants no authority on
     another team or project unless an explicit relation provides it.
 15. Active membership without a `team.owner` assignment grants no owner
-    authority; an owner assignment without active membership is rejected as
-    invalid state and fails closed.
+    authority.
+16. The team-owner write path rejects creating a `team.owner` assignment for a
+    user without active membership, and membership removal revokes the separate
+    owner assignment in the same transaction. The resolver does not re-read
+    roster state or add an owner/member intersection on every authorization
+    check.
 
 ## Consequences
 
@@ -479,10 +493,13 @@ If accepted, follow-up documentation must:
   [`system-permission-catalog.md`](../design/api/system-permission-catalog.md)
   and the checked-in alpha seed with the normative
   `admin -> editor -> viewer` hierarchy, assign project secrets to `admin`, and
-  keep `project.create` at the owning-team boundary; no compatibility migration
-  is required for pre-release databases;
+  keep `project.create` at the owning-team boundary; require dropping and
+  recreating databases that applied the old alpha seed rather than promising a
+  compatibility migration;
 - update [`permission-storage.md`](../design/api/permission-storage.md) with
   separate membership and `team.owner` facts, unique owning-team assignments,
-  direct-user grants, and transfer/revocation rules; and
+  direct-user grants, transfer/revocation rules, the addition of
+  `project.owning_team`, and retirement of the transitional `project.team`
+  ownership relation; and
 - update the Console/customer-portal contract to use the authorization-filtered
   project query and explain effective-role sources.

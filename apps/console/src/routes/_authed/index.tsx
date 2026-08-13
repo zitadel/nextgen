@@ -18,8 +18,8 @@ import { ComingSoon } from "../../components/coming-soon";
  * needs and does not have:
  *
  *   - the stat figures: no aggregate/count endpoint exists (`GET /users` and
- *     `POST /projects/query` return pages, and `POST /projects/query` is
- *     scope-pinned to the caller's own project per Console ADR 0004)
+ *     `POST /projects/query` return pages, and the current query is
+ *     scope-pinned until root ADR 052's authorized-project query lands)
  *   - "Total Projects" and its trend: no multi-project list, no time series
  *   - the "Browse all" rows: no resource behind them at all
  *
