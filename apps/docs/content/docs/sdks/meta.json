@@ -9,6 +9,9 @@
     "react",
     "vue",
     "angular",
+    "solid",
+    "svelte",
+    "qwik",
     "---Building blocks---",
     "components",
     "api-client"

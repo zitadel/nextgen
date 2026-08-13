@@ -1,8 +1,13 @@
 # ADR 021: Ordered Arrays for Step Fields, Actions, and Gates
 
-> **Status:** Draft
+> **Status:** Accepted — 2026-06-05 (status updated 2026-08-11; originally Draft)
 > **Date:** 2026-06-05
 > **Context:** Flow engine wire contract, Liquid template rendering, flow definitions
+>
+> **Amendment (2026-08-11):** the ordered-array shape shipped for `fields` and
+> `actions` in both `flow-step.yaml` and `flow-definition-step.yaml`. `gates`
+> shipped as a map keyed by gate type — the array form was not adopted for
+> gates. `transitions` remains a dictionary as decided below.
 
 ## Decision
 

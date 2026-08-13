@@ -1,7 +1,10 @@
 # CLI Identity Surface
 
-> **Status:** Draft — concept doc, not an implementation spec.
-> **Date:** 2026-04-23 (revised after `frontend-adr-001` folded the external-factor research doc)
+> **Status:** Draft — concept doc, not an implementation spec. None of the
+> `zitadel idp` / `zitadel app` commands or `.zitadel/{idps,apps}/` directories
+> described here are built; they land only once the server exposes the
+> resources. Shipped CLI resources today: schemas, flows, branding.
+> **Date:** 2026-04-23 (revised after `frontend-adr-001` folded the external-factor research doc; status note updated 2026-08-11)
 > **See also:** [CLI Plan](PLAN.md) · [Flow Engine](../flowengine/flow-engine.md) · [Flow Engine — Step Response Shape](../flowengine/flow-engine-nodes.md) · [User Schema](../flowengine/user-schema.md)
 
 ## Problem
@@ -135,7 +138,7 @@ zitadel app metadata web-frontend   # emits metadata for the counterparty (SAML)
 
 ## How they plug into flow definitions
 
-[Flow definitions](../flowengine/flow-engine.md) are `.zitadel/flows/<slug>.json` files shaped like `FlowDefinition` (see [`api/openapi/components/flows/`](../../../api/openapi/components/flows/) and [flow-api.yaml](../flowengine/api/flow-api.yaml)). Fields, actions, and gates are unordered dicts keyed by name; every user-visible label is a `text_key` resolved client-side via LiquidJS's `| t` filter (see [flow-engine-nodes.md](../flowengine/flow-engine-nodes.md)). Steps reference identity resources:
+[Flow definitions](../flowengine/flow-engine.md) are `.zitadel/flows/<slug>.json` files shaped like `FlowDefinition` (canonical spec: [`api/openapi/components/flows/`](../../../api/openapi/components/flows/)). `fields` and `actions` are ordered arrays whose entries carry a `name` ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)); `gates` is keyed by gate type; every user-visible label is a `text_key` resolved client-side via LiquidJS's `| t` filter (see [flow-engine-nodes.md](../flowengine/flow-engine-nodes.md)). Steps reference identity resources:
 
 - An `identifier` step's `sso_providers` list resolves against `.zitadel/idps/`.
 - An `app`'s `audience` (via the flow's `audience.app_ids`) scopes which flow runs for which token consumer.
@@ -187,7 +190,7 @@ Without this, agents cannot dry-run the identity surface — which is precisely 
 - Policy rules that decide *when* MFA is required (policy engine — TBD).
 - Enrollment flows (e.g., first-time Futurae device binding). That's a flow-definition concern, not an identity-resource concern.
 - Trust-on-first-use heuristics for custom IdPs — we require explicit configuration.
-- The runtime API surface (`/v1/idps`, `/v1/apps`, etc.). This doc is only about the CLI's local file shape and command tree.
+- The runtime API surface (`/idps`, `/apps`, etc. — none of which exist in the shipped spec yet). This doc is only about the CLI's local file shape and command tree.
 
 ## Open questions
 

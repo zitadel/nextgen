@@ -54,8 +54,10 @@ under `Atoms/<Name>`, plus the orchestrator under `Orchestrator/`:
 | `Atoms/Icon` | `<zl-icon>` | `<Icon>` | — |
 | `Atoms/Page Shell` | `<zl-page-shell>` | `<PageShell>` | — |
 | `Atoms/Pill` | `<zl-pill>` | `<Pill>` | — |
+| `Atoms/Select` | `<zl-select>` | `<Select>` | — |
 | `Atoms/Text Field` | `<zl-field>` | `<TextField>` | React (clear) |
 | `Orchestrator/Login` | `<zitadel-login>` | — | — (`no-test`) |
+| `Orchestrator/Session` | `<zitadel-session>` | — | — |
 
 `<zl-passkey>` is intentionally **not** in Storybook: it's an invisible WebAuthn
 ceremony handler (no rendered surface, no React pair, drives

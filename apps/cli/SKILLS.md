@@ -125,6 +125,18 @@ the CLI's help layer, not the envelope.
   manifest, `doctor --fix` restores managed pages in the recorded posture,
   and editing the generated page is the supported way to change presentation
   — there is no config knob.
+  Widget-posture embedding levers: host-page CSS sets `--zl-*` design-token
+  custom properties on the element to bridge the app's look through the
+  widget's shadow DOM (fonts `--zl-font-family-heading`/`-sans`, radii
+  `--zl-radius-*`, primary CTA `--zl-primary`/`--zl-primary-foreground`,
+  link color `--zl-color-text-link`); the `suppress-header` attribute
+  (wrapper prop `suppressHeader`) visually hides the widget's own heading
+  block when the page already carries one, keeping it in the accessibility
+  tree. Split-family designs collapse their brand pane by container width —
+  at card width they show the compact brand mark (`logo_url`, else
+  `hero_url`, from `.zitadel/branding/branding.json`; `hero` falls back to
+  editable text), and setup warns when a widget-posture app picks `split`
+  or `split-right`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
@@ -282,9 +294,9 @@ validator (`E_VALIDATION` lists rule ids such as `no-script-tag` and
 must be absolute `https://`. Keep exactly one descriptor in
 `.zitadel/branding/` — extra `*.json` files there fail the scan.
 Server-provisioned defaults remain a fallback for non-CLI project
-creation, but CLI-created projects are authored from local files first. Flow create, read, list, and
-update are available, while the server enforces lifecycle rules such as
-draft-only edits. Managed files carry a marker comment; `eject` removes only
+creation, but CLI-created projects are authored from local files first. Flow create, read, list,
+update, and delete are available, while the server enforces lifecycle rules
+such as draft-only edits. Managed files carry a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
 requires a healthy

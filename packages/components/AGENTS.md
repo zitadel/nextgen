@@ -5,10 +5,21 @@ Scoped instructions for `packages/components/`. Read together with the
 
 ## What's in here
 
-Lit-based atoms (`<zl-*>`) and the `<zitadel-login>` orchestrator for the
-auth flow API. Consumed directly by tenant pages and indirectly by the
-`apps/console` shell. See [`README.md`](README.md) for consumer-facing
-docs.
+Lit-based atoms (`<zl-*>`) and the orchestrators for the auth flow API:
+`<zitadel-login>` (flow runner), `<zitadel-logout>`, and `<zitadel-session>`
+(session surface), all under `src/orchestrator/`. Consumed directly by tenant
+pages and indirectly by the `apps/console` shell. See [`README.md`](README.md)
+for consumer-facing docs.
+
+## Theming
+
+Mode resolution is owned by `src/orchestrator/theme-controller.ts` +
+`surface.ts`, which stamp `data-theme` / `data-theme-dark` on the host. The
+precedence is strongest-first: the embedding page's `theme` property → stored
+branding `theme.mode` → a variant-derived default (`dark` for
+`variant="page"`, `auto` for `variant="widget"`) — see amended ADR 014 §5 and
+`theme.browser.spec.ts`. Never hardcode mode-specific colors in orchestrator
+CSS; consume the semantic tokens, which flip via `[data-theme="light"]`.
 
 The orchestrator calls `@zitadel/api` (orval-generated typed fetch
 client) through the wrappers in `src/orchestrator/api-client.ts`. There is

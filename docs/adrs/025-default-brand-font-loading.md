@@ -1,8 +1,6 @@
 # ADR 025: Default brand font loading
 
-## Status
-
-Accepted — 2026-06-15 (revised 2026-06-16: dropped APK Futural; headings use bold Arimo)
+> **Status:** Accepted — 2026-06-15 (revised 2026-06-16: dropped APK Futural; headings use bold Arimo)
 
 ## Context
 

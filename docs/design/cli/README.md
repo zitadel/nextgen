@@ -19,18 +19,22 @@ A quick test: *"Would I want a PR for each one of these?"* If yes, it's a CLI re
 
 **Subordinate config follows its parent.** Claim mappings, redirect URIs, role bindings, and similar attached config live wherever the resource they belong to lives. A default Google IdP defined in `.zitadel/idps/google.json` carries its claim mapping in that file. A B2B customer's runtime-created Okta IdP carries its claim mapping in the API call that creates it. There is no separate "claim-mapping registry" per surface — the child config rides with the parent.
 
-The six resource kinds the CLI manages, each with a runtime-API counterpart where one exists:
+The resource kinds the CLI manages (shipped: schemas, flows, branding; the
+rest are target design), each with a runtime-API counterpart where one exists:
 
-| Resource | `.zitadel/<dir>/` | Runtime-API counterpart |
-|---|---|---|
-| IdP | `idps/` — your default sign-in sources | per-customer-org SSO from your B2B admin UI |
-| App | `apps/` — your first-party apps and machine clients | customer-managed apps, dynamic client registration |
-| User schema | `schemas/` — what a user looks like on your platform | dev-owned only |
-| Flow | `flows/` — login / register / recovery definitions | dev-owned only |
-| Locale | `locales/` — translation dictionaries | dev-owned only |
-| Template | `templates/` — Liquid templates | tenant-editable after eject; see [template-security.md](../flowengine/template-security.md) |
+| Resource | `.zitadel/<dir>/` | Status | Runtime-API counterpart |
+|---|---|---|---|
+| User schema | `schemas/` — what a user looks like on your platform | shipped | dev-owned only |
+| Flow | `flows/` — login / register / recovery definitions | shipped | dev-owned only |
+| Branding | `branding/` — design, tokens, Liquid template, copy overlays | shipped | tenant-editable after eject; see [template-security.md](../flowengine/template-security.md) |
+| IdP | `idps/` — your default sign-in sources | design | per-customer-org SSO from your B2B admin UI |
+| App | `apps/` — your first-party apps and machine clients | design | customer-managed apps, dynamic client registration |
+| Locale | `locales/` — translation dictionaries | design (copy overlays shipped instead, [ADR 045](../../adrs/045-copy-overlays-as-branding-revisions.md)) | dev-owned only |
 
-The canonical directory list is read at [apps/cli/src/commands/apply.ts:144-150](../../../apps/cli/src/commands/apply.ts) (templates are loaded separately as `.liquid` files, not `.json` resources).
+The canonical directory handling lives in the sync engine
+([`apps/cli/src/lib/sync/syncers.ts`](../../../apps/cli/src/lib/sync/syncers.ts));
+Liquid templates are loaded as `.liquid` files referenced from branding, not as
+`.json` resources.
 
 **Things that intentionally have no `.zitadel/` directory** — users, sessions, audit events, per-customer-org IdPs and apps. They're unbounded or owned by someone other than the dev. Bootstrapping a small set (e.g. a first admin user in staging) is the job of a *planned* one-shot imperative CLI surface that hits the API but doesn't get tracked in git. Concrete command names are deliberately absent here until the surface ships in the registry.
 
@@ -48,7 +52,7 @@ The per-resource sections in [identity-surface.md](identity-surface.md) carry a 
 The gap analysis against the product vision is tracked in [PLAN.md](PLAN.md). Ordering rationale:
 
 1. Lock the two concept docs (this batch).
-2. Align the local resource shapes with `docs/design/flowengine/api/flow-api.yaml` so `zitadel apply` corresponds 1:1 with server resources.
+2. Align the local resource shapes with the shipped spec under [`api/openapi/components/flows/`](../../../api/openapi/components/flows/) so `zitadel apply` corresponds 1:1 with server resources.
 3. Build the identity surface commands.
 4. Introduce the renderer abstraction and the Lit plug-in point.
 5. Add the diff/plan/apply reconciliation loop.

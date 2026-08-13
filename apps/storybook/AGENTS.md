@@ -6,8 +6,9 @@ The unified component workbench. Read together with the
 ## What's in here
 
 A single `@storybook/web-components-vite` instance that hosts `@zitadel/components`
-(Lit atoms), `@zitadel/ui-react` (paired React), and the `<zitadel-login>`
-orchestrator, so Figma parity is visible side by side and the orchestrator can
+(Lit atoms), `@zitadel/ui-react` (paired React), and the orchestrators
+(`<zitadel-login>`, `<zitadel-session>` — see `src/session.stories.ts`), so
+Figma parity is visible side by side and the orchestrators can
 be driven against `@zitadel/api-mock`. It is a dev tool, not a shipped package
 (`private`, no `dist`, `build` is `runInCI: false`), but `storybook:test` runs
 in CI.

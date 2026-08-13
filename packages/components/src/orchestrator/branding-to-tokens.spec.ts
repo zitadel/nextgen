@@ -21,6 +21,15 @@ describe("buildBrandingStylesheet", () => {
     expect(css).toContain("--zl-color-surface-default-black: #FAFAFA;");
   });
 
+  it("maps palette.link to the link contract variable, not the pill token", () => {
+    const css = buildBrandingStylesheet({ palette: { link: "#B97B2E" } });
+    expect(css).toContain("--zl-color-text-link: #B97B2E;");
+    // Regression: `link` used to target `--zl-color-text-subtitle-pink`,
+    // which recolored pills while the actual links stayed on their
+    // hard-coded purple accent.
+    expect(css).not.toContain("--zl-color-text-subtitle-pink");
+  });
+
   it("maps shape.radius into --zl-radius-* declarations", () => {
     const css = buildBrandingStylesheet({ shape: { radius: "lg" } });
     expect(css).toContain("--zl-radius-s: 0.75rem;");

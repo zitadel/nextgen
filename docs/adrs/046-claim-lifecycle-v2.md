@@ -1,7 +1,12 @@
 # ADR 046: Claim Lifecycle v2
 
-> **Status:** Accepted
+> **Status:** Implemented — 2026-08-11 (Accepted 2026-07-24)
 > **Date:** 2026-07-24
+>
+> **Amendment (2026-08-11):** shipped — the server serves
+> `/projects/{project_id}/claim/{init,status,complete}`, the CLI provides
+> `zitadel claim` (#754), and team attachment is reported in
+> `setup`/`status`/`doctor` (#776).
 > **Context:** The server-side contract for **claim**: the operation that turns
 > an unclaimed project into one owned by an accountable team. Supersedes the
 > Withdrawn [ADR 003](003-create-first-claim-later.md), which removed the

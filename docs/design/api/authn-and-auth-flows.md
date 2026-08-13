@@ -9,7 +9,7 @@
 - **flow engine** — orchestrates the *UI* around those primitives: which step renders when, which screen to show next, when to branch on policy. Does not hold primitives. See [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md).
 - **sessions** — durable post-auth container produced by a completed auth_attempt. Carries accumulated factors and `assurance_levels[]`. Detail in [`../flowengine/session-api.md`](../flowengine/session-api.md).
 
-A flow runs on top of auth_attempt primitives without collapsing the resource model. A flow decides *what screen to draw*; an auth_attempt decides *what primitive to offer and what proof to accept*; a session is the durable post-auth outcome. The flow docs keep using `session_id` as the frontend handle for `/flows/*`, but that handle is not a blanket alias for `auth_attempt_id`.
+A flow runs on top of auth_attempt primitives without collapsing the resource model. A flow decides *what screen to draw*; an auth_attempt decides *what primitive to offer and what proof to accept*; a session is the durable post-auth outcome. The `/flow/{id}` handle is the flow's own `id` from the latest response — it is distinct from the stable underlying `session_id` and from `auth_attempt_id`, and it may change on pivot or pop.
 
 ## Pre-session concepts
 
@@ -23,12 +23,12 @@ A flow runs on top of auth_attempt primitives without collapsing the resource mo
 
 ## Bootstrap challenge
 
-Every auth_attempt begins with a server-minted, origin-bound nonce. The client gets the nonce from `POST /bootstrap/challenge`:
+Every auth_attempt begins with a server-minted, origin-bound nonce. The client gets the nonce from `POST /bootstrap/challenge` (direction: the `challenge_nonce` request field is shipped on `POST /auth_attempts`, but the `/bootstrap/challenge` endpoint that mints it is not yet in the OpenAPI spec):
 
 ```http
 POST /bootstrap/challenge
 {
-  "project_id": "river-8421",
+  "project_id": "proj_01HEXAMPLE",
   "client_type": "browser" | "native_ios" | "native_android" | "server"
 }
 ```
@@ -53,7 +53,7 @@ nonce, and an optional existing session for step-up:
 ```http
 POST /auth_attempts
 {
-  "project_id": "river-8421",
+  "project_id": "proj_01HEXAMPLE",
   "challenge_nonce": "…",
   "session_id": "sess_existing"   // optional, for step-up
 }
@@ -99,7 +99,7 @@ Exchange requirements (also documented in [`credentials.md`](credentials.md#hand
 - Single-use (atomic GETDEL).
 - TTL ≤ 60 seconds.
 - Audience-bound: exchange requires an `sk_proj_…` whose project ID matches the handoff's minted project.
-- Idempotency-safe (Category B, 5-minute window — see [`conventions.md`](conventions.md#idempotency)). Packet loss on the success response must not lock out the user.
+- Idempotency-safe via the optional `Idempotency-Key` header (see [`conventions.md`](conventions.md#idempotency-shipped)). Packet loss on the success response must not lock out the user.
 
 ## Sessions
 
@@ -110,9 +110,11 @@ verified state:
 
 ```http
 POST   /sessions                         # pre-allocate anonymous session (optional, pre-auth)
-GET    /sessions/{id}                    # read state, factors, assurance_levels[]
-DELETE /sessions/{id}                    # revoke (logout), requires session_token
-GET    /sessions                         # list (admin / management)
+GET    /sessions/me                      # read the caller's session (__nextgen_session cookie)
+DELETE /sessions/me                      # end-user logout (__nextgen_session cookie)
+GET    /sessions/{id}                    # read state, factors, assurance_levels[] (operator, session.read)
+DELETE /sessions/{id}                    # operator revoke (session.delete; idempotent 204)
+POST   /sessions/query                   # operator list — cursor-paginated, structured filters
 ```
 
 `POST /sessions` is optional — it creates an anonymous shell (no user, no factors) for cases where a `session_id` must be pre-allocated before the user is known. Most clients skip this; the flow engine and direct `auth_attempts` callers create the session implicitly on first completion.
@@ -180,7 +182,7 @@ sequenceDiagram
 
     Note over Browser,CustomerBackend: Start auth attempt (flow engine path)
 
-    Browser->>FlowEngine: POST /flows { project_id, challenge_nonce, session_id? }
+    Browser->>FlowEngine: POST /flow { project_id, challenge_nonce, session_id? }
     FlowEngine->>AuthAttempts: svc.Create({ project_id, challenge_nonce, session_id? })
     AuthAttempts-->>FlowEngine: { attempt_id }
     FlowEngine->>AuthAttempts: svc.IssueChallenge(attempt_id, { method: "identifier" })
@@ -189,24 +191,24 @@ sequenceDiagram
 
     Note over Browser,CustomerBackend: Factor 1 — identifier + password
 
-    Browser->>FlowEngine: POST /flows/{id}/submit { login_name: "alice@acme.com" }
+    Browser->>FlowEngine: POST /flow/{id}/submit { login_name: "alice@acme.com" }
     FlowEngine->>AuthAttempts: svc.VerifyChallenge(attempt_id, cid, { login_name: "alice@acme.com" })
     AuthAttempts-->>FlowEngine: OK — identifier verified
     FlowEngine->>AuthAttempts: svc.IssueChallenge(attempt_id, { method: "password" })
     AuthAttempts-->>FlowEngine: { challenge_id, method: "password" }
     FlowEngine-->>Browser: Set-Cookie: flow=<encrypted_state> · 200 { step: "password" }
 
-    Browser->>FlowEngine: POST /flows/{id}/submit { password: "…" }
+    Browser->>FlowEngine: POST /flow/{id}/submit { password: "…" }
     FlowEngine->>AuthAttempts: svc.VerifyChallenge(attempt_id, cid, { password: "…" })
     AuthAttempts-->>FlowEngine: OK — factor written to auth_attempt
     FlowEngine-->>Browser: Set-Cookie: flow=<encrypted_state> · 200 { step: "totp" }
 
     Note over Browser,CustomerBackend: Factor 2 — TOTP (policy required MFA)
 
-    Browser->>FlowEngine: POST /flows/{id}/submit { method: "totp" }
+    Browser->>FlowEngine: POST /flow/{id}/submit { method: "totp" }
     FlowEngine->>AuthAttempts: svc.IssueChallenge(attempt_id, { method: "totp" })
     AuthAttempts-->>FlowEngine: { challenge_id, method: "totp" }
-    Browser->>FlowEngine: POST /flows/{id}/submit { totp: { code: "123456" } }
+    Browser->>FlowEngine: POST /flow/{id}/submit { totp: { code: "123456" } }
     FlowEngine->>AuthAttempts: svc.VerifyChallenge(attempt_id, cid, { totp: { code: "123456" } })
     AuthAttempts-->>FlowEngine: OK — factor written, assurance_levels[] updated
     FlowEngine->>AuthAttempts: svc.Handoff(attempt_id)
@@ -319,7 +321,7 @@ sequenceDiagram
 
     Note over Browser,DB: Flow engine drives login (same as Path 1, steps omitted)
 
-    Browser->>FlowEngine: POST /flows { attempt_id }
+    Browser->>FlowEngine: POST /flow { attempt_id }
     FlowEngine-->>Browser: { step: "identifier" }
     Note right of Browser: … identifier → password → totp steps …
     FlowEngine-->>Browser: { step: "complete" }
@@ -376,14 +378,14 @@ sequenceDiagram
 
     Note over Browser,DB: Flow engine resolves acr_values from auth_request, renders only missing factor
 
-    Browser->>FlowEngine: POST /flows { attempt_id }
+    Browser->>FlowEngine: POST /flow { attempt_id }
     Note right of FlowEngine: lookup auth_request via attempt_id → acr_values = aal:2<br/>policy_check: session has password, only totp missing
     FlowEngine-->>Browser: { step: "totp" }
 
-    Browser->>FlowEngine: POST /flows/{id}/submit { method: "totp" }
+    Browser->>FlowEngine: POST /flow/{id}/submit { method: "totp" }
     FlowEngine-)AuthService: issue_challenge(method: "totp")
     AuthService--)FlowEngine: { challenge_id }
-    Browser->>FlowEngine: POST /flows/{id}/submit { totp: { code: "123456" } }
+    Browser->>FlowEngine: POST /flow/{id}/submit { totp: { code: "123456" } }
     FlowEngine-)AuthService: verify_challenge(challenge_id, totp: { code: "123456" })
     AuthService-)DB: write totp factor, recompute assurance_levels[]
     DB--)AuthService: assurance_levels: ["urn:nist:aal:1","urn:nist:aal:2"]
@@ -411,6 +413,6 @@ sequenceDiagram
 - [`../glossary.md`](../glossary.md)
 - [`credentials.md`](credentials.md) — bootstrap nonce, handoff token hardening
 - [`authz.md`](authz.md) — who can create an auth_attempt
-- [`conventions.md`](conventions.md#idempotency) — Category B retry semantics
+- [`conventions.md`](conventions.md#idempotency-shipped) — Category B retry semantics
 - [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md) — UI orchestration on top of these primitives
 - [`../flowengine/session-api.md`](../flowengine/session-api.md) — durable sessions, ACR/AAL
