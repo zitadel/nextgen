@@ -16,7 +16,7 @@
         "split"
       ],
       "default": "centered",
-      "description": "Layout preset the bundled default template branches on. Custom templates may ignore it; it also serves as the degrade target when a template fails component-side validation."
+      "description": "Degrade preset (`centered` or `split`) the bundled default template branches on, not the complete design catalog. All named designs (`centered`, `split`, `split-right`, `hero`, `minimal`) ship as templates and map onto one of these two values; switch designs with the `branding eject --design <name>` command instead of editing this field. Custom templates may ignore it; the preset is also used when a template fails component-side validation."
     },
     "liquid_template_file": {
       "type": "string",
