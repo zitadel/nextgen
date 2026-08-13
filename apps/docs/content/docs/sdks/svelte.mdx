@@ -53,7 +53,7 @@ The Svelte SDK is the SPA wrapper for the shared Zitadel login and logout widget
 
     ```svelte
     <script lang="ts">
-      import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-svelte";
+      import { ZitadelLogin, ZitadelLogout, configureZitadel } from "@zitadel/sdk-svelte";
 
       const project = configureZitadel({
         projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID,
@@ -62,9 +62,10 @@ The Svelte SDK is the SPA wrapper for the shared Zitadel login and logout widget
     </script>
 
     <ZitadelLogin {project} purpose="login" postSignInUrl="/" />
+    <ZitadelLogout {project} postSignOutUrl="/login" />
     ```
 
-    `<ZitadelLogout {project} postSignOutUrl="/login" />` works the same way, and the widget's flow events surface as optional callbacks: `onFlowStep`, `onFlowInput`, `onFlowComplete`, and `onFlowError`.
+    The widget's flow events surface as optional callbacks: `onFlowStep`, `onFlowInput`, `onFlowComplete`, and `onFlowError`.
   </Tab>
 </Tabs>
 

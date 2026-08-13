@@ -53,19 +53,23 @@ The Qwik SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
 
     ```tsx
     import { component$ } from "@builder.io/qwik";
-    import { ZitadelLogin, configureZitadel } from "@zitadel/sdk-qwik";
+    import { ZitadelLogin, ZitadelLogout, configureZitadel } from "@zitadel/sdk-qwik";
 
-    export default component$(() => {
-      const project = configureZitadel({
-        projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID,
-        proxyPath: "/__nextgen",
-      });
+    const project = configureZitadel({
+      projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID,
+      proxyPath: "/__nextgen",
+    });
 
+    export const LoginPage = component$(() => {
       return <ZitadelLogin project={project} purpose="login" postSignInUrl="/" />;
+    });
+
+    export const ProfilePage = component$(() => {
+      return <ZitadelLogout project={project} postSignOutUrl="/login" />;
     });
     ```
 
-    `<ZitadelLogout project={project} postSignOutUrl="/login" />` works the same way, and the widget's flow events surface as optional QRL callbacks: `onFlowStep$`, `onFlowInput$`, `onFlowComplete$`, and `onFlowError$`.
+    The widget's flow events surface as optional QRL callbacks: `onFlowStep$`, `onFlowInput$`, `onFlowComplete$`, and `onFlowError$`.
   </Tab>
 </Tabs>
 
