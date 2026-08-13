@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
@@ -40,6 +41,8 @@ func NewTokenService(
 }
 
 func (s *tokenService) GenerateJWE(ctx context.Context, data *domain.Token) (string, error) {
+	// Spanner may retry this callback after abort; CreateToken keep-if-sets
+	// data.TokenID so a second attempt does not reject the minted id.
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().CreateToken(ctx, data); err != nil {
 			return err
@@ -50,7 +53,7 @@ func (s *tokenService) GenerateJWE(ctx context.Context, data *domain.Token) (str
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return "", de
 		}
-		return "", domain.ErrInternal(err).WithMessage("failed to persist token record")
+		return "", domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed to persist token record: %v", err))
 	}
 	tokenCrypter, err := s.keys.GetProjectCrypter(ctx, data.ProjectID, domain.EncryptionKeyPurposeToken)
 	if err != nil {
