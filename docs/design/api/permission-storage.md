@@ -39,7 +39,7 @@ stmttest are the substrate — see #834). Fine-grained catalog relations
 | Layer | Owner | What it is |
 | --- | --- | --- |
 | Policy IR + compiler | [#421](https://github.com/zitadel/nextgen/issues/421) / `internal/authz` | OpenFGA DSL/JSON → profile → storage-neutral `CatalogMutations` + query plans |
-| Runtime facts + DDL | Wave 1 (#422) / `internal/domain` + storage v2 | RSI, assignments, membership edges, catalog DDL |
+| Runtime facts + DDL | Wave 1 (#422) / `internal/domain` + `internal/storage` | RSI, assignments, membership edges, catalog DDL |
 | Persist compiled catalog | Wave 1 mapper / `PersistCatalogVersion` | Maps `CatalogMutations` → `authz_*` rows (relations, references, expression edges, closure); does **not** fill bundles |
 
 Do **not** conflate `internal/domain` grant/scope/edge types with the compiler IR.

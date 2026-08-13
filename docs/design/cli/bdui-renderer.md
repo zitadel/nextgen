@@ -1,15 +1,26 @@
 # BDUI Renderer
 
-> **Status:** Draft — concept doc, not an implementation spec.
-> **Date:** 2026-04-23
+> **Status:** Concept doc, not an implementation spec. Revised 2026-08-11.
+> **Where this stands:** the core bet landed, in a different shape than first
+> sketched. The Lit web components shipped in
+> [`packages/components`](../../../packages/components) as the
+> `<zitadel-login>` / `<zitadel-logout>` / `<zitadel-session>` orchestrators,
+> and the framework SDKs (`sdk-react`, `sdk-vue`, `sdk-angular`, …) wrap them.
+> Scaffolding goes through the orca patchers
+> (`apps/cli/src/lib/orca/patchers/rule/<framework>/`) with renderer ids
+> `react` (available) and `web-component` (declared, deliberately unavailable —
+> the `lit/` placeholder spec reserves the integration shape for a future
+> standalone `@zitadel/ui-lit` renderer). What follows is the concept; shipped
+> deviations are noted inline.
 > **See also:** [CLI Plan](PLAN.md) · [Flow Engine](../flowengine/flow-engine.md) · [Flow Engine — Step Response Shape](../flowengine/flow-engine-nodes.md)
 
 ## Problem
 
-The product vision says "CLI figures out the framework and can later plug in the [Lit] web component." The POC's adapter hardcodes a React import:
+The product vision says "CLI figures out the framework and can later plug in the [Lit] web component." The original POC's adapter hardcoded a React import:
 
 ```tsx
-// apps/cli/src/adapters/next/adapter.ts:69
+// the pre-orca adapter layer (since replaced by
+// apps/cli/src/lib/orca/patchers/rule/next/)
 import { ZitadelFlow } from "@zitadel/sdk-next";
 export default function LoginPage() {
   return <ZitadelFlow purpose="login" />;
@@ -38,20 +49,20 @@ A single web component — call it `<zitadel-flow>` — takes enough input to ta
 
 Under the hood the component:
 
-1. `POST /v1/flows` with `{ purpose, auth_request_id?, hint? }` to start a flow.
-2. Receives a step response with **three unordered capability dicts** (`fields`, `actions`, `gates`), optional `sso_providers`, step-level `texts.{title_key, description_key}`, and a **`branding.liquid_template` string**.
-3. Renders the step by **executing the Liquid template** against the capability dicts as context — not by iterating arrays. The template controls element ordering, grouping, and layout; the component never decides "email first, then password."
+1. `POST /flow` with `{ purpose, auth_request_id?, hint? }` to start a flow.
+2. Receives a step response with **ordered capability arrays** for `fields` and `actions` (entries carry a `name`; [ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)), a keyed `gates` map, optional `sso_providers`, step-level `texts.{title_key, description_key}`, and a **`branding.liquid_template` string**.
+3. Renders the step by **executing the Liquid template** against those capabilities as context. The template iterates the arrays or looks entries up by name (`where: "name"`); it controls element ordering, grouping, and layout — the component never decides "email first, then password."
 4. Resolves every `text_key` through the `| t` LiquidJS filter against the active locale dictionary loaded at boot.
 5. Sanitizes the rendered HTML (DOMPurify) and injects it into the Shadow DOM.
 6. Mounts `<zl-*>` web components emitted by the template: `<zl-field>`, `<zl-action>`, `<zl-captcha>`, `<zl-passkey>`, `<zl-sso>`.
-7. On submit, collects field values from `<zl-field>` and gate proofs from `<zl-captcha>` / `<zl-passkey>`; POSTs `{ action, fields, gate_proofs?, sso_provider_id? }` to `/v1/flows/{session_id}/submit` — note `fields` (object), not `data`.
+7. On submit, collects field values from `<zl-field>` and gate proofs from `<zl-captcha>` / `<zl-passkey>`; POSTs `{ action, fields, gate_proofs?, sso_provider_id? }` to `/flow/{id}/submit` — note `fields` (object), not `data`.
 8. Applies the response: next step, or redirect on completion.
 
 Step rendering is the whole job, but rendering is now **Liquid execution**, not array iteration. The capability contract is defined by [flow-engine-nodes.md](../flowengine/flow-engine-nodes.md); the renderer implements that contract and nothing else.
 
 ## Why web components
 
-**Framework-agnostic.** One implementation, not one per ecosystem. A React consumer, a Vue consumer, and a vanilla-HTML consumer see the same component. We do not want to maintain `@zitadel/sdk-react`, `@zitadel/sdk-vue`, `@zitadel/sdk-svelte`.
+**Framework-agnostic.** One implementation, not one per ecosystem. A React consumer, a Vue consumer, and a vanilla-HTML consumer see the same component. (Shipped deviation: the `@zitadel/sdk-*` packages do exist, but as thin wrappers over the shared `@zitadel/components` web components — the single-implementation goal held; the wrappers only add framework ergonomics and the proxy/session plumbing.)
 
 **Stable output.** The shadow DOM encapsulates our styles. Customer Tailwind / CSS resets / design systems do not mangle our login UI. For customers who want to restyle, we expose CSS custom properties (`--zitadel-primary-color`, `--zitadel-border-radius`) and slots for branded header/footer.
 
@@ -124,23 +135,18 @@ The renderer choice is explicit in config, not inferred:
 | `"default"` | CLI picks based on framework adapter preference | Always — today defaults to `react`, flips to `web-component` when ready |
 | `"headless"` | No rendering; user implements their own UI against Session API | Out-of-scope until customers ask |
 
-**Per-renderer template selection** in the adapter:
+**Per-renderer template selection** in the patcher (shipped layout):
 
 ```
-apps/cli/src/adapters/next/
-├── adapter.ts
+apps/cli/src/lib/orca/patchers/rule/next/
+├── index.ts
 └── renderers/
+    ├── registry.ts        # AVAILABLE_RENDERER_IDS — react | web-component
     ├── react/
-    │   ├── login.tsx.tmpl
-    │   └── register.tsx.tmpl
-    ├── web-component/
-    │   ├── login.tsx.tmpl
-    │   └── register.tsx.tmpl
-    └── headless/
-        └── (not yet)
+    └── lit/               # declares id "web-component", status not-implemented
 ```
 
-Contract test: every (adapter × renderer) pair produces a valid scaffold that typechecks.
+Contract test: every (patcher × renderer) pair produces a valid scaffold that typechecks.
 
 ## The React shim
 
@@ -160,14 +166,16 @@ The server never sends display text — it sends semantic keys following the `<s
 
 ```liquid
 <h1>{{ step.texts.title_key | t }}</h1>
-<zl-field
-  name="{{ field[0] }}"
-  type="{{ field[1].type }}"
-  label="{{ field[1].text_key | t }}"
-></zl-field>
+{% for f in fields %}
+  <zl-field
+    name="{{ f.name }}"
+    type="{{ f.type }}"
+    label="{{ f.text_key | t }}"
+  ></zl-field>
+{% endfor %}
 ```
 
-Locale dictionaries are flat `text_key → string` maps, generated and maintained by the CLI at `.zitadel/locales/<lang>.json`. `zitadel setup` seeds `en.json`; `zitadel locale scaffold [--lang de]` walks current flows and adds any missing keys as empty strings. Missing keys fall through to the raw key at render time — useful for debugging and for bespoke schema fields.
+Missing keys fall through to the raw key at render time — useful for debugging and for bespoke schema fields. (Shipped deviation: there is no `.zitadel/locales/` directory and no `zitadel locale` command — copy customization ships as branding **copy overlays** per [ADR 045](../../adrs/045-copy-overlays-as-branding-revisions.md).)
 
 ## Template security
 
@@ -194,7 +202,10 @@ Three layers, in precedence order:
 
 ## Agent UX
 
-The CLI must expose the renderer choice as a flag *and* in capabilities:
+The CLI should expose the renderer choice as a flag *and* in capabilities once
+a second renderer is available (direction — today the shipped knobs are
+`setup --design` for the login design and the ADR 044 posture derivation;
+there is no `--renderer` flag):
 
 ```
 zitadel setup --renderer web-component
@@ -219,14 +230,13 @@ The CLI's `doctor` command verifies: (a) the renderer package is installed, (b) 
 
 ## What this means for the current POC
 
-- [`packages/sdk-next`](../../../packages/sdk-next) stays, but its real job becomes "host the web component with a React-ergonomic API." The current POC surface is a single `ZitadelFlow` that follows the future `<zitadel-flow>` contract.
-- [`apps/cli/src/adapters/next/adapter.ts`](../../../apps/cli/src/adapters/next/adapter.ts) splits into per-renderer templates.
-- `zitadel.json#branding.renderer` becomes a first-class field, not a placeholder.
-- A new package, `packages/ui-lit/`, is created as the home of `<zitadel-flow>`. Out-of-scope for this plan to build — just commit to the package name and the component contract so downstream work can start against the interface.
+- [`packages/sdk-next`](../../../packages/sdk-next) hosts the shared web components with a framework-ergonomic API — this landed: the SDKs mount `<zitadel-login>` from [`packages/components`](../../../packages/components).
+- The adapter layer split into per-renderer templates — this landed as the orca patchers (`apps/cli/src/lib/orca/patchers/rule/<framework>/renderers/`).
+- A future package, `packages/ui-lit/`, remains the reserved home of a standalone `<zitadel-flow>` renderer. Out-of-scope to build — the name and the component contract are committed (the `lit/` renderer placeholder reserves the shape) so downstream work can start against the interface.
 
 ## Open questions
 
-- **`<zitadel-flow>` vs multiple components.** Should we ship one omnibus component, or `<zitadel-login>` + `<zitadel-register>` + `<zitadel-profile>`? The flow engine's `purpose` field already disambiguates behaviors — one component with a `purpose` attribute is simpler. Going with one.
+- **`<zitadel-flow>` vs multiple components.** Resolved in practice the other way: the shipped orchestrators are purpose-specific (`<zitadel-login>`, `<zitadel-logout>`, `<zitadel-session>`). A future standalone `<zitadel-flow>` would fold them back into one omnibus component; whether that is worth it is open.
 - **Attribute vs. slot for theming.** Strong bias toward CSS custom properties for style and slots for content. Attributes like `title`, `logo-src` are handy but drift toward content-as-props. Prefer slots.
 - **Token storage.** The flow completes and returns tokens. Where do they go? Browser session, HTTP-only cookie, hand off to the framework? Default: Zitadel issues an HTTP-only cookie on successful flow completion. The component never exposes the token to JS. Frameworks get `useSession()` via the sdk-next/vue/etc packages.
 - **Server components / RSC.** Next.js App Router's server components expect render-on-server. `<zitadel-flow>` must render both server-side (declarative shadow DOM) and hydrate client-side without double-fetch. Needs a spike.

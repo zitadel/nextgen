@@ -30,7 +30,7 @@ All three variants carry the same prefix and differ only by metadata bound at cr
 | Variant | Metadata | When minted | What can it do |
 |---|---|---|---|
 | **Pre-claim** | `pre_claim: true` | `POST /projects` (anonymous; no human yet) | Full project authority against an unclaimed project. See [`../platform/claim-flow.md`](../platform/claim-flow.md). |
-| **Claimed** | `pre_claim: false`, bound to a team | At claim — the pre-claim token is replaced by a first claimed `sk_proj_…` bound to a team in the platform project. | Full project authority, audited under the team. |
+| **Claimed** | `pre_claim: false`, bound to a team | Target design: at claim, the pre-claim token is replaced by a first claimed `sk_proj_…` bound to a team in the platform project. **Not shipped** — [ADR 046](../../adrs/046-claim-lifecycle-v2.md) lists secret rotation at claim as an explicit MVP non-goal, so today the pre-claim secret stays valid after claim (accepted, ADR-documented risk until a dedicated rotation epic). | Full project authority, audited under the team. |
 | **Origin-scoped** | `origin_patterns: [...]` | Minted at `POST /projects` alongside pre-claim token, or later for preview deploys once a management API exists. | Restricted to calls whose `Origin` matches one of the declared patterns. Replaces what used to be called the "preview secret". |
 
 > **Note:** The old `zp_…` / `zpp_…` prefixes are retired. Any cross-reference in older design notes maps: `zp_` → `sk_proj_`; `zpp_` → origin-scoped `sk_proj_`.
@@ -159,7 +159,7 @@ For SSR embedding, the lit component completes auth in-browser and hands the cus
 - **Single-use**, enforced with an atomic SQL-backed consume operation. A distributed cache can be added later if measured traffic needs it.
 - **TTL ≤ 60 seconds.**
 - **Audience-bound.** The exchange call requires an `sk_proj_…` whose project ID cryptographically matches the handoff's minted project.
-- **Idempotency-safe for retries.** If the exchange burns the token but the response gets dropped in flight, the backend's retry with the same `Idempotency-Key` **must return the cached session payload**, not a "token already used" error. Otherwise packet loss = user locked out. The idempotency window here is ~5 minutes; outside that window, the normal "token burned" error returns. See [`conventions.md`](conventions.md#idempotency) for Category B semantics.
+- **Idempotency-safe for retries.** If the exchange burns the token but the response gets dropped in flight, the backend's retry with the same `Idempotency-Key` **must return the cached session payload**, not a "token already used" error. Otherwise packet loss = user locked out. The idempotency window here is ~5 minutes; outside that window, the normal "token burned" error returns. See [`conventions.md`](conventions.md#idempotency-shipped) for Category B semantics.
 
 The endpoint pair:
 
