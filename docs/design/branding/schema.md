@@ -122,11 +122,14 @@ Shape validation cannot tell a live asset from a dead one, and a well-formed
 URL that serves nothing renders as a 0×0 `<img>` — invisible in the design and
 silent in the console. Two layers cover that gap, neither of them a gate:
 `zitadel plan` / `apply` probe each URL and warn (`apps/cli/src/lib/sync/asset-probe.ts`),
-and the component hides an asset whose load fails, restoring the split designs'
-decorative placeholder when that empties the brand pane
+and the component hides an asset whose load fails, restoring either the split
+designs' decorative placeholder or a shipped design's authored no-asset content
 (`packages/components/src/orchestrator/asset-fallback.ts`). Templates cannot do
 the latter themselves: DOMPurify strips inline `onerror` along with every other
-event handler, so the listener has to be orchestrator-side.
+event handler, so the listener has to be orchestrator-side. The CLI side only
+contacts public HTTPS destinations and validates every redirect; loopback,
+private, and internal targets remain inconclusive so repo config cannot make
+the planning host scan its own network.
 
 `font_url` is **read-only in v1**: because the component must inject it at document level (shadow-scoped `@font-face` never registers faces), a writable value would give `branding.write` page-wide CSS control over the embedding application. `POST /branding` rejects it and the local config dialect omits it; safe delivery is an [ADR 040](../../adrs/040-tenant-login-templates-editable-config.md) follow-up. Until then, load fonts from the embedding page.
 

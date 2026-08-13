@@ -2,14 +2,20 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { annotateAssetWarnings } from "../../../../src/lib/sync/asset-probe";
+import {
+  annotateAssetWarnings,
+  resolvePublicAddresses,
+} from "../../../../src/lib/sync/asset-probe";
 import { buildSyncPlan } from "../../../../src/lib/sync/loop";
 import { collectPlanWarnings } from "../../../../src/lib/sync/plan-renderer";
 import type { ResourceSyncer, SyncAction } from "../../../../src/lib/sync/types";
+
+const { lookupMock } = vi.hoisted(() => ({ lookupMock: vi.fn() }));
+vi.mock("node:dns/promises", () => ({ lookup: lookupMock }));
 
 /**
  * Every outbound request the probe makes is intercepted: a sandboxed vitest
@@ -20,6 +26,10 @@ const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
+beforeEach(() => {
+  lookupMock.mockReset();
+  lookupMock.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+});
 afterEach(() => {
   server.resetHandlers();
   delete process.env.ZITADEL_SKIP_ASSET_PROBE;
@@ -31,10 +41,18 @@ function makeSyncer(kind: string): ResourceSyncer {
     directory: `.zitadel/${kind}`,
     mutable: false,
     revisioned: true,
-    validate() { /* no-op: probe tests do not exercise validation */ },
-    async create() { return { id: "id" }; },
-    async update() { return {}; },
-    async delete() { /* no-op: probe tests do not exercise delete */ },
+    validate() {
+      /* no-op: probe tests do not exercise validation */
+    },
+    async create() {
+      return { id: "id" };
+    },
+    async update() {
+      return {};
+    },
+    async delete() {
+      /* no-op: probe tests do not exercise delete */
+    },
   };
 }
 
@@ -117,6 +135,18 @@ describe("annotateAssetWarnings", () => {
     expect(warningsOf(actions)[0].message).toContain('content-type "text/html"');
   });
 
+  it("warns when a successful response is explicitly bodyless", async () => {
+    server.use(
+      http.head("https://cdn.example.com/logo.svg", () => new HttpResponse(null, { status: 204 })),
+    );
+    const actions = reviseBranding({ logo_url: "https://cdn.example.com/logo.svg" });
+
+    await annotateAssetWarnings(actions);
+
+    expect(warningsOf(actions)[0].rule).toBe("warn/asset-unreachable");
+    expect(warningsOf(actions)[0].message).toContain("HTTP 204 with no representation");
+  });
+
   it("stays quiet when the origin refuses HEAD — that says nothing about the asset", async () => {
     server.use(
       http.head("https://cdn.example.com/logo.svg", () => new HttpResponse(null, { status: 405 })),
@@ -125,6 +155,54 @@ describe("annotateAssetWarnings", () => {
 
     await annotateAssetWarnings(actions);
 
+    expect(warningsOf(actions)).toEqual([]);
+  });
+
+  it("does not probe literal private destinations and rejects private DNS answers", async () => {
+    lookupMock.mockResolvedValueOnce([{ address: "10.0.0.7", family: 4 }]);
+    const loopback = reviseBranding({ logo_url: "http://127.0.0.1:8080/logo.svg" });
+    const privateLiteral = reviseBranding({ logo_url: "https://10.0.0.7/logo.svg" });
+
+    await annotateAssetWarnings(loopback);
+    await annotateAssetWarnings(privateLiteral);
+    const privateAddresses = await resolvePublicAddresses("assets.internal.example");
+
+    expect(warningsOf(loopback)).toEqual([]);
+    expect(warningsOf(privateLiteral)).toEqual([]);
+    expect(privateAddresses).toBeUndefined();
+    expect(lookupMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects IPv6 translation addresses that could tunnel to a private IPv4 host", async () => {
+    lookupMock.mockResolvedValueOnce([
+      { address: "::ffff:10.0.0.7", family: 6 },
+      { address: "64:ff9b::a00:7", family: 6 },
+    ]);
+
+    await expect(resolvePublicAddresses("translated.example.com")).resolves.toBeUndefined();
+  });
+
+  it("re-validates redirects instead of following them into a private network", async () => {
+    let privateHits = 0;
+    server.use(
+      http.head(
+        "https://cdn.example.com/logo.svg",
+        () =>
+          new HttpResponse(null, {
+            status: 302,
+            headers: { location: "https://10.0.0.7/internal-logo.svg" },
+          }),
+      ),
+      http.head("https://10.0.0.7/internal-logo.svg", () => {
+        privateHits += 1;
+        return new HttpResponse(null, { headers: { "content-type": "image/svg+xml" } });
+      }),
+    );
+    const actions = reviseBranding({ logo_url: "https://cdn.example.com/logo.svg" });
+
+    await annotateAssetWarnings(actions);
+
+    expect(privateHits).toBe(0);
     expect(warningsOf(actions)).toEqual([]);
   });
 
@@ -188,7 +266,10 @@ describe("annotateAssetWarnings", () => {
 
     await annotateAssetWarnings(actions);
 
-    expect(warningsOf(actions).map((w) => w.rule)).toEqual(["warn/other", "warn/asset-unreachable"]);
+    expect(warningsOf(actions).map((w) => w.rule)).toEqual([
+      "warn/other",
+      "warn/asset-unreachable",
+    ]);
   });
 });
 

@@ -103,23 +103,31 @@ describe("armAssetFallbacks", () => {
     fail(pane.querySelector("img.zl-split__logo") as Element);
 
     expect(pane.querySelector(".zl-split__placeholder")).toBeNull();
-    expect((pane.querySelector("img.zl-split__hero") as Element).hasAttribute(
-      "data-zl-asset-broken",
-    )).toBe(false);
+    expect(
+      (pane.querySelector("img.zl-split__hero") as Element).hasAttribute("data-zl-asset-broken"),
+    ).toBe(false);
   });
 
-  it("does not decorate a brand pane whose non-image content still renders", () => {
+  it("reveals the hero design's authored fallbacks without decorating its brand pane", () => {
     // The hero design fills the pane with a landing mock; a dead logo inside
     // it is a missing wordmark, not an empty pane.
     const root = render("hero", { logo_url: "https://cdn.example.com/gone.svg" });
     const pane = root.querySelector(".zl-split__brand") as HTMLElement;
+    const authoredFallbacks = root.querySelectorAll("[data-zl-asset-fallback-content]");
+    expect(authoredFallbacks).toHaveLength(2);
+    for (const fallback of authoredFallbacks) {
+      expect(fallback.hasAttribute("hidden")).toBe(true);
+    }
 
     armAssetFallbacks(root);
-    for (const img of pane.querySelectorAll("img")) {
+    for (const img of root.querySelectorAll("img")) {
       fail(img);
     }
 
     expect(pane.querySelector(".zl-split__placeholder")).toBeNull();
+    for (const fallback of authoredFallbacks) {
+      expect(fallback.hasAttribute("hidden")).toBe(false);
+    }
   });
 
   it("adds exactly one placeholder however often it is called", () => {

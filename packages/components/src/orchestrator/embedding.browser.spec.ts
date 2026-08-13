@@ -1,16 +1,16 @@
-import type { CreateFlow201 } from "@zitadel/api/generated/model";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { ZitadelProject } from "@zitadel/api/config";
+import type { CreateFlow201 } from "@zitadel/api/generated/model";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./zitadel-login.js";
-import type { ZitadelLogin } from "./zitadel-login.js";
+import heroTemplate from "../../../config/defaults/branding/hero/login.liquid";
+import minimalTemplate from "../../../config/defaults/branding/minimal/login.liquid";
+import splitRightTemplate from "../../../config/defaults/branding/split-right/login.liquid";
 // Raw import via the liquidRaw Vite plugin — @zitadel/config/defaults reads
 // files with node:fs at call time, which cannot run inside Chromium.
 import splitTemplate from "../../../config/defaults/branding/split/login.liquid";
-import splitRightTemplate from "../../../config/defaults/branding/split-right/login.liquid";
-import heroTemplate from "../../../config/defaults/branding/hero/login.liquid";
-import minimalTemplate from "../../../config/defaults/branding/minimal/login.liquid";
+import type { ZitadelLogin } from "./zitadel-login.js";
 
 /**
  * Real-browser checks for the widget-first embedding contract.
@@ -35,9 +35,7 @@ const identifierStep: CreateFlow201 = {
   step: {
     name: "identifier",
     texts: { title_key: "identifier.title" },
-    fields: [
-      { name: "email", type: "email", text_key: "identifier.field.email", required: true },
-    ],
+    fields: [{ name: "email", type: "email", text_key: "identifier.field.email", required: true }],
     actions: [{ name: "submit", kind: "submit", text_key: "submit.continue", primary: true }],
     gates: {},
   },
@@ -87,6 +85,7 @@ const fieldlessStep: CreateFlow201 = {
  * layout tests below want to measure.
  */
 const LOADABLE_ASSET = `${location.origin}/src/orchestrator/__fixtures__/asset.svg`;
+const BROKEN_ASSET = `${location.origin}/src/orchestrator/__fixtures__/does-not-exist.svg`;
 
 /** The shipped split design carried as tenant branding, logo-less. */
 const splitHeroOnlyStep: CreateFlow201 = {
@@ -114,7 +113,7 @@ const splitBrokenLogoStep: CreateFlow201 = {
   branding: {
     layout: "split",
     liquid_template: splitTemplate,
-    logo_url: `${location.origin}/src/orchestrator/__fixtures__/does-not-exist.svg`,
+    logo_url: BROKEN_ASSET,
   },
 } as unknown as CreateFlow201;
 
@@ -152,6 +151,16 @@ const heroNoLogoStep: CreateFlow201 = {
   branding: {
     layout: "split",
     liquid_template: heroTemplate,
+  },
+} as unknown as CreateFlow201;
+
+/** A configured hero logo whose request fails must recover both authored fallbacks. */
+const heroBrokenLogoStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    layout: "split",
+    liquid_template: heroTemplate,
+    logo_url: BROKEN_ASSET,
   },
 } as unknown as CreateFlow201;
 
@@ -297,9 +306,7 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
       el.variant = "page";
     });
     const mountNode = element.shadowRoot?.querySelector(".zl-mount") as HTMLElement;
-    expect(mountNode.getBoundingClientRect().height).toBeGreaterThanOrEqual(
-      window.innerHeight - 1,
-    );
+    expect(mountNode.getBoundingClientRect().height).toBeGreaterThanOrEqual(window.innerHeight - 1);
     expect(getComputedStyle(element).backgroundColor).not.toBe(TRANSPARENT);
     expect(document.getElementById("zl-default-font-link")).not.toBeNull();
     const field = element.shadowRoot?.querySelector("zl-field");
@@ -486,5 +493,21 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
       element.shadowRoot?.querySelector(".zl-split__placeholder"),
     );
     expect(placeholder.getBoundingClientRect().width).toBeGreaterThan(0);
+  });
+
+  it("a broken hero logo restores the compact text fallback at narrow widths", async () => {
+    const element = await mount(heroBrokenLogoStep);
+    await waitFor(() =>
+      element.shadowRoot?.querySelector("img.zl-split__compact[data-zl-asset-broken]"),
+    );
+
+    const brandPane = element.shadowRoot?.querySelector(".zl-split__brand") as HTMLElement;
+    expect(getComputedStyle(brandPane).display).toBe("none");
+
+    const fallback = await waitFor(() =>
+      element.shadowRoot?.querySelector(".zl-split__form > .zl-hero__compact-brand:not([hidden])"),
+    );
+    expect(getComputedStyle(fallback).display).not.toBe("none");
+    expect(fallback.textContent).toContain("Your brand");
   });
 });

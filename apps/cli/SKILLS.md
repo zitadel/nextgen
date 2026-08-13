@@ -156,6 +156,9 @@ the CLI's help layer, not the envelope.
   gate and then renders as a 0×0 image with nothing in the console, so the
   probe is the only place it can be caught. It is advisory by design: the
   machine planning is not necessarily the machine that renders the login page.
+  The probe only contacts public HTTPS destinations and re-checks every
+  redirect; loopback/private/internal targets stay inconclusive instead of
+  turning repo config into a network request from the planning host.
   Set `ZITADEL_SKIP_ASSET_PROBE` to turn it off (offline, air-gapped CI, or a
   CDN that only resolves from production) and `ZITADEL_ASSET_PROBE_TIMEOUT_MS`
   to retune the per-URL budget (default 2500).

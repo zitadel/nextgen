@@ -24,6 +24,8 @@ const BROKEN_ATTR = "data-zl-asset-broken";
 
 const BRAND_PANE_SELECTOR = ".zl-split__brand";
 const PLACEHOLDER_CLASS = "zl-split__placeholder";
+const AUTHORED_FALLBACK_ATTR = "data-zl-asset-fallback";
+const AUTHORED_FALLBACK_CONTENT_ATTR = "data-zl-asset-fallback-content";
 
 /**
  * Arm every not-yet-armed `<img>` under `root`, and repair anything already
@@ -65,10 +67,28 @@ export function armAssetFallbacks(root: ParentNode): void {
 
 function markBroken(img: HTMLImageElement): void {
   img.setAttribute(BROKEN_ATTR, "");
+  revealAuthoredFallback(img);
   // The failure is invisible by construction — say so once, out loud.
   console.warn(
     `[zitadel-login] branding asset failed to load, hiding it: ${img.getAttribute("src") ?? ""}`,
   );
+}
+
+/**
+ * Some shipped templates have a richer no-asset branch than the generic split
+ * placeholder (the hero design's brand mark and compact text). They render that
+ * branch hidden beside the image and opt in with data attributes, so the
+ * orchestrator can reveal the exact authored fallback without knowing template
+ * copy or structure.
+ */
+function revealAuthoredFallback(img: HTMLImageElement): void {
+  if (!img.hasAttribute(AUTHORED_FALLBACK_ATTR)) {
+    return;
+  }
+  const fallback = img.nextElementSibling;
+  if (fallback?.hasAttribute(AUTHORED_FALLBACK_CONTENT_ATTR)) {
+    fallback.removeAttribute("hidden");
+  }
 }
 
 /**
