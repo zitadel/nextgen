@@ -398,27 +398,48 @@ func (r schemaReader) RequiredSet() map[string]struct{} {
 	return out
 }
 
-// RequiredLeafPaths returns the dotted paths a document must carry:
-// every name in `required`, recursed through the nested `required` of
-// each required object. A required object that declares no `required`
-// of its own ends the descent at the object itself — any leaf beneath
-// it satisfies the coverage check.
-func (r schemaReader) RequiredLeafPaths() map[string]struct{} {
+// RequiredPaths returns the dotted paths a document must carry once the
+// objects named in materialized exist: every name in `required`,
+// recursed through the nested `required` of each required object. A
+// required object that declares no `required` of its own ends the
+// descent at the object itself — any leaf beneath it satisfies the
+// coverage check.
+//
+// An optional object contributes its own `required` too once it appears
+// in materialized. It only exists in the document because something
+// beneath it was collected, and from that point document validation
+// enforces the rest of its `required` list.
+func (r schemaReader) RequiredPaths(materialized map[string]struct{}) map[string]struct{} {
 	out := map[string]struct{}{}
-	r.collectRequiredLeafPaths("", out)
+	r.collectRequiredPaths("", materialized, out)
 	return out
 }
 
-func (r schemaReader) collectRequiredLeafPaths(prefix AttributeKey, out map[string]struct{}) {
+func (r schemaReader) collectRequiredPaths(prefix AttributeKey, materialized, out map[string]struct{}) {
 	properties := r.Properties()
-	for name := range r.RequiredSet() {
+	required := r.RequiredSet()
+
+	for name := range required {
 		path := prefix.AppendNode(name)
 		prop, ok := properties[name]
 		if !ok || len(prop.RequiredSet()) == 0 {
 			out[string(path)] = struct{}{}
 			continue
 		}
-		prop.collectRequiredLeafPaths(path, out)
+		prop.collectRequiredPaths(path, materialized, out)
+	}
+
+	// An optional object is invisible to the loop above, so descend into
+	// the ones a collected field materializes.
+	for name, prop := range properties {
+		if _, isRequired := required[name]; isRequired {
+			continue
+		}
+		path := prefix.AppendNode(name)
+		if _, ok := materialized[string(path)]; !ok {
+			continue
+		}
+		prop.collectRequiredPaths(path, materialized, out)
 	}
 }
 

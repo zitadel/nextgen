@@ -3,7 +3,6 @@ package domain
 import (
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/ianlancetaylor/jsonschema"
 )
@@ -116,7 +115,7 @@ func resolveAllStepFields(schema *jsonschema.Schema, steps []FlowDefinitionStep)
 	}
 
 	// validate that all required fields in the schema are present in the flow definition
-	if err := validateRequiredUserSchemaFields(sr.RequiredLeafPaths(), steps); err != nil {
+	if err := validateRequiredUserSchemaFields(sr, steps); err != nil {
 		return nil, err
 	}
 
@@ -180,29 +179,29 @@ func validatePasskeyActionsEnabled(sr schemaReader, steps []FlowDefinitionStep) 
 
 // validateRequiredUserSchemaFields checks that all required fields in the
 // user schema are present in the flow definition.
-func validateRequiredUserSchemaFields(requiredPaths map[string]struct{}, steps []FlowDefinitionStep) error {
-	if len(requiredPaths) == 0 {
-		return nil
-	}
-
+func validateRequiredUserSchemaFields(sr schemaReader, steps []FlowDefinitionStep) error {
 	// Collecting `address.street` covers the leaf and every object above
 	// it, since an object materializes once one of its children is
-	// collected.
+	// collected. The same prefixes are what the schema treats as
+	// materialized, so an optional object's own `required` list comes
+	// into force here too.
 	covered := make(map[string]struct{})
-	cover := func(path string) {
-		for {
-			covered[path] = struct{}{}
-			dot := strings.LastIndex(path, ".")
-			if dot < 0 {
-				return
-			}
-			path = path[:dot]
+	cover := func(field Field) {
+		var path AttributeKey
+		for _, node := range AttributeKey(field.String()).Nodes() {
+			path = path.AppendNode(node)
+			covered[string(path)] = struct{}{}
 		}
 	}
 	for _, step := range steps {
 		for _, field := range step.Fields {
-			cover(string(field))
+			cover(field)
 		}
+	}
+
+	requiredPaths := sr.RequiredPaths(covered)
+	if len(requiredPaths) == 0 {
+		return nil
 	}
 
 	missing := make([]string, 0, len(requiredPaths))
