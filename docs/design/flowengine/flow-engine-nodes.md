@@ -7,13 +7,17 @@
 
 The original question — how to structure interactive elements and who controls their visual order — is resolved by **separating data from presentation entirely**.
 
-The backend emits **semantic capabilities** (what the user can/must do). Per [ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md), `fields` and `actions` are **ordered arrays** whose entries carry a `name`; `gates` remains keyed by gate type. A **LiquidJS template** controls the visual structure, labels, and layout — it iterates the arrays in order or looks entries up by name, and it may reorder freely. The frontend is a dumb renderer that parses the template and mounts Lit Web Components.
+The backend emits **semantic capabilities** (what the user can/must do). Per [ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md), `fields` and `actions` are **ordered arrays** whose entries carry a `name`; `gates` remains keyed by gate name. A **LiquidJS template** controls the visual structure, labels, and layout — it iterates the arrays in order or looks entries up by name, and it may reorder freely. The frontend is a dumb renderer that parses the template and mounts Lit Web Components.
 
 This eliminates the need to choose between Options A, B, or C. The definition's array order gives templates a stable default; the template owns the final layout.
 
 ## Step Response Structure
 
 Every step response contains the capability collections and step-level metadata:
+
+> The non-empty `gates` and `sso_providers` below illustrate the decided wire
+> shape. Today's runtime emits neither collection with content and rejects gate
+> proofs and SSO submissions with `flow.unsupported`.
 
 ```json
 {
@@ -84,7 +88,7 @@ Every step response contains the capability collections and step-level metadata:
 |---|---|---|
 | `fields` | `FlowField[]` | Data the user must provide. Ordered array; each entry carries `name`. Resolved from user schema at runtime. |
 | `actions` | `FlowAction[]` | Available user actions. Ordered array; each entry carries `name` and `kind`. |
-| `gates` | `Record<string, FlowGate>` | Security gates (captcha, passkey ceremony). Keyed by gate type. |
+| `gates` | `Record<string, FlowGate>` | Planned security-gate payload, keyed by gate name. Passkey uses `challenge`, not `gates`; today's runtime emits an empty map. |
 | `sso_providers` | `SSOProvider[]` | Available SSO identity providers. |
 | `texts` | `Record<string, string>` | Step-level text keys for localization (resolved client-side via `| t` filter). |
 | `complete` | `string \| null` | Terminal step indicator: `"redirect"` or `"show"`. Null for non-terminal steps. |
@@ -173,7 +177,8 @@ The template decides whether first/last name are side-by-side or stacked:
 
 ## Captcha / Bot Detection
 
-Security gates are capabilities, not visual elements. The template places them:
+When gate emission ships, security gates are capabilities rather than visual
+elements, and the template places them:
 
 ```liquid
 {% if gates.captcha %}
@@ -181,7 +186,9 @@ Security gates are capabilities, not visual elements. The template places them:
 {% endif %}
 ```
 
-If a template forgets to render a required gate, the orchestrator appends it automatically as a safety net.
+The orchestrator's mandatory-gates hook is intended to append an emitted gate
+when a template forgets to render it. Today's engine never emits the CAPTCHA
+payload, so this is not currently an enforcement boundary.
 
 ## Translation Pipeline (The `| t` Filter)
 

@@ -22,14 +22,16 @@ to be a fast answer to "can I build flow X right now?"
 ### Resolution
 
 - Direct lookup by `name` (with optional `schema_version`). Multiple matches resolve via `pickLatestFlowVersion` — a lexicographic compare over `schema_version` strings (see [Missing → Resolution](#resolution-1)).
-- Audience-based resolution by `purpose` plus active `status`. Statement list
-  options order `created_at DESC, id DESC`; the service takes the first.
+- Audience-based resolution by `purpose` plus active `status`:
+  `user_schema_id` is a hard filter, then candidates score app match > team
+  match > project-wide > a definition scoped elsewhere. Equal scores prefer
+  newer `created_at`, then the higher ID.
 - Fails with `ErrFlowDefinitionPurposeMismatch` when a name-resolved definition doesn't serve the requested purpose.
 
 ### Definitions
 
 - `FlowDefinitionStatements` over Postgres, Spanner, and SQLite (the storage layer).
-- Status enum: `draft`, `active`, `deprecated`, `archived`.
+- API-exposed status values: `draft`, `active`.
 - Per-definition `user_schema` URL, captured into `FlowState` at `Start`.
 
 ### Steps & state machine
@@ -95,7 +97,6 @@ Not implemented at any layer:
 
 ### Resolution
 
-- `ResolveFlowRequest.Hint` (`AppID`, `TeamID`, `UserSchemaID`) is plumbed through the service but not honored by `resolveByAudience`. Today the first match from `(status=active, purpose)` wins, with no specificity ranking.
 - `pickLatestFlowVersion` does a lexicographic compare — only correct while `schema_version` stays zero-padded `MAJOR.MINOR.PATCH`.
 
 ### Storage

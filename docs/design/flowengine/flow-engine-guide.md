@@ -22,10 +22,10 @@ sequenceDiagram
     participant Server
 
     User->>Frontend: Opens login page
-    Frontend->>Server: POST /flow { purpose: "login" }
-    Server-->>Frontend: Step: fields=[email, password]
+    Frontend->>Server: POST /flow { project_id, purpose: "login" }
+    Server-->>Frontend: Step: fields=[email, x-auth-methods#password]
     User->>Frontend: Types email + password
-    Frontend->>Server: submit { email: "alice@acme.com", password: "..." }
+    Frontend->>Server: submit { email: "alice@acme.com", x-auth-methods#password: "..." }
     Server-->>Frontend: Step: complete → redirect
     Frontend->>User: Redirects to app
 ```
@@ -42,7 +42,6 @@ Every step the server returns has the same shape:
 {
   "id": "flow_1",
   "session_id": "sess_1",
-  "session_token": "tok_1",
   "step": {
     "name": "login",
     "texts": { "title_key": "login.title", "description_key": "login.description" },
@@ -63,7 +62,7 @@ Every step the server returns has the same shape:
 | `complete` | Only on terminal steps: `redirect` or `show` (null otherwise) |
 | `fields` | Input fields to render — an ordered array; each entry carries `name` |
 | `actions` | Things the user can do — an ordered array; each entry carries `name` and `kind` |
-| `gates` | Security gates that must be satisfied before submission |
+| `gates` | Reserved security-gate contract; always empty in today's runtime |
 
 **Fields** are resolved by the engine from the user schema:
 
@@ -224,7 +223,6 @@ loop:
   { action, fields } = waitForCustomEvent()
 
   response = POST /flow/{id}/submit {
-    session_token: response.session_token,
     action: action,
     fields: fields
   }
@@ -265,7 +263,7 @@ As a definition:
   "steps": [
     {
       "name": "login",
-      "fields": ["email", "password"],
+      "fields": ["email", "x-auth-methods#password"],
       "actions": [
         {"name": "submit", "kind": "submit", "primary": true}
       ],
@@ -279,9 +277,9 @@ As a definition:
 ```
 
 Key points:
-- **`fields`** reference properties from the definition's `user_schema`. The engine resolves type, validation, and text keys at runtime.
+- **`fields`** reference properties from the definition's `user_schema` or reserved authentication-method fields such as `x-auth-methods#password`. The engine resolves type, validation, challenge behavior, and text keys at runtime.
 - **`transitions`** define the edges of the graph — each maps an action name to a target step.
-- The engine **implicitly evaluates assurance policy** after every submit. If the session meets the target ACR, it transitions to `complete`. If not, it follows the defined transition or injects additional steps dynamically.
+- Today's engine follows the authored transition after verifying the fields on the submitted step. Requested-ACR evaluation and dynamic step injection are planned.
 
 ---
 
@@ -303,16 +301,18 @@ flowchart LR
 
 The schema is the **single source of truth** for field metadata. Changing a field's label or validation in the schema automatically updates every flow that references it.
 
-### Schema annotations drive engine behavior
+### Schema annotations and reserved fields drive engine behavior
 
 Schema fields can have `x-*` annotations that tell the engine how to handle them:
 
-| Annotation | Effect |
+| Marker | Effect |
 |---|---|
 | `x-unique: "<scope>"` | Value must be unique at the given scope (`project` or `team`). A non-empty scope makes the field an identifier: the engine looks up the user on submit, which implies the `user_not_found` and `user_already_exists` outcomes in transitions. |
-| `x-credential: "password"` | Engine verifies the credential via auth_attempt. |
+| Step field `x-auth-methods#password` plus root `x-auth-methods.password.enabled: true` | Engine renders a password field and verifies the submitted credential via `auth_attempt`. |
 
-This means the flow definition stays simple — field names only — while the engine derives all the complex behavior from the schema.
+Ordinary step fields name top-level user-schema properties. Credential fields
+use the reserved `x-auth-methods#<method>` namespace; a top-level property named
+`password` is only user data and does not trigger password verification.
 
 ---
 
@@ -325,7 +325,7 @@ Steps can declare server-side behavior directly as properties:
 ```json
 {
   "name": "set-password",
-  "fields": ["password"],
+  "fields": ["x-auth-methods#password"],
   "on_success": "create_user",
   "actions": [
     {"name": "submit", "kind": "submit", "primary": true}
@@ -353,32 +353,17 @@ A step with `complete` set is the terminal state. No fields, no actions, no tran
 
 ---
 
-## Implicit Policy Evaluation
+## Planned Policy Evaluation
 
-The engine evaluates assurance policy **after every submit** — no explicit policy check nodes in the definition.
+Implicit assurance-policy evaluation is design direction, not shipped
+behavior. Today the engine verifies the challenges declared by the current
+step and then follows that step's authored transition. It does not compare the
+session with a requested ACR, skip transitions, or inject MFA steps.
 
-After the user submits a step:
-1. Engine validates fields and runs any `on_success` logic
-2. Engine checks: does the session's `assurance_levels[]` meet the target ACR?
-3. **If yes** → skip to `complete` (regardless of what the transition says)
-4. **If no** → follow the defined transition, or inject a step dynamically if additional factors are needed
-
-This means a simple two-step login (`login` → `done`) works for both single-factor and MFA — the engine handles the complexity invisibly.
-
-```mermaid
-sequenceDiagram
-    participant Frontend
-    participant Engine
-
-    Frontend->>Engine: submit { email, password }
-    Note right of Engine: Validate fields ✓
-    Note right of Engine: Check policy: needs OTP?
-    alt ACR met
-        Engine-->>Frontend: complete → redirect
-    else needs more factors
-        Engine-->>Frontend: injected OTP step
-    end
-```
+Until a policy evaluator populates required checks, a definition must model
+every required authentication step explicitly. Reaching a step with
+`complete` means only that the authored graph reached that terminal step; it
+is not evidence that an ACR policy was evaluated.
 
 ---
 
@@ -422,13 +407,14 @@ When a flow starts, the server resolves which definition to use:
 flowchart TD
     req["Flow request:<br>purpose=login<br>team_id=acme<br>app_id=dashboard"]
     filter["Filter: active definitions<br>whose purposes has an entry for 'login'"]
-    match["Match audience:<br>app_id > team_id > project"]
-    pick["Pick most specific match<br>tie-break by priority"]
-    fallback["No match → built-in default"]
+    schema["If set, hard-filter by<br>user_schema_id"]
+    match["Score audience:<br>app match > team match > project-wide > other scoped"]
+    pick["Pick highest score<br>tie-break by created_at, then id"]
+    missing["No candidate → flow_definition.not_found"]
 
-    req --> filter --> match --> pick
+    req --> filter --> schema --> match --> pick
     pick -->|found| use["Use matched definition"]
-    pick -->|none| fallback
+    pick -->|none| missing
 ```
 
 A definition's **audience** scopes where it applies:
@@ -442,15 +428,22 @@ A definition's **audience** scopes where it applies:
 }
 ```
 
-- `app_ids` is the most specific — a definition scoped to an app wins over one scoped to a team.
+- A matching `app_id` is the most specific, followed by a matching `team_id`, then a project-wide definition.
 - An empty audience means "project default" — matches everything inside the project.
-- Multiple definitions can coexist: one for `team_acme`, another for `team_globex`, a default for everyone else.
+- Equal scores prefer the newest `created_at`, then the highest ID; there is no `priority` field.
+- Audience hints are routing suggestions, not a security boundary. If no matching or project-wide definition exists, a definition scoped to another app or team can still be selected at the lowest score.
+- Project creation persists the shipped default definition normally; the resolver does not synthesize a fallback when no candidate exists.
 
 ---
 
 ## Gates
 
-Gates are security challenges that must be satisfied before a step can be submitted. Declare them on any step:
+> **Direction — not runtime-supported.** The definition schema accepts gates,
+> but today's engine emits `gates: {}`, accepts a normal submission without a
+> proof, and rejects a non-empty `gate_proofs` map with `flow.unsupported`.
+> Do not rely on gates for CAPTCHA or other security enforcement yet.
+
+The planned contract declares a keyed gate on a step:
 
 ```json
 {
@@ -468,17 +461,16 @@ Gates are security challenges that must be satisfied before a step can be submit
 }
 ```
 
-The engine resolves gate details (provider, config) at runtime. The frontend receives:
+When gate support ships, the engine is intended to resolve provider details
+and emit them to the frontend. Today the frontend receives:
 
 ```json
 {
-  "gates": {
-    "captcha": { "kind": "captcha", "provider": "altcha", "config": { ... } }
-  }
+  "gates": {}
 }
 ```
 
-The engine can also **inject gates dynamically** based on policy (e.g., risk score triggers captcha even if the definition doesn't declare it).
+Proof verification and dynamic gate injection remain planned work.
 
 ---
 
@@ -504,7 +496,7 @@ Transitions support two cross-flow actions:
 ```json
 {
   "name": "login",
-  "fields": ["email", "password"],
+  "fields": ["email", "x-auth-methods#password"],
   "actions": [
     {"name": "submit", "primary": true, "kind": "submit"},
     {"name": "register", "kind": "navigate"},
@@ -552,7 +544,10 @@ flowchart TD
 | `redirect` | Login/reauth with OIDC auth request | Navigate to `redirect_uri` |
 | `show` | Standalone registration, recovery | Display success screen |
 
-After a pivoted flow completes, the engine auto-pops back to the parent. If the session now meets the target ACR, it transitions straight to `complete` with `redirect`.
+Automatic pop-and-resume after a pivot and requested-ACR evaluation are
+planned. Today's runtime rejects the cross-flow transition before entering the
+child definition; ordinary local transitions reach `complete` exactly as
+authored.
 
 ---
 
@@ -569,7 +564,10 @@ A session and a flow are different things with different lifetimes:
 | **One or many?** | One session can have many flows over time | Each flow operates on one session |
 | **What it knows** | user, factors, assurance_levels | definition, step, history, collected data |
 
-The session accumulates factors across flows. A login flow adds `user` + `password`. A step-up flow adds `totp`. A profiling flow doesn't add factors — it collects data. Each flow is independent, but they all contribute to the same session.
+The shipped password and passkey paths record verified factors on the
+flow-linked authentication attempt, and terminal handoff transfers the result
+to the session. Additional methods such as TOTP and cross-flow factor
+accumulation are planned.
 
 ---
 
@@ -582,22 +580,24 @@ sequenceDiagram
     participant Frontend
     participant Server
 
-    Frontend->>Server: submit { password: "wrong" }
-    Server-->>Frontend: same step + error: "Invalid password"
+    Frontend->>Server: submit { x-auth-methods#password: "wrong" }
+    Server-->>Frontend: same step + error.invalid_credentials
     Note left of Frontend: Re-render with error message
-    Frontend->>Server: submit { password: "correct" }
+    Frontend->>Server: submit { x-auth-methods#password: "correct" }
     Server-->>Frontend: next step
 ```
 
-The session token still rotates on error (prevents replay). The step doesn't advance. The frontend re-renders with the error message displayed.
+The sealed `_zflow` cookie rotates on error to prevent replay. The response
+body does not contain a rotating `session_token`. The step does not advance,
+and the frontend localizes the returned error key before re-rendering.
 
 ```json
 {
   "step": {
     "name": "signin",
-    "error": "Invalid password. 2 attempts remaining.",
+    "error": "error.invalid_credentials",
     "fields": [
-      {"name": "password", "type": "password", "text_key": "signin.field.password", "required": true}
+      {"name": "x-auth-methods#password", "type": "password", "text_key": "signin.field.password", "required": true}
     ],
     "actions": [
       {"name": "submit", "text_key": "signin.action.submit", "primary": true, "kind": "submit"},
@@ -638,7 +638,10 @@ graph TD
     profile -.->|"login (switch)"| login
 ```
 
-Two separate flow definitions, connected by a switch transition. The user can navigate between them. The session persists throughout, accumulating factors and collected data. The engine handles policy evaluation implicitly after every submit.
+This diagram is direction for the planned cross-flow implementation. Today's
+shipped default keeps login and registration inside one definition with local
+re-purposing transitions, and follows the authored graph without implicit
+policy evaluation.
 
 ---
 

@@ -34,10 +34,10 @@ present.
 | Property | Meaning |
 |---|---|
 | `name` | Unique within the definition. Used as the `Transitions` target. |
-| `fields` | Array of user-schema property names. Resolved at runtime to per-field type, validation, uniqueness scope, and `FlowFieldChallenge`. |
-| `actions` | Map of user-selectable action → `{ text_key, primary }`. Keyed by the action name the client echoes back in `submit`. |
-| `gates` | Map of gate name → `{ kind, provider, config }`. Pre-submit barriers. Captcha is the only gate kind in the enum today. |
-| `sso_providers` | List of `{ id, name, template }` for the providers offered on this step. |
+| `fields` | Ordered array of user-schema property names or reserved authentication-method fields such as `x-auth-methods#password`. Resolved at runtime to per-field type, validation, uniqueness scope, and `FlowFieldChallenge`. |
+| `actions` | Ordered array of `{ name, kind, text_key?, primary? }`. The client echoes `name` back in `submit`. |
+| `gates` | Definition-schema map of gate name → `{ kind, provider, config }`. Captcha is the only gate kind in the enum, but today's runtime neither emits nor enforces gates and rejects `gate_proofs`. |
+| `sso_providers` | Definition-schema list of `{ id, name, template }`. Today's runtime does not emit providers and rejects SSO submissions. |
 | `on_success` | Server-side mutation that runs after fields validate, before the transition fires. `create_user` today. |
 | `complete` | Terminal classifier: `redirect` (frontend navigates to `redirect_uri`) or `show` (success screen). |
 | `transitions` | Map of action name **or** engine-emitted outcome → `{ target, action? }`. `action` distinguishes intra-flow targets (`null`) from cross-flow `switch` / `pivot`. |

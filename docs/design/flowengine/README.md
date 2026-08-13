@@ -56,6 +56,11 @@ The architecture is built on four concepts:
 
 The flow engine orchestrates **which step renders when** (UI layer). The underlying auth primitives — start an attempt, issue a challenge, verify a proof, complete, mint a handoff — live in [`../api/authn-and-auth-flows.md`](../api/authn-and-auth-flows.md) as the `auth_attempts` state machine. Both paths below use the same primitives; they differ in who drives the UI.
 
+> **Runtime boundary:** the shared policy/ACR layer in the target architecture
+> is not implemented. Today the flow engine follows authored transitions and
+> `auth_attempts` verifies the explicitly submitted challenges; neither path
+> re-evaluates assurance against requested `acr_values`.
+
 ```
 Web/frontend client                    Any other client (mobile, backend, CLI)
 ─────────────────────                  ─────────────────────────────────────────
@@ -65,10 +70,9 @@ POST /flow                          POST /auth_attempts
 POST /flow/{id}/submit             POST /auth_attempts/{id}/challenges
   → server advances state machine        + /challenges/{cid}/verify
   → internally invokes auth_attempt      → submit factor proofs
-    Go service layer (no HTTP)           → server verifies, re-evaluates assurance
-  → renders next step
-  → manages registration, profiling    Check assurance levels against requested acr_values
-  → handles SSO redirects                → build native UI, step-up if needed
+    Go service layer (no HTTP)           → server verifies the declared proof
+  → renders authored next step
+  → manages registration; SSO planned    → build native UI, choose next challenge
   ...                                  request satisfied → exchange / handoff
 complete → redirect
 
@@ -77,7 +81,8 @@ auth_attempts via the internal         calls auth_attempts REST endpoints
 Go service layer, not HTTP.            + Session API over HTTP directly.
 ```
 
-Both paths get the same policy enforcement — the policy engine evaluates sessions regardless of how factors were submitted.
+Shared policy enforcement across both paths is the intended architecture, not
+shipped behavior.
 
 ## Separation of Concerns
 
