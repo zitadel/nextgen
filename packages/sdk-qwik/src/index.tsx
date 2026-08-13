@@ -137,6 +137,7 @@ export const ZitadelLogin = component$<ZitadelLoginProps>((props) => {
       post-sign-in-url={props.postSignInUrl}
       variant={props.variant}
       theme={props.theme}
+      suppressHeader={props.suppressHeader}
     />
   );
 });
@@ -249,6 +250,7 @@ export const ZitadelSession = component$<ZitadelSessionProps>((props) => {
       logout-label={props.logoutLabel}
       variant={props.variant}
       theme={props.theme}
+      suppressHeader={props.suppressHeader}
     />
   );
 });

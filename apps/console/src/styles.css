@@ -42,6 +42,22 @@
   --zl-font-family-heading: "APK Futural", "Arimo", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
 }
 
+/* Shiki's CSS-variables theme emits `var(--zl-shiki-*)` per token role; these
+   alias them onto the design system's `syntax/*` colours so highlighted code
+   re-themes with `data-theme` like everything else, and so the palette stays
+   owned by `@zitadel/design-tokens` rather than by a highlighter theme.
+   Roles the schema grammars never produce are left to fall through to the
+   foreground. */
+:root {
+  --zl-shiki-foreground: var(--zl-syntax-punctuation);
+  --zl-shiki-token-keyword: var(--zl-syntax-key);
+  --zl-shiki-token-string: var(--zl-syntax-string);
+  --zl-shiki-token-string-expression: var(--zl-syntax-string);
+  --zl-shiki-token-constant: var(--zl-syntax-number);
+  --zl-shiki-token-comment: var(--zl-syntax-comment);
+  --zl-shiki-token-punctuation: var(--zl-syntax-punctuation);
+}
+
 /* Global page theming only. Component styles live in Tailwind utilities on the
    components themselves. `data-theme` on <html> selects the token mode (dark
    `:root` vs light override); `color-scheme` keeps native form controls aligned

@@ -28,7 +28,7 @@
   font-size: 0.875rem;
   font-weight: 400;
   line-height: 1.25rem;
-  color: var(--zl-color-icon-default-purple, #bba5e4);
+  color: var(--zl-color-text-link, var(--zl-color-icon-default-purple, #bba5e4));
   text-decoration: none;
 }
 .zr-field__link:hover {
@@ -66,7 +66,7 @@
   padding-inline-end: 2.5rem;
 }
 .zr-field:not(.zr-field--disabled) .zr-field__wrap:hover:not(:focus-within) {
-  border-color: var(--zl-color-gray-500, #9e9eb2);
+  border-color: var(--zl-color-border-hover, #9e9eb2);
   background-color: color-mix(in srgb, var(--zl-color-text-primary-white, #f4f4f6) 10%, transparent);
 }
 .zr-field:not(.zr-field--invalid):not(.zr-field--disabled):not(.zr-field--success)

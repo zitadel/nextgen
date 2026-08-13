@@ -8,7 +8,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // ---- Service interface -------------------------------------------------------
@@ -37,7 +37,7 @@ type AuthAttemptService interface {
 	// For passkey challenges, the user check must already be verified, so the user ID is known
 	// for retrieving registered credentials.
 	//
-	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidRequest, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptAlreadyCompleted, domain.ErrInternal
+	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidRequest, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptAlreadyHandedOff, domain.ErrInternal
 	IssueChallenge(ctx context.Context, input IssueChallengeInput) (*domain.AuthAttempt, error)
 
 	// VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.
@@ -50,7 +50,7 @@ type AuthAttemptService interface {
 	// The ChallengeID must match the ID returned by IssueChallenge to prevent use of
 	// stale proofs after a challenge is re-issued.
 	//
-	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptStaleChallenge, domain.ErrAuthAttemptInvalidRequest, domain.ErrAuthAttemptProofRejected, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptAlreadyCompleted, domain.ErrInternal
+	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptStaleChallenge, domain.ErrAuthAttemptInvalidRequest, domain.ErrAuthAttemptProofRejected, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptAlreadyHandedOff, domain.ErrInternal
 	VerifyProof(ctx context.Context, input VerifyProofInput) (*domain.AuthAttempt, error)
 
 	// Handoff mints a single-use handoff token for a completed attempt.
@@ -60,7 +60,7 @@ type AuthAttemptService interface {
 	//
 	// The attempt must be in a completed state and not expired.
 	//
-	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptNotCompleted, domain.ErrInternal
+	// errors: domain.ErrAuthAttemptNotFound, domain.ErrAuthAttemptInvalidState, domain.ErrAuthAttemptNotCompleted, domain.ErrAuthAttemptAlreadyHandedOff, domain.ErrInternal
 	Handoff(ctx context.Context, input HandoffInput) (*domain.AuthAttempt, error)
 
 	// RegisterCreatedUser registers a newly-created user's ID as a verified user
@@ -163,8 +163,6 @@ type PasskeyProof struct {
 func (PasskeyProof) proofCheckType() domain.AuthCheckType { return domain.AuthCheckTypePasskey }
 
 // ---- Secondary ports -------------------------------------------------------------
-
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/auth_attempt.mock.go . SessionResolver,UserLookup
 
 type SessionResolver interface {
 	Get(ctx context.Context, projectID, sessionID string) (*domain.Session, error)
@@ -436,7 +434,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		return passkeyChallenge, attempt.SetPasskeyFactor(verification), nil
 
 	default:
-		return nil, nil, domain.ErrAuthAttemptInvalidRequest().WithDetails("unsupported proof type")
+		return nil, nil, domain.ErrAuthAttemptInvalidRequest().WithMessage("unsupported proof type")
 	}
 }
 

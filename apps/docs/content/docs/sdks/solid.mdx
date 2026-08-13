@@ -1,0 +1,94 @@
+---
+title: Solid SDK
+description: Client-side Solid wrappers for the Zitadel login and logout components.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { File, Files } from "fumadocs-ui/components/files";
+import { Step, Steps } from "fumadocs-ui/components/steps";
+import { Tab, Tabs } from "fumadocs-ui/components/tabs";
+
+The Solid SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
+
+<Callout title="SPA proxy requirement" type="warn">
+  Solid apps do not have server middleware by default. The CLI configures a Vite dev proxy; production deployments need an equivalent same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/concepts/sdk-proxy).
+</Callout>
+
+## Install
+
+<Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
+  <Tab>
+    ```sh
+    pnpm add @zitadel/sdk-solid
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    npm install @zitadel/sdk-solid
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    yarn add @zitadel/sdk-solid
+    ```
+  </Tab>
+</Tabs>
+
+## Setup
+
+<Tabs items={["CLI generated", "Manual"]}>
+  <Tab>
+    The CLI configures the Vite proxy, writes app-level auth UI, adds environment files, and installs the SDK.
+
+    <Files>
+      <File name="src/App.tsx" />
+      <File name="vite.config.ts" />
+      <File name=".env.local" />
+      <File name=".env.example" />
+      <File name="package.json" />
+    </Files>
+  </Tab>
+  <Tab>
+    Configure Zitadel once, then render login and logout widgets:
+
+    ```tsx
+    import { ZitadelLogin, ZitadelLogout, configureZitadel } from "@zitadel/sdk-solid";
+
+    const project = configureZitadel({
+      projectId: import.meta.env.VITE_ZITADEL_PROJECT_ID,
+      proxyPath: "/__nextgen",
+    });
+
+    export function LoginPage() {
+      return <ZitadelLogin project={project} purpose="login" postSignInUrl="/" />;
+    }
+
+    export function ProfilePage() {
+      return <ZitadelLogout project={project} postSignOutUrl="/login" />;
+    }
+    ```
+
+    The widget's flow events surface as optional callbacks: `onFlowStep`, `onFlowInput`, `onFlowComplete`, and `onFlowError`.
+  </Tab>
+</Tabs>
+
+## Runtime model
+
+<Steps>
+  <Step>The widgets call the configured proxy path on the same origin.</Step>
+  <Step>In local Vite development, the generated proxy forwards `/__nextgen/*` to Zitadel and attaches the project service key only on the session exchange.</Step>
+  <Step>In production, the same-origin path comes from a platform rewrite or minimal worker (see [SDK proxy](/docs/concepts/sdk-proxy)) — or intentionally configure a backend URL for local-only experiments.</Step>
+</Steps>
+
+## Verify
+
+- Run the Vite app with generated environment variables.
+- Register or sign in through the rendered widget.
+- Confirm logout returns to the configured login path.
+- In browser automation, use shadow-DOM-aware locators because the native inputs live inside shared web components.
+
+## See also
+
+- [SDK proxy](/docs/concepts/sdk-proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and how to run one in production.
+- [Components](/docs/sdks/components) — the shared web components these wrappers render.
+- [`@zitadel/sdk-solid` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-solid) and the [CLI Solid patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/solid).

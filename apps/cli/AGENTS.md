@@ -1,3 +1,21 @@
+# Agent Instructions — `apps/cli`
+
+Scope pointers first — this file's own body covers **telemetry only**:
+
+- The agent-facing command contract (JSON envelope, posture, claim, doctor
+  repair) is [`SKILLS.md`](SKILLS.md) — keep it aligned with the command
+  surface on every CLI behavior change (root `AGENTS.md` Generated Files rule).
+- Scaffold posture derivation (standalone page vs widget in a pre-existing
+  app) is [ADR 044](../../docs/adrs/044-scaffold-embedding-posture-defaults.md);
+  the implementation lives in `src/lib/orca/patchers/posture.ts` and the
+  manifest in `src/lib/scaffold-manifest.ts` (drift rules:
+  [ADR 042](../../docs/adrs/042-scaffolded-file-ownership-and-drift-detection.md)).
+- The claim lifecycle is
+  [ADR 046](../../docs/adrs/046-claim-lifecycle-v2.md) (`src/commands/claim.ts`,
+  `src/lib/claim-state.ts`, `src/commands/doctor/checks/claim.ts`).
+- The journey e2e contract is
+  [`apps/cli-journey-e2e/AGENTS.md`](../cli-journey-e2e/AGENTS.md).
+
 # Analytics Tracking — Mixpanel
 
 This package (`@zitadel/cli`) uses **Mixpanel** for anonymous product analytics.
@@ -149,8 +167,8 @@ Commands add dimensions via `this.recordTelemetry({ … })` (merged immutably on
 each lifecycle event emitted *after* recording — typically `completed`/`failed`,
 since `started` fires before the command body runs):
 
-- **setup** — `framework`, `renderer`, `package_manager`, `scaffolded_skeleton`, `skip_install`, `dev_port_explicit`, `files_written_count`, `step` (`framework_resolved` → `project_created` → `files_patched` → `dependencies_installed`).
-- **plan / apply** — `creates`, `updates`, `deletes`, `total` (diff *counts* only).
+- **setup** — `framework`, `renderer`, `package_manager`, `scaffolded_skeleton`, `skip_install`, `dev_port_explicit`, `preset`, `use_case`, `design` (a `BRANDING_DESIGNS` value or `built-in`), `files_written_count`, `step` (`framework_resolved` → `project_created` → `files_patched` → `dependencies_installed`).
+- **plan / apply** — `creates`, `updates`, `deletes`, `revisions`, `total` (diff *counts* only).
 - **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (failing check **names**, never messages).
 - **start** — `runtime` (`binary` / `docker`).
 - **claim** — `claim_outcome` (`completed` / `already_claimed` / `expired` / `timeout` / `dry_run`), `poll_count`, `browser_opened`. Deliberately *not* recorded: `challenge_id`, `team_id`, `claim_url`, `dashboard_url` — every one of them is an id or a URL.

@@ -8,6 +8,8 @@
   --zl-color-surface-default-white: #f4f4f6;
   --zl-color-surface-default-primary-gray: #252528;
   --zl-color-surface-default-secondary-gray: #37373a;
+  --zl-color-surface-hover-strong: #cfcfde;
+  --zl-color-surface-hover-subtle: #484a57;
   --zl-color-text-primary-white: #f4f4f6;
   --zl-color-text-secondary-gray: #bfbfcf;
   --zl-color-text-button-default: #0f0f11;
@@ -34,6 +36,7 @@
   --zl-color-border-default-gray-200: #484a57;
   --zl-color-border-default-gray-300: #686883;
   --zl-color-border-default-gray-400: #82829c;
+  --zl-color-border-hover: #9e9eb2;
   --zl-color-border-error: #ea4f70;
   --zl-color-border-success: #33a779;
   --zl-accent: #404040;
@@ -81,6 +84,9 @@
   --zl-color-gray-700: #bfbfcf;
   --zl-color-gray-800: #e1e1e7;
   --zl-color-gray-900: #f4f4f6;
+  --zl-color-surface-default-white: var(--zl-primary);
+  --zl-color-text-button-default: var(--zl-primary-foreground);
+  --zl-color-text-link: var(--zl-color-icon-default-purple);
   --zl-spacing-01: 0.25rem;
   --zl-spacing-02: 0.5rem;
   --zl-spacing-03: 1rem;
@@ -136,7 +142,7 @@
   --zl-syntax-number: #e25f7d;
   --zl-syntax-boolean: #bba5e4;
   --zl-syntax-punctuation: #82829c;
-  --zl-syntax-comment: #7c7c95;
+  --zl-syntax-comment: #686883;
 }
 
 [data-theme="light"] {
@@ -144,6 +150,8 @@
   --zl-color-surface-default-white: #0f0f11;
   --zl-color-surface-default-primary-gray: #ffffff;
   --zl-color-surface-default-secondary-gray: #e1e1e7;
+  --zl-color-surface-hover-strong: #37373a;
+  --zl-color-surface-hover-subtle: #cfcfde;
   --zl-color-text-primary-white: #0f0f11;
   --zl-color-text-secondary-gray: #686883;
   --zl-color-text-button-default: #f4f4f6;
@@ -169,6 +177,7 @@
   --zl-color-border-default-gray-100: #e1e1e7;
   --zl-color-border-default-gray-200: #cfcfde;
   --zl-color-border-default-gray-300: #9e9eb2;
+  --zl-color-border-hover: #686883;
   --zl-color-border-error: #c52247;
   --zl-color-border-success: #217a55;
   --zl-accent: #f5f5f5;
@@ -202,6 +211,8 @@
   --zl-sidebar-accent-foreground: #171717;
   --zl-sidebar-border: #e5e5e5;
   --zl-sidebar-ring: #a3a3a3;
+  --zl-color-surface-default-white: var(--zl-primary);
+  --zl-color-text-button-default: var(--zl-primary-foreground);
   --zl-focus-color: #0f0f11;
   --zl-gradient-neutral-start: #bfbfcf;
   --zl-gradient-base-end: #fafafa;
@@ -210,5 +221,5 @@
   --zl-syntax-number: #c52247;
   --zl-syntax-boolean: #5a23bd;
   --zl-syntax-punctuation: #686883;
-  --zl-syntax-comment: #71718b;
+  --zl-syntax-comment: #82829c;
 }

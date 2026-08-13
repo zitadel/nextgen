@@ -1,8 +1,10 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Check, Copy, Key, UserRoundCog } from "lucide-react";
-import { useId, useState } from "react";
+import { Key, UserRoundCog } from "lucide-react";
+import { useId } from "react";
 
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
+import { EYEBROW, MetaRule, MetaValue } from "@/components/detail-meta";
+import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,13 +12,12 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserStatusBadge } from "@/components/user-status-badge";
 
 import { api } from "../../../api/zitadel";
+import { formatDate } from "../../../lib/date";
 import { displayValue, field } from "../../../lib/record";
 import { type UserSchema, schemaDisplayName, schemaFields } from "../../../lib/schema";
 import { userDisplayName } from "../../../lib/user";
-import { getConsoleProjectId } from "../../../runtime/runtime";
 
 /**
  * User detail (Figma `467:44362`, `Filled` and `Authentication` variants).
@@ -37,8 +38,7 @@ import { getConsoleProjectId } from "../../../runtime/runtime";
  */
 export const Route = createFileRoute("/_authed/users/$userId")({
   loader: async ({ params }) => {
-    const projectId = getConsoleProjectId();
-    const user = await api.getUserByID(params.userId, { project_id: projectId });
+    const user = await api.getUserByID(params.userId);
 
     // Both are chrome for the record rather than the record itself, so neither
     // is allowed to reject the loader: a failure costs a card, not the screen.
@@ -46,12 +46,12 @@ export const Route = createFileRoute("/_authed/users/$userId")({
     const [schema, passkeys] = await Promise.all([
       schemaId
         ? api
-            .getSchemaById(schemaId, { project_id: projectId })
+            .getSchemaById(schemaId)
             .then((value) => value as UserSchema)
             .catch(() => undefined)
         : Promise.resolve(undefined),
       api
-        .listUserPasskeys(params.userId, { project_id: projectId })
+        .listUserPasskeys(params.userId)
         .then((result) => result.passkeys)
         .catch(() => undefined),
     ]);
@@ -70,7 +70,6 @@ const CARD = "gap-0 rounded-xl py-0";
 // the header, the divider and the content (Detail Panel `1305:392714`).
 const CARD_HEAD = "flex items-center gap-3 px-6 pt-5 pb-4";
 const PLATE = "flex size-9 items-center justify-center rounded-md bg-muted text-foreground";
-const EYEBROW = "text-muted-foreground font-serif text-xs tracking-[0.72px] uppercase";
 // 18px between fields on both axes — not a 4px-scale step, so it is written out.
 const GRID = "grid gap-[18px] px-6 pt-4 pb-5 sm:grid-cols-2";
 const ROW = "flex items-center justify-between gap-4 px-6 pt-4 pb-5";
@@ -92,18 +91,18 @@ function UserDetail() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className={HEADING}>{name}</h1>
-          {metadata.status && <UserStatusBadge status={metadata.status} />}
+          {metadata.status && <StatusBadge status={metadata.status} />}
         </div>
         <Card className="gap-0 rounded-xl py-0">
           {/* Stacked below `sm`, in a row above it — the mobile frame
               (`520:80552`) keeps every item flush left and turns the column
               rule into a tick on its own row between them. */}
           <CardContent className="flex flex-col px-5 py-3.5 sm:flex-row sm:flex-wrap sm:items-start">
-            <MetaItem label="User ID" value={userId} copyable />
+            <MetaValue label="User ID" value={userId} copyable />
             {metadata.createdAt && (
               <>
                 <MetaRule />
-                <MetaItem label="Created" value={formatDate(metadata.createdAt)} />
+                <MetaValue label="Created" value={formatDate(metadata.createdAt)} />
               </>
             )}
           </CardContent>
@@ -258,85 +257,3 @@ function userMetadata(user: Record<string, unknown>): { status?: string; created
   return { status: field(record, "status"), createdAt: field(record, "created_at") };
 }
 
-/**
- * A created date, in the viewer's own locale.
- *
- * The design renders `12 Jul 2026`, which is how this reads in a British locale
- * — that is the mock's locale, not a format the product should impose. Day,
- * short month and year are requested; the order and separators are the
- * viewer's. Tests derive the expected string the same way rather than hardcoding
- * one locale's output.
- *
- * Falls back to the raw value rather than rendering `Invalid Date` if the server
- * sends something unparseable.
- */
-function formatDate(value: string): string {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-/**
- * The rule between two values in the header card — a 30px hairline rather than
- * a plain gap.
- *
- * Stacked, it is a tick inset 18px on its own row; in a row it takes 18px of air
- * on both sides. Same mark, two layouts, exactly as the two frames draw it.
- */
-function MetaRule() {
-  return (
-    <span
-      aria-hidden
-      className="bg-border ml-[18px] h-[30px] w-px shrink-0 sm:mx-[18px] sm:self-center"
-    />
-  );
-}
-
-/** One labelled value in the header card, optionally copyable. */
-function MetaItem({
-  label,
-  value,
-  copyable = false,
-}: {
-  label: string;
-  value: string;
-  copyable?: boolean;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard access can be refused (permissions, insecure origin). The id
-      // is on screen and selectable, so a failure needs no error surface.
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-[3px]">
-      <span className={EYEBROW}>{label}</span>
-      <div className="flex items-center gap-1.5">
-        <span className="text-foreground font-mono text-[13px] leading-[19px] tracking-[-0.5px]">
-          {value}
-        </span>
-        {copyable && (
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={() => void copy()}
-            aria-label={copied ? `${label} copied` : `Copy ${label}`}
-          >
-            {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}

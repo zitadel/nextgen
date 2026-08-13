@@ -150,9 +150,10 @@ func extractResourcePrefixes(pkgs map[string]*ast.Package) map[string]string {
 	for _, pkg := range pkgs {
 		for _, file := range pkg.Files {
 			ast.Inspect(file, func(n ast.Node) bool {
-				// Look for const declarations
+				// Resource prefixes are normally const, but TokenPrefix is a
+				// var — accept both, or its error codes go missing entirely.
 				genDecl, ok := n.(*ast.GenDecl)
-				if !ok || genDecl.Tok != token.CONST {
+				if !ok || (genDecl.Tok != token.CONST && genDecl.Tok != token.VAR) {
 					return true
 				}
 

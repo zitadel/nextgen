@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"maps"
 	"time"
 
 	"github.com/muhlemmer/gu"
@@ -112,7 +113,7 @@ type Session struct {
 func NewSession(projectID string, agent *UserAgent) (*Session, error) {
 	return &Session{
 		ProjectID:  projectID,
-		UserAgent:  agent,
+		UserAgent:  agent.Clone(),
 		TimeToLive: SessionAnonymousTTL,
 	}, nil
 }
@@ -169,6 +170,14 @@ type UserAgent struct {
 	Info map[string]any
 }
 
+// Clone returns a deep copy safe to mutate independently of the original.
+func (ua *UserAgent) Clone() *UserAgent {
+	if ua == nil {
+		return nil
+	}
+	return &UserAgent{ID: ua.ID, IP: ua.IP, Info: maps.Clone(ua.Info)}
+}
+
 // SessionField enumerates the fields of Session which can be used for filtering and
 // ordering in list operations.
 type SessionField uint8
@@ -183,4 +192,8 @@ const (
 	SessionFieldTimeToLive
 	SessionFieldTokenID
 	SessionFieldUserID
+	// SessionFieldHasVerifiedFactors is computed, not stored: it reflects
+	// whether the session has verified factors, the test State() uses to
+	// separate building from active. Filter only; not sortable.
+	SessionFieldHasVerifiedFactors
 )

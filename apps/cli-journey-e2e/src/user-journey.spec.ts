@@ -5,6 +5,9 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   clickFlowAction,
   enableVirtualPasskey,
+  fillFlowField,
+  flowAction,
+  flowField,
   loginWithPasskey,
   loginWithPassword,
   registerWithPasskey,
@@ -53,6 +56,46 @@ if (preset === "password-first") {
     await logout(page);
     await gotoLogin(page);
     await loginWithPassword(page, { email, password });
+    await expectSignedIn(page);
+    await expectSessionCookie(page);
+  });
+
+  test(`in-card sign-up and sign-in navigation switches purpose in a fresh ${framework} app`, async ({
+    page,
+  }) => {
+    const email = uniqueEmail("navswitch");
+    const password = "Correct-Horse-43!";
+
+    await gotoLogin(page);
+
+    // The identifier step's "Sign up" nav must work with the email box
+    // empty: navigate-kind actions skip field validation, and the purposed
+    // transition re-enters the flow in register mode. The registration
+    // step's `passkey_register` action is a structural, locale-free marker.
+    await clickFlowAction(page, "register");
+    await expect(flowAction(page, "passkey_register")).toBeVisible();
+
+    // Round-trip back to sign-in through the register step's own nav.
+    await clickFlowAction(page, "sign_in");
+    await expect(flowField(page, "email", { label: /email/i })).toBeVisible();
+    await expect(flowAction(page, "passkey_register")).toBeHidden();
+
+    // Forward again and complete the registration entirely on the nav
+    // path — this must run real register semantics (create, not verify).
+    await clickFlowAction(page, "register");
+    await expect(flowAction(page, "passkey_register")).toBeVisible();
+    await fillFlowField(page, "email", email, { label: /email/i });
+    for (const entry of registrationProfile) {
+      if (typeof entry.value !== "string") continue;
+      const field = flowField(page, entry.field, { label: entry.label });
+      if (await field.isVisible().catch(() => false)) {
+        await field.fill(entry.value);
+      }
+    }
+    await clickFlowAction(page, "submit");
+    await fillFlowField(page, "password", password, { label: /password/i });
+    await clickFlowAction(page, "submit");
+    await skipPasskeyUpsellIfVisible(page);
     await expectSignedIn(page);
     await expectSessionCookie(page);
   });

@@ -60,7 +60,7 @@ func TestOgenErrorHandlerInvalidSessionCookie(t *testing.T) {
 	t.Parallel()
 	mock := gomock.NewController(t)
 	tokenService := mocks.NewMockTokenService(mock)
-	tokenService.EXPECT().VerifyToken(gomock.Any(), gomock.Any()).Return(nil, errors.New("bad token"))
+	tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, errors.New("bad token"))
 
 	srv := newErrorHandlerTestServer(t, tokenService)
 
@@ -118,4 +118,60 @@ func TestDomainErrorDetailsOmitsDiagnostics(t *testing.T) {
 	require.Equal(t, api.ErrorCode("internal"), details.Code)
 	require.Equal(t, "An unexpected error occurred.", details.Message)
 	require.False(t, details.Details.Set, "parent/location diagnostics must not be serialized")
+}
+
+// A transaction that exhausted its abort retries is transient, so the caller
+// needs a status that says "retry", not the 500 it used to get.
+func TestErrorResponseUnavailableIs503(t *testing.T) {
+	t.Parallel()
+
+	got := errorResponse(domain.ErrUnavailable().WithParent(errors.New("transaction aborted")))
+
+	require.Equal(t, http.StatusServiceUnavailable, got.StatusCode)
+	require.Equal(t, api.ErrorCode("unavailable"), got.Response.Code)
+}
+
+func TestErrorResponseInternalStays500(t *testing.T) {
+	t.Parallel()
+
+	got := errorResponse(domain.ErrInternal(errors.New("boom")))
+
+	require.Equal(t, http.StatusInternalServerError, got.StatusCode,
+		"only transient failures may claim 503")
+}
+
+func TestDomainErrorDetails_requestInvalidField(t *testing.T) {
+	t.Parallel()
+
+	details := domainErrorDetails(
+		domain.ErrRequestInvalid().
+			WithMessage(`invalid value for field "age"`).
+			WithDetails(domain.RequestInvalidFieldDetails{Field: "age"}),
+	)
+
+	require.Equal(t, api.ErrorCode("req.invalid"), details.Code)
+	require.Equal(t, `invalid value for field "age"`, details.Message)
+	require.True(t, details.Details.Set)
+	require.JSONEq(t, `{"field":"age"}`, string(details.Details.Value["details"]))
+	_, hasParent := details.Details.Value["parent"]
+	require.False(t, hasParent, "parent must stay off when FullErrorInResponse is false")
+}
+
+func TestDomainErrorDetails_fullErrorInResponseComposesWithProducerDetails(t *testing.T) {
+	// Mutates package-global FullErrorInResponse; must not run parallel with
+	// other tests that assume the default (false).
+	prev := FullErrorInResponse.Load()
+	FullErrorInResponse.Store(true)
+	t.Cleanup(func() { FullErrorInResponse.Store(prev) })
+
+	details := domainErrorDetails(
+		domain.ErrRequestInvalid().
+			WithMessage(`invalid value for field "age"`).
+			WithDetails(domain.RequestInvalidFieldDetails{Field: "age"}).
+			WithParent(errors.New("json: cannot unmarshal number")),
+	)
+
+	require.True(t, details.Details.Set)
+	require.JSONEq(t, `{"field":"age"}`, string(details.Details.Value["details"]))
+	require.Contains(t, string(details.Details.Value["parent"]), "json: cannot unmarshal number")
 }

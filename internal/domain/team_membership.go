@@ -14,6 +14,11 @@ const (
 
 func (s MembershipStatus) String() string { return string(s) }
 
+// IsAuthzActive reports whether the roster status should project an authz membership edge.
+func (s MembershipStatus) IsAuthzActive() bool {
+	return s == MembershipStatusActive
+}
+
 // RosterMembershipStatuses are the participation states that keep a user on a
 // team's roster. [MembershipStatusRemoved] is deliberately absent: a removed
 // membership is history, not roster, and roster reads must not serve it.

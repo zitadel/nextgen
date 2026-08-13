@@ -4,30 +4,30 @@ package integration_test
 
 import (
 	"encoding/json"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// TestManagementAuthz exercises the shared project-access guard across the
-// management API (the operator plane of ADR 036), generalizing the access
-// model settled for branding in ADR 037:
+// TestManagementAuthz exercises the authz resolver gate across the
+// management API (the operator plane of ADR 036):
 //
-//   - Project binding with anti-oracle responses: a second, real project's
+//   - Project foothold with anti-oracle responses: a second, real project's
 //     secret must not operate on the first project's resources, and the
 //     answers must not reveal that the foreign project exists (identical to
-//     the nonexistent-project responses).
+//     the nonexistent-project / no-foothold responses → 404 shapes).
 //   - Plane separation: the preview secret ships to visitors' browsers by
 //     design (project.read only), so the management API rejects it entirely
 //     with 403 permission_denied — including on its own project.
-//
-// The guard rejects before any service or storage call, so foreign probes use
-// fabricated resource ids; the schema subtests additionally probe a real
-// resource id to pin that real data does not leak either.
+//   - CreateProject seeds an sk_proj grant so the returned project secret
+//     can set up the project through resolver.Check.
 func TestManagementAuthz(t *testing.T) {
 	t.Parallel()
 
@@ -51,12 +51,22 @@ func TestManagementAuthz(t *testing.T) {
 	t.Run("schemas", func(t *testing.T) {
 		t.Parallel()
 
-		// Real data in the victim project: the foreign read of its real id
-		// must be indistinguishable from a nonexistent one.
-		realSchemaID := harness.CreateUserSchema(t, victim, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
+		// Omit $id so CreateSchema mints a slash-free sch_* id. URL-shaped
+		// $id values become the schema id (Create returns schema.URL), and
+		// /schemas/{id} is an ogen leaf path param that forbids embedded '/'
+		// in the routed segment — unrelated to RSI (composite PK scopes URLs per project).
+		schemaJSON := []byte(harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
+		var schemaObj map[string]any
+		require.NoError(t, json.Unmarshal(schemaJSON, &schemaObj))
+		delete(schemaObj, "$id")
+		schemaJSON, err := json.Marshal(schemaObj)
+		require.NoError(t, err)
+
+		realSchemaID := harness.CreateUserSchema(t, victim, string(schemaJSON))
+		require.True(t, strings.HasPrefix(realSchemaID, "sch_"), "want managed sch_* id, got %q", realSchemaID)
 
 		apiSchema := api.UserSchema{}
-		require.NoError(t, apiSchema.UnmarshalJSON([]byte(harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)))
+		require.NoError(t, apiSchema.UnmarshalJSON(schemaJSON))
 		createReq := api.CreateSchemaReq{Type: api.UserSchemaCreateSchemaReq, UserSchema: apiSchema}
 
 		t.Run("bound to the token's project", func(t *testing.T) {
@@ -66,7 +76,7 @@ func TestManagementAuthz(t *testing.T) {
 			require.NoError(t, err)
 			assertAuthzError(t, resp, "sch.invalid_request")
 
-			getResp, err := foreign.GetSchemaById(t.Context(), api.GetSchemaByIdParams{ID: realSchemaID, ProjectID: victimID})
+			getResp, err := foreign.GetSchemaById(t.Context(), api.GetSchemaByIdParams{ID: realSchemaID})
 			require.NoError(t, err)
 			assertAuthzError(t, getResp, "sch.not_found")
 
@@ -82,7 +92,7 @@ func TestManagementAuthz(t *testing.T) {
 			require.NoError(t, err)
 			assertAuthzStatus(t, resp, 403, "sch.permission_denied")
 
-			getResp, err := preview.GetSchemaById(t.Context(), api.GetSchemaByIdParams{ID: realSchemaID, ProjectID: victimID})
+			getResp, err := preview.GetSchemaById(t.Context(), api.GetSchemaByIdParams{ID: realSchemaID})
 			require.NoError(t, err)
 			assertAuthzStatus(t, getResp, 403, "sch.permission_denied")
 		})
@@ -100,7 +110,7 @@ func TestManagementAuthz(t *testing.T) {
 			require.NoError(t, err)
 			assertAuthzError(t, resp, "flowdef.invalid")
 
-			getResp, err := foreign.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{ProjectID: victimID, ID: "flowdef_irrelevant"})
+			getResp, err := foreign.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{ID: "flowdef_irrelevant"})
 			require.NoError(t, err)
 			assertAuthzError(t, getResp, "flowdef.not_found")
 
@@ -108,13 +118,14 @@ func TestManagementAuthz(t *testing.T) {
 			require.NoError(t, err)
 			assertAuthzStatus(t, listResp, 404, "flowdef.not_found")
 
-			updResp, err := foreign.UpdateFlowDefinition(t.Context(), newUpdateFlowDefinitionRequest(fixture), api.UpdateFlowDefinitionParams{ProjectID: victimID, ID: "flowdef_irrelevant"})
+			updResp, err := foreign.UpdateFlowDefinition(t.Context(), newUpdateFlowDefinitionRequest(fixture), api.UpdateFlowDefinitionParams{ID: "flowdef_irrelevant"})
 			require.NoError(t, err)
-			assertAuthzError(t, updResp, "flowdef.invalid")
+			assertAuthzError(t, updResp, "flowdef.not_found")
 
-			delResp, err := foreign.DeleteFlowDefinition(t.Context(), api.DeleteFlowDefinitionParams{ProjectID: victimID, ID: "flowdef_irrelevant"})
+			// Fabricated ids miss RSI → idempotent delete 204 (same as never existed).
+			delResp, err := foreign.DeleteFlowDefinition(t.Context(), api.DeleteFlowDefinitionParams{ID: "flowdef_irrelevant"})
 			require.NoError(t, err)
-			assertAuthzError(t, delResp, "flowdef.not_found")
+			assert.IsType(t, &api.DeleteFlowDefinitionNoContent{}, delResp, helpers.MustMarshal(t, delResp))
 		})
 
 		t.Run("preview secret rejected", func(t *testing.T) {
@@ -123,10 +134,6 @@ func TestManagementAuthz(t *testing.T) {
 			resp, err := preview.CreateFlowDefinition(t.Context(), newCreateFlowDefinitionRequest(victimID, fixture))
 			require.NoError(t, err)
 			assertAuthzStatus(t, resp, 403, "flowdef.permission_denied")
-
-			delResp, err := preview.DeleteFlowDefinition(t.Context(), api.DeleteFlowDefinitionParams{ProjectID: victimID, ID: "flowdef_irrelevant"})
-			require.NoError(t, err)
-			assertAuthzStatus(t, delResp, 403, "flowdef.permission_denied")
 
 			listResp, err := preview.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{ProjectID: victimID})
 			require.NoError(t, err)
@@ -154,17 +161,17 @@ func TestManagementAuthz(t *testing.T) {
 			require.NoError(t, err)
 			assertAuthzError(t, resp, "user.invalid")
 
-			getResp, err := foreign.GetUserByID(t.Context(), api.GetUserByIDParams{ProjectID: victimID, UserID: "user_irrelevant"})
+			getResp, err := foreign.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: "user_irrelevant"})
 			require.NoError(t, err)
 			assertAuthzError(t, getResp, "user.not_found")
 
-			pwResp, err := foreign.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "hijacked-password"}, api.SetUserPasswordParams{ProjectID: victimID, UserID: "user_irrelevant"})
+			pwResp, err := foreign.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "hijacked-password"}, api.SetUserPasswordParams{UserID: "user_irrelevant"})
 			require.NoError(t, err)
-			assertAuthzError(t, pwResp, "user.invalid")
+			assertAuthzError(t, pwResp, "user.not_found")
 
-			delResp, err := foreign.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{ProjectID: victimID, UserID: "user_irrelevant"})
+			delResp, err := foreign.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: "user_irrelevant"})
 			require.NoError(t, err)
-			assertAuthzError(t, delResp, "user.not_found")
+			assert.IsType(t, &api.DeleteUserByIDNoContent{}, delResp, helpers.MustMarshal(t, delResp))
 		})
 
 		t.Run("a foreign delete of a real user leaves it standing", func(t *testing.T) {
@@ -181,7 +188,7 @@ func TestManagementAuthz(t *testing.T) {
 			require.NoError(t, err)
 			victimUserID := api.UserID(victimUser["id"].(string))
 
-			delResp, err := foreign.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{ProjectID: victimID, UserID: victimUserID})
+			delResp, err := foreign.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: victimUserID})
 			require.NoError(t, err)
 			assertAuthzError(t, delResp, "user.not_found")
 
@@ -189,13 +196,13 @@ func TestManagementAuthz(t *testing.T) {
 			require.NoError(t, err)
 			harness.SetProjectSecretOnApiClient(t, ownClient, victim)
 
-			getResp, err := ownClient.GetUserByID(t.Context(), api.GetUserByIDParams{ProjectID: victimID, UserID: victimUserID})
+			getResp, err := ownClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: victimUserID})
 			require.NoError(t, err)
 			assert.IsType(t, &api.User{}, getResp, helpers.MustMarshal(t, getResp))
 
 			// The owner's secret does reach the delete: project.write implies
 			// user.delete, so the rejection above was the binding, not the op.
-			ownDelResp, err := ownClient.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{ProjectID: victimID, UserID: victimUserID})
+			ownDelResp, err := ownClient.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: victimUserID})
 			require.NoError(t, err)
 			assert.IsType(t, &api.DeleteUserByIDNoContent{}, ownDelResp, helpers.MustMarshal(t, ownDelResp))
 		})
@@ -203,21 +210,41 @@ func TestManagementAuthz(t *testing.T) {
 		t.Run("preview secret rejected", func(t *testing.T) {
 			t.Parallel()
 
-			// The preview secret must not set passwords…
-			pwResp, err := preview.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "hijacked-password"}, api.SetUserPasswordParams{ProjectID: victimID, UserID: "user_irrelevant"})
+			// Preview ceiling (403) on list; fabricated by-id misses RSI before
+			// the ceiling (write → not_found; delete without project.write → not_found, not 204).
+			pwResp, err := preview.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "hijacked-password"}, api.SetUserPasswordParams{UserID: "user_irrelevant"})
 			require.NoError(t, err)
-			assertAuthzStatus(t, pwResp, 403, "user.permission_denied")
+			assertAuthzError(t, pwResp, "user.not_found")
 
-			// …nor delete users…
-			delResp, err := preview.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{ProjectID: victimID, UserID: "user_irrelevant"})
+			delResp, err := preview.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: "user_irrelevant"})
 			require.NoError(t, err)
-			assertAuthzStatus(t, delResp, 403, "user.permission_denied")
+			assertAuthzError(t, delResp, "user.not_found")
 
-			// …and must not enumerate the project's users, even though the
-			// operation is implicitly scoped to its own project.
 			listResp, err := preview.ListUsers(t.Context(), api.ListUsersParams{})
 			require.NoError(t, err)
 			assertAuthzStatus(t, listResp, 403, "user.permission_denied")
+		})
+
+		t.Run("preview secret cannot delete a real user", func(t *testing.T) {
+			t.Parallel()
+
+			victimUser, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+				ProjectID: victim.ID,
+				User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "authz-preview-delete@example.com"),
+			})
+			require.NoError(t, err)
+			victimUserID := api.UserID(victimUser["id"].(string))
+
+			delResp, err := preview.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: victimUserID})
+			require.NoError(t, err)
+			assertAuthzError(t, delResp, "user.permission_denied")
+
+			ownClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+			require.NoError(t, err)
+			harness.SetProjectSecretOnApiClient(t, ownClient, victim)
+			getResp, err := ownClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: victimUserID})
+			require.NoError(t, err)
+			assert.IsType(t, &api.User{}, getResp, helpers.MustMarshal(t, getResp))
 		})
 	})
 
@@ -231,13 +258,13 @@ func TestManagementAuthz(t *testing.T) {
 			require.NoError(t, err)
 			assertAuthzError(t, resp, "team.project_not_found")
 
-			getResp, err := foreign.GetTeam(t.Context(), api.GetTeamParams{ProjectID: victimID, TeamID: "team_irrelevant"})
+			getResp, err := foreign.GetTeam(t.Context(), api.GetTeamParams{TeamID: "team_irrelevant"})
 			require.NoError(t, err)
 			assertAuthzError(t, getResp, "team.team_not_found")
 
-			updateResp, err := foreign.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, api.UpdateTeamParams{ProjectID: victimID, TeamID: "team_irrelevant"})
+			updateResp, err := foreign.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, api.UpdateTeamParams{TeamID: "team_irrelevant"})
 			require.NoError(t, err)
-			assertAuthzError(t, updateResp, "team.project_not_found")
+			assertAuthzError(t, updateResp, "team.team_not_found")
 
 			// A read of a foreign project answers "nothing there", so a
 			// listing cannot be used to prove the project exists.
@@ -254,10 +281,10 @@ func TestManagementAuthz(t *testing.T) {
 			require.IsType(t, &api.CreateTeamForbidden{}, resp, helpers.MustMarshal(t, resp))
 			assertAuthzError(t, resp, "team.permission_denied")
 
-			updateResp, err := preview.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, api.UpdateTeamParams{ProjectID: victimID, TeamID: "team_irrelevant"})
+			updateResp, err := preview.UpdateTeam(t.Context(), &api.UpdateTeamRequest{Name: api.NewOptString(helpers.TeamName())}, api.UpdateTeamParams{TeamID: "team_irrelevant"})
 			require.NoError(t, err)
-			require.IsType(t, &api.UpdateTeamForbidden{}, updateResp, helpers.MustMarshal(t, updateResp))
-			assertAuthzError(t, updateResp, "team.permission_denied")
+			// Fabricated path id misses RSI before the preview ceiling runs.
+			assertAuthzError(t, updateResp, "team.team_not_found")
 
 			queryResp, err := preview.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: victimID})
 			require.NoError(t, err)
@@ -370,21 +397,102 @@ func TestManagementAuthz(t *testing.T) {
 	})
 }
 
-// authzErrorParts extracts (status, code) from any error-shaped response the
-// generated client returns: declared statuses decode into typed
-// ErrorDetails-shaped values (status not carried, reported as 0), undeclared
-// ones into *api.ErrorDetailsStatusCode.
+// TestListAuthzTeamScopedOnlyForbidden documents that today's HTTP gate
+// requireProjectAccess Checks project-level relations only: a principal whose
+// only grant is team-scoped project.viewer gets 403 before withAuthzListFilter
+// can narrow rows (#834).
+func TestListAuthzTeamScopedOnlyForbidden(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
+	})
+	require.NoError(t, err)
+
+	stmts := harness.EnsureServiceDB(t).Statements()
+	asgns, err := stmts.ListAuthzAssignments(t.Context(), project.ID, domain.AuthzPrincipalTypeSKProj, project.ID, false)
+	require.NoError(t, err)
+	require.NotEmpty(t, asgns, "CreateProject seeds sk_proj → project.viewer")
+	for _, a := range asgns {
+		require.NoError(t, stmts.RevokeAuthzAssignment(t.Context(), project.ID, a.ID))
+	}
+
+	scoped := &domain.AuthzAssignment{
+		ProjectID:     project.ID,
+		CatalogID:     domain.SystemCatalogID,
+		PrincipalType: domain.AuthzPrincipalTypeSKProj,
+		PrincipalID:   project.ID,
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+	scoped.ApplyScope(domain.NewTeamAssignmentScope(team.ID))
+	require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), scoped))
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	listResp, err := client.ListSchemas(t.Context(), api.ListSchemasParams{ProjectID: api.ProjectID(project.ID)})
+	require.NoError(t, err)
+	assertAuthzStatus(t, listResp, 403, "sch.permission_denied")
+
+	teamsResp, err := client.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: api.ProjectID(project.ID)})
+	require.NoError(t, err)
+	assertAuthzError(t, teamsResp, "team.permission_denied")
+}
+
+// errorResponseParts pulls the status and error body out of any error-shaped
+// response the generated client returns. Three shapes exist:
+//
+//   - an operation whose contract declares an operation-specific default
+//     response decodes into a <Operation>ErrorResponseStatusCode wrapper, which
+//     carries the status beside a discriminated union of that operation's
+//     errors;
+//   - an operation still on the shared default decodes into the generic
+//     *api.ErrorDetailsStatusCode;
+//   - a declared status decodes into a bare ErrorDetails-shaped value that does
+//     not carry its status at all, reported here as 0.
+//
+// The wrapper is matched structurally rather than by listing its types, so
+// wiring another operation to an operation-specific response needs no case
+// added here.
+func errorResponseParts(t *testing.T, resp any) (status int, code, message string, ok bool) {
+	t.Helper()
+
+	if e, isGeneric := resp.(*api.ErrorDetailsStatusCode); isGeneric {
+		return e.StatusCode, string(e.Response.Code), e.Response.Message, true
+	}
+
+	body := resp
+	if v := reflect.Indirect(reflect.ValueOf(resp)); v.Kind() == reflect.Struct {
+		statusField := v.FieldByName("StatusCode")
+		responseField := v.FieldByName("Response")
+		if statusField.IsValid() && statusField.Kind() == reflect.Int && responseField.IsValid() {
+			status = int(statusField.Int())
+			body = responseField.Interface()
+		}
+	}
+
+	var parsed struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
+	if json.Unmarshal([]byte(helpers.MustMarshal(t, body)), &parsed) != nil || parsed.Code == "" {
+		return 0, "", "", false
+	}
+	return status, parsed.Code, parsed.Message, true
+}
+
+// authzErrorParts extracts (status, code) from any error-shaped response.
 func authzErrorParts(t *testing.T, resp any) (status int, code string) {
 	t.Helper()
-	if e, ok := resp.(*api.ErrorDetailsStatusCode); ok {
-		return e.StatusCode, string(e.Response.Code)
-	}
-	var body struct {
-		Code string `json:"code"`
-	}
-	require.NoError(t, json.Unmarshal([]byte(helpers.MustMarshal(t, resp)), &body), "response is not error-shaped: %T", resp)
-	require.NotEmpty(t, body.Code, "response is not error-shaped: %T: %s", resp, helpers.MustMarshal(t, resp))
-	return 0, body.Code
+	status, code, _, ok := errorResponseParts(t, resp)
+	require.True(t, ok, "response is not error-shaped: %T: %s", resp, helpers.MustMarshal(t, resp))
+	return status, code
 }
 
 // assertAuthzError asserts the response is the error with the given code,

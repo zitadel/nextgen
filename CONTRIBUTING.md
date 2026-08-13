@@ -261,8 +261,7 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 - Playwright Chromium install for `@zitadel/components`.
 - `moon ci :lint :typecheck :build :test :test-browser :check-adrs`.
 - `moon run server:test`, then `moon run server:test-postgres`,
-  `moon run server:test-spanner` (Spanner emulator testcontainer, or a
-  real instance when `SPANNER_TEST_INSTANCE` is set), and
+  `moon run server:test-spanner` (Spanner emulator testcontainer), and
   `moon run server:test-sqlite`.
 - `moon run release:snapshot -- --skip-container` — a non-publishing release
   snapshot.
@@ -276,24 +275,32 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 Within full mode, the steps after the `moon ci` graph are additionally gated
 by moon's affected task selection (`moon query tasks --affected --downstream
 deep`, computed in `scripts/ci-mode.mjs`): a lane is skipped when the diff
-provably cannot reach its tasks — a docs-only PR runs almost nothing, a
-frontend-only PR skips the Go suites. The gates fail open: known repo-wide
+provably cannot reach its
+tasks — a docs-only PR runs almost nothing, a frontend-only PR skips the Go
+suites, a console-only PR runs the e2e suites but no journeys. The journey
+variants gate per surface (the map lives as task-space constants in
+`scripts/ci-mode.mjs`): the fresh-app journey answers to every SDK plus the
+shared login surface, the passkey-preset and test-kit journeys to the shared
+surface only, and the fresh-app framework matrix collapses to a single
+framework unless an SDK, the CLI, or the journey project itself moved. The
+snapshot runs iff any journey does — the tarball handoff between them is a
+filesystem contract moon cannot see. The gates fail open: known repo-wide
 files no moon task claims (workflow definitions, `scripts/`, moon config,
 root manifests and compiler/release inputs such as `tsconfig.base.json`), an
-empty diff, or a failed query all force the complete run — and when the
-query returns an empty affected set, the run is only skipped if every
-changed file is on a narrow explicitly-inert allowlist (`docs/`, root agent
-notes), because unclaimed files are not assumed inert. The journeys and the
-snapshot share one gate because the tarball handoff between them is a
-filesystem contract moon cannot see.
+empty diff, or a failed query all force the
+complete run — and when the query returns an empty affected set, the run is
+only skipped if every changed file is on a narrow explicitly-inert allowlist
+(`docs/`, root agent notes), because unclaimed files are not assumed inert.
 
 **Version-only mode** (Changesets version PRs) runs `release:version`,
 `release:pack`, and tarball verification instead.
 
 CI consumes the workflow's packed npm tarballs, not public Zitadel packages.
 Changesets PR comments are informational release-intent feedback, not a
-blocking gate. Workflow artifacts (the release snapshot always, journey
-diagnostics on failure) expire after 7 days. The demo end-to-end suites and
+blocking gate. Workflow artifacts (the release snapshot whenever a journey
+lane runs — a run whose journeys are gated off, such as a docs-only or
+console-only PR, uploads no snapshot — and journey diagnostics on failure)
+expire after 7 days. The demo end-to-end suites and
 the Docker-fallback journey do not run in CI; they stay opt-in local checks
 (see below).
 
@@ -333,20 +340,54 @@ Docker. Point them at a throwaway database — the suites run migrations that
 create the `zitadel_nextgen` schema.
 
 The Spanner emulator only supports one transaction at a time, so concurrent
-integration tests are flaky against it. `moon run server:test-spanner`
-therefore passes `-parallel 1 -p 1` whenever `ZITADEL_TEST_SPANNER_INSTANCE`
-is unset (the default for local/OSS contributors, which starts the emulator
-via testcontainers). To run against a real, long-lived Spanner test instance
-instead, set `ZITADEL_TEST_SPANNER_INSTANCE` to an instance path
-(`projects/<project>/instances/<instance>`). The suites then provision a
-uniquely named database on that instance before the run and drop it
-afterwards, and the Moon task keeps normal go test parallelism.
-Authentication uses Application Default Credentials — locally run
-`gcloud auth application-default login`. CI authenticates via Workload
-Identity Federation when `SPANNER_TEST_INSTANCE` is set, and labels the job
-step as emulator vs test instance accordingly. Precedence when multiple are
-set: `ZITADEL_TEST_SPANNER_INSTANCE` > `ZITADEL_TEST_SPANNER_URL` > emulator
-testcontainer.
+integration tests make it abort read-write transactions aggressively. That is
+deliberate and useful: Spanner aborts under concurrency in production too, and
+the emulator surfaces a missing retry immediately. The suite therefore runs at
+full parallelism against the emulator, and `TestTransactionContention` asserts
+that concurrent writers to one row all commit.
+
+If you see a raw `ABORTED` ("aborted due to another transaction getting
+priority"), do not serialize the tests and do not move them to a real instance —
+both hide the bug. It means something on that code path stripped the gRPC status
+off the error, so Spanner's `ReadWriteTransaction` stopped recognising it as
+retryable. See the error-wrapping rules in
+[internal/storage/AGENTS.md](internal/storage/AGENTS.md) and #788.
+
+A stalled transaction is a different failure and has a different fix. Read-write
+transactions run under a retry budget, and because the emulator serializes
+process-wide and hands priority to the newest transaction, a transaction
+spanning several statements can be starved by any concurrent write regardless of
+which rows it touches. So the emulator gets a much looser budget (2 minutes)
+than production (30 seconds). Tell the two apart by timing:
+
+- **Fails immediately** with a raw `ABORTED`: the status was stripped, see
+  above. Fix the wrapping.
+- **Stalls, then fails** with `unavailable` / HTTP 503 and a
+  `spanner transaction gave up retrying` warning naming the elapsed time: it was
+  starved. Do not raise the budget; shorten the transaction, or reduce how many
+  statements it holds open.
+
+Before that budget existed the second case surfaced as an opaque 500 with no log
+line, and had to be diagnosed from a test's wall-clock duration (#794).
+
+The emulator container is pinned to `linux/amd64`. The arm64 build returns
+commit timestamps at a different resolution, which fails seven `created_at`
+assertions on Apple Silicon while passing in CI. Pinning costs a few seconds
+under Rosetta and is a no-op on amd64, so the suite behaves the same
+everywhere. Do not unpin it to make local runs faster.
+
+To run against a Spanner you manage instead of the emulator testcontainer, set
+`ZITADEL_TEST_SPANNER_URL` to its DSN.
+
+`ZITADEL_TEST_SPANNER_INSTANCE` (an instance path,
+`projects/<project>/instances/<instance>`) still works and still provisions a
+uniquely named database per run, dropping it afterwards, authenticating via
+Application Default Credentials. Nothing sets it: CI is emulator-only on
+purpose, and this path is kept only so the real instance can be brought back
+quickly if the emulator turns out not to hold. Re-wiring is CI-side (restore the
+Workload Identity Federation auth step and set the variable); the Go side needs
+no change. Do not reach for it to make a failing test pass — that hides exactly
+the aborts these suites exist to catch. Removal is tracked in #793.
 
 ### Demo end-to-end suites
 

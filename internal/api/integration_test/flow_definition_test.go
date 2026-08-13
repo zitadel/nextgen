@@ -285,8 +285,7 @@ func TestUpdateFlowDefinitionUnauthenticated(t *testing.T) {
 			Steps:      validSteps(),
 		},
 	}, api.UpdateFlowDefinitionParams{
-		ID:        "flowDef_1234",
-		ProjectID: "proj_1234",
+		ID: "flowDef_1234",
 	})
 	require.NoError(t, err)
 	assertFlowDefinitionResponse(t, &api.ErrorDetailsStatusCode{
@@ -352,7 +351,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				}
 				return def
 			}()),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginFlowDef.ID},
+			params: api.UpdateFlowDefinitionParams{ID: loginFlowDef.ID},
 			wantResp: &api.FlowDefinitionDetailResponse{
 				ID:        loginFlowDef.ID,
 				ProjectID: project.ID,
@@ -379,19 +378,19 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				def.Status = api.FlowDefinitionStatusDraft // deactivate while removing recovery
 				return def
 			}()),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginRegisterFlowDef.ID},
-			wantResp: &api.ErrorDetailsStatusCode{
+			params: api.UpdateFlowDefinitionParams{ID: loginRegisterFlowDef.ID},
+			wantResp: &api.UpdateFlowDefinitionErrorResponseStatusCode{
 				StatusCode: http.StatusConflict,
-				Response: api.ErrorDetails{
+				Response: api.NewFlowdefUpdateConflictUpdateFlowDefinitionErrorResponse(api.FlowdefUpdateConflict{
 					Code:    "flowdef.update_conflict",
 					Message: "flow definition: update conflict",
-					Details: api.OptErrorDetailsDetails{
-						Value: api.ErrorDetailsDetails{
+					Details: api.OptFlowdefUpdateConflictDetails{
+						Value: api.FlowdefUpdateConflictDetails{
 							"details": jx.Raw(`"cannot update: no other active flow definition found with purpose \"recovery\""`),
 						},
 						Set: true,
 					},
-				},
+				}),
 			},
 		},
 		{
@@ -404,19 +403,19 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				def.Status = api.FlowDefinitionStatusActive
 				return def
 			}()),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginRegisterFlowDef.ID},
-			wantResp: &api.ErrorDetailsStatusCode{
+			params: api.UpdateFlowDefinitionParams{ID: loginRegisterFlowDef.ID},
+			wantResp: &api.UpdateFlowDefinitionErrorResponseStatusCode{
 				StatusCode: http.StatusConflict,
-				Response: api.ErrorDetails{
+				Response: api.NewFlowdefUpdateConflictUpdateFlowDefinitionErrorResponse(api.FlowdefUpdateConflict{
 					Code:    "flowdef.update_conflict",
 					Message: "flow definition: update conflict",
-					Details: api.OptErrorDetailsDetails{
-						Value: api.ErrorDetailsDetails{
+					Details: api.OptFlowdefUpdateConflictDetails{
+						Value: api.FlowdefUpdateConflictDetails{
 							"details": jx.Raw(`"cannot update: no other active flow definition found with purpose \"recovery\""`),
 						},
 						Set: true,
 					},
-				},
+				}),
 			},
 		},
 		{
@@ -429,7 +428,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				def.Status = api.FlowDefinitionStatusActive
 				return def
 			}()),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginRegisterFlowDef.ID},
+			params: api.UpdateFlowDefinitionParams{ID: loginRegisterFlowDef.ID},
 			wantResp: &api.FlowDefinitionDetailResponse{
 				ID:        loginRegisterFlowDef.ID,
 				ProjectID: project.ID,
@@ -452,7 +451,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		{
 			name:   "flow definition not found",
 			req:    newUpdateFlowDefinitionRequest(newFlowDefinitionFixture("updated-flow", userSchemaURI)),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: "flowdef_missing"},
+			params: api.UpdateFlowDefinitionParams{ID: "flowdef_missing"},
 			wantResp: &api.UpdateFlowDefinitionNotFound{
 				Code:    "flowdef.not_found",
 				Message: "flow definition: not found",
@@ -461,7 +460,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		{
 			name:   "unknown user schema",
 			req:    newUpdateFlowDefinitionRequest(newFlowDefinitionFixture("updated-flow", unknownUserSchemaURI)),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginFlowDef.ID},
+			params: api.UpdateFlowDefinitionParams{ID: loginFlowDef.ID},
 			wantResp: &api.UpdateFlowDefinitionBadRequest{
 				Code:    "flowdef.invalid",
 				Message: "flow definition: invalid",
@@ -480,7 +479,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				def.Purposes = map[string]string{"login": "collect_identifier"}
 				return def
 			}()),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginFlowDef.ID},
+			params: api.UpdateFlowDefinitionParams{ID: loginFlowDef.ID},
 			wantResp: &api.UpdateFlowDefinitionBadRequest{
 				Code:    "flowdef.invalid",
 				Message: "flow definition: invalid",
@@ -534,6 +533,22 @@ func newFlowDefinitionFixture(name string, userSchemaURI string) api.FlowDefinit
 
 func assertFlowDefinitionResponse(t *testing.T, want, got any) {
 	t.Helper()
+
+	// An expectation written as the generic *api.ErrorDetailsStatusCode says
+	// "this status with this code" and nothing about which Go type carries it.
+	// Operations wired to an operation-specific default response answer with
+	// their own wrapper, so compare those structurally instead of by type —
+	// otherwise every such expectation would have to be restated as a sum-type
+	// literal to assert the same two fields.
+	if expected, isGeneric := want.(*api.ErrorDetailsStatusCode); isGeneric {
+		if status, code, message, ok := errorResponseParts(t, got); ok {
+			assert.Equal(t, expected.StatusCode, status, helpers.MustMarshal(t, got))
+			assert.Equal(t, string(expected.Response.Code), code, helpers.MustMarshal(t, got))
+			assert.Equal(t, expected.Response.Message, message, helpers.MustMarshal(t, got))
+			return
+		}
+	}
+
 	if !assert.IsType(t, want, got) {
 		return
 	}
@@ -579,6 +594,31 @@ func assertFlowDefinitionResponse(t *testing.T, want, got any) {
 		assert.Equal(t, expected.StatusCode, actual.StatusCode)
 		assert.Equal(t, expected.Response.Code, actual.Response.Code)
 		assert.Equal(t, expected.Response.Message, actual.Response.Message)
+	// The operation-specific error responses are discriminated unions, so the
+	// variant is the assertion: matching on Type proves the server sent the
+	// code this case expects, and the payload compare covers message and
+	// details.
+	case *api.UpdateFlowDefinitionErrorResponseStatusCode:
+		require.IsType(t, &api.UpdateFlowDefinitionErrorResponseStatusCode{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.UpdateFlowDefinitionErrorResponseStatusCode)
+
+		assert.Equal(t, expected.StatusCode, actual.StatusCode)
+		assert.Equal(t, expected.Response.Type, actual.Response.Type)
+		assert.Equal(t, expected.Response, actual.Response)
+	case *api.GetFlowDefinitionErrorResponseStatusCode:
+		require.IsType(t, &api.GetFlowDefinitionErrorResponseStatusCode{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.GetFlowDefinitionErrorResponseStatusCode)
+
+		assert.Equal(t, expected.StatusCode, actual.StatusCode)
+		assert.Equal(t, expected.Response.Type, actual.Response.Type)
+		assert.Equal(t, expected.Response, actual.Response)
+	case *api.DeleteFlowDefinitionErrorResponseStatusCode:
+		require.IsType(t, &api.DeleteFlowDefinitionErrorResponseStatusCode{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.DeleteFlowDefinitionErrorResponseStatusCode)
+
+		assert.Equal(t, expected.StatusCode, actual.StatusCode)
+		assert.Equal(t, expected.Response.Type, actual.Response.Type)
+		assert.Equal(t, expected.Response, actual.Response)
 	default:
 		assert.Fail(t, "unexpected response type", helpers.MustMarshal(t, got))
 	}
@@ -611,8 +651,7 @@ func TestGetFlowDefinitionUnauthenticated(t *testing.T) {
 	require.NoError(t, err)
 
 	getResp, err := client.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{
-		ID:        "flowDef_1234",
-		ProjectID: "proj_1234",
+		ID: "flowDef_1234",
 	})
 
 	require.NoError(t, err)
@@ -666,23 +705,21 @@ func TestGetFlowDefinition(t *testing.T) {
 		{
 			name: "get flow definition by id succeeds",
 			req: api.GetFlowDefinitionParams{
-				ProjectID: api.ProjectID(project.ID),
-				ID:        flowDef.ID,
+				ID: flowDef.ID,
 			},
 			wantResp: flowDef,
 		},
 		{
 			name: "non-existing flow definition",
 			req: api.GetFlowDefinitionParams{
-				ProjectID: api.ProjectID(project.ID),
-				ID:        "non-existing-id",
+				ID: "non-existing-id",
 			},
-			wantResp: &api.ErrorDetailsStatusCode{
+			wantResp: &api.GetFlowDefinitionErrorResponseStatusCode{
 				StatusCode: http.StatusNotFound,
-				Response: api.ErrorDetails{
+				Response: api.NewFlowdefNotFoundGetFlowDefinitionErrorResponse(api.FlowdefNotFound{
 					Code:    "flowdef.not_found",
 					Message: "flow definition: not found",
-				},
+				}),
 			},
 		},
 	}
@@ -975,8 +1012,7 @@ func TestDeleteFlowDefinitionUnauthenticated(t *testing.T) {
 	require.NoError(t, err)
 
 	resp, err := client.DeleteFlowDefinition(t.Context(), api.DeleteFlowDefinitionParams{
-		ID:        "flowDef_1234",
-		ProjectID: "proj_1234",
+		ID: "flowDef_1234",
 	})
 
 	require.NoError(t, err)
@@ -1034,35 +1070,17 @@ func TestDeleteFlowDefinition(t *testing.T) {
 		{
 			name: "delete flow definition succeeds",
 			req: api.DeleteFlowDefinitionParams{
-				ID:        flowDef.ID,
-				ProjectID: api.ProjectID(project.ID),
+				ID: flowDef.ID,
 			},
 			wantResp: &api.DeleteFlowDefinitionNoContent{},
 		},
 		{
+			// Flat-by-id: missing RSI is indistinguishable from never existed → 204.
 			name: "delete non-existing flow definition",
 			req: api.DeleteFlowDefinitionParams{
-				ID:        "non-existing-id",
-				ProjectID: api.ProjectID(project.ID),
+				ID: "non-existing-id",
 			},
 			wantResp: &api.DeleteFlowDefinitionNoContent{},
-		},
-		{
-			// A project the token is not bound to — existing or not — answers
-			// like a nonexistent flow definition (anti-oracle), instead of the
-			// blind 204 the unguarded handler used to return.
-			name: "invalid project id",
-			req: api.DeleteFlowDefinitionParams{
-				ID:        "non-existing-id",
-				ProjectID: "invalid-project-id",
-			},
-			wantResp: &api.ErrorDetailsStatusCode{
-				StatusCode: http.StatusNotFound,
-				Response: api.ErrorDetails{
-					Code:    "flowdef.not_found",
-					Message: "flow definition: not found",
-				},
-			},
 		},
 	}
 	for _, tt := range tests {
@@ -1075,8 +1093,7 @@ func TestDeleteFlowDefinition(t *testing.T) {
 
 			// if the flow definition is deleted, the get request should return a not found error
 			getResp, err := client.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{
-				ID:        tt.req.ID,
-				ProjectID: tt.req.ProjectID,
+				ID: tt.req.ID,
 			})
 
 			assert.NoError(t, err)

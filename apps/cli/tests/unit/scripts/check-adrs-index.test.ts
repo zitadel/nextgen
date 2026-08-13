@@ -14,6 +14,8 @@ type CheckAdrsIndexModule = {
     status: string;
     summary: string;
   }>;
+  parseAdrStatus: (content: string) => string | null;
+  normalizeAdrStatus: (raw: unknown) => string | null;
   validateAdrIndex: (options: {
     files: Array<{ id: string; number: number; filename: string }>;
     readmeRows: Array<{
@@ -25,6 +27,7 @@ type CheckAdrsIndexModule = {
       summary: string;
     }>;
     headings?: Map<string, { id: string; title: string }>;
+    statuses?: Map<string, string>;
   }) => { ok: boolean; errors: Array<{ code: string; message: string }>; count: number };
 };
 
@@ -61,6 +64,14 @@ function sampleHeadings() {
   ]);
 }
 
+function sampleStatuses() {
+  return new Map([
+    ["001-first.md", "Proposed"],
+    ["002-second.md", "Proposed"],
+    ["003-third.md", "Proposed"],
+  ]);
+}
+
 describe("check-adrs-index", () => {
   it("parses valid ADR filenames", async () => {
     const { parseAdrFilename } = await loadModule();
@@ -83,6 +94,7 @@ describe("check-adrs-index", () => {
       files: sampleFiles(),
       readmeRows: parseReadmeIndex(sampleReadme),
       headings: sampleHeadings(),
+      statuses: sampleStatuses(),
     });
 
     expect(report.ok).toBe(true);
@@ -135,6 +147,7 @@ describe("check-adrs-index", () => {
 | [003](003-third.md) | Third ADR | Proposed | Summary three. |
 `),
       headings: sampleHeadings(),
+      statuses: sampleStatuses(),
     });
 
     expect(report.ok).toBe(false);
@@ -155,6 +168,7 @@ describe("check-adrs-index", () => {
 | [002](002-second.md) | Second ADR | Proposed | Summary two. |
 `),
       headings: sampleHeadings(),
+      statuses: sampleStatuses(),
     });
 
     expect(report.ok).toBe(false);
@@ -176,6 +190,7 @@ describe("check-adrs-index", () => {
 | [003](003-missing.md) | Third ADR | Proposed | Summary three. |
 `),
       headings: sampleHeadings(),
+      statuses: sampleStatuses(),
     });
 
     expect(report.ok).toBe(false);
@@ -196,6 +211,95 @@ describe("check-adrs-index", () => {
 
     expect(report.ok).toBe(false);
     expect(report.errors.some((error) => error.code === "heading-id-mismatch")).toBe(true);
+  });
+
+  it("parses the blockquote status line and ignores suffixes when normalizing", async () => {
+    const { parseAdrStatus, normalizeAdrStatus } = await loadModule();
+    expect(parseAdrStatus("# ADR 001: X\n\n> **Status:** Accepted — 2026-05-19\n")).toBe(
+      "Accepted — 2026-05-19",
+    );
+    expect(parseAdrStatus("# ADR 001: X\n\nNo status here.\n")).toBeNull();
+    expect(normalizeAdrStatus("Accepted — 2026-05-19")).toBe("Accepted");
+    expect(normalizeAdrStatus("Proposed (superseded in part by ADR 035)")).toBe("Proposed");
+    expect(normalizeAdrStatus("Superseded by [ADR 002](002-x.md)")).toBe("Superseded");
+    expect(normalizeAdrStatus("implemented")).toBe("Implemented");
+    expect(normalizeAdrStatus("Rejected")).toBeNull();
+    expect(normalizeAdrStatus("— dated only")).toBeNull();
+  });
+
+  it("passes when README row statuses match ADR body statuses", async () => {
+    const { parseReadmeIndex, validateAdrIndex } = await loadModule();
+    const report = validateAdrIndex({
+      files: sampleFiles(),
+      readmeRows: parseReadmeIndex(sampleReadme),
+      headings: sampleHeadings(),
+      statuses: new Map([
+        ["001-first.md", "Proposed"],
+        ["002-second.md", "Proposed (superseded in part by ADR 099)"],
+        ["003-third.md", "proposed — 2026-01-01"],
+      ]),
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.errors).toEqual([]);
+  });
+
+  it("fails when a README row status disagrees with the ADR body", async () => {
+    const { parseReadmeIndex, validateAdrIndex } = await loadModule();
+    const statuses = sampleStatuses();
+    statuses.set("002-second.md", "Accepted — 2026-08-11");
+    const report = validateAdrIndex({
+      files: sampleFiles(),
+      readmeRows: parseReadmeIndex(sampleReadme),
+      headings: sampleHeadings(),
+      statuses,
+    });
+
+    expect(report.ok).toBe(false);
+    expect(
+      report.errors.some(
+        (error) =>
+          error.code === "status-mismatch" && error.message.includes("002-second.md"),
+      ),
+    ).toBe(true);
+  });
+
+  it("fails when an ADR is missing its status line", async () => {
+    const { parseReadmeIndex, validateAdrIndex } = await loadModule();
+    const statuses = sampleStatuses();
+    statuses.delete("003-third.md");
+    const report = validateAdrIndex({
+      files: sampleFiles(),
+      readmeRows: parseReadmeIndex(sampleReadme),
+      headings: sampleHeadings(),
+      statuses,
+    });
+
+    expect(report.ok).toBe(false);
+    expect(
+      report.errors.some(
+        (error) => error.code === "status-missing" && error.message.includes("003-third.md"),
+      ),
+    ).toBe(true);
+  });
+
+  it("fails when a status does not start with a canonical token", async () => {
+    const { parseReadmeIndex, validateAdrIndex } = await loadModule();
+    const statuses = sampleStatuses();
+    statuses.set("001-first.md", "Pending review");
+    const report = validateAdrIndex({
+      files: sampleFiles(),
+      readmeRows: parseReadmeIndex(sampleReadme),
+      headings: sampleHeadings(),
+      statuses,
+    });
+
+    expect(report.ok).toBe(false);
+    expect(
+      report.errors.some(
+        (error) => error.code === "status-invalid" && error.message.includes("001-first.md"),
+      ),
+    ).toBe(true);
   });
 
   it("scanAdrDirectory ignores README and rejects invalid filenames", async () => {

@@ -113,7 +113,10 @@ function FieldLabel({
     <Label
       data-slot="field-label"
       className={cn(
-        "group/field-label peer/field-label flex w-fit gap-2 leading-snug group-data-[disabled=true]/field:opacity-50",
+        // The design draws a field label in the display face at 14/20 and normal
+        // weight. The registry default is the sans face at `leading-snug`, which
+        // is why call sites kept re-declaring their own label class.
+        "group/field-label peer/field-label flex w-fit gap-2 font-serif text-sm leading-5 font-normal group-data-[disabled=true]/field:opacity-50",
         "has-[>[data-slot=field]]:w-full has-[>[data-slot=field]]:flex-col has-[>[data-slot=field]]:rounded-md has-[>[data-slot=field]]:border [&>*]:data-[slot=field]:p-4",
         "has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary/5 dark:has-data-[state=checked]:bg-primary/10",
         className

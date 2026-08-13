@@ -8,8 +8,9 @@ brand, while Zitadel guards the credentials, sessions, and tokens underneath.
 > surface, so it ships as a preview in its own repository and is intended to
 > merge back into [zitadel/zitadel](https://github.com/zitadel/zitadel) as the
 > foundation of a future major version. APIs, CLI flags, package surfaces, and
-> docs are still in flux; create-first, claim-later is the product direction,
-> but `zitadel claim` is not shipped in this repo yet. The full story is in
+> docs are still in flux. Create-first, claim-later is the product direction,
+> and `zitadel claim` ships in this repo
+> ([ADR 046](docs/adrs/046-claim-lifecycle-v2.md)). The full story is in
 > [VISION.md](VISION.md).
 
 ## Workflow front doors
@@ -110,8 +111,9 @@ For product direction and the four pillars, see [VISION.md](VISION.md).
 Pull requests are gated by the GitHub Actions context `full-pr`, shown in the
 pull request UI as `ci / full-pr`. On a 16-core runner it runs a Go
 generated-file drift check, lint, type checks, builds, unit and browser
-tests, Go tests including Postgres integration, a non-publishing release
-snapshot, and fresh-app journeys against the snapshot's npm tarballs.
+tests, Go tests including Postgres/Spanner/SQLite dialect integration, a
+non-publishing release snapshot, and fresh-app journeys against the snapshot's
+npm tarballs.
 Changesets version PRs run a smaller release validation path instead, and
 Changesets comments give release-intent feedback without adding a blocking
 gate. The full step list lives in

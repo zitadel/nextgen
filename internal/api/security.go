@@ -2,7 +2,10 @@ package api
 
 import (
 	"context"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
@@ -27,14 +30,18 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 
-	payload, err := s.tokenService.VerifyToken(ctx, t.Token)
+	payload, err := s.tokenService.IntrospectToken(ctx, t.Token)
 	if err != nil {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 
 	scope := ScopeContext{
-		ProjectID: payload.ProjectID,
-		Scope:     payload.Scope,
+		ProjectID:     payload.ProjectID,
+		Scope:         payload.Scope,
+		PrincipalType: domain.AuthzPrincipalTypeSKProj,
+		// Project secrets are JWEs without a stable key id; the project id is
+		// the durable principal for sk_proj grants (survives rotate/claim).
+		PrincipalID: payload.ProjectID,
 	}
 
 	ctx = WithScopeContext(ctx, scope)
@@ -47,7 +54,7 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 // It verifies that the cookie value decrypts to a session token and stashes
 // the parsed token in the context for the handlers.
 func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName api.OperationName, t api.NextgenSession) (context.Context, error) {
-	token, err := s.tokenService.VerifyToken(ctx, t.APIKey)
+	token, err := s.tokenService.IntrospectToken(ctx, t.APIKey)
 	if err != nil {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
@@ -122,13 +129,57 @@ func requestOriginFromContext(ctx context.Context) (string, bool) {
 	return v, ok && v != ""
 }
 
+// cookieSecureFromContext reports whether Set-Cookie should include Secure.
+//
+// HTTPS requests (including TLS terminated upstream with X-Forwarded-Proto)
+// keep Secure. Loopback HTTP — http://localhost / 127.0.0.0/8 / ::1 used by
+// the CLI local runtime — omits it so Safari will store and send the cookie.
+// Chrome and Firefox already accept Secure cookies on localhost; Safari does
+// not (WebKit bug 232088). Non-loopback HTTP keeps Secure so a mis-set
+// X-Forwarded-Proto fails closed rather than silently weakening cookies.
+//
+// When the request host was never injected (callers that skip
+// WithRequestHostMiddleware), or the origin cannot be parsed, default to
+// Secure=true so production-shaped paths stay locked down.
+func cookieSecureFromContext(ctx context.Context) bool {
+	origin, ok := requestOriginFromContext(ctx)
+	if !ok {
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil || u.Hostname() == "" {
+		return true
+	}
+	if strings.EqualFold(u.Scheme, "https") {
+		return true
+	}
+	if strings.EqualFold(u.Scheme, "http") && isLoopbackHost(u.Hostname()) {
+		return false
+	}
+	return true
+}
+
+// isLoopbackHost reports whether host is localhost or a loopback IP
+// (127.0.0.0/8, ::1). Host must already be stripped of any port.
+func isLoopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
 type ScopeContext struct {
 	ProjectID string
 	// Scope carries the token's minted scopes verbatim (domain.Token.Scope):
 	// project secrets hold project.write + project.read, preview secrets hold
-	// project.read only. Handlers that gate management operations check this
-	// list; blanket per-operation scope enforcement is ADR 036 territory.
+	// project.read only. The authz gate requires project.write as a ceiling on
+	// top of resolver.Check — preview cannot call management APIs at all.
 	Scope []string
+	// PrincipalType / PrincipalID identify the authz principal for resolver.Check.
+	// OAuth2 project secrets are sk_proj with PrincipalID == ProjectID.
+	PrincipalType domain.AuthzPrincipalType
+	PrincipalID   string
 }
 
 func WithScopeContext(ctx context.Context, scopeCtx ScopeContext) context.Context {

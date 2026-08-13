@@ -27,6 +27,8 @@ declare module "react" {
         project?: ZitadelLogin["project"];
         variant?: ZitadelLogin["variant"];
         theme?: ZitadelLogin["theme"];
+        suppressHeader?: ZitadelLogin["suppressHeader"];
+        "suppress-header"?: boolean;
         purpose?: ZitadelLogin["purpose"];
         "flow-name"?: string;
         "project-id"?: string;
@@ -42,6 +44,8 @@ declare module "react" {
         project?: ZitadelSession["project"];
         variant?: ZitadelSession["variant"];
         theme?: ZitadelSession["theme"];
+        suppressHeader?: ZitadelSession["suppressHeader"];
+        "suppress-header"?: boolean;
         "project-id"?: string;
         "proxy-path"?: string;
         url?: string;

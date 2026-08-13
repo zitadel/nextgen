@@ -6,11 +6,9 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
-
-//go:generate go tool mockgen -typed -package mocks -destination ./mocks/keys.mock.go . KeyService
 
 // ---- Interface -------------------------------------------------------------
 

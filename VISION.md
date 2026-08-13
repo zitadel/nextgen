@@ -116,15 +116,18 @@ Shipped: the CLI takes an app from zero to working local auth
 live under [packages/](packages/). The OpenAPI 3.1 sources under
 [api/openapi/](api/openapi/) are the contract of record, configuration is
 repo state with `plan` and `apply`
-([ADR 007](docs/adrs/007-gitops-configuration-surface.md)), and the docs
+([ADR 035](docs/adrs/035-configuration-environments.md)), and the docs
 site publishes LLM-readable text at `/llms.txt` and answers documentation
-queries over MCP.
+queries over MCP. `zitadel claim` and the claim lifecycle behind
+create-first, claim-later are shipped
+([ADR 046](docs/adrs/046-claim-lifecycle-v2.md)): the server serves the
+claim endpoints and the CLI drives the ceremony, reports team attachment,
+and verifies it in `doctor`.
 
-Direction: `zitadel claim` and the service behind create-first, claim-later
-do not exist yet —
-[ADR 003](docs/adrs/003-create-first-claim-later.md) records the withdrawal
-of the earlier mock-only lifecycle, and design notes describing the claim
-flow are target design. Management operations over MCP are still ahead;
+Direction: [ADR 003](docs/adrs/003-create-first-claim-later.md) records the
+withdrawal of the earlier mock-only claim lifecycle, and the design notes
+describing the hosted claim service beyond the shipped endpoints remain
+target design. Management operations over MCP are still ahead;
 whether the CLI or MCP becomes the primary agent transport is deliberately
 open, because the contract is the invariant and transports compete on
 ergonomics. The storage core records auth attempts, sessions, checks, and

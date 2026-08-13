@@ -63,7 +63,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"password": { "kind": "auth-method", "enabled": true, "position": 0 }
+					"password": { "enabled": true }
 				}
 			}`),
 		},
@@ -76,7 +76,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"title": "My User",
 				"description": "A user schema",
 				"x-auth-methods": {
-					"passkey": { "kind": "auth-method", "enabled": true, "position": 1 }
+					"passkey": { "enabled": true }
 				},
 				"required": ["email"],
 				"properties": {
@@ -92,7 +92,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind":    "user-schema",
 				"title":   "My User",
 				"x-auth-methods": {
-					"password": { "enabled": true, "position": 0 }
+					"password": { "enabled": true }
 				},
 				"properties": {
 					"address": {
@@ -106,13 +106,81 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			}`),
 		},
 		{
+			name: "dotted property name at the top level",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true }
+				},
+				"properties": {
+					"address.street": { "type": "string" }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
+			// Two levels down, so it only fails if user-property.json
+			// recurses into its own `properties` map.
+			name: "dotted property name inside a nested object",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true }
+				},
+				"properties": {
+					"address": {
+						"type": "object",
+						"properties": {
+							"geo": {
+								"type": "object",
+								"properties": {
+									"zip.code": { "type": "string" }
+								}
+							}
+						}
+					}
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
+			// A nested leaf carries x-unique the same way a top-level one
+			// does, so a typo there has to fail rather than silently leave
+			// the value non-unique.
+			name: "invalid x-unique on a nested property",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true }
+				},
+				"properties": {
+					"address": {
+						"type": "object",
+						"properties": {
+							"zipCode": { "type": "string", "x-unique": "bogus" }
+						}
+					}
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
 			name: "missing metaSchema",
 			input: []byte(`{
 				"$id": "https://example.test/schemas/my-user.json",
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"password": { "enabled": true, "position": 0 }
+					"password": { "enabled": true }
 				}
 			}`),
 			wantErr: domain.ErrMissingSchemaID,
@@ -141,22 +209,6 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			},
 		},
 		{
-			name: "invalid auth method — missing position",
-			input: []byte(`{
-				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
-				"$id": "https://example.test/schemas/my-user.json",
-				"kind": "user-schema",
-				"title": "My User",
-				"x-auth-methods": {
-					"password": { "enabled": true }
-				}
-			}`),
-			wantErr: domain.ErrSchemaValidationFailed,
-			wantValidationErrors: map[string]string{
-				"/properties/x-auth-methods/properties/password/required/position": `missing required field "position"`,
-			},
-		},
-		{
 			name: "invalid auth method — missing enabled",
 			input: []byte(`{
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
@@ -164,7 +216,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"password": { "position": 0 }
+					"password": {}
 				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
@@ -180,12 +232,28 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 				"kind": "user-schema",
 				"title": "My User",
 				"x-auth-methods": {
-					"totp": { "enabled": true, "position": 0 }
+					"totp": { "enabled": true }
 				}
 			}`),
 			wantErr: domain.ErrSchemaValidationFailed,
 			wantValidationErrors: map[string]string{
 				"/properties/x-auth-methods/additionalProperties/totp": `false schema never matches`,
+			},
+		},
+		{
+			name: "unknown auth method field rejected",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true, "position": 0 }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+			wantValidationErrors: map[string]string{
+				"/properties/x-auth-methods/properties/password/additionalProperties/position": `false schema never matches`,
 			},
 		},
 		{

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // list-query translation for resource List endpoints.
@@ -67,16 +67,61 @@ func mapListError(err error, internalMsg string) error {
 }
 
 // parseSortDirection maps an API sort direction to a storage order direction.
-// An empty direction defaults to ascending.
 func parseSortDirection(direction string) (database.OrderDirection, error) {
 	switch direction {
-	case "", sortAsc:
+	case sortAsc:
 		return database.OrderAsc, nil
 	case sortDesc:
 		return database.OrderDesc, nil
 	default:
 		return database.OrderAsc, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown sort direction %q", direction))
 	}
+}
+
+// listOrderBy builds the sort order from the request, using the given
+// defaults when no sorting is requested, and appends idField as a tiebreaker:
+// id is unique, so it gives the sort a total order. Without it, rows sharing
+// a sort-key value (e.g. equal createdAt) have no stable order, and cursor
+// pagination could skip or repeat them across pages.
+func listOrderBy[F ~uint8](sorting *Sorting, defaultField F, defaultDirection database.OrderDirection, parseField func(string) (F, error), idField F) (database.OrderBy[F], error) {
+	sortField := defaultField
+	direction := defaultDirection
+
+	if sorting != nil {
+		f, err := parseField(sorting.Field)
+		if err != nil {
+			return database.OrderBy[F]{}, err
+		}
+		sortField = f
+		dir, err := parseSortDirection(sorting.Direction)
+		if err != nil {
+			return database.OrderBy[F]{}, err
+		}
+		direction = dir
+	}
+
+	columns := []database.Column[F]{database.Col(sortField)}
+	if sortField != idField {
+		columns = append(columns, database.Col(idField))
+	}
+	return database.OrderBy[F]{Columns: columns, Direction: direction}, nil
+}
+
+// createdAtFilter maps an operation to a comparison filter on a timestamp
+// column. The value arrives as an untyped string (the filter-value union in
+// the openapi contract does not specify a format for a timestamp); parse it
+// into the time.Time needed for the comparison.
+func createdAtFilter[F ~uint8](op string, col database.Column[F], value any) (database.Filter[F], error) {
+	raw, ok := value.(string)
+	if !ok {
+		return nil, domain.ErrRequestInvalid().WithDetails("createdAt filter value must be an RFC3339 string")
+	}
+	t, err := database.CoerceTimeValue(raw)
+	if err != nil {
+		return nil, domain.ErrRequestInvalid().WithDetails(
+			fmt.Sprintf("createdAt filter value %q is not a valid RFC3339 timestamp", raw))
+	}
+	return compareFilter(op, col, t)
 }
 
 // compareFilter maps an operation to a comparison filter for an ordered column (e.g. a timestamp or number).

@@ -1,10 +1,13 @@
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { makeTestSession } from "../auth/session.fixture";
 import { createAppRouter } from "../router";
+import { THEME_STORAGE_KEY } from "../theme";
 
 /**
  * Console authentication guard (Console ADR 0003): the `_authed` pathless
@@ -30,14 +33,30 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 vi.mock("@zitadel/sdk-react", () => ({
-  ZitadelLogin: (props: { postSignInUrl?: string; project?: { projectId?: string } }) => (
+  ZitadelLogin: (props: {
+    postSignInUrl?: string;
+    theme?: string;
+    project?: { projectId?: string };
+  }) => (
     <div
       data-testid="zitadel-login"
       data-post-sign-in-url={props.postSignInUrl}
       data-project-id={props.project?.projectId}
+      data-widget-theme={props.theme}
     />
   ),
 }));
+
+/**
+ * The redirect target below is a real screen with a loader, so the guard tests
+ * need its data call answered — an empty list is enough to prove the redirect
+ * landed. A path pattern rather than an absolute URL: this spec imports the
+ * router statically, so `api/zitadel.ts` binds its base before any `stubEnv`.
+ */
+const server = setupServer(http.get("*/api/schemas", () => HttpResponse.json([])));
+
+beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
+afterAll(() => server.close());
 
 async function renderAt(path: string) {
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
@@ -56,6 +75,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  localStorage.removeItem(THEME_STORAGE_KEY);
 });
 
 describe("authentication guard", () => {
@@ -74,6 +94,21 @@ describe("authentication guard", () => {
     expect(screen.getByTestId("zitadel-login")).toHaveAttribute("data-project-id", "proj_test");
   });
 
+  /**
+   * The widget resolves its own colour mode and, as a widget-variant embed,
+   * paints no surface of its own. Left to itself it defaults to dark, so on
+   * a light console its text landed on the console's light background and
+   * the sign-in screen was unreadable. The console owns this page's surface,
+   * so it must declare the mode.
+   */
+  it.each(["light", "dark"] as const)("hands the widget the console's %s theme", async (theme) => {
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+    fetchSession.mockResolvedValue(null);
+    await renderAt("/login");
+
+    expect(await screen.findByTestId("zitadel-login")).toHaveAttribute("data-widget-theme", theme);
+  });
+
   it("omits ?next= when the root path was requested", async () => {
     fetchSession.mockResolvedValue(null);
     const router = await renderAt("/");
@@ -86,7 +121,7 @@ describe("authentication guard", () => {
     fetchSession.mockResolvedValue(makeTestSession());
     const router = await renderAt("/login?next=/schemas");
 
-    expect(await screen.findByRole("heading", { name: "Schemas" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "User schemas" })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/schemas");
   });
 
@@ -117,7 +152,7 @@ describe("authentication guard", () => {
     // After sign-out the guard must see no session again.
     fetchSession.mockResolvedValue(null);
     await userEvent.click(screen.getByRole("button", { name: /Account: Test User/ }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Log out" }));
 
     expect(await screen.findByTestId("zitadel-login")).toBeInTheDocument();
     expect(signOut).toHaveBeenCalledOnce();

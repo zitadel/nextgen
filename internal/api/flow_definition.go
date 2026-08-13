@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -13,7 +14,7 @@ import (
 )
 
 func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDefinitionRequest) (api.CreateFlowDefinitionRes, error) {
-	if err := requireProjectAccess(ctx, string(req.GetProjectID()), flowDefinitionAccess, opWrite); err != nil {
+	if err := h.requireProjectAccess(ctx, string(req.GetProjectID()), flowDefinitionAccess, opWrite); err != nil {
 		return nil, err
 	}
 	svcReq, err := mapCreateRequestToService(req)
@@ -30,10 +31,11 @@ func (h Handler) CreateFlowDefinition(ctx context.Context, req *api.CreateFlowDe
 }
 
 func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefinitionParams) (api.GetFlowDefinitionRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opRead); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, params.ID, flowDefinitionAccess, opRead)
+	if err != nil {
 		return nil, err
 	}
-	definition, err := h.flowDefinitionService.Get(ctx, string(params.ProjectID), params.ID)
+	definition, err := h.flowDefinitionService.Get(ctx, projectID, params.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +43,11 @@ func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefini
 }
 
 func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDefinitionsParams) (api.ListFlowDefinitionsRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opRead); err != nil {
+		return nil, err
+	}
+	ctx, err := h.withAuthzListFilter(ctx, string(params.ProjectID), domain.ResourceKindFlowDefinition, opRead)
+	if err != nil {
 		return nil, err
 	}
 	svcReq := mapListRequestToService(params)
@@ -62,10 +68,11 @@ func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDef
 }
 
 func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefinitionUpdateRequest, params api.UpdateFlowDefinitionParams) (api.UpdateFlowDefinitionRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opWrite); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, params.ID, flowDefinitionAccess, opWrite)
+	if err != nil {
 		return nil, err
 	}
-	svcReq, err := mapUpdateRequestToService(params, req)
+	svcReq, err := mapUpdateRequestToService(projectID, params, req)
 	if err != nil {
 		return nil, err
 	}
@@ -80,10 +87,14 @@ func (h Handler) UpdateFlowDefinition(ctx context.Context, req *api.FlowDefiniti
 }
 
 func (h Handler) DeleteFlowDefinition(ctx context.Context, params api.DeleteFlowDefinitionParams) (api.DeleteFlowDefinitionRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opDelete); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, params.ID, flowDefinitionAccess, opDelete)
+	if err != nil {
+		if errors.Is(err, errResourceGone) {
+			return &api.DeleteFlowDefinitionNoContent{}, nil
+		}
 		return nil, err
 	}
-	err := h.flowDefinitionService.Delete(ctx, string(params.ProjectID), params.ID)
+	err = h.flowDefinitionService.Delete(ctx, projectID, params.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -98,9 +109,9 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Fl
 	return mapFlowDefinitionRequestToService(string(req.GetProjectID()), req.GetSchemaURI(), req.GetFlowDefinition(), strings.ToLower(string(definition.GetStatus())))
 }
 
-func mapUpdateRequestToService(params api.UpdateFlowDefinitionParams, req *api.FlowDefinitionUpdateRequest) (service.FlowDefinitionRequest, error) {
+func mapUpdateRequestToService(projectID string, params api.UpdateFlowDefinitionParams, req *api.FlowDefinitionUpdateRequest) (service.FlowDefinitionRequest, error) {
 	definition := req.GetFlowDefinition()
-	svcReq, err := mapFlowDefinitionRequestToService(string(params.ProjectID), req.GetSchemaURI(), definition, strings.ToLower(string(definition.GetStatus())))
+	svcReq, err := mapFlowDefinitionRequestToService(projectID, req.GetSchemaURI(), definition, strings.ToLower(string(definition.GetStatus())))
 	if err != nil {
 		return svcReq, err
 	}
@@ -201,15 +212,25 @@ func mapFlowDefinitionRequestToService(projectID string, schemaURI api.OptSchema
 		if step.GetTransitions().IsSet() {
 			transitions := make(map[string]domain.FlowStepTransition, len(step.GetTransitions().Value))
 			for name, apiTransition := range step.GetTransitions().Value {
+				// Get() is false for both absent and explicit-null values;
+				// IsSet() alone would map an explicit `null` to the zero
+				// enum. Non-null strings are enum-validated by the
+				// generated request decoder.
 				var transitionAction *domain.FlowDefinitionTransitionAction
-				if apiTransition.Action.IsSet() {
-					a, _ := domain.FlowDefinitionTransitionActionString(string(apiTransition.GetAction().Value)) // validated in the domain
+				if value, ok := apiTransition.Action.Get(); ok {
+					a, _ := domain.FlowDefinitionTransitionActionString(string(value))
 					transitionAction = &a
+				}
+				var transitionPurpose *domain.FlowDefinitionPurpose
+				if value, ok := apiTransition.Purpose.Get(); ok {
+					p, _ := domain.FlowDefinitionPurposeString(string(value))
+					transitionPurpose = &p
 				}
 
 				t := domain.FlowStepTransition{
-					Action: transitionAction,
-					Target: apiTransition.GetTarget(),
+					Action:  transitionAction,
+					Purpose: transitionPurpose,
+					Target:  apiTransition.GetTarget(),
 				}
 				transitions[name] = t
 			}
@@ -384,12 +405,21 @@ func mapTransitionsToAPI(domainTransitions map[string]domain.FlowStepTransition)
 		if transition.Action != nil {
 			action = transition.Action.String()
 		}
+		var purpose string
+		if transition.Purpose != nil {
+			purpose = transition.Purpose.String()
+		}
 		transitions[n] = api.FlowDefinitionStepTransitionsItem{
 			Target: transition.Target,
 			Action: api.OptNilFlowDefinitionStepTransitionsItemAction{
 				Value: api.FlowDefinitionStepTransitionsItemAction(action),
 				Set:   transition.Action != nil,
 				Null:  transition.Action == nil,
+			},
+			Purpose: api.OptNilFlowDefinitionStepTransitionsItemPurpose{
+				Value: api.FlowDefinitionStepTransitionsItemPurpose(purpose),
+				Set:   transition.Purpose != nil,
+				Null:  transition.Purpose == nil,
 			},
 		}
 	}

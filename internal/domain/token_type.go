@@ -22,6 +22,11 @@ const (
 	TokenTypeFlow
 	// TokenTypeJWTProfile is a self-signed JWT verified with a stored public key; it is not stored but may be used as a bearer token.
 	TokenTypeJWTProfile
+	// TokenTypeProjectToken is the confidential-plane project secret (ADR 036)
+	TokenTypeProjectToken
+	// TokenTypeProjectPreview is the read-only preview credential issued
+	// alongside the project secret.
+	TokenTypeProjectPreview
 )
 
 // Persistable reports whether t may be written to the tokens table.
@@ -41,6 +46,10 @@ func (t TokenType) Persistable() bool {
 		return false
 	case TokenTypeJWTProfile:
 		return false
+	case TokenTypeProjectToken:
+		return true
+	case TokenTypeProjectPreview:
+		return true
 	default:
 		return false
 	}

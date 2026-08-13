@@ -8,13 +8,13 @@
 ## Decision
 
 Shared behavioral integration tests for v2 statement implementations live in
-[`internal/storage/v2/stmttest`](../../internal/storage/v2/stmttest/). They
+[`internal/storage/stmttest`](../../internal/storage/stmttest/). They
 assert domain-visible behavior through [`service.AllStatements`](../../internal/service/statement.go),
 not dialect SQL strings.
 
 ## Context
 
-Per-dialect statement packages under `internal/storage/v2/dialect/{postgres,spanner,sqlite}`
+Per-dialect statement packages under `internal/storage/dialect/{postgres,spanner,sqlite}`
 naturally grow near-duplicate integration tests. Those copies drift (coverage
 gaps, fixture style), and they do not prove that every engine honors the same
 service contract. Higher layers (services, API) cannot substitute for this
@@ -43,5 +43,5 @@ boundary without pulling in unrelated orchestration.
 - New portable statement behavior should gain a `stmttest` case (or extend an
   existing one) rather than only a dialect-package copy.
 - Engine-specific proof stays next to the engine.
-- Bring-up uses [`dbtest.Pool`](../../internal/storage/v2/dbtest/dbtest.go)
+- Bring-up uses [`dbtest.Pool`](../../internal/storage/dbtest/dbtest.go)
   (`database.Pool` + `service.Pool`).

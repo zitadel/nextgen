@@ -64,6 +64,28 @@ export const reactRenderer: RendererSpec = {
             }
           }}`
         : "";
+      // Pre-existing apps embed the card in their own layout (ADR 044); a
+      // fresh scaffold keeps the widget's full-page chrome.
+      const widget = context.posture === "widget";
+      const variantAttrs = widget ? `variant="widget"\n          theme="auto"` : `variant="page"`;
+      const postureComment = widget
+        ? `  // variant="widget" embeds the sign-in card in this app's existing layout.
+  // theme="auto" follows the OS light/dark preference (prefers-color-scheme),
+  // not this app's own theme — set theme="light" or theme="dark" to match an
+  // app that pins its scheme. The wrapper below only centers the card —
+  // restyle or replace it freely. Switch to variant="page" for the widget's
+  // own full-page chrome (viewport height, surface background from design
+  // tokens).
+  // If this page already carries its own heading, add suppress-header to the
+  // element to visually hide the widget's heading block — it stays in the
+  // accessibility tree, and the card keeps no blank header band.`
+        : `  // variant="page" makes the widget paint the full-page chrome itself
+  // (viewport height, surface background) from design tokens; switch to
+  // variant="widget" to embed the sign-in card inside a layout you own.`;
+      const wrapperOpen = widget
+        ? `<div style={{ display: "flex", justifyContent: "center", padding: "4rem 1rem" }}>`
+        : `<main style={{ colorScheme: "dark" }}>`;
+      const wrapperClose = widget ? `</div>` : `</main>`;
       return {
         mode,
         contents: `${MANAGED_MARKER}
@@ -86,7 +108,7 @@ const ${elementName} = dynamic(
     return function ${elementName}Element() {${localesComment}
       return (
         <zitadel-login
-          variant="page"${localesAttr}
+          ${variantAttrs}${localesAttr}
           project={project}
           purpose="${mode}"
           post-sign-in-url="/profile"
@@ -98,19 +120,39 @@ const ${elementName} = dynamic(
 );
 
 export default function ${componentName}() {
-  // variant="page" makes the widget paint the full-page chrome itself
-  // (viewport height, surface background) from design tokens; switch to
-  // variant="widget" to embed the sign-in card inside a layout you own.
+${postureComment}
   return (
-    <main style={{ colorScheme: "dark" }}>
+    ${wrapperOpen}
       <${elementName} />
-    </main>
+    ${wrapperClose}
   );
 }
 `,
       };
     },
-    profilePage() {
+    profilePage(context) {
+      // Same posture hinge as the auth pages (ADR 044): a pre-existing app
+      // gets the session card embedded in its own layout.
+      const widget = context.posture === "widget";
+      const variantAttrs = widget ? `variant="widget"\n          theme="auto"` : `variant="page"`;
+      const postureComment = widget
+        ? `  // variant="widget" embeds the session card in this app's existing layout.
+  // theme="auto" follows the OS light/dark preference (prefers-color-scheme),
+  // not this app's own theme — set theme="light" or theme="dark" to match an
+  // app that pins its scheme. The wrapper below only centers the card —
+  // restyle or replace it freely. Switch to variant="page" for the card's
+  // own full-page chrome (viewport height, surface background from design
+  // tokens).
+  // If this page already carries its own heading, add suppress-header to the
+  // element to visually hide the widget's heading block — it stays in the
+  // accessibility tree, and the card keeps no blank header band.`
+        : `  // variant="page" makes the session card paint the full-page chrome itself
+  // (viewport height, surface background) from design tokens; switch to
+  // variant="widget" to embed the card inside a layout you own.`;
+      const wrapperOpen = widget
+        ? `<div style={{ display: "flex", justifyContent: "center", padding: "4rem 1rem" }}>`
+        : `<main style={{ colorScheme: "dark" }}>`;
+      const wrapperClose = widget ? `</div>` : `</main>`;
       return {
         contents: `${MANAGED_MARKER}
 "use client";
@@ -132,7 +174,7 @@ const ZitadelSession = dynamic(
     return function ZitadelSessionElement() {
       return (
         <zitadel-session
-          variant="page"
+          ${variantAttrs}
           project={project}
           post-sign-out-url="/login"
         />
@@ -143,13 +185,11 @@ const ZitadelSession = dynamic(
 );
 
 export default function ProfilePage() {
-  // variant="page" makes the session card paint the full-page chrome itself
-  // (viewport height, surface background) from design tokens; switch to
-  // variant="widget" to embed the card inside a layout you own.
+${postureComment}
   return (
-    <main style={{ colorScheme: "dark" }}>
+    ${wrapperOpen}
       <ZitadelSession />
-    </main>
+    ${wrapperClose}
   );
 }
 `,

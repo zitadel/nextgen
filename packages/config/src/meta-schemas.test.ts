@@ -40,6 +40,7 @@ describe("meta-schemas", () => {
       "flow-definition.json",
       "user-schema.json",
       "user-property.json",
+      "property-name.json",
       "auth-methods.json",
       "auth-method.json",
       "branding.json",
@@ -111,6 +112,44 @@ describe("meta-schemas", () => {
     // The enum still constrains real values.
     (transition as { action: unknown }).action = "warp";
     expect(check(flow)).toBe(false);
+  });
+
+  // The dialect is what an editor validates against, so the property-name
+  // rule has to hold in a plain JSON Schema validator, not just in the
+  // server's Go one.
+  it("constrains user schema property names at every level", () => {
+    const ajv = new Ajv2020({ strict: false, validateFormats: false });
+    for (const file of metaSchemaFiles()) {
+      if (file.name !== "user-schema.json") ajv.addSchema(file.body as object, file.name);
+    }
+    const check = ajv.compile(
+      metaSchemaFiles().find((f) => f.name === "user-schema.json")?.body as object,
+    );
+    const userSchema = (properties: unknown) => ({
+      metaSchema: "https://example.test/user-schema.json",
+      kind: "user-schema",
+      "x-auth-methods": { password: { enabled: true } },
+      properties,
+    });
+
+    expect(check(userSchema({ email: { type: "string", "x-unique": "project" } }))).toBe(true);
+    expect(check(userSchema({ "address.street": { type: "string" } }))).toBe(false);
+    expect(
+      check(
+        userSchema({
+          address: { type: "object", properties: { "zip.code": { type: "string" } } },
+        }),
+      ),
+    ).toBe(false);
+    // Recursion also carries the annotation rules down, so a nested typo is
+    // caught rather than silently ignored at runtime.
+    expect(
+      check(
+        userSchema({
+          address: { type: "object", properties: { zip: { type: "string", "x-unique": "nope" } } },
+        }),
+      ),
+    ).toBe(false);
   });
 
   it("validates every scaffolded branding design descriptor", () => {

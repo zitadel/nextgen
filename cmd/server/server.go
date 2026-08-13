@@ -36,10 +36,10 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
-	_ "github.com/zitadel/nextgen/internal/storage/v2/dialect/all"
-	"github.com/zitadel/nextgen/internal/storage/v2/dialect/idgen"
-	"github.com/zitadel/nextgen/internal/storage/v2/dialect/sqlite"
+	"github.com/zitadel/nextgen/internal/storage/database"
+	_ "github.com/zitadel/nextgen/internal/storage/dialect/all"
+	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
+	"github.com/zitadel/nextgen/internal/storage/dialect/sqlite"
 )
 
 func NewCommand() *cobra.Command {
@@ -196,6 +196,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		passwordHasher,
 		userService,
 		schemaStore,
+		serviceDBPool,
 	)
 	createUserForPasskeyHandler := service.NewFlowCreateUserForPasskeyHandler(userService, schemaStore)
 	passkeyRegSvc := service.NewPasskeyRegistrationService(serviceDBPool)
@@ -212,7 +213,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	)
 
 	flowService := service.NewFlowService(serviceDBPool, stateMachine)
-	tokenService := service.NewTokenService(keyService)
+	tokenService := service.NewTokenService(keyService, serviceDBPool)
 
 	// ── Default project resolution ──
 	// Console ADR 0004 §3 (standalone): the deployment tracks exactly one
@@ -247,6 +248,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			brandingService,
 			tokenService,
 			keyService,
+			serviceDBPool,
 			cfg.Platform.ProjectID,
 		),
 		api.NewSecurityHandler(tokenService),
@@ -262,7 +264,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
-		standaloneRuntimeResolver(projectService, keyService, cfg.Platform.ResolvedProjectID()))
+		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()))
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -453,10 +455,16 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 		}
 		mux.Handle(cfg.ConsolePath, consoleHandler)
 		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
+	}
 
-		// Pre-session runtime metadata for the embedded console (Console
-		// ADR 0004 §2). Registered as an exact path, so it wins over the
-		// catch-all API mount below.
+	// Pre-session runtime metadata for the embedded UI surfaces (Console
+	// ADR 0004 §2). Named for the console, which carries it first, but it
+	// describes the deployment — the default project and its publishable key
+	// — and the hosted login shell resolves the project it signs into from
+	// the same two fields, so it is mounted for either surface rather than
+	// only alongside the console. Registered as an exact path, so it wins
+	// over the catch-all API mount below.
+	if cfg.ConsoleEnabled || cfg.LoginEnabled {
 		mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
 	}
 
@@ -465,6 +473,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 			func(next http.Handler) http.Handler { return middleware.WithRequestIdentification(reqIdGen, next) },
 			middleware.WithLogging,
 			api.WithRequestHostMiddleware,
+			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
 		),
 	)

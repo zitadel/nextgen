@@ -1,6 +1,6 @@
 # @zitadel/cli
 
-Scaffolds Zitadel auth (login, register, profile, middleware) into a Next.js, React, Vue, Angular, or Nuxt app.
+Scaffolds Zitadel auth (login, register, profile, middleware/proxy) into a Next.js, Nuxt, React, Vue, Angular, Solid, Svelte, or Qwik app.
 
 ```sh
 npx @zitadel/cli@alpha start
@@ -15,9 +15,10 @@ automation when reproducibility matters.
 
 ## Requirements
 
-- Node 24+
+- Node from the supported range in `package.json#engines` (currently ≥ 24)
 - Docker only when using the optional Docker runtime backend
-- A Next.js project, or an empty directory where setup can scaffold one
+- An app in one of the eight supported frameworks, or an empty directory
+  where setup can scaffold one
 
 ## Quickstart
 
@@ -31,14 +32,20 @@ npm run dev
 ```
 
 `start` runs the `@zitadel/server` npm binary by default and stores runtime data
-under `.zitadel/local/`. Remote-server setup can use `--server <url>` without
-starting a local runtime. Use `--runtime docker`, `--image`, or
-`ZITADEL_LOCAL_IMAGE` for advanced Docker backend debugging.
+under `.zitadel/local/` (SQLite by default). Remote-server setup can use
+`--server <url>` without starting a local runtime. Use `--runtime docker`,
+`--image`, or `ZITADEL_LOCAL_IMAGE` for advanced Docker backend debugging.
 `setup --server local` creates a project on that local server, asks which
-framework to scaffold when the directory is fresh, writes the Next.js app into
-the current directory, scaffolds `app/login`, `app/register`, `app/profile`, and
-`proxy.ts` for Next 16+ or `middleware.ts` for older Next versions. Fresh
-scaffolds also replace the starter `app/page.tsx` with a redirect to `/login`.
+framework to scaffold when the directory is fresh (and which login design to
+use), writes the app into the current directory, and scaffolds the framework's
+idiomatic auth routes plus the proxy layer — for Next.js that means
+`app/login`, `app/register`, `app/profile`, and `proxy.ts` for Next 16+ or
+`middleware.ts` for older versions; other frameworks get their equivalents
+from the same patcher system. In a pre-existing app, setup derives the
+embedding posture from the app instead of assuming a fresh skeleton: the
+scaffolded pages take the `variant="widget"` posture inside your app's own
+shell, recorded in the scaffold manifest and verified by `doctor`. Fresh
+scaffolds also replace the starter home page with a redirect to `/login`.
 Setup writes `.env.local` and `.zitadel/`, and installs
 dependencies with the detected package manager. Pass `--skip-install` to install
 them yourself. The project's default user schema and login flow are provisioned
@@ -80,12 +87,22 @@ and agent UIs may display stderr package-manager progress together with stdout.
 
 ## Other commands
 
+- `zitadel claim` — attach the project to your team (opens the claim page,
+  polls for completion; team attachment then shows in `setup`, `status`, and
+  `doctor`)
 - `zitadel doctor` — verify the local runtime and generated project files
+  (including scaffold drift and dependency-version alignment)
 - `zitadel status` — summarise the local runtime and project
 - `zitadel plan` — validate config and preview sync changes without mutation
 - `zitadel apply` — validate and upload repo config to Zitadel
+- `zitadel branding eject` — scaffold an editable login template from a design
+- `zitadel schemas list` — list the project's user schemas
 - `zitadel eject` — remove what setup wrote (alias: `zitadel uninstall`)
 - `zitadel start|stop|logs|reset` — manage the local runtime
+
+The full agent-facing contract (JSON envelope, posture rules, claim flow,
+doctor repair) is [`SKILLS.md`](https://github.com/zitadel/nextgen/blob/main/apps/cli/SKILLS.md),
+which ships in this package.
 
 ## Reference
 
@@ -484,29 +501,60 @@ USAGE
     centered|split|split-right|hero|minimal]
 
 FLAGS
-  -c, --cwd=<value>         Project directory to operate on.
-  -f, --force               Overwrite protected files on conflict.
-  -n, --non-interactive     Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>      Override the resolved server URL.
-      --debug               Debug logging.
-      --design=<option>     Login design to eject into .zitadel/branding/ and publish as branding revision 1. When
-                            omitted, the login uses the built-in template; run the `branding eject` command later to
-                            customize.
-                            <options: centered|split|split-right|hero|minimal>
-      --dev-port=<value>    Dev-server port; also the issuer origin registered with Zitadel. Defaults to the detected
-                            port. Use distinct ports to run several scaffolded apps side by side.
-      --dry-run             Preview without mutating files or the platform.
-      --framework=<option>  Framework to target.
-                            <options: next|nuxt|react|vue|solid|svelte|qwik|angular>
-      --preset=<option>     Sign-in preset for the scaffolded schema and login flow (default: password-first).
-                            <options: password-first|passkey-first>
-      --renderer=<option>   Renderer (default: react). Not yet available: web-component.
-                            <options: react>
-      --skip-install        Do not install dependencies after setup updates package.json.
-      --[no-]telemetry      Send anonymous usage analytics. Disable with --no-telemetry.
-      --use-case=<option>   Use case for the scaffolded schema fields: who signs in to the app (default: minimal).
-                            <options: minimal|consumer|business>
-      --verbose             Verbose logging.
+  -c, --cwd=<value>
+      Project directory to operate on.
+
+  -f, --force
+      Overwrite protected files on conflict.
+
+  -n, --non-interactive
+      Disable prompts. Required when scripting or running as an agent.
+
+  -s, --server=<value>
+      Override the resolved server URL.
+
+  --debug
+      Debug logging.
+
+  --design=<option>
+      Login design to eject into .zitadel/branding/ and publish as branding revision 1. Skips the wizard's design
+      question. When omitted in non-interactive runs, the login uses the built-in template; run the `branding eject`
+      command later to customize. Split-family designs (split, split-right, hero) collapse their brand pane by container
+      width: narrow containers — including widget-posture embeds at card width — render the compact brand mark instead
+      (logo_url, else hero_url, from .zitadel/branding/branding.json; hero falls back to editable text).
+      <options: centered|split|split-right|hero|minimal>
+
+  --dev-port=<value>
+      Dev-server port; also the issuer origin registered with Zitadel. Defaults to the detected port. Use distinct ports
+      to run several scaffolded apps side by side.
+
+  --dry-run
+      Preview without mutating files or the platform.
+
+  --framework=<option>
+      Framework to target.
+      <options: next|nuxt|react|vue|solid|svelte|qwik|angular>
+
+  --preset=<option>
+      Sign-in preset for the scaffolded schema and login flow (default: password-first).
+      <options: password-first|passkey-first>
+
+  --renderer=<option>
+      Renderer (default: react). Not yet available: web-component.
+      <options: react>
+
+  --skip-install
+      Do not install dependencies after setup updates package.json.
+
+  --[no-]telemetry
+      Send anonymous usage analytics. Disable with --no-telemetry.
+
+  --use-case=<option>
+      Use case for the scaffolded schema fields: who signs in to the app (default: minimal).
+      <options: minimal|consumer|business>
+
+  --verbose
+      Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.

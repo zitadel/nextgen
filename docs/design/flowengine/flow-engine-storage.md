@@ -7,7 +7,7 @@
 
 Sessions and flows have fundamentally different lifetimes and purposes:
 
-- A **session** is durable server-side state: factors, assurance_levels, user identity. It lives in Postgres and persists for hours or days.
+- A **session** is durable server-side state: factors, assurance_levels, user identity. It lives in the configured storage dialect and persists for hours or days.
 - A **flow** is ephemeral orchestration: which step the user is on, what data they've entered so far, where to redirect on completion. It lives only while the user is actively clicking through screens.
 
 A single session can have **many flows over its lifetime**:
@@ -16,10 +16,10 @@ A single session can have **many flows over its lifetime**:
 sequenceDiagram
     participant Browser
     participant Server
-    participant DB as Postgres (sessions)
+    participant DB as Storage dialect sessions
 
     Note over Browser,DB: Login Flow
-    Browser->>Server: POST /flows (purpose: login)
+    Browser->>Server: POST /flow (purpose: login)
     Server->>DB: Create session (factors: {})
     Server-->>Browser: session_id + Set-Cookie: flow=enc_1
     Browser->>Server: submit identifier (Cookie: flow=enc_1)
@@ -34,7 +34,7 @@ sequenceDiagram
     Note over Browser,DB: Session active at AAL2. Time passes...
 
     Note over Browser,DB: Step-Up Flow (AAL3 requested)
-    Browser->>Server: POST /flows (purpose: reauth)
+    Browser->>Server: POST /flow (purpose: reauth)
     Note right of Server: Reads existing session from DB
     Server-->>Browser: session_id + Set-Cookie: flow=enc_a
     Browser->>Server: submit passkey (Cookie: flow=enc_a)
@@ -44,7 +44,7 @@ sequenceDiagram
     Note over Browser,DB: Session now at AAL3
 
     Note over Browser,DB: Profiling Flow (policy requires phone)
-    Browser->>Server: POST /flows (purpose: profiling)
+    Browser->>Server: POST /flow (purpose: profiling)
     Server-->>Browser: session_id + Set-Cookie: flow=enc_x
     Browser->>Server: submit phone number (Cookie: flow=enc_x)
     Server->>DB: Update user profile
@@ -78,10 +78,16 @@ Flow state is stored as an **encrypted, HttpOnly cookie** set by the server on e
 ### Cookie shape
 
 ```
-Set-Cookie: _zflow=<encrypted-payload>; HttpOnly; Secure; SameSite=Strict; Path=/flows
+Set-Cookie: _zflow=<encrypted-payload>; HttpOnly; Secure; SameSite=Strict; Path=/
 ```
 
-The cookie is scoped to `/flows` — it's never sent to Session API or other endpoints.
+The cookie is set with `Path=/` so that each `Set-Cookie` replaces the previous
+one in the browser's cookie jar instead of accumulating per-path copies (the
+flow endpoints span `/flow` and `/flow/{id}/submit`, which would otherwise
+derive different paths — see the rationale in `internal/api/flow.go`). It is
+therefore sent to other endpoints on the same origin; confidentiality and
+integrity rest on the AES-GCM encryption and authentication, not on path
+scoping.
 
 ## Cookie Contents
 
@@ -156,7 +162,7 @@ For flow-only transitions (advancing steps without touching the session), there'
 
 | Operation | DB read | DB write |
 |---|---|---|
-| Start flow (`POST /flows`) | Read session (if reauth/step-up) or create session | Create session (login/register) |
+| Start flow (`POST /flow`) | Read session (if reauth/step-up) or create session | Create session (login/register) |
 | Advance step (no factor change) | None | None |
 | Pivot to different purpose | None | None |
 | Submit identifier (resolve user) | Read user | None |
@@ -164,4 +170,4 @@ For flow-only transitions (advancing steps without touching the session), there'
 | Create user (registration action) | Read session | Write session + write user |
 | Complete flow | Read session | None (cookie cleared) |
 
-Most step transitions are **zero-DB operations**. Only factor verifications and user mutations touch Postgres.
+Most step transitions are **zero-DB operations**. Only factor verifications and user mutations touch the storage dialect.

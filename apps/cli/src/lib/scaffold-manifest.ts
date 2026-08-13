@@ -5,7 +5,7 @@ import { join, isAbsolute, relative, sep } from "node:path";
 import { isObject } from "./json";
 import type { EjectActions } from "./orca/patchers/types";
 import { readState, updateScaffold } from "./sync/state";
-import type { ScaffoldManifest } from "./sync/types";
+import type { ScaffoldManifest, ScaffoldPosture } from "./sync/types";
 
 /**
  * Content hash of one scaffolded file as recorded in the scaffold manifest.
@@ -48,6 +48,16 @@ export async function readScaffoldManifest(cwd: string): Promise<ScaffoldManifes
         return undefined;
       }
     }
+    // A posture value this CLI does not know is a future-shaped manifest —
+    // degrade like any other malformed section rather than restoring a
+    // posture the templates cannot render.
+    if (
+      scaffold.posture !== undefined &&
+      scaffold.posture !== "page" &&
+      scaffold.posture !== "widget"
+    ) {
+      return undefined;
+    }
     return scaffold as unknown as ScaffoldManifest;
   } catch {
     return undefined;
@@ -70,8 +80,9 @@ export async function writeScaffoldManifest(options: {
   written: ReadonlyArray<string>;
   scaffoldedFramework?: boolean;
   devPort?: number;
+  posture?: ScaffoldPosture;
 }): Promise<void> {
-  const { cwd, actions, written, scaffoldedFramework, devPort } = options;
+  const { cwd, actions, written, scaffoldedFramework, devPort, posture } = options;
   const touched = new Set(written.map((path) => relativePosix(cwd, path)));
   const files: ScaffoldManifest["files"] = {};
   for (const path of actions.markedFiles) {
@@ -94,6 +105,7 @@ export async function writeScaffoldManifest(options: {
     files,
     ...(scaffoldedFramework ? { scaffolded_framework: true } : {}),
     ...(typeof devPort === "number" ? { dev_port: devPort } : {}),
+    ...(posture === undefined ? {} : { posture }),
   });
 }
 

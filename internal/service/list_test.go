@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 func TestNormalizeLimit(t *testing.T) {
@@ -75,7 +75,7 @@ func TestParseSortDirection(t *testing.T) {
 		want      database.OrderDirection
 		wantErr   error
 	}{
-		{name: "empty defaults to ascending", direction: "", want: database.OrderAsc},
+		{name: "empty is invalid", direction: "", want: database.OrderAsc, wantErr: domain.ErrRequestInvalid()},
 		{name: "asc", direction: sortAsc, want: database.OrderAsc},
 		{name: "desc", direction: sortDesc, want: database.OrderDesc},
 		{name: "unknown is invalid", direction: "sideways", want: database.OrderAsc, wantErr: domain.ErrRequestInvalid()},

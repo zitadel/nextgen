@@ -321,6 +321,9 @@ catalogs:
     xstate:
       specifier: ^5.31.1
       version: 5.31.1
+    yaml:
+      specifier: ^2.9.0
+      version: 2.9.0
     zod:
       specifier: ^4.3.6
       version: 4.4.3
@@ -491,6 +494,9 @@ importers:
       eslint-plugin-playwright:
         specifier: 'catalog:'
         version: 2.10.2(eslint@10.2.1(jiti@2.7.0))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
 
   apps/console:
     dependencies:
@@ -539,6 +545,9 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.2.8(react@19.2.8)
+      shiki:
+        specifier: 'catalog:'
+        version: 4.2.0
       sonner:
         specifier: 'catalog:'
         version: 2.0.7(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -551,6 +560,9 @@ importers:
       tw-animate-css:
         specifier: 'catalog:'
         version: 1.4.0
+      yaml:
+        specifier: 'catalog:'
+        version: 2.9.0
     devDependencies:
       '@tailwindcss/vite':
         specifier: 'catalog:'
@@ -618,6 +630,9 @@ importers:
       eslint-plugin-playwright:
         specifier: 'catalog:'
         version: 2.10.2(eslint@10.2.1(jiti@2.7.0))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
 
   apps/demo-next:
     dependencies:
@@ -676,6 +691,9 @@ importers:
       eslint-plugin-playwright:
         specifier: 'catalog:'
         version: 2.10.2(eslint@10.2.1(jiti@2.7.0))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
 
   apps/demo-nuxt:
     dependencies:
@@ -716,6 +734,9 @@ importers:
       eslint-plugin-playwright:
         specifier: 'catalog:'
         version: 2.10.2(eslint@10.2.1(jiti@2.7.0))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
 
   apps/docs:
     dependencies:
