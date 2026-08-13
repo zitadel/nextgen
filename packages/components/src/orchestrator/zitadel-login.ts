@@ -389,7 +389,7 @@ export class ZitadelLogin extends ZitadelSurface {
     }
     this.applyValuesToFields();
     if (!initial || this.variant === "page") {
-      this.moveFocusToFirstField(initial);
+      this.moveFocusToFirstField(initial && this.variant === "page");
     }
   }
 

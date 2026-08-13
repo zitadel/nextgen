@@ -3,7 +3,7 @@
 "@zitadel/server": patch
 ---
 
-Login-widget fixes from alpha.18 team feedback:
+The login widget now uses clearer identifier-step copy and avoids misleading initial focus:
 
 - The identifier step's primary button now says "Continue" ("Weiter" /
   "Continua") instead of "Sign in". The step branches to registration when
