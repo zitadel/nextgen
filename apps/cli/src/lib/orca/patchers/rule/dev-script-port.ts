@@ -1,6 +1,6 @@
 import { ZitadelError } from "../../../errors";
 import { isObject, parseJsonObject, setTopLevelJsonKey } from "../../../json";
-import { extractPort, withDevPort } from "../../detectors/port";
+import { extractPort, portFromIssuer, withDevPort } from "../../detectors/port";
 import type { FileOp } from "./file-writer/types";
 
 /**
@@ -24,13 +24,28 @@ import type { FileOp } from "./file-writer/types";
  * (so the op skips the file rather than reformatting a user's package.json),
  * and a project without a `dev` script is left alone because there is no
  * command to pin.
+ *
+ * Takes the project's registered `issuer` rather than a port, because the
+ * expected value has to survive the app drifting away from it. `doctor`
+ * rebuilds this plan from `loadPatchContext`, whose `framework.devPort` is
+ * freshly *detected* from the current script — deriving the target from that
+ * would make any edited script verify against itself (always "applied") and
+ * would make `doctor --fix` write back the detected fallback instead of the
+ * port the project actually allows. The issuer comes from `zitadel.json`
+ * (falling back to the scaffold manifest), so it still says 3456 after
+ * someone edits the script to 4000. An issuer that names no port yields no
+ * expectation and the op becomes a no-op.
  */
-export function devScriptPortEdit(devPort: number): (source: string | undefined) => string {
+export function devScriptPortEdit(issuer: string): (source: string | undefined) => string {
   return (source) => {
     if (source === undefined) {
       throw new ZitadelError("E_VALIDATION", "package.json is required to pin the dev port", {
         hint: "Run setup from a project that has a package.json.",
       });
+    }
+    const devPort = portFromIssuer(issuer);
+    if (devPort === undefined) {
+      return source;
     }
     const pkg = parseJsonObject(source, "package.json");
     const scripts = isObject(pkg.scripts) ? pkg.scripts : undefined;
@@ -58,11 +73,11 @@ export function devScriptPortEdit(devPort: number): (source: string | undefined)
  * moves it without touching the file, so a hard failure here would promise a
  * guarantee the check cannot make.
  */
-export function devScriptPortOp(devPort: number): FileOp {
+export function devScriptPortOp(issuer: string): FileOp {
   return {
     kind: "edit",
     path: "package.json",
-    edit: devScriptPortEdit(devPort),
+    edit: devScriptPortEdit(issuer),
     wiring: "convenience",
   };
 }

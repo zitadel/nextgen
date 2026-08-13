@@ -143,7 +143,9 @@ describe("NuxtPatcher.artifacts", () => {
     });
     expect(artifacts.markedFiles).toContain("app/pages/login.vue");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-nuxt"]);
-    expect(artifacts.configEdits).toEqual(["nuxt.config.*"]);
+    // package.json is listed too: the `dev` script gets the registered
+    // dev-server port pinned into it, and eject can't auto-revert that.
+    expect(artifacts.configEdits).toEqual(["nuxt.config.*", "package.json"]);
   });
 
   it("declares the app shell and homepage as conditionally scaffolded", () => {

@@ -82,10 +82,11 @@ export function extractPort(script: string): number | undefined {
  * `EADDRINUSE` instead of drifting to one the project does not allow.
  *
  * `--port <n>` is the one spelling every framework this CLI scaffolds
- * accepts (`next dev`, `nuxt dev`, `vite`, `vinxi dev`, `ng serve`), so the
- * rewrite stays framework-agnostic. An existing port declaration is replaced
- * in place — including the `PORT=` env-assignment form, which is rewritten to
- * the flag so one mechanism owns the port.
+ * accepts (`next dev`, `nuxt dev`, `vite`, `vinxi dev`, `ng serve`), so an
+ * appended declaration stays framework-agnostic. An existing declaration is
+ * rewritten in its own form instead — a `PORT=` env assignment keeps the
+ * `PORT=` form — so the script keeps whichever mechanism its author chose and
+ * only the number changes.
  */
 export function withDevPort(script: string, port: number): string {
   // Test for a declaration rather than comparing before/after: a script that
@@ -109,4 +110,25 @@ export function withDevPort(script: string, port: number): string {
  */
 export function issuerFromPort(port: number): string {
   return `http://localhost:${port}`;
+}
+
+/**
+ * The port an issuer URL names, or `undefined` when it names none.
+ *
+ * The inverse of {@link issuerFromPort}, and the authoritative way to learn
+ * which port a project *registered* — as opposed to {@link detectDevPort},
+ * which reports the port the app would start on right now. The two agree
+ * during setup and diverge afterwards, which is exactly when it matters: a
+ * dev script edited to another port must be read as a mismatch against the
+ * registered origin, not as the new truth.
+ */
+export function portFromIssuer(issuer: string): number | undefined {
+  let parsed: URL;
+  try {
+    parsed = new URL(issuer);
+  } catch {
+    return undefined;
+  }
+  const port = Number.parseInt(parsed.port, 10);
+  return Number.isFinite(port) && port > 0 ? port : undefined;
 }

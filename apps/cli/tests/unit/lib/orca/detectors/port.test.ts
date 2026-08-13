@@ -9,6 +9,7 @@ import {
   detectDevPort,
   extractPort,
   issuerFromPort,
+  portFromIssuer,
   withDevPort,
 } from "../../../../../src/lib/orca/detectors/port";
 
@@ -138,5 +139,21 @@ describe("withDevPort", () => {
     ]) {
       expect(extractPort(withDevPort(script, 3456)), script).toBe(3456);
     }
+  });
+});
+
+describe("portFromIssuer", () => {
+  it("round-trips issuerFromPort", () => {
+    expect(portFromIssuer(issuerFromPort(3456))).toBe(3456);
+  });
+
+  it("returns undefined when the issuer names no explicit port", () => {
+    expect(portFromIssuer("https://auth.example.com")).toBeUndefined();
+    expect(portFromIssuer("http://localhost")).toBeUndefined();
+  });
+
+  it("returns undefined for a malformed issuer", () => {
+    expect(portFromIssuer("")).toBeUndefined();
+    expect(portFromIssuer("localhost:3456")).toBeUndefined();
   });
 });

@@ -76,7 +76,7 @@ export class NuxtPatcher extends AbstractRulePatcher {
       },
       // `nuxt dev` takes its port from the command line only, so without this
       // the app can serve a port the project does not allow as an origin.
-      devScriptPortOp(ctx.framework.devPort),
+      devScriptPortOp(ctx.issuer),
     ];
   }
 
@@ -113,7 +113,9 @@ export class NuxtPatcher extends AbstractRulePatcher {
   }
 
   protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
-    return ["nuxt.config.*"];
+    // package.json: the `dev` script gets the project's dev-server port
+    // pinned into it, another in-place edit eject can't auto-revert.
+    return ["nuxt.config.*", "package.json"];
   }
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {

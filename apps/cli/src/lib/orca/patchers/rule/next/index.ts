@@ -87,6 +87,13 @@ export class NextPatcher extends AbstractRulePatcher {
     return [getRenderer(view.rendererId).dependency.name];
   }
 
+  protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
+    // The `dev` script gets the project's dev-server port pinned into it via
+    // an `edit` op eject can't auto-revert, so it has to be surfaced as a
+    // manual cleanup step like any other in-place config merge.
+    return ["package.json"];
+  }
+
   protected summary(ctx: PatchContext): { title: string; detail: string } {
     return {
       title: "Next.js integration",
@@ -203,7 +210,7 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     },
     // `next dev` takes its port from the command line only, so without this
     // the app can serve a port the project does not allow as an origin.
-    devScriptPortOp(ctx.framework.devPort),
+    devScriptPortOp(ctx.issuer),
   ].filter((op): op is FileOp => op !== undefined);
 }
 

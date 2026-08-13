@@ -11,7 +11,7 @@ function devScriptOf(source: string): string | undefined {
 
 describe("devScriptPortEdit", () => {
   it("pins the port on a dev script that declares none", () => {
-    const out = devScriptPortEdit(3456)(pkg({ dev: "next dev", build: "next build" }));
+    const out = devScriptPortEdit("http://localhost:3456")(pkg({ dev: "next dev", build: "next build" }));
     expect(devScriptOf(out)).toBe("next dev --port 3456");
     // Sibling scripts survive untouched.
     expect(devScriptOf(out)).not.toBe(undefined);
@@ -21,7 +21,7 @@ describe("devScriptPortEdit", () => {
   });
 
   it("rewrites a dev script pointing at a different port", () => {
-    const out = devScriptPortEdit(3456)(pkg({ dev: "next dev -p 3000" }));
+    const out = devScriptPortEdit("http://localhost:3456")(pkg({ dev: "next dev -p 3000" }));
     expect(devScriptOf(out)).toBe("next dev -p 3456");
   });
 
@@ -29,22 +29,39 @@ describe("devScriptPortEdit", () => {
     // Unchanged output is how the edit op skips the file, so a pre-existing
     // app whose script already agrees never gets its package.json reformatted.
     const source = pkg({ dev: "next dev --port 3456" });
-    expect(devScriptPortEdit(3456)(source)).toBe(source);
+    expect(devScriptPortEdit("http://localhost:3456")(source)).toBe(source);
   });
 
   it("leaves a project without a dev script alone", () => {
     const source = pkg({ build: "next build" });
-    expect(devScriptPortEdit(3456)(source)).toBe(source);
+    expect(devScriptPortEdit("http://localhost:3456")(source)).toBe(source);
   });
 
   it("preserves formatting outside the scripts map", () => {
     const source = `{\n  "name": "app",\n\n  "scripts": { "dev": "next dev" },\n  "private": true\n}\n`;
-    const out = devScriptPortEdit(3456)(source);
+    const out = devScriptPortEdit("http://localhost:3456")(source);
     expect(out).toContain(`"private": true`);
     expect(out.startsWith(`{\n  "name": "app",\n\n`)).toBe(true);
   });
 
   it("fails with actionable guidance when package.json is missing", () => {
-    expect(() => devScriptPortEdit(3456)(undefined)).toThrow(/package\.json is required/);
+    expect(() => devScriptPortEdit("http://localhost:3456")(undefined)).toThrow(/package\.json is required/);
+  });
+});
+
+describe("devScriptPortEdit issuer handling", () => {
+  it("is a no-op when the issuer names no port", () => {
+    // Nothing to hold the script to, so the user's script is left alone
+    // rather than guessed at.
+    const source = pkg({ dev: "next dev" });
+    expect(devScriptPortEdit("https://auth.example.com")(source)).toBe(source);
+    expect(devScriptPortEdit("not-a-url")(source)).toBe(source);
+  });
+
+  it("targets the issuer's port even when the script names another", () => {
+    // The doctor path: detection would say 4000; the registered origin is
+    // what the server actually allows.
+    const out = devScriptPortEdit("http://localhost:3456")(pkg({ dev: "next dev --port 4000" }));
+    expect(devScriptOf(out)).toBe("next dev --port 3456");
   });
 });
