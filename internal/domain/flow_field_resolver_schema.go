@@ -443,39 +443,6 @@ func (r schemaReader) collectRequiredPaths(prefix AttributeKey, materialized, ou
 	}
 }
 
-// RequiredEmptyObjects returns the paths of required objects an empty
-// object satisfies: ones that declare no `required` of their own, so
-// the schema demands the node exists without constraining its contents.
-// A flow has no way to guarantee such an object materializes — the leaf
-// covering it resolves optional, because the object does not require it
-// — so the engine writes `{}` instead.
-func (r schemaReader) RequiredEmptyObjects() []AttributeKey {
-	var out []AttributeKey
-	r.collectRequiredEmptyObjects("", &out)
-	return out
-}
-
-func (r schemaReader) collectRequiredEmptyObjects(prefix AttributeKey, out *[]AttributeKey) {
-	properties := r.Properties()
-	for name := range r.RequiredSet() {
-		prop, ok := properties[name]
-		if !ok {
-			continue
-		}
-		path := prefix.AppendNode(name)
-		if len(prop.RequiredSet()) > 0 {
-			prop.collectRequiredEmptyObjects(path, out)
-			continue
-		}
-		// Same object test as [deriveUserPropertyType]: a property
-		// carrying `properties` is an object even without the `type`
-		// keyword. Arrays are left alone — `{}` does not satisfy one.
-		if jsonType, _ := prop.JSONType(); jsonType == "object" || prop.Properties() != nil {
-			*out = append(*out, path)
-		}
-	}
-}
-
 // AuthMethods returns a reader over the root schema's `x-auth-methods`
 // keyword. An empty (no-op) reader is returned when the keyword is
 // absent. An error is returned only when the keyword is present but

@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ianlancetaylor/jsonschema"
-
 	"github.com/zitadel/nextgen/internal/maputil"
 )
 
@@ -322,10 +320,6 @@ type processCtx struct {
 	state       *FlowState
 	currentStep *FlowDefinitionStep
 	in          FlowSubmitInput
-	// schema is the user schema the current step's fields were resolved
-	// against, nil until [FlowStateMachineRuntime.resolveInputs] runs and
-	// for a step declaring no fields.
-	schema *jsonschema.Schema
 }
 
 // Process advances the flow one step by dispatching the submission to
@@ -395,14 +389,12 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 }
 
 // resolveInputs resolves the step's fields and prefills any values the
-// user already supplied on earlier steps. The loaded schema is kept on
-// pc so the merge can read it without a second resolve.
+// user already supplied on earlier steps.
 func (r *FlowStateMachineRuntime) resolveInputs(pc *processCtx) (FlowResolvedFields, error) {
-	resolved, schema, err := r.resolveStepFields(pc.ctx, pc.state, pc.currentStep)
+	resolved, err := r.resolveStepFields(pc.ctx, pc.state, pc.currentStep)
 	if err != nil {
 		return FlowResolvedFields{}, err
 	}
-	pc.schema = schema
 	prefillFromCollected(&resolved, pc.state.CollectedData.UserData)
 	return resolved, nil
 }
@@ -443,32 +435,8 @@ func (r *FlowStateMachineRuntime) validateAndMerge(pc *processCtx, resolved Flow
 	if err := mergeCollected(pc.state, pc.in.Fields); err != nil {
 		return nil, fmt.Errorf("flow state machine: validate fields: %w", err)
 	}
-	if err := materializeRequiredObjects(pc.schema, pc.state.CollectedData.UserData); err != nil {
-		return nil, fmt.Errorf("flow state machine: %w", err)
-	}
 
 	return nil, nil
-}
-
-// materializeRequiredObjects gives the collected document the required
-// objects a flow cannot fill on its own — see
-// [schemaReader.RequiredEmptyObjects]. The objects follow from the
-// schema, not from what was submitted, and an empty object flattens to
-// no attributes, so the only thing this changes is the schema
-// validation `create_user` runs at the end of the flow.
-func materializeRequiredObjects(schema *jsonschema.Schema, doc map[string]any) error {
-	if schema == nil {
-		return nil
-	}
-	for _, path := range newSchemaReader(schema).RequiredEmptyObjects() {
-		if _, present := maputil.GetNested[any](doc, path.Nodes()); present {
-			continue
-		}
-		if err := maputil.SetNested(doc, path.Nodes(), map[string]any{}); err != nil {
-			return fmt.Errorf("materialize required object %q: %w", path, err)
-		}
-	}
-	return nil
 }
 
 // renderStepError re-renders the current step with an error key set,
@@ -1152,7 +1120,7 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *FlowDefin
 	if !ok {
 		return nil, fmt.Errorf("%w: render unknown step %q", ErrFlowIntegrity(), state.CurrentStep)
 	}
-	resolved, _, err := r.resolveStepFields(ctx, state, step)
+	resolved, err := r.resolveStepFields(ctx, state, step)
 	if err != nil {
 		return nil, err
 	}
@@ -1160,23 +1128,19 @@ func (r *FlowStateMachineRuntime) renderStep(ctx context.Context, def *FlowDefin
 	return r.buildStep(state, step, resolved, nil, nil, nil), nil
 }
 
-// resolveStepFields returns the step's resolved fields alongside the
-// schema they were resolved against, so a caller that needs the schema
-// again does not pay a second resolve. Both are zero for a step that
-// declares no fields.
-func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *FlowState, step *FlowDefinitionStep) (FlowResolvedFields, *jsonschema.Schema, error) {
+func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *FlowState, step *FlowDefinitionStep) (FlowResolvedFields, error) {
 	if len(step.Fields) == 0 {
-		return FlowResolvedFields{}, nil, nil
+		return FlowResolvedFields{}, nil
 	}
 	schema, err := r.schemas.Resolve(ctx, r.schemaStore, state.ProjectID, state.UserSchemaURL, nil)
 	if err != nil {
-		return FlowResolvedFields{}, nil, fmt.Errorf("flow state machine: load user schema on step %q: %w", step.Name, err)
+		return FlowResolvedFields{}, fmt.Errorf("flow state machine: load user schema on step %q: %w", step.Name, err)
 	}
 	resolved, err := r.fields.Resolve(schema, step.Name, step.Fields)
 	if err != nil {
-		return FlowResolvedFields{}, nil, fmt.Errorf("flow state machine: resolve fields on step %q: %w", step.Name, err)
+		return FlowResolvedFields{}, fmt.Errorf("flow state machine: resolve fields on step %q: %w", step.Name, err)
 	}
-	return resolved, schema, nil
+	return resolved, nil
 }
 
 // resolveVisitedFields resolves the union of fields collected by every
