@@ -54,10 +54,8 @@ Every step response contains the capability collections and step-level metadata:
 
     "gates": {
       "captcha": {
-        "type": "captcha",
+        "kind": "captcha",
         "provider": "altcha",
-        "required": true,
-        "satisfied": false,
         "config": {
           "algorithm": "SHA-256",
           "challenge": "abc...",

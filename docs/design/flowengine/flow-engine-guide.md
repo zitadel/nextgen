@@ -200,7 +200,7 @@ Customers who want full control "eject" this template — the Zitadel Console co
 ### The frontend loop (pseudocode)
 
 ```
-response = POST /flow { purpose, auth_request_id }
+response = POST /flow { project_id, purpose, auth_request_id }
 
 loop:
   step = response.step
@@ -221,12 +221,12 @@ loop:
   })
   shadowRoot.innerHTML = html
 
-  { action, data } = waitForCustomEvent()
+  { action, fields } = waitForCustomEvent()
 
   response = POST /flow/{id}/submit {
     session_token: response.session_token,
     action: action,
-    data: data
+    fields: fields
   }
 ```
 
@@ -258,15 +258,17 @@ As a definition:
 
 ```json
 {
-  "slug": "simple-login",
-  "name": "Simple Login",
-  "user_schema": "human_user",
-  "purposes": ["login"],
-  "initial_steps": { "login": "login" },
+  "name": "simple-login",
+  "status": "active",
+  "user_schema": "sch_01hexample",
+  "purposes": { "login": "login" },
   "steps": [
     {
       "name": "login",
       "fields": ["email", "password"],
+      "actions": [
+        {"name": "submit", "kind": "submit", "primary": true}
+      ],
       "transitions": {
         "submit": { "target": "done" }
       }
@@ -277,7 +279,7 @@ As a definition:
 ```
 
 Key points:
-- **`fields`** reference properties from the `human_user` schema. The engine resolves type, validation, and text keys at runtime.
+- **`fields`** reference properties from the definition's `user_schema`. The engine resolves type, validation, and text keys at runtime.
 - **`transitions`** define the edges of the graph — each maps an action name to a target step.
 - The engine **implicitly evaluates assurance policy** after every submit. If the session meets the target ACR, it transitions to `complete`. If not, it follows the defined transition or injects additional steps dynamically.
 
@@ -289,7 +291,7 @@ Steps reference fields by name from the flow's user schema. The engine resolves 
 
 ```mermaid
 flowchart LR
-    schema["User Schema<br>(human_user)"]
+    schema["User Schema<br>(sch_01hexample)"]
     definition["Flow Definition<br>fields: [email, given_name]"]
     engine["Flow Engine"]
     response["Step Response<br>fields with types, text_keys, validation"]
@@ -322,9 +324,12 @@ Steps can declare server-side behavior directly as properties:
 
 ```json
 {
-  "name": "set_password",
+  "name": "set-password",
   "fields": ["password"],
   "on_success": "create_user",
+  "actions": [
+    {"name": "submit", "kind": "submit", "primary": true}
+  ],
   "transitions": {
     "submit": { "target": "done" }
   }
@@ -333,10 +338,10 @@ Steps can declare server-side behavior directly as properties:
 
 The `on_success` mutation runs **after** the step succeeds (fields validated) and **before** the transition fires. Possible values:
 
-| Action | What it does |
+| Value | What it does |
 |---|---|
-| `create_user` | Creates the user from accumulated schema data |
-| `reset_credential` | Resets the password or other credential |
+| `create_user` | Creates the user from accumulated schema data. The only value in the shipped schema. |
+| `reset_credential` | Direction for recovery flows — not in the shipped schema. |
 
 ### `complete` — terminal step
 
@@ -394,10 +399,10 @@ A single flow definition can serve **multiple purposes** by declaring different 
 
 ```json
 {
-  "slug": "combined-auth",
-  "user_schema": "human_user",
-  "purposes": ["login", "register"],
-  "initial_steps": {
+  "name": "combined-auth",
+  "status": "active",
+  "user_schema": "sch_01hexample",
+  "purposes": {
     "login": "identify",
     "register": "identify"
   },
@@ -416,8 +421,8 @@ When a flow starts, the server resolves which definition to use:
 ```mermaid
 flowchart TD
     req["Flow request:<br>purpose=login<br>team_id=acme<br>app_id=dashboard"]
-    filter["Filter: active definitions<br>where purposes includes 'login'"]
-    match["Match audience:<br>app_id > team_id > schema_id > project"]
+    filter["Filter: active definitions<br>whose purposes has an entry for 'login'"]
+    match["Match audience:<br>app_id > team_id > project"]
     pick["Pick most specific match<br>tie-break by priority"]
     fallback["No match → built-in default"]
 
@@ -432,8 +437,7 @@ A definition's **audience** scopes where it applies:
 {
   "audience": {
     "team_ids": ["team_acme"],
-    "app_ids": ["app_dashboard"],
-    "schema_ids": ["human_user"]
+    "app_ids": ["app_dashboard"]
   }
 }
 ```
@@ -453,10 +457,13 @@ Gates are security challenges that must be satisfied before a step can be submit
   "name": "profile",
   "fields": ["email", "given_name", "family_name"],
   "gates": {
-    "captcha": { "type": "captcha", "provider": "altcha" }
+    "captcha": { "kind": "captcha", "provider": "altcha" }
   },
+  "actions": [
+    {"name": "submit", "kind": "submit", "primary": true}
+  ],
   "transitions": {
-    "submit": { "target": "set_password" }
+    "submit": { "target": "set-password" }
   }
 }
 ```
@@ -466,7 +473,7 @@ The engine resolves gate details (provider, config) at runtime. The frontend rec
 ```json
 {
   "gates": {
-    "captcha": { "type": "captcha", "provider": "altcha", "config": { ... } }
+    "captcha": { "kind": "captcha", "provider": "altcha", "config": { ... } }
   }
 }
 ```
@@ -485,6 +492,14 @@ Transitions support two cross-flow actions:
 |---|---|
 | `pivot` | Push a new flow onto the stack. The current flow pauses and resumes when the new flow completes. |
 | `switch` | Replace the current flow entirely. No return. |
+
+> **Direction — not runtime-supported.** The schema and validator accept these,
+> but today's engine rejects every transition carrying a non-null `action` with
+> `{ "code": "flow.unsupported" }` — see
+> [flow-engine.md](flow-engine.md#flow-pivot-cross-flow-navigation) and
+> [capabilities.md](capabilities.md). The shipped default flow covers
+> login ↔ register inside one definition with local re-purposing transitions
+> (`{ "target": "register", "purpose": "register" }`).
 
 ```json
 {
@@ -582,7 +597,7 @@ The session token still rotates on error (prevents replay). The step doesn't adv
     "name": "signin",
     "error": "Invalid password. 2 attempts remaining.",
     "fields": [
-      {"name": "password", "kind": "navigate", "type": "password", "text_key": "signin.field.password", "required": true}
+      {"name": "password", "type": "password", "text_key": "signin.field.password", "required": true}
     ],
     "actions": [
       {"name": "submit", "text_key": "signin.action.submit", "primary": true, "kind": "submit"},
@@ -597,7 +612,9 @@ The session token still rotates on error (prevents replay). The step doesn't adv
 
 ## Putting It All Together
 
-Here's how two separate flow definitions connect via a cross-flow switch:
+Here's how two separate flow definitions connect via a cross-flow switch
+(direction — today's runtime rejects cross-flow transitions; see
+[Cross-Flow Navigation](#cross-flow-navigation-pivot-and-switch)):
 
 ```mermaid
 graph TD
@@ -610,7 +627,7 @@ graph TD
 
     subgraph "Registration Flow (default-register)"
         profile["profile<br>(email, given_name, family_name)"]
-        set_pwd["set_password<br>(password, on_success: create_user)"]
+        set_pwd["set-password<br>(password, on_success: create_user)"]
         reg_done["done (show)"]
 
         profile -->|submit| set_pwd
@@ -627,24 +644,15 @@ Two separate flow definitions, connected by a switch transition. The user can na
 
 ## Definition Lifecycle
 
-Flow definitions go through a lifecycle before they're used in production:
+The shipped schema defines two statuses:
 
-```mermaid
-stateDiagram-v2
-    [*] --> draft: POST /flow_definitions
-    draft --> draft: PATCH (edit)
-    draft --> active: POST .../activate
-    active --> archived: POST .../archive
-    archived --> [*]
-
-    draft --> draft: POST .../validate
-    draft --> draft: POST .../simulate
-```
-
-| State | Can be resolved? | Can be edited? |
+| Status | Can be resolved? | How to edit |
 |---|---|---|
-| `draft` | No | Yes |
-| `active` | Yes | No (create a new draft to iterate) |
-| `archived` | No | No |
+| `draft` | No — never selected for new flows | `PUT /flow_definitions/{id}` (full replacement) |
+| `active` | Yes | `PUT /flow_definitions/{id}` (full replacement) |
 
-Use **validate** to check for dead ends, missing transitions, and unreachable steps before activating. Use **simulate** to dry-run the flow with mock input and see the path the state machine would take.
+There are no lifecycle verbs in the shipped spec — you change `status` by
+replacing the document, and create/update already run the definition
+validator. A standalone `POST .../validate` (dead-end and reachability checks
+on demand) and `POST .../simulate` (dry-run with mock input) are planned, not
+shipped — see [flow-engine.md](flow-engine.md#flow-definitions).

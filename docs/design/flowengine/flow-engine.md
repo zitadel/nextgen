@@ -24,6 +24,7 @@ The `{id}` is a flow handle returned by `POST /flow` or the latest `POST /flow/{
 ```http
 POST /flow
 {
+  "project_id": "proj_01hexample",
   "purpose": "login",
   "auth_request_id": "oidc-123",
   "redirect_uri": "https://app.com/callback",
@@ -36,22 +37,23 @@ POST /flow
 
 | Field | Purpose |
 |---|---|
+| `project_id` | Required — which project's flow definitions to resolve against |
 | `purpose` | What the flow achieves: `login`, `register`, `recovery`, `profiling`, `reauth`, `link_account` |
 | `auth_request_id` | Links to an OIDC/SAML auth request — determines target ACR and redirect |
 | `redirect_uri` | Where to send the user on completion (from the auth request or explicit) |
 | `hint.login_name` | Auto-submits identifier step (OIDC `login_hint`) |
 | `hint.team_id` | Scopes flow resolution to a team |
-| `hint.schema_id` | Scopes to a specific user type |
+| `hint.user_schema_id` | Scopes to a specific user type |
 | `hint.app_id` | Scopes to a specific application |
 
 ### Flow Resolution
 
 The server resolves which flow definition to use:
 
-1. Filter active definitions where `purposes[]` includes the requested purpose
-2. Filter by audience match (app > team > schema > project default)
+1. Filter active definitions whose `purposes` map has an entry for the requested purpose
+2. Filter by audience match (app > team > project-wide)
 3. Most specific wins; tie-break by priority
-4. Select `initial_steps[purpose]` from the matched definition
+4. Enter at the step named by `purposes[<purpose>]` in the matched definition
 5. Fallback: built-in default flow
 
 ## Flow Definitions
@@ -75,9 +77,9 @@ POST   /flow_definitions/{id}/simulate    Dry-run with mock input
 Steps do not have a `type`. Instead, the engine derives behavior from the step's properties:
 
 - **`fields`** — array of schema property names. The engine resolves each field's type, validation, and implicit outcomes from the user schema's `x-*` annotations. For example, a field with a non-empty `x-unique` scope is an identifier and implies a `user_not_found` outcome in transitions.
-- **`action`** — server-side mutation to run after the step succeeds (e.g. `"create_user"`). Executes before the transition fires.
+- **`on_success`** — server-side mutation to run after the step's fields validate (`"create_user"` is the only shipped value). Executes before the transition fires.
 - **`complete`** — marks the step as terminal (`"redirect"` or `"show"`).
-- **`gates`** — array of gate types (`"captcha"`, `"passkey"`) required before submission. The engine may also inject gates dynamically based on policy.
+- **`gates`** — object keyed by gate name; each gate declares `{ "kind": "captcha", "provider": … }`. The engine may also inject gates dynamically based on policy. Passkey is not a gate — authenticator ceremonies run as credential auth_attempts.
 
 ### Implicit Post-Submit Policy Evaluation
 
@@ -89,6 +91,7 @@ A step with `complete` set is the terminal state. The frontend knows the flow is
 
 ```json
 {
+  "id": "flow_xyz",
   "session_id": "sess_xyz",
   "session_token": "tok_final",
   "step": {
@@ -120,6 +123,16 @@ When the flow completes after a pivot (e.g., registration with a pending `auth_r
 Users navigate between flows (login ↔ register ↔ recovery) without losing context. The session persists.
 
 Transitions with `"action": "pivot"` push a new flow onto the stack. Transitions with `"action": "switch"` replace the current flow entirely.
+
+> **Direction — not runtime-supported.** The definition schema accepts
+> `switch`/`pivot` transitions and the validator admits them, but today's
+> engine rejects every transition carrying a non-null `action` with
+> `{ "code": "flow.unsupported" }` (`internal/domain/flow_state_machine.go`;
+> tracked as stubbed in [capabilities.md](capabilities.md)). The shipped
+> default flow moves between login and register inside a single definition
+> using local re-purposing transitions instead
+> (`{ "target": "register", "purpose": "register" }` — see
+> [`packages/config/defaults/default-login.json`](../../../packages/config/defaults/default-login.json)).
 
 ```json
 {
@@ -158,11 +171,10 @@ See [Flow Engine — Storage](flow-engine-storage.md) for the encrypted cookie m
 
 ```json
 {
-  "slug": "default-login",
-  "name": "Default Login",
-  "user_schema": "human_user",
-  "purposes": ["login"],
-  "initial_steps": { "login": "login" },
+  "name": "default-login",
+  "status": "active",
+  "user_schema": "sch_01hexample",
+  "purposes": { "login": "login" },
   "steps": [
     {
       "name": "login",
@@ -187,7 +199,7 @@ See [Flow Engine — Storage](flow-engine-storage.md) for the encrypted cookie m
 
 ```http
 POST /flow
-{ "purpose": "login", "auth_request_id": "oidc-123", "redirect_uri": "https://app.com/cb" }
+{ "project_id": "proj_01hexample", "purpose": "login", "auth_request_id": "oidc-123", "redirect_uri": "https://app.com/cb" }
 ```
 ```json
 ← 201
@@ -198,8 +210,8 @@ POST /flow
   "step": {
     "name": "login",
     "fields": [
-      {"name": "email", "kind": "navigate", "type": "email", "text_key": "login.field.email", "required": true},
-      {"name": "password", "kind": "navigate", "type": "password", "text_key": "login.field.password", "required": true}
+      {"name": "email", "type": "email", "text_key": "login.field.email", "required": true},
+      {"name": "password", "type": "password", "text_key": "login.field.password", "required": true}
     ],
     "actions": [
       {"name": "submit", "kind": "submit", "text_key": "login.action.submit", "primary": true},
@@ -213,7 +225,7 @@ POST /flow
 
 ```http
 POST /flow/flow_1/submit
-{ "session_token": "tok_1", "action": "submit", "data": { "email": "alice@acme.com", "password": "correct-horse" } }
+{ "session_token": "tok_1", "action": "submit", "fields": { "email": "alice@acme.com", "password": "correct-horse" } }
 ```
 ```json
 ← 200  (implicit policy check: session has password factor, ACR met → complete)
@@ -241,11 +253,10 @@ If the policy requires MFA, the engine would instead respond with a dynamically 
 
 ```json
 {
-  "slug": "default-register",
-  "name": "Default Registration",
-  "user_schema": "human_user",
-  "purposes": ["register"],
-  "initial_steps": { "register": "profile" },
+  "name": "default-register",
+  "status": "active",
+  "user_schema": "sch_01hexample",
+  "purposes": { "register": "profile" },
   "steps": [
     {
       "name": "profile",
@@ -255,14 +266,17 @@ If the policy requires MFA, the engine would instead respond with a dynamically 
         {"name": "login", "kind": "navigate"}
       ],
       "transitions": {
-        "submit": { "target": "set_password" },
+        "submit": { "target": "set-password" },
         "login": { "target": "default-login", "action": "switch" }
       }
     },
     {
-      "name": "set_password",
+      "name": "set-password",
       "fields": ["password"],
       "on_success": "create_user",
+      "actions": [
+        {"name": "submit", "kind": "submit", "primary": true}
+      ],
       "transitions": {
         "submit": { "target": "done" }
       }
@@ -274,7 +288,8 @@ If the policy requires MFA, the engine would instead respond with a dynamically 
 
 **Frontend interaction (started from login via switch):**
 
-User was on the login flow, clicked "Create account":
+User was on the login flow, clicked "Create account" — a `switch` transition
+(direction-only today; see [Flow Pivot](#flow-pivot-cross-flow-navigation)):
 
 ```http
 POST /flow/flow_1/submit
@@ -289,9 +304,9 @@ POST /flow/flow_1/submit
   "step": {
     "name": "profile",
     "fields": [
-      {"name": "email", "kind": "navigate", "type": "email", "text_key": "profile.field.email", "required": true, "value": "alice@acme.com"},
-      {"name": "given_name", "kind": "navigate", "type": "text", "text_key": "profile.field.given_name", "required": true},
-      {"name": "family_name", "kind": "navigate", "type": "text", "text_key": "profile.field.family_name", "required": true}
+      {"name": "email", "type": "email", "text_key": "profile.field.email", "required": true, "value": "alice@acme.com"},
+      {"name": "given_name", "type": "text", "text_key": "profile.field.given_name", "required": true},
+      {"name": "family_name", "type": "text", "text_key": "profile.field.family_name", "required": true}
     ],
     "actions": [
       {"name": "submit", "kind": "submit", "text_key": "profile.action.submit", "primary": true},
@@ -304,7 +319,7 @@ POST /flow/flow_1/submit
 
 ```http
 POST /flow/flow_1/submit
-{ "session_token": "tok_2", "action": "submit", "data": { "email": "alice@acme.com", "given_name": "Alice", "family_name": "Smith" } }
+{ "session_token": "tok_2", "action": "submit", "fields": { "email": "alice@acme.com", "given_name": "Alice", "family_name": "Smith" } }
 ```
 ```json
 ← 200
@@ -313,12 +328,12 @@ POST /flow/flow_1/submit
   "session_id": "sess_1",
   "session_token": "tok_3",
   "step": {
-    "name": "set_password",
+    "name": "set-password",
     "fields": [
-      {"name": "password", "type": "password", "text_key": "set_password.field.password", "required": true, "validation": { "min_length": 8 }}
+      {"name": "password", "type": "password", "text_key": "set-password.field.password", "required": true, "validation": { "min_length": 8 }}
     ],
     "actions": [
-      {"name": "submit", "kind": "submit", "text_key": "set_password.action.submit", "primary": true}
+      {"name": "submit", "kind": "submit", "text_key": "set-password.action.submit", "primary": true}
     ],
     "gates": {}
   }
@@ -327,7 +342,7 @@ POST /flow/flow_1/submit
 
 ```http
 POST /flow/flow_1/submit
-{ "session_token": "tok_3", "action": "submit", "data": { "password": "strong-pass-123!" } }
+{ "session_token": "tok_3", "action": "submit", "fields": { "password": "strong-pass-123!" } }
 ```
 ```json
 ← 200  (create_user action runs → done)
@@ -354,15 +369,17 @@ A single flow that handles both login and registration using implicit outcomes f
 
 ```json
 {
-  "slug": "combined-auth",
-  "name": "Combined Auth",
-  "user_schema": "human_user",
-  "purposes": ["login", "register"],
-  "initial_steps": { "login": "identify", "register": "identify" },
+  "name": "combined-auth",
+  "status": "active",
+  "user_schema": "sch_01hexample",
+  "purposes": { "login": "identify", "register": "identify" },
   "steps": [
     {
       "name": "identify",
       "fields": ["email"],
+      "actions": [
+        {"name": "submit", "kind": "submit", "primary": true}
+      ],
       "transitions": {
         "submit": { "target": "signin" },
         "user_not_found": { "target": "profile" }
@@ -383,14 +400,20 @@ A single flow that handles both login and registration using implicit outcomes f
     {
       "name": "profile",
       "fields": ["given_name", "family_name"],
+      "actions": [
+        {"name": "submit", "kind": "submit", "primary": true}
+      ],
       "transitions": {
-        "submit": { "target": "set_password" }
+        "submit": { "target": "set-password" }
       }
     },
     {
-      "name": "set_password",
+      "name": "set-password",
       "fields": ["password"],
       "on_success": "create_user",
+      "actions": [
+        {"name": "submit", "kind": "submit", "primary": true}
+      ],
       "transitions": {
         "submit": { "target": "done" }
       }
@@ -406,51 +429,59 @@ The `email` field has `x-unique: "project"` in the user schema, which makes it a
 
 ### Example 4: SSO Login (Google)
 
+> **Direction:** SSO is stubbed in today's engine (`ErrUnsupported` — see
+> [capabilities.md](capabilities.md)). The definition below validates against
+> the shipped schema; the runtime exchange shows the intended ceremony.
+
 **Flow Definition:**
 
 ```json
 {
-  "slug": "sso-login",
-  "name": "SSO Login",
-  "user_schema": "human_user",
-  "purposes": ["login"],
-  "initial_steps": { "login": "login" },
+  "name": "sso-login",
+  "status": "active",
+  "user_schema": "sch_01hexample",
+  "purposes": { "login": "login" },
   "steps": [
     {
       "name": "login",
       "fields": ["email"],
+      "actions": [
+        {"name": "submit", "kind": "submit", "primary": true}
+      ],
       "sso_providers": [
-        { "id": "google", "name": "Google" },
-        { "id": "entra", "name": "Microsoft" }
+        { "id": "google", "name": "Google", "template": "google" },
+        { "id": "entra", "name": "Microsoft", "template": "entraid" }
       ],
       "transitions": {
         "submit": { "target": "signin" },
         "user_not_found": { "target": "login" },
-        "sso": { "target": "sso_redirect" },
         "callback": { "target": "done" }
       }
     },
     {
       "name": "signin",
       "fields": ["password"],
+      "actions": [
+        {"name": "submit", "kind": "submit", "primary": true}
+      ],
       "transitions": {
         "submit": { "target": "done" }
       }
-    },
-    {
-      "name": "sso_redirect",
-      "transitions": {}
     },
     { "name": "done", "complete": "redirect" }
   ]
 }
 ```
 
+The author never writes a `transitions.sso` — the engine handles the reserved
+`sso` action transparently (IdP redirect, code exchange, user resolution) and
+fires `callback` on this step when the IdP returns.
+
 **Frontend interaction:**
 
 ```http
 POST /flow
-{ "purpose": "login", "auth_request_id": "oidc-789" }
+{ "project_id": "proj_01hexample", "purpose": "login", "auth_request_id": "oidc-789" }
 ```
 ```json
 ← 201
@@ -461,7 +492,7 @@ POST /flow
   "step": {
     "name": "login",
     "fields": [
-      {"name": "email", "kind": "navigate", "type": "email", "text_key": "login.field.email", "required": true}
+      {"name": "email", "type": "email", "text_key": "login.field.email", "required": true}
     ],
     "actions": [
       {"name": "submit", "kind": "submit", "text_key": "login.action.submit", "primary": true}
@@ -479,16 +510,16 @@ User clicks "Continue with Google":
 
 ```http
 POST /flow/flow_2/submit
-{ "session_token": "tok_1", "action": "google" }
+{ "session_token": "tok_1", "action": "sso", "sso_provider_id": "google" }
 ```
 ```json
-← 200
+← 200  (engine-emitted redirect step — not authored in the definition)
 {
   "id": "flow_2",
   "session_id": "sess_2",
   "session_token": "tok_2",
   "step": {
-    "name": "sso_redirect",
+    "name": "sso-redirect",
     "redirect_url": "https://accounts.google.com/o/oauth2/auth?client_id=...&state=sess_2_google"
   }
 }
@@ -521,24 +552,29 @@ GET /flow/flow_2
 
 ```json
 {
-  "slug": "protected-register",
-  "name": "Protected Registration",
-  "user_schema": "human_user",
-  "purposes": ["register"],
-  "initial_steps": { "register": "profile" },
+  "name": "protected-register",
+  "status": "active",
+  "user_schema": "sch_01hexample",
+  "purposes": { "register": "profile" },
   "steps": [
     {
       "name": "profile",
       "fields": ["email", "given_name", "family_name"],
-      "gates": { "captcha": { "type": "captcha", "provider": "altcha" } },
+      "gates": { "captcha": { "kind": "captcha", "provider": "altcha" } },
+      "actions": [
+        {"name": "submit", "kind": "submit", "primary": true}
+      ],
       "transitions": {
-        "submit": { "target": "set_password" }
+        "submit": { "target": "set-password" }
       }
     },
     {
-      "name": "set_password",
+      "name": "set-password",
       "fields": ["password"],
       "on_success": "create_user",
+      "actions": [
+        {"name": "submit", "kind": "submit", "primary": true}
+      ],
       "transitions": {
         "submit": { "target": "done" }
       }
@@ -558,7 +594,7 @@ When a submission fails validation or proof verification, the flow does **not** 
 
 ```http
 POST /flow/flow_1/submit
-{ "session_token": "tok_2", "action": "submit", "data": { "password": "wrong" } }
+{ "session_token": "tok_2", "action": "submit", "fields": { "password": "wrong" } }
 ```
 ```json
 ← 400
@@ -570,7 +606,7 @@ POST /flow/flow_1/submit
     "name": "signin",
     "error": "Invalid password. 2 attempts remaining.",
     "fields": [
-      {"name": "password", "kind": "navigate", "type": "password", "text_key": "signin.field.password", "required": true}
+      {"name": "password", "type": "password", "text_key": "signin.field.password", "required": true}
     ],
     "actions": [
       {"name": "submit", "kind": "submit", "text_key": "signin.action.submit", "primary": true},
