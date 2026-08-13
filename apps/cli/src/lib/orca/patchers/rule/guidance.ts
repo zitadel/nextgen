@@ -73,13 +73,18 @@ export function agentsGuidanceSection(ctx: PatchContext): string {
     ctx.posture === "widget"
       ? 'Presentation, by contrast, is edited in the generated pages: this app pre-dates setup, so they embed the sign-in widgets as `variant="widget"` cards (with `theme="auto"`) inside your existing layout; switch to `variant="page"` for the widget\'s own full-page chrome, and set `theme` (`light` | `dark` | `auto`) to pick the color scheme — `auto` follows the OS `prefers-color-scheme`, not this app\'s own theme, so pin `light` or `dark` when the app fixes its scheme.'
       : 'Presentation, by contrast, is edited in the generated pages: they pin the sign-in widgets to `variant="page"` (full-page chrome); switch to `variant="widget"` to embed a card inside your own layout, and set `theme` (`light` | `dark` | `auto`) to pick the color scheme — `auto` follows the OS `prefers-color-scheme`, not this app\'s own theme, so pin `light` or `dark` when the app fixes its scheme.';
+  // The token bridge is the highest-leverage embedding lever and lives
+  // nowhere an integrator would otherwise look (component source). Keep the
+  // knob list here in sync with the documented public tokens.
+  const themingParagraph =
+    "Theming the widgets from your app: `--zl-*` design-token custom properties set on the element in your own stylesheet pierce the widgets' shadow DOM. The bridge covers your fonts (`--zl-font-family-heading`, `--zl-font-family-sans`), radii (`--zl-radius-s`/`-m`/`-l`), the primary CTA pair (`--zl-primary` / `--zl-primary-foreground`), and the link color (`--zl-color-text-link`). When your page already carries the heading, set the `suppress-header` attribute on `<zitadel-login>` / `<zitadel-session>` (SDK wrappers: `suppressHeader`) to visually hide the widget's own heading block — it stays in the accessibility tree. Starter designs from `.zitadel/branding/` collapse their brand pane by container width, not viewport: an embedded card usually renders the compact brand mark instead (`logo_url`, else `hero_url`, from `branding.json`; the `hero` design falls back to editable text).";
   // The app's own chrome (header nav, account menus) needs a session read of
   // its own — the widgets render their surfaces but never tell the host page
   // whether someone is signed in. Name the framework's supported read path;
   // the contract details live with each helper's own docs.
   const sessionStateParagraph =
     ctx.framework.id === "next"
-      ? "Your app's own chrome (header navigation, account menus) reads session state with `getSession()` from `@zitadel/sdk-next/session` — a no-store client read of the same-origin `/__nextgen/sessions/me` that the session card itself uses. It returns identity only for 200 with a non-empty `user_id`, and signed-out only for the backend's canonical `401/auth.unauthorized` or `404/sess.not_found`; any other response is unknown/error, never signed-out. In Server Components on routes covered by the request-boundary `matcher`, `auth()` from `@zitadel/sdk-next/server` works too. Sign-in and sign-out navigate (`post-sign-in-url` / `post-sign-out-url`), so chrome re-reads on the next page load without extra wiring."
+      ? "Your app's own chrome (header navigation, account menus) reads session state with `getSession()` from `@zitadel/sdk-next/session` — a no-store client read of the same-origin `/__nextgen/sessions/me` that the session card itself uses. It returns identity only for 200 with a non-empty `user_id`, and signed-out only for the backend's canonical `401/auth.unauthorized` or `404/sess.not_found`; any other response is unknown/error, never signed-out. In Server Components on routes covered by the request-boundary `matcher`, `auth()` from `@zitadel/sdk-next/server` works too — extend the `matcher` in the request boundary to cover your public routes when you want server-rendered, flash-free session state in shared chrome (the trade: the middleware then runs on those routes). Sign-in and sign-out navigate (`post-sign-in-url` / `post-sign-out-url`), so chrome re-reads on the next page load without extra wiring."
       : ctx.framework.id === "nuxt"
         ? "Your app's own chrome (header navigation, account menus) reads session state with the auto-imported `useAuth()` composable — seeded from the server on every render by the scaffolded auth plugin. Sign-in and sign-out navigate (`post-sign-in-url` / `post-sign-out-url`), so the state is fresh on every page load."
         : 'Your app\'s own chrome (header navigation, account menus) can read session state from the same-origin `/__nextgen/sessions/me` — the same server-answered read the session card performs. Fetch with `credentials: "include"`, `cache: "no-store"`, and `Accept: application/json`; treat 200 as signed-in only with a non-empty `user_id`, and signed-out only for the canonical error envelope `401/auth.unauthorized` or `404/sess.not_found`. Any other response is unknown/error, never signed-out. Sign-in and sign-out navigate (`post-sign-in-url` / `post-sign-out-url`), so chrome re-reads on the next page load.';
@@ -100,6 +105,8 @@ The golden path:
    - Agents: append \`--non-interactive --json\` to both. \`plan\` validates flow invariants with the server's own rules **before** anything uploads — fix what it reports and re-run.
 
 ${presentationParagraph}${jsxTypesNote}
+
+${themingParagraph}
 
 ${sessionStateParagraph}
 
