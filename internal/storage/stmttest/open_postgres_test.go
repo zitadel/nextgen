@@ -20,5 +20,9 @@ func init() {
 		func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error {
 			return postgres.HardDeleteTeam(ctx, pool, projectID, teamID)
 		},
+		postgres.SchemaColumnNullability(),
+		func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error) {
+			return postgres.LiveColumnNullability(ctx, pool)
+		},
 	)
 }
