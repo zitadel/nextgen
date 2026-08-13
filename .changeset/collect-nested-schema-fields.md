@@ -13,6 +13,9 @@ schema declaring `required: ["address"]` with `address.required: ["street"]` is
 satisfied by a step collecting `address.street`. Collecting into an *optional*
 object brings its own `required` list into force for the same reason — the
 object exists in the document only because one of its leaves was collected, so
-a step collecting `shipping.city` must collect `shipping.street` too. Naming an
-object- or array-typed property directly is rejected when the flow definition is
-saved instead of failing part way through the flow.
+a step collecting `shipping.city` must collect `shipping.street` too. A required
+object that declares no `required` of its own constrains nothing about its
+contents, so the flow engine materializes it as an empty object rather than
+depending on a leaf the user may leave blank. Naming an object- or array-typed
+property directly is rejected when the flow definition is saved instead of
+failing part way through the flow.
