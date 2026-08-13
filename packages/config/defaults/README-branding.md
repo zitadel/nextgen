@@ -27,6 +27,24 @@ by re-applying an earlier template.
 
 ## Make it yours
 
+- Brand assets go in `branding.json` — the shipped templates render them
+  as soon as they are set (all asset URLs must be `https://`):
+
+  ```json
+  {
+    "$schema": "../meta/branding.json",
+    "layout": "split",
+    "liquid_template_file": "./login.liquid",
+    "logo_url": "https://example.com/logo.svg",
+    "hero_url": "https://example.com/hero.jpg",
+    "font_url": "https://example.com/font.css"
+  }
+  ```
+
+  `layout` is the degrade preset (`centered` or `split`), **not** the design
+  name — `split-right`, `hero`, and `minimal` are delivered as templates and
+  map onto those two values. Switch designs with
+  `zitadel branding eject --design <name>`, don't edit `layout`.
 - In the split-family designs (`split`, `split-right`, `hero`) the
   `.zl-split__brand` pane is yours: structural HTML plus inline `style=""`
   attributes are allowed; `button`, `input`, and `form` tags are stripped —

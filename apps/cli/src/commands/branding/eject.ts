@@ -16,11 +16,12 @@ import {
 import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
 
 import { BRANDING_DIR } from "../../lib/branding";
+import { BRANDING_DESIGN_INFO } from "../../lib/branding/designs";
 import { ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { hasZitadelConfig } from "../../lib/project";
-import { publicCliCommand } from "../../lib/public-cli";
+import { normalizePublicCliProse, publicCliCommand } from "../../lib/public-cli";
 
 /**
  * The `branding eject` command — take ownership of the login template.
@@ -85,9 +86,11 @@ export default class BrandingEject extends BaseCommand {
 
     // Never overwrite a hand-edited README; setups from before the branding
     // dialect also miss the meta-schema, so materialize it when absent.
-    await write(join(BRANDING_DIR, "README.md"), brandingReadmeContent(), false).catch(
-      swallowConflict,
-    );
+    await write(
+      join(BRANDING_DIR, "README.md"),
+      normalizePublicCliProse(brandingReadmeContent(), this.meta.cliVersion),
+      false,
+    ).catch(swallowConflict);
     const brandingMeta = metaSchemaFiles().find((f) => f.name === "branding.json");
     if (brandingMeta) {
       await write(
@@ -126,13 +129,11 @@ export default class BrandingEject extends BaseCommand {
     const choice = await select({
       message: "Which design do you want to start from?",
       initialValue: DEFAULT_BRANDING_DESIGN as string,
-      options: [
-        { value: "centered", label: "Centered", hint: "the bundled default, card centred on page" },
-        { value: "split", label: "Split", hint: "brand panel left, form right" },
-        { value: "split-right", label: "Split (reversed)", hint: "form left, brand panel right" },
-        { value: "hero", label: "Hero", hint: "landing-style brand pane left, form right" },
-        { value: "minimal", label: "Minimal", hint: "no card chrome, fields straight on the page" },
-      ],
+      options: BRANDING_DESIGNS.map((design) => ({
+        value: design as string,
+        label: BRANDING_DESIGN_INFO[design].label,
+        hint: BRANDING_DESIGN_INFO[design].hint,
+      })),
     });
     if (isCancel(choice)) {
       cancel("Eject cancelled.");

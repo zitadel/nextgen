@@ -16,7 +16,7 @@
         "split"
       ],
       "default": "centered",
-      "description": "Layout preset the bundled default template branches on. Custom templates may ignore it; it also serves as the degrade target when a template fails component-side validation."
+      "description": "Layout preset the bundled default template branches on — NOT the design name. Richer designs (split-right, hero, minimal) are delivered as templates and map onto these two values; switch designs with `zitadel branding eject --design <name>` instead of editing this field. Custom templates may ignore it; it also serves as the degrade target when a template fails component-side validation."
     },
     "liquid_template_file": {
       "type": "string",
@@ -41,6 +41,12 @@
       "format": "uri",
       "pattern": "^[hH][tT][tT][pP][sS]://",
       "description": "Hero/background image URL (https required), used by split designs."
+    },
+    "font_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^[hH][tT][tT][pP][sS]://",
+      "description": "Font stylesheet URL (https required)."
     }
   },
   "not": {

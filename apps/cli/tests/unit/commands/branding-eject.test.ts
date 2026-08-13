@@ -62,6 +62,12 @@ describe("branding eject", () => {
 
     const template = await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8");
     expect(template).toBe(getDefaultBrandingConfig("centered").template);
+
+    // The README's command mentions must be runnable: the scaffolded app has
+    // no `zitadel` binary, so prose is normalized to the public npx form.
+    const readme = await readFile(join(cwd, ".zitadel/branding/README.md"), "utf8");
+    expect(readme).toContain("npx @zitadel/cli@");
+    expect(readme).not.toMatch(/`zitadel /);
   });
 
   it("--design split writes the split template and layout", async () => {
