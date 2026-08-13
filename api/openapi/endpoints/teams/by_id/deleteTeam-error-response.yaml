@@ -7,6 +7,7 @@ content:
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../../components/schemas/errors/team-team_not_found.yaml'
         - $ref: '../../../components/schemas/errors/team-permission_denied.yaml'
       discriminator:
         propertyName: code
@@ -14,6 +15,7 @@ content:
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
+          team.team_not_found: '../../../components/schemas/errors/team-team_not_found.yaml'
           team.permission_denied: '../../../components/schemas/errors/team-permission_denied.yaml'
     examples:
       auth.unauthorized:
@@ -31,6 +33,11 @@ content:
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      team.team_not_found:
+        summary: team.team_not_found
+        value:
+          code: team.team_not_found
+          message: 'team not found'
       team.permission_denied:
         summary: team.permission_denied
         value:

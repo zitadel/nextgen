@@ -4,6 +4,15 @@ Optional **surface CSS** for components that exist as both a Lit atom and a pair
 React implementation. Values always come from `@zitadel/design-tokens`;
 this package owns **rules** (selectors, states, layout) once.
 
+**Mode-aware tokens only.** Surface CSS must consume the semantic tokens
+(`--zl-color-surface-*`, `--zl-color-text-*`, `--zl-color-border-*`), which
+flip with `[data-theme="light"]`. Never reach for the raw `--zl-color-gray-*`
+ramp — it is mode-independent by design, and using it silently breaks light
+mode (the #818 lesson: alert/button/card/pill/select/text-field all had to be
+migrated off the ramp onto semantic tokens). If the semantic name you need is
+missing, add it as a `{ dark, light }` pair in
+`@zitadel/design-tokens/src/legacy.tokens.json`, never a hardcoded value.
+
 ## Layout
 
 ```

@@ -285,8 +285,7 @@ func TestUpdateFlowDefinitionUnauthenticated(t *testing.T) {
 			Steps:      validSteps(),
 		},
 	}, api.UpdateFlowDefinitionParams{
-		ID:        "flowDef_1234",
-		ProjectID: "proj_1234",
+		ID: "flowDef_1234",
 	})
 	require.NoError(t, err)
 	assertFlowDefinitionResponse(t, &api.ErrorDetailsStatusCode{
@@ -352,7 +351,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				}
 				return def
 			}()),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginFlowDef.ID},
+			params: api.UpdateFlowDefinitionParams{ID: loginFlowDef.ID},
 			wantResp: &api.FlowDefinitionDetailResponse{
 				ID:        loginFlowDef.ID,
 				ProjectID: project.ID,
@@ -379,7 +378,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				def.Status = api.FlowDefinitionStatusDraft // deactivate while removing recovery
 				return def
 			}()),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginRegisterFlowDef.ID},
+			params: api.UpdateFlowDefinitionParams{ID: loginRegisterFlowDef.ID},
 			wantResp: &api.UpdateFlowDefinitionErrorResponseStatusCode{
 				StatusCode: http.StatusConflict,
 				Response: api.NewFlowdefUpdateConflictUpdateFlowDefinitionErrorResponse(api.FlowdefUpdateConflict{
@@ -404,7 +403,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				def.Status = api.FlowDefinitionStatusActive
 				return def
 			}()),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginRegisterFlowDef.ID},
+			params: api.UpdateFlowDefinitionParams{ID: loginRegisterFlowDef.ID},
 			wantResp: &api.UpdateFlowDefinitionErrorResponseStatusCode{
 				StatusCode: http.StatusConflict,
 				Response: api.NewFlowdefUpdateConflictUpdateFlowDefinitionErrorResponse(api.FlowdefUpdateConflict{
@@ -429,7 +428,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				def.Status = api.FlowDefinitionStatusActive
 				return def
 			}()),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginRegisterFlowDef.ID},
+			params: api.UpdateFlowDefinitionParams{ID: loginRegisterFlowDef.ID},
 			wantResp: &api.FlowDefinitionDetailResponse{
 				ID:        loginRegisterFlowDef.ID,
 				ProjectID: project.ID,
@@ -452,7 +451,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		{
 			name:   "flow definition not found",
 			req:    newUpdateFlowDefinitionRequest(newFlowDefinitionFixture("updated-flow", userSchemaURI)),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: "flowdef_missing"},
+			params: api.UpdateFlowDefinitionParams{ID: "flowdef_missing"},
 			wantResp: &api.UpdateFlowDefinitionNotFound{
 				Code:    "flowdef.not_found",
 				Message: "flow definition: not found",
@@ -461,7 +460,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 		{
 			name:   "unknown user schema",
 			req:    newUpdateFlowDefinitionRequest(newFlowDefinitionFixture("updated-flow", unknownUserSchemaURI)),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginFlowDef.ID},
+			params: api.UpdateFlowDefinitionParams{ID: loginFlowDef.ID},
 			wantResp: &api.UpdateFlowDefinitionBadRequest{
 				Code:    "flowdef.invalid",
 				Message: "flow definition: invalid",
@@ -480,7 +479,7 @@ func TestUpdateFlowDefinition(t *testing.T) {
 				def.Purposes = map[string]string{"login": "collect_identifier"}
 				return def
 			}()),
-			params: api.UpdateFlowDefinitionParams{ProjectID: api.ProjectID(project.ID), ID: loginFlowDef.ID},
+			params: api.UpdateFlowDefinitionParams{ID: loginFlowDef.ID},
 			wantResp: &api.UpdateFlowDefinitionBadRequest{
 				Code:    "flowdef.invalid",
 				Message: "flow definition: invalid",
@@ -652,8 +651,7 @@ func TestGetFlowDefinitionUnauthenticated(t *testing.T) {
 	require.NoError(t, err)
 
 	getResp, err := client.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{
-		ID:        "flowDef_1234",
-		ProjectID: "proj_1234",
+		ID: "flowDef_1234",
 	})
 
 	require.NoError(t, err)
@@ -707,16 +705,14 @@ func TestGetFlowDefinition(t *testing.T) {
 		{
 			name: "get flow definition by id succeeds",
 			req: api.GetFlowDefinitionParams{
-				ProjectID: api.ProjectID(project.ID),
-				ID:        flowDef.ID,
+				ID: flowDef.ID,
 			},
 			wantResp: flowDef,
 		},
 		{
 			name: "non-existing flow definition",
 			req: api.GetFlowDefinitionParams{
-				ProjectID: api.ProjectID(project.ID),
-				ID:        "non-existing-id",
+				ID: "non-existing-id",
 			},
 			wantResp: &api.GetFlowDefinitionErrorResponseStatusCode{
 				StatusCode: http.StatusNotFound,
@@ -1016,8 +1012,7 @@ func TestDeleteFlowDefinitionUnauthenticated(t *testing.T) {
 	require.NoError(t, err)
 
 	resp, err := client.DeleteFlowDefinition(t.Context(), api.DeleteFlowDefinitionParams{
-		ID:        "flowDef_1234",
-		ProjectID: "proj_1234",
+		ID: "flowDef_1234",
 	})
 
 	require.NoError(t, err)
@@ -1075,35 +1070,17 @@ func TestDeleteFlowDefinition(t *testing.T) {
 		{
 			name: "delete flow definition succeeds",
 			req: api.DeleteFlowDefinitionParams{
-				ID:        flowDef.ID,
-				ProjectID: api.ProjectID(project.ID),
+				ID: flowDef.ID,
 			},
 			wantResp: &api.DeleteFlowDefinitionNoContent{},
 		},
 		{
+			// Flat-by-id: missing RSI is indistinguishable from never existed → 204.
 			name: "delete non-existing flow definition",
 			req: api.DeleteFlowDefinitionParams{
-				ID:        "non-existing-id",
-				ProjectID: api.ProjectID(project.ID),
+				ID: "non-existing-id",
 			},
 			wantResp: &api.DeleteFlowDefinitionNoContent{},
-		},
-		{
-			// A project the token is not bound to — existing or not — answers
-			// like a nonexistent flow definition (anti-oracle), instead of the
-			// blind 204 the unguarded handler used to return.
-			name: "invalid project id",
-			req: api.DeleteFlowDefinitionParams{
-				ID:        "non-existing-id",
-				ProjectID: "invalid-project-id",
-			},
-			wantResp: &api.DeleteFlowDefinitionErrorResponseStatusCode{
-				StatusCode: http.StatusNotFound,
-				Response: api.NewFlowdefNotFoundDeleteFlowDefinitionErrorResponse(api.FlowdefNotFound{
-					Code:    "flowdef.not_found",
-					Message: "flow definition: not found",
-				}),
-			},
 		},
 	}
 	for _, tt := range tests {
@@ -1116,8 +1093,7 @@ func TestDeleteFlowDefinition(t *testing.T) {
 
 			// if the flow definition is deleted, the get request should return a not found error
 			getResp, err := client.GetFlowDefinition(t.Context(), api.GetFlowDefinitionParams{
-				ID:        tt.req.ID,
-				ProjectID: tt.req.ProjectID,
+				ID: tt.req.ID,
 			})
 
 			assert.NoError(t, err)

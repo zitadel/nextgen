@@ -146,11 +146,12 @@ describe("ZitadelSession", () => {
 
   it("forwards the surface variant/theme", () => {
     const { container } = render(() => (
-      <ZitadelSession project={project} variant="page" theme="light" />
+      <ZitadelSession project={project} variant="page" theme="light" suppressHeader />
     ));
     const el = container.querySelector<ZitadelSessionElement>("zitadel-session");
     expect(el!.variant).toBe("page");
     expect(el!.theme).toBe("light");
+    expect(el!.suppressHeader).toBe(true);
   });
 
   it.each(Object.entries(ZITADEL_SESSION_EVENT_HANDLERS))(

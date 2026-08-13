@@ -84,14 +84,17 @@ func (ss sessionStatements) ListSessions(ctx context.Context, filter *database.L
 
 // DeleteSessionByID implements [service.SessionStatements].
 func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, sessionID string) error {
-	n, err := execAffected(ctx, ss.client, `DELETE FROM sessions WHERE project_id = ? AND id = ?`, projectID, sessionID)
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return domain.ErrSessionNotFound()
-	}
-	return nil
+	return withTransaction(ctx, ss.client, func(ctx context.Context, tx queryExecutor) error {
+		n, err := execAffected(ctx, tx, `DELETE FROM sessions WHERE project_id = ? AND id = ?`, projectID, sessionID)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return domain.ErrSessionNotFound()
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.DeleteResourceScope(ctx, domain.ResourceKindSession, projectID, sessionID)
+	})
 }
 
 // ExchangeSession implements [service.SessionStatements].
@@ -182,7 +185,11 @@ func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.S
 	session.CreatedAt = timeFromUnixNano(createdNano)
 	session.UpdatedAt = timeFromUnixNano(updatedNano)
 	session.ExpiresAt = timeFromUnixNano(expiresNano)
-	return ss.CreateSessionToken(ctx, session, "")
+	if err := ss.CreateSessionToken(ctx, session, ""); err != nil {
+		return err
+	}
+	rsi := newResourceScopeStatements(ss.client)
+	return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindSession, session.ProjectID, session.ID))
 }
 
 // CreateSessionToken creates a session token and links it back to the session.

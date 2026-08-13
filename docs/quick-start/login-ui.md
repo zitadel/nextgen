@@ -18,7 +18,7 @@ http://<host>:<port>/ui/login/
 Example:
 
 ```text
-http://localhost:8080/ui/login/?project_id=river-8421
+http://localhost:8080/ui/login/?project_id=proj_01hexample
 ```
 
 ## How it works

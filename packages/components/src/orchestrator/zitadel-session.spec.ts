@@ -139,6 +139,35 @@ describe("<zitadel-session>", () => {
     expect(element.shadowRoot?.querySelector(".identity")).toBeNull();
   });
 
+  it("suppress-header visually hides the heading but keeps it accessible", async () => {
+    currentEmail = "alice@acme.com";
+    const element = mount('<zitadel-session suppress-header></zitadel-session>');
+    await flush(element);
+    // Boolean attribute reflects into the property (and back — reflect
+    // keeps DOM assertions honest under React 19's property-first binding).
+    expect(element.suppressHeader).toBe(true);
+    expect(element.hasAttribute("suppress-header")).toBe(true);
+    const title = shadowQuery<HTMLElement>(element, ".title");
+    // sr-only, not removed: the card keeps its accessible name.
+    expect(title.classList.contains("sr-only")).toBe(true);
+    expect(title.textContent?.trim()).toBe("Signed in as");
+    // The identity line is content, not header — it stays visible.
+    const identity = shadowQuery<HTMLElement>(element, ".identity");
+    expect(identity.classList.contains("sr-only")).toBe(false);
+    expect(identity.hasAttribute("slot")).toBe(false);
+  });
+
+  it("renders the heading normally without suppress-header", async () => {
+    currentEmail = "alice@acme.com";
+    const element = mount();
+    await flush(element);
+    expect(element.suppressHeader).toBe(false);
+    expect(
+      shadowQuery<HTMLElement>(element, ".title").classList.contains("sr-only"),
+    ).toBe(false);
+    expect(shadowQuery<HTMLElement>(element, ".identity").getAttribute("slot")).toBe("header");
+  });
+
   it("renders a single primary Sign out action", async () => {
     const element = mount();
     await flush(element);

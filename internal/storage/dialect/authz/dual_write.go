@@ -29,7 +29,7 @@ func UserDeleted(ctx context.Context, rsi service.ResourceScopeStatements, edges
 	if err := edges.DeleteAuthzMembershipEdges(ctx, edgesByMember(projectID, userID)); err != nil {
 		return err
 	}
-	return rsi.DeleteResourceScope(ctx, userID)
+	return rsi.DeleteResourceScope(ctx, domain.ResourceKindUser, projectID, userID)
 }
 
 func edgesByMember(projectID, userID string) database.Filter[domain.AuthzMembershipEdgeField] {

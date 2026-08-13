@@ -1,10 +1,17 @@
 # ADR 028: Storage v2 — Typed Statements and Per-Dialect SQL
 
-> **Status:** Proposed (partially implemented; pre-merge checklist tracks remaining work on `new-repo`)
+> **Status:** Implemented — 2026-08-11 (originally Proposed 2026-06-23)
 > **Date:** 2026-06-23
 > **Updated:** 2026-08-12
 > **Context:** Multi-dialect SQL storage for nextgen (PostgreSQL, Spanner, and SQLite)
 > **Supersedes:** docs/design/storage-v2.md (removed sketch)
+>
+> **Amendment (2026-08-11):** the `new-repo` merge landed, storage v1 was
+> removed, and the `internal/storage/v2/` tree was flattened into
+> `internal/storage/` (#790). Path references below have been repointed to the
+> flattened layout; where the text says "storage v2" it names this
+> architecture, which is now simply the storage layer. SQLite joined
+> PostgreSQL and Spanner as a third dialect after this ADR was written.
 
 ## Context
 

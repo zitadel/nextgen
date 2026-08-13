@@ -110,7 +110,11 @@ const GO_TEST_TARGETS = [
   "server:test-sqlite",
 ];
 const TESTING_DEMO_TARGETS = ["testing:test-integration", "demo-next-e2e:e2e-real"];
-const CONSOLE_E2E_TARGET = "console-e2e:e2e-real";
+// Both real-instance console lanes: the dev-proxy suite and the embedded
+// suite (binary-served /ui/* + API at one origin). Either being affected
+// runs the console gate — the workflow steps them sequentially so two local
+// instances do not contend.
+const CONSOLE_E2E_TARGETS = ["console-e2e:e2e-real", "console-e2e:e2e-embedded"];
 
 const ALL_GATES = [
   "go_tests",
@@ -178,7 +182,7 @@ export function resolveGates({ mode, files, targets }) {
   // Nuxt, so it answers to the shared next-scaffold surface plus the Nuxt SDK.
   const journeyPreexisting = journeyNextScaffold || set.has("sdk-nuxt:build");
   const suitesTestingDemo = TESTING_DEMO_TARGETS.some((t) => set.has(t));
-  const suitesConsole = set.has(CONSOLE_E2E_TARGET);
+  const suitesConsole = CONSOLE_E2E_TARGETS.some((t) => set.has(t));
   const anyJourney = journeyFreshApp || journeyNextScaffold || journeyPreexisting;
 
   const gates = {

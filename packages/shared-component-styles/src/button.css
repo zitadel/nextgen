@@ -42,6 +42,13 @@
   line-height: 1.25rem;
 }
 
+/* Primary reads the legacy names, which the design-tokens sheet now emits
+   as aliases of the Figma semantic pair (`--zl-color-surface-default-white:
+   var(--zl-primary)`, see design-tokens build). Stock buttons therefore take
+   the Figma `primary` values, and BOTH override paths keep working: a host
+   page overriding the legacy name beats the alias, and overriding
+   `--zl-primary` flows through it. Hover stays on the legacy hover role
+   until Figma publishes a `primary`-scoped hover value. */
 .zr-btn--primary {
   background: var(--zl-color-surface-default-white, #f4f4f6);
   color: var(--zl-color-text-button-default, #0f0f11);

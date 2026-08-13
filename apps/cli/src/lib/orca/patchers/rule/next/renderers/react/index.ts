@@ -75,7 +75,10 @@ export const reactRenderer: RendererSpec = {
   // app that pins its scheme. The wrapper below only centers the card —
   // restyle or replace it freely. Switch to variant="page" for the widget's
   // own full-page chrome (viewport height, surface background from design
-  // tokens).`
+  // tokens).
+  // If this page already carries its own heading, add suppress-header to the
+  // element to visually hide the widget's heading block — it stays in the
+  // accessibility tree, and the card keeps no blank header band.`
         : `  // variant="page" makes the widget paint the full-page chrome itself
   // (viewport height, surface background) from design tokens; switch to
   // variant="widget" to embed the sign-in card inside a layout you own.`;
@@ -139,7 +142,10 @@ ${postureComment}
   // app that pins its scheme. The wrapper below only centers the card —
   // restyle or replace it freely. Switch to variant="page" for the card's
   // own full-page chrome (viewport height, surface background from design
-  // tokens).`
+  // tokens).
+  // If this page already carries its own heading, add suppress-header to the
+  // element to visually hide the widget's heading block — it stays in the
+  // accessibility tree, and the card keeps no blank header band.`
         : `  // variant="page" makes the session card paint the full-page chrome itself
   // (viewport height, surface background) from design tokens; switch to
   // variant="widget" to embed the card inside a layout you own.`;

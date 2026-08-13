@@ -178,6 +178,7 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		compiler.WriteArg(domain.MembershipStatusActive.String())
 		compiler.WriteString(")")
 	}
+	maybeWriteAuthzListPredicate(ctx, &compiler, &hasWhere, "users", "id")
 
 	compileOrderBy(&compiler, filter.Pagination.OrderBy, v2user.Schema)
 	compileLimit(&compiler, filter.Pagination.Limit)

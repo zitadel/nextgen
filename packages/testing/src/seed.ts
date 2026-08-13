@@ -50,11 +50,7 @@ export async function seedUser(
     { project_id: context.projectId },
   )) as Record<string, unknown>;
   const id = requireString(user.id, "user id");
-  await client.setUserPassword(
-    id,
-    { password, is_change_required: false },
-    { project_id: context.projectId },
-  );
+  await client.setUserPassword(id, { password, is_change_required: false });
   return { id, email, password };
 }
 

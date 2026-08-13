@@ -15,14 +15,28 @@ const (
 	upsertResourceScopeStmt = `
 INSERT INTO resource_scope_index (resource_id, resource_kind, project_id, team_id)
 VALUES (@p1, @p2, @p3, @p4)
-ON CONFLICT (resource_id) DO UPDATE SET
-    resource_kind = EXCLUDED.resource_kind,
-    project_id = EXCLUDED.project_id,
+ON CONFLICT (resource_kind, project_id, resource_id) DO UPDATE SET
     team_id = EXCLUDED.team_id,
     updated_at = CURRENT_TIMESTAMP()
 THEN RETURN resource_id, resource_kind, project_id, team_id, created_at, updated_at`
 
-	deleteResourceScopeStmt = `DELETE FROM resource_scope_index WHERE resource_id = @p1`
+	getResourceScopeStmt = `
+SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
+FROM resource_scope_index
+WHERE resource_id = @p1`
+
+	getResourceScopeByIDInProjectStmt = `
+SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
+FROM resource_scope_index
+WHERE project_id = @p1 AND resource_id = @p2`
+
+	existsResourceScopeElsewhereStmt = `
+SELECT EXISTS (
+    SELECT 1 FROM resource_scope_index
+    WHERE resource_kind = @p1 AND resource_id = @p2 AND project_id <> @p3
+)`
+
+	deleteResourceScopeStmt = `DELETE FROM resource_scope_index WHERE resource_kind = @p1 AND project_id = @p2 AND resource_id = @p3`
 )
 
 var resourceScopeColumns = []string{
@@ -56,16 +70,66 @@ func (s resourceScopeStatements) UpsertResourceScope(ctx context.Context, scope 
 
 // GetResourceScope implements [service.ResourceScopeStatements].
 func (s resourceScopeStatements) GetResourceScope(ctx context.Context, resourceID string) (*domain.ResourceScope, error) {
-	row, err := s.db.ReadRow(ctx, resourceScopeIndexTable, spanner.Key{resourceID}, resourceScopeColumns)
+	var scope *domain.ResourceScope
+	err := s.db.Query(ctx, buildStatement(getResourceScopeStmt, resourceID).statement(), func(iter *spanner.RowIterator) error {
+		updated, err := collectOneRow(iter, scanResourceScope)
+		if err != nil {
+			return err
+		}
+		scope = updated
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return scope, nil
+}
+
+// GetResourceScopeInProject implements [service.ResourceScopeStatements].
+func (s resourceScopeStatements) GetResourceScopeInProject(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) (*domain.ResourceScope, error) {
+	row, err := s.db.ReadRow(ctx, resourceScopeIndexTable, spanner.Key{kind.String(), projectID, resourceID}, resourceScopeColumns)
 	if err != nil {
 		return nil, err
 	}
 	return scanResourceScope(row)
 }
 
+// GetResourceScopeByIDInProject implements [service.ResourceScopeStatements].
+func (s resourceScopeStatements) GetResourceScopeByIDInProject(ctx context.Context, projectID, resourceID string) (*domain.ResourceScope, error) {
+	var scope *domain.ResourceScope
+	err := s.db.Query(ctx, buildStatement(getResourceScopeByIDInProjectStmt, projectID, resourceID).statement(), func(iter *spanner.RowIterator) error {
+		updated, err := collectOneRow(iter, scanResourceScope)
+		if err != nil {
+			return err
+		}
+		scope = updated
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return scope, nil
+}
+
+// ExistsResourceScopeElsewhere implements [service.ResourceScopeStatements].
+func (s resourceScopeStatements) ExistsResourceScopeElsewhere(ctx context.Context, kind domain.ResourceKind, resourceID, excludeProjectID string) (bool, error) {
+	var exists bool
+	err := s.db.Query(ctx, buildStatement(existsResourceScopeElsewhereStmt, kind.String(), resourceID, excludeProjectID).statement(), func(iter *spanner.RowIterator) error {
+		row, err := iter.Next()
+		if err != nil {
+			return err
+		}
+		return row.Columns(&exists)
+	})
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
 // DeleteResourceScope implements [service.ResourceScopeStatements].
-func (s resourceScopeStatements) DeleteResourceScope(ctx context.Context, resourceID string) error {
-	_, err := s.db.Update(ctx, buildStatement(deleteResourceScopeStmt, resourceID).statement())
+func (s resourceScopeStatements) DeleteResourceScope(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) error {
+	_, err := s.db.Update(ctx, buildStatement(deleteResourceScopeStmt, kind.String(), projectID, resourceID).statement())
 	return err
 }
 

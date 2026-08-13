@@ -29,7 +29,8 @@ In-repo consumers, which double as the dogfood proof:
 On the release train since #692: listed in `PUBLIC_RELEASE_PACKAGES`
 ([`scripts/release-manifest.mjs`](../../scripts/release-manifest.mjs)) and in
 the changesets `fixed` group — the two lists must match **in order**
-(`release-manifest.test.ts` enforces it). Consequences:
+(enforced by `apps/cli/tests/unit/scripts/release-manifest.test.ts`).
+Consequences:
 
 - **Every observable change needs a changeset** (minor for new API surface),
   and PR titles follow the outcome-based decision table in
