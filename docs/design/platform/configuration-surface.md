@@ -135,7 +135,7 @@ A comprehensive example showing every top-level field:
 | Field | Required | Purpose |
 |---|---|---|
 | `$schema` | Recommended | Pins schema version for IDE validation. Should match the installed SDK version. |
-| `project` | Yes | The `project_id` (`proj_<ulid>`, [ADR 047](../../adrs/047-dialect-id-generation.md)). Must match `.zitadel/secret`. It is an identifier, not a user-facing URL. |
+| `project` | Yes | The dialect-minted `project_id` (`proj_<opaque>`, [ADR 047](../../adrs/047-dialect-id-generation.md)). Must match `.zitadel/secret`. Treat the body as opaque; it is an identifier, not a user-facing URL. |
 | `flows` | No | Flow definitions by purpose. Values are inline objects or relative file paths. |
 | `idps` | No | Identity providers. Keys are developer-chosen stable names. |
 | `schemas` | No | User schemas. Keys are schema names referenced from flow definitions. |
@@ -421,7 +421,7 @@ This is the point at which claim becomes unavoidable.
 
 ## Project identifiers
 
-Project IDs are prefixed ULIDs (`proj_<ulid>`, [ADR 047](../../adrs/047-dialect-id-generation.md)); the earlier curated-dictionary slug scheme is retired. They appear in dashboard URLs, claim URLs, and scratch-dashboard paths as *identifiers* — never as user-facing origins in the default path.
+Project IDs use the dialect-minted `proj_<opaque>` form ([ADR 047](../../adrs/047-dialect-id-generation.md)): PostgreSQL and SQLite use ULID bodies, while Spanner uses UUID v4. Clients must treat the body as opaque. The earlier curated-dictionary slug scheme is retired. Project IDs appear in dashboard URLs, claim URLs, and scratch-dashboard paths as *identifiers* — never as user-facing origins in the default path.
 
 Subdomain naming rules (phishing-kit string blocks, Levenshtein brand matching, abuse review) apply only when Zitadel mints a real subdomain on the customer's behalf — a Level 2/3 concern. Deferred until those levels ship.
 

@@ -481,22 +481,19 @@ levels are currently satisfied." The consumer decides if that set is enough.
 | `recovery_code` | `{ "code": "..." }` | Prior `user` factor | Single-use, not counted toward assurance |
 | `captcha` | `{ "provider": "altcha", "salt": "...", "number": ... }` or `{ "provider": "recaptcha", "token": "..." }` | Challenge (from auth_attempt) | Bot detection signal, not an authentication factor |
 
-## Database Schema
+## Shipped Storage Model
 
-```sql
-CREATE TABLE sessions (
-    id              TEXT        NOT NULL,
-    project_id      TEXT        NOT NULL,
-    version         INTEGER     NOT NULL DEFAULT 1,
-    state           TEXT        NOT NULL,       -- 'building', 'active', 'expired'
-    user_id         TEXT,
-    factors         JSONB       NOT NULL DEFAULT '{}', -- verified factor events with timestamps + properties
-    assurance_levels TEXT[]     DEFAULT '{}',   -- all assurance levels currently satisfied (recomputed on auth_attempt completion)
-    metadata        JSONB       NOT NULL DEFAULT '{}',
-    user_agent      JSONB,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    expires_at      TIMESTAMPTZ,                -- short TTL for anonymous sessions; reset on first factor write
+The API response is not a one-to-one projection of the `sessions` table. The
+shipped table stores the session key, creation/update timestamps, TTL and
+expiry, token reference, optional user reference, and optional user-agent
+reference. It does **not** have `state`, `factors`, `assurance_levels`,
+`metadata`, or `version` columns.
 
-    PRIMARY KEY (project_id, id)
-);
-```
+`state` is derived from expiry and whether verified factors exist. Factors are
+loaded from the checks associated with the session, and assurance levels are
+computed at runtime rather than persisted. See the current dialect migrations
+for the exact DDL:
+
+- [PostgreSQL](../../../internal/storage/dialect/postgres/migration/sql/000007_user_agents_and_sessions.sql)
+- [Spanner](../../../internal/storage/dialect/spanner/migration/sql/000007_user_agents_and_sessions.sql)
+- [SQLite](../../../internal/storage/dialect/sqlite/migration/sql/000001_init.sql)

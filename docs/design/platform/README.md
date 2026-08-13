@@ -42,7 +42,7 @@ The canonical vocabulary for all design docs lives in [`../glossary.md`](../glos
 
 - **Flow** — the state machine that drives a user through login, registration, recovery, or profile steps. Owned by the flow engine. Defined by the developer in `zitadel.json`. Full definition in [`../glossary.md`](../glossary.md).
 - **Session** — the durable post-auth container. Full definition in [`../glossary.md`](../glossary.md).
-- **Project** — the top-level tenant/deployment; what used to be called an "instance" in older design notes. Identified by a stable `project_id` minted by the server at `POST /projects` in the prefixed-ULID form `proj_<ulid>` per [ADR 047](../../adrs/047-dialect-id-generation.md); the older dictionary-slug form is retired. Vocabulary:
+- **Project** — the top-level tenant/deployment; what used to be called an "instance" in older design notes. Identified by a stable `project_id` minted by the server at `POST /projects` in the dialect-owned form `proj_<opaque>` per [ADR 047](../../adrs/047-dialect-id-generation.md). The opaque body is a ULID on PostgreSQL/SQLite and a UUID v4 on Spanner; clients must not assume either representation. The older dictionary-slug form is retired. Vocabulary:
   - `project_id` — the canonical identifier used in API paths, response bodies, and dashboard URLs.
   - `"project"` — the JSON field name in `zitadel.json` and `.zitadel/secret` that holds the `project_id` value.
 
