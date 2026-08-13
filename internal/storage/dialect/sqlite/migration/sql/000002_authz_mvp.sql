@@ -25,7 +25,7 @@ CREATE TABLE resource_scope_index (
     team_id       TEXT,
     created_at    INTEGER NOT NULL,
     updated_at    INTEGER NOT NULL,
-    PRIMARY KEY (resource_id),
+    PRIMARY KEY (resource_kind, project_id, resource_id),
     FOREIGN KEY (project_id, team_id) REFERENCES teams (project_id, id) ON DELETE CASCADE
 );
 -- +goose StatementEnd

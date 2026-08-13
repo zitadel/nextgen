@@ -1,12 +1,11 @@
 # Authz testing without an API
 
 > **Status:** RECOMMENDED exploration (not locked)
-> **Context:** Wave 1 storage ([#422](https://github.com/zitadel/nextgen/issues/422) /
-> [PR #677](https://github.com/zitadel/nextgen/pull/677)) and the OpenFGA
-> compiler ([#421](https://github.com/zitadel/nextgen/issues/421) /
+> **Context:** Wave 1 storage ([#422](https://github.com/zitadel/nextgen/issues/422))
+> and the OpenFGA compiler ([#421](https://github.com/zitadel/nextgen/issues/421) /
 > [PR #720](https://github.com/zitadel/nextgen/pull/720)) land before a public
-> grants/check API and before the resolver ([#423](https://github.com/zitadel/nextgen/issues/423)).
-> This note maps how to gain confidence in compiler + database behavior anyway.
+> grants/check HTTP API. The resolver library ([#423](https://github.com/zitadel/nextgen/issues/423))
+> provides Check / ListObjects + L4 oracle tests; endpoint wiring remains later.
 >
 > Sibling: [`permission-storage.md`](permission-storage.md),
 > [`authz.md`](authz.md), [ADR 032 §2](../../adrs/032-permission-catalogs.md#2-openfga-parser-and-profile-compiler).
@@ -32,7 +31,7 @@ Three related techniques, not one tool:
 | --- | --- | --- | --- |
 | **Crash fuzz** | Arbitrary bytes (DSL/JSON) | No panic; bounded runtime | `openfga.Parse*` |
 | **Property / generative fuzz** | Structured `authz.Model` (valid + near-valid) | Algebraic invariants on `CatalogMutations` / plans | `profile` + `compiler` |
-| **Differential / sequence fuzz** | Random mutation sequences + same payload across dialects | Dialects agree; dual-write stays consistent | storage v2 / `stmttest` |
+| **Differential / sequence fuzz** | Random mutation sequences + same payload across dialects | Dialects agree; dual-write stays consistent | storage `stmttest` |
 
 Go's built-in `testing.F` is enough for the first two. Prefer it over a new
 property-testing dependency until generators outgrow a small byte decoder.
@@ -50,8 +49,8 @@ flowchart LR
   mut --> persist[PersistCatalogVersion]
   persist --> rows[authz_star_rows]
   facts[Dual_write_RSI_edges] --> rows
-  rows -.->|"later #423"| resolve[resolver_check_list]
-  oracle[In_memory_oracle] -.->|"later #423"| resolve
+  rows --> resolve[resolver_check_list]
+  oracle[In_memory_oracle] --> resolve
 ```
 
 Do **not** duplicate upward: each property belongs at the lowest layer that
@@ -131,30 +130,20 @@ Wave 1 already has golden persist + seed tests. Generative coverage:
 `LoadCatalogMutations` exists for persist round-trip verification in tests;
 product check/list paths are not callers yet (#423).
 
-### L4 — Check / list oracle (with #423)
+### L4 — Check / list oracle (#423 library)
 
-Once the resolver exists, the high-value fuzz becomes:
+The resolver library compares:
 
 ```
-random model (L2) + random tuples (assignments, membership edges, RSI)
+random model (or seeded system catalog) + random tuples (assignments, membership edges, RSI)
   → in-memory graph oracle
   → SQL/resolver Check / ListObjects
   → must agree
 ```
 
-Oracle rules for the MVP profile (union, computed userset, bounded TTU):
-
-- Direct: assignment row exists for `(principal, object, relation)`.
-- Computed: principal has any relation that implies the target via closure.
-- TTU: exists tupleset edge `object --tupleset--> intermediate` and
-  principal satisfies `source` on `intermediate` (recursive within profile
-  bounds).
-- Team principal: expand via `authz_membership_edges` only.
-
-Optional later: differential vs OpenFGA's check engine on the **supported**
-subset only. Treat OpenFGA as a second opinion, not the source of truth —
-Zitadel rejects constructs OpenFGA accepts, and storage shape differs
-(ADR 032).
+See `internal/authz/resolver` (oracle + unit tests) and
+`internal/storage/stmttest/authz_resolver_oracle_test.go`. HTTP grants/check API
+wiring remains a follow-up.
 
 ## What not to do
 
@@ -173,7 +162,7 @@ Zitadel rejects constructs OpenFGA accepts, and storage shape differs
 | --- | --- | --- |
 | **A (shipped)** | Design note + L1/L2 harness under `internal/authz/...` | Compiler/profile invariants on random models; parse crash fuzz |
 | **B (catalog path shipped)** | `stmttest` generative persist via `LoadCatalogMutations` | Compiler output ↔ dialect rows without HTTP; dual-write sequences still deferred |
-| **C** | In-memory oracle + resolver differential (#423) | End-to-end check/list correctness |
+| **C (library shipped)** | In-memory oracle + resolver differential (#423) in `internal/authz/resolver` + `stmttest` | Check/list correctness vs SQL; HTTP wiring still later |
 
 Slice A is pure Go unit/fuzz — no containers. Slice B reuses existing
 integration tags. Slice C is the long-term gate for authz behavior.

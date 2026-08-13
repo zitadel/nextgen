@@ -1,8 +1,6 @@
 # ADR 015: Shared component styles for paired Lit/React components
 
-## Status
-
-Accepted — 2026-05-20
+> **Status:** Accepted — 2026-05-20
 
 ## Context
 

@@ -102,7 +102,7 @@ Templates iterate these bindings. They never mutate them.
 Notes:
 
 - The `font_url` stylesheet is injected by the orchestrator; the template does not emit the `<link>` tag itself.
-- `actions` is a keyed dictionary with a `primary: true` flag on the primary entry; there is no `actions.primary` alias. Exactly one entry must be `primary`.
+- `actions` is an ordered array of entries carrying `name` and a `primary: true` flag on the primary entry ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)); look an action up with `{% assign submit = actions | where: "name", "submit" | first %}`. There is no `actions.primary` alias. Exactly one entry must be `primary`.
 - `{% mandatory_gates %}` appends missing required UI. Structural validator requires this tag.
 
 ## Built-in set and the design catalog
@@ -159,7 +159,7 @@ zitadel apply                           # publishes an immutable branding revisi
 
 Regardless of grouping decision (open question 3 in [`README.md`](README.md)), every template must render:
 
-- One `<zl-field>` per entry in `fields`, with `name` matching the dictionary key.
+- One `<zl-field>` per entry in the `fields` array, with `name` matching the entry's `name`.
 - One consumer per required entry in `gates` (`<zl-captcha>` for `captcha`, `<zl-passkey>` for `passkey_ceremony`, `<zl-fingerprint>` for `fingerprint`).
 - Exactly one `<zl-submit>` wired to the action with `primary: true`.
 - A consumer for every secondary action declared (`<zl-action>` for navigation, `<zl-sso-providers>` for SSO).

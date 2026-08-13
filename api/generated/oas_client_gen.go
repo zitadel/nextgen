@@ -2055,27 +2055,6 @@ func (c *Client) sendDeleteFlowDefinition(ctx context.Context, params DeleteFlow
 	}
 	uri.AddPathParts(u, pathParts[:]...)
 
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
-
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "DELETE", u)
 	if err != nil {
@@ -2209,27 +2188,6 @@ func (c *Client) sendDeleteTeam(ctx context.Context, params DeleteTeamParams) (r
 	}
 	uri.AddPathParts(u, pathParts[:]...)
 
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
-
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "DELETE", u)
 	if err != nil {
@@ -2357,27 +2315,6 @@ func (c *Client) sendDeleteUserByID(ctx context.Context, params DeleteUserByIDPa
 		pathParts[1] = encoded
 	}
 	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "DELETE", u)
@@ -2797,27 +2734,6 @@ func (c *Client) sendGetBrandingById(ctx context.Context, params GetBrandingById
 	}
 	uri.AddPathParts(u, pathParts[:]...)
 
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
-
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)
 	if err != nil {
@@ -3095,27 +3011,6 @@ func (c *Client) sendGetFlowDefinition(ctx context.Context, params GetFlowDefini
 		pathParts[1] = encoded
 	}
 	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)
@@ -3922,23 +3817,6 @@ func (c *Client) sendGetSchemaById(ctx context.Context, params GetSchemaByIdPara
 	stage = "EncodeQueryParams"
 	q := uri.NewQueryEncoder()
 	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	{
 		// Encode "team_id" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
 			Name:    "team_id",
@@ -4092,27 +3970,6 @@ func (c *Client) sendGetSession(ctx context.Context, params GetSessionParams) (r
 	}
 	uri.AddPathParts(u, pathParts[:]...)
 
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
-
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)
 	if err != nil {
@@ -4240,27 +4097,6 @@ func (c *Client) sendGetTeam(ctx context.Context, params GetTeamParams) (res Get
 		pathParts[1] = encoded
 	}
 	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "GET", u)
@@ -4392,23 +4228,6 @@ func (c *Client) sendGetUserByID(ctx context.Context, params GetUserByIDParams) 
 
 	stage = "EncodeQueryParams"
 	q := uri.NewQueryEncoder()
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
 	{
 		// Encode "team_id" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
@@ -5381,23 +5200,6 @@ func (c *Client) sendListUserPasskeys(ctx context.Context, params ListUserPasske
 			return res, errors.Wrap(err, "encode query")
 		}
 	}
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
 	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
@@ -5570,23 +5372,6 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 					return e.EncodeValue(conv.StringToString(unwrapped))
 				}
 				return nil
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
 			}
 			return nil
 		}); err != nil {
@@ -6526,27 +6311,6 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 	}
 	uri.AddPathParts(u, pathParts[:]...)
 
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
-
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "DELETE", u)
 	if err != nil {
@@ -6675,27 +6439,6 @@ func (c *Client) sendSetUserPassword(ctx context.Context, request *SetUserPasswo
 	}
 	pathParts[2] = "/password"
 	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "PUT", u)
@@ -6984,27 +6727,6 @@ func (c *Client) sendUpdateFlowDefinition(ctx context.Context, request *FlowDefi
 	}
 	uri.AddPathParts(u, pathParts[:]...)
 
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
-
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "PUT", u)
 	if err != nil {
@@ -7144,27 +6866,6 @@ func (c *Client) sendUpdateTeam(ctx context.Context, request *UpdateTeamRequest,
 		pathParts[1] = encoded
 	}
 	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeQueryParams"
-	q := uri.NewQueryEncoder()
-	{
-		// Encode "project_id" parameter.
-		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "project_id",
-			Style:   uri.QueryStyleForm,
-			Explode: true,
-		}
-
-		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode query")
-		}
-	}
-	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
 	r, err := ht.NewRequest(ctx, "PATCH", u)

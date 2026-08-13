@@ -8,17 +8,21 @@ take precedence over, the root [`AGENTS.md`](../../AGENTS.md) for files under
 
 Before changing console routing, navigation, the app shell, or how the console
 talks to the API, read the console-scoped ADRs in
-[`docs/adrs/`](docs/adrs/README.md). They are **Accepted** (team-reviewed) and
-are the agreed direction for upcoming work (issue
+[`docs/adrs/`](docs/adrs/README.md) (statuses in that index; 0001/0002 are
+Accepted, 0003/0004 Proposed and largely implemented). They are the agreed
+direction for the console build-out (issue
 [#440](https://github.com/zitadel/nextgen/issues/440)):
 
 - [ADR 0001: Routing](docs/adrs/0001-console-routing.md) — file-based routing,
   one router factory, `basepath` derived from the Vite `base`, route loaders +
   pending/error/not-found boundaries, `staticData`-driven sidebar.
 - [ADR 0002: API access and auth interceptors](docs/adrs/0002-console-api-access.md)
-  — server-side proxy injects the project secret; the console holds no
-  credential; reuse `configureZitadel()` / `getApi()` rather than a bespoke
-  client.
+  — the console holds no credential and calls the API same-origin; reuse
+  `configureZitadel()` / `getApi()` rather than a bespoke client. The base is
+  `/api` **only** under the dev server (whose proxy injects the project
+  secret); the embedded build talks to the origin root, where the Go binary
+  serves the API. The `/api` shim §1 once deferred to the server was withdrawn
+  in the 2026-08-12 revision — do not reintroduce it.
 - [ADR 0003: Console authentication](docs/adrs/0003-console-authentication.md)
   — `/login` embeds the login widget (`@zitadel/sdk-react`); the pathless
   `_authed` layout owns the session guard (`GET /sessions/me`) and the app
@@ -37,6 +41,24 @@ are the agreed direction for upcoming work (issue
 
 If an implementation needs to diverge from an ADR, update the ADR in the same
 change rather than letting code and decision drift.
+
+## Styling: classify before building
+
+Before building any console UI, read
+[`docs/styling.md`](docs/styling.md) — where a component lives decides how it
+is styled (unprefixed shadcn utilities for console chrome vs a Lit+React pair),
+and the retired `*-zl-*` console utility names must not come back. The 3-way
+classification and token authority live there; the pair recipe lives in
+[`apps/storybook/AGENTS.md`](../storybook/AGENTS.md).
+
+## Screen conventions
+
+List/detail screens follow the shipped patterns under `src/routes/_authed/`
+(users, schemas, flow-definitions): loader-fetched data, status columns where
+the resource has lifecycle state, `$param` detail routes. The sessions screen
+speaks `POST /sessions/query` (structured filters + cursor pagination); there
+is no `GET /sessions` list, and sessions have no `revoked` state — revocation
+deletes the session.
 
 ## Generated files
 
@@ -61,16 +83,8 @@ The console manages an instance, so **use `console:dev-real`** — it boots a re
 ephemeral instance and seeds users, so list screens show real API responses.
 `@zitadel/api-mock` has no user store; a users list read from it is a fiction.
 
-Two things to know:
-
-- `listUsers` requires `user.read`, which only the project secret carries — the
-  publishable key is deliberately refused (`internal/api/user.go`). A signed-in
-  console is not sufficient for real list data; the proxy secret is.
-- The mock's flow shape now mirrors the real default flow (split
-  `identifier` → `password`), so it is trustworthy for chrome — but it has no user
-  store and cannot prove authorization. Keep it that way: the authority is
-  `packages/config/defaults/default-login.json`, and a step fixture must be
-  diffed against it before being changed (`packages/api-mock/AGENTS.md`).
-
-See the Local development section of [`README.md`](README.md) for all three
-backends and when each applies.
+Why the mock cannot substitute (authorization, the `user.read` scope, and the
+publishable-key refusal) is documented canonically in the Local development
+section of [`README.md`](README.md) — read it for all three backends and when
+each applies. The mock's flow-shape authority rule lives in
+[`packages/api-mock/AGENTS.md`](../../packages/api-mock/AGENTS.md).

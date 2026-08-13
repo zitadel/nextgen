@@ -12,7 +12,7 @@
 
 ## Platform is a reserved project
 
-There is no separate "platform" resource kind. Zitadel's own control plane is just a **reserved project** inside the same model — the platform project. Its `project_id` is discoverable via the authenticated [`/capabilities`](conventions.md#capabilities) response under `defaults.project_id`. The SDK does not hardcode the value; it reads it on initialisation.
+There is no separate "platform" resource kind. Zitadel's own control plane is just a **reserved project** inside the same model — the platform project. Discovering its `project_id` from the server (rather than hardcoding it) is target design: the planned [`/capabilities`](conventions.md#direction-not-shipped) endpoint would expose it under `defaults.project_id`, but no such endpoint is shipped today.
 
 This means:
 
@@ -27,7 +27,7 @@ Same resources, different project context. The SDK talks to `/users`, `/teams`, 
 
 **LOCKED.** Self-hosted returns a singleton platform project and a singleton default team with the identical JSON schema the cloud version returns. The SDK does not branch on deployment mode — it blindly works against both.
 
-The self-hosted project ID is **discoverable via `/capabilities`**, never hardcoded. When self-hosted grows to multiple projects, restores from backup with a different `project_id`, or runs clustered, the SDK keeps working because it discovered its defaults from the server.
+The self-hosted project ID should be **discoverable from the server** ([direction](conventions.md#direction-not-shipped)), never hardcoded. When self-hosted grows to multiple projects, restores from backup with a different `project_id`, or runs clustered, the SDK keeps working because it discovered its defaults from the server.
 
 ## Concrete shapes
 

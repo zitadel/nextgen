@@ -23,20 +23,21 @@ TypeScript ≥ 5.0 — the published type definitions re-export with `export typ
 
 `<ZitadelLogout {project} postSignOutUrl="/login" />` works the same way.
 
+The signed-in session card is `<ZitadelSession {project} />` (exported as `ZitadelSession`).
+
 The widget's flow events are also surfaced as optional callbacks:
 `onFlowStep`, `onFlowInput`, `onFlowComplete`, and `onFlowError`.
 
 ## Proxying to the backend (deployment)
 
-The widgets call `${proxyPath}/…` same-origin (default `/__nextgen`). A SPA has no
-server, so in production the path comes from your hosting platform — a
-`vercel.json` rewrite, a `netlify.toml` redirect, or a minimal Cloudflare
-worker — with no secrets on the platform, per
-[ADR 036](https://github.com/zitadel/nextgen/blob/main/docs/adrs/036-api-credential-planes.md).
-CLI scaffolding for these configs is tracked in
-[zitadel/nextgen#560](https://github.com/zitadel/nextgen/issues/560). **Until
-that work lands, production SPA deployment is not yet supported** — the CLI dev
-proxy covers local development.
+The widgets call `${proxyPath}/…` same-origin (default `/__nextgen`). In
+production the same-origin path must come from your hosting platform — until
+the CLI can scaffold those configs, **production SPA deployment is not yet
+supported**; see
+[ADR 036](https://github.com/zitadel/nextgen/blob/main/docs/adrs/036-api-credential-planes.md)
+and [zitadel/nextgen#560](https://github.com/zitadel/nextgen/issues/560). The
+CLI dev proxy covers local development.
 
-For local development you can skip the proxy and point `proxyPath` straight at the
-backend (cross-origin), e.g. `proxyPath: "http://localhost:4000"`.
+For local development you can also skip the proxy and point `proxyPath`
+straight at the backend (cross-origin), e.g. `proxyPath: "http://localhost:8080"`
+(the `zitadel start` local runtime default port).

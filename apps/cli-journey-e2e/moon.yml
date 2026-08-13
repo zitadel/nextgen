@@ -10,6 +10,12 @@ tasks:
   lint:
     command: "corepack pnpm exec oxlint ."
 
+  typecheck:
+    command: "corepack pnpm run typecheck"
+    deps:
+      # The journey spec imports the kit's Playwright entry.
+      - "testing:build"
+
   test:
     command: "corepack pnpm run test"
 
