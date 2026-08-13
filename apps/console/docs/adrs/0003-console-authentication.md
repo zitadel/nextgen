@@ -2,7 +2,8 @@
 
 > **Status:** Proposed
 > **Date:** 2026-07-23 (revised 2026-08-12 — §4/Consequences: the ADR 0002
-> `/api` shim this ADR narrowed was withdrawn, not built)
+> `/api` shim this ADR narrowed was withdrawn, not built; revised 2026-08-13
+> — the first-party session becomes a management credential under root ADR 054)
 > **Scope:** `apps/console`. See
 > [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Follows the forward-looking slot recorded in
@@ -10,12 +11,12 @@
 
 ## Context
 
-ADR 0002 shipped the console with **no console-user authentication**: the
-browser holds no credential, and the dev-only Vite proxy injects the
+ADR 0002 shipped the console with **no console-user authentication**: before
+sign-in the browser held no session, and the dev-only Vite proxy injected the
 project-secret bearer — explicitly labelled in
-[`vite.config.mts`](../../vite.config.mts) as *"a temporary pre-login
+[`vite.config.mts`](../../vite.config.mts) as _"a temporary pre-login
 workaround: once the console has a login, a proxy forwards the auth cookie as
-the bearer and the secret is dropped."* This ADR designs that login.
+the bearer and the secret is dropped."_ This ADR designs that login.
 
 The platform already has everything a console sign-in needs:
 
@@ -33,7 +34,8 @@ Two alternatives were considered for where the login screen lives:
 
 1. **Embed the widget in a console route** (chosen) — one deployment surface,
    no cross-app redirect plumbing, and the ADR 0002 request shape
-   (same-origin, credential-less) already fits the widget's needs.
+   (same-origin, no project secret in browser code) already fits the widget's
+   needs.
 2. **Redirect to a separately hosted login page** — keeps the console free
    of the widget, but needs a return-URL contract between two surfaces, a
    second surface to brand/configure, and still requires all the session
@@ -90,35 +92,33 @@ boundary drops the session cache and redirects to `/login?next=…` instead of
 rendering dead-end copy (the hook ADR 0002 §3 anticipated). `403` stays a
 rendered state — signed in, but no access.
 
-### 4. What the cookie does and does not authorize
+### 4. The cookie is the embedded Console's human credential
 
-**The cookie gate authenticates the console UI; it does not yet authorize
-management calls.** The management plane
-([`internal/api/authz.go`](../../../../internal/api/authz.go)) accepts only
-project-bound bearers with management scopes; a user session carries none
-until the permission model (root ADRs 032/033/036) lands. Consequences:
+The HttpOnly `__nextgen_session` cookie authenticates the human on same-origin
+Console requests. Root
+[ADR 054](../../../../docs/adrs/054-cross-project-principals.md) makes that
+first-party session an accepted operator-plane credential: the server resolves
+the platform-project user from the cookie and authorizes the requested
+customer project through ordinary target-scoped assignments. The Console
+receives neither a project secret nor a script-readable session bearer.
 
-- The dev proxy **keeps injecting the project secret** whenever a request has
-  no `Authorization` header. Cookie and bearer coexist by scheme: the
-  session-cookie operations ignore the bearer, the management operations
-  ignore the cookie. Signed-in-ness now gates the UI; authorization stays
-  project-coarse. `POST /sessions/exchange` — the one browser-path
-  operation requiring a bearer — is carried by root
-  [ADR 036](../../../../docs/adrs/036-api-credential-planes.md)'s
-  **publishable key** (browser-safe, origin-scoped): the runtime document
-  (Console ADR 0004 §2) serves it, the login widget's handle sends it, and
-  because the request then carries an `Authorization` header, the dev proxy
-  never stamps the secret onto the sign-in path. The injected secret
-  remains for operator-plane (management) requests only.
-- ~~The production Go `/api` shim should follow the same interim shape~~
-  *(Revised 2026-08-12: the shim was withdrawn — ADR 0002 §1, revised. There
-  is no production proxy to attach the secret: the deployed console reaches
-  the API at the origin root with the session cookie, plus the publishable
-  key on the sign-in path. Management routes stay unauthorized in a deployed
-  build until session-derived, permission-checked authority ships
-  server-side (root ADRs 032/033); the dev proxy remains the only
-  secret-injection point, and when that authority lands the secret
-  disappears from it — a config change, not a console rewrite.)*
+Login establishes identity, not blanket management authority. A platform role
+alone grants no customer-project access, and every management endpoint remains
+responsible for its own permission check. Unsafe cookie-authenticated requests
+also require the exact-Origin and session-bound-CSRF protections specified by
+ADRs 046 and 054.
+
+`POST /sessions/exchange` still uses root
+[ADR 036](../../../../docs/adrs/036-api-credential-planes.md)'s publishable key,
+which is browser-safe and origin-scoped. `runtime.json` (Console ADR 0004 §3)
+provides it to the login widget.
+
+**Current implementation bridge:** the management gate does not yet resolve
+session-derived target permissions. The Vite dev proxy therefore continues to
+inject a project secret for management requests, while the embedded build
+fails those requests closed. No production `/api` shim or secret injection is
+planned. Once ADR 054 lands, the dev proxy drops the secret; the Console client
+does not change.
 
 ### 5. Recorded caveats
 
@@ -129,10 +129,11 @@ until the permission model (root ADRs 032/033/036) lands. Consequences:
 - **Full-page reload on sign-in.** The widget's document navigation reboots
   the SPA with the cookie present. Accepted; an `onFlowComplete` +
   `router.navigate` in-SPA handoff is possible later.
-- **Project identity.** The login flow runs against
-  `VITE_CONSOLE_PROJECT_ID` — the same project the console's data calls are
-  scoped to. Local dev needs that project to have a `login` flow definition
-  and at least one user (`--user-file` bootstrap).
+- **Identity project vs protected project.** The login flow runs against the
+  reserved platform project discovered through `runtime.json` (with
+  `VITE_CONSOLE_PROJECT_ID` only as a local-dev override). Data calls may
+  target any customer project the signed-in principal is authorized to use;
+  Console ADR 0004 and root ADR 054 keep those scopes distinct.
 - **Fail-closed session probe.** Any `fetchSession` failure (including a
   backend outage) reads as "not signed in" and lands on the login screen,
   where the outage surfaces as a widget error.
@@ -149,7 +150,7 @@ until the permission model (root ADRs 032/033/036) lands. Consequences:
 - **~~Dependency to track~~ resolved 2026-08-12 by withdrawal (ADR 0002):**
   no Go `/api` mount exists or is planned — the deployed console calls the
   API at the origin root. The deployed management surface now waits on
-  session-derived permissions (root ADRs 032/033) rather than on a
+  session-derived target permissions (root ADRs 032/033/054) rather than on a
   secret-injecting mount.
 - Tests: the `_authed` guard is covered by `src/routes/auth-guard.spec.tsx`;
   existing screen specs mock `@/auth/session` and run as signed-in.
@@ -164,7 +165,9 @@ until the permission model (root ADRs 032/033/036) lands. Consequences:
   [016](../../../../docs/adrs/016-global-api-initializer.md),
   [032](../../../../docs/adrs/032-permission-catalogs.md)/
   [033](../../../../docs/adrs/033-internal-permission-management.md)/
-  [036](../../../../docs/adrs/036-api-credential-planes.md),
+  [036](../../../../docs/adrs/036-api-credential-planes.md)/
+  [046](../../../../docs/adrs/046-claim-lifecycle-v2.md)/
+  [054](../../../../docs/adrs/054-cross-project-principals.md),
   [037](../../../../docs/adrs/037-token-lifecycle.md).
 - [`packages/sdk-react`](../../../../packages/sdk-react/README.md),
   [`packages/components/src/orchestrator/zitadel-login.ts`](../../../../packages/components/src/orchestrator/zitadel-login.ts),
