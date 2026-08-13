@@ -399,8 +399,18 @@ export class ZitadelLogin extends ZitadelSurface {
 
   override render() {
     if (this.startupError) {
+      // Same chrome a step renders into (page shell + card), because this is
+      // still the login surface — just one that could not start. Without the
+      // shell the alert lands bare in the top-left corner of an otherwise
+      // empty page, which reads as a broken app rather than as auth reporting
+      // a problem: the most common trigger is a misconfigured origin, where
+      // the first step paints normally and only the submit fails.
       return html`<form class="zl-mount" novalidate>
-        <zl-alert severity="error">${this.startupError}</zl-alert>
+        <zl-page-shell>
+          <zl-card>
+            <zl-alert severity="error">${this.startupError}</zl-alert>
+          </zl-card>
+        </zl-page-shell>
       </form>`;
     }
     if (!this.response || !this.engine) {

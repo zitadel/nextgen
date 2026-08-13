@@ -131,6 +131,12 @@ export async function prepareApp(options = {}) {
     registryUrl,
     sdkPackage,
   });
+  await assertDevScriptServesSetupPort({
+    appDir,
+    framework,
+    port: appPort,
+    readFile: fs.readFile,
+  });
 
   const metadata = {
     appDir,
@@ -324,6 +330,36 @@ async function assertNoNestedApp(appDir, readFileFn) {
     throw error;
   }
   throw new Error("setup scaffolded a nested myapp directory instead of using the app root");
+}
+
+/**
+ * Fails when the framework CLI whose port comes only from the command line
+ * (`next dev`, `nuxt dev`) was left without one, because `setup` registered
+ * `http://localhost:<port>` as the project's only allowed origin and the dev
+ * server has to land there.
+ *
+ * The journey itself cannot catch that: it always starts the app with an
+ * explicit `--port` (see `devServerArgs` in frameworks.mjs), so a scaffolded
+ * script that would have defaulted to 3000 — and been rejected as an origin
+ * on the first submit — still runs on the right port here. Asserting on the
+ * written script closes that blind spot without changing how the lanes launch.
+ * Frameworks that pin the port in their own dev-server config instead (Vite's
+ * `server.port`, Angular's `serve.options.port`) are not checked here.
+ */
+async function assertDevScriptServesSetupPort({ appDir, framework, port, readFile }) {
+  if (!["next", "nuxt"].includes(framework.id)) {
+    return;
+  }
+  const appPackage = JSON.parse(await readFile(join(appDir, "package.json"), "utf8"));
+  const dev = appPackage.scripts?.dev ?? "";
+  const match = dev.match(/-p\s+(\d+)|--port[=\s]+(\d+)|(?:^|\s)PORT=(\d+)/);
+  const declared = match ? Number(match[1] ?? match[2] ?? match[3]) : undefined;
+  if (declared !== port) {
+    throw new Error(
+      `${framework.id} dev script must serve the port setup registered as the project origin ` +
+        `(${port}), else login fails with "origin is not allowed for this project"; got ${JSON.stringify(dev)}`,
+    );
+  }
 }
 
 async function assertLocalPackageResolution(input) {
