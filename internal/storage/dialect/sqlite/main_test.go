@@ -76,7 +76,7 @@ func TestProjectCRUD(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, list.Items, 1)
 
-	_, err := testPool.DeleteProjectByID(ctx, id)
+	_, err = testPool.DeleteProjectByID(ctx, id)
 	require.NoError(t, err)
 	_, err = testPool.GetProjectByID(ctx, id)
 	require.Error(t, err)
