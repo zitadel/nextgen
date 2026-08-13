@@ -44,6 +44,15 @@ by re-applying an earlier template.
   }
   ```
 
+  A well-formed URL that serves nothing is the one branding mistake nothing
+  else catches — it passes validation, publishes a revision, and then renders
+  as an invisible image. So `zitadel plan` fetches each asset URL and warns
+  (never fails) when it is unreachable or does not answer with an image, and
+  the login UI hides an asset that fails to load, falling back to the split
+  designs' decorative panel rather than leaving a gap. If the host is only
+  reachable from where the login page renders — or you are offline — set
+  `ZITADEL_SKIP_ASSET_PROBE=1` to skip the check.
+
   `layout` is the degrade preset (`centered` or `split`), **not** the complete
   design catalog. All named designs (`centered`, `split`, `split-right`, `hero`,
   `minimal`) are delivered as templates and map onto those two values. Switch

@@ -118,6 +118,16 @@ document also runs on loopback HTTP. `font_url` remains HTTPS-only and is
 injected as a `<link rel="stylesheet">` before the widget paints. `hero_url` is
 consumed by the `split` layout.
 
+Shape validation cannot tell a live asset from a dead one, and a well-formed
+URL that serves nothing renders as a 0×0 `<img>` — invisible in the design and
+silent in the console. Two layers cover that gap, neither of them a gate:
+`zitadel plan` / `apply` probe each URL and warn (`apps/cli/src/lib/sync/asset-probe.ts`),
+and the component hides an asset whose load fails, restoring the split designs'
+decorative placeholder when that empties the brand pane
+(`packages/components/src/orchestrator/asset-fallback.ts`). Templates cannot do
+the latter themselves: DOMPurify strips inline `onerror` along with every other
+event handler, so the listener has to be orchestrator-side.
+
 `font_url` is **read-only in v1**: because the component must inject it at document level (shadow-scoped `@font-face` never registers faces), a writable value would give `branding.write` page-wide CSS control over the embedding application. `POST /branding` rejects it and the local config dialect omits it; safe delivery is an [ADR 040](../../adrs/040-tenant-login-templates-editable-config.md) follow-up. Until then, load fonts from the embedding page.
 
 ### Proposed extensions
@@ -183,6 +193,7 @@ Every branding payload the component receives passes through:
 1. **Shape validation**: types, enums, URLs, invariants. Every paint, cheap.
 2. **Template validation**: if `liquid_template` is set, structural AST pass vs flow ([`validator.md`](validator.md)). Once per load, cached.
 3. **Runtime safety net**: `{% mandatory_gates %}` appends missing required UI so a bad template still yields a submittable step.
+4. **Asset degradation**: an `<img>` that fails to load is hidden and, in the split designs, replaced by the decorative brand-pane placeholder. Armed per commit; a failure is warned about once on the console.
 
 Stages 1 and 2 run in the component. Stage 3 runs as part of Liquid rendering. The security pipeline in [`../flowengine/template-security.md`](../flowengine/template-security.md) runs on save server-side; this doc assumes it. The widget does not re-check security at paint time.
 

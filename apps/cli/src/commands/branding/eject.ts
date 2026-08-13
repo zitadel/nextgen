@@ -21,7 +21,11 @@ import { ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
 import { BaseCommand, type JsonEnvelope } from "../../lib/oclif";
 import { hasZitadelConfig } from "../../lib/project";
-import { normalizePublicCliProse, publicCliCommand } from "../../lib/public-cli";
+import {
+  normalizePublicCliJson,
+  normalizePublicCliProse,
+  publicCliCommand,
+} from "../../lib/public-cli";
 
 /**
  * The `branding eject` command — take ownership of the login template.
@@ -95,7 +99,7 @@ export default class BrandingEject extends BaseCommand {
     if (brandingMeta) {
       await write(
         join(META_SCHEMA_DIR, brandingMeta.name),
-        `${stableStringify(brandingMeta.body)}\n`,
+        `${stableStringify(normalizePublicCliJson(brandingMeta.body, this.meta.cliVersion))}\n`,
         false,
       ).catch(swallowConflict);
     }

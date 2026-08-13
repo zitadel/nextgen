@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { metaSchemaFiles, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
 import { stableStringify } from "../../../json";
+import { normalizePublicCliJson } from "../../../public-cli";
 import { DEFAULT_SERVER } from "../../../server";
 import { scaffold } from "./file-writer";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
@@ -261,13 +262,16 @@ export abstract class AbstractRulePatcher implements Patcher {
       },
       // The dialect meta-schemas, committed with the project so flow files'
       // relative `$schema` pointers resolve offline (editor validation) and
-      // agents can read the flow/schema dialect without the docs site.
+      // agents can read the flow/schema dialect without the docs site. Their
+      // descriptions become editor tooltips inside the generated app, so the
+      // `zitadel …` mentions are rewritten to the runnable public form on the
+      // way out — the shared source keeps the bare spelling the server wants.
       { kind: "mkdir", path: META_SCHEMA_DIR },
       ...metaSchemaFiles().map(
         (file): FileOp => ({
           kind: "write",
           path: `${META_SCHEMA_DIR}/${file.name}`,
-          contents: `${JSON.stringify(file.body, null, 2)}\n`,
+          contents: `${JSON.stringify(normalizePublicCliJson(file.body, ctx.cliVersion), null, 2)}\n`,
         }),
       ),
       // Guidance for humans (README) and agents (AGENTS.md): the golden

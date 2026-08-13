@@ -139,6 +139,23 @@ the CLI's help layer, not the envelope.
   or `split-right`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
+- `plan` and `apply --dry-run` also emit `data.warnings`: non-blocking
+  findings as `{path, rule, message}`, the same text the human plan prints as
+  `# warning:` lines and `apply` prints through stderr. They never fail a run.
+  Two families exist today: flow-definition rules (`warn/…`, mirrored from the
+  server's validator) and branding asset reachability. `warn/asset-unreachable`
+  and `warn/asset-content-type` come from a bounded HEAD probe of
+  `logo_url` / `hero_url` — a URL that is well-formed but dead passes every
+  gate and then renders as a 0×0 image with nothing in the console, so the
+  probe is the only place it can be caught. It is advisory by design: the
+  machine planning is not necessarily the machine that renders the login page.
+  Set `ZITADEL_SKIP_ASSET_PROBE` to turn it off (offline, air-gapped CI, or a
+  CDN that only resolves from production) and `ZITADEL_ASSET_PROBE_TIMEOUT_MS`
+  to retune the per-URL budget (default 2500).
+- In the human-readable plan, a multi-line field (branding's inlined
+  `liquid_template`) renders as `(<n> lines, sha256:…)` when it is created or
+  unchanged, and as a changed-line diff when it moved — not as one escaped
+  line. Read the file itself for full content.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
   `--object-type` (e.g. `human-user`). Non-interactive/`--json` prints one row
   per revision (newest first); interactive adds a picker that fetches and

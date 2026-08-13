@@ -23,6 +23,16 @@
   min-height: 100%;
   background: var(--zl-color-surface-default-black, #0f0f11);
 }
+/* A branding asset whose URL is well-formed but dead otherwise renders as a
+   0×0 <img> — a silent hole in the design. `asset-fallback.ts` stamps this
+   attribute from a real `error` listener (templates are DOMPurify-sanitised,
+   so inline `onerror` is not available to them) and the element leaves the
+   layout, degrading to the same result as "no asset configured". Qualified
+   on `img` so it outranks the `.zl-split__compact` display rules below
+   regardless of source order. */
+img[data-zl-asset-broken] {
+  display: none;
+}
 .zl-mount {
   display: flex;
   flex-direction: column;
