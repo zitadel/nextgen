@@ -2,9 +2,10 @@ package domain
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -102,9 +103,9 @@ func validateBrandingTemplate(template string) error {
 // validateBrandingAssetURL requires https asset URLs so the login widget never
 // mixes content on customer origins. Loopback HTTP (http://localhost /
 // 127.0.0.0/8 / ::1) is the one carve-out: it is the CLI local-runtime dev
-// posture, where the natural asset host is the app's own dev server — the
-// same loopback exception the cookie Secure flag makes (isLoopbackHost in
-// internal/api/security.go; keep the two predicates aligned).
+// posture, where the natural asset host is the app's own dev server. Unlike
+// the request-origin cookie predicate, this stored URL contract accepts only
+// canonical host spellings so the Go, TypeScript, and editor gates agree.
 func validateBrandingAssetURL(name, value string) error {
 	if value == "" {
 		return nil
@@ -113,23 +114,34 @@ func validateBrandingAssetURL(name, value string) error {
 	if err != nil {
 		return ErrBrandingInvalid(fmt.Sprintf("%s is not a valid URL", name), err)
 	}
-	if strings.EqualFold(u.Scheme, "http") && isLoopbackAssetHost(u.Hostname()) {
+	if strings.EqualFold(u.Scheme, "http") && isCanonicalLoopbackAssetURL(u) {
 		return nil
 	}
 	if !strings.EqualFold(u.Scheme, "https") || u.Host == "" {
-		return ErrBrandingInvalid(fmt.Sprintf("%s must be an absolute https URL (http is allowed for localhost only)", name), nil)
+		return ErrBrandingInvalid(fmt.Sprintf("%s must be an absolute https URL (http is allowed for canonical loopback development hosts only)", name), nil)
 	}
 	return nil
 }
 
-// isLoopbackAssetHost reports whether host is localhost or a loopback IP
-// (127.0.0.0/8, ::1). Host must already be stripped of any port. Mirrors
-// internal/api/security.go's isLoopbackHost, which the domain layer cannot
-// import.
-func isLoopbackAssetHost(host string) bool {
+// isCanonicalLoopbackAssetURL accepts localhost, canonical dotted-decimal
+// 127.0.0.0/8, and the exact IPv6 spelling ::1. Userinfo and invalid/empty
+// ports are rejected so the URL has the same meaning in Go and WHATWG parsers.
+func isCanonicalLoopbackAssetURL(u *url.URL) bool {
+	if u.Host == "" || u.User != nil || strings.HasSuffix(u.Host, ":") {
+		return false
+	}
+	if port := u.Port(); port != "" {
+		if _, err := strconv.ParseUint(port, 10, 16); err != nil {
+			return false
+		}
+	}
+	host := u.Hostname()
 	if strings.EqualFold(host, "localhost") {
 		return true
 	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
+	if host == "::1" {
+		return true
+	}
+	ip, err := netip.ParseAddr(host)
+	return err == nil && ip.Is4() && ip.As4()[0] == 127
 }

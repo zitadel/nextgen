@@ -137,6 +137,42 @@ func TestValidateBranding(t *testing.T) {
 	}
 }
 
+func TestValidateBrandingAssetURLLoopbackParity(t *testing.T) {
+	for _, value := range []string{
+		"http://localhost:3000/logo.svg",
+		"HTTP://LOCALHOST:3000/logo.svg",
+		"http://127.0.0.1:8080/logo.svg",
+		"http://127.255.255.255/logo.svg",
+		"http://[::1]:3000/logo.svg",
+	} {
+		t.Run("accept "+value, func(t *testing.T) {
+			if err := validateBrandingAssetURL("logo_url", value); err != nil {
+				t.Fatalf("validateBrandingAssetURL() error = %v", err)
+			}
+		})
+	}
+
+	for _, value := range []string{
+		"http://localhost.evil.example/logo.svg",
+		"http://localhost:3000@evil.example/logo.svg",
+		"http://192.168.1.10/logo.svg",
+		"http://127.1/logo.svg",
+		"http://2130706433/logo.svg",
+		"http://0x7f000001/logo.svg",
+		"http://127.00.0.1/logo.svg",
+		"http://[0:0:0:0:0:0:0:1]/logo.svg",
+		"http://[::ffff:127.0.0.1]/logo.svg",
+		"http://localhost:/logo.svg",
+		"http://localhost:65536/logo.svg",
+	} {
+		t.Run("reject "+value, func(t *testing.T) {
+			if err := validateBrandingAssetURL("logo_url", value); err == nil {
+				t.Fatal("validateBrandingAssetURL() succeeded, want error")
+			}
+		})
+	}
+}
+
 func TestNewBrandingDefaultsLayout(t *testing.T) {
 	b, err := NewBranding("proj_test", "", "", "", "", "")
 	if err != nil {

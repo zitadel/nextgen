@@ -167,8 +167,8 @@ describe("meta-schemas", () => {
     expect(check({ liquid_template: "x", liquid_template_file: "./login.liquid" })).toBe(false);
     // Unknown keys are dialect errors, like the flow dialect.
     expect(check({ not_a_branding_key: true })).toBe(false);
-    // Asset URLs must be https at the dialect level too — editors flag what
-    // the server's save gate would reject. Scheme matching is
+    // Asset URLs are https by default at the dialect level too — editors flag
+    // what the server's save gate would reject. Scheme matching is
     // case-insensitive, like the zod and Go validators.
     expect(check({ logo_url: "http://cdn.example.com/logo.svg" })).toBe(false);
     expect(check({ hero_url: "https://cdn.example.com/hero.png" })).toBe(true);
@@ -176,10 +176,20 @@ describe("meta-schemas", () => {
     // Loopback HTTP is the dev-posture carve-out, mirrored across the zod
     // and Go gates: editors must not flag what plan/apply accept.
     expect(check({ logo_url: "http://localhost:3000/logo.svg" })).toBe(true);
+    expect(check({ logo_url: "HTTP://LOCALHOST:3000/logo.svg" })).toBe(true);
     expect(check({ hero_url: "http://127.0.0.1:8080/hero.png" })).toBe(true);
+    expect(check({ hero_url: "http://127.255.255.255/hero.png" })).toBe(true);
     expect(check({ logo_url: "http://[::1]:3000/logo.svg" })).toBe(true);
     expect(check({ logo_url: "http://localhost.evil.example/logo.svg" })).toBe(false);
+    expect(check({ logo_url: "http://localhost:3000@evil.example/logo.svg" })).toBe(false);
     expect(check({ hero_url: "http://192.168.1.10/hero.png" })).toBe(false);
+    expect(check({ hero_url: "http://127.1/hero.png" })).toBe(false);
+    expect(check({ hero_url: "http://2130706433/hero.png" })).toBe(false);
+    expect(check({ hero_url: "http://0x7f000001/hero.png" })).toBe(false);
+    expect(check({ hero_url: "http://127.00.0.1/hero.png" })).toBe(false);
+    expect(check({ hero_url: "http://[0:0:0:0:0:0:0:1]/hero.png" })).toBe(false);
+    expect(check({ hero_url: "http://[::ffff:127.0.0.1]/hero.png" })).toBe(false);
+    expect(check({ hero_url: "http://localhost:65536/hero.png" })).toBe(false);
   });
 
   it("the branding $schema ref resolves from .zitadel/branding/ into the meta dir", () => {

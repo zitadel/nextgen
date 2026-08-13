@@ -25,7 +25,14 @@ describe("brandingConfigSchema", () => {
     for (const url of [
       "http://cdn.example.com/logo.svg",
       "http://localhost.evil.example/logo.svg",
+      "http://localhost:3000@evil.example/logo.svg",
       "http://192.168.1.10/logo.svg",
+      "http://127.1/logo.svg",
+      "http://2130706433/logo.svg",
+      "http://0x7f000001/logo.svg",
+      "http://127.00.0.1/logo.svg",
+      "http://[0:0:0:0:0:0:0:1]/logo.svg",
+      "http://[::ffff:127.0.0.1]/logo.svg",
     ]) {
       const result = brandingConfigSchema.safeParse({ ...base, logo_url: url });
       expect(result.success, url).toBe(false);
@@ -35,7 +42,9 @@ describe("brandingConfigSchema", () => {
   it("accepts loopback http asset URLs (local-dev carve-out)", () => {
     for (const url of [
       "http://localhost:3000/logo.svg",
+      "HTTP://LOCALHOST:3000/logo.svg",
       "http://127.0.0.1:8080/logo.svg",
+      "http://127.255.255.255/logo.svg",
       "http://[::1]:3000/logo.svg",
     ]) {
       const result = brandingConfigSchema.safeParse({ ...base, logo_url: url });
