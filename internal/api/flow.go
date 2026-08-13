@@ -80,7 +80,7 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 
 	resp := h.buildFlowResponse(ctx, result, false)
 	return &api.FlowResponseHeaders{
-		SetCookie: api.NewOptString(flowSetCookie(cookieValue, false)),
+		SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, false)),
 		Response:  resp,
 	}, nil
 }
@@ -178,13 +178,13 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	// Validation error: state machine keeps the user on the step with Error set.
 	if result.Step != nil && result.Step.Error != nil {
 		return &api.SubmitFlowStepBadRequest{
-			SetCookie: api.NewOptString(flowSetCookie(cookieValue, false)),
+			SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, false)),
 			Response:  flowResp,
 		}, nil
 	}
 
 	return &api.SubmitFlowStepOK{
-		SetCookie: api.NewOptString(flowSetCookie(cookieValue, terminal)),
+		SetCookie: api.NewOptString(flowSetCookie(ctx, cookieValue, terminal)),
 		Response:  flowResp,
 	}, nil
 }
@@ -255,11 +255,13 @@ func (h *Handler) sealState(ctx context.Context, state *domain.FlowState) (strin
 	return cookieCrypter.Encrypt(string(payload))
 }
 
-func flowSetCookie(value string, clear bool) string {
+func flowSetCookie(ctx context.Context, value string, clear bool) string {
 	c := &http.Cookie{
 		Name:     flowCookieName,
 		HttpOnly: true,
-		Secure:   true,
+		// Secure follows the request scheme so Safari can keep the cookie on
+		// http://localhost (see cookieSecureFromContext).
+		Secure:   cookieSecureFromContext(ctx),
 		SameSite: http.SameSiteStrictMode,
 		// Path=/ ensures that each Set-Cookie replaces the previous one in
 		// the browser's cookie jar rather than accumulating — without an

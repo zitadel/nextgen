@@ -62,6 +62,10 @@ avatar may show a minimal `?` identity. These come from the current
 server-owned default user schema and profile surface; they are not setup
 failures.
 
+Open the app at exactly `http://localhost:<port>` (not `127.0.0.1` or the
+Next.js Network URL). Preview origins are exact-match, and WebAuthn RP IDs
+are hostname-based, so those spellings are not interchangeable.
+
 ## Local Runtime URLs
 
 | Surface | URL |
