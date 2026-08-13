@@ -8,6 +8,7 @@ import type { ZitadelLogin } from "./zitadel-login.js";
 // Raw import via the liquidRaw Vite plugin — @zitadel/config/defaults reads
 // files with node:fs at call time, which cannot run inside Chromium.
 import splitTemplate from "../../../config/defaults/branding/split/login.liquid";
+import splitRightTemplate from "../../../config/defaults/branding/split-right/login.liquid";
 import heroTemplate from "../../../config/defaults/branding/hero/login.liquid";
 import minimalTemplate from "../../../config/defaults/branding/minimal/login.liquid";
 
@@ -97,6 +98,34 @@ const splitLogoStep: CreateFlow201 = {
   },
 } as unknown as CreateFlow201;
 
+/** The shipped split designs with no assets exercise the decorative placeholder. */
+const splitNoAssetsStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    layout: "split",
+    liquid_template: splitTemplate,
+  },
+} as unknown as CreateFlow201;
+
+const splitRightNoAssetsStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    layout: "split",
+    liquid_template: splitRightTemplate,
+  },
+} as unknown as CreateFlow201;
+
+const splitCustomColumnsStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    layout: "split",
+    liquid_template: splitTemplate.replace(
+      "<zl-page-shell data-zl-template-root>",
+      '<zl-page-shell data-zl-template-root style="--zl-split-columns: 7fr 5fr">',
+    ),
+  },
+} as unknown as CreateFlow201;
+
 /** The hero design, logo-less: its compact fallback is a <p>, not an <img>. */
 const heroNoLogoStep: CreateFlow201 = {
   ...identifierStep,
@@ -132,6 +161,11 @@ function installFlowFetchStub(responses: readonly CreateFlow201[]): { restore: (
   const original = globalThis.fetch;
   globalThis.fetch = fetchStub as unknown as typeof fetch;
   return { restore: () => void (globalThis.fetch = original) };
+}
+
+function centerX(element: Element): number {
+  const rect = element.getBoundingClientRect();
+  return (rect.left + rect.right) / 2;
 }
 
 async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Promise<T> {
@@ -317,6 +351,52 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(getComputedStyle(form).padding).toBe("16px");
     const brand = element.shadowRoot?.querySelector(".zl-split__brand") as HTMLElement;
     expect(getComputedStyle(brand).padding).toBe("52px 16px");
+  });
+
+  it("wide split placeholder and attribution stay centred on the form track", async () => {
+    host.style.width = "1200px";
+    const element = await mount(splitNoAssetsStep, (el) => {
+      el.variant = "page";
+    });
+    const placeholder = element.shadowRoot?.querySelector(".zl-split__placeholder") as HTMLElement;
+    const form = element.shadowRoot?.querySelector(".zl-split__form") as HTMLElement;
+    const pill = element.shadowRoot?.querySelector(".zl-attribution > *") as HTMLElement;
+    expect(getComputedStyle(placeholder).display).not.toBe("none");
+    expect(placeholder.getBoundingClientRect().width).toBeGreaterThan(0);
+    expect(Math.abs(centerX(form) - centerX(pill))).toBeLessThanOrEqual(1);
+  });
+
+  it("wide split-right attribution stays centred on the mirrored form track", async () => {
+    host.style.width = "1200px";
+    const element = await mount(splitRightNoAssetsStep, (el) => {
+      el.variant = "page";
+    });
+    const form = element.shadowRoot?.querySelector(".zl-split__form") as HTMLElement;
+    const pill = element.shadowRoot?.querySelector(".zl-attribution > *") as HTMLElement;
+    expect(Math.abs(centerX(form) - centerX(pill))).toBeLessThanOrEqual(1);
+  });
+
+  it("custom split column tracks also carry through to the attribution row", async () => {
+    host.style.width = "1200px";
+    const element = await mount(splitCustomColumnsStep, (el) => {
+      el.variant = "page";
+    });
+    const form = element.shadowRoot?.querySelector(".zl-split__form") as HTMLElement;
+    const pill = element.shadowRoot?.querySelector(".zl-attribution > *") as HTMLElement;
+    expect(Math.abs(centerX(form) - centerX(pill))).toBeLessThanOrEqual(1);
+  });
+
+  it("collapsed no-asset split keeps the form and attribution at the container width", async () => {
+    host.style.width = "600px";
+    const element = await mount(splitNoAssetsStep, (el) => {
+      el.variant = "page";
+    });
+    const split = element.shadowRoot?.querySelector(".zl-split") as HTMLElement;
+    const card = element.shadowRoot?.querySelector("zl-card") as HTMLElement;
+    const pill = element.shadowRoot?.querySelector(".zl-attribution > *") as HTMLElement;
+    expect(split.getBoundingClientRect().width).toBeGreaterThan(500);
+    expect(card.getBoundingClientRect().width).toBeGreaterThan(300);
+    expect(Math.abs(centerX(split) - centerX(pill))).toBeLessThanOrEqual(1);
   });
 
   it("split chrome collapses to the widget's width, not the viewport's", async () => {

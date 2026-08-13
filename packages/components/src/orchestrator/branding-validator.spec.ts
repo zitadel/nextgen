@@ -26,6 +26,45 @@ describe("validateBranding", () => {
     expect(result.issues[0]).toMatch(/logo_url/);
   });
 
+  it("keeps canonical loopback http logo/hero URLs on loopback pages", () => {
+    const result = validateBranding(
+      {
+        logo_url: "http://LOCALHOST:3000/logo.svg",
+        hero_url: "http://127.0.0.1:8080/hero.png",
+      },
+      { renderingOrigin: "http://localhost:4173" },
+    );
+    expect(result.issues).toHaveLength(0);
+    expect(result.branding?.logo_url).toBe("http://localhost:3000/logo.svg");
+    expect(result.branding?.hero_url).toBe("http://127.0.0.1:8080/hero.png");
+  });
+
+  it("drops loopback http assets on public pages", () => {
+    const result = validateBranding(
+      { logo_url: "http://localhost:3000/logo.svg" },
+      { renderingOrigin: "https://login.example.com" },
+    );
+    expect(result.branding?.logo_url).toBeUndefined();
+    expect(result.issues[0]).toMatch(/loopback development pages/);
+  });
+
+  it("does not extend the carve-out to font, proposed assets, or noncanonical hosts", () => {
+    const result = validateBranding(
+      {
+        logo_url: "http://127.1/logo.svg",
+        hero_url: "http://localhost:3000@evil.example/hero.png",
+        font_url: "http://[::1]:3000/font.css",
+        assets: { logo_dark: "http://localhost:3000/dark.svg" },
+      },
+      { renderingOrigin: "http://127.0.0.1:4173" },
+    );
+    expect(result.branding?.logo_url).toBeUndefined();
+    expect(result.branding?.hero_url).toBeUndefined();
+    expect(result.branding?.font_url).toBeUndefined();
+    expect(result.branding?.assets?.logo_dark).toBeUndefined();
+    expect(result.issues).toHaveLength(4);
+  });
+
   it("rejects malformed URLs", () => {
     const result = validateBranding({ font_url: "not-a-url" });
     expect(result.branding?.font_url).toBeUndefined();

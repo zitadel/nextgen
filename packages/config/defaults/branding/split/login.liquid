@@ -7,6 +7,11 @@
       {% if branding.hero_url %}
         <img class="zl-split__hero" src="{{ branding.hero_url }}" alt="" />
       {% endif %}
+      {% unless branding.logo_url or branding.hero_url %}
+        {% comment %} Until branding.json names an asset, a decorative panel
+           keeps the split composition readable. {% endcomment %}
+        <div class="zl-split__placeholder" aria-hidden="true"></div>
+      {% endunless %}
     </aside>
     <section class="zl-split__form">
     {% if branding.logo_url %}

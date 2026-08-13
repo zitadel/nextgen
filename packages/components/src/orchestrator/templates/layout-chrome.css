@@ -156,6 +156,10 @@
   grid-template-columns: var(--zl-split-columns, minmax(0, 1fr) minmax(0, 1fr));
   align-items: var(--zl-split-align, center);
   min-height: 100%;
+  /* Explicit, not content-derived: the column ratio applies to the full
+     available width, and the attribution row below mirrors the same tracks
+     to line the badge up under the form pane. */
+  width: 100%;
   gap: var(--zl-spacing-05, 2rem);
 }
 .zl-split__brand {
@@ -173,6 +177,28 @@
   max-width: 100%;
   border-radius: var(--zl-radius-m, 0.75rem);
   object-fit: cover;
+}
+/* No-asset default for the brand pane: a token-gradient panel (same visual
+   language as .zl-hero__brand-mark) so a split design still reads as split
+   before branding.json names a logo_url/hero_url — an empty aside renders
+   the whole design as a lonely off-centre card. The templates swap it for
+   the real assets the moment one is set. */
+.zl-split__placeholder {
+  width: min(22rem, 85%);
+  aspect-ratio: 4 / 5;
+  border-radius: var(--zl-radius-m, 0.75rem);
+  background:
+    radial-gradient(
+      120% 120% at 18% 12%,
+      var(--zl-color-icon-default-purple, #bba5e4) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      130% 130% at 85% 92%,
+      var(--zl-color-icon-default-pink, #f48aa0) 0%,
+      transparent 60%
+    ),
+    var(--zl-color-surface-default-primary-gray, #252528);
 }
 .zl-split__form {
   display: flex;
@@ -211,6 +237,24 @@ img.zl-split__compact--hero {
 .zl-split--right .zl-split__form {
   order: 1;
 }
+/* The shell footer spans both split panes, so a centred attribution pill
+   lands under the pane seam instead of under the form. Mirror the split's
+   tracks (same custom property, same gap, same width) on the attribution
+   row and park the pill in the form column; `:has` keys it to the template
+   actually rendering a split so centred/minimal keep the plain centring. */
+zl-page-shell:has(.zl-split) .zl-attribution {
+  width: 100%;
+  display: grid;
+  grid-template-columns: var(--zl-split-columns, minmax(0, 1fr) minmax(0, 1fr));
+  gap: var(--zl-spacing-05, 2rem);
+}
+zl-page-shell:has(.zl-split) .zl-attribution > * {
+  grid-column: 2;
+  justify-self: center;
+}
+zl-page-shell:has(.zl-split--right) .zl-attribution > * {
+  grid-column: 1;
+}
 /* Container query, not media query: keyed to the mount's inline size so a
    narrow embed on a wide viewport collapses exactly like a phone. */
 @container (max-width: 48rem) {
@@ -228,6 +272,14 @@ img.zl-split__compact--hero {
   }
   .zl-split__compact {
     display: block;
+  }
+  /* Collapsed split is a single column — the badge recentres with it. */
+  zl-page-shell:has(.zl-split) .zl-attribution {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  zl-page-shell:has(.zl-split) .zl-attribution > *,
+  zl-page-shell:has(.zl-split--right) .zl-attribution > * {
+    grid-column: 1;
   }
 }
 /* Hero-design landing primitives (`hero`): a token-styled mock landing

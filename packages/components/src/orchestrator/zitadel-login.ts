@@ -9,32 +9,34 @@ import type {
   SubmitFlowStepBodyFields,
 } from "@zitadel/api/generated/model";
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
+import { zitadelAttributionPillInnerHtml } from "@zitadel/shared-component-styles/attribution-markup";
+import type { Liquid, Template } from "liquidjs";
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import type { Liquid, Template } from "liquidjs";
 
 import "../atoms/index.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
+
+import { emit } from "../internal/emit.js";
+import { escapeHtml } from "../internal/escape-html.js";
 import {
   exchangeSession,
   getCurrentStep,
   startFlow as apiStartFlow,
   submitStep as apiSubmitStep,
 } from "./api-client.js";
-import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
-import type { Branding } from "./branding.js";
 import { validateBranding } from "./branding-validator.js";
+import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
-import { emit } from "../internal/emit.js";
-import { escapeHtml } from "../internal/escape-html.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
-import { TEMPLATE_NAMES } from "./template-names.js";
 import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
-import { zitadelAttributionPillInnerHtml } from "@zitadel/shared-component-styles/attribution-markup";
+import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
 import { createSanitiser } from "./sanitiser.js";
 import { ZitadelSurface } from "./surface.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
+import { TEMPLATE_NAMES } from "./template-names.js";
+
 import layoutChromeCss from "./templates/layout-chrome.css?inline";
 
 /**
@@ -528,7 +530,9 @@ export class ZitadelLogin extends ZitadelSurface {
     // A fresh response carries fresh (or no) errors — un-dismiss.
     this.stepErrorDismissed = false;
     this.response = wire;
-    const { branding, issues } = validateBranding(wire.branding);
+    const { branding, issues } = validateBranding(wire.branding, {
+      renderingOrigin: this.ownerDocument.location.origin,
+    });
     this.branding = branding;
     this.themeController.setBranding(branding);
     if (issues.length > 0) {
