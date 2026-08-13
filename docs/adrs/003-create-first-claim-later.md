@@ -7,7 +7,7 @@
 
 ## Withdrawal
 
-The pre-claim / claim lifecycle has been removed from the CLI and api-mock pending a server-side `claim` contract (`/projects/{id}/claim/init` and `/projects/{id}/claim/status` are not in the OpenAPI spec). If and when the backend lands, a follow-up ADR will re-propose the lifecycle aligned with the shipped server surface. **That follow-up is now [ADR 046: Claim Lifecycle v2](046-claim-lifecycle-v2.md)**, which supersedes this ADR.
+The pre-claim / claim lifecycle has been removed from the CLI and api-mock pending a server-side `claim` contract (`/projects/{id}/claim/init` and `/projects/{id}/claim/status` are not in the OpenAPI spec). If and when the backend lands, a follow-up ADR will re-propose the lifecycle aligned with the shipped server surface. **That follow-up is now [ADR 046: Claim Lifecycle v2](046-claim-lifecycle-v2.md)**, which supersedes this ADR. *(Correction 2026-08-11: the claim endpoints are now in the OpenAPI spec and `zitadel claim` shipped — the parenthetical above describes the state at withdrawal time, not the present.)*
 
 ## Original proposal
 

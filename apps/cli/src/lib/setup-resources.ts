@@ -102,9 +102,9 @@ export async function materializeSetupResources(opts: {
   // the template body and its hash (parity is best-effort at setup).
   let schemaHash = hashForState({ normalize: normalizeSchemaBody }, schemaBody);
   try {
-    const canonical = (await opts.client.getSchemaById(encodeURIComponent(schemaId), {
-      project_id: opts.projectId,
-    })) as object;
+    const canonical = (await opts.client.getSchemaById(
+      encodeURIComponent(schemaId),
+    )) as object;
     const written = await writeBackResource(
       opts.cwd,
       DEFAULT_SCHEMA_CONFIG_PATH,

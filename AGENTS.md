@@ -38,9 +38,15 @@ maps roles, not an exhaustive inventory — the authoritative project list is
 Go server:
 
 - `main.go` + `cmd/` — Go entrypoint and command wiring.
-- `internal/` — Go server implementation. `internal/staticui/` serves the
+- `internal/` — Go server implementation. `internal/api/` owns the HTTP
+  handlers, `internal/service/` the service layer, `internal/domain/` the
+  domain model and error sentinels, `internal/storage/` the multi-dialect
+  storage layer (see [internal/storage/AGENTS.md](internal/storage/AGENTS.md)),
+  `internal/authz/` the authorization subsystem (OpenFGA parser, profile
+  validator, compiler — ADRs 032–034), and `internal/staticui/` serves the
   embedded UI builds.
-- `api/openapi/` — OpenAPI 3.1 source files. `api/generated/` is ogen
+- `api/openapi/` — OpenAPI 3.1 source files; wire rules in
+  [api/openapi/AGENTS.md](api/openapi/AGENTS.md). `api/generated/` is ogen
   output; edit the OpenAPI source instead.
 
 Product surfaces (`apps/`):
@@ -161,10 +167,14 @@ scripts so server processes are signaled and cleaned up directly.
 startup, then runs `go run .`. Direct `go run .` callers must build the embedded
 UI surfaces themselves or disable both embedded UI surfaces.
 
-Checked-in demo end-to-end tests are **opt-in local checks**; they do not run
-in CI. They are not part of the default `moon ci :lint :typecheck :build :test`
-invocation because they boot real dev servers and need browsers installed
-(more in
+Checked-in end-to-end tests are **opt-in for local runs** — they are not part
+of the default `moon ci :lint :typecheck :build :test` invocation because they
+boot real dev servers and need browsers installed. CI does run selected lanes:
+their tasks carry `runInCI: false` only to keep them out of moon's automatic
+selection, and the `full-pr` job runs the real-instance and embedded-surface
+lanes through explicit workflow steps — the canonical statement of that
+interaction is in
+[packages/testing/AGENTS.md](packages/testing/AGENTS.md). (More in
 [CONTRIBUTING.md](CONTRIBUTING.md#running-integration-and-end-to-end-tests)):
 
 ```sh
@@ -224,9 +234,13 @@ upward**. When deciding where a new test belongs:
    `*.browser.spec.ts`.
 3. **End-to-end (Playwright)** — full HTTP path through framework
    middleware, the `/__nextgen` proxy, real `Set-Cookie` round-trip,
-   and full-page navigation. Owned by `apps/<demo>-e2e/`. Each framework
-   SDK (`sdk-next`, `sdk-nuxt`) has its own e2e project because the proxy
-   and route-protection layers are framework-specific.
+   and full-page navigation. Owned by the `apps/*-e2e/` projects: the demo
+   projects (`demo-next-e2e`, `demo-nuxt-e2e` — each with a mock lane and,
+   for next, an `e2e-real` lane on `@zitadel/testing`), `console-e2e`
+   (shell smoke, dev-proxy real-instance, and binary-served embedded lanes),
+   and `cli-journey-e2e` (the framework matrix across all 8 SDKs).
+   Middleware-owning SDKs get their own e2e project because
+   the proxy and route-protection layers are framework-specific.
 
 The consumer journey suite is the exception to the checked-in demo ownership
 rule: it belongs in `apps/cli-journey-e2e/` and must exercise a freshly
@@ -252,26 +266,27 @@ building any UI under `apps/console/**` or
 [`apps/console/docs/styling.md`](apps/console/docs/styling.md)):
 
 1. **Existing pair** (`Button`, `Card`, `Pill`, `Icon`, `TextField`, `Select`,
-   `Checkbox`, `Alert`) — compose it from `@zitadel/ui-react`.
+   `Checkbox`, `Alert`, `PageShell` — the registry is
+   [`packages/shared-component-styles/pairs.json`](packages/shared-component-styles/pairs.json)) —
+   compose it from `@zitadel/ui-react`.
 2. **Console-only chrome** (shell, page layout, tables, app widgets) — build in
-   `apps/console` with `zl-*` Tailwind utilities. Most console UI is this; do
-   not pre-build a Lit twin for it.
+   `apps/console` with the **unprefixed shadcn utility contract**
+   (`bg-background`, `text-muted-foreground`, …) from
+   `@zitadel/design-tokens/css/shadcn.css`. Do **not** use `bg-zl-*`/`text-zl-*`
+   utilities there — the canonical statement of this console exception is in
+   [`packages/design-tokens/AGENTS.md`](packages/design-tokens/AGENTS.md).
+   Most console UI is this; do not pre-build a Lit twin for it.
 3. **A new primitive the login / web-component surface also needs** — build it
    as a Lit + React pair via the Storybook recipe
    ([`apps/storybook/AGENTS.md`](apps/storybook/AGENTS.md)) and iterate there
    behind the parity + a11y gates, not on a console mock.
 
-**Caveat — the pairs are not theme-portable yet.** Every pair's surface CSS in
-`packages/shared-component-styles/src/*.css` still uses the **legacy dark-only
-login tokens** (`--zl-color-surface-default-*`, `--zl-color-text-button-*`,
-`--zl-color-gray-*`), which do **not** flip with `data-theme`. The login surface
-is dark-only for v1 (ADR-014 §5). So composing a pair into the light/dark console
-renders the login treatment in both themes — wrong in light. Until the pairs'
-surface CSS migrates to the current semantic taxonomy (`surface/*`, `text/*`,
-`border/*`), **bucket 1 is dormant for the console**: build console screens
-console-local (bucket 2) with theme-flipping `zl-*` utilities even where a pair
-nominally exists, and swap to the pair after it migrates. (`Icon` is the
-exception — it renders a glyph with `currentColor` and is theme-safe.)
+The pairs are theme-portable: legacy tokens are authored as `{ dark, light }`
+pairs and flip via `[data-theme="light"]` (amended ADR 014 §5), and the pairs'
+surface CSS consumes mode-aware semantic tokens. When adding surface CSS,
+never reach for the raw `--zl-color-gray-*` ramp — it is mode-independent by
+design; use the semantic tokens. The canonical statement of that invariant is
+in [`packages/shared-component-styles/AGENTS.md`](packages/shared-component-styles/AGENTS.md).
 
 Where the component lives decides the iteration tool: console-local UI iterates
 on the console dev server, verified at light/dark and each breakpoint; pairs
@@ -283,12 +298,10 @@ iterate in Storybook. A missing visual value is a **new token** in
 ## Resource identifiers
 
 Resource primary keys are dialect-owned `prefix_<opaque>` strings
-([ADR 047](docs/adrs/047-dialect-id-generation.md)). **Always** mint them
-through the storage statements surface: create paths use dialect `Ensure`;
-pre-persist ceremony IDs use `Statements().NewManagedID`. Never add custom
-ULID/UUID generation in domain, service, API, or other packages, and do not
-call `idgen` outside dialect packages. Full minting contract:
-[`internal/storage/v2/AGENTS.md`](internal/storage/v2/AGENTS.md).
+([ADR 047](docs/adrs/047-dialect-id-generation.md)). Never add custom
+ULID/UUID generation in domain, service, API, or other packages. The canonical
+minting contract (`Ensure` / `NewManagedID`, the `idgen` boundary) lives in
+[`internal/storage/AGENTS.md`](internal/storage/AGENTS.md).
 
 ## Generated Files
 
@@ -307,6 +320,9 @@ call `idgen` outside dialect packages. Full minting contract:
   generator resolves both itself, running those two directives (`go generate
   -run`) over a placeholder spec before analyzing. Neither caller knows about the
   cycle; do not reintroduce a scheduler-side bootstrap pass.
+  Wire fields are `snake_case`, enforced by the redocly rules and
+  `workspace:check-openapi-rules` — the wire contract rules live in
+  [api/openapi/AGENTS.md](api/openapi/AGENTS.md).
 - The consolidated `mockgen` directives live in the mock packages
   (`internal/domain/mock`, `internal/service/mocks`, `internal/crypto/mock`),
   not beside the interfaces they mock. mockgen has to type-check the source

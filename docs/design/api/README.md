@@ -4,7 +4,7 @@
 
 ## Thesis
 
-One surface: `api.zitadel.cloud/*`. Stripe-shaped, Vercel-shaped. No frontend/backend/platform product split. One bearer-token auth model. Self-hosted exposes the identical API shape as cloud — the SDK does not branch on deployment mode. Versioning lives in the `Zitadel-Version` header, not in the URL.
+One surface: `api.zitadel.cloud/*`. Stripe-shaped, Vercel-shaped. No frontend/backend/platform product split. One bearer-token auth model. Self-hosted exposes the identical API shape as cloud — the SDK does not branch on deployment mode. No version segment in URLs; header-selected versioning (`Zitadel-Version`) is target design, not shipped ([`conventions.md`](conventions.md#direction-not-shipped)).
 
 Target properties:
 
@@ -54,10 +54,10 @@ for this design PR live in:
 
 - [`../platform/api/claim-api.yaml`](../platform/api/claim-api.yaml)
 - [`../platform/api/config-api.yaml`](../platform/api/config-api.yaml)
-- [`../flowengine/api/flow-api.yaml`](../flowengine/api/flow-api.yaml)
-- [`../flowengine/api/session-api.yaml`](../flowengine/api/session-api.yaml)
 
-Specs for auth_attempts, flat api_keys, imports, and capabilities are not yet written.
+The former flow-engine and session sketches were deleted once the shipped spec
+under `api/openapi/endpoints/{flow,sessions}/` became the contract of record.
+Design sketches for flat api_keys, imports, and capabilities are not yet written.
 Events are partially specified in [ADR 049](../../adrs/049-events-api-retention-export.md);
 OpenAPI sketch pending.
 Implementation OpenAPI source remains under `api/openapi/**`; generated Go code

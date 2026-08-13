@@ -38,7 +38,7 @@ The CLI detects Next.js (or Remix, Astro, Nuxt, SvelteKit, …), installs the SD
 
 OIDC proxy routes (`/authorize`, `/token`, `/userinfo`, `/.well-known/*`) are not scaffolded yet. They are scaffolded later, when `npx zitadel push` detects one of two signals: an `idps.*` entry in `zitadel.json` (federated login needs a callback route on the customer's origin), or the server-side "OIDC client" capability switching on after the first client is added via API / MCP. See [Configuration Surface — Proxy endpoints](configuration-surface.md#proxy-endpoints-scaffolded-on-demand).
 
-The setup CLI also prints a **scratch dashboard** URL (`https://zitadel.dev/scratch/river-8421`) — a pre-claim inspection surface where the developer can see their config, their registered users, and the dev inbox without running a local UI. See [The scratch dashboard](#the-scratch-dashboard) below.
+The setup CLI also prints a **scratch dashboard** URL (`https://zitadel.dev/scratch/proj_01hexample`) — a pre-claim inspection surface where the developer can see their config, their registered users, and the dev inbox without running a local UI. See [The scratch dashboard](#the-scratch-dashboard) below.
 
 **Tuesday morning.** They push a branch to Vercel to share with a designer. The preview just works — the preview secret is already in the Vercel env, the auth web component renders on the preview origin, magic-link emails route to the dev inbox. No claim prompt.
 
@@ -47,7 +47,7 @@ The setup CLI also prints a **scratch dashboard** URL (`https://zitadel.dev/scra
 > Production deploys require a claimed Zitadel project.
 > Claim this project now: `npx zitadel claim`
 
-They run `npx zitadel claim`. Browser opens at `https://zitadel.cloud/claim/river-8421`, GitHub/Google/email. One click on GitHub. Dashboard loads; the project is now owned by a newly-created "Acme" team. Forty seconds. No credit card.
+They run `npx zitadel claim`. Browser opens at `https://zitadel.cloud/claim/proj_01hexample`, GitHub/Google/email. One click on GitHub. Dashboard loads; the project is now owned by a newly-created "Acme" team. Forty seconds. No credit card.
 
 **Two weeks later.** They want password-reset emails in production instead of the dev inbox. The dashboard offers Dev Inbox (default), Bring Your Own Provider, or Zitadel Managed. They pick BYO, connect their existing Resend account, and password-reset emails start flowing from `noreply@acme.com`. Magic-link URLs in the emails render the declared production issuer — `https://acme.com` — because that's what the developer declared in `zitadel.json`'s `environments.production.issuer`.
 
@@ -70,17 +70,17 @@ They enable the Pro-gated capability, add a card, configure the SP metadata from
 
 ## The scratch dashboard
 
-Before claim, the project has no accountable owner — so it cannot have a "logged-in dashboard" in the usual sense. Instead, `npx @zitadel/setup` prints a **scratch dashboard** URL: `https://zitadel.dev/scratch/<slug>` (e.g. `https://zitadel.dev/scratch/river-8421`). This is the only piece of Zitadel-hosted UI the developer touches in the MVP.
+Before claim, the project has no accountable owner — so it cannot have a "logged-in dashboard" in the usual sense. Instead, `npx @zitadel/setup` prints a **scratch dashboard** URL: `https://zitadel.dev/scratch/<project_id>` (e.g. `https://zitadel.dev/scratch/proj_01hexample`). This is the only piece of Zitadel-hosted UI the developer touches in the MVP.
 
-**What it is.** A browser-session-keyed inspection surface. The first visit drops a signed cookie bound to the project slug; subsequent visits from the same browser see the same view. It is not authenticated against a human identity — there isn't one yet — and it is not shareable in a persistent sense (a teammate opening the URL on their laptop gets a fresh session and sees only what a stranger would see).
+**What it is.** A browser-session-keyed inspection surface. The first visit drops a signed cookie bound to the project_id; subsequent visits from the same browser see the same view. It is not authenticated against a human identity — there isn't one yet — and it is not shareable in a persistent sense (a teammate opening the URL on their laptop gets a fresh session and sees only what a stranger would see).
 
 **What it shows.** The project's current config (as last uploaded by `npx zitadel push`), recently registered users, the dev inbox (magic-link and OTP payloads that would otherwise have been emailed), config version history with hashes, declared issuer origins per environment, and capability warnings from the most recent upload. Pre-claim, outbound delivery is always dev-inbox-only, so the scratch dashboard *is* where magic links land.
 
 **What it is not.** A multi-member surface (no sharing, no roles — teams do not exist pre-claim). A persistence guarantee (scratch sessions expire; loss of browser state means loss of inspection access, though the underlying project is unaffected as long as `.zitadel/secret` is intact). A production tool.
 
-**At claim time, the scratch URL retires** and the claim-complete flow redirects to the real dashboard at `dashboard.zitadel.cloud/<team>/projects/<slug>`. The scratch session cookie is invalidated; any future inspection is via the claimed dashboard, authenticated through the team.
+**At claim time, the scratch URL retires** and the claim-complete flow redirects to the real dashboard at `dashboard.zitadel.cloud/<team>/projects/<project_id>`. The scratch session cookie is invalidated; any future inspection is via the claimed dashboard, authenticated through the team.
 
-The scratch dashboard is also the recovery escape hatch referenced in [Project Secret — Failure modes](secret.md#failure-modes): a developer whose laptop lost `.zitadel/secret` while the project was still unclaimed can, if they still have the scratch session in the same browser, read back the project slug and correlate with support. It is best-effort, not a guarantee — the system-level answer is *claim early*.
+The scratch dashboard is also the recovery escape hatch referenced in [Project Secret — Failure modes](secret.md#failure-modes): a developer whose laptop lost `.zitadel/secret` while the project was still unclaimed can, if they still have the scratch session in the same browser, read back the project_id and correlate with support. It is best-effort, not a guarantee — the system-level answer is *claim early*.
 
 ## Three orthogonal axes
 
@@ -160,7 +160,7 @@ The rest of the platform docs in this folder specify Level 1 in full. Everything
 
 ### Level 2 — SPA support  *(deferred)*
 
-For customers shipping a pure-static SPA on a CDN with no server-side runtime — Create React App on S3+CloudFront, a Vite build on GitHub Pages, an Angular bundle on Azure Static Web Apps without Functions, and similar. The SPA cannot proxy OIDC endpoints and cannot set HttpOnly cookies on its own origin, so Zitadel mints a per-project subdomain (`project-<slug>.zitadel.app`, dictionary-named) that acts as a cookie-setting BFF the SPA calls via CORS + `SameSite=None; Secure`.
+For customers shipping a pure-static SPA on a CDN with no server-side runtime — Create React App on S3+CloudFront, a Vite build on GitHub Pages, an Angular bundle on Azure Static Web Apps without Functions, and similar. The SPA cannot proxy OIDC endpoints and cannot set HttpOnly cookies on its own origin, so Zitadel mints a per-project subdomain (`project-<project_id>.zitadel.app`) that acts as a cookie-setting BFF the SPA calls via CORS + `SameSite=None; Secure`.
 
 Security model is the declared-issuer allowlist from Level 1 plus strict subdomain-naming rules. The SPA code still imports and uses the published auth component from Level 1 — the component is the same; only the cookie-setting origin changes.
 

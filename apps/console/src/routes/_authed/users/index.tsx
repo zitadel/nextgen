@@ -34,7 +34,6 @@ import { api } from "../../../api/zitadel";
 import { displayValue, field } from "../../../lib/record";
 import { type SchemaField, type UserSchema, schemaColumns } from "../../../lib/schema";
 import { userDisplayName } from "../../../lib/user";
-import { getConsoleProjectId } from "../../../runtime/runtime";
 
 export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the sidebar frame's row carries `lucide/User`, the
@@ -74,12 +73,11 @@ const RESERVED_KEYS = new Set(["id", "$schema", "metadata"]);
  * carries `$schema`, so the set is known without a second list call.
  */
 async function columnsForUsers(users: Record<string, unknown>[]): Promise<SchemaField[]> {
-  const projectId = getConsoleProjectId();
   const schemaIds = [...new Set(users.map((user) => field(user, "$schema")).filter(isPresent))];
   const schemas = await Promise.all(
     schemaIds.map(async (id) => {
       try {
-        return (await api.getSchemaById(id, { project_id: projectId })) as UserSchema;
+        return (await api.getSchemaById(id)) as UserSchema;
       } catch {
         // One unreadable schema costs its columns, not the screen. The rows
         // still render from the fallback below.

@@ -31,7 +31,9 @@ func TestQuerySessions(t *testing.T) {
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
-	harness.SetScopedTokenOnApiClient(t, client, project, "session.read")
+	// MVP management gate is project.write (full project secret). Fine-grained
+	// session.* scopes are not enough until #420.
+	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	querySessions := func(t *testing.T, req *api.QuerySessionsRequest) *api.QuerySessionsResponse {
 		t.Helper()
@@ -68,10 +70,10 @@ func TestQuerySessions(t *testing.T) {
 
 	// The scope matrix and binding anti-oracle live in authz_internal_test.go;
 	// this only pins that the endpoint invokes the guard at all.
-	t.Run("project secret is denied", func(t *testing.T) {
+	t.Run("session.read is denied", func(t *testing.T) {
 		denied, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
-		harness.SetProjectSecretOnApiClient(t, denied, project)
+		harness.SetScopedTokenOnApiClient(t, denied, project, "session.read")
 
 		res, err := denied.QuerySessions(t.Context(), &api.QuerySessionsRequest{}, api.QuerySessionsParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
