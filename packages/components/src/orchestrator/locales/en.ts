@@ -25,7 +25,7 @@ export const en: Record<string, string> = {
   "identifier.field.email.placeholder": "you@example.com",
   "identifier.field.password": "Password",
   "identifier.action.submit": "Sign in",
-  "identifier.action.continue": "Sign in",
+  "identifier.action.continue": "Continue",
   "identifier.action.passkey": "Sign in with a passkey",
   "identifier.action.register.lead": "Don't have an account? ",
   "identifier.action.register.link": "Sign up",

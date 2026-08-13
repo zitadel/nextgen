@@ -385,7 +385,7 @@ export class ZitadelLogin extends ZitadelSurface {
     }
     this.applyValuesToFields();
     if (!initial || this.variant === "page") {
-      this.moveFocusToFirstField();
+      this.moveFocusToFirstField(initial);
     }
   }
 
@@ -1015,10 +1015,18 @@ export class ZitadelLogin extends ZitadelSurface {
     return primary?.getAttribute("action") || null;
   }
 
-  private moveFocusToFirstField(): void {
+  /**
+   * On the initial paint, only a field earns focus: script-moved focus with
+   * no prior interaction matches `:focus-visible`, so autofocusing a button
+   * on a field-less step (passkey-first) paints a ring that reads as a
+   * pre-selected state. Step swaps keep button focus — there the browser
+   * derives the modality from the user's actual input.
+   */
+  private moveFocusToFirstField(fieldsOnly = false): void {
     const root = this.shadowRoot;
     if (!root) return;
-    const focusables = root.querySelectorAll<HTMLElement>("zl-field, zl-button");
+    const selector = fieldsOnly ? "zl-field" : "zl-field, zl-button";
+    const focusables = root.querySelectorAll<HTMLElement>(selector);
     const target = Array.from(focusables).find((el) => !el.hasAttribute("disabled"));
     target?.focus();
   }
