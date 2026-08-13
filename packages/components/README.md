@@ -6,12 +6,16 @@ Zitadel auth UI.
 The package exports:
 
 - **Atoms** — `<zl-field>`, `<zl-button>`, `<zl-alert>`, `<zl-icon>`,
-  `<zl-pill>`, `<zl-card>`, `<zl-page-shell>`. Form-associated, accessible,
+  `<zl-pill>`, `<zl-card>`, `<zl-checkbox>`, `<zl-select>`,
+  `<zl-page-shell>`, and `<zl-passkey>` (an invisible WebAuthn ceremony
+  handler — no rendered surface). Form-associated, accessible,
   branding-aware Lit elements that map 1:1 to the flow API
   field/action/error primitives and the Figma design system.
-- **Orchestrator** — `<zitadel-login>`. A single drop-in element that calls
+- **Orchestrators** — `<zitadel-login>`, a single drop-in element that calls
   the flow API, renders each step through a Liquid template, manages focus
-  and form submission, and applies branding/theme/locale.
+  and form submission, and applies branding/theme/locale; `<zitadel-logout>`
+  for sign-out; and `<zitadel-session>`, the post-sign-in "signed in" card
+  (session read + sign-out in one element).
 - **Tokens & manifests** — design tokens (`--zl-*` CSS custom properties), a
   Liquid template registry, and per-atom manifests describing allowed
   attributes/parts/events for sanitiser allowlists.
@@ -128,8 +132,9 @@ fixtures:
   `applyBranding(...)` injects a tenant branding overlay merged into every
   response (presets include `font_url` for Inter).
 - **Framework demos (TCP server)** — `moon run api-mock:start`
-  serves the same handlers on port 4000 with `defaultDevBranding` (Arimo
-  `font_url`) applied at boot. See [`apps/demo-next`](../../apps/demo-next/README.md)
+  serves the same handlers on port 8080 (set `PORT` to override) with
+  `defaultDevBranding` (Arimo `font_url`) applied at boot. See
+  [`apps/demo-next`](../../apps/demo-next/README.md)
   and [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md).
 
 ### Preview surfaces
@@ -344,8 +349,10 @@ See [`src/atoms/`](src/atoms) for full TypeScript types and JSDoc.
 packages/components/
 ├── src/
 │   ├── atoms/             zl-field, zl-button, zl-alert, zl-icon, zl-pill,
-│   │                       zl-card, zl-page-shell + tests
-│   ├── orchestrator/      <zitadel-login>, <zitadel-logout>, api-client, liquid, branding
+│   │                       zl-card, zl-checkbox, zl-select, zl-page-shell,
+│   │                       zl-passkey + tests
+│   ├── orchestrator/      <zitadel-login>, <zitadel-logout>, <zitadel-session>,
+│   │                       api-client, liquid, branding
 │   │   ├── locales/       bundled English fallback
 │   │   └── templates/     default.liquid (all steps) + layout-chrome.css
 │   ├── tokens/            re-export of @zitadel/design-tokens

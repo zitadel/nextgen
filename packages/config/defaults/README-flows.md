@@ -37,8 +37,11 @@ Typical edits:
   tokens).
 - **Add or remove a step** — extend `steps[]`.
 - **Rewire transitions** — edit `steps[].transitions` to point at a
-  different next step, or use `action: switch` / `pivot` to jump to
-  another flow.
+  different next step. Cross-flow jumps (`action: switch` / `pivot`)
+  validate in a definition but are **not yet executed by the runtime** —
+  submitting through one fails with a 400 (`code: "flow.unsupported"`);
+  keep transitions within one flow, using a purpose switch (next bullet)
+  for login ↔ register navigation.
 - **Offer a purpose switch in the card** — pair a `kind: navigate`
   action with a transition that declares a local `purpose`. The default
   login flow ships this in both directions:
@@ -84,8 +87,8 @@ experiment can't silently take over `/login` — scope it or pin
 
 ## Presets
 
-`zitadel setup` scaffolds this folder from a preset (`--preset
-password-first` or `--preset passkey-first`). The passkey-first flow
+`zitadel setup` scaffolds this folder from a preset: `password-first` (the
+default root files) or `--preset passkey-first`. The passkey-first flow
 enters login on a fields-less passkey step with an email → password
 fallback path. The preset only decides the starting point — edit
 anything here afterwards.

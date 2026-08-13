@@ -199,7 +199,7 @@ const z = await startLocalZitadel({
   appOrigins,    // registered as the project's preview_origins
   useCase,       // "minimal" (default) | "consumer" | "business"
   preset,        // "password-first" (default)
-  serverBinary,  // ZITADEL_SERVER_BINARY override (in-repo: dist/server/nextgen)
+  serverBinary,  // ZITADEL_SERVER_BINARY override (path to a built server binary)
   keep,          // keep the temp dir for debugging
 });
 
@@ -247,7 +247,7 @@ project, so per-test `seed.user()` calls are isolation enough for login-flow
 tests, and tests run fully parallel against the shared instance
 (demonstrated by `demo-next-e2e:e2e-real`, 2 workers).
 
-Typical timings with the SQLite local default (dev build, July 2026 — estimates, not a fresh remeasure):
+Typical timings with the SQLite local default (dated estimates from a July 2026 dev build — orders of magnitude, not a benchmark; remeasure locally before relying on them):
 
 | Operation | Time |
 | --- | --- |
