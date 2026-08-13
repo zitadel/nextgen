@@ -74,7 +74,7 @@ test("signs into the deployment's project with no query parameter", async ({ pag
   const completion = flowCompletion(page);
 
   await page.getByLabel("Email").fill(user.email);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByLabel("Password")).toBeVisible();
   await page.getByLabel("Password").fill(user.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
