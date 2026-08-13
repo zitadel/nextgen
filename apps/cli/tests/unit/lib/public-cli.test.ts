@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   normalizePublicCliCommand,
+  normalizePublicCliProse,
   npmDistTagForCliVersion,
   npmSelectorForCliVersion,
   publicCliCommand,
@@ -39,5 +40,38 @@ describe("public CLI command formatting", () => {
     );
     expect(normalizePublicCliCommand("npm install", "0.1.0-alpha.1")).toBe("npm install");
     expect(normalizePublicCliCommand("docker version", "0.1.0-alpha.1")).toBe("docker version");
+  });
+});
+
+describe("normalizePublicCliProse", () => {
+  it("rewrites inline code spans to the public npx form", () => {
+    expect(
+      normalizePublicCliProse("2. `zitadel plan` — validates the template.", "0.1.0-alpha.1"),
+    ).toBe("2. `npx @zitadel/cli@0.1.0-alpha.1 plan` — validates the template.");
+    expect(
+      normalizePublicCliProse(
+        "Start over with `zitadel branding eject --design <name>`.",
+        "0.1.0-alpha.1",
+      ),
+    ).toBe(
+      "Start over with `npx @zitadel/cli@0.1.0-alpha.1 branding eject --design <name>`.",
+    );
+  });
+
+  it("rewrites a bare `zitadel` span and fenced-block command lines", () => {
+    expect(normalizePublicCliProse("run `zitadel` for help", "0.1.0-alpha.1")).toBe(
+      "run `npx @zitadel/cli@0.1.0-alpha.1` for help",
+    );
+    expect(normalizePublicCliProse("```sh\nzitadel apply\n```", "0.1.0-alpha.1")).toBe(
+      "```sh\nnpx @zitadel/cli@0.1.0-alpha.1 apply\n```",
+    );
+  });
+
+  it("leaves file names and unrelated prose untouched", () => {
+    const prose = "Edit `zitadel.json` and `.zitadel/branding/branding.json`; `zitadel.db` stays.";
+    expect(normalizePublicCliProse(prose, "0.1.0-alpha.1")).toBe(prose);
+    expect(normalizePublicCliProse("`npm install` then `git push`", "0.1.0-alpha.1")).toBe(
+      "`npm install` then `git push`",
+    );
   });
 });

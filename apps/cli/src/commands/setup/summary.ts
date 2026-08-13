@@ -25,6 +25,19 @@ export type Section = {
 };
 
 /**
+ * Renders a path under `cwd` with stable POSIX separators. Setup's summary
+ * matches generated artifacts against repository-style suffixes such as
+ * `.zitadel/schemas/default-human-user.json`; normalizing here keeps those
+ * matches working when Node returns Windows paths with backslashes.
+ */
+export function relativeDisplayPath(cwd: string, absolute: string): string {
+  const boundary = absolute[cwd.length];
+  const withinCwd = absolute.startsWith(cwd) && (boundary === "/" || boundary === "\\");
+  const display = withinCwd ? absolute.slice(cwd.length + 1) : absolute;
+  return display.replaceAll("\\", "/");
+}
+
+/**
  * Renders the section list as a single multi-line string. Labels are
  * padded to a common width per section so the `✓ label  value` columns
  * line up, the title prints in dim gray, and `✓` is green. Values come
