@@ -410,6 +410,13 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(errorEvents[0]?.detail.message).toBe(serverMessage);
     await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
     expect(element.shadowRoot?.querySelector("zl-alert")?.textContent).toContain(serverMessage);
+    // The failure keeps the login surface: the alert renders inside the same
+    // page-shell/card chrome a step would, not bare on an otherwise empty
+    // page — a misconfigured origin is the common trigger and used to blank
+    // the app after the first step had painted normally.
+    const alert = element.shadowRoot?.querySelector("zl-alert");
+    expect(alert?.closest("zl-card")).not.toBeNull();
+    expect(alert?.closest("zl-page-shell")).not.toBeNull();
   });
 
   it("renders branding overlay applied via api-mock applyBranding", async () => {
