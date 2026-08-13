@@ -4,6 +4,11 @@
 > **See also:** [Overview](README.md) · [Flow Engine](flow-engine.md) · [Session API](session-api.md) · [ADR 019](../../adrs/019-captcha-gate-and-bot-signals.md)
 > **POC ADRs:** [021](https://github.com/zitadel/oxidel/blob/main/docs/adr/021-login-flow-schema.md) Bot Detection & Telemetry, [024](https://github.com/zitadel/oxidel/blob/main/docs/adr/024-risk-evaluation-policy-consumers.md) Risk Evaluation
 
+> **Runtime status:** CAPTCHA is not implemented. Flow definitions can store a
+> gate, but the engine emits `gates: {}`, does not require a proof, and rejects
+> non-empty `gate_proofs` with `flow.unsupported`. The provider, risk, and
+> `auth_attempts` ceremonies below describe the intended contract.
+
 Bot detection is a **first-class, composable subsystem** — not an afterthought bolted onto login.
 
 ## Principles
@@ -161,7 +166,7 @@ Captcha is configured per flow via `x-captcha` in the flow definition or schema:
 Browser fingerprinting collects device signals for risk correlation. It does not block — it feeds the risk evaluator.
 
 - **Provider:** ThumbmarkJS (open-source, self-hosted) with fallback to a minimal built-in collector.
-- **Collection:** Flow engine emits a fingerprint collection action. Frontend submits via `POST /flows/{session_id}/event`.
+- **Collection:** Flow engine emits a fingerprint collection action. Frontend submits via `POST /flow/{id}/event` (direction — the event endpoint is not in the shipped spec).
 - **Persistence:** Fingerprint hash stored on the session. Repeat visitors with the same fingerprint on the same user are lower risk.
 
 ## Behavioral Telemetry
@@ -173,7 +178,7 @@ Browser fingerprinting collects device signals for risk correlation. It does not
 | Time on step | Step transition timestamps | Bots complete forms in <100ms |
 | Copy/paste of credentials | Event endpoint | Unusual for real users on password fields |
 
-Signals are submitted via `POST /flows/{session_id}/event`. They are **observation-only** — never blocking on their own.
+Signals are submitted via `POST /flow/{id}/event` (direction — the event endpoint is not in the shipped spec). They are **observation-only** — never blocking on their own.
 
 ## Rate Limiting
 
@@ -198,17 +203,21 @@ Three modes:
      "gates": {
        "captcha": { "kind": "captcha", "provider": "altcha" }
      },
+     "actions": [
+       { "name": "submit", "kind": "submit", "primary": true }
+     ],
      "transitions": {
-       "submit": { "target": "set_password" }
+       "submit": { "target": "set-password" }
      }
    }
 ```
    
-The `gates.captcha` declaration means the frontend must solve a captcha (using the configured provider) before submission is accepted.
+The intended contract makes the frontend solve the configured CAPTCHA before
+submission. Today's runtime does not emit or enforce the declaration.
 
-2. **Dynamic injection** — policy evaluates risk and injects a captcha gate on any step dynamically, even if the definition doesn't declare it.
+2. **Dynamic injection (planned)** — policy evaluates risk and injects a captcha gate on any step dynamically, even if the definition doesn't declare it.
 
-3. **Risk-based activation** — the engine evaluates risk after every submit. Low score → proceed. High score → inject captcha gate on the current or next step.
+3. **Risk-based activation (planned)** — the engine evaluates risk after every submit. Low score → proceed. High score → inject captcha gate on the current or next step.
 
 ## Integration: Auth Attempts
 
