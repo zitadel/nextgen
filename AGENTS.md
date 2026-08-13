@@ -167,12 +167,13 @@ scripts so server processes are signaled and cleaned up directly.
 startup, then runs `go run .`. Direct `go run .` callers must build the embedded
 UI surfaces themselves or disable both embedded UI surfaces.
 
-Checked-in demo end-to-end tests are **opt-in for local runs** — they are not
-part of the default `moon ci :lint :typecheck :build :test` invocation because
-they boot real dev servers and need browsers installed. CI does run them: the
-real-instance lanes carry `runInCI: false` only to keep them out of moon's
-automatic selection, and the `full-pr` job runs them through explicit workflow
-steps — the canonical statement of that interaction is in
+Checked-in end-to-end tests are **opt-in for local runs** — they are not part
+of the default `moon ci :lint :typecheck :build :test` invocation because they
+boot real dev servers and need browsers installed. CI does run selected lanes:
+their tasks carry `runInCI: false` only to keep them out of moon's automatic
+selection, and the `full-pr` job runs the real-instance and embedded-surface
+lanes through explicit workflow steps — the canonical statement of that
+interaction is in
 [packages/testing/AGENTS.md](packages/testing/AGENTS.md). (More in
 [CONTRIBUTING.md](CONTRIBUTING.md#running-integration-and-end-to-end-tests)):
 
@@ -236,8 +237,9 @@ upward**. When deciding where a new test belongs:
    and full-page navigation. Owned by the `apps/*-e2e/` projects: the demo
    projects (`demo-next-e2e`, `demo-nuxt-e2e` — each with a mock lane and,
    for next, an `e2e-real` lane on `@zitadel/testing`), `console-e2e`
-   (mock + real lanes), and `cli-journey-e2e` (the framework matrix across
-   all 8 SDKs). Middleware-owning SDKs get their own e2e project because
+   (shell smoke, dev-proxy real-instance, and binary-served embedded lanes),
+   and `cli-journey-e2e` (the framework matrix across all 8 SDKs).
+   Middleware-owning SDKs get their own e2e project because
    the proxy and route-protection layers are framework-specific.
 
 The consumer journey suite is the exception to the checked-in demo ownership

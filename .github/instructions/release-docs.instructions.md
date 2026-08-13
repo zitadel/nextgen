@@ -10,8 +10,9 @@ state of the repo.
 - The CI gate is the `full-pr` job in `.github/workflows/ci.yml`: a Moon graph
   run plus per-database Go integration lanes, four gated journey variants
   (contract: [`apps/cli-journey-e2e/AGENTS.md`](../../apps/cli-journey-e2e/AGENTS.md),
-  the project id is `cli-journey-e2e`), real-instance suite lanes, and the
-  version-PR path. Mirror locally with `moon run workspace:check -- --full`
+  the project id is `cli-journey-e2e`), real-instance suite lanes, the
+  binary-served console embedded-surface lane, and the version-PR path. Mirror
+  locally with `moon run workspace:check -- --full`
   ([CONTRIBUTING.md](../../CONTRIBUTING.md#what-ci-runs)).
 - The release workflow publishes alpha npm packages and containers, then
   creates or updates a draft product GitHub Release shell; product prose stays

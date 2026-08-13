@@ -4,7 +4,7 @@ Scoped instructions for packages that have **no nearer `AGENTS.md` of their
 own** — today that is the nine `packages/sdk-*` packages plus `packages/api`
 and `packages/config`. Packages with their own scoped file
 (`components`, `design-tokens`, `shared-component-styles`, `testing`,
-`api-mock`) are governed by those files, not this one. Defer to root
+`api-mock`, `ui-react`) are governed by those files, not this one. Defer to root
 [`AGENTS.md`](../AGENTS.md) for repo-wide rules.
 
 ## `packages/sdk-*` (applies only to the SDK packages)
