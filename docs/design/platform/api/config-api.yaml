@@ -171,10 +171,10 @@ components:
       name: projectId
       in: path
       required: true
-      description: Project identifier (e.g. `river-8421`).
+      description: Project identifier (e.g. `proj_01hexample`).
       schema:
         type: string
-        example: river-8421
+        example: proj_01hexample
 
     environment:
       name: environment

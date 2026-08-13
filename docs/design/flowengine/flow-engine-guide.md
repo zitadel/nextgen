@@ -1,7 +1,7 @@
 # Building Flows
 
 > **Status:** Draft
-> **Note:** The step response shape is [decided](flow-engine-nodes.md) — steps emit unordered capability dictionaries (`fields`, `actions`, `gates`) and a LiquidJS template controls layout.
+> **Note:** The step response shape is [decided](flow-engine-nodes.md) — steps emit ordered capability arrays for `fields` and `actions` (entries carry a `name`, ADR 021), a keyed `gates` map, and a LiquidJS template controls layout.
 >
 > **Canonical OpenAPI spec:** [`api/openapi/openapi-spec.yaml`](../../../api/openapi/openapi-spec.yaml) — endpoints under `/flow`. Schemas in [`api/openapi/components/flows/`](../../../api/openapi/components/flows/).
 
@@ -22,10 +22,10 @@ sequenceDiagram
     participant Server
 
     User->>Frontend: Opens login page
-    Frontend->>Server: POST /flows { purpose: "login" }
-    Server-->>Frontend: Step: fields=[email, password]
+    Frontend->>Server: POST /flow { project_id, purpose: "login" }
+    Server-->>Frontend: Step: fields=[email, x-auth-methods#password]
     User->>Frontend: Types email + password
-    Frontend->>Server: submit { email: "alice@acme.com", password: "..." }
+    Frontend->>Server: submit { email: "alice@acme.com", x-auth-methods#password: "..." }
     Server-->>Frontend: Step: complete → redirect
     Frontend->>User: Redirects to app
 ```
@@ -40,15 +40,15 @@ Every step the server returns has the same shape:
 
 ```json
 {
+  "id": "flow_1",
   "session_id": "sess_1",
-  "session_token": "tok_1",
   "step": {
     "name": "login",
     "texts": { "title_key": "login.title", "description_key": "login.description" },
     "error": null,
     "complete": null,
-    "fields": { ... },
-    "actions": { ... },
+    "fields": [ ... ],
+    "actions": [ ... ],
     "gates": { ... }
   }
 }
@@ -60,27 +60,27 @@ Every step the server returns has the same shape:
 | `texts` | Localization keys for title and description |
 | `error` | Error message from a failed previous submission (null if none) |
 | `complete` | Only on terminal steps: `redirect` or `show` (null otherwise) |
-| `fields` | Input fields to render — keyed by field name |
-| `actions` | Things the user can do — keyed by action name |
-| `gates` | Security gates that must be satisfied before submission |
+| `fields` | Input fields to render — an ordered array; each entry carries `name` |
+| `actions` | Things the user can do — an ordered array; each entry carries `name` and `kind` |
+| `gates` | Reserved security-gate contract; always empty in today's runtime |
 
 **Fields** are resolved by the engine from the user schema:
 
 ```json
-{ "type": "email", "text_key": "login.field.email", "required": true }
+{ "name": "email", "type": "email", "text_key": "login.field.email", "required": true }
 ```
 
-**Actions** are keyed by name in an unordered dictionary:
+**Actions** are an ordered array of `{name, kind, …}` entries:
 
 ```json
-{
-  "submit": { "text_key": "login.action.submit", "primary": true },
-  "register": { "text_key": "login.action.register" },
-  "recover": { "text_key": "login.action.recover" }
-}
+[
+  { "name": "submit", "kind": "submit", "text_key": "login.action.submit", "primary": true },
+  { "name": "register", "kind": "navigate", "text_key": "login.action.register" },
+  { "name": "recover", "kind": "navigate", "text_key": "login.action.recover" }
+]
 ```
 
-Actions are **unordered capabilities**. The LiquidJS template decides where and how to render them — the server never controls visual positioning.
+The array order is a stable default, but the LiquidJS template owns layout — it iterates in order, reorders, or looks entries up by name (`where: "name"`).
 
 ---
 
@@ -98,7 +98,7 @@ sequenceDiagram
     participant Atoms as <zl-*> Atoms
 
     App->>ZL: Mounts component
-    ZL->>ZL: POST /flows → receives capabilities + template
+    ZL->>ZL: POST /flow → receives capabilities + template
     ZL->>ZL: Loads locale dictionary (en.ts)
     ZL->>Liquid: Parse template string + inject capabilities as context
     Liquid->>Liquid: Resolve {{ field.text_key | t }} via translation filter
@@ -107,7 +107,7 @@ sequenceDiagram
     ZL->>ZL: Inject HTML into Shadow DOM
     ZL->>Atoms: Browser upgrades <zl-field>, <zl-submit>, etc.
     Atoms-->>ZL: User interacts → dispatches CustomEvent
-    ZL->>ZL: POST /flows/{id}/submit → receives next step
+    ZL->>ZL: POST /flow/{id}/submit → receives next step
     ZL->>Liquid: Re-render with new capabilities
 ```
 
@@ -129,8 +129,8 @@ The template receives the full step payload as its rendering context:
 // What the orchestrator passes to LiquidJS
 {
   step: { name, texts, complete },
-  fields: { email: { type, required, text_key } },
-  actions: { submit: { primary, text_key }, recover: { text_key } },
+  fields: [ { name, type, required, text_key } ],
+  actions: [ { name, kind, primary, text_key } ],
   gates: { captcha: { provider, config } },
   sso_providers: [ { id, name, template } ],
   identity: { display_name, avatar_url },
@@ -162,10 +162,11 @@ All human-readable text is resolved client-side. The backend sends `text_key` st
 
 ```liquid
 <!-- The filter looks up "login.field.email" in the active locale dictionary -->
+{% assign email = fields | where: "name", "email" | first %}
 <zl-field
   name="email"
-  label="{{ fields.email.text_key | t }}"
-  type="{{ fields.email.type }}"
+  label="{{ email.text_key | t }}"
+  type="{{ email.type }}"
 ></zl-field>
 
 <!-- Interpolation: "Hi, {{displayName}}" becomes "Hi, Alice" -->
@@ -198,7 +199,7 @@ Customers who want full control "eject" this template — the Zitadel Console co
 ### The frontend loop (pseudocode)
 
 ```
-response = POST /flows { purpose, auth_request_id }
+response = POST /flow { project_id, purpose, auth_request_id }
 
 loop:
   step = response.step
@@ -219,12 +220,11 @@ loop:
   })
   shadowRoot.innerHTML = html
 
-  { action, data } = waitForCustomEvent()
+  { action, fields } = waitForCustomEvent()
 
-  response = POST /flows/{session_id}/submit {
-    session_token: response.session_token,
+  response = POST /flow/{id}/submit {
     action: action,
-    data: data
+    fields: fields
   }
 ```
 
@@ -256,15 +256,17 @@ As a definition:
 
 ```json
 {
-  "slug": "simple-login",
-  "name": "Simple Login",
-  "user_schema": "human_user",
-  "purposes": ["login"],
-  "initial_steps": { "login": "login" },
+  "name": "simple-login",
+  "status": "active",
+  "user_schema": "sch_01hexample",
+  "purposes": { "login": "login" },
   "steps": [
     {
       "name": "login",
-      "fields": ["email", "password"],
+      "fields": ["email", "x-auth-methods#password"],
+      "actions": [
+        {"name": "submit", "kind": "submit", "primary": true}
+      ],
       "transitions": {
         "submit": { "target": "done" }
       }
@@ -275,9 +277,9 @@ As a definition:
 ```
 
 Key points:
-- **`fields`** reference properties from the `human_user` schema. The engine resolves type, validation, and text keys at runtime.
+- **`fields`** reference properties from the definition's `user_schema` or reserved authentication-method fields such as `x-auth-methods#password`. The engine resolves type, validation, challenge behavior, and text keys at runtime.
 - **`transitions`** define the edges of the graph — each maps an action name to a target step.
-- The engine **implicitly evaluates assurance policy** after every submit. If the session meets the target ACR, it transitions to `complete`. If not, it follows the defined transition or injects additional steps dynamically.
+- Today's engine follows the authored transition after verifying the fields on the submitted step. Requested-ACR evaluation and dynamic step injection are planned.
 
 ---
 
@@ -287,7 +289,7 @@ Steps reference fields by name from the flow's user schema. The engine resolves 
 
 ```mermaid
 flowchart LR
-    schema["User Schema<br>(human_user)"]
+    schema["User Schema<br>(sch_01hexample)"]
     definition["Flow Definition<br>fields: [email, given_name]"]
     engine["Flow Engine"]
     response["Step Response<br>fields with types, text_keys, validation"]
@@ -299,16 +301,18 @@ flowchart LR
 
 The schema is the **single source of truth** for field metadata. Changing a field's label or validation in the schema automatically updates every flow that references it.
 
-### Schema annotations drive engine behavior
+### Schema annotations and reserved fields drive engine behavior
 
 Schema fields can have `x-*` annotations that tell the engine how to handle them:
 
-| Annotation | Effect |
+| Marker | Effect |
 |---|---|
 | `x-unique: "<scope>"` | Value must be unique at the given scope (`project` or `team`). A non-empty scope makes the field an identifier: the engine looks up the user on submit, which implies the `user_not_found` and `user_already_exists` outcomes in transitions. |
-| `x-credential: "password"` | Engine verifies the credential via auth_attempt. |
+| Step field `x-auth-methods#password` plus root `x-auth-methods.password.enabled: true` | Engine renders a password field and verifies the submitted credential via `auth_attempt`. |
 
-This means the flow definition stays simple — field names only — while the engine derives all the complex behavior from the schema.
+Ordinary step fields name top-level user-schema properties. Credential fields
+use the reserved `x-auth-methods#<method>` namespace; a top-level property named
+`password` is only user data and does not trigger password verification.
 
 ---
 
@@ -320,9 +324,12 @@ Steps can declare server-side behavior directly as properties:
 
 ```json
 {
-  "name": "set_password",
-  "fields": ["password"],
+  "name": "set-password",
+  "fields": ["x-auth-methods#password"],
   "on_success": "create_user",
+  "actions": [
+    {"name": "submit", "kind": "submit", "primary": true}
+  ],
   "transitions": {
     "submit": { "target": "done" }
   }
@@ -331,10 +338,10 @@ Steps can declare server-side behavior directly as properties:
 
 The `on_success` mutation runs **after** the step succeeds (fields validated) and **before** the transition fires. Possible values:
 
-| Action | What it does |
+| Value | What it does |
 |---|---|
-| `create_user` | Creates the user from accumulated schema data |
-| `reset_credential` | Resets the password or other credential |
+| `create_user` | Creates the user from accumulated schema data. The only value in the shipped schema. |
+| `reset_credential` | Direction for recovery flows — not in the shipped schema. |
 
 ### `complete` — terminal step
 
@@ -346,32 +353,17 @@ A step with `complete` set is the terminal state. No fields, no actions, no tran
 
 ---
 
-## Implicit Policy Evaluation
+## Planned Policy Evaluation
 
-The engine evaluates assurance policy **after every submit** — no explicit policy check nodes in the definition.
+Implicit assurance-policy evaluation is design direction, not shipped
+behavior. Today the engine verifies the challenges declared by the current
+step and then follows that step's authored transition. It does not compare the
+session with a requested ACR, skip transitions, or inject MFA steps.
 
-After the user submits a step:
-1. Engine validates fields and runs any `on_success` logic
-2. Engine checks: does the session's `assurance_levels[]` meet the target ACR?
-3. **If yes** → skip to `complete` (regardless of what the transition says)
-4. **If no** → follow the defined transition, or inject a step dynamically if additional factors are needed
-
-This means a simple two-step login (`login` → `done`) works for both single-factor and MFA — the engine handles the complexity invisibly.
-
-```mermaid
-sequenceDiagram
-    participant Frontend
-    participant Engine
-
-    Frontend->>Engine: submit { email, password }
-    Note right of Engine: Validate fields ✓
-    Note right of Engine: Check policy: needs OTP?
-    alt ACR met
-        Engine-->>Frontend: complete → redirect
-    else needs more factors
-        Engine-->>Frontend: injected OTP step
-    end
-```
+Until a policy evaluator populates required checks, a definition must model
+every required authentication step explicitly. Reaching a step with
+`complete` means only that the authored graph reached that terminal step; it
+is not evidence that an ACR policy was evaluated.
 
 ---
 
@@ -392,10 +384,10 @@ A single flow definition can serve **multiple purposes** by declaring different 
 
 ```json
 {
-  "slug": "combined-auth",
-  "user_schema": "human_user",
-  "purposes": ["login", "register"],
-  "initial_steps": {
+  "name": "combined-auth",
+  "status": "active",
+  "user_schema": "sch_01hexample",
+  "purposes": {
     "login": "identify",
     "register": "identify"
   },
@@ -414,14 +406,15 @@ When a flow starts, the server resolves which definition to use:
 ```mermaid
 flowchart TD
     req["Flow request:<br>purpose=login<br>team_id=acme<br>app_id=dashboard"]
-    filter["Filter: active definitions<br>where purposes includes 'login'"]
-    match["Match audience:<br>app_id > team_id > schema_id > project"]
-    pick["Pick most specific match<br>tie-break by priority"]
-    fallback["No match → built-in default"]
+    filter["Filter: active definitions<br>whose purposes has an entry for 'login'"]
+    schema["If set, hard-filter by<br>user_schema_id"]
+    match["Score audience:<br>app match > team match > project-wide > other scoped"]
+    pick["Pick highest score<br>tie-break by created_at, then id"]
+    missing["No candidate → flow_definition.not_found"]
 
-    req --> filter --> match --> pick
+    req --> filter --> schema --> match --> pick
     pick -->|found| use["Use matched definition"]
-    pick -->|none| fallback
+    pick -->|none| missing
 ```
 
 A definition's **audience** scopes where it applies:
@@ -430,46 +423,54 @@ A definition's **audience** scopes where it applies:
 {
   "audience": {
     "team_ids": ["team_acme"],
-    "app_ids": ["app_dashboard"],
-    "schema_ids": ["human_user"]
+    "app_ids": ["app_dashboard"]
   }
 }
 ```
 
-- `app_ids` is the most specific — a definition scoped to an app wins over one scoped to a team.
+- A matching `app_id` is the most specific, followed by a matching `team_id`, then a project-wide definition.
 - An empty audience means "project default" — matches everything inside the project.
-- Multiple definitions can coexist: one for `team_acme`, another for `team_globex`, a default for everyone else.
+- Equal scores prefer the newest `created_at`, then the highest ID; there is no `priority` field.
+- Audience hints are routing suggestions, not a security boundary. If no matching or project-wide definition exists, a definition scoped to another app or team can still be selected at the lowest score.
+- Project creation persists the shipped default definition normally; the resolver does not synthesize a fallback when no candidate exists.
 
 ---
 
 ## Gates
 
-Gates are security challenges that must be satisfied before a step can be submitted. Declare them on any step:
+> **Direction — not runtime-supported.** The definition schema accepts gates,
+> but today's engine emits `gates: {}`, accepts a normal submission without a
+> proof, and rejects a non-empty `gate_proofs` map with `flow.unsupported`.
+> Do not rely on gates for CAPTCHA or other security enforcement yet.
+
+The planned contract declares a keyed gate on a step:
 
 ```json
 {
   "name": "profile",
   "fields": ["email", "given_name", "family_name"],
   "gates": {
-    "captcha": { "type": "captcha", "provider": "altcha" }
+    "captcha": { "kind": "captcha", "provider": "altcha" }
   },
+  "actions": [
+    {"name": "submit", "kind": "submit", "primary": true}
+  ],
   "transitions": {
-    "submit": { "target": "set_password" }
+    "submit": { "target": "set-password" }
   }
 }
 ```
 
-The engine resolves gate details (provider, config) at runtime. The frontend receives:
+When gate support ships, the engine is intended to resolve provider details
+and emit them to the frontend. Today the frontend receives:
 
 ```json
 {
-  "gates": {
-    "captcha": { "type": "captcha", "provider": "altcha", "config": { ... } }
-  }
+  "gates": {}
 }
 ```
 
-The engine can also **inject gates dynamically** based on policy (e.g., risk score triggers captcha even if the definition doesn't declare it).
+Proof verification and dynamic gate injection remain planned work.
 
 ---
 
@@ -484,15 +485,23 @@ Transitions support two cross-flow actions:
 | `pivot` | Push a new flow onto the stack. The current flow pauses and resumes when the new flow completes. |
 | `switch` | Replace the current flow entirely. No return. |
 
+> **Direction — not runtime-supported.** The schema and validator accept these,
+> but today's engine rejects every transition carrying a non-null `action` with
+> `{ "code": "flow.unsupported" }` — see
+> [flow-engine.md](flow-engine.md#flow-pivot-cross-flow-navigation) and
+> [capabilities.md](capabilities.md). The shipped default flow covers
+> login ↔ register inside one definition with local re-purposing transitions
+> (`{ "target": "register", "purpose": "register" }`).
+
 ```json
 {
   "name": "login",
-  "fields": ["email", "password"],
-  "actions": {
-    "submit": { "primary": true },
-    "register": {},
-    "recover": {}
-  },
+  "fields": ["email", "x-auth-methods#password"],
+  "actions": [
+    {"name": "submit", "primary": true, "kind": "submit"},
+    {"name": "register", "kind": "navigate"},
+    {"name": "recover", "kind": "navigate"}
+  ],
   "transitions": {
     "submit": { "target": "done" },
     "register": { "target": "default-register", "action": "switch" },
@@ -535,7 +544,10 @@ flowchart TD
 | `redirect` | Login/reauth with OIDC auth request | Navigate to `redirect_uri` |
 | `show` | Standalone registration, recovery | Display success screen |
 
-After a pivoted flow completes, the engine auto-pops back to the parent. If the session now meets the target ACR, it transitions straight to `complete` with `redirect`.
+Automatic pop-and-resume after a pivot and requested-ACR evaluation are
+planned. Today's runtime rejects the cross-flow transition before entering the
+child definition; ordinary local transitions reach `complete` exactly as
+authored.
 
 ---
 
@@ -552,7 +564,10 @@ A session and a flow are different things with different lifetimes:
 | **One or many?** | One session can have many flows over time | Each flow operates on one session |
 | **What it knows** | user, factors, assurance_levels | definition, step, history, collected data |
 
-The session accumulates factors across flows. A login flow adds `user` + `password`. A step-up flow adds `totp`. A profiling flow doesn't add factors — it collects data. Each flow is independent, but they all contribute to the same session.
+The shipped password and passkey paths record verified factors on the
+flow-linked authentication attempt, and terminal handoff transfers the result
+to the session. Additional methods such as TOTP and cross-flow factor
+accumulation are planned.
 
 ---
 
@@ -565,27 +580,29 @@ sequenceDiagram
     participant Frontend
     participant Server
 
-    Frontend->>Server: submit { password: "wrong" }
-    Server-->>Frontend: same step + error: "Invalid password"
+    Frontend->>Server: submit { x-auth-methods#password: "wrong" }
+    Server-->>Frontend: same step + error.invalid_credentials
     Note left of Frontend: Re-render with error message
-    Frontend->>Server: submit { password: "correct" }
+    Frontend->>Server: submit { x-auth-methods#password: "correct" }
     Server-->>Frontend: next step
 ```
 
-The session token still rotates on error (prevents replay). The step doesn't advance. The frontend re-renders with the error message displayed.
+The sealed `_zflow` cookie rotates on error to prevent replay. The response
+body does not contain a rotating `session_token`. The step does not advance,
+and the frontend localizes the returned error key before re-rendering.
 
 ```json
 {
   "step": {
     "name": "signin",
-    "error": "Invalid password. 2 attempts remaining.",
-    "fields": {
-      "password": { "type": "password", "text_key": "signin.field.password", "required": true }
-    },
-    "actions": {
-      "submit": { "text_key": "signin.action.submit", "primary": true },
-      "recover": { "text_key": "signin.action.recover" }
-    },
+    "error": "error.invalid_credentials",
+    "fields": [
+      {"name": "x-auth-methods#password", "type": "password", "text_key": "signin.field.password", "required": true}
+    ],
+    "actions": [
+      {"name": "submit", "text_key": "signin.action.submit", "primary": true, "kind": "submit"},
+      {"name": "recover", "text_key": "signin.action.recover", "kind": "navigate"}
+    ],
     "gates": {}
   }
 }
@@ -595,7 +612,9 @@ The session token still rotates on error (prevents replay). The step doesn't adv
 
 ## Putting It All Together
 
-Here's how two separate flow definitions connect via a cross-flow switch:
+Here's how two separate flow definitions connect via a cross-flow switch
+(direction — today's runtime rejects cross-flow transitions; see
+[Cross-Flow Navigation](#cross-flow-navigation-pivot-and-switch)):
 
 ```mermaid
 graph TD
@@ -608,7 +627,7 @@ graph TD
 
     subgraph "Registration Flow (default-register)"
         profile["profile<br>(email, given_name, family_name)"]
-        set_pwd["set_password<br>(password, on_success: create_user)"]
+        set_pwd["set-password<br>(password, on_success: create_user)"]
         reg_done["done (show)"]
 
         profile -->|submit| set_pwd
@@ -619,30 +638,24 @@ graph TD
     profile -.->|"login (switch)"| login
 ```
 
-Two separate flow definitions, connected by a switch transition. The user can navigate between them. The session persists throughout, accumulating factors and collected data. The engine handles policy evaluation implicitly after every submit.
+This diagram is direction for the planned cross-flow implementation. Today's
+shipped default keeps login and registration inside one definition with local
+re-purposing transitions, and follows the authored graph without implicit
+policy evaluation.
 
 ---
 
 ## Definition Lifecycle
 
-Flow definitions go through a lifecycle before they're used in production:
+The shipped schema defines two statuses:
 
-```mermaid
-stateDiagram-v2
-    [*] --> draft: POST /flow-definitions
-    draft --> draft: PATCH (edit)
-    draft --> active: POST .../activate
-    active --> archived: POST .../archive
-    archived --> [*]
-
-    draft --> draft: POST .../validate
-    draft --> draft: POST .../simulate
-```
-
-| State | Can be resolved? | Can be edited? |
+| Status | Can be resolved? | How to edit |
 |---|---|---|
-| `draft` | No | Yes |
-| `active` | Yes | No (create a new draft to iterate) |
-| `archived` | No | No |
+| `draft` | No — never selected for new flows | `PUT /flow_definitions/{id}` (full replacement) |
+| `active` | Yes | `PUT /flow_definitions/{id}` (full replacement) |
 
-Use **validate** to check for dead ends, missing transitions, and unreachable steps before activating. Use **simulate** to dry-run the flow with mock input and see the path the state machine would take.
+There are no lifecycle verbs in the shipped spec — you change `status` by
+replacing the document, and create/update already run the definition
+validator. A standalone `POST .../validate` (dead-end and reachability checks
+on demand) and `POST .../simulate` (dry-run with mock input) are planned, not
+shipped — see [flow-engine.md](flow-engine.md#flow-definitions).

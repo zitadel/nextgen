@@ -12,7 +12,7 @@ import (
 )
 
 func (h *Handler) CreateBranding(ctx context.Context, req *api.Branding, params api.CreateBrandingParams) (api.CreateBrandingRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), brandingAccess, opWrite); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), brandingAccess, opWrite); err != nil {
 		return nil, err
 	}
 	branding, err := h.brandingService.Create(ctx, service.CreateBrandingInput{
@@ -30,10 +30,11 @@ func (h *Handler) CreateBranding(ctx context.Context, req *api.Branding, params 
 }
 
 func (h *Handler) GetBrandingById(ctx context.Context, params api.GetBrandingByIdParams) (api.GetBrandingByIdRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), brandingAccess, opRead); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, params.ID, brandingAccess, opRead)
+	if err != nil {
 		return nil, err
 	}
-	branding, err := h.brandingService.Get(ctx, string(params.ProjectID), params.ID)
+	branding, err := h.brandingService.Get(ctx, projectID, params.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +42,11 @@ func (h *Handler) GetBrandingById(ctx context.Context, params api.GetBrandingByI
 }
 
 func (h *Handler) ListBranding(ctx context.Context, params api.ListBrandingParams) (api.ListBrandingRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), brandingAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), brandingAccess, opRead); err != nil {
+		return nil, err
+	}
+	ctx, err := h.withAuthzListFilter(ctx, string(params.ProjectID), domain.ResourceKindBranding, opRead)
+	if err != nil {
 		return nil, err
 	}
 	brandings, err := h.brandingService.List(ctx, string(params.ProjectID))

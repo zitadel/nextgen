@@ -1,12 +1,21 @@
 # Agent Instructions — `apps/demo-next-e2e/`
 
-Playwright project that exercises `apps/demo-next/` end-to-end against
-the standalone `@zitadel/api-mock` TCP server. Defer to root
+Playwright project that exercises `apps/demo-next/` end-to-end. It has two
+suites: the **mock lane** (`e2e`, against the standalone `@zitadel/api-mock`
+TCP server, specs under `src/`) and the **real lane** (`e2e-real`, specs under
+`src-real/` with `playwright.real.config.mts`), which boots a real server
+instance through `@zitadel/testing` (`ZITADEL_SERVER_BINARY`,
+`NEXTGEN_SERVER_{LOGIN,CONSOLE}_ENABLED=false`) and covers registration,
+password and passkey sign-in, and authenticated navigation against real
+storage. This project is the flagship Playwright consumer of the test kit —
+see [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md). The
+real lane runs in CI through an explicit `full-pr` step even though its moon
+task carries `runInCI: false`. Defer to root
 [`AGENTS.md`](../../AGENTS.md) for repo-wide rules.
 
 ## Scope
 
-This project covers the boundary that Vitest cannot reach:
+The mock lane covers the boundary that Vitest cannot reach:
 
 - `<zitadel-login>` mounted inside Next.js `dynamic({ ssr: false })`.
 - The Lit orchestrator's internal `POST /sessions/exchange` traversing
@@ -34,7 +43,8 @@ this project.
 
 ```sh
 corepack pnpm exec playwright install        # one-time, browsers
-moon run demo-next-e2e:e2e
+moon run demo-next-e2e:e2e                   # mock lane
+moon run demo-next-e2e:e2e-real              # real-instance lane (@zitadel/testing)
 ```
 
 Moon rebuilds `@zitadel/components` first through task dependencies, then

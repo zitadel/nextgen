@@ -35,7 +35,7 @@ export const Route = createFileRoute("/_authed/schemas/")({
     const documents = await Promise.all(
       entries.map(async (entry) => {
         try {
-          return (await api.getSchemaById(entry.id, { project_id: projectId })) as UserSchema;
+          return (await api.getSchemaById(entry.id)) as UserSchema;
         } catch {
           // One unreadable document costs its row's detail, not the screen.
           return undefined;

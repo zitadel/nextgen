@@ -67,14 +67,17 @@ func (ss sessionStatements) ListSessions(ctx context.Context, filter *database.L
 }
 
 func (ss sessionStatements) DeleteSessionByID(ctx context.Context, projectID, sessionID string) error {
-	n, err := ss.db.Update(ctx, buildStatement(`DELETE FROM sessions WHERE project_id = @p1 AND id = @p2`, projectID, sessionID).statement())
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return domain.ErrSessionNotFound()
-	}
-	return nil
+	return withTransaction(ctx, ss.db, func(ctx context.Context, tx queryExecutor) error {
+		n, err := tx.Update(ctx, buildStatement(`DELETE FROM sessions WHERE project_id = @p1 AND id = @p2`, projectID, sessionID).statement())
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return domain.ErrSessionNotFound()
+		}
+		rsi := newResourceScopeStatements(tx)
+		return rsi.DeleteResourceScope(ctx, domain.ResourceKindSession, projectID, sessionID)
+	})
 }
 
 func (ss sessionStatements) ExchangeSession(ctx context.Context, projectID, handoffToken string, _ *string, ttl time.Duration) (*domain.Session, error) {
@@ -176,7 +179,11 @@ func (ss sessionStatements) InsertSession(ctx context.Context, session *domain.S
 	if err != nil {
 		return fmt.Errorf("failed to insert session: %w", err)
 	}
-	return ss.CreateSessionToken(ctx, session, "")
+	if err := ss.CreateSessionToken(ctx, session, ""); err != nil {
+		return err
+	}
+	rsi := newResourceScopeStatements(ss.db)
+	return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindSession, session.ProjectID, session.ID))
 }
 
 func (ss sessionStatements) CreateSessionToken(ctx context.Context, session *domain.Session, previousTokenID string) error {

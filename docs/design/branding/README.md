@@ -2,7 +2,7 @@
 
 Notes for how the login UI is themed and laid out relative to the step payload.
 
-**Contract (source of truth):** [`../flowengine/flow-engine-nodes.md`](../flowengine/flow-engine-nodes.md), [`../flowengine/api/flow-api.yaml`](../flowengine/api/flow-api.yaml) (`Branding`), [`../flowengine/template-security.md`](../flowengine/template-security.md).
+**Contract (source of truth):** [`../flowengine/flow-engine-nodes.md`](../flowengine/flow-engine-nodes.md), the shipped Branding spec under [`api/openapi/endpoints/branding/`](../../../api/openapi/endpoints/branding/), [`../flowengine/template-security.md`](../flowengine/template-security.md).
 
 **This folder:** optional extensions and working notes (extra branding fields, `--zl-*` tokens, Liquid layout checks). Details live in the files linked below.
 

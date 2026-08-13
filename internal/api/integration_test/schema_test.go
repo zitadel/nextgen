@@ -5,6 +5,7 @@ package integration_test
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -165,11 +166,21 @@ func TestGetSchema(t *testing.T) {
 		t.Run("simple", func(t *testing.T) {
 			t.Parallel()
 
-			schemaID := harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
+			// Omit $id so Create mints a unique sch_* id. The shared fixture's
+			// URL-shaped $id contains '/' segments that ogen rejects as a leaf
+			// path param; composite RSI PK (#809) scopes URL reuse per project.
+			schemaJSON := []byte(harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
+			var schemaObj map[string]any
+			require.NoError(t, json.Unmarshal(schemaJSON, &schemaObj))
+			delete(schemaObj, "$id")
+			schemaJSON, err := json.Marshal(schemaObj)
+			require.NoError(t, err)
+
+			schemaID := harness.CreateUserSchema(t, project, string(schemaJSON))
+			require.True(t, strings.HasPrefix(schemaID, "sch_"), "want managed sch_* id, got %q", schemaID)
 
 			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
-				ID:        schemaID,
-				ProjectID: api.ProjectID(project.ID),
+				ID: schemaID,
 			})
 			assert.NoError(t, err)
 
@@ -184,8 +195,7 @@ func TestGetSchema(t *testing.T) {
 			t.Parallel()
 
 			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
-				ID:        "does-not-exist",
-				ProjectID: api.ProjectID(project.ID),
+				ID: "does-not-exist",
 			})
 			assert.NoError(t, err)
 

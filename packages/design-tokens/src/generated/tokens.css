@@ -84,6 +84,9 @@
   --zl-color-gray-700: #bfbfcf;
   --zl-color-gray-800: #e1e1e7;
   --zl-color-gray-900: #f4f4f6;
+  --zl-color-surface-default-white: var(--zl-primary);
+  --zl-color-text-button-default: var(--zl-primary-foreground);
+  --zl-color-text-link: var(--zl-color-icon-default-purple);
   --zl-spacing-01: 0.25rem;
   --zl-spacing-02: 0.5rem;
   --zl-spacing-03: 1rem;
@@ -208,6 +211,8 @@
   --zl-sidebar-accent-foreground: #171717;
   --zl-sidebar-border: #e5e5e5;
   --zl-sidebar-ring: #a3a3a3;
+  --zl-color-surface-default-white: var(--zl-primary);
+  --zl-color-text-button-default: var(--zl-primary-foreground);
   --zl-focus-color: #0f0f11;
   --zl-gradient-neutral-start: #bfbfcf;
   --zl-gradient-base-end: #fafafa;

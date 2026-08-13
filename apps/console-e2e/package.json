@@ -2,9 +2,13 @@
   "name": "@zitadel/console-e2e",
   "version": "0.0.1",
   "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
   "devDependencies": {
     "@playwright/test": "catalog:",
     "@zitadel/testing": "workspace:*",
-    "eslint-plugin-playwright": "catalog:"
+    "eslint-plugin-playwright": "catalog:",
+    "typescript": "catalog:"
   }
 }

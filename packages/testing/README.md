@@ -70,6 +70,24 @@ apps; the console maps the same fields to `VITE_*`/`CONSOLE_*` names instead.
 The fixtures find the instance through `ZITADEL_TESTING_HANDSHAKE`, which
 `withZitadel()` points at its handshake file.
 
+`app` is optional. Omit it when the instance itself serves the app — the
+Zitadel binary embeds the console and hosted sign-in at `/ui/console/` and
+`/ui/login/`, so a suite testing those surfaces has no second server to boot.
+Only the instance entry is generated, and `appOrigin` must then be the
+instance's own local origin:
+
+```ts
+export default defineConfig({
+  testDir: "./e2e",
+  use: { baseURL: "http://localhost:8092" },
+  ...withZitadel({
+    configDir: import.meta.dirname,
+    port: 8092,
+    appOrigin: "http://localhost:8092", // the instance is the app server
+  }),
+});
+```
+
 ### Start tests authenticated
 
 Most app tests don't want to re-test login. `authenticatedPage` seeds a user,
@@ -181,7 +199,7 @@ const z = await startLocalZitadel({
   appOrigins,    // registered as the project's preview_origins
   useCase,       // "minimal" (default) | "consumer" | "business"
   preset,        // "password-first" (default)
-  serverBinary,  // ZITADEL_SERVER_BINARY override (in-repo: dist/server/nextgen)
+  serverBinary,  // ZITADEL_SERVER_BINARY override (path to a built server binary)
   keep,          // keep the temp dir for debugging
 });
 
@@ -229,7 +247,7 @@ project, so per-test `seed.user()` calls are isolation enough for login-flow
 tests, and tests run fully parallel against the shared instance
 (demonstrated by `demo-next-e2e:e2e-real`, 2 workers).
 
-Typical timings with the SQLite local default (dev build, July 2026 — estimates, not a fresh remeasure):
+Typical timings with the SQLite local default (dated estimates from a July 2026 dev build — orders of magnitude, not a benchmark; remeasure locally before relying on them):
 
 | Operation | Time |
 | --- | --- |
@@ -259,10 +277,12 @@ Customer installs get the published server binary through `@zitadel/server`'s
 platform packages; the in-repo workspace carries no such binary, so the repo's
 own suites run `moon run server:build` and point the kit at the result via
 `ZITADEL_SERVER_BINARY` (the `withZitadel` option `zitadel.serverBinary` /
-`serverBinaryHint` exists for this). The in-repo moon tasks set
+`serverBinaryHint` exists for this). Most in-repo moon tasks set
 `NEXTGEN_SERVER_LOGIN_ENABLED=false` / `NEXTGEN_SERVER_CONSOLE_ENABLED=false`
-— the suites drive the app-embedded login, not the server-hosted `/ui/*`.
-Customer installs need none of this.
+because they drive the app-embedded login, not the server-hosted `/ui/*`; the
+exception is `console-e2e:e2e-embedded`, which keeps both surfaces on and
+omits `app` — the binary-served `/ui/*` pages are its subject. Customer
+installs need none of this.
 
 ## Known limitations
 

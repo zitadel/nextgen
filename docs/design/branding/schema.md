@@ -1,12 +1,12 @@
 # Branding object
 
-**Status:** Draft. Extension notes on top of the baseline `Branding` shape in [`../flowengine/api/flow-api.yaml`](../flowengine/api/flow-api.yaml). **Parent:** [`README.md`](README.md). **Scope:** JSON the login component reads. Storage, admin APIs, and server-side validation are out of scope here.
+**Status:** Draft. Extension notes on top of the baseline `Branding` shape shipped under [`api/openapi/endpoints/branding/`](../../../api/openapi/endpoints/branding/). **Parent:** [`README.md`](README.md). **Scope:** JSON the login component reads. Storage, admin APIs, and server-side validation are out of scope here.
 
 `<zitadel-login>` reads branding as data: layout, URLs, optional Liquid string, optional theme keys. No user-facing copy in this blob. Optional `advanced.custom_css` is gated (see end of doc).
 
 ## Baseline (flow API)
 
-The v1 `Branding` object lives in [`../flowengine/api/flow-api.yaml`](../flowengine/api/flow-api.yaml). Excerpt:
+The v1 `Branding` object is specified under [`api/openapi/endpoints/branding/`](../../../api/openapi/endpoints/branding/) (historical design excerpt below):
 
 ```yaml
 Branding:
