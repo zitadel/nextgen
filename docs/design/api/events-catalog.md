@@ -72,13 +72,11 @@ Types planned but not yet emitted by a live producer. Follow-up issues:
 
 | `event_type` | Follow-up |
 |--------------|-----------|
-| `user.updated` | attribute patch API |
-| `user.deactivated` | per-row emit from team cascade / UserService.Deactivate |
-| `team.membership.updated` | membership + claim CompleteClaim path |
-| `claim.challenge_created` / `claim.completed` | claim lifecycle emitters |
-| `session.expired` | session reaper |
-| `schema.deleted` | schema delete API |
-| `authz.revoked` | product revoke path |
-| `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | factor remove + TOTP/recovery APIs |
-
-Issue links are filled in the PR Notes when the deferred issues are filed.
+| `user.updated` | [#877](https://github.com/zitadel/nextgen/issues/877) attribute patch API |
+| `user.deactivated` | [#878](https://github.com/zitadel/nextgen/issues/878) per-row emit from team cascade / UserService.Deactivate |
+| `team.membership.updated` | [#879](https://github.com/zitadel/nextgen/issues/879) membership + claim CompleteClaim path |
+| `claim.challenge_created` / `claim.completed` | [#880](https://github.com/zitadel/nextgen/issues/880) claim lifecycle emitters |
+| `session.expired` | [#881](https://github.com/zitadel/nextgen/issues/881) session reaper |
+| `schema.deleted` | [#882](https://github.com/zitadel/nextgen/issues/882) schema delete API |
+| `authz.revoked` | [#883](https://github.com/zitadel/nextgen/issues/883) product revoke path |
+| `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | [#884](https://github.com/zitadel/nextgen/issues/884) factor remove + TOTP/recovery APIs |
