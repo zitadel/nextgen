@@ -57,6 +57,6 @@
     "vite": "catalog:sdk",
     "vite-plugin-dts": "catalog:",
     "vitest": "catalog:sdk",
-    "vue": "^3.5.0"
+    "vue": "catalog:"
   }
 }

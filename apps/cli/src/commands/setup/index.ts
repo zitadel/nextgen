@@ -17,6 +17,7 @@ import {
 } from "@zitadel/config/defaults";
 import { consola } from "consola";
 
+import { brandingDesignLabel } from "../../lib/branding/designs";
 import { claimAction, claimCommand, claimState } from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
@@ -51,6 +52,7 @@ import {
   formatFrameworkLine,
   id as styleId,
   path as stylePath,
+  relativeDisplayPath as relativeDisplay,
   renderSummary,
   url as styleUrl,
   type Row,
@@ -322,6 +324,7 @@ export default class Setup extends BaseCommand {
             preset: answers.preset,
             useCase: answers.useCase,
             design: answers.design,
+            cliVersion: this.meta.cliVersion,
           });
     } catch (error) {
       // Setup is not atomic: the patcher already wrote `zitadel.json` (the
@@ -688,11 +691,6 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
   });
 }
 
-/** Renders an absolute path relative to `cwd` for human-readable output. */
-function relativeDisplay(cwd: string, path: string): string {
-  return path.startsWith(cwd) ? path.slice(cwd.length + 1) : path;
-}
-
 /**
  * Replaces the user's `$HOME` with `~` in a path for compact terminal output.
  * Falls back to the raw path when `HOME` isn't set or doesn't match.
@@ -754,6 +752,10 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   ".zitadel/meta/flow-definition.json": { subject: "the flow dialect spec (editor $schema)" },
   ".zitadel/meta/user-schema.json": { subject: "the user-schema dialect spec" },
   ".zitadel/meta/user-property.json": { subject: "the user-property dialect spec" },
+  ".zitadel/meta/branding.json": { subject: "the branding dialect spec" },
+  ".zitadel/branding/branding.json": { subject: "the branding descriptor (layout + asset URLs)" },
+  ".zitadel/branding/login.liquid": { subject: "the editable login template" },
+  ".zitadel/branding/README.md": { subject: "the branding folder README" },
   "AGENTS.md": { subject: "the agent guidance (golden journey + config dialect)" },
   "README.md": { subject: "the README's Zitadel section" },
   "app/page.tsx": { subject: "the home page redirect" },
@@ -806,18 +808,37 @@ function buildSummary(opts: {
     if (hit) installedRows.push({ label, value: stylePath(hit) });
   }
 
+  // The login-customization entry points. These are what a user edits to
+  // change what the login collects, how it authenticates, and how it looks —
+  // burying them in the verbose per-file narration above the box means users
+  // don't find them (each folder ships a README with the workflow).
+  const customizeRows: Row[] = [];
+  for (const [label, suffix, dir] of [
+    ["User schema", ".zitadel/schemas/default-human-user.json", ".zitadel/schemas/"],
+    ["Login flow", ".zitadel/flows/default-login.json", ".zitadel/flows/"],
+    ["Login template", ".zitadel/branding/login.liquid", ".zitadel/branding/"],
+  ] as const) {
+    const hit = pickWrittenFile(writtenRel, suffix);
+    if (hit) customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });
+  }
+
   const projectRows: Row[] = [
     { label: "Project id", value: styleId(project.id) },
     { label: "Server", value: styleUrl(server) },
     { label: "App will run", value: styleUrl(issuer) },
     design
-      ? { label: "Login design", value: design, secondary: stylePath(".zitadel/branding/") }
+      ? {
+          label: "Login design",
+          value: brandingDesignLabel(design),
+          secondary: `${design} · ${stylePath(".zitadel/branding/")}`,
+        }
       : { label: "Login design", value: styleDim("built-in template") },
   ];
 
   return [
     { title: "Detected", rows: detected },
     { title: "Installed", rows: installedRows },
+    { title: "Customize", rows: customizeRows },
     { title: "Project", rows: projectRows },
   ];
 }

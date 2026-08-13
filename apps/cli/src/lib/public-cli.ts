@@ -35,3 +35,27 @@ export function normalizePublicCliCommands(
 ): string[] | undefined {
   return commands?.map((command) => normalizePublicCliCommand(command, cliVersion));
 }
+
+/**
+ * Rewrites `zitadel …` command mentions in scaffolded prose (the
+ * `.zitadel/**` READMEs) to the public `npx @zitadel/cli@<version> …` form.
+ *
+ * The checked-in README sources stay written with the bare `zitadel`
+ * command — that is the canonical, readable spelling — but the CLI is not a
+ * dependency of the scaffolded app, so the bare command does not exist on
+ * the user's PATH (and `npx zitadel` would fetch an unrelated npm package).
+ * Covers inline code spans (`` `zitadel plan` ``) and fenced-block lines
+ * that start with `zitadel `; prose file names like `zitadel.json` and
+ * `zitadel.db` don't match because the word must end the span or be
+ * followed by a space.
+ */
+export function normalizePublicCliProse(content: string, cliVersion: string): string {
+  const prefix = publicCliCommand("", cliVersion);
+  return content
+    .replace(/`zitadel( [^`\n]*)?`/g, (_match, args: string | undefined) => {
+      return `\`${prefix}${args ?? ""}\``;
+    })
+    .replace(/^(\s*)zitadel (.*)$/gm, (_match, indent: string, rest: string) => {
+      return `${indent}${prefix} ${rest}`;
+    });
+}

@@ -23,7 +23,7 @@ export const de: Locale = {
   "identifier.field.email.placeholder": "du@beispiel.de",
   "identifier.field.password": "Passwort",
   "identifier.action.submit": "Anmelden",
-  "identifier.action.continue": "Anmelden",
+  "identifier.action.continue": "Weiter",
   "identifier.action.passkey": "Mit Passkey anmelden",
   "identifier.action.register.lead": "Noch kein Konto? ",
   "identifier.action.register.link": "Registrieren",

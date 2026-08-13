@@ -24,12 +24,11 @@ test("signs in via the embedded component and lands on /admin", async ({ page })
   await page.goto("/login");
 
   // Split sign-in, matching the real default flow: `identifier` collects the
-  // email, then `password` collects the credential. Both steps label their
-  // primary action "Sign in", so this is the same two-click walk the
-  // real-instance suites use.
+  // email with "Continue", then `password` collects the credential with
+  // "Sign in". This is the same two-click walk the real-instance suites use.
   const email = "alice@acme.com";
   await page.getByLabel(/email/i).fill(email);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
 
   await page.getByLabel(/password/i).fill("hunter2");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

@@ -38,6 +38,11 @@
       "types": "./dist/schemas.d.mts",
       "import": "./dist/schemas.mjs"
     },
+    "./branding-url": {
+      "@zitadel/source": "./src/branding-url.ts",
+      "types": "./dist/branding-url.d.mts",
+      "import": "./dist/branding-url.mjs"
+    },
     "./normalize": {
       "@zitadel/source": "./src/normalize.ts",
       "types": "./dist/normalize.d.mts",

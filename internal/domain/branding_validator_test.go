@@ -90,6 +90,34 @@ func TestValidateBranding(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			// Loopback HTTP is the dev-posture carve-out: assets served from
+			// the app's own dev server (same exception the cookie Secure flag
+			// makes for the CLI local runtime).
+			name:   "http localhost logo url allowed",
+			mutate: func(b *Branding) { b.LogoURL = "http://localhost:3000/logo.svg" },
+		},
+		{
+			name:   "http 127.0.0.1 hero url allowed",
+			mutate: func(b *Branding) { b.HeroURL = "http://127.0.0.1:8080/hero.png" },
+		},
+		{
+			name:   "http ipv6 loopback logo url allowed",
+			mutate: func(b *Branding) { b.LogoURL = "http://[::1]:3000/logo.svg" },
+		},
+		{
+			// Only loopback gets the http carve-out — a lookalike host or a
+			// private-range IP stays https-only so a mis-typed production URL
+			// fails closed.
+			name:    "http localhost lookalike rejected",
+			mutate:  func(b *Branding) { b.LogoURL = "http://localhost.evil.example/logo.svg" },
+			wantErr: true,
+		},
+		{
+			name:    "http private-range ip rejected",
+			mutate:  func(b *Branding) { b.HeroURL = "http://192.168.1.10/hero.png" },
+			wantErr: true,
+		},
+		{
 			// Read-only in v1: even a well-formed https value is rejected —
 			// the field would load an arbitrary stylesheet at document level.
 			name:    "font url rejected even when https",
@@ -104,6 +132,42 @@ func TestValidateBranding(t *testing.T) {
 			err := ValidateBranding(b)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("ValidateBranding() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateBrandingAssetURLLoopbackParity(t *testing.T) {
+	for _, value := range []string{
+		"http://localhost:3000/logo.svg",
+		"HTTP://LOCALHOST:3000/logo.svg",
+		"http://127.0.0.1:8080/logo.svg",
+		"http://127.255.255.255/logo.svg",
+		"http://[::1]:3000/logo.svg",
+	} {
+		t.Run("accept "+value, func(t *testing.T) {
+			if err := validateBrandingAssetURL("logo_url", value); err != nil {
+				t.Fatalf("validateBrandingAssetURL() error = %v", err)
+			}
+		})
+	}
+
+	for _, value := range []string{
+		"http://localhost.evil.example/logo.svg",
+		"http://localhost:3000@evil.example/logo.svg",
+		"http://192.168.1.10/logo.svg",
+		"http://127.1/logo.svg",
+		"http://2130706433/logo.svg",
+		"http://0x7f000001/logo.svg",
+		"http://127.00.0.1/logo.svg",
+		"http://[0:0:0:0:0:0:0:1]/logo.svg",
+		"http://[::ffff:127.0.0.1]/logo.svg",
+		"http://localhost:/logo.svg",
+		"http://localhost:65536/logo.svg",
+	} {
+		t.Run("reject "+value, func(t *testing.T) {
+			if err := validateBrandingAssetURL("logo_url", value); err == nil {
+				t.Fatal("validateBrandingAssetURL() succeeded, want error")
 			}
 		})
 	}
