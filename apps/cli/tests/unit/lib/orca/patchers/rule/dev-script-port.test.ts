@@ -58,6 +58,13 @@ describe("devScriptPortEdit issuer handling", () => {
     expect(devScriptPortEdit("not-a-url")(source)).toBe(source);
   });
 
+  it("still pins a scheme-default port", () => {
+    // Regression: losing 80 to URL canonicalisation turned the op into a
+    // no-op, leaving the app on 3000 while the project allowed only 80.
+    const out = devScriptPortEdit("http://localhost:80")(pkg({ dev: "next dev" }));
+    expect(devScriptOf(out)).toBe("next dev --port 80");
+  });
+
   it("targets the issuer's port even when the script names another", () => {
     // The doctor path: detection would say 4000; the registered origin is
     // what the server actually allows.

@@ -123,12 +123,24 @@ export function issuerFromPort(port: number): string {
  * registered origin, not as the new truth.
  */
 export function portFromIssuer(issuer: string): number | undefined {
-  let parsed: URL;
   try {
-    parsed = new URL(issuer);
+    // Validity gate only. `.port` cannot be read off this: WHATWG drops a
+    // port matching the scheme's default, so `http://localhost:80` — a port
+    // `--dev-port` accepts — would come back portless and silently disable
+    // the dev-script pinning, reintroducing the very mismatch it prevents.
+    new URL(issuer);
   } catch {
     return undefined;
   }
-  const port = Number.parseInt(parsed.port, 10);
+  // Re-parse under a scheme the URL standard treats as non-special. Those
+  // have no default port, so an explicitly written 80/443 survives, while
+  // host parsing (IPv6 brackets, userinfo) stays the standard's job.
+  let probe: URL;
+  try {
+    probe = new URL(issuer.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:/, "zl-issuer-probe:"));
+  } catch {
+    return undefined;
+  }
+  const port = Number.parseInt(probe.port, 10);
   return Number.isFinite(port) && port > 0 ? port : undefined;
 }

@@ -147,6 +147,21 @@ describe("portFromIssuer", () => {
     expect(portFromIssuer(issuerFromPort(3456))).toBe(3456);
   });
 
+  // `--dev-port` accepts 1..65535, and WHATWG canonicalisation drops a port
+  // matching the scheme default — so reading `new URL(...).port` would return
+  // nothing here and silently disable the dev-script pinning.
+  it("keeps an explicitly written scheme-default port", () => {
+    expect(portFromIssuer(issuerFromPort(80))).toBe(80);
+    expect(portFromIssuer("https://localhost:443")).toBe(443);
+  });
+
+  it("reads the port past IPv6 brackets and userinfo", () => {
+    expect(portFromIssuer("http://[::1]:80")).toBe(80);
+    expect(portFromIssuer("http://[::1]:3456")).toBe(3456);
+    expect(portFromIssuer("http://user:pass@localhost:80")).toBe(80);
+    expect(portFromIssuer("http://[::1]")).toBeUndefined();
+  });
+
   it("returns undefined when the issuer names no explicit port", () => {
     expect(portFromIssuer("https://auth.example.com")).toBeUndefined();
     expect(portFromIssuer("http://localhost")).toBeUndefined();
