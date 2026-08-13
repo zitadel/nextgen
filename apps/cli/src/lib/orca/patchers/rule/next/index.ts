@@ -4,6 +4,7 @@ import { MANAGED_MARKER } from "../../../../paths";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
+import { devScriptPortOp } from "../dev-script-port";
 import { getRenderer } from "./renderers/registry";
 import type { RendererSpec } from "./renderers/types";
 
@@ -200,6 +201,9 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
       name: renderer.dependency.name,
       version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
     },
+    // `next dev` takes its port from the command line only, so without this
+    // the app can serve a port the project does not allow as an origin.
+    devScriptPortOp(ctx.framework.devPort),
   ].filter((op): op is FileOp => op !== undefined);
 }
 

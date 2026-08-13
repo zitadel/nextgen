@@ -71,6 +71,39 @@ export function extractPort(script: string): number | undefined {
 }
 
 /**
+ * Rewrites a `dev` script so it explicitly runs on `port`.
+ *
+ * Setup registers `http://localhost:<port>` as the project's only allowed
+ * origin, so the dev server has to land on exactly that port — a bare
+ * `next dev` does not: it defaults to 3000 and, when 3000 is taken, silently
+ * falls back to 3001. Either way the flow API then rejects the app's origin
+ * mid-login. An explicit `--port` removes both failure modes: the port
+ * matches what setup registered, and a busy port fails loudly with
+ * `EADDRINUSE` instead of drifting to one the project does not allow.
+ *
+ * `--port <n>` is the one spelling every framework this CLI scaffolds
+ * accepts (`next dev`, `nuxt dev`, `vite`, `vinxi dev`, `ng serve`), so the
+ * rewrite stays framework-agnostic. An existing port declaration is replaced
+ * in place — including the `PORT=` env-assignment form, which is rewritten to
+ * the flag so one mechanism owns the port.
+ */
+export function withDevPort(script: string, port: number): string {
+  // Test for a declaration rather than comparing before/after: a script that
+  // already names the target port rewrites to itself, and treating that
+  // "unchanged" as "no port found" would append a second, duplicate flag on
+  // every re-run of setup.
+  const flagPattern = /(-p\s+|--port[=\s]+)\d+/;
+  if (flagPattern.test(script)) {
+    return script.replace(flagPattern, (_match, prefix: string) => `${prefix}${String(port)}`);
+  }
+  const envPattern = /((?:^|\s)PORT=)\d+/;
+  if (envPattern.test(script)) {
+    return script.replace(envPattern, (_match, prefix: string) => `${prefix}${String(port)}`);
+  }
+  return `${script.trimEnd()} --port ${String(port)}`;
+}
+
+/**
  * Builds the local OIDC issuer URL for a given dev port. Centralized so the
  * `localhost` origin convention is defined in exactly one place.
  */

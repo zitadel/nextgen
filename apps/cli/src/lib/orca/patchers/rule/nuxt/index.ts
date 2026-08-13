@@ -5,6 +5,7 @@ import { configCandidates } from "../config-paths";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
+import { devScriptPortOp } from "../dev-script-port";
 import { nuxtConfigEdit } from "./nuxt-config";
 import {
   appVueTemplate,
@@ -73,6 +74,9 @@ export class NuxtPatcher extends AbstractRulePatcher {
         name: SDK_DEPENDENCY,
         version: npmDistTagForCliVersion(ctx.cliVersion),
       },
+      // `nuxt dev` takes its port from the command line only, so without this
+      // the app can serve a port the project does not allow as an origin.
+      devScriptPortOp(ctx.framework.devPort),
     ];
   }
 

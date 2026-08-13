@@ -9,6 +9,7 @@ import {
   detectDevPort,
   extractPort,
   issuerFromPort,
+  withDevPort,
 } from "../../../../../src/lib/orca/detectors/port";
 
 describe("extractPort", () => {
@@ -99,5 +100,43 @@ describe("detectDevPort", () => {
     await writeFile(join(dir, ".env.local"), "PORT=5700\n");
     await writeFile(join(dir, ".env"), "PORT=5800\n");
     expect(await detectDevPort(dir, {})).toBe(5700);
+  });
+});
+
+describe("withDevPort", () => {
+  it("appends the flag when the script declares no port", () => {
+    expect(withDevPort("next dev", 3456)).toBe("next dev --port 3456");
+    expect(withDevPort("nuxt dev", 4100)).toBe("nuxt dev --port 4100");
+  });
+
+  it("keeps other flags intact when appending", () => {
+    expect(withDevPort("next dev --turbopack", 3456)).toBe("next dev --turbopack --port 3456");
+  });
+
+  it("rewrites an existing port in place, in every form extractPort reads", () => {
+    expect(withDevPort("next dev -p 3000", 3456)).toBe("next dev -p 3456");
+    expect(withDevPort("next dev --port 3000", 3456)).toBe("next dev --port 3456");
+    expect(withDevPort("next dev --port=3000", 3456)).toBe("next dev --port=3456");
+    expect(withDevPort("PORT=3000 next dev", 3456)).toBe("PORT=3456 next dev");
+  });
+
+  it("is idempotent, so re-running setup does not churn package.json", () => {
+    const once = withDevPort("next dev", 3456);
+    expect(withDevPort(once, 3456)).toBe(once);
+  });
+
+  // The whole point: whatever the script said before, reading it back must
+  // yield the port setup registered as the project's allowed origin.
+  it("round-trips through extractPort for every input shape", () => {
+    for (const script of [
+      "next dev",
+      "next dev --turbopack",
+      "next dev -p 3000",
+      "next dev --port=9999",
+      "PORT=1234 next dev",
+      "nuxt dev",
+    ]) {
+      expect(extractPort(withDevPort(script, 3456)), script).toBe(3456);
+    }
   });
 });
