@@ -125,6 +125,18 @@ the CLI's help layer, not the envelope.
   manifest, `doctor --fix` restores managed pages in the recorded posture,
   and editing the generated page is the supported way to change presentation
   — there is no config knob.
+  Widget-posture embedding levers: host-page CSS sets `--zl-*` design-token
+  custom properties on the element to bridge the app's look through the
+  widget's shadow DOM (fonts `--zl-font-family-heading`/`-sans`, radii
+  `--zl-radius-*`, primary CTA `--zl-primary`/`--zl-primary-foreground`,
+  link color `--zl-color-text-link`); the `suppress-header` attribute
+  (wrapper prop `suppressHeader`) visually hides the widget's own heading
+  block when the page already carries one, keeping it in the accessibility
+  tree. Split-family designs collapse their brand pane by container width —
+  at card width they show the compact brand mark (`logo_url`, else
+  `hero_url`, from `.zitadel/branding/branding.json`; `hero` falls back to
+  editable text), and setup warns when a widget-posture app picks `split`
+  or `split-right`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
 - `schemas list` — inspect the revision history of a user-schema, filtered by

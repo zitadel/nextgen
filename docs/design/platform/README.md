@@ -8,10 +8,14 @@
 > **What's early draft:** OpenAPI stubs for claim and config APIs (endpoints and schemas marked `TODO` where the team still needs to converge). Flow v1 (the named versioned protocol between UI renderers and the flow engine) is referenced throughout but specified in a follow-up pass.
 >
 > **Current implementation note:** This folder describes target platform design.
-> The shipped CLI and server do not currently expose the claim lifecycle or a
-> `zitadel claim` command. ADR 003 records the current implementation state:
-> claim/link-first was removed from the CLI and api-mock until a real
-> server-side claim contract exists.
+> The MVP claim lifecycle is shipped: the server serves
+> `/projects/{project_id}/claim/{init,status,complete}` and the CLI provides
+> `zitadel claim`, per
+> [ADR 046: Claim Lifecycle v2](../../adrs/046-claim-lifecycle-v2.md).
+> ADR 003 records the withdrawal of the earlier mock-only lifecycle. The
+> fuller design below (team resolution, secret rotation at claim, OAuth
+> authenticators) remains target design beyond the shipped MVP — see the
+> per-document notes.
 
 ## How this relates to the flow engine
 
@@ -38,9 +42,8 @@ The canonical vocabulary for all design docs lives in [`../glossary.md`](../glos
 
 - **Flow** — the state machine that drives a user through login, registration, recovery, or profile steps. Owned by the flow engine. Defined by the developer in `zitadel.json`. Full definition in [`../glossary.md`](../glossary.md).
 - **Session** — the durable post-auth container. Full definition in [`../glossary.md`](../glossary.md).
-- **Project** — the top-level tenant/deployment; what used to be called an "instance" in older design notes. Identified by a stable `project_id` minted by the server at `POST /projects` (e.g. `river-8421`), drawn from a curated dictionary so it is also human-pronounceable. Vocabulary:
+- **Project** — the top-level tenant/deployment; what used to be called an "instance" in older design notes. Identified by a stable `project_id` minted by the server at `POST /projects` in the dialect-owned form `proj_<opaque>` per [ADR 047](../../adrs/047-dialect-id-generation.md). The opaque body is a ULID on PostgreSQL/SQLite and a UUID v4 on Spanner; clients must not assume either representation. The older dictionary-slug form is retired. Vocabulary:
   - `project_id` — the canonical identifier used in API paths, response bodies, and dashboard URLs.
-  - **slug** — informal synonym for `project_id`, used when emphasizing its human-friendly dictionary shape.
   - `"project"` — the JSON field name in `zitadel.json` and `.zitadel/secret` that holds the `project_id` value.
 
   The `project_id` is never a user-facing origin; user-facing URLs are the customer's declared issuers per environment.

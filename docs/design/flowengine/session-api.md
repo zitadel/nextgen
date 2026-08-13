@@ -1,7 +1,7 @@
 # Session API
 
 > **Status:** Preliminary — direction is set, details are open
-> **See also:** [Overview](README.md) · [API sketch](api/session-api.yaml) · [Glossary](../glossary.md) · [auth_attempts state machine](../api/authn-and-auth-flows.md)
+> **See also:** [Overview](README.md) · [Shipped spec](../../../api/openapi/endpoints/sessions/) · [Glossary](../glossary.md) · [auth_attempts state machine](../api/authn-and-auth-flows.md)
 >
 > The session-as-factor-accumulator model and assurance-profile evaluation are the intended direction. The specifics — JSON Schema for assurance profile definitions and `x-freshness` semantics — are proposals, not decisions. The policy engine design (which consumes and evaluates assurance levels) is not yet written.
 
@@ -19,8 +19,9 @@ POST /auth_attempts                       →  drive verification (challenges, p
 POST /auth_attempts/{id}/handoff          →  mint handoff_token
 POST /sessions/exchange { handoff_token }  →  receive { session, session_token }
 
-GET    /sessions/{id}                     →  read state, factors, assurance_levels[]
-DELETE /sessions/{id}                     →  revoke (logout)
+GET    /sessions/{id}                     →  read state, factors, assurance_levels[] (operator)
+DELETE /sessions/me                       →  end-user logout (__nextgen_session cookie)
+DELETE /sessions/{id}                     →  operator revoke (session.delete scope, idempotent 204)
 ```
 
 Step-up re-authentication creates a **new auth_attempt against the same `session_id`**, adds factors, and expands the satisfied assurance level list. The session accumulates.
@@ -45,7 +46,7 @@ POST /sessions
   "session_id": "sess_abc123",
   "session_token": "stok_initial_…",
   "state": "building",
-  "factors": {},
+  "factors": [],
   "assurance_levels": []
 }
 ```
@@ -79,7 +80,7 @@ The current v2 API (`CreateSession` / `SetSession` / `GetSession` / `DeleteSessi
 |---|---|---|
 | **Who decides what's needed** | The caller. No guidance from the server. | The policy engine. Evaluates factors against ACR level definitions. |
 | **How the client interacts** | Client pushes "checks" — telling the server _what_ to verify. Anti-pattern: the client owns verification logic. | Client drives `auth_attempts`; session is a read model. |
-| **Session lifecycle** | Implicit — exists or doesn't. | Explicit: `building → active → expired | revoked`. |
+| **Session lifecycle** | Implicit — exists or doesn't. | Explicit: `building → active → expired` (revocation deletes the session). |
 | **Assurance** | Not modeled. External logic decides "done." | `assurance_levels[]` lists all levels the current factors satisfy. Whether any is enough depends on the request context. |
 | **Client guidance** | None. | Flow/policy layer decides what to ask for; the session itself does not prescribe next steps. |
 | **Step-up / re-auth** | Not modeled. Requires new session. | New auth_attempt against the same session — adds factors and expands `assurance_levels[]`. |
@@ -295,9 +296,11 @@ Custom levels appear in `assurance_levels[]` alongside default NIST levels when 
 
 ```
 POST   /sessions                     Create anonymous session shell (pre-auth)
-GET    /sessions/{id}                Get session state, factors, assurance_levels[]
-DELETE /sessions/{id}                Revoke session (logout)
-POST   /sessions/query               Query sessions (admin / management)
+GET    /sessions/me                  Get the caller's session (__nextgen_session cookie)
+DELETE /sessions/me                  End-user logout (__nextgen_session cookie)
+GET    /sessions/{id}                Get session state, factors, assurance_levels[] (operator, session.read)
+DELETE /sessions/{id}                Operator revoke (session.delete; idempotent — 204 even if already gone)
+POST   /sessions/query               Query sessions (operator; cursor-paginated, structured filters)
 ```
 
 Factor proofs are **not submitted here**. They go to:
@@ -342,7 +345,7 @@ Content-Type: application/json
     "session_id":        "sess_…",
     "state":             "active",
     "user_id":           "user_…",
-    "factors":           { "password": { "verified_at": "…" }, "totp": { "verified_at": "…" } },
+    "factors":           [ { "method": "identifier", "verified_at": "…", "payload": { "user_id": "user_…" } }, { "method": "password", "verified_at": "…" } ],
     "assurance_levels":  ["urn:nist:aal:1", "urn:nist:aal:2"],
     "created_at":        "…",
     "expires_at":        "…"
@@ -377,19 +380,19 @@ See [auth_attempts state machine](../api/authn-and-auth-flows.md) for the full e
                                   │ authentication factor
                                   ▼
                   ┌──────────────────────────────────────┐
-                   │                                      │
-                   │  active                              │◄─── step-up expands assurance_levels[]
-                   │  assurance_levels[] may shrink as factors age │
                   │                                      │
-                  └──────────┬───────────────────────────┘
-                        ┌────┴────┐
-                        ▼         ▼
-                  ┌─────────┐ ┌─────────┐
-                  │ expired │ │ revoked │
-                  └─────────┘ └─────────┘
+                  │  active                              │◄─── step-up expands assurance_levels[]
+                  │  assurance_levels[] may shrink       │
+                  │  as factors age                      │
+                  └───────────────┬──────────────────────┘
+                                  │ TTL elapses
+                                  ▼
+                          ┌─────────┐
+                          │ expired │
+                          └─────────┘
 ```
 
-A session transitions to `active` when it has at least one verified authentication factor (beyond just user identification). `active` does not mean "enough for all purposes" — the consumer checks whether its required assurance level appears in `assurance_levels[]`.
+A session transitions to `active` when it has at least one verified authentication factor (beyond just user identification). `active` does not mean "enough for all purposes" — the consumer checks whether its required assurance level appears in `assurance_levels[]`. There is no `revoked` state: revocation deletes the session, so a revoked session simply stops existing (and the operator delete is idempotent).
 
 ## Handoff Exchange
 
@@ -410,13 +413,12 @@ Example response:
   "session": {
     "session_id": "sess_abc",
     "state": "active",
-    "factors": {
-      "user": { "user_id": "u_123", "verified_at": "2026-04-17T10:00:00Z" },
-      "password": { "verified_at": "2026-04-17T10:01:00Z" },
-      "otp": { "verified_at": "2026-04-17T10:02:00Z" }
-    },
-    "assurance_levels": ["urn:zitadel:aal:1", "urn:zitadel:aal:2"],
-    "amr": ["pwd", "otp", "mfa"]
+    "factors": [
+      { "method": "identifier", "verified_at": "2026-04-17T10:00:00Z", "payload": { "user_id": "user_123" } },
+      { "method": "password", "verified_at": "2026-04-17T10:01:00Z" },
+      { "method": "passkey", "verified_at": "2026-04-17T10:02:00Z" }
+    ],
+    "assurance_levels": ["urn:nist:aal:1", "urn:nist:aal:2"]
   },
   "session_token": "tok_final"
 }
@@ -428,11 +430,11 @@ Example response:
 A user has an active session at AAL1 (password only). An RP requests AAL2:
 
 ```
-RP → /authorize?acr_values=urn:zitadel:aal:2
-IdP checks session: assurance_levels[] = ["urn:zitadel:aal:1"]
+RP → /authorize?acr_values=urn:nist:aal:2
+IdP checks session: assurance_levels[] = ["urn:nist:aal:1"]
 IdP: "need a second factor" → starts auth_attempt against same session
-User verifies TOTP through auth_attempt → assurance_levels[] includes urn:zitadel:aal:2
-IdP issues ID token with acr: "urn:zitadel:aal:2"
+User verifies TOTP through auth_attempt → assurance_levels[] includes urn:nist:aal:2
+IdP issues ID token with acr: "urn:nist:aal:2"
 ```
 
 The **same session** is used. No new session is created. Factors accumulate and `assurance_levels[]` grows.
@@ -444,10 +446,10 @@ RP → /authorize?acr_values=urn:nist:aal:2&max_age=300
 IdP checks session:
   - password: verified 2h ago (within 24h limit → OK)
   - totp: verified 5h ago (exceeds 4h freshness → STALE)
-  - assurance_levels[] = ["urn:zitadel:aal:1"]
+  - assurance_levels[] = ["urn:nist:aal:1"]
 
 IdP: "TOTP is stale, need a fresh second factor"
-User verifies fresh TOTP through a new auth_attempt → assurance_levels[] includes urn:zitadel:aal:2
+User verifies fresh TOTP through a new auth_attempt → assurance_levels[] includes urn:nist:aal:2
 ```
 
 ## Context-Specific Evaluation
@@ -479,22 +481,19 @@ levels are currently satisfied." The consumer decides if that set is enough.
 | `recovery_code` | `{ "code": "..." }` | Prior `user` factor | Single-use, not counted toward assurance |
 | `captcha` | `{ "provider": "altcha", "salt": "...", "number": ... }` or `{ "provider": "recaptcha", "token": "..." }` | Challenge (from auth_attempt) | Bot detection signal, not an authentication factor |
 
-## Database Schema
+## Shipped Storage Model
 
-```sql
-CREATE TABLE sessions (
-    id              TEXT        NOT NULL,
-    project_id      TEXT        NOT NULL,
-    version         INTEGER     NOT NULL DEFAULT 1,
-    state           TEXT        NOT NULL,       -- 'building', 'active', 'expired', 'revoked'
-    user_id         TEXT,
-    factors         JSONB       NOT NULL DEFAULT '{}', -- verified factor events with timestamps + properties
-    assurance_levels TEXT[]     DEFAULT '{}',   -- all assurance levels currently satisfied (recomputed on auth_attempt completion)
-    metadata        JSONB       NOT NULL DEFAULT '{}',
-    user_agent      JSONB,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    expires_at      TIMESTAMPTZ,                -- short TTL for anonymous sessions; reset on first factor write
+The API response is not a one-to-one projection of the `sessions` table. The
+shipped table stores the session key, creation/update timestamps, TTL and
+expiry, token reference, optional user reference, and optional user-agent
+reference. It does **not** have `state`, `factors`, `assurance_levels`,
+`metadata`, or `version` columns.
 
-    PRIMARY KEY (project_id, id)
-);
-```
+`state` is derived from expiry and whether verified factors exist. Factors are
+loaded from the checks associated with the session, and assurance levels are
+computed at runtime rather than persisted. See the current dialect migrations
+for the exact DDL:
+
+- [PostgreSQL](../../../internal/storage/dialect/postgres/migration/sql/000007_user_agents_and_sessions.sql)
+- [Spanner](../../../internal/storage/dialect/spanner/migration/sql/000007_user_agents_and_sessions.sql)
+- [SQLite](../../../internal/storage/dialect/sqlite/migration/sql/000001_init.sql)

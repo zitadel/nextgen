@@ -83,9 +83,13 @@ catchable downstream: the snapshot test only sees names that already reached
 Two colour systems ship at once so consumers migrate incrementally:
 
 - **Legacy** (`--zl-color-surface-*`, `--zl-color-text-*`, `--zl-color-gray-*`,
-  spacing, radius) is frozen in `src/legacy.tokens.json` and emitted verbatim by
-  `build.ts`. Do not change its values or names — that is the migration's stable
-  floor. In the typed export it stays under `tokens.color.*`.
+  spacing, radius) lives in `src/legacy.tokens.json`, authored as
+  `{ dark, light }` pairs whose light halves `build.ts` emits under
+  `[data-theme="light"]` (amended ADR 014 §5). It is actively maintained —
+  new mode-aware semantic names may be added (as #818 did) — but existing
+  names and their dark values are the migration's stable floor: do not rename
+  or change them while consumers reference them. In the typed export it stays
+  under `tokens.color.*`.
 - **shadcn** (`--zl-background`, `--zl-foreground`, `--zl-primary`, `--zl-card`,
   `--zl-border`, `--zl-sidebar-*`, `--zl-chart-*`) comes from the designer export
   and lives under `tokens.theme.*`. This is the target surface.
@@ -127,8 +131,9 @@ not reintroduce `bg-zl-*` there — the bridge file owns the mapping.
   `:sync-export`.
 - `src/generated/tokens.css`, `tokens.ts`, `tailwind.css`, `shadcn.css` —
   overwritten by `:generate`.
-- `src/legacy.tokens.json` — frozen legacy colour source. Only touch it to
-  deliberately retire a legacy token once no consumer references it.
+- `src/legacy.tokens.json` — the legacy colour source (two-mode, see above).
+  Add semantic names deliberately; retire a token only once no consumer
+  references it; update `tokens.snapshot.spec.ts` in the same change.
 - `figma-tokens.lock` — only bumped as part of a sync PR.
 
 ## Output ordering

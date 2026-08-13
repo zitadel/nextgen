@@ -501,29 +501,60 @@ USAGE
     centered|split|split-right|hero|minimal]
 
 FLAGS
-  -c, --cwd=<value>         Project directory to operate on.
-  -f, --force               Overwrite protected files on conflict.
-  -n, --non-interactive     Disable prompts. Required when scripting or running as an agent.
-  -s, --server=<value>      Override the resolved server URL.
-      --debug               Debug logging.
-      --design=<option>     Login design to eject into .zitadel/branding/ and publish as branding revision 1. Skips the
-                            wizard's design question. When omitted in non-interactive runs, the login uses the built-in
-                            template; run the `branding eject` command later to customize.
-                            <options: centered|split|split-right|hero|minimal>
-      --dev-port=<value>    Dev-server port; also the issuer origin registered with Zitadel. Defaults to the detected
-                            port. Use distinct ports to run several scaffolded apps side by side.
-      --dry-run             Preview without mutating files or the platform.
-      --framework=<option>  Framework to target.
-                            <options: next|nuxt|react|vue|solid|svelte|qwik|angular>
-      --preset=<option>     Sign-in preset for the scaffolded schema and login flow (default: password-first).
-                            <options: password-first|passkey-first>
-      --renderer=<option>   Renderer (default: react). Not yet available: web-component.
-                            <options: react>
-      --skip-install        Do not install dependencies after setup updates package.json.
-      --[no-]telemetry      Send anonymous usage analytics. Disable with --no-telemetry.
-      --use-case=<option>   Use case for the scaffolded schema fields: who signs in to the app (default: minimal).
-                            <options: minimal|consumer|business>
-      --verbose             Verbose logging.
+  -c, --cwd=<value>
+      Project directory to operate on.
+
+  -f, --force
+      Overwrite protected files on conflict.
+
+  -n, --non-interactive
+      Disable prompts. Required when scripting or running as an agent.
+
+  -s, --server=<value>
+      Override the resolved server URL.
+
+  --debug
+      Debug logging.
+
+  --design=<option>
+      Login design to eject into .zitadel/branding/ and publish as branding revision 1. Skips the wizard's design
+      question. When omitted in non-interactive runs, the login uses the built-in template; run the `branding eject`
+      command later to customize. Split-family designs (split, split-right, hero) collapse their brand pane by container
+      width: narrow containers — including widget-posture embeds at card width — render the compact brand mark instead
+      (logo_url, else hero_url, from .zitadel/branding/branding.json; hero falls back to editable text).
+      <options: centered|split|split-right|hero|minimal>
+
+  --dev-port=<value>
+      Dev-server port; also the issuer origin registered with Zitadel. Defaults to the detected port. Use distinct ports
+      to run several scaffolded apps side by side.
+
+  --dry-run
+      Preview without mutating files or the platform.
+
+  --framework=<option>
+      Framework to target.
+      <options: next|nuxt|react|vue|solid|svelte|qwik|angular>
+
+  --preset=<option>
+      Sign-in preset for the scaffolded schema and login flow (default: password-first).
+      <options: password-first|passkey-first>
+
+  --renderer=<option>
+      Renderer (default: react). Not yet available: web-component.
+      <options: react>
+
+  --skip-install
+      Do not install dependencies after setup updates package.json.
+
+  --[no-]telemetry
+      Send anonymous usage analytics. Disable with --no-telemetry.
+
+  --use-case=<option>
+      Use case for the scaffolded schema fields: who signs in to the app (default: minimal).
+      <options: minimal|consumer|business>
+
+  --verbose
+      Verbose logging.
 
 GLOBAL FLAGS
   --json  Format output as json.
