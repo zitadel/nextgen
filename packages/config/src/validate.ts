@@ -587,23 +587,44 @@ function schemaRequired(schema: Record<string, unknown>): string[] {
 }
 
 /**
- * Mirrors `schemaReader.RequiredLeafPaths`: every name in `required`,
+ * Mirrors `schemaReader.RequiredPaths`: every name in `required`,
  * recursed through the nested `required` of each required object. A
  * required object declaring no `required` of its own ends the descent at
  * the object itself.
+ *
+ * An optional object contributes its own `required` too once it appears
+ * in `materialized`. It only exists in the document because something
+ * beneath it was collected, and from that point document validation
+ * enforces the rest of its `required` list.
  */
-function requiredLeafPaths(schema: Record<string, unknown>, prefix = ""): string[] {
+function requiredPaths(
+  schema: Record<string, unknown>,
+  materialized: ReadonlySet<string>,
+  prefix = "",
+): string[] {
   const properties = schemaProperties(schema);
+  const required = schemaRequired(schema);
   const out: string[] = [];
-  for (const name of schemaRequired(schema)) {
+
+  for (const name of required) {
     const path = prefix === "" ? name : `${prefix}.${name}`;
     const property = properties?.[name];
     if (!isPlainObject(property) || schemaRequired(property).length === 0) {
       out.push(path);
       continue;
     }
-    out.push(...requiredLeafPaths(property, path));
+    out.push(...requiredPaths(property, materialized, path));
   }
+
+  // An optional object is invisible to the loop above, so descend into
+  // the ones a collected field materializes.
+  for (const [name, property] of Object.entries(properties ?? {})) {
+    if (required.includes(name) || !isPlainObject(property)) continue;
+    const path = prefix === "" ? name : `${prefix}.${name}`;
+    if (!materialized.has(path)) continue;
+    out.push(...requiredPaths(property, materialized, path));
+  }
+
   return out;
 }
 
@@ -659,12 +680,14 @@ function resolveFieldChallenge(
   }
 
   // Mirrors deriveUserPropertyType: an object or array has no
-  // field-shaped input. A property carrying `properties` is an object
-  // even when it omits the `type` keyword.
+  // field-shaped input. A property carrying `properties` is an object,
+  // and one carrying `items` is an array, even when it omits the `type`
+  // keyword.
   if (
     property.type === "object" ||
     property.type === "array" ||
-    schemaProperties(property) !== undefined
+    schemaProperties(property) !== undefined ||
+    "items" in property
   ) {
     return {
       message: `flow field: not a scalar property, name a nested leaf instead: ${q(field)}`,
@@ -701,19 +724,23 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
   }
 
   // Required-fields coverage (validateRequiredUserSchemaFields).
-  const collected = new Set<string>();
+  // Collecting `address.street` covers the leaf and every object above
+  // it, since an object materializes once one of its children is
+  // collected. The same prefixes are what the schema treats as
+  // materialized, so an optional object's own `required` list comes into
+  // force here too.
+  const covered = new Set<string>();
   for (const step of def.steps) {
     for (const field of step.fields) {
-      collected.add(field);
+      let path = "";
+      for (const node of field.split(".")) {
+        path = path === "" ? node : `${path}.${node}`;
+        covered.add(path);
+      }
     }
   }
-  // A required leaf is covered only by itself; a required object that
-  // declares no `required` of its own is covered by any field beneath it.
-  const missing = requiredLeafPaths(raw)
-    .filter(
-      (field) =>
-        !collected.has(field) && ![...collected].some((f) => f.startsWith(`${field}.`)),
-    )
+  const missing = requiredPaths(raw, covered)
+    .filter((field) => !covered.has(field))
     .sort();
   if (missing.length > 0) {
     issues.push(

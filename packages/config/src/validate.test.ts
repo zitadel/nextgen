@@ -471,6 +471,68 @@ describe("schema-dependent rules", () => {
         "required fields [address] in user schema are missing in the flow definition steps",
       );
     });
+
+    // An optional object exists in the collected document only because a
+    // step collected something beneath it, and from that point the
+    // document validator enforces its `required` list.
+    it("demands an optional object's required leaf once a step collects into it", () => {
+      const def = flow();
+      step(def, "register").fields.push("address.city");
+      expect(messages(validateFlowDefinition(def, nested()))).toContain(
+        "required fields [address.street] in user schema are missing in the flow definition steps",
+      );
+    });
+
+    it("accepts an optional object whose required leaf is collected too", () => {
+      const def = flow();
+      step(def, "register").fields.push("address.city", "address.street");
+      expect(messages(validateFlowDefinition(def, nested()))).not.toContain(
+        "required fields [address.street] in user schema are missing in the flow definition steps",
+      );
+    });
+
+    it("demands nothing from an optional object no step collects into", () => {
+      const def = flow();
+      expect(messages(validateFlowDefinition(def, nested()))).not.toContain(
+        "required fields [address.street] in user schema are missing in the flow definition steps",
+      );
+    });
+
+    // The same rule one level down: `geo` is optional inside `address`,
+    // which is itself required, so the descent has to keep alternating
+    // between required names and materialized ones.
+    it("demands the leaf of an optional object nested in a required one", () => {
+      const withGeo = structuredClone(schema);
+      withGeo.required = ["address"];
+      (withGeo.properties as Record<string, unknown>).address = {
+        type: "object",
+        required: ["street"],
+        properties: {
+          street: { type: "string" },
+          city: { type: "string" },
+          geo: {
+            type: "object",
+            required: ["lat"],
+            properties: { lat: { type: "string" }, lng: { type: "string" } },
+          },
+        },
+      };
+      const def = flow();
+      step(def, "register").fields.push("address.street", "address.geo.lng");
+      expect(messages(validateFlowDefinition(def, withGeo))).toContain(
+        "required fields [address.geo.lat] in user schema are missing in the flow definition steps",
+      );
+    });
+
+    it("rejects a property carrying items but no type", () => {
+      const withItems = structuredClone(schema);
+      (withItems.properties as Record<string, unknown>).tags = { items: { type: "string" } };
+      const def = flow();
+      step(def, "register").fields.push("tags");
+      expect(messages(validateFlowDefinition(def, withItems))).toContain(
+        'step "register": flow field: not a scalar property, name a nested leaf instead: "tags"',
+      );
+    });
   });
 
   it("rejects an ambiguous JSON type union but accepts the nullable idiom", () => {
