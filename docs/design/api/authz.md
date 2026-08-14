@@ -56,13 +56,13 @@ Permissions are flat `{resource}.{verb}` strings such as `user.read`, `project.w
 
 ## Scoped Allow (team- / resource-scoped grants)
 
-Locked for [#833](https://github.com/zitadel/nextgen/issues/833) / [#834](https://github.com/zitadel/nextgen/issues/834). List SQL already evaluates team- and resource-scoped grant arms; Check and the HTTP gate do not yet.
+Locked for [#833](https://github.com/zitadel/nextgen/issues/833) / [#834](https://github.com/zitadel/nextgen/issues/834). List SQL already evaluates team- and resource-scoped grant arms. By-id Check uses those arms after an RSI hit; HTTP lists proceed on Forbidden and attach the EXISTS predicate.
 
 | Path | Rule |
 | --- | --- |
 | **By-id (after RSI hit)** | Allow when a **team-scoped** grant’s `scope_team_id` equals the row’s `RSI.team_id`, **or** a **resource-scoped** grant’s `scope_resource_id` equals the path id, **and** the catalog relation still matches (`viewer` / `editor` / `admin`). |
 | **Create** (no RSI row) | Still requires a **project-scoped** Allow. A principal whose only grant is team- or resource-scoped cannot create project-wide resources. |
-| **List** | Not this rule. [#834](https://github.com/zitadel/nextgen/issues/834) is Forbidden → proceed-with-predicate (partial view). Until that lands, `requireProjectAccess` 403s team-scoped-only principals before the EXISTS filter attaches. |
+| **List** | [#834](https://github.com/zitadel/nextgen/issues/834): Forbidden (foothold, no project-wide Allow) proceeds and `withAuthzListFilter` attaches the EXISTS predicate (partial view). NotFound (no foothold) still 404s. |
 | **403 vs 404** | Unchanged (**D10**). Scoped Allow is still inside a project foothold. |
 
 Bare `requireProjectAccess` (create / list / project-by-id without an RSI object) must not treat a team-scoped grant as project-wide Allow.

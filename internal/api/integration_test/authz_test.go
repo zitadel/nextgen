@@ -397,17 +397,22 @@ func TestManagementAuthz(t *testing.T) {
 	})
 }
 
-// TestListAuthzTeamScopedOnlyForbidden documents that today's HTTP gate
-// requireProjectAccess Checks project-level relations only: a principal whose
-// only grant is team-scoped project.viewer gets 403 before withAuthzListFilter
-// can narrow rows (#834).
-func TestListAuthzTeamScopedOnlyForbidden(t *testing.T) {
+// TestListAuthzTeamScopedOnlyPartialView pins #834: a principal whose only
+// grant is team-scoped project.viewer gets a filtered 200, not 403. QueryTeams
+// returns the granted team and omits the outsider. ListSchemas returns no
+// rows because schema RSI rows are project-scoped (no team_id).
+func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	t.Parallel()
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 
 	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
+	})
+	require.NoError(t, err)
+	other, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
 		Name:      helpers.TeamName(),
 	})
@@ -438,11 +443,16 @@ func TestListAuthzTeamScopedOnlyForbidden(t *testing.T) {
 
 	listResp, err := client.ListSchemas(t.Context(), api.ListSchemasParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
-	assertAuthzStatus(t, listResp, 403, "sch.permission_denied")
+	require.IsType(t, &api.ListSchemasResponse{}, listResp, helpers.MustMarshal(t, listResp))
+	require.Empty(t, *listResp.(*api.ListSchemasResponse))
 
 	teamsResp, err := client.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
-	assertAuthzError(t, teamsResp, "team.permission_denied")
+	require.IsType(t, &api.QueryTeamsResponse{}, teamsResp, helpers.MustMarshal(t, teamsResp))
+	listed := teamsResp.(*api.QueryTeamsResponse)
+	require.Len(t, listed.Teams, 1)
+	assert.Equal(t, team.ID, string(listed.Teams[0].ID))
+	assert.NotEqual(t, other.ID, string(listed.Teams[0].ID))
 }
 
 // TestGetAuthzTeamScopedOnlyAllow pins #833: after RSI, a team-scoped-only

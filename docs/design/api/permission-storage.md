@@ -27,12 +27,12 @@ flow_definition / session path ids in addition to project / team / user.
 Path-id management handlers resolve RSI before Check (flat-by-id; no
 required query `project_id`). Management list endpoints inject an authz
 EXISTS predicate (same assignment/closure branches as `ListObjects`) into
-the resource SELECT **after** a successful **project-level** Check. That
-enforces RSI-backed visibility / TOCTOU for principals that already passed
-the gate; **team-scoped HTTP list narrowing is not live yet** (SQL +
-stmttest are the substrate — see #834). Fine-grained catalog relations
-(#420) remain a follow-up; `QuerySessions` list predicate waits on
-`sessionService.List`.
+the resource SELECT after `requireProjectListAccess`. Project-wide Allow
+**or** Forbidden (foothold, no project-wide grant) both proceed; the EXISTS
+predicate returns the partial view. NotFound (no foothold) still 404s.
+**Team-scoped HTTP list narrowing is live** (#834). Fine-grained catalog
+relations (#420) remain a follow-up; `QuerySessions` list predicate waits
+on `sessionService.List`.
 
 ### Wave 1 vs OpenFGA compiler (#421 / PR #720)
 
@@ -87,13 +87,12 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
   `project.{viewer,editor,admin}` until #420) after credential resolution.
   By-id scoped Allow (team-/resource-scoped grants after RSI) is specified in
   [`authz.md`](authz.md#scoped-allow-team--resource-scoped-grants) and tracked
-  in [#833](https://github.com/zitadel/nextgen/issues/833); HTTP list
-  narrowing remains [#834](https://github.com/zitadel/nextgen/issues/834).
-  Management list endpoints inject an authz EXISTS **predicate** (same
+  in [#833](https://github.com/zitadel/nextgen/issues/833). HTTP list
+  narrowing is live ([#834](https://github.com/zitadel/nextgen/issues/834)):
+  management list endpoints inject an authz EXISTS **predicate** (same
   assignment/closure branches as `ListObjects`) via `service.AuthzListFilter`
-  after a successful **project-level** Check (RSI-backed visibility / TOCTOU;
-  team-scoped HTTP narrowing deferred — #834); `QuerySessions` waits on
-  `sessionService.List`.
+  after `requireProjectListAccess` (Allow or Forbidden → proceed; NotFound →
+  404). `QuerySessions` waits on `sessionService.List`.
 
 ## Locked decisions
 
