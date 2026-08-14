@@ -122,6 +122,7 @@ describe("server build metadata", () => {
     const { buildLocalServer, readServerBuildMetadata } = await loadModule();
     const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-server-build-meta-"));
     tempDirs.push(repoRoot);
+    const commands: string[] = [];
 
     const built = await buildLocalServer({
       repoRoot,
@@ -134,9 +135,12 @@ describe("server build metadata", () => {
         date: "2026-06-16T00:00:00Z",
       },
       runCapture: goListStub(),
-      run: async () => {},
+      run: async (command) => {
+        commands.push(command);
+      },
     });
 
+    expect(commands).toEqual(["go"]);
     await expect(readServerBuildMetadata(built.metadataPath)).resolves.toMatchObject({
       version: "dev+abcdef123456",
     });
