@@ -59,7 +59,6 @@ describe("handshake", () => {
       platform: {
         projectId: "proj_platform",
         publishableKey: "pk_proj_platform",
-        platformKey: "platform-key-1",
       },
     };
     const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
@@ -73,10 +72,7 @@ describe("handshake", () => {
     const path = join(dir, "handshake.json");
     await writeFile(
       path,
-      JSON.stringify({
-        ...handle,
-        platform: { publishableKey: "pk_proj_platform", platformKey: "platform-key-1" },
-      }),
+      JSON.stringify({ ...handle, platform: { publishableKey: "pk_proj_platform" } }),
     );
     expect(() => readHandshakeSync(path)).toThrow(/"projectId" is required/);
   });
@@ -88,38 +84,19 @@ describe("handshake", () => {
     expect(() => readHandshakeSync(path)).toThrow(/"publishableKey" is required/);
   });
 
-  it("rejects a platform block with a non-string platformKey", async () => {
+  it("passes unknown platform fields through (future credentials join additively)", async () => {
     const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
     const path = join(dir, "handshake.json");
-    await writeFile(
-      path,
-      JSON.stringify({
-        ...handle,
-        platform: {
-          projectId: "proj_platform",
-          publishableKey: "pk_proj_platform",
-          platformKey: 42,
-        },
-      }),
-    );
-    expect(() => readHandshakeSync(path)).toThrow(/"platformKey" must be a non-empty string/);
-  });
-
-  it("rejects a platform block whose operatorSession lacks a sessionToken", async () => {
-    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
-    const path = join(dir, "handshake.json");
-    await writeFile(
-      path,
-      JSON.stringify({
-        ...handle,
-        platform: {
-          projectId: "proj_platform",
-          publishableKey: "pk_proj_platform",
-          operatorSession: { expiresAt: "2026-01-01T00:00:00Z" },
-        },
-      }),
-    );
-    expect(() => readHandshakeSync(path)).toThrow(/"operatorSession" must carry a "sessionToken"/);
+    const written = {
+      ...handle,
+      platform: {
+        projectId: "proj_platform",
+        publishableKey: "pk_proj_platform",
+        someFutureCredential: "opaque",
+      },
+    };
+    await writeFile(path, JSON.stringify(written));
+    expect(readHandshakeSync(path)).toEqual(written);
   });
 
   it("waitForHandshake resolves once the file appears", async () => {

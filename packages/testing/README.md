@@ -256,12 +256,13 @@ output at the moment the server mints it, and exposes it predictably on
 - `handle.previewSecret` — the same project's browser-plane credential (the
   publishable-key predecessor from root ADR 036).
 - `handle.platform` — the platform-plane slot (`PlatformCredentials`): the
-  reserved platform project's id and publishable key, a platform automation
-  credential (its concrete form is deferred to a future PAT / service-user
-  decision — no wire format exists yet), and a pre-minted operator session.
-  **Stub today**: the server's platform-project provisioner (Console ADR 0004
-  §2) has not landed, so `startLocalZitadel` never populates it yet. The
-  shape is fixed now so fixtures can code against it without churn.
+  reserved platform project's id and publishable key. **Stub today**: the
+  server's platform-project provisioner (Console ADR 0004 §2) has not
+  landed, so `startLocalZitadel` never populates it yet. Only the fields the
+  contract already guarantees are declared; credentials whose design is
+  still open — the platform automation principal (deferred to a future PAT /
+  service-user decision) and a boot-minted operator session — join as
+  optional fields once they exist, which is additive and churn-free.
 
 What this rules out, deliberately: there is no server `--test-mode`, no
 seed-document credential flag, and no other server-side door that mints

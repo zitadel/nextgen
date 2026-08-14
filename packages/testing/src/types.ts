@@ -5,16 +5,16 @@ import type { ZitadelClient } from "@zitadel/api/client";
  * provisioning time. The shape follows the direction settled in PR #876's
  * review (root ADR 052 §9 and Console ADR 0004 §2 — both still Proposed
  * there): bootstrap mints **no platform project secret** — the publishable
- * key is the only default credential, the platform-homed automation
- * principal is deferred to the PAT / service-user decision §5 defers (no
- * wire format exists yet), and test infrastructure gets its credentials
- * from the testkit's boot contract, not from seed defaults.
+ * key is the only default credential, and test infrastructure gets its
+ * credentials from the testkit's boot contract, not from seed defaults.
  *
  * Stub today: the server's platform-project provisioner does not exist yet,
- * so `startLocalZitadel` never populates this field. The shape is fixed now
- * so fixtures can code against it without churning when the provisioner
- * lands; if the proposal shifts before acceptance, this inert slot moves
- * with it.
+ * so `startLocalZitadel` never populates this field. Only the fields §9
+ * itself guarantees are declared. Credentials whose design is still open —
+ * the platform automation principal (deferred to a future PAT /
+ * service-user decision) and a boot-minted operator session — join as
+ * optional fields once they exist: additions are churn-free, removals are
+ * not, so nothing is pre-declared here.
  */
 export interface PlatformCredentials {
   /** Reserved platform project id — the Console sign-in target. */
@@ -25,20 +25,6 @@ export interface PlatformCredentials {
    * without it is malformed.
    */
   publishableKey: string;
-  /**
-   * Platform-homed automation credential, captured at creation — the server
-   * returns it exactly once. Present only when the boot options explicitly
-   * request one; there is no ambient platform secret to capture. The
-   * concrete principal (storage, issuance, wire format) is deferred to the
-   * future PAT / service-user ADR, so this stays a reserved slot until it
-   * lands.
-   */
-  platformKey?: string;
-  /**
-   * Operator session minted through the real login flow at boot, for suites
-   * that drive Console/management surfaces without re-running sign-in.
-   */
-  operatorSession?: MintedSession;
 }
 
 /**

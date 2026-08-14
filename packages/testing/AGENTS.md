@@ -106,17 +106,15 @@ server or the production seed contract. The kit boots the process and applies
 seeds, so it captures credentials from provisioning output (`POST /projects`
 returns `project_secret` exactly once) and exposes them on `InstanceHandle`:
 `projectSecret` today; the `platform` slot (`PlatformCredentials` — reserved
-project id, publishable key, platform automation credential, operator
-session) once the platform-project provisioner lands. Root ADR 052 §9
-(Proposed, lands with PR #876) sets the rule: test infrastructure gets its
-credentials from the testkit's boot contract, not from seed defaults —
-paraphrased here on purpose; §9's exact sentence lives in the ADR, so a
-reword there doesn't strand this file. Console ADR 0004 §2 names the
-testkit as the bootstrap transport test and dev infrastructure use. §9 defers the platform automation principal itself
-to the future PAT / service-user decision — the wire format is deliberately
-undecided, so never name a key prefix for `platformKey` here or in fixtures.
-Until #876 is accepted, treat the slot as tracking that proposal — it is
-inert, so a wording shift there moves this shape, not shipped behavior.
+project id + publishable key, the pair the proposal itself guarantees) once
+the platform-project provisioner lands. Root ADR 052 §9 (Proposed, lands
+with PR #876) sets the rule: test infrastructure gets its credentials from
+the testkit's boot contract, not from seed defaults — paraphrased here on
+purpose; §9's exact sentence lives in the ADR, so a reword there doesn't
+strand this file. Console ADR 0004 §2 names the testkit as the bootstrap
+transport test and dev infrastructure use. Until #876 is accepted, treat
+the slot as tracking that proposal — it is inert, so a wording shift there
+moves this shape, not shipped behavior.
 
 Consequences for changes here:
 
@@ -129,6 +127,14 @@ Consequences for changes here:
   contract point; don't invent a parallel channel. The handle must stay
   serializable: it crosses process boundaries via the handshake file, and
   `AppEnvTemplate` deliberately reaches only its flat string fields.
+- Declare a credential field only when its design is settled: additions are
+  churn-free minors, removals are not, so deferred credentials (the platform
+  automation principal, a boot-minted operator session) join as optional
+  fields when their ADRs land — never pre-frozen, and never with an invented
+  wire prefix in code or fixtures. Serialize only non-derivable state: a
+  session cookie is rebuilt from its token (`SESSION_COOKIE_NAME` +
+  constants), so a future serialized session is `{ sessionToken, expiresAt }`,
+  not a stored cookie object.
 - Dev loops feed from boot output: `console:dev-real` threads
   `handle.projectSecret` into the Vite proxy env itself (and prints it under
   `--seed-only`). Don't reintroduce developer-remembered credential env vars.

@@ -81,24 +81,7 @@ function validatePlatform(value: unknown, source: string): void {
       fail(`"${field}" is required`);
     }
   }
-  if (
-    platform.platformKey !== undefined &&
-    (typeof platform.platformKey !== "string" || platform.platformKey.length === 0)
-  ) {
-    fail(`"platformKey" must be a non-empty string when present`);
-  }
-  if (platform.operatorSession !== undefined) {
-    const session = platform.operatorSession as Partial<
-      NonNullable<PlatformCredentials["operatorSession"]>
-    > | null;
-    if (
-      typeof session !== "object" ||
-      session === null ||
-      Array.isArray(session) ||
-      typeof session.sessionToken !== "string" ||
-      session.sessionToken.length === 0
-    ) {
-      fail(`"operatorSession" must carry a "sessionToken" when present`);
-    }
-  }
+  // Unknown extra fields pass through on purpose: future platform
+  // credentials join additively, and an older reader must not reject a
+  // newer producer's handle.
 }
