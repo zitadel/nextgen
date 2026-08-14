@@ -88,6 +88,25 @@ func ActorFromContext(ctx context.Context) (ActorContext, bool) {
 	return v, ok
 }
 
+// actorFromContext prefers the value actor (AuthGate), then the mutable slot
+// (BindPublicRequest / public login). RequestID always falls back to the HTTP
+// middleware value so Path B events share the request's req_… even when no
+// actor was stamped yet (POST /projects in-TX emits).
+func actorFromContext(ctx context.Context) ActorContext {
+	var ac ActorContext
+	if v, ok := ActorFromContext(ctx); ok {
+		ac = v
+	} else if slot, ok := ActorSlotFromContext(ctx); ok && slot != nil {
+		ac = *slot
+	}
+	if ac.RequestID == nil {
+		if reqID, ok := middleware.GetRequestIDContext(ctx); ok && reqID != "" {
+			ac.RequestID = &reqID
+		}
+	}
+	return ac
+}
+
 // FromContext builds a domain.Event skeleton from ActorContext when present.
 func FromContext(ctx context.Context, eventType domain.EventType, category domain.EventCategory) *domain.Event {
 	ev := &domain.Event{
@@ -97,23 +116,22 @@ func FromContext(ctx context.Context, eventType domain.EventType, category domai
 		Payload:        json.RawMessage("{}"),
 		Metadata:       json.RawMessage("{}"),
 	}
-	if ac, ok := ActorFromContext(ctx); ok {
-		ev.ProjectID = ac.ProjectID
-		ev.TeamID = ac.TeamID
-		ev.ActorID = ac.ActorID
-		ev.ActorType = ac.ActorType
-		ev.ClientID = ac.ClientID
-		ev.TokenID = ac.TokenID
-		if ac.DelegationType != "" {
-			ev.DelegationType = ac.DelegationType
-		}
-		ev.DelegationID = ac.DelegationID
-		ev.Grantor = ac.Grantor
-		ev.Fingerprint = ac.Fingerprint
-		ev.SessionID = ac.SessionID
-		ev.FlowID = ac.FlowID
-		ev.RequestID = ac.RequestID
+	ac := actorFromContext(ctx)
+	ev.ProjectID = ac.ProjectID
+	ev.TeamID = ac.TeamID
+	ev.ActorID = ac.ActorID
+	ev.ActorType = ac.ActorType
+	ev.ClientID = ac.ClientID
+	ev.TokenID = ac.TokenID
+	if ac.DelegationType != "" {
+		ev.DelegationType = ac.DelegationType
 	}
+	ev.DelegationID = ac.DelegationID
+	ev.Grantor = ac.Grantor
+	ev.Fingerprint = ac.Fingerprint
+	ev.SessionID = ac.SessionID
+	ev.FlowID = ac.FlowID
+	ev.RequestID = ac.RequestID
 	return ev
 }
 

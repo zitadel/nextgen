@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
@@ -61,9 +62,16 @@ func TestProjectCreate_EventPayloadIncludesPreviewOrigins(t *testing.T) {
 	require.NoError(t, err)
 	svc := service.NewProjectService(service.NewPool(pool), baseURL, schemaValidator, keyService)
 
-	got, err := svc.Create(t.Context(), "Acme", []string{"*.vercel.app"}, true)
+	ctx := middleware.WithRequestIDContext(t.Context(), "req_create")
+	got, err := svc.Create(ctx, "Acme", []string{"*.vercel.app"}, true)
 	require.NoError(t, err)
 	require.NotNil(t, got)
+
+	require.NotEmpty(t, events, "expected Path B events from Create")
+	for _, ev := range events {
+		require.NotNil(t, ev.RequestID, "event %s missing request_id", ev.EventType)
+		assert.Equal(t, "req_create", *ev.RequestID, "event %s", ev.EventType)
+	}
 
 	var created *domain.Event
 	for _, ev := range events {

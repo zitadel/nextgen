@@ -41,6 +41,43 @@ func TestFromContext_WithActor(t *testing.T) {
 	assert.Equal(t, "req_abc", *ev.RequestID)
 }
 
+// Path B Emit reads FromContext. Public login/flow only stamps the mutable
+// slot (BindPublicRequest); the value actor context stays empty.
+func TestFromContext_ReadsActorSlot(t *testing.T) {
+	ctx := WithActorSlot(t.Context())
+	ctx = middleware.WithRequestIDContext(ctx, "req_flow")
+	BindPublicRequest(ctx, "proj_1", "flow_1", "sess_1")
+
+	ev := FromContext(ctx, domain.EventTypeUserCreated, domain.EventCategoryEntity)
+	assert.Equal(t, "proj_1", ev.ProjectID)
+	require.NotNil(t, ev.RequestID)
+	assert.Equal(t, "req_flow", *ev.RequestID)
+	require.NotNil(t, ev.FlowID)
+	assert.Equal(t, "flow_1", *ev.FlowID)
+	require.NotNil(t, ev.SessionID)
+	assert.Equal(t, "sess_1", *ev.SessionID)
+}
+
+// POST /projects has no AuthGate and stamps the slot only after create.
+// In-TX Path B (project.created, schema.created, …) still needs request_id
+// from the HTTP middleware value on ctx.
+func TestFromContext_FillsRequestIDFromMiddleware(t *testing.T) {
+	ctx := middleware.WithRequestIDContext(t.Context(), "req_create")
+	ev := FromContext(ctx, domain.EventTypeProjectCreated, domain.EventCategoryEntity)
+	require.NotNil(t, ev.RequestID)
+	assert.Equal(t, "req_create", *ev.RequestID)
+	assert.Empty(t, ev.ProjectID)
+}
+
+func TestFromContext_FillsRequestIDWhenActorOmitsIt(t *testing.T) {
+	ctx := middleware.WithRequestIDContext(t.Context(), "req_mw")
+	ctx = WithActorContext(ctx, ActorContext{ProjectID: "proj_1"})
+	ev := FromContext(ctx, domain.EventTypeUserCreated, domain.EventCategoryEntity)
+	assert.Equal(t, "proj_1", ev.ProjectID)
+	require.NotNil(t, ev.RequestID)
+	assert.Equal(t, "req_mw", *ev.RequestID)
+}
+
 func TestBindPublicRequest_StampsSlot(t *testing.T) {
 	ctx := WithActorSlot(t.Context())
 	ctx = middleware.WithRequestIDContext(ctx, "req_flow")

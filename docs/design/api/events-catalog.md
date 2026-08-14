@@ -79,8 +79,9 @@ Event **columns** carry correlation: `request_id`, `session_id`, `flow_id`,
 
 `occurred_at` is request **start** so a `request_id` group sorts
 `request.api` first, then in-TX Path B mutations. `created_at` is flush time.
-Login/flow HTTP emits when the handler stamps `project_id` (actor/token empty).
-Probes (`healthz` / `readyz` / `livez`) do not.
+Login/flow HTTP and `POST /projects` emit when the handler stamps `project_id`
+(actor/token empty). Path B copies `request_id` from the HTTP request even
+without AuthGate. Probes (`healthz` / `readyz` / `livez`) do not.
 
 Path A buffer: flush on batch size **N≈100** or age **T≈1s**. Capacity **C**
 (default 2000); drop only when full; never block the request.

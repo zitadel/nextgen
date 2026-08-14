@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -56,4 +57,21 @@ func TestEmit_BuildsAndInserts(t *testing.T) {
 	require.Equal(t, domain.EventTypeUserCreated, cap.last.EventType)
 	require.NotNil(t, cap.last.EntityID)
 	require.Equal(t, "user_1", *cap.last.EntityID)
+}
+
+func TestEmit_CopiesRequestIDFromMiddleware(t *testing.T) {
+	t.Parallel()
+	cap := &insertEventCapture{}
+	ctx := middleware.WithRequestIDContext(t.Context(), "req_api")
+	require.NoError(t, audit.Emit(ctx, cap, audit.EmitSpec{
+		Type:       domain.EventTypeProjectCreated,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  "proj_1",
+		EntityType: "project",
+		EntityID:   "proj_1",
+		Payload:    domain.ProjectPayload{Name: "Acme"},
+	}))
+	require.Equal(t, 1, cap.called)
+	require.NotNil(t, cap.last.RequestID)
+	require.Equal(t, "req_api", *cap.last.RequestID)
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -72,7 +73,9 @@ func TestRequestEventMiddleware_EmitsWhenProjectIDWithoutAuth(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 		w.WriteHeader(http.StatusCreated)
 	}))
-	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/flow", nil))
+	req := httptest.NewRequest(http.MethodPost, "/flow", nil)
+	req = req.WithContext(middleware.WithRequestIDContext(req.Context(), "req_flow"))
+	h.ServeHTTP(httptest.NewRecorder(), req)
 
 	require.Eventually(t, func() bool { return buf.Flushed() >= 1 }, 2*time.Second, 10*time.Millisecond)
 	ins.mu.Lock()
@@ -80,6 +83,8 @@ func TestRequestEventMiddleware_EmitsWhenProjectIDWithoutAuth(t *testing.T) {
 	require.Len(t, ins.events, 1)
 	assert.Equal(t, domain.EventTypeRequestAPI, ins.events[0].EventType)
 	assert.Equal(t, "proj_1", ins.events[0].ProjectID)
+	require.NotNil(t, ins.events[0].RequestID)
+	assert.Equal(t, "req_flow", *ins.events[0].RequestID)
 	require.Len(t, ins.waits, 1)
 	assert.GreaterOrEqual(t, ins.waits[0], 20*time.Millisecond)
 }
