@@ -37,7 +37,11 @@ export { createSanitiser } from "./sanitiser.js";
 export { default as defaultTemplate } from "./templates/default.liquid";
 export { default as layoutChromeCss } from "./templates/layout-chrome.css?inline";
 export { startFlow, submitStep, getCurrentStep } from "./api-client.js";
-export { validateBranding, type BrandingValidationResult } from "./branding-validator.js";
+export {
+  validateBranding,
+  type BrandingValidationContext,
+  type BrandingValidationResult,
+} from "./branding-validator.js";
 export type {
   Branding,
   BrandingAssets,
@@ -48,9 +52,4 @@ export type {
   BrandingTypography,
   FlowLayout,
 } from "./branding.js";
-export type {
-  FlowError,
-  FlowIdentity,
-  FlowMessage,
-  LiquidContext,
-} from "./template-context.js";
+export type { FlowError, FlowIdentity, FlowMessage, LiquidContext } from "./template-context.js";

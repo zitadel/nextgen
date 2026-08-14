@@ -11,7 +11,7 @@ import { expect } from "@zitadel/testing/playwright";
 
 /**
  * Completes the console's login screen (Console ADR 0003) with a seeded
- * user: the default-login flow's identifier step ("Email" + "Sign in"),
+ * user: the default-login flow's identifier step ("Email" + "Continue"),
  * then the password step ("Password" + "Sign in"). The widget exchanges the
  * handoff for the `__nextgen_session` cookie and performs a full-document
  * navigation away from /login.
@@ -22,7 +22,7 @@ export async function signIn(
 ): Promise<void> {
   await page.goto("/login");
   await page.getByLabel("Email").fill(user.email);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.getByLabel("Password").fill(user.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));

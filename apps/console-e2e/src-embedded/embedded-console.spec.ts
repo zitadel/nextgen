@@ -31,7 +31,7 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // wrong base the widget renders "POST /api/flow returned 404" here.
   await expect(page.getByLabel("Email")).toBeVisible();
   await page.getByLabel("Email").fill(user.email);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
 
   await expect(page.getByLabel("Password")).toBeVisible();
   await page.getByLabel("Password").fill(user.password);
