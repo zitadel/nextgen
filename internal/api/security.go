@@ -34,6 +34,9 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 	if err != nil {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
+	if !isProjectSecretType(payload.Type) {
+		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
 
 	scope := ScopeContext{
 		ProjectID:     payload.ProjectID,
@@ -189,4 +192,23 @@ func WithScopeContext(ctx context.Context, scopeCtx ScopeContext) context.Contex
 func GetScopeContext(ctx context.Context) (ScopeContext, bool) {
 	v, ok := ctx.Value(contextKey{}).(ScopeContext)
 	return v, ok
+}
+
+// isProjectSecretType reports whether t may mint an sk_proj ScopeContext.
+// Preview secrets still cannot call management APIs (hasOperatorProjectWrite).
+func isProjectSecretType(t domain.TokenType) bool {
+	switch t {
+	case domain.TokenTypeProjectToken, domain.TokenTypeProjectPreview:
+		return true
+	case domain.TokenTypeUnspecified,
+		domain.TokenTypeSessionToken,
+		domain.TokenTypeOIDCAccessToken,
+		domain.TokenTypeSAMLAssertion,
+		domain.TokenTypePersonalAccessToken,
+		domain.TokenTypeFlow,
+		domain.TokenTypeJWTProfile:
+		return false
+	default:
+		return false
+	}
 }
