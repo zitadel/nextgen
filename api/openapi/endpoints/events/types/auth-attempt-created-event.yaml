@@ -13,4 +13,4 @@ allOf:
         type: string
         const: auth.attempt.created
       payload:
-        $ref: ../payloads/auth-attempt-created-payload.yaml
+        $ref: ../payloads/empty-event-payload.yaml

@@ -13,4 +13,4 @@ allOf:
         type: string
         const: project.created
       payload:
-        $ref: ../payloads/project-created-payload.yaml
+        $ref: ../payloads/project-payload.yaml

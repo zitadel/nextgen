@@ -13,4 +13,4 @@ allOf:
         type: string
         const: team.created
       payload:
-        $ref: ../payloads/team-created-payload.yaml
+        $ref: ../payloads/team-payload.yaml

@@ -18,7 +18,7 @@ func TestEventToAPI_UserCreated(t *testing.T) {
 	entityType := "user"
 	entityID := "user_1"
 	schemaID := "sch_default"
-	payload, err := json.Marshal(domain.UserCreatedPayload{UserID: entityID, SchemaID: schemaID})
+	payload, err := json.Marshal(domain.UserCreatedPayload{SchemaID: schemaID, AttributeKeys: []string{"email"}})
 	require.NoError(t, err)
 
 	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
@@ -41,10 +41,10 @@ func TestEventToAPI_UserCreated(t *testing.T) {
 	v, ok := got.GetUserCreatedEvent()
 	require.True(t, ok)
 	assert.Equal(t, "evt_1", v.ID)
-	assert.Equal(t, entityID, v.Payload.UserID)
 	sid, ok := v.Payload.SchemaID.Get()
 	require.True(t, ok)
 	assert.Equal(t, schemaID, sid)
+	assert.Equal(t, []string{"email"}, v.Payload.AttributeKeys)
 }
 
 func TestEventToAPI_EmptyPayload(t *testing.T) {

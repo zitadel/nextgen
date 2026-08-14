@@ -25,16 +25,16 @@ import (
 var payloadByEventType = map[string]string{
 	"request.api": "request-api-payload.yaml",
 
-	"project.created": "project-created-payload.yaml",
-	"project.updated": "project-updated-payload.yaml",
+	"project.created": "project-payload.yaml",
+	"project.updated": "project-payload.yaml",
 	"project.deleted": "empty-event-payload.yaml",
 
 	"user.created":       "user-created-payload.yaml",
 	"user.create.failed": "user-create-failed-payload.yaml",
 	"user.deleted":       "empty-event-payload.yaml",
 
-	"team.created":     "team-created-payload.yaml",
-	"team.updated":     "team-updated-payload.yaml",
+	"team.created":     "team-payload.yaml",
+	"team.updated":     "team-payload.yaml",
 	"team.deactivated": "empty-event-payload.yaml",
 
 	"auth.token.issued":  "auth-token-issued-payload.yaml",
@@ -43,8 +43,8 @@ var payloadByEventType = map[string]string{
 	"session.established": "session-established-payload.yaml",
 	"session.deleted":     "session-deleted-payload.yaml",
 
-	"auth.attempt.created":    "auth-attempt-created-payload.yaml",
-	"auth.attempt.handed_off": "auth-attempt-handed-off-payload.yaml",
+	"auth.attempt.created":    "empty-event-payload.yaml",
+	"auth.attempt.handed_off": "empty-event-payload.yaml",
 	"auth.check.failed":       "auth-check-payload.yaml",
 	"auth.check.succeeded":    "auth-check-payload.yaml",
 
@@ -52,7 +52,7 @@ var payloadByEventType = map[string]string{
 	"flowdef.updated": "flowdef-payload.yaml",
 	"flowdef.deleted": "empty-event-payload.yaml",
 
-	"schema.created": "schema-payload.yaml",
+	"schema.created": "empty-event-payload.yaml",
 
 	"branding.created": "branding-created-payload.yaml",
 

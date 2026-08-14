@@ -43,7 +43,7 @@ func (s *TeamService) Create(ctx context.Context, input CreateTeamInput) (*domai
 			ProjectID:  model.ProjectID,
 			EntityType: "team",
 			EntityID:   model.ID,
-			Payload:    domain.TeamCreatedPayload{Name: model.Name},
+			Payload:    domain.TeamPayload{Name: model.Name},
 		})
 	})
 	if err != nil {
@@ -183,7 +183,7 @@ func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (*domai
 			ProjectID:  team.ProjectID,
 			EntityType: "team",
 			EntityID:   team.ID,
-			Payload:    domain.TeamUpdatedPayload{ChangedKeys: []string{"name"}},
+			Payload:    domain.TeamPayload{Name: team.Name},
 		})
 	})
 	if err != nil {

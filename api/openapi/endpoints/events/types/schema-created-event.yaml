@@ -13,4 +13,4 @@ allOf:
         type: string
         const: schema.created
       payload:
-        $ref: ../payloads/schema-payload.yaml
+        $ref: ../payloads/empty-event-payload.yaml

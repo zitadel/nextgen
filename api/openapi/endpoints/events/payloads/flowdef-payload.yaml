@@ -1,6 +1,27 @@
 title: FlowdefPayload
 type: object
-description: Payload for `flowdef.*` events.
+description: |
+  Shared allowlisted fields for `flowdef.created` (full snapshot) and
+  `flowdef.updated` (delta: only changed fields present). Steps are omitted.
 properties:
   name:
     type: string
+  status:
+    type: string
+  user_schema:
+    type: string
+  purposes:
+    type: object
+    additionalProperties:
+      type: string
+  audience:
+    type: object
+    properties:
+      app_ids:
+        type: array
+        items:
+          type: string
+      team_ids:
+        type: array
+        items:
+          type: string

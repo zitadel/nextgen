@@ -1,10 +1,15 @@
 title: UserCreatedPayload
 type: object
-description: Payload for `user.created` events.
-required:
-  - user_id
+description: |
+  Payload for `user.created`. Identity is `entity_id`; attribute values
+  appear only for schema fields marked `x-audit`.
 properties:
-  user_id:
-    type: string
   schema_id:
     type: string
+  attribute_keys:
+    type: array
+    items:
+      type: string
+  attributes:
+    type: object
+    additionalProperties: true

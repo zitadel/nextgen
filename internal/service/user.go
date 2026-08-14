@@ -345,6 +345,8 @@ type CreateUserAction struct {
 	schemaStore domain.JSONSchemaStore
 
 	CreateUser *domain.CreateUser
+	// schemaJSON is the user schema document used at create time for x-audit value filtering.
+	schemaJSON []byte
 }
 
 func NewCreateUserAction(input CreateUserInput, schemaStore domain.JSONSchemaStore) *CreateUserAction {
@@ -368,6 +370,7 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 
+	o.schemaJSON = schemaEntity.Schema
 	o.CreateUser, err = domain.NewCreateUser(o.ProjectID, o.TeamID, o.ID, schemaEntity.Schema, o.User)
 	if err != nil {
 		return err
@@ -381,6 +384,7 @@ func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		return err
 	}
 	o.User["id"] = o.CreateUser.ID
+	attrKeys, attrValues := audit.UserAttributeAuditFields(o.User, o.schemaJSON)
 	return audit.Emit(ctx, stmts, audit.EmitSpec{
 		Type:       domain.EventTypeUserCreated,
 		Category:   domain.EventCategoryEntity,
@@ -388,8 +392,9 @@ func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		EntityType: "user",
 		EntityID:   o.CreateUser.ID,
 		Payload: domain.UserCreatedPayload{
-			UserID:   o.CreateUser.ID,
-			SchemaID: o.CreateUser.SchemaURL,
+			SchemaID:      o.CreateUser.SchemaURL,
+			AttributeKeys: attrKeys,
+			Attributes:    attrValues,
 		},
 	})
 }
@@ -428,12 +433,13 @@ func (o *SetPasswordUserAction) Prepare(_ context.Context) (err error) {
 }
 
 func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) error {
-	err := stmts.SetUserPassword(ctx, &domain.SetUserPassword{
+	pw := &domain.SetUserPassword{
 		ProjectID:      o.ProjectID,
 		UserID:         o.UserID,
 		EncodedHash:    o.hash,
 		ChangeRequired: o.IsPasswordChangeRequired,
-	})
+	}
+	err := stmts.SetUserPassword(ctx, pw)
 	if err != nil {
 		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
 			return domain.ErrUserNotFound()
@@ -445,8 +451,11 @@ func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) 
 		Category:   domain.EventCategoryAuth,
 		ProjectID:  o.ProjectID,
 		EntityType: "user_password",
-		EntityID:   o.UserID,
-		Payload:    domain.AuthFactorPayload{UserID: o.UserID},
+		EntityID:   pw.ID,
+		Payload: domain.AuthFactorPayload{
+			UserID:   o.UserID,
+			FactorID: pw.ID,
+		},
 	})
 }
 

@@ -42,7 +42,8 @@ func TestFromContext_WithActor(t *testing.T) {
 
 func TestWithPayload(t *testing.T) {
 	ev := FromContext(t.Context(), domain.EventTypeUserCreated, domain.EventCategoryEntity)
-	ev, err := WithPayload(ev, domain.UserCreatedPayload{UserID: "user_1", SchemaID: "sch_1"})
+	ev, err := WithPayload(ev, domain.UserCreatedPayload{SchemaID: "sch_1", AttributeKeys: []string{"email"}})
 	require.NoError(t, err)
-	assert.Contains(t, string(ev.Payload), "user_1")
+	assert.Contains(t, string(ev.Payload), "sch_1")
+	assert.Contains(t, string(ev.Payload), "email")
 }

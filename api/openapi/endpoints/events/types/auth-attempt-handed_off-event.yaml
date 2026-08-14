@@ -13,4 +13,4 @@ allOf:
         type: string
         const: auth.attempt.handed_off
       payload:
-        $ref: ../payloads/auth-attempt-handed-off-payload.yaml
+        $ref: ../payloads/empty-event-payload.yaml

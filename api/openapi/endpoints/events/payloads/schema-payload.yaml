@@ -1,6 +1,0 @@
-title: SchemaPayload
-type: object
-description: Payload for `schema.*` events.
-properties:
-  schema_id:
-    type: string

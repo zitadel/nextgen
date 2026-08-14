@@ -1,8 +1,0 @@
-title: TeamUpdatedPayload
-type: object
-description: Payload for `team.updated` events.
-properties:
-  changed_keys:
-    type: array
-    items:
-      type: string

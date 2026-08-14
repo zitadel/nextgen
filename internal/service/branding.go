@@ -57,7 +57,12 @@ func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput)
 			ProjectID:  entity.ProjectID,
 			EntityType: "branding",
 			EntityID:   entity.ID,
-			Payload:    domain.BrandingCreatedPayload{Layout: entity.Layout},
+			Payload: domain.BrandingPayload{
+				Layout:  entity.Layout,
+				LogoURL: entity.LogoURL,
+				FontURL: entity.FontURL,
+				HeroURL: entity.HeroURL,
+			},
 		})
 	}); err != nil {
 		// The only integrity constraint reachable from user input is the FK to

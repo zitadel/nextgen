@@ -214,7 +214,10 @@ func emitProjectCreated(ctx context.Context, stmts EventStatements, project *dom
 		ProjectID:  project.ID,
 		EntityType: "project",
 		EntityID:   project.ID,
-		Payload:    domain.ProjectCreatedPayload{Name: project.Name},
+		Payload: domain.ProjectPayload{
+			Name:           project.Name,
+			PreviewOrigins: project.PreviewOrigins,
+		},
 	})
 }
 
@@ -240,7 +243,7 @@ func emitSchemaCreated(ctx context.Context, stmts EventStatements, schema *domai
 		ProjectID:  schema.ProjectID,
 		EntityType: "json_schema",
 		EntityID:   schema.URL,
-		Payload:    domain.SchemaPayload{SchemaID: schema.URL},
+		Payload:    struct{}{},
 	})
 }
 
@@ -251,7 +254,7 @@ func emitFlowdefCreated(ctx context.Context, stmts EventStatements, flowDef *dom
 		ProjectID:  flowDef.ProjectID,
 		EntityType: "flow_definition",
 		EntityID:   flowDef.ID,
-		Payload:    domain.FlowdefPayload{Name: flowDef.Name},
+		Payload:    flowdefPayloadSnapshot(flowDef),
 	})
 }
 
@@ -320,7 +323,7 @@ func (s *projectService) Update(ctx context.Context, id, name string) (*domain.P
 			ProjectID:  project.ID,
 			EntityType: "project",
 			EntityID:   project.ID,
-			Payload:    domain.ProjectUpdatedPayload{ChangedKeys: []string{"name"}},
+			Payload:    domain.ProjectPayload{Name: project.Name},
 		})
 	})
 	if err != nil {

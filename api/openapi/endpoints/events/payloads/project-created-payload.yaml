@@ -1,6 +1,0 @@
-title: ProjectCreatedPayload
-type: object
-description: Payload for `project.created` events.
-properties:
-  name:
-    type: string

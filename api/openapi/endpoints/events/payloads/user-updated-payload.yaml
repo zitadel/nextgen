@@ -1,10 +1,13 @@
 title: UserUpdatedPayload
 type: object
-description: Payload for `user.updated` events.
-required:
-  - changed_keys
+description: |
+  Payload for `user.updated` (deferred emitter). Same attribute rules as
+  create: keys touched plus `x-audit` values only.
 properties:
-  changed_keys:
+  attribute_keys:
     type: array
     items:
       type: string
+  attributes:
+    type: object
+    additionalProperties: true

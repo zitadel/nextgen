@@ -17,6 +17,60 @@ same TX (shared `request_id`).
 
 **PII:** deny-by-default. Secrets, challenges, and token values never appear.
 
+## Payload rules
+
+1. **Envelope owns identity** — `entity_type` / `entity_id` / `session_id` /
+   `token_id` / `client_id` / `flow_id` / `request_id` / actor identify the
+   subject. Do **not** put the primary entity id in `payload` again.
+   Exceptions: join events (membership) or a **secondary** id (e.g. `user_id`
+   on a factor event; `auth_attempt_id` on a check event).
+2. **Create** — full **allowlisted snapshot** of fields the mutate API
+   actually writes. Never passwords, passkey challenges, or user attribute
+   **values** unless `x-audit`.
+3. **Update** — **delta with new values**: only fields that changed, each set
+   to the **new** value. Absent field = unchanged. Not `changed_keys[]` for
+   admin resources. Not a full row dump.
+4. **User attributes** — same on **create and update**: list attribute
+   **keys** that were written; include **values only** for schema fields
+   marked `x-audit`. Never credentials.
+5. **Delete / simple state flip** — empty `{}` unless a **reason enum** is
+   required (for example session delete or user deactivate — see Deferred).
+6. **Auth / authz / checks** — refs + enums + allowlisted arrays; keep SIEM
+   join keys on columns and/or secondary payload ids (see SIEM note below).
+7. **Share payload schemas** when create and update use the **same property
+   bag** (update just omits unchanged fields). Deletes use the empty payload
+   file.
+
+### Allowlisted fields per resource
+
+| Resource | Allowlisted in payload | Intentionally omitted |
+|----------|------------------------|------------------------|
+| **Project** | `name`, `preview_origins` (full array as stored) | Secrets, key material |
+| **Team** | `name` | — |
+| **Flow definition** | `name`, `status`, `user_schema`, `purposes`, `audience` | Full `steps` graph |
+| **Branding** | `layout`, `logo_url`, `font_url`, `hero_url` | `liquid_template` |
+| **Schema** | _(none — identity is `entity_id`)_ | Schema document body |
+| **User** | `schema_id`; `attribute_keys[]`; `attributes` map **only** for `x-audit` fields | Non-`x-audit` values; passwords / factors |
+| **Token** | `scopes[]` | Token string / JWE |
+| **Auth check** | `check_id`, `check_type`, `auth_attempt_id` | Challenge/proof JSON |
+| **Auth factor** | `user_id`, `factor_id` | Hash, public key material, challenges |
+
+`PATCH /projects/{id}` today only renames (`name`). `preview_origins` is set
+on **create** only. Create emits both fields; update emits `name` when
+renamed. If origins become patchable later, the update delta includes the
+**full new** `preview_origins` array (whole-array replace).
+
+### SIEM join path
+
+Event **columns** carry correlation: `request_id`, `session_id`, `flow_id`,
+`client_id`, `token_id`, `actor_id`, `entity_id`.
+
+- Auth attempt `entity_id` ↔ check payload `auth_attempt_id`.
+- Session after handoff: `session_id` **column** (set via `EmitSpec.SessionID`;
+  not duplicated in attempt payloads).
+- Factors: `entity_id` / payload `factor_id` + shared `request_id` when
+  co-committed.
+
 ## Path A
 
 | Trigger | `event_type` | `category` | Payload |
@@ -35,31 +89,31 @@ tracked below.
 
 | Statement / operation | `event_type` | `category` | `entity_type` | Payload properties |
 |----------------------|--------------|------------|---------------|--------------------|
-| `CreateProject` | `project.created` | `entity` | `project` | `name` |
-| `UpdateProject` | `project.updated` | `entity` | `project` | `changed_keys[]` |
+| `CreateProject` | `project.created` | `entity` | `project` | `name`, `preview_origins[]` |
+| `UpdateProject` | `project.updated` | `entity` | `project` | delta: `name` (when renamed) |
 | `DeleteProjectByID` (when a row was deleted) | `project.deleted` | `entity` | `project` | _(empty)_ |
-| `CreateUser` | `user.created` | `entity` | `user` | `user_id`, `schema_id` |
+| `CreateUser` | `user.created` | `entity` | `user` | `schema_id`, `attribute_keys[]`, `attributes` (`x-audit` values only) |
 | Unique violation on create | `user.create.failed` | `entity` | `user` | `key_name` |
 | `DeleteUserByID` | `user.deleted` | `entity` | `user` | _(empty)_ |
 | `CreateTeam` | `team.created` | `admin` | `team` | `name` |
-| `UpdateTeam` | `team.updated` | `admin` | `team` | `changed_keys[]` |
+| `UpdateTeam` | `team.updated` | `admin` | `team` | delta: `name` |
 | `DeactivateTeam` (when status changed) | `team.deactivated` | `admin` | `team` | _(empty)_ |
 | `CreateToken` / session mint / `GenerateJWE` | `auth.token.issued` | `auth` | `token` | `scopes[]` |
 | `DeleteTokenByID` / `RevokeToken` | `auth.token.revoked` | `auth` | `token` | _(empty)_ |
 | Session delete token peers (`DeleteTokensBySessionID`; token ids unavailable) | `auth.token.revoked` | `auth` | `token` | _(empty; `session_id` column set, `entity_id` empty)_ |
-| `CreateSession` / `ExchangeSession` | `session.established` | `session` | `session` | `user_id` |
+| `CreateSession` / `ExchangeSession` | `session.established` | `session` | `session` | `user_id` (secondary) |
 | `DeleteSessionByID` (operator/API revoke) | `session.deleted` | `session` | `session` | `reason` (`revoked`) |
-| `CreateAuthAttempt` | `auth.attempt.created` | `auth` | `auth_attempt` | `flow_id` |
-| `HandoffAuthAttempt` | `auth.attempt.handed_off` | `auth` | `auth_attempt` | `session_id` |
-| Challenge failed | `auth.check.failed` | `auth` | `check` | `check_id`, `check_type` |
-| Challenge succeeded | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type` |
-| Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name` |
-| Flow definition update | `flowdef.updated` | `admin` | `flow_definition` | `name` |
+| `CreateAuthAttempt` | `auth.attempt.created` | `auth` | `auth_attempt` | _(empty; `flow_id` / `session_id` columns)_ |
+| `HandoffAuthAttempt` | `auth.attempt.handed_off` | `auth` | `auth_attempt` | _(empty; `session_id` column set)_ |
+| Challenge failed | `auth.check.failed` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
+| Challenge succeeded | `auth.check.succeeded` | `auth` | `check` | `check_id`, `check_type`, `auth_attempt_id` |
+| Flow definition create | `flowdef.created` | `admin` | `flow_definition` | `name`, `status`, `user_schema`, `purposes`, `audience` |
+| Flow definition update | `flowdef.updated` | `admin` | `flow_definition` | delta of allowlisted fields that changed |
 | Flow definition delete | `flowdef.deleted` | `admin` | `flow_definition` | _(empty)_ |
-| JSON schema create | `schema.created` | `admin` | `json_schema` | `schema_id` |
-| Branding create | `branding.created` | `admin` | `branding` | `layout` |
+| JSON schema create | `schema.created` | `admin` | `json_schema` | _(empty; identity is `entity_id`)_ |
+| Branding create | `branding.created` | `admin` | `branding` | `layout`, `logo_url`, `font_url`, `hero_url` |
 | Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
-| Set password | `auth.factor.password.set` | `auth` | `user_password` | `user_id`, `factor_id` |
+| Set password (`entity_id` / `factor_id` = password row id) | `auth.factor.password.set` | `auth` | `user_password` | `user_id`, `factor_id` |
 | Create passkey (`entity_id` / `factor_id` = credential id) | `auth.factor.passkey.enrolled` | `auth` | `user_passkey` | `user_id`, `factor_id` |
 
 **Non-events:** pure reads; RSI upserts as create side-effects; crypto/catalog
@@ -72,11 +126,11 @@ Types planned but not yet emitted by a live producer. Follow-up issues:
 
 | `event_type` | Follow-up |
 |--------------|-----------|
-| `user.updated` | [#877](https://github.com/zitadel/nextgen/issues/877) attribute patch API |
-| `user.deactivated` | [#878](https://github.com/zitadel/nextgen/issues/878) per-row emit from team cascade / UserService.Deactivate |
-| `team.membership.updated` | [#879](https://github.com/zitadel/nextgen/issues/879) membership + claim CompleteClaim path |
+| `user.updated` | [#877](https://github.com/zitadel/nextgen/issues/877) attribute patch API — payload: keys touched + `x-audit` values (same rule as create) |
+| `user.deactivated` | [#878](https://github.com/zitadel/nextgen/issues/878) per-row emit from team cascade / UserService.Deactivate — `reason` enum; no primary-id echo |
+| `team.membership.updated` | [#879](https://github.com/zitadel/nextgen/issues/879) membership + claim CompleteClaim path — join ids + status |
 | `claim.challenge_created` / `claim.completed` | [#880](https://github.com/zitadel/nextgen/issues/880) claim lifecycle emitters |
 | `session.expired` | [#881](https://github.com/zitadel/nextgen/issues/881) session reaper |
 | `schema.deleted` | [#882](https://github.com/zitadel/nextgen/issues/882) schema delete API |
-| `authz.revoked` | [#883](https://github.com/zitadel/nextgen/issues/883) product revoke path |
-| `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | [#884](https://github.com/zitadel/nextgen/issues/884) factor remove + TOTP/recovery APIs |
+| `authz.revoked` | [#883](https://github.com/zitadel/nextgen/issues/883) product revoke path — same payload shape as granted |
+| `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | [#884](https://github.com/zitadel/nextgen/issues/884) factor remove + TOTP/recovery APIs — same `AuthFactorPayload` rules |

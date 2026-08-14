@@ -226,10 +226,6 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 		if err := tx.Statements().CreateAuthAttempt(ctx, attempt); err != nil {
 			return err
 		}
-		payload := domain.AuthAttemptCreatedPayload{}
-		if ac, ok := audit.ActorFromContext(ctx); ok && ac.FlowID != nil {
-			payload.FlowID = *ac.FlowID
-		}
 		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
 			Type:       domain.EventTypeAuthAttemptCreated,
 			Category:   domain.EventCategoryAuth,
@@ -237,7 +233,7 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 			EntityType: "auth_attempt",
 			EntityID:   attempt.ID,
 			SessionID:  attempt.SessionID,
-			Payload:    payload,
+			Payload:    domain.AuthAttemptCreatedPayload{},
 		})
 	}); err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {
@@ -335,10 +331,6 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 		if err := tx.Statements().HandoffAuthAttempt(ctx, attempt); err != nil {
 			return err
 		}
-		payload := domain.AuthAttemptHandedOffPayload{}
-		if attempt.SessionID != nil {
-			payload.SessionID = *attempt.SessionID
-		}
 		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
 			Type:       domain.EventTypeAuthAttemptHandedOff,
 			Category:   domain.EventCategoryAuth,
@@ -346,7 +338,7 @@ func (s *authAttemptService) Handoff(ctx context.Context, input HandoffInput) (*
 			EntityType: "auth_attempt",
 			EntityID:   attempt.ID,
 			SessionID:  attempt.SessionID,
-			Payload:    payload,
+			Payload:    domain.AuthAttemptHandedOffPayload{},
 		})
 	})
 	if err != nil {
@@ -390,8 +382,9 @@ func emitAuthCheck(ctx context.Context, stmts EventStatements, attempt *domain.A
 		EntityID:   challenge.GetID(),
 		SessionID:  attempt.SessionID,
 		Payload: domain.AuthCheckPayload{
-			CheckID:   challenge.GetID(),
-			CheckType: challenge.Type().String(),
+			CheckID:       challenge.GetID(),
+			CheckType:     challenge.Type().String(),
+			AuthAttemptID: attempt.ID,
 		},
 	})
 }

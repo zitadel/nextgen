@@ -573,7 +573,7 @@ type AuthAttemptCreatedEvent struct {
 	FlowID OptNilString `json:"flow_id"`
 	// Additional emit-time metadata (already redacted).
 	Metadata OptAuthAttemptCreatedEventMetadata `json:"metadata"`
-	Payload  AuthAttemptCreatedPayload          `json:"payload"`
+	Payload  EmptyEventPayload                  `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -682,7 +682,7 @@ func (s *AuthAttemptCreatedEvent) GetMetadata() OptAuthAttemptCreatedEventMetada
 }
 
 // GetPayload returns the value of Payload.
-func (s *AuthAttemptCreatedEvent) GetPayload() AuthAttemptCreatedPayload {
+func (s *AuthAttemptCreatedEvent) GetPayload() EmptyEventPayload {
 	return s.Payload
 }
 
@@ -792,7 +792,7 @@ func (s *AuthAttemptCreatedEvent) SetMetadata(val OptAuthAttemptCreatedEventMeta
 }
 
 // SetPayload sets the value of Payload.
-func (s *AuthAttemptCreatedEvent) SetPayload(val AuthAttemptCreatedPayload) {
+func (s *AuthAttemptCreatedEvent) SetPayload(val EmptyEventPayload) {
 	s.Payload = val
 }
 
@@ -989,22 +989,6 @@ func (s *AuthAttemptCreatedEventMetadata) init() AuthAttemptCreatedEventMetadata
 	return m
 }
 
-// Payload for `auth.attempt.created` events.
-// Ref: #
-type AuthAttemptCreatedPayload struct {
-	FlowID OptString `json:"flow_id"`
-}
-
-// GetFlowID returns the value of FlowID.
-func (s *AuthAttemptCreatedPayload) GetFlowID() OptString {
-	return s.FlowID
-}
-
-// SetFlowID sets the value of FlowID.
-func (s *AuthAttemptCreatedPayload) SetFlowID(val OptString) {
-	s.FlowID = val
-}
-
 // Merged schema.
 // Ref: #
 type AuthAttemptHandedOffEvent struct {
@@ -1047,7 +1031,7 @@ type AuthAttemptHandedOffEvent struct {
 	FlowID OptNilString `json:"flow_id"`
 	// Additional emit-time metadata (already redacted).
 	Metadata OptAuthAttemptHandedOffEventMetadata `json:"metadata"`
-	Payload  AuthAttemptHandedOffPayload          `json:"payload"`
+	Payload  EmptyEventPayload                    `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -1156,7 +1140,7 @@ func (s *AuthAttemptHandedOffEvent) GetMetadata() OptAuthAttemptHandedOffEventMe
 }
 
 // GetPayload returns the value of Payload.
-func (s *AuthAttemptHandedOffEvent) GetPayload() AuthAttemptHandedOffPayload {
+func (s *AuthAttemptHandedOffEvent) GetPayload() EmptyEventPayload {
 	return s.Payload
 }
 
@@ -1266,7 +1250,7 @@ func (s *AuthAttemptHandedOffEvent) SetMetadata(val OptAuthAttemptHandedOffEvent
 }
 
 // SetPayload sets the value of Payload.
-func (s *AuthAttemptHandedOffEvent) SetPayload(val AuthAttemptHandedOffPayload) {
+func (s *AuthAttemptHandedOffEvent) SetPayload(val EmptyEventPayload) {
 	s.Payload = val
 }
 
@@ -1461,22 +1445,6 @@ func (s *AuthAttemptHandedOffEventMetadata) init() AuthAttemptHandedOffEventMeta
 		*s = m
 	}
 	return m
-}
-
-// Payload for `auth.attempt.handed_off` events.
-// Ref: #
-type AuthAttemptHandedOffPayload struct {
-	SessionID OptString `json:"session_id"`
-}
-
-// GetSessionID returns the value of SessionID.
-func (s *AuthAttemptHandedOffPayload) GetSessionID() OptString {
-	return s.SessionID
-}
-
-// SetSessionID sets the value of SessionID.
-func (s *AuthAttemptHandedOffPayload) SetSessionID(val OptString) {
-	s.SessionID = val
 }
 
 // The current state of an authentication attempt.
@@ -2144,11 +2112,13 @@ func (s *AuthCheckFailedEventMetadata) init() AuthCheckFailedEventMetadata {
 	return m
 }
 
-// Payload for `auth.check.failed` / `auth.check.succeeded` events.
+// Payload for `auth.check.failed` / `auth.check.succeeded`.
+// `auth_attempt_id` joins the check to its attempt for SIEM correlation.
 // Ref: #
 type AuthCheckPayload struct {
-	CheckID   string    `json:"check_id"`
-	CheckType OptString `json:"check_type"`
+	CheckID       string    `json:"check_id"`
+	CheckType     OptString `json:"check_type"`
+	AuthAttemptID OptString `json:"auth_attempt_id"`
 }
 
 // GetCheckID returns the value of CheckID.
@@ -2161,6 +2131,11 @@ func (s *AuthCheckPayload) GetCheckType() OptString {
 	return s.CheckType
 }
 
+// GetAuthAttemptID returns the value of AuthAttemptID.
+func (s *AuthCheckPayload) GetAuthAttemptID() OptString {
+	return s.AuthAttemptID
+}
+
 // SetCheckID sets the value of CheckID.
 func (s *AuthCheckPayload) SetCheckID(val string) {
 	s.CheckID = val
@@ -2169,6 +2144,11 @@ func (s *AuthCheckPayload) SetCheckID(val string) {
 // SetCheckType sets the value of CheckType.
 func (s *AuthCheckPayload) SetCheckType(val OptString) {
 	s.CheckType = val
+}
+
+// SetAuthAttemptID sets the value of AuthAttemptID.
+func (s *AuthCheckPayload) SetAuthAttemptID(val OptString) {
+	s.AuthAttemptID = val
 }
 
 // Merged schema.
@@ -5700,10 +5680,13 @@ func (s *BrandingCreatedEventMetadata) init() BrandingCreatedEventMetadata {
 	return m
 }
 
-// Payload for `branding.created` events.
+// Allowlisted fields for `branding.created`. Omits `liquid_template`.
 // Ref: #
 type BrandingCreatedPayload struct {
-	Layout OptString `json:"layout"`
+	Layout  OptString `json:"layout"`
+	LogoURL OptString `json:"logo_url"`
+	FontURL OptString `json:"font_url"`
+	HeroURL OptString `json:"hero_url"`
 }
 
 // GetLayout returns the value of Layout.
@@ -5711,9 +5694,39 @@ func (s *BrandingCreatedPayload) GetLayout() OptString {
 	return s.Layout
 }
 
+// GetLogoURL returns the value of LogoURL.
+func (s *BrandingCreatedPayload) GetLogoURL() OptString {
+	return s.LogoURL
+}
+
+// GetFontURL returns the value of FontURL.
+func (s *BrandingCreatedPayload) GetFontURL() OptString {
+	return s.FontURL
+}
+
+// GetHeroURL returns the value of HeroURL.
+func (s *BrandingCreatedPayload) GetHeroURL() OptString {
+	return s.HeroURL
+}
+
 // SetLayout sets the value of Layout.
 func (s *BrandingCreatedPayload) SetLayout(val OptString) {
 	s.Layout = val
+}
+
+// SetLogoURL sets the value of LogoURL.
+func (s *BrandingCreatedPayload) SetLogoURL(val OptString) {
+	s.LogoURL = val
+}
+
+// SetFontURL sets the value of FontURL.
+func (s *BrandingCreatedPayload) SetFontURL(val OptString) {
+	s.FontURL = val
+}
+
+// SetHeroURL sets the value of HeroURL.
+func (s *BrandingCreatedPayload) SetHeroURL(val OptString) {
+	s.HeroURL = val
 }
 
 // Layout preset selector. The default.liquid master template uses this
@@ -15069,10 +15082,15 @@ func (s *FlowdefNotFoundDetails) init() FlowdefNotFoundDetails {
 	return m
 }
 
-// Payload for `flowdef.*` events.
+// Shared allowlisted fields for `flowdef.created` (full snapshot) and
+// `flowdef.updated` (delta: only changed fields present). Steps are omitted.
 // Ref: #
 type FlowdefPayload struct {
-	Name OptString `json:"name"`
+	Name       OptString                 `json:"name"`
+	Status     OptString                 `json:"status"`
+	UserSchema OptString                 `json:"user_schema"`
+	Purposes   OptFlowdefPayloadPurposes `json:"purposes"`
+	Audience   OptFlowdefPayloadAudience `json:"audience"`
 }
 
 // GetName returns the value of Name.
@@ -15080,9 +15098,85 @@ func (s *FlowdefPayload) GetName() OptString {
 	return s.Name
 }
 
+// GetStatus returns the value of Status.
+func (s *FlowdefPayload) GetStatus() OptString {
+	return s.Status
+}
+
+// GetUserSchema returns the value of UserSchema.
+func (s *FlowdefPayload) GetUserSchema() OptString {
+	return s.UserSchema
+}
+
+// GetPurposes returns the value of Purposes.
+func (s *FlowdefPayload) GetPurposes() OptFlowdefPayloadPurposes {
+	return s.Purposes
+}
+
+// GetAudience returns the value of Audience.
+func (s *FlowdefPayload) GetAudience() OptFlowdefPayloadAudience {
+	return s.Audience
+}
+
 // SetName sets the value of Name.
 func (s *FlowdefPayload) SetName(val OptString) {
 	s.Name = val
+}
+
+// SetStatus sets the value of Status.
+func (s *FlowdefPayload) SetStatus(val OptString) {
+	s.Status = val
+}
+
+// SetUserSchema sets the value of UserSchema.
+func (s *FlowdefPayload) SetUserSchema(val OptString) {
+	s.UserSchema = val
+}
+
+// SetPurposes sets the value of Purposes.
+func (s *FlowdefPayload) SetPurposes(val OptFlowdefPayloadPurposes) {
+	s.Purposes = val
+}
+
+// SetAudience sets the value of Audience.
+func (s *FlowdefPayload) SetAudience(val OptFlowdefPayloadAudience) {
+	s.Audience = val
+}
+
+type FlowdefPayloadAudience struct {
+	AppIds  []string `json:"app_ids"`
+	TeamIds []string `json:"team_ids"`
+}
+
+// GetAppIds returns the value of AppIds.
+func (s *FlowdefPayloadAudience) GetAppIds() []string {
+	return s.AppIds
+}
+
+// GetTeamIds returns the value of TeamIds.
+func (s *FlowdefPayloadAudience) GetTeamIds() []string {
+	return s.TeamIds
+}
+
+// SetAppIds sets the value of AppIds.
+func (s *FlowdefPayloadAudience) SetAppIds(val []string) {
+	s.AppIds = val
+}
+
+// SetTeamIds sets the value of TeamIds.
+func (s *FlowdefPayloadAudience) SetTeamIds(val []string) {
+	s.TeamIds = val
+}
+
+type FlowdefPayloadPurposes map[string]string
+
+func (s *FlowdefPayloadPurposes) init() FlowdefPayloadPurposes {
+	m := *s
+	if m == nil {
+		m = map[string]string{}
+		*s = m
+	}
+	return m
 }
 
 // Merged schema.
@@ -23142,6 +23236,98 @@ func (o OptFlowdefNotFoundDetails) Or(d FlowdefNotFoundDetails) FlowdefNotFoundD
 	return d
 }
 
+// NewOptFlowdefPayloadAudience returns new OptFlowdefPayloadAudience with value set to v.
+func NewOptFlowdefPayloadAudience(v FlowdefPayloadAudience) OptFlowdefPayloadAudience {
+	return OptFlowdefPayloadAudience{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowdefPayloadAudience is optional FlowdefPayloadAudience.
+type OptFlowdefPayloadAudience struct {
+	Value FlowdefPayloadAudience
+	Set   bool
+}
+
+// IsSet returns true if OptFlowdefPayloadAudience was set.
+func (o OptFlowdefPayloadAudience) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowdefPayloadAudience) Reset() {
+	var v FlowdefPayloadAudience
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowdefPayloadAudience) SetTo(v FlowdefPayloadAudience) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowdefPayloadAudience) Get() (v FlowdefPayloadAudience, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowdefPayloadAudience) Or(d FlowdefPayloadAudience) FlowdefPayloadAudience {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowdefPayloadPurposes returns new OptFlowdefPayloadPurposes with value set to v.
+func NewOptFlowdefPayloadPurposes(v FlowdefPayloadPurposes) OptFlowdefPayloadPurposes {
+	return OptFlowdefPayloadPurposes{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowdefPayloadPurposes is optional FlowdefPayloadPurposes.
+type OptFlowdefPayloadPurposes struct {
+	Value FlowdefPayloadPurposes
+	Set   bool
+}
+
+// IsSet returns true if OptFlowdefPayloadPurposes was set.
+func (o OptFlowdefPayloadPurposes) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowdefPayloadPurposes) Reset() {
+	var v FlowdefPayloadPurposes
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowdefPayloadPurposes) SetTo(v FlowdefPayloadPurposes) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowdefPayloadPurposes) Get() (v FlowdefPayloadPurposes, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowdefPayloadPurposes) Or(d FlowdefPayloadPurposes) FlowdefPayloadPurposes {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowdefPermissionDeniedDetails returns new OptFlowdefPermissionDeniedDetails with value set to v.
 func NewOptFlowdefPermissionDeniedDetails(v FlowdefPermissionDeniedDetails) OptFlowdefPermissionDeniedDetails {
 	return OptFlowdefPermissionDeniedDetails{
@@ -28584,6 +28770,52 @@ func (o OptUserCreatedEventMetadata) Or(d UserCreatedEventMetadata) UserCreatedE
 	return d
 }
 
+// NewOptUserCreatedPayloadAttributes returns new OptUserCreatedPayloadAttributes with value set to v.
+func NewOptUserCreatedPayloadAttributes(v UserCreatedPayloadAttributes) OptUserCreatedPayloadAttributes {
+	return OptUserCreatedPayloadAttributes{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUserCreatedPayloadAttributes is optional UserCreatedPayloadAttributes.
+type OptUserCreatedPayloadAttributes struct {
+	Value UserCreatedPayloadAttributes
+	Set   bool
+}
+
+// IsSet returns true if OptUserCreatedPayloadAttributes was set.
+func (o OptUserCreatedPayloadAttributes) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUserCreatedPayloadAttributes) Reset() {
+	var v UserCreatedPayloadAttributes
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUserCreatedPayloadAttributes) SetTo(v UserCreatedPayloadAttributes) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUserCreatedPayloadAttributes) Get() (v UserCreatedPayloadAttributes, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUserCreatedPayloadAttributes) Or(d UserCreatedPayloadAttributes) UserCreatedPayloadAttributes {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptUserDeletedEventDelegationType returns new OptUserDeletedEventDelegationType with value set to v.
 func NewOptUserDeletedEventDelegationType(v UserDeletedEventDelegationType) OptUserDeletedEventDelegationType {
 	return OptUserDeletedEventDelegationType{
@@ -30016,7 +30248,7 @@ type ProjectCreatedEvent struct {
 	FlowID OptNilString `json:"flow_id"`
 	// Additional emit-time metadata (already redacted).
 	Metadata OptProjectCreatedEventMetadata `json:"metadata"`
-	Payload  ProjectCreatedPayload          `json:"payload"`
+	Payload  ProjectPayload                 `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -30125,7 +30357,7 @@ func (s *ProjectCreatedEvent) GetMetadata() OptProjectCreatedEventMetadata {
 }
 
 // GetPayload returns the value of Payload.
-func (s *ProjectCreatedEvent) GetPayload() ProjectCreatedPayload {
+func (s *ProjectCreatedEvent) GetPayload() ProjectPayload {
 	return s.Payload
 }
 
@@ -30235,7 +30467,7 @@ func (s *ProjectCreatedEvent) SetMetadata(val OptProjectCreatedEventMetadata) {
 }
 
 // SetPayload sets the value of Payload.
-func (s *ProjectCreatedEvent) SetPayload(val ProjectCreatedPayload) {
+func (s *ProjectCreatedEvent) SetPayload(val ProjectPayload) {
 	s.Payload = val
 }
 
@@ -30430,22 +30662,6 @@ func (s *ProjectCreatedEventMetadata) init() ProjectCreatedEventMetadata {
 		*s = m
 	}
 	return m
-}
-
-// Payload for `project.created` events.
-// Ref: #
-type ProjectCreatedPayload struct {
-	Name OptString `json:"name"`
-}
-
-// GetName returns the value of Name.
-func (s *ProjectCreatedPayload) GetName() OptString {
-	return s.Name
-}
-
-// SetName sets the value of Name.
-func (s *ProjectCreatedPayload) SetName(val OptString) {
-	s.Name = val
 }
 
 // Merged schema.
@@ -30908,6 +31124,34 @@ func (s *ProjectDeletedEventMetadata) init() ProjectDeletedEventMetadata {
 
 type ProjectID string
 
+// Shared allowlisted fields for `project.created` (full snapshot) and
+// `project.updated` (delta: only changed fields present).
+// Ref: #
+type ProjectPayload struct {
+	Name           OptString `json:"name"`
+	PreviewOrigins []string  `json:"preview_origins"`
+}
+
+// GetName returns the value of Name.
+func (s *ProjectPayload) GetName() OptString {
+	return s.Name
+}
+
+// GetPreviewOrigins returns the value of PreviewOrigins.
+func (s *ProjectPayload) GetPreviewOrigins() []string {
+	return s.PreviewOrigins
+}
+
+// SetName sets the value of Name.
+func (s *ProjectPayload) SetName(val OptString) {
+	s.Name = val
+}
+
+// SetPreviewOrigins sets the value of PreviewOrigins.
+func (s *ProjectPayload) SetPreviewOrigins(val []string) {
+	s.PreviewOrigins = val
+}
+
 // The current state of a project.
 // Ref: #
 type ProjectResponse struct {
@@ -31018,7 +31262,7 @@ type ProjectUpdatedEvent struct {
 	FlowID OptNilString `json:"flow_id"`
 	// Additional emit-time metadata (already redacted).
 	Metadata OptProjectUpdatedEventMetadata `json:"metadata"`
-	Payload  ProjectUpdatedPayload          `json:"payload"`
+	Payload  ProjectPayload                 `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -31127,7 +31371,7 @@ func (s *ProjectUpdatedEvent) GetMetadata() OptProjectUpdatedEventMetadata {
 }
 
 // GetPayload returns the value of Payload.
-func (s *ProjectUpdatedEvent) GetPayload() ProjectUpdatedPayload {
+func (s *ProjectUpdatedEvent) GetPayload() ProjectPayload {
 	return s.Payload
 }
 
@@ -31237,7 +31481,7 @@ func (s *ProjectUpdatedEvent) SetMetadata(val OptProjectUpdatedEventMetadata) {
 }
 
 // SetPayload sets the value of Payload.
-func (s *ProjectUpdatedEvent) SetPayload(val ProjectUpdatedPayload) {
+func (s *ProjectUpdatedEvent) SetPayload(val ProjectPayload) {
 	s.Payload = val
 }
 
@@ -31432,22 +31676,6 @@ func (s *ProjectUpdatedEventMetadata) init() ProjectUpdatedEventMetadata {
 		*s = m
 	}
 	return m
-}
-
-// Payload for `project.updated` events.
-// Ref: #
-type ProjectUpdatedPayload struct {
-	ChangedKeys []string `json:"changed_keys"`
-}
-
-// GetChangedKeys returns the value of ChangedKeys.
-func (s *ProjectUpdatedPayload) GetChangedKeys() []string {
-	return s.ChangedKeys
-}
-
-// SetChangedKeys sets the value of ChangedKeys.
-func (s *ProjectUpdatedPayload) SetChangedKeys(val []string) {
-	s.ChangedKeys = val
 }
 
 type QueryProjectsBadRequest ErrorDetails
@@ -33670,7 +33898,7 @@ type SchemaCreatedEvent struct {
 	FlowID OptNilString `json:"flow_id"`
 	// Additional emit-time metadata (already redacted).
 	Metadata OptSchemaCreatedEventMetadata `json:"metadata"`
-	Payload  SchemaPayload                 `json:"payload"`
+	Payload  EmptyEventPayload             `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -33779,7 +34007,7 @@ func (s *SchemaCreatedEvent) GetMetadata() OptSchemaCreatedEventMetadata {
 }
 
 // GetPayload returns the value of Payload.
-func (s *SchemaCreatedEvent) GetPayload() SchemaPayload {
+func (s *SchemaCreatedEvent) GetPayload() EmptyEventPayload {
 	return s.Payload
 }
 
@@ -33889,7 +34117,7 @@ func (s *SchemaCreatedEvent) SetMetadata(val OptSchemaCreatedEventMetadata) {
 }
 
 // SetPayload sets the value of Payload.
-func (s *SchemaCreatedEvent) SetPayload(val SchemaPayload) {
+func (s *SchemaCreatedEvent) SetPayload(val EmptyEventPayload) {
 	s.Payload = val
 }
 
@@ -34084,22 +34312,6 @@ func (s *SchemaCreatedEventMetadata) init() SchemaCreatedEventMetadata {
 		*s = m
 	}
 	return m
-}
-
-// Payload for `schema.*` events.
-// Ref: #
-type SchemaPayload struct {
-	SchemaID OptString `json:"schema_id"`
-}
-
-// GetSchemaID returns the value of SchemaID.
-func (s *SchemaPayload) GetSchemaID() OptString {
-	return s.SchemaID
-}
-
-// SetSchemaID sets the value of SchemaID.
-func (s *SchemaPayload) SetSchemaID(val OptString) {
-	s.SchemaID = val
 }
 
 type SchemaURI url.URL
@@ -37301,7 +37513,7 @@ type TeamCreatedEvent struct {
 	FlowID OptNilString `json:"flow_id"`
 	// Additional emit-time metadata (already redacted).
 	Metadata OptTeamCreatedEventMetadata `json:"metadata"`
-	Payload  TeamCreatedPayload          `json:"payload"`
+	Payload  TeamPayload                 `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -37410,7 +37622,7 @@ func (s *TeamCreatedEvent) GetMetadata() OptTeamCreatedEventMetadata {
 }
 
 // GetPayload returns the value of Payload.
-func (s *TeamCreatedEvent) GetPayload() TeamCreatedPayload {
+func (s *TeamCreatedEvent) GetPayload() TeamPayload {
 	return s.Payload
 }
 
@@ -37520,7 +37732,7 @@ func (s *TeamCreatedEvent) SetMetadata(val OptTeamCreatedEventMetadata) {
 }
 
 // SetPayload sets the value of Payload.
-func (s *TeamCreatedEvent) SetPayload(val TeamCreatedPayload) {
+func (s *TeamCreatedEvent) SetPayload(val TeamPayload) {
 	s.Payload = val
 }
 
@@ -37715,22 +37927,6 @@ func (s *TeamCreatedEventMetadata) init() TeamCreatedEventMetadata {
 		*s = m
 	}
 	return m
-}
-
-// Payload for `team.created` events.
-// Ref: #
-type TeamCreatedPayload struct {
-	Name OptString `json:"name"`
-}
-
-// GetName returns the value of Name.
-func (s *TeamCreatedPayload) GetName() OptString {
-	return s.Name
-}
-
-// SetName sets the value of Name.
-func (s *TeamCreatedPayload) SetName(val OptString) {
-	s.Name = val
 }
 
 // Merged schema.
@@ -38228,6 +38424,23 @@ func (s *TeamFilterField) UnmarshalText(data []byte) error {
 
 type TeamID string
 
+// Shared allowlisted fields for `team.created` (snapshot) and
+// `team.updated` (delta: only changed fields present).
+// Ref: #
+type TeamPayload struct {
+	Name OptString `json:"name"`
+}
+
+// GetName returns the value of Name.
+func (s *TeamPayload) GetName() OptString {
+	return s.Name
+}
+
+// SetName sets the value of Name.
+func (s *TeamPayload) SetName(val OptString) {
+	s.Name = val
+}
+
 // Details of a team.
 // Ref: #
 type TeamResponse struct {
@@ -38383,7 +38596,7 @@ type TeamUpdatedEvent struct {
 	FlowID OptNilString `json:"flow_id"`
 	// Additional emit-time metadata (already redacted).
 	Metadata OptTeamUpdatedEventMetadata `json:"metadata"`
-	Payload  TeamUpdatedPayload          `json:"payload"`
+	Payload  TeamPayload                 `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -38492,7 +38705,7 @@ func (s *TeamUpdatedEvent) GetMetadata() OptTeamUpdatedEventMetadata {
 }
 
 // GetPayload returns the value of Payload.
-func (s *TeamUpdatedEvent) GetPayload() TeamUpdatedPayload {
+func (s *TeamUpdatedEvent) GetPayload() TeamPayload {
 	return s.Payload
 }
 
@@ -38602,7 +38815,7 @@ func (s *TeamUpdatedEvent) SetMetadata(val OptTeamUpdatedEventMetadata) {
 }
 
 // SetPayload sets the value of Payload.
-func (s *TeamUpdatedEvent) SetPayload(val TeamUpdatedPayload) {
+func (s *TeamUpdatedEvent) SetPayload(val TeamPayload) {
 	s.Payload = val
 }
 
@@ -38797,22 +39010,6 @@ func (s *TeamUpdatedEventMetadata) init() TeamUpdatedEventMetadata {
 		*s = m
 	}
 	return m
-}
-
-// Payload for `team.updated` events.
-// Ref: #
-type TeamUpdatedPayload struct {
-	ChangedKeys []string `json:"changed_keys"`
-}
-
-// GetChangedKeys returns the value of ChangedKeys.
-func (s *TeamUpdatedPayload) GetChangedKeys() []string {
-	return s.ChangedKeys
-}
-
-// SetChangedKeys sets the value of ChangedKeys.
-func (s *TeamUpdatedPayload) SetChangedKeys(val []string) {
-	s.ChangedKeys = val
 }
 
 // Merged schema.
@@ -40451,16 +40648,13 @@ func (s *UserCreatedEventMetadata) init() UserCreatedEventMetadata {
 	return m
 }
 
-// Payload for `user.created` events.
+// Payload for `user.created`. Identity is `entity_id`; attribute values
+// appear only for schema fields marked `x-audit`.
 // Ref: #
 type UserCreatedPayload struct {
-	UserID   string    `json:"user_id"`
-	SchemaID OptString `json:"schema_id"`
-}
-
-// GetUserID returns the value of UserID.
-func (s *UserCreatedPayload) GetUserID() string {
-	return s.UserID
+	SchemaID      OptString                       `json:"schema_id"`
+	AttributeKeys []string                        `json:"attribute_keys"`
+	Attributes    OptUserCreatedPayloadAttributes `json:"attributes"`
 }
 
 // GetSchemaID returns the value of SchemaID.
@@ -40468,14 +40662,40 @@ func (s *UserCreatedPayload) GetSchemaID() OptString {
 	return s.SchemaID
 }
 
-// SetUserID sets the value of UserID.
-func (s *UserCreatedPayload) SetUserID(val string) {
-	s.UserID = val
+// GetAttributeKeys returns the value of AttributeKeys.
+func (s *UserCreatedPayload) GetAttributeKeys() []string {
+	return s.AttributeKeys
+}
+
+// GetAttributes returns the value of Attributes.
+func (s *UserCreatedPayload) GetAttributes() OptUserCreatedPayloadAttributes {
+	return s.Attributes
 }
 
 // SetSchemaID sets the value of SchemaID.
 func (s *UserCreatedPayload) SetSchemaID(val OptString) {
 	s.SchemaID = val
+}
+
+// SetAttributeKeys sets the value of AttributeKeys.
+func (s *UserCreatedPayload) SetAttributeKeys(val []string) {
+	s.AttributeKeys = val
+}
+
+// SetAttributes sets the value of Attributes.
+func (s *UserCreatedPayload) SetAttributes(val OptUserCreatedPayloadAttributes) {
+	s.Attributes = val
+}
+
+type UserCreatedPayloadAttributes map[string]jx.Raw
+
+func (s *UserCreatedPayloadAttributes) init() UserCreatedPayloadAttributes {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
 }
 
 // Merged schema.

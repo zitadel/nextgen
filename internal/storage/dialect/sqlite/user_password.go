@@ -38,14 +38,13 @@ func newUserPasswordStatements(client queryExecutor) userPasswordStatements {
 
 // SetUserPassword implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error {
-	id := ""
-	if err := ensureManagedID(&id, domain.PrefixUserPassword); err != nil {
+	if err := ensureManagedID(&pw.ID, domain.PrefixUserPassword); err != nil {
 		return err
 	}
 	now := nowUnixNano()
 	_, err := ps.client.Exec(ctx, setUserPasswordStmt,
 		pw.ProjectID,
-		id,
+		pw.ID,
 		pw.UserID,
 		pw.EncodedHash,
 		pw.ChangeRequired,
@@ -54,7 +53,18 @@ func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain
 		now,
 		now,
 	)
-	return wrapError(err)
+	if err != nil {
+		return wrapError(err)
+	}
+	got, err := ps.GetUserPassword(ctx, database.And(
+		database.Equal(database.Col(domain.UserPasswordFieldProjectID), pw.ProjectID),
+		database.Equal(database.Col(domain.UserPasswordFieldUserID), pw.UserID),
+	))
+	if err != nil {
+		return err
+	}
+	pw.ID = got.ID
+	return nil
 }
 
 // GetUserPassword implements [service.UserPasswordStatements].

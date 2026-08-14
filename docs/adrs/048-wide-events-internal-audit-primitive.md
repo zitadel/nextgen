@@ -384,18 +384,32 @@ Event types like `auth.check.failed` point investigators to the `checks` table
 for detail. This avoids duplicating high-volume JSONB while preserving an
 audit-friendly summary at the event layer.
 
-### 7. EAV users (ADR 008)
+### 7. Event payload shapes
+
+**Non-user resources** (project, team, flowdef, branding, …) use:
+
+| Operation | Payload |
+|-----------|---------|
+| Create | Full **allowlisted snapshot** of fields the mutate API wrote |
+| Update | **Delta with new values** — only changed allowlisted fields; absent = unchanged |
+| Delete / simple state flip | Empty `{}` unless a reason enum is required |
+
+Primary identity lives on the event envelope (`entity_id`, `session_id`, …),
+not duplicated in payload. Secondary ids (e.g. `user_id` on a factor event,
+`auth_attempt_id` on a check) are allowed. The living allowlist is
+[events-catalog.md](../design/api/events-catalog.md).
+
+#### EAV users (ADR 008)
 
 User mutations through the header/data/registry model
-([ADR 008](008-users-eav-store.md)) require special emit rules on the
-corresponding statement methods:
+([ADR 008](008-users-eav-store.md)) require special emit rules:
 
 | Operation | Event | Payload |
 |-----------|-------|---------|
-| Create user | `user.created` | `user_id`, schema ref — no attribute values |
-| Patch attributes | `user.updated` | `changed_keys[]` only |
+| Create user | `user.created` | schema ref; **attribute keys** written; **values only** for `x-audit` fields — never primary `user_id` echo |
+| Patch attributes | `user.updated` | keys touched + `x-audit` values for those keys (same rule as create) |
 | Unique violation | `user.create.failed` | key name — not value |
-| Deactivate | `user.deactivated` | `user_id`, lifecycle reason enum |
+| Deactivate | `user.deactivated` | lifecycle reason enum (identity on envelope) |
 
 No generic auto-diff of `user_attributes` JSON. Attribute values appear in event
 payloads only when explicitly allowlisted (see §8).

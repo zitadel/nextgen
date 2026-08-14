@@ -36,7 +36,7 @@ func sampleEvent(projectID, id string) *domain.Event {
 	actorType := domain.EventActorTypeHuman
 	entityType := "user"
 	entityID := "user_sample"
-	payload, _ := json.Marshal(domain.UserCreatedPayload{UserID: entityID, SchemaID: "sch_default"})
+	payload, _ := json.Marshal(domain.UserCreatedPayload{SchemaID: "sch_default", AttributeKeys: []string{"email"}})
 	return &domain.Event{
 		ProjectID:  projectID,
 		ID:         id,

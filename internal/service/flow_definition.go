@@ -123,7 +123,7 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 			ProjectID:  flowDefinition.ProjectID,
 			EntityType: "flow_definition",
 			EntityID:   flowDefinition.ID,
-			Payload:    domain.FlowdefPayload{Name: flowDefinition.Name},
+			Payload:    flowdefPayloadSnapshot(flowDefinition),
 		})
 	})
 	if err != nil {
@@ -178,7 +178,7 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 			ProjectID:  flowDefinition.ProjectID,
 			EntityType: "flow_definition",
 			EntityID:   flowDefinition.ID,
-			Payload:    domain.FlowdefPayload{Name: flowDefinition.Name},
+			Payload:    flowdefPayloadDelta(retrievedFlowDef, flowDefinition),
 		})
 	})
 	if err != nil {
@@ -385,4 +385,78 @@ func (fd *flowDefinitionService) Delete(ctx context.Context, projectID, id strin
 			EntityID:   id,
 		})
 	})
+}
+
+func flowdefPayloadSnapshot(fd *domain.FlowDefinition) domain.FlowdefPayload {
+	if fd == nil {
+		return domain.FlowdefPayload{}
+	}
+	return domain.FlowdefPayload{
+		Name:       fd.Name,
+		Status:     fd.Status.String(),
+		UserSchema: fd.UserSchema,
+		Purposes:   flowdefPurposesWire(fd.Purposes),
+		Audience:   flowdefAudiencePayload(fd.Audience),
+	}
+}
+
+func flowdefPayloadDelta(before, after *domain.FlowDefinition) domain.FlowdefPayload {
+	if after == nil {
+		return domain.FlowdefPayload{}
+	}
+	if before == nil {
+		return flowdefPayloadSnapshot(after)
+	}
+	var delta domain.FlowdefPayload
+	if before.Name != after.Name {
+		delta.Name = after.Name
+	}
+	if before.Status != after.Status {
+		delta.Status = after.Status.String()
+	}
+	if before.UserSchema != after.UserSchema {
+		delta.UserSchema = after.UserSchema
+	}
+	beforePurposes := flowdefPurposesWire(before.Purposes)
+	afterPurposes := flowdefPurposesWire(after.Purposes)
+	if !maps.Equal(beforePurposes, afterPurposes) {
+		delta.Purposes = afterPurposes
+	}
+	beforeAud := flowdefAudiencePayload(before.Audience)
+	afterAud := flowdefAudiencePayload(after.Audience)
+	if !flowdefAudienceEqual(beforeAud, afterAud) {
+		delta.Audience = afterAud
+	}
+	return delta
+}
+
+func flowdefPurposesWire(in map[domain.FlowDefinitionPurpose]string) map[string]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	for purpose, step := range in {
+		out[purpose.String()] = step
+	}
+	return out
+}
+
+func flowdefAudiencePayload(a domain.FlowDefinitionAudience) *domain.FlowdefAudiencePayload {
+	if len(a.AppIDs) == 0 && len(a.TeamIDs) == 0 {
+		return nil
+	}
+	return &domain.FlowdefAudiencePayload{
+		AppIDs:  append([]string(nil), a.AppIDs...),
+		TeamIDs: append([]string(nil), a.TeamIDs...),
+	}
+}
+
+func flowdefAudienceEqual(a, b *domain.FlowdefAudiencePayload) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return slices.Equal(a.AppIDs, b.AppIDs) && slices.Equal(a.TeamIDs, b.TeamIDs)
 }

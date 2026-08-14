@@ -42,19 +42,30 @@ func newUserPasswordStatements(client queryExecutor) userPasswordStatements {
 
 // SetUserPassword implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error {
-	id := ""
-	if err := ensureManagedID(&id, domain.PrefixUserPassword); err != nil {
+	if err := ensureManagedID(&pw.ID, domain.PrefixUserPassword); err != nil {
 		return err
 	}
 	_, err := ps.client.Exec(ctx, setUserPasswordStmt,
-		id,
+		pw.ID,
 		pw.ProjectID,
 		pw.UserID,
 		pw.EncodedHash,
 		pw.ChangeRequired,
 		pw.VerificationID,
 	)
-	return wrapError(err)
+	if err != nil {
+		return wrapError(err)
+	}
+	// Upsert may keep an existing row id; resolve the persisted id for emitters.
+	got, err := ps.GetUserPassword(ctx, database.And(
+		database.Equal(database.Col(domain.UserPasswordFieldProjectID), pw.ProjectID),
+		database.Equal(database.Col(domain.UserPasswordFieldUserID), pw.UserID),
+	))
+	if err != nil {
+		return err
+	}
+	pw.ID = got.ID
+	return nil
 }
 
 // GetUserPassword implements [service.UserPasswordStatements].
