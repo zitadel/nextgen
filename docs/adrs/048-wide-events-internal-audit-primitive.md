@@ -249,9 +249,12 @@ into a **RequestContext** middleware:
   (including `delegation_id` / `grantor` when acting under an agent delegation
   per [ADR 033 §5](033-internal-permission-management.md)). Public login/flow
   stamps `project_id` without a token (`Authenticated` stays false). `POST /projects`
-  stamps the minted `project_id` after create succeeds. Path B `FromContext`
-  copies `request_id` from the HTTP middleware even when AuthGate did not run.
-  Probes (`healthz` / `readyz` / `livez`) leave `project_id` empty and are skipped.
+  stamps the minted `project_id` after create succeeds. `createFlow` mints
+  `flow_id` and stamps the actor slot **before** the state machine starts, so
+  Path B `auth.attempt.created` shares `flow_id` with Path A `request.api`.
+  Path B `FromContext` copies `request_id` from the HTTP middleware even when
+  AuthGate did not run. Probes (`healthz` / `readyz` / `livez`) leave
+  `project_id` empty and are skipped.
 - Response header `X-Request-Id` echoes the assigned `request_id`.
 
 **Durability (batched insert, DB clock):** Request-wide events are **not**

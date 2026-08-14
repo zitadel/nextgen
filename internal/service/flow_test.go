@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/mock/gomock"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
@@ -474,13 +475,15 @@ type fakeStateMachine struct {
 	renderResult  domain.FlowStepResult
 	renderErr     error
 
+	gotStartCtx    context.Context
 	gotStartInput  domain.FlowStartInput
 	gotSubmitInput domain.FlowSubmitInput
 	gotProcessDef  *domain.FlowDefinition
 	gotRenderState *domain.FlowState
 }
 
-func (f *fakeStateMachine) Start(_ context.Context, in domain.FlowStartInput) (domain.FlowStepResult, error) {
+func (f *fakeStateMachine) Start(ctx context.Context, in domain.FlowStartInput) (domain.FlowStepResult, error) {
+	f.gotStartCtx = ctx
 	f.gotStartInput = in
 	return f.startResult, f.startErr
 }
@@ -548,6 +551,41 @@ func TestFlowService_Start_MintsFlowAndSessionIDs(t *testing.T) {
 	}
 	if sm.gotStartInput.UserSchemaURL != def.UserSchema {
 		t.Errorf("UserSchemaURL = %q, want %q", sm.gotStartInput.UserSchemaURL, def.UserSchema)
+	}
+}
+
+// Path B auth.attempt.created runs inside stateMachine.Start. The flow id
+// must already be on the actor slot so FromContext can copy flow_id.
+func TestFlowService_Start_StampsFlowIDBeforeStateMachine(t *testing.T) {
+	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	state := &domain.FlowState{ProjectID: def.ProjectID}
+	sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "start"}}}
+	svc := service.NewFlowService(stubDB(t), sm)
+
+	ctx := audit.WithActorSlot(t.Context())
+	res, err := svc.Start(ctx, service.StartFlowRequest{
+		Definition: def,
+		Purpose:    domain.FlowDefinitionPurposeLogin,
+	})
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	slot, ok := audit.ActorSlotFromContext(sm.gotStartCtx)
+	if !ok || slot == nil {
+		t.Fatal("state machine Start ctx has no actor slot")
+	}
+	if slot.FlowID == nil || *slot.FlowID == "" {
+		t.Fatal("flow_id was not stamped before stateMachine.Start (auth.attempt.created would miss it)")
+	}
+	if res.State == nil || *slot.FlowID != res.State.ID {
+		t.Errorf("stamped flow_id = %v, want %q", slot.FlowID, res.State.ID)
+	}
+	if slot.SessionID == nil || *slot.SessionID == "" {
+		t.Fatal("session_id was not stamped before stateMachine.Start")
+	}
+	if sm.gotStartInput.Session.ID != *slot.SessionID {
+		t.Errorf("stamped session_id = %q, want %q", *slot.SessionID, sm.gotStartInput.Session.ID)
 	}
 }
 
