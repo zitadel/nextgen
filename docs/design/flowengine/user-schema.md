@@ -11,20 +11,22 @@ What matters here is the contract: which schema annotations exist, how the flow 
 
 | Annotation | Scope | Consumer | Purpose |
 |---|---|---|---|
-| `x-mfa: "sms"` | Field | Policy Engine | Field can be used for OTP delivery |
-| `x-sensitive: true` | Field | Flow Engine | Value redacted in API / flow payloads (non-audit) |
+| `writeOnly: true` | Field | Read API | Value may be written but is never returned. Declared, not yet enforced — responses currently include write-only properties |
 | `x-audit: true` | Field | Audit emitter | Field value may appear in audit event payloads (allowlist; deny-by-default) |
-| `x-editable: true` | Field | Flow Engine | Field appears in profiling / self-service flows |
 | `x-unique: "<scope>"` | Field | Flow Engine | Server validates uniqueness on form submit at the given scope (`project` or `team`); a non-empty scope also marks the field as an identifier used for user resolution |
 | `x-claim: "claims.email"` | Field | Flow Engine | Maps to SSO/OIDC claim for auto-population |
 | `x-auth-methods` | Schema | Policy Engine | Which auth methods this user type supports (narrows what policy can require) |
 
-Audit event payloads use a **deny-by-default** PII policy: user attribute values
-are omitted unless a field is explicitly marked with `x-audit`. See
+`writeOnly` is native JSON Schema; the `x-*` annotations are this dialect's.
+Anything else a customer writes under a property is carried verbatim and
+ignored — the dialect keeps `additionalProperties: true`, so an unrecognised
+`x-*` key is accepted rather than rejected.
+
+Audit event payloads use a **deny-by-default** PII policy: an attribute
+contributes its key to the payload, and its value only when the property is
+marked `x-audit` (`true`, or `"identifier"` for a field used to correlate
+events). See
 [ADR 048](../../adrs/048-wide-events-internal-audit-primitive.md) §8.
-`x-sensitive` remains for API/flow payload redaction (OpenAPI user-property
-schema and CLI presets, e.g. phone/password). Audit does not use `x-sensitive`;
-it uses deny-by-default + `x-audit`. The two annotations are complementary.
 
 ## How the Flow Engine and Policy Engine Consume Schemas
 
@@ -34,7 +36,7 @@ User Schema                     Flow Definition                   Policy Engine
 Defines fields:                 References schema fields:         Reads schema annotations:
   email (x-unique: project)      step fields: [email, password]    x-auth-methods →
                                  step fields: [given_name, ...]     narrows available factors
-  phone (x-mfa: sms)
+  phone
   given_name                    user_schema: "human_user"         Reads user context:
   family_name                                                       user.roles, user.team →
   password                      Engine resolves field metadata      determines assurance level
@@ -69,35 +71,29 @@ The following is an example user schema showing the annotations that the flow en
       "title": "Email address",
       "x-unique": "project",
       "x-claim": "claims.email",
-      "x-editable": true
+      "x-audit": "identifier"
     },
     "phone": {
       "type": "string",
-      "title": "Phone number",
-      "x-mfa": "sms",
-      "x-sensitive": true,
-      "x-editable": true
+      "title": "Phone number"
     },
     "given_name": {
       "type": "string",
       "title": "First name",
       "minLength": 1,
       "maxLength": 200,
-      "x-claim": "claims.given_name",
-      "x-editable": true
+      "x-claim": "claims.given_name"
     },
     "family_name": {
       "type": "string",
       "title": "Last name",
       "minLength": 1,
       "maxLength": 200,
-      "x-claim": "claims.family_name",
-      "x-editable": true
+      "x-claim": "claims.family_name"
     },
     "address": {
       "type": "object",
       "title": "Address",
-      "x-editable": true,
       "properties": {
         "street": { "type": "string", "title": "Street" },
         "city":   { "type": "string", "title": "City" },
@@ -152,6 +148,6 @@ Schemas enable progressive profiling by marking some fields as optional and defe
 
 1. **Registration flow:** collects `required` fields only (`email`, `given_name`, `family_name`, `password`)
 2. **Post-login profiling flow:** the engine evaluates "does this user have a phone number?" — if not, injects a step with `fields: ["phone"]`
-3. **Self-service flow:** user can edit any field with `x-editable: true`
+3. **Self-service flow:** user can edit the fields the flow's step lists
 
 Each step's `fields` array selects which schema properties to show. The schema defines what's possible. The policy engine decides when profiling is needed.
