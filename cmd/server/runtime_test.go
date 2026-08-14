@@ -11,6 +11,60 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// clearDefaultDataDir removes the data dir beside the test binary so an earlier
+// loadConfig test cannot make these assertions order-dependent. Safe to call:
+// the parallel tests in this package never touch the default data dir.
+func clearDefaultDataDir(t *testing.T) string {
+	t.Helper()
+	path, err := defaultServerDataDir()
+	require.NoError(t, err)
+	require.NotEmpty(t, path)
+	require.NoError(t, os.RemoveAll(path))
+	return path
+}
+
+// The container entrypoint lives in root-owned /usr/local/bin, so deriving the
+// default must not touch the filesystem: an eager mkdir there aborted startup
+// for the image's own non-root user even when data_dir pointed elsewhere.
+func TestDefaultServerDataDirHasNoSideEffects(t *testing.T) {
+	path := clearDefaultDataDir(t)
+
+	_, err := defaultServerDataDir()
+	require.NoError(t, err)
+
+	assert.NoDirExists(t, path, "computing the default data dir must not create it")
+}
+
+func TestLoadConfigCreatesOnlyTheConfiguredDataDir(t *testing.T) {
+	defaultDir := clearDefaultDataDir(t)
+	dataDir := filepath.Join(t.TempDir(), "configured")
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, dataDir, cfg.Server.DataDir)
+	assert.DirExists(t, dataDir)
+	assert.NoDirExists(t, defaultDir, "the unused default data dir must not be created")
+}
+
+func TestEnsureServerDataDirReportsAnUnwritableParent(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root ignores directory permissions")
+	}
+	parent := t.TempDir()
+	require.NoError(t, os.Chmod(parent, 0o500))
+	t.Cleanup(func() { _ = os.Chmod(parent, 0o700) })
+
+	err := ensureServerDataDir(filepath.Join(parent, "nextgen-data"))
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create server data dir")
+}
+
 func TestLoadConfigCreatesAndReusesMasterKeyFile(t *testing.T) {
 	dataDir := t.TempDir()
 	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
