@@ -16,8 +16,8 @@ export interface SchemaField {
   key: string;
   label: string;
   required: boolean;
-  /** `<input type>` chosen from the property's `format` / `x-sensitive`. */
-  inputType: "text" | "email" | "password" | "number" | "url" | "tel" | "date";
+  /** `<input type>` chosen from the property's JSON Schema `format`. */
+  inputType: "text" | "email" | "number" | "url" | "tel" | "date";
   placeholder?: string;
 }
 
@@ -262,14 +262,16 @@ function propertyLabel(key: string, property: Record<string, unknown>): string {
 }
 
 /**
- * `x-sensitive` masks the value — it is the schema's own marker for data that
- * must not be shown in the clear (ADR 020 keeps credentials out of the schema,
- * but a customer schema may still flag an attribute). Otherwise the JSON Schema
- * `format` picks the input type so browsers contribute their native keyboards
- * and validation.
+ * The JSON Schema `format` picks the input type, so browsers contribute their
+ * native keyboards and validation.
+ *
+ * Nothing here masks a value. ADR 020 keeps credentials out of the user schema,
+ * so no attribute is a secret, and the users table renders every attribute in
+ * the clear regardless — masking the form alone was a promise the rest of the
+ * console did not keep. `writeOnly` is the annotation for a value the read API
+ * withholds; this can key off it once the server enforces it.
  */
 function propertyInputType(property: Record<string, unknown>): SchemaField["inputType"] {
-  if (property["x-sensitive"] === true) return "password";
   switch (field(property, "format")) {
     case "email":
       return "email";

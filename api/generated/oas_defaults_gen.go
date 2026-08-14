@@ -69,15 +69,7 @@ func (s *StepAction) setDefaults() {
 // setDefaults set default value of fields.
 func (s *UserProperty) setDefaults() {
 	{
-		val := bool(true)
-		s.XMinusEditable.SetTo(val)
-	}
-	{
 		val := bool(false)
-		s.XMinusSensitive.SetTo(val)
-	}
-	{
-		val := bool(false)
-		s.XMinusMfa.SetTo(val)
+		s.WriteOnly.SetTo(val)
 	}
 }

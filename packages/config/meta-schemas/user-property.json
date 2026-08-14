@@ -14,16 +14,10 @@
       "const": "https://json-schema.org/draft/2020-12/schema",
       "description": "The JSON Schema version used for this schema."
     },
-    "x-verify": {
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "The verification method for this property, if applicable"
+    "writeOnly": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether the value may be written but is never returned by the read API. Enforcement is not implemented: responses currently include write-only properties."
     },
     "x-unique": {
       "oneOf": [
@@ -52,20 +46,20 @@
       ],
       "description": "The claim name for this property, if applicable"
     },
-    "x-editable": {
-      "type": "boolean",
-      "default": true,
-      "description": "Whether this property is editable by the user or not"
-    },
-    "x-sensitive": {
-      "type": "boolean",
+    "x-audit": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "enum": [
+            "identifier"
+          ]
+        }
+      ],
       "default": false,
-      "description": "Whether this property contains sensitive information or not"
-    },
-    "x-mfa": {
-      "type": "boolean",
-      "default": false,
-      "description": "Whether this property is used for multi-factor authentication or not"
+      "description": "Whether this property's value may appear in audit event payloads. Audit payloads are deny-by-default: a property without this annotation contributes its key but never its value. `identifier` enables the value the same way `true` does, and is the spelling reserved for fields used to correlate events."
     },
     "properties": {
       "type": "object",

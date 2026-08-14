@@ -62,7 +62,7 @@ describe("normalizeSchemaBody", () => {
     const normalized = normalizeSchemaBody({
       objectType: "human-user",
       properties: {
-        email: { type: "string", "x-editable": true, "x-sensitive": false, "x-mfa": false },
+        email: { type: "string", "x-audit": false, writeOnly: false },
         givenName: { type: "string" },
       },
     });
@@ -75,12 +75,12 @@ describe("normalizeSchemaBody", () => {
     });
   });
 
-  it("keeps non-default values, including non-boolean x-mfa", () => {
+  it("keeps non-default values, including the string form of x-audit", () => {
     const body = {
       properties: {
-        email: { type: "string", "x-editable": false },
-        phone: { type: "string", "x-mfa": "sms" },
-        secret: { type: "string", "x-sensitive": true },
+        email: { type: "string", "x-audit": true },
+        phone: { type: "string", "x-audit": "identifier" },
+        secret: { type: "string", writeOnly: true },
       },
     };
     expect(normalizeSchemaBody(body)).toEqual(body);
@@ -98,9 +98,9 @@ describe("normalizeSchemaBody", () => {
   });
 
   it("does not mutate its input and is idempotent", () => {
-    const body = { properties: { email: { type: "string", "x-editable": true } } };
+    const body = { properties: { email: { type: "string", "x-audit": false } } };
     const once = normalizeSchemaBody(body);
-    expect(body).toEqual({ properties: { email: { type: "string", "x-editable": true } } });
+    expect(body).toEqual({ properties: { email: { type: "string", "x-audit": false } } });
     expect(normalizeSchemaBody(once)).toEqual(once);
   });
 

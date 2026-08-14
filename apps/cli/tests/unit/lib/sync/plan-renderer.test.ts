@@ -462,7 +462,7 @@ describe("renderPlan — normalized diffs", () => {
         previousId: "sch_A",
         oldContent: {
           properties: {
-            email: { type: "string", "x-editable": true, "x-sensitive": false },
+            email: { type: "string", "x-audit": false, writeOnly: false },
           },
         },
         affectedPaths: [],
@@ -472,8 +472,8 @@ describe("renderPlan — normalized diffs", () => {
     const out = renderPlan(actions, false);
     // The only property-level change is the added `company`; the defaults
     // spelled out on the server side must not read as removals.
-    expect(out).not.toContain("x-editable");
-    expect(out).not.toContain("x-sensitive");
+    expect(out).not.toContain("x-audit");
+    expect(out).not.toContain("writeOnly");
     expect(out).toContain("company");
   });
 });

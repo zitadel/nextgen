@@ -94,7 +94,7 @@ describe("materializeSetupResources", () => {
       objectType: "human-user",
       kind: "user-schema",
       title: "ServerCanonicalTitle",
-      properties: { email: { type: "string", "x-editable": true } },
+      properties: { email: { type: "string", "x-audit": false } },
     };
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
@@ -114,7 +114,7 @@ describe("materializeSetupResources", () => {
     // schema bytes as uploaded, so a spelled-out meta-schema default must
     // survive write-back or the next revision would publish without it.
     expect(schemaFile.title).toBe("ServerCanonicalTitle");
-    expect(schemaFile.properties).toEqual({ email: { type: "string", "x-editable": true } });
+    expect(schemaFile.properties).toEqual({ email: { type: "string", "x-audit": false } });
 
     const state = JSON.parse(
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),

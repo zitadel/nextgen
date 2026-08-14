@@ -174,6 +174,50 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 			wantErr: domain.ErrSchemaValidationFailed,
 		},
 		{
+			// The audit emitter enables the value for any non-empty string
+			// other than "false", so `x-audit: "no"` would allowlist a field
+			// while reading as a refusal. The dialect only spells `true` or
+			// "identifier", which turns that into a push-time failure.
+			name: "invalid x-audit string",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true }
+				},
+				"properties": {
+					"email": { "type": "string", "x-audit": "no" }
+				}
+			}`),
+			wantErr: domain.ErrSchemaValidationFailed,
+		},
+		{
+			// A property is an open bag: the dialect names the annotations it
+			// consumes, and carries anything else through untouched. Dropping
+			// an annotation from the vocabulary therefore stops documenting
+			// it, it does not start rejecting documents that still carry it.
+			name: "undeclared annotation on a property is accepted",
+			input: []byte(`{
+				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
+				"$id": "https://example.test/schemas/my-user.json",
+				"kind": "user-schema",
+				"title": "My User",
+				"x-auth-methods": {
+					"password": { "enabled": true }
+				},
+				"properties": {
+					"email": {
+						"type": "string",
+						"writeOnly": true,
+						"x-audit": "identifier",
+						"x-not-a-real-annotation": true
+					}
+				}
+			}`),
+		},
+		{
 			name: "missing metaSchema",
 			input: []byte(`{
 				"$id": "https://example.test/schemas/my-user.json",

@@ -4,14 +4,14 @@
  * The sync engine compares `.zitadel/**` files against server responses;
  * the server echoes fields the author never wrote (an empty `audience`
  * on flows) and the meta-schema declares defaults an author may or may
- * not spell out (`x-editable` et al on schema properties). Normalizing
+ * not spell out (`x-audit` et al on schema properties). Normalizing
  * both sides before hashing or diffing keeps a one-field edit rendering
  * as a one-field diff.
  *
  * Normalized bodies are for COMPARISON. Never upload them, and never
  * write a normalized schema body to a file: the server stores schema
  * bytes verbatim without materializing meta-schema defaults, so a
- * stripped `"x-editable": true` would vanish from the next published
+ * stripped `"x-audit": false` would vanish from the next published
  * revision. (Flow write-back may reuse {@link normalizeFlowBody} —
  * everything it strips is pure transport noise.)
  */
@@ -19,12 +19,13 @@
 /**
  * Property-level defaults declared by the user-property meta-schema
  * (`api/openapi/endpoints/schemas/user-property.json`). A property that
- * spells one of these out is semantically identical to one that omits it.
+ * spells one of these out is semantically identical to one that omits it:
+ * audit payloads deny by default, and a property is readable unless it
+ * says otherwise.
  */
 export const USER_PROPERTY_DEFAULTS: Readonly<Record<string, boolean>> = {
-  "x-editable": true,
-  "x-sensitive": false,
-  "x-mfa": false,
+  writeOnly: false,
+  "x-audit": false,
 };
 
 /**
@@ -77,7 +78,7 @@ export function normalizeFlowBody(body: object): object {
 
 /**
  * Return a deep copy of a user-schema body with meta-schema property
- * defaults stripped: a property carrying `"x-editable": true` (or the
+ * defaults stripped: a property carrying `"x-audit": false` (or the
  * other {@link USER_PROPERTY_DEFAULTS}) normalizes to one omitting it.
  * Only exact default values are removed; `$id` and every other field
  * pass through untouched.

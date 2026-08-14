@@ -8,3 +8,8 @@ api/openapi/endpoints/schemas/user-schema.yaml:
     # a data-format migration.
     - '#/properties/objectType'
     - '#/properties/metaSchema'
+api/openapi/endpoints/schemas/user-property.yaml:
+  rule/wire-field-snake-case:
+    # A native JSON Schema keyword inside a stored user-schema document. The
+    # spec fixes its spelling; this is not a field we get to name.
+    - '#/properties/writeOnly'
