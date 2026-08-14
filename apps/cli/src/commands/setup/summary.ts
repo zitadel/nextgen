@@ -5,7 +5,6 @@ import type { BrandingDesign } from "@zitadel/config/defaults";
 import pc from "picocolors";
 
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
-import type { ScaffoldPosture } from "../../lib/sync/types";
 
 /**
  * Structured end-of-command summary, modelled on the report layout the
@@ -175,24 +174,21 @@ export function fileNameOf(p: string): string {
  *
  * The split family's brand pane is keyed to the **login's own container**
  * width — a `@container (max-width: 48rem)` query on the widget's mount, not
- * a viewport media query. Above that the pane renders; below it the pane
- * collapses and the compact brand mark takes over, and that mark is empty
- * until `branding.json` names an asset. So the warning describes the
- * contract, not a prediction about the container this app happens to give
- * it: the wrapper we scaffold is full-width, and the pane does render there.
+ * a viewport media query. Above that the pane renders; below it the pane is
+ * `display: none` and the compact brand mark takes its place — and the split
+ * template only emits that mark when `branding.json` names `logo_url` or
+ * `hero_url`, so without one the narrow layout loses the branding entirely.
  *
- * Scoped to widget posture because that is where container width becomes the
- * host app's choice — the card is meant to move into a layout we do not own,
- * and a sidebar or modal is exactly the narrow case. `hero` stays quiet: its
- * compact fallback is editable text, so a narrow container never leaves it
- * blank.
+ * Independent of posture, because the container query is: a full-page login
+ * hits the same collapse on a phone that an embedded card hits in a sidebar.
+ * Gating on `widget` would have been a guess about the container, and a wrong
+ * one in both directions — the wrapper setup scaffolds for a widget is
+ * full-width (the pane renders there), and a page-posture login on a phone is
+ * exactly the narrow case the advice is for. `hero` stays quiet: its compact
+ * fallback is editable text, so a narrow container never leaves it blank.
  */
-export function designWarnings(input: {
-  design?: BrandingDesign;
-  posture: ScaffoldPosture;
-}): string[] {
-  const { design, posture } = input;
-  if (posture !== "widget" || (design !== "split" && design !== "split-right")) {
+export function designWarnings(design?: BrandingDesign): string[] {
+  if (design !== "split" && design !== "split-right") {
     return [];
   }
   return [

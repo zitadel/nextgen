@@ -423,11 +423,12 @@ export default class Setup extends BaseCommand {
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
     // The split-family brand pane collapses to the compact brand mark once the
-    // login's container is narrow — and that mark is empty until branding.json
-    // names an asset. Say so at setup time instead of letting the pane's
-    // absence read as a rendering bug once the card moves into a layout we
-    // don't own (see `designWarnings` for the scoping rationale).
-    const warnings = designWarnings({ design: answers.design, posture });
+    // login's container is narrow — and the template only emits that mark when
+    // branding.json names an asset. Say so at setup time instead of letting the
+    // branding's absence read as a rendering bug. Keyed to the design alone:
+    // the collapse is a container query, so posture doesn't decide it (see
+    // `designWarnings`).
+    const warnings = designWarnings(answers.design);
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, framework.id);
       const sections = buildSummary({

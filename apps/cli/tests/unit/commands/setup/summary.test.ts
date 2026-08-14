@@ -22,7 +22,7 @@ describe("relativeDisplayPath", () => {
 
 describe("designWarnings", () => {
   it("describes the container-width contract without claiming the pane is already collapsed", () => {
-    const [warning, ...rest] = designWarnings({ design: "split-right", posture: "widget" });
+    const [warning, ...rest] = designWarnings("split-right");
 
     expect(rest).toEqual([]);
     expect(warning).toBeDefined();
@@ -40,20 +40,15 @@ describe("designWarnings", () => {
   });
 
   it("names the chosen design", () => {
-    expect(designWarnings({ design: "split", posture: "widget" })[0]).toContain("The split design");
+    expect(designWarnings("split")[0]).toContain("The split design");
   });
 
   it("stays quiet for designs that survive a narrow container", () => {
     // `hero`'s compact fallback is editable text, and the non-split designs
     // have no brand pane to collapse.
-    expect(designWarnings({ design: "hero", posture: "widget" })).toEqual([]);
-    expect(designWarnings({ design: "centered", posture: "widget" })).toEqual([]);
-    expect(designWarnings({ design: "minimal", posture: "widget" })).toEqual([]);
-    expect(designWarnings({ posture: "widget" })).toEqual([]);
-  });
-
-  it("stays quiet in page posture, where the login owns the container", () => {
-    expect(designWarnings({ design: "split", posture: "page" })).toEqual([]);
-    expect(designWarnings({ design: "split-right", posture: "page" })).toEqual([]);
+    expect(designWarnings("hero")).toEqual([]);
+    expect(designWarnings("centered")).toEqual([]);
+    expect(designWarnings("minimal")).toEqual([]);
+    expect(designWarnings()).toEqual([]);
   });
 });
