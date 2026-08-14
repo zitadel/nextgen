@@ -103,10 +103,10 @@ type ClaimCompletedPayload struct {
 // FlowdefPayload is shared by flowdef.created (snapshot) and flowdef.updated (delta).
 // Steps are intentionally omitted (large graph).
 type FlowdefPayload struct {
-	Name       string                 `json:"name,omitempty"`
-	Status     string                 `json:"status,omitempty"`
-	UserSchema string                 `json:"user_schema,omitempty"`
-	Purposes   map[string]string      `json:"purposes,omitempty"`
+	Name       string                  `json:"name,omitempty"`
+	Status     string                  `json:"status,omitempty"`
+	UserSchema string                  `json:"user_schema,omitempty"`
+	Purposes   map[string]string       `json:"purposes,omitempty"`
 	Audience   *FlowdefAudiencePayload `json:"audience,omitempty"`
 }
 
