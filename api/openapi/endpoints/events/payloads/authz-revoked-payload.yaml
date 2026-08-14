@@ -1,0 +1,10 @@
+title: AuthzRevokedPayload
+type: object
+description: Payload for `authz.revoked` events.
+properties:
+  principal_type:
+    type: string
+  principal_id:
+    type: string
+  relation:
+    type: string

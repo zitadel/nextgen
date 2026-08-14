@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -143,9 +144,27 @@ func (s *userService) ApplyActions(ctx context.Context, actions ...UserAction) (
 	return nil
 }
 
+func (s *userService) emitUserCreateFailedBestEffort(ctx context.Context, action *CreateUserAction, applyErr error) {
+	var unique *database.UniqueError
+	if !errors.As(applyErr, &unique) {
+		return
+	}
+	if action == nil || action.CreateUser == nil {
+		return
+	}
+	_ = audit.Emit(ctx, s.v2Pool.Statements(), audit.EmitSpec{
+		Type:       domain.EventTypeUserCreateFailed,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  action.ProjectID,
+		EntityType: "user",
+		Payload:    domain.UserCreateFailedPayload{KeyName: unique.Constraint()},
+	})
+}
+
 func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
 	action := NewCreateUserAction(input, s.schemaStore)
 	if err := s.ApplyActions(ctx, action); err != nil {
+		s.emitUserCreateFailedBestEffort(ctx, action, err)
 		return nil, err
 	}
 	return action.User, nil
@@ -319,6 +338,8 @@ type CreateUserAction struct {
 	schemaStore domain.JSONSchemaStore
 
 	CreateUser *domain.CreateUser
+	// schemaJSON is the user schema document used at create time for x-audit value filtering.
+	schemaJSON []byte
 }
 
 func NewCreateUserAction(input CreateUserInput, schemaStore domain.JSONSchemaStore) *CreateUserAction {
@@ -342,6 +363,7 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 
+	o.schemaJSON = schemaEntity.Schema
 	o.CreateUser, err = domain.NewCreateUser(o.ProjectID, o.TeamID, o.ID, schemaEntity.Schema, o.User)
 	if err != nil {
 		return err
@@ -355,7 +377,19 @@ func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		return err
 	}
 	o.User["id"] = o.CreateUser.ID
-	return nil
+	attrKeys, attrValues := audit.UserAttributeAuditFields(o.User, o.schemaJSON)
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeUserCreated,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  o.CreateUser.ProjectID,
+		EntityType: "user",
+		EntityID:   o.CreateUser.ID,
+		Payload: domain.UserCreatedPayload{
+			SchemaID:      o.CreateUser.SchemaURL,
+			AttributeKeys: attrKeys,
+			Attributes:    attrValues,
+		},
+	})
 }
 
 func applyCreateUser(ctx context.Context, stmts UserStatements, user *domain.CreateUser) error {
@@ -392,19 +426,30 @@ func (o *SetPasswordUserAction) Prepare(_ context.Context) (err error) {
 }
 
 func (o *SetPasswordUserAction) Apply(ctx context.Context, stmts AllStatements) error {
-	err := stmts.SetUserPassword(ctx, &domain.SetUserPassword{
+	pw := &domain.SetUserPassword{
 		ProjectID:      o.ProjectID,
 		UserID:         o.UserID,
 		EncodedHash:    o.hash,
 		ChangeRequired: o.IsPasswordChangeRequired,
-	})
+	}
+	err := stmts.SetUserPassword(ctx, pw)
 	if err != nil {
 		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
 			return domain.ErrUserNotFound()
 		}
 		return domain.ErrInternal(err).WithMessage("failed to set password")
 	}
-	return nil
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeAuthFactorPasswordSet,
+		Category:   domain.EventCategoryAuth,
+		ProjectID:  o.ProjectID,
+		EntityType: "user_password",
+		EntityID:   pw.ID,
+		Payload: domain.AuthFactorPayload{
+			UserID:   o.UserID,
+			FactorID: pw.ID,
+		},
+	})
 }
 
 // ---- Delete ACTION -------------------------------------------------------------
@@ -431,7 +476,13 @@ func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		}
 		return domain.ErrInternal(err).WithMessage("failed to delete user")
 	}
-	return nil
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeUserDeleted,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  o.ProjectID,
+		EntityType: "user",
+		EntityID:   o.UserID,
+	})
 }
 
 // UserStatementsLookup adapts [UserStatements] to [UserLookup] for AuthAttemptService.

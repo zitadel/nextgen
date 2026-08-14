@@ -14,6 +14,35 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
+func TestTokenStatements_CreateKeepsPresetTokenID(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		userID := "usr-tok-preset-" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Preset Token User")))
+
+		// Spanner ReadWriteTransaction may retry after abort with the same
+		// *Token after CreateToken already minted TokenID on the first attempt.
+		wantID := "tkn_preset-" + uniqueSuffix(t)
+		oidcSess := "oidc-preset-" + uniqueSuffix(t)
+		tok := &domain.Token{
+			ProjectID:     projectID,
+			TokenID:       wantID,
+			UserID:        userID,
+			Type:          domain.TokenTypeOIDCAccessToken,
+			OIDCSessionID: &oidcSess,
+			Scope:         []string{"openid"},
+		}
+		require.NoError(t, d.stmts.CreateToken(t.Context(), tok))
+		t.Cleanup(func() {
+			_ = d.stmts.DeleteTokenByID(context.Background(), projectID, tok.TokenID)
+		})
+		assert.Equal(t, wantID, tok.TokenID)
+		got, err := d.stmts.GetTokenByID(t.Context(), projectID, wantID)
+		require.NoError(t, err)
+		assert.Equal(t, wantID, got.TokenID)
+	})
+}
+
 func TestTokenStatements_GetByID(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("returns_created_token", func(t *testing.T) {

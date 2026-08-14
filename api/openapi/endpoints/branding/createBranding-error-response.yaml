@@ -9,6 +9,7 @@ content:
         - $ref: '../../components/schemas/errors/brnd-missing_project_id.yaml'
         - $ref: '../../components/schemas/errors/brnd-not_found.yaml'
         - $ref: '../../components/schemas/errors/brnd-permission_denied.yaml'
+        - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
       discriminator:
@@ -19,6 +20,7 @@ content:
           brnd.missing_project_id: '../../components/schemas/errors/brnd-missing_project_id.yaml'
           brnd.not_found: '../../components/schemas/errors/brnd-not_found.yaml'
           brnd.permission_denied: '../../components/schemas/errors/brnd-permission_denied.yaml'
+          evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
     examples:
@@ -47,6 +49,11 @@ content:
         value:
           code: brnd.permission_denied
           message: 'branding: requires an operator-grade token bound to the project (project.write or a branding.* scope)'
+      evt.invalid:
+        summary: evt.invalid
+        value:
+          code: evt.invalid
+          message: 'event: invalid'
       internal:
         summary: internal
         value:
