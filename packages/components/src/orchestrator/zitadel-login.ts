@@ -9,32 +9,35 @@ import type {
   SubmitFlowStepBodyFields,
 } from "@zitadel/api/generated/model";
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
+import { zitadelAttributionPillInnerHtml } from "@zitadel/shared-component-styles/attribution-markup";
+import type { Liquid, Template } from "liquidjs";
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import type { Liquid, Template } from "liquidjs";
 
 import "../atoms/index.js";
+import { unsafeHTML } from "lit/directives/unsafe-html.js";
+
+import { emit } from "../internal/emit.js";
+import { escapeHtml } from "../internal/escape-html.js";
 import {
   exchangeSession,
   getCurrentStep,
   startFlow as apiStartFlow,
   submitStep as apiSubmitStep,
 } from "./api-client.js";
-import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
-import type { Branding } from "./branding.js";
+import { armAssetFallbacks } from "./asset-fallback.js";
 import { validateBranding } from "./branding-validator.js";
+import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
-import { emit } from "../internal/emit.js";
-import { escapeHtml } from "../internal/escape-html.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
-import { TEMPLATE_NAMES } from "./template-names.js";
 import { en, builtinLocales, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
-import { zitadelAttributionPillInnerHtml } from "@zitadel/shared-component-styles/attribution-markup";
+import { resolveApi, type ProjectAttrs } from "./resolve-api.js";
 import { createSanitiser } from "./sanitiser.js";
 import { ZitadelSurface } from "./surface.js";
 import type { FlowError, FlowIdentity, LiquidContext } from "./template-context.js";
+import { TEMPLATE_NAMES } from "./template-names.js";
+
 import layoutChromeCss from "./templates/layout-chrome.css?inline";
 
 /**
@@ -341,6 +344,9 @@ export class ZitadelLogin extends ZitadelSurface {
     // `:host([variant])` selector.
     if (this.shadowRoot) {
       stampExportparts(this.shadowRoot);
+      // A configured-but-dead logo_url/hero_url is invisible everywhere else
+      // in the pipeline; this is the only layer that can see the image fail.
+      armAssetFallbacks(this.shadowRoot);
       const widget = this.variant !== "page";
       for (const shell of this.shadowRoot.querySelectorAll("zl-page-shell")) {
         shell.toggleAttribute("data-widget", widget);
@@ -367,10 +373,10 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /**
    * Apply captured values and move focus once the new step has fully
-   * rendered. This commit produces the step's `zl-field`/`zl-button` atoms,
-   * but those render their own shadow DOM on a later microtask — so await
-   * this element's update *and* the child atoms' first render before touching
-   * them, rather than guessing a frame with `requestAnimationFrame`.
+   * rendered. This commit produces the step's field/action atoms, but those
+   * render their own shadow DOM on a later microtask — so await this element's
+   * update *and* the child atoms' first render before touching them, rather
+   * than guessing a frame with `requestAnimationFrame`.
    *
    * Focus on the *initial* response is page-mode-only: a dedicated login
    * route should focus its first field, but a widget embedded further down
@@ -379,20 +385,32 @@ export class ZitadelLogin extends ZitadelSurface {
    */
   private async hydrateStepAfterRender(initial = false): Promise<void> {
     await this.updateComplete;
-    const atoms = this.shadowRoot?.querySelectorAll<LitElement>("zl-field, zl-button");
+    const atoms = this.shadowRoot?.querySelectorAll<LitElement>(
+      "zl-field, zl-select, zl-checkbox, zl-button",
+    );
     if (atoms) {
       await Promise.all(Array.from(atoms).map((atom) => atom.updateComplete));
     }
     this.applyValuesToFields();
     if (!initial || this.variant === "page") {
-      this.moveFocusToFirstField();
+      this.moveFocusToFirstField(initial && this.variant === "page");
     }
   }
 
   override render() {
     if (this.startupError) {
+      // Same chrome a step renders into (page shell + card), because this is
+      // still the login surface — just one that could not start. Without the
+      // shell the alert lands bare in the top-left corner of an otherwise
+      // empty page, which reads as a broken app rather than as auth reporting
+      // a problem: the most common trigger is a misconfigured origin, where
+      // the first step paints normally and only the submit fails.
       return html`<form class="zl-mount" novalidate>
-        <zl-alert severity="error">${this.startupError}</zl-alert>
+        <zl-page-shell>
+          <zl-card>
+            <zl-alert severity="error">${this.startupError}</zl-alert>
+          </zl-card>
+        </zl-page-shell>
       </form>`;
     }
     if (!this.response || !this.engine) {
@@ -526,7 +544,9 @@ export class ZitadelLogin extends ZitadelSurface {
     // A fresh response carries fresh (or no) errors — un-dismiss.
     this.stepErrorDismissed = false;
     this.response = wire;
-    const { branding, issues } = validateBranding(wire.branding);
+    const { branding, issues } = validateBranding(wire.branding, {
+      renderingOrigin: this.ownerDocument.location.origin,
+    });
     this.branding = branding;
     this.themeController.setBranding(branding);
     if (issues.length > 0) {
@@ -1015,11 +1035,27 @@ export class ZitadelLogin extends ZitadelSurface {
     return primary?.getAttribute("action") || null;
   }
 
-  private moveFocusToFirstField(): void {
+  /**
+   * On the initial paint, only a field earns focus: script-moved focus with
+   * no prior interaction matches `:focus-visible`, so autofocusing a button
+   * on a field-less step (passkey-first) paints a ring that reads as a
+   * pre-selected state. Step swaps keep button focus — there the browser
+   * derives the modality from the user's actual input.
+   */
+  private moveFocusToFirstField(fieldsOnly = false): void {
     const root = this.shadowRoot;
     if (!root) return;
-    const focusables = root.querySelectorAll<HTMLElement>("zl-field, zl-button");
-    const target = Array.from(focusables).find((el) => !el.hasAttribute("disabled"));
+    const focusables = fieldsOnly
+      ? this.fieldAtoms()
+      : Array.from(
+          root.querySelectorAll<HTMLElement>("zl-field, zl-select, zl-checkbox, zl-button"),
+        );
+    const target = focusables.find(
+      (el) =>
+        !el.hasAttribute("disabled") &&
+        !el.hasAttribute("hidden") &&
+        el.getAttribute("type") !== "hidden",
+    );
     target?.focus();
   }
 

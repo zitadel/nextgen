@@ -93,6 +93,16 @@ func TestCompileStringFilterContainsFoldUsesSQLLower(t *testing.T) {
 	assert.Equal(t, "Übung", c.args[0])
 }
 
+func TestCompileStringFilterContainsFoldUsesEscape(t *testing.T) {
+	t.Parallel()
+
+	var c statementCompiler
+	compileFilter(&c, database.StringContainsFold(database.Col(domain.ProjectFieldName), `100%_a\b`), projectSchema)
+	assert.Equal(t, `LOWER(name) LIKE LOWER('%' || ? || '%') ESCAPE '\'`, c.String())
+	require.Len(t, c.args, 1)
+	assert.Equal(t, `100\%\_a\\b`, c.args[0])
+}
+
 func TestCompileCompareFilterNilLeadingValue(t *testing.T) {
 	t.Parallel()
 

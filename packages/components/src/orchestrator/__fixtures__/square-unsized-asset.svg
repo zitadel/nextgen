@@ -1,0 +1,5 @@
+<!-- A square SVG with a viewBox and no width/height: it has an intrinsic ratio
+     but no intrinsic size, so `width: auto` resolves to the containing block's
+     width and the ratio squares it. Every framework scaffold ships one of these
+     (Next's `public/globe.svg`), which is how it reached a brand pane. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="square test asset"><rect width="64" height="64" rx="8" fill="#bba5e4"/></svg>

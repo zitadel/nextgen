@@ -4,6 +4,7 @@ import { MANAGED_MARKER } from "../../../../paths";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
+import { devScriptPortOp } from "../dev-script-port";
 import { getRenderer } from "./renderers/registry";
 import type { RendererSpec } from "./renderers/types";
 
@@ -84,6 +85,13 @@ export class NextPatcher extends AbstractRulePatcher {
 
   protected routeDeps(view: PatchView): ReadonlyArray<string> {
     return [getRenderer(view.rendererId).dependency.name];
+  }
+
+  protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
+    // The `dev` script gets the project's dev-server port pinned into it via
+    // an `edit` op eject can't auto-revert, so it has to be surfaced as a
+    // manual cleanup step like any other in-place config merge.
+    return ["package.json"];
   }
 
   protected summary(ctx: PatchContext): { title: string; detail: string } {
@@ -200,6 +208,9 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
       name: renderer.dependency.name,
       version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
     },
+    // `next dev` takes its port from the command line only, so without this
+    // the app can serve a port the project does not allow as an origin.
+    devScriptPortOp(ctx.issuer),
   ].filter((op): op is FileOp => op !== undefined);
 }
 
