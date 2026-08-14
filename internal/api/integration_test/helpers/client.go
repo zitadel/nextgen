@@ -91,7 +91,11 @@ func (h *Harness) SetScopedTokenOnApiClient(t *testing.T, client *ApiClient, pro
 
 	tokenCrypter, err := h.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
 	require.NoError(t, err)
-	token, err := (&domain.Token{ProjectID: project.ID, Scope: scopes}).JWE(tokenCrypter)
+	token, err := (&domain.Token{
+		ProjectID: project.ID,
+		Type:      domain.TokenTypeProjectToken,
+		Scope:     scopes,
+	}).JWE(tokenCrypter)
 	require.NoError(t, err)
 
 	client.SetToken(token)
