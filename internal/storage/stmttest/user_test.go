@@ -21,7 +21,7 @@ func ensureUserTestProject(t *testing.T, stmts service.AllStatements) (projectID
 
 	project := newTestProject(uniqueProjectID(t))
 	require.NoError(t, stmts.CreateProject(t.Context(), project))
-	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 
 	schemaURL = "https://example.com/schemas/test-user"
 	require.NoError(t, stmts.CreateJSONSchema(t.Context(), &domain.JSONSchema{

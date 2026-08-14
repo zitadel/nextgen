@@ -39,6 +39,12 @@ tags:
     description: User schema creation and lookup endpoints.
   - name: Branding
     description: Branding revision publication and lookup endpoints for the login UI (layout, asset URLs, Liquid template).
+  - name: Events
+    description: |
+      Project-scoped audit event list and get (ADR 049). Unified surface for
+      identity, session, admin, and entity events; filter by `category` /
+      `event_type`. Response items are a discriminated Event union on
+      `event_type` with typed payloads per docs/design/api/events-catalog.md.
 
 paths:
   /healthz:
@@ -115,6 +121,10 @@ paths:
     $ref: endpoints/branding/methods.yaml
   /branding/{id}:
     $ref: endpoints/branding/by_id/methods.yaml
+  /events:
+    $ref: endpoints/events/methods.yaml
+  /events/{id}:
+    $ref: endpoints/events/by_id/methods.yaml
 
 components:
   securitySchemes:

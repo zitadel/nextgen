@@ -6,8 +6,10 @@ content:
       oneOf:
         - $ref: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-not_found.yaml'
+        - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid.yaml'
+        - $ref: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
         - $ref: '../../components/schemas/errors/sch-invalid_request.yaml'
         - $ref: '../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../components/schemas/errors/proj-name_invalid.yaml'
@@ -19,8 +21,10 @@ content:
         mapping:
           enc_key.decrypt_failed: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.not_found: '../../components/schemas/errors/enc_key-not_found.yaml'
+          evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../components/schemas/errors/tkn-invalid.yaml'
+          tkn.invalid_tknid: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
           sch.invalid_request: '../../components/schemas/errors/sch-invalid_request.yaml'
           not_implemented: '../../components/schemas/errors/not_implemented.yaml'
           proj.name_invalid: '../../components/schemas/errors/proj-name_invalid.yaml'
@@ -38,6 +42,11 @@ content:
         value:
           code: enc_key.not_found
           message: 'encryption key not found'
+      evt.invalid:
+        summary: evt.invalid
+        value:
+          code: evt.invalid
+          message: 'event: invalid'
       internal:
         summary: internal
         value:
@@ -48,6 +57,11 @@ content:
         value:
           code: tkn.invalid
           message: 'the token is not valid'
+      tkn.invalid_tknid:
+        summary: tkn.invalid_tknid
+        value:
+          code: tkn.invalid_tknid
+          message: 'token identifiers do not match token type'
       sch.invalid_request:
         summary: sch.invalid_request
         value:
