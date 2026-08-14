@@ -1,6 +1,7 @@
 title: CreateUserRequest
 description: |
-  The `attributes` object is validated against the schema named by `schema`.
+  `attributes` is the document that must satisfy the user schema named by
+  `schema`.
 
   The resource primary key is server-assigned and returned in the response, so
   the request carries no `id`; `metadata` is server-owned for the same reason.

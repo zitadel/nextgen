@@ -1,7 +1,7 @@
 title: CreateUserResponse
 description: |
-  The created user, echoed back with its server-assigned `id`. The
-  `attributes` object is the content as stored, validated against `schema`.
+  The created user, echoed back with its server-assigned `id`. `attributes` is
+  the stored content, satisfying the schema named by `schema`.
 type: object
 required:
   - id
