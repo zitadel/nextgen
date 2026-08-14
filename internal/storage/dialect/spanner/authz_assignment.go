@@ -9,6 +9,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 )
 
 const (
@@ -67,6 +68,9 @@ func newAuthzAssignmentStatements(db queryExecutor) authzAssignmentStatements {
 
 // CreateAuthzAssignment implements [service.AuthzAssignmentStatements].
 func (s authzAssignmentStatements) CreateAuthzAssignment(ctx context.Context, a *domain.AuthzAssignment) error {
+	if err := authz.ValidateAssignment(a); err != nil {
+		return err
+	}
 	if err := ensureManagedID(&a.ID, domain.PrefixAuthzAssignment); err != nil {
 		return err
 	}

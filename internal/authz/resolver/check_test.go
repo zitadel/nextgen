@@ -76,6 +76,7 @@ func TestCheck_Orchestration(t *testing.T) {
 			ProjectID:     "proj_1",
 			ObjectType:    "project",
 			Relation:      "write",
+			TeamID:        "team_1",
 		})
 		require.NoError(t, err)
 		assert.Equal(t, resolver.DecisionNotFound, d)
@@ -85,7 +86,17 @@ func TestCheck_Orchestration(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
 		stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
-		stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(true, true, nil)
+		stmts.EXPECT().CheckAuthz(gomock.Any(), domain.AuthzCheckParams{
+			CatalogID:              domain.SystemCatalogID,
+			ProjectID:              "proj_1",
+			PrincipalHomeProjectID: "proj_1",
+			PrincipalType:          domain.AuthzPrincipalTypeSKTeam,
+			PrincipalID:            "sk_team_1",
+			ObjectType:             "user",
+			Relation:               "read",
+			ConstraintTeamID:       "team_1",
+			ResourceID:             "usr_in",
+		}).Return(true, true, nil)
 
 		d, err := resolver.New().Check(context.Background(), stmts, resolver.Request{
 			PrincipalType: domain.AuthzPrincipalTypeSKTeam,
@@ -93,9 +104,25 @@ func TestCheck_Orchestration(t *testing.T) {
 			ProjectID:     "proj_1",
 			ObjectType:    "user",
 			Relation:      "read",
+			TeamID:        "team_1",
+			ResourceID:    "usr_in",
 		})
 		require.NoError(t, err)
 		assert.Equal(t, resolver.DecisionAllow, d)
+	})
+
+	t.Run("sk_team missing team id", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+		_, err := resolver.New().Check(context.Background(), stmts, resolver.Request{
+			PrincipalType: domain.AuthzPrincipalTypeSKTeam,
+			PrincipalID:   "sk_team_1",
+			ProjectID:     "proj_1",
+			ObjectType:    "user",
+			Relation:      "read",
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "team id is required")
 	})
 
 	t.Run("invalid input", func(t *testing.T) {
@@ -170,6 +197,7 @@ func TestListObjects_SKTeamDeny(t *testing.T) {
 			ProjectID:     "proj_1",
 			ObjectType:    "project",
 			Relation:      "viewer",
+			TeamID:        "team_1",
 		},
 		ResourceKind: domain.ResourceKindUser,
 	})
