@@ -16,6 +16,12 @@ type Request struct {
 	ProjectID     string
 	ObjectType    string
 	Relation      string
+	// TeamID is required for sk_team_ principals (token team). Copied to
+	// AuthzCheckParams.ConstraintTeamID so SQL can constrain the object.
+	TeamID string
+	// ResourceID is the object being checked (user id, team id). Optional for
+	// permission-level Check; required for per-object sk_team_ deny.
+	ResourceID string
 }
 
 // ListRequest is the public ListObjects input (L4 / oracle helper).
@@ -32,6 +38,8 @@ type memoKey struct {
 	ProjectID     string
 	ObjectType    string
 	Relation      string
+	TeamID        string
+	ResourceID    string
 }
 
 // Resolver evaluates checks with optional request-scoped memoization.
@@ -67,6 +75,8 @@ func (r *Resolver) Check(ctx context.Context, stmts service.AuthzResolverStateme
 		ProjectID:     req.ProjectID,
 		ObjectType:    req.ObjectType,
 		Relation:      req.Relation,
+		TeamID:        req.TeamID,
+		ResourceID:    req.ResourceID,
 	}
 	if d, ok := r.memo[key]; ok {
 		return d, nil
@@ -77,15 +87,7 @@ func (r *Resolver) Check(ctx context.Context, stmts service.AuthzResolverStateme
 		return DecisionUnspecified, err
 	}
 
-	allowed, foothold, err := stmts.CheckAuthz(ctx, domain.AuthzCheckParams{
-		CatalogID:              catalogID,
-		ProjectID:              req.ProjectID,
-		PrincipalHomeProjectID: req.ProjectID,
-		PrincipalType:          req.PrincipalType,
-		PrincipalID:            req.PrincipalID,
-		ObjectType:             req.ObjectType,
-		Relation:               req.Relation,
-	})
+	allowed, foothold, err := stmts.CheckAuthz(ctx, checkParams(catalogID, req))
 	if err != nil {
 		return DecisionUnspecified, err
 	}
@@ -117,17 +119,26 @@ func (r *Resolver) ListObjects(ctx context.Context, stmts service.AuthzResolverS
 		return nil, err
 	}
 	return stmts.ListAuthzObjectIDs(ctx, domain.AuthzListObjectsParams{
-		AuthzCheckParams: domain.AuthzCheckParams{
-			CatalogID:              catalogID,
-			ProjectID:              req.ProjectID,
-			PrincipalHomeProjectID: req.ProjectID,
-			PrincipalType:          req.PrincipalType,
-			PrincipalID:            req.PrincipalID,
-			ObjectType:             req.ObjectType,
-			Relation:               req.Relation,
-		},
-		ResourceKind: req.ResourceKind,
+		AuthzCheckParams: checkParams(catalogID, req.Request),
+		ResourceKind:     req.ResourceKind,
 	})
+}
+
+func checkParams(catalogID string, req Request) domain.AuthzCheckParams {
+	p := domain.AuthzCheckParams{
+		CatalogID:              catalogID,
+		ProjectID:              req.ProjectID,
+		PrincipalHomeProjectID: req.ProjectID,
+		PrincipalType:          req.PrincipalType,
+		PrincipalID:            req.PrincipalID,
+		ObjectType:             req.ObjectType,
+		Relation:               req.Relation,
+		ResourceID:             req.ResourceID,
+	}
+	if req.PrincipalType == domain.AuthzPrincipalTypeSKTeam {
+		p.ConstraintTeamID = req.TeamID
+	}
+	return p
 }
 
 func (r *Resolver) activeCatalogID(ctx context.Context, stmts service.AuthzResolverStatements) (string, error) {
@@ -154,6 +165,8 @@ func validateCheckRequest(req Request) error {
 		return fmt.Errorf("resolver: object type is required")
 	case req.Relation == "":
 		return fmt.Errorf("resolver: relation is required")
+	case req.PrincipalType == domain.AuthzPrincipalTypeSKTeam && req.TeamID == "":
+		return fmt.Errorf("resolver: team id is required for sk_team")
 	default:
 		return nil
 	}

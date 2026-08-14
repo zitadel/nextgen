@@ -338,6 +338,11 @@ const (
 
 // AuthzCheckParams is the storage-level input for a single-resource permission check.
 // PrincipalHomeProjectID is the project used for membership-edge lookup (defaults to ProjectID).
+//
+// ConstraintTeamID, when set (sk_team_ tokens), requires the checked or listed
+// object to belong to that team: users via authz_membership_edges, teams by id,
+// other kinds via resource_scope_index.team_id. ResourceID is the object being
+// checked (empty for permission-level Check / list materialization).
 type AuthzCheckParams struct {
 	CatalogID              string
 	ProjectID              string
@@ -346,6 +351,8 @@ type AuthzCheckParams struct {
 	PrincipalID            string
 	ObjectType             string
 	Relation               string
+	ConstraintTeamID       string
+	ResourceID             string
 }
 
 // HomeProjectID returns PrincipalHomeProjectID, or ProjectID when unset.

@@ -135,4 +135,36 @@ func TestOracle_HandBuilt(t *testing.T) {
 		assert.True(t, g.OracleFoothold("p1", domain.AuthzPrincipalTypeUser, "alice"))
 		assert.False(t, g.OracleFoothold("p1", domain.AuthzPrincipalTypeUser, "bob"))
 	})
+
+	t.Run("sk_team constraint", func(t *testing.T) {
+		g := Graph{
+			Closure: closure,
+			Assignments: []*domain.AuthzAssignment{{
+				ProjectID: "p1", CatalogID: "c1",
+				PrincipalType: domain.AuthzPrincipalTypeSKTeam, PrincipalID: "sk",
+				ObjectType: "project", Relation: "viewer",
+				ScopeKind: domain.AuthzScopeKindProject,
+			}},
+			Memberships: []*domain.AuthzMembershipEdge{
+				domain.NewUserTeamMembershipEdge("p1", "eng", "alice"),
+			},
+			Resources: []*domain.ResourceScope{
+				domain.NewUserResourceScope("p1", "alice"),
+				domain.NewUserResourceScope("p1", "bob"),
+			},
+		}
+		in := domain.AuthzCheckParams{
+			ProjectID: "p1", PrincipalType: domain.AuthzPrincipalTypeSKTeam, PrincipalID: "sk",
+			ObjectType: "project", Relation: "viewer",
+			ConstraintTeamID: "eng", ResourceID: "alice",
+		}
+		out := in
+		out.ResourceID = "bob"
+		assert.True(t, g.OracleCheckParams(in))
+		assert.False(t, g.OracleCheckParams(out))
+		assert.Equal(t, []string{"alice"}, g.OracleListParams(domain.AuthzListObjectsParams{
+			AuthzCheckParams: in,
+			ResourceKind:     domain.ResourceKindUser,
+		}))
+	})
 }
