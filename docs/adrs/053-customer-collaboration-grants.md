@@ -163,6 +163,12 @@ Spanner seed migrations, constructors, and tests together: a project secret
 receives `project.admin`, and `admin` satisfies `editor` and `viewer`. No
 compatibility migration or assignment backfill is provided.
 
+That closure applies to a customer project's own `sk_proj_` secret. The
+reserved platform project mints no secret by default; platform-homed
+automation uses explicitly scoped `sk_plat_` keys whose authority is only
+their assignment rows
+([ADR 052 §9](052-cross-project-principals.md#9-deployment-wide-operators-are-a-separate-authority)).
+
 That choice requires an explicit destructive reset: every database that has
 already applied the old Goose migration must be dropped and recreated before
 running the updated binary. Editing an already-applied migration source does

@@ -102,7 +102,12 @@ All transports must converge on the same persisted resources and invariants.
 The minimum useful seed provisions, in one operation:
 
 1. the reserved platform project through the normal full project provisioner,
-   including its keys, default user schema, and login flow;
+   including its publishable key, default user schema, and login flow — but
+   **no project secret**: platform-homed automation keys are explicitly
+   created, scoped `sk_plat_` credentials under root
+   [ADR 052 §9](../../../../docs/adrs/052-cross-project-principals.md), and
+   test infrastructure gets predictable credentials from the testkit's boot
+   contract, never from a seed default;
 2. at least one initial platform user who can sign into the Console;
 3. a default team plus that user's `team_memberships` row;
 4. a separate `team.owner` authorization assignment for the initial owner;

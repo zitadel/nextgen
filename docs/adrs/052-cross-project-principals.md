@@ -188,7 +188,9 @@ does not become public-plane merely because its human credential is also used
 by public-plane `/me` operations. Credential transport and operation plane are
 separate properties. Both paths enter the same authorization resolver after
 credential resolution. A future user bearer token uses the same principal and
-grant semantics rather than creating another authorization model.
+grant semantics rather than creating another authorization model. The CLI's
+platform login — `zitadel login` completing in the browser over the existing
+claim handoff transport — is the first planned consumer of that bearer.
 
 Cookie-authenticated state-changing management requests require all of:
 
@@ -308,11 +310,38 @@ No role, membership, or administrative permission on the platform project
 implicitly grants access to every project. The platform project is an identity
 and customer-collaboration home, not a wildcard authorization object.
 
+For the same reason, the reserved platform project mints **no project secret
+by default**. Bootstrap provisions its publishable key — sign-in needs it —
+and nothing else. A deployment runs indefinitely with no platform-homed API
+credential at all: the Console and the claim ceremony ride the first-party
+session (§5) and login rides the publishable key. A blanket-admin secret over
+the identity home would reach every customer project transitively through
+platform-team rosters; the mitigation is that no such credential exists unless
+someone deliberately creates one.
+
+Platform-homed automation uses **named, scoped keys**, carried on the wire
+with the `sk_plat_` prefix. An `sk_plat_` key is an ordinary principal whose
+authority is exactly its explicit `authz_assignments` rows — there is no
+implicit admin closure for platform keys, unlike a customer project's own
+`sk_proj_` secret under ADR 053 §3. The prefix names the credential's home,
+never its authority: resolution always ends at the assignment rows. Creation
+is a deliberate act under §5's rules — a Console page, or `zitadel key create`
+riding the claim handoff transport — and test infrastructure obtains
+credentials through the testkit's boot contract, never through a seed default.
+
+The intended first use is customer-boundary automation: a team owner mints a
+key scoped to their own team's authority — creating and managing the projects
+that team owns — so the key's blast radius is bounded by the account that
+minted it.
+
 Cloud operations and self-hosted break-glass may use an explicit
 deployment-wide operator relation or credential. Its issuance, activation,
 customer visibility, and audit requirements are defined separately with staff
 support governance. It must not be represented as
-`project:platform#admin -> every project`.
+`project:platform#admin -> every project`, and it must not be approximated by
+an `sk_plat_` key granted broad roles — the operator credential is explicit
+precisely so issuance governance, customer visibility, and audit posture can
+attach to it.
 
 ## Testing obligations
 
