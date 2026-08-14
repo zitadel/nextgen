@@ -108,6 +108,26 @@ func TestWriteActiveSystemCatalogID(t *testing.T) {
 	assert.Contains(t, w.b.String(), "zitadel_nextgen.authz_catalogs")
 }
 
+func TestWriteCheckAuthzScopedGrantArms(t *testing.T) {
+	t.Parallel()
+	params := domain.AuthzCheckParams{
+		CatalogID:      "cat_sys_1",
+		ProjectID:      "proj_1",
+		PrincipalType:  domain.AuthzPrincipalTypeUser,
+		PrincipalID:    "user_a",
+		ObjectType:     "project",
+		Relation:       "viewer",
+		ResourceID:     "usr_1",
+		ResourceTeamID: "team_1",
+	}
+	var w recordingWriter
+	authz.WriteCheckAuthz(&w, testEnv(&w), params)
+	assert.Contains(t, w.b.String(), "a.scope_kind = 'team' AND a.scope_team_id = ?")
+	assert.Contains(t, w.b.String(), "a.scope_kind = 'resource' AND a.scope_resource_id = ?")
+	assert.Contains(t, w.args, "team_1")
+	assert.Contains(t, w.args, "usr_1")
+}
+
 func TestWriteCheckAuthzConstraintTeam(t *testing.T) {
 	t.Parallel()
 	params := domain.AuthzCheckParams{

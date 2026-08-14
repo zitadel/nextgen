@@ -353,6 +353,8 @@ type AuthzCheckParams struct {
 	Relation               string
 	ConstraintTeamID       string
 	ResourceID             string
+	// ResourceTeamID is RSI.team_id for by-id Check (team-scoped grant arm).
+	ResourceTeamID string
 }
 
 // HomeProjectID returns PrincipalHomeProjectID, or ProjectID when unset.

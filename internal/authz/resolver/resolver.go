@@ -19,9 +19,12 @@ type Request struct {
 	// TeamID is required for sk_team_ principals (token team). Copied to
 	// AuthzCheckParams.ConstraintTeamID so SQL can constrain the object.
 	TeamID string
-	// ResourceID is the object being checked (user id, team id). Optional for
-	// permission-level Check; required for per-object sk_team_ deny.
+	// ResourceID is the object being checked (user id, team id, path id).
+	// Optional for permission-level Check; used for per-object sk_team_ deny
+	// and resource-scoped grant arms.
 	ResourceID string
+	// ResourceTeamID is RSI.team_id after a by-id lookup (team-scoped grant arm).
+	ResourceTeamID string
 }
 
 // ListRequest is the public ListObjects input (L4 / oracle helper).
@@ -33,13 +36,14 @@ type ListRequest struct {
 // memoKey is the request-scoped Check cache key. A struct key avoids
 // delimiter aliasing that string joins can introduce.
 type memoKey struct {
-	PrincipalType domain.AuthzPrincipalType
-	PrincipalID   string
-	ProjectID     string
-	ObjectType    string
-	Relation      string
-	TeamID        string
-	ResourceID    string
+	PrincipalType  domain.AuthzPrincipalType
+	PrincipalID    string
+	ProjectID      string
+	ObjectType     string
+	Relation       string
+	TeamID         string
+	ResourceID     string
+	ResourceTeamID string
 }
 
 // Resolver evaluates checks with optional request-scoped memoization.
@@ -70,13 +74,14 @@ func (r *Resolver) Check(ctx context.Context, stmts service.AuthzResolverStateme
 	}
 
 	key := memoKey{
-		PrincipalType: req.PrincipalType,
-		PrincipalID:   req.PrincipalID,
-		ProjectID:     req.ProjectID,
-		ObjectType:    req.ObjectType,
-		Relation:      req.Relation,
-		TeamID:        req.TeamID,
-		ResourceID:    req.ResourceID,
+		PrincipalType:  req.PrincipalType,
+		PrincipalID:    req.PrincipalID,
+		ProjectID:      req.ProjectID,
+		ObjectType:     req.ObjectType,
+		Relation:       req.Relation,
+		TeamID:         req.TeamID,
+		ResourceID:     req.ResourceID,
+		ResourceTeamID: req.ResourceTeamID,
 	}
 	if d, ok := r.memo[key]; ok {
 		return d, nil
@@ -134,6 +139,7 @@ func checkParams(catalogID string, req Request) domain.AuthzCheckParams {
 		ObjectType:             req.ObjectType,
 		Relation:               req.Relation,
 		ResourceID:             req.ResourceID,
+		ResourceTeamID:         req.ResourceTeamID,
 	}
 	if req.PrincipalType == domain.AuthzPrincipalTypeSKTeam {
 		p.ConstraintTeamID = req.TeamID
