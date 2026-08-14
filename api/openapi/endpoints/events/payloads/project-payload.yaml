@@ -1,0 +1,12 @@
+title: ProjectPayload
+type: object
+description: |
+  Shared allowlisted fields for `project.created` (full snapshot) and
+  `project.updated` (delta: only changed fields present).
+properties:
+  name:
+    type: string
+  preview_origins:
+    type: array
+    items:
+      type: string

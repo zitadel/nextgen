@@ -31,8 +31,7 @@ func newUserPasskeyStatements(client queryExecutor) userPasskeyStatements {
 
 // CreateUserPasskey implements [service.UserPasskeyStatements].
 func (ps userPasskeyStatements) CreateUserPasskey(ctx context.Context, p *domain.CreateUserPasskey) error {
-	id := ""
-	if err := ensureManagedID(&id, domain.PrefixUserPasskey); err != nil {
+	if err := ensureManagedID(&p.ID, domain.PrefixUserPasskey); err != nil {
 		return err
 	}
 	transports := p.Transports
@@ -46,7 +45,7 @@ func (ps userPasskeyStatements) CreateUserPasskey(ctx context.Context, p *domain
 	now := nowUnixNano()
 	_, err = ps.client.Exec(ctx, createUserPasskeyStmt,
 		p.ProjectID,
-		id,
+		p.ID,
 		p.UserID,
 		p.CredentialID,
 		p.PublicKey,

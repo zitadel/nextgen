@@ -323,6 +323,12 @@ func TestCompileCompareFilterSingleColumn(t *testing.T) {
 			wantArg: createdAt,
 		},
 		{
+			name:    "greater than or equal",
+			filter:  database.GreaterThanOrEqual(database.Col(domain.ProjectFieldCreatedAt), createdAt),
+			wantSQL: "created_at >= @p1",
+			wantArg: createdAt,
+		},
+		{
 			name:    "less than",
 			filter:  database.LessThan(database.Col(domain.ProjectFieldCreatedAt), createdAt),
 			wantSQL: "created_at < @p1",

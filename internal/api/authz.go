@@ -116,6 +116,15 @@ var brandingAccess = resourceAccess{
 	denied:    domain.ErrBrandingPermissionDenied,
 }
 
+// eventsAccess gates the operator audit stream (ADR 049). List/get are
+// project-scoped (no RSI kind); credential ceiling is project.write like other
+// management resources until #420 mints a fine-grained events relation.
+var eventsAccess = resourceAccess{
+	readMiss:  domain.ErrEventNotFound,
+	writeMiss: domain.ErrEventNotFound,
+	denied:    domain.ErrEventPermissionDenied,
+}
+
 var projectAccess = resourceAccess{
 	kind:      domain.ResourceKindProject,
 	readMiss:  domain.ErrProjectNotFound,

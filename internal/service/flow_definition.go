@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/ianlancetaylor/jsonschema"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -112,7 +113,19 @@ func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionR
 	if err != nil {
 		return nil, err
 	}
-	err = fd.v2Pool.Statements().CreateFlowDefinition(ctx, flowDefinition)
+	err = fd.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().CreateFlowDefinition(ctx, flowDefinition); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeFlowdefCreated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  flowDefinition.ProjectID,
+			EntityType: "flow_definition",
+			EntityID:   flowDefinition.ID,
+			Payload:    domain.FlowdefPayloadSnapshot(flowDefinition),
+		})
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +168,19 @@ func (fd *flowDefinitionService) Update(ctx context.Context, req FlowDefinitionR
 	if err != nil {
 		return nil, err
 	}
-	err = fd.v2Pool.Statements().UpdateFlowDefinition(ctx, flowDefinition)
+	err = fd.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().UpdateFlowDefinition(ctx, flowDefinition); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeFlowdefUpdated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  flowDefinition.ProjectID,
+			EntityType: "flow_definition",
+			EntityID:   flowDefinition.ID,
+			Payload:    domain.FlowdefPayloadDelta(retrievedFlowDef, flowDefinition),
+		})
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -348,5 +373,16 @@ func (fd *flowDefinitionService) Delete(ctx context.Context, projectID, id strin
 	if id == "" {
 		return domain.ErrMissingFlowDefinitionID()
 	}
-	return fd.v2Pool.Statements().DeleteFlowDefinitionByID(ctx, projectID, id)
+	return fd.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().DeleteFlowDefinitionByID(ctx, projectID, id); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeFlowdefDeleted,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  projectID,
+			EntityType: "flow_definition",
+			EntityID:   id,
+		})
+	})
 }

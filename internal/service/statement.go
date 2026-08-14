@@ -47,6 +47,7 @@ type AllStatements interface {
 	AuthzMembershipEdgeStatements
 	AuthzCatalogStatements
 	AuthzResolverStatements
+	EventStatements
 	Statements
 }
 
@@ -62,7 +63,8 @@ type ProjectStatements interface {
 	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
 	UpdateProject(ctx context.Context, entity *domain.Project) error
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
-	DeleteProjectByID(ctx context.Context, id string) error
+	// DeleteProjectByID removes the project. changed is false when no row matched.
+	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -121,10 +123,10 @@ type TeamStatements interface {
 	// via Statements(), joins an outer pool.Transaction when already nested).
 	//
 	// Only an active team is deactivated: the team UPDATE is guarded on the status,
-	// and a zero-row result skips the cascade and reports success. An unknown or
-	// already-deactivated team is therefore a no-op;
+	// and a zero-row result skips the cascade and reports success with changed=false.
+	// An unknown or already-deactivated team is therefore a no-op;
 	// updated_at records when the team was first deactivated.
-	DeactivateTeam(ctx context.Context, projectID, id string) error
+	DeactivateTeam(ctx context.Context, projectID, id string) (changed bool, err error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -347,6 +349,10 @@ type ResourceScopeStatements interface {
 	GetResourceScopeByIDInProject(ctx context.Context, projectID, resourceID string) (*domain.ResourceScope, error)
 	ExistsResourceScopeElsewhere(ctx context.Context, kind domain.ResourceKind, resourceID, excludeProjectID string) (bool, error)
 	DeleteResourceScope(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) error
+	// ListClaimedProjectIDs returns project ids whose resource_scope_index
+	// row has team_id set (ADR 049 export visibility), ordered by project_id
+	// after afterID (empty starts at the beginning).
+	ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error)
 }
 
 // AuthzAssignmentStatements persists grants (principal → catalog relation at a scope).
@@ -425,4 +431,20 @@ type AuthzResolverStatements interface {
 	HasAuthzProjectFoothold(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
 	CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (allowed bool, foothold bool, err error)
 	ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error)
+}
+
+// EventStatements persists append-only wide events (ADR 048).
+type EventStatements interface {
+	Statements
+	InsertEvent(ctx context.Context, event *domain.Event) error
+	GetEventByID(ctx context.Context, projectID, id string) (*domain.Event, error)
+	ListEvents(ctx context.Context, filter *database.ListOptions[domain.EventField]) (*database.ListResult[*domain.Event], error)
+	// DeleteEventsOlderThan removes events with created_at before cutoff across
+	// all projects (retention job; includes orphaned project_id rows).
+	DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (int64, error)
+	EnsureEventSink(ctx context.Context, sink *domain.EventSink) error
+	// GetEventSinkCursor returns (nil, nil) when no cursor row exists.
+	GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error)
+	UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error
+	ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit uint32) ([]*domain.Event, error)
 }

@@ -20,7 +20,7 @@ func TestJSONSchemaStatements_CRUD(t *testing.T) {
 
 	project := newTestProject(uniqueProjectID(t))
 	require.NoError(t, stmts.CreateProject(ctx, project))
-	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 
 	schemaURL := "https://example.test/schemas/user.v1.json"
 	objectType := "user"

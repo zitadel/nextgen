@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -16,6 +17,9 @@ func (h *Handler) CreateProject(ctx context.Context, req *api.CreateProjectReque
 	if err != nil {
 		return nil, err
 	}
+	// POST /projects is unauthenticated; Path A needs the new project_id on
+	// the actor slot so request.api is tenant-scoped after create.
+	audit.BindPublicRequest(ctx, project.ID, "", "")
 
 	projectSecret, err := h.tokenService.GenerateJWE(ctx, project.Token())
 	if err != nil {
