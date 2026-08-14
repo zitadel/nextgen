@@ -169,14 +169,12 @@ automation uses explicitly scoped `sk_plat_` keys whose authority is only
 their assignment rows
 ([ADR 052 §9](052-cross-project-principals.md#9-deployment-wide-operators-are-a-separate-authority)).
 
-That choice requires an explicit destructive reset: every database that has
-already applied the old Goose migration must be dropped and recreated before
-running the updated binary. Editing an already-applied migration source does
-not update its catalog, and reusing such a database would leave the permissive
-`viewer -> editor -> admin` closure active. CI lanes must use fresh databases,
-and the implementation handoff must give developers and alpha operators the
-exact reset procedure. Catalog rows remain immutable within a running
-database—never patch an active catalog partially.
+Databases that already applied the old Goose migration must be dropped and
+recreated: editing an applied migration never updates its catalog, so reuse
+would leave the permissive closure active. CI is fresh every run — this note
+exists for persistent local databases and alpha operators, and the
+implementation handoff must include the exact reset procedure. Never patch an
+active catalog partially.
 
 ### 4. Direct users and access teams are both v1 sharing primitives
 

@@ -50,8 +50,12 @@ The permission foundation already anticipates the correct shape:
 
 This ADR ratifies the cross-project mechanism and its security boundary. It does
 not define customer collaboration policy; [ADR 053](053-customer-collaboration-grants.md)
-does that. Staff support tiers, customer consent, and break-glass governance are
-separate follow-up decisions.
+does that. Together they resolve the cross-project human-identity question that
+[ADR 033](033-internal-permission-management.md) (out of scope) and
+`permission-storage.md` both deferred to
+[#333](https://github.com/zitadel/nextgen/issues/333). The remainder of #333 —
+staff support tiers, customer consent, and break-glass governance — stays open
+as separate follow-up decisions (§9).
 
 ## Glossary
 
@@ -119,6 +123,18 @@ resolver expands active membership through `authz_membership_edges` in the
 team's home project. Membership edges are never copied into the customer
 project. A user can match that team userset only when the user and team share
 the same home project; cross-project team membership is not introduced.
+
+**Foreign grant principals are platform-homed.** A cross-project `user` or
+`team` principal must be homed in the reserved platform project, and the grant
+API validates that at write time — a principal homed in another customer
+project is rejected, not stored. Without the rule, an app-homed row would sit
+inert until §5's credential rules widened, then become live authority nobody
+consciously granted. Cross-application automation belongs to the future PAT,
+service-user, or token-exchange leg, never to a human grant. Transitionally,
+while Console ADR 0004 §2's fallback makes the Console sign-in project a
+customer project, that project stands in as the platform home. The invariant
+is also what entitles the resolver to evaluate a foreign team's relations in
+the caller's home project: principal and team are guaranteed to share it.
 
 The assignment is created, changed, revoked, and audited in the same database
 partition as the protected resources, preserving ADR 033's consistency and
