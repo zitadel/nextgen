@@ -107,10 +107,12 @@ seeds, so it captures credentials from provisioning output (`POST /projects`
 returns `project_secret` exactly once) and exposes them on `InstanceHandle`:
 `projectSecret` today; the `platform` slot (`PlatformCredentials` — reserved
 project id, publishable key, scoped `sk_plat_` key, operator session) once the
-platform-project provisioner lands. Root ADR 052 §9 (PR #876): "test
-infrastructure obtains credentials through the testkit's boot contract, never
-through a seed default"; Console ADR 0004 §2 names the testkit as the
-bootstrap transport test and dev infrastructure use.
+platform-project provisioner lands. Root ADR 052 §9 (Proposed, lands with
+PR #876): "test infrastructure obtains credentials through the testkit's boot
+contract, never through a seed default"; Console ADR 0004 §2 names the
+testkit as the bootstrap transport test and dev infrastructure use. Until
+#876 is accepted, treat the slot as tracking that proposal — it is inert, so
+a wording shift there moves this shape, not shipped behavior.
 
 Consequences for changes here:
 

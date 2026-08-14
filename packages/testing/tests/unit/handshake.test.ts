@@ -71,8 +71,55 @@ describe("handshake", () => {
   it("rejects a platform block without a projectId", async () => {
     const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
     const path = join(dir, "handshake.json");
-    await writeFile(path, JSON.stringify({ ...handle, platform: { platformKey: "sk_plat_1" } }));
-    expect(() => readHandshakeSync(path)).toThrow(/malformed "platform"/);
+    await writeFile(
+      path,
+      JSON.stringify({
+        ...handle,
+        platform: { publishableKey: "pk_proj_platform", platformKey: "sk_plat_1" },
+      }),
+    );
+    expect(() => readHandshakeSync(path)).toThrow(/"projectId" is required/);
+  });
+
+  it("rejects a platform block without a publishableKey", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
+    const path = join(dir, "handshake.json");
+    await writeFile(path, JSON.stringify({ ...handle, platform: { projectId: "proj_platform" } }));
+    expect(() => readHandshakeSync(path)).toThrow(/"publishableKey" is required/);
+  });
+
+  it("rejects a platform block with a non-string platformKey", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
+    const path = join(dir, "handshake.json");
+    await writeFile(
+      path,
+      JSON.stringify({
+        ...handle,
+        platform: {
+          projectId: "proj_platform",
+          publishableKey: "pk_proj_platform",
+          platformKey: 42,
+        },
+      }),
+    );
+    expect(() => readHandshakeSync(path)).toThrow(/"platformKey" must be a non-empty string/);
+  });
+
+  it("rejects a platform block whose operatorSession lacks a sessionToken", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
+    const path = join(dir, "handshake.json");
+    await writeFile(
+      path,
+      JSON.stringify({
+        ...handle,
+        platform: {
+          projectId: "proj_platform",
+          publishableKey: "pk_proj_platform",
+          operatorSession: { expiresAt: "2026-01-01T00:00:00Z" },
+        },
+      }),
+    );
+    expect(() => readHandshakeSync(path)).toThrow(/"operatorSession" must carry a "sessionToken"/);
   });
 
   it("waitForHandshake resolves once the file appears", async () => {

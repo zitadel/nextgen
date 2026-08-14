@@ -59,18 +59,46 @@ function validateHandle(value: unknown, source: string): InstanceHandle {
     throw new Error(`handshake file ${source} has a malformed "baseUrl": ${handle.baseUrl}`);
   }
   if (handle.platform !== undefined) {
-    const platform = handle.platform as Partial<PlatformCredentials> | null;
-    if (
-      typeof platform !== "object" ||
-      platform === null ||
-      Array.isArray(platform) ||
-      typeof platform.projectId !== "string" ||
-      platform.projectId.length === 0
-    ) {
-      throw new Error(
-        `handshake file ${source} has a malformed "platform" block: "projectId" is required`,
-      );
-    }
+    validatePlatform(handle.platform, source);
   }
   return handle as InstanceHandle;
+}
+
+/**
+ * The handshake is the cross-process contract, so a malformed platform block
+ * must fail here with the field name, not later with a less actionable error.
+ */
+function validatePlatform(value: unknown, source: string): void {
+  const fail = (detail: string): never => {
+    throw new Error(`handshake file ${source} has a malformed "platform" block: ${detail}`);
+  };
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    fail("not an object");
+  }
+  const platform = value as Partial<PlatformCredentials>;
+  for (const field of ["projectId", "publishableKey"] as const) {
+    if (typeof platform[field] !== "string" || platform[field].length === 0) {
+      fail(`"${field}" is required`);
+    }
+  }
+  if (
+    platform.platformKey !== undefined &&
+    (typeof platform.platformKey !== "string" || platform.platformKey.length === 0)
+  ) {
+    fail(`"platformKey" must be a non-empty string when present`);
+  }
+  if (platform.operatorSession !== undefined) {
+    const session = platform.operatorSession as Partial<
+      NonNullable<PlatformCredentials["operatorSession"]>
+    > | null;
+    if (
+      typeof session !== "object" ||
+      session === null ||
+      Array.isArray(session) ||
+      typeof session.sessionToken !== "string" ||
+      session.sessionToken.length === 0
+    ) {
+      fail(`"operatorSession" must carry a "sessionToken" when present`);
+    }
+  }
 }

@@ -2,23 +2,29 @@ import type { ZitadelClient } from "@zitadel/api/client";
 
 /**
  * Credentials of the reserved platform project, captured by the kit at
- * provisioning time. The design is settled by root ADR 052 §9 and Console
- * ADR 0004 §2 (PR #876): bootstrap mints **no platform project secret** — the
- * publishable key is the only default credential, platform-homed automation
- * uses explicitly created, scoped `sk_plat_` keys, and "test infrastructure
+ * provisioning time. The shape follows the direction settled in PR #876's
+ * review (root ADR 052 §9 and Console ADR 0004 §2 — both still Proposed
+ * there): bootstrap mints **no platform project secret** — the publishable
+ * key is the only default credential, platform-homed automation uses
+ * explicitly created, scoped `sk_plat_` keys, and "test infrastructure
  * obtains credentials through the testkit's boot contract, never through a
  * seed default."
  *
  * Stub today: the server's platform-project provisioner does not exist yet,
  * so `startLocalZitadel` never populates this field. The shape is fixed now
  * so fixtures can code against it without churning when the provisioner
- * lands.
+ * lands; if the proposal shifts before acceptance, this inert slot moves
+ * with it.
  */
 export interface PlatformCredentials {
   /** Reserved platform project id — the Console sign-in target. */
   projectId: string;
-  /** Browser-safe publishable key, the only credential bootstrap mints. */
-  publishableKey?: string;
+  /**
+   * Browser-safe publishable key. Required: it is the one credential
+   * bootstrap always provisions (sign-in needs it), so a platform block
+   * without it is malformed.
+   */
+  publishableKey: string;
   /**
    * Scoped platform automation key (`sk_plat_` on the wire), captured at
    * creation — the server returns it exactly once. Present only when the

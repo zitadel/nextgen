@@ -2,14 +2,13 @@
 "@zitadel/testing": minor
 ---
 
-Define the kit's credential surface on `InstanceHandle` as the sanctioned boot
-contract (root ADR 052 §9: test infrastructure obtains credentials through the
-testkit's boot contract, never through a seed default). `projectSecret` is
-documented as captured from provisioning output, and a new optional `platform`
-slot (`PlatformCredentials`: reserved platform project id, publishable key,
-scoped `sk_plat_` automation key, pre-minted operator session) fixes the
-platform-plane shape ahead of the server-side provisioner — it stays
-unpopulated until that lands, and no server test-mode door exists or may be
-added. `AppEnvTemplate` now accepts only the handle's flat string fields
-(structured fields were never valid env-var material and now fail at compile
-time), and handshake files validate the `platform` block on read.
+Boot-captured credentials are now a documented contract on the instance
+handle. `handle.projectSecret` and `handle.previewSecret` are captured the
+one time the server mints them at provisioning, and a new `handle.platform`
+slot fixes the shape for upcoming platform-plane credentials (platform
+project id, publishable key, a scoped automation key, an operator session) —
+fixtures written against it today won't churn when platform provisioning
+ships; until then the slot stays unset. `AppEnvTemplate` now accepts only the
+handle's string fields, so mapping a structured field into an env var fails
+at compile time instead of at app boot, and handshake files reject malformed
+`platform` blocks on read with the offending field named.
