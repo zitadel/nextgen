@@ -203,7 +203,7 @@ const z = await startLocalZitadel({
   keep,          // keep the temp dir for debugging
 });
 
-z.handle;   // serializable: { baseUrl, projectId, projectSecret, schemaId, previewSecret? }
+z.handle;   // serializable: { baseUrl, projectId, projectSecret, schemaId, previewSecret?, platform? }
 z.api;      // authenticated @zitadel/api client (bearer = projectSecret)
 z.appEnv;   // { ZITADEL_URL, NEXT_PUBLIC_ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET }
 await z.seedUser({ email?, password?, attributes? }); // → { id, email, password }
@@ -239,6 +239,41 @@ above.
   Templates come from `@zitadel/config/defaults`.
 - **Seeding** is `POST /users` (the body carries `$schema: <schema id>`) +
   `PUT /users/{id}/password` with `is_change_required: false`.
+
+## Credentials: the boot contract
+
+The kit's boot contract is the sanctioned way tests and dev loops obtain
+credentials — root ADR 052 §9 (landing with the cross-project-access ADRs,
+PR #876) states it directly: "test infrastructure obtains credentials through
+the testkit's boot contract, never through a seed default." The kit owns the
+server process and its database, captures each credential from provisioning
+output at the moment the server mints it, and exposes it predictably on
+`handle`:
+
+- `handle.projectSecret` — the seeded customer project's operator credential,
+  captured from `POST /projects` (the server returns it exactly once, at
+  creation). Bearer behind `z.api` and every seed op.
+- `handle.previewSecret` — the same project's browser-plane credential (the
+  publishable-key predecessor from root ADR 036).
+- `handle.platform` — the platform-plane slot (`PlatformCredentials`): the
+  reserved platform project's id and publishable key, an explicitly-created
+  scoped automation key (`sk_plat_`), and a pre-minted operator session.
+  **Stub today**: the server's platform-project provisioner (Console ADR 0004
+  §2) has not landed, so `startLocalZitadel` never populates it yet. The
+  shape is fixed now so fixtures can code against it without churn.
+
+What this rules out, deliberately: there is no server `--test-mode`, no
+seed-document credential flag, and no other server-side door that mints
+deterministic credentials — and none may be added. The production seed
+contract stays credential-free; predictable test access is this kit's job,
+done entirely with what provisioning already returns (or, in-repo, with the
+kit's own storage access). If a credential the kit needs is not capturable at
+provisioning time, the fix is in the kit's boot path, never a server flag.
+
+The in-repo dev loop follows the same contract: `moon run console:dev-real`
+boots, seeds, and threads `handle.projectSecret` into the console dev proxy's
+`CONSOLE_PROJECT_SECRET` itself; `--seed-only` prints the same variables for
+a separately-started dev server. Nothing to remember or export.
 
 ## Parallelism model
 

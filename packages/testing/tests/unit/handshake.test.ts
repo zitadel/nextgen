@@ -53,6 +53,28 @@ describe("handshake", () => {
     expect(() => readHandshakeSync(path)).toThrow(/malformed "baseUrl"/);
   });
 
+  it("round-trips the platform credential slot", async () => {
+    const withPlatform: InstanceHandle = {
+      ...handle,
+      platform: {
+        projectId: "proj_platform",
+        publishableKey: "pk_proj_platform",
+        platformKey: "sk_plat_1",
+      },
+    };
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
+    const path = join(dir, "handshake.json");
+    await writeHandshake(path, withPlatform);
+    expect(readHandshakeSync(path)).toEqual(withPlatform);
+  });
+
+  it("rejects a platform block without a projectId", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
+    const path = join(dir, "handshake.json");
+    await writeFile(path, JSON.stringify({ ...handle, platform: { platformKey: "sk_plat_1" } }));
+    expect(() => readHandshakeSync(path)).toThrow(/malformed "platform"/);
+  });
+
   it("waitForHandshake resolves once the file appears", async () => {
     const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
     const path = join(dir, "handshake.json");

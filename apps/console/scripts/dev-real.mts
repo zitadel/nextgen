@@ -17,6 +17,13 @@
  *   VITE_CONSOLE_PROJECT_ID -> pins the client to the bootstrapped project, so
  *                              it agrees with the secret above
  *
+ * All three come from the boot-captured instance handle — the testkit's boot
+ * contract is the sanctioned credential source (root ADR 052 §9, PR #876):
+ * the kit captures the secret from `POST /projects` provisioning output, so
+ * nothing here is a developer-remembered variable and there is no server-side
+ * test door to lean on. `--seed-only` prints the same three variables for a
+ * separately-started dev server.
+ *
  * The instance is ephemeral: each run gets a fresh database and re-seeds, so
  * the users list looks identical every time (good for design work) at the cost
  * of signing in again after a restart. Persisting the instance across runs is
@@ -167,7 +174,22 @@ console.log(
 );
 
 if (seedOnly) {
-  console.log("[console-dev-real] --seed-only: instance stays up, Ctrl-C to stop.");
+  // Hand the boot-captured credentials to the separately-started dev server —
+  // the whole point of the boot contract is that nobody has to remember or
+  // reconstruct these (the secret exists nowhere else: the server returns it
+  // exactly once, at provisioning).
+  console.log(
+    [
+      "[console-dev-real] --seed-only: instance stays up, Ctrl-C to stop.",
+      "  point a console dev server at it:",
+      "",
+      `    CONSOLE_BACKEND_URL=${baseUrl} \\`,
+      `    CONSOLE_PROJECT_SECRET=${projectSecret} \\`,
+      `    VITE_CONSOLE_PROJECT_ID=${projectId} \\`,
+      "    corepack pnpm --filter @zitadel/console dev",
+      "",
+    ].join("\n"),
+  );
   setInterval(() => {
     /* keep the event loop alive */
   }, 60_000);

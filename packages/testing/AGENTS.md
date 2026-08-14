@@ -99,6 +99,34 @@ fact changes:
   If a kit helper needs a shape the definition does not declare, the
   definition changes first (same rule as `packages/api-mock`).
 
+## Credential contract (root ADR 052 §9)
+
+Predictable test/dev credentials are a property of **this kit**, never of the
+server or the production seed contract. The kit boots the process and applies
+seeds, so it captures credentials from provisioning output (`POST /projects`
+returns `project_secret` exactly once) and exposes them on `InstanceHandle`:
+`projectSecret` today; the `platform` slot (`PlatformCredentials` — reserved
+project id, publishable key, scoped `sk_plat_` key, operator session) once the
+platform-project provisioner lands. Root ADR 052 §9 (PR #876): "test
+infrastructure obtains credentials through the testkit's boot contract, never
+through a seed default"; Console ADR 0004 §2 names the testkit as the
+bootstrap transport test and dev infrastructure use.
+
+Consequences for changes here:
+
+- Never add — or lean on — a server `--test-mode` flag, a seed-default
+  credential, or any other server-side door that mints deterministic
+  credentials. If the kit cannot capture a credential at provisioning time,
+  fix the kit's boot path (which may also write through its existing storage
+  access), not the server surface.
+- New credentials extend `InstanceHandle` — the `platform` slot is the
+  contract point; don't invent a parallel channel. The handle must stay
+  serializable: it crosses process boundaries via the handshake file, and
+  `AppEnvTemplate` deliberately reaches only its flat string fields.
+- Dev loops feed from boot output: `console:dev-real` threads
+  `handle.projectSecret` into the Vite proxy env itself (and prints it under
+  `--seed-only`). Don't reintroduce developer-remembered credential env vars.
+
 ## Moon layering
 
 The layer is `tool`, not `library` — deliberately between the e2e suites

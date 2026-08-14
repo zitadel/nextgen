@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import type { InstanceHandle } from "./types";
+import type { InstanceHandle, PlatformCredentials } from "./types";
 
 /**
  * The handshake file carries an InstanceHandle across process boundaries:
@@ -57,6 +57,20 @@ function validateHandle(value: unknown, source: string): InstanceHandle {
   }
   if (!URL.canParse(handle.baseUrl as string)) {
     throw new Error(`handshake file ${source} has a malformed "baseUrl": ${handle.baseUrl}`);
+  }
+  if (handle.platform !== undefined) {
+    const platform = handle.platform as Partial<PlatformCredentials> | null;
+    if (
+      typeof platform !== "object" ||
+      platform === null ||
+      Array.isArray(platform) ||
+      typeof platform.projectId !== "string" ||
+      platform.projectId.length === 0
+    ) {
+      throw new Error(
+        `handshake file ${source} has a malformed "platform" block: "projectId" is required`,
+      );
+    }
   }
   return handle as InstanceHandle;
 }

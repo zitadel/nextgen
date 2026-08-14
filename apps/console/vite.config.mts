@@ -99,6 +99,10 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
   // vars to the client; loading with an empty prefix here stays config-time
   // and server-side only, so `.env.local` works without exporting the vars in
   // the shell. The process environment still wins for CI/one-off overrides.
+  // Normally nobody sets these by hand: `console:dev-real` (and the e2e-real
+  // suite) thread both from the boot-captured @zitadel/testing instance
+  // handle (`scripts/dev-real.mts`) — hand-set values are for pointing at an
+  // already-running instance.
   const nodeEnv = loadEnv(mode, import.meta.dirname, "");
   const backendUrl =
     process.env.CONSOLE_BACKEND_URL || nodeEnv.CONSOLE_BACKEND_URL || defaultBackendUrl;

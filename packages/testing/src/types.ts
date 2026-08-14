@@ -1,12 +1,54 @@
 import type { ZitadelClient } from "@zitadel/api/client";
 
 /**
+ * Credentials of the reserved platform project, captured by the kit at
+ * provisioning time. The design is settled by root ADR 052 §9 and Console
+ * ADR 0004 §2 (PR #876): bootstrap mints **no platform project secret** — the
+ * publishable key is the only default credential, platform-homed automation
+ * uses explicitly created, scoped `sk_plat_` keys, and "test infrastructure
+ * obtains credentials through the testkit's boot contract, never through a
+ * seed default."
+ *
+ * Stub today: the server's platform-project provisioner does not exist yet,
+ * so `startLocalZitadel` never populates this field. The shape is fixed now
+ * so fixtures can code against it without churning when the provisioner
+ * lands.
+ */
+export interface PlatformCredentials {
+  /** Reserved platform project id — the Console sign-in target. */
+  projectId: string;
+  /** Browser-safe publishable key, the only credential bootstrap mints. */
+  publishableKey?: string;
+  /**
+   * Scoped platform automation key (`sk_plat_` on the wire), captured at
+   * creation — the server returns it exactly once. Present only when the
+   * boot options explicitly request one; there is no ambient platform
+   * secret to capture.
+   */
+  platformKey?: string;
+  /**
+   * Operator session minted through the real login flow at boot, for suites
+   * that drive Console/management surfaces without re-running sign-in.
+   */
+  operatorSession?: MintedSession;
+}
+
+/**
  * Serializable description of a bootstrapped instance + project. This is the
- * contract that crosses process boundaries (boot script -> Playwright workers).
+ * contract that crosses process boundaries (boot script -> Playwright workers)
+ * — and the credential surface of the kit: every credential the server mints
+ * during provisioning is captured here, so tests and dev loops read them from
+ * the handle instead of hand-set environment or a server-side test door (a
+ * server flag that mints deterministic credentials must not exist).
  */
 export interface InstanceHandle {
   baseUrl: string;
   projectId: string;
+  /**
+   * The seeded customer project's operator credential, captured from
+   * `POST /projects` — the server returns it exactly once, at creation.
+   * Bearer for the management API (`api`) and every seed op.
+   */
   projectSecret: string;
   /**
    * First registered app origin. Flow submissions enforce the project's
@@ -20,7 +62,18 @@ export interface InstanceHandle {
    * project credential.
    */
   schemaId: string;
+  /**
+   * The same project's browser-plane credential (the publishable-key
+   * predecessor from root ADR 036), also captured at creation.
+   */
   previewSecret?: string;
+  /**
+   * Platform-plane credential slot. Unpopulated until the platform-project
+   * provisioner (Console ADR 0004 §2) lands server-side; see
+   * `PlatformCredentials` for the settled contract and why it stays empty
+   * today.
+   */
+  platform?: PlatformCredentials;
 }
 
 export interface SeedUserInput {
