@@ -73,6 +73,10 @@ type GetClaimStatusRes interface {
 	getClaimStatusRes()
 }
 
+type GetEventRes interface {
+	getEventRes()
+}
+
 type GetFlowDefinitionRes interface {
 	getFlowDefinitionRes()
 }
@@ -131,6 +135,10 @@ type IssueChallengeRes interface {
 
 type ListBrandingRes interface {
 	listBrandingRes()
+}
+
+type ListEventsRes interface {
+	listEventsRes()
 }
 
 type ListFlowDefinitionsRes interface {

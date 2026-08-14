@@ -35,12 +35,12 @@ func newTokenStatements(client queryExecutor) tokenStatements {
 }
 
 // CreateToken implements [service.TokenStatements].
+//
+// TokenID uses ensureManagedID (keep-if-set) so Spanner-style abort retries of
+// an outer Transaction that share the same *Token remain idempotent on id mint.
 func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) error {
 	if err := token.ValidatePersisted(); err != nil {
 		return err
-	}
-	if token.TokenID != "" {
-		return fmt.Errorf("token_id must not be set on create")
 	}
 	if err := ensureManagedID(&token.TokenID, domain.TokenPrefix); err != nil {
 		return err

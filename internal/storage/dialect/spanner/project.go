@@ -59,9 +59,12 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 
 // DeleteProjectByID implements [service.ProjectStatements].
 // resource_scope_index rows for this project cascade via the project_id FK.
-func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) error {
-	_, err := ps.db.Update(ctx, buildStatement(deleteByIDProjectStmt, id).statement())
-	return err
+func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) (bool, error) {
+	n, err := ps.db.Update(ctx, buildStatement(deleteByIDProjectStmt, id).statement())
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }
 
 // GetProjectByID implements [service.ProjectStatements].

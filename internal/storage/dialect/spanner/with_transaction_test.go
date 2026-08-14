@@ -27,6 +27,10 @@ func (s *stubDB) Update(context.Context, spanner.Statement) (int64, error) {
 	return 1, nil
 }
 
+func (s *stubDB) BufferWrite(context.Context, []*spanner.Mutation) error {
+	return errors.New("not implemented")
+}
+
 func (s *stubDB) ReadRow(context.Context, string, spanner.Key, []string) (*spanner.Row, error) {
 	return nil, errors.New("not implemented")
 }

@@ -67,7 +67,7 @@ func ensureTestUser(t *testing.T, projectID, userID string) {
 func TestSessionStatements_Exchange_basic(t *testing.T) {
 	projectID := "proj-sess-ex-" + t.Name()
 	require.NoError(t, testPool.CreateProject(t.Context(), &domain.Project{ID: projectID, Name: "s"}))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 
 	plain, attempt := handoffCompletedAttempt(t, projectID, nil)
 	exchanged, err := testPool.ExchangeSession(t.Context(), projectID, plain, nil, 0)
@@ -85,7 +85,7 @@ func TestSessionStatements_Exchange_basic(t *testing.T) {
 func TestSessionStatements_Exchange_withUserAndPassword(t *testing.T) {
 	projectID := "proj-sess-up-" + t.Name()
 	require.NoError(t, testPool.CreateProject(t.Context(), &domain.Project{ID: projectID, Name: "s"}))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 
 	userID := "user_1"
 	ensureTestUser(t, projectID, userID)
@@ -110,7 +110,7 @@ func TestSessionStatements_Exchange_withUserAndPassword(t *testing.T) {
 func TestSessionStatements_Exchange_concurrent(t *testing.T) {
 	projectID := "proj-sess-conc-" + t.Name()
 	require.NoError(t, testPool.CreateProject(t.Context(), &domain.Project{ID: projectID, Name: "s"}))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 
 	const n = 8
 	plains := make([]string, n)

@@ -14,6 +14,7 @@ content:
         - $ref: '../../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-encrypt_failed.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../components/schemas/errors/flow-cookie_expired.yaml'
         - $ref: '../../../components/schemas/errors/flow-cookie_invalid.yaml'
         - $ref: '../../../components/schemas/errors/flow-integrity.yaml'
@@ -43,6 +44,7 @@ content:
           enc_key.decrypt_failed: '../../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.encrypt_failed: '../../../components/schemas/errors/enc_key-encrypt_failed.yaml'
           enc_key.not_found: '../../../components/schemas/errors/enc_key-not_found.yaml'
+          evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
           flow.cookie_expired: '../../../components/schemas/errors/flow-cookie_expired.yaml'
           flow.cookie_invalid: '../../../components/schemas/errors/flow-cookie_invalid.yaml'
           flow.integrity: '../../../components/schemas/errors/flow-integrity.yaml'
@@ -110,6 +112,11 @@ content:
         value:
           code: enc_key.not_found
           message: 'encryption key not found'
+      evt.invalid:
+        summary: evt.invalid
+        value:
+          code: evt.invalid
+          message: 'event: invalid'
       flow.cookie_expired:
         summary: flow.cookie_expired
         value:
