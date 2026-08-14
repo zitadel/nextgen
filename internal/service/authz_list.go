@@ -27,9 +27,9 @@ func AuthzListFilterFromContext(ctx context.Context) (AuthzListFilter, bool) {
 
 type authzListFilterBypassCtxKey struct{}
 
-// WithAuthzListFilterBypass marks a storage-layer list that is not a
-// management HTTP path (stmttest, dialect tests, post-create inspection).
-// Production handlers must attach WithAuthzListFilter instead.
+// WithAuthzListFilterBypass marks a list that is not a management HTTP path
+// (nested uniqueness/resolve/GetLatest, stmttest, dialect tests). Production
+// HTTP list handlers must attach WithAuthzListFilter instead.
 func WithAuthzListFilterBypass(ctx context.Context) context.Context {
 	return context.WithValue(ctx, authzListFilterBypassCtxKey{}, true)
 }

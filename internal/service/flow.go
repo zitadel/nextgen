@@ -102,7 +102,7 @@ func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest)
 		filters = append(filters, database.Equal(database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
 	}
 
-	result, err := s.v2Pool.Statements().ListFlowDefinitions(ctx, &database.ListOptions[domain.FlowDefinitionField]{
+	result, err := s.v2Pool.Statements().ListFlowDefinitions(WithAuthzListFilterBypass(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(filters...),
 	})
 	if err != nil {
@@ -141,7 +141,7 @@ func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequ
 		filters = append(filters, database.Equal(database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
 	}
 
-	result, err := s.v2Pool.Statements().ListFlowDefinitions(ctx, &database.ListOptions[domain.FlowDefinitionField]{
+	result, err := s.v2Pool.Statements().ListFlowDefinitions(WithAuthzListFilterBypass(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(filters...),
 	})
 	if err != nil {

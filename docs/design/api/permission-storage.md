@@ -97,7 +97,9 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
   carve-outs ([#839](https://github.com/zitadel/nextgen/issues/839)):
   `QuerySessions` (`compileRead`, List not implemented), `QueryProjects`
   (project is the scope boundary), `ListUserPasskeys` / `ListUserTeams`
-  (nested under a user already gated by `requireResourceAccess`).
+  (nested under a user already gated by `requireResourceAccess`), nested
+  `ListFlowDefinitions` (create uniqueness / login Resolve) and branding
+  `GetLatest` (`WithAuthzListFilterBypass`).
 
 ## Locked decisions
 
@@ -633,6 +635,8 @@ Management `compileList` with a non-empty table name and resource-id column **re
 | `QuerySessions` | Uses `compileRead`; `List` is not implemented. |
 | `QueryProjects` | The project **is** the scope boundary. |
 | `ListUserPasskeys` / `ListUserTeams` | Nested under a user already gated by `requireResourceAccess`. |
+| Nested `ListFlowDefinitions` (create uniqueness, update conflict, pivoting, login `Resolve`) | Not a management HTTP list; uses `WithAuthzListFilterBypass` so uniqueness/routing see the whole project. |
+| `GetLatest` branding | Runtime/flow resolution, not the management list endpoint. |
 
 Do not wire `QuerySessions` here; keep this table accurate until `sessionService.List` exists.
 
