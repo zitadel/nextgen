@@ -71,7 +71,7 @@ func NewFlowDefinitionService(
 }
 
 func (fd *flowDefinitionService) Create(ctx context.Context, req FlowDefinitionRequest) (*domain.FlowDefinition, error) {
-	existing, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, &database.ListOptions[domain.FlowDefinitionField]{
+	existing, err := fd.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
 			database.Equal(database.Col(domain.FlowDefinitionFieldName), req.Name),
@@ -194,7 +194,7 @@ func (fd *flowDefinitionService) isUpdateAllowed(
 		return cmp.Compare(a.String(), b.String())
 	})
 
-	fds, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, &database.ListOptions[domain.FlowDefinitionField]{
+	fds, err := fd.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
 			database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
@@ -245,7 +245,7 @@ func (fd *flowDefinitionService) validatePivotingTargets(ctx context.Context, pi
 		return nil
 	}
 	for _, target := range pivotingTargets {
-		defs, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, &database.ListOptions[domain.FlowDefinitionField]{
+		defs, err := fd.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 			Filter: database.And(
 				database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
 				database.Equal(database.Col(domain.FlowDefinitionFieldName), target.Name),

@@ -27,8 +27,8 @@ func AuthzListFilterFromContext(ctx context.Context) (AuthzListFilter, bool) {
 type authzListUnrestrictedCtxKey struct{}
 
 // WithAuthzListUnrestricted marks a list that must not fail closed and must
-// not write EXISTS: project-wide Allow, or a storage-layer test that is not a
-// management HTTP path.
+// not write EXISTS: project-wide Allow, nested uniqueness/resolve/GetLatest,
+// or a storage-layer test that is not a management HTTP path.
 func WithAuthzListUnrestricted(ctx context.Context) context.Context {
 	return context.WithValue(ctx, authzListUnrestrictedCtxKey{}, true)
 }
