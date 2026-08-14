@@ -52,6 +52,9 @@ func TestLoadConfigCreatesOnlyTheConfiguredDataDir(t *testing.T) {
 }
 
 func TestEnsureServerDataDirReportsAnUnwritableParent(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows does not enforce the POSIX mode bits this test makes the parent unwritable with")
+	}
 	if os.Geteuid() == 0 {
 		t.Skip("root ignores directory permissions")
 	}
