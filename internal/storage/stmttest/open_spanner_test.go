@@ -20,5 +20,9 @@ func init() {
 		func(ctx context.Context, pool dbtest.Pool, projectID, teamID string) error {
 			return spanner.HardDeleteTeam(ctx, pool, projectID, teamID)
 		},
+		spanner.SchemaColumnNullability(),
+		func(ctx context.Context, pool dbtest.Pool) (map[string]map[string]bool, error) {
+			return spanner.LiveColumnNullability(ctx, pool)
+		},
 	)
 }

@@ -93,7 +93,7 @@ Every field is optional; omitting a field falls back to the built-in default. A 
         "border": "#262626"
       }
     }
-  },
+  }
 }
 ```
 
@@ -111,7 +111,25 @@ The LiquidJS template string for the current step. When present, the orchestrato
 
 #### `logo_url`, `font_url`, `hero_url` (URIs, optional)
 
-Asset URLs. Must be https. `font_url` is injected as a `<link rel="stylesheet">` before the widget paints. `hero_url` is consumed by the `split` layout.
+Asset URLs are HTTPS by default. `logo_url` and `hero_url` may use canonical
+loopback HTTP (`localhost`, dotted-decimal `127.0.0.0/8`, or `[::1]`) for local
+development; the component preserves those URLs only while its embedding
+document also runs on loopback HTTP. `font_url` remains HTTPS-only and is
+injected as a `<link rel="stylesheet">` before the widget paints. `hero_url` is
+consumed by the `split` layout.
+
+Shape validation cannot tell a live asset from a dead one, and a well-formed
+URL that serves nothing renders as a 0×0 `<img>` — invisible in the design and
+silent in the console. Two layers cover that gap, neither of them a gate:
+`zitadel plan` / `apply` probe each URL and warn (`apps/cli/src/lib/sync/asset-probe.ts`),
+and the component hides an asset whose load fails, restoring either the split
+designs' decorative placeholder or a shipped design's authored no-asset content
+(`packages/components/src/orchestrator/asset-fallback.ts`). Templates cannot do
+the latter themselves: DOMPurify strips inline `onerror` along with every other
+event handler, so the listener has to be orchestrator-side. The CLI side only
+contacts public HTTPS destinations and validates every redirect; loopback,
+private, and internal targets remain inconclusive so repo config cannot make
+the planning host scan its own network.
 
 `font_url` is **read-only in v1**: because the component must inject it at document level (shadow-scoped `@font-face` never registers faces), a writable value would give `branding.write` page-wide CSS control over the embedding application. `POST /branding` rejects it and the local config dialect omits it; safe delivery is an [ADR 040](../../adrs/040-tenant-login-templates-editable-config.md) follow-up. Until then, load fonts from the embedding page.
 
@@ -150,6 +168,7 @@ Both modes carry real token values ([ADR 014 §5](../../adrs/014-design-tokens-a
 #### ~~`advanced.custom_css`~~ (removed)
 
 Dropped. The override ladder covers all CSS customization needs:
+
 1. **Tokens** — orchestrator-owned from `Branding` (`adoptedStyleSheets`)
 2. **Inline styles** — `<zitadel-login style="--zl-*">` (host override)
 3. **`::part()`** — parent page styles atom internals
@@ -161,7 +180,9 @@ No need for a separate `custom_css` escape hatch. Eliminates a security surface 
 
 Beyond field-level types, the component refuses to render a branding object unless:
 
-1. Every referenced URL is https (no mixed content on customer origins).
+1. Every referenced URL is HTTPS, except `logo_url` / `hero_url` may use the
+   canonical loopback-development exception above; the render gate drops that
+   exception on non-loopback documents.
 2. `liquid_template`, when present, passes both the security validator ([`../flowengine/template-security.md`](../flowengine/template-security.md)) and the structural validator ([`validator.md`](validator.md)).
 3. Dark-mode overrides only override keys that exist on `palette` (proposed extension only).
 4. `advanced.custom_css`, when present, matches the sandbox allowlist (proposed extension only).
@@ -175,6 +196,7 @@ Every branding payload the component receives passes through:
 1. **Shape validation**: types, enums, URLs, invariants. Every paint, cheap.
 2. **Template validation**: if `liquid_template` is set, structural AST pass vs flow ([`validator.md`](validator.md)). Once per load, cached.
 3. **Runtime safety net**: `{% mandatory_gates %}` appends missing required UI so a bad template still yields a submittable step.
+4. **Asset degradation**: an `<img>` that fails to load is hidden and, in the split designs, replaced by the decorative brand-pane placeholder. Armed per commit; a failure is warned about once on the console.
 
 Stages 1 and 2 run in the component. Stage 3 runs as part of Liquid rendering. The security pipeline in [`../flowengine/template-security.md`](../flowengine/template-security.md) runs on save server-side; this doc assumes it. The widget does not re-check security at paint time.
 

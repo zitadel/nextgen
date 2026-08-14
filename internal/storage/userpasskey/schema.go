@@ -46,6 +46,7 @@ var Schema = database.NewSchema(map[domain.UserPasskeyField]database.FieldBindin
 		SQLName:  "name",
 		Accessor: func(p *domain.UserPasskey) any { return p.Name },
 		Coerce:   database.CoerceString,
+		Nullable: true,
 	},
 	domain.UserPasskeyFieldVerifiedAt: {
 		SQLName:  "verified_at",

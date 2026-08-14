@@ -388,7 +388,14 @@ test("records log collection failures thrown as non-Error values", async () => {
 async function writeGeneratedApp(appDir, registryUrl, sdkPackage, lockfile = "npm") {
   await writeFile(
     join(appDir, "package.json"),
-    `${JSON.stringify({ dependencies: { [sdkPackage]: "alpha" } }, null, 2)}\n`,
+    // The dev script carries the port setup registered as the project origin —
+    // what the real CLI writes for the command-line-only framework CLIs, and
+    // what `assertDevScriptServesSetupPort` checks.
+    `${JSON.stringify(
+      { scripts: { dev: "next dev --port 3010" }, dependencies: { [sdkPackage]: "alpha" } },
+      null,
+      2,
+    )}\n`,
   );
   if (lockfile === "pnpm") {
     await writeFile(

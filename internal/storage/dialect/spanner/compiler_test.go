@@ -438,20 +438,26 @@ func TestCompileStringFilter(t *testing.T) {
 		{
 			name:    "starts with fold",
 			filter:  database.StringStartsWithFold(col, "Acme"),
-			wantSQL: "LOWER(name) LIKE @p1 || '%'",
-			wantArg: "acme",
+			wantSQL: "LOWER(name) LIKE LOWER(@p1 || '%')",
+			wantArg: "Acme",
 		},
 		{
 			name:    "contains fold",
-			filter:  database.StringContainsFold(col, "Flow"),
-			wantSQL: "LOWER(name) LIKE '%' || @p1 || '%'",
-			wantArg: "flow",
+			filter:  database.StringContainsFold(col, "Übung"),
+			wantSQL: "LOWER(name) LIKE LOWER('%' || @p1 || '%')",
+			wantArg: "Übung",
 		},
 		{
 			name:    "ends with fold",
 			filter:  database.StringEndsWithFold(col, "Suffix"),
-			wantSQL: "LOWER(name) LIKE '%' || @p1",
-			wantArg: "suffix",
+			wantSQL: "LOWER(name) LIKE LOWER('%' || @p1)",
+			wantArg: "Suffix",
+		},
+		{
+			name:    "contains fold escapes wildcards",
+			filter:  database.StringContainsFold(col, `100%`),
+			wantSQL: "LOWER(name) LIKE LOWER('%' || @p1 || '%')",
+			wantArg: `100\%`,
 		},
 	}
 
