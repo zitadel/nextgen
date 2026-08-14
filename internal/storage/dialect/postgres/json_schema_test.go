@@ -54,7 +54,7 @@ func TestJSONSchemaStatements_CRUD(t *testing.T) {
 	assert.Contains(t, string(got.Schema), `"type":"object"`)
 	assert.False(t, got.CreatedAt.IsZero())
 
-	listed, err := testPool.ListJSONSchemas(service.WithAuthzListFilterBypass(t.Context()), &v2database.ListOptions[domain.JSONSchemaField]{
+	listed, err := testPool.ListJSONSchemas(service.WithAuthzListUnrestricted(t.Context()), &v2database.ListOptions[domain.JSONSchemaField]{
 		Filter: v2database.Equal(v2database.Col(domain.JSONSchemaFieldProjectID), projectID),
 		Pagination: v2database.Page[domain.JSONSchemaField]{
 			OrderBy: v2database.OrderBy[domain.JSONSchemaField]{

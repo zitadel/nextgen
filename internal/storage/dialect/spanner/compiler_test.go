@@ -578,7 +578,7 @@ func TestCompileListRequiresAuthzFilter(t *testing.T) {
 	assert.Contains(t, compiler.String(), "EXISTS")
 
 	compiler.Reset()
-	allowCtx := service.WithAuthzListProjectWideAllow(context.Background())
+	allowCtx := service.WithAuthzListUnrestricted(context.Background())
 	require.NoError(t, compileList(allowCtx, &compiler, stmt, opts, teamSchema, "teams", "id"))
 	assert.NotContains(t, compiler.String(), "EXISTS")
 }

@@ -110,7 +110,7 @@ func run(m *testing.M) int {
 // management lists. Production compileList requires AuthzListFilter (#838).
 func unfilteredListCtx(t *testing.T) context.Context {
 	t.Helper()
-	return service.WithAuthzListFilterBypass(t.Context())
+	return service.WithAuthzListUnrestricted(t.Context())
 }
 
 // forEachDialect runs fn once per brought-up dialect as a subtest named after the dialect.

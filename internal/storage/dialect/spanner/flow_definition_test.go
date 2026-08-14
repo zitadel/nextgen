@@ -69,7 +69,7 @@ func TestFlowDefinitionStatements_CRUD(t *testing.T) {
 	assert.Equal(t, def.UserSchema, got.UserSchema)
 	assert.Equal(t, def.Purposes, got.Purposes)
 
-	listed, err := stmts.ListFlowDefinitions(service.WithAuthzListFilterBypass(ctx), &database.ListOptions[domain.FlowDefinitionField]{
+	listed, err := stmts.ListFlowDefinitions(service.WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), project.ID),
 			database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), domain.FlowDefinitionPurposeLogin.String()),

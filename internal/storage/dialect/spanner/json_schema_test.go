@@ -43,7 +43,7 @@ func TestJSONSchemaStatements_CRUD(t *testing.T) {
 	assert.Contains(t, string(got.Schema), `"type":"object"`)
 	assert.Equal(t, schema.CreatedAt.UTC(), got.CreatedAt.UTC())
 
-	listed, err := stmts.ListJSONSchemas(service.WithAuthzListFilterBypass(ctx), &database.ListOptions[domain.JSONSchemaField]{
+	listed, err := stmts.ListJSONSchemas(service.WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.JSONSchemaField]{
 		Filter: database.Equal(database.Col(domain.JSONSchemaFieldProjectID), project.ID),
 		Pagination: database.Page[domain.JSONSchemaField]{
 			Limit: 10,

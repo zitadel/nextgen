@@ -68,11 +68,7 @@ func (h *Handler) ListUsers(ctx context.Context, params api.ListUsersParams) (ap
 	// No project parameter: the operation is bound to the token's own project
 	// by construction, so only the scope check is live — it keeps the
 	// browser-plane preview secret from listing the project's users.
-	ctx, proceed, err := h.requireProjectListAccess(ctx, scopeCtx.ProjectID, userAccess)
-	if err != nil || !proceed {
-		return nil, err
-	}
-	ctx, err = h.withAuthzListFilterIfNeeded(ctx, scopeCtx.ProjectID, domain.ResourceKindUser, opRead)
+	ctx, err := h.requireProjectListAccess(ctx, scopeCtx.ProjectID, userAccess, domain.ResourceKindUser)
 	if err != nil {
 		return nil, err
 	}

@@ -87,15 +87,9 @@ func (s authzCatalogStatements) PersistCatalogVersion(
 	meta domain.AuthzCatalogVersion,
 	mutations compiler.CatalogMutations,
 ) error {
-	authz.BeforePersistCatalogVersion(meta.CatalogKind)
-	err := withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
+	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
 		return persistCatalogVersion(ctx, tx, meta, mutations)
 	})
-	if err != nil {
-		return err
-	}
-	authz.AfterPersistCatalogVersion(meta.CatalogKind, meta.ID)
-	return nil
 }
 
 func persistCatalogVersion(

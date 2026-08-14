@@ -24,16 +24,11 @@ type stubAuthzStmts struct {
 	kinds map[string]domain.ResourceKind
 	// elsewhere forces ExistsResourceScopeElsewhere for a resource_id (shared URL across foreign projects).
 	elsewhere map[string]bool
-	// catalogCalls counts ActiveSystemCatalogID invocations when non-nil.
-	catalogCalls *int
 }
 
 func (stubAuthzStmts) IsStatements() {}
 
 func (s stubAuthzStmts) ActiveSystemCatalogID(context.Context) (string, error) {
-	if s.catalogCalls != nil {
-		*s.catalogCalls++
-	}
 	return domain.SystemCatalogID, nil
 }
 
@@ -277,68 +272,65 @@ func TestRequireProjectListAccess(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
 	})
 
-	ctx, proceed, err := requireProjectListAccess(operator, stmts, "proj_a", userAccess)
-	if err != nil || !proceed {
-		t.Fatalf("project-wide Allow should proceed: proceed=%v err=%v", proceed, err)
+	ctx, err := requireProjectListAccess(operator, stmts, "proj_a", userAccess, domain.ResourceKindUser)
+	if err != nil {
+		t.Fatalf("project-wide Allow should proceed: %v", err)
 	}
-	if !service.AuthzListProjectWideAllowed(ctx) {
+	if !service.AuthzListUnrestricted(ctx) {
 		t.Fatal("Allow must skip the EXISTS list filter")
+	}
+	if _, ok := service.AuthzListFilterFromContext(ctx); ok {
+		t.Fatal("Allow must not attach EXISTS")
 	}
 
 	deny := false
 	foothold := true
 	narrow := stubAuthzStmts{allowCheck: &deny, foothold: &foothold}
-	ctx, proceed, err = requireProjectListAccess(operator, narrow, "proj_a", userAccess)
-	if err != nil || !proceed {
-		t.Fatalf("Forbidden with foothold should proceed for partial-view lists: proceed=%v err=%v", proceed, err)
+	ctx, err = requireProjectListAccess(operator, narrow, "proj_a", userAccess, domain.ResourceKindUser)
+	if err != nil {
+		t.Fatalf("Forbidden with foothold should proceed for partial-view lists: %v", err)
 	}
-	if service.AuthzListProjectWideAllowed(ctx) {
+	if service.AuthzListUnrestricted(ctx) {
+		t.Fatal("Forbidden must not mark the list unrestricted")
+	}
+	filter, ok := service.AuthzListFilterFromContext(ctx)
+	if !ok {
 		t.Fatal("Forbidden must attach the EXISTS list filter")
 	}
-
-	_, proceed, err = requireProjectListAccess(operator, stmts, "proj_b", userAccess)
-	if proceed {
-		t.Fatal("no foothold must not proceed")
+	if filter.ResourceKind != domain.ResourceKindUser {
+		t.Fatalf("filter kind = %q, want user", filter.ResourceKind)
 	}
+	if filter.ConstraintTeamID != "" {
+		t.Fatalf("sk_proj filter ConstraintTeamID = %q, want empty", filter.ConstraintTeamID)
+	}
+
+	_, err = requireProjectListAccess(operator, stmts, "proj_b", userAccess, domain.ResourceKindUser)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 
-	_, proceed, err = requireProjectListAccess(preview, stmts, "proj_a", userAccess)
-	if proceed {
-		t.Fatal("preview must not proceed")
-	}
+	_, err = requireProjectListAccess(preview, stmts, "proj_a", userAccess, domain.ResourceKindUser)
 	assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
 
-	_, proceed, err = requireProjectListAccess(context.Background(), stmts, "proj_a", userAccess)
-	if proceed {
-		t.Fatal("missing scope must not proceed")
-	}
+	_, err = requireProjectListAccess(context.Background(), stmts, "proj_a", userAccess, domain.ResourceKindUser)
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 }
 
-func TestRequestResolverSharesCatalogLookup(t *testing.T) {
-	calls := 0
-	stmts := stubAuthzStmts{catalogCalls: &calls}
+func TestWithAuthzListFilterCopiesConstraintTeamID(t *testing.T) {
+	stmts := stubAuthzStmts{}
 	ctx := WithScopeContext(context.Background(), ScopeContext{
 		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
-		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+		PrincipalType: domain.AuthzPrincipalTypeSKTeam, PrincipalID: "sk_team_1",
+		TeamID: "team_eng",
 	})
-	r, ctx := requestResolver(ctx)
-	_, err := r.Check(ctx, stmts, resolver.Request{
-		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
-		ProjectID: "proj_a", ObjectType: "project", Relation: "viewer",
-	})
+	ctx, err := withAuthzListFilter(ctx, resolver.New(), stmts, "proj_a", domain.ResourceKindUser, opRead)
 	if err != nil {
-		t.Fatalf("Check: %v", err)
+		t.Fatalf("withAuthzListFilter: %v", err)
 	}
-	id, err := r.ActiveCatalogID(ctx, stmts)
-	if err != nil {
-		t.Fatalf("ActiveCatalogID: %v", err)
+	filter, ok := service.AuthzListFilterFromContext(ctx)
+	if !ok {
+		t.Fatal("expected list filter")
 	}
-	if id != domain.SystemCatalogID {
-		t.Fatalf("catalog id = %q", id)
-	}
-	if calls != 1 {
-		t.Fatalf("ActiveSystemCatalogID calls = %d, want 1", calls)
+	if filter.ConstraintTeamID != "team_eng" {
+		t.Fatalf("ConstraintTeamID = %q, want team_eng", filter.ConstraintTeamID)
 	}
 }
 

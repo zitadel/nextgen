@@ -129,6 +129,17 @@ func (r *Resolver) ListObjects(ctx context.Context, stmts service.AuthzResolverS
 	})
 }
 
+// CheckParams is the storage Check/List payload for req, including
+// ConstraintTeamID for sk_team principals. HTTP list filters must use this
+// so EXISTS SQL matches Check.
+func (r *Resolver) CheckParams(ctx context.Context, stmts service.AuthzResolverStatements, req Request) (domain.AuthzCheckParams, error) {
+	catalogID, err := r.ActiveCatalogID(ctx, stmts)
+	if err != nil {
+		return domain.AuthzCheckParams{}, err
+	}
+	return checkParams(catalogID, req), nil
+}
+
 func checkParams(catalogID string, req Request) domain.AuthzCheckParams {
 	p := domain.AuthzCheckParams{
 		CatalogID:              catalogID,

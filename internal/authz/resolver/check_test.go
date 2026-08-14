@@ -204,3 +204,21 @@ func TestListObjects_SKTeamDeny(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, ids)
 }
+
+func TestCheckParams_SKTeamConstraint(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+	stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
+
+	params, err := resolver.New().CheckParams(context.Background(), stmts, resolver.Request{
+		PrincipalType: domain.AuthzPrincipalTypeSKTeam,
+		PrincipalID:   "sk_team_1",
+		ProjectID:     "proj_1",
+		ObjectType:    "project",
+		Relation:      "viewer",
+		TeamID:        "team_eng",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "team_eng", params.ConstraintTeamID)
+	assert.Equal(t, domain.SystemCatalogID, params.CatalogID)
+}

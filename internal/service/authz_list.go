@@ -24,30 +24,17 @@ func AuthzListFilterFromContext(ctx context.Context) (AuthzListFilter, bool) {
 	return f, ok
 }
 
-type authzListFilterBypassCtxKey struct{}
+type authzListUnrestrictedCtxKey struct{}
 
-// WithAuthzListFilterBypass marks a storage-layer list that is not a
-// management HTTP path. Production handlers must attach WithAuthzListFilter.
-func WithAuthzListFilterBypass(ctx context.Context) context.Context {
-	return context.WithValue(ctx, authzListFilterBypassCtxKey{}, true)
+// WithAuthzListUnrestricted marks a list that must not fail closed and must
+// not write EXISTS: project-wide Allow, or a storage-layer test that is not a
+// management HTTP path.
+func WithAuthzListUnrestricted(ctx context.Context) context.Context {
+	return context.WithValue(ctx, authzListUnrestrictedCtxKey{}, true)
 }
 
-// AuthzListFilterBypassed reports whether WithAuthzListFilterBypass is set.
-func AuthzListFilterBypassed(ctx context.Context) bool {
-	v, _ := ctx.Value(authzListFilterBypassCtxKey{}).(bool)
-	return v
-}
-
-type authzListProjectWideAllowCtxKey struct{}
-
-// WithAuthzListProjectWideAllow marks a list whose project-level Check already
-// Allowed, so compileList must not fail closed and EXISTS is not attached.
-func WithAuthzListProjectWideAllow(ctx context.Context) context.Context {
-	return context.WithValue(ctx, authzListProjectWideAllowCtxKey{}, true)
-}
-
-// AuthzListProjectWideAllowed reports whether Check already Allowed project-wide.
-func AuthzListProjectWideAllowed(ctx context.Context) bool {
-	v, _ := ctx.Value(authzListProjectWideAllowCtxKey{}).(bool)
+// AuthzListUnrestricted reports whether WithAuthzListUnrestricted is set.
+func AuthzListUnrestricted(ctx context.Context) bool {
+	v, _ := ctx.Value(authzListUnrestrictedCtxKey{}).(bool)
 	return v
 }

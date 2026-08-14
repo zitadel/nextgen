@@ -24,23 +24,21 @@ func newAuthzResolverStatements(db queryExecutor) authzResolverStatements {
 
 // ActiveSystemCatalogID implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) ActiveSystemCatalogID(ctx context.Context) (string, error) {
-	return authz.LoadOrFetchActiveSystemCatalogID(func() (string, error) {
-		var c statementCompiler
-		authz.WriteActiveSystemCatalogID(&c, spannerAuthzEnv())
-		var id string
-		err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
-			var qErr error
-			id, qErr = collectOneRow(iter, func(row *spanner.Row) (string, error) {
-				var v string
-				return v, row.Columns(&v)
-			})
-			return qErr
+	var c statementCompiler
+	authz.WriteActiveSystemCatalogID(&c, spannerAuthzEnv())
+	var id string
+	err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
+		var qErr error
+		id, qErr = collectOneRow(iter, func(row *spanner.Row) (string, error) {
+			var v string
+			return v, row.Columns(&v)
 		})
-		if err != nil {
-			return "", wrapError(err)
-		}
-		return id, nil
+		return qErr
 	})
+	if err != nil {
+		return "", wrapError(err)
+	}
+	return id, nil
 }
 
 // HasAuthzProjectFoothold implements [service.AuthzResolverStatements].
