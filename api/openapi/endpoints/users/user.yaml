@@ -1,18 +1,19 @@
 title: User
 description: |
-  A user represents an individual identity in the system. It can be used to 
-  represent a human user, but also a service account or any other type of 
-  identity. The content of a user is determined by the configured schema for 
-  users, this is only a base schema.
+  A user represents an individual identity in the system. It can be used to
+  represent a human user, but also a service account or any other type of
+  identity.
 
-  The server assigns the resource primary key (`id`) on create. Clients must
-  not send `id` in the create body; it is returned in the create response.
-# ogen does not enforce JSON Schema `not`, and rejects `properties.id: false`.
-# Document the forbid here; the create handler rejects a client-supplied `id`.
+  The envelope — `id`, `metadata`, `$schema` — is server-owned and fixed. The
+  schema-defined content lives under `attributes`, which is exactly the
+  document the user's `$schema` validates. Keeping the two apart means a schema
+  may name a property `id` or `metadata` without colliding with the envelope,
+  and closed-world keywords (`additionalProperties: false`, `propertyNames`,
+  `unevaluatedProperties`) behave as their author expects.
 type: object
-additionalProperties: true
 required:
   - $schema
+  - attributes
 properties:
   id:
     readOnly: true
@@ -23,7 +24,12 @@ properties:
   $schema:
     type: string
     description: |
-      The schema that defines the content of the user. These schemas can be
+      The schema that defines the content of `attributes`. These schemas can be
       created using the `/schemas` endpoint. A default schema is provided.
-      This schema can be retrieved using the same endpoint. The schema will
-      be used to validate the user's properties.
+      This schema can be retrieved using the same endpoint.
+  attributes:
+    type: object
+    additionalProperties: true
+    description: |
+      The user's schema-defined content, validated against `$schema`. Property
+      names and types are determined entirely by that schema.

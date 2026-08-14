@@ -1,12 +1,19 @@
 title: CreateUserResponse
-type: object
 description: |
-  The content of this response is determined by the configured 
-  schema for users.
-additionalProperties: true
+  The created user, echoed back with its server-assigned `id`. The
+  `attributes` object is the content as stored, validated against `$schema`.
+type: object
 required:
   - id
+  - $schema
+  - attributes
 properties:
   id:
+    $ref: ../../components/schemas/user-id.yaml
+  $schema:
     type: string
-    description: The unique identifier of the created user.
+    description: The schema that defines the content of `attributes`.
+  attributes:
+    type: object
+    additionalProperties: true
+    description: The user's schema-defined content, as stored.
