@@ -77,7 +77,8 @@ func TestTeamStatements_Deactivate_clearsMembershipEdges(t *testing.T) {
 		_, err := d.stmts.GetAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdgeKey(projectID, teamID, userID))
 		require.NoError(t, err)
 
-		require.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, teamID))
+		_, err = d.stmts.DeactivateTeam(t.Context(), projectID, teamID)
+		require.NoError(t, err)
 		_, err = d.stmts.GetAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdgeKey(projectID, teamID, userID))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 

@@ -194,7 +194,8 @@ func TestClaimStatements_GetPersonalTeamForUser(t *testing.T) {
 			// Deactivating the earliest team must NOT fall back to the next active
 			// team: the earliest membership is selected unconditionally, so once its
 			// team is inactive the resolve returns not-found rather than teamB.
-			require.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, teamA))
+			_, err = d.stmts.DeactivateTeam(t.Context(), projectID, teamA)
+			require.NoError(t, err)
 			_, err = d.stmts.GetPersonalTeamForUser(t.Context(), projectID, userID)
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		})
