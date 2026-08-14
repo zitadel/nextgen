@@ -1,5 +1,4 @@
 import type { Page } from "@playwright/test";
-
 import { expect, test, type SeededUser } from "@zitadel/testing/playwright";
 
 /**
@@ -9,7 +8,7 @@ import { expect, test, type SeededUser } from "@zitadel/testing/playwright";
 async function loginWithPassword(page: Page, user: SeededUser): Promise<void> {
   await page.goto("/login");
   await page.getByLabel(/email/i).fill(user.email);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.getByLabel(/password/i).fill(user.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await page.waitForURL("**/admin", { timeout: 20_000 });

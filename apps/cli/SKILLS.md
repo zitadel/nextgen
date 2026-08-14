@@ -99,7 +99,14 @@ the CLI's help layer, not the envelope.
   templates by it; the planned `web-component` renderer is not yet available
   and is rejected if passed), `--dev-port` (dev-server port, also the issuer
   origin registered with Zitadel — use distinct ports to run several scaffolded
-  apps side by side), `--preset password-first|passkey-first` (the sign-in
+  apps side by side. The app must actually serve this port or the flow API
+  rejects its origin on the first submit, so setup makes the port explicit in
+  the app's own dev-server config: `server.port` + `strictPort` for Vite
+  frameworks, `serve.options.port` for Angular, and — because `next dev` and
+  `nuxt dev` take a port only from the command line — `--port` in the
+  `package.json` `dev` script for Next and Nuxt. On a pre-existing app that
+  means setup edits the `dev` script when it does not already name that port;
+  a script already on it is left untouched), `--preset password-first|passkey-first` (the sign-in
   experience the scaffold starts from: `password-first` is the default —
   email + password with passkey optional during registration; `passkey-first`
   enters login on a one-tap passkey step with an email + password fallback;
@@ -139,6 +146,26 @@ the CLI's help layer, not the envelope.
   or `split-right`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
+- `plan` and `apply --dry-run` also emit `data.warnings`: non-blocking
+  findings as `{path, rule, message}`, the same text the human plan prints as
+  `# warning:` lines and `apply` prints through stderr. They never fail a run.
+  Two families exist today: flow-definition rules (`warn/…`, mirrored from the
+  server's validator) and branding asset reachability. `warn/asset-unreachable`
+  and `warn/asset-content-type` come from a bounded HEAD probe of
+  `logo_url` / `hero_url` — a URL that is well-formed but dead passes every
+  gate and then renders as a 0×0 image with nothing in the console, so the
+  probe is the only place it can be caught. It is advisory by design: the
+  machine planning is not necessarily the machine that renders the login page.
+  The probe only contacts public HTTPS destinations and re-checks every
+  redirect; loopback/private/internal targets stay inconclusive instead of
+  turning repo config into a network request from the planning host.
+  Set `ZITADEL_SKIP_ASSET_PROBE` to turn it off (offline, air-gapped CI, or a
+  CDN that only resolves from production) and `ZITADEL_ASSET_PROBE_TIMEOUT_MS`
+  to retune the per-URL budget (default 2500).
+- In the human-readable plan, a multi-line field (branding's inlined
+  `liquid_template`) renders as `(<n> lines, sha256:…)` when it is created or
+  unchanged, and as a changed-line diff when it moved — not as one escaped
+  line. Read the file itself for full content.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
   `--object-type` (e.g. `human-user`). Non-interactive/`--json` prints one row
   per revision (newest first); interactive adds a picker that fetches and
@@ -152,7 +179,11 @@ the CLI's help layer, not the envelope.
   managed config wirings (Vite/Nuxt proxy merges, Angular's `angular.json`
   proxy and auth routes) through the patchers' idempotent transforms — a
   detached or missing wiring config fails, an unverifiable one warns, and
-  `--fix` re-applies it. Boundary migrations converge: a pristine leftover
+  `--fix` re-applies it. The Next/Nuxt `dev` script is verified the same way,
+  against the port recorded as the development issuer rather than the port the
+  script names today: a script moved off that port reports as an unapplied
+  config edit (a warning — a `dev` script is not the only way to choose a
+  port), and `--fix` restores the registered one. Boundary migrations converge: a pristine leftover
   `middleware.ts` from a Next 15→16 upgrade is swapped for `proxy.ts`, while
   an edited one is reported as a conflict instead of creating both (Next
   rejects the pair). The default local

@@ -21,7 +21,7 @@ export const it: Locale = {
   "identifier.field.email.placeholder": "tu@esempio.com",
   "identifier.field.password": "Password",
   "identifier.action.submit": "Accedi",
-  "identifier.action.continue": "Accedi",
+  "identifier.action.continue": "Continua",
   "identifier.action.passkey": "Accedi con passkey",
   "identifier.action.register.lead": "Non hai un account? ",
   "identifier.action.register.link": "Registrati",

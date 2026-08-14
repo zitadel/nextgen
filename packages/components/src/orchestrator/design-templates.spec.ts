@@ -115,6 +115,21 @@ describe("branding design catalog", () => {
     expect(right).toContain("zl-split--right");
   });
 
+  it("split designs render the placeholder panel until an asset is set", () => {
+    const engine = createLiquidEngine({ locale });
+    const noAssets = { ...context, branding: {} };
+    for (const design of ["split", "split-right"]) {
+      const { template } = getDefaultBrandingConfig(design);
+      const bare = createSanitiser()(engine.parseAndRenderSync(template, noAssets));
+      // An empty brand pane renders the whole design as a lonely off-centre
+      // card; the decorative panel must survive the sanitiser.
+      expect(bare, design).toContain("zl-split__placeholder");
+
+      const branded = createSanitiser()(engine.parseAndRenderSync(template, context));
+      expect(branded, design).not.toContain("zl-split__placeholder");
+    }
+  });
+
   it("split-family designs render the mobile compact brand header", () => {
     // The chrome hides .zl-split__brand on narrow widths; the compact
     // node is the fallback that keeps the tenant's identity visible there.

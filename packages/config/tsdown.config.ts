@@ -2,6 +2,7 @@ import { defineConfig } from "tsdown";
 
 export default defineConfig({
   entry: {
+    "branding-url": "src/branding-url.ts",
     index: "src/index.ts",
     defaults: "src/defaults.ts",
     "meta-schemas": "src/meta-schemas.ts",
