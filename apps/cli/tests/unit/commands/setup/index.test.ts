@@ -284,6 +284,44 @@ describe("setup command pre-flight", () => {
     }
     expect(projectName.trim().length).toBeGreaterThan(0);
   });
+
+  it("warns about the split brand pane's narrow-container fallback, not about this app", async () => {
+    const cwd = await makeTempDir();
+    // A pre-existing Next app — the posture that embeds `variant="widget"`
+    // cards (ADR 044), which is what scopes the warning.
+    await mkdir(join(cwd, "app"), { recursive: true });
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
+    );
+    const capture = await startCreateProjectCaptureServer();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--design",
+      "split-right",
+      "--server",
+      capture.url,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; warnings: string[] };
+    expect(json.status).toBe("ok");
+    expect(json.warnings).toHaveLength(1);
+    // The wrapper setup scaffolds around the widget is full-width, so the
+    // brand pane does render in the page we just wrote. Telling the user it
+    // shows the compact mark "instead" sends them hunting a rendering bug
+    // that isn't happening — the warning states the container-width contract
+    // and the branding.json fix for the narrow case.
+    expect(json.warnings[0]).not.toMatch(/this app/i);
+    expect(json.warnings[0]).toContain("container is wide");
+    expect(json.warnings[0]).toContain(".zitadel/branding/branding.json");
+  });
 });
 
 describe("setup --renderer surface", () => {
@@ -395,6 +433,16 @@ async function startCreateProjectCaptureServer(): Promise<{
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
           id: "flow_test",
+          created_at: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/branding") {
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "brand_test",
+          revision: 1,
           created_at: "2026-06-01T00:00:00.000Z",
         }),
       );

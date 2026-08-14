@@ -1,9 +1,11 @@
 import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
+import type { BrandingDesign } from "@zitadel/config/defaults";
 import pc from "picocolors";
 
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
+import type { ScaffoldPosture } from "../../lib/sync/types";
 
 /**
  * Structured end-of-command summary, modelled on the report layout the
@@ -165,4 +167,35 @@ function stripRange(range: string): string {
 /** Returns just the file name from a relative path, for the `→ filename` secondary detail in PACKAGE rows. */
 export function fileNameOf(p: string): string {
   return basename(p);
+}
+
+/**
+ * Layout caveats for the chosen login design, shown to humans after the
+ * summary box and carried in the JSON envelope's `warnings`.
+ *
+ * The split family's brand pane is keyed to the **login's own container**
+ * width — a `@container (max-width: 48rem)` query on the widget's mount, not
+ * a viewport media query. Above that the pane renders; below it the pane
+ * collapses and the compact brand mark takes over, and that mark is empty
+ * until `branding.json` names an asset. So the warning describes the
+ * contract, not a prediction about the container this app happens to give
+ * it: the wrapper we scaffold is full-width, and the pane does render there.
+ *
+ * Scoped to widget posture because that is where container width becomes the
+ * host app's choice — the card is meant to move into a layout we do not own,
+ * and a sidebar or modal is exactly the narrow case. `hero` stays quiet: its
+ * compact fallback is editable text, so a narrow container never leaves it
+ * blank.
+ */
+export function designWarnings(input: {
+  design?: BrandingDesign;
+  posture: ScaffoldPosture;
+}): string[] {
+  const { design, posture } = input;
+  if (posture !== "widget" || (design !== "split" && design !== "split-right")) {
+    return [];
+  }
+  return [
+    `The ${design} design shows its brand pane only when the login's container is wide; a narrow container — a card-width embed, or any phone-width viewport — collapses it to the compact brand mark. Set logo_url (or hero_url) in .zitadel/branding/branding.json so that mark isn't empty.`,
+  ];
 }

@@ -46,6 +46,7 @@ import {
 import { installDependenciesForSetup } from "./install";
 import { PickFrameworkPrompt, SETUP_PROMPTS, type SetupAnswers } from "./prompts";
 import {
+  designWarnings,
   detectProjectFacts,
   dim as styleDim,
   fileNameOf,
@@ -421,18 +422,12 @@ export default class Setup extends BaseCommand {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
-    // Widget-posture embeds render at card width, where the split-family
-    // brand pane is collapsed to the compact brand mark — which is empty
-    // until branding.json names an asset. Say so at setup time instead of
-    // letting the pane's absence read as a rendering bug. Scoped to the
-    // designs whose wide layout is mostly brand pane; `hero` keeps its
-    // editable text fallback and stays quiet.
-    const designWarnings =
-      posture === "widget" && (answers.design === "split" || answers.design === "split-right")
-        ? [
-            `The ${answers.design} design renders its brand pane only at wide container widths; this app embeds the login as a card, which shows the compact brand mark instead. Set logo_url (or hero_url) in .zitadel/branding/branding.json so the mark isn't empty.`,
-          ]
-        : [];
+    // The split-family brand pane collapses to the compact brand mark once the
+    // login's container is narrow — and that mark is empty until branding.json
+    // names an asset. Say so at setup time instead of letting the pane's
+    // absence read as a rendering bug once the card moves into a layout we
+    // don't own (see `designWarnings` for the scoping rationale).
+    const warnings = designWarnings({ design: answers.design, posture });
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, framework.id);
       const sections = buildSummary({
@@ -459,14 +454,14 @@ export default class Setup extends BaseCommand {
       });
       // The envelope's `warnings` never render in non-JSON mode (setup
       // passes `pretty: ""`), so surface them to humans here.
-      for (const warning of designWarnings) {
+      for (const warning of warnings) {
         consola.warn(warning);
       }
     }
 
     return this.emit({
       status: "ok",
-      warnings: designWarnings,
+      warnings,
       // Human-facing output was already shown via consola (box + per-step
       // narration). Pass an empty `pretty` so the base command's fallback
       // renderer doesn't duplicate the summary on stdout. The JSON envelope
