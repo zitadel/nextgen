@@ -16,9 +16,10 @@ async function clearStaleServiceWorkers(): Promise<void> {
 async function main(): Promise<void> {
   await clearStaleServiceWorkers();
   // Discover deployment runtime metadata (mode + project ids) before any
-  // route guard or loader runs (Console ADR 0004 §3). Falls back to
-  // standalone when the endpoint is unreachable, so rendering never blocks
-  // on a broken backend.
+  // route guard or loader runs (Console ADR 0004 §3). Today an unreachable
+  // endpoint resolves to the standalone fallback so rendering never blocks on
+  // a broken backend; §3 supersedes that with an explicit error state, which
+  // is a pending change tracked in that ADR's Consequences.
   await initRuntime();
 
   const rootElement = document.getElementById("app");

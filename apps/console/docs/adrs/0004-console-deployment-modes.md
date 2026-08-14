@@ -6,10 +6,12 @@
 > **Implementation state:** `GET /console/runtime.json`, runtime discovery,
 > the no-project hint, `platform.project_id`, first-created-project fallback,
 > and the flag-gated row-only `platform.bootstrap_project` path exist. The
-> first-created fallback and row-only bootstrap are transitional behavior, not
-> the target described here. The full platform-project provisioner,
-> first-party Console session authorization, effective-permission exposure,
-> and seed-input contract remain future work.
+> pin, the first-created fallback, and row-only bootstrap are transitional
+> behavior, not the target described here, and the pin retires with the
+> fallback (§2). The Console's current fall-back-to-`standalone` handling of an
+> unreachable runtime document contradicts §3 and is a pending change. The full
+> platform-project provisioner, first-party Console session authorization,
+> effective-permission exposure, and seed-input contract remain future work.
 > **Scope:** `apps/console`, plus the server-owned bootstrap and authorization
 > contracts on which it depends. See
 > [`apps/console/AGENTS.md`](../../AGENTS.md).
@@ -120,13 +122,38 @@ keys. Because the product is alpha, the checked-in seed behavior and test
 fixtures may be corrected directly; no compatibility migration or backfill is
 required for pre-release development databases.
 
-**Cutover rule:** the implemented first-created-project fallback remains
-available until a human-usable replacement—such as the server-owned seed
-file—ships with the full provisioner and an end-to-end first-operator test. The
-testkit can prove the target shape before that point, but test infrastructure
-alone must not strand a self-hoster. Only after that replacement exists may the
-server stop resolving the first-created project and require the reserved
-platform-project seed.
+Once provisioned, the reserved project is identified by a **persisted reserved
+marker the server can query**, not by configuration. Bootstrap is the only
+writer of that marker. This is what makes discovery predictable, and it is the
+property the transitional fallback lacks.
+
+**Cutover rule:** the implemented transitional fallback remains available until
+a human-usable replacement—such as the server-owned seed file—ships with the
+full provisioner and an end-to-end first-operator test. The testkit can prove
+the target shape before that point, but test infrastructure alone must not
+strand a self-hoster.
+
+That fallback is two behaviors, and both retire together:
+
+- `platform.project_id` / `NEXTGEN_PLATFORM_PROJECT_ID` pins an existing
+  project as the Console sign-in target. The pinned project must already
+  exist — a missing one is a startup configuration error, never a create.
+- With no pin, the deployment's first-created project wins, ordered by
+  `created_at` ascending so every replica resolves the same project.
+
+The pin exists only to override that guess. Once bootstrap always provisions a
+marked platform project, there is no guess left to override, so the pin is
+removed rather than carried forward — a second, configurable answer to
+"which project is the platform project" would just reintroduce the ambiguity
+the marker removes. `VITE_CONSOLE_PROJECT_ID` is unaffected; it is a
+development-only client override (§3), not a deployment fact.
+
+Deployments that already hold customer projects but no reserved platform
+project get **no adoption path**. They are recreated, consistent with the alpha
+reset that [ADR 053 §3](../../../../docs/adrs/053-customer-collaboration-grants.md)
+already requires. Promoting an existing customer project to the reserved role
+would make the Console identity boundary depend on operator guesswork again,
+which is the failure this ADR exists to end.
 
 Bootstrap inputs are server-side configuration. Secrets from them never enter
 `runtime.json`, the Console bundle, or browser-readable storage.
@@ -150,6 +177,43 @@ GET /console/runtime.json
 project. They are omitted while bootstrap has not completed. The response is
 resolved per request and served with `no-store`, so completing bootstrap does
 not require a server restart.
+
+**Transitional caveat.** That paragraph describes the target. Until §2's
+cutover completes, the id is the pinned or first-created project — an ordinary
+customer project — and it is omitted because no project exists yet rather than
+because bootstrap has not run. Code and contributor docs describing today's
+behavior must say so; the field's meaning changes at cutover even though its
+name and shape do not.
+
+**Placement.** The endpoint is served by the mux next to the static UI mounts
+and stays **deliberately outside the OpenAPI product surface**. It is a
+first-party contract between the server and the UI surfaces it ships — the
+embedded Console and the hosted login shell — in the same way the SPA mounts
+themselves are. Publishing it would make an internal deployment detail a
+documented surface with compatibility obligations, and it is already understood
+as an interim carrier: [`hierarchy.md`](../../../../docs/design/api/hierarchy.md)
+makes server-side discovery of the platform `project_id` target design through a
+planned `/capabilities` endpoint exposing `defaults.project_id`, and
+[`conventions.md`](../../../../docs/design/api/conventions.md) names this
+document as the closest shipped surface to it. The public contract, when it
+exists, is `/capabilities` — not this file. Its absence from the spec is a
+decision, not an oversight.
+
+**An unreachable endpoint is an error, not a mode.** The Console must not treat
+a failed or non-`2xx` fetch as a successful answer. Without this document there
+is no sign-in project, so the Console has nothing useful to render regardless;
+guessing a mode only turns a server outage into a false product state. In
+particular, reporting "no project yet" for what is actually an unreachable API
+sends an operator to run `zitadel setup` against a problem setup cannot fix.
+
+Three states are therefore distinct: reachable and provisioned, reachable and
+not yet provisioned (the setup hint), and unreachable or erroring (an explicit
+connectivity error, retryable). This supersedes the earlier fall-back-to-
+`standalone` rule, whose stated purpose — never degrading into an accidental
+portal — is satisfied at least as well by rendering an error, since an error
+state cannot render portal surfaces either. Development and preview builds that
+run without a backend must opt in explicitly rather than rely on a silent
+production fallback.
 
 The publishable key is browser-safe public-plane material under ADR 036. The
 document never contains a project secret, seed credential, license key,
@@ -237,7 +301,17 @@ without changing its Console build or moving operator identities.
   neither changes team membership.
 - Standalone is simple by default but not artificially limited to one project.
 - Existing alpha databases and fixtures may be recreated after the seed
-  contract changes; no migration is promised.
+  contract changes; no migration is promised. A deployment holding customer
+  projects but no reserved platform project is recreated, not adopted.
+- `platform.project_id` / `NEXTGEN_PLATFORM_PROJECT_ID` is scheduled for
+  removal at cutover, together with the first-created fallback it overrides.
+  It is transitional configuration, not a supported way to choose the
+  platform project.
+- The unreachable-endpoint rule in §3 is a **pending behavior change**: the
+  shipped Console still resolves any fetch failure to `mode: "standalone"`
+  (`apps/console/src/runtime/runtime.ts`), and `apps/console-e2e` asserts that
+  behavior against a backend-less preview. Implementing §3 means an explicit
+  error state, an opt-in for backend-less development, and an updated spec.
 - Effective-permission exposure, CSRF enforcement, and session-derived
   target authorization are server dependencies. The Console remains
   fail-closed until they land.

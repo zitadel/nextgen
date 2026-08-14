@@ -53,6 +53,14 @@ let initialized = false;
  * Fetches the runtime document once. Idempotent; later calls return the
  * cached result. Never throws — any failure resolves to the standalone
  * fallback.
+ *
+ * That fallback is transitional. Console ADR 0004 §3 requires an unreachable
+ * or non-`2xx` endpoint to surface an explicit connectivity error instead,
+ * kept distinct from "reachable, not provisioned yet": collapsing the two
+ * reports a server outage as "no project yet" and sends operators to run
+ * `zitadel setup` against a problem setup cannot fix. Implementing it needs an
+ * opt-in for backend-less preview/dev builds, which is what the fallback
+ * actually serves today, plus an `apps/console-e2e` update.
  */
 export async function initRuntime(): Promise<ConsoleRuntime> {
   if (initialized) return runtime;
@@ -64,7 +72,9 @@ export async function initRuntime(): Promise<ConsoleRuntime> {
     }
   } catch {
     // Unreachable endpoint (preview builds, dev without a backend) — keep
-    // the standalone fallback.
+    // the standalone fallback. Note this also swallows a non-`2xx` response,
+    // so a failing server currently renders as "no project yet"; ADR 0004 §3
+    // separates the two.
   }
   return runtime;
 }

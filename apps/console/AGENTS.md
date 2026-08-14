@@ -32,14 +32,17 @@ direction for the console build-out (issue
   until ADR 052's session-derived target authorization exists; embedded calls
   fail closed in the meantime.
 - [ADR 0004: Deployment modes](docs/adrs/0004-console-deployment-modes.md)
-  — one build and one authorization model serve cloud and self-host. Every
-  deployment uses a reserved platform project for Console identities; an
+  — one build and one authorization model serve cloud and self-host. **Target:**
+  every deployment uses a reserved platform project for Console identities; an
   explicit testkit or future server-file seed fully provisions it, its initial
   user, membership, separate owner assignment, and optional customer project.
-  Standalone optimizes for one project but does not forbid more. The runtime
-  document carries only public sign-in metadata; portal surfaces render from
-  target-scoped **effective permissions**, never membership, build-time flags,
-  or a parallel console-facing feature array.
+  **Today:** the Console signs into the pinned or first-created project — an
+  ordinary customer project — under §2's cutover rule. Do not remove that
+  fallback (or the `platform.project_id` pin) until the seed transport ships;
+  doing so strands self-hosters. Standalone optimizes for one project but does
+  not forbid more. The runtime document carries only public sign-in metadata;
+  portal surfaces render from target-scoped **effective permissions**, never
+  membership, build-time flags, or a parallel console-facing feature array.
 
 If an implementation needs to diverge from an ADR, update the ADR in the same
 change rather than letting code and decision drift.
