@@ -1,0 +1,13 @@
+title: BrandingCreatedPayload
+type: object
+description: |
+  Allowlisted fields for `branding.created`. Omits `liquid_template`.
+properties:
+  layout:
+    type: string
+  logo_url:
+    type: string
+  font_url:
+    type: string
+  hero_url:
+    type: string

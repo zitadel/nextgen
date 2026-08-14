@@ -92,6 +92,10 @@ func (e *IntegrityViolationError) Error() string {
 	return fmt.Sprintf("integrity violation of type %q on %q (constraint: %q)", e.integrityType, e.table, e.constraint)
 }
 
+func (e *IntegrityViolationError) Constraint() string {
+	return e.constraint
+}
+
 func (e *IntegrityViolationError) Is(target error) bool {
 	_, ok := target.(*IntegrityViolationError)
 	return ok

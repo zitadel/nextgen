@@ -53,6 +53,10 @@ func (s stubAuthzStmts) ListAuthzObjectIDs(context.Context, domain.AuthzListObje
 	return nil, nil
 }
 
+func (stubAuthzStmts) ListClaimedProjectIDs(context.Context, string, uint32) ([]string, error) {
+	return nil, nil
+}
+
 func (s stubAuthzStmts) GetResourceScope(_ context.Context, resourceID string) (*domain.ResourceScope, error) {
 	if s.scopes == nil {
 		return nil, new(database.NoRowFoundError)
@@ -217,6 +221,11 @@ func TestRequireProjectAccess(t *testing.T) {
 			name: "session", res: sessionAccess,
 			readMiss: domain.ErrSessionNotFound().Code, writeMiss: domain.ErrSessionNotFound().Code,
 			denied: domain.ErrSessionPermissionDenied().Code,
+		},
+		{
+			name: "events", res: eventsAccess,
+			readMiss: domain.ErrEventNotFound().Code, writeMiss: domain.ErrEventNotFound().Code,
+			denied: domain.ErrEventPermissionDenied().Code,
 		},
 	}
 

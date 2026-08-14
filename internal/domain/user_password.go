@@ -43,6 +43,10 @@ func (u *UserPassword) Verify(password string, verifier crypto.HashVerifier) err
 }
 
 type SetUserPassword struct {
+	// ID is the password row id. Dialects mint on create and overwrite with the
+	// persisted id on upsert (RETURNING / equivalent) so emitters can set
+	// entity_id / factor_id.
+	ID             string
 	ProjectID      string
 	UserID         string
 	EncodedHash    string

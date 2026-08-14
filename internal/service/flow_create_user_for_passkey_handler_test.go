@@ -85,10 +85,11 @@ func expectSchemaLookup(f *passkeyHandlerFixture) {
 
 func expectCreateUserTx(f *passkeyHandlerFixture, createFn func(context.Context, *domain.CreateUser) error) {
 	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).DoAndReturn(createFn)
+	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	f.v2Pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
 			return fn(ctx, v2TestTx{stmts: f.stmts})
-		})
+		}).AnyTimes()
 }
 
 func TestFlowCreateUserForPasskey_HonorsPreAssignedUserID(t *testing.T) {
