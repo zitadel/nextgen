@@ -43,6 +43,10 @@ direction for the console build-out (issue
   not forbid more. The runtime document carries only public sign-in metadata;
   portal surfaces render from target-scoped **effective permissions**, never
   membership, build-time flags, or a parallel console-facing feature array.
+  A runtime document the Console cannot read is an **error, not a mode** (§3):
+  keep "unreachable/erroring" and "no project yet" separate states, and do not
+  reintroduce a silent fallback to `standalone` — backend-less dev and preview
+  runs opt in with `VITE_CONSOLE_RUNTIME_FALLBACK` instead.
 
 If an implementation needs to diverge from an ADR, update the ADR in the same
 change rather than letting code and decision drift.
