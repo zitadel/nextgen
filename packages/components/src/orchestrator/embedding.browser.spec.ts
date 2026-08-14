@@ -130,6 +130,17 @@ const splitTallLogoStep: CreateFlow201 = {
   },
 } as unknown as CreateFlow201;
 
+/** Both assets at once — the pane stacks them, so the caps share one budget. */
+const splitBothAssetsStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    layout: "split",
+    liquid_template: splitTemplate,
+    logo_url: TALL_ASSET,
+    hero_url: SQUARE_ASSET,
+  },
+} as unknown as CreateFlow201;
+
 /** The shipped split design with a logo: the compact fallback is a capped <img>. */
 const splitLogoStep: CreateFlow201 = {
   ...identifierStep,
@@ -597,6 +608,33 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     // Deliberately unlike the hero: no pinned width, so the cap shrinks both
     // axes and the mark keeps its whole shape. Cropping a logo loses brand.
     expect(rect.width / rect.height).toBeCloseTo(logo.naturalWidth / logo.naturalHeight, 1);
+  });
+
+  it("a logo and a hero together stay inside the whole page shell's budget", async () => {
+    // Capping each image on its own is not enough. The templates render both
+    // when a tenant sets both, and the brand pane's padding and gap are only
+    // half the chrome they compete with: the shell adds 3.25rem of block
+    // padding, a region gap, and the attribution row. At their solo caps the
+    // pair measured an 824px pane inside a 976px document at 1440×900 — the
+    // attribution back below the fold, which is what the caps exist to stop.
+    host.style.width = "1200px";
+    const element = await mount(splitBothAssetsStep, (el) => {
+      el.variant = "page";
+    });
+
+    // Both are really rendering — a budget met by dropping one asset is no fix.
+    const logo = await loadedImage(element, "img.zl-split__logo");
+    const hero = await loadedImage(element, "img.zl-split__hero");
+    expect(logo.getBoundingClientRect().height).toBeGreaterThan(0);
+    expect(hero.getBoundingClientRect().height).toBeGreaterThan(0);
+
+    const brand = element.shadowRoot?.querySelector(".zl-split__brand") as HTMLElement;
+    expect(brand.getBoundingClientRect().height).toBeLessThanOrEqual(window.innerHeight);
+    const mountNode = element.shadowRoot?.querySelector(".zl-mount") as HTMLElement;
+    expect(mountNode.getBoundingClientRect().height).toBeLessThanOrEqual(window.innerHeight + 1);
+    // The user-visible invariant behind the whole budget: the badge is on screen.
+    const pill = element.shadowRoot?.querySelector(".zl-attribution > *") as HTMLElement;
+    expect(pill.getBoundingClientRect().bottom).toBeLessThanOrEqual(window.innerHeight);
   });
 
   it("the logo cap never stretches a small logo to the pane", async () => {

@@ -187,13 +187,25 @@ img[data-zl-asset-broken] {
    logo is a mark, not a pane-filling image, so it shrinks proportionally and
    keeps its whole shape rather than being cropped to a slot — and it is never
    stretched to the pane, which is what `width: 100%` there would do. 16rem
-   squares off the existing width cap, and it is also the budget: logo and hero
-   stack in this pane, so 16rem + the hero's 27.5rem + the gap and padding is
-   what still fits a laptop viewport when a tenant sets both. Raise
-   `--zl-split-logo-max-height` from the template root for a taller lockup. */
+   squares off the existing width cap, so the logo fits a 16rem box either way.
+   That is the cap for a logo that has the pane to itself — when a hero shares
+   it, the rule below takes over. Raise `--zl-split-logo-max-height` from the
+   template root for a taller lockup. */
 .zl-split__logo {
   max-width: min(16rem, 60%);
   max-height: var(--zl-split-logo-max-height, 16rem);
+}
+/* A tenant who sets both assets stacks them in this one pane, so the two solo
+   caps stop being independent — and the pane's own gap and padding are only
+   half the chrome they compete with. The shell around it adds 3.25rem of block
+   padding, a region gap, and the attribution row: 16rem + 27.5rem + all of that
+   measures an 824px pane inside a 976px document at 1440×900, which is the same
+   below-the-fold attribution these caps exist to prevent. The logo yields
+   rather than the hero — above a hero image a logo reads as a header mark, and
+   shrinking the hero would tax the far more common hero-only pane for a
+   combination it never uses. */
+.zl-split__logo:has(+ .zl-split__hero) {
+  max-height: var(--zl-split-logo-max-height, 8rem);
 }
 /* Pinned width and a capped height, not a bare `max-width`. The brand pane is
    content-sized — the grid centres it, nothing above the image constrains it —
