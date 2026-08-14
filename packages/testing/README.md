@@ -243,9 +243,9 @@ above.
 ## Credentials: the boot contract
 
 The kit's boot contract is the sanctioned way tests and dev loops obtain
-credentials — root ADR 052 §9 (landing with the cross-project-access ADRs,
-PR #876) states it directly: "test infrastructure obtains credentials through
-the testkit's boot contract rather than through a seed default." The kit owns the
+credentials: they come from the boot contract, never from a seed default —
+the rule root ADR 052 §9 sets (landing with the cross-project-access ADRs,
+PR #876). The kit owns the
 server process and its database, captures each credential from provisioning
 output at the moment the server mints it, and exposes it predictably on
 `handle`:

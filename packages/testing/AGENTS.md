@@ -108,10 +108,11 @@ returns `project_secret` exactly once) and exposes them on `InstanceHandle`:
 `projectSecret` today; the `platform` slot (`PlatformCredentials` — reserved
 project id, publishable key, platform automation credential, operator
 session) once the platform-project provisioner lands. Root ADR 052 §9
-(Proposed, lands with PR #876): "test infrastructure obtains credentials
-through the testkit's boot contract rather than through a seed default";
-Console ADR 0004 §2 names the testkit as the bootstrap transport test and
-dev infrastructure use. §9 defers the platform automation principal itself
+(Proposed, lands with PR #876) sets the rule: test infrastructure gets its
+credentials from the testkit's boot contract, not from seed defaults —
+paraphrased here on purpose; §9's exact sentence lives in the ADR, so a
+reword there doesn't strand this file. Console ADR 0004 §2 names the
+testkit as the bootstrap transport test and dev infrastructure use. §9 defers the platform automation principal itself
 to the future PAT / service-user decision — the wire format is deliberately
 undecided, so never name a key prefix for `platformKey` here or in fixtures.
 Until #876 is accepted, treat the slot as tracking that proposal — it is

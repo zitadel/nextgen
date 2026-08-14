@@ -7,8 +7,8 @@ import type { ZitadelClient } from "@zitadel/api/client";
  * there): bootstrap mints **no platform project secret** — the publishable
  * key is the only default credential, the platform-homed automation
  * principal is deferred to the PAT / service-user decision §5 defers (no
- * wire format exists yet), and "test infrastructure obtains credentials
- * through the testkit's boot contract rather than through a seed default."
+ * wire format exists yet), and test infrastructure gets its credentials
+ * from the testkit's boot contract, not from seed defaults.
  *
  * Stub today: the server's platform-project provisioner does not exist yet,
  * so `startLocalZitadel` never populates this field. The shape is fixed now
