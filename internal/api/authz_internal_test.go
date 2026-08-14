@@ -7,6 +7,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/authz/resolver"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -23,11 +24,16 @@ type stubAuthzStmts struct {
 	kinds map[string]domain.ResourceKind
 	// elsewhere forces ExistsResourceScopeElsewhere for a resource_id (shared URL across foreign projects).
 	elsewhere map[string]bool
+	// catalogCalls counts ActiveSystemCatalogID invocations when non-nil.
+	catalogCalls *int
 }
 
 func (stubAuthzStmts) IsStatements() {}
 
 func (s stubAuthzStmts) ActiveSystemCatalogID(context.Context) (string, error) {
+	if s.catalogCalls != nil {
+		*s.catalogCalls++
+	}
 	return domain.SystemCatalogID, nil
 }
 
@@ -271,36 +277,69 @@ func TestRequireProjectListAccess(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
 	})
 
-	proceed, err := requireProjectListAccess(operator, stmts, "proj_a", userAccess)
+	ctx, proceed, err := requireProjectListAccess(operator, stmts, "proj_a", userAccess)
 	if err != nil || !proceed {
 		t.Fatalf("project-wide Allow should proceed: proceed=%v err=%v", proceed, err)
+	}
+	if !service.AuthzListProjectWideAllowed(ctx) {
+		t.Fatal("Allow must skip the EXISTS list filter")
 	}
 
 	deny := false
 	foothold := true
 	narrow := stubAuthzStmts{allowCheck: &deny, foothold: &foothold}
-	proceed, err = requireProjectListAccess(operator, narrow, "proj_a", userAccess)
+	ctx, proceed, err = requireProjectListAccess(operator, narrow, "proj_a", userAccess)
 	if err != nil || !proceed {
 		t.Fatalf("Forbidden with foothold should proceed for partial-view lists: proceed=%v err=%v", proceed, err)
 	}
+	if service.AuthzListProjectWideAllowed(ctx) {
+		t.Fatal("Forbidden must attach the EXISTS list filter")
+	}
 
-	proceed, err = requireProjectListAccess(operator, stmts, "proj_b", userAccess)
+	_, proceed, err = requireProjectListAccess(operator, stmts, "proj_b", userAccess)
 	if proceed {
 		t.Fatal("no foothold must not proceed")
 	}
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
 
-	proceed, err = requireProjectListAccess(preview, stmts, "proj_a", userAccess)
+	_, proceed, err = requireProjectListAccess(preview, stmts, "proj_a", userAccess)
 	if proceed {
 		t.Fatal("preview must not proceed")
 	}
 	assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
 
-	proceed, err = requireProjectListAccess(context.Background(), stmts, "proj_a", userAccess)
+	_, proceed, err = requireProjectListAccess(context.Background(), stmts, "proj_a", userAccess)
 	if proceed {
 		t.Fatal("missing scope must not proceed")
 	}
 	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+}
+
+func TestRequestResolverSharesCatalogLookup(t *testing.T) {
+	calls := 0
+	stmts := stubAuthzStmts{catalogCalls: &calls}
+	ctx := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+	})
+	r, ctx := requestResolver(ctx)
+	_, err := r.Check(ctx, stmts, resolver.Request{
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+		ProjectID: "proj_a", ObjectType: "project", Relation: "viewer",
+	})
+	if err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	id, err := r.ActiveCatalogID(ctx, stmts)
+	if err != nil {
+		t.Fatalf("ActiveCatalogID: %v", err)
+	}
+	if id != domain.SystemCatalogID {
+		t.Fatalf("catalog id = %q", id)
+	}
+	if calls != 1 {
+		t.Fatalf("ActiveSystemCatalogID calls = %d, want 1", calls)
+	}
 }
 
 func TestListUserTeamsGateShape(t *testing.T) {

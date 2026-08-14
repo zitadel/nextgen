@@ -39,3 +39,18 @@ func AuthzListFilterBypassed(ctx context.Context) bool {
 	v, _ := ctx.Value(authzListFilterBypassCtxKey{}).(bool)
 	return v
 }
+
+type authzListProjectWideAllowCtxKey struct{}
+
+// WithAuthzListProjectWideAllow marks a list whose project-level Check already
+// Allowed. compileList must not fail closed, and maybeWriteAuthzListPredicate
+// must not attach EXISTS (#837).
+func WithAuthzListProjectWideAllow(ctx context.Context) context.Context {
+	return context.WithValue(ctx, authzListProjectWideAllowCtxKey{}, true)
+}
+
+// AuthzListProjectWideAllowed reports whether Check already Allowed project-wide.
+func AuthzListProjectWideAllowed(ctx context.Context) bool {
+	v, _ := ctx.Value(authzListProjectWideAllowCtxKey{}).(bool)
+	return v
+}

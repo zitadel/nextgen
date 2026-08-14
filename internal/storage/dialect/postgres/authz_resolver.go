@@ -27,17 +27,19 @@ func newAuthzResolverStatements(client queryExecutor) authzResolverStatements {
 
 // ActiveSystemCatalogID implements [service.AuthzResolverStatements].
 func (s authzResolverStatements) ActiveSystemCatalogID(ctx context.Context) (string, error) {
-	var c statementCompiler
-	authz.WriteActiveSystemCatalogID(&c, postgresAuthzEnv())
-	var id string
-	err := s.client.QueryRow(ctx, c.String(), c.args...).Scan(&id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", database.NewNoRowFoundError(nil)
+	return authz.LoadOrFetchActiveSystemCatalogID(func() (string, error) {
+		var c statementCompiler
+		authz.WriteActiveSystemCatalogID(&c, postgresAuthzEnv())
+		var id string
+		err := s.client.QueryRow(ctx, c.String(), c.args...).Scan(&id)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return "", database.NewNoRowFoundError(nil)
+			}
+			return "", wrapError(err)
 		}
-		return "", wrapError(err)
-	}
-	return id, nil
+		return id, nil
+	})
 }
 
 // HasAuthzProjectFoothold implements [service.AuthzResolverStatements].

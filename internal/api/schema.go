@@ -71,11 +71,11 @@ func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdPar
 }
 
 func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams) (api.ListSchemasRes, error) {
-	proceed, err := h.requireProjectListAccess(ctx, string(params.ProjectID), schemaAccess)
+	ctx, proceed, err := h.requireProjectListAccess(ctx, string(params.ProjectID), schemaAccess)
 	if err != nil || !proceed {
 		return nil, err
 	}
-	ctx, err = h.withAuthzListFilter(ctx, string(params.ProjectID), domain.ResourceKindSchema, opRead)
+	ctx, err = h.withAuthzListFilterIfNeeded(ctx, string(params.ProjectID), domain.ResourceKindSchema, opRead)
 	if err != nil {
 		return nil, err
 	}

@@ -62,7 +62,8 @@ func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stm
 		hasWhere = true
 	}
 	if tableName != "" && resourceIDCol != "" {
-		if _, ok := service.AuthzListFilterFromContext(ctx); !ok && !service.AuthzListFilterBypassed(ctx) {
+		_, hasFilter := service.AuthzListFilterFromContext(ctx)
+		if !hasFilter && !service.AuthzListFilterBypassed(ctx) && !service.AuthzListProjectWideAllowed(ctx) {
 			return authz.ErrListFilterRequired
 		}
 		maybeWriteAuthzListPredicate(ctx, c, &hasWhere, tableName, resourceIDCol)

@@ -15,11 +15,12 @@ import (
 // credential → ScopeContext. Path-id ops resolve scope via resource_scope_index
 // (requireResourceAccess) before Check; create keeps an explicit project_id and
 // requireProjectAccess. Management lists use requireProjectListAccess: project-
-// wide Allow or Forbidden (foothold, no project-wide grant) both proceed, then
-// withAuthzListFilter attaches the EXISTS predicate. NotFound still 404s.
-// MVP uses coarse project.{viewer,editor,admin} (#420 expands to fine-grained
-// catalog relations). Preview secrets (project.read only) cannot call
-// management APIs (ADR 037).
+// wide Allow skips the EXISTS predicate; Forbidden (foothold, no project-wide
+// grant) proceeds and withAuthzListFilter attaches it. NotFound still 404s.
+// Check and the list filter share one request-scoped Resolver (#837). MVP uses
+// coarse project.{viewer,editor,admin} (#420 expands to fine-grained catalog
+// relations). Preview secrets (project.read only) cannot call management APIs
+// (ADR 037).
 
 // accessOp classifies a management operation for relation mapping and miss shaping.
 type accessOp int
@@ -260,7 +261,8 @@ func requireProjectAccessMapped(ctx context.Context, stmts service.AuthzResolver
 			req.ResourceTeamID = *rsi.TeamID
 		}
 	}
-	dec, err := resolver.New().Check(ctx, stmts, req)
+	r, _ := requestResolver(ctx)
+	dec, err := r.Check(ctx, stmts, req)
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("authz permission check failed")
 	}
@@ -299,26 +301,30 @@ func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) er
 // Forbidden (foothold, no project-wide grant) both proceed so the EXISTS
 // predicate can return a partial view. NotFound (no foothold) still 404s.
 // Preview / missing credentials keep the same miss/denied shapes as create.
-func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string, res resourceAccess) (bool, error) {
+// On Allow, the returned context carries AuthzListProjectWideAllow so list
+// handlers skip withAuthzListFilter (#837). The request-scoped Resolver is
+// stored on context so Check and the list filter share one catalog lookup.
+func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string, res resourceAccess) (context.Context, bool, error) {
 	if h == nil || h.pool == nil {
-		return false, domain.ErrInternal(errors.New("authz statements not configured"))
+		return ctx, false, domain.ErrInternal(errors.New("authz statements not configured"))
 	}
 	return requireProjectListAccess(ctx, h.pool.Statements(), projectID, res)
 }
 
-func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess) (bool, error) {
+func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess) (context.Context, bool, error) {
 	scope, ok := GetScopeContext(ctx)
 	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
-		return false, res.miss(opRead)
+		return ctx, false, res.miss(opRead)
 	}
 
 	if !hasOperatorProjectWrite(scope.Scope) {
 		if scope.ProjectID == "" || scope.ProjectID != projectID {
-			return false, res.miss(opRead)
+			return ctx, false, res.miss(opRead)
 		}
-		return false, res.denied()
+		return ctx, false, res.denied()
 	}
 
+	r, ctx := requestResolver(ctx)
 	req := resolver.Request{
 		PrincipalType: scope.PrincipalType,
 		PrincipalID:   scope.PrincipalID,
@@ -327,18 +333,30 @@ func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverSt
 		Relation:      projectRelation(opRead),
 		TeamID:        scope.TeamID,
 	}
-	dec, err := resolver.New().Check(ctx, stmts, req)
+	dec, err := r.Check(ctx, stmts, req)
 	if err != nil {
-		return false, domain.ErrInternal(err).WithMessage("authz permission check failed")
+		return ctx, false, domain.ErrInternal(err).WithMessage("authz permission check failed")
 	}
 	switch dec {
-	case resolver.DecisionAllow, resolver.DecisionForbidden:
-		return true, nil
+	case resolver.DecisionAllow:
+		return service.WithAuthzListProjectWideAllow(ctx), true, nil
+	case resolver.DecisionForbidden:
+		return ctx, true, nil
 	case resolver.DecisionNotFound, resolver.DecisionUnspecified:
-		return false, res.miss(opRead)
+		return ctx, false, res.miss(opRead)
 	default:
-		return false, res.miss(opRead)
+		return ctx, false, res.miss(opRead)
 	}
+}
+
+type requestResolverKey struct{}
+
+func requestResolver(ctx context.Context) (*resolver.Resolver, context.Context) {
+	if r, ok := ctx.Value(requestResolverKey{}).(*resolver.Resolver); ok && r != nil {
+		return r, ctx
+	}
+	r := resolver.New()
+	return r, context.WithValue(ctx, requestResolverKey{}, r)
 }
 
 // mapAuthzDecisionAfterRSI maps Check results after RSI already located the
@@ -358,10 +376,10 @@ func mapAuthzDecisionAfterRSI(dec resolver.Decision, res resourceAccess) error {
 }
 
 // withAuthzListFilter attaches the SQL list-predicate filter for management
-// list endpoints after requireProjectListAccess has already passed (Allow or
-// Forbidden). PrincipalHomeProjectID comes from the credential's home project
-// while Check uses the target projectID; those are equivalent until foreign
-// footholds (#333) land.
+// list endpoints after requireProjectListAccess has already passed (Forbidden
+// path). Skip this on project-wide Allow (#837). PrincipalHomeProjectID comes
+// from the credential's home project while Check uses the target projectID;
+// those are equivalent until foreign footholds (#333) land.
 func (h *Handler) withAuthzListFilter(ctx context.Context, projectID string, kind domain.ResourceKind, op accessOp) (context.Context, error) {
 	scope, ok := GetScopeContext(ctx)
 	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
@@ -370,7 +388,8 @@ func (h *Handler) withAuthzListFilter(ctx context.Context, projectID string, kin
 	if h == nil || h.pool == nil {
 		return ctx, domain.ErrInternal(errors.New("authz statements not configured"))
 	}
-	catalogID, err := h.pool.Statements().ActiveSystemCatalogID(ctx)
+	r, ctx := requestResolver(ctx)
+	catalogID, err := r.ActiveCatalogID(ctx, h.pool.Statements())
 	if err != nil {
 		return ctx, domain.ErrInternal(err).WithMessage("authz catalog lookup failed")
 	}
@@ -390,6 +409,13 @@ func (h *Handler) withAuthzListFilter(ctx context.Context, projectID string, kin
 		},
 		ResourceKind: kind,
 	}), nil
+}
+
+func (h *Handler) withAuthzListFilterIfNeeded(ctx context.Context, projectID string, kind domain.ResourceKind, op accessOp) (context.Context, error) {
+	if service.AuthzListProjectWideAllowed(ctx) {
+		return ctx, nil
+	}
+	return h.withAuthzListFilter(ctx, projectID, kind, op)
 }
 
 // requireTeamDelete gates deleteTeam via the team's RSI. Unknown teams are

@@ -159,6 +159,12 @@ func (r *Resolver) activeCatalogID(ctx context.Context, stmts service.AuthzResol
 	return id, nil
 }
 
+// ActiveCatalogID is the active system catalog for this request-scoped
+// Resolver. Check and list-filter attachment share one lookup.
+func (r *Resolver) ActiveCatalogID(ctx context.Context, stmts service.AuthzResolverStatements) (string, error) {
+	return r.activeCatalogID(ctx, stmts)
+}
+
 func validateCheckRequest(req Request) error {
 	switch {
 	case req.PrincipalType == "":

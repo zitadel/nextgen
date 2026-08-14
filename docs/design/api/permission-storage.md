@@ -91,8 +91,12 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
   narrowing is live ([#834](https://github.com/zitadel/nextgen/issues/834)):
   management list endpoints inject an authz EXISTS **predicate** (same
   assignment/closure branches as `ListObjects`) via `service.AuthzListFilter`
-  after `requireProjectListAccess` (Allow or Forbidden → proceed; NotFound →
-  404). `compileList` for management tables fails closed without the filter
+  after `requireProjectListAccess` (Allow → skip EXISTS; Forbidden → proceed
+  with predicate; NotFound → 404). Check and the list filter share one
+  request-scoped Resolver and a process-level active-catalog cache
+  ([#837](https://github.com/zitadel/nextgen/issues/837),
+  [#843](https://github.com/zitadel/nextgen/issues/843)). `compileList` for
+  management tables fails closed without the filter
   ([#838](https://github.com/zitadel/nextgen/issues/838)). Intentional
   carve-outs ([#839](https://github.com/zitadel/nextgen/issues/839)):
   `QuerySessions` (`compileRead`, List not implemented), `QueryProjects`
