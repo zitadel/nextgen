@@ -107,8 +107,9 @@ type Event struct {
 	Metadata json.RawMessage
 
 	// OccurredAtWait is an insert-only hint for Path A batching: dialects set
-	// occurred_at = created_at - wait (DB clock or equivalent). Zero means
-	// Path B (occurred_at = created_at). Not a persisted column.
+	// occurred_at = created_at - wait (DB clock or equivalent). Path A wait is
+	// time since HTTP request start so request.api sorts first on request_id.
+	// Zero means Path B (occurred_at = created_at). Not a persisted column.
 	OccurredAtWait time.Duration
 }
 

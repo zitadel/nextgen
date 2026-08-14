@@ -77,10 +77,13 @@ Event **columns** carry correlation: `request_id`, `session_id`, `flow_id`,
 |---------|--------------|------------|---------|
 | Authenticated HTTP handler completes | `request.api` | `request` | `operation_id`, `method`, `route_template`, `status`, `duration_ms` |
 
-Unauthenticated routes emit no `request` event.
+`occurred_at` is request **start** so a `request_id` group sorts
+`request.api` first, then in-TX Path B mutations. `created_at` is flush time.
+Unauthenticated routes emit no `request` event (login/flow HTTP has no Path A
+envelope; Path B mutations still emit).
 
-Path A buffer: flush on batch size **N≈100**, age **T≈1s**, or high-watermark
-**≈80% of capacity C** (`C ≫ N`). Drop only when full; never block the request.
+Path A buffer: flush on batch size **N≈100** or age **T≈1s**. Capacity **C**
+(default 2000); drop only when full; never block the request.
 
 ## Path B
 

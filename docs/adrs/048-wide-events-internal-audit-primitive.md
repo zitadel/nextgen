@@ -253,23 +253,26 @@ into a **RequestContext** middleware:
 inserted synchronously per API call. Middleware enqueues into an **in-process
 bounded durable-intent buffer** (not per-request awaited INSERT).
 
-1. Each buffered item stores payload fields plus `enqueuedAt` (Go
-   `time.Time` / monotonic clock used **only** to compute
-   `wait = time.Since(enqueuedAt)` at flush — **not** as a wall-clock stamp
-   written to the row).
+1. Each buffered item stores payload fields, `startedAt` (HTTP middleware
+   entry — forensic `occurred_at`), and `enqueuedAt` (buffer residency / MaxAge
+   only). Go clocks compute `wait`; they are **not** wall-clock stamps written
+   to the row.
 2. A flusher writes batches when either:
    - batch size reaches **N** (suggested default **100**), or
    - **T** elapsed since the oldest buffered event (suggested default **1s**).
 3. Timestamps use the **database `now()` as the single time server**:
 
 ```sql
--- $wait_interval = time.Since(enqueuedAt) at successful insert
+-- $wait_interval = time.Since(startedAt) at successful insert
 INSERT INTO zitadel_nextgen.events (..., occurred_at, created_at, ...)
 VALUES (..., now() - $wait_interval, now(), ...);
 ```
 
-   - `occurred_at` — when the action happened (`now() - wait`)
+   - `occurred_at` — when the request **started** (`now() - wait`), so
+     `request.api` sorts first among events sharing `request_id`
    - `created_at` — when the row was written (`now()` / `DEFAULT now()`)
+   - Payload `duration_ms` / `status` describe completion; they are not used
+     as the sort timestamp
    - Recompute `wait` at the **successful** insert (including after retries) so
      `occurred_at` stays honest.
    - Dialect note: Postgres `now()` is transaction-start time (all rows in one

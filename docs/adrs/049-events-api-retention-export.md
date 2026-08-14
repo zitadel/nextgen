@@ -69,8 +69,9 @@ GET /events/{id}?project_id=…   # project scope required (see below)
 | `page_token` | opaque string | [ADR 027](027-cursor-based-pagination.md) cursor |
 
 `created_after` / `created_before` filter insert time. ADR 048 recommends
-`occurred_at` for forensic "when did it happen"; with Path A batching the skew
-is bounded by ~T (~1s). `occurred_after` / `occurred_before` are a **future
+`occurred_at` for forensic "when did it happen". Path A `request.api`
+`occurred_at` is request start; `created_at` lags by handler duration plus
+buffer delay (~T, 1s). `occurred_after` / `occurred_before` are a **future
 extension** (predicate filters only — keyset pagination stays on
 `(created_at, id)`).
 

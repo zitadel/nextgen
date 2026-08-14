@@ -78,6 +78,6 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 		ev := FromContext(WithActorContext(r.Context(), *ac), domain.EventTypeRequestAPI, domain.EventCategoryRequest)
 		ev.ProjectID = ac.ProjectID
 		ev.Payload = payload
-		buf.Enqueue(ev)
+		buf.EnqueueSince(ev, start)
 	})
 }

@@ -47,6 +47,10 @@ func applyRequestBufferDefaults(cfg RequestBufferConfig) RequestBufferConfig {
 type bufferedEvent struct {
 	event      *domain.Event
 	enqueuedAt time.Time
+	// startedAt is when the request began. Flush computes OccurredAtWait from
+	// this so request.api sorts before in-TX Path B events on the same
+	// request_id. MaxAge still uses enqueuedAt (buffer residency).
+	startedAt time.Time
 }
 
 // RequestBuffer is an in-process Path A queue. Flush when the buffer holds at
@@ -80,7 +84,18 @@ func NewRequestBuffer(insert EventBatchInserter, cfg RequestBufferConfig) *Reque
 }
 
 // Enqueue adds a request event. Drops when full (never blocks).
+// occurred_at is enqueue time (tests / callers without a request start).
 func (b *RequestBuffer) Enqueue(ev *domain.Event) {
+	b.enqueue(ev, time.Time{})
+}
+
+// EnqueueSince records a request event whose forensic occurred_at is startedAt
+// (HTTP middleware entry), not enqueue/flush time.
+func (b *RequestBuffer) EnqueueSince(ev *domain.Event, startedAt time.Time) {
+	b.enqueue(ev, startedAt)
+}
+
+func (b *RequestBuffer) enqueue(ev *domain.Event, startedAt time.Time) {
 	if ev == nil || ev.ProjectID == "" {
 		return
 	}
@@ -94,7 +109,11 @@ func (b *RequestBuffer) Enqueue(ev *domain.Event) {
 		b.mu.Unlock()
 		return
 	}
-	b.buf = append(b.buf, bufferedEvent{event: ev, enqueuedAt: time.Now()})
+	now := time.Now()
+	if startedAt.IsZero() {
+		startedAt = now
+	}
+	b.buf = append(b.buf, bufferedEvent{event: ev, enqueuedAt: now, startedAt: startedAt})
 	shouldWake := b.shouldFlushLocked()
 	b.mu.Unlock()
 	if shouldWake {
@@ -187,9 +206,9 @@ func (b *RequestBuffer) flush(batch []bufferedEvent) {
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		// Recompute wait immediately before each insert attempt so retries
-		// include backoff time (review: OccurredAtWait on retry).
+		// include backoff time. startedAt is request begin, not enqueue.
 		for i, item := range batch {
-			events[i].OccurredAtWait = time.Since(item.enqueuedAt)
+			events[i].OccurredAtWait = time.Since(item.startedAt)
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		lastErr = b.insert.InsertEvents(ctx, events)

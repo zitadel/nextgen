@@ -17,6 +17,7 @@ type channelInserter struct {
 	mu     sync.Mutex
 	events []*domain.Event
 	calls  int
+	waits  []time.Duration
 }
 
 func (c *channelInserter) InsertEvents(_ context.Context, events []*domain.Event) error {
@@ -24,6 +25,9 @@ func (c *channelInserter) InsertEvents(_ context.Context, events []*domain.Event
 	defer c.mu.Unlock()
 	c.calls++
 	c.events = append(c.events, events...)
+	for _, ev := range events {
+		c.waits = append(c.waits, ev.OccurredAtWait)
+	}
 	return nil
 }
 
@@ -215,4 +219,39 @@ func TestRequestBuffer_OccurredAtWaitIncludesRetryBackoff(t *testing.T) {
 	require.Len(t, ins.lastWaits, 1)
 	// First attempt failed; second attempt wait must include the 50ms backoff.
 	assert.GreaterOrEqual(t, ins.lastWaits[0], 50*time.Millisecond)
+}
+
+func TestRequestBuffer_OccurredAtWaitUsesRequestStart(t *testing.T) {
+	ins := &failThenSucceedInserter{}
+	buf := NewRequestBuffer(ins, RequestBufferConfig{
+		BatchSize: 1,
+		Capacity:  100,
+		MaxAge:    time.Hour,
+	})
+	defer buf.Close()
+
+	started := time.Now().Add(-80 * time.Millisecond)
+	buf.EnqueueSince(&domain.Event{ProjectID: "proj_1", EventType: domain.EventTypeRequestAPI, Category: domain.EventCategoryRequest}, started)
+
+	require.Eventually(t, func() bool { return buf.Flushed() >= 1 }, 2*time.Second, 10*time.Millisecond)
+	ins.mu.Lock()
+	defer ins.mu.Unlock()
+	require.GreaterOrEqual(t, ins.calls, 1)
+	require.Len(t, ins.lastWaits, 1)
+	assert.GreaterOrEqual(t, ins.lastWaits[0], 80*time.Millisecond)
+}
+
+func TestRequestBuffer_MaxAgeUsesEnqueueTimeNotRequestStart(t *testing.T) {
+	ins := SequentialBatchInserter{Inner: noopInserter{}}
+	buf := NewRequestBuffer(ins, RequestBufferConfig{
+		BatchSize:       1000,
+		Capacity:        10,
+		MaxAge:          time.Hour,
+		ShutdownTimeout: time.Millisecond,
+	})
+	t.Cleanup(buf.Close)
+
+	buf.EnqueueSince(&domain.Event{ProjectID: "proj_1", EventType: domain.EventTypeRequestAPI, Category: domain.EventCategoryRequest}, time.Now().Add(-2*time.Hour))
+	assert.Equal(t, 1, buf.Len())
+	assert.Equal(t, uint64(0), buf.Flushed())
 }
