@@ -123,6 +123,24 @@ describe("initRuntime", () => {
     });
   });
 
+  // A wrongly-typed id must not coerce to "absent" and render as "no project
+  // yet": the server omits the ids it has none of (`omitempty`), so a present
+  // one that is not a usable string came from something that is not our
+  // server. Same misdiagnosis §3 removes, one field lower down.
+  it.each([
+    ["console_project_id", { mode: "standalone", console_project_id: 42 }],
+    ["publishable_key", { mode: "standalone", console_project_id: "proj_a", publishable_key: 42 }],
+    ["a null id", { mode: "standalone", console_project_id: null }],
+    ["an empty id", { mode: "standalone", console_project_id: "" }],
+  ])("reports a malformed %s as a failure rather than an absent project", async (_case, doc) => {
+    fetchMock.mockResolvedValue(jsonResponse(doc));
+
+    expect(await initRuntime()).toEqual({
+      ok: false,
+      failure: { status: 200, detail: "the response was not a runtime document" },
+    });
+  });
+
   it("shares one in-flight fetch across concurrent callers", async () => {
     fetchMock.mockResolvedValue(jsonResponse({ mode: "standalone", console_project_id: "proj_a" }));
 

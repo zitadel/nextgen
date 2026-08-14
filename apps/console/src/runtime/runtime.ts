@@ -192,16 +192,28 @@ function describeCause(cause: unknown): string {
 function parseRuntime(doc: unknown): ConsoleRuntime | undefined {
   if (typeof doc !== "object" || doc === null) return undefined;
   const record = doc as Record<string, unknown>;
-  if (record.mode !== "standalone" && record.mode !== "platform") return undefined;
-  return {
-    mode: record.mode,
-    console_project_id: optionalString(record.console_project_id),
-    publishable_key: optionalString(record.publishable_key),
-  };
+  // Destructured first: a type predicate does not narrow a property read off
+  // a `Record<string, unknown>`, only a local.
+  const { mode, console_project_id: projectId, publishable_key: publishableKey } = record;
+
+  if (mode !== "standalone" && mode !== "platform") return undefined;
+  if (!absentOrString(projectId) || !absentOrString(publishableKey)) return undefined;
+
+  return { mode, console_project_id: projectId, publishable_key: publishableKey };
 }
 
-function optionalString(value: unknown): string | undefined {
-  return typeof value === "string" && value !== "" ? value : undefined;
+/**
+ * Absence is how the document says "not provisioned yet": the server omits
+ * both ids rather than emitting empty ones (`omitempty` in
+ * `cmd/server/console_runtime.go`), and ADR 0004 §2's shape shows the field
+ * omitted. A *present* field must therefore be a usable string — a number, a
+ * `null`, or `""` came from something that is not our server, and coercing it
+ * to "absent" would report that as "no project yet", which is the
+ * misdiagnosis §3 exists to end, one field lower down. JSON cannot carry
+ * `undefined`, so it can only mean the key was missing.
+ */
+function absentOrString(value: unknown): value is string | undefined {
+  return value === undefined || (typeof value === "string" && value !== "");
 }
 
 /** Test-only: drop the cached document so specs can exercise `initRuntime` again. */
