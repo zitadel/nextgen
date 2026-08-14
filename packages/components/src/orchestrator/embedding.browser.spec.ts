@@ -222,6 +222,14 @@ const minimalStep: CreateFlow201 = {
 
 const TRANSPARENT = "rgba(0, 0, 0, 0)";
 
+/**
+ * Captured before any test runs, because a test that resizes the viewport has
+ * to hand back what it borrowed. Vitest's own default is 414×896 — restoring a
+ * hardcoded desktop size instead would silently re-house every test declared
+ * after the resizing one.
+ */
+const DEFAULT_VIEWPORT = { width: window.innerWidth, height: window.innerHeight };
+
 function installFlowFetchStub(responses: readonly CreateFlow201[]): { restore: () => void } {
   let cursor = 0;
   const fetchStub = vi.fn(async (): Promise<Response> => {
@@ -290,7 +298,7 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     document.getElementById("zl-font-link")?.remove();
     if (resetViewport) {
       resetViewport = false;
-      await page.viewport(1440, 900);
+      await page.viewport(DEFAULT_VIEWPORT.width, DEFAULT_VIEWPORT.height);
     }
   });
 
@@ -646,6 +654,24 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     // The user-visible invariant behind the whole budget: the badge is on screen.
     const pill = element.shadowRoot?.querySelector(".zl-attribution > *") as HTMLElement;
     expect(pill.getBoundingClientRect().bottom).toBeLessThanOrEqual(window.innerHeight);
+  });
+
+  it("a viewport too short for the budget shrinks the hero, it does not erase it", async () => {
+    // The budget subtraction goes negative below ~420px of viewport height.
+    // Floored at 0 the hero silently vanished while the pane kept the logo —
+    // and it bought nothing, because at those heights the form card is already
+    // taller than the brand pane and sets the page height by itself. The floor
+    // is the compact banner's 6rem so the asset degrades instead of dropping.
+    resetViewport = true;
+    await page.viewport(1200, 420);
+    host.style.width = "1200px";
+    const element = await mount(splitBothAssetsStep, (el) => {
+      el.variant = "page";
+    });
+
+    const hero = await loadedImage(element, "img.zl-split__hero");
+    expect(hero.getBoundingClientRect().height).toBeGreaterThanOrEqual(96);
+    expect(getComputedStyle(hero).display).not.toBe("none");
   });
 
   it("the logo cap never stretches a small logo to the pane", async () => {

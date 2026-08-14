@@ -201,7 +201,14 @@ img[data-zl-asset-broken] {
    padding, a region gap, and the 2.5rem attribution pill. The logo first yields
    to a header-mark cap; the hero then takes only the viewport height left after
    that whole fixed budget, so the pair also fits short, wide laptop viewports.
-   Hero-only panes keep the larger cap below. */
+   Hero-only panes keep the larger cap below.
+
+   The floor is 6rem — the compact banner's cap — not 0. Below roughly a 420px
+   viewport the subtraction goes negative, and floored at 0 the hero silently
+   disappeared while the pane kept the logo. That bought nothing: at those
+   heights the form card is already taller than the brand pane, so it, not the
+   hero, sets the page height. A visible-but-small hero is the honest
+   degradation. */
 .zl-split__logo:has(+ .zl-split__hero) {
   max-height: var(--zl-split-logo-max-height, 8rem);
 }
@@ -209,7 +216,7 @@ img[data-zl-asset-broken] {
   max-height: min(
     var(--zl-split-hero-max-height, 27.5rem),
     max(
-      0px,
+      6rem,
       calc(
         100vh - 104px - 6.5rem - 2.5rem - var(--zl-spacing-04, 1.5rem) -
           var(--zl-spacing-04, 1.5rem) - var(--zl-split-logo-max-height, 8rem)
