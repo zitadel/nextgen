@@ -5,11 +5,16 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-const teamFieldCreatedAt = "created_at"
+const (
+	teamFieldCreatedAt = "created_at"
+	teamFieldName      = "name"
+	teamFieldStatus    = "status"
+)
 
 type TeamService struct {
 	v2Pool *DB
@@ -32,12 +37,28 @@ func (s *TeamService) Create(ctx context.Context, input CreateTeamInput) (*domai
 		return nil, err
 	}
 
-	if err := s.v2Pool.Statements().CreateTeam(ctx, model); err != nil {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().CreateTeam(ctx, model); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeTeamCreated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  model.ProjectID,
+			EntityType: "team",
+			EntityID:   model.ID,
+			Payload:    domain.TeamPayload{Name: model.Name},
+		})
+	})
+	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
 			// Also catches a (project_id, id) primary key collision, which is
 			// unreachable with generated IDs. Discriminating on the constraint
 			// name would need Spanner to report one; today it returns "".
 			return nil, domain.ErrTeamAlreadyExists().WithParent(err)
+		}
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create team")
 	}
@@ -51,6 +72,12 @@ func (s *TeamService) Get(ctx context.Context, projectID string, teamID string) 
 			return nil, domain.ErrTeamNotFound()
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get team")
+	}
+	// A pending_purge team is awaiting deletion by the cleanup job (#622
+	// dropped that status from the team lifecycle), so reads treat it as
+	// already gone.
+	if team.Status == domain.TeamStatusPendingPurge {
+		return nil, domain.ErrTeamNotFound()
 	}
 	return team, nil
 }
@@ -74,14 +101,21 @@ type ListTeamsResponse struct {
 
 // List returns the teams of a project, ordered and paginated with an opaque
 // cursor token. The returned NextPageToken is empty when the last page has been
-// reached. Teams of every status are returned; status is not filterable yet.
+// reached.
 func (s *TeamService) List(ctx context.Context, req ListTeamsRequest) (*ListTeamsResponse, error) {
 	if req.ProjectID == "" {
 		return nil, domain.ErrTeamProjectNotFound()
 	}
 
-	filters := make([]database.Filter[domain.TeamField], 0, len(req.Filters)+1)
+	filters := make([]database.Filter[domain.TeamField], 0, len(req.Filters)+2)
 	filters = append(filters, database.Equal(database.Col(domain.TeamFieldProjectID), req.ProjectID))
+	// A pending_purge team is awaiting deletion by the cleanup job (#622
+	// dropped that status from the team lifecycle), so reads treat it as
+	// already gone.
+	filters = append(filters, database.Or(
+		database.Equal(database.Col(domain.TeamFieldStatus), domain.TeamStatusActive.String()),
+		database.Equal(database.Col(domain.TeamFieldStatus), domain.TeamStatusDeactivated.String()),
+	))
 	for _, f := range req.Filters {
 		filter, err := teamFilter(f)
 		if err != nil {
@@ -122,11 +156,50 @@ func (s *TeamService) List(ctx context.Context, req ListTeamsRequest) (*ListTeam
 // v2 filter layer cannot express return [domain.ErrNotImplemented];
 // invalid field/operation/value combinations return [domain.ErrRequestInvalid].
 func teamFilter(f Filter) (database.Filter[domain.TeamField], error) {
-	field, err := teamField(f.Field)
-	if err != nil {
-		return nil, err
+	switch f.Field {
+	case teamFieldCreatedAt:
+		return createdAtFilter(f.Operation, database.Col(domain.TeamFieldCreatedAt), f.Value)
+	case teamFieldName:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		// Names are unique per project case-insensitively.
+		// The unique index is on the folded name, so this matches on the index.
+		if f.Operation == filterOpEquals {
+			return database.StringEqualFold(database.Col(domain.TeamFieldName), value), nil
+		}
+		return stringFilter(f.Operation, database.Col(domain.TeamFieldName), value)
+	case teamFieldStatus:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		return teamStatusFilter(f.Operation, value)
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", f.Field))
 	}
-	return createdAtFilter(f.Operation, database.Col(field), f.Value)
+}
+
+// teamStatusFilter filters on the team's two status values.
+func teamStatusFilter(op, status string) (database.Filter[domain.TeamField], error) {
+	switch op {
+	case filterOpEquals:
+	case filterOpNotEquals:
+		// todo (grvijayan): update when the operation is supported
+		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
+	case filterOpContains, filterOpNotContains, filterOpLessThan, filterOpGreaterThan, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for this field", op))
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown operation %q", op))
+	}
+
+	switch status {
+	case domain.TeamStatusActive.String(), domain.TeamStatusDeactivated.String():
+		return database.Equal(database.Col(domain.TeamFieldStatus), status), nil
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown status %q", status))
+	}
 }
 
 // teamField maps an API field name to its [domain.TeamField].
@@ -134,6 +207,10 @@ func teamField(field string) (domain.TeamField, error) {
 	switch field {
 	case teamFieldCreatedAt:
 		return domain.TeamFieldCreatedAt, nil
+	case teamFieldName:
+		return domain.TeamFieldName, nil
+	case teamFieldStatus:
+		return domain.TeamFieldStatus, nil
 	default:
 		return domain.TeamFieldUnspecified, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", field))
 	}
@@ -156,12 +233,28 @@ func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (*domai
 		return nil, err
 	}
 	team := &domain.Team{ProjectID: input.ProjectID, ID: input.TeamID, Name: name}
-	if err := s.v2Pool.Statements().UpdateTeam(ctx, team); err != nil {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().UpdateTeam(ctx, team); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeTeamUpdated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  team.ProjectID,
+			EntityType: "team",
+			EntityID:   team.ID,
+			Payload:    domain.TeamPayload{Name: team.Name},
+		})
+	})
+	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
 			return nil, domain.ErrTeamAlreadyExists().WithParent(err)
 		}
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrTeamNotFound()
+		}
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to update team")
 	}
@@ -175,7 +268,26 @@ func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (*domai
 // Delete is idempotent: DeactivateTeam only touches an active team, so an
 // unknown or already-deactivated team reports success without persisting any changes.
 func (s *TeamService) Delete(ctx context.Context, projectID, teamID string) error {
-	if err := s.v2Pool.Statements().DeactivateTeam(ctx, projectID, teamID); err != nil {
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		changed, err := tx.Statements().DeactivateTeam(ctx, projectID, teamID)
+		if err != nil {
+			return err
+		}
+		if !changed {
+			return nil
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeTeamDeactivated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  projectID,
+			EntityType: "team",
+			EntityID:   teamID,
+		})
+	})
+	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return de
+		}
 		return domain.ErrInternal(err).WithMessage("failed to delete team")
 	}
 	return nil

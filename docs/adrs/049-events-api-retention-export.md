@@ -41,6 +41,7 @@ GET /events?project_id=…
          &team_id=…
          &created_after=…
          &created_before=…
+         &order=desc
          &page_token=…
 
 GET /events/{id}?project_id=…   # project scope required (see below)
@@ -64,11 +65,13 @@ GET /events/{id}?project_id=…   # project scope required (see below)
 | `team_id` | string | Filter by emit-time team scope |
 | `created_after` | RFC 3339 timestamp | Inclusive lower bound on **`created_at`** |
 | `created_before` | RFC 3339 timestamp | Exclusive upper bound on **`created_at`** |
+| `order` | `asc` \| `desc` | Keyset direction on `(created_at, id)`. Default **`desc`** (newest first) |
 | `page_token` | opaque string | [ADR 027](027-cursor-based-pagination.md) cursor |
 
 `created_after` / `created_before` filter insert time. ADR 048 recommends
-`occurred_at` for forensic "when did it happen"; with Path A batching the skew
-is bounded by ~T (~1s). `occurred_after` / `occurred_before` are a **future
+`occurred_at` for forensic "when did it happen". Path A `request.api`
+`occurred_at` is request start; `created_at` lags by handler duration plus
+buffer delay (~T, 1s). `occurred_after` / `occurred_before` are a **future
 extension** (predicate filters only — keyset pagination stays on
 `(created_at, id)`).
 
@@ -174,20 +177,21 @@ Events are append-only within their retention window.
 
 - `INSERT` and `SELECT` on `events` — no `UPDATE` or `DELETE` from application
   code during normal operation.
-- `INSERT` on `event_deliveries` — shipper only.
+- `INSERT`/`UPDATE` on `event_sink_cursors` — shipper only.
 - The retention background job uses a dedicated role with `DELETE` permission on
-  `events` (and relies on FK cascade for `event_deliveries`).
+  `events`. Sink cursors are independent of event rows (no cascade from purge).
 
 **Retention policy:**
 
 - Configurable per deployment via server config (suggested default: **30 days**).
 - Retention is **time-only**. An event is eligible when
   `created_at < now() - retention` — **not** gated on sink delivery.
-- Background job deletes eligible `events` rows; matching `event_deliveries`
-  rows are removed by `ON DELETE CASCADE` (see §3).
-- When deleting rows that still lack a delivery for one or more currently
-  enabled sinks, increment metric `events_purged_undelivered` (no block, no
-  extend). Export is best-effort within the retention window.
+- Background job deletes eligible `events` rows. Sink cursors remain as keyset
+  bounds; `(created_at, id) > cursor` still works after the pointed-at event
+  has been purged.
+- When deleting rows that are still beyond a sink's cursor for one or more
+  currently enabled sinks, increment metric `events_purged_undelivered` (no
+  block, no extend). Export is best-effort within the retention window.
 - Future optimization (not v1-mandatory): time-range partitioning on
   `created_at` so retention can drop partitions instead of large DELETEs.
 
@@ -214,8 +218,9 @@ user-data purge windows.
 ### 3. External export (per-sink delivery)
 
 A background **shipper** delivers events to configured external sinks before
-(and independently of) retention. Delivery is tracked per sink in a companion
-table for **idempotency and observability** — not as a purge gate.
+(and independently of) retention. Delivery progress is tracked per
+`(sink_id, project_id)` with a keyset watermark on `(created_at, id)` —
+not as a purge gate.
 
 #### Sink resource (first-class CRUD)
 
@@ -229,9 +234,10 @@ CREATE TABLE zitadel_nextgen.event_sinks (
     , type            TEXT        NOT NULL   -- 'stdout' | 'webhook'
     , scope           TEXT        NOT NULL   -- 'deployment' | 'project'
     , project_id      TEXT                  -- NULL for deployment-scoped; set for project-scoped
-    , url             TEXT                  -- required for type=webhook
+    , url             TEXT        NOT NULL DEFAULT ''  -- required for type=webhook
     , enabled         BOOLEAN     NOT NULL DEFAULT TRUE
     , PRIMARY KEY (id)
+    , UNIQUE (type, scope, url)    -- find-or-create natural key (ADR 047 mint on insert)
 );
 ```
 
@@ -244,58 +250,57 @@ v1 CRUD + cardinality caps:
 | Project webhook | At most **one** enabled `type=webhook`, `scope=project` per `project_id` |
 
 Delivery is **additive**: when all three are enabled for a project, each event
-may produce up to **three** `event_deliveries` rows (one per sink id).
-Additional sink types and unbounded multi-webhook lists are out of scope for v1.
+advances up to **three** independent cursors (one per sink id). Deployment-wide
+sinks still keep **one cursor row per claimed project** under the same
+`sink_id`. Additional sink types and unbounded multi-webhook lists are out of
+scope for v1.
 
 #### Delivery tracking
 
 ```sql
-CREATE TABLE zitadel_nextgen.event_deliveries (
-    project_id      TEXT        NOT NULL
-    , event_id      TEXT        NOT NULL
-    , sink_id       TEXT        NOT NULL   -- FK conceptually to event_sinks.id
-    , delivered_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-    , PRIMARY KEY (project_id, event_id, sink_id)
-    , FOREIGN KEY (project_id, event_id)
-        REFERENCES zitadel_nextgen.events (project_id, id)
-        ON DELETE CASCADE
+CREATE TABLE zitadel_nextgen.event_sink_cursors (
+    sink_id           TEXT        NOT NULL
+        REFERENCES zitadel_nextgen.event_sinks (id)
+    , project_id      TEXT        NOT NULL
+        REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE
+    , last_created_at TIMESTAMPTZ NOT NULL
+    , last_event_id   TEXT        NOT NULL
+    , PRIMARY KEY (sink_id, project_id)
 );
 ```
 
-Retention deletes from `events`; child `event_deliveries` rows are removed by
-cascade.
+Missing cursor means epoch (ship from the start of retained history). Cursors
+do not cascade from `events` purge; they are independent keyset bounds.
 
 ```mermaid
 flowchart LR
-  subgraph perSink [Per enabled sink]
-    Poll["Poll events missing delivery for sink_id"]
-    Deliver[POST webhook or write stdout]
-    Record["INSERT event_deliveries"]
+  subgraph perSinkProject [Per enabled sink x claimed project]
+    LoadCursor[Load or epoch cursor]
+    Poll["List events where created_at,id greater than cursor"]
+    Deliver[POST webhook or write stdout in order]
+    Advance[Upsert cursor to last success]
   end
-  Poll --> Deliver --> Record
+  LoadCursor --> Poll --> Deliver --> Advance
 ```
 
 **Shipper behavior:**
 
-- One shipper loop **per enabled sink** (or one loop iterating sinks).
+- One shipper loop iterating enabled sinks × claimed projects (see §4).
 - For each project, enabled sinks = deployment-scoped sinks that apply globally
   **plus** that project's project-scoped webhook (if any).
-- Poll: events with no `event_deliveries` row for that `sink_id` (and only for
-  claimed projects — see §4).
-- Deliver batch to the sink (webhook POST or stdout JSON).
-- On success: `INSERT INTO event_deliveries ...` (idempotent via primary key).
-- Future optimization: per-sink watermark cursor on `(created_at, id)` instead
-  of a full anti-join rescanning a growing table.
+- Poll: `ORDER BY created_at, id` with keyset `(created_at, id) > cursor`.
+- Deliver sequentially; on success upsert the cursor to that event.
+- On failure: **head-of-line block** for that `(sink, project)` only — do not
+  advance past the last success; other projects for the same sink keep moving.
 
 **Delivery semantics:**
 
 - At-least-once delivery within the retention window. Consumers must be
   **idempotent** on `event.id`.
-- Shipper retries on transient failure without inserting a delivery row.
-- Duplicate external delivery is acceptable; missing delivery after retention
-  purge is accepted (metric `events_purged_undelivered`).
-- Duplicate `INSERT` into `event_deliveries` conflicts on the primary key and is
-  a no-op.
+- Shipper retries on transient failure without advancing the cursor.
+- Duplicate external delivery is acceptable (crash between deliver and upsert);
+  missing delivery after retention purge is accepted (metric
+  `events_purged_undelivered`).
 
 **Configuration sketch** (illustrative; real config is CRUD on `event_sinks`):
 
@@ -345,8 +350,8 @@ Per [ADR 046](046-claim-lifecycle-v2.md) and
 
 - Single API surface simplifies SDK and SIEM integration vs split
   `/events` + `/audit_events`.
-- Per-sink `event_deliveries` supports additive multi-sink delivery without a
-  single `shipped_at` timestamp.
+- Per-`(sink, project)` watermark cursors support additive multi-sink delivery
+  without a single `shipped_at` timestamp or a growing delivery-ack table.
 - Time-only retention keeps disk bounded even when webhooks are down or
   misconfigured.
 - Emit-time `team_id` + project-scoped get make list/get authorization safe
@@ -363,15 +368,22 @@ Per [ADR 046](046-claim-lifecycle-v2.md) and
   operators who need durable archive must consume within the retention window
   (or extend retention). Metric `events_purged_undelivered` surfaces the gap.
 - **Webhook reliability:** at-least-once delivery requires consumer idempotency;
-  document clearly.
+  document clearly. Head-of-line blocking means one poison event stalls that
+  `(sink, project)` until retention drops it or ops intervenes.
+- **Deployment sink identity:** v1 mints deployment sink ids through dialect
+  `Ensure` on first insert (ADR 047). Identity is the natural unique key
+  `(type, scope, url)`. Changing a webhook URL starts a new sink and re-ships
+  retained history from epoch for that new id; the previous `event_sinks` row
+  and cursors stay behind (no auto-disable in v1).
+- **Deleted-project export gap:** `events.project_id` is not a live FK, so audit
+  rows survive hard delete, but the shipper only walks claimed live projects —
+  post-delete history is not re-exported in v1 (retention still purges by age).
 - **Request event volume:** high-traffic projects generate large `/events`
   result sets when filtering `category=request`; operators should prefer SIEM
   export over repeated full scans.
 - **Permissions TBD:** `events.read` system-catalog entry must be specified and
   the design catalog's `event.read` / `audit_event.read` split retired in a
   follow-up.
-- **Shipper scan cost:** naive anti-join poll grows with table size; watermark
-  cursor is a known follow-up.
 
 ## Related ADRs
 

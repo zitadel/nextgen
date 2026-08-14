@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation"
@@ -21,6 +22,13 @@ type Config struct {
 	Session         service.SessionConfig  `mapstructure:"session"`
 	Instrumentation instrumentation.Config `mapstructure:"instrumentation"`
 	Platform        PlatformConfig         `mapstructure:"platform"`
+	Events          EventsConfig           `mapstructure:"events"`
+}
+
+// EventsConfig configures audit event retention and deployment export sinks.
+type EventsConfig struct {
+	Retention audit.RetentionConfig `mapstructure:"retention"`
+	Export    audit.ExportConfig    `mapstructure:"export"`
 }
 
 // PlatformConfig configures the deployment's default project resolution

@@ -46,9 +46,12 @@ const deleteByIDProjectStmt = `DELETE FROM zitadel_nextgen.projects WHERE id = $
 
 // DeleteProjectByID implements [service.ProjectStatements].
 // resource_scope_index rows for this project cascade via the project_id FK.
-func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) error {
-	_, err := ps.client.Exec(ctx, deleteByIDProjectStmt, id)
-	return wrapError(err)
+func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) (bool, error) {
+	tag, err := ps.client.Exec(ctx, deleteByIDProjectStmt, id)
+	if err != nil {
+		return false, wrapError(err)
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 const projectQuery = "SELECT id, name, preview_origins, created_at, updated_at FROM zitadel_nextgen.projects"

@@ -36,7 +36,7 @@ func TestCursorBattle_AdversarialTokens(t *testing.T) {
 			ids := []string{prefix + "-a", prefix + "-b"}
 			for _, id := range ids {
 				require.NoError(t, d.stmts.CreateProject(t.Context(), newTestProject(id)))
-				t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), id) })
+				t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), id) })
 			}
 			filter := database.Or(
 				database.Equal(database.Col(domain.ProjectFieldID), ids[0]),
@@ -75,7 +75,7 @@ func TestCursorBattle_AdversarialTokens(t *testing.T) {
 			ids := []string{prefix + "-a", prefix + "-b"}
 			for _, id := range ids {
 				require.NoError(t, d.stmts.CreateProject(t.Context(), newTestProject(id)))
-				t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), id) })
+				t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), id) })
 			}
 			filter := database.Or(
 				database.Equal(database.Col(domain.ProjectFieldID), ids[0]),
@@ -150,7 +150,7 @@ func TestCursorBattle_DestructiveMidPage(t *testing.T) {
 			ids := []string{prefix + "-a", prefix + "-b", prefix + "-c"}
 			for _, id := range ids {
 				require.NoError(t, d.stmts.CreateProject(t.Context(), newTestProject(id)))
-				t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), id) })
+				t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), id) })
 			}
 			filter := database.Or(
 				database.Equal(database.Col(domain.ProjectFieldID), ids[0]),
@@ -169,8 +169,8 @@ func TestCursorBattle_DestructiveMidPage(t *testing.T) {
 			require.Len(t, first.Items, 2)
 			require.NotEmpty(t, first.NextCursor)
 			deleted := first.Items[1].ID
-			require.NoError(t, d.stmts.DeleteProjectByID(t.Context(), deleted))
-
+			_, err = d.stmts.DeleteProjectByID(t.Context(), deleted)
+			require.NoError(t, err)
 			got := append(projectIDs(first.Items[:1]), pageAll(t, 2, first.NextCursor, func(cursor []byte) (*database.ListResult[*domain.Project], error) {
 				return d.stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
 					Filter: filter,
@@ -189,7 +189,7 @@ func TestCursorBattle_DestructiveMidPage(t *testing.T) {
 			mid, late := prefix+"-m", prefix+"-z"
 			for _, id := range []string{mid, late} {
 				require.NoError(t, d.stmts.CreateProject(t.Context(), newTestProject(id)))
-				t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), id) })
+				t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), id) })
 			}
 			filterPrefix := database.StringStartsWith(database.Col(domain.ProjectFieldID), prefix+"-")
 			order := database.OrderBy[domain.ProjectField]{
@@ -206,7 +206,7 @@ func TestCursorBattle_DestructiveMidPage(t *testing.T) {
 
 			early := prefix + "-a"
 			require.NoError(t, d.stmts.CreateProject(t.Context(), newTestProject(early)))
-			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), early) })
+			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), early) })
 
 			rest := pageAll(t, 2, first.NextCursor, func(cursor []byte) (*database.ListResult[*domain.Project], error) {
 				return d.stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
@@ -225,7 +225,7 @@ func TestCursorBattle_DestructiveMidPage(t *testing.T) {
 			early, mid := prefix+"-a", prefix+"-m"
 			for _, id := range []string{early, mid} {
 				require.NoError(t, d.stmts.CreateProject(t.Context(), newTestProject(id)))
-				t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), id) })
+				t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), id) })
 			}
 			filterPrefix := database.StringStartsWith(database.Col(domain.ProjectFieldID), prefix+"-")
 			order := database.OrderBy[domain.ProjectField]{
@@ -241,7 +241,7 @@ func TestCursorBattle_DestructiveMidPage(t *testing.T) {
 
 			late := prefix + "-z"
 			require.NoError(t, d.stmts.CreateProject(t.Context(), newTestProject(late)))
-			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), late) })
+			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), late) })
 
 			rest := pageAll(t, 3, first.NextCursor, func(cursor []byte) (*database.ListResult[*domain.Project], error) {
 				return d.stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
@@ -332,7 +332,7 @@ func TestCursorBattle_ListResultIterate(t *testing.T) {
 		want := []string{prefix + "-a", prefix + "-b", prefix + "-c"}
 		for _, id := range want {
 			require.NoError(t, d.stmts.CreateProject(t.Context(), newTestProject(id)))
-			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), id) })
+			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), id) })
 		}
 		filter := database.Or(
 			database.Equal(database.Col(domain.ProjectFieldID), want[0]),

@@ -1,0 +1,10 @@
+title: AuthzGrantedPayload
+type: object
+description: Payload for `authz.granted` events.
+properties:
+  principal_type:
+    type: string
+  principal_id:
+    type: string
+  relation:
+    type: string

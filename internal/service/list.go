@@ -114,12 +114,12 @@ func listOrderBy[F ~uint8](sorting *Sorting, defaultField F, defaultDirection da
 func createdAtFilter[F ~uint8](op string, col database.Column[F], value any) (database.Filter[F], error) {
 	raw, ok := value.(string)
 	if !ok {
-		return nil, domain.ErrRequestInvalid().WithDetails("createdAt filter value must be an RFC3339 string")
+		return nil, domain.ErrRequestInvalid().WithDetails("created_at filter value must be an RFC3339 string")
 	}
 	t, err := database.CoerceTimeValue(raw)
 	if err != nil {
 		return nil, domain.ErrRequestInvalid().WithDetails(
-			fmt.Sprintf("createdAt filter value %q is not a valid RFC3339 timestamp", raw))
+			fmt.Sprintf("created_at filter value %q is not a valid RFC3339 timestamp", raw))
 	}
 	return compareFilter(op, col, t)
 }
@@ -133,7 +133,9 @@ func compareFilter[F ~uint8](op string, col database.Column[F], value any) (data
 		return database.LessThan(col, value), nil
 	case filterOpGreaterThan:
 		return database.GreaterThan(col, value), nil
-	case filterOpNotEquals, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+	case filterOpGreaterThanOrEqual:
+		return database.GreaterThanOrEqual(col, value), nil
+	case filterOpNotEquals, filterOpLessThanOrEqual:
 		// todo (grvijayan): update when these operations are supported
 		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
 	case filterOpContains, filterOpNotContains:
@@ -143,13 +145,23 @@ func compareFilter[F ~uint8](op string, col database.Column[F], value any) (data
 	}
 }
 
+// stringFilterValue asserts the filter's value is a string, naming the field
+// in the error detail.
+func stringFilterValue(f Filter) (string, error) {
+	value, ok := f.Value.(string)
+	if !ok {
+		return "", domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("%s filter value must be a string", f.Field))
+	}
+	return value, nil
+}
+
 // stringFilter maps an operation to a text filter.
 func stringFilter[F ~uint8](op string, col database.Column[F], value string) (database.Filter[F], error) {
 	switch op {
 	case filterOpEquals:
 		return database.StringEqual(col, value), nil
 	case filterOpContains:
-		return database.StringContains(col, value), nil
+		return database.StringContainsFold(col, value), nil
 	case filterOpNotEquals, filterOpNotContains:
 		// todo (grvijayan): update when these operations are supported
 		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))

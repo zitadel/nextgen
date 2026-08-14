@@ -49,7 +49,7 @@ sk_team_… MAY:
   team_membership.read, team_membership.write
                                      (not .create / .delete — roster add/remove
                                       and invitations require a user token)
-  event.read                         (filtered to this team)
+  events.read                        (filtered to this team)
 
 sk_team_… MUST NEVER:
   user.set_password                  (account takeover — human/owner op only)
@@ -73,7 +73,6 @@ sk_team_… MUST NEVER:
   flow_definition.*
   session.*
   auth_attempt.*
-  audit_event.read
   import.*
   platform.*                         (cross-project — note: the platform itself is a project)
 ```

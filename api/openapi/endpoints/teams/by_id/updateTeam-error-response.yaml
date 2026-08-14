@@ -5,6 +5,7 @@ content:
     schema:
       oneOf:
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/team-already_exists.yaml'
@@ -16,6 +17,7 @@ content:
         propertyName: code
         mapping:
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
+          evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           team.already_exists: '../../../components/schemas/errors/team-already_exists.yaml'
@@ -29,6 +31,11 @@ content:
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
+      evt.invalid:
+        summary: evt.invalid
+        value:
+          code: evt.invalid
+          message: 'event: invalid'
       internal:
         summary: internal
         value:

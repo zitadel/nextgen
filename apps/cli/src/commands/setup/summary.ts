@@ -1,6 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
+import type { BrandingDesign } from "@zitadel/config/defaults";
 import pc from "picocolors";
 
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
@@ -165,4 +166,32 @@ function stripRange(range: string): string {
 /** Returns just the file name from a relative path, for the `→ filename` secondary detail in PACKAGE rows. */
 export function fileNameOf(p: string): string {
   return basename(p);
+}
+
+/**
+ * Layout caveats for the chosen login design, shown to humans after the
+ * summary box and carried in the JSON envelope's `warnings`.
+ *
+ * The split family's brand pane is keyed to the **login's own container**
+ * width — a `@container (max-width: 48rem)` query on the widget's mount, not
+ * a viewport media query. Above that the pane renders; below it the pane is
+ * `display: none` and the compact brand mark takes its place — and the split
+ * template only emits that mark when `branding.json` names `logo_url` or
+ * `hero_url`, so without one the narrow layout loses the branding entirely.
+ *
+ * Independent of posture, because the container query is: a full-page login
+ * hits the same collapse on a phone that an embedded card hits in a sidebar.
+ * Gating on `widget` would have been a guess about the container, and a wrong
+ * one in both directions — the wrapper setup scaffolds for a widget is
+ * full-width (the pane renders there), and a page-posture login on a phone is
+ * exactly the narrow case the advice is for. `hero` stays quiet: its compact
+ * fallback is editable text, so a narrow container never leaves it blank.
+ */
+export function designWarnings(design?: BrandingDesign): string[] {
+  if (design !== "split" && design !== "split-right") {
+    return [];
+  }
+  return [
+    `The ${design} design shows its brand pane only when the login's container is wide; a narrow container — a card-width embed, or any phone-width viewport — collapses it to the compact brand mark. Set logo_url (or hero_url) in .zitadel/branding/branding.json so that mark isn't empty.`,
+  ];
 }

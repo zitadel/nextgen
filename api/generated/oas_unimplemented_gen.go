@@ -259,6 +259,18 @@ func (UnimplementedHandler) GetClaimStatus(ctx context.Context, params GetClaimS
 	return r, ht.ErrNotImplemented
 }
 
+// GetEvent implements getEvent operation.
+//
+// Loads a single event by `(project_id, id)`. Requires `events.read`.
+// Events are not registered in `resource_scope_index`; project scope is
+// required on the query (ADR 049). Misses and cross-project ids return 404.
+// Pre-claim projects return 404 (stored events stay invisible until claim).
+//
+// GET /events/{id}
+func (UnimplementedHandler) GetEvent(ctx context.Context, params GetEventParams) (r GetEventRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // GetFlowDefinition implements getFlowDefinition operation.
 //
 // Get a flow definition by id.
@@ -415,6 +427,23 @@ func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandin
 	return r, ht.ErrNotImplemented
 }
 
+// ListEvents implements listEvents operation.
+//
+// Returns project-scoped audit events, newest-first by keyset on
+// `(created_at, id)` (ADR 027 / ADR 049). Pass `order=asc` for oldest-first.
+// Requires `events.read`.
+// Pre-claim projects return an empty list (events are stored but not
+// visible until claim succeeds). Team-scoped credentials see only events
+// whose emit-time `team_id` matches the credential team (enforced when
+// team-scoped tokens exist).
+// Clients discriminate each item via `event_type` (OpenAPI Event oneOf) —
+// see docs/design/api/events-catalog.md.
+//
+// GET /events
+func (UnimplementedHandler) ListEvents(ctx context.Context, params ListEventsParams) (r ListEventsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListFlowDefinitions implements listFlowDefinitions operation.
 //
 // Retrieves a list of all flow definitions.
@@ -499,7 +528,6 @@ func (UnimplementedHandler) QuerySessions(ctx context.Context, req *QuerySession
 // QueryTeams implements queryTeams operation.
 //
 // Returns the teams of a project, paginated with a cursor.
-// Teams of every lifecycle status are returned; each carries its `status`.
 //
 // POST /teams/query
 func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (r QueryTeamsRes, _ error) {

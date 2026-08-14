@@ -8,6 +8,7 @@ content:
         - $ref: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/enc_key-not_found.yaml'
+        - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/flowdef-not_found.yaml'
         - $ref: '../../components/schemas/errors/flowdef-purpose_mismatch.yaml'
         - $ref: '../../components/schemas/errors/flow-integrity.yaml'
@@ -24,6 +25,7 @@ content:
           enc_key.decrypt_failed: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           enc_key.encrypt_failed: '../../components/schemas/errors/enc_key-encrypt_failed.yaml'
           enc_key.not_found: '../../components/schemas/errors/enc_key-not_found.yaml'
+          evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           flowdef.not_found: '../../components/schemas/errors/flowdef-not_found.yaml'
           flowdef.purpose_mismatch: '../../components/schemas/errors/flowdef-purpose_mismatch.yaml'
           flow.integrity: '../../components/schemas/errors/flow-integrity.yaml'
@@ -54,6 +56,11 @@ content:
         value:
           code: enc_key.not_found
           message: 'encryption key not found'
+      evt.invalid:
+        summary: evt.invalid
+        value:
+          code: evt.invalid
+          message: 'event: invalid'
       flowdef.not_found:
         summary: flowdef.not_found
         value:
