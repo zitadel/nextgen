@@ -76,9 +76,11 @@ lifecycle ownership field.
 Product mutations keep the distinct facts consistent: a `team.owner` assignment
 may be issued only to an active team participant; removing or deactivating that
 participant revokes their `team.owner` assignment in the same transaction.
-Being an active participant never synthesizes `team.owner`. A team must retain
-at least one active owner; ownership transfer is explicit and resources do not
-depend on the lifecycle of their creator.
+Being an active participant never synthesizes `team.owner`. Ordinary mutations
+must leave a team with at least one active owner; only an identity-level
+suspension may transiently break that state, and §8 defines what it leaves
+behind. Ownership transfer is explicit and resources do not depend on the
+lifecycle of their creator.
 
 Creating a team, its creator's active roster membership, and a distinct
 `team.owner` assignment for that creator is one transaction. This rule applies
@@ -93,6 +95,16 @@ neither target relation exists in the checked-in seed yet. Exactly one active
 owning-team assignment may exist per claimed or account-owned project. It is
 stored as an `authz_assignments` row on the protected project, with the foreign
 platform team as principal.
+
+That uniqueness is enforced, not assumed. The generic active-assignment key
+includes the principal, so by itself it permits two teams to hold `owning_team`
+concurrently; racing claim or transfer requests must not be able to create that
+state. Each dialect provides an equivalent guarantee — a partial or
+null-filtered unique index over active `owning_team` rows where the database
+supports one, serialization through the single atomic transfer mutation (§8)
+where it does not — and an owning-team assignment never carries `expires_at`:
+ownership ends by explicit transfer or revocation, never by lapse. The losing
+writer of a race receives a conflict, not a second owner.
 
 The owning team determines:
 
@@ -199,14 +211,23 @@ exists.
 
 An agency or consultancy uses its own platform-project team as the principal on
 customer-issued grants. A user may belong to several customer or agency access
-teams. Team IDs are stable addressing identifiers; a grant API validates that
-the target team exists and is active without exposing a global team directory.
+teams. Team IDs are stable addressing identifiers.
 
 For v1, the customer-facing collaboration API accepts either a user ID or team
 ID from the platform project. It validates that the supplied principal exists
 and is active without exposing a global directory. Direct grants are useful for
 one-off access; access teams are preferred when several people share the same
 project set or when one membership removal should revoke several derived roles.
+
+Both primitives are model commitments from day one: the row shape is identical,
+and the testing obligations cover the direct and team-derived paths regardless
+of when each API surface ships. The collaboration API itself may stage — team
+grants can ship first, with direct user grants following once §6's per-project
+grant listing and §9's source-annotated project listing are implemented,
+because a direct grant is only operable once an owner can enumerate and revoke
+it as easily as a membership. Staging is an API-availability choice, not a
+model choice; nothing may be built that assumes teams are the only grant
+principal type.
 
 Removing a person from an access team revokes only roles derived through that
 team; a deliberate direct project grant remains until separately revoked.
@@ -324,9 +345,15 @@ grants are intentionally independent and must be revoked separately; suspending
 or deactivating the user denies all paths immediately.
 
 Removing the final owner of an owning team is rejected until another active
-owner is assigned. Deactivating an owning team leaves its projects in a derived
-`needs_owner` condition for management purposes; this is not a new persisted
-project status. It does not delete projects or create a new owner implicitly.
+owner is assigned. Suspending or deactivating the user who is the final active
+owner is **not** rejected: identity-level security actions take effect
+immediately and outrank §1's owner-retention invariant. The team is then left
+without an active owner, and its owned projects show the derived `needs_owner`
+condition below until another owner is assigned; rejection remains the rule
+only for ordinary owner removal. Deactivating an owning team leaves its
+projects in the same derived `needs_owner` condition for management purposes;
+this is not a new persisted project status. It does not delete projects or
+create a new owner implicitly.
 
 An ownership transfer is one atomic mutation that replaces the unique
 `owning_team` assignment. The v1 caller must be an active owner of both the
