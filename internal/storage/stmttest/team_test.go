@@ -390,7 +390,7 @@ func TestTeamStatements_List(t *testing.T) {
 		// Filter bounds come from the stored rows, not from what CreateTeam wrote
 		// back: the Spanner emulator returns a created_at from THEN RETURN that
 		// is a few hundred microseconds off the value it commits.
-		read, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{
+		read, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{
 			Filter: onlyFixtures,
 			Pagination: database.Page[domain.TeamField]{
 				OrderBy: database.OrderBy[domain.TeamField]{
@@ -406,7 +406,7 @@ func TestTeamStatements_List(t *testing.T) {
 
 		list := func(t *testing.T, filter database.Filter[domain.TeamField], dir database.OrderDirection) []string {
 			t.Helper()
-			res, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{
+			res, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{
 				Filter: database.And(onlyFixtures, filter),
 				Pagination: database.Page[domain.TeamField]{
 					OrderBy: database.OrderBy[domain.TeamField]{
@@ -420,7 +420,7 @@ func TestTeamStatements_List(t *testing.T) {
 		}
 
 		t.Run("scopes results to the project", func(t *testing.T) {
-			res, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{
+			res, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{
 				Filter: database.Equal(projectCol, otherProjectID),
 			})
 			require.NoError(t, err)
@@ -428,7 +428,7 @@ func TestTeamStatements_List(t *testing.T) {
 		})
 
 		t.Run("returns the stored team", func(t *testing.T) {
-			res, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{
+			res, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{
 				Filter: database.And(onlyFixtures, database.Equal(idCol, ids[0])),
 			})
 			require.NoError(t, err)
@@ -449,7 +449,7 @@ func TestTeamStatements_List(t *testing.T) {
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
 			require.NoError(t, d.stmts.DeactivateTeam(t.Context(), deactivatedProjectID, team.ID))
 
-			res, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{
+			res, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{
 				Filter: database.Equal(projectCol, deactivatedProjectID),
 			})
 			require.NoError(t, err)
@@ -503,13 +503,13 @@ func TestTeamStatements_List(t *testing.T) {
 					},
 				}
 
-				first, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{Filter: onlyFixtures, Pagination: page})
+				first, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{Filter: onlyFixtures, Pagination: page})
 				require.NoError(t, err)
 				assert.Equal(t, []string{ids[0], ids[1]}, teamIDs(first.Items))
 				require.NotEmpty(t, first.NextCursor)
 
 				page.Cursor = first.NextCursor
-				second, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{Filter: onlyFixtures, Pagination: page})
+				second, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{Filter: onlyFixtures, Pagination: page})
 				require.NoError(t, err)
 				assert.Equal(t, []string{ids[2]}, teamIDs(second.Items))
 				assert.Empty(t, second.NextCursor)
@@ -526,18 +526,18 @@ func TestTeamStatements_List(t *testing.T) {
 				},
 			}
 
-			first, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{Filter: filter, Pagination: page})
+			first, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{Filter: filter, Pagination: page})
 			require.NoError(t, err)
 			assert.Equal(t, []string{ids[1]}, teamIDs(first.Items))
 			require.NotEmpty(t, first.NextCursor)
 
 			page.Cursor = first.NextCursor
-			second, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{Filter: filter, Pagination: page})
+			second, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{Filter: filter, Pagination: page})
 			require.NoError(t, err)
 			assert.Equal(t, []string{ids[2]}, teamIDs(second.Items))
 
 			page.Cursor = second.NextCursor
-			third, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{Filter: filter, Pagination: page})
+			third, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{Filter: filter, Pagination: page})
 			require.NoError(t, err)
 			assert.Empty(t, teamIDs(third.Items))
 		})

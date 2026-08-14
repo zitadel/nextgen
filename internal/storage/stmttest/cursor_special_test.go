@@ -424,7 +424,7 @@ func TestCursorBattle_UpdateSortKeyCrossingCursor(t *testing.T) {
 			},
 			Direction: database.OrderAsc,
 		}
-		first, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{
+		first, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{
 			Filter:     filter,
 			Pagination: database.Page[domain.TeamField]{Limit: 2, OrderBy: order},
 		})
@@ -438,7 +438,7 @@ func TestCursorBattle_UpdateSortKeyCrossingCursor(t *testing.T) {
 		require.NoError(t, d.stmts.UpdateTeam(t.Context(), bravo))
 
 		rest := pageAll(t, 2, first.NextCursor, func(cursor []byte) (*database.ListResult[*domain.Team], error) {
-			return d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{
+			return d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{
 				Filter: filter,
 				Pagination: database.Page[domain.TeamField]{
 					Limit: 2, OrderBy: order, Cursor: cursor,

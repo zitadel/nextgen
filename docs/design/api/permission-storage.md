@@ -92,7 +92,12 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
   management list endpoints inject an authz EXISTS **predicate** (same
   assignment/closure branches as `ListObjects`) via `service.AuthzListFilter`
   after `requireProjectListAccess` (Allow or Forbidden → proceed; NotFound →
-  404). `QuerySessions` waits on `sessionService.List`.
+  404). `compileList` for management tables fails closed without the filter
+  ([#838](https://github.com/zitadel/nextgen/issues/838)). Intentional
+  carve-outs ([#839](https://github.com/zitadel/nextgen/issues/839)):
+  `QuerySessions` (`compileRead`, List not implemented), `QueryProjects`
+  (project is the scope boundary), `ListUserPasskeys` / `ListUserTeams`
+  (nested under a user already gated by `requireResourceAccess`).
 
 ## Locked decisions
 
@@ -618,6 +623,18 @@ bundles:
 - Permission grants management API / product UI
 - `#333` foreign home project, Leopard (**D11**)
 - QuerySessions list predicate (deferred until `sessionService.List` exists)
+
+### List-predicate carve-outs ([#839](https://github.com/zitadel/nextgen/issues/839))
+
+Management `compileList` with a non-empty table name and resource-id column **requires** `AuthzListFilter` on the context ([#838](https://github.com/zitadel/nextgen/issues/838)). `compileRead` still uses `context.Background()` on purpose and is unchanged.
+
+| Endpoint | Why it is not a `compileList` + filter path |
+| --- | --- |
+| `QuerySessions` | Uses `compileRead`; `List` is not implemented. |
+| `QueryProjects` | The project **is** the scope boundary. |
+| `ListUserPasskeys` / `ListUserTeams` | Nested under a user already gated by `requireResourceAccess`. |
+
+Do not wire `QuerySessions` here; keep this table accurate until `sessionService.List` exists.
 
 ## See also
 

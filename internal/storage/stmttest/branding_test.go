@@ -94,14 +94,14 @@ func TestBrandingStatements_ListNewestFirst(t *testing.T) {
 		second.LiquidTemplate = `<p data-rev="2">{% mandatory_gates %}</p>`
 		require.NoError(t, d.stmts.CreateBranding(t.Context(), second))
 
-		got, err := d.stmts.ListBrandings(t.Context(), branding.ListOptions(projectID, 0))
+		got, err := d.stmts.ListBrandings(unfilteredListCtx(t), branding.ListOptions(projectID, 0))
 		require.NoError(t, err)
 		require.Len(t, got.Items, 2)
 		assert.Equal(t, "brnd-002", got.Items[0].ID)
 		assert.Equal(t, second.LiquidTemplate, got.Items[0].LiquidTemplate)
 		assert.Equal(t, "brnd-001", got.Items[1].ID)
 
-		latest, err := d.stmts.ListBrandings(t.Context(), branding.ListOptions(projectID, 1))
+		latest, err := d.stmts.ListBrandings(unfilteredListCtx(t), branding.ListOptions(projectID, 1))
 		require.NoError(t, err)
 		require.Len(t, latest.Items, 1)
 		assert.Equal(t, "brnd-002", latest.Items[0].ID)
@@ -113,7 +113,7 @@ func TestBrandingStatements_ListEmpty(t *testing.T) {
 		projectID, _ := uniqueBrandingIDs(t)
 		ensureBrandingProject(t, d.stmts, projectID)
 
-		got, err := d.stmts.ListBrandings(t.Context(), branding.ListOptions(projectID, 1))
+		got, err := d.stmts.ListBrandings(unfilteredListCtx(t), branding.ListOptions(projectID, 1))
 		require.NoError(t, err)
 		assert.Empty(t, got.Items)
 	})
