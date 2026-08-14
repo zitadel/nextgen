@@ -19,7 +19,7 @@ func TestDeactivateTeam_wrapsMultiWriteInTransaction(t *testing.T) {
 	forced := errors.New("boom on second write")
 	inner := &failOnNthStubTx{failOn: 2, fail: forced}
 	beginner := &txBeginner{tx: inner}
-	err := newTeamStatements(beginner).DeactivateTeam(t.Context(), "proj", "team")
+	_, err := newTeamStatements(beginner).DeactivateTeam(t.Context(), "proj", "team")
 	require.ErrorIs(t, err, forced)
 	assert.False(t, inner.committed)
 	assert.True(t, inner.rolledBack)

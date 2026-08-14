@@ -54,7 +54,7 @@ func ensureProject(t *testing.T, stmts service.AllStatements) string {
 	t.Helper()
 	project := newTestProject(uniqueProjectID(t))
 	require.NoError(t, stmts.CreateProject(t.Context(), project))
-	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 	return project.ID
 }
 

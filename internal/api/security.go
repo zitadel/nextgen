@@ -9,6 +9,8 @@ import (
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -45,7 +47,7 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 	}
 
 	ctx = WithScopeContext(ctx, scope)
-
+	ctx = withActorFromToken(ctx, payload)
 	return ctx, nil
 }
 
@@ -62,7 +64,9 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 	if err != nil {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
-	return context.WithValue(ctx, sessionTokenKey{}, token), nil
+	ctx = context.WithValue(ctx, sessionTokenKey{}, token)
+	ctx = withActorFromToken(ctx, token)
+	return ctx, nil
 }
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
@@ -191,4 +195,46 @@ func WithScopeContext(ctx context.Context, scopeCtx ScopeContext) context.Contex
 func GetScopeContext(ctx context.Context) (ScopeContext, bool) {
 	v, ok := ctx.Value(contextKey{}).(ScopeContext)
 	return v, ok
+}
+
+func withActorFromToken(ctx context.Context, token *domain.Token) context.Context {
+	if token == nil {
+		return ctx
+	}
+	ac := audit.ActorContext{
+		ProjectID:      token.ProjectID,
+		TokenID:        token.TokenID,
+		DelegationType: "direct",
+		Authenticated:  true,
+		SessionID:      token.SessionID,
+	}
+	if token.UserID != "" {
+		uid := token.UserID
+		ac.ActorID = &uid
+		actorType := domain.EventActorTypeHuman
+		if token.Type == domain.TokenTypePersonalAccessToken {
+			actorType = domain.EventActorTypeService
+		}
+		ac.ActorType = &actorType
+	} else {
+		actorType := domain.EventActorTypeService
+		ac.ActorType = &actorType
+	}
+	if reqID, ok := middleware.GetRequestIDContext(ctx); ok {
+		ac.RequestID = &reqID
+	}
+	if rc, ok := middleware.GetRequestContext(ctx); ok {
+		if rc.Fingerprint != "" {
+			ac.Fingerprint = rc.Fingerprint
+		}
+		if rc.FlowID != "" {
+			flowID := rc.FlowID
+			ac.FlowID = &flowID
+		}
+		if rc.SessionID != "" && ac.SessionID == nil {
+			sid := rc.SessionID
+			ac.SessionID = &sid
+		}
+	}
+	return audit.WithActorContext(ctx, ac)
 }

@@ -20,7 +20,7 @@ func TestProjectStatements_Create(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("creates project and timestamps are set", func(t *testing.T) {
 			project := newTestProject(uniqueProjectID(t))
-			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 
 			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 			assert.False(t, project.CreatedAt.IsZero())
@@ -39,7 +39,7 @@ func TestProjectStatements_Create(t *testing.T) {
 		t.Run("empty id is assigned by dialect", func(t *testing.T) {
 			project := &domain.Project{Name: "project-" + uniqueSuffix(t), PreviewOrigins: []string{}}
 			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
-			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 
 			require.NotEmpty(t, project.ID)
 			assert.True(t, strings.HasPrefix(project.ID, string(domain.PrefixProject)+"_"))
@@ -51,7 +51,7 @@ func TestProjectStatements_Create(t *testing.T) {
 
 		t.Run("duplicate ID returns error", func(t *testing.T) {
 			project := newTestProject(uniqueProjectID(t))
-			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 
 			err := d.stmts.CreateProject(t.Context(), newTestProject(project.ID))
@@ -65,7 +65,7 @@ func TestProjectStatements_Update(t *testing.T) {
 		t.Run("updates name and refreshes updated_at", func(t *testing.T) {
 			project := newTestProject(uniqueProjectID(t))
 			project.PreviewOrigins = []string{"*.example.com", "localhost:3000"}
-			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 			createdUpdatedAt := project.UpdatedAt
 			createdAt := project.CreatedAt
@@ -95,7 +95,7 @@ func TestProjectStatements_Get(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("returns project by ID", func(t *testing.T) {
 			project := newTestProject(uniqueProjectID(t))
-			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 
 			stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
@@ -117,17 +117,21 @@ func TestProjectStatements_Delete(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("deletes an existing project", func(t *testing.T) {
 			project := newTestProject(uniqueProjectID(t))
-			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 
-			require.NoError(t, d.stmts.DeleteProjectByID(t.Context(), project.ID))
+			changed, err := d.stmts.DeleteProjectByID(t.Context(), project.ID)
+			require.NoError(t, err)
+			assert.True(t, changed)
 
-			_, err := d.stmts.GetProjectByID(t.Context(), project.ID)
+			_, err = d.stmts.GetProjectByID(t.Context(), project.ID)
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		})
 
 		t.Run("deleting a missing project is a no-op", func(t *testing.T) {
-			assert.NoError(t, d.stmts.DeleteProjectByID(t.Context(), uniqueProjectID(t)))
+			changed, err := d.stmts.DeleteProjectByID(t.Context(), uniqueProjectID(t))
+			assert.NoError(t, err)
+			assert.False(t, changed)
 		})
 	})
 }
@@ -140,7 +144,7 @@ func TestProjectStatements_List(t *testing.T) {
 				time.Sleep(2 * time.Millisecond)
 			}
 			project := newTestProject(uniqueProjectID(t) + "-" + strconv.Itoa(i))
-			t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
+			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 			projects[i] = project
 		}
@@ -284,7 +288,7 @@ func runListCursorTie(
 
 	tieCreatedAt := time.Now().UTC().Truncate(time.Microsecond)
 	for _, id := range ids {
-		t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), id) })
+		t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), id) })
 	}
 	require.NoError(t, d.seedTiedProjects(t.Context(), ids, tieCreatedAt))
 
