@@ -194,21 +194,6 @@ func GetScopeContext(ctx context.Context) (ScopeContext, bool) {
 	return v, ok
 }
 
-// isProjectSecretType reports whether t may mint an sk_proj ScopeContext.
-// Preview secrets still cannot call management APIs (hasOperatorProjectWrite).
 func isProjectSecretType(t domain.TokenType) bool {
-	switch t {
-	case domain.TokenTypeProjectToken, domain.TokenTypeProjectPreview:
-		return true
-	case domain.TokenTypeUnspecified,
-		domain.TokenTypeSessionToken,
-		domain.TokenTypeOIDCAccessToken,
-		domain.TokenTypeSAMLAssertion,
-		domain.TokenTypePersonalAccessToken,
-		domain.TokenTypeFlow,
-		domain.TokenTypeJWTProfile:
-		return false
-	default:
-		return false
-	}
+	return t == domain.TokenTypeProjectToken || t == domain.TokenTypeProjectPreview
 }
