@@ -10,7 +10,7 @@ type RunCliModule = {
     buildCli?: (options: { env: Record<string, string | undefined> }) => Promise<void>;
     buildLocalServerBinary?: (options: {
       env: Record<string, string | undefined>;
-    }) => Promise<string>;
+    }) => Promise<{ path: string; version: string }>;
     buildLocalRuntimeImage?: (options: {
       env: Record<string, string | undefined>;
     }) => Promise<unknown>;
@@ -150,7 +150,7 @@ describe("run-cli wrapper", () => {
       buildLocalServerBinary: async (options) => {
         calls.push("build-server");
         expect(options.env).toBe(env);
-        return "/repo/dist/server/nextgen";
+        return { path: "/repo/dist/server/nextgen", version: "dev+abcdef123456" };
       },
       buildLocalRuntimeImage: async (options) => {
         calls.push("build-image");
@@ -170,6 +170,7 @@ describe("run-cli wrapper", () => {
     expect(runEnv).toMatchObject({
       PATH: "/bin",
       ZITADEL_SERVER_BINARY: "/repo/dist/server/nextgen",
+      ZITADEL_SERVER_BINARY_VERSION: "dev+abcdef123456",
     });
     expect(runEnv).not.toHaveProperty("ZITADEL_LOCAL_IMAGE");
     expect(env).not.toHaveProperty("ZITADEL_SERVER_BINARY");
@@ -190,7 +191,7 @@ describe("run-cli wrapper", () => {
       },
       buildLocalServerBinary: async () => {
         calls.push("build-server");
-        return "/repo/dist/server/nextgen";
+        return { path: "/repo/dist/server/nextgen", version: "dev+abcdef123456" };
       },
       buildLocalRuntimeImage: async (options) => {
         calls.push("build-image");
@@ -216,7 +217,10 @@ describe("run-cli wrapper", () => {
 
   it("skips the builder when start receives --image", async () => {
     const buildLocalRuntimeImage = vi.fn(noop);
-    const buildLocalServerBinary = vi.fn(async () => "/repo/dist/server/nextgen");
+    const buildLocalServerBinary = vi.fn(async () => ({
+      path: "/repo/dist/server/nextgen",
+      version: "dev+abcdef123456",
+    }));
     const run = vi.fn(noop);
 
     await runCli.main({
@@ -236,7 +240,10 @@ describe("run-cli wrapper", () => {
 
   it("skips the builder when ZITADEL_LOCAL_IMAGE is set", async () => {
     const buildLocalRuntimeImage = vi.fn(noop);
-    const buildLocalServerBinary = vi.fn(async () => "/repo/dist/server/nextgen");
+    const buildLocalServerBinary = vi.fn(async () => ({
+      path: "/repo/dist/server/nextgen",
+      version: "dev+abcdef123456",
+    }));
     const run = vi.fn(noop);
 
     await runCli.main({
@@ -255,7 +262,10 @@ describe("run-cli wrapper", () => {
   });
 
   it("preserves an explicit local server binary override for binary start", async () => {
-    const buildLocalServerBinary = vi.fn(async () => "/repo/dist/server/nextgen");
+    const buildLocalServerBinary = vi.fn(async () => ({
+      path: "/repo/dist/server/nextgen",
+      version: "dev+abcdef123456",
+    }));
     const run = vi.fn(noop);
 
     await runCli.main({
@@ -273,7 +283,10 @@ describe("run-cli wrapper", () => {
   });
 
   it("skips the local server binary build for dry-run start", async () => {
-    const buildLocalServerBinary = vi.fn(async () => "/repo/dist/server/nextgen");
+    const buildLocalServerBinary = vi.fn(async () => ({
+      path: "/repo/dist/server/nextgen",
+      version: "dev+abcdef123456",
+    }));
 
     await runCli.main({
       args: ["start", "--dry-run"],
@@ -289,7 +302,10 @@ describe("run-cli wrapper", () => {
 
   it("skips the builder for non-start commands", async () => {
     const buildLocalRuntimeImage = vi.fn(noop);
-    const buildLocalServerBinary = vi.fn(async () => "/repo/dist/server/nextgen");
+    const buildLocalServerBinary = vi.fn(async () => ({
+      path: "/repo/dist/server/nextgen",
+      version: "dev+abcdef123456",
+    }));
 
     await runCli.main({
       args: ["doctor"],
