@@ -13,7 +13,20 @@ import { expect, test } from "@zitadel/testing/playwright";
  * The shell sets no `post-sign-in-url`, so it stops at the terminal step and
  * emits `zitadel-flow-complete` for the host to act on rather than exchanging
  * the handoff itself. These cases follow it exactly that far.
+ *
+ * The runtime document the shell discovers from is real here — this lane boots
+ * a provisioned instance — so the cases that need a *different* deployment
+ * state (no project yet, a server that cannot answer) stub the endpoint per
+ * test. Those three states are the ones Console ADR 0004 §3 keeps apart, and
+ * the shell's copy differs per state because its audience does: the setup hint
+ * addresses whoever is standing up the deployment, the connectivity error
+ * addresses someone who just wanted to sign in.
  */
+
+const RUNTIME_URL = "**/console/runtime.json";
+
+/** What a reachable server with no project yet answers (ADR 0004 §3, state 2). */
+const AWAITING_SETUP = { mode: "standalone" };
 
 interface FlowCompletion {
   behavior: string;
@@ -103,13 +116,93 @@ test("an explicit ?project_id= still wins over discovery", async ({ page, zitade
   expect(project.publishableKey).toBeUndefined();
 });
 
-// The shell's other branch — the setup hint — needs a deployment with no
-// project at all, which this suite's instance is bootstrapped past. A
-// caller-supplied id that does not resolve is a different case and keeps the
-// widget's own error, deliberately: the hint tells an operator to run
-// `zitadel setup`, which is not the answer to a bad query parameter.
+// A caller-supplied id that does not resolve is neither of the shell's own
+// screens and keeps the widget's own error, deliberately: the setup hint tells
+// an operator to run `zitadel setup`, which is not the answer to a bad query
+// parameter.
 test("a caller-supplied unknown project keeps the widget's own error", async ({ page }) => {
   await page.goto("/ui/login/?project_id=proj_does_not_exist");
   await expect(page.getByText(/not found/i)).toBeVisible();
   await expect(page.getByLabel("Email")).toHaveCount(0);
+});
+
+test("a reachable deployment with no project yet shows the setup hint", async ({ page }) => {
+  // This instance is bootstrapped past the state, so serve it directly. It is
+  // the one case whose copy is aimed at an operator: a deployment with no
+  // project has no application to send an end user here.
+  await page.route(RUNTIME_URL, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(AWAITING_SETUP),
+    }),
+  );
+
+  await page.goto("/ui/login/");
+  await expect(page.getByRole("heading", { name: "No project yet" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign-in is unavailable" })).toBeHidden();
+});
+
+test("an erroring runtime endpoint renders a retryable error, not the setup hint", async ({
+  page,
+  zitadel,
+}) => {
+  // The failure this replaces, and the reason it is not the narrow window it
+  // sounds like: `/ui/login/` is served from the binary's embedded assets and
+  // touches no storage, while `/console/runtime.json` is resolved per request
+  // from the default project and answers 500 when that lookup fails. A healthy
+  // binary in front of an unhealthy database hit exactly this, and told the
+  // people trying to sign in that the deployment was never set up.
+  let broken = true;
+  await page.route(RUNTIME_URL, (route) =>
+    broken
+      ? route.fulfill({
+          status: 500,
+          contentType: "text/plain",
+          body: "failed to resolve console runtime metadata",
+        })
+      : route.continue(),
+  );
+
+  await page.goto("/ui/login/");
+  await expect(page.getByRole("heading", { name: "Sign-in is unavailable" })).toBeVisible();
+  await expect(page.getByText("the server answered 500")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "No project yet" })).toBeHidden();
+  await expect(page.getByLabel("Email")).toHaveCount(0);
+
+  // Retry is a real second attempt, not a reload hint: the next request goes
+  // to the actual server, so a recovered deployment is one click from the
+  // widget it should have rendered all along.
+  broken = false;
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(page.getByLabel("Email")).toBeVisible();
+  expect((await widgetProject(page)).projectId).toBe(zitadel.handle.projectId);
+});
+
+test("an unreachable runtime endpoint renders the same error", async ({ page }) => {
+  await page.route(RUNTIME_URL, (route) => route.abort("failed"));
+
+  await page.goto("/ui/login/");
+  await expect(page.getByRole("heading", { name: "Sign-in is unavailable" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "No project yet" })).toBeHidden();
+});
+
+test("a 2xx body that is not the runtime document is an error, not a setup hint", async ({
+  page,
+}) => {
+  // What a misrouting proxy answers with, and what `vite preview` answers with
+  // for any unknown path. The shell used to tolerate it and fall through to
+  // the hint; `mode` is the field that tells a real document from this one.
+  await page.route(RUNTIME_URL, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: "<!doctype html><title>Zitadel sign-in</title>",
+    }),
+  );
+
+  await page.goto("/ui/login/");
+  await expect(page.getByRole("heading", { name: "Sign-in is unavailable" })).toBeVisible();
+  await expect(page.getByText("the response was not valid JSON")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "No project yet" })).toBeHidden();
 });

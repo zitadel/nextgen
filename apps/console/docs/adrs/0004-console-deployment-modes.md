@@ -8,15 +8,18 @@
 > and the flag-gated row-only `platform.bootstrap_project` path exist. The
 > pin, the first-created fallback, and row-only bootstrap are transitional
 > behavior, not the target described here, and the pin retires with the
-> fallback (§2). §3's three discovery states are implemented: an unreachable,
-> erroring, or unreadable runtime document renders a retryable connectivity
-> error, and builds that deliberately run without one (`vite preview`, the
-> api-mock dev loop) opt back into the standalone fallback with
-> `VITE_CONSOLE_RUNTIME_FALLBACK`. The full platform-project provisioner,
-> first-party Console session authorization, effective-permission exposure,
-> and seed-input contract remain future work.
+> fallback (§2). §3's three discovery states are implemented on both surfaces
+> that read the runtime document: an unreachable, erroring, or unreadable
+> document renders a retryable connectivity error in the Console and in the
+> hosted login shell, each with copy for its own audience. Console builds that
+> deliberately run without a document (`vite preview`, the api-mock dev loop)
+> opt back into the standalone fallback with `VITE_CONSOLE_RUNTIME_FALLBACK`;
+> the shell has no such lane and no such flag. The full platform-project
+> provisioner, first-party Console session authorization, effective-permission
+> exposure, and seed-input contract remain future work.
 > **Scope:** `apps/console`, plus the server-owned bootstrap and authorization
-> contracts on which it depends. See
+> contracts on which it depends. §2 and §3's runtime-document rules also bind
+> `apps/login-ui`, which reads the same document. See
 > [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Issues [#555](https://github.com/zitadel/nextgen/issues/555)
 > (Console / Customer Portal epic) and
@@ -222,6 +225,32 @@ portal — is satisfied at least as well by rendering an error, since an error
 state cannot render portal surfaces either. Development and preview builds that
 run without a backend must opt in explicitly rather than rely on a silent
 production fallback.
+
+**The hosted login shell holds the same three states, with different copy.**
+`apps/login-ui` reads this document for the same reason the Console does, so
+the rule binds it too — and the deployment topology makes the third state
+sharper there, not narrower. The shell is served from the binary's embedded
+assets and touches no storage, while the document is resolved per request from
+the default project and its encryption key; a healthy binary in front of an
+unhealthy database therefore serves the sign-in page and fails this fetch. The
+shell used to render "no project yet" for exactly that, telling the people
+trying to sign in that the deployment had never been set up.
+
+What differs is who is reading. The setup hint keeps its operator copy on both
+surfaces, because a deployment with no project has no application to send an
+end user to the sign-in page in the first place. The connectivity error does
+not: "check that the Zitadel server is running" is Console copy for a Console
+audience, and the shell says instead that sign-in is unavailable and worth
+retrying, carrying the failure clause in a demoted line for whoever can act on
+it. Distinguishing the states is the requirement; matching the Console's
+wording is not.
+
+The shell also needs no backend-less opt-in, and must not grow one on
+symmetry alone. The Console's `VITE_CONSOLE_RUNTIME_FALLBACK` exists because
+real lanes serve the Console with no document to read; nothing serves the
+shell that way, and previewing it without a backend is what an explicit
+`?project_id=` covers. A flag with no consumer is only a way to reintroduce
+the silent fallback.
 
 The publishable key is browser-safe public-plane material under ADR 036. The
 document never contains a project secret, seed credential, license key,
