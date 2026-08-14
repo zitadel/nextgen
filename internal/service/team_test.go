@@ -443,7 +443,7 @@ func TestTeamService_List(t *testing.T) {
 			},
 		},
 		{
-			name: "name equals matches exactly",
+			name: "name equals matches case-insensitively",
 			req: service.ListTeamsRequest{
 				ProjectID: "proj_1",
 				Filters:   []service.Filter{{Field: "name", Operation: "equals", Value: "Acme"}},
@@ -453,7 +453,7 @@ func TestTeamService_List(t *testing.T) {
 				assert.Equal(t, database.And(
 					inProject,
 					visibleStatuses,
-					database.StringEqual(database.Col(domain.TeamFieldName), "Acme"),
+					database.StringEqualFold(database.Col(domain.TeamFieldName), "Acme"),
 				), opts.Filter)
 			},
 		},

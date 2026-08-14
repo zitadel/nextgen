@@ -164,6 +164,11 @@ func teamFilter(f Filter) (database.Filter[domain.TeamField], error) {
 		if err != nil {
 			return nil, err
 		}
+		// Names are unique per project case-insensitively.
+		// The unique index is on the folded name, so this matches on the index.
+		if f.Operation == filterOpEquals {
+			return database.StringEqualFold(database.Col(domain.TeamFieldName), value), nil
+		}
 		return stringFilter(f.Operation, database.Col(domain.TeamFieldName), value)
 	case teamFieldStatus:
 		value, err := stringFilterValue(f)

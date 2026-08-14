@@ -114,12 +114,12 @@ func listOrderBy[F ~uint8](sorting *Sorting, defaultField F, defaultDirection da
 func createdAtFilter[F ~uint8](op string, col database.Column[F], value any) (database.Filter[F], error) {
 	raw, ok := value.(string)
 	if !ok {
-		return nil, domain.ErrRequestInvalid().WithDetails("createdAt filter value must be an RFC3339 string")
+		return nil, domain.ErrRequestInvalid().WithDetails("created_at filter value must be an RFC3339 string")
 	}
 	t, err := database.CoerceTimeValue(raw)
 	if err != nil {
 		return nil, domain.ErrRequestInvalid().WithDetails(
-			fmt.Sprintf("createdAt filter value %q is not a valid RFC3339 timestamp", raw))
+			fmt.Sprintf("created_at filter value %q is not a valid RFC3339 timestamp", raw))
 	}
 	return compareFilter(op, col, t)
 }

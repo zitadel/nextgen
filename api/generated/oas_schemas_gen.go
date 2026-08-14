@@ -11808,6 +11808,9 @@ func (s *FilterField) UnmarshalText(data []byte) error {
 
 // Filter operation defines the operations which can be used when filtering on a
 // query endpoint.
+// On text fields, `contains` is a case-insensitive substring match. `equals`
+// compares the whole value and is case-sensitive unless the field documents
+// otherwise.
 // Ref: #
 type FilterOperation string
 
@@ -38475,6 +38478,8 @@ func (s *TeamDeactivatedEventMetadata) init() TeamDeactivatedEventMetadata {
 }
 
 // Field to filter or sort teams by.
+// Team names are unique per project case-insensitively, so `name` is matched
+// case-insensitively by `equals` as well as by `contains`.
 // Ref: #
 type TeamFilterField string
 

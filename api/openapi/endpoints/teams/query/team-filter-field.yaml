@@ -1,6 +1,9 @@
 type: string
 description: |
   Field to filter or sort teams by.
+
+  Team names are unique per project case-insensitively, so `name` is matched
+  case-insensitively by `equals` as well as by `contains`.
 enum:
   - created_at
   - name

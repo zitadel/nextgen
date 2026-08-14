@@ -2,6 +2,10 @@ type: string
 description: |
   Filter operation defines the operations which can be used when filtering on a
   query endpoint.
+
+  On text fields, `contains` is a case-insensitive substring match. `equals`
+  compares the whole value and is case-sensitive unless the field documents
+  otherwise.
 enum:
   - equals
   - not_equals

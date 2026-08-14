@@ -414,9 +414,6 @@ type Invoker interface {
 	// QueryTeams invokes queryTeams operation.
 	//
 	// Returns the teams of a project, paginated with a cursor.
-	// Teams of every lifecycle status are returned by default; each carries its
-	// `status`. A `name` filter matches exactly with `equals` and
-	// case-insensitively with `contains`.
 	//
 	// POST /teams/query
 	QueryTeams(ctx context.Context, request *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)
@@ -6586,9 +6583,6 @@ func (c *Client) sendQuerySessions(ctx context.Context, request *QuerySessionsRe
 // QueryTeams invokes queryTeams operation.
 //
 // Returns the teams of a project, paginated with a cursor.
-// Teams of every lifecycle status are returned by default; each carries its
-// `status`. A `name` filter matches exactly with `equals` and
-// case-insensitively with `contains`.
 //
 // POST /teams/query
 func (c *Client) QueryTeams(ctx context.Context, request *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error) {

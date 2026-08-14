@@ -528,9 +528,6 @@ func (UnimplementedHandler) QuerySessions(ctx context.Context, req *QuerySession
 // QueryTeams implements queryTeams operation.
 //
 // Returns the teams of a project, paginated with a cursor.
-// Teams of every lifecycle status are returned by default; each carries its
-// `status`. A `name` filter matches exactly with `equals` and
-// case-insensitively with `contains`.
 //
 // POST /teams/query
 func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (r QueryTeamsRes, _ error) {

@@ -804,21 +804,31 @@ func TestQueryTeams(t *testing.T) {
 	})
 
 	t.Run("filters by name case-insensitively", func(t *testing.T) {
-		nameFilter := func(value string) []api.QueryTeamsRequestFilterItem {
+		nameFilter := func(op api.FilterOperation, value string) []api.QueryTeamsRequestFilterItem {
 			return []api.QueryTeamsRequestFilterItem{{
 				Field:     api.TeamFilterFieldName,
-				Operation: api.FilterOperationContains,
+				Operation: op,
 				Value:     api.NewOptFilterValue(api.NewStringFilterValue(value)),
 			}}
 		}
 
 		// The uppercase needle only matches the mixed-case names folded.
-		both := queryTeams(t, &api.QueryTeamsRequest{Filter: nameFilter("PAYMENTS")})
+		both := queryTeams(t, &api.QueryTeamsRequest{Filter: nameFilter(api.FilterOperationContains, "PAYMENTS")})
 		assert.Len(t, both.Teams, 2)
 
-		one := queryTeams(t, &api.QueryTeamsRequest{Filter: nameFilter("beta")})
+		one := queryTeams(t, &api.QueryTeamsRequest{Filter: nameFilter(api.FilterOperationContains, "beta")})
 		require.Len(t, one.Teams, 1)
 		assert.Equal(t, deactivated.ID, one.Teams[0].ID)
+
+		// "Payments Alpha" is stored mixed-case; names are unique per project
+		// case-insensitively, so equals folds rather than missing the row.
+		exact := queryTeams(t, &api.QueryTeamsRequest{Filter: nameFilter(api.FilterOperationEquals, "payments alpha")})
+		require.Len(t, exact.Teams, 1)
+		assert.Equal(t, active.ID, exact.Teams[0].ID)
+
+		// Folding equals must not turn it into a substring match.
+		partial := queryTeams(t, &api.QueryTeamsRequest{Filter: nameFilter(api.FilterOperationEquals, "payments")})
+		assert.Empty(t, partial.Teams)
 	})
 
 	t.Run("filters by status", func(t *testing.T) {
