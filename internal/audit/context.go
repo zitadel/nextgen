@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/events"
 )
@@ -45,6 +46,33 @@ func WithActorSlot(ctx context.Context) context.Context {
 func ActorSlotFromContext(ctx context.Context) (*ActorContext, bool) {
 	v, ok := ctx.Value(actorSlotKey{}).(*ActorContext)
 	return v, ok && v != nil
+}
+
+// BindPublicRequest stamps project/flow/session onto the actor slot so Path A
+// can emit request.api without a token (hosted login/flow). No-op when
+// projectID is empty or there is no slot. Does not set Authenticated.
+func BindPublicRequest(ctx context.Context, projectID, flowID, sessionID string) {
+	if projectID == "" {
+		return
+	}
+	slot, ok := ActorSlotFromContext(ctx)
+	if !ok || slot == nil {
+		return
+	}
+	slot.ProjectID = projectID
+	if flowID != "" {
+		id := flowID
+		slot.FlowID = &id
+	}
+	if sessionID != "" {
+		id := sessionID
+		slot.SessionID = &id
+	}
+	if slot.RequestID == nil {
+		if reqID, ok := middleware.GetRequestIDContext(ctx); ok && reqID != "" {
+			slot.RequestID = &reqID
+		}
+	}
 }
 
 // WithActorContext stores ActorContext on ctx and updates any actor slot.

@@ -38,7 +38,9 @@ func (w *statusCapturingWriter) Flush() {
 	}
 }
 
-// WithRequestEventMiddleware enqueues Path A request.api events after authenticated requests.
+// WithRequestEventMiddleware enqueues Path A request.api events after the
+// handler when project_id is known (authenticated API or public login/flow).
+// Probes (healthz) leave project_id empty and are skipped.
 func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -51,7 +53,7 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 			return
 		}
 		ac, ok := ActorSlotFromContext(r.Context())
-		if !ok || ac == nil || !ac.Authenticated || ac.ProjectID == "" {
+		if !ok || ac == nil || ac.ProjectID == "" {
 			return
 		}
 		status := sw.status

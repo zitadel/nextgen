@@ -186,15 +186,16 @@ audit filter dimensions and are not indexed for forensic queries.
 
 | `category` | When emitted | Emission path → durability | Sampling |
 |------------|--------------|----------------------------|----------|
-| `request` | Every **authenticated** API call (wide event at request end) | Path A → batched flush (N/T); visibility ≤ T; bounded crash-loss / drop-on-overflow (§4) | None |
+| `request` | HTTP handler completed **and** `project_id` is known (authenticated API or public login/flow) | Path A → batched flush (N/T); visibility ≤ T; bounded crash-loss / drop-on-overflow (§4) | None |
 | `auth` | Token issue/revoke/exchange, login outcomes, MFA decisions | Path B → in-TX with the mutating statement; no loss | None |
 | `session` | Session create/end, step-up, handoff | Path B → in-TX with the mutating statement; no loss | None |
 | `admin` | Team, API key, config push, RBAC mutations | Path B → in-TX with the mutating statement; no loss | None (mutations only) |
 | `entity` | User/project lifecycle semantic events | Path B → in-TX with the mutating statement; no loss | None |
 | `signal` | Platform bot/abuse signals ([ADR 019](019-captcha-gate-and-bot-signals.md)) | Path B → in-TX with the auth-attempt/check mutation | None |
 
-Unauthenticated routes (public login widget, health checks) emit **no**
-`request` events unless explicitly listed as security-relevant in a future ADR.
+Public login/flow HTTP emits `request` when the handler stamps `project_id`
+(actor/token stay empty). Health/ready/live probes have no project and emit
+**no** `request` event.
 
 **Durability bars differ by path:** Path B categories are **transactional audit**
 (co-committed with the mutation). Path A `request` events are **best-effort
@@ -225,7 +226,7 @@ flowchart TB
   Stmt --> EventSQL
 ```
 
-#### Path A — Request-wide events (authenticated API)
+#### Path A — Request-wide events (`project_id` known)
 
 Extend the existing request-ID middleware
 ([`internal/api/middleware/request_id.go`](../../internal/api/middleware/request_id.go))
@@ -242,11 +243,13 @@ into a **RequestContext** middleware:
   export — they are **not persisted** on audit event rows.
 - Client headers named `session_id`, `flow_id`, or `fingerprint`, if accepted at
   all, go into `metadata.client_hints` as untrusted hints only.
-- After the handler completes, if the request was **authenticated**, enqueue one
+- After the handler completes, if **`project_id` is known**, enqueue one
   `category=request` wide event containing: `operation_id`, HTTP method, route
   template, status code, duration, and actor/delegation dimensions from context
   (including `delegation_id` / `grantor` when acting under an agent delegation
-  per [ADR 033 §5](033-internal-permission-management.md)).
+  per [ADR 033 §5](033-internal-permission-management.md)). Public login/flow
+  stamps `project_id` without a token (`Authenticated` stays false). Probes
+  (`healthz` / `readyz` / `livez`) leave `project_id` empty and are skipped.
 - Response header `X-Request-Id` echoes the assigned `request_id`.
 
 **Durability (batched insert, DB clock):** Request-wide events are **not**
@@ -491,7 +494,8 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 ## Non-goals
 
 - Database triggers or CDC as the primary audit mechanism.
-- Full unauthenticated/public request logging.
+- Unscoped public request logging (no `project_id`): probes, and flow
+  requests that never resolve a project (invalid cookie).
 - Retroactive fabrication of events that were never stored (pre-claim history
   is stored; visibility opens at claim — see Context).
 
@@ -519,8 +523,8 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 
 ### Negative / Risks
 
-- **Volume:** one `request` event per authenticated API call adds write
-  amplification (amortized by batch flush).
+- **Volume:** one `request` event per in-scope API call (authenticated plus
+  public login/flow) adds write amplification (amortized by batch flush).
 - **Delayed visibility:** request events may appear up to ~T after the action
   (batch age); forensic queries should prefer `occurred_at` when timing matters.
 - **Best-effort Path A:** crash before drain, overflow drop, or flush give-up

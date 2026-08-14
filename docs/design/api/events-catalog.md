@@ -75,12 +75,12 @@ Event **columns** carry correlation: `request_id`, `session_id`, `flow_id`,
 
 | Trigger | `event_type` | `category` | Payload |
 |---------|--------------|------------|---------|
-| Authenticated HTTP handler completes | `request.api` | `request` | `operation_id`, `method`, `route_template`, `status`, `duration_ms` |
+| HTTP handler completes and `project_id` is known | `request.api` | `request` | `operation_id`, `method`, `route_template`, `status`, `duration_ms` |
 
 `occurred_at` is request **start** so a `request_id` group sorts
 `request.api` first, then in-TX Path B mutations. `created_at` is flush time.
-Unauthenticated routes emit no `request` event (login/flow HTTP has no Path A
-envelope; Path B mutations still emit).
+Login/flow HTTP emits when the handler stamps `project_id` (actor/token empty).
+Probes (`healthz` / `readyz` / `livez`) do not.
 
 Path A buffer: flush on batch size **N≈100** or age **T≈1s**. Capacity **C**
 (default 2000); drop only when full; never block the request.
