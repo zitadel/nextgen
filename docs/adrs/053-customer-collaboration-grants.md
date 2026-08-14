@@ -164,9 +164,9 @@ receives `project.admin`, and `admin` satisfies `editor` and `viewer`. No
 compatibility migration or assignment backfill is provided.
 
 That closure applies to a customer project's own `sk_proj_` secret. The
-reserved platform project mints no secret by default; platform-homed
-automation uses explicitly scoped `sk_plat_` keys whose authority is only
-their assignment rows
+reserved platform project mints no secret by default, and platform-homed
+automation has no credential yet — it waits on the deferred PAT / service-user
+principal
 ([ADR 052 §9](052-cross-project-principals.md#9-deployment-wide-operators-are-a-separate-authority)).
 
 Databases that already applied the old Goose migration must be dropped and
@@ -353,11 +353,30 @@ owner is assigned. Suspending or deactivating the user who is the final active
 owner is **not** rejected: identity-level security actions take effect
 immediately and outrank §1's owner-retention invariant. The team is then left
 without an active owner, and its owned projects show the derived `needs_owner`
-condition below until another owner is assigned; rejection remains the rule
-only for ordinary owner removal. Deactivating an owning team leaves its
-projects in the same derived `needs_owner` condition for management purposes;
-this is not a new persisted project status. It does not delete projects or
-create a new owner implicitly.
+condition below; rejection remains the rule only for ordinary owner removal.
+Deactivating an owning team leaves its projects in the same derived
+`needs_owner` condition for management purposes; this is not a new persisted
+project status. It does not delete projects or create a new owner implicitly.
+
+**Recovery from `needs_owner` is authorized, not deferred.** Ordinarily only an
+active owner may issue `team.owner`, so a team with none would otherwise be
+permanently stuck — reachable through a single security action, with no exit.
+Two paths resolve it, and both are in-project operations that keep §9's
+customer/staff boundary intact:
+
+- reinstating the suspended identity restores its existing `team.owner`
+  assignment, which is not revoked by suspension; and
+- an administrator of the **platform project** — where every owning team is
+  homed — may assign `team.owner` to an active participant of an ownerless
+  team. This is ordinary administration of a platform-project resource, not
+  deployment-wide authority: it confers nothing on the customer projects that
+  team owns beyond what the new owner then inherits, and it does not need
+  [ADR 052 §9](052-cross-project-principals.md#9-deployment-wide-operators-are-a-separate-authority)'s
+  deferred operator credential.
+
+The second path is privileged and applies only while the team has no active
+owner; it is never a way to add a co-owner to a healthy team. Both emit the
+ordinary ADR 048 grant-mutation event, so recovery is auditable.
 
 An ownership transfer is one atomic mutation that replaces the unique
 `owning_team` assignment. The v1 caller must be an active owner of both the
@@ -438,6 +457,11 @@ The stable service-backed test matrix must include:
     owner assignment in the same transaction. The resolver does not re-read
     roster state or add an owner/member intersection on every authorization
     check.
+17. Suspending the sole owner of an owning team succeeds, leaves its projects
+    in `needs_owner`, and is recoverable both ways: reinstating that identity
+    restores its owner authority, and a platform-project administrator can
+    assign `team.owner` to another active participant. The same privileged
+    assignment is rejected while the team still has an active owner (§8).
 
 ## Consequences
 

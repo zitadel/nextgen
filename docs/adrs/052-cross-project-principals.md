@@ -335,29 +335,37 @@ the identity home would reach every customer project transitively through
 platform-team rosters; the mitigation is that no such credential exists unless
 someone deliberately creates one.
 
-Platform-homed automation uses **named, scoped keys**, carried on the wire
-with the `sk_plat_` prefix. An `sk_plat_` key is an ordinary principal whose
-authority is exactly its explicit `authz_assignments` rows — there is no
-implicit admin closure for platform keys, unlike a customer project's own
-`sk_proj_` secret under ADR 053 §3. The prefix names the credential's home,
-never its authority: resolution always ends at the assignment rows. Creation
-is a deliberate act under §5's rules — a Console page, or `zitadel key create`
-riding the claim handoff transport — and test infrastructure obtains
-credentials through the testkit's boot contract, never through a seed default.
+Platform-homed automation therefore has no credential in this ADR. When it is
+needed it must be a **named, individually scoped principal** — several keys in
+the platform project, each authorized only by its own assignment rows — and
+that is a credential the system cannot currently express: `authz_assignments`
+knows `user`, `team`, `agent`, `sk_proj`, `sk_team` and no platform-key type,
+and OAuth introspection resolves every project secret to the single principal
+`(sk_proj, <project_id>)`. Reusing `sk_proj` would collapse every platform key
+onto one shared grant set, which is exactly the blanket credential this
+section refuses.
 
-The intended first use is customer-boundary automation: a team owner mints a
-key scoped to their own team's authority — creating and managing the projects
-that team owns — so the key's blast radius is bounded by the account that
-minted it.
+Defining that principal — its storage, issuance ceremony, rotation, revocation,
+introspection mapping, resolver behavior, and test obligations — belongs with
+the PAT / service-user credential §5 already defers, not here. Until that ADR
+exists, platform-homed automation is **not available**, and nothing may
+approximate it by granting broad roles to a project secret. Test
+infrastructure obtains credentials through the testkit's boot contract rather
+than through a seed default, so it does not depend on this gap being closed.
+
+The intended first use, when it is specified, is customer-boundary automation:
+a team owner mints a key scoped to their own team's authority — creating and
+managing the projects that team owns — so the key's blast radius is bounded by
+the account that minted it.
 
 Cloud operations and self-hosted break-glass may use an explicit
 deployment-wide operator relation or credential. Its issuance, activation,
 customer visibility, and audit requirements are defined separately with staff
 support governance. It must not be represented as
-`project:platform#admin -> every project`, and it must not be approximated by
-an `sk_plat_` key granted broad roles — the operator credential is explicit
-precisely so issuance governance, customer visibility, and audit posture can
-attach to it.
+`project:platform#admin -> every project`, and it must not be approximated by a
+platform-homed automation key granted broad roles — the operator credential is
+explicit precisely so issuance governance, customer visibility, and audit
+posture can attach to it.
 
 ## Testing obligations
 
