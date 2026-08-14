@@ -59,7 +59,7 @@ describe("handshake", () => {
       platform: {
         projectId: "proj_platform",
         publishableKey: "pk_proj_platform",
-        platformKey: "sk_plat_1",
+        platformKey: "platform-key-1",
       },
     };
     const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
@@ -75,7 +75,7 @@ describe("handshake", () => {
       path,
       JSON.stringify({
         ...handle,
-        platform: { publishableKey: "pk_proj_platform", platformKey: "sk_plat_1" },
+        platform: { publishableKey: "pk_proj_platform", platformKey: "platform-key-1" },
       }),
     );
     expect(() => readHandshakeSync(path)).toThrow(/"projectId" is required/);
