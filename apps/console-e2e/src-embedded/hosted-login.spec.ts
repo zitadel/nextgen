@@ -206,3 +206,28 @@ test("a 2xx body that is not the runtime document is an error, not a setup hint"
   await expect(page.getByText("the response was not valid JSON")).toBeVisible();
   await expect(page.getByRole("heading", { name: "No project yet" })).toBeHidden();
 });
+
+// A wrongly-typed field is the same misdiagnosis one level down: `mode` is
+// valid, so the document passes, and coercing the id to "absent" renders the
+// setup hint for a document the shell could not read. Only an *omitted* id
+// means "not provisioned" — that is how the server says it.
+for (const [field, document] of [
+  ["console_project_id", { mode: "standalone", console_project_id: 42 }],
+  ["publishable_key", { mode: "standalone", console_project_id: "proj_x", publishable_key: 42 }],
+] as const) {
+  test(`a non-string ${field} is a malformed document, not "no project yet"`, async ({ page }) => {
+    await page.route(RUNTIME_URL, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(document),
+      }),
+    );
+
+    await page.goto("/ui/login/");
+    await expect(page.getByRole("heading", { name: "Sign-in is unavailable" })).toBeVisible();
+    await expect(page.getByText("the response was not a runtime document")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "No project yet" })).toBeHidden();
+    await expect(page.getByLabel("Email")).toHaveCount(0);
+  });
+}

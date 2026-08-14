@@ -140,10 +140,13 @@ function loginWidget(projectId: string, publishableKey?: string): HTMLElement {
  * reachable and answering honestly, and only the client threw the answer
  * away.
  *
- * `mode` is what makes state 2 a positive assertion rather than an absence:
- * the resolver always sets it, including when the deployment has no project,
- * so a 2xx body without it is some other document (a proxy's error envelope,
- * a dev server's `index.html`) and must not read as "no project yet". This is
+ * {@link parseRuntime} is what makes state 2 a positive assertion rather than
+ * an absence. `mode` carries most of it — the resolver always sets it,
+ * including when the deployment has no project, so a 2xx body without it is
+ * some other document (a proxy's error envelope, a dev server's `index.html`)
+ * and must not read as "no project yet". The field types carry the rest: a
+ * document is only "not provisioned" when the ids are *absent*, never when
+ * they are present and unreadable. This is
  * why the shell no longer tolerates a non-JSON 200: `vite dev` proxies this
  * path to the backend (`vite.config.mts`), so the only surface still
  * answering `index.html` here is `vite preview`, which has no backend to sign
@@ -170,31 +173,43 @@ async function fetchRuntime(): Promise<RuntimeResult> {
     return { ok: false, detail: "the response was not valid JSON" };
   }
 
-  if (!isRuntimeDocument(doc)) {
-    return { ok: false, detail: "the response was not a runtime document" };
-  }
+  const runtime = parseRuntime(doc);
+  if (!runtime) return { ok: false, detail: "the response was not a runtime document" };
 
-  return {
-    ok: true,
-    runtime: {
-      projectId: optionalString(doc.console_project_id),
-      publishableKey: optionalString(doc.publishable_key),
-    },
-  };
+  return { ok: true, runtime };
 }
 
-function isRuntimeDocument(doc: unknown): doc is Record<string, unknown> {
-  if (typeof doc !== "object" || doc === null) return false;
-  const { mode } = doc as Record<string, unknown>;
-  return mode === "standalone" || mode === "platform";
+/**
+ * Reads a runtime document, or reports that this is not one.
+ *
+ * The type checks are the whole point, so they do not coerce. Every field is
+ * either **absent** — which is how the document says "not provisioned yet",
+ * since the server omits both ids rather than emitting empty ones (ADR 0004
+ * §2's shape, `omitempty` in `cmd/server/console_runtime.go`) — or a usable
+ * string. Anything else present in its place (a number, `null`, `""`) came
+ * from something that is not the server, and quietly reading it as absence
+ * would land back in state 2 and render "no project yet" for a document the
+ * shell could not actually understand: the same misdiagnosis one field lower
+ * down than the one this change set out to fix.
+ */
+function parseRuntime(doc: unknown): DeploymentRuntime | undefined {
+  if (typeof doc !== "object" || doc === null) return undefined;
+  const record = doc as Record<string, unknown>;
+  const { mode, console_project_id: projectId, publishable_key: publishableKey } = record;
+
+  if (mode !== "standalone" && mode !== "platform") return undefined;
+  if (!absentOrString(projectId) || !absentOrString(publishableKey)) return undefined;
+
+  return { projectId, publishableKey };
+}
+
+/** JSON cannot carry `undefined`, so it means the key was absent, not empty. */
+function absentOrString(value: unknown): value is string | undefined {
+  return value === undefined || (typeof value === "string" && value !== "");
 }
 
 function describeCause(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
-}
-
-function optionalString(value: unknown): string | undefined {
-  return typeof value === "string" && value !== "" ? value : undefined;
 }
 
 /**
