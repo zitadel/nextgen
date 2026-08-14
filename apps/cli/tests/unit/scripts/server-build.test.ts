@@ -19,6 +19,7 @@ type ServerBuildModule = {
   buildLocalServer: (options: {
     repoRoot: string;
     output: string;
+    metadataPath?: string;
     gitInfo: { commit: string; shortCommit: string; branch?: string; date: string };
     runCapture?: RunCapture;
     run: (
@@ -115,6 +116,30 @@ describe("server build metadata", () => {
     });
     await expect(readServerBuildMetadata(built.metadataPath)).resolves.toEqual(built.metadata);
     await expect(readFile(built.metadataPath, "utf8")).resolves.toMatch(/\n$/);
+  });
+
+  it("creates the metadata directory when it sits outside the binary's own", async () => {
+    const { buildLocalServer, readServerBuildMetadata } = await loadModule();
+    const repoRoot = await mkdtemp(join(tmpdir(), "zitadel-server-build-meta-"));
+    tempDirs.push(repoRoot);
+
+    const built = await buildLocalServer({
+      repoRoot,
+      output: join(repoRoot, "dist/server/nextgen"),
+      metadataPath: join(repoRoot, "dist/meta/server/metadata.json"),
+      gitInfo: {
+        commit: "abcdef1234567890",
+        shortCommit: "abcdef123456",
+        branch: "feat/stamp-builds",
+        date: "2026-06-16T00:00:00Z",
+      },
+      runCapture: goListStub(),
+      run: async () => {},
+    });
+
+    await expect(readServerBuildMetadata(built.metadataPath)).resolves.toMatchObject({
+      version: "dev+abcdef123456",
+    });
   });
 
   it("fails loudly when the metadata package moves out from under the -X targets", async () => {

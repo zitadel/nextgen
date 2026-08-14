@@ -122,6 +122,9 @@ export async function buildLocalServer(options = {}) {
     branch: info.branch ?? info.shortCommit,
     date: info.date,
   };
+  // metadataPath defaults next to the binary, but callers may point it
+  // elsewhere — mkdir here too rather than relying on the output's directory.
+  await mkdir(dirname(metadataPath), { recursive: true });
   await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
   return { output, metadataPath, metadata };
 }
