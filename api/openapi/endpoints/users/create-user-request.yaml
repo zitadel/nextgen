@@ -1,6 +1,6 @@
 title: CreateUserRequest
 description: |
-  The `attributes` object is validated against the schema named by `$schema`.
+  The `attributes` object is validated against the schema named by `schema`.
 
   The resource primary key is server-assigned and returned in the response, so
   the request carries no `id`; `metadata` is server-owned for the same reason.
@@ -8,10 +8,10 @@ description: |
   properties of those names.
 type: object
 required:
-  - $schema
+  - schema
   - attributes
 properties:
-  $schema:
+  schema:
     type: string
     minLength: 1
     description: |
@@ -21,5 +21,5 @@ properties:
     type: object
     additionalProperties: true
     description: |
-      The user's schema-defined content. Validated against `$schema`; a
+      The user's schema-defined content. Validated against `schema`; a
       property the schema does not permit is rejected with `user.invalid`.

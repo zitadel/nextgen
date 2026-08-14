@@ -4,15 +4,15 @@ description: |
   represent a human user, but also a service account or any other type of
   identity.
 
-  The envelope — `id`, `metadata`, `$schema` — is server-owned and fixed. The
+  The envelope — `id`, `metadata`, `schema` — is server-owned and fixed. The
   schema-defined content lives under `attributes`, which is exactly the
-  document the user's `$schema` validates. Keeping the two apart means a schema
+  document the user's `schema` validates. Keeping the two apart means a schema
   may name a property `id` or `metadata` without colliding with the envelope,
   and closed-world keywords (`additionalProperties: false`, `propertyNames`,
   `unevaluatedProperties`) behave as their author expects.
 type: object
 required:
-  - $schema
+  - schema
   - attributes
 properties:
   id:
@@ -21,7 +21,7 @@ properties:
   metadata:
     readOnly: true
     $ref: user-metadata.yaml
-  $schema:
+  schema:
     type: string
     description: |
       The schema that defines the content of `attributes`. These schemas can be
@@ -31,5 +31,5 @@ properties:
     type: object
     additionalProperties: true
     description: |
-      The user's schema-defined content, validated against `$schema`. Property
+      The user's schema-defined content, validated against `schema`. Property
       names and types are determined entirely by that schema.
