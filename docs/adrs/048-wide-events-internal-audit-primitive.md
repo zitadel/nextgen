@@ -5,6 +5,15 @@
 > **Context:** Audit logging for nextgen relational storage
 > **Builds on:** [ADR 028](028-storage-v2-statements-and-dialects.md), [ADR 010](010-session-auth-attempt-check-model.md), [ADR 011](011-resource-identifiers.md), [ADR 047](047-dialect-id-generation.md), [ADR 008](008-users-eav-store.md), [ADR 033](033-internal-permission-management.md), [ADR 046](046-claim-lifecycle-v2.md), [oxidel ADR-023](https://github.com/zitadel/oxidel/blob/main/docs/adr/023-wide-events.md)
 > **Related:** [ADR 049](049-events-api-retention-export.md) (API, retention, export)
+>
+> **Proposed amendment — [ADR 052 §8](052-cross-project-principals.md#8-audit-events-are-written-in-the-protected-project):**
+> if ADR 052 is accepted, the emit-time rule for `team_id` changes. Today the
+> column captures the resolved credential's `ScopeContext` team, which for a
+> cross-project actor would be a team in the actor's *home* project. ADR 052
+> restricts the column to protected-resource scope and moves the actor's home
+> project, authorizing assignment ids, path, and team into non-PII
+> `authorization` metadata on the event. The DDL comment and the scope table
+> below still describe the pre-amendment rule.
 
 ## Context
 

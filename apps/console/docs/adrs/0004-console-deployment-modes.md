@@ -169,8 +169,10 @@ from that first-party session, then evaluates the target customer project with
 the same ADR 052 authorization resolver used for confidential automation.
 
 Cookie-authenticated unsafe methods require the exact-Origin and
-session-bound-CSRF protections in ADRs 046 and 052. A successful Console login
-therefore establishes identity, not blanket management authority.
+session-bound-CSRF protections in
+[ADR 052 §5](../../../../docs/adrs/052-cross-project-principals.md), which
+amends ADR 046's SameSite-only conclusion. A successful Console login therefore
+establishes identity, not blanket management authority.
 
 The development proxy may temporarily inject a project secret while the
 session-derived path is incomplete, but that is development compatibility,

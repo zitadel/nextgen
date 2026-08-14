@@ -215,9 +215,12 @@ re-architecting it:
 - The `401`/`403` handling from §3 becomes the "redirect to console login"
   trigger.
 
-Identity is already carried by the cookie. Root ADR 052 supplies the missing
-target-project authorization contract, while ADR 046 supplies the CSRF
-requirements for unsafe cookie-authenticated requests.
+Identity is already carried by the cookie. Root
+[ADR 052](../../../../docs/adrs/052-cross-project-principals.md) supplies both
+the missing target-project authorization contract (§§1–3) and the CSRF
+requirements for unsafe cookie-authenticated requests (§5). ADR 046 concluded
+the opposite — that SameSite alone is sufficient and no CSRF token is needed —
+and ADR 052 amends it; cite 052, not 046, for the CSRF contract.
 
 ## Consequences
 
@@ -248,7 +251,7 @@ requirements for unsafe cookie-authenticated requests.
 - **Management calls are fail-closed until the cookie is authorized.** The
   dev proxy's secret is what carries `user.read` and friends today; the
   publishable key is deliberately refused for them (`internal/api/user.go`).
-  Root ADRs 032/033/054's session-derived target permissions make the embedded
+  Root ADRs 032/033/052's session-derived target permissions make the embedded
   Console's list screens work without a proxy.
 
 ## Related work

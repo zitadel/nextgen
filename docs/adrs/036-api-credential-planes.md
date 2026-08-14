@@ -4,6 +4,14 @@
 > **Date:** 2026-07-17
 > **Amended:** 2026-08-03 — credential exposure contracts; server-originated
 > me-ops; SSR session validation at the render layer
+>
+> **Proposed amendment — [ADR 052 §5](052-cross-project-principals.md#5-first-party-human-sessions-may-call-the-operator-plane):**
+> if ADR 052 is accepted, the operator plane no longer always authenticates
+> calling *software*. An operator-plane operation may authenticate either
+> confidential automation (project secret, later a PAT or service-user
+> credential) or a human through the first-party Console session cookie. Both
+> paths enter the same authorization resolver; the operation stays
+> operator-plane because of what it manages, not which credential carried it.
 > **Context:** Which APIs are callable from a browser, with which credential, and where each credential lives
 
 ## Context

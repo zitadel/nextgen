@@ -106,7 +106,8 @@ Login establishes identity, not blanket management authority. A platform role
 alone grants no customer-project access, and every management endpoint remains
 responsible for its own permission check. Unsafe cookie-authenticated requests
 also require the exact-Origin and session-bound-CSRF protections specified by
-ADRs 046 and 052.
+[ADR 052 §5](../../../../docs/adrs/052-cross-project-principals.md), which
+amends ADR 046's SameSite-only conclusion.
 
 `POST /sessions/exchange` still uses root
 [ADR 036](../../../../docs/adrs/036-api-credential-planes.md)'s publishable key,

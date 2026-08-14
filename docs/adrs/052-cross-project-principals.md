@@ -10,9 +10,14 @@
 > [ADR 036](036-api-credential-planes.md).
 > **Amends if accepted:** ADR 036's credential-plane invariant and table so
 > operator-plane operations may authenticate either confidential automation or
-> a first-party human session; and
+> a first-party human session;
 > [ADR 046 §2](046-claim-lifecycle-v2.md#2-claimcomplete-is-authenticated-by-a-platform-project-session)
-> to require explicit CSRF protection for cookie-authenticated mutations.
+> to require explicit CSRF protection for cookie-authenticated mutations; and
+> [ADR 048](048-wide-events-internal-audit-primitive.md)'s emit-time rule for
+> `team_id`, which today captures the resolved credential's team scope. For a
+> foreign actor that rule would store the actor's _home_-project team; §8
+> requires the column to carry protected-resource scope only, and moves the
+> actor's team to the non-PII `authorization` metadata.
 > **Clarifies:** [ADR 046 §1](046-claim-lifecycle-v2.md#1-claim-state-is-a-permission-engine-grant)
 > remains the ownership/claim rule; a direct user assignment defined here is an
 > access grant and never claim state or project ownership.
@@ -256,8 +261,10 @@ exception for project secrets does not extend to foreign human sessions.
 ### 8. Audit events are written in the protected project
 
 Every allowed cross-project mutation and every security-relevant read produces
-the same protected-project event as a local actor. It uses ADR 048's existing
-top-level columns:
+the same protected-project event as a local actor. It reuses
+[ADR 048](048-wide-events-internal-audit-primitive.md)'s existing top-level
+columns, with one amendment to that ADR's emit-time rule for `team_id`, called
+out below the block:
 
 ```text
 project_id = proj_customer  # protected target, not the actor's home project
@@ -265,6 +272,13 @@ team_id    = ...            # protected-resource scope only, when applicable
 actor_id   = user_alice
 actor_type = human
 ```
+
+`team_id` is the amendment. ADR 048 captures it at emit time from the resolved
+credential's `ScopeContext`, which for a foreign actor is a team in their home
+project — a team the protected project has no business seeing on its own
+events. Here the column means protected-resource scope only; the actor's team
+moves into the `authorization` metadata below. ADR 048's DDL comment, emit-time
+rule, and scope table need the same correction.
 
 The authorization explanation is non-PII metadata on that event rather than a
 new event-table column contract:
@@ -392,8 +406,10 @@ If accepted, follow-up documentation must:
   mechanism and add the principal-first project-discovery index;
 - correct [`hierarchy.md`](../design/api/hierarchy.md) so `/me/memberships`
   means home-project memberships, while authorized projects come from grants;
-- extend ADR 048's actor metadata with the assignment path that authorized the
-  request;
+- amend ADR 048's emit-time `team_id` rule (§8) so the column carries
+  protected-resource scope rather than the resolved credential's team scope,
+  update its DDL comment and scope table accordingly, and extend its actor
+  metadata with the assignment path that authorized the request;
 - amend ADR 046's SameSite-only CSRF conclusion; and
 - update the claim/Console OpenAPI, generated client, API mock, testkit, and E2E
   surfaces for the session-bound CSRF header before server enforcement ships.

@@ -7,7 +7,7 @@ import "./styles.css";
  *
  * Which project it signs into is a *deployment* fact, so it is discovered at
  * boot rather than baked into the build (the same reasoning as Console
- * ADR 0004 §2, which this shell shares an endpoint with). Precedence:
+ * ADR 0004 §3, which this shell shares an endpoint with). Precedence:
  *
  * 1. `?project_id=` / `?project-id=` — an explicit caller wins.
  * 2. `VITE_PROJECT_ID` — dev-only override, for running against a hand-minted
@@ -112,7 +112,7 @@ function optionalString(value: unknown): string | undefined {
 
 /**
  * Rendered when the deployment has no project to sign in to — the server
- * never creates one (Console ADR 0004 §3), the customer's `zitadel setup`
+ * never creates one (Console ADR 0004 §2), the customer's `zitadel setup`
  * does, and the first project created becomes the default this shell picks
  * up on the next load.
  */
