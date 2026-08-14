@@ -5,6 +5,7 @@ content:
     schema:
       oneOf:
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/flowdef-already_exists.yaml'
         - $ref: '../../components/schemas/errors/flowdef-invalid.yaml'
         - $ref: '../../components/schemas/errors/flowdef-not_found.yaml'
@@ -17,6 +18,7 @@ content:
         propertyName: code
         mapping:
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
+          evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           flowdef.already_exists: '../../components/schemas/errors/flowdef-already_exists.yaml'
           flowdef.invalid: '../../components/schemas/errors/flowdef-invalid.yaml'
           flowdef.not_found: '../../components/schemas/errors/flowdef-not_found.yaml'
@@ -31,6 +33,11 @@ content:
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
+      evt.invalid:
+        summary: evt.invalid
+        value:
+          code: evt.invalid
+          message: 'event: invalid'
       flowdef.already_exists:
         summary: flowdef.already_exists
         value:

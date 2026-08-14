@@ -60,8 +60,11 @@ func TestGreaterAndLessThanFilterRestricts(t *testing.T) {
 	t.Parallel()
 
 	gt := database.GreaterThan(database.Col(domain.ProjectFieldCreatedAt), "t1")
+	gte := database.GreaterThanOrEqual(database.Col(domain.ProjectFieldCreatedAt), "t1")
 	lt := database.LessThan(database.Col(domain.ProjectFieldID), "proj_1")
 	assert.True(t, gt.Restricts(database.Col(domain.ProjectFieldCreatedAt)))
+	assert.True(t, gte.Restricts(database.Col(domain.ProjectFieldCreatedAt)))
+	assert.Equal(t, database.OpGreaterOrEqual, gte.Op)
 	assert.True(t, lt.Restricts(database.Col(domain.ProjectFieldID)))
 }
 

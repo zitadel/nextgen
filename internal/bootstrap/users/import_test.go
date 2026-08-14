@@ -48,7 +48,7 @@ func TestImport_loadAndSkip(t *testing.T) {
 	suffix := rand.Text()
 	projectID := "proj_" + suffix
 	userID := "user_" + suffix
-	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
 
 	path := writeUserFile(t, projectID, "team_"+suffix, userID)
 
@@ -93,7 +93,7 @@ func TestImport_teamPlaceholderNameTaken(t *testing.T) {
 		Name:           "project-" + projectID,
 		PreviewOrigins: []string{},
 	}))
-	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
 
 	// The placeholder name is derived from the team ID, so parking it on another
 	// team makes the insert fail on the name index instead of the primary key.
