@@ -89,14 +89,17 @@ func TestUserPasswordStatements_SetUpsert(t *testing.T) {
 		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, "pw-upsert@example.com", "PW Upsert")))
 
 		byUser := userPasswordByUser(projectID, userID)
-		require.NoError(t, d.stmts.SetUserPassword(t.Context(), &domain.SetUserPassword{
+		first := &domain.SetUserPassword{
 			ProjectID:      projectID,
 			UserID:         userID,
 			EncodedHash:    "argon2id$v=19$m=65536,t=3,p=4$initial",
 			ChangeRequired: true,
-		}))
+		}
+		require.NoError(t, d.stmts.SetUserPassword(t.Context(), first))
+		require.True(t, domain.PrefixUserPassword.Matches(first.ID))
 		got, err := d.stmts.GetUserPassword(t.Context(), byUser)
 		require.NoError(t, err)
+		assert.Equal(t, first.ID, got.ID)
 		initialID := got.ID
 
 		now := time.Now().UTC().Truncate(time.Millisecond)
@@ -105,12 +108,14 @@ func TestUserPasswordStatements_SetUpsert(t *testing.T) {
 			&domain.UserPasswordLastSuccessfulCheckUpdate{LastSuccessfulCheck: now},
 		))
 
-		require.NoError(t, d.stmts.SetUserPassword(t.Context(), &domain.SetUserPassword{
+		updated := &domain.SetUserPassword{
 			ProjectID:      projectID,
 			UserID:         userID,
 			EncodedHash:    "argon2id$v=19$m=65536,t=3,p=4$updated",
 			ChangeRequired: false,
-		}))
+		}
+		require.NoError(t, d.stmts.SetUserPassword(t.Context(), updated))
+		assert.Equal(t, initialID, updated.ID)
 		got2, err := d.stmts.GetUserPassword(t.Context(), byUser)
 		require.NoError(t, err)
 		assert.Equal(t, initialID, got2.ID)

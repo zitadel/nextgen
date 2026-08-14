@@ -133,7 +133,9 @@ func compareFilter[F ~uint8](op string, col database.Column[F], value any) (data
 		return database.LessThan(col, value), nil
 	case filterOpGreaterThan:
 		return database.GreaterThan(col, value), nil
-	case filterOpNotEquals, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+	case filterOpGreaterThanOrEqual:
+		return database.GreaterThanOrEqual(col, value), nil
+	case filterOpNotEquals, filterOpLessThanOrEqual:
 		// todo (grvijayan): update when these operations are supported
 		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
 	case filterOpContains, filterOpNotContains:

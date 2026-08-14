@@ -26,7 +26,7 @@ func ensureTestProject(t *testing.T, projectID string) {
 	t.Helper()
 	project := newTestProject(projectID)
 	require.NoError(t, testPool.CreateProject(t.Context(), project))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 }
 
 // TestDeactivateTeam_rollsBackWhenSecondWriteFails proves multi-write atomicity:
@@ -39,7 +39,7 @@ func TestDeactivateTeam_rollsBackWhenSecondWriteFails(t *testing.T) {
 
 	forced := errors.New("forced second write failure")
 	client := &failAfterNBeginner{Pool: testPool.pool, succeed: 1, err: forced}
-	err := newTeamStatements(client).DeactivateTeam(t.Context(), projectID, teamID)
+	_, err := newTeamStatements(client).DeactivateTeam(t.Context(), projectID, teamID)
 	require.ErrorIs(t, err, forced)
 
 	stored, getErr := testPool.GetTeamByID(t.Context(), projectID, teamID)

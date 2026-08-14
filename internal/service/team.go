@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -36,12 +37,28 @@ func (s *TeamService) Create(ctx context.Context, input CreateTeamInput) (*domai
 		return nil, err
 	}
 
-	if err := s.v2Pool.Statements().CreateTeam(ctx, model); err != nil {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().CreateTeam(ctx, model); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeTeamCreated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  model.ProjectID,
+			EntityType: "team",
+			EntityID:   model.ID,
+			Payload:    domain.TeamPayload{Name: model.Name},
+		})
+	})
+	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
 			// Also catches a (project_id, id) primary key collision, which is
 			// unreachable with generated IDs. Discriminating on the constraint
 			// name would need Spanner to report one; today it returns "".
 			return nil, domain.ErrTeamAlreadyExists().WithParent(err)
+		}
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create team")
 	}
@@ -211,12 +228,28 @@ func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (*domai
 		return nil, err
 	}
 	team := &domain.Team{ProjectID: input.ProjectID, ID: input.TeamID, Name: name}
-	if err := s.v2Pool.Statements().UpdateTeam(ctx, team); err != nil {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().UpdateTeam(ctx, team); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeTeamUpdated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  team.ProjectID,
+			EntityType: "team",
+			EntityID:   team.ID,
+			Payload:    domain.TeamPayload{Name: team.Name},
+		})
+	})
+	if err != nil {
 		if _, ok := errors.AsType[*database.UniqueError](err); ok {
 			return nil, domain.ErrTeamAlreadyExists().WithParent(err)
 		}
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrTeamNotFound()
+		}
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to update team")
 	}
@@ -230,7 +263,26 @@ func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (*domai
 // Delete is idempotent: DeactivateTeam only touches an active team, so an
 // unknown or already-deactivated team reports success without persisting any changes.
 func (s *TeamService) Delete(ctx context.Context, projectID, teamID string) error {
-	if err := s.v2Pool.Statements().DeactivateTeam(ctx, projectID, teamID); err != nil {
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		changed, err := tx.Statements().DeactivateTeam(ctx, projectID, teamID)
+		if err != nil {
+			return err
+		}
+		if !changed {
+			return nil
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeTeamDeactivated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  projectID,
+			EntityType: "team",
+			EntityID:   teamID,
+		})
+	})
+	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return de
+		}
 		return domain.ErrInternal(err).WithMessage("failed to delete team")
 	}
 	return nil

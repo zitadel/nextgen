@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -94,7 +95,23 @@ func (s *sessionService) Create(ctx context.Context, input CreateSessionInput) (
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("Failed to create the session.")
 	}
-	if err := s.v2Pool.Statements().CreateSession(ctx, session); err != nil {
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().CreateSession(ctx, session); err != nil {
+			return err
+		}
+		if err := emitSessionEstablished(ctx, tx.Statements(), session); err != nil {
+			return err
+		}
+		// CreateSession mints a session token; emit the peer when TokenID is set.
+		if session.TokenID != "" {
+			return emitAuthTokenIssued(ctx, tx.Statements(), session.ProjectID, session.TokenID, &session.ID, session.UserID, nil)
+		}
+		return nil
+	})
+	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
+		}
 		return nil, domain.ErrInternal(err).WithMessage("Failed to create the session.")
 	}
 	return session, nil
@@ -105,10 +122,30 @@ func (s *sessionService) Exchange(ctx context.Context, input ExchangeInput) (*do
 	if err != nil {
 		return nil, err
 	}
-	session, err := s.v2Pool.Statements().ExchangeSession(ctx, input.ProjectID, input.HandoffToken, input.IdempotencyKey, ttl)
+	var session *domain.Session
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		var err error
+		session, err = tx.Statements().ExchangeSession(ctx, input.ProjectID, input.HandoffToken, input.IdempotencyKey, ttl)
+		if err != nil {
+			return err
+		}
+		if err := emitSessionEstablished(ctx, tx.Statements(), session); err != nil {
+			return err
+		}
+		if session.TokenID != "" {
+			// Session mint uses empty scopes today; pass through honestly.
+			if err := emitAuthTokenIssued(ctx, tx.Statements(), session.ProjectID, session.TokenID, &session.ID, session.UserID, nil); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		if errors.Is(err, domain.ErrSessionExchangeConflict()) || errors.Is(err, domain.ErrSessionInvalidHandoffToken()) {
 			return nil, err
+		}
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("Failed to exchange the session.")
 	}
@@ -243,8 +280,7 @@ func sessionStateFilter(op, state string, now time.Time) (database.Filter[domain
 	case sessionStateExpired:
 		return database.LessThan(expiresAt, now), nil
 	case sessionStateBuilding, sessionStateActive:
-		// todo (grvijayan): replace with a greater-or-equal compare once the filter layer supports it
-		unexpiredSessions := database.Or(database.GreaterThan(expiresAt, now), database.Equal(expiresAt, now))
+		unexpiredSessions := database.GreaterThanOrEqual(expiresAt, now)
 		hasVerifiedFactors := database.Col(domain.SessionFieldHasVerifiedFactors)
 		return database.And(unexpiredSessions, database.Equal(hasVerifiedFactors, state == sessionStateActive)), nil
 	default:
@@ -258,13 +294,74 @@ func (s *sessionService) Delete(ctx context.Context, input DeleteSessionInput) e
 		if err != nil && !errors.Is(err, domain.ErrSessionNotFound()) {
 			return domain.ErrInternal(err).WithMessage("Failed to delete the session.")
 		}
+		sessionMissing := errors.Is(err, domain.ErrSessionNotFound())
 
 		if err := tx.Statements().DeleteTokensBySessionID(ctx, input.ProjectID, input.SessionID); err != nil {
 			return domain.ErrInternal(err).WithMessage("Failed to revoke session tokens.")
 		}
+		if sessionMissing {
+			return nil
+		}
 
-		return nil
+		sid := input.SessionID
+		// DeleteTokensBySessionID does not return deleted token ids; emit one
+		// peer with session_id set and empty entity_id (compound revoke).
+		if err := audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeAuthTokenRevoked,
+			Category:   domain.EventCategoryAuth,
+			ProjectID:  input.ProjectID,
+			EntityType: "token",
+			SessionID:  &sid,
+			Payload:    domain.AuthTokenRevokedPayload{},
+		}); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeSessionDeleted,
+			Category:   domain.EventCategorySession,
+			ProjectID:  input.ProjectID,
+			EntityType: "session",
+			EntityID:   input.SessionID,
+			SessionID:  &sid,
+			Payload:    domain.SessionDeletedPayload{Reason: "revoked"},
+		})
 	})
+}
+
+func emitSessionEstablished(ctx context.Context, stmts EventStatements, session *domain.Session) error {
+	payload := domain.SessionEstablishedPayload{}
+	if session.UserID != nil {
+		payload.UserID = *session.UserID
+	}
+	sid := session.ID
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeSessionEstablished,
+		Category:   domain.EventCategorySession,
+		ProjectID:  session.ProjectID,
+		EntityType: "session",
+		EntityID:   session.ID,
+		SessionID:  &sid,
+		Payload:    payload,
+	})
+}
+
+func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, projectID, tokenID string, sessionID, userID *string, scopes []string) error {
+	spec := audit.EmitSpec{
+		Type:       domain.EventTypeAuthTokenIssued,
+		Category:   domain.EventCategoryAuth,
+		ProjectID:  projectID,
+		EntityType: "token",
+		EntityID:   tokenID,
+		TokenID:    tokenID,
+		SessionID:  sessionID,
+		Payload:    domain.AuthTokenIssuedPayload{Scopes: scopes},
+	}
+	if userID != nil && *userID != "" {
+		spec.ActorID = userID
+		actorType := domain.EventActorTypeHuman
+		spec.ActorType = &actorType
+	}
+	return audit.Emit(ctx, stmts, spec)
 }
 
 func NewSessionService(v2Pool StatementPool, users UserIdentityReader, cfg SessionConfig) SessionService {

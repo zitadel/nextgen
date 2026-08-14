@@ -1,0 +1,113 @@
+type: object
+description: |
+  Shared wide-event envelope (ADR 048 / ADR 049). Concrete events are
+  `allOf` this schema plus a `const` `event_type` and a typed `payload`.
+required:
+  - id
+  - project_id
+  - event_type
+  - category
+  - occurred_at
+  - created_at
+  - client_id
+properties:
+  id:
+    type: string
+    description: Managed event id (`evt_<opaque>`).
+    example: evt_01HZYABCDEFGHJKMNPQRSTVWXY
+  project_id:
+    $ref: ../../components/schemas/project-id.yaml
+  team_id:
+    description: Emit-time team scope, when the actor operated under a team.
+    oneOf:
+      - type: string
+      - type: 'null'
+  event_type:
+    type: string
+    description: |
+      Semantic event name (dot-separated). Discriminator for the Event union —
+      see docs/design/api/events-catalog.md.
+  category:
+    type: string
+    description: Wide-event category.
+    enum:
+      - request
+      - auth
+      - session
+      - admin
+      - entity
+      - signal
+    example: entity
+  occurred_at:
+    type: string
+    format: date-time
+    description: When the action happened (server/storage clock, dialect-owned).
+  created_at:
+    type: string
+    format: date-time
+    description: When the row was inserted (server/storage clock, dialect-owned).
+  actor_id:
+    description: Who triggered the event.
+    oneOf:
+      - type: string
+      - type: 'null'
+  actor_type:
+    description: Actor kind.
+    oneOf:
+      - type: string
+        enum:
+          - human
+          - service
+          - system
+          - agent
+      - type: 'null'
+  entity_type:
+    description: Resource type affected.
+    oneOf:
+      - type: string
+      - type: 'null'
+  entity_id:
+    description: Resource id affected.
+    oneOf:
+      - type: string
+      - type: 'null'
+  client_id:
+    type: string
+    description: Application or agent that produced the event.
+  token_id:
+    type: string
+    description: Token id present at emit time, when any.
+  delegation_type:
+    type: string
+    description: Delegation kind (omit when unset).
+    enum:
+      - direct
+      - delegated
+      - pat_shared
+      - exchanged
+  delegation_id:
+    type: string
+  grantor:
+    type: string
+  fingerprint:
+    type: string
+    description: Device fingerprint correlation id.
+  request_id:
+    description: HTTP request correlation id.
+    oneOf:
+      - type: string
+      - type: 'null'
+  session_id:
+    description: Session correlation id.
+    oneOf:
+      - type: string
+      - type: 'null'
+  flow_id:
+    description: Login flow correlation id.
+    oneOf:
+      - type: string
+      - type: 'null'
+  metadata:
+    description: Additional emit-time metadata (already redacted).
+    type: object
+    additionalProperties: true
