@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, formatCommand, run } from "./dev-process.mjs";
-import { gitInfo, serverLdflags } from "./server-build.mjs";
+import { assertServerBuildPackage, gitInfo, serverLdflags } from "./server-build.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const args = forwardedArgs();
@@ -12,6 +12,7 @@ const out = "dist/server/nextgen-debug";
 // -gcflags "all=-N -l": disable compiler optimisations (-N) and inlining (-l) so the
 // debugger can step through code accurately and inspect local variables.
 try {
+  await assertServerBuildPackage({ repoRoot });
   const info = await gitInfo({ repoRoot });
   const ldflags = serverLdflags({
     version: `debug+${info.shortCommit}`,

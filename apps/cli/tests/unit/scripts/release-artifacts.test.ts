@@ -11,6 +11,11 @@ type ReleaseArtifactsModule = {
     version: string;
     gitInfo: { commit: string; shortCommit: string; date: string };
     platforms: Array<{ goos: string; goarch: string }>;
+    runCapture?: (
+      command: string,
+      args: string[],
+      options: { cwd: string },
+    ) => Promise<{ stdout: string }>;
     run: (
       command: string,
       args: string[],
@@ -87,6 +92,8 @@ describe("release artifact helpers", () => {
         date: "2026-06-16T00:00:00Z",
       },
       platforms: [{ goos: "linux", goarch: "amd64" }],
+      // The ldflags target package is verified via `go list` before any build.
+      runCapture: async () => ({ stdout: "github.com/zitadel/nextgen/internal/build\n" }),
       run: async (command, args) => {
         calls.push({ command, args });
       },

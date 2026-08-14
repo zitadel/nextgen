@@ -15,7 +15,6 @@ fileGroups:
     - "/api/**/*.json"
     - "/api/.ogen.yaml"
     - "/scripts/check-go-generate.mjs"
-    - "/scripts/server-build.mjs"
     - "moon.yml"
     - "package.json"
     - "bin/**"
@@ -234,6 +233,12 @@ tasks:
       # artifact depends on dist content — test/vet/format must not re-run on
       # UI-only changes.
       - "/internal/staticui/**"
+      # Same scoping argument: the build script and its process helper decide
+      # what this task produces, but nothing about how the Go sources lint or
+      # test. dev-process.mjs is listed because server-build.mjs imports it —
+      # without it, editing the helper cache-hits a stale binary.
+      - "/scripts/server-build.mjs"
+      - "/scripts/dev-process.mjs"
     outputs:
       - "/dist/server/nextgen"
       - "/dist/server/metadata.json"

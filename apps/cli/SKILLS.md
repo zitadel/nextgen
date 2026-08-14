@@ -231,8 +231,10 @@ the CLI's help layer, not the envelope.
 - `start` — start the managed local Zitadel server and persist runtime metadata
   under `.zitadel/local/runtime.json`. The binary runtime defaults to SQLite
   under `.zitadel/local/nextgen-data/`. Runtime metadata reports the published
-  server package version; the repository contributor wrapper reports the exact
-  `dev+<short-commit>` source build it launched. Use `--runtime docker` or
+  server package version; the repository contributor wrapper reports the
+  `dev+<short-commit>` source build it launched. That label names the revision
+  the binary was built from, which after a Moon cache hit can be an earlier
+  commit whose server sources are byte-identical. Use `--runtime docker` or
   `--image` for the Docker backend.
 - `stop` — stop the managed runtime while preserving
   `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered

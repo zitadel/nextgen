@@ -88,7 +88,7 @@ moon run workspace:server-debug -- server --user-file examples/bootstrap-users/d
 The task prints the exact `go build` invocation and the PID of the running process:
 
 ```
-[server-debug] build: go build -gcflags 'all=-N -l' -ldflags '-X main.version=debug' -o dist/server/nextgen-debug .
+[server-debug] build: go build -gcflags 'all=-N -l' -ldflags '-X github.com/zitadel/nextgen/internal/build.version=debug+1c736ea2cec6 -X github.com/zitadel/nextgen/internal/build.commit=1c736ea2cec694a8b5b6045ea883656019c9d3f6 -X github.com/zitadel/nextgen/internal/build.date=2026-08-14T02:06:38Z' -o dist/server/nextgen-debug .
 [server-debug] run:   ./dist/server/nextgen-debug server --user-file examples/bootstrap-users/demo-admin.json
 
 [server-debug] PID 98765 — VSCode: Run ▸ Start Debugging ▸ "Attach to Process"

@@ -11,7 +11,7 @@ import {
   PUBLIC_RELEASE_PACKAGES,
   SERVER_PLATFORM_PACKAGES,
 } from "./release-manifest.mjs";
-import { gitInfo, serverLdflags } from "./server-build.mjs";
+import { assertServerBuildPackage, gitInfo, serverLdflags } from "./server-build.mjs";
 
 export { PUBLIC_PACKAGE_DIRS, SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
 export { gitInfo } from "./server-build.mjs";
@@ -81,6 +81,8 @@ export async function buildServerBinaries(options = {}) {
   const platforms = options.platforms ?? SERVER_PLATFORMS;
   const runFn = options.run ?? run;
   const baseEnv = { ...process.env, ...(options.env ?? {}) };
+
+  await assertServerBuildPackage({ repoRoot, runCapture: options.runCapture });
 
   // The per-platform builds are independent and the Go build cache is safe
   // under concurrency, so cross-compile all platforms at once.

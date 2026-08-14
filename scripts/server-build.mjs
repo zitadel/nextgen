@@ -5,6 +5,11 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectRun, run, runCapture } from "./dev-process.mjs";
 
+// The -X targets below must name this package exactly. `go build` silently
+// ignores -X for a symbol it cannot resolve — exit 0, no diagnostic — which is
+// how the previous `-X main.version=...` stamping went unnoticed while every
+// shipped binary reported an empty version. assertServerBuildPackage turns a
+// package move back into a loud failure at build time.
 export const SERVER_BUILD_PACKAGE = "github.com/zitadel/nextgen/internal/build";
 
 const defaultRepoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -25,7 +30,43 @@ export async function gitInfo(options = {}) {
       cwd: repoRoot,
     })
   ).stdout.trim();
-  return { commit, shortCommit, date };
+  const branch = await gitBranch(repoRoot, runCaptureFn, shortCommit);
+  return { commit, shortCommit, date, branch };
+}
+
+// The branch is sidecar metadata only — it never reaches the binary, because
+// build.Version() becomes the OTel service.version and every log line's
+// version attribute, which must stay a bounded version string.
+async function gitBranch(repoRoot, runCaptureFn, fallback) {
+  try {
+    // `symbolic-ref -q` exits non-zero on a detached HEAD, which is the normal
+    // state under actions/checkout. Metadata is not worth failing a build over.
+    const branch = (
+      await runCaptureFn("git", ["symbolic-ref", "-q", "--short", "HEAD"], {
+        cwd: repoRoot,
+      })
+    ).stdout.trim();
+    return branch || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function assertServerBuildPackage(options = {}) {
+  const repoRoot = options.repoRoot ?? defaultRepoRoot;
+  const runCaptureFn = options.runCapture ?? runCapture;
+  const actual = (
+    await runCaptureFn("go", ["list", "-f", "{{.ImportPath}}", "./internal/build"], {
+      cwd: repoRoot,
+    })
+  ).stdout.trim();
+  if (actual !== SERVER_BUILD_PACKAGE) {
+    throw new Error(
+      `server build metadata package moved: -X targets ${SERVER_BUILD_PACKAGE}, go reports ${actual}. ` +
+        "Update SERVER_BUILD_PACKAGE in scripts/server-build.mjs.",
+    );
+  }
+  return actual;
 }
 
 export function serverLdflags({ version, commit, date, strip = false }) {
@@ -57,6 +98,7 @@ export async function buildLocalServer(options = {}) {
   const output = options.output ?? join(repoRoot, "dist/server/nextgen");
   const metadataPath = options.metadataPath ?? join(dirname(output), "metadata.json");
 
+  await assertServerBuildPackage({ repoRoot, runCapture: options.runCapture });
   await mkdir(dirname(output), { recursive: true });
   await runFn(
     "go",
@@ -77,6 +119,7 @@ export async function buildLocalServer(options = {}) {
     version,
     commit: info.commit,
     short_commit: info.shortCommit,
+    branch: info.branch ?? info.shortCommit,
     date: info.date,
   };
   await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
