@@ -64,8 +64,8 @@ export interface InstanceHandle {
   /**
    * Platform-plane credential slot. Unpopulated until the platform-project
    * provisioner (Console ADR 0004 §2) lands server-side; see
-   * `PlatformCredentials` for the settled contract and why it stays empty
-   * today.
+   * `PlatformCredentials` for what it carries, why it stays empty today, and
+   * why the still-undecided credentials are left out of it.
    */
   platform?: PlatformCredentials;
 }
