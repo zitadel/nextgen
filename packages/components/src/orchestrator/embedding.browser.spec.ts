@@ -86,6 +86,11 @@ const fieldlessStep: CreateFlow201 = {
  */
 const LOADABLE_ASSET = `${location.origin}/src/orchestrator/__fixtures__/asset.svg`;
 const BROKEN_ASSET = `${location.origin}/src/orchestrator/__fixtures__/does-not-exist.svg`;
+/** Square, and carrying a viewBox but no width/height — see the fixture. */
+const SQUARE_ASSET = `${location.origin}/src/orchestrator/__fixtures__/square-unsized-asset.svg`;
+const WIDE_ASSET = `${location.origin}/src/orchestrator/__fixtures__/wide-banner-asset.svg`;
+/** Sized, 1:4 — the shape the brand pane's width cap does *not* bound. */
+const TALL_ASSET = `${location.origin}/src/orchestrator/__fixtures__/tall-logo-asset.svg`;
 
 /** The shipped split design carried as tenant branding, logo-less. */
 const splitHeroOnlyStep: CreateFlow201 = {
@@ -94,6 +99,34 @@ const splitHeroOnlyStep: CreateFlow201 = {
     layout: "split",
     liquid_template: splitTemplate,
     hero_url: LOADABLE_ASSET,
+  },
+} as unknown as CreateFlow201;
+
+/** Same design, pointed at the two hero shapes the height cap has to separate. */
+const splitSquareHeroStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    layout: "split",
+    liquid_template: splitTemplate,
+    hero_url: SQUARE_ASSET,
+  },
+} as unknown as CreateFlow201;
+
+const splitWideHeroStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    layout: "split",
+    liquid_template: splitTemplate,
+    hero_url: WIDE_ASSET,
+  },
+} as unknown as CreateFlow201;
+
+const splitTallLogoStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    layout: "split",
+    liquid_template: splitTemplate,
+    logo_url: TALL_ASSET,
   },
 } as unknown as CreateFlow201;
 
@@ -205,6 +238,17 @@ async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Pr
     await new Promise((resolve) => setTimeout(resolve, 16));
   }
   throw new Error("waitFor timed out");
+}
+
+/**
+ * Asset-sizing assertions are meaningless against a pending `<img>`: the
+ * intrinsic dimensions the layout derives from only exist once it has decoded.
+ */
+async function loadedImage(element: ZitadelLogin, selector: string): Promise<HTMLImageElement> {
+  return waitFor(() => {
+    const img = element.shadowRoot?.querySelector(selector) as HTMLImageElement | null;
+    return img?.complete && img.naturalWidth > 0 ? img : null;
+  });
 }
 
 describe("<zitadel-login> widget-first embedding (chromium)", () => {
@@ -470,6 +514,104 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     const banner = withHero.shadowRoot?.querySelector(".zl-split__compact") as HTMLElement;
     expect(banner.tagName).toBe("IMG");
     expect(getComputedStyle(banner).maxHeight).toBe("96px");
+  });
+
+  it("a square hero asset cannot grow the brand pane past the viewport", async () => {
+    // The reported failure: `hero_url` pointed at a framework scaffold's own
+    // `public/globe.svg` — square, and with no intrinsic size, so it laid out
+    // at the brand pane's width and squared itself (656×656). The pane is
+    // content-sized, so that became the page height (1028px at a 900px
+    // viewport) and pushed the attribution below the fold.
+    host.style.width = "1200px";
+    const element = await mount(splitSquareHeroStep, (el) => {
+      el.variant = "page";
+    });
+
+    const hero = await loadedImage(element, "img.zl-split__hero");
+    const heroRect = hero.getBoundingClientRect();
+    // Still a pane-filling hero, not a stamp — the cap bounds height only.
+    expect(heroRect.width).toBeGreaterThan(400);
+    expect(heroRect.height).toBeLessThan(heroRect.width);
+
+    const brand = element.shadowRoot?.querySelector(".zl-split__brand") as HTMLElement;
+    expect(brand.getBoundingClientRect().height).toBeLessThanOrEqual(window.innerHeight);
+    // Page mode floors the mount at 100vh; it must not have grown past it.
+    const mountNode = element.shadowRoot?.querySelector(".zl-mount") as HTMLElement;
+    expect(mountNode.getBoundingClientRect().height).toBeLessThanOrEqual(window.innerHeight + 1);
+
+    const cap = parseFloat(getComputedStyle(hero).maxHeight);
+    expect(cap).toBeGreaterThan(0);
+    expect(heroRect.height).toBeLessThanOrEqual(cap + 1);
+    // The cap crops rather than distorts; `contain` here would letterbox the
+    // asset back into the same square footprint the cap just removed.
+    expect(getComputedStyle(hero).objectFit).toBe("cover");
+  });
+
+  it("the hero height cap leaves a conventional wide banner uncropped", async () => {
+    // The other half of the cap: it may not turn into a fixed slot. A landscape
+    // banner's height never reaches the cap, so it keeps its own ratio and
+    // `object-fit` stays a no-op — the tenant sees the whole asset.
+    host.style.width = "1200px";
+    const element = await mount(splitWideHeroStep, (el) => {
+      el.variant = "page";
+    });
+
+    const hero = await loadedImage(element, "img.zl-split__hero");
+    const heroRect = hero.getBoundingClientRect();
+    const intrinsicRatio = hero.naturalWidth / hero.naturalHeight;
+    expect(heroRect.width / heroRect.height).toBeCloseTo(intrinsicRatio, 1);
+  });
+
+  it("the collapsed compact banner caps the same square asset", async () => {
+    // Narrow container: the brand pane is gone and the hero rides in the form
+    // pane instead. Its `width: 100%` is what makes the 6rem cap bite — without
+    // it the same asset would square itself off the form pane's width and wall
+    // off the card.
+    const element = await mount(splitSquareHeroStep);
+    const banner = await loadedImage(element, "img.zl-split__compact--hero");
+    const rect = banner.getBoundingClientRect();
+    expect(rect.width).toBeGreaterThan(100);
+    expect(rect.height).toBeLessThanOrEqual(96 + 1);
+  });
+
+  it("a tall logo asset cannot grow the brand pane past the viewport", async () => {
+    // The hero's sibling defect. `max-width: min(16rem, 60%)` bounds one axis
+    // only, so a 1:4 portrait lockup clamped to 256px wide still resolved to
+    // 1024px tall and handed that to the content-sized pane. A square asset
+    // does not reproduce this — the width cap already squares it off at 256.
+    host.style.width = "1200px";
+    const element = await mount(splitTallLogoStep, (el) => {
+      el.variant = "page";
+    });
+
+    const logo = await loadedImage(element, "img.zl-split__logo");
+    const brand = element.shadowRoot?.querySelector(".zl-split__brand") as HTMLElement;
+    expect(brand.getBoundingClientRect().height).toBeLessThanOrEqual(window.innerHeight);
+    const mountNode = element.shadowRoot?.querySelector(".zl-mount") as HTMLElement;
+    expect(mountNode.getBoundingClientRect().height).toBeLessThanOrEqual(window.innerHeight + 1);
+
+    const rect = logo.getBoundingClientRect();
+    const cap = parseFloat(getComputedStyle(logo).maxHeight);
+    expect(cap).toBeGreaterThan(0);
+    expect(rect.height).toBeLessThanOrEqual(cap + 1);
+    // Deliberately unlike the hero: no pinned width, so the cap shrinks both
+    // axes and the mark keeps its whole shape. Cropping a logo loses brand.
+    expect(rect.width / rect.height).toBeCloseTo(logo.naturalWidth / logo.naturalHeight, 1);
+  });
+
+  it("the logo cap never stretches a small logo to the pane", async () => {
+    // The other direction of the same rule. `.zl-split__hero` pins `width:
+    // 100%`, which upscales a small asset; the logo must not inherit that —
+    // a 64px brand mark blown up to a 536px pane is a blurry mess.
+    host.style.width = "1200px";
+    const element = await mount(splitLogoStep, (el) => {
+      el.variant = "page";
+    });
+
+    const logo = await loadedImage(element, "img.zl-split__logo");
+    const rect = logo.getBoundingClientRect();
+    expect(rect.width).toBeCloseTo(logo.naturalWidth, 0);
+    expect(rect.height).toBeCloseTo(logo.naturalHeight, 0);
   });
 
   it("a branding asset that fails to load degrades to the split placeholder", async () => {
