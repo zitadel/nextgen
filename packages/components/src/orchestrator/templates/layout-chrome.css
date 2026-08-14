@@ -198,14 +198,24 @@ img[data-zl-asset-broken] {
 /* A tenant who sets both assets stacks them in this one pane, so the two solo
    caps stop being independent — and the pane's own gap and padding are only
    half the chrome they compete with. The shell around it adds 3.25rem of block
-   padding, a region gap, and the attribution row: 16rem + 27.5rem + all of that
-   measures an 824px pane inside a 976px document at 1440×900, which is the same
-   below-the-fold attribution these caps exist to prevent. The logo yields
-   rather than the hero — above a hero image a logo reads as a header mark, and
-   shrinking the hero would tax the far more common hero-only pane for a
-   combination it never uses. */
+   padding, a region gap, and the 2.5rem attribution pill. The logo first yields
+   to a header-mark cap; the hero then takes only the viewport height left after
+   that whole fixed budget, so the pair also fits short, wide laptop viewports.
+   Hero-only panes keep the larger cap below. */
 .zl-split__logo:has(+ .zl-split__hero) {
   max-height: var(--zl-split-logo-max-height, 8rem);
+}
+.zl-split__logo:has(+ .zl-split__hero) + .zl-split__hero {
+  max-height: min(
+    var(--zl-split-hero-max-height, 27.5rem),
+    max(
+      0px,
+      calc(
+        100vh - 104px - 6.5rem - 2.5rem - var(--zl-spacing-04, 1.5rem) -
+          var(--zl-spacing-04, 1.5rem) - var(--zl-split-logo-max-height, 8rem)
+      )
+    )
+  );
 }
 /* Pinned width and a capped height, not a bare `max-width`. The brand pane is
    content-sized — the grid centres it, nothing above the image constrains it —

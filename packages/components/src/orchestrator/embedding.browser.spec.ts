@@ -2,6 +2,7 @@ import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { ZitadelProject } from "@zitadel/api/config";
 import type { CreateFlow201 } from "@zitadel/api/generated/model";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { page } from "vitest/browser";
 
 import "./zitadel-login.js";
 import heroTemplate from "../../../config/defaults/branding/hero/login.liquid";
@@ -266,6 +267,7 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
   let host: HTMLDivElement;
   let stub: ReturnType<typeof installFlowFetchStub> | undefined;
   let project: ZitadelProject;
+  let resetViewport = false;
 
   beforeEach(() => {
     _resetConfigForTesting();
@@ -279,13 +281,17 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     document.body.appendChild(host);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     host.remove();
     stub?.restore();
     // The font links are document-level state the orchestrator manages on
     // update; isolate tests from each other.
     document.getElementById("zl-default-font-link")?.remove();
     document.getElementById("zl-font-link")?.remove();
+    if (resetViewport) {
+      resetViewport = false;
+      await page.viewport(1440, 900);
+    }
   });
 
   async function mount(
@@ -617,6 +623,11 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     // padding, a region gap, and the attribution row. At their solo caps the
     // pair measured an 824px pane inside a 976px document at 1440×900 — the
     // attribution back below the fold, which is what the caps exist to stop.
+    // This is still a desktop-width split pane, but its 800px height exposed
+    // the stale arithmetic in the first combined cap (864px mount).
+    resetViewport = true;
+    await page.viewport(1200, 800);
+    expect(window.innerHeight).toBe(800);
     host.style.width = "1200px";
     const element = await mount(splitBothAssetsStep, (el) => {
       el.variant = "page";
