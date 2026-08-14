@@ -42,11 +42,9 @@ func (c *channelInserter) batchCalls() int {
 func TestRequestBuffer_FlushOnBatchSize(t *testing.T) {
 	ins := &channelInserter{}
 	buf := NewRequestBuffer(ins, RequestBufferConfig{
-		BatchSize:     3,
-		Capacity:      100,
-		HighWatermark: 0.9,
-		MaxAge:        time.Hour,
-		FlushInterval: time.Hour,
+		BatchSize: 3,
+		Capacity:  100,
+		MaxAge:    time.Hour,
 	})
 	defer buf.Close()
 
@@ -68,9 +66,7 @@ func TestRequestBuffer_DropWhenFull(t *testing.T) {
 	buf := NewRequestBuffer(ins, RequestBufferConfig{
 		BatchSize:       1000,
 		Capacity:        2,
-		HighWatermark:   0, // disable watermark so capacity can fill
 		MaxAge:          24 * time.Hour,
-		FlushInterval:   24 * time.Hour,
 		ShutdownTimeout: time.Millisecond,
 	})
 	t.Cleanup(buf.Close)
@@ -87,22 +83,40 @@ type noopInserter struct{}
 
 func (noopInserter) InsertEvent(context.Context, *domain.Event) error { return nil }
 
-func TestRequestBuffer_WatermarkFlush(t *testing.T) {
+func TestRequestBuffer_BatchSizeTakesPrefix(t *testing.T) {
 	ins := &channelInserter{}
 	buf := NewRequestBuffer(ins, RequestBufferConfig{
-		BatchSize:     100,
-		Capacity:      10,
-		HighWatermark: 0.8,
-		MaxAge:        time.Hour,
-		FlushInterval: time.Hour,
+		BatchSize: 3,
+		Capacity:  100,
+		MaxAge:    time.Hour,
 	})
 	defer buf.Close()
 
-	for i := 0; i < 8; i++ {
+	for i := 0; i < 5; i++ {
 		buf.Enqueue(&domain.Event{ProjectID: "proj_1", EventType: domain.EventTypeRequestAPI, Category: domain.EventCategoryRequest})
 	}
-	require.Eventually(t, func() bool { return buf.Flushed() >= 8 }, time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool { return buf.Flushed() >= 3 }, time.Second, 10*time.Millisecond)
+	assert.Equal(t, uint64(3), buf.Flushed())
+	assert.Equal(t, 2, buf.Len())
 	assert.Equal(t, 1, ins.batchCalls())
+}
+
+func TestRequestBuffer_BatchSizeDrainsFullPrefixes(t *testing.T) {
+	ins := &channelInserter{}
+	buf := NewRequestBuffer(ins, RequestBufferConfig{
+		BatchSize: 3,
+		Capacity:  100,
+		MaxAge:    time.Hour,
+	})
+	defer buf.Close()
+
+	for i := 0; i < 7; i++ {
+		buf.Enqueue(&domain.Event{ProjectID: "proj_1", EventType: domain.EventTypeRequestAPI, Category: domain.EventCategoryRequest})
+	}
+	require.Eventually(t, func() bool { return buf.Flushed() >= 6 && buf.Len() == 1 }, time.Second, 10*time.Millisecond)
+	assert.Equal(t, uint64(6), buf.Flushed())
+	assert.Equal(t, 1, buf.Len())
+	assert.Equal(t, 2, ins.batchCalls())
 }
 
 func TestStatusCapturingWriter(t *testing.T) {
@@ -148,11 +162,9 @@ func (f *failingInserter) InsertEvents(context.Context, []*domain.Event) error {
 func TestRequestBuffer_FlushFailureDropsAndCounts(t *testing.T) {
 	ins := &failingInserter{}
 	buf := NewRequestBuffer(ins, RequestBufferConfig{
-		BatchSize:     2,
-		Capacity:      100,
-		HighWatermark: 0.9,
-		MaxAge:        time.Hour,
-		FlushInterval: time.Hour,
+		BatchSize: 2,
+		Capacity:  100,
+		MaxAge:    time.Hour,
 	})
 	defer buf.Close()
 
@@ -188,11 +200,9 @@ func (f *failThenSucceedInserter) InsertEvents(_ context.Context, events []*doma
 func TestRequestBuffer_OccurredAtWaitIncludesRetryBackoff(t *testing.T) {
 	ins := &failThenSucceedInserter{}
 	buf := NewRequestBuffer(ins, RequestBufferConfig{
-		BatchSize:     1,
-		Capacity:      100,
-		HighWatermark: 0.9,
-		MaxAge:        time.Hour,
-		FlushInterval: time.Hour,
+		BatchSize: 1,
+		Capacity:  100,
+		MaxAge:    time.Hour,
 	})
 	defer buf.Close()
 

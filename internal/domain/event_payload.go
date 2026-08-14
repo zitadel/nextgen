@@ -1,5 +1,10 @@
 package domain
 
+import (
+	"maps"
+	"slices"
+)
+
 // Typed event payloads (deny-by-default allowlists). Keep in sync with
 // docs/design/api/events-catalog.md and OpenAPI Event discriminator schemas.
 
@@ -114,6 +119,82 @@ type FlowdefPayload struct {
 type FlowdefAudiencePayload struct {
 	AppIDs  []string `json:"app_ids,omitempty"`
 	TeamIDs []string `json:"team_ids,omitempty"`
+}
+
+// FlowdefPayloadSnapshot is the allowlisted create snapshot for flowdef events.
+func FlowdefPayloadSnapshot(fd *FlowDefinition) FlowdefPayload {
+	if fd == nil {
+		return FlowdefPayload{}
+	}
+	return FlowdefPayload{
+		Name:       fd.Name,
+		Status:     fd.Status.String(),
+		UserSchema: fd.UserSchema,
+		Purposes:   flowdefPurposesWire(fd.Purposes),
+		Audience:   flowdefAudiencePayload(fd.Audience),
+	}
+}
+
+// FlowdefPayloadDelta is the allowlisted update delta (new values only).
+func FlowdefPayloadDelta(before, after *FlowDefinition) FlowdefPayload {
+	if after == nil {
+		return FlowdefPayload{}
+	}
+	if before == nil {
+		return FlowdefPayloadSnapshot(after)
+	}
+	var delta FlowdefPayload
+	if before.Name != after.Name {
+		delta.Name = after.Name
+	}
+	if before.Status != after.Status {
+		delta.Status = after.Status.String()
+	}
+	if before.UserSchema != after.UserSchema {
+		delta.UserSchema = after.UserSchema
+	}
+	beforePurposes := flowdefPurposesWire(before.Purposes)
+	afterPurposes := flowdefPurposesWire(after.Purposes)
+	if !maps.Equal(beforePurposes, afterPurposes) {
+		delta.Purposes = afterPurposes
+	}
+	beforeAud := flowdefAudiencePayload(before.Audience)
+	afterAud := flowdefAudiencePayload(after.Audience)
+	if !flowdefAudienceEqual(beforeAud, afterAud) {
+		delta.Audience = afterAud
+	}
+	return delta
+}
+
+func flowdefPurposesWire(in map[FlowDefinitionPurpose]string) map[string]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	for purpose, step := range in {
+		out[purpose.String()] = step
+	}
+	return out
+}
+
+func flowdefAudiencePayload(a FlowDefinitionAudience) *FlowdefAudiencePayload {
+	if len(a.AppIDs) == 0 && len(a.TeamIDs) == 0 {
+		return nil
+	}
+	return &FlowdefAudiencePayload{
+		AppIDs:  append([]string(nil), a.AppIDs...),
+		TeamIDs: append([]string(nil), a.TeamIDs...),
+	}
+}
+
+func flowdefAudienceEqual(a, b *FlowdefAudiencePayload) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return slices.Equal(a.AppIDs, b.AppIDs) && slices.Equal(a.TeamIDs, b.TeamIDs)
 }
 
 type BrandingPayload struct {

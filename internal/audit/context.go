@@ -9,6 +9,10 @@ import (
 )
 
 type contextKey struct{}
+
+// actorSlotKey is a second context slot so ogen AuthGate can enrich a child
+// ctx while net/http middleware still reads the parent. Collapsing to one key
+// would drop that copy unless AuthGate reused the parent ctx.
 type actorSlotKey struct{}
 
 // ActorContext holds server-authoritative WHO/HOW dimensions for event emission (ADR 048 §5).

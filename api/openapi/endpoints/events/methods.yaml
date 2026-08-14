@@ -2,8 +2,9 @@ get:
   operationId: listEvents
   summary: List events
   description: |
-    Returns project-scoped audit events, oldest-first by keyset on
-    `(created_at, id)` (ADR 027 / ADR 049). Requires `events.read`.
+    Returns project-scoped audit events, newest-first by keyset on
+    `(created_at, id)` (ADR 027 / ADR 049). Pass `order=asc` for oldest-first.
+    Requires `events.read`.
 
     Pre-claim projects return an empty list (events are stored but not
     visible until claim succeeds). Team-scoped credentials see only events
@@ -95,6 +96,17 @@ get:
       schema:
         type: string
         format: date-time
+    - name: order
+      in: query
+      description: |
+        Sort direction on `(created_at, id)`. Default `desc` (newest first)
+        for audit UI. Pass `asc` for oldest-first.
+      schema:
+        type: string
+        enum:
+          - asc
+          - desc
+        default: desc
     - $ref: ../../components/parameters/page-token.yaml
     - $ref: ../../components/parameters/limit.yaml
   responses:

@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 type fakeExportSource struct {
@@ -51,7 +50,7 @@ func (f *fakeExportSource) GetEventSinkCursor(_ context.Context, sinkID, project
 	defer f.mu.Unlock()
 	c, ok := f.cursors[cursorKey(sinkID, projectID)]
 	if !ok {
-		return nil, &database.NoRowFoundError{}
+		return nil, nil
 	}
 	cp := *c
 	return &cp, nil
@@ -115,7 +114,7 @@ func TestShipper_AdvancesCursorOnSuccess(t *testing.T) {
 	got, err := src.GetEventSinkCursor(t.Context(), sink.ID, "proj_a")
 	require.NoError(t, err)
 	assert.Equal(t, "evt_2", got.LastEventID)
-	require.Len(t, src.upserts, 2)
+	require.Len(t, src.upserts, 1)
 }
 
 func TestShipper_HeadOfLineStopsOnFailure(t *testing.T) {
@@ -282,5 +281,64 @@ func TestShipper_DrainsMultiplePagesInOneTick(t *testing.T) {
 	got, err := src.GetEventSinkCursor(t.Context(), "sink_deployment_webhook", "proj_a")
 	require.NoError(t, err)
 	assert.Equal(t, "evt_149", got.LastEventID)
-	require.Len(t, src.upserts, 150)
+	require.Len(t, src.upserts, 2)
+}
+
+func TestShipper_PartialPageFailurePersistsLastSuccess(t *testing.T) {
+	t.Parallel()
+	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	src := newFakeExportSource([]string{"proj_a"}, map[string][]*domain.Event{
+		"proj_a": {
+			{ProjectID: "proj_a", ID: "evt_1", CreatedAt: t0, EventType: domain.EventTypeUserCreated, Category: domain.EventCategoryEntity},
+			{ProjectID: "proj_a", ID: "evt_2", CreatedAt: t0.Add(time.Second), EventType: domain.EventTypeUserDeleted, Category: domain.EventCategoryEntity},
+			{ProjectID: "proj_a", ID: "evt_fail", CreatedAt: t0.Add(2 * time.Second), EventType: domain.EventTypeUserDeleted, Category: domain.EventCategoryEntity},
+			{ProjectID: "proj_a", ID: "evt_skip", CreatedAt: t0.Add(3 * time.Second), EventType: domain.EventTypeUserDeleted, Category: domain.EventCategoryEntity},
+		},
+	})
+	var hits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		hits++
+		if hits == 3 {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(srv.Close)
+
+	s := NewShipper(src, ExportConfig{Enabled: true, Interval: time.Hour})
+	s.client = srv.Client()
+	s.sinks = []*domain.EventSink{{
+		ID:      "sink_deployment_webhook",
+		Type:    domain.EventSinkTypeWebhook,
+		Scope:   domain.EventSinkScopeDeployment,
+		URL:     srv.URL,
+		Enabled: true,
+	}}
+
+	s.shipOnce()
+
+	got, err := src.GetEventSinkCursor(t.Context(), "sink_deployment_webhook", "proj_a")
+	require.NoError(t, err)
+	assert.Equal(t, "evt_2", got.LastEventID)
+	assert.Equal(t, 3, hits)
+	require.Len(t, src.upserts, 1)
+}
+
+func TestShipper_StartSkipsDisabledSinks(t *testing.T) {
+	t.Parallel()
+	src := newFakeExportSource(nil, nil)
+	disabled := false
+	s := NewShipper(src, ExportConfig{
+		Enabled:  true,
+		Interval: time.Hour,
+		Sinks: []SinkConfig{{
+			Type:    domain.EventSinkTypeStdout,
+			Enabled: &disabled,
+		}},
+	})
+	require.NoError(t, s.Start(t.Context()))
+	t.Cleanup(s.Close)
+	assert.Empty(t, s.sinks)
 }

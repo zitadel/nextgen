@@ -64,6 +64,9 @@ func (h *Handler) ListEvents(ctx context.Context, params api.ListEventsParams) (
 		t := v
 		req.CreatedBefore = &t
 	}
+	if v, ok := params.Order.Get(); ok {
+		req.Order = string(v)
+	}
 
 	result, err := h.eventService.List(ctx, req)
 	if err != nil {

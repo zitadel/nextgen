@@ -342,8 +342,9 @@ type Invoker interface {
 	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
 	// ListEvents invokes listEvents operation.
 	//
-	// Returns project-scoped audit events, oldest-first by keyset on
-	// `(created_at, id)` (ADR 027 / ADR 049). Requires `events.read`.
+	// Returns project-scoped audit events, newest-first by keyset on
+	// `(created_at, id)` (ADR 027 / ADR 049). Pass `order=asc` for oldest-first.
+	// Requires `events.read`.
 	// Pre-claim projects return an empty list (events are stored but not
 	// visible until claim succeeds). Team-scoped credentials see only events
 	// whose emit-time `team_id` matches the credential team (enforced when
@@ -4887,8 +4888,9 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 
 // ListEvents invokes listEvents operation.
 //
-// Returns project-scoped audit events, oldest-first by keyset on
-// `(created_at, id)` (ADR 027 / ADR 049). Requires `events.read`.
+// Returns project-scoped audit events, newest-first by keyset on
+// `(created_at, id)` (ADR 027 / ADR 049). Pass `order=asc` for oldest-first.
+// Requires `events.read`.
 // Pre-claim projects return an empty list (events are stored but not
 // visible until claim succeeds). Team-scoped credentials see only events
 // whose emit-time `team_id` matches the credential team (enforced when
@@ -5195,6 +5197,23 @@ func (c *Client) sendListEvents(ctx context.Context, params ListEventsParams) (r
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.CreatedBefore.Get(); ok {
 				return e.EncodeValue(conv.DateTimeToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "order" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "order",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Order.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
 			}
 			return nil
 		}); err != nil {

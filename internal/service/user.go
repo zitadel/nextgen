@@ -136,7 +136,6 @@ func (s *userService) ApplyActions(ctx context.Context, actions ...UserAction) (
 		return nil
 	})
 	if err != nil {
-		s.emitUserCreateFailedBestEffort(ctx, actions, err)
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return de
 		}
@@ -145,25 +144,18 @@ func (s *userService) ApplyActions(ctx context.Context, actions ...UserAction) (
 	return nil
 }
 
-func (s *userService) emitUserCreateFailedBestEffort(ctx context.Context, actions []UserAction, applyErr error) {
+func (s *userService) emitUserCreateFailedBestEffort(ctx context.Context, action *CreateUserAction, applyErr error) {
 	var unique *database.UniqueError
 	if !errors.As(applyErr, &unique) {
 		return
 	}
-	var create *CreateUserAction
-	for _, a := range actions {
-		if c, ok := a.(*CreateUserAction); ok {
-			create = c
-			break
-		}
-	}
-	if create == nil || create.CreateUser == nil {
+	if action == nil || action.CreateUser == nil {
 		return
 	}
 	_ = audit.Emit(ctx, s.v2Pool.Statements(), audit.EmitSpec{
 		Type:       domain.EventTypeUserCreateFailed,
 		Category:   domain.EventCategoryEntity,
-		ProjectID:  create.ProjectID,
+		ProjectID:  action.ProjectID,
 		EntityType: "user",
 		Payload:    domain.UserCreateFailedPayload{KeyName: unique.Constraint()},
 	})
@@ -172,6 +164,7 @@ func (s *userService) emitUserCreateFailedBestEffort(ctx context.Context, action
 func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
 	action := NewCreateUserAction(input, s.schemaStore)
 	if err := s.ApplyActions(ctx, action); err != nil {
+		s.emitUserCreateFailedBestEffort(ctx, action, err)
 		return nil, err
 	}
 	return action.User, nil

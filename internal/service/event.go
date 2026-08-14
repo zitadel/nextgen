@@ -26,6 +26,7 @@ type ListEventsRequest struct {
 	TeamID        string
 	CreatedAfter  *time.Time
 	CreatedBefore *time.Time
+	Order         string
 	Limit         int
 	PageToken     string
 }
@@ -157,12 +158,7 @@ func listEventsOptions(req ListEventsRequest) (*database.ListOptions[domain.Even
 		filters = append(filters, database.Equal(database.Col(domain.EventFieldTeamID), req.TeamID))
 	}
 	if req.CreatedAfter != nil {
-		// Inclusive lower bound: created_at >= after ≡ equal OR greater.
-		col := database.Col(domain.EventFieldCreatedAt)
-		filters = append(filters, database.Or(
-			database.Equal(col, *req.CreatedAfter),
-			database.GreaterThan(col, *req.CreatedAfter),
-		))
+		filters = append(filters, database.GreaterThanOrEqual(database.Col(domain.EventFieldCreatedAt), *req.CreatedAfter))
 	}
 	if req.CreatedBefore != nil {
 		filters = append(filters, database.LessThan(database.Col(domain.EventFieldCreatedAt), *req.CreatedBefore))
@@ -173,11 +169,21 @@ func listEventsOptions(req ListEventsRequest) (*database.ListOptions[domain.Even
 		cursor = []byte(req.PageToken)
 	}
 
+	orderBy := events.CreatedAtDesc()
+	switch req.Order {
+	case "", "desc":
+		orderBy = events.CreatedAtDesc()
+	case "asc":
+		orderBy = events.CreatedAtAsc()
+	default:
+		return nil, domain.ErrEventInvalid("order must be asc or desc", nil)
+	}
+
 	return &database.ListOptions[domain.EventField]{
 		Filter: database.And(filters...),
 		Pagination: database.Page[domain.EventField]{
 			Limit:   uint32(normalizeLimit(req.Limit)),
-			OrderBy: events.CreatedAtAsc(),
+			OrderBy: orderBy,
 			Cursor:  cursor,
 		},
 	}, nil

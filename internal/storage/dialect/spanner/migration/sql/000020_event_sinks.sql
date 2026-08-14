@@ -6,9 +6,13 @@ CREATE TABLE event_sinks (
     type        STRING(MAX) NOT NULL,
     scope       STRING(MAX) NOT NULL,
     project_id  STRING(MAX),
-    url         STRING(MAX),
+    url         STRING(MAX) NOT NULL DEFAULT (''),
     enabled     BOOL NOT NULL DEFAULT (TRUE)
 ) PRIMARY KEY (id)
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE UNIQUE INDEX idx_event_sinks_natural
+    ON event_sinks (type, scope, url)
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -31,6 +35,9 @@ CREATE TABLE event_sink_cursors (
 -- +goose NO TRANSACTION
 -- +goose StatementBegin
 DROP TABLE IF EXISTS event_sink_cursors
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_event_sinks_natural
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS event_sinks

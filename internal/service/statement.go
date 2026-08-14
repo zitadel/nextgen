@@ -349,6 +349,10 @@ type ResourceScopeStatements interface {
 	GetResourceScopeByIDInProject(ctx context.Context, projectID, resourceID string) (*domain.ResourceScope, error)
 	ExistsResourceScopeElsewhere(ctx context.Context, kind domain.ResourceKind, resourceID, excludeProjectID string) (bool, error)
 	DeleteResourceScope(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) error
+	// ListClaimedProjectIDs returns project ids whose resource_scope_index
+	// row has team_id set (ADR 049 export visibility), ordered by project_id
+	// after afterID (empty starts at the beginning).
+	ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error)
 }
 
 // AuthzAssignmentStatements persists grants (principal → catalog relation at a scope).
@@ -439,6 +443,7 @@ type EventStatements interface {
 	// all projects (retention job; includes orphaned project_id rows).
 	DeleteEventsOlderThan(ctx context.Context, createdBefore time.Time) (int64, error)
 	EnsureEventSink(ctx context.Context, sink *domain.EventSink) error
+	// GetEventSinkCursor returns (nil, nil) when no cursor row exists.
 	GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error)
 	UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error
 	ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit uint32) ([]*domain.Event, error)

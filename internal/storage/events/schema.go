@@ -120,6 +120,13 @@ func CreatedAtAsc() database.OrderBy[domain.EventField] {
 	}
 }
 
+// CreatedAtDesc is keyset order (created_at, id) descending (newest first).
+func CreatedAtDesc() database.OrderBy[domain.EventField] {
+	order := CreatedAtAsc()
+	order.Direction = database.OrderDesc
+	return order
+}
+
 // ListOptions lists events for a project with keyset pagination on (created_at, id).
 func ListOptions(projectID string, limit uint32) *database.ListOptions[domain.EventField] {
 	return &database.ListOptions[domain.EventField]{

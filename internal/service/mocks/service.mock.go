@@ -3286,6 +3286,45 @@ func (c *MockAllStatementsListBrandingsCall) DoAndReturn(f func(context.Context,
 	return c
 }
 
+// ListClaimedProjectIDs mocks base method.
+func (m *MockAllStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListClaimedProjectIDs", ctx, afterID, limit)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListClaimedProjectIDs indicates an expected call of ListClaimedProjectIDs.
+func (mr *MockAllStatementsMockRecorder) ListClaimedProjectIDs(ctx, afterID, limit any) *MockAllStatementsListClaimedProjectIDsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListClaimedProjectIDs", reflect.TypeOf((*MockAllStatements)(nil).ListClaimedProjectIDs), ctx, afterID, limit)
+	return &MockAllStatementsListClaimedProjectIDsCall{Call: call}
+}
+
+// MockAllStatementsListClaimedProjectIDsCall wrap *gomock.Call
+type MockAllStatementsListClaimedProjectIDsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListClaimedProjectIDsCall) Return(arg0 []string, arg1 error) *MockAllStatementsListClaimedProjectIDsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListClaimedProjectIDsCall) Do(f func(context.Context, string, uint32) ([]string, error)) *MockAllStatementsListClaimedProjectIDsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListClaimedProjectIDsCall) DoAndReturn(f func(context.Context, string, uint32) ([]string, error)) *MockAllStatementsListClaimedProjectIDsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListEncryptionKeys mocks base method.
 func (m *MockAllStatements) ListEncryptionKeys(ctx context.Context, opts *database.ListOptions[domain.EncryptionKeyField]) (*database.ListResult[*domain.EncryptionKey], error) {
 	m.ctrl.T.Helper()
@@ -9214,6 +9253,45 @@ func (c *MockResourceScopeStatementsIsStatementsCall) Do(f func()) *MockResource
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockResourceScopeStatementsIsStatementsCall) DoAndReturn(f func()) *MockResourceScopeStatementsIsStatementsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListClaimedProjectIDs mocks base method.
+func (m *MockResourceScopeStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListClaimedProjectIDs", ctx, afterID, limit)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListClaimedProjectIDs indicates an expected call of ListClaimedProjectIDs.
+func (mr *MockResourceScopeStatementsMockRecorder) ListClaimedProjectIDs(ctx, afterID, limit any) *MockResourceScopeStatementsListClaimedProjectIDsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListClaimedProjectIDs", reflect.TypeOf((*MockResourceScopeStatements)(nil).ListClaimedProjectIDs), ctx, afterID, limit)
+	return &MockResourceScopeStatementsListClaimedProjectIDsCall{Call: call}
+}
+
+// MockResourceScopeStatementsListClaimedProjectIDsCall wrap *gomock.Call
+type MockResourceScopeStatementsListClaimedProjectIDsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockResourceScopeStatementsListClaimedProjectIDsCall) Return(arg0 []string, arg1 error) *MockResourceScopeStatementsListClaimedProjectIDsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockResourceScopeStatementsListClaimedProjectIDsCall) Do(f func(context.Context, string, uint32) ([]string, error)) *MockResourceScopeStatementsListClaimedProjectIDsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockResourceScopeStatementsListClaimedProjectIDsCall) DoAndReturn(f func(context.Context, string, uint32) ([]string, error)) *MockResourceScopeStatementsListClaimedProjectIDsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

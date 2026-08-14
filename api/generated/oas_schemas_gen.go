@@ -18411,6 +18411,47 @@ type ListEventsForbidden ErrorDetails
 
 func (*ListEventsForbidden) listEventsRes() {}
 
+type ListEventsOrder string
+
+const (
+	ListEventsOrderAsc  ListEventsOrder = "asc"
+	ListEventsOrderDesc ListEventsOrder = "desc"
+)
+
+// AllValues returns all ListEventsOrder values.
+func (ListEventsOrder) AllValues() []ListEventsOrder {
+	return []ListEventsOrder{
+		ListEventsOrderAsc,
+		ListEventsOrderDesc,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ListEventsOrder) MarshalText() ([]byte, error) {
+	switch s {
+	case ListEventsOrderAsc:
+		return []byte(s), nil
+	case ListEventsOrderDesc:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ListEventsOrder) UnmarshalText(data []byte) error {
+	switch ListEventsOrder(data) {
+	case ListEventsOrderAsc:
+		*s = ListEventsOrderAsc
+		return nil
+	case ListEventsOrderDesc:
+		*s = ListEventsOrderDesc
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Paginated list of events (ADR 027 / ADR 049).
 // Ref: #
 type ListEventsResponse struct {
@@ -23874,6 +23915,52 @@ func (o OptLimit) Get() (v Limit, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptLimit) Or(d Limit) Limit {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptListEventsOrder returns new OptListEventsOrder with value set to v.
+func NewOptListEventsOrder(v ListEventsOrder) OptListEventsOrder {
+	return OptListEventsOrder{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptListEventsOrder is optional ListEventsOrder.
+type OptListEventsOrder struct {
+	Value ListEventsOrder
+	Set   bool
+}
+
+// IsSet returns true if OptListEventsOrder was set.
+func (o OptListEventsOrder) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptListEventsOrder) Reset() {
+	var v ListEventsOrder
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptListEventsOrder) SetTo(v ListEventsOrder) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptListEventsOrder) Get() (v ListEventsOrder, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptListEventsOrder) Or(d ListEventsOrder) ListEventsOrder {
 	if v, ok := o.Get(); ok {
 		return v
 	}

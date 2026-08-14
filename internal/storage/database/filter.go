@@ -52,6 +52,7 @@ const (
 	OpEqual CompareOp = iota
 	OpGreater
 	OpLess
+	OpGreaterOrEqual
 )
 
 type CompareTerm[F ~uint8] struct {
@@ -95,6 +96,11 @@ func Equal[F ~uint8](column Column[F], value any) *CompareFilter[F] {
 // GreaterThan creates a single-column greater-than filter: "column > value".
 func GreaterThan[F ~uint8](column Column[F], value any) *CompareFilter[F] {
 	return Compare(OpGreater, Term(column, value))
+}
+
+// GreaterThanOrEqual creates a single-column inclusive lower-bound filter: "column >= value".
+func GreaterThanOrEqual[F ~uint8](column Column[F], value any) *CompareFilter[F] {
+	return Compare(OpGreaterOrEqual, Term(column, value))
 }
 
 // LessThan creates a single-column less-than filter: "column < value".

@@ -104,7 +104,7 @@ func (s *sessionService) Create(ctx context.Context, input CreateSessionInput) (
 		}
 		// CreateSession mints a session token; emit the peer when TokenID is set.
 		if session.TokenID != "" {
-			return emitAuthTokenIssued(ctx, tx.Statements(), session, []string{})
+			return emitAuthTokenIssued(ctx, tx.Statements(), session.ProjectID, session.TokenID, &session.ID, session.UserID, nil)
 		}
 		return nil
 	})
@@ -134,7 +134,7 @@ func (s *sessionService) Exchange(ctx context.Context, input ExchangeInput) (*do
 		}
 		if session.TokenID != "" {
 			// Session mint uses empty scopes today; pass through honestly.
-			if err := emitAuthTokenIssued(ctx, tx.Statements(), session, []string{}); err != nil {
+			if err := emitAuthTokenIssued(ctx, tx.Statements(), session.ProjectID, session.TokenID, &session.ID, session.UserID, nil); err != nil {
 				return err
 			}
 		}
@@ -280,8 +280,7 @@ func sessionStateFilter(op, state string, now time.Time) (database.Filter[domain
 	case sessionStateExpired:
 		return database.LessThan(expiresAt, now), nil
 	case sessionStateBuilding, sessionStateActive:
-		// todo (grvijayan): replace with a greater-or-equal compare once the filter layer supports it
-		unexpiredSessions := database.Or(database.GreaterThan(expiresAt, now), database.Equal(expiresAt, now))
+		unexpiredSessions := database.GreaterThanOrEqual(expiresAt, now)
 		hasVerifiedFactors := database.Col(domain.SessionFieldHasVerifiedFactors)
 		return database.And(unexpiredSessions, database.Equal(hasVerifiedFactors, state == sessionStateActive)), nil
 	default:
@@ -346,20 +345,19 @@ func emitSessionEstablished(ctx context.Context, stmts EventStatements, session 
 	})
 }
 
-func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, session *domain.Session, scopes []string) error {
-	sid := session.ID
+func emitAuthTokenIssued(ctx context.Context, stmts EventStatements, projectID, tokenID string, sessionID, userID *string, scopes []string) error {
 	spec := audit.EmitSpec{
 		Type:       domain.EventTypeAuthTokenIssued,
 		Category:   domain.EventCategoryAuth,
-		ProjectID:  session.ProjectID,
+		ProjectID:  projectID,
 		EntityType: "token",
-		EntityID:   session.TokenID,
-		TokenID:    session.TokenID,
-		SessionID:  &sid,
+		EntityID:   tokenID,
+		TokenID:    tokenID,
+		SessionID:  sessionID,
 		Payload:    domain.AuthTokenIssuedPayload{Scopes: scopes},
 	}
-	if session.UserID != nil {
-		spec.ActorID = session.UserID
+	if userID != nil && *userID != "" {
+		spec.ActorID = userID
 		actorType := domain.EventActorTypeHuman
 		spec.ActorType = &actorType
 	}

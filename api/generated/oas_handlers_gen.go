@@ -6291,8 +6291,9 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 
 // handleListEventsRequest handles listEvents operation.
 //
-// Returns project-scoped audit events, oldest-first by keyset on
-// `(created_at, id)` (ADR 027 / ADR 049). Requires `events.read`.
+// Returns project-scoped audit events, newest-first by keyset on
+// `(created_at, id)` (ADR 027 / ADR 049). Pass `order=asc` for oldest-first.
+// Requires `events.read`.
 // Pre-claim projects return an empty list (events are stored but not
 // visible until claim succeeds). Team-scoped credentials see only events
 // whose emit-time `team_id` matches the credential team (enforced when
@@ -6495,6 +6496,10 @@ func (s *Server) handleListEventsRequest(args [0]string, argsEscaped bool, w htt
 					Name: "created_before",
 					In:   "query",
 				}: params.CreatedBefore,
+				{
+					Name: "order",
+					In:   "query",
+				}: params.Order,
 				{
 					Name: "page_token",
 					In:   "query",

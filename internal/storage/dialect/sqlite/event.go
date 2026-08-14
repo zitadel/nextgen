@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -49,12 +50,14 @@ WHERE created_at < ?`
 	ensureEventSinkStmt = `
 INSERT INTO event_sinks (id, type, scope, project_id, url, enabled)
 VALUES (?, ?, ?, ?, ?, ?)
-ON CONFLICT(id) DO UPDATE SET
-    type = excluded.type,
-    scope = excluded.scope,
-    project_id = excluded.project_id,
-    url = excluded.url,
-    enabled = excluded.enabled`
+ON CONFLICT(type, scope, url) DO UPDATE SET
+    enabled = excluded.enabled,
+    project_id = excluded.project_id
+RETURNING id`
+
+	getEventSinkByNaturalKeyStmt = `
+SELECT id FROM event_sinks
+WHERE type = ? AND scope = ? AND url = ?`
 
 	getEventSinkCursorStmt = `
 SELECT sink_id, project_id, last_created_at, last_event_id
@@ -178,6 +181,16 @@ func (e eventStatements) DeleteEventsOlderThan(ctx context.Context, createdBefor
 
 // EnsureEventSink implements [service.EventStatements].
 func (e eventStatements) EnsureEventSink(ctx context.Context, sink *domain.EventSink) error {
+	url := sink.URL
+	var existing string
+	err := e.client.QueryRow(ctx, getEventSinkByNaturalKeyStmt, string(sink.Type), string(sink.Scope), url).Scan(&existing)
+	if err == nil {
+		sink.ID = existing
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return wrapError(err)
+	}
 	if sink.ID == "" {
 		if err := ensureManagedID(&sink.ID, domain.PrefixEventSink); err != nil {
 			return err
@@ -187,9 +200,9 @@ func (e eventStatements) EnsureEventSink(ctx context.Context, sink *domain.Event
 	if sink.Enabled {
 		enabled = 1
 	}
-	_, err := e.client.Exec(ctx, ensureEventSinkStmt,
-		sink.ID, string(sink.Type), string(sink.Scope), nullString(sink.ProjectID), sink.URL, enabled,
-	)
+	err = e.client.QueryRow(ctx, ensureEventSinkStmt,
+		sink.ID, string(sink.Type), string(sink.Scope), nullString(sink.ProjectID), url, enabled,
+	).Scan(&sink.ID)
 	return wrapError(err)
 }
 
@@ -202,6 +215,9 @@ func (e eventStatements) GetEventSinkCursor(ctx context.Context, sinkID, project
 	err := e.client.QueryRow(ctx, getEventSinkCursorStmt, sinkID, projectID).Scan(
 		&c.SinkID, &c.ProjectID, &lastCreated, &c.LastEventID,
 	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, wrapError(err)
 	}

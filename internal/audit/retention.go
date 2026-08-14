@@ -3,6 +3,7 @@ package audit
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 )
 
@@ -14,9 +15,9 @@ type EventPurger interface {
 
 // RetentionConfig controls time-only event purge (ADR 049).
 type RetentionConfig struct {
-	Retention time.Duration // default 30 days
-	Interval  time.Duration // how often to run
-	Enabled   bool
+	Retention time.Duration `mapstructure:"window"`
+	Interval  time.Duration `mapstructure:"interval"`
+	Enabled   bool          `mapstructure:"enabled"`
 }
 
 func DefaultRetentionConfig() RetentionConfig {
@@ -27,23 +28,32 @@ func DefaultRetentionConfig() RetentionConfig {
 	}
 }
 
+func applyRetentionDefaults(cfg RetentionConfig) RetentionConfig {
+	def := DefaultRetentionConfig()
+	if cfg.Retention <= 0 {
+		cfg.Retention = def.Retention
+	}
+	if cfg.Interval <= 0 {
+		cfg.Interval = def.Interval
+	}
+	return cfg
+}
+
+const retentionCloseTimeout = 5 * time.Second
+
 // RetentionJob periodically deletes events older than the retention window.
 type RetentionJob struct {
-	cfg   RetentionConfig
-	purge EventPurger
-	stop  chan struct{}
-	done  chan struct{}
+	cfg       RetentionConfig
+	purge     EventPurger
+	stop      chan struct{}
+	done      chan struct{}
+	runMu     sync.Mutex
+	runCancel context.CancelFunc
 }
 
 func NewRetentionJob(purge EventPurger, cfg RetentionConfig) *RetentionJob {
-	if cfg.Retention <= 0 {
-		cfg.Retention = 30 * 24 * time.Hour
-	}
-	if cfg.Interval <= 0 {
-		cfg.Interval = time.Hour
-	}
 	return &RetentionJob{
-		cfg:   cfg,
+		cfg:   applyRetentionDefaults(cfg),
 		purge: purge,
 		stop:  make(chan struct{}),
 		done:  make(chan struct{}),
@@ -75,7 +85,16 @@ func (j *RetentionJob) loop() {
 
 func (j *RetentionJob) runOnce() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
+	j.runMu.Lock()
+	j.runCancel = cancel
+	j.runMu.Unlock()
+	defer func() {
+		cancel()
+		j.runMu.Lock()
+		j.runCancel = nil
+		j.runMu.Unlock()
+	}()
+
 	cutoff := time.Now().UTC().Add(-j.cfg.Retention)
 	n, err := j.purge.DeleteEventsOlderThan(ctx, cutoff)
 	if err != nil {
@@ -93,5 +112,14 @@ func (j *RetentionJob) Close() {
 	default:
 		close(j.stop)
 	}
-	<-j.done
+	j.runMu.Lock()
+	if j.runCancel != nil {
+		j.runCancel()
+	}
+	j.runMu.Unlock()
+	select {
+	case <-j.done:
+	case <-time.After(retentionCloseTimeout):
+		slog.Warn("event retention: shutdown timed out")
+	}
 }

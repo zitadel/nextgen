@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation"
@@ -26,17 +27,8 @@ type Config struct {
 
 // EventsConfig configures audit event retention and deployment export sinks.
 type EventsConfig struct {
-	RetentionDays  int               `mapstructure:"retention_days"`
-	RetentionEvery time.Duration     `mapstructure:"retention_interval"`
-	ExportEnabled  bool              `mapstructure:"export_enabled"`
-	ExportEvery    time.Duration     `mapstructure:"export_interval"`
-	Sinks          []EventSinkConfig `mapstructure:"sinks"`
-}
-
-type EventSinkConfig struct {
-	Type    string `mapstructure:"type"`
-	URL     string `mapstructure:"url"`
-	Enabled bool   `mapstructure:"enabled"`
+	Retention audit.RetentionConfig `mapstructure:"retention"`
+	Export    audit.ExportConfig    `mapstructure:"export"`
 }
 
 // PlatformConfig configures the deployment's default project resolution

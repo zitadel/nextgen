@@ -15,8 +15,6 @@ type RequestBufferConfig struct {
 	BatchSize       int
 	MaxAge          time.Duration
 	Capacity        int
-	HighWatermark   float64
-	FlushInterval   time.Duration
 	ShutdownTimeout time.Duration
 }
 
@@ -25,10 +23,25 @@ func DefaultRequestBufferConfig() RequestBufferConfig {
 		BatchSize:       100,
 		MaxAge:          time.Second,
 		Capacity:        2000,
-		HighWatermark:   0.8,
-		FlushInterval:   100 * time.Millisecond,
 		ShutdownTimeout: 5 * time.Second,
 	}
+}
+
+func applyRequestBufferDefaults(cfg RequestBufferConfig) RequestBufferConfig {
+	def := DefaultRequestBufferConfig()
+	if cfg.BatchSize <= 0 {
+		cfg.BatchSize = def.BatchSize
+	}
+	if cfg.Capacity <= 0 {
+		cfg.Capacity = def.Capacity
+	}
+	if cfg.MaxAge <= 0 {
+		cfg.MaxAge = def.MaxAge
+	}
+	if cfg.ShutdownTimeout <= 0 {
+		cfg.ShutdownTimeout = def.ShutdownTimeout
+	}
+	return cfg
 }
 
 type bufferedEvent struct {
@@ -36,8 +49,9 @@ type bufferedEvent struct {
 	enqueuedAt time.Time
 }
 
-// RequestBuffer is an in-process Path A queue with N/T/watermark flush.
-// A single background flusher owns all inserts (no per-enqueue goroutines).
+// RequestBuffer is an in-process Path A queue. Flush when the buffer holds at
+// least BatchSize events (a prefix of that many) or the oldest event exceeds
+// MaxAge. A single background flusher owns all inserts.
 type RequestBuffer struct {
 	cfg     RequestBufferConfig
 	insert  EventBatchInserter
@@ -52,21 +66,7 @@ type RequestBuffer struct {
 
 // NewRequestBuffer starts a background flusher. Call Close on shutdown.
 func NewRequestBuffer(insert EventBatchInserter, cfg RequestBufferConfig) *RequestBuffer {
-	if cfg.BatchSize <= 0 {
-		cfg.BatchSize = 100
-	}
-	if cfg.Capacity <= 0 {
-		cfg.Capacity = 2000
-	}
-	if cfg.HighWatermark < 0 || cfg.HighWatermark > 1 {
-		cfg.HighWatermark = 0.8
-	}
-	if cfg.MaxAge <= 0 {
-		cfg.MaxAge = time.Second
-	}
-	if cfg.FlushInterval <= 0 {
-		cfg.FlushInterval = 100 * time.Millisecond
-	}
+	cfg = applyRequestBufferDefaults(cfg)
 	b := &RequestBuffer{
 		cfg:    cfg,
 		insert: insert,
@@ -117,12 +117,20 @@ func (b *RequestBuffer) shouldFlushLocked() bool {
 	if n >= b.cfg.BatchSize {
 		return true
 	}
-	watermark := int(float64(b.cfg.Capacity) * b.cfg.HighWatermark)
-	if watermark > 0 && n >= watermark {
-		return true
+	return time.Since(b.buf[0].enqueuedAt) >= b.cfg.MaxAge
+}
+
+func (b *RequestBuffer) takeReadyLocked() []bufferedEvent {
+	if !b.shouldFlushLocked() {
+		return nil
 	}
-	oldest := b.buf[0].enqueuedAt
-	return time.Since(oldest) >= b.cfg.MaxAge
+	take := len(b.buf)
+	if take > b.cfg.BatchSize {
+		take = b.cfg.BatchSize
+	}
+	batch := append([]bufferedEvent(nil), b.buf[:take]...)
+	b.buf = append([]bufferedEvent(nil), b.buf[take:]...)
+	return batch
 }
 
 func (b *RequestBuffer) takeAllLocked() []bufferedEvent {
@@ -136,7 +144,7 @@ func (b *RequestBuffer) takeAllLocked() []bufferedEvent {
 
 func (b *RequestBuffer) loop() {
 	defer close(b.done)
-	ticker := time.NewTicker(b.cfg.FlushInterval)
+	ticker := time.NewTicker(b.cfg.MaxAge)
 	defer ticker.Stop()
 	for {
 		select {
@@ -155,13 +163,15 @@ func (b *RequestBuffer) loop() {
 }
 
 func (b *RequestBuffer) flushReady() {
-	b.mu.Lock()
-	var batch []bufferedEvent
-	if b.shouldFlushLocked() {
-		batch = b.takeAllLocked()
+	for {
+		b.mu.Lock()
+		batch := b.takeReadyLocked()
+		b.mu.Unlock()
+		if len(batch) == 0 {
+			return
+		}
+		b.flush(batch)
 	}
-	b.mu.Unlock()
-	b.flush(batch)
 }
 
 func (b *RequestBuffer) flush(batch []bufferedEvent) {
@@ -211,7 +221,7 @@ func (b *RequestBuffer) Close() {
 	}
 	timeout := b.cfg.ShutdownTimeout
 	if timeout <= 0 {
-		timeout = 5 * time.Second
+		timeout = DefaultRequestBufferConfig().ShutdownTimeout
 	}
 	select {
 	case <-b.done:

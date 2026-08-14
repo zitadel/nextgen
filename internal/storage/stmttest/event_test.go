@@ -194,16 +194,17 @@ func TestEventStatements_SinkCursor(t *testing.T) {
 		ensureEventProject(t, d.stmts, projectID)
 
 		sink := &domain.EventSink{
-			ID:      "sink_test_" + uniqueSuffix(t),
-			Type:    domain.EventSinkTypeStdout,
+			Type:    domain.EventSinkTypeWebhook,
 			Scope:   domain.EventSinkScopeDeployment,
+			URL:     "https://example.invalid/sink-" + uniqueSuffix(t),
 			Enabled: true,
 		}
 		require.NoError(t, d.stmts.EnsureEventSink(t.Context(), sink))
+		require.NotEmpty(t, sink.ID)
 
-		_, err := d.stmts.GetEventSinkCursor(t.Context(), sink.ID, projectID)
-		require.Error(t, err)
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		cursor, err := d.stmts.GetEventSinkCursor(t.Context(), sink.ID, projectID)
+		require.NoError(t, err)
+		assert.Nil(t, cursor)
 
 		first := sampleEvent(projectID, "evt-cursor-001")
 		require.NoError(t, d.stmts.InsertEvent(t.Context(), first))
@@ -241,6 +242,29 @@ func TestEventStatements_SinkCursor(t *testing.T) {
 		got, err = d.stmts.GetEventSinkCursor(t.Context(), sink.ID, projectID)
 		require.NoError(t, err)
 		assert.Equal(t, second.ID, got.LastEventID)
+	})
+}
+
+func TestEventStatements_EnsureSinkNaturalKey(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		url := "https://example.invalid/reuse-" + uniqueSuffix(t)
+		first := &domain.EventSink{
+			Type:    domain.EventSinkTypeWebhook,
+			Scope:   domain.EventSinkScopeDeployment,
+			URL:     url,
+			Enabled: true,
+		}
+		require.NoError(t, d.stmts.EnsureEventSink(t.Context(), first))
+		require.True(t, domain.PrefixEventSink.Matches(first.ID))
+
+		second := &domain.EventSink{
+			Type:    domain.EventSinkTypeWebhook,
+			Scope:   domain.EventSinkScopeDeployment,
+			URL:     url,
+			Enabled: true,
+		}
+		require.NoError(t, d.stmts.EnsureEventSink(t.Context(), second))
+		assert.Equal(t, first.ID, second.ID)
 	})
 }
 

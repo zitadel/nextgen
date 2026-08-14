@@ -429,8 +429,9 @@ func (UnimplementedHandler) ListBranding(ctx context.Context, params ListBrandin
 
 // ListEvents implements listEvents operation.
 //
-// Returns project-scoped audit events, oldest-first by keyset on
-// `(created_at, id)` (ADR 027 / ADR 049). Requires `events.read`.
+// Returns project-scoped audit events, newest-first by keyset on
+// `(created_at, id)` (ADR 027 / ADR 049). Pass `order=asc` for oldest-first.
+// Requires `events.read`.
 // Pre-claim projects return an empty list (events are stored but not
 // visible until claim succeeds). Team-scoped credentials see only events
 // whose emit-time `team_id` matches the credential team (enforced when

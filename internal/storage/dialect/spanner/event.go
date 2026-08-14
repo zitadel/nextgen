@@ -2,6 +2,7 @@ package spanner
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -33,12 +34,14 @@ WHERE created_at < @p1`
 	ensureEventSinkStmt = `
 INSERT INTO event_sinks (id, type, scope, project_id, url, enabled)
 VALUES (@p1, @p2, @p3, @p4, @p5, @p6)
-ON CONFLICT (id) DO UPDATE SET
-    type = EXCLUDED.type,
-    scope = EXCLUDED.scope,
-    project_id = EXCLUDED.project_id,
-    url = EXCLUDED.url,
-    enabled = EXCLUDED.enabled`
+ON CONFLICT (type, scope, url) DO UPDATE SET
+    enabled = EXCLUDED.enabled,
+    project_id = EXCLUDED.project_id
+THEN RETURN id`
+
+	getEventSinkByNaturalKeyStmt = `
+SELECT id FROM event_sinks
+WHERE type = @p1 AND scope = @p2 AND url = @p3`
 
 	getEventSinkCursorStmt = `
 SELECT sink_id, project_id, last_created_at, last_event_id
@@ -186,15 +189,52 @@ func (e eventStatements) DeleteEventsOlderThan(ctx context.Context, createdBefor
 
 // EnsureEventSink implements [service.EventStatements].
 func (e eventStatements) EnsureEventSink(ctx context.Context, sink *domain.EventSink) error {
+	url := sink.URL
+	var existing string
+	err := e.db.Query(ctx, buildStatement(getEventSinkByNaturalKeyStmt, string(sink.Type), string(sink.Scope), url).statement(), func(iter *spanner.RowIterator) error {
+		id, err := collectOneRow(iter, func(row *spanner.Row) (string, error) {
+			var id string
+			if err := row.Columns(&id); err != nil {
+				return "", err
+			}
+			return id, nil
+		})
+		if err != nil {
+			return err
+		}
+		existing = id
+		return nil
+	})
+	if err == nil && existing != "" {
+		sink.ID = existing
+		return nil
+	}
+	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+			return err
+		}
+	}
 	if sink.ID == "" {
 		if err := ensureManagedID(&sink.ID, domain.PrefixEventSink); err != nil {
 			return err
 		}
 	}
-	_, err := e.db.Update(ctx, buildStatement(ensureEventSinkStmt,
-		sink.ID, string(sink.Type), string(sink.Scope), nullString(sink.ProjectID), sink.URL, sink.Enabled,
-	).statement())
-	return err
+	return e.db.Write(ctx, buildStatement(ensureEventSinkStmt,
+		sink.ID, string(sink.Type), string(sink.Scope), nullString(sink.ProjectID), url, sink.Enabled,
+	).statement(), func(iter *spanner.RowIterator) error {
+		id, err := collectOneRow(iter, func(row *spanner.Row) (string, error) {
+			var id string
+			if err := row.Columns(&id); err != nil {
+				return "", err
+			}
+			return id, nil
+		})
+		if err != nil {
+			return err
+		}
+		sink.ID = id
+		return nil
+	})
 }
 
 // GetEventSinkCursor implements [service.EventStatements].
@@ -213,6 +253,9 @@ func (e eventStatements) GetEventSinkCursor(ctx context.Context, sinkID, project
 		return err
 	})
 	if err != nil {
+		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return cursor, nil

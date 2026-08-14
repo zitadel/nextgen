@@ -47,7 +47,7 @@ func (s *tokenService) GenerateJWE(ctx context.Context, data *domain.Token) (str
 		if err := tx.Statements().CreateToken(ctx, data); err != nil {
 			return err
 		}
-		return emitAuthTokenIssuedFromToken(ctx, tx.Statements(), data)
+		return emitAuthTokenIssued(ctx, tx.Statements(), data.ProjectID, data.TokenID, data.SessionID, tokenUserID(data), data.Scope)
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {
@@ -126,24 +126,12 @@ func (s *tokenService) RevokeToken(ctx context.Context, projectID, tokenID strin
 	return nil
 }
 
-func emitAuthTokenIssuedFromToken(ctx context.Context, stmts EventStatements, tok *domain.Token) error {
-	spec := audit.EmitSpec{
-		Type:       domain.EventTypeAuthTokenIssued,
-		Category:   domain.EventCategoryAuth,
-		ProjectID:  tok.ProjectID,
-		EntityType: "token",
-		EntityID:   tok.TokenID,
-		TokenID:    tok.TokenID,
-		SessionID:  tok.SessionID,
-		Payload:    domain.AuthTokenIssuedPayload{Scopes: tok.Scope},
+func tokenUserID(tok *domain.Token) *string {
+	if tok.UserID == "" {
+		return nil
 	}
-	if tok.UserID != "" {
-		uid := tok.UserID
-		spec.ActorID = &uid
-		actorType := domain.EventActorTypeHuman
-		spec.ActorType = &actorType
-	}
-	return audit.Emit(ctx, stmts, spec)
+	uid := tok.UserID
+	return &uid
 }
 
 func (s *tokenService) IntrospectToken(ctx context.Context, token string) (*domain.Token, error) {

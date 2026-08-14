@@ -5,9 +5,10 @@ CREATE TABLE event_sinks (
     type        TEXT NOT NULL,
     scope       TEXT NOT NULL,
     project_id  TEXT,
-    url         TEXT,
+    url         TEXT NOT NULL DEFAULT '',
     enabled     INTEGER NOT NULL DEFAULT 1,
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    UNIQUE (type, scope, url)
 );
 -- +goose StatementEnd
 

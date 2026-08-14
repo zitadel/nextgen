@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -51,12 +52,14 @@ WHERE created_at < $1`
 	ensureEventSinkStmt = `
 INSERT INTO zitadel_nextgen.event_sinks (id, type, scope, project_id, url, enabled)
 VALUES ($1, $2, $3, $4, $5, $6)
-ON CONFLICT (id) DO UPDATE SET
-    type = EXCLUDED.type,
-    scope = EXCLUDED.scope,
-    project_id = EXCLUDED.project_id,
-    url = EXCLUDED.url,
-    enabled = EXCLUDED.enabled`
+ON CONFLICT (type, scope, url) DO UPDATE SET
+    enabled = EXCLUDED.enabled,
+    project_id = EXCLUDED.project_id
+RETURNING id`
+
+	getEventSinkByNaturalKeyStmt = `
+SELECT id FROM zitadel_nextgen.event_sinks
+WHERE type = $1 AND scope = $2 AND url = $3`
 
 	getEventSinkCursorStmt = `
 SELECT sink_id, project_id, last_created_at, last_event_id
@@ -175,14 +178,24 @@ func (e eventStatements) DeleteEventsOlderThan(ctx context.Context, createdBefor
 
 // EnsureEventSink implements [service.EventStatements].
 func (e eventStatements) EnsureEventSink(ctx context.Context, sink *domain.EventSink) error {
+	url := sink.URL
+	var existing string
+	err := e.client.QueryRow(ctx, getEventSinkByNaturalKeyStmt, string(sink.Type), string(sink.Scope), url).Scan(&existing)
+	if err == nil {
+		sink.ID = existing
+		return nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return wrapError(err)
+	}
 	if sink.ID == "" {
 		if err := ensureManagedID(&sink.ID, domain.PrefixEventSink); err != nil {
 			return err
 		}
 	}
-	_, err := e.client.Exec(ctx, ensureEventSinkStmt,
-		sink.ID, string(sink.Type), string(sink.Scope), nullString(sink.ProjectID), sink.URL, sink.Enabled,
-	)
+	err = e.client.QueryRow(ctx, ensureEventSinkStmt,
+		sink.ID, string(sink.Type), string(sink.Scope), nullString(sink.ProjectID), url, sink.Enabled,
+	).Scan(&sink.ID)
 	return wrapError(err)
 }
 
@@ -192,6 +205,9 @@ func (e eventStatements) GetEventSinkCursor(ctx context.Context, sinkID, project
 	err := e.client.QueryRow(ctx, getEventSinkCursorStmt, sinkID, projectID).Scan(
 		&c.SinkID, &c.ProjectID, &c.LastCreatedAt, &c.LastEventID,
 	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, wrapError(err)
 	}

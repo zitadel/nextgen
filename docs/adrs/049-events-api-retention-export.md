@@ -41,6 +41,7 @@ GET /events?project_id=…
          &team_id=…
          &created_after=…
          &created_before=…
+         &order=desc
          &page_token=…
 
 GET /events/{id}?project_id=…   # project scope required (see below)
@@ -64,6 +65,7 @@ GET /events/{id}?project_id=…   # project scope required (see below)
 | `team_id` | string | Filter by emit-time team scope |
 | `created_after` | RFC 3339 timestamp | Inclusive lower bound on **`created_at`** |
 | `created_before` | RFC 3339 timestamp | Exclusive upper bound on **`created_at`** |
+| `order` | `asc` \| `desc` | Keyset direction on `(created_at, id)`. Default **`desc`** (newest first) |
 | `page_token` | opaque string | [ADR 027](027-cursor-based-pagination.md) cursor |
 
 `created_after` / `created_before` filter insert time. ADR 048 recommends
@@ -231,9 +233,10 @@ CREATE TABLE zitadel_nextgen.event_sinks (
     , type            TEXT        NOT NULL   -- 'stdout' | 'webhook'
     , scope           TEXT        NOT NULL   -- 'deployment' | 'project'
     , project_id      TEXT                  -- NULL for deployment-scoped; set for project-scoped
-    , url             TEXT                  -- required for type=webhook
+    , url             TEXT        NOT NULL DEFAULT ''  -- required for type=webhook
     , enabled         BOOLEAN     NOT NULL DEFAULT TRUE
     , PRIMARY KEY (id)
+    , UNIQUE (type, scope, url)    -- find-or-create natural key (ADR 047 mint on insert)
 );
 ```
 
@@ -366,10 +369,11 @@ Per [ADR 046](046-claim-lifecycle-v2.md) and
 - **Webhook reliability:** at-least-once delivery requires consumer idempotency;
   document clearly. Head-of-line blocking means one poison event stalls that
   `(sink, project)` until retention drops it or ops intervenes.
-- **Deployment sink identity:** v1 mints deployment sink ids as a stable hash of
-  `(type, url)`. Changing a webhook URL re-keys the sink and re-ships retained
-  history from epoch for that new id. Sinks removed from config leave their
-  `event_sinks` row and cursors behind (no auto-disable in v1).
+- **Deployment sink identity:** v1 mints deployment sink ids through dialect
+  `Ensure` on first insert (ADR 047). Identity is the natural unique key
+  `(type, scope, url)`. Changing a webhook URL starts a new sink and re-ships
+  retained history from epoch for that new id; the previous `event_sinks` row
+  and cursors stay behind (no auto-disable in v1).
 - **Deleted-project export gap:** `events.project_id` is not a live FK, so audit
   rows survive hard delete, but the shipper only walks claimed live projects —
   post-delete history is not re-exported in v1 (retention still purges by age).

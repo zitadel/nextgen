@@ -237,44 +237,15 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	requestEventBuf := audit.NewRequestBuffer(audit.BatchInserter(func(ctx context.Context, events []*domain.Event) error {
-		return serviceDBPool.Transaction(ctx, func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
-			stmts := tx.Statements()
-			for _, ev := range events {
-				if err := stmts.InsertEvent(ctx, ev); err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-	}), audit.DefaultRequestBufferConfig())
+	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool}
+	requestEventBuf := audit.NewRequestBuffer(exportAdapter, audit.DefaultRequestBufferConfig())
 	defer requestEventBuf.Close()
 
-	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool}
-	retentionCfg := audit.DefaultRetentionConfig()
-	if cfg.Events.RetentionDays > 0 {
-		retentionCfg.Retention = time.Duration(cfg.Events.RetentionDays) * 24 * time.Hour
-	}
-	if cfg.Events.RetentionEvery > 0 {
-		retentionCfg.Interval = cfg.Events.RetentionEvery
-	}
-	retentionJob := audit.NewRetentionJob(exportAdapter, retentionCfg)
+	retentionJob := audit.NewRetentionJob(exportAdapter, cfg.Events.Retention)
 	retentionJob.Start()
 	defer retentionJob.Close()
 
-	exportCfg := audit.DefaultExportConfig()
-	exportCfg.Enabled = cfg.Events.ExportEnabled
-	if cfg.Events.ExportEvery > 0 {
-		exportCfg.Interval = cfg.Events.ExportEvery
-	}
-	for _, sc := range cfg.Events.Sinks {
-		exportCfg.Sinks = append(exportCfg.Sinks, audit.SinkConfig{
-			Type:    domain.EventSinkType(sc.Type),
-			URL:     sc.URL,
-			Enabled: sc.Enabled,
-		})
-	}
-	shipper := audit.NewShipper(exportAdapter, exportCfg)
+	shipper := audit.NewShipper(exportAdapter, cfg.Events.Export)
 	if err := shipper.Start(ctx); err != nil {
 		return fmt.Errorf("start event shipper: %w", err)
 	}
@@ -417,10 +388,11 @@ func loadConfig(configPath string) (Config, error) {
 	// unless platform.bootstrap_project explicitly opts in (#605).
 	v.SetDefault("platform.project_id", "")
 	v.SetDefault("platform.bootstrap_project", false)
-	v.SetDefault("events.retention_days", 30)
-	v.SetDefault("events.retention_interval", time.Hour)
-	v.SetDefault("events.export_enabled", false)
-	v.SetDefault("events.export_interval", 5*time.Second)
+	v.SetDefault("events.retention.window", 30*24*time.Hour)
+	v.SetDefault("events.retention.interval", time.Hour)
+	v.SetDefault("events.retention.enabled", true)
+	v.SetDefault("events.export.enabled", false)
+	v.SetDefault("events.export.interval", 5*time.Second)
 	v.SetDefault("instrumentation.service_name", "Zitadel")
 	v.SetDefault("instrumentation.log.level", zlog.LevelInfo)
 	v.SetDefault("instrumentation.log.streams", []zlog.Stream{

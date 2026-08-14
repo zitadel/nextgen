@@ -4,9 +4,10 @@ CREATE TABLE zitadel_nextgen.event_sinks (
     , type      TEXT    NOT NULL
     , scope     TEXT    NOT NULL
     , project_id TEXT
-    , url       TEXT
+    , url       TEXT    NOT NULL DEFAULT ''
     , enabled   BOOLEAN NOT NULL DEFAULT TRUE
     , PRIMARY KEY (id)
+    , UNIQUE (type, scope, url)
 );
 
 CREATE TABLE zitadel_nextgen.event_sink_cursors (

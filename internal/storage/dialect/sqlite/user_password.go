@@ -23,7 +23,8 @@ ON CONFLICT (project_id, user_id) DO UPDATE SET
 	changed_at = EXCLUDED.changed_at,
 	failed_attempts = 0,
 	last_successful_check = NULL,
-	updated_at = EXCLUDED.updated_at`
+	updated_at = EXCLUDED.updated_at
+RETURNING id`
 
 	userPasswordQuery = `SELECT id, project_id, user_id, encoded_hash, change_required,
 	changed_at, verification_id, last_successful_check, failed_attempts, created_at, updated_at
@@ -42,7 +43,7 @@ func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain
 		return err
 	}
 	now := nowUnixNano()
-	_, err := ps.client.Exec(ctx, setUserPasswordStmt,
+	err := ps.client.QueryRow(ctx, setUserPasswordStmt,
 		pw.ProjectID,
 		pw.ID,
 		pw.UserID,
@@ -52,19 +53,8 @@ func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain
 		now,
 		now,
 		now,
-	)
-	if err != nil {
-		return wrapError(err)
-	}
-	got, err := ps.GetUserPassword(ctx, database.And(
-		database.Equal(database.Col(domain.UserPasswordFieldProjectID), pw.ProjectID),
-		database.Equal(database.Col(domain.UserPasswordFieldUserID), pw.UserID),
-	))
-	if err != nil {
-		return err
-	}
-	pw.ID = got.ID
-	return nil
+	).Scan(&pw.ID)
+	return wrapError(err)
 }
 
 // GetUserPassword implements [service.UserPasswordStatements].

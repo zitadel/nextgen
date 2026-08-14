@@ -3828,6 +3828,17 @@ func (s ListEventsCategoryItem) Validate() error {
 	}
 }
 
+func (s ListEventsOrder) Validate() error {
+	switch s {
+	case "asc":
+		return nil
+	case "desc":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *ListEventsResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer

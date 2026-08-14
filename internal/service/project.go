@@ -254,7 +254,7 @@ func emitFlowdefCreated(ctx context.Context, stmts EventStatements, flowDef *dom
 		ProjectID:  flowDef.ProjectID,
 		EntityType: "flow_definition",
 		EntityID:   flowDef.ID,
-		Payload:    flowdefPayloadSnapshot(flowDef),
+		Payload:    domain.FlowdefPayloadSnapshot(flowDef),
 	})
 }
 

@@ -3,9 +3,6 @@ package audit
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -14,15 +11,23 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/events"
 )
 
 // SinkConfig is a deployment-configured event sink (no project CRUD in v1).
 type SinkConfig struct {
-	Type    domain.EventSinkType `mapstructure:"type"`
-	URL     string               `mapstructure:"url"`
-	Enabled bool                 `mapstructure:"enabled"`
+	Type domain.EventSinkType `mapstructure:"type"`
+	URL  string               `mapstructure:"url"`
+	// Enabled is opt-out: a configured sink (non-empty type) ships unless this
+	// is explicitly false.
+	Enabled *bool `mapstructure:"enabled"`
+}
+
+func sinkEnabled(sc SinkConfig) bool {
+	if sc.Enabled == nil {
+		return true
+	}
+	return *sc.Enabled
 }
 
 // ExportConfig holds deployment-scoped sinks and shipper tuning.
@@ -49,6 +54,12 @@ type EventExportSource interface {
 	ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit int) ([]*domain.Event, error)
 }
 
+const (
+	shipListTimeout    = 30 * time.Second
+	shipProjectTimeout = 30 * time.Second
+	shipPageSize       = 100
+)
+
 // Shipper delivers events to deployment-configured sinks (ADR 049).
 type Shipper struct {
 	cfg    ExportConfig
@@ -61,7 +72,7 @@ type Shipper struct {
 
 func NewShipper(src EventExportSource, cfg ExportConfig) *Shipper {
 	if cfg.Interval <= 0 {
-		cfg.Interval = 5 * time.Second
+		cfg.Interval = DefaultExportConfig().Interval
 	}
 	return &Shipper{
 		cfg:    cfg,
@@ -84,17 +95,20 @@ func (s *Shipper) Start(ctx context.Context) error {
 		switch sc.Type {
 		case domain.EventSinkTypeStdout, domain.EventSinkTypeWebhook:
 		default:
+			close(s.done)
 			return fmt.Errorf("unsupported event sink type %q", sc.Type)
 		}
-		// v1 always enables configured sink types (Enabled flag is reserved).
+		if !sinkEnabled(sc) {
+			continue
+		}
 		sink := &domain.EventSink{
-			ID:      deploymentSinkID(sc.Type, sc.URL),
 			Type:    sc.Type,
 			Scope:   domain.EventSinkScopeDeployment,
 			URL:     sc.URL,
 			Enabled: true,
 		}
 		if err := s.src.EnsureSink(ctx, sink); err != nil {
+			close(s.done)
 			return err
 		}
 		s.sinks = append(s.sinks, sink)
@@ -118,9 +132,9 @@ func (s *Shipper) loop() {
 }
 
 func (s *Shipper) shipOnce() {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), shipListTimeout)
 	projects, err := s.src.ListClaimedProjectIDs(ctx)
+	cancel()
 	if err != nil {
 		slog.Error("event shipper: list claimed projects failed",
 			slog.String("error", err.Error()),
@@ -129,34 +143,36 @@ func (s *Shipper) shipOnce() {
 	}
 	for _, sink := range s.sinks {
 		for _, projectID := range projects {
-			s.shipProject(ctx, sink, projectID)
+			s.shipProject(sink, projectID)
 		}
 	}
 }
 
-func (s *Shipper) shipProject(ctx context.Context, sink *domain.EventSink, projectID string) {
+func (s *Shipper) shipProject(sink *domain.EventSink, projectID string) {
+	ctx, cancel := context.WithTimeout(context.Background(), shipProjectTimeout)
+	defer cancel()
+
 	cursor, err := s.src.GetEventSinkCursor(ctx, sink.ID, projectID)
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-			slog.Error("event shipper: get cursor failed",
-				slog.String("sink_id", sink.ID),
-				slog.String("project_id", projectID),
-				slog.String("error", err.Error()),
-			)
-			return
-		}
+		slog.Error("event shipper: get cursor failed",
+			slog.String("sink_id", sink.ID),
+			slog.String("project_id", projectID),
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+	if cursor == nil {
 		cursor = &domain.EventSinkCursor{
 			SinkID:    sink.ID,
 			ProjectID: projectID,
 		}
 	}
 
-	const pageSize = 100
 	for {
 		if err := ctx.Err(); err != nil {
 			return
 		}
-		batch, err := s.src.ListEventsAfterCursor(ctx, projectID, cursor.LastCreatedAt, cursor.LastEventID, pageSize)
+		batch, err := s.src.ListEventsAfterCursor(ctx, projectID, cursor.LastCreatedAt, cursor.LastEventID, shipPageSize)
 		if err != nil {
 			slog.Error("event shipper: list after cursor failed",
 				slog.String("sink_id", sink.ID),
@@ -168,6 +184,7 @@ func (s *Shipper) shipProject(ctx context.Context, sink *domain.EventSink, proje
 		if len(batch) == 0 {
 			return
 		}
+		var last *domain.Event
 		for _, ev := range batch {
 			if err := s.deliver(ctx, sink, ev); err != nil {
 				slog.Error("event shipper: deliver failed",
@@ -176,24 +193,36 @@ func (s *Shipper) shipProject(ctx context.Context, sink *domain.EventSink, proje
 					slog.String("event_id", ev.ID),
 					slog.String("error", err.Error()),
 				)
+				s.upsertCursor(ctx, sink.ID, projectID, cursor, last)
 				return
 			}
 			cursor.LastCreatedAt = ev.CreatedAt
 			cursor.LastEventID = ev.ID
-			if err := s.src.UpsertEventSinkCursor(ctx, cursor); err != nil {
-				slog.Error("event shipper: upsert cursor failed",
-					slog.String("sink_id", sink.ID),
-					slog.String("project_id", projectID),
-					slog.String("event_id", ev.ID),
-					slog.String("error", err.Error()),
-				)
-				return
-			}
+			last = ev
 		}
-		if len(batch) < pageSize {
+		if !s.upsertCursor(ctx, sink.ID, projectID, cursor, last) {
+			return
+		}
+		if len(batch) < shipPageSize {
 			return
 		}
 	}
+}
+
+func (s *Shipper) upsertCursor(ctx context.Context, sinkID, projectID string, cursor *domain.EventSinkCursor, last *domain.Event) bool {
+	if last == nil {
+		return true
+	}
+	if err := s.src.UpsertEventSinkCursor(ctx, cursor); err != nil {
+		slog.Error("event shipper: upsert cursor failed",
+			slog.String("sink_id", sinkID),
+			slog.String("project_id", projectID),
+			slog.String("event_id", last.ID),
+			slog.String("error", err.Error()),
+		)
+		return false
+	}
+	return true
 }
 
 func (s *Shipper) deliver(ctx context.Context, sink *domain.EventSink, ev *domain.Event) error {
@@ -237,12 +266,4 @@ func (s *Shipper) Close() {
 		close(s.stop)
 	}
 	<-s.done
-}
-
-func deploymentSinkID(sinkType domain.EventSinkType, url string) string {
-	if sinkType == domain.EventSinkTypeStdout {
-		return "sink_deployment_stdout"
-	}
-	sum := sha256.Sum256([]byte(string(sinkType) + "\n" + url))
-	return "sink_deployment_" + hex.EncodeToString(sum[:8])
 }
