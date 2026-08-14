@@ -1,16 +1,16 @@
-import type { CreateFlow201 } from "@zitadel/api/generated/model";
 import { configureZitadel, _resetConfigForTesting } from "@zitadel/api/config";
 import type { ZitadelProject } from "@zitadel/api/config";
+import type { CreateFlow201 } from "@zitadel/api/generated/model";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./zitadel-login.js";
-import type { ZitadelLogin } from "./zitadel-login.js";
+import heroTemplate from "../../../config/defaults/branding/hero/login.liquid";
+import minimalTemplate from "../../../config/defaults/branding/minimal/login.liquid";
+import splitRightTemplate from "../../../config/defaults/branding/split-right/login.liquid";
 // Raw import via the liquidRaw Vite plugin — @zitadel/config/defaults reads
 // files with node:fs at call time, which cannot run inside Chromium.
 import splitTemplate from "../../../config/defaults/branding/split/login.liquid";
-import splitRightTemplate from "../../../config/defaults/branding/split-right/login.liquid";
-import heroTemplate from "../../../config/defaults/branding/hero/login.liquid";
-import minimalTemplate from "../../../config/defaults/branding/minimal/login.liquid";
+import type { ZitadelLogin } from "./zitadel-login.js";
 
 /**
  * Real-browser checks for the widget-first embedding contract.
@@ -35,9 +35,7 @@ const identifierStep: CreateFlow201 = {
   step: {
     name: "identifier",
     texts: { title_key: "identifier.title" },
-    fields: [
-      { name: "email", type: "email", text_key: "identifier.field.email", required: true },
-    ],
+    fields: [{ name: "email", type: "email", text_key: "identifier.field.email", required: true }],
     actions: [{ name: "submit", kind: "submit", text_key: "submit.continue", primary: true }],
     gates: {},
   },
@@ -78,13 +76,24 @@ const fieldlessStep: CreateFlow201 = {
   },
 };
 
+/**
+ * A branding asset URL that genuinely loads in the test browser. It has to
+ * be same-origin (the vitest server is loopback http, which
+ * `validateBranding` allows for assets, unlike a `data:` URI) and it has to
+ * decode: an unreachable host now degrades to a hidden image plus the split
+ * placeholder (`asset-fallback.ts`), which is the opposite of what the
+ * layout tests below want to measure.
+ */
+const LOADABLE_ASSET = `${location.origin}/src/orchestrator/__fixtures__/asset.svg`;
+const BROKEN_ASSET = `${location.origin}/src/orchestrator/__fixtures__/does-not-exist.svg`;
+
 /** The shipped split design carried as tenant branding, logo-less. */
 const splitHeroOnlyStep: CreateFlow201 = {
   ...identifierStep,
   branding: {
     layout: "split",
     liquid_template: splitTemplate,
-    hero_url: "https://cdn.example.com/hero.png",
+    hero_url: LOADABLE_ASSET,
   },
 } as unknown as CreateFlow201;
 
@@ -94,7 +103,17 @@ const splitLogoStep: CreateFlow201 = {
   branding: {
     layout: "split",
     liquid_template: splitTemplate,
-    logo_url: "https://cdn.example.com/logo.png",
+    logo_url: LOADABLE_ASSET,
+  },
+} as unknown as CreateFlow201;
+
+/** Same design, pointed at a host that does not resolve. */
+const splitBrokenLogoStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    layout: "split",
+    liquid_template: splitTemplate,
+    logo_url: BROKEN_ASSET,
   },
 } as unknown as CreateFlow201;
 
@@ -132,6 +151,16 @@ const heroNoLogoStep: CreateFlow201 = {
   branding: {
     layout: "split",
     liquid_template: heroTemplate,
+  },
+} as unknown as CreateFlow201;
+
+/** A configured hero logo whose request fails must recover both authored fallbacks. */
+const heroBrokenLogoStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    layout: "split",
+    liquid_template: heroTemplate,
+    logo_url: BROKEN_ASSET,
   },
 } as unknown as CreateFlow201;
 
@@ -277,9 +306,7 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
       el.variant = "page";
     });
     const mountNode = element.shadowRoot?.querySelector(".zl-mount") as HTMLElement;
-    expect(mountNode.getBoundingClientRect().height).toBeGreaterThanOrEqual(
-      window.innerHeight - 1,
-    );
+    expect(mountNode.getBoundingClientRect().height).toBeGreaterThanOrEqual(window.innerHeight - 1);
     expect(getComputedStyle(element).backgroundColor).not.toBe(TRANSPARENT);
     expect(document.getElementById("zl-default-font-link")).not.toBeNull();
     const field = element.shadowRoot?.querySelector("zl-field");
@@ -443,5 +470,44 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     const banner = withHero.shadowRoot?.querySelector(".zl-split__compact") as HTMLElement;
     expect(banner.tagName).toBe("IMG");
     expect(getComputedStyle(banner).maxHeight).toBe("96px");
+  });
+
+  it("a branding asset that fails to load degrades to the split placeholder", async () => {
+    // The reported failure: a well-formed but dead logo_url clears the CLI
+    // gate and the server gate, then renders as a 0×0 img — the templates'
+    // own placeholder is keyed on "no asset configured", so the brand pane
+    // was left blank with nothing in the console.
+    host.style.width = "1200px";
+    const element = await mount(splitBrokenLogoStep, (el) => {
+      el.variant = "page";
+    });
+
+    const logo = await waitFor(() =>
+      element.shadowRoot?.querySelector("img.zl-split__logo[data-zl-asset-broken]"),
+    );
+    // The recovery has to be scripted: DOMPurify strips inline `onerror`, so
+    // no template could do this for itself.
+    expect(getComputedStyle(logo).display).toBe("none");
+
+    const placeholder = await waitFor(() =>
+      element.shadowRoot?.querySelector(".zl-split__placeholder"),
+    );
+    expect(placeholder.getBoundingClientRect().width).toBeGreaterThan(0);
+  });
+
+  it("a broken hero logo restores the compact text fallback at narrow widths", async () => {
+    const element = await mount(heroBrokenLogoStep);
+    await waitFor(() =>
+      element.shadowRoot?.querySelector("img.zl-split__compact[data-zl-asset-broken]"),
+    );
+
+    const brandPane = element.shadowRoot?.querySelector(".zl-split__brand") as HTMLElement;
+    expect(getComputedStyle(brandPane).display).toBe("none");
+
+    const fallback = await waitFor(() =>
+      element.shadowRoot?.querySelector(".zl-split__form > .zl-hero__compact-brand:not([hidden])"),
+    );
+    expect(getComputedStyle(fallback).display).not.toBe("none");
+    expect(fallback.textContent).toContain("Your brand");
   });
 });

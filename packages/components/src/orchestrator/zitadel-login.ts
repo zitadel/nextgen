@@ -25,6 +25,7 @@ import {
   startFlow as apiStartFlow,
   submitStep as apiSubmitStep,
 } from "./api-client.js";
+import { armAssetFallbacks } from "./asset-fallback.js";
 import { validateBranding } from "./branding-validator.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
@@ -343,6 +344,9 @@ export class ZitadelLogin extends ZitadelSurface {
     // `:host([variant])` selector.
     if (this.shadowRoot) {
       stampExportparts(this.shadowRoot);
+      // A configured-but-dead logo_url/hero_url is invisible everywhere else
+      // in the pipeline; this is the only layer that can see the image fail.
+      armAssetFallbacks(this.shadowRoot);
       const widget = this.variant !== "page";
       for (const shell of this.shadowRoot.querySelectorAll("zl-page-shell")) {
         shell.toggleAttribute("data-widget", widget);
@@ -395,8 +399,18 @@ export class ZitadelLogin extends ZitadelSurface {
 
   override render() {
     if (this.startupError) {
+      // Same chrome a step renders into (page shell + card), because this is
+      // still the login surface — just one that could not start. Without the
+      // shell the alert lands bare in the top-left corner of an otherwise
+      // empty page, which reads as a broken app rather than as auth reporting
+      // a problem: the most common trigger is a misconfigured origin, where
+      // the first step paints normally and only the submit fails.
       return html`<form class="zl-mount" novalidate>
-        <zl-alert severity="error">${this.startupError}</zl-alert>
+        <zl-page-shell>
+          <zl-card>
+            <zl-alert severity="error">${this.startupError}</zl-alert>
+          </zl-card>
+        </zl-page-shell>
       </form>`;
     }
     if (!this.response || !this.engine) {

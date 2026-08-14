@@ -51,11 +51,50 @@ export function normalizePublicCliCommands(
  */
 export function normalizePublicCliProse(content: string, cliVersion: string): string {
   const prefix = publicCliCommand("", cliVersion);
-  return content
-    .replace(/`zitadel( [^`\n]*)?`/g, (_match, args: string | undefined) => {
-      return `\`${prefix}${args ?? ""}\``;
-    })
-    .replace(/^(\s*)zitadel (.*)$/gm, (_match, indent: string, rest: string) => {
-      return `${indent}${prefix} ${rest}`;
-    });
+  return rewriteCliCodeSpans(content, cliVersion).replace(
+    /^(\s*)zitadel (.*)$/gm,
+    (_match, indent: string, rest: string) => `${indent}${prefix} ${rest}`,
+  );
+}
+
+/** The inline-code-span half of {@link normalizePublicCliProse}. */
+function rewriteCliCodeSpans(content: string, cliVersion: string): string {
+  const prefix = publicCliCommand("", cliVersion);
+  return content.replace(
+    /`zitadel( [^`\n]*)?`/g,
+    (_match, args: string | undefined) => `\`${prefix}${args ?? ""}\``,
+  );
+}
+
+/**
+ * Rewrites `zitadel …` command mentions inside every string of a scaffolded
+ * JSON document — today the `.zitadel/meta/*.json` dialect files — returning
+ * a rewritten copy. The input is never mutated: the meta-schema bodies are
+ * imported JSON modules shared across calls.
+ *
+ * Those files are byte-copies of the meta-schemas the server embeds
+ * (`api/openapi/endpoints/schemas/*.json`), where the bare `zitadel` spelling
+ * is the correct one — the server documents the product command, not one
+ * project's install. Their `description` strings surface as editor tooltips
+ * on the scaffolded `.zitadel/**` files, where the bare command does not
+ * exist on the user's PATH, so the copy is normalized on the way out instead
+ * of the shared source being edited (same fix PR #872 made for the READMEs).
+ *
+ * Unlike {@link normalizePublicCliProse} this rewrites inline code spans
+ * only: a JSON `description` is prose, so a value that merely begins with
+ * the word `zitadel` is a sentence, not a command line.
+ */
+export function normalizePublicCliJson<T>(value: T, cliVersion: string): T {
+  if (typeof value === "string") {
+    return rewriteCliCodeSpans(value, cliVersion) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizePublicCliJson(item, cliVersion)) as T;
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, normalizePublicCliJson(item, cliVersion)]),
+    ) as T;
+  }
+  return value;
 }

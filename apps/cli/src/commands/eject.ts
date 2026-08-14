@@ -185,12 +185,15 @@ export default class Eject extends BaseCommand {
     }
 
     // In-place config merges (vite.config.ts / angular.json / nuxt.config.ts)
-    // can't be auto-reverted, so surface them as manual cleanup steps. The
-    // Angular patcher also edits package.json (a `dev` script, not a config
-    // block), so word that one accurately.
+    // can't be auto-reverted, so surface them as manual cleanup steps.
+    // package.json is not a config block: Angular has its `dev` script added
+    // outright, while Next and Nuxt keep theirs and only get the dev-server
+    // port pinned into it — one line has to cover both, so it names the
+    // script and both ways setup touches it rather than claiming the script
+    // itself should go.
     const manualSteps = actions.configEdits.map((rel) => {
       if (rel === "package.json" || rel.endsWith("/package.json")) {
-        return `Remove the "dev" script setup added to ${rel}`;
+        return `Restore the "dev" script in ${rel} (setup added the script, or pinned its dev-server port)`;
       }
       if (rel === "angular.json" || rel.endsWith("/angular.json")) {
         return `Remove the Zitadel proxyConfig (and dev-server port) from the serve target in ${rel}`;

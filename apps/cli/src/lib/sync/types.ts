@@ -171,8 +171,9 @@ export type SyncPlanSummary = {
 export type FlowRepin = { previousId: string; schemaPath: string; newId?: string };
 
 /**
- * A non-blocking finding from plan-time flow validation (severity
- * `warning` in `@zitadel/config/validate`). Rendered as `# warning:`
+ * A non-blocking plan-time finding: a flow-validation issue of severity
+ * `warning` (`@zitadel/config/validate`), or a branding asset URL the
+ * probe could not fetch (`asset-probe.ts`). Rendered as `# warning:`
  * comment lines in the plan and `consola.warn`ed during apply; never
  * fails the run.
  */
@@ -208,6 +209,7 @@ export type SyncAction =
       previousId: string;
       oldContent: object | null;
       affectedPaths: ReadonlyArray<string>;
+      warnings?: ReadonlyArray<SyncActionWarning>;
     }
   | { kind: "delete"; path: string; syncer: ResourceSyncer; id: string; oldContent: object | null }
   | { kind: "skip"; path: string; reason: "immutable" | "no-change" };

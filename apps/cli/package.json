@@ -70,6 +70,7 @@
     "mixpanel": "^0.18.1",
     "safe-stable-stringify": "catalog:",
     "semver": "catalog:",
+    "undici": "^7.24.7",
     "zod": "catalog:",
     "picocolors": "^1.1.1"
   },
