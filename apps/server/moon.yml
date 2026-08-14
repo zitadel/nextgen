@@ -15,6 +15,7 @@ fileGroups:
     - "/api/**/*.json"
     - "/api/.ogen.yaml"
     - "/scripts/check-go-generate.mjs"
+    - "/scripts/server-build.mjs"
     - "moon.yml"
     - "package.json"
     - "bin/**"
@@ -216,7 +217,7 @@ tasks:
       runInCI: true
 
   build:
-    command: "go build -trimpath -o dist/server/nextgen ."
+    command: "node scripts/server-build.mjs"
     deps:
       - "check-generate"
       # The binary embeds both UI dists (//go:embed all:dist in
@@ -235,5 +236,6 @@ tasks:
       - "/internal/staticui/**"
     outputs:
       - "/dist/server/nextgen"
+      - "/dist/server/metadata.json"
     options:
       runFromWorkspaceRoot: true

@@ -102,7 +102,7 @@ describe("build-local-runtime-image", () => {
         "build",
         "-trimpath",
         "-ldflags",
-        "-s -w -X main.version=0.1.0-alpha.5 -X main.commit=abcdef123456 -X main.date=2026-06-16T00:00:00Z",
+        "-s -w -X github.com/zitadel/nextgen/internal/build.version=0.1.0-alpha.5 -X github.com/zitadel/nextgen/internal/build.commit=abcdef1234567890 -X github.com/zitadel/nextgen/internal/build.date=2026-06-16T00:00:00Z",
         "-o",
         "/tmp/zitadel-local-image-test/build/linux/arm64/nextgen",
         ".",
