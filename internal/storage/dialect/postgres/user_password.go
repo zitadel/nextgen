@@ -24,7 +24,8 @@ ON CONFLICT (project_id, user_id) DO UPDATE SET
 	changed_at = NOW(),
 	failed_attempts = 0,
 	last_successful_check = NULL,
-	updated_at = NOW()`
+	updated_at = NOW()
+RETURNING id`
 
 const userPasswordQuery = `SELECT id, project_id, user_id, encoded_hash, change_required,
 	changed_at, verification_id, last_successful_check, failed_attempts, created_at, updated_at
@@ -42,18 +43,17 @@ func newUserPasswordStatements(client queryExecutor) userPasswordStatements {
 
 // SetUserPassword implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error {
-	id := ""
-	if err := ensureManagedID(&id, domain.PrefixUserPassword); err != nil {
+	if err := ensureManagedID(&pw.ID, domain.PrefixUserPassword); err != nil {
 		return err
 	}
-	_, err := ps.client.Exec(ctx, setUserPasswordStmt,
-		id,
+	err := ps.client.QueryRow(ctx, setUserPasswordStmt,
+		pw.ID,
 		pw.ProjectID,
 		pw.UserID,
 		pw.EncodedHash,
 		pw.ChangeRequired,
 		pw.VerificationID,
-	)
+	).Scan(&pw.ID)
 	return wrapError(err)
 }
 

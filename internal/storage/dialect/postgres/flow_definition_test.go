@@ -52,7 +52,7 @@ func sampleFlowDefinition(projectID, id string) *domain.FlowDefinition {
 
 func TestFlowDefinitionStatements_CreateAndGet(t *testing.T) {
 	projectID := uniqueProjectID(t)
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
 
 	def := sampleFlowDefinition(projectID, uniqueFlowDefinitionID(t))
@@ -80,7 +80,7 @@ func TestFlowDefinitionStatements_GetNotFound(t *testing.T) {
 
 func TestFlowDefinitionStatements_ListAndDelete(t *testing.T) {
 	projectID := uniqueProjectID(t)
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
 
 	def := sampleFlowDefinition(projectID, uniqueFlowDefinitionID(t))
@@ -103,7 +103,7 @@ func TestFlowDefinitionStatements_ListAndDelete(t *testing.T) {
 
 func TestFlowDefinitionStatements_Update(t *testing.T) {
 	projectID := uniqueProjectID(t)
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
 
 	def := sampleFlowDefinition(projectID, uniqueFlowDefinitionID(t))
@@ -124,7 +124,7 @@ func TestFlowDefinitionStatements_Update(t *testing.T) {
 
 func TestFlowDefinitionStatements_ListByPurpose(t *testing.T) {
 	projectID := uniqueProjectID(t)
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
 
 	login := sampleFlowDefinition(projectID, uniqueFlowDefinitionID(t)+"-login")
@@ -153,7 +153,7 @@ func TestFlowDefinitionStatements_ListByPurpose(t *testing.T) {
 
 func TestFlowDefinitionStatements_ListByStatus(t *testing.T) {
 	projectID := uniqueProjectID(t)
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
 
 	draft := sampleFlowDefinition(projectID, uniqueFlowDefinitionID(t)+"-draft")
@@ -185,8 +185,8 @@ func TestFlowDefinitionStatements_DeleteProjectCascades(t *testing.T) {
 	def := sampleFlowDefinition(projectID, uniqueFlowDefinitionID(t))
 	require.NoError(t, testPool.CreateFlowDefinition(t.Context(), def))
 
-	require.NoError(t, testPool.DeleteProjectByID(t.Context(), projectID))
-
-	_, err := testPool.GetFlowDefinitionByID(t.Context(), projectID, def.ID)
+	_, err := testPool.DeleteProjectByID(t.Context(), projectID)
+	require.NoError(t, err)
+	_, err = testPool.GetFlowDefinitionByID(t.Context(), projectID, def.ID)
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }

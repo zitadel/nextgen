@@ -237,6 +237,55 @@ func TestCompileOrderByNullable(t *testing.T) {
 	}
 }
 
+func TestCompileCompareFilterSingleColumn(t *testing.T) {
+	t.Parallel()
+
+	createdAt := time.Date(2026, 6, 26, 10, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name    string
+		filter  database.Filter[domain.ProjectField]
+		wantSQL string
+		wantArg any
+	}{
+		{
+			name:    "equal",
+			filter:  database.Equal(database.Col(domain.ProjectFieldID), "proj_1"),
+			wantSQL: "id = ?",
+			wantArg: "proj_1",
+		},
+		{
+			name:    "greater than",
+			filter:  database.GreaterThan(database.Col(domain.ProjectFieldCreatedAt), createdAt),
+			wantSQL: "created_at > ?",
+			wantArg: createdAt.UnixNano(),
+		},
+		{
+			name:    "greater than or equal",
+			filter:  database.GreaterThanOrEqual(database.Col(domain.ProjectFieldCreatedAt), createdAt),
+			wantSQL: "created_at >= ?",
+			wantArg: createdAt.UnixNano(),
+		},
+		{
+			name:    "less than",
+			filter:  database.LessThan(database.Col(domain.ProjectFieldCreatedAt), createdAt),
+			wantSQL: "created_at < ?",
+			wantArg: createdAt.UnixNano(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var c statementCompiler
+			compileFilter(&c, tt.filter, projectSchema)
+			assert.Equal(t, tt.wantSQL, c.String())
+			require.Len(t, c.args, 1)
+			assert.Equal(t, tt.wantArg, c.args[0])
+		})
+	}
+}
+
 func TestCompileCompareFilterNullableKeyset(t *testing.T) {
 	t.Parallel()
 

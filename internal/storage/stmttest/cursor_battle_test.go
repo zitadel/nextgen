@@ -85,7 +85,7 @@ func battleProjects(t *testing.T, d dialect) {
 		id := prefix + "-" + string(rune('a'+i))
 		p := newTestProject(id)
 		require.NoError(t, d.stmts.CreateProject(t.Context(), p))
-		t.Cleanup(func() { _ = d.stmts.DeleteProjectByID(context.Background(), id) })
+		t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), id) })
 		want = append(want, id)
 	}
 	filters := make([]database.Filter[domain.ProjectField], 0, len(want))

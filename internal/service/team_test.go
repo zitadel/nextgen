@@ -254,21 +254,29 @@ func TestTeamService_Delete(t *testing.T) {
 			name:   "ok",
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(nil)
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(true, nil)
+			},
+		},
+		{
+			name:   "already deactivated does not emit",
+			teamID: "team_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(false, nil)
+				// InsertEvent must not be required; AnyTimes helper still allows zero calls.
 			},
 		},
 		{
 			name:   "unknown team",
 			teamID: "missing",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "missing").Return(nil)
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "missing").Return(false, nil)
 			},
 		},
 		{
 			name:   "deactivate fails",
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(assert.AnError)
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(false, assert.AnError)
 			},
 			wantErr: domain.ErrInternal(assert.AnError),
 		},
@@ -563,7 +571,16 @@ func newMockedTeamService(t *testing.T, setupStmt func(*servicemocks.MockAllStat
 	pool := servicemocks.NewMockPool(ctrl)
 	if setupStmt != nil {
 		statements := servicemocks.NewMockAllStatements(ctrl)
-		pool.EXPECT().Statements().Return(statements)
+		statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
+		pool.EXPECT().Statements().Return(statements).AnyTimes()
+		pool.EXPECT().
+			Transaction(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+				return fn(ctx, statementer)
+			}).
+			AnyTimes()
+		statementer.EXPECT().Statements().Return(statements).AnyTimes()
+		statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 		setupStmt(statements)
 	}
 

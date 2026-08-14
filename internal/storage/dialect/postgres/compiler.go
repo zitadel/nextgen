@@ -201,6 +201,8 @@ func compareOpSQL(op database.CompareOp) string {
 		return " > "
 	case database.OpLess:
 		return " < "
+	case database.OpGreaterOrEqual:
+		return " >= "
 	default:
 		panic("unknown compare op")
 	}

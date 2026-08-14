@@ -26,7 +26,7 @@ func ensureJSONSchemaProject(t *testing.T, projectID string) {
 	t.Helper()
 	project := newTestProject(projectID)
 	require.NoError(t, testPool.CreateProject(t.Context(), project))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 }
 
 func TestJSONSchemaStatements_CRUD(t *testing.T) {

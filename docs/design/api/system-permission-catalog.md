@@ -91,7 +91,7 @@ see [§ Drift notes](#drift-notes).
 | `domain`, `allowed_origin`, `webhook` | manage | Project-scoped collections; `write` = create + update; `delete` separate. Class covers the full set; grant `write` and/or `delete`, never a `manage` permission. |
 | `feature` | read-write-only | Project feature configuration has no independent create/delete lifecycle. |
 | `import` | job-lifecycle | Start job (`create`); poll status (`read`). |
-| `event`, `audit_event` | read-only | |
+| `events` | read-only | Unified audit stream (`GET /events`); replaces retired `event` / `audit_event` split (ADR 049). |
 | `session`, `auth_attempt` | runtime | App-plane `*.write` only (no separate `*.create` — OpenAPI `*.write` covers start + mutate). Operator: `session.read` / `session.delete`. |
 | `app`, `idp`, `app_group`, `schema`, `flow_definition` | manage | No create/write split — `write` = create + update; `delete` where exposed. Matches OpenAPI. Class implies the full CRUD *set*; permissions remain `read` / `write` / `delete` (no `*.manage`). |
 
@@ -335,14 +335,15 @@ not yet exposed.
 | `auth_attempt.read` | `GET /auth_attempts/{id}` | Operator/debug read. |
 | `auth_attempt.write` | `POST /auth_attempts`, `POST …/challenges`, `POST …/verify`, `POST …/handoff` | App plane. Session materialization is `session.write` (`POST /sessions/exchange`). |
 
-### Events and audit
+### Events
 
-> **Verb model:** read-only.
+> **Verb model:** read-only. Unified `/events` surface (ADR 049) — the earlier
+> split between identity `event.read` and admin `audit_event.read` /
+> `/audit_events` is **retired**.
 
 | Permission | Endpoints | Notes |
 |---|---|---|
-| `event.read` | `GET /events/{id}`, `GET /events` | **Identity / auth lifecycle** events (sign-in, password change, factor changes). Not admin config audit — see `audit_event.read`. |
-| `audit_event.read` | `GET /audit_events/{id}`, `GET /audit_events` | Configuration and admin changes (who changed what in the console/API). |
+| `events.read` | `GET /events/{id}`, `GET /events` | All audit categories (`request`, `auth`, `session`, `admin`, `entity`, `signal`). Filter with `category` / `event_type`. |
 
 ### Imports
 
@@ -366,7 +367,7 @@ Replacements:
 | `team.users.write` | `user.write` (and usually `user.create` / `user.delete` as needed) | **Yes.** Same flattening; create/delete should be granted explicitly when needed. Same team-scope compensating requirement as `user.read`. |
 | `team.memberships.read` / `.write` | `team_membership.read` / `team_membership.write` | **Yes.** Compound type, not dot nesting. |
 | `team.roles.assign` | `team_membership.write` | **Yes.** Role assignment is a membership mutation. |
-| `team.events.read` | `event.read` | **Yes.** Filter to the team via grant/credential scope. |
+| `team.events.read` | `events.read` | **Yes.** Filter to the team via grant/credential scope. |
 | `team.scim.sync` | TBD (`scim.sync` or similar) | **Parked** — SCIM interop exists (`/scim/v2/*` in resource-map); no management-permission mapping yet. |
 | `allowed_origins.write`, `signing_keys.*` | `allowed_origin.write`, `signing_key.*` | **Yes.** Flat resource permissions; the project grant carries scope. |
 | `apps.write` / `idps.write` | `app.write` / `idp.write` | **Yes.** Plural → singular. |
@@ -402,7 +403,7 @@ schema.read, schema.write, schema.delete,
 flow_definition.read, flow_definition.write, flow_definition.delete,
 session.read, session.delete,
 auth_attempt.read,
-event.read, audit_event.read,
+events.read,
 import.create, import.read
 ```
 
@@ -435,7 +436,7 @@ schema.read,
 flow_definition.read,
 session.read,
 auth_attempt.read,
-event.read, audit_event.read,
+events.read,
 import.read
 ```
 
@@ -450,7 +451,7 @@ Manage a team's own resources (scoped to the team grant boundary). Illustrates
 team.read, team.write,
 user.create, user.read, user.write, user.set_password, user.delete,
 team_membership.create, team_membership.read, team_membership.write, team_membership.delete,
-event.read
+events.read
 ```
 
 ### `team_member`
@@ -466,7 +467,7 @@ Basic team-scoped access:
 team.read,
 user.read,
 team_membership.read,
-event.read
+events.read
 ```
 
 ---
@@ -498,7 +499,7 @@ MAY:
   team_membership.read, team_membership.write
                                      (not .create / .delete — roster changes
                                       are human/owner operations; see Invitations)
-  event.read                         (filtered to this team)
+  events.read                        (filtered to this team)
 
 MUST NEVER:
   user.set_password                  (account takeover — human/owner op only)
@@ -521,7 +522,6 @@ MUST NEVER:
   flow_definition.*
   session.*
   auth_attempt.*
-  audit_event.read
   import.*
   platform.*                         (cross-project — note: the platform itself is a project)
 ```
