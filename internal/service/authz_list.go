@@ -7,9 +7,8 @@ import (
 )
 
 // AuthzListFilter is the portable authz conjunct injected into resource list
-// SQL (EXISTS over the same RSI/assignment/closure/TTU branches as
-// ListAuthzObjectIDs). Management compileList requires this on context (#838).
-// compileRead and nested lists omit it on purpose (#839).
+// SQL. Management compileList requires this on context; compileRead and nested
+// lists omit it on purpose.
 type AuthzListFilter = domain.AuthzListObjectsParams
 
 type authzListFilterCtxKey struct{}
@@ -28,8 +27,7 @@ func AuthzListFilterFromContext(ctx context.Context) (AuthzListFilter, bool) {
 type authzListFilterBypassCtxKey struct{}
 
 // WithAuthzListFilterBypass marks a storage-layer list that is not a
-// management HTTP path (stmttest, dialect tests, post-create inspection).
-// Production handlers must attach WithAuthzListFilter instead.
+// management HTTP path. Production handlers must attach WithAuthzListFilter.
 func WithAuthzListFilterBypass(ctx context.Context) context.Context {
 	return context.WithValue(ctx, authzListFilterBypassCtxKey{}, true)
 }
@@ -43,8 +41,7 @@ func AuthzListFilterBypassed(ctx context.Context) bool {
 type authzListProjectWideAllowCtxKey struct{}
 
 // WithAuthzListProjectWideAllow marks a list whose project-level Check already
-// Allowed. compileList must not fail closed, and maybeWriteAuthzListPredicate
-// must not attach EXISTS (#837).
+// Allowed, so compileList must not fail closed and EXISTS is not attached.
 func WithAuthzListProjectWideAllow(ctx context.Context) context.Context {
 	return context.WithValue(ctx, authzListProjectWideAllowCtxKey{}, true)
 }

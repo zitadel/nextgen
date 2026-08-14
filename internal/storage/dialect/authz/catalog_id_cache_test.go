@@ -10,8 +10,8 @@ import (
 )
 
 func TestLoadOrFetchActiveSystemCatalogID(t *testing.T) {
-	t.Cleanup(InvalidateActiveSystemCatalogID)
-	InvalidateActiveSystemCatalogID()
+	t.Cleanup(invalidateActiveSystemCatalogID)
+	invalidateActiveSystemCatalogID()
 
 	var fetches atomic.Int32
 	fetch := func() (string, error) {
@@ -28,10 +28,10 @@ func TestLoadOrFetchActiveSystemCatalogID(t *testing.T) {
 	assert.Equal(t, "cat_sys_cached", id)
 	assert.Equal(t, int32(1), fetches.Load(), "second load must not hit fetch")
 
-	InvalidateActiveSystemCatalogID()
+	invalidateActiveSystemCatalogID()
 	AfterPersistCatalogVersion(domain.AuthzCatalogKindSystem, "cat_sys_next")
 	id, err = LoadOrFetchActiveSystemCatalogID(func() (string, error) {
-		t.Fatal("fetch must not run after Remember")
+		t.Fatal("fetch must not run after persist")
 		return "", nil
 	})
 	require.NoError(t, err)
@@ -39,14 +39,14 @@ func TestLoadOrFetchActiveSystemCatalogID(t *testing.T) {
 }
 
 func TestPersistCatalogVersionCacheHooksIgnoreAppGroup(t *testing.T) {
-	t.Cleanup(InvalidateActiveSystemCatalogID)
-	RememberActiveSystemCatalogID("cat_sys_1")
+	t.Cleanup(invalidateActiveSystemCatalogID)
+	rememberActiveSystemCatalogID("cat_sys_1")
 	BeforePersistCatalogVersion(domain.AuthzCatalogKindAppGroup)
-	id, ok := CachedActiveSystemCatalogID()
+	id, ok := cachedActiveSystemCatalogID()
 	require.True(t, ok)
 	assert.Equal(t, "cat_sys_1", id)
 	AfterPersistCatalogVersion(domain.AuthzCatalogKindAppGroup, "cat_app_1")
-	id, ok = CachedActiveSystemCatalogID()
+	id, ok = cachedActiveSystemCatalogID()
 	require.True(t, ok)
 	assert.Equal(t, "cat_sys_1", id)
 }

@@ -10,17 +10,11 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// The management API (operator plane: schemas, flow definitions, users, teams,
-// project queries, branding, operator sessions) is gated by resolver.Check after
-// credential → ScopeContext. Path-id ops resolve scope via resource_scope_index
-// (requireResourceAccess) before Check; create keeps an explicit project_id and
-// requireProjectAccess. Management lists use requireProjectListAccess: project-
-// wide Allow skips the EXISTS predicate; Forbidden (foothold, no project-wide
-// grant) proceeds and withAuthzListFilter attaches it. NotFound still 404s.
-// Check and the list filter share one request-scoped Resolver (#837). MVP uses
-// coarse project.{viewer,editor,admin} (#420 expands to fine-grained catalog
-// relations). Preview secrets (project.read only) cannot call management APIs
-// (ADR 037).
+// The management API is gated by resolver.Check after credential → ScopeContext.
+// Path-id ops resolve RSI then Check; create uses requireProjectAccess.
+// Lists use requireProjectListAccess: project-wide Allow skips the EXISTS
+// predicate, Forbidden attaches it, NotFound 404s. Preview secrets
+// (project.read only) cannot call management APIs (ADR 037).
 
 // accessOp classifies a management operation for relation mapping and miss shaping.
 type accessOp int
@@ -261,8 +255,7 @@ func requireProjectAccessMapped(ctx context.Context, stmts service.AuthzResolver
 			req.ResourceTeamID = *rsi.TeamID
 		}
 	}
-	r, _ := requestResolver(ctx)
-	dec, err := r.Check(ctx, stmts, req)
+	dec, err := resolver.New().Check(ctx, stmts, req)
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("authz permission check failed")
 	}
@@ -297,13 +290,9 @@ func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) er
 	}
 }
 
-// requireProjectListAccess gates a management list. Project-wide Allow or
-// Forbidden (foothold, no project-wide grant) both proceed so the EXISTS
-// predicate can return a partial view. NotFound (no foothold) still 404s.
-// Preview / missing credentials keep the same miss/denied shapes as create.
-// On Allow, the returned context carries AuthzListProjectWideAllow so list
-// handlers skip withAuthzListFilter (#837). The request-scoped Resolver is
-// stored on context so Check and the list filter share one catalog lookup.
+// requireProjectListAccess gates a management list. Allow and Forbidden
+// (foothold, no project-wide grant) both proceed; NotFound 404s. Allow marks
+// the context so handlers skip the EXISTS predicate.
 func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string, res resourceAccess) (context.Context, bool, error) {
 	if h == nil || h.pool == nil {
 		return ctx, false, domain.ErrInternal(errors.New("authz statements not configured"))
@@ -375,11 +364,8 @@ func mapAuthzDecisionAfterRSI(dec resolver.Decision, res resourceAccess) error {
 	}
 }
 
-// withAuthzListFilter attaches the SQL list-predicate filter for management
-// list endpoints after requireProjectListAccess has already passed (Forbidden
-// path). Skip this on project-wide Allow (#837). PrincipalHomeProjectID comes
-// from the credential's home project while Check uses the target projectID;
-// those are equivalent until foreign footholds (#333) land.
+// withAuthzListFilter attaches the EXISTS list predicate. Call after
+// requireProjectListAccess on the Forbidden path only.
 func (h *Handler) withAuthzListFilter(ctx context.Context, projectID string, kind domain.ResourceKind, op accessOp) (context.Context, error) {
 	scope, ok := GetScopeContext(ctx)
 	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {

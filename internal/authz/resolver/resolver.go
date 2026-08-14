@@ -87,7 +87,7 @@ func (r *Resolver) Check(ctx context.Context, stmts service.AuthzResolverStateme
 		return d, nil
 	}
 
-	catalogID, err := r.activeCatalogID(ctx, stmts)
+	catalogID, err := r.ActiveCatalogID(ctx, stmts)
 	if err != nil {
 		return DecisionUnspecified, err
 	}
@@ -119,7 +119,7 @@ func (r *Resolver) ListObjects(ctx context.Context, stmts service.AuthzResolverS
 		!skTeamPermissionAllowed(PermissionName(req.ObjectType, req.Relation)) {
 		return []string{}, nil
 	}
-	catalogID, err := r.activeCatalogID(ctx, stmts)
+	catalogID, err := r.ActiveCatalogID(ctx, stmts)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func checkParams(catalogID string, req Request) domain.AuthzCheckParams {
 	return p
 }
 
-func (r *Resolver) activeCatalogID(ctx context.Context, stmts service.AuthzResolverStatements) (string, error) {
+func (r *Resolver) ActiveCatalogID(ctx context.Context, stmts service.AuthzResolverStatements) (string, error) {
 	if r.catalogID != "" {
 		return r.catalogID, nil
 	}
@@ -157,12 +157,6 @@ func (r *Resolver) activeCatalogID(ctx context.Context, stmts service.AuthzResol
 	}
 	r.catalogID = id
 	return id, nil
-}
-
-// ActiveCatalogID is the active system catalog for this request-scoped
-// Resolver. Check and list-filter attachment share one lookup.
-func (r *Resolver) ActiveCatalogID(ctx context.Context, stmts service.AuthzResolverStatements) (string, error) {
-	return r.activeCatalogID(ctx, stmts)
 }
 
 func validateCheckRequest(req Request) error {

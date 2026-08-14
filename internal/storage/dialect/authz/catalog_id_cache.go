@@ -12,44 +12,38 @@ var (
 	activeSystemCatalogMu sync.Mutex
 )
 
-// CachedActiveSystemCatalogID returns the process-cached active system catalog
-// id when one has been loaded.
-func CachedActiveSystemCatalogID() (string, bool) {
+func cachedActiveSystemCatalogID() (string, bool) {
 	id, ok := activeSystemCatalog.Load().(string)
 	return id, ok && id != ""
 }
 
-// RememberActiveSystemCatalogID stores the active system catalog id.
-func RememberActiveSystemCatalogID(id string) {
+func rememberActiveSystemCatalogID(id string) {
 	if id == "" {
 		return
 	}
 	activeSystemCatalog.Store(id)
 }
 
-// InvalidateActiveSystemCatalogID drops the process cache. Call when a new
-// system catalog becomes active (PersistCatalogVersion retires the previous
-// row). A cache that never invalidates would Check against a retired catalog.
-func InvalidateActiveSystemCatalogID() {
+func invalidateActiveSystemCatalogID() {
 	activeSystemCatalog.Store("")
 }
 
 // LoadOrFetchActiveSystemCatalogID returns the cached id, or fetch() once and
 // remembers it. Concurrent first loads share one fetch.
 func LoadOrFetchActiveSystemCatalogID(fetch func() (string, error)) (string, error) {
-	if id, ok := CachedActiveSystemCatalogID(); ok {
+	if id, ok := cachedActiveSystemCatalogID(); ok {
 		return id, nil
 	}
 	activeSystemCatalogMu.Lock()
 	defer activeSystemCatalogMu.Unlock()
-	if id, ok := CachedActiveSystemCatalogID(); ok {
+	if id, ok := cachedActiveSystemCatalogID(); ok {
 		return id, nil
 	}
 	id, err := fetch()
 	if err != nil {
 		return "", err
 	}
-	RememberActiveSystemCatalogID(id)
+	rememberActiveSystemCatalogID(id)
 	return id, nil
 }
 
@@ -57,7 +51,7 @@ func LoadOrFetchActiveSystemCatalogID(fetch func() (string, error)) (string, err
 // catalog is about to be published.
 func BeforePersistCatalogVersion(kind domain.AuthzCatalogKind) {
 	if kind == domain.AuthzCatalogKindSystem {
-		InvalidateActiveSystemCatalogID()
+		invalidateActiveSystemCatalogID()
 	}
 }
 
@@ -65,6 +59,6 @@ func BeforePersistCatalogVersion(kind domain.AuthzCatalogKind) {
 // successful persist.
 func AfterPersistCatalogVersion(kind domain.AuthzCatalogKind, id string) {
 	if kind == domain.AuthzCatalogKindSystem {
-		RememberActiveSystemCatalogID(id)
+		rememberActiveSystemCatalogID(id)
 	}
 }
