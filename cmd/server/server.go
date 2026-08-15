@@ -183,6 +183,13 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		nil,
 	)
 	teamService := service.NewTeamService(serviceDBPool)
+	// The claim and dashboard URLs hang off the console. builtin_public_base is
+	// the only public-origin config today and carries the /api/schemas path, so
+	// strip it down to the origin before appending the console path; a
+	// dedicated server public-base setting should replace this when cloud
+	// deployment configuration lands.
+	consoleBase := (&url.URL{Scheme: builtinPublicBase.Scheme, Host: builtinPublicBase.Host}).String() + cfg.Server.ConsolePath
+	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	userService := service.NewUserService(
@@ -265,6 +272,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			eventService,
 			tokenService,
 			keyService,
+			claimService,
 			serviceDBPool,
 			cfg.Platform.ProjectID,
 		),
