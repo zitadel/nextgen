@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"net/url"
 	"time"
@@ -110,7 +111,9 @@ func (s *claimService) Status(ctx context.Context, projectID, challengeID, secre
 	}
 	// Proof of possession before anything else: a caller without the
 	// initiating secret learns nothing about the challenge, not even expiry.
-	if challenge.InitiatingSecretHash != secretHash {
+	// Constant-time comparison as defense in depth; both sides are SHA-256
+	// hex digests, so equal length is the normal case.
+	if subtle.ConstantTimeCompare([]byte(challenge.InitiatingSecretHash), []byte(secretHash)) == 0 {
 		return nil, domain.ErrProjectPermissionDenied()
 	}
 	if challenge.Status == domain.ClaimChallengeStatusCompleted {
