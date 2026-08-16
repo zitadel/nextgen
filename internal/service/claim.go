@@ -95,7 +95,9 @@ func (s *claimService) Init(ctx context.Context, projectID, secretHash string) (
 		return nil, domain.ErrInternal(mapStorageError(err)).WithMessage("failed to create claim challenge")
 	}
 	return &ClaimInitResult{
-		ClaimURL:    s.claimURL(projectID, plain),
+		ClaimURL: s.consoleBaseURL +
+			"/claim?" +
+			url.Values{"challenge_id": {plain}, "project_id": {projectID}}.Encode(),
 		ChallengeID: plain,
 		ExpiresAt:   challenge.ExpiresAt,
 	}, nil
@@ -273,11 +275,6 @@ func (s *claimService) alreadyClaimedErr(projectID, teamID string) error {
 		TeamID:       teamID,
 		DashboardURL: s.dashboardURL(projectID),
 	})
-}
-
-func (s *claimService) claimURL(projectID, token string) string {
-	query := url.Values{"challenge_id": {token}, "project_id": {projectID}}
-	return s.consoleBaseURL + "/claim?" + query.Encode()
 }
 
 func (s *claimService) dashboardURL(projectID string) string {

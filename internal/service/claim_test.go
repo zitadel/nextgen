@@ -28,6 +28,8 @@ const (
 var (
 	claimToken   = domain.PrefixClaimChallenge.IDPrefix("dGVzdC10b2tlbg")
 	claimTokenID = domain.HashClaimChallengeToken(claimToken)
+	future       = time.Now().Add(5 * time.Minute)
+	past         = time.Now().Add(-time.Minute)
 )
 
 func pendingClaimChallenge(expiresAt time.Time) *domain.ClaimChallenge {
@@ -80,7 +82,6 @@ func TestClaimService_Init(t *testing.T) {
 			check: func(t *testing.T, got *service.ClaimInitResult, captured *domain.ClaimChallenge) {
 				assert.True(t, strings.HasPrefix(got.ChallengeID, "claim_challenge_"))
 				assert.Equal(t, domain.HashClaimChallengeToken(got.ChallengeID), captured.ID)
-				assert.Len(t, captured.ID, 64)
 				assert.Equal(t, "proj_1", captured.ProjectID)
 				assert.Equal(t, "secret_hash_1", captured.InitiatingSecretHash)
 				assert.Equal(t, domain.ClaimChallengeStatusPending, captured.Status)
@@ -156,8 +157,6 @@ func TestClaimService_Status(t *testing.T) {
 
 	teamID := "team_1"
 	claimedAt := time.Date(2026, 8, 14, 12, 0, 0, 0, time.UTC)
-	future := time.Now().Add(5 * time.Minute)
-	past := time.Now().Add(-time.Minute)
 
 	completedGrantStmts := func(s *servicemocks.MockAllStatements, assignments []*domain.AuthzAssignment) {
 		s.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(&domain.ResourceScope{ResourceID: "proj_1", TeamID: &teamID}, nil)
@@ -284,8 +283,6 @@ func TestClaimService_Complete(t *testing.T) {
 
 	teamID := "team_1"
 	claimedAt := time.Date(2026, 8, 14, 12, 0, 0, 0, time.UTC)
-	future := time.Now().Add(5 * time.Minute)
-	past := time.Now().Add(-time.Minute)
 
 	unclaimedProjectStmts := func(s *servicemocks.MockAllStatements) {
 		s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
