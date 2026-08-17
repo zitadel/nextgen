@@ -237,17 +237,17 @@ func sessionSortField(field string) (domain.SessionField, error) {
 func sessionFilter(f Filter, now time.Time) (database.Filter[domain.SessionField], error) {
 	switch f.Field {
 	case sessionFieldUserID:
-		value, ok := f.Value.(string)
-		if !ok {
-			return nil, domain.ErrRequestInvalid().WithDetails("user_id filter value must be a string")
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
 		}
 		return stringFilter(f.Operation, database.Col(domain.SessionFieldUserID), value)
 	case sessionFieldCreatedAt:
 		return createdAtFilter(f.Operation, database.Col(domain.SessionFieldCreatedAt), f.Value)
 	case sessionFieldState:
-		value, ok := f.Value.(string)
-		if !ok {
-			return nil, domain.ErrRequestInvalid().WithDetails("state filter value must be a string")
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
 		}
 		return sessionStateFilter(f.Operation, value, now)
 	default:
