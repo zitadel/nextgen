@@ -5,14 +5,16 @@ import { chmod, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { mapWithConcurrency, run, runCapture } from "./dev-process.mjs";
+import { mapWithConcurrency, run } from "./dev-process.mjs";
 import {
   PUBLIC_PACKAGE_DIRS,
   PUBLIC_RELEASE_PACKAGES,
   SERVER_PLATFORM_PACKAGES,
 } from "./release-manifest.mjs";
+import { assertServerBuildPackage, gitInfo, serverLdflags } from "./server-build.mjs";
 
 export { PUBLIC_PACKAGE_DIRS, SERVER_PLATFORM_PACKAGES } from "./release-manifest.mjs";
+export { gitInfo } from "./server-build.mjs";
 
 export const SERVER_IMAGE = "ghcr.io/zitadel/nextgen";
 export const SERVER_PACKAGE = "@zitadel/server";
@@ -55,19 +57,6 @@ export function validateSemver(version) {
   }
 }
 
-export async function gitInfo(options = {}) {
-  const repoRoot = options.repoRoot ?? defaultRepoRoot;
-  const runCaptureFn = options.runCapture ?? runCapture;
-  const commit = (await runCaptureFn("git", ["rev-parse", "HEAD"], { cwd: repoRoot })).stdout.trim();
-  const shortCommit = (await runCaptureFn("git", ["rev-parse", "--short=12", "HEAD"], {
-    cwd: repoRoot,
-  })).stdout.trim();
-  const date = (await runCaptureFn("git", ["show", "-s", "--format=%cI", "HEAD"], {
-    cwd: repoRoot,
-  })).stdout.trim();
-  return { commit, shortCommit, date };
-}
-
 export function releaseDir(repoRoot, version) {
   return join(repoRoot, "dist", "release", version);
 }
@@ -93,6 +82,8 @@ export async function buildServerBinaries(options = {}) {
   const runFn = options.run ?? run;
   const baseEnv = { ...process.env, ...(options.env ?? {}) };
 
+  await assertServerBuildPackage({ repoRoot, runCapture: options.runCapture });
+
   // The per-platform builds are independent and the Go build cache is safe
   // under concurrency, so cross-compile all platforms at once.
   await mapWithConcurrency(platforms, platforms.length, async (platform) => {
@@ -105,12 +96,7 @@ export async function buildServerBinaries(options = {}) {
         "build",
         "-trimpath",
         "-ldflags",
-        [
-          "-s -w",
-          `-X main.version=${version}`,
-          `-X main.commit=${info.shortCommit}`,
-          `-X main.date=${info.date}`,
-        ].join(" "),
+        serverLdflags({ version, commit: info.commit, date: info.date, strip: true }),
         "-o",
         output,
         ".",

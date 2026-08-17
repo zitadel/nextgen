@@ -435,6 +435,14 @@ func loadConfig(configPath string) (Config, error) {
 	if err := v.Unmarshal(&cfg); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w", err)
 	}
+	// Create the data dir configuration actually selected, not the default
+	// computed above — an explicit empty data_dir still means the default.
+	if cfg.Server.DataDir == "" {
+		cfg.Server.DataDir = dataDir
+	}
+	if err := ensureServerDataDir(cfg.Server.DataDir); err != nil {
+		return Config{}, err
+	}
 	if err := ensureServerMasterKey(&cfg.Server); err != nil {
 		return Config{}, err
 	}
