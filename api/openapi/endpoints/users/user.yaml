@@ -13,8 +13,10 @@ description: |
   `propertyNames`, `unevaluatedProperties`) behave as their author expects.
 type: object
 required:
+  - id
   - schema
   - attributes
+  - metadata
 properties:
   id:
     readOnly: true
