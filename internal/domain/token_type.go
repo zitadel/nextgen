@@ -55,6 +55,13 @@ func (t TokenType) Persistable() bool {
 	}
 }
 
+// IsProjectSecret reports whether t may mint an sk_proj ScopeContext.
+// TokenTypeJWTProfile may be presented as a bearer (see its const comment) but
+// is not a project secret and must not take that path.
+func (t TokenType) IsProjectSecret() bool {
+	return t == TokenTypeProjectToken || t == TokenTypeProjectPreview
+}
+
 func (t TokenType) Value() (driver.Value, error) {
 	if !t.Persistable() {
 		return nil, ErrInvalidTokenType

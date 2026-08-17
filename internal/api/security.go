@@ -36,6 +36,9 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 	if err != nil {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
+	if !payload.Type.IsProjectSecret() {
+		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
 
 	scope := ScopeContext{
 		ProjectID:     payload.ProjectID,
