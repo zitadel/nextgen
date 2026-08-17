@@ -168,7 +168,7 @@ func (c *CreateUser) AttributeTeamScope() string {
 func NewCreateUser(projectID string, teamID *string, id, schemaURL string, schemabs []byte, attrs map[string]any) (*CreateUser, error) {
 	if schemaURL == "" {
 		return nil, ErrUserInvalid().
-			WithMessage("No schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
+			WithMessage("No schema provided. A user must name the schema its attributes are validated against.")
 	}
 
 	var jschema jsonschema.Schema

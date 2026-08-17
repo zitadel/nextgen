@@ -1,5 +1,8 @@
 import { field } from "./record";
 
+/** Shared so a user without attributes keeps a stable identity across renders. */
+const NO_ATTRIBUTES: Record<string, unknown> = Object.freeze({});
+
 /**
  * The user's schema-defined content, the half of the record a user schema
  * describes. Read defensively: the screens type users as open records, so a
@@ -7,7 +10,7 @@ import { field } from "./record";
  */
 export function userAttributes(user: Record<string, unknown>): Record<string, unknown> {
   const attributes = user.attributes;
-  if (!attributes || typeof attributes !== "object") return {};
+  if (!attributes || typeof attributes !== "object") return NO_ATTRIBUTES;
   return attributes as Record<string, unknown>;
 }
 
