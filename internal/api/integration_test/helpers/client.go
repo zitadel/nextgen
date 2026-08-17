@@ -89,16 +89,12 @@ func (h *Harness) SetProjectSecretOnApiClient(t *testing.T, client *ApiClient, p
 func (h *Harness) SetScopedTokenOnApiClient(t *testing.T, client *ApiClient, project *domain.Project, scopes ...string) {
 	t.Helper()
 
-	tokenCrypter, err := h.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
-	require.NoError(t, err)
-	token, err := (&domain.Token{
-		ProjectID: project.ID,
-		Type:      domain.TokenTypeProjectToken,
-		Scope:     scopes,
-	}).JWE(tokenCrypter)
+	tok := project.Token()
+	tok.Scope = scopes
+	secret, err := h.EnsureTokenService(t).GenerateJWE(t.Context(), tok)
 	require.NoError(t, err)
 
-	client.SetToken(token)
+	client.SetToken(secret)
 }
 
 func (h *Harness) SetPreviewSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {

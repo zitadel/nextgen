@@ -36,7 +36,7 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 	if err != nil {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
-	if !isProjectSecretType(payload.Type) {
+	if !payload.Type.IsProjectSecret() {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 
@@ -196,10 +196,6 @@ func WithScopeContext(ctx context.Context, scopeCtx ScopeContext) context.Contex
 func GetScopeContext(ctx context.Context) (ScopeContext, bool) {
 	v, ok := ctx.Value(contextKey{}).(ScopeContext)
 	return v, ok
-}
-
-func isProjectSecretType(t domain.TokenType) bool {
-	return t == domain.TokenTypeProjectToken || t == domain.TokenTypeProjectPreview
 }
 
 func withActorFromToken(ctx context.Context, token *domain.Token) context.Context {

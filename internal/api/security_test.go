@@ -15,55 +15,48 @@ import (
 func TestHandleOAuth2(t *testing.T) {
 	t.Parallel()
 
-	t.Run("project token mints sk_proj scope", func(t *testing.T) {
-		t.Parallel()
+	for _, tc := range []struct {
+		name  string
+		token *domain.Token
+	}{
+		{
+			name: "project token mints sk_proj scope",
+			token: &domain.Token{
+				ProjectID: "project-1",
+				TokenID:   "token-1",
+				Type:      domain.TokenTypeProjectToken,
+				Scope:     []string{"project.write", "project.read"},
+			},
+		},
+		{
+			name: "preview token mints sk_proj scope",
+			token: &domain.Token{
+				ProjectID: "project-1",
+				TokenID:   "token-preview",
+				Type:      domain.TokenTypeProjectPreview,
+				Scope:     []string{"project.read"},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-		token := &domain.Token{
-			ProjectID: "project-1",
-			TokenID:   "token-1",
-			Type:      domain.TokenTypeProjectToken,
-			Scope:     []string{"project.write", "project.read"},
-		}
+			mock := gomock.NewController(t)
+			tokenService := mocks.NewMockTokenService(mock)
+			tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(tc.token, nil)
 
-		mock := gomock.NewController(t)
-		tokenService := mocks.NewMockTokenService(mock)
-		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(token, nil)
+			handler := NewSecurityHandler(tokenService)
+			ctx, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: "raw-bearer"})
+			require.NoError(t, err)
 
-		handler := NewSecurityHandler(tokenService)
-		ctx, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: "raw-bearer"})
-		require.NoError(t, err)
-
-		got, ok := GetScopeContext(ctx)
-		require.True(t, ok)
-		require.Equal(t, "project-1", got.ProjectID)
-		require.Equal(t, domain.AuthzPrincipalTypeSKProj, got.PrincipalType)
-		require.Equal(t, "project-1", got.PrincipalID)
-		require.Equal(t, token.Scope, got.Scope)
-	})
-
-	t.Run("preview token mints sk_proj scope", func(t *testing.T) {
-		t.Parallel()
-
-		token := &domain.Token{
-			ProjectID: "project-1",
-			TokenID:   "token-preview",
-			Type:      domain.TokenTypeProjectPreview,
-			Scope:     []string{"project.read"},
-		}
-
-		mock := gomock.NewController(t)
-		tokenService := mocks.NewMockTokenService(mock)
-		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(token, nil)
-
-		handler := NewSecurityHandler(tokenService)
-		ctx, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: "raw-bearer"})
-		require.NoError(t, err)
-
-		got, ok := GetScopeContext(ctx)
-		require.True(t, ok)
-		require.Equal(t, domain.AuthzPrincipalTypeSKProj, got.PrincipalType)
-		require.Equal(t, "project-1", got.PrincipalID)
-	})
+			got, ok := GetScopeContext(ctx)
+			require.True(t, ok)
+			require.Equal(t, tc.token.ProjectID, got.ProjectID)
+			require.Equal(t, domain.AuthzPrincipalTypeSKProj, got.PrincipalType)
+			require.Equal(t, tc.token.ProjectID, got.PrincipalID)
+			require.Equal(t, tc.token.Scope, got.Scope)
+		})
+	}
 
 	t.Run("empty token is an unsatisfied requirement", func(t *testing.T) {
 		t.Parallel()
@@ -89,6 +82,7 @@ func TestHandleOAuth2(t *testing.T) {
 		name      string
 		tokenType domain.TokenType
 	}{
+		{name: "unspecified token", tokenType: domain.TokenTypeUnspecified},
 		{name: "session token", tokenType: domain.TokenTypeSessionToken},
 		{name: "oidc access token", tokenType: domain.TokenTypeOIDCAccessToken},
 		{name: "personal access token", tokenType: domain.TokenTypePersonalAccessToken},
