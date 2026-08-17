@@ -45,7 +45,15 @@ describe("users screen", () => {
           users: [
             // The shipped `consumer`/`business` presets spell the name parts
             // camelCase; `listUsers` returns the schema's attribute tree verbatim.
-            { id: "user_1", givenName: "Maya", familyName: "Patel", email: "maya.patel@acme.com" },
+            {
+              id: "user_1",
+              schema: "sch_business",
+              attributes: {
+                givenName: "Maya",
+                familyName: "Patel",
+                email: "maya.patel@acme.com",
+              },
+            },
           ],
         }),
       ),
@@ -65,7 +73,11 @@ describe("users screen", () => {
       http.get(USERS_URL, () =>
         HttpResponse.json({
           users: [
-            { id: "user_1", $schema: "sch_business", email: "maya@acme.com", companyName: "Acme" },
+            {
+              id: "user_1",
+              schema: "sch_business",
+              attributes: { email: "maya@acme.com", companyName: "Acme" },
+            },
           ],
         }),
       ),
@@ -98,8 +110,12 @@ describe("users screen", () => {
       http.get(USERS_URL, () =>
         HttpResponse.json({
           users: [
-            { id: "user_1", $schema: "sch_business", email: "maya@acme.com", companyName: "Acme" },
-            { id: "user_2", $schema: "sch_business", email: "min@acme.com" },
+            {
+              id: "user_1",
+              schema: "sch_business",
+              attributes: { email: "maya@acme.com", companyName: "Acme" },
+            },
+            { id: "user_2", schema: "sch_business", attributes: { email: "min@acme.com" } },
           ],
         }),
       ),
@@ -132,13 +148,15 @@ describe("users screen", () => {
           users: [
             {
               id: "user_1",
-              name: "Ada L.",
-              givenName: "Ada",
-              familyName: "Lovelace",
-              email: "a@x.com",
+              attributes: {
+                name: "Ada L.",
+                givenName: "Ada",
+                familyName: "Lovelace",
+                email: "a@x.com",
+              },
             },
-            { id: "user_2", given_name: "Grace", family_name: "Hopper", email: "g@x.com" },
-            { id: "user_3", givenName: "Radia", email: "r@x.com" },
+            { id: "user_2", attributes: { given_name: "Grace", family_name: "Hopper", email: "g@x.com" } },
+            { id: "user_3", attributes: { givenName: "Radia", email: "r@x.com" } },
           ],
         }),
       ),
@@ -157,7 +175,7 @@ describe("users screen", () => {
     // unrelated attribute as the name is worse than having none.
     server.use(
       http.get(USERS_URL, () =>
-        HttpResponse.json({ users: [{ id: "user_1", username: "nope", email: "kenji@acme.com" }] }),
+        HttpResponse.json({ users: [{ id: "user_1", attributes: { username: "nope", email: "kenji@acme.com" } }] }),
       ),
     );
     await renderUsers();
@@ -169,7 +187,7 @@ describe("users screen", () => {
   it("shows the user id alongside the schema's own attributes", async () => {
     server.use(
       http.get(USERS_URL, () =>
-        HttpResponse.json({ users: [{ id: "user_1", email: "kenji@acme.com", status: "Blocked" }] }),
+        HttpResponse.json({ users: [{ id: "user_1", attributes: { email: "kenji@acme.com", status: "Blocked" } }] }),
       ),
     );
     await renderUsers();
@@ -216,8 +234,8 @@ describe("users screen", () => {
       http.get(USERS_URL, () =>
         HttpResponse.json({
           users: [
-            { id: "user_1", givenName: "Maya", familyName: "Patel", email: "maya@acme.com" },
-            { id: "user_2", givenName: "Sasha", familyName: "Kim", email: "sasha@acme.com" },
+            { id: "user_1", attributes: { givenName: "Maya", familyName: "Patel", email: "maya@acme.com" } },
+            { id: "user_2", attributes: { givenName: "Sasha", familyName: "Kim", email: "sasha@acme.com" } },
           ],
         }),
       ),
@@ -244,10 +262,10 @@ describe("users screen", () => {
       http.get(USERS_URL, () =>
         HttpResponse.json({
           users: [
-            { id: "user_1", email: "a@x.com", metadata: { status: "active" } },
-            { id: "user_2", email: "b@x.com", metadata: { status: "pending_purge" } },
+            { id: "user_1", metadata: { status: "active" }, attributes: { email: "a@x.com" } },
+            { id: "user_2", metadata: { status: "pending_purge" }, attributes: { email: "b@x.com" } },
             // Written before `metadata` existed: nothing is invented for it.
-            { id: "user_3", email: "c@x.com" },
+            { id: "user_3", attributes: { email: "c@x.com" } },
           ],
         }),
       ),
@@ -267,7 +285,7 @@ describe("users screen", () => {
     server.use(
       http.get(USERS_URL, () =>
         HttpResponse.json({
-          users: [{ id: "user_1", email: "a@x.com", metadata: { status: "active" } }],
+          users: [{ id: "user_1", metadata: { status: "active" }, attributes: { email: "a@x.com" } }],
         }),
       ),
     );
@@ -285,9 +303,9 @@ describe("users screen", () => {
         const token = new URL(request.url).searchParams.get("page_token");
         asked = token;
         return token
-          ? HttpResponse.json({ users: [{ id: "user_2", email: "second@x.com" }] })
+          ? HttpResponse.json({ users: [{ id: "user_2", attributes: { email: "second@x.com" } }] })
           : HttpResponse.json({
-              users: [{ id: "user_1", email: "first@x.com" }],
+              users: [{ id: "user_1", attributes: { email: "first@x.com" } }],
               next_page_token: "tok_2",
             });
       }),
@@ -321,11 +339,11 @@ describe("users screen", () => {
         const token = new URL(request.url).searchParams.get("page_token");
         if (token) {
           await secondPageSent;
-          return HttpResponse.json({ users: [{ id: "user_stale", email: "stale@x.com" }] });
+          return HttpResponse.json({ users: [{ id: "user_stale", attributes: { email: "stale@x.com" } }] });
         }
         firstPageCalls += 1;
         return HttpResponse.json({
-          users: [{ id: "user_1", email: `page1-${firstPageCalls}@x.com` }],
+          users: [{ id: "user_1", attributes: { email: `page1-${firstPageCalls}@x.com` } }],
           next_page_token: "tok_2",
         });
       }),

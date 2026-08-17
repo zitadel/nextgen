@@ -56,7 +56,10 @@ describe("seedUser via connectZitadel", () => {
     expect(user.email).toMatch(/^e2e-[0-9a-f]{8}@example\.com$/);
     expect(user.password.length).toBeGreaterThanOrEqual(8);
 
-    expect(captured.userBody).toMatchObject({ $schema: "sch_1", email: user.email });
+    expect(captured.userBody).toMatchObject({
+      schema: "sch_1",
+      attributes: { email: user.email },
+    });
     expect(captured.userAuth).toBe("Bearer secret_1");
     expect(captured.userQuery).toBe("proj_1");
     expect(captured.passwordUserId).toBe("user_1");
@@ -77,24 +80,25 @@ describe("seedUser via connectZitadel", () => {
       password: "hunter2-hunter2",
     });
     expect(captured.userBody).toMatchObject({
-      $schema: "sch_1",
-      email: "alice@acme.com",
-      firstName: "Alice",
+      schema: "sch_1",
+      attributes: { email: "alice@acme.com", firstName: "Alice" },
     });
   });
 
-  it("never lets attributes override reserved fields", async () => {
+  it("keeps the envelope out of reach of the attributes", async () => {
     const zitadel = connectZitadel(handle);
     const user = await zitadel.seedUser({
       email: "real@acme.com",
-      attributes: { email: "evil@acme.com", $schema: "sch_evil", firstName: "Mallory" },
+      attributes: { email: "evil@acme.com", schema: "sch_evil", firstName: "Mallory" },
     });
 
+    // `email` is the one attribute the caller cannot override, since the
+    // returned SeededUser has to match what was created. A `schema` attribute
+    // is just a schema property now, and does not reach the envelope.
     expect(user.email).toBe("real@acme.com");
     expect(captured.userBody).toMatchObject({
-      $schema: "sch_1",
-      email: "real@acme.com",
-      firstName: "Mallory",
+      schema: "sch_1",
+      attributes: { email: "real@acme.com", schema: "sch_evil", firstName: "Mallory" },
     });
   });
 
