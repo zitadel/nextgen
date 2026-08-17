@@ -86,8 +86,8 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
   management handlers call `resolver.Check` (coarse
   `project.{viewer,editor,admin}` until #420) after credential resolution.
   By-id scoped Allow (team-/resource-scoped grants after RSI) is specified in
-  [`authz.md`](authz.md#scoped-allow-team--resource-scoped-grants) and tracked
-  in [#833](https://github.com/zitadel/nextgen/issues/833). HTTP list
+  [`authz.md`](authz.md#scoped-allow) and landed in
+  [#833](https://github.com/zitadel/nextgen/issues/833). HTTP list
   narrowing is live ([#834](https://github.com/zitadel/nextgen/issues/834)):
   management list endpoints inject an authz EXISTS **predicate** (same
   assignment/closure branches as `ListObjects`) via `service.AuthzListFilter`

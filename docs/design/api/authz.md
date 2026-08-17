@@ -54,7 +54,7 @@ Permissions are flat `{resource}.{verb}` strings such as `user.read`, `project.w
 > `{resource}.{verb}` catalog relations land with #420; until then do not
 > assume independently mintable per-resource scopes when configuring clients.
 
-## Scoped Allow (team- / resource-scoped grants)
+## Scoped Allow
 
 Locked for [#833](https://github.com/zitadel/nextgen/issues/833) / [#834](https://github.com/zitadel/nextgen/issues/834). List SQL already evaluates team- and resource-scoped grant arms. By-id Check uses those arms after an RSI hit; HTTP lists proceed on Forbidden and attach the EXISTS predicate.
 
