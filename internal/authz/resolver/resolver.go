@@ -20,8 +20,12 @@ type Request struct {
 	// AuthzCheckParams.ConstraintTeamID so SQL can constrain the object.
 	TeamID string
 	// ResourceID is the object being checked (user id, team id, path id).
-	// Optional for permission-level Check; used for per-object sk_team_ deny
-	// and resource-scoped grant arms.
+	// Optional for permission-level Check of non-team-bound types; required for
+	// sk_team checks of team-bound object types so the compensating team
+	// constraint cannot be skipped. Also used for resource-scoped grant arms.
+	// Empty ResourceID does not skip the grant Check — it only skips the extra
+	// "object is in the token team" AND — so omission would look like a
+	// create-style Check. Missing id is an error, not Allow.
 	ResourceID string
 	// ResourceTeamID is RSI.team_id after a by-id lookup (team-scoped grant arm).
 	ResourceTeamID string
@@ -66,6 +70,9 @@ func New() *Resolver {
 // Forbidden / NotFound as usual.
 func (r *Resolver) Check(ctx context.Context, stmts service.AuthzResolverStatements, req Request) (Decision, error) {
 	if err := validateCheckRequest(req); err != nil {
+		return DecisionUnspecified, err
+	}
+	if err := requireSKTeamTeamBoundResourceID(req); err != nil {
 		return DecisionUnspecified, err
 	}
 	if req.PrincipalType == domain.AuthzPrincipalTypeSKTeam &&
@@ -176,4 +183,13 @@ func validateCheckRequest(req Request) error {
 	default:
 		return nil
 	}
+}
+
+func requireSKTeamTeamBoundResourceID(req Request) error {
+	if req.PrincipalType == domain.AuthzPrincipalTypeSKTeam &&
+		domain.TeamBoundObjectType(req.ObjectType) &&
+		req.ResourceID == "" {
+		return fmt.Errorf("resolver: resource id is required for sk_team team-bound checks")
+	}
+	return nil
 }
