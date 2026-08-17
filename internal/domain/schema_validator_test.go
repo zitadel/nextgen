@@ -176,8 +176,8 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 		{
 			// The audit emitter enables the value for any non-empty string
 			// other than "false", so `x-audit: "no"` would allowlist a field
-			// while reading as a refusal. The dialect only spells `true` or
-			// "identifier", which turns that into a push-time failure.
+			// while reading as a refusal. The dialect is boolean-only, which
+			// turns that into a push-time failure.
 			name: "invalid x-audit string",
 			input: []byte(`{
 				"metaSchema": "https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/user-schema.json",
@@ -211,7 +211,7 @@ func TestTenantSchemaValidator_ValidateAgainstMetaSchema(t *testing.T) {
 					"email": {
 						"type": "string",
 						"writeOnly": true,
-						"x-audit": "identifier",
+						"x-audit": true,
 						"x-not-a-real-annotation": true
 					}
 				}

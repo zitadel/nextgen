@@ -41536,10 +41536,8 @@ type UserProperty struct {
 	XMinusClaim OptNilString `json:"x-claim"`
 	// Whether this property's value may appear in audit event payloads. Audit
 	// payloads are deny-by-default: a property without this annotation
-	// contributes its key but never its value. `identifier` enables the value
-	// the same way `true` does, and is the spelling reserved for fields used to
-	// correlate events.
-	XMinusAudit jx.Raw `json:"x-audit"`
+	// contributes its key but never its value.
+	XMinusAudit OptBool `json:"x-audit"`
 	// A map of additional properties for the user definition, where the key is
 	// the property name and the value is the property schema.
 	Properties      OptUserPropertyProperties `json:"properties"`
@@ -41562,7 +41560,7 @@ func (s *UserProperty) GetXMinusClaim() OptNilString {
 }
 
 // GetXMinusAudit returns the value of XMinusAudit.
-func (s *UserProperty) GetXMinusAudit() jx.Raw {
+func (s *UserProperty) GetXMinusAudit() OptBool {
 	return s.XMinusAudit
 }
 
@@ -41592,7 +41590,7 @@ func (s *UserProperty) SetXMinusClaim(val OptNilString) {
 }
 
 // SetXMinusAudit sets the value of XMinusAudit.
-func (s *UserProperty) SetXMinusAudit(val jx.Raw) {
+func (s *UserProperty) SetXMinusAudit(val OptBool) {
 	s.XMinusAudit = val
 }
 

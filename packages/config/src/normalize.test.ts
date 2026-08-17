@@ -75,11 +75,10 @@ describe("normalizeSchemaBody", () => {
     });
   });
 
-  it("keeps non-default values, including the string form of x-audit", () => {
+  it("keeps non-default values", () => {
     const body = {
       properties: {
         email: { type: "string", "x-audit": true },
-        phone: { type: "string", "x-audit": "identifier" },
         secret: { type: "string", writeOnly: true },
       },
     };

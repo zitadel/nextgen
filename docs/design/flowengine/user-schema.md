@@ -24,8 +24,7 @@ ignored — the dialect keeps `additionalProperties: true`, so an unrecognised
 
 Audit event payloads use a **deny-by-default** PII policy: an attribute
 contributes its key to the payload, and its value only when the property is
-marked `x-audit` (`true`, or `"identifier"` for a field used to correlate
-events). See
+marked `x-audit: true`. See
 [ADR 048](../../adrs/048-wide-events-internal-audit-primitive.md) §8.
 
 ## How the Flow Engine and Policy Engine Consume Schemas
@@ -71,7 +70,7 @@ The following is an example user schema showing the annotations that the flow en
       "title": "Email address",
       "x-unique": "project",
       "x-claim": "claims.email",
-      "x-audit": "identifier"
+      "x-audit": true
     },
     "phone": {
       "type": "string",

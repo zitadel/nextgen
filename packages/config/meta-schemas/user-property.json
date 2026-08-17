@@ -47,19 +47,9 @@
       "description": "The claim name for this property, if applicable"
     },
     "x-audit": {
-      "oneOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "type": "string",
-          "enum": [
-            "identifier"
-          ]
-        }
-      ],
+      "type": "boolean",
       "default": false,
-      "description": "Whether this property's value may appear in audit event payloads. Audit payloads are deny-by-default: a property without this annotation contributes its key but never its value. `identifier` enables the value the same way `true` does, and is the spelling reserved for fields used to correlate events."
+      "description": "Whether this property's value may appear in audit event payloads. Audit payloads are deny-by-default: a property without this annotation contributes its key but never its value."
     },
     "properties": {
       "type": "object",

@@ -477,11 +477,12 @@ regardless of annotation.
 ### Amendment (2026-08-14): `x-audit` is declared; `x-sensitive` is gone
 
 `x-audit` is now part of the user-schema dialect
-(`api/openapi/endpoints/schemas/user-property.json`), declared as `true` or the
-string `"identifier"`. The emitter accepts any non-empty string other than
-`"false"`, so the declaration is the narrower of the two: `x-audit: "no"` would
-have enabled the value while reading as a refusal, and now fails validation at
-push instead.
+(`api/openapi/endpoints/schemas/user-property.json`), declared as a boolean. The
+emitter enables the value for any non-empty string other than `"false"`, so the
+declaration is the narrower of the two: `x-audit: "no"` would have enabled the
+value while reading as a refusal, and now fails validation at push instead.
+Point 2's `"identifier"` spelling is not part of the dialect — a field used to
+correlate events is marked `x-audit: true` like any other.
 
 Point 4 above no longer holds. `x-sensitive` was removed from the dialect along
 with `x-verify`, `x-editable`, and `x-mfa` — none had a consumer, and the three

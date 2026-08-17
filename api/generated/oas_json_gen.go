@@ -65749,9 +65749,9 @@ func (s *UserProperty) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if len(s.XMinusAudit) != 0 {
+		if s.XMinusAudit.Set {
 			e.FieldStart("x-audit")
-			e.Raw(s.XMinusAudit)
+			s.XMinusAudit.Encode(e)
 		}
 	}
 	{
@@ -65819,9 +65819,8 @@ func (s *UserProperty) Decode(d *jx.Decoder) error {
 			}
 		case "x-audit":
 			if err := func() error {
-				v, err := d.RawAppend(nil)
-				s.XMinusAudit = jx.Raw(v)
-				if err != nil {
+				s.XMinusAudit.Reset()
+				if err := s.XMinusAudit.Decode(d); err != nil {
 					return err
 				}
 				return nil
