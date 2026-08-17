@@ -3,7 +3,6 @@ post:
   summary: Query teams
   description: |
     Returns the teams of a project, paginated with a cursor.
-    Teams of every lifecycle status are returned; each carries its `status`.
   tags:
     - Teams
   security:

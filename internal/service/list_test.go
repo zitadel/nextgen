@@ -149,7 +149,7 @@ func TestStringFilter(t *testing.T) {
 		wantErr error
 	}{
 		{name: "equals", op: filterOpEquals, want: database.StringEqual(col, value)},
-		{name: "contains", op: filterOpContains, want: database.StringContains(col, value)},
+		{name: "contains matches case-insensitively", op: filterOpContains, want: database.StringContainsFold(col, value)},
 		{name: "not_equals not implemented", op: filterOpNotEquals, wantErr: domain.ErrNotImplemented()},
 		{name: "not_contains not implemented", op: filterOpNotContains, wantErr: domain.ErrNotImplemented()},
 		{name: "less_than is invalid for a string field", op: filterOpLessThan, wantErr: domain.ErrRequestInvalid()},

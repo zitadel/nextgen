@@ -11,10 +11,12 @@ import {
 } from "../apps/cli-journey-e2e/scripts/local-registry.mjs";
 import { buildLocalRuntimeImage, LOCAL_RUNTIME_IMAGE } from "./build-local-runtime-image.mjs";
 import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
+import { readServerBuildMetadata } from "./server-build.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const cliBin = join(repoRoot, "apps/cli/bin/run.js");
 const localServerBinary = join(repoRoot, "dist/server/nextgen");
+const localServerMetadata = join(repoRoot, "dist/server/metadata.json");
 const localRegistryWorkDir = join(repoRoot, "tmp", "cli-local-registry");
 
 export async function main(options = {}) {
@@ -35,7 +37,9 @@ export async function main(options = {}) {
   await buildCliFn({ env });
 
   if (shouldUseLocalServerBinary(args, env)) {
-    cliEnv.ZITADEL_SERVER_BINARY = await buildLocalServerBinaryFn({ env });
+    const localServer = await buildLocalServerBinaryFn({ env });
+    cliEnv.ZITADEL_SERVER_BINARY = localServer.path;
+    cliEnv.ZITADEL_SERVER_BINARY_VERSION = localServer.version;
   }
 
   if (shouldPrepareLocalPackages(args, env)) {
@@ -210,7 +214,8 @@ export async function buildLocalServerBinary({ env = process.env } = {}) {
   // server:build deps console:build and login-ui:build, so one invocation
   // produces the fully embedded binary in graph order.
   await runMoonToStderr(["run", "server:build"], "moon run server:build", env);
-  return localServerBinary;
+  const metadata = await readServerBuildMetadata(localServerMetadata);
+  return { path: localServerBinary, version: metadata.version };
 }
 
 function runMoonToStderr(args, label, env = process.env) {
