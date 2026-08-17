@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,6 +17,7 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -55,12 +57,14 @@ func TestCreateUser(t *testing.T) {
 					ProjectID: api.ProjectID(project.ID),
 				},
 				userjson: helpers.MustMarshal(t, map[string]any{
-					"$schema":     "https://test.example.schemas.com/schemas/default-human-user.json",
-					"email":       "john.doe.withalloptionalproperties@example.com",
-					"givenName":   "John",
-					"familyName":  "Doe",
-					"dateOfBirth": "1990-05-12",
-					"password":    "my-strong-password",
+					"schema": test_data.UserSchemaURL,
+					"attributes": map[string]any{
+						"email":       "john.doe.withalloptionalproperties@example.com",
+						"givenName":   "John",
+						"familyName":  "Doe",
+						"dateOfBirth": "1990-05-12",
+						"password":    "my-strong-password",
+					},
 				}),
 			},
 			{
@@ -69,11 +73,13 @@ func TestCreateUser(t *testing.T) {
 					ProjectID: api.ProjectID(project.ID),
 				},
 				userjson: helpers.MustMarshal(t, map[string]any{
-					"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
-					"email":      "john.doe.withoutoptionalproperties@example.com",
-					"givenName":  "John",
-					"familyName": "Doe",
-					"password":   "my-strong-password",
+					"schema": test_data.UserSchemaURL,
+					"attributes": map[string]any{
+						"email":      "john.doe.withoutoptionalproperties@example.com",
+						"givenName":  "John",
+						"familyName": "Doe",
+						"password":   "my-strong-password",
+					},
 				}),
 			},
 			{
@@ -82,11 +88,13 @@ func TestCreateUser(t *testing.T) {
 					ProjectID: api.ProjectID(project.ID),
 				},
 				userjson: helpers.MustMarshal(t, map[string]any{
-					"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
-					"email":      "john.doe.withoutteammembership@example.com",
-					"givenName":  "John",
-					"familyName": "Doe",
-					"password":   "my-strong-password",
+					"schema": test_data.UserSchemaURL,
+					"attributes": map[string]any{
+						"email":      "john.doe.withoutteammembership@example.com",
+						"givenName":  "John",
+						"familyName": "Doe",
+						"password":   "my-strong-password",
+					},
 				}),
 			},
 			{
@@ -96,11 +104,13 @@ func TestCreateUser(t *testing.T) {
 					TeamID:    api.OptTeamID{Set: true, Value: api.TeamID(team.ID)},
 				},
 				userjson: helpers.MustMarshal(t, map[string]any{
-					"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
-					"email":      "john.doe.withteammembermship@example.com",
-					"givenName":  "John",
-					"familyName": "Doe",
-					"password":   "my-strong-password",
+					"schema": test_data.UserSchemaURL,
+					"attributes": map[string]any{
+						"email":      "john.doe.withteammembermship@example.com",
+						"givenName":  "John",
+						"familyName": "Doe",
+						"password":   "my-strong-password",
+					},
 				}),
 			},
 			{
@@ -109,11 +119,13 @@ func TestCreateUser(t *testing.T) {
 					ProjectID: api.ProjectID(project.ID),
 				},
 				userjson: helpers.MustMarshal(t, map[string]any{
-					"$schema":     "https://test.example.schemas.com/schemas/default-human-user.json",
-					"email":       "john.doe.emptyvalueoptionalproperties@example.com",
-					"password":    "my-strong-password",
-					"name":        "",
-					"phoneNumber": "",
+					"schema": test_data.UserSchemaURL,
+					"attributes": map[string]any{
+						"email":       "john.doe.emptyvalueoptionalproperties@example.com",
+						"password":    "my-strong-password",
+						"name":        "",
+						"phoneNumber": "",
+					},
 				}),
 			},
 		}
@@ -121,16 +133,45 @@ func TestCreateUser(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
 
-				user := &api.User{}
+				user := &api.CreateUserRequest{}
 				err := user.UnmarshalJSON([]byte(tc.userjson))
 				require.NoError(t, err)
 
 				resp, err := client.CreateUser(t.Context(), user, params)
 				assert.NoError(t, err)
 
-				assert.IsType(t, &api.CreateUserResponse{}, resp, helpers.MustMarshal(t, resp))
+				assert.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 			})
 		}
+
+		t.Run("attributes may use envelope names", func(t *testing.T) {
+			t.Parallel()
+
+			// The envelope and the schema-defined content are separate
+			// namespaces, so a schema is free to declare `id` or `metadata`.
+			// Neither collides with the server's own fields.
+			user := &api.CreateUserRequest{}
+			require.NoError(t, user.UnmarshalJSON([]byte(helpers.MustMarshal(t, map[string]any{
+				"schema": test_data.UserSchemaURL,
+				"attributes": map[string]any{
+					"email":    "john.doe.envelopenames@example.com",
+					"password": "my-strong-password",
+					"id":       "the-schema-owns-this-one",
+					"metadata": "so-is-this",
+				},
+			}))))
+
+			resp, err := client.CreateUser(t.Context(), user, params)
+			require.NoError(t, err)
+			require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
+
+			created := resp.(*api.User)
+			assert.True(t, strings.HasPrefix(string(created.ID), "user_"),
+				"the envelope id is the minted one, not the attribute")
+			assert.Equal(t, "the-schema-owns-this-one", userProp(t, *created, "id"))
+			assert.Equal(t, "so-is-this", userProp(t, *created, "metadata"))
+			assert.Equal(t, api.UserMetadataStatusActive, created.Metadata.Status)
+		})
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -152,19 +193,12 @@ func TestCreateUser(t *testing.T) {
 					// flow_field_validation_test.go.)
 					name: "missing required email property",
 					userjson: helpers.MustMarshal(t, map[string]any{
-						"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
-						"givenName":  "John",
-						"familyName": "Doe",
-						"password":   "my-strong-password",
-					}),
-				},
-				{
-					name: "client-supplied resource id",
-					userjson: helpers.MustMarshal(t, map[string]any{
-						"$schema":  "https://test.example.schemas.com/schemas/default-human-user.json",
-						"id":       "user_client_supplied",
-						"email":    "john.doe.clientsuppliedid@example.com",
-						"password": "my-strong-password",
+						"schema": test_data.UserSchemaURL,
+						"attributes": map[string]any{
+							"givenName":  "John",
+							"familyName": "Doe",
+							"password":   "my-strong-password",
+						},
 					}),
 				},
 			}
@@ -173,7 +207,7 @@ func TestCreateUser(t *testing.T) {
 				t.Run(tc.name, func(t *testing.T) {
 					t.Parallel()
 
-					user := &api.User{}
+					user := &api.CreateUserRequest{}
 					err := user.UnmarshalJSON([]byte(tc.userjson))
 					require.NoError(t, err)
 
@@ -185,36 +219,48 @@ func TestCreateUser(t *testing.T) {
 			}
 		})
 
-		t.Run("a caller-supplied id does not shadow the minted one", func(t *testing.T) {
+		t.Run("a caller-supplied id is refused", func(t *testing.T) {
 			t.Parallel()
 
-			// `id` is served as a field of api.User and would be served a second
-			// time if it were also stored as an attribute — and on decode the
-			// second one wins. So a body carrying `id` must not reach the
-			// attributes: the reads below must report the id the platform minted.
-			usermap := harness.EnsureTestData(t).Generator.GenerateUser(t, "testcreateuser.suppliedid@example.com")
-			usermap["id"] = "user_supplied_by_the_caller"
+			// ADR 047 section 4: a create body must not carry a client-chosen
+			// resource primary key. The request schema is closed, so the field
+			// is refused rather than skipped — the generated client cannot
+			// express it, hence the raw request.
+			body := helpers.MustMarshal(t, map[string]any{
+				"schema":     test_data.UserSchemaURL,
+				"id":         "user_supplied_by_the_caller",
+				"attributes": harness.EnsureTestData(t).Generator.GenerateUser(t, "testcreateuser.suppliedid@example.com"),
+			})
 
-			user := &api.User{}
-			require.NoError(t, user.UnmarshalJSON([]byte(helpers.MustMarshal(t, usermap))))
-
-			resp, err := client.CreateUser(t.Context(), user, params)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+				harness.EnsureTestServer(t).URL+"/users?project_id="+project.ID, strings.NewReader(body))
 			require.NoError(t, err)
-			require.IsType(t, &api.CreateUserBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+harness.ProjectSecret(t, project))
+
+			resp, err := harness.EnsureHttpClient(t).Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			answer, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+
+			assert.Equal(t, http.StatusBadRequest, resp.StatusCode, string(answer))
 		})
 
 		t.Run("duplicate mail address", func(t *testing.T) {
 			t.Parallel()
 
-			usermap := harness.EnsureTestData(t).Generator.GenerateUser(t, "testcreateuser.error.duplicatemailaddress@example.com")
-
-			user := &api.User{}
-			err := user.UnmarshalJSON([]byte(helpers.MustMarshal(t, usermap)))
+			user := &api.CreateUserRequest{}
+			err := user.UnmarshalJSON([]byte(helpers.MustMarshal(t, map[string]any{
+				"schema":     test_data.UserSchemaURL,
+				"attributes": harness.EnsureTestData(t).Generator.GenerateUser(t, "testcreateuser.error.duplicatemailaddress@example.com"),
+			})))
 			require.NoError(t, err)
 
 			resp, err := client.CreateUser(t.Context(), user, params)
 			require.NoError(t, err)
-			require.IsType(t, &api.CreateUserResponse{}, resp, helpers.MustMarshal(t, resp))
+			require.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
 
 			resp, err = client.CreateUser(t.Context(), user, params)
 			assert.NoError(t, err)
@@ -241,14 +287,15 @@ func TestDeleteUser(t *testing.T) {
 			t.Parallel()
 
 			user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-				ProjectID: project.ID,
-				User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "testdeleteuser@example.com"),
+				ProjectID:  project.ID,
+				SchemaURL:  test_data.UserSchemaURL,
+				Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testdeleteuser@example.com"),
 			})
 			require.NoError(t, err)
 
 			// ACT
 			deleteParams := api.DeleteUserByIDParams{
-				UserID: api.UserID(user["id"].(string)),
+				UserID: api.UserID(user.ID),
 			}
 			deleteResp, err := client.DeleteUserByID(t.Context(), deleteParams)
 			require.NoError(t, err)
@@ -257,7 +304,7 @@ func TestDeleteUser(t *testing.T) {
 			assert.IsType(t, &api.DeleteUserByIDNoContent{}, deleteResp, helpers.MustMarshal(t, deleteResp))
 
 			getUserParams := api.GetUserByIDParams{
-				UserID: api.UserID(user["id"].(string)),
+				UserID: api.UserID(user.ID),
 			}
 			getResp, err := client.GetUserByID(t.Context(), getUserParams)
 			require.NoError(t, err)
@@ -288,11 +335,12 @@ func TestDeleteUser(t *testing.T) {
 			userService := harness.EnsureUserService(t)
 
 			user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-				ProjectID: project.ID,
-				User:      harness.EnsureTestData(t).Generator.GenerateUser(t, email),
+				ProjectID:  project.ID,
+				SchemaURL:  test_data.UserSchemaURL,
+				Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, email),
 			})
 			require.NoError(t, err)
-			userID := user["id"].(string)
+			userID := user.ID
 
 			err = userService.SetPassword(t.Context(), service.SetPasswordInput{
 				ProjectID: project.ID,
@@ -346,13 +394,14 @@ func TestSetUserPassword(t *testing.T) {
 	createUser := func(t *testing.T, email string) (api.SetUserPasswordParams, string) {
 		t.Helper()
 		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-			ProjectID: project.ID,
-			User:      harness.EnsureTestData(t).Generator.GenerateUser(t, email),
+			ProjectID:  project.ID,
+			SchemaURL:  test_data.UserSchemaURL,
+			Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, email),
 		})
 		require.NoError(t, err)
 		return api.SetUserPasswordParams{
-			UserID: api.UserID(user["id"].(string)),
-		}, user["email"].(string)
+			UserID: api.UserID(user.ID),
+		}, user.StringAttribute("email")
 	}
 
 	t.Run("ok", func(t *testing.T) {
@@ -458,8 +507,9 @@ func TestGetUser(t *testing.T) {
 	require.NoError(t, err)
 
 	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-		ProjectID: project.ID,
-		User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuser@example.com"),
+		ProjectID:  project.ID,
+		SchemaURL:  test_data.UserSchemaURL,
+		Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuser@example.com"),
 	})
 	require.NoError(t, err)
 
@@ -468,7 +518,7 @@ func TestGetUser(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	params := api.GetUserByIDParams{
-		UserID: api.UserID(user["id"].(string)),
+		UserID: api.UserID(user.ID),
 	}
 
 	resp, err := client.GetUserByID(t.Context(), params)
@@ -478,9 +528,7 @@ func TestGetUser(t *testing.T) {
 
 	// The roster lives at /users/{user_id}/teams; the user itself only reports
 	// who owns its lifecycle, and this one is self-owned.
-	metadata, ok := resp.(*api.User).Metadata.Get()
-	require.True(t, ok, "the user carries metadata")
-	assert.True(t, metadata.LifecycleOwnerTeamID.Null)
+	assert.True(t, resp.(*api.User).Metadata.LifecycleOwnerTeamID.Null)
 }
 
 // TestListUserTeams pins the roster endpoint and the line ADR 024 draws: the
@@ -574,9 +622,7 @@ func TestListUserTeams(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.User{}, userResp, helpers.MustMarshal(t, userResp))
-	metadata, ok := userResp.(*api.User).Metadata.Get()
-	require.True(t, ok, "the user carries metadata")
-	assert.Equal(t, api.NewOptNilString(owner.ID), metadata.LifecycleOwnerTeamID,
+	assert.Equal(t, api.NewOptNilString(owner.ID), userResp.(*api.User).Metadata.LifecycleOwnerTeamID,
 		"the lifecycle owner is not one of the roster teams")
 
 	// An unknown user is a 404, not an empty roster.
@@ -603,12 +649,13 @@ func TestGetMyUser(t *testing.T) {
 		userService := harness.EnsureUserService(t)
 
 		user, err := userService.CreateUser(t.Context(), service.CreateUserInput{
-			ProjectID: project.ID,
-			User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuser@example.com"),
+			ProjectID:  project.ID,
+			SchemaURL:  test_data.UserSchemaURL,
+			Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuser@example.com"),
 		})
 		require.NoError(t, err)
-		userID := user["id"].(string)
-		userEmail := user["email"].(string)
+		userID := user.ID
+		userEmail := user.StringAttribute("email")
 
 		const password = "fake-password"
 		err = userService.SetPassword(t.Context(), service.SetPasswordInput{
@@ -677,13 +724,14 @@ func TestGetMyUser(t *testing.T) {
 func TestListPasskeys(t *testing.T) {
 	t.Parallel()
 
-	dependencies := func(t *testing.T) (project *domain.Project, user map[string]any, client *helpers.ApiClient) {
+	dependencies := func(t *testing.T) (project *domain.Project, user *domain.User, client *helpers.ApiClient) {
 		project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
 
 		user, err = harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-			ProjectID: project.ID,
-			User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuser@example.com"),
+			ProjectID:  project.ID,
+			SchemaURL:  test_data.UserSchemaURL,
+			Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "testgetuser@example.com"),
 		})
 		require.NoError(t, err)
 
@@ -700,7 +748,7 @@ func TestListPasskeys(t *testing.T) {
 
 			project, user, client := dependencies(t)
 
-			userID := user["id"].(string)
+			userID := user.ID
 			harness.RegisterPasskey(t, project.ID, userID, "first passkey")
 			harness.RegisterPasskey(t, project.ID, userID, "second passkey")
 
@@ -731,7 +779,7 @@ func TestListPasskeys(t *testing.T) {
 			_, user, client := dependencies(t)
 
 			params := api.ListUserPasskeysParams{
-				UserID: api.UserID(user["id"].(string)),
+				UserID: api.UserID(user.ID),
 			}
 
 			resp, err := client.ListUserPasskeys(t.Context(), params)

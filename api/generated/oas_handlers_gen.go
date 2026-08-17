@@ -2110,7 +2110,7 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 		}
 
 		type (
-			Request  = *User
+			Request  = *CreateUserRequest
 			Params   = CreateUserParams
 			Response = CreateUserRes
 		)

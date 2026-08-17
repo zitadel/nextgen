@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ianlancetaylor/jsonschema"
-	"github.com/zitadel/nextgen/internal/maputil"
 )
 
 const (
@@ -160,28 +159,25 @@ func (c *CreateUser) AttributeTeamScope() string {
 	return ""
 }
 
-// NewCreateUser builds a [CreateUser] from a schema-validated user map.
+// NewCreateUser builds a [CreateUser] from the schema-defined attributes.
 // Empty id is filled by the dialect on create; non-empty id is for ceremony only.
-func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
-	if _, ok := muser["id"]; ok {
-		return nil, ErrUserInvalid().WithMessage("client cannot choose user id")
-	}
-	if _, ok := muser["metadata"]; ok {
-		return nil, ErrUserInvalid().WithMessage("metadata is readonly and cannot be set")
-	}
-
-	schemaURL, err := SchemaFromUserMap(muser)
-	if err != nil {
-		return nil, err
+//
+// attrs is the instance the schema validates: envelope fields (id, schema,
+// metadata) are not part of it, so a schema may declare properties of those
+// names and closed-world keywords such as additionalProperties: false hold.
+func NewCreateUser(projectID string, teamID *string, id, schemaURL string, schemabs []byte, attrs map[string]any) (*CreateUser, error) {
+	if schemaURL == "" {
+		return nil, ErrUserInvalid().
+			WithMessage("No schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
 	}
 
 	var jschema jsonschema.Schema
-	err = json.Unmarshal(schemabs, &jschema)
+	err := json.Unmarshal(schemabs, &jschema)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal json schema")
 	}
 
-	err = jschema.Validate(muser)
+	err = jschema.Validate(attrs)
 	if err != nil {
 		return nil, ErrUserInvalid().WithParent(err).WithMessage("user is not valid according to schema")
 	}
@@ -192,7 +188,7 @@ func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte,
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal schema map")
 	}
 
-	attrs, err := CreateAttributesFromMap(muser, mschema)
+	createAttrs, err := CreateAttributesFromMap(attrs, mschema)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to flatten user attributes")
 	}
@@ -202,17 +198,8 @@ func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte,
 		InitialMembershipTeamID: teamID,
 		ID:                      id,
 		SchemaURL:               schemaURL,
-		Attributes:              attrs,
+		Attributes:              createAttrs,
 	}, nil
-}
-
-func SchemaFromUserMap(user map[string]any) (string, error) {
-	schemaURL, ok := maputil.Get[string](user, "$schema")
-	if !ok {
-		return "", ErrUserInvalid().
-			WithMessage("No $schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
-	}
-	return schemaURL, nil
 }
 
 // UserField enumerates the fields of User which can be used for filtering and

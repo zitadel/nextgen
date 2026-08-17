@@ -1718,7 +1718,7 @@ func decodeCreateUserResponse(resp *http.Response) (res CreateUserRes, _ error) 
 			}
 			d := jx.DecodeBytes(buf)
 
-			var response CreateUserResponse
+			var response User
 			if err := func() error {
 				if err := response.Decode(d); err != nil {
 					return err
@@ -1734,6 +1734,15 @@ func decodeCreateUserResponse(resp *http.Response) (res CreateUserRes, _ error) 
 					Err:         err,
 				}
 				return res, err
+			}
+			// Validate response.
+			if err := func() error {
+				if err := response.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return res, errors.Wrap(err, "validate")
 			}
 			return &response, nil
 		default:
