@@ -20,8 +20,14 @@ type Request struct {
 	// AuthzCheckParams.ConstraintTeamID so SQL can constrain the object.
 	TeamID string
 	// ResourceID is the object being checked (user id, team id). Optional for
-	// permission-level Check; required for per-object sk_team_ deny.
+	// permission-level Check of non-team-bound types; required for sk_team
+	// checks of team-bound object types so the compensating team constraint
+	// cannot be skipped. Empty ResourceID does not skip the grant Check — it
+	// only skips the extra "object is in the token team" AND — so omission
+	// would look like a create-style Check. Missing id is an error, not Allow.
 	ResourceID string
+	// ResourceTeamID is RSI.team_id after a by-id lookup (team-scoped grant arm).
+	ResourceTeamID string
 }
 
 // ListRequest is the public ListObjects input (L4 / oracle helper).
@@ -33,13 +39,14 @@ type ListRequest struct {
 // memoKey is the request-scoped Check cache key. A struct key avoids
 // delimiter aliasing that string joins can introduce.
 type memoKey struct {
-	PrincipalType domain.AuthzPrincipalType
-	PrincipalID   string
-	ProjectID     string
-	ObjectType    string
-	Relation      string
-	TeamID        string
-	ResourceID    string
+	PrincipalType  domain.AuthzPrincipalType
+	PrincipalID    string
+	ProjectID      string
+	ObjectType     string
+	Relation       string
+	TeamID         string
+	ResourceID     string
+	ResourceTeamID string
 }
 
 // Resolver evaluates checks with optional request-scoped memoization.
@@ -64,19 +71,23 @@ func (r *Resolver) Check(ctx context.Context, stmts service.AuthzResolverStateme
 	if err := validateCheckRequest(req); err != nil {
 		return DecisionUnspecified, err
 	}
+	if err := requireSKTeamTeamBoundResourceID(req); err != nil {
+		return DecisionUnspecified, err
+	}
 	if req.PrincipalType == domain.AuthzPrincipalTypeSKTeam &&
 		!skTeamPermissionAllowed(PermissionName(req.ObjectType, req.Relation)) {
 		return DecisionNotFound, nil
 	}
 
 	key := memoKey{
-		PrincipalType: req.PrincipalType,
-		PrincipalID:   req.PrincipalID,
-		ProjectID:     req.ProjectID,
-		ObjectType:    req.ObjectType,
-		Relation:      req.Relation,
-		TeamID:        req.TeamID,
-		ResourceID:    req.ResourceID,
+		PrincipalType:  req.PrincipalType,
+		PrincipalID:    req.PrincipalID,
+		ProjectID:      req.ProjectID,
+		ObjectType:     req.ObjectType,
+		Relation:       req.Relation,
+		TeamID:         req.TeamID,
+		ResourceID:     req.ResourceID,
+		ResourceTeamID: req.ResourceTeamID,
 	}
 	if d, ok := r.memo[key]; ok {
 		return d, nil
@@ -134,6 +145,7 @@ func checkParams(catalogID string, req Request) domain.AuthzCheckParams {
 		ObjectType:             req.ObjectType,
 		Relation:               req.Relation,
 		ResourceID:             req.ResourceID,
+		ResourceTeamID:         req.ResourceTeamID,
 	}
 	if req.PrincipalType == domain.AuthzPrincipalTypeSKTeam {
 		p.ConstraintTeamID = req.TeamID
@@ -170,4 +182,13 @@ func validateCheckRequest(req Request) error {
 	default:
 		return nil
 	}
+}
+
+func requireSKTeamTeamBoundResourceID(req Request) error {
+	if req.PrincipalType == domain.AuthzPrincipalTypeSKTeam &&
+		domain.TeamBoundObjectType(req.ObjectType) &&
+		req.ResourceID == "" {
+		return fmt.Errorf("resolver: resource id is required for sk_team team-bound checks")
+	}
+	return nil
 }

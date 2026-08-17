@@ -28,6 +28,19 @@ const (
 
 func (k ResourceKind) String() string { return string(k) }
 
+// TeamBoundObjectType reports whether objectType is always team-scoped for
+// sk_team_ principals (user, team, team_membership, event). Mint-time
+// validation and the sk_team allowlist share this set so a new allowlist
+// entry cannot silently allow project-scoped minting.
+func TeamBoundObjectType(objectType string) bool {
+	switch objectType {
+	case "user", "team", "team_membership", "event":
+		return true
+	default:
+		return false
+	}
+}
+
 // AuthzMemberType is authz_membership_edges.member_type.
 type AuthzMemberType string
 
@@ -341,8 +354,9 @@ const (
 //
 // ConstraintTeamID, when set (sk_team_ tokens), requires the checked or listed
 // object to belong to that team: users via authz_membership_edges, teams by id,
-// other kinds via resource_scope_index.team_id. ResourceID is the object being
-// checked (empty for permission-level Check / list materialization).
+// other kinds via resource_scope_index.team_id (Check binds ResourceTeamID).
+// ResourceID is the object being checked (empty for permission-level Check /
+// list materialization). ResourceTeamID is RSI.team_id for by-id Check.
 type AuthzCheckParams struct {
 	CatalogID              string
 	ProjectID              string
@@ -353,6 +367,7 @@ type AuthzCheckParams struct {
 	Relation               string
 	ConstraintTeamID       string
 	ResourceID             string
+	ResourceTeamID         string
 }
 
 // HomeProjectID returns PrincipalHomeProjectID, or ProjectID when unset.
