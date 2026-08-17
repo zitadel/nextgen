@@ -64,6 +64,30 @@ type claimService struct {
 
 var _ ClaimService = (*claimService)(nil)
 
+// Caller-side statement dependencies: the exact slice of AllStatements the
+// claim flow touches, so the future per-resource Statements split has its
+// seam ready. The pool-level half (ClaimPool, Statementer[ClaimStatements])
+// waits on go 1.27 generic methods; see the commented block in database.go.
+
+// claimedProjectStatements is what the claimed-check reads (Init, Complete).
+type claimedProjectStatements interface {
+	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
+	GetResourceScope(ctx context.Context, resourceID string) (*domain.ResourceScope, error)
+}
+
+// claimStatements is the claim service's full statement surface.
+type claimStatements interface {
+	claimedProjectStatements
+	CreateChallenge(ctx context.Context, entity *domain.ClaimChallenge) error
+	GetChallengeByID(ctx context.Context, projectID, id string) (*domain.ClaimChallenge, error)
+	MarkChallengeCompleted(ctx context.Context, projectID, id string) error
+	GetPersonalTeamForUser(ctx context.Context, projectID, userID string) (*domain.Team, error)
+	ListAuthzAssignments(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string, includeRevoked bool) ([]*domain.AuthzAssignment, error)
+	CreateAuthzAssignment(ctx context.Context, assignment *domain.AuthzAssignment) error
+	UpsertResourceScope(ctx context.Context, scope *domain.ResourceScope) error
+	InsertEvent(ctx context.Context, event *domain.Event) error
+}
+
 // NewClaimService builds the claim service. platformProjectID is the project
 // hosting the claiming humans' accounts and personal teams (ADR 046 §2).
 func NewClaimService(v2Pool *DB, consoleBaseURL, platformProjectID string) ClaimService {
@@ -75,7 +99,8 @@ func NewClaimService(v2Pool *DB, consoleBaseURL, platformProjectID string) Claim
 }
 
 func (s *claimService) Init(ctx context.Context, projectID, secretHash string) (*ClaimInitResult, error) {
-	teamID, err := claimedTeamID(ctx, s.v2Pool.Statements(), projectID)
+	var stmts claimStatements = s.v2Pool.Statements()
+	teamID, err := claimedTeamID(ctx, stmts, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +116,7 @@ func (s *claimService) Init(ctx context.Context, projectID, secretHash string) (
 	if err != nil {
 		return nil, err
 	}
-	if err := s.v2Pool.Statements().CreateChallenge(ctx, challenge); err != nil {
+	if err := stmts.CreateChallenge(ctx, challenge); err != nil {
 		return nil, domain.ErrInternal(mapStorageError(err)).WithMessage("failed to create claim challenge")
 	}
 	return &ClaimInitResult{
@@ -104,7 +129,8 @@ func (s *claimService) Init(ctx context.Context, projectID, secretHash string) (
 }
 
 func (s *claimService) Status(ctx context.Context, projectID, challengeID, secretHash string) (*ClaimStatusResult, error) {
-	challenge, err := s.v2Pool.Statements().GetChallengeByID(ctx, projectID, domain.HashClaimChallengeToken(challengeID))
+	var stmts claimStatements = s.v2Pool.Statements()
+	challenge, err := stmts.GetChallengeByID(ctx, projectID, domain.HashClaimChallengeToken(challengeID))
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrClaimChallengeNotFound()
@@ -119,7 +145,7 @@ func (s *claimService) Status(ctx context.Context, projectID, challengeID, secre
 		return nil, domain.ErrProjectPermissionDenied()
 	}
 	if challenge.Status == domain.ClaimChallengeStatusCompleted {
-		return s.completedStatus(ctx, projectID)
+		return s.completedStatus(ctx, stmts, projectID)
 	}
 	if time.Now().After(challenge.ExpiresAt) {
 		return nil, domain.ErrProjectClaimExpired()
@@ -130,8 +156,7 @@ func (s *claimService) Status(ctx context.Context, projectID, challengeID, secre
 // completedStatus reconstructs team and claim time from the grant written at
 // complete. Missing scope or grant on a completed challenge is corrupt state:
 // both are written in the same transaction that marks completion.
-func (s *claimService) completedStatus(ctx context.Context, projectID string) (*ClaimStatusResult, error) {
-	stmts := s.v2Pool.Statements()
+func (s *claimService) completedStatus(ctx context.Context, stmts claimStatements, projectID string) (*ClaimStatusResult, error) {
 	scope, err := stmts.GetResourceScope(ctx, projectID)
 	if err != nil || scope.TeamID == nil || *scope.TeamID == "" {
 		return nil, domain.ErrInternal(err).WithMessage("completed claim challenge without a project-team scope")
@@ -157,7 +182,7 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 	challengeIDHash := domain.HashClaimChallengeToken(challengeID)
 	var result *ClaimCompleteResult
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		stmts := tx.Statements()
+		var stmts claimStatements = tx.Statements()
 		challenge, err := stmts.GetChallengeByID(ctx, projectID, challengeIDHash)
 		if err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -247,10 +272,7 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 // projectIsClaimed (event_claim.go) is deliberately not reused: events
 // visibility treats a missing project as unclaimed, while claim needs the 404
 // and the team id for the 409 details.
-func claimedTeamID(ctx context.Context, stmts interface {
-	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
-	GetResourceScope(ctx context.Context, resourceID string) (*domain.ResourceScope, error)
-}, projectID string) (*string, error) {
+func claimedTeamID(ctx context.Context, stmts claimedProjectStatements, projectID string) (*string, error) {
 	if _, err := stmts.GetProjectByID(ctx, projectID); err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrProjectNotFound()
