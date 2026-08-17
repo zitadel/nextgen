@@ -65731,12 +65731,6 @@ func (s *UserProperty) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *UserProperty) encodeFields(e *jx.Encoder) {
 	{
-		if s.WriteOnly.Set {
-			e.FieldStart("writeOnly")
-			s.WriteOnly.Encode(e)
-		}
-	}
-	{
 		if s.XMinusUnique.Set {
 			e.FieldStart("x-unique")
 			s.XMinusUnique.Encode(e)
@@ -65769,12 +65763,11 @@ func (s *UserProperty) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserProperty = [5]string{
-	0: "writeOnly",
-	1: "x-unique",
-	2: "x-claim",
-	3: "x-audit",
-	4: "properties",
+var jsonFieldsNameOfUserProperty = [4]string{
+	0: "x-unique",
+	1: "x-claim",
+	2: "x-audit",
+	3: "properties",
 }
 
 // Decode decodes UserProperty from json.
@@ -65787,16 +65780,6 @@ func (s *UserProperty) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "writeOnly":
-			if err := func() error {
-				s.WriteOnly.Reset()
-				if err := s.WriteOnly.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"writeOnly\"")
-			}
 		case "x-unique":
 			if err := func() error {
 				s.XMinusUnique.Reset()

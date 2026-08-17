@@ -70,10 +70,6 @@ func (s *StepAction) setDefaults() {
 func (s *UserProperty) setDefaults() {
 	{
 		val := bool(false)
-		s.WriteOnly.SetTo(val)
-	}
-	{
-		val := bool(false)
 		s.XMinusAudit.SetTo(val)
 	}
 }

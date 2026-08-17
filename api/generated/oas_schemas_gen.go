@@ -41520,16 +41520,17 @@ func (s *UserPermissionDeniedDetails) init() UserPermissionDeniedDetails {
 
 // This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`.
 // This is done because a lot of code generators cannot handle that.
+// Native JSON Schema keywords such as `type`, `format` and `title` are accepted
+// without being listed below. One of them carries meaning for this API:
+// `writeOnly: true` marks a value that may be written but is never returned by
+// the read API. Enforcement is not implemented: responses currently include
+// write-only properties.
 // A few properties are reserved:
 // - id: is used to return the id of the user
 // - metadata: is used to embed metadata of the user, like creation date,
 // status,... in a return object.
 // Ref: #
 type UserProperty struct {
-	// Whether the value may be written but is never returned by the read API.
-	// Enforcement is not implemented: responses currently include write-only
-	// properties.
-	WriteOnly OptBool `json:"writeOnly"`
 	// The level of uniqueness for this property, if applicable.
 	XMinusUnique OptNilUserPropertyXMinusUnique `json:"x-unique"`
 	// The claim name for this property, if applicable.
@@ -41542,11 +41543,6 @@ type UserProperty struct {
 	// the property name and the value is the property schema.
 	Properties      OptUserPropertyProperties `json:"properties"`
 	AdditionalProps UserPropertyAdditional
-}
-
-// GetWriteOnly returns the value of WriteOnly.
-func (s *UserProperty) GetWriteOnly() OptBool {
-	return s.WriteOnly
 }
 
 // GetXMinusUnique returns the value of XMinusUnique.
@@ -41572,11 +41568,6 @@ func (s *UserProperty) GetProperties() OptUserPropertyProperties {
 // GetAdditionalProps returns the value of AdditionalProps.
 func (s *UserProperty) GetAdditionalProps() UserPropertyAdditional {
 	return s.AdditionalProps
-}
-
-// SetWriteOnly sets the value of WriteOnly.
-func (s *UserProperty) SetWriteOnly(val OptBool) {
-	s.WriteOnly = val
 }
 
 // SetXMinusUnique sets the value of XMinusUnique.
