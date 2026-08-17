@@ -60168,6 +60168,10 @@ func (s *TeamFilterField) Decode(d *jx.Decoder) error {
 	switch TeamFilterField(v) {
 	case TeamFilterFieldCreatedAt:
 		*s = TeamFilterFieldCreatedAt
+	case TeamFilterFieldName:
+		*s = TeamFilterFieldName
+	case TeamFilterFieldStatus:
+		*s = TeamFilterFieldStatus
 	default:
 		*s = TeamFilterField(v)
 	}

@@ -11808,6 +11808,9 @@ func (s *FilterField) UnmarshalText(data []byte) error {
 
 // Filter operation defines the operations which can be used when filtering on a
 // query endpoint.
+// On text fields, `contains` is a case-insensitive substring match. `equals`
+// compares the whole value and is case-sensitive unless the field documents
+// otherwise.
 // Ref: #
 type FilterOperation string
 
@@ -38474,17 +38477,24 @@ func (s *TeamDeactivatedEventMetadata) init() TeamDeactivatedEventMetadata {
 	return m
 }
 
+// Field to filter or sort teams by.
+// Team names are unique per project case-insensitively, so `name` is matched
+// case-insensitively by `equals` as well as by `contains`.
 // Ref: #
 type TeamFilterField string
 
 const (
 	TeamFilterFieldCreatedAt TeamFilterField = "created_at"
+	TeamFilterFieldName      TeamFilterField = "name"
+	TeamFilterFieldStatus    TeamFilterField = "status"
 )
 
 // AllValues returns all TeamFilterField values.
 func (TeamFilterField) AllValues() []TeamFilterField {
 	return []TeamFilterField{
 		TeamFilterFieldCreatedAt,
+		TeamFilterFieldName,
+		TeamFilterFieldStatus,
 	}
 }
 
@@ -38492,6 +38502,10 @@ func (TeamFilterField) AllValues() []TeamFilterField {
 func (s TeamFilterField) MarshalText() ([]byte, error) {
 	switch s {
 	case TeamFilterFieldCreatedAt:
+		return []byte(s), nil
+	case TeamFilterFieldName:
+		return []byte(s), nil
+	case TeamFilterFieldStatus:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -38503,6 +38517,12 @@ func (s *TeamFilterField) UnmarshalText(data []byte) error {
 	switch TeamFilterField(data) {
 	case TeamFilterFieldCreatedAt:
 		*s = TeamFilterFieldCreatedAt
+		return nil
+	case TeamFilterFieldName:
+		*s = TeamFilterFieldName
+		return nil
+	case TeamFilterFieldStatus:
+		*s = TeamFilterFieldStatus
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
