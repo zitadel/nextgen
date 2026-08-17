@@ -7,7 +7,12 @@ description: |
   the request carries no `id`; `metadata` is server-owned for the same reason.
   Neither is part of this schema, which is what frees a user schema to declare
   properties of those names.
+
+  A request carrying any other top-level property is rejected rather than
+  ignored. `attributes` stays open, since the user schema is what determines
+  what belongs in it.
 type: object
+additionalProperties: false
 required:
   - schema
   - attributes
