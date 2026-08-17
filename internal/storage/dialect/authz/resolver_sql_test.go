@@ -134,7 +134,15 @@ func TestWriteCheckAuthzConstraintTeam(t *testing.T) {
 	authz.WriteListAuthzObjectIDs(&list, testEnv(&list), listParams)
 	assert.Contains(t, list.b.String(), "authz_membership_edges")
 	assert.Contains(t, list.b.String(), "r.resource_kind = ?")
+	assert.Contains(t, list.b.String(), "r.resource_kind <> ?")
 	assert.Contains(t, list.args, "team_1")
+
+	withTeam := params
+	withTeam.ResourceTeamID = "team_1"
+	var checkTeam recordingWriter
+	authz.WriteCheckAuthz(&checkTeam, testEnv(&checkTeam), withTeam)
+	assert.Contains(t, checkTeam.b.String(), "authz_membership_edges")
+	assert.Contains(t, checkTeam.args, "team_1")
 }
 
 func TestWriteHasAuthzProjectFoothold(t *testing.T) {

@@ -143,38 +143,52 @@ func writeListAuthzRSIMatch(w ArgWriter, env Env, params domain.AuthzListObjects
 }
 
 // writeCheckedObjectInConstraintTeam is the per-object sk_team_ compensating
-// constraint for Check: the ResourceID is a member of ConstraintTeamID or is
-// the team itself (team / team_membership reads).
+// constraint for Check: the ResourceID is a member of ConstraintTeamID, is
+// the team itself, or (non-user kinds) ResourceTeamID matches RSI.team_id.
 func writeCheckedObjectInConstraintTeam(w ArgWriter, env Env, params domain.AuthzCheckParams) {
 	w.WriteString("(")
-	writeUserMembershipInTeam(w, env, params.ProjectID, params.ConstraintTeamID, "", params.ResourceID)
+	writeUserMembershipInTeam(w, env, params.ProjectID, "", params.ConstraintTeamID, "", params.ResourceID)
 	w.WriteString(" OR ")
 	w.WriteArg(params.ResourceID)
 	w.WriteString(" = ")
 	w.WriteArg(params.ConstraintTeamID)
+	if params.ResourceTeamID != "" {
+		w.WriteString(" OR ")
+		w.WriteArg(params.ResourceTeamID)
+		w.WriteString(" = ")
+		w.WriteArg(params.ConstraintTeamID)
+	}
 	w.WriteString(")")
 }
 
 // writeListedObjectInConstraintTeam filters list/EXISTS rows to the token team.
 // Users are not team-keyed in RSI — membership edges are the source of truth.
+// The RSI.team_id disjunct is gated off user and team kinds so a stray
+// team_id on a user row cannot skip the membership edge.
 func writeListedObjectInConstraintTeam(w ArgWriter, env Env, params domain.AuthzListObjectsParams) {
 	w.WriteString("(")
 	w.WriteString("(r.resource_kind = ")
 	w.WriteArg(domain.ResourceKindUser.String())
 	w.WriteString(" AND ")
-	writeUserMembershipInTeam(w, env, params.ProjectID, params.ConstraintTeamID, "r.resource_id", "")
+	writeUserMembershipInTeam(w, env, params.ProjectID, "", params.ConstraintTeamID, "r.resource_id", "")
 	w.WriteString(") OR (r.resource_kind = ")
 	w.WriteArg(domain.ResourceKindTeam.String())
 	w.WriteString(" AND r.resource_id = ")
 	w.WriteArg(params.ConstraintTeamID)
-	w.WriteString(") OR (r.team_id IS NOT NULL AND r.team_id = ")
+	w.WriteString(") OR (r.resource_kind <> ")
+	w.WriteArg(domain.ResourceKindUser.String())
+	w.WriteString(" AND r.resource_kind <> ")
+	w.WriteArg(domain.ResourceKindTeam.String())
+	w.WriteString(" AND r.team_id IS NOT NULL AND r.team_id = ")
 	w.WriteArg(params.ConstraintTeamID)
 	w.WriteString("))")
 }
 
-// writeUserMembershipInTeam emits EXISTS on authz_membership_edges.
-// memberIDExpr is a raw SQL column (list); memberIDArg is a bound value (Check).
-func writeUserMembershipInTeam(w ArgWriter, env Env, projectID, teamID, memberIDExpr, memberIDArg string) {
+// writeUserMembershipInTeam emits EXISTS on authz_membership_edges: user is a
+// member of a team. setIDExpr / memberIDExpr are raw SQL column refs; when
+// empty, setID / memberID are bound arguments. Check, List, TTU, and
+// principal-match all use this helper so ADR 052's home-project switch is one edit.
+func writeUserMembershipInTeam(w ArgWriter, env Env, projectID, setIDExpr, setID, memberIDExpr, memberID string) {
 	w.WriteString(`EXISTS (
         SELECT 1
         FROM `)
@@ -185,17 +199,21 @@ func writeUserMembershipInTeam(w ArgWriter, env Env, projectID, teamID, memberID
 	w.WriteString(`
           AND e.set_type = 'team'
           AND e.set_id = `)
-	w.WriteArg(teamID)
+	writeExprOrArg(w, setIDExpr, setID)
 	w.WriteString(`
           AND e.member_type = 'user'
           AND e.member_id = `)
-	if memberIDExpr != "" {
-		w.WriteString(memberIDExpr)
-	} else {
-		w.WriteArg(memberIDArg)
-	}
+	writeExprOrArg(w, memberIDExpr, memberID)
 	w.WriteString(`
     )`)
+}
+
+func writeExprOrArg(w ArgWriter, expr, arg string) {
+	if expr != "" {
+		w.WriteString(expr)
+		return
+	}
+	w.WriteArg(arg)
 }
 
 func writeFoothold(w ArgWriter, env Env, projectID string, principalType domain.AuthzPrincipalType, principalID string) {
@@ -333,21 +351,9 @@ func writeFullTTUExists(w ArgWriter, env Env, params domain.AuthzCheckParams) {
                 AND `)
 	w.WriteArg(ptype)
 	w.WriteString(` = 'user'
-                AND EXISTS (
-                    SELECT 1
-                    FROM `)
-	writeTable(w, env, "authz_membership_edges")
-	w.WriteString(` e
-                    WHERE e.project_id = `)
-	w.WriteArg(home)
+                AND `)
+	writeUserMembershipInTeam(w, env, home, "ts.principal_id", "", "", params.PrincipalID)
 	w.WriteString(`
-                      AND e.set_type = 'team'
-                      AND e.set_id = ts.principal_id
-                      AND e.member_type = 'user'
-                      AND e.member_id = `)
-	w.WriteArg(params.PrincipalID)
-	w.WriteString(`
-                )
                 )
              OR EXISTS (
                     SELECT 1
@@ -403,23 +409,9 @@ func writePrincipalMatch(w ArgWriter, env Env, alias, principalType, principalID
                 AND `)
 	w.WriteString(alias)
 	w.WriteString(`.principal_type = 'team'
-                AND EXISTS (
-                    SELECT 1
-                    FROM `)
-	writeTable(w, env, "authz_membership_edges")
-	w.WriteString(` e
-                    WHERE e.project_id = `)
-	w.WriteArg(homeProjectID)
+                AND `)
+	writeUserMembershipInTeam(w, env, homeProjectID, alias+".principal_id", "", "", principalID)
 	w.WriteString(`
-                      AND e.set_type = 'team'
-                      AND e.set_id = `)
-	w.WriteString(alias)
-	w.WriteString(`.principal_id
-                      AND e.member_type = 'user'
-                      AND e.member_id = `)
-	w.WriteArg(principalID)
-	w.WriteString(`
-                )
              )
           )`)
 }
