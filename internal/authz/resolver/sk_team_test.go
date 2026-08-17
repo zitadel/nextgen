@@ -1,14 +1,20 @@
 package resolver
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 func TestSKTeamAllowlist(t *testing.T) {
 	for perm := range skTeamAllowed {
 		assert.True(t, skTeamPermissionAllowed(perm), perm)
+		objectType, _, ok := strings.Cut(perm, ".")
+		assert.True(t, ok, perm)
+		assert.True(t, domain.TeamBoundObjectType(objectType), perm)
 	}
 	denies := []string{
 		"user.set_password",

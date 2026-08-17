@@ -148,7 +148,9 @@ func (s *tokenService) IntrospectToken(ctx context.Context, token string) (*doma
 	}
 	// Credentials minted before token records existed carry no `jti`. They stay
 	// authentic — a token cannot be forged without the encryption key — so they
-	// keep working, unrevocable, until they are reissued.
+	// keep working, unrevocable, until they are reissued. HandleOAuth2 no longer
+	// honors that promise for typeless (pre-#760) JWEs: TokenTypeUnspecified is
+	// not a project secret, so those bearers fail the security requirement.
 	if payload.TokenID == "" {
 		return payload, nil
 	}
