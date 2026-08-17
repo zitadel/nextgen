@@ -93,6 +93,9 @@ func (g *Graph) constraintTeamAllows(p domain.AuthzCheckParams) bool {
 	if p.ResourceID == p.ConstraintTeamID {
 		return true
 	}
+	if p.ResourceTeamID != "" && p.ResourceTeamID == p.ConstraintTeamID {
+		return true
+	}
 	return g.isMember(p.ProjectID, p.ConstraintTeamID, p.ResourceID)
 }
 
@@ -103,9 +106,6 @@ func (g *Graph) listedObjectInConstraintTeam(p domain.AuthzListObjectsParams, id
 	case domain.ResourceKindTeam:
 		return id == p.ConstraintTeamID
 	default:
-		if id == p.ConstraintTeamID {
-			return true
-		}
 		for _, r := range g.Resources {
 			if r.ResourceID == id && r.TeamID != nil && *r.TeamID == p.ConstraintTeamID {
 				return true

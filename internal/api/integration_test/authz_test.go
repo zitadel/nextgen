@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -398,9 +399,11 @@ func TestManagementAuthz(t *testing.T) {
 }
 
 // TestListAuthzTeamScopedOnlyPartialView pins #834: a principal whose only
-// grant is team-scoped project.viewer gets a filtered 200, not 403. QueryTeams
-// returns the granted team and omits the outsider. ListSchemas returns no
-// rows because schema RSI rows are project-scoped (no team_id).
+// grant is team-scoped project.viewer gets a filtered 200, not 403.
+// QueryTeams / ListBranding / ListFlowDefinitions return the granted row and
+// omit the outsider (RSI.team_id stamped after create). ListSchemas is empty
+// because schema RSI rows are project-scoped. ListUsers is 200 [] because
+// user RSI rows have NULL team_id — by-id user reads deny for the same shape.
 func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	t.Parallel()
 
@@ -418,7 +421,70 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	const template = `<zl-page-shell data-rev="1">{% mandatory_gates %}</zl-page-shell>`
+	createBranding := func(t *testing.T) string {
+		t.Helper()
+		resp, err := client.CreateBranding(t.Context(), &api.Branding{
+			Layout:         api.NewOptBrandingLayout(api.BrandingLayoutSplit),
+			LiquidTemplate: api.NewOptString(template),
+		}, api.CreateBrandingParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.BrandingRevisionResponse{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.BrandingRevisionResponse).ID
+	}
+	brandIn := createBranding(t)
+	brandOut := createBranding(t)
+
+	schemaURI := helpers.BuiltinSchemaBaseURL + "/user-schema.json"
+	createFlow := func(t *testing.T, name string) string {
+		t.Helper()
+		resp, err := client.CreateFlowDefinition(t.Context(), newCreateFlowDefinitionRequest(
+			api.ProjectID(project.ID), newFlowDefinitionFixture(name, schemaURI)))
+		require.NoError(t, err)
+		require.IsType(t, &api.FlowDefinitionDetailResponse{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.FlowDefinitionDetailResponse).ID
+	}
+	flowIn := createFlow(t, "authz-list-in-"+helpers.RandString(6))
+	flowOut := createFlow(t, "authz-list-out-"+helpers.RandString(6))
+
+	userIn := "user_" + helpers.RandString(8)
+	emailIn, err := domain.NewCreateAttribute("email", helpers.RandString(8)+"@example.com", domain.AttributeUniquenessProject)
+	require.NoError(t, err)
+	require.NoError(t, harness.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
+		ProjectID:               project.ID,
+		SchemaURL:               apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL),
+		ID:                      userIn,
+		InitialMembershipTeamID: &team.ID,
+		Attributes:              domain.CreateAttributes{*emailIn},
+	}))
+	userOut := "user_" + helpers.RandString(8)
+	emailOut, err := domain.NewCreateAttribute("email", helpers.RandString(8)+"@example.com", domain.AttributeUniquenessProject)
+	require.NoError(t, err)
+	require.NoError(t, harness.EnsureUserFixture(t).Create(t.Context(), &domain.CreateUser{
+		ProjectID:               project.ID,
+		SchemaURL:               apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL),
+		ID:                      userOut,
+		InitialMembershipTeamID: &other.ID,
+		Attributes:              domain.CreateAttributes{*emailOut},
+	}))
+
 	stmts := harness.EnsureServiceDB(t).Statements()
+	stampRSITeam := func(t *testing.T, resourceID, teamID string) {
+		t.Helper()
+		scope, err := stmts.GetResourceScope(t.Context(), resourceID)
+		require.NoError(t, err)
+		scope.TeamID = &teamID
+		require.NoError(t, stmts.UpsertResourceScope(t.Context(), scope))
+	}
+	stampRSITeam(t, brandIn, team.ID)
+	stampRSITeam(t, brandOut, other.ID)
+	stampRSITeam(t, flowIn, team.ID)
+	stampRSITeam(t, flowOut, other.ID)
+
 	asgns, err := stmts.ListAuthzAssignments(t.Context(), project.ID, domain.AuthzPrincipalTypeSKProj, project.ID, false)
 	require.NoError(t, err)
 	require.NotEmpty(t, asgns, "CreateProject seeds sk_proj → project.viewer")
@@ -437,10 +503,6 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	scoped.ApplyScope(domain.NewTeamAssignmentScope(team.ID))
 	require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), scoped))
 
-	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
-	require.NoError(t, err)
-	harness.SetProjectSecretOnApiClient(t, client, project)
-
 	listResp, err := client.ListSchemas(t.Context(), api.ListSchemasParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
 	require.IsType(t, &api.ListSchemasResponse{}, listResp, helpers.MustMarshal(t, listResp))
@@ -453,6 +515,29 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	require.Len(t, listed.Teams, 1)
 	assert.Equal(t, team.ID, string(listed.Teams[0].ID))
 	assert.NotEqual(t, other.ID, string(listed.Teams[0].ID))
+
+	brandResp, err := client.ListBranding(t.Context(), api.ListBrandingParams{ProjectID: api.ProjectID(project.ID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListBrandingResponse{}, brandResp, helpers.MustMarshal(t, brandResp))
+	brands := *brandResp.(*api.ListBrandingResponse)
+	require.Len(t, brands, 1)
+	assert.Equal(t, brandIn, brands[0].ID)
+
+	flowResp, err := client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{ProjectID: api.ProjectID(project.ID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionListResponse{}, flowResp, helpers.MustMarshal(t, flowResp))
+	flows := flowResp.(*api.FlowDefinitionListResponse).FlowDefinitions
+	require.Len(t, flows, 1)
+	assert.Equal(t, flowIn, flows[0].ID)
+
+	usersResp, err := client.ListUsers(t.Context(), api.ListUsersParams{})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListUsersResponse{}, usersResp, helpers.MustMarshal(t, usersResp))
+	assert.Empty(t, usersResp.(*api.ListUsersResponse).Users, "user RSI team_id is NULL so team-scoped lists are empty")
+
+	getUser, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userIn)})
+	require.NoError(t, err)
+	assertAuthzError(t, getUser, "user.permission_denied")
 }
 
 // TestGetAuthzTeamScopedOnlyAllow pins #833: after RSI, a team-scoped-only
