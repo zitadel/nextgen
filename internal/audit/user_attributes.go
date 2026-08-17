@@ -10,12 +10,12 @@ import (
 // attributes. Values are included only when the matching top-level schema
 // property has x-audit set (true or a non-empty string). When schemaJSON is
 // empty or unparsable, keys are still returned and attributes is empty.
-func UserAttributeAuditFields(written map[string]any, schemaJSON []byte) (keys []string, attributes map[string]any) {
-	if len(written) == 0 {
+func UserAttributeAuditFields(user map[string]any, schemaJSON []byte) (keys []string, attributes map[string]any) {
+	if len(user) == 0 {
 		return nil, nil
 	}
-	keys = make([]string, 0, len(written))
-	for k := range written {
+	keys = make([]string, 0, len(user))
+	for k := range user {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -32,7 +32,7 @@ func UserAttributeAuditFields(written map[string]any, schemaJSON []byte) (keys [
 		if !xAudit[k] {
 			continue
 		}
-		attributes[k] = written[k]
+		attributes[k] = user[k]
 	}
 	if len(attributes) == 0 {
 		return keys, nil
