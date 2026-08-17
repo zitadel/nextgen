@@ -17,7 +17,7 @@ it:
 {
   "id": "user_01KZZY8PX8K8ATNVDSMRCZY4N1",
   "schema": "sch_01KZZY705G04CPPG0QGZM9ERF2",
-  "attributes": { "email": "vitor@zitadel.com", "givenName": "Vitor" },
+  "attributes": { "email": "alex@example.com", "givenName": "Alex" },
   "metadata": { "created_at": "2026-08-14T10:49:43Z", "status": "active" }
 }
 ```
