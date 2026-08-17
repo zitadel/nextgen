@@ -213,7 +213,8 @@ func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resou
 }
 
 // requireProjectAccess gates a management operation via resolver.Check when
-// project_id is already known (create/list/query, project by-id, or after RSI).
+// project_id is already known (create, project by-id, or after RSI).
+// Management lists use requireProjectListAccess, not this gate.
 // DecisionNotFound → resource not-found / invalid-project shapes (404).
 // DecisionForbidden → permission_denied (403).
 func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {

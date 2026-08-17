@@ -30,9 +30,16 @@ EXISTS predicate (same assignment/closure branches as `ListObjects`) into
 the resource SELECT after `requireProjectListAccess`. Project-wide Allow
 **or** Forbidden (foothold, no project-wide grant) both proceed; the EXISTS
 predicate returns the partial view. NotFound (no foothold) still 404s.
-**Team-scoped HTTP list narrowing is live** (#834). Fine-grained catalog
-relations (#420) remain a follow-up; `QuerySessions` list predicate waits
-on `sessionService.List`.
+**Team-scoped HTTP list narrowing is live** for lists that inject that
+predicate (#834). It is **not** every HTTP list — see the carve-outs below.
+Fine-grained catalog relations (#420) remain a follow-up.
+
+| Endpoint | Why it is not EXISTS-narrowed |
+| --- | --- |
+| `QueryProjects` | The project **is** the boundary. The caller lists their own project; there is no partial-view problem. |
+| `ListEvents` | Events have no RSI resource kind. A naive EXISTS would dump the whole audit stream to a foothold-only principal. Do **not** migrate this to EXISTS in this work. |
+| `QuerySessions` | Waits on `sessionService.List`. |
+| `ListUsers` | User RSI rows have `NULL team_id`, so a team-scoped-only principal gets `200 []`. By-id user reads deny for the same RSI shape. Do not add a membership-edge list arm here — pin the empty view so console authors are not surprised. |
 
 ### Wave 1 vs OpenFGA compiler (#421 / PR #720)
 
@@ -92,7 +99,11 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
   management list endpoints inject an authz EXISTS **predicate** (same
   assignment/closure branches as `ListObjects`) via `service.AuthzListFilter`
   after `requireProjectListAccess` (Allow or Forbidden → proceed; NotFound →
-  404). `QuerySessions` waits on `sessionService.List`.
+  404). Carve-outs: `QueryProjects` (the project is the boundary), `ListEvents`
+  (no RSI kind — do not migrate to EXISTS), `QuerySessions` (waits on
+  `sessionService.List`). `ListUsers` is EXISTS-wired but user RSI `team_id` is
+  NULL, so a team-scoped-only principal sees `200 []` (by-id user reads deny
+  for the same shape).
 
 ## Locked decisions
 
@@ -618,6 +629,7 @@ bundles:
 - Permission grants management API / product UI
 - `#333` foreign home project, Leopard (**D11**)
 - QuerySessions list predicate (deferred until `sessionService.List` exists)
+- ListEvents EXISTS narrowing (events have no RSI kind; a naive filter would dump the audit stream)
 
 ## See also
 

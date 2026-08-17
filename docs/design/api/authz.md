@@ -65,7 +65,7 @@ Locked for [#833](https://github.com/zitadel/nextgen/issues/833) / [#834](https:
 | **List** | [#834](https://github.com/zitadel/nextgen/issues/834): Forbidden (foothold, no project-wide Allow) proceeds and `withAuthzListFilter` attaches the EXISTS predicate (partial view). NotFound (no foothold) still 404s. |
 | **403 vs 404** | Unchanged (**D10**). Scoped Allow is still inside a project foothold. |
 
-Bare `requireProjectAccess` (create / list / project-by-id without an RSI object) must not treat a team-scoped grant as project-wide Allow.
+Bare `requireProjectAccess` (create / project-by-id without an RSI object) must not treat a team-scoped grant as project-wide Allow. Management lists use `requireProjectListAccess`, not this gate.
 
 **Grants and roles** provide the mapping:
 
