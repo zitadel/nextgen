@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/compare"
@@ -62,8 +61,8 @@ func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stm
 		hasWhere = true
 	}
 	if tableName != "" && resourceIDCol != "" {
-		if _, ok := service.AuthzListFilterFromContext(ctx); !ok && !service.AuthzListFilterBypassed(ctx) {
-			return authz.ErrListFilterRequired
+		if err := authz.RequireManagementListFilter(ctx); err != nil {
+			return err
 		}
 		maybeWriteAuthzListPredicate(ctx, c, &hasWhere, tableName, resourceIDCol)
 	}

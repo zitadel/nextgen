@@ -144,7 +144,7 @@ func battleUsers(t *testing.T, d dialect) {
 	}
 	slices.Sort(want)
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.UserField]) (*database.ListResult[*domain.User], error) {
-		return d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+		return d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 			Filter: filter, Pagination: page,
 		}, service.UserQueryOptions{})
 	}, func(u *domain.User) string { return u.ID }, 2)
@@ -152,7 +152,7 @@ func battleUsers(t *testing.T, d dialect) {
 	// B6: default EnsureListOptions OrderBy still pages.
 	t.Run("default_order", func(t *testing.T) {
 		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.User], error) {
-			return d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+			return d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 				Filter:     filter,
 				Pagination: database.Page[domain.UserField]{Limit: 2, Cursor: cursor},
 			}, service.UserQueryOptions{})

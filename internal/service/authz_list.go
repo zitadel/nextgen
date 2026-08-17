@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -26,6 +27,11 @@ func AuthzListFilterFromContext(ctx context.Context) (AuthzListFilter, bool) {
 }
 
 type authzListFilterBypassCtxKey struct{}
+
+// ErrListFilterRequired means a management list ran without AuthzListFilter
+// (or an unrestricted/bypass marker) on the context. HTTP maps this to a 500
+// with message "authz list filter missing" so it is not triaged as a DB outage.
+var ErrListFilterRequired = errors.New("authz list filter missing")
 
 // WithAuthzListFilterBypass marks a list that is not a management HTTP path
 // (nested uniqueness/resolve/GetLatest, stmttest, dialect tests). Production
