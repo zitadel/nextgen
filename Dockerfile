@@ -15,6 +15,10 @@ RUN apt-get update \
   && chown -R 65532:65532 /var/lib/zitadel
 
 COPY $TARGETPLATFORM/nextgen /usr/local/bin/nextgen
+# Without this the data dir defaults next to the entrypoint, in root-owned
+# /usr/local/bin, which the non-root USER below cannot create. Point it at the
+# volume prepared above so `docker run <image>` works with no extra flags.
+ENV NEXTGEN_SERVER_DATA_DIR=/var/lib/zitadel/nextgen-data
 USER 65532:65532
 VOLUME ["/var/lib/zitadel/nextgen-data"]
 EXPOSE 8080

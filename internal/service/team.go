@@ -10,7 +10,11 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-const teamFieldCreatedAt = "created_at"
+const (
+	teamFieldCreatedAt = "created_at"
+	teamFieldName      = "name"
+	teamFieldStatus    = "status"
+)
 
 type TeamService struct {
 	v2Pool *DB
@@ -69,6 +73,12 @@ func (s *TeamService) Get(ctx context.Context, projectID string, teamID string) 
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get team")
 	}
+	// A pending_purge team is awaiting deletion by the cleanup job (#622
+	// dropped that status from the team lifecycle), so reads treat it as
+	// already gone.
+	if team.Status == domain.TeamStatusPendingPurge {
+		return nil, domain.ErrTeamNotFound()
+	}
 	return team, nil
 }
 
@@ -91,14 +101,21 @@ type ListTeamsResponse struct {
 
 // List returns the teams of a project, ordered and paginated with an opaque
 // cursor token. The returned NextPageToken is empty when the last page has been
-// reached. Teams of every status are returned; status is not filterable yet.
+// reached.
 func (s *TeamService) List(ctx context.Context, req ListTeamsRequest) (*ListTeamsResponse, error) {
 	if req.ProjectID == "" {
 		return nil, domain.ErrTeamProjectNotFound()
 	}
 
-	filters := make([]database.Filter[domain.TeamField], 0, len(req.Filters)+1)
+	filters := make([]database.Filter[domain.TeamField], 0, len(req.Filters)+2)
 	filters = append(filters, database.Equal(database.Col(domain.TeamFieldProjectID), req.ProjectID))
+	// A pending_purge team is awaiting deletion by the cleanup job (#622
+	// dropped that status from the team lifecycle), so reads treat it as
+	// already gone.
+	filters = append(filters, database.Or(
+		database.Equal(database.Col(domain.TeamFieldStatus), domain.TeamStatusActive.String()),
+		database.Equal(database.Col(domain.TeamFieldStatus), domain.TeamStatusDeactivated.String()),
+	))
 	for _, f := range req.Filters {
 		filter, err := teamFilter(f)
 		if err != nil {
@@ -139,11 +156,50 @@ func (s *TeamService) List(ctx context.Context, req ListTeamsRequest) (*ListTeam
 // v2 filter layer cannot express return [domain.ErrNotImplemented];
 // invalid field/operation/value combinations return [domain.ErrRequestInvalid].
 func teamFilter(f Filter) (database.Filter[domain.TeamField], error) {
-	field, err := teamField(f.Field)
-	if err != nil {
-		return nil, err
+	switch f.Field {
+	case teamFieldCreatedAt:
+		return createdAtFilter(f.Operation, database.Col(domain.TeamFieldCreatedAt), f.Value)
+	case teamFieldName:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		// Names are unique per project case-insensitively.
+		// The unique index is on the folded name, so this matches on the index.
+		if f.Operation == filterOpEquals {
+			return database.StringEqualFold(database.Col(domain.TeamFieldName), value), nil
+		}
+		return stringFilter(f.Operation, database.Col(domain.TeamFieldName), value)
+	case teamFieldStatus:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		return teamStatusFilter(f.Operation, value)
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", f.Field))
 	}
-	return createdAtFilter(f.Operation, database.Col(field), f.Value)
+}
+
+// teamStatusFilter filters on the team's two status values.
+func teamStatusFilter(op, status string) (database.Filter[domain.TeamField], error) {
+	switch op {
+	case filterOpEquals:
+	case filterOpNotEquals:
+		// todo (grvijayan): update when the operation is supported
+		return nil, domain.ErrNotImplemented().WithDetails(fmt.Sprintf("operation %q is not supported", op))
+	case filterOpContains, filterOpNotContains, filterOpLessThan, filterOpGreaterThan, filterOpLessThanOrEqual, filterOpGreaterThanOrEqual:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for this field", op))
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown operation %q", op))
+	}
+
+	switch status {
+	case domain.TeamStatusActive.String(), domain.TeamStatusDeactivated.String():
+		return database.Equal(database.Col(domain.TeamFieldStatus), status), nil
+	default:
+		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown status %q", status))
+	}
 }
 
 // teamField maps an API field name to its [domain.TeamField].
@@ -151,6 +207,10 @@ func teamField(field string) (domain.TeamField, error) {
 	switch field {
 	case teamFieldCreatedAt:
 		return domain.TeamFieldCreatedAt, nil
+	case teamFieldName:
+		return domain.TeamFieldName, nil
+	case teamFieldStatus:
+		return domain.TeamFieldStatus, nil
 	default:
 		return domain.TeamFieldUnspecified, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", field))
 	}

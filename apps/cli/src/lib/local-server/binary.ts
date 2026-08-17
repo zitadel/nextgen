@@ -13,6 +13,7 @@ import {
 
 export const SERVER_NPM_PACKAGE = "@zitadel/server";
 const START_COMMAND_ENV = "ZITADEL_SERVER_BINARY";
+const START_COMMAND_VERSION_ENV = "ZITADEL_SERVER_BINARY_VERSION";
 const STOP_TIMEOUT_MS = 10_000;
 const STOP_KILL_TIMEOUT_MS = 2_000;
 
@@ -44,7 +45,7 @@ export function resolveServerCommand(env: NodeJS.ProcessEnv = process.env): {
       command: env[START_COMMAND_ENV],
       args: [],
       serverPackage: SERVER_NPM_PACKAGE,
-      serverVersion: "override",
+      serverVersion: env[START_COMMAND_VERSION_ENV]?.trim() || "override",
     };
   }
 

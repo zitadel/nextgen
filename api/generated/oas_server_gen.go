@@ -394,7 +394,6 @@ type Handler interface {
 	// QueryTeams implements queryTeams operation.
 	//
 	// Returns the teams of a project, paginated with a cursor.
-	// Teams of every lifecycle status are returned; each carries its `status`.
 	//
 	// POST /teams/query
 	QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)

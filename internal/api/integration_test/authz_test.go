@@ -439,17 +439,19 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	brandIn := createBranding(t)
 	brandOut := createBranding(t)
 
-	schemaURI := helpers.BuiltinSchemaBaseURL + "/user-schema.json"
-	createFlow := func(t *testing.T, name string) string {
+	schemaURI := harness.CreateUserSchema(t, project, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
+	createFlow := func(t *testing.T, name, purpose string) string {
 		t.Helper()
+		def := newFlowDefinitionFixture(name, schemaURI)
+		def.Purposes = map[string]string{purpose: "step_1"}
 		resp, err := client.CreateFlowDefinition(t.Context(), newCreateFlowDefinitionRequest(
-			api.ProjectID(project.ID), newFlowDefinitionFixture(name, schemaURI)))
+			api.ProjectID(project.ID), def))
 		require.NoError(t, err)
 		require.IsType(t, &api.FlowDefinitionDetailResponse{}, resp, helpers.MustMarshal(t, resp))
 		return resp.(*api.FlowDefinitionDetailResponse).ID
 	}
-	flowIn := createFlow(t, "authz-list-in-"+helpers.RandString(6))
-	flowOut := createFlow(t, "authz-list-out-"+helpers.RandString(6))
+	flowIn := createFlow(t, "authz-list-in-"+helpers.RandString(6), "login")
+	flowOut := createFlow(t, "authz-list-out-"+helpers.RandString(6), "profiling")
 
 	userIn := "user_" + helpers.RandString(8)
 	emailIn, err := domain.NewCreateAttribute("email", helpers.RandString(8)+"@example.com", domain.AttributeUniquenessProject)
