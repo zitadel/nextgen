@@ -39,6 +39,18 @@ func ErrUserPermissionDenied() Error {
 	return newError(PrefixUser.ErrorCodePrefix("permission_denied"), "the user management API requires the project secret", nil, nil)
 }
 
+// UserSchemaUnknownDetails names the schema a create referenced that the
+// project does not have.
+type UserSchemaUnknownDetails struct {
+	Schema string `json:"schema"`
+}
+
+// CreatedUserDetails names a user the server created, for the answer that
+// cannot carry its representation.
+type CreatedUserDetails struct {
+	UserID string `json:"user_id"`
+}
+
 // User is a hydrated user projection (header + optional EAV joins).
 type User struct {
 	ProjectID string

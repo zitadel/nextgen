@@ -178,7 +178,9 @@ func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 		database.Equal(database.Col(domain.UserFieldID), action.CreateUser.ID),
 	), UserQueryOptions{})
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("the user was created but could not be read back, so no representation is returned. Retrying the create will conflict")
+		return nil, domain.ErrInternal(err).
+			WithMessage("The user was created but could not be read back. Fetch it by id rather than retrying the create.").
+			WithDetails(domain.CreatedUserDetails{UserID: action.CreateUser.ID})
 	}
 
 	return user, nil
@@ -367,7 +369,9 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 	schemaEntity, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, o.SchemaURL)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return domain.ErrUserInvalid().WithMessage("schema is not known to the system. First create a schema, then create users.")
+			return domain.ErrUserInvalid().
+				WithMessage("schema is not known to the system. First create a schema, then create users.").
+				WithDetails(domain.UserSchemaUnknownDetails{Schema: o.SchemaURL})
 		}
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
