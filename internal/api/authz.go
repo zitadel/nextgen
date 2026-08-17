@@ -12,8 +12,8 @@ import (
 
 // The management API is gated by resolver.Check after credential → ScopeContext.
 // Path-id ops resolve RSI then Check; create uses requireProjectAccess.
-// Lists use requireProjectListAccess: project-wide Allow skips the EXISTS
-// predicate, Forbidden attaches it, NotFound 404s. Preview secrets
+// Lists use requireProjectListAccess: project-wide Allow stamps a one-shot
+// EXISTS skip, Forbidden attaches the predicate, NotFound 404s. Preview secrets
 // (project.read only) cannot call management APIs (ADR 037).
 
 // accessOp classifies a management operation for relation mapping and miss shaping.
@@ -208,7 +208,8 @@ func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resou
 }
 
 // requireProjectAccess gates a management operation via resolver.Check when
-// project_id is already known (create/list/query, project by-id, or after RSI).
+// project_id is already known (create, project by-id, or after RSI).
+// Management lists use requireProjectListAccess, not this gate.
 // DecisionNotFound → resource not-found / invalid-project shapes (404).
 // DecisionForbidden → permission_denied (403).
 func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
@@ -265,6 +266,7 @@ func projectCheckRequest(scope ScopeContext, projectID string, op accessOp, rsi 
 		PrincipalType: scope.PrincipalType,
 		PrincipalID:   scope.PrincipalID,
 		ProjectID:     projectID,
+		HomeProjectID: scope.ProjectID,
 		ObjectType:    "project",
 		Relation:      projectRelation(op),
 		TeamID:        scope.TeamID,
@@ -326,7 +328,8 @@ func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) er
 }
 
 // requireProjectListAccess gates a management list and attaches the list
-// context: Allow skips EXISTS; Forbidden attaches the EXISTS predicate via
+// context: Allow stamps a one-shot EXISTS skip (consumed by the next
+// compileList / ListUsers); Forbidden attaches the EXISTS predicate via
 // the same Resolver used for Check; NotFound 404s.
 func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, error) {
 	if h == nil || h.pool == nil {
@@ -343,7 +346,7 @@ func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverSt
 	}
 	switch dec {
 	case resolver.DecisionAllow:
-		return service.WithAuthzListUnrestricted(ctx), nil
+		return service.WithAuthzListSkipOnce(ctx), nil
 	case resolver.DecisionForbidden:
 		return withAuthzListFilter(ctx, r, stmts, projectID, kind, opRead)
 	case resolver.DecisionNotFound, resolver.DecisionUnspecified:

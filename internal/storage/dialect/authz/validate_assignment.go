@@ -20,7 +20,7 @@ func ValidateAssignment(a *domain.AuthzAssignment) error {
 	if a.PrincipalType != domain.AuthzPrincipalTypeSKTeam {
 		return nil
 	}
-	if !teamBoundObjectType(a.ObjectType) {
+	if !domain.TeamBoundObjectType(a.ObjectType) {
 		return nil
 	}
 	if a.ScopeKind == domain.AuthzScopeKindProject {
@@ -30,13 +30,4 @@ func ValidateAssignment(a *domain.AuthzAssignment) error {
 		return ErrSKTeamProjectScope
 	}
 	return nil
-}
-
-func teamBoundObjectType(objectType string) bool {
-	switch objectType {
-	case "user", "team", "team_membership", "event":
-		return true
-	default:
-		return false
-	}
 }

@@ -285,8 +285,11 @@ func TestRequireProjectListAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("project-wide Allow should proceed: %v", err)
 	}
-	if !service.AuthzListUnrestricted(ctx) {
-		t.Fatal("Allow must skip the EXISTS list filter")
+	if !service.AuthzListSkipOncePending(ctx) {
+		t.Fatal("Allow must stamp a one-shot EXISTS skip")
+	}
+	if service.AuthzListUnrestricted(ctx) {
+		t.Fatal("Allow must not mark the whole request unrestricted")
 	}
 	if _, ok := service.AuthzListFilterFromContext(ctx); ok {
 		t.Fatal("Allow must not attach EXISTS")
@@ -311,6 +314,9 @@ func TestRequireProjectListAccess(t *testing.T) {
 	}
 	if filter.ConstraintTeamID != "" {
 		t.Fatalf("sk_proj filter ConstraintTeamID = %q, want empty", filter.ConstraintTeamID)
+	}
+	if filter.PrincipalHomeProjectID != "proj_a" {
+		t.Fatalf("PrincipalHomeProjectID = %q, want credential home proj_a", filter.PrincipalHomeProjectID)
 	}
 
 	_, err = requireProjectListAccess(operator, stmts, "proj_b", userAccess, domain.ResourceKindUser)
@@ -340,6 +346,9 @@ func TestWithAuthzListFilterCopiesConstraintTeamID(t *testing.T) {
 	}
 	if filter.ConstraintTeamID != "team_eng" {
 		t.Fatalf("ConstraintTeamID = %q, want team_eng", filter.ConstraintTeamID)
+	}
+	if filter.PrincipalHomeProjectID != "proj_a" {
+		t.Fatalf("PrincipalHomeProjectID = %q, want credential home proj_a", filter.PrincipalHomeProjectID)
 	}
 }
 

@@ -21,6 +21,7 @@ func TestCheck_Orchestration(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeUser,
 		PrincipalID:   "user_alice",
 		ProjectID:     "proj_1",
+		HomeProjectID: "proj_1",
 		ObjectType:    "project",
 		Relation:      "viewer",
 	}
@@ -102,6 +103,7 @@ func TestCheck_Orchestration(t *testing.T) {
 			PrincipalType: domain.AuthzPrincipalTypeSKTeam,
 			PrincipalID:   "sk_team_1",
 			ProjectID:     "proj_1",
+			HomeProjectID: "proj_1",
 			ObjectType:    "user",
 			Relation:      "read",
 			TeamID:        "team_1",
@@ -123,6 +125,21 @@ func TestCheck_Orchestration(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "team id is required")
+	})
+
+	t.Run("sk_team team-bound check requires resource id", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+		_, err := resolver.New().Check(context.Background(), stmts, resolver.Request{
+			PrincipalType: domain.AuthzPrincipalTypeSKTeam,
+			PrincipalID:   "sk_team_1",
+			ProjectID:     "proj_1",
+			ObjectType:    "user",
+			Relation:      "read",
+			TeamID:        "team_1",
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "resource id is required")
 	})
 
 	t.Run("invalid input", func(t *testing.T) {
@@ -178,6 +195,7 @@ func TestListObjects_Orchestration(t *testing.T) {
 			PrincipalType: domain.AuthzPrincipalTypeUser,
 			PrincipalID:   "user_a",
 			ProjectID:     "proj_1",
+			HomeProjectID: "proj_1",
 			ObjectType:    "project",
 			Relation:      "viewer",
 		},
@@ -214,6 +232,7 @@ func TestCheckParams_SKTeamConstraint(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeSKTeam,
 		PrincipalID:   "sk_team_1",
 		ProjectID:     "proj_1",
+		HomeProjectID: "proj_home",
 		ObjectType:    "project",
 		Relation:      "viewer",
 		TeamID:        "team_eng",
@@ -221,4 +240,57 @@ func TestCheckParams_SKTeamConstraint(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "team_eng", params.ConstraintTeamID)
 	assert.Equal(t, domain.SystemCatalogID, params.CatalogID)
+	assert.Equal(t, "proj_home", params.PrincipalHomeProjectID)
+	assert.Equal(t, "proj_1", params.ProjectID)
+}
+
+func TestCheckParams_DoesNotDefaultHomeToTarget(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+	stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
+
+	params, err := resolver.New().CheckParams(context.Background(), stmts, resolver.Request{
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_alice",
+		ProjectID:     "proj_target",
+		ObjectType:    "project",
+		Relation:      "viewer",
+	})
+	require.NoError(t, err)
+	assert.Empty(t, params.PrincipalHomeProjectID)
+	assert.Equal(t, "proj_target", params.ProjectID)
+}
+
+func TestListObjects_SKTeamTeamBoundDoesNotRequireResourceID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+	stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
+	stmts.EXPECT().ListAuthzObjectIDs(gomock.Any(), domain.AuthzListObjectsParams{
+		AuthzCheckParams: domain.AuthzCheckParams{
+			CatalogID:              domain.SystemCatalogID,
+			ProjectID:              "proj_1",
+			PrincipalHomeProjectID: "proj_1",
+			PrincipalType:          domain.AuthzPrincipalTypeSKTeam,
+			PrincipalID:            "sk",
+			ObjectType:             "user",
+			Relation:               "read",
+			ConstraintTeamID:       "team_1",
+		},
+		ResourceKind: domain.ResourceKindUser,
+	}).Return([]string{"usr_in"}, nil)
+
+	ids, err := resolver.New().ListObjects(context.Background(), stmts, resolver.ListRequest{
+		Request: resolver.Request{
+			PrincipalType: domain.AuthzPrincipalTypeSKTeam,
+			PrincipalID:   "sk",
+			ProjectID:     "proj_1",
+			HomeProjectID: "proj_1",
+			ObjectType:    "user",
+			Relation:      "read",
+			TeamID:        "team_1",
+		},
+		ResourceKind: domain.ResourceKindUser,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"usr_in"}, ids)
 }

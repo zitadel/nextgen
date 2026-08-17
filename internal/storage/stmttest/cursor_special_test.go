@@ -115,7 +115,7 @@ func TestCursorBattle_AdversarialTokens(t *testing.T) {
 				Direction: database.OrderAsc,
 			}
 
-			_, err := d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+			_, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 				Filter: filter,
 				Pagination: database.Page[domain.UserField]{
 					Limit: 1, OrderBy: orderAsc, Cursor: []byte("%%%"),
@@ -123,7 +123,7 @@ func TestCursorBattle_AdversarialTokens(t *testing.T) {
 			}, service.UserQueryOptions{})
 			assertDatabaseErrorCode(t, err, "db.invalid_cursor")
 
-			first, err := d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+			first, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 				Filter:     filter,
 				Pagination: database.Page[domain.UserField]{Limit: 1, OrderBy: orderAsc},
 			}, service.UserQueryOptions{})
@@ -132,7 +132,7 @@ func TestCursorBattle_AdversarialTokens(t *testing.T) {
 
 			orderDesc := orderAsc
 			orderDesc.Direction = database.OrderDesc
-			_, err = d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+			_, err = d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 				Filter: filter,
 				Pagination: database.Page[domain.UserField]{
 					Limit: 1, OrderBy: orderDesc, Cursor: first.NextCursor,
@@ -270,7 +270,7 @@ func TestCursorBattle_DestructiveMidPage(t *testing.T) {
 				Columns:   []database.Column[domain.UserField]{database.Col(domain.UserFieldID)},
 				Direction: database.OrderAsc,
 			}
-			first, err := d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+			first, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 				Filter:     filter,
 				Pagination: database.Page[domain.UserField]{Limit: 2, OrderBy: order},
 			}, service.UserQueryOptions{})
@@ -280,7 +280,7 @@ func TestCursorBattle_DestructiveMidPage(t *testing.T) {
 			require.NoError(t, d.stmts.DeleteUserByID(t.Context(), projectID, deleted))
 
 			rest := pageAll(t, 2, first.NextCursor, func(cursor []byte) (*database.ListResult[*domain.User], error) {
-				return d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+				return d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 					Filter: filter,
 					Pagination: database.Page[domain.UserField]{
 						Limit: 2, OrderBy: order, Cursor: cursor,

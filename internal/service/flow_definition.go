@@ -358,7 +358,7 @@ func (fd *flowDefinitionService) List(ctx context.Context, req ListFlowDefinitio
 	}
 	result, err := fd.v2Pool.Statements().ListFlowDefinitions(ctx, opts)
 	if err != nil {
-		return nil, err
+		return nil, mapListError(err, "failed to list flow definitions")
 	}
 	return &ListFlowDefinitionsResponse{
 		Items:         result.Items,

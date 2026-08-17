@@ -115,7 +115,7 @@ const maxBrandingListRevisions = 100
 func (s *BrandingService) List(ctx context.Context, projectID string) ([]*domain.Branding, error) {
 	result, err := s.v2Pool.Statements().ListBrandings(ctx, branding.ListOptions(projectID, maxBrandingListRevisions))
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to list branding revisions")
+		return nil, mapListError(err, "failed to list branding revisions")
 	}
 	return result.Items, nil
 }

@@ -20,11 +20,20 @@ type Request struct {
 	// AuthzCheckParams.ConstraintTeamID so SQL can constrain the object.
 	TeamID string
 	// ResourceID is the object being checked (user id, team id, path id).
-	// Optional for permission-level Check; used for per-object sk_team_ deny
-	// and resource-scoped grant arms.
+	// Optional for permission-level Check of non-team-bound types; required for
+	// sk_team checks of team-bound object types so the compensating team
+	// constraint cannot be skipped. Also used for resource-scoped grant arms.
+	// Empty ResourceID does not skip the grant Check — it only skips the extra
+	// "object is in the token team" AND — so omission would look like a
+	// create-style Check. Missing id is an error, not Allow.
 	ResourceID string
 	// ResourceTeamID is RSI.team_id after a by-id lookup (team-scoped grant arm).
 	ResourceTeamID string
+	// HomeProjectID is the credential's home project for membership-edge
+	// lookup (#333 / ADR 052). Empty stays empty — CheckParams does not
+	// default it to ProjectID (the target). SQL still falls back via
+	// AuthzCheckParams.HomeProjectID() when unset.
+	HomeProjectID string
 }
 
 // ListRequest is the public ListObjects input (L4 / oracle helper).
@@ -66,6 +75,9 @@ func New() *Resolver {
 // Forbidden / NotFound as usual.
 func (r *Resolver) Check(ctx context.Context, stmts service.AuthzResolverStatements, req Request) (Decision, error) {
 	if err := validateCheckRequest(req); err != nil {
+		return DecisionUnspecified, err
+	}
+	if err := requireSKTeamTeamBoundResourceID(req); err != nil {
 		return DecisionUnspecified, err
 	}
 	if req.PrincipalType == domain.AuthzPrincipalTypeSKTeam &&
@@ -132,6 +144,11 @@ func (r *Resolver) ListObjects(ctx context.Context, stmts service.AuthzResolverS
 // CheckParams is the storage Check/List payload for req, including
 // ConstraintTeamID for sk_team principals. HTTP list filters must use this
 // so EXISTS SQL matches Check.
+//
+// CheckParams does not apply the sk_team allowlist short-circuit that Check
+// uses. sk_team Checks of project.viewer are DecisionNotFound, so HTTP lists
+// never take the Forbidden / filter branch for those principals. ConstraintTeamID
+// plumbing stays so a future allowlisted project relation still constrains SQL.
 func (r *Resolver) CheckParams(ctx context.Context, stmts service.AuthzResolverStatements, req Request) (domain.AuthzCheckParams, error) {
 	catalogID, err := r.ActiveCatalogID(ctx, stmts)
 	if err != nil {
@@ -141,10 +158,13 @@ func (r *Resolver) CheckParams(ctx context.Context, stmts service.AuthzResolverS
 }
 
 func checkParams(catalogID string, req Request) domain.AuthzCheckParams {
+	// Home vs target: HomeProjectID is the credential project; ProjectID is
+	// the protected resource's project. Do not default home to target here
+	// (#333 / ADR 052).
 	p := domain.AuthzCheckParams{
 		CatalogID:              catalogID,
 		ProjectID:              req.ProjectID,
-		PrincipalHomeProjectID: req.ProjectID,
+		PrincipalHomeProjectID: req.HomeProjectID,
 		PrincipalType:          req.PrincipalType,
 		PrincipalID:            req.PrincipalID,
 		ObjectType:             req.ObjectType,
@@ -187,4 +207,13 @@ func validateCheckRequest(req Request) error {
 	default:
 		return nil
 	}
+}
+
+func requireSKTeamTeamBoundResourceID(req Request) error {
+	if req.PrincipalType == domain.AuthzPrincipalTypeSKTeam &&
+		domain.TeamBoundObjectType(req.ObjectType) &&
+		req.ResourceID == "" {
+		return fmt.Errorf("resolver: resource id is required for sk_team team-bound checks")
+	}
+	return nil
 }

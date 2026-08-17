@@ -64,6 +64,16 @@ func TestMapListError(t *testing.T) {
 		assert.Equal(t, "failed to list projects", de.Message)
 		assert.ErrorIs(t, err, assert.AnError)
 	})
+
+	t.Run("missing authz list filter is labeled for triage", func(t *testing.T) {
+		t.Parallel()
+		err := mapListError(ErrListFilterRequired, "failed to list users from database")
+		require.ErrorIs(t, err, domain.ErrInternal(ErrListFilterRequired))
+		var de domain.Error
+		require.ErrorAs(t, err, &de)
+		assert.Equal(t, "authz list filter missing", de.Message)
+		assert.ErrorIs(t, err, ErrListFilterRequired)
+	})
 }
 
 func TestParseSortDirection(t *testing.T) {

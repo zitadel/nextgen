@@ -2,23 +2,26 @@ package authz
 
 import (
 	"context"
-	"errors"
 
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// ErrListFilterRequired is returned when compileList is asked to build a
-// management list without an AuthzListFilter on the context.
-var ErrListFilterRequired = errors.New("authz: management list requires AuthzListFilter on context")
+// ErrListFilterRequired is returned when a management list runs without an
+// AuthzListFilter (or unrestricted / one-shot skip marker) on the context.
+var ErrListFilterRequired = service.ErrListFilterRequired
 
-// RequireManagementListFilter fails closed when a management list has neither
-// an AuthzListFilter nor an unrestricted marker (project-wide Allow or a
-// storage-layer test that is not a management HTTP path).
+// RequireManagementListFilter is the #838 tripwire: compileList and hand-built
+// lists (ListUsers) must not SELECT the world if the HTTP filter was forgotten.
+// Unrestricted nested lists are checked first so they do not consume Allow's
+// one-shot skip.
 func RequireManagementListFilter(ctx context.Context) error {
-	if _, ok := service.AuthzListFilterFromContext(ctx); ok {
+	if service.AuthzListUnrestricted(ctx) {
 		return nil
 	}
-	if service.AuthzListUnrestricted(ctx) {
+	if service.ConsumeAuthzListSkipOnce(ctx) {
+		return nil
+	}
+	if _, ok := service.AuthzListFilterFromContext(ctx); ok {
 		return nil
 	}
 	return ErrListFilterRequired
