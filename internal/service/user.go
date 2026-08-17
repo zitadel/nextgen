@@ -175,8 +175,13 @@ func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ 
 	// answers with the same representation a read does, so load the stored user.
 	// The write has already committed by this point: a failure here loses the
 	// response, not the user, so the message says so rather than inviting a
-	// retry that would conflict on the same unique attributes. Having the insert
-	// return the row would remove the second round-trip and this window with it.
+	// retry that would conflict on the same unique attributes.
+	//
+	// TODO(vitorbari): have the insert return the row instead. That removes the
+	// round-trip and the window with it, rather than reporting the window. Two
+	// ways in: the read errors, or it finds nothing. The second needs the read
+	// to observe the committed write, which holds while reads and writes share
+	// one node and stops holding the day any of them is served by a replica.
 	user, err := s.v2Pool.Statements().GetUser(ctx, database.And(
 		database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
 		database.Equal(database.Col(domain.UserFieldID), action.CreateUser.ID),
