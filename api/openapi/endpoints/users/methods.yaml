@@ -21,7 +21,7 @@ post:
       content:
         application/json:
           schema:
-            $ref: create-user-response.yaml
+            $ref: user.yaml
     '400':
       description: The provided input was not valid
       content:
