@@ -85,10 +85,12 @@ then attach VSCode's Go debugger by PID:
 moon run workspace:server-debug -- server --user-file examples/bootstrap-users/demo-admin.json
 ```
 
-The task prints the exact `go build` invocation and the PID of the running process:
+The task prints the `go build` invocation and the PID of the running process. The
+three `-X` values are stamped from the current HEAD, and `<pkg>` below stands for
+`github.com/zitadel/nextgen/internal/build`:
 
 ```
-[server-debug] build: go build -gcflags 'all=-N -l' -ldflags '-X main.version=debug' -o dist/server/nextgen-debug .
+[server-debug] build: go build -gcflags 'all=-N -l' -ldflags '-X <pkg>.version=debug+<short-sha> -X <pkg>.commit=<sha> -X <pkg>.date=<commit-date>' -o dist/server/nextgen-debug .
 [server-debug] run:   ./dist/server/nextgen-debug server --user-file examples/bootstrap-users/demo-admin.json
 
 [server-debug] PID 98765 — VSCode: Run ▸ Start Debugging ▸ "Attach to Process"
