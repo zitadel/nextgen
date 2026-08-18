@@ -69,7 +69,7 @@ issues same-origin API requests carrying its HttpOnly first-party
 `__nextgen_session` cookie. Browser JavaScript cannot read that credential.
 The API resolves the human principal and target-project permissions from the
 session as specified by root
-[ADR 052](../../../../docs/adrs/052-cross-project-principals.md). The browser
+[ADR 053](../../../../docs/adrs/053-cross-project-principals.md). The browser
 bundle contains no `sk_proj_...` value, upholding
 [ADR 005](../../../../docs/adrs/005-public-runtime-private-credentials.md).
 
@@ -216,11 +216,11 @@ re-architecting it:
   trigger.
 
 Identity is already carried by the cookie. Root
-[ADR 052](../../../../docs/adrs/052-cross-project-principals.md) supplies both
+[ADR 053](../../../../docs/adrs/053-cross-project-principals.md) supplies both
 the missing target-project authorization contract (§§1–3) and the CSRF
 requirements for unsafe cookie-authenticated requests (§5). ADR 046 concluded
 the opposite — that SameSite alone is sufficient and no CSRF token is needed —
-and ADR 052 amends it; cite 052, not 046, for the CSRF contract.
+and ADR 053 amends it; cite 053, not 046, for the CSRF contract.
 
 ## Consequences
 
@@ -251,7 +251,7 @@ and ADR 052 amends it; cite 052, not 046, for the CSRF contract.
 - **Management calls are fail-closed until the cookie is authorized.** The
   dev proxy's secret is what carries `user.read` and friends today; the
   publishable key is deliberately refused for them (`internal/api/user.go`).
-  Root ADRs 032/033/052's session-derived target permissions make the embedded
+  Root ADRs 032/033/053's session-derived target permissions make the embedded
   Console's list screens work without a proxy.
 
 ## Related work

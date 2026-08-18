@@ -24,7 +24,8 @@ ON CONFLICT (project_id, user_id) DO UPDATE SET
 	changed_at = CURRENT_TIMESTAMP(),
 	failed_attempts = 0,
 	last_successful_check = NULL,
-	updated_at = CURRENT_TIMESTAMP()`
+	updated_at = CURRENT_TIMESTAMP()
+THEN RETURN id`
 
 	userPasswordQuery = `SELECT id, project_id, user_id, encoded_hash, change_required,
 	changed_at, verification_id, last_successful_check, failed_attempts, created_at, updated_at
@@ -43,19 +44,31 @@ func newUserPasswordStatements(db queryExecutor) userPasswordStatements {
 
 // SetUserPassword implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error {
-	id := ""
-	if err := ensureManagedID(&id, domain.PrefixUserPassword); err != nil {
+	if err := ensureManagedID(&pw.ID, domain.PrefixUserPassword); err != nil {
 		return err
 	}
-	_, err := ps.db.Update(ctx, buildStatement(setUserPasswordStmt,
-		id,
+	stmt := buildStatement(setUserPasswordStmt,
+		pw.ID,
 		pw.ProjectID,
 		pw.UserID,
 		pw.EncodedHash,
 		pw.ChangeRequired,
 		verificationIDArg(pw.VerificationID),
-	).statement())
-	return wrapError(err)
+	).statement()
+	return ps.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+		id, err := collectOneRow(iter, func(row *spanner.Row) (string, error) {
+			var id string
+			if err := row.Columns(&id); err != nil {
+				return "", err
+			}
+			return id, nil
+		})
+		if err != nil {
+			return err
+		}
+		pw.ID = id
+		return nil
+	})
 }
 
 // GetUserPassword implements [service.UserPasswordStatements].

@@ -6,10 +6,10 @@
 > **Builds on:** [ADR 028](028-storage-v2-statements-and-dialects.md), [ADR 010](010-session-auth-attempt-check-model.md), [ADR 011](011-resource-identifiers.md), [ADR 047](047-dialect-id-generation.md), [ADR 008](008-users-eav-store.md), [ADR 033](033-internal-permission-management.md), [ADR 046](046-claim-lifecycle-v2.md), [oxidel ADR-023](https://github.com/zitadel/oxidel/blob/main/docs/adr/023-wide-events.md)
 > **Related:** [ADR 049](049-events-api-retention-export.md) (API, retention, export)
 >
-> **Proposed amendment — [ADR 052 §8](052-cross-project-principals.md#8-audit-events-are-written-in-the-protected-project):**
-> if ADR 052 is accepted, the emit-time rule for `team_id` changes. Today the
+> **Proposed amendment — [ADR 053 §8](053-cross-project-principals.md#8-audit-events-are-written-in-the-protected-project):**
+> if ADR 053 is accepted, the emit-time rule for `team_id` changes. Today the
 > column captures the resolved credential's `ScopeContext` team, which for a
-> cross-project actor would be a team in the actor's *home* project. ADR 052
+> cross-project actor would be a team in the actor's *home* project. ADR 053
 > restricts the column to protected-resource scope and moves the actor's home
 > project, authorizing assignment ids, path, and team into non-PII
 > `authorization` metadata on the event. The DDL comment and the scope table
@@ -133,8 +133,8 @@ small map for durable globally-addressable resources
 [url-architecture.md](../design/api/url-architecture.md)); high-volume TTL audit
 rows do not belong there. `GET /events/{id}` is **project-scoped** (see ADR 049).
 
-Per-sink export delivery is tracked in a separate `event_deliveries` table; see
-[ADR 049 §3](049-events-api-retention-export.md).
+Per-sink export delivery is tracked with per-(sink, project) watermark cursors;
+see [ADR 049 §3](049-events-api-retention-export.md).
 
 **Indexes:**
 
@@ -195,15 +195,16 @@ audit filter dimensions and are not indexed for forensic queries.
 
 | `category` | When emitted | Emission path → durability | Sampling |
 |------------|--------------|----------------------------|----------|
-| `request` | Every **authenticated** API call (wide event at request end) | Path A → batched flush (N/T); visibility ≤ T; bounded crash-loss / drop-on-overflow (§4) | None |
+| `request` | HTTP handler completed **and** `project_id` is known (authenticated API or public login/flow) | Path A → batched flush (N/T); visibility ≤ T; bounded crash-loss / drop-on-overflow (§4) | None |
 | `auth` | Token issue/revoke/exchange, login outcomes, MFA decisions | Path B → in-TX with the mutating statement; no loss | None |
 | `session` | Session create/end, step-up, handoff | Path B → in-TX with the mutating statement; no loss | None |
 | `admin` | Team, API key, config push, RBAC mutations | Path B → in-TX with the mutating statement; no loss | None (mutations only) |
 | `entity` | User/project lifecycle semantic events | Path B → in-TX with the mutating statement; no loss | None |
 | `signal` | Platform bot/abuse signals ([ADR 019](019-captcha-gate-and-bot-signals.md)) | Path B → in-TX with the auth-attempt/check mutation | None |
 
-Unauthenticated routes (public login widget, health checks) emit **no**
-`request` events unless explicitly listed as security-relevant in a future ADR.
+Public login/flow HTTP emits `request` when the handler stamps `project_id`
+(actor/token stay empty). Health/ready/live probes have no project and emit
+**no** `request` event.
 
 **Durability bars differ by path:** Path B categories are **transactional audit**
 (co-committed with the mutation). Path A `request` events are **best-effort
@@ -234,7 +235,7 @@ flowchart TB
   Stmt --> EventSQL
 ```
 
-#### Path A — Request-wide events (authenticated API)
+#### Path A — Request-wide events (`project_id` known)
 
 Extend the existing request-ID middleware
 ([`internal/api/middleware/request_id.go`](../../internal/api/middleware/request_id.go))
@@ -251,34 +252,44 @@ into a **RequestContext** middleware:
   export — they are **not persisted** on audit event rows.
 - Client headers named `session_id`, `flow_id`, or `fingerprint`, if accepted at
   all, go into `metadata.client_hints` as untrusted hints only.
-- After the handler completes, if the request was **authenticated**, enqueue one
+- After the handler completes, if **`project_id` is known**, enqueue one
   `category=request` wide event containing: `operation_id`, HTTP method, route
   template, status code, duration, and actor/delegation dimensions from context
   (including `delegation_id` / `grantor` when acting under an agent delegation
-  per [ADR 033 §5](033-internal-permission-management.md)).
+  per [ADR 033 §5](033-internal-permission-management.md)). Public login/flow
+  stamps `project_id` without a token (`Authenticated` stays false). `POST /projects`
+  stamps the minted `project_id` after create succeeds. `createFlow` mints
+  `flow_id` and stamps the actor slot **before** the state machine starts, so
+  Path B `auth.attempt.created` shares `flow_id` with Path A `request.api`.
+  Path B `FromContext` copies `request_id` from the HTTP middleware even when
+  AuthGate did not run. Probes (`healthz` / `readyz` / `livez`) leave
+  `project_id` empty and are skipped.
 - Response header `X-Request-Id` echoes the assigned `request_id`.
 
 **Durability (batched insert, DB clock):** Request-wide events are **not**
 inserted synchronously per API call. Middleware enqueues into an **in-process
 bounded durable-intent buffer** (not per-request awaited INSERT).
 
-1. Each buffered item stores payload fields plus `enqueuedAt` (Go
-   `time.Time` / monotonic clock used **only** to compute
-   `wait = time.Since(enqueuedAt)` at flush — **not** as a wall-clock stamp
-   written to the row).
+1. Each buffered item stores payload fields, `startedAt` (HTTP middleware
+   entry — forensic `occurred_at`), and `enqueuedAt` (buffer residency / MaxAge
+   only). Go clocks compute `wait`; they are **not** wall-clock stamps written
+   to the row.
 2. A flusher writes batches when either:
    - batch size reaches **N** (suggested default **100**), or
    - **T** elapsed since the oldest buffered event (suggested default **1s**).
 3. Timestamps use the **database `now()` as the single time server**:
 
 ```sql
--- $wait_interval = time.Since(enqueuedAt) at successful insert
+-- $wait_interval = time.Since(startedAt) at successful insert
 INSERT INTO zitadel_nextgen.events (..., occurred_at, created_at, ...)
 VALUES (..., now() - $wait_interval, now(), ...);
 ```
 
-   - `occurred_at` — when the action happened (`now() - wait`)
+   - `occurred_at` — when the request **started** (`now() - wait`), so
+     `request.api` sorts first among events sharing `request_id`
    - `created_at` — when the row was written (`now()` / `DEFAULT now()`)
+   - Payload `duration_ms` / `status` describe completion; they are not used
+     as the sort timestamp
    - Recompute `wait` at the **successful** insert (including after retries) so
      `occurred_at` stays honest.
    - Dialect note: Postgres `now()` is transaction-start time (all rows in one
@@ -327,26 +338,25 @@ interfaces.
 - Event `id` is minted via dialect `NewManagedID` before insert
   ([ADR 047](047-dialect-id-generation.md)).
 
-Example event types (non-exhaustive; catalog grows with statement coverage):
+Example event types (non-exhaustive samples). The living operation →
+`event_type` → payload catalog is
+[events-catalog.md](../design/api/events-catalog.md):
 
 | `event_type` | `category` | Trigger |
 |--------------|------------|---------|
 | `request.api` | `request` | Authenticated HTTP handler completes |
 | `project.created` | `entity` | `CreateProject` statement (including pre-claim) |
 | `user.created` | `entity` | User create statement |
-| `user.updated` | `entity` | User patch statement |
-| `user.deactivated` | `entity` | User lifecycle statement |
-| `auth.token.issued` | `auth` | Token create statement |
-| `auth.token.revoked` | `auth` | Token revoke statement |
-| `auth.check.failed` | `auth` | Check verification failure |
-| `session.established` | `session` | Auth attempt handoff |
-| `session.ended` | `session` | Explicit end **or** passive expiry via session reaper/cleanup statement |
-| `admin.config.pushed` | `admin` | Config upload statement |
-| `admin.api_key.created` | `admin` | API key create statement |
+| `session.deleted` | `session` | Explicit session delete |
+| `session.expired` | `session` | Session reaper / TTL cleanup |
 
 Passive session expiry has no user-triggered mutation: the cleanup/reaper
 statement that marks or deletes the expired session is the Path B emission
-point for `session.ended`.
+point for `session.expired` (distinct from explicit `session.deleted`).
+
+**Path A buffer refinement:** flush also when the in-process buffer reaches
+~80% of capacity `C` (with `C ≫ N`), in addition to batch size **N** and age
+**T**. Drop only when the buffer is full.
 
 ### 5. AuthGate enriches delegation context
 
@@ -394,18 +404,32 @@ Event types like `auth.check.failed` point investigators to the `checks` table
 for detail. This avoids duplicating high-volume JSONB while preserving an
 audit-friendly summary at the event layer.
 
-### 7. EAV users (ADR 008)
+### 7. Event payload shapes
+
+**Non-user resources** (project, team, flowdef, branding, …) use:
+
+| Operation | Payload |
+|-----------|---------|
+| Create | Full **allowlisted snapshot** of fields the mutate API wrote |
+| Update | **Delta with new values** — only changed allowlisted fields; absent = unchanged |
+| Delete / simple state flip | Empty `{}` unless a reason enum is required |
+
+Primary identity lives on the event envelope (`entity_id`, `session_id`, …),
+not duplicated in payload. Secondary ids (e.g. `user_id` on a factor event,
+`auth_attempt_id` on a check) are allowed. The living allowlist is
+[events-catalog.md](../design/api/events-catalog.md).
+
+#### EAV users (ADR 008)
 
 User mutations through the header/data/registry model
-([ADR 008](008-users-eav-store.md)) require special emit rules on the
-corresponding statement methods:
+([ADR 008](008-users-eav-store.md)) require special emit rules:
 
 | Operation | Event | Payload |
 |-----------|-------|---------|
-| Create user | `user.created` | `user_id`, schema ref — no attribute values |
-| Patch attributes | `user.updated` | `changed_keys[]` only |
+| Create user | `user.created` | schema ref; **attribute keys** written; **values only** for `x-audit` fields — never primary `user_id` echo |
+| Patch attributes | `user.updated` | keys touched + `x-audit` values for those keys (same rule as create) |
 | Unique violation | `user.create.failed` | key name — not value |
-| Deactivate | `user.deactivated` | `user_id`, lifecycle reason enum |
+| Deactivate | `user.deactivated` | lifecycle reason enum (identity on envelope) |
 
 No generic auto-diff of `user_attributes` JSON. Attribute values appear in event
 payloads only when explicitly allowlisted (see §8).
@@ -484,7 +508,8 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 ## Non-goals
 
 - Database triggers or CDC as the primary audit mechanism.
-- Full unauthenticated/public request logging.
+- Unscoped public request logging (no `project_id`): probes, and flow
+  requests that never resolve a project (invalid cookie).
 - Retroactive fabrication of events that were never stored (pre-claim history
   is stored; visibility opens at claim — see Context).
 
@@ -512,13 +537,17 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 
 ### Negative / Risks
 
-- **Volume:** one `request` event per authenticated API call adds write
-  amplification (amortized by batch flush).
+- **Volume:** one `request` event per in-scope API call (authenticated plus
+  public login/flow) adds write amplification (amortized by batch flush).
 - **Delayed visibility:** request events may appear up to ~T after the action
   (batch age); forensic queries should prefer `occurred_at` when timing matters.
 - **Best-effort Path A:** crash before drain, overflow drop, or flush give-up
   can lose `request` events; Path B remains TX-safe. Metrics and alerts are
   required.
+- **No live project FK on `events`:** `project_id` is an opaque tenancy scope.
+  Hard-deleting a project leaves audit rows (including `project.deleted`) for
+  retention to purge. The shipper iterates **live claimed projects**, so
+  post-delete rows are not re-exported after the project disappears (v1).
 - **Missing InsertEvent:** statement methods that mutate state but forget
   `InsertEvent` create coverage gaps — catch via review and
   [`stmttest`](041-storage-statement-contract-tests.md) contract coverage when
@@ -535,7 +564,7 @@ When exporting to OTEL, the projector maps: `request_id → trace_id`,
 
 | ADR | Relationship |
 |-----|--------------|
-| [049 Events API, Retention, and Export](049-events-api-retention-export.md) | HTTP surface, `event_deliveries`, retention purge, external export; project-scoped get |
+| [049 Events API, Retention, and Export](049-events-api-retention-export.md) | HTTP surface, sink cursors, retention purge, external export; project-scoped get |
 | [028 Storage v2 Statements](028-storage-v2-statements-and-dialects.md) | `AllStatements` / `EventStatements` is the emission boundary |
 | [041 Storage Statement Contract Tests](041-storage-statement-contract-tests.md) | `InsertEvent` coverage belongs in `stmttest` when implemented |
 | [033 Internal Permission Management](033-internal-permission-management.md) | Actor/delegation metadata; `resource_scope_index` is **not** used for events |

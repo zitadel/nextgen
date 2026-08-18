@@ -29,7 +29,7 @@ direction for the console build-out (issue
   `_authed` layout owns the session guard (`GET /sessions/me`) and the app
   shell; the first-party session cookie is the embedded Console's human
   operator credential. Management calls stay on the dev-only proxy secret
-  until ADR 052's session-derived target authorization exists; embedded calls
+  until ADR 053's session-derived target authorization exists; embedded calls
   fail closed in the meantime.
 - [ADR 0004: Deployment modes](docs/adrs/0004-console-deployment-modes.md)
   — one build and one authorization model serve cloud and self-host. **Target:**

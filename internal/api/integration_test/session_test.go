@@ -21,7 +21,7 @@ func TestQuerySessions(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		// Sessions cascade with their project.
-		_ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
+		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), project.ID)
 	})
 
 	building := harness.CreateSession(t, project.ID, time.Hour)

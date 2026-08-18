@@ -37,6 +37,7 @@ type statements struct {
 	authzMembershipEdgeStatements
 	authzCatalogStatements
 	authzResolverStatements
+	eventStatements
 }
 
 func (s statements) Statements() service.AllStatements {
@@ -70,6 +71,7 @@ func newStatements(client queryExecutor) statements {
 		authzMembershipEdgeStatements: newAuthzMembershipEdgeStatements(client),
 		authzCatalogStatements:        newAuthzCatalogStatements(client),
 		authzResolverStatements:       newAuthzResolverStatements(client),
+		eventStatements:               newEventStatements(client),
 	}
 }
 

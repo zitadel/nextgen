@@ -23,7 +23,7 @@ func uniqueSessionFixtureIDs(t *testing.T) string {
 func ensureSessionProject(t *testing.T, projectID string) {
 	t.Helper()
 	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 }
 
 func handoffCompletedAttemptForSession(

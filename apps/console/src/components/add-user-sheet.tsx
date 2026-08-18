@@ -42,7 +42,7 @@ import {
 } from "../lib/schema";
 import { getConsoleProjectId } from "../runtime/runtime";
 
-/** A schema plus the id needed to reference it in the created user's `$schema`. */
+/** A schema plus the id needed to reference it in the created user's `schema`. */
 interface SchemaOption {
   id: string;
   schema: UserSchema;
@@ -68,10 +68,10 @@ const FOOTER = "flex-row items-center justify-end gap-3 bg-background px-6 py-4"
 /**
  * The Add user drawer (Figma `641:13005` — "User creation: drawer").
  *
- * The form is **schema-driven**: `POST /users` takes an open body validated
- * against the user schema named in `$schema`, so the controls below are built
- * from the chosen schema's `properties` rather than hardcoded. That is the whole
- * point of the screen — a project with a `minimal` schema asks only for an
+ * The form is **schema-driven**: `POST /users` takes an `attributes` object
+ * validated against the user schema named in `schema`, so the controls below are
+ * built from the chosen schema's `properties` rather than hardcoded. That is the
+ * whole point of the screen — a project with a `minimal` schema asks only for an
  * email, a `business` one also asks for names and a company.
  *
  * The design also specifies a "Projects (optional)" block granting the new user
@@ -203,7 +203,7 @@ function AddUserForm({
         }
       }
       await api.createUser(
-        { ...attributes, $schema: selected.id },
+        { schema: selected.id, attributes },
         { project_id: getConsoleProjectId() },
       );
       await onCreated();
@@ -264,7 +264,7 @@ function AddUserForm({
             The backend could not honour it anyway: granting needs a role
             catalogue (ADR 034's app-group catalog, epic #419) and a
             multi-project scope, but `queryProjects` remains scope-pinned until
-            root ADR 052 lands and `POST /users` accepts no ADR 053 grants, so
+            root ADR 053 lands and `POST /users` accepts no ADR 054 grants, so
             the block could select things it could never save.
 
             The component, its unit spec and its e2e coverage are kept intact

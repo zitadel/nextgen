@@ -32,7 +32,7 @@ interface SwitcherOption {
 export function ContextSwitcher() {
   const projects = useProjects();
   // The current management bridge scope-pins `queryProjects` to one project.
-  // Until root ADR 052's authorized-project query lands, this normally resolves
+  // Until root ADR 053's authorized-project query lands, this normally resolves
   // to a single entry — the switcher shows the truth rather than a list it
   // cannot switch between.
   const current =

@@ -23,6 +23,16 @@
   min-height: 100%;
   background: var(--zl-color-surface-default-black, #0f0f11);
 }
+/* A branding asset whose URL is well-formed but dead otherwise renders as a
+   0×0 <img> — a silent hole in the design. `asset-fallback.ts` stamps this
+   attribute from a real `error` listener (templates are DOMPurify-sanitised,
+   so inline `onerror` is not available to them) and the element leaves the
+   layout, degrading to the same result as "no asset configured". Qualified
+   on `img` so it outranks the `.zl-split__compact` display rules below
+   regardless of source order. */
+img[data-zl-asset-broken] {
+  display: none;
+}
 .zl-mount {
   display: flex;
   flex-direction: column;
@@ -170,11 +180,66 @@
   gap: var(--zl-spacing-04, 1.5rem);
   padding: 52px 16px;
 }
+/* A width cap alone leaves the height open: a portrait lockup clamped to 16rem
+   wide still resolves whatever height its ratio asks for (a 500×2000 mark
+   renders 256×1024), and the content-sized brand pane hands that straight to
+   the page. `max-height` only, deliberately unlike `.zl-split__hero` below: a
+   logo is a mark, not a pane-filling image, so it shrinks proportionally and
+   keeps its whole shape rather than being cropped to a slot — and it is never
+   stretched to the pane, which is what `width: 100%` there would do. 16rem
+   squares off the existing width cap, so the logo fits a 16rem box either way.
+   That is the cap for a logo that has the pane to itself — when a hero shares
+   it, the rule below takes over. Raise `--zl-split-logo-max-height` from the
+   template root for a taller lockup. */
 .zl-split__logo {
   max-width: min(16rem, 60%);
+  max-height: var(--zl-split-logo-max-height, 16rem);
 }
+/* A tenant who sets both assets stacks them in this one pane, so the two solo
+   caps stop being independent — and the pane's own gap and padding are only
+   half the chrome they compete with. The shell around it adds 3.25rem of block
+   padding, a region gap, and the 2.5rem attribution pill. The logo first yields
+   to a header-mark cap; the hero then takes only the viewport height left after
+   that whole fixed budget, so the pair also fits short, wide laptop viewports.
+   Hero-only panes keep the larger cap below.
+
+   The floor is 6rem — the compact banner's cap — not 0. Below roughly a 420px
+   viewport the subtraction goes negative, and floored at 0 the hero silently
+   disappeared while the pane kept the logo. That bought nothing: at those
+   heights the form card is already taller than the brand pane, so it, not the
+   hero, sets the page height. A visible-but-small hero is the honest
+   degradation. */
+.zl-split__logo:has(+ .zl-split__hero) {
+  max-height: var(--zl-split-logo-max-height, 8rem);
+}
+.zl-split__logo:has(+ .zl-split__hero) + .zl-split__hero {
+  max-height: min(
+    var(--zl-split-hero-max-height, 27.5rem),
+    max(
+      6rem,
+      calc(
+        100vh - 104px - 6.5rem - 2.5rem - var(--zl-spacing-04, 1.5rem) -
+          var(--zl-spacing-04, 1.5rem) - var(--zl-split-logo-max-height, 8rem)
+      )
+    )
+  );
+}
+/* Pinned width and a capped height, not a bare `max-width`. The brand pane is
+   content-sized — the grid centres it, nothing above the image constrains it —
+   so an unbounded hero *is* the page height. That bites hardest on an asset
+   with no intrinsic size (an SVG carrying only a viewBox, which every
+   framework scaffold ships): `width: auto` resolves to the pane's width and
+   the ratio squares it, so the pane grows past the viewport and pushes the
+   attribution below the fold. Pinning the width hands the excess to
+   `object-fit` instead of the layout: a wide banner is untouched (its height
+   never reaches the cap) and a tall or square one is cropped. The cap is the
+   `.zl-split__placeholder` footprint (22rem at 4 / 5), so a hero never claims
+   more vertical space than the panel it replaces, with a viewport term for
+   short screens. Tenants whose design wants a taller pane raise
+   `--zl-split-hero-max-height` from the template root. */
 .zl-split__hero {
-  max-width: 100%;
+  width: 100%;
+  max-height: var(--zl-split-hero-max-height, min(27.5rem, 60vh));
   border-radius: var(--zl-radius-m, 0.75rem);
   object-fit: cover;
 }
@@ -223,7 +288,10 @@ img.zl-split__compact {
   max-height: 2.5rem;
 }
 /* hero_url-only tenants: the compact fallback renders the hero image as a
-   modest banner instead of vanishing with the brand pane. */
+   modest banner instead of vanishing with the brand pane. Same pinned-width +
+   capped-height shape as `.zl-split__hero`, and load-bearing for the same
+   reason — drop the `width` and an intrinsic-size-less asset sizes itself off
+   the form pane instead, squaring a banner slot into a wall above the card. */
 img.zl-split__compact--hero {
   max-height: 6rem;
   max-width: 100%;

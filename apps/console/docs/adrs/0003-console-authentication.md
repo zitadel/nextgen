@@ -3,7 +3,7 @@
 > **Status:** Proposed
 > **Date:** 2026-07-23 (revised 2026-08-12 — §4/Consequences: the ADR 0002
 > `/api` shim this ADR narrowed was withdrawn, not built; revised 2026-08-13
-> — the first-party session becomes a management credential under root ADR 052)
+> — the first-party session becomes a management credential under root ADR 053)
 > **Scope:** `apps/console`. See
 > [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Follows the forward-looking slot recorded in
@@ -96,7 +96,7 @@ rendered state — signed in, but no access.
 
 The HttpOnly `__nextgen_session` cookie authenticates the human on same-origin
 Console requests. Root
-[ADR 052](../../../../docs/adrs/052-cross-project-principals.md) makes that
+[ADR 053](../../../../docs/adrs/053-cross-project-principals.md) makes that
 first-party session an accepted operator-plane credential: the server resolves
 the platform-project user from the cookie and authorizes the requested
 customer project through ordinary target-scoped assignments. The Console
@@ -106,7 +106,7 @@ Login establishes identity, not blanket management authority. A platform role
 alone grants no customer-project access, and every management endpoint remains
 responsible for its own permission check. Unsafe cookie-authenticated requests
 also require the exact-Origin and session-bound-CSRF protections specified by
-[ADR 052 §5](../../../../docs/adrs/052-cross-project-principals.md), which
+[ADR 053 §5](../../../../docs/adrs/053-cross-project-principals.md), which
 amends ADR 046's SameSite-only conclusion.
 
 `POST /sessions/exchange` still uses root
@@ -118,7 +118,7 @@ provides it to the login widget.
 session-derived target permissions. The Vite dev proxy therefore continues to
 inject a project secret for management requests, while the embedded build
 fails those requests closed. No production `/api` shim or secret injection is
-planned. Once ADR 052 lands, the dev proxy drops the secret; the Console client
+planned. Once ADR 053 lands, the dev proxy drops the secret; the Console client
 does not change.
 
 ### 5. Recorded caveats
@@ -134,7 +134,7 @@ does not change.
   reserved platform project discovered through `runtime.json` (with
   `VITE_CONSOLE_PROJECT_ID` only as a local-dev override). Data calls may
   target any customer project the signed-in principal is authorized to use;
-  Console ADR 0004 and root ADR 052 keep those scopes distinct.
+  Console ADR 0004 and root ADR 053 keep those scopes distinct.
 - **Fail-closed session probe.** Any `fetchSession` failure (including a
   backend outage) reads as "not signed in" and lands on the login screen,
   where the outage surfaces as a widget error.
@@ -151,7 +151,7 @@ does not change.
 - **~~Dependency to track~~ resolved 2026-08-12 by withdrawal (ADR 0002):**
   no Go `/api` mount exists or is planned — the deployed console calls the
   API at the origin root. The deployed management surface now waits on
-  session-derived target permissions (root ADRs 032/033/052) rather than on a
+  session-derived target permissions (root ADRs 032/033/053) rather than on a
   secret-injecting mount.
 - Tests: the `_authed` guard is covered by `src/routes/auth-guard.spec.tsx`;
   existing screen specs mock `@/auth/session` and run as signed-in.
@@ -168,7 +168,7 @@ does not change.
   [033](../../../../docs/adrs/033-internal-permission-management.md)/
   [036](../../../../docs/adrs/036-api-credential-planes.md)/
   [046](../../../../docs/adrs/046-claim-lifecycle-v2.md)/
-  [052](../../../../docs/adrs/052-cross-project-principals.md),
+  [053](../../../../docs/adrs/053-cross-project-principals.md),
   [037](../../../../docs/adrs/037-token-lifecycle.md).
 - [`packages/sdk-react`](../../../../packages/sdk-react/README.md),
   [`packages/components/src/orchestrator/zitadel-login.ts`](../../../../packages/components/src/orchestrator/zitadel-login.ts),

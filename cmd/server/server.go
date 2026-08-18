@@ -25,6 +25,7 @@ import (
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -182,7 +183,15 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		nil,
 	)
 	teamService := service.NewTeamService(serviceDBPool)
+	// The claim and dashboard URLs hang off the console. builtin_public_base is
+	// the only public-origin config today and carries the /api/schemas path, so
+	// strip it down to the origin before appending the console path; a
+	// dedicated server public-base setting should replace this when cloud
+	// deployment configuration lands.
+	consoleBase := (&url.URL{Scheme: builtinPublicBase.Scheme, Host: builtinPublicBase.Host}).String() + cfg.Server.ConsolePath
+	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
+	eventService := service.NewEventService(serviceDBPool)
 	userService := service.NewUserService(
 		serviceDBPool,
 		schemaStore,
@@ -238,6 +247,20 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool}
+	requestEventBuf := audit.NewRequestBuffer(exportAdapter, audit.DefaultRequestBufferConfig())
+	defer requestEventBuf.Close()
+
+	retentionJob := audit.NewRetentionJob(exportAdapter, cfg.Events.Retention)
+	retentionJob.Start()
+	defer retentionJob.Close()
+
+	shipper := audit.NewShipper(exportAdapter, cfg.Events.Export)
+	if err := shipper.Start(ctx); err != nil {
+		return fmt.Errorf("start event shipper: %w", err)
+	}
+	defer shipper.Close()
+
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
 			flowService,
@@ -249,8 +272,10 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			flowDefinitionSvc,
 			teamService,
 			brandingService,
+			eventService,
 			tokenService,
 			keyService,
+			claimService,
 			serviceDBPool,
 			cfg.Platform.ProjectID,
 		),
@@ -267,7 +292,8 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
-		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()))
+		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
+		requestEventBuf)
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -373,6 +399,11 @@ func loadConfig(configPath string) (Config, error) {
 	// unless platform.bootstrap_project explicitly opts in (#605).
 	v.SetDefault("platform.project_id", "")
 	v.SetDefault("platform.bootstrap_project", false)
+	v.SetDefault("events.retention.window", 30*24*time.Hour)
+	v.SetDefault("events.retention.interval", time.Hour)
+	v.SetDefault("events.retention.enabled", true)
+	v.SetDefault("events.export.enabled", false)
+	v.SetDefault("events.export.interval", 5*time.Second)
 	v.SetDefault("instrumentation.service_name", "Zitadel")
 	v.SetDefault("instrumentation.log.level", zlog.LevelInfo)
 	v.SetDefault("instrumentation.log.streams", []zlog.Stream{
@@ -415,6 +446,14 @@ func loadConfig(configPath string) (Config, error) {
 	if err := v.Unmarshal(&cfg); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w", err)
 	}
+	// Create the data dir configuration actually selected, not the default
+	// computed above — an explicit empty data_dir still means the default.
+	if cfg.Server.DataDir == "" {
+		cfg.Server.DataDir = dataDir
+	}
+	if err := ensureServerDataDir(cfg.Server.DataDir); err != nil {
+		return Config{}, err
+	}
 	if err := ensureServerMasterKey(&cfg.Server); err != nil {
 		return Config{}, err
 	}
@@ -433,7 +472,7 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 // ----------------------------- HTTP --------------------------------------
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler http.Handler, runtime runtimeResolver) (*http.ServeMux, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	if cfg.LoginEnabled {
@@ -473,11 +512,12 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 
 	mux.Handle("/",
 		middleware.Chain(apiHandler,
-			func(next http.Handler) http.Handler { return middleware.WithRequestIdentification(reqIdGen, next) },
+			func(next http.Handler) http.Handler { return middleware.WithRequestContextMiddleware(reqIdGen, next) },
 			middleware.WithLogging,
 			api.WithRequestHostMiddleware,
 			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
+			func(next http.Handler) http.Handler { return audit.WithRequestEventMiddleware(requestEvents, next) },
 		),
 	)
 	return mux, nil

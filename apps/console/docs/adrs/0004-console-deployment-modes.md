@@ -45,16 +45,16 @@ complete bootstrap contract.
 
 The following repository-wide decisions constrain this ADR:
 
-- root [ADR 052](../../../../docs/adrs/052-cross-project-principals.md) keeps
+- root [ADR 053](../../../../docs/adrs/053-cross-project-principals.md) keeps
   the authenticated user's home project distinct from the protected customer
   project and authorizes every target explicitly;
-- root [ADR 053](../../../../docs/adrs/053-customer-collaboration-grants.md)
+- root [ADR 054](../../../../docs/adrs/054-customer-collaboration-grants.md)
   keeps team membership, team ownership, and project access as separate
   facts, and supports both direct-user and team-derived project grants;
 - root [ADR 046](../../../../docs/adrs/046-claim-lifecycle-v2.md) uses the
   platform project for registration and claim in hosted deployments;
 - root [ADR 036](../../../../docs/adrs/036-api-credential-planes.md), as
-  amended by ADR 052, permits operator-plane calls authenticated by a
+  amended by ADR 053, permits operator-plane calls authenticated by a
   confidential automation credential or a first-party human session; and
 - root [ADR 048](../../../../docs/adrs/048-wide-events-internal-audit-primitive.md)
   records the human actor and the assignment path that authorized a mutation.
@@ -72,8 +72,8 @@ The reserved project is a **control project**, not a super-project:
 
 - a role in it does not imply access to any customer project;
 - access to a customer project comes only from that project's owning-team,
-  direct-user, team, or confidential-project assignment under ADRs 052 and
-  053; and
+  direct-user, team, or confidential-project assignment under ADRs 053 and
+  054; and
 - it is never used as the hosted-login project for a customer's application.
 
 Standalone remains the default product posture, not a different authorization
@@ -105,7 +105,7 @@ The minimum useful seed provisions, in one operation:
    including its publishable key, default user schema, and login flow — but
    **no project secret**: nothing in the Console's path needs one, and
    platform-homed automation waits on the deferred credential in root
-   [ADR 052 §9](../../../../docs/adrs/052-cross-project-principals.md). Test
+   [ADR 053 §9](../../../../docs/adrs/053-cross-project-principals.md). Test
    infrastructure gets predictable credentials from the testkit's boot
    contract, never from a seed default;
 2. at least one initial platform user who can sign into the Console;
@@ -155,7 +155,7 @@ development-only client override (§3), not a deployment fact.
 
 Deployments that already hold customer projects but no reserved platform
 project get **no adoption path**. They are recreated, consistent with the alpha
-reset that [ADR 053 §3](../../../../docs/adrs/053-customer-collaboration-grants.md)
+reset that [ADR 054 §3](../../../../docs/adrs/054-customer-collaboration-grants.md)
 already requires. Promoting an existing customer project to the reserved role
 would make the Console identity boundary depend on operator guesswork again,
 which is the failure this ADR exists to end.
@@ -235,11 +235,11 @@ The Console performs same-origin API calls with its HttpOnly
 `__nextgen_session` cookie. It does not receive a project secret and does not
 store a script-readable session bearer. The server resolves the platform user
 from that first-party session, then evaluates the target customer project with
-the same ADR 052 authorization resolver used for confidential automation.
+the same ADR 053 authorization resolver used for confidential automation.
 
 Cookie-authenticated unsafe methods require the exact-Origin and
 session-bound-CSRF protections in
-[ADR 052 §5](../../../../docs/adrs/052-cross-project-principals.md), which
+[ADR 053 §5](../../../../docs/adrs/053-cross-project-principals.md), which
 amends ADR 046's SameSite-only conclusion. A successful Console login therefore
 establishes identity, not blanket management authority.
 
@@ -338,5 +338,5 @@ without changing its Console build or moving operator identities.
   [036](../../../../docs/adrs/036-api-credential-planes.md),
   [046](../../../../docs/adrs/046-claim-lifecycle-v2.md),
   [048](../../../../docs/adrs/048-wide-events-internal-audit-primitive.md),
-  [052](../../../../docs/adrs/052-cross-project-principals.md), and
-  [053](../../../../docs/adrs/053-customer-collaboration-grants.md).
+  [053](../../../../docs/adrs/053-cross-project-principals.md), and
+  [054](../../../../docs/adrs/054-customer-collaboration-grants.md).

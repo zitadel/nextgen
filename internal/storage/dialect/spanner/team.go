@@ -139,13 +139,14 @@ func (ts teamStatements) ListTeams(ctx context.Context, filter *database.ListOpt
 // DeactivateTeam implements [service.TeamStatements].
 // Deactivating a team that is not active is a no-op, so updated_at records when
 // the team was deactivated, not when delete was last called.
-func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id string) error {
+func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id string) (bool, error) {
 	membershipRemoved := domain.MembershipStatusRemoved.String()
 	userDeactivated := domain.UserStatusDeactivated.String()
 	teamDeactivated := domain.TeamStatusDeactivated.String()
 	teamActive := domain.TeamStatusActive.String()
 
-	return withTransaction(ctx, ts.db, func(ctx context.Context, tx queryExecutor) error {
+	var changed bool
+	err := withTransaction(ctx, ts.db, func(ctx context.Context, tx queryExecutor) error {
 		affected, err := tx.Update(ctx, buildStatement(deactivateTeamStmt, teamDeactivated, projectID, id, teamActive).statement())
 		if err != nil {
 			return err
@@ -154,6 +155,7 @@ func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id strin
 		if affected == 0 {
 			return nil
 		}
+		changed = true
 
 		for _, step := range []struct {
 			sql  string
@@ -170,6 +172,7 @@ func (ts teamStatements) DeactivateTeam(ctx context.Context, projectID, id strin
 		edges := newAuthzMembershipEdgeStatements(tx)
 		return edges.DeleteAuthzMembershipEdgesForTeamDeactivate(ctx, projectID, id)
 	})
+	return changed, err
 }
 
 func (ts teamStatements) scanTeam(row *spanner.Row) (*domain.Team, error) {

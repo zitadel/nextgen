@@ -37,6 +37,17 @@ tasks:
       cache: false
       runInCI: false
 
+  # Starts a built image the way an operator would — no flags, no volumes, no
+  # --user override — and asserts it serves. Covers the container contract that
+  # unit tests cannot: the Dockerfile's data dir default against the non-root
+  # USER it declares. Needs a local Docker daemon and an image built by
+  # `node scripts/build-local-runtime-image.mjs`, so it stays out of CI.
+  smoke-container:
+    command: "node scripts/smoke-container.mjs"
+    options:
+      cache: false
+      runInCI: false
+
   check:
     command: "node scripts/check.mjs"
     options:

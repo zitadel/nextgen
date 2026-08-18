@@ -1,5 +1,12 @@
+import { createHash } from "node:crypto";
+
 import { stableStringify } from "../json";
-import type { ResourceSyncer, SyncAction, SyncPlanSummary } from "./types.js";
+import type {
+  ResourceSyncer,
+  SyncAction,
+  SyncActionWarning,
+  SyncPlanSummary,
+} from "./types.js";
 
 /**
  * Count the non-`skip` actions in a {@link buildSyncPlan} result. Pure; the
@@ -27,14 +34,21 @@ export function collectPlanWarnings(
 ): Array<{ path: string; rule: string; message: string }> {
   const out: Array<{ path: string; rule: string; message: string }> = [];
   for (const action of actions) {
-    if (action.kind !== "create" && action.kind !== "update") {
-      continue;
-    }
-    for (const warning of action.warnings ?? []) {
+    for (const warning of warningsOf(action)) {
       out.push({ path: action.path, rule: warning.rule, message: warning.message });
     }
   }
   return out;
+}
+
+/**
+ * The warnings an action carries. Only the three kinds that upload a body can
+ * have any: a `delete` has no content to judge, and a `skip` was never judged.
+ */
+function warningsOf(action: SyncAction): ReadonlyArray<SyncActionWarning> {
+  return action.kind === "create" || action.kind === "update" || action.kind === "revise"
+    ? (action.warnings ?? [])
+    : [];
 }
 
 /**
@@ -136,14 +150,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
 
   out.push(paint(`Plan: ${parts.join(", ")}.`, A.bold, tty));
 
-  const warningCount = active.reduce(
-    (count, action) =>
-      count +
-      ((action.kind === "create" || action.kind === "update") && action.warnings
-        ? action.warnings.length
-        : 0),
-    0,
-  );
+  const warningCount = active.reduce((count, action) => count + warningsOf(action).length, 0);
   if (warningCount > 0) {
     out.push(
       paint(
@@ -202,6 +209,44 @@ function fmtPrimitive(v: string | number | boolean | null): string {
 }
 
 /**
+ * A multi-line string is a document, not a scalar: branding inlines a whole
+ * `login.liquid` into `liquid_template`, and escaping 200 lines onto one
+ * `"…\n…\n…"` line buries every real change in the same block. Such values
+ * render as a summary (and, when they changed, as a line diff) instead.
+ */
+function isBlockString(v: unknown): v is string {
+  return typeof v === "string" && v !== KNOWN_AFTER_APPLY && v.includes("\n");
+}
+
+/** Trailing-newline-insensitive line count: `"a\nb\n"` is two lines, not three. */
+function lineCount(value: string): number {
+  const lines = value.split("\n");
+  return lines.length > 1 && lines[lines.length - 1] === "" ? lines.length - 1 : lines.length;
+}
+
+/** Short content fingerprint, so two summarised blocks can be told apart. */
+function shortHash(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 8);
+}
+
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function blockSummary(value: string): string {
+  return `(${plural(lineCount(value), "line")}, sha256:${shortHash(value)})`;
+}
+
+function unchangedBlockSummary(value: string): string {
+  return `(unchanged, ${plural(lineCount(value), "line")}, sha256:${shortHash(value)})`;
+}
+
+/** {@link fmtPrimitive}, with multi-line strings summarised. */
+function fmtScalar(v: string | number | boolean | null): string {
+  return isBlockString(v) ? blockSummary(v) : fmtPrimitive(v);
+}
+
+/**
  * Indentation contract (matches Terraform exactly):
  *   prefixCol = column index of the +/-/~ character
  *   field content starts at prefixCol + 2  (one space gap after prefix)
@@ -247,7 +292,7 @@ function renderFields(
     const pk = key.padEnd(maxLen);
 
     if (isPrimitive(val)) {
-      const formatted = fmtPrimitive(val);
+      const formatted = fmtScalar(val);
       const suffix = ctx.deleteMode ? " -> null" : "";
       lines.push(col(`${pad}${prefix} ${pk} = ${formatted}${suffix}`));
     } else if (Array.isArray(val)) {
@@ -289,7 +334,7 @@ function renderArrayItems(
 
   for (const item of arr) {
     if (isPrimitive(item)) {
-      const formatted = fmtPrimitive(item);
+      const formatted = fmtScalar(item);
       lines.push(col(`${pad}${prefix} ${formatted},`));
     } else if (Array.isArray(item)) {
       if (item.length === 0) {
@@ -308,6 +353,134 @@ function renderArrayItems(
         lines.push(col(`${" ".repeat(prefixCol + 2)}},`));
       }
     }
+  }
+}
+
+/** Changed-line budget for one block-string diff, before the "more" trailer. */
+const MAX_BLOCK_DIFF_LINES = 20;
+
+/**
+ * LCS cell budget (500 × 500 changed lines). Above it the middle section
+ * renders as one remove/add block instead — quadratic DP over a pathological
+ * template is not worth the memory, and a whole-block replace is still an
+ * honest rendering. The shipped designs are under 200 lines *before* the
+ * prefix/suffix trim, so real templates never come close.
+ */
+const MAX_LCS_CELLS = 250_000;
+
+type LineOp = { kind: "same" | "del" | "add"; line: string };
+
+function asLines(v: string | number | boolean | null): string[] {
+  return typeof v === "string" ? v.split("\n") : [fmtPrimitive(v)];
+}
+
+/**
+ * Line-level diff of two block strings. Common prefix and suffix are trimmed
+ * first — a template edit touches one region, so this alone usually reduces
+ * the problem to a handful of lines — and the remaining middle goes through
+ * an LCS pass (or, past {@link MAX_LCS_CELLS}, renders as a wholesale
+ * replacement).
+ */
+function diffLines(oldLines: readonly string[], newLines: readonly string[]): LineOp[] {
+  let start = 0;
+  while (
+    start < oldLines.length &&
+    start < newLines.length &&
+    oldLines[start] === newLines[start]
+  ) {
+    start += 1;
+  }
+  let endOld = oldLines.length;
+  let endNew = newLines.length;
+  while (endOld > start && endNew > start && oldLines[endOld - 1] === newLines[endNew - 1]) {
+    endOld -= 1;
+    endNew -= 1;
+  }
+
+  const midOld = oldLines.slice(start, endOld);
+  const midNew = newLines.slice(start, endNew);
+  if (midOld.length * midNew.length > MAX_LCS_CELLS) {
+    return [
+      ...midOld.map((line): LineOp => ({ kind: "del", line })),
+      ...midNew.map((line): LineOp => ({ kind: "add", line })),
+    ];
+  }
+  return lcsDiff(midOld, midNew);
+}
+
+/** Classic LCS-length DP, walked back into an op list. */
+function lcsDiff(a: readonly string[], b: readonly string[]): LineOp[] {
+  const table: number[][] = Array.from({ length: a.length + 1 }, () =>
+    new Array<number>(b.length + 1).fill(0),
+  );
+  for (let i = a.length - 1; i >= 0; i -= 1) {
+    for (let j = b.length - 1; j >= 0; j -= 1) {
+      table[i][j] =
+        a[i] === b[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
+    }
+  }
+
+  const ops: LineOp[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      ops.push({ kind: "same", line: a[i] });
+      i += 1;
+      j += 1;
+    } else if (table[i + 1][j] >= table[i][j + 1]) {
+      ops.push({ kind: "del", line: a[i] });
+      i += 1;
+    } else {
+      ops.push({ kind: "add", line: b[j] });
+      j += 1;
+    }
+  }
+  for (; i < a.length; i += 1) {
+    ops.push({ kind: "del", line: a[i] });
+  }
+  for (; j < b.length; j += 1) {
+    ops.push({ kind: "add", line: b[j] });
+  }
+  return ops;
+}
+
+/**
+ * Render a changed block string as a header plus its changed lines. Context
+ * lines are deliberately omitted: the file is on disk, and the plan's job is
+ * to name what moved, not to reproduce the template.
+ */
+function renderBlockStringDiff(
+  paddedKey: string,
+  oldVal: string | number | boolean | null,
+  newVal: string | number | boolean | null,
+  prefixCol: number,
+  tty: boolean,
+  lines: string[],
+): void {
+  const pad = " ".repeat(prefixCol);
+  const bodyPad = " ".repeat(prefixCol + 4);
+  const changed = diffLines(asLines(oldVal), asLines(newVal)).filter((op) => op.kind !== "same");
+  const total = typeof newVal === "string" ? lineCount(newVal) : 1;
+  const fingerprints =
+    typeof oldVal === "string" && typeof newVal === "string"
+      ? `, sha256:${shortHash(oldVal)} -> sha256:${shortHash(newVal)}`
+      : "";
+
+  lines.push(
+    paint(
+      `${pad}~ ${paddedKey} = (${plural(changed.length, "line")} changed of ${total}${fingerprints})`,
+      A.yellow,
+      tty,
+    ),
+  );
+  for (const op of changed.slice(0, MAX_BLOCK_DIFF_LINES)) {
+    const del = op.kind === "del";
+    lines.push(paint(`${bodyPad}${del ? "-" : "+"} ${op.line}`, del ? A.red : A.green, tty));
+  }
+  const omitted = changed.length - MAX_BLOCK_DIFF_LINES;
+  if (omitted > 0) {
+    lines.push(`${bodyPad}  # (${plural(omitted, "more changed line")} not shown)`);
   }
 }
 
@@ -345,7 +518,7 @@ function renderDiff(
       hasChanges = true;
       const col = (s: string) => paint(s, A.green, tty);
       if (isPrimitive(newVal)) {
-        lines.push(col(`${pad}+ ${pk} = ${fmtPrimitive(newVal)}`));
+        lines.push(col(`${pad}+ ${pk} = ${fmtScalar(newVal)}`));
       } else if (Array.isArray(newVal)) {
         lines.push(col(`${pad}+ ${pk} = [`));
         renderArrayItems(newVal, "+", prefixCol + 4, { tty, deleteMode: false }, lines);
@@ -359,7 +532,7 @@ function renderDiff(
       hasChanges = true;
       const col = (s: string) => paint(s, A.red, tty);
       if (isPrimitive(oldVal)) {
-        lines.push(col(`${pad}- ${pk} = ${fmtPrimitive(oldVal)} -> null`));
+        lines.push(col(`${pad}- ${pk} = ${fmtScalar(oldVal)} -> null`));
       } else if (Array.isArray(oldVal)) {
         lines.push(col(`${pad}- ${pk} = [`));
         renderArrayItems(oldVal, "-", prefixCol + 4, { tty, deleteMode: false }, lines);
@@ -371,7 +544,14 @@ function renderDiff(
       }
     } else if (isPrimitive(oldVal) && isPrimitive(newVal)) {
       if (oldVal === newVal) {
-        lines.push(`${pad}  ${pk} = ${fmtPrimitive(newVal)}`);
+        lines.push(
+          isBlockString(newVal)
+            ? `${pad}  ${pk} = ${unchangedBlockSummary(newVal)}`
+            : `${pad}  ${pk} = ${fmtPrimitive(newVal)}`,
+        );
+      } else if (isBlockString(oldVal) || isBlockString(newVal)) {
+        hasChanges = true;
+        renderBlockStringDiff(pk, oldVal, newVal, prefixCol, tty, lines);
       } else {
         hasChanges = true;
         const col = (s: string) => paint(s, A.yellow, tty);
@@ -429,10 +609,10 @@ function renderDiff(
       const colR = (s: string) => paint(s, A.red, tty);
       const colA = (s: string) => paint(s, A.green, tty);
       if (isPrimitive(oldVal)) {
-        lines.push(colR(`${pad}- ${pk} = ${fmtPrimitive(oldVal)} -> null`));
+        lines.push(colR(`${pad}- ${pk} = ${fmtScalar(oldVal)} -> null`));
       }
       if (isPrimitive(newVal)) {
-        lines.push(colA(`${pad}+ ${pk} = ${fmtPrimitive(newVal)}`));
+        lines.push(colA(`${pad}+ ${pk} = ${fmtScalar(newVal)}`));
       }
     }
   }
@@ -584,6 +764,7 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
         );
       }
       lines.push(`${closePad}}`);
+      renderWarnings(action.warnings, blkPad, tty, lines);
       if (action.affectedPaths.length > 0) {
         lines.push(
           paint(

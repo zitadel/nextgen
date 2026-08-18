@@ -52,7 +52,7 @@ const SMALL = "h-8 gap-1 px-2.5 text-xs";
  *
  * Nothing here is sent on submit, and nothing is lost by that: `POST /users`
  * accepts no grants, and `queryProjects` remains scope-pinned until root ADR
- * 052's authorized-project query lands — the same project id the create call
+ * 053's authorized-project query lands — the same project id the create call
  * already passes.
  */
 export function ProjectAccess({

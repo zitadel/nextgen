@@ -1,9 +1,25 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 import { CONTAINER_DATA_DIR } from "../../../../src/lib/local-server/runtime";
 import { dockerRunArgs } from "../../../../src/lib/local-server/docker";
 
 describe("local server Docker helpers", () => {
+  // The server derives its default data dir next to the entrypoint, which lives
+  // in root-owned /usr/local/bin. Without this ENV the image cannot start as the
+  // non-root USER it declares, and `zitadel start --runtime docker` dies before
+  // serving. CI has no Docker, so this parity check is the gate.
+  it("ships an image whose data dir default matches the mount the CLI provides", async () => {
+    const dockerfile = await readFile(
+      new URL("../../../../../../Dockerfile", import.meta.url),
+      "utf8",
+    );
+
+    expect(dockerfile).toContain(`ENV NEXTGEN_SERVER_DATA_DIR=${CONTAINER_DATA_DIR}`);
+    // The declared USER is what makes the default location unwritable.
+    expect(dockerfile).toContain("USER 65532:65532");
+  });
+
   it("builds the single-container run command without an explicit encryption key", () => {
     const args = dockerRunArgs({
       containerName: "zitadel-server-test",

@@ -1,4 +1,4 @@
-# ADR 052: Cross-Project Principals
+# ADR 053: Cross-Project Principals
 
 > **Status:** Proposed
 > **Date:** 2026-08-13
@@ -49,7 +49,7 @@ The permission foundation already anticipates the correct shape:
   are equal.
 
 This ADR ratifies the cross-project mechanism and its security boundary. It does
-not define customer collaboration policy; [ADR 053](053-customer-collaboration-grants.md)
+not define customer collaboration policy; [ADR 054](054-customer-collaboration-grants.md)
 does that. Together they resolve the cross-project human-identity question that
 [ADR 033](033-internal-permission-management.md) (out of scope) and
 `permission-storage.md` both deferred to
@@ -440,7 +440,7 @@ synthetic `project:*` grant.
 
 ## Non-goals
 
-- Customer collaboration roles and ownership policy; see ADR 053.
+- Customer collaboration roles and ownership policy; see ADR 054.
 - Staff support tiers, self-grant policy, approval, impersonation, and
   break-glass governance.
 - Federated cross-deployment access tokens.

@@ -157,7 +157,7 @@ describe("theme toggle", () => {
   });
   it("names the project from the API rather than a hardcoded label", async () => {
     // The switcher used to hardcode "River". `queryProjects` remains scope-pinned
-    // until root ADR 052 lands, so this normally resolves to one entry.
+    // until root ADR 053 lands, so this normally resolves to one entry.
     renderShell();
     const switcher = await screen.findByRole("button", { name: "Switch project" });
     await vi.waitFor(() => expect(switcher).toHaveTextContent("console-dev"));

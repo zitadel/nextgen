@@ -12,6 +12,7 @@ import (
 
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -122,12 +123,16 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 			return domain.ErrInternal(err).WithMessage("failed to create project token signing key in the database")
 		}
 
-		if err := tx.Statements().CreateAuthzAssignment(ctx, domain.NewSKProjProjectSetupAssignment(project.ID)); err != nil {
+		asgn := domain.NewSKProjProjectSetupAssignment(project.ID)
+		if err := tx.Statements().CreateAuthzAssignment(ctx, asgn); err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to seed project secret authz assignment")
+		}
+		if err := emitAuthzGranted(ctx, tx.Statements(), asgn); err != nil {
+			return err
 		}
 
 		if !seedDefaults {
-			return nil
+			return emitProjectCreated(ctx, tx.Statements(), project)
 		}
 
 		userschema, err := s.createDefaultUserSchemas(ctx, tx.Statements(), project.ID)
@@ -139,7 +144,10 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to parse default user schema")
 		}
-		return s.createDefaultLoginFlowDefinitions(ctx, tx.Statements(), project.ID, userSchema)
+		if err := s.createDefaultLoginFlowDefinitions(ctx, tx.Statements(), project.ID, userSchema); err != nil {
+			return err
+		}
+		return emitProjectCreated(ctx, tx.Statements(), project)
 	})
 
 	if err != nil {
@@ -155,7 +163,7 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 	return project, nil
 }
 
-func (s *projectService) createDefaultUserSchemas(ctx context.Context, stmts JSONSchemaStatements, projectID string) (*domain.JSONSchema, error) {
+func (s *projectService) createDefaultUserSchemas(ctx context.Context, stmts AllStatements, projectID string) (*domain.JSONSchema, error) {
 	schemabs := schemas.DefaultHumanUserSchema(s.serverURL)
 	schema, err := domain.NewJSONSchema(projectID, schemabs)
 	if err != nil {
@@ -167,10 +175,13 @@ func (s *projectService) createDefaultUserSchemas(ctx context.Context, stmts JSO
 	if err := stmts.CreateJSONSchema(ctx, schema); err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to save default human schema to project")
 	}
+	if err := emitSchemaCreated(ctx, stmts, schema); err != nil {
+		return nil, err
+	}
 	return schema, nil
 }
 
-func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, stmts FlowDefinitionStatements, projectID string, userSchema *jsonschema.Schema) error {
+func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, stmts AllStatements, projectID string, userSchema *jsonschema.Schema) error {
 	flowDefs, err := flow_definitions.DefaultLoginFlowDefinitions(
 		s.serverURL,
 		projectID,
@@ -189,8 +200,62 @@ func (s *projectService) createDefaultLoginFlowDefinitions(ctx context.Context, 
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to save default login flow definition to project")
 		}
+		if err := emitFlowdefCreated(ctx, stmts, flowDef); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func emitProjectCreated(ctx context.Context, stmts EventStatements, project *domain.Project) error {
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeProjectCreated,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  project.ID,
+		EntityType: "project",
+		EntityID:   project.ID,
+		Payload: domain.ProjectPayload{
+			Name:           project.Name,
+			PreviewOrigins: project.PreviewOrigins,
+		},
+	})
+}
+
+func emitAuthzGranted(ctx context.Context, stmts EventStatements, a *domain.AuthzAssignment) error {
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeAuthzGranted,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  a.ProjectID,
+		EntityType: "authz_assignment",
+		EntityID:   a.ID,
+		Payload: domain.AuthzGrantedPayload{
+			PrincipalType: a.PrincipalType.String(),
+			PrincipalID:   a.PrincipalID,
+			Relation:      a.Relation,
+		},
+	})
+}
+
+func emitSchemaCreated(ctx context.Context, stmts EventStatements, schema *domain.JSONSchema) error {
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeSchemaCreated,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  schema.ProjectID,
+		EntityType: "json_schema",
+		EntityID:   schema.URL,
+		Payload:    struct{}{},
+	})
+}
+
+func emitFlowdefCreated(ctx context.Context, stmts EventStatements, flowDef *domain.FlowDefinition) error {
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeFlowdefCreated,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  flowDef.ProjectID,
+		EntityType: "flow_definition",
+		EntityID:   flowDef.ID,
+		Payload:    domain.FlowdefPayloadSnapshot(flowDef),
+	})
 }
 
 func (s *projectService) Get(ctx context.Context, id string) (*domain.Project, error) {
@@ -248,9 +313,25 @@ func (s *projectService) Update(ctx context.Context, id, name string) (*domain.P
 		ID:   id,
 		Name: name,
 	}
-	if err := s.v2Pool.Statements().UpdateProject(ctx, project); err != nil {
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().UpdateProject(ctx, project); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeProjectUpdated,
+			Category:   domain.EventCategoryEntity,
+			ProjectID:  project.ID,
+			EntityType: "project",
+			EntityID:   project.ID,
+			Payload:    domain.ProjectPayload{Name: project.Name},
+		})
+	})
+	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrProjectNotFound()
+		}
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to update project")
 	}
@@ -346,7 +427,28 @@ func (s *projectService) Delete(ctx context.Context, id string) error {
 	if id == "" {
 		return domain.ErrProjectMissingID()
 	}
-	if err := s.v2Pool.Statements().DeleteProjectByID(ctx, id); err != nil {
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		changed, err := tx.Statements().DeleteProjectByID(ctx, id)
+		if err != nil {
+			return err
+		}
+		if !changed {
+			return nil
+		}
+		// Emit after confirmed delete: events.project_id is not an FK (audit
+		// must outlive the project row).
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeProjectDeleted,
+			Category:   domain.EventCategoryEntity,
+			ProjectID:  id,
+			EntityType: "project",
+			EntityID:   id,
+		})
+	})
+	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return de
+		}
 		return domain.ErrInternal(err).WithMessage("failed to delete project")
 	}
 	return nil

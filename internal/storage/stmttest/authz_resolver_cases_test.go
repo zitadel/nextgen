@@ -234,6 +234,14 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewTeamAssignmentScope(teamT))))
 			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
+			assert.False(t, allowed, "no object ids → still deny")
+			withTeam := base(domain.AuthzPrincipalTypeUser, u, "project", "viewer")
+			withTeam.ResourceTeamID = teamT
+			allowed, _ = check(t, withTeam)
+			assert.True(t, allowed, "matching team id → Allow")
+			wrongTeam := base(domain.AuthzPrincipalTypeUser, u, "project", "viewer")
+			wrongTeam.ResourceTeamID = teamU
+			allowed, _ = check(t, wrongTeam)
 			assert.False(t, allowed)
 		})
 
@@ -243,6 +251,14 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewResourceAssignmentScope(res))))
 			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
+			assert.False(t, allowed, "no object ids → still deny")
+			withRes := base(domain.AuthzPrincipalTypeUser, u, "project", "viewer")
+			withRes.ResourceID = res
+			allowed, _ = check(t, withRes)
+			assert.True(t, allowed, "matching resource id → Allow")
+			wrongRes := base(domain.AuthzPrincipalTypeUser, u, "project", "viewer")
+			wrongRes.ResourceID = "usr_other_" + uniqueSuffix(t)
+			allowed, _ = check(t, wrongRes)
 			assert.False(t, allowed)
 		})
 

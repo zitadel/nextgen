@@ -68,6 +68,13 @@ describe("branding eject", () => {
     const readme = await readFile(join(cwd, ".zitadel/branding/README.md"), "utf8");
     expect(readme).toContain("npx @zitadel/cli@");
     expect(readme).not.toMatch(/`zitadel /);
+
+    // Same rule for the dialect file: its `description` strings are the
+    // editor tooltip on branding.json, so a bare `zitadel apply` there reads
+    // as a command the generated app doesn't have.
+    const meta = await readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8");
+    expect(meta).toContain("npx @zitadel/cli@");
+    expect(meta).not.toMatch(/`zitadel /);
   });
 
   it("--design split writes the split template and layout", async () => {

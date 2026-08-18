@@ -629,6 +629,71 @@ describe("ManagedFilesCheck", () => {
     expect((after.details as ManagedDetails).mode).toBe("manifest");
   });
 
+  // The dev script has to be verified against the port the project
+  // *registered* as its allowed origin, not the port the app happens to start
+  // on now. Those agree at setup and diverge exactly when it matters: reading
+  // the live script would make any edited script verify against itself, and
+  // would make `--fix` write back the detected fallback instead of the port
+  // the server actually allows — leaving login broken while doctor says the
+  // wiring is applied.
+  async function makeNextProjectWithDevScript(devScript: string, issuerPort: number) {
+    const cwd = await makeProject();
+    const pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ ...pkg, scripts: { dev: devScript } }),
+    );
+    const config = JSON.parse(await readFile(join(cwd, "zitadel.json"), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({
+        ...config,
+        environments: { development: { issuer: `http://localhost:${String(issuerPort)}` } },
+      }),
+    );
+    return cwd;
+  }
+
+  function devScriptOf(cwd: string): Promise<string> {
+    return readFile(join(cwd, "package.json"), "utf8").then(
+      (raw) => (JSON.parse(raw) as { scripts: { dev: string } }).scripts.dev,
+    );
+  }
+
+  it("reports the dev script as applied only when it serves the registered port", async () => {
+    const cwd = await makeNextProjectWithDevScript("next dev --port 3456", 3456);
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("pass");
+  });
+
+  it("flags a dev script edited to a port the project does not allow", async () => {
+    // Detection would report 4000 and happily verify it against itself.
+    const cwd = await makeNextProjectWithDevScript("next dev --port 4000", 3456);
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("unapplied managed config edit(s): package.json");
+  });
+
+  it("--fix restores the registered port, not the detected fallback", async () => {
+    // No declaration at all: detection falls back to 3000, so a fix driven by
+    // the live script would write 3000 and keep login broken.
+    const cwd = await makeNextProjectWithDevScript("next dev", 3456);
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).status).toBe("warn");
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await devScriptOf(cwd)).toBe("next dev --port 3456");
+    expect(await devScriptOf(cwd)).not.toContain("3000");
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
   it("fails when a managed config wiring is detached, and --fix re-applies it", async () => {
     const cwd = await makeAngularProject();
     const check = new ManagedFilesCheck();

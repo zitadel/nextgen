@@ -83,7 +83,7 @@ describe("add user sheet", () => {
   // The Projects block is out of the MVP: design removed the project selector
   // (design decisions log D6, 2026-07-31), and the backend could not grant
   // access regardless (roles need ADR 034's app-group catalog, epic #419;
-  // `queryProjects` remains scope-pinned until root ADR 052 lands). D6 expects
+  // `queryProjects` remains scope-pinned until root ADR 053 lands). D6 expects
   // it back later, so its specs are parked rather than deleted — restore the
   // block, this file's cases and `project-access.spec.tsx` together.
   it("builds the form from the selected schema's properties", async () => {
@@ -146,7 +146,7 @@ describe("add user sheet", () => {
     expect(submit).toBeEnabled();
   });
 
-  it("posts the schema id as $schema and omits untouched optional properties", async () => {
+  it("posts the schema id as schema and omits untouched optional properties", async () => {
     stubSchemas({ sch_business: BUSINESS });
     let body: Record<string, unknown> | undefined;
     server.use(
@@ -165,9 +165,11 @@ describe("add user sheet", () => {
     // An empty optional property must be absent, not sent as "" — an empty
     // string fails format validation instead of reading as absent.
     expect(body).toEqual({
-      $schema: "sch_business",
-      email: "maya.patel@acme.com",
-      givenName: "Maya",
+      schema: "sch_business",
+      attributes: {
+        email: "maya.patel@acme.com",
+        givenName: "Maya",
+      },
     });
   });
 
@@ -295,7 +297,7 @@ describe("add user sheet", () => {
   //   await userEvent.click(screen.getByRole("button", { name: "Add user" }));
 //
   //   await waitFor(() => expect(body).toBeDefined());
-  //   expect(body).toEqual({ $schema: "sch_business", email: "a@acme.com" });
+  //   expect(body).toEqual({ schema: "sch_business", attributes: { email: "a@acme.com" } });
   // });
 
   it("marks fields the schema does not require, and leaves required ones unmarked", async () => {
@@ -347,7 +349,8 @@ describe("add user sheet", () => {
     await userEvent.click(screen.getByRole("button", { name: "Add user" }));
 
     await waitFor(() => expect(body).toBeDefined());
-    expect(body?.seats).toBe(42);
-    expect(typeof body?.seats).toBe("number");
+    const attributes = body?.attributes as Record<string, unknown>;
+    expect(attributes.seats).toBe(42);
+    expect(typeof attributes.seats).toBe("number");
   });
 });

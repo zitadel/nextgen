@@ -1,4 +1,4 @@
-# ADR 053: Customer Collaboration Grants
+# ADR 054: Customer Collaboration Grants
 
 > **Status:** Proposed
 > **Date:** 2026-08-13
@@ -9,7 +9,7 @@
 > [ADR 033](033-internal-permission-management.md),
 > [ADR 035](035-configuration-environments.md),
 > [ADR 046](046-claim-lifecycle-v2.md), and
-> [ADR 052](052-cross-project-principals.md).
+> [ADR 053](053-cross-project-principals.md).
 > **Amends if accepted:** [ADR 046 §4](046-claim-lifecycle-v2.md#4-the-personal-team-is-created-at-registration-not-at-claim)
 > so claim selects an explicitly authorized target team instead of always
 > reusing the claimer's personal team.
@@ -167,7 +167,7 @@ That closure applies to a customer project's own `sk_proj_` secret. The
 reserved platform project mints no secret by default, and platform-homed
 automation has no credential yet — it waits on the deferred PAT / service-user
 principal
-([ADR 052 §9](052-cross-project-principals.md#9-deployment-wide-operators-are-a-separate-authority)).
+([ADR 053 §9](053-cross-project-principals.md#9-deployment-wide-operators-are-a-separate-authority)).
 
 Databases that already applied the old Goose migration must be dropped and
 recreated: editing an applied migration never updates its catalog, so reuse
@@ -371,7 +371,7 @@ customer/staff boundary intact:
   team. This is ordinary administration of a platform-project resource, not
   deployment-wide authority: it confers nothing on the customer projects that
   team owns beyond what the new owner then inherits, and it does not need
-  [ADR 052 §9](052-cross-project-principals.md#9-deployment-wide-operators-are-a-separate-authority)'s
+  [ADR 053 §9](053-cross-project-principals.md#9-deployment-wide-operators-are-a-separate-authority)'s
   deferred operator credential.
 
 The second path is privileged and applies only while the team has no active
@@ -391,7 +391,7 @@ issued service credentials.
 
 ### 9. Project listing returns effective access and its source
 
-The authorized-project query from ADR 052 returns only projects on which the
+The authorized-project query from ADR 053 returns only projects on which the
 principal has an effective role. For each result it may return:
 
 ```text
