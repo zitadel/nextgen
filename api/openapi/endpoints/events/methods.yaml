@@ -1,0 +1,142 @@
+get:
+  operationId: listEvents
+  summary: List events
+  description: |
+    Returns project-scoped audit events, newest-first by keyset on
+    `(created_at, id)` (ADR 027 / ADR 049). Pass `order=asc` for oldest-first.
+    Requires `events.read`.
+
+    Pre-claim projects return an empty list (events are stored but not
+    visible until claim succeeds). Team-scoped credentials see only events
+    whose emit-time `team_id` matches the credential team (enforced when
+    team-scoped tokens exist).
+
+    Clients discriminate each item via `event_type` (OpenAPI Event oneOf) —
+    see docs/design/api/events-catalog.md.
+  tags:
+    - Events
+  security:
+    - oauth2:
+        - events.read
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - name: category
+      in: query
+      description: |
+        Filter by wide-event category. Repeatable (OR within the parameter).
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+          enum:
+            - request
+            - auth
+            - session
+            - admin
+            - entity
+            - signal
+    - name: event_type
+      in: query
+      description: |
+        Exact-match filter on `event_type`. Repeatable (OR within the parameter).
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+    - name: actor_id
+      in: query
+      schema:
+        type: string
+    - name: client_id
+      in: query
+      schema:
+        type: string
+    - name: session_id
+      in: query
+      schema:
+        type: string
+    - name: flow_id
+      in: query
+      schema:
+        type: string
+    - name: request_id
+      in: query
+      schema:
+        type: string
+    - name: fingerprint
+      in: query
+      schema:
+        type: string
+    - name: entity_type
+      in: query
+      schema:
+        type: string
+    - name: entity_id
+      in: query
+      schema:
+        type: string
+    - name: team_id
+      in: query
+      description: Filter by emit-time team scope stored on the event.
+      schema:
+        type: string
+    - name: created_after
+      in: query
+      description: Inclusive lower bound on `created_at` (RFC 3339).
+      schema:
+        type: string
+        format: date-time
+    - name: created_before
+      in: query
+      description: Exclusive upper bound on `created_at` (RFC 3339).
+      schema:
+        type: string
+        format: date-time
+    - name: order
+      in: query
+      description: |
+        Sort direction on `(created_at, id)`. Default `desc` (newest first)
+        for audit UI. Pass `asc` for oldest-first.
+      schema:
+        type: string
+        enum:
+          - asc
+          - desc
+        default: desc
+    - $ref: ../../components/parameters/page-token.yaml
+    - $ref: ../../components/parameters/limit.yaml
+  responses:
+    '200':
+      description: Events were retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: list-events-response.yaml
+    '400':
+      description: Invalid request (e.g., invalid query parameters or page token).
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      description: Unexpected error response.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml

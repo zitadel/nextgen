@@ -33,6 +33,12 @@ type BuildLocalRuntimeImageModule = {
   linuxArchForNodeArch: (arch?: string) => string;
 };
 
+// buildServerBinaries verifies the ldflags target package via `go list`; with
+// gitInfo injected that is the only capture the image build makes.
+const goListStub = async () => ({
+  stdout: "github.com/zitadel/nextgen/internal/build\n",
+});
+
 async function loadModule(): Promise<BuildLocalRuntimeImageModule> {
   return (await import(
     new URL("../../../../../scripts/build-local-runtime-image.mjs", import.meta.url).href
@@ -77,6 +83,7 @@ describe("build-local-runtime-image", () => {
       rm: async (path) => {
         calls.push({ type: "rm", path });
       },
+      runCapture: goListStub,
       prepareDockerContext: async (options) => {
         expect(options).toMatchObject({
           repoRoot: "/repo",
@@ -102,7 +109,10 @@ describe("build-local-runtime-image", () => {
         "build",
         "-trimpath",
         "-ldflags",
-        "-s -w -X main.version=0.1.0-alpha.5 -X main.commit=abcdef123456 -X main.date=2026-06-16T00:00:00Z",
+        // A local dev image is not a release: it carries the source-build
+        // version, not release.version, so its logs and OTel service.version
+        // cannot be mistaken for the published binary.
+        "-s -w -X github.com/zitadel/nextgen/internal/build.version=dev+abcdef123456 -X github.com/zitadel/nextgen/internal/build.commit=abcdef1234567890 -X github.com/zitadel/nextgen/internal/build.date=2026-06-16T00:00:00Z",
         "-o",
         "/tmp/zitadel-local-image-test/build/linux/arm64/nextgen",
         ".",
@@ -158,6 +168,7 @@ describe("build-local-runtime-image", () => {
           date: "2026-06-16T00:00:00Z",
         },
         mkdtemp: async () => "/tmp/zitadel-local-image-fail",
+        runCapture: goListStub,
         rm: async (path) => {
           calls.push({ type: "rm", path });
         },

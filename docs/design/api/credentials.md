@@ -49,7 +49,7 @@ sk_team_… MAY:
   team_membership.read, team_membership.write
                                      (not .create / .delete — roster add/remove
                                       and invitations require a user token)
-  event.read                         (filtered to this team)
+  events.read                        (filtered to this team)
 
 sk_team_… MUST NEVER:
   user.set_password                  (account takeover — human/owner op only)
@@ -73,7 +73,6 @@ sk_team_… MUST NEVER:
   flow_definition.*
   session.*
   auth_attempt.*
-  audit_event.read
   import.*
   platform.*                         (cross-project — note: the platform itself is a project)
 ```
@@ -85,11 +84,13 @@ permission string (old `team.users.*` did). Compensating requirement: every
 `sk_team_` grant must carry a resolver-enforced team scope, and the deny-list
 suite must include "team token reads/writes a user outside its team".
 
-> **LOCKED / deferred:** Wave 3 (#423) ships the flat permission-name allowlist
-> only (`internal/authz/resolver/sk_team.go`). Resolver-enforced team scope and
-> the outside-team deny suite are **not** implemented yet — tracked in
-> [#831](https://github.com/zitadel/nextgen/issues/831). `sk_team_` is not
-> production-safe for `user.*` / `team_membership.*` until that lands.
+> **LOCKED:** Wave 3 (#423) shipped the flat permission-name allowlist
+> (`internal/authz/resolver/sk_team.go`). Resolver-enforced team scope
+> (`Request.TeamID` → `ConstraintTeamID`) and the outside-team deny suite
+> landed in [#831](https://github.com/zitadel/nextgen/issues/831). Grant
+> minting rejects project-scoped `sk_team_` grants for team-bound object
+> types. There is still no HTTP `sk_team_` token type — tests inject
+> `ScopeContext` / `resolver.Request` directly.
 
 SCIM sync (`scim.sync`) is not listed yet — SCIM is a hosted interop surface
 (`/scim/v2/Users`, `/scim/v2/Groups` in [`resource-map.md`](resource-map.md))

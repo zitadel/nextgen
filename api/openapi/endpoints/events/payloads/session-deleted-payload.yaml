@@ -1,0 +1,6 @@
+title: SessionDeletedPayload
+type: object
+description: Payload for `session.deleted` events.
+properties:
+  reason:
+    type: string

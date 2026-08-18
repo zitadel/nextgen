@@ -37,6 +37,14 @@ SELECT EXISTS (
 )`
 
 	deleteResourceScopeStmt = `DELETE FROM resource_scope_index WHERE resource_kind = @p1 AND project_id = @p2 AND resource_id = @p3`
+
+	listClaimedProjectIDsStmt = `
+SELECT project_id FROM resource_scope_index
+WHERE resource_kind = @p1
+  AND team_id IS NOT NULL AND team_id <> ''
+  AND (@p2 = '' OR project_id > @p2)
+ORDER BY project_id
+LIMIT @p3`
 )
 
 var resourceScopeColumns = []string{
@@ -131,6 +139,29 @@ func (s resourceScopeStatements) ExistsResourceScopeElsewhere(ctx context.Contex
 func (s resourceScopeStatements) DeleteResourceScope(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) error {
 	_, err := s.db.Update(ctx, buildStatement(deleteResourceScopeStmt, kind.String(), projectID, resourceID).statement())
 	return err
+}
+
+// ListClaimedProjectIDs implements [service.ResourceScopeStatements].
+func (s resourceScopeStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
+	if limit == 0 {
+		limit = 500
+	}
+	var ids []string
+	err := s.db.Query(ctx, buildStatement(listClaimedProjectIDsStmt, domain.ResourceKindProject.String(), afterID, int64(limit)).statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		ids, err = collectRows(iter, func(row *spanner.Row) (string, error) {
+			var id string
+			if err := row.Columns(&id); err != nil {
+				return "", err
+			}
+			return id, nil
+		})
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return ids, nil
 }
 
 func scanResourceScope(row *spanner.Row) (*domain.ResourceScope, error) {

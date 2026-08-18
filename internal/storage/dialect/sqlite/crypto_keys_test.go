@@ -23,7 +23,7 @@ func withProject(t *testing.T) string {
 	t.Helper()
 	projectID := "proj-" + t.Name()
 	require.NoError(t, testPool.CreateProject(t.Context(), &domain.Project{ID: projectID, Name: "crypto"}))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 	return projectID
 }
 
