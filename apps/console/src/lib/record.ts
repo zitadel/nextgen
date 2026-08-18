@@ -12,7 +12,7 @@ export function field(record: Record<string, unknown>, key: string): string | un
  * Reads a schema-defined attribute for display.
  *
  * `field` is deliberately string-only: it reads server-owned keys like `id` and
- * `$schema`, where a non-string means the record is not what was expected. A
+ * `schema`, where a non-string means the record is not what was expected. A
  * *schema* attribute is different — `schemaFields` surfaces `number` and
  * `integer` properties, and a schema may define a boolean, so reading those
  * through `field` renders a real value as blank.
