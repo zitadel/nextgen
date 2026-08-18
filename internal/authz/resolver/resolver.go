@@ -19,12 +19,13 @@ type Request struct {
 	// TeamID is required for sk_team_ principals (token team). Copied to
 	// AuthzCheckParams.ConstraintTeamID so SQL can constrain the object.
 	TeamID string
-	// ResourceID is the object being checked (user id, team id). Optional for
-	// permission-level Check of non-team-bound types; required for sk_team
-	// checks of team-bound object types so the compensating team constraint
-	// cannot be skipped. Empty ResourceID does not skip the grant Check — it
-	// only skips the extra "object is in the token team" AND — so omission
-	// would look like a create-style Check. Missing id is an error, not Allow.
+	// ResourceID is the object being checked (user id, team id, path id).
+	// Optional for permission-level Check of non-team-bound types; required for
+	// sk_team checks of team-bound object types so the compensating team
+	// constraint cannot be skipped. Also used for resource-scoped grant arms.
+	// Empty ResourceID does not skip the grant Check — it only skips the extra
+	// "object is in the token team" AND — so omission would look like a
+	// create-style Check. Missing id is an error, not Allow.
 	ResourceID string
 	// ResourceTeamID is RSI.team_id after a by-id lookup (team-scoped grant arm).
 	ResourceTeamID string
