@@ -197,7 +197,7 @@ func writeListedObjectInConstraintTeam(w ArgWriter, env Env, params domain.Authz
 // writeUserMembershipInTeam emits EXISTS on authz_membership_edges: user is a
 // member of a team. setIDExpr / memberIDExpr are raw SQL column refs; when
 // empty, setID / memberID are bound arguments. Check, List, TTU, and
-// principal-match all use this helper so ADR 052's home-project switch is one edit.
+// principal-match all use this helper so ADR 053's home-project switch is one edit.
 func writeUserMembershipInTeam(w ArgWriter, env Env, projectID, setIDExpr, setID, memberIDExpr, memberID string) {
 	w.WriteString(`EXISTS (
         SELECT 1

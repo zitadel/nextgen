@@ -21,6 +21,14 @@ under its production embed base at `/ui/console/`. This lane does not connect to
 a live API — with no backend, every API call fails the same way whatever base it
 targeted, so nothing here can vouch for the API base.
 
+The one request it does answer is `/console/runtime.json`, stubbed per test with
+Playwright routing. Console ADR 0004 §3 makes an unreachable runtime document a
+connectivity error rather than "no project yet", so the guard cases have to say
+which of the two they mean; the same routing lets the lane assert the error
+state (and its retry) against a real build. The build under test deliberately
+carries no `VITE_CONSOLE_RUNTIME_FALLBACK` — that opt-in exists for humans
+previewing without a backend, and setting it here would hide the error state.
+
 ## Real-instance resource coverage
 
 ```sh
@@ -36,6 +44,12 @@ The dev proxy is also this lane's blind spot: it rewrites `/api/*` onto the API
 root, so the console's API base is correct here by construction. That is what
 `e2e-embedded` is for.
 
+This lane boots the binary with both `/ui/*` surfaces off, and the mux mounts
+`/console/runtime.json` only alongside one of them — so its instance serves no
+runtime document, and the lane sets `VITE_CONSOLE_RUNTIME_FALLBACK` for the same
+reason a backend-less preview does (see [`moon.yml`](moon.yml)). The project id
+reaches the console through `VITE_CONSOLE_PROJECT_ID` as before.
+
 ## Embedded-surface coverage
 
 ```sh
@@ -48,6 +62,14 @@ origin root — no Vite, no proxy, no rewrite. This is the only lane that
 exercises the request path a customer gets, and the one that would have caught
 both shipped bugs: the console calling `/api/*` at a mux that never served it,
 and the login shell defaulting to the project id `"demo"`.
+
+Its instance is provisioned, so the login shell's non-happy paths stub
+`/console/runtime.json` per test the way the preview lane does — Console
+ADR 0004 §3 holds for the shell too, and the states it separates ("no project
+yet" vs. a server that cannot answer) are exactly the ones this lane's own
+deployment state cannot produce. The stubbed retry falls through to the real
+server, so recovery is asserted against a genuine document rather than a
+fixture.
 
 Keep feature coverage out of it. Management screens need `user.read`, which
 only the project secret carries — that is `e2e-real`'s job. This lane asserts

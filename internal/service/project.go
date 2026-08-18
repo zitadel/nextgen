@@ -31,9 +31,9 @@ type ProjectService interface {
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
 	Get(ctx context.Context, id string) (*domain.Project, error)
 
-	// DefaultProject resolves the project a standalone deployment tracks
-	// (Console ADR 0004 §3): the configured project when cfgProjectID is
-	// set — which must exist; a missing configured project is a
+	// DefaultProject resolves the transitional standalone default retained by
+	// Console ADR 0004 §2's bootstrap cutover rule: the configured project when
+	// cfgProjectID is set — which must exist; a missing configured project is a
 	// configuration error — otherwise the deployment's first-created
 	// project. Returns (nil, nil) while no project exists yet: the server
 	// never creates the default project, the customer's integration
