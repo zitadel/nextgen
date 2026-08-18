@@ -25,7 +25,11 @@ Same resources, different project context. The SDK talks to `/users`, `/teams`, 
 
 ## Self-hosted exposes the same API shape as cloud
 
-**LOCKED.** Self-hosted returns a singleton platform project and a singleton default team with the identical JSON schema the cloud version returns. The SDK does not branch on deployment mode — it blindly works against both.
+**LOCKED.** A bootstrapped self-hosted deployment returns a singleton platform project and a singleton default team with the identical JSON schema the cloud version returns. The SDK does not branch on deployment mode — it blindly works against both. Before bootstrap completes there is no platform project to return; that is a deployment-lifecycle state, not a second API shape ([Console ADR 0004 §2](../../../apps/console/docs/adrs/0004-console-deployment-modes.md#2-bootstrap-is-explicit-desired-state)).
+
+"Singleton" describes the platform project and the default team, not the deployment's project count. Customer projects are unbounded in both modes.
+
+Not shipped yet: self-host today has **no platform project at all** — bootstrap creates one only once ADR 0004 §2's seed transport ships for self-hosted deployments. Until then every project created is a customer project, and the Console signs in against §2's transitional fallback (the first-created project, or the `platform.project_id` pin). Read this section as the contract bootstrap implements, not as current behavior.
 
 The self-hosted project ID should be **discoverable from the server** ([direction](conventions.md#direction-not-shipped)), never hardcoded. When self-hosted grows to multiple projects, restores from backup with a different `project_id`, or runs clustered, the SDK keeps working because it discovered its defaults from the server.
 

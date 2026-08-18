@@ -44,7 +44,7 @@ export const apiBase =
  * env override; the *effective* project id is resolved through
  * `getConsoleProjectId()` in `src/runtime/runtime.ts`, which prefers this
  * override and falls back to the runtime-discovered `console_project_id`
- * (Console ADR 0004 §5). Callers needing a project id must use that helper
+ * (Console ADR 0004 §3). Callers needing a project id must use that helper
  * rather than this handle's field.
  */
 export const project = configureZitadel({

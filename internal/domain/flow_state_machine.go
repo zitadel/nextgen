@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/zitadel/nextgen/internal/maputil"
 )
 
 // Step error text keys the state machine emits when an auth-attempt
@@ -1293,7 +1295,7 @@ func prefillFromCollected(resolved *FlowResolvedFields, collected map[string]any
 		if resolved.Fields[i].Value != nil {
 			continue
 		}
-		if v, ok := collected[resolved.Fields[i].Name].(string); ok && v != "" {
+		if v, ok := maputil.GetNested[string](collected, AttributeKey(resolved.Fields[i].Name).Nodes()); ok && v != "" {
 			val := v
 			resolved.Fields[i].Value = &val
 		}
@@ -1321,7 +1323,12 @@ func mergeCollected(state *FlowState, fields map[string]any) error {
 			return fmt.Errorf("unknown auth method %s", k)
 		}
 
-		state.CollectedData.UserData[k] = v
+		// A field name is an attribute key, so the collected document keeps
+		// the shape the user schema validates and the attribute store
+		// flattens back out.
+		if err := maputil.SetNested(state.CollectedData.UserData, AttributeKey(k).Nodes(), v); err != nil {
+			return fmt.Errorf("merge collected field %q: %w", k, err)
+		}
 	}
 	return nil
 }
@@ -1335,7 +1342,7 @@ func FindCollectedFieldByChallenge(resolved []FlowField, collected map[string]an
 		if f.Challenge != target {
 			continue
 		}
-		if v, present := collected[f.Name]; present {
+		if v, present := maputil.GetNested[any](collected, AttributeKey(f.Name).Nodes()); present {
 			return f.Name, f, v, true
 		}
 	}

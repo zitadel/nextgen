@@ -17,27 +17,36 @@ direction for the console build-out (issue
   one router factory, `basepath` derived from the Vite `base`, route loaders +
   pending/error/not-found boundaries, `staticData`-driven sidebar.
 - [ADR 0002: API access and auth interceptors](docs/adrs/0002-console-api-access.md)
-  — the console holds no credential and calls the API same-origin; reuse
-  `configureZitadel()` / `getApi()` rather than a bespoke client. The base is
-  `/api` **only** under the dev server (whose proxy injects the project
-  secret); the embedded build talks to the origin root, where the Go binary
-  serves the API. The `/api` shim §1 once deferred to the server was withdrawn
-  in the 2026-08-12 revision — do not reintroduce it.
+  — the console holds no script-readable credential and calls the API
+  same-origin; the embedded browser carries its HttpOnly first-party session
+  cookie. Reuse `configureZitadel()` / `getApi()` rather than a bespoke client.
+  The base is `/api` **only** under the dev server (whose proxy temporarily
+  injects the project secret); the embedded build talks to the origin root,
+  where the Go binary serves the API. The `/api` shim §1 once deferred to the
+  server was withdrawn in the 2026-08-12 revision — do not reintroduce it.
 - [ADR 0003: Console authentication](docs/adrs/0003-console-authentication.md)
   — `/login` embeds the login widget (`@zitadel/sdk-react`); the pathless
   `_authed` layout owns the session guard (`GET /sessions/me`) and the app
-  shell; the session cookie authenticates the UI while management calls stay
-  on the server-held secret until session-derived permissions exist.
+  shell; the first-party session cookie is the embedded Console's human
+  operator credential. Management calls stay on the dev-only proxy secret
+  until ADR 053's session-derived target authorization exists; embedded calls
+  fail closed in the meantime.
 - [ADR 0004: Deployment modes](docs/adrs/0004-console-deployment-modes.md)
-  — one build serves cloud and self-host; the initial standalone Console uses
-  one default project (the first project created by `zitadel setup` through
-  `POST /projects`; the server never creates it). A minimal per-request
-  runtime document carries `mode` + the sign-in project id, and portal surfaces
-  (billing,
-  multi-project, support) render from **effective permissions** (user
-  grants ∩ deployment profile, computed server-side) via
-  `staticData.permission` — never build-time flags, never a parallel
-  console-facing feature array.
+  — one build and one authorization model serve cloud and self-host. **Target:**
+  every deployment uses a reserved platform project for Console identities; an
+  explicit testkit or future server-file seed fully provisions it, its initial
+  user, membership, separate owner assignment, and optional customer project.
+  **Today:** the Console signs into the pinned or first-created project — an
+  ordinary customer project — under §2's cutover rule. Do not remove that
+  fallback (or the `platform.project_id` pin) until the seed transport ships;
+  doing so strands self-hosters. Standalone optimizes for one project but does
+  not forbid more. The runtime document carries only public sign-in metadata;
+  portal surfaces render from target-scoped **effective permissions**, never
+  membership, build-time flags, or a parallel console-facing feature array.
+  A runtime document the Console cannot read is an **error, not a mode** (§3):
+  keep "unreachable/erroring" and "no project yet" separate states, and do not
+  reintroduce a silent fallback to `standalone` — backend-less dev and preview
+  runs opt in with `VITE_CONSOLE_RUNTIME_FALLBACK` instead.
 
 If an implementation needs to diverge from an ADR, update the ADR in the same
 change rather than letting code and decision drift.

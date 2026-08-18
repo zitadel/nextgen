@@ -396,6 +396,137 @@ describe("schema-dependent rules", () => {
     );
   });
 
+  // A nested property is addressed by the same dotted path the attribute
+  // store keys it under (walkUserProperty in the Go resolver).
+  describe("nested properties", () => {
+    const nested = () => {
+      const withNested = structuredClone(schema);
+      (withNested.properties as Record<string, unknown>).address = {
+        type: "object",
+        required: ["street"],
+        properties: {
+          street: { type: "string" },
+          city: { type: "string" },
+        },
+      };
+      return withNested;
+    };
+
+    it("accepts a nested leaf addressed by its dotted path", () => {
+      const def = flow();
+      step(def, "register").fields.push("address.street");
+      expect(errors(validateFlowDefinition(def, nested()))).toEqual([]);
+    });
+
+    it("rejects an unknown nested leaf", () => {
+      const def = flow();
+      step(def, "register").fields.push("address.country");
+      expect(messages(validateFlowDefinition(def, nested()))).toContain(
+        'step "register": flow field: not a property in the user schema: "address.country"',
+      );
+    });
+
+    it("rejects a path through a scalar intermediate", () => {
+      const def = flow();
+      step(def, "register").fields.push("email.domain");
+      expect(messages(validateFlowDefinition(def, nested()))).toContain(
+        'step "register": flow field: not a property in the user schema: "email.domain"',
+      );
+    });
+
+    it("rejects naming the object itself", () => {
+      const def = flow();
+      step(def, "register").fields.push("address");
+      expect(messages(validateFlowDefinition(def, nested()))).toContain(
+        'step "register": flow field: not a scalar property, name a nested leaf instead: "address"',
+      );
+    });
+
+    it("demands a required object's required leaf by its path", () => {
+      const withRequired = nested();
+      withRequired.required = ["address"];
+      const def = flow();
+      step(def, "identifier").fields = ["email"];
+      step(def, "register").fields = ["email"];
+      expect(messages(validateFlowDefinition(def, withRequired))).toContain(
+        "required fields [address.street] in user schema are missing in the flow definition steps",
+      );
+    });
+
+    it("covers a required object without its own required by any leaf beneath it", () => {
+      const withRequired = structuredClone(schema);
+      (withRequired.properties as Record<string, unknown>).address = {
+        type: "object",
+        properties: {
+          street: { type: "string" },
+          city: { type: "string" },
+        },
+      };
+      withRequired.required = ["address"];
+      const def = flow();
+      step(def, "register").fields.push("address.city");
+      expect(errors(validateFlowDefinition(def, withRequired))).toEqual([]);
+    });
+
+    // An optional object exists in the collected document only because a
+    // step collected something beneath it, and from that point the
+    // document validator enforces its `required` list.
+    it("demands an optional object's required leaf once a step collects into it", () => {
+      const def = flow();
+      step(def, "register").fields.push("address.city");
+      expect(messages(validateFlowDefinition(def, nested()))).toContain(
+        "required fields [address.street] in user schema are missing in the flow definition steps",
+      );
+    });
+
+    it("accepts an optional object whose required leaf is collected too", () => {
+      const def = flow();
+      step(def, "register").fields.push("address.city", "address.street");
+      expect(errors(validateFlowDefinition(def, nested()))).toEqual([]);
+    });
+
+    it("demands nothing from an optional object no step collects into", () => {
+      const def = flow();
+      expect(errors(validateFlowDefinition(def, nested()))).toEqual([]);
+    });
+
+    // The same rule one level down: `geo` is optional inside `address`,
+    // which is itself required, so the descent has to keep alternating
+    // between required names and materialized ones.
+    it("demands the leaf of an optional object nested in a required one", () => {
+      const withGeo = structuredClone(schema);
+      withGeo.required = ["address"];
+      (withGeo.properties as Record<string, unknown>).address = {
+        type: "object",
+        required: ["street"],
+        properties: {
+          street: { type: "string" },
+          city: { type: "string" },
+          geo: {
+            type: "object",
+            required: ["lat"],
+            properties: { lat: { type: "string" }, lng: { type: "string" } },
+          },
+        },
+      };
+      const def = flow();
+      step(def, "register").fields.push("address.street", "address.geo.lng");
+      expect(messages(validateFlowDefinition(def, withGeo))).toContain(
+        "required fields [address.geo.lat] in user schema are missing in the flow definition steps",
+      );
+    });
+
+    it("rejects a property carrying items but no type", () => {
+      const withItems = structuredClone(schema);
+      (withItems.properties as Record<string, unknown>).tags = { items: { type: "string" } };
+      const def = flow();
+      step(def, "register").fields.push("tags");
+      expect(messages(validateFlowDefinition(def, withItems))).toContain(
+        'step "register": flow field: not a scalar property, name a nested leaf instead: "tags"',
+      );
+    });
+  });
+
   it("rejects an ambiguous JSON type union but accepts the nullable idiom", () => {
     const withUnions = structuredClone(schema);
     (withUnions.properties as Record<string, unknown>).mixed = { type: ["string", "number"] };
@@ -408,6 +539,81 @@ describe("schema-dependent rules", () => {
     );
     expect(msgs).not.toContain(
       'step "register": flow field: unsupported JSON type: [null string]',
+    );
+  });
+
+  // The nullable idiom reduces before the composite test, so a nullable
+  // object is still an object. Reading the raw union instead would match
+  // none of the composite clauses and accept it as a scalar.
+  it("rejects a nullable object", () => {
+    const withNullableObject = structuredClone(schema);
+    (withNullableObject.properties as Record<string, unknown>).address = {
+      type: ["null", "object"],
+    };
+    const def = flow();
+    step(def, "register").fields.push("address");
+    expect(messages(validateFlowDefinition(def, withNullableObject))).toContain(
+      'step "register": flow field: not a scalar property, name a nested leaf instead: "address"',
+    );
+  });
+
+  // An ambiguous union is reported as one even when the property also
+  // carries `properties`, because Go reduces the type before it looks for
+  // a composite.
+  it("reports an ambiguous union on a property that also declares properties", () => {
+    const withBoth = structuredClone(schema);
+    (withBoth.properties as Record<string, unknown>).address = {
+      type: ["string", "number"],
+      properties: { street: { type: "string" } },
+    };
+    const def = flow();
+    step(def, "register").fields.push("address");
+    expect(messages(validateFlowDefinition(def, withBoth))).toContain(
+      'step "register": flow field: unsupported JSON type: [string number]',
+    );
+  });
+
+  // Segment lookup is an own-property test, mirroring a Go map index.
+  // Reaching through the prototype chain would resolve these as schema
+  // properties and report nothing.
+  it("rejects Object.prototype member names as fields", () => {
+    for (const name of ["toString", "valueOf", "constructor"]) {
+      const def = flow();
+      step(def, "register").fields.push(name);
+      expect(messages(validateFlowDefinition(def, schema))).toContain(
+        `step "register": flow field: not a property in the user schema: ${JSON.stringify(name)}`,
+      );
+    }
+  });
+
+  it("rejects an inherited member reached through a nested path", () => {
+    const withNested = structuredClone(schema);
+    (withNested.properties as Record<string, unknown>).address = {
+      type: "object",
+      properties: { street: { type: "string" } },
+    };
+    const def = flow();
+    step(def, "register").fields.push("address.toString");
+    expect(messages(validateFlowDefinition(def, withNested))).toContain(
+      'step "register": flow field: not a property in the user schema: "address.toString"',
+    );
+  });
+
+  // Go accumulates required paths into a set, so a name repeated in
+  // `required` reports the missing path once.
+  it("reports a repeated required name once", () => {
+    const withDuplicate = structuredClone(schema);
+    (withDuplicate.properties as Record<string, unknown>).address = {
+      type: "object",
+      required: ["street"],
+      properties: { street: { type: "string" } },
+    };
+    withDuplicate.required = ["address", "address"];
+    const def = flow();
+    step(def, "identifier").fields = ["email"];
+    step(def, "register").fields = ["email"];
+    expect(messages(validateFlowDefinition(def, withDuplicate))).toContain(
+      "required fields [address.street] in user schema are missing in the flow definition steps",
     );
   });
 

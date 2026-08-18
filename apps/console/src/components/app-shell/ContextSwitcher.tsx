@@ -31,9 +31,10 @@ interface SwitcherOption {
 
 export function ContextSwitcher() {
   const projects = useProjects();
-  // The console is bound to one project, and `queryProjects` is scope-pinned to
-  // it (ADR 0004), so this normally resolves to a single entry — the switcher
-  // shows the truth rather than a list it cannot switch between.
+  // The current management bridge scope-pins `queryProjects` to one project.
+  // Until root ADR 053's authorized-project query lands, this normally resolves
+  // to a single entry — the switcher shows the truth rather than a list it
+  // cannot switch between.
   const current =
     projects?.find((project) => project.id === getConsoleProjectId()) ?? projects?.[0];
 
