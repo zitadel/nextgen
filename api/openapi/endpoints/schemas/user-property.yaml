@@ -4,11 +4,6 @@ type: object
 description: |
   This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`. 
   This is done because a lot of code generators cannot handle that.
-  
-  A few properties are reserved:
-  - id: is used to return the id of the user 
-  - metadata: is used to embed metadata of the user, like creation date, 
-    status,... in a return object
 additionalProperties: true
 properties:
   x-verify:

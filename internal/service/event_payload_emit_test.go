@@ -238,8 +238,8 @@ func TestCreateUserAction_EventPayloadAttributeKeys(t *testing.T) {
 
 	action := service.NewCreateUserAction(service.CreateUserInput{
 		ProjectID: "proj_1",
-		User: map[string]any{
-			"$schema":   schemaURL,
+		SchemaURL: schemaURL,
+		Attributes: map[string]any{
 			"email":     "alice@example.com",
 			"givenName": "Alice",
 		},

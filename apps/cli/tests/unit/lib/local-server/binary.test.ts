@@ -1,11 +1,31 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { stopBinaryRuntime } from "../../../../src/lib/local-server/binary";
+import { resolveServerCommand, stopBinaryRuntime } from "../../../../src/lib/local-server/binary";
 
 describe("local server binary helpers", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it("records an explicit source build version with a binary override", () => {
+    expect(
+      resolveServerCommand({
+        ZITADEL_SERVER_BINARY: "/repo/dist/server/nextgen",
+        ZITADEL_SERVER_BINARY_VERSION: "dev+abcdef123456",
+      }),
+    ).toEqual({
+      command: "/repo/dist/server/nextgen",
+      args: [],
+      serverPackage: "@zitadel/server",
+      serverVersion: "dev+abcdef123456",
+    });
+  });
+
+  it("keeps the generic label for an unversioned user override", () => {
+    expect(
+      resolveServerCommand({ ZITADEL_SERVER_BINARY: "/tmp/custom-nextgen" }).serverVersion,
+    ).toBe("override");
   });
 
   it("falls back from process-group SIGTERM to pid SIGTERM and reports a stale process", async () => {

@@ -164,7 +164,7 @@ func (UnimplementedHandler) CreateTeam(ctx context.Context, req *CreateTeamReque
 // Create user.
 //
 // POST /users
-func (UnimplementedHandler) CreateUser(ctx context.Context, req *User, params CreateUserParams) (r CreateUserRes, _ error) {
+func (UnimplementedHandler) CreateUser(ctx context.Context, req *CreateUserRequest, params CreateUserParams) (r CreateUserRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
