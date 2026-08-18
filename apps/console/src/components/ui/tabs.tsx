@@ -70,12 +70,15 @@ function TabsTrigger({
         // `foreground/60` in light.
         "relative inline-flex h-full flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap text-muted-foreground transition-all group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 group-data-[variant=default]/tabs-list:data-[state=active]:shadow-sm group-data-[variant=line]/tabs-list:data-[state=active]:shadow-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:border-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent",
-        // The active trigger is `base/input` at full strength, with the
-        // `shadow/sm` applied above and no border. Upstream shadcn uses
-        // `bg-background` in light and `bg-input/30` + `border-input` in dark —
-        // at 30% the pill renders (16,16,16) where the design is (42,42,42),
-        // which is `rgba(255,255,255,.15)` over the (5,5,5) page.
-        "data-[state=active]:bg-input data-[state=active]:text-foreground",
+        // The active trigger is `base/card`, with the `shadow/sm` applied above
+        // and no border: (18,18,18) in dark and white in light, a raised plate
+        // on the page rather than a tint of it. Upstream shadcn uses
+        // `bg-background` in light and `bg-input/30` + `border-input` in dark.
+        //
+        // This was `bg-input` — (42,42,42) — measured off design-system node
+        // `183:539`, which no longer exists: the Tabs component was rebuilt, and
+        // every current frame resolves the active fill to `base/card`.
+        "data-[state=active]:bg-card data-[state=active]:text-foreground",
         "after:absolute after:bg-foreground after:opacity-0 after:transition-opacity group-data-[orientation=horizontal]/tabs:after:inset-x-0 group-data-[orientation=horizontal]/tabs:after:bottom-[-5px] group-data-[orientation=horizontal]/tabs:after:h-0.5 group-data-[orientation=vertical]/tabs:after:inset-y-0 group-data-[orientation=vertical]/tabs:after:-right-1 group-data-[orientation=vertical]/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-[state=active]:after:opacity-100",
         className
       )}
