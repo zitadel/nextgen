@@ -1590,6 +1590,169 @@ func TestValidator_MissingRequiredUserSchemaFields(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrFlowDefinitionInvalid(`required fields [first_name last_name] in user schema are missing in the flow definition steps`, nil))
 }
 
+// userSchemaRequiredNested makes `address` required and gives it a
+// required leaf of its own, so coverage has to be checked one level
+// down. `billing` is required but declares no `required`, so any leaf
+// beneath it covers the object. `shipping` is optional with a required
+// leaf, and `address.geo` is the same shape one level down inside a
+// required object — neither is demanded until a step collects into it.
+var userSchemaRequiredNested = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tenant.com/schemas/nested-user.json",
+  "type": "object",
+  "required": ["email", "address", "billing"],
+  "x-auth-methods": {
+    "password": { "enabled": true, "position": 0 }
+  },
+  "properties": {
+    "email": { "type": "string", "format": "email", "x-unique": "team" },
+    "address": {
+      "type": "object",
+      "required": ["street"],
+      "properties": {
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "geo": {
+          "type": "object",
+          "required": ["lat"],
+          "properties": {
+            "lat": { "type": "string" },
+            "lng": { "type": "string" }
+          }
+        }
+      }
+    },
+    "billing": {
+      "type": "object",
+      "properties": { "vat_id": { "type": "string" } }
+    },
+    "shipping": {
+      "type": "object",
+      "required": ["street"],
+      "properties": {
+        "street": { "type": "string" },
+        "city": { "type": "string" }
+      }
+    }
+  }
+}`)
+
+// nestedRequiredFlow builds a login flow whose profile step collects the
+// given fields, so cases vary only by what the step declares.
+func nestedRequiredFlow(fields []domain.Field) domain.FlowDefinition {
+	return domain.FlowDefinition{
+		ProjectID: "p", Name: "f", SchemaVersion: "1",
+		UserSchema: "https://tenant.com/schemas/nested-user.json",
+		Purposes:   map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identifier"},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name: "identifier", Fields: []domain.Field{"email"},
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "profile"}},
+			},
+			{
+				Name: "profile", Fields: fields,
+				Actions: []domain.FlowStepAction{
+					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{"submit": {Target: "done"}},
+			},
+			{Name: "done", Complete: new(domain.FlowStepCompleteShow)},
+		},
+	}
+}
+
+func TestValidator_RequiredNestedUserSchemaFields(t *testing.T) {
+	schema := mustSchema(t, userSchemaRequiredNested)
+
+	t.Run("nested required leaf satisfies coverage", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address.street", "billing.vat_id"},
+		))
+		require.NoError(t, err)
+	})
+
+	t.Run("missing nested required leaf is reported by its path", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address.city", "billing.vat_id"},
+		))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrFlowDefinitionInvalid(
+			`required fields [address.street] in user schema are missing in the flow definition steps`, nil))
+	})
+
+	t.Run("required object without its own required is covered by any leaf", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address.street"},
+		))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrFlowDefinitionInvalid(
+			`required fields [billing] in user schema are missing in the flow definition steps`, nil))
+	})
+
+	// The resolver's own fixture, driven through the save path: the
+	// resolver cases prove a dotted field resolves, this proves the
+	// definition carrying it is accepted.
+	t.Run("the resolver's nested fixture saves", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(
+			mustSchema(t, []byte(nestedSchemaContent)),
+			nestedRequiredFlow([]domain.Field{"address.street"}),
+		)
+		require.NoError(t, err)
+	})
+
+	// An optional object exists in the collected document only because a
+	// step collected something beneath it, and from that point the
+	// document validator enforces its `required` list. Without this the
+	// definition saved and then failed at create_user on every submission.
+	t.Run("collecting into an optional object demands its own required leaf", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address.street", "billing.vat_id", "shipping.city"},
+		))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrFlowDefinitionInvalid(
+			`required fields [shipping.street] in user schema are missing in the flow definition steps`, nil))
+	})
+
+	t.Run("collecting an optional object's required leaf satisfies it", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address.street", "billing.vat_id", "shipping.street", "shipping.city"},
+		))
+		require.NoError(t, err)
+	})
+
+	t.Run("an optional object no step collects into demands nothing", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address.street", "billing.vat_id"},
+		))
+		require.NoError(t, err)
+	})
+
+	// The same rule one level down: `geo` is optional inside `address`,
+	// which is itself required, so the descent has to keep alternating
+	// between required names and materialized ones.
+	t.Run("collecting into an optional object nested in a required one demands its leaf", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address.street", "billing.vat_id", "address.geo.lng"},
+		))
+		require.Error(t, err)
+		assert.ErrorIs(t, err, domain.ErrFlowDefinitionInvalid(
+			`required fields [address.geo.lat] in user schema are missing in the flow definition steps`, nil))
+	})
+
+	// Naming the object itself used to resolve as a text input and only
+	// fail once the user submitted it, at create_user.
+	t.Run("naming the object itself is rejected at definition time", func(t *testing.T) {
+		_, err := domain.ValidateFlowDefinition(schema, nestedRequiredFlow(
+			[]domain.Field{"address", "address.street", "billing.vat_id"},
+		))
+		require.Error(t, err)
+		assert.Contains(t, errorDetails(t, err), domain.ErrFlowFieldNotScalar.Error())
+	})
+}
+
 // ---- Passkey action enablement ----
 
 // passkeyActionFlow builds a minimal login flow whose entry step offers
