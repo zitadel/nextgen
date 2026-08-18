@@ -11,6 +11,15 @@
 > the platform-session precondition for `claim/complete` (#751), the CLI
 > `zitadel claim` command (#754), and team attachment reporting in
 > `setup`/`status`/`doctor` (#776).
+>
+> **Proposed amendment — [ADR 053 §5](053-cross-project-principals.md#5-first-party-human-sessions-may-call-the-operator-plane):**
+> if ADR 053 is accepted, [§2](#2-claimcomplete-is-authenticated-by-a-platform-project-session)'s
+> conclusion that SameSite semantics alone are sufficient against CSRF no longer
+> holds. Cookie-authenticated unsafe requests — `claim/complete` included —
+> additionally require an exact `Origin` match and a session-bound CSRF token in
+> a non-simple header. SameSite becomes defense in depth rather than the only
+> check. This is a wire-contract change to an already-implemented flow; do not
+> implement §2's CSRF posture from this ADR alone.
 > **Context:** The server-side contract for **claim**: the operation that turns
 > an unclaimed project into one owned by an accountable team. Supersedes the
 > Withdrawn [ADR 003](003-create-first-claim-later.md), which removed the

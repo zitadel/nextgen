@@ -5,27 +5,17 @@ import (
 	"sort"
 )
 
-// reservedUserMapKeys are not user attributes for audit purposes.
-var reservedUserMapKeys = map[string]struct{}{
-	"$schema":  {},
-	"id":       {},
-	"metadata": {},
-}
-
 // UserAttributeAuditFields builds attribute_keys and x-audit attribute values
-// for user.created / user.updated payloads. Keys come from the written user map
-// (minus reserved keys). Values are included only when the matching top-level
-// schema property has x-audit set (true or a non-empty string). When schemaJSON
-// is empty or unparsable, keys are still returned and attributes is empty.
+// for user.created / user.updated payloads. Keys come from the written
+// attributes. Values are included only when the matching top-level schema
+// property has x-audit set (true or a non-empty string). When schemaJSON is
+// empty or unparsable, keys are still returned and attributes is empty.
 func UserAttributeAuditFields(user map[string]any, schemaJSON []byte) (keys []string, attributes map[string]any) {
 	if len(user) == 0 {
 		return nil, nil
 	}
 	keys = make([]string, 0, len(user))
 	for k := range user {
-		if _, reserved := reservedUserMapKeys[k]; reserved {
-			continue
-		}
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)

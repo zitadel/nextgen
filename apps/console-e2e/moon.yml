@@ -56,6 +56,15 @@ tasks:
       # Vite-served console, so keep both server surfaces off.
       NEXTGEN_SERVER_LOGIN_ENABLED: "false"
       NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
+      # Consequence of the two flags above: `/console/runtime.json` is mounted
+      # only alongside a UI surface (`buildHTTPMux`), so this lane's instance
+      # serves none. Since Console ADR 0004 §3 that is a connectivity error,
+      # not a mode, and the console would stop at its error screen before any
+      # screen loaded — so opt in explicitly, the same way a backend-less
+      # preview does. The project id comes from VITE_CONSOLE_PROJECT_ID, which
+      # withZitadel already maps from the instance handle. Reaches the Vite dev
+      # server through the app-runner, which inherits this process env.
+      VITE_CONSOLE_RUNTIME_FALLBACK: "1"
     options:
       cache: false
       runInCI: false

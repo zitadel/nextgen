@@ -137,7 +137,7 @@ func encodeCreateTeamRequest(
 }
 
 func encodeCreateUserRequest(
-	req *User,
+	req *CreateUserRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

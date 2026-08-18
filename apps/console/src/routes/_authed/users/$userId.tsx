@@ -17,7 +17,7 @@ import { api } from "../../../api/zitadel";
 import { formatDate } from "../../../lib/date";
 import { displayValue, field } from "../../../lib/record";
 import { type UserSchema, schemaDisplayName, schemaFields } from "../../../lib/schema";
-import { userDisplayName } from "../../../lib/user";
+import { userAttributes, userDisplayName } from "../../../lib/user";
 
 /**
  * User detail (Figma `467:44362`, `Filled` and `Authentication` variants).
@@ -42,7 +42,7 @@ export const Route = createFileRoute("/_authed/users/$userId")({
 
     // Both are chrome for the record rather than the record itself, so neither
     // is allowed to reject the loader: a failure costs a card, not the screen.
-    const schemaId = field(user, "$schema");
+    const schemaId = field(user, "schema");
     const [schema, passkeys] = await Promise.all([
       schemaId
         ? api
@@ -82,7 +82,8 @@ function UserDetail() {
   const { user, schema, passkeys } = Route.useLoaderData();
   const { userId } = Route.useParams();
   const router = useRouter();
-  const name = userDisplayName(user) ?? field(user, "email") ?? userId;
+  const attributes = userAttributes(user);
+  const name = userDisplayName(attributes) ?? field(attributes, "email") ?? userId;
   const fields = schema ? schemaFields(schema) : [];
   const metadata = userMetadata(user);
 
@@ -139,7 +140,7 @@ function UserDetail() {
                   <ProfileField
                     key={entry.key}
                     label={entry.label}
-                    value={displayValue(user, entry.key) ?? ""}
+                    value={displayValue(attributes, entry.key) ?? ""}
                   />
                 ))}
               </div>

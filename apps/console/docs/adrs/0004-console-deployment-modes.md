@@ -1,330 +1,374 @@
-# Console ADR 0004: Deployment modes — platform cloud vs standalone self-host
+# Console ADR 0004: Deployment modes and control-project bootstrap
 
 > **Status:** Proposed
-> **Date:** 2026-07-23 (revised same day: portal gating moved from a
-> console-facing capabilities array to effective permissions)
-> **Implementation state:** the standalone slice is implemented — the
-> `platform.project_id` config key, single-project default resolution
-> (§3: first-created project wins, no server-side creation), the
-> `GET /console/runtime.json` endpoint (§2, resolved per request, always
-> `mode: "standalone"` for now, including the default project's ADR 036
-> **publishable key**), and the console's runtime discovery
-> (`src/runtime/runtime.ts`, wired into `main.tsx`, the login screen —
-> including its no-project setup hint and the publishable-key-bearing
-> widget handle — and every loader's project id). The flag-gated #605 slice
-> is also implemented: `platform.bootstrap_project` (default false) makes the
-> server ensure the built-in platform project (`proj_platform`) exists at
-> startup and resolve it as the default (no `platform.project_id` required);
-> standalone default semantics are unchanged. Platform mode, the portal
-> config keys, and effective-permission exposure (§4) remain future work.
-> **Scope:** `apps/console` (with recorded server dependencies). See
+> **Date:** 2026-07-23; revised 2026-08-13 after the cross-project
+> authorization and first-operator bootstrap design
+> **Implementation state:** `GET /console/runtime.json`, runtime discovery,
+> the no-project hint, `platform.project_id`, first-created-project fallback,
+> and the flag-gated row-only `platform.bootstrap_project` path exist. The
+> pin, the first-created fallback, and row-only bootstrap are transitional
+> behavior, not the target described here, and the pin retires with the
+> fallback (§2). §3's three discovery states are implemented on both surfaces
+> that read the runtime document: an unreachable, erroring, or unreadable
+> document renders a retryable connectivity error in the Console and in the
+> hosted login shell, each with copy for its own audience. Console builds that
+> deliberately run without a document (`vite preview`, the api-mock dev loop)
+> opt back into the standalone fallback with `VITE_CONSOLE_RUNTIME_FALLBACK`;
+> the shell has no such lane and no such flag. The full platform-project
+> provisioner, first-party Console session authorization, effective-permission
+> exposure, and seed-input contract remain future work.
+> **Scope:** `apps/console`, plus the server-owned bootstrap and authorization
+> contracts on which it depends. §2 and §3's runtime-document rules also bind
+> `apps/login-ui`, which reads the same document. See
 > [`apps/console/AGENTS.md`](../../AGENTS.md).
-> **Context:** Issue [#555](https://github.com/zitadel/nextgen/issues/555)
+> **Context:** Issues [#555](https://github.com/zitadel/nextgen/issues/555)
 > (Console / Customer Portal epic) and
-> [#527](https://github.com/zitadel/nextgen/issues/527) (Platform project
-> bootstrapping).
+> [#527](https://github.com/zitadel/nextgen/issues/527) (platform-project
+> bootstrap).
 
 ## Context
 
-The console will serve two very different deployments with one codebase:
+One Console build must serve two product postures:
 
-- **Cloud** — Zitadel-operated, hosting many customer projects. The console
-  doubles as the **customer portal**: a multi-project dashboard, billing
-  (Stripe, subscription tiers), and support-access surfaces (#555).
-- **Self-host** — an operator running their own server for, typically, a
-  single project. No billing, no multi-project dashboard — unless #555's
-  license-key mechanics later enable portal surfaces on a self-hosted
-  deployment too.
+- **Standalone** is the default self-hosted posture. It should be useful with
+  one customer project and one operator team, without forbidding an operator
+  from creating more projects later.
+- **Platform** hosts many customer projects. Platform-project users can receive
+  direct or team-derived access to selected customer projects. A platform
+  role alone never means access to every project.
 
-Facts that constrain the design:
+Both postures need a stable place to authenticate Console operators before a
+customer project exists. Reusing an arbitrary customer application project as
+the Console login project mixes two identities that have different lifecycles:
+platform operators and the end-users managed by the customer project.
 
-1. **One build artifact serves both.** The console is built once and embedded
-   into the Go server (`internal/staticui/console`). Which deployment it is
-   running in is a *deployment* property, not a *build* property — the same
-   reasoning that made ADR 0001 derive `basepath` from the Vite base instead
-   of hardcoding it. A `VITE_*` build-time mode flag is therefore the wrong
-   tool.
-2. **The initial self-hosted Console operates within one default project
-   context.** The platform design
-   ([`docs/design/platform/project-team-modeling.md`](../../../../docs/design/platform/project-team-modeling.md))
-   sketches a reserved platform project for every deployment; this ADR
-   **narrows that reservation to platform (cloud) mode**, where ownership,
-   claim, and billing need somewhere to live. The initial standalone
-   experience opens the customer's own application project — the one their
-   integration (`zitadel setup` → `POST /projects`) created. Multi-project
-   navigation and management are outside the initial scope, but the deployment
-   model should allow them to be added later. An extra, empty bootstrap project
-   alongside it would mean the console signs into a project holding none of
-   the deployment's real users.
-3. **The server creates no project — and keeps it that way.** `POST
-   /projects` (unauthenticated, per the create-first model) is the only real
-   provisioning path — the CLI's `zitadel setup` drives it, seeding the
-   default user schema and login flow definitions when `seedDefaults` is on
-   (`internal/service/project.go`). The console's `.env.local`
-   (`VITE_CONSOLE_PROJECT_ID`, `CONSOLE_PROJECT_SECRET`) holds hand-minted
-   values from such a call. (`--user-file` bootstrap inserts a bare project
-   *row* to satisfy FKs — `internal/bootstrap/users/ensure.go` — but that is
-   not a provisioned project: no keys, no schemas, no flows.) The one explicit
-   opt-in exception is platform-mode provisioning (#605): setting
-   `platform.bootstrap_project` (off by default) makes the server idempotently
-   ensure the built-in platform project (`proj_platform`, a server-owned id)
-   exists at startup — deliberate and configured, never silent. #527's platform-project provisioning question
-   remains open **for platform mode**; standalone answers it with "don't
-   provision — resolve".
-4. **Permissions are the authoritative gate.** The permission catalogs
-   (root ADRs [032](../../../../docs/adrs/032-permission-catalogs.md)/
-   [033](../../../../docs/adrs/033-internal-permission-management.md)) are the
-   model that ultimately decides what a signed-in user may do — including on
-   portal surfaces: in cloud, a team member without the billing role must not
-   see billing any more than a self-host user whose deployment has none.
-5. **#555's product decisions:** the portal stays open-source inside the
-   console; portal features activate only when explicitly enabled via
-   configuration; license-key mechanics should be evaluated for self-hosted
-   portals.
+The current first-created-project fallback avoided an empty bootstrap project,
+but it also made whichever project happened to be created first the Console's
+identity boundary. The current `platform.bootstrap_project` path only inserts
+the reserved row; it does not provision keys, login flows, user schemas, an
+initial operator, teams, or authorization assignments. Neither behavior is a
+complete bootstrap contract.
+
+The following repository-wide decisions constrain this ADR:
+
+- root [ADR 053](../../../../docs/adrs/053-cross-project-principals.md) keeps
+  the authenticated user's home project distinct from the protected customer
+  project and authorizes every target explicitly;
+- root [ADR 054](../../../../docs/adrs/054-customer-collaboration-grants.md)
+  keeps team membership, team ownership, and project access as separate
+  facts, and supports both direct-user and team-derived project grants;
+- root [ADR 046](../../../../docs/adrs/046-claim-lifecycle-v2.md) uses the
+  platform project for registration and claim in hosted deployments;
+- root [ADR 036](../../../../docs/adrs/036-api-credential-planes.md), as
+  amended by ADR 053, permits operator-plane calls authenticated by a
+  confidential automation credential or a first-party human session; and
+- root [ADR 048](../../../../docs/adrs/048-wide-events-internal-audit-primitive.md)
+  records the human actor and the assignment path that authorized a mutation.
 
 ## Decision
 
-Two distinct questions govern a portal surface, and the design answers each
-exactly once:
+### 1. Every bootstrapped deployment has one reserved platform project
 
-- **"Does this deployment offer the feature at all?"** — server
-  configuration/license. Exists before any session; distinguishes cloud from
-  self-host.
-- **"May this signed-in user use it?"** — a permission from the catalogs.
+The reserved platform project is the Console operator identity boundary in
+both standalone and platform modes. The Console always signs into that
+project. Customer projects remain ordinary protected resources selected after
+sign-in.
 
-The console never evaluates the first question per surface. The server folds
-it into the second: **effective permissions = the user's granted permissions
-∩ what the deployment offers.** One vocabulary, one source of truth; the
-console renders from the effective set alone.
+The reserved project is a **control project**, not a super-project:
 
-### 1. The server owns the deployment profile
+- a role in it does not imply access to any customer project;
+- access to a customer project comes only from that project's owning-team,
+  direct-user, team, or confidential-project assignment under ADRs 053 and
+  054; and
+- it is never used as the hosted-login project for a customer's application.
 
-The deployment profile is server configuration (names indicative; the config
-schema is the server change's to finalize):
+Standalone remains the default product posture, not a different authorization
+model. Its bootstrap may create one initial customer project and one owner
+team, and the initial Console can optimize for that common path. The data model
+and APIs do not enforce a one-project ceiling.
 
-```yaml
-platform:
-  project_id: ""            # the reserved platform project (see §3)
-  portal:
-    enabled: false          # cloud sets true; self-host may unlock via license
-    billing: "none"         # "stripe" in cloud
-    support_access: false
-```
+### 2. Bootstrap is explicit desired state
 
-These keys are read only by the server. They surface to the console
-exclusively through the mechanisms below — never as a build-time flag and
-never as a parallel console-facing feature array.
+The server may start with no projects. In that state the embedded Console is
+available but cannot offer sign-in; it shows a bootstrap instruction instead.
+The first arbitrary `POST /projects` must not silently become the control
+project.
 
-### 2. Pre-session discovery: a minimal runtime-metadata endpoint
+Bootstrap consumes an explicit seed input and reconciles it idempotently. The
+input transport is deliberately not fixed here:
 
-Some facts are needed *before* a session exists — above all, which project
-the login widget (Console ADR 0003) signs into. A new unauthenticated,
-same-origin endpoint carries exactly those and nothing more:
+- test and development infrastructure may provide the desired state through
+  the testkit now;
+- a later server-owned seed file may provide the same desired state for
+  self-hosted deployments; and
+- a future CLI command or Console wizard may collect the values and invoke the
+  same server contract rather than inventing another provisioning path.
 
-```
+All transports must converge on the same persisted resources and invariants.
+The minimum useful seed provisions, in one operation:
+
+1. the reserved platform project through the normal full project provisioner,
+   including its publishable key, default user schema, and login flow — but
+   **no project secret**: nothing in the Console's path needs one, and
+   platform-homed automation waits on the deferred credential in root
+   [ADR 053 §9](../../../../docs/adrs/053-cross-project-principals.md). Test
+   infrastructure gets predictable credentials from the testkit's boot
+   contract, never from a seed default;
+2. at least one initial platform user who can sign into the Console;
+3. a default team plus that user's `team_memberships` row;
+4. a separate `team.owner` authorization assignment for the initial owner;
+   and
+5. optionally, one initial customer project, its `project.owning_team`
+   relation, and any explicit direct-user or team access assignments.
+
+Membership in step 3 is roster state only. It neither creates project access
+nor substitutes for the separate owner assignment in step 4. The bootstrap
+transaction maintains the invariant that every team owner is an active team
+participant.
+
+The existing `platform.bootstrap_project` row-only behavior is insufficient
+and must be replaced or routed through this provisioner. The same is true for
+`--user-file` behavior that inserts a bare project row only to satisfy foreign
+keys. Because the product is alpha, the checked-in seed behavior and test
+fixtures may be corrected directly; no compatibility migration or backfill is
+required for pre-release development databases.
+
+Once provisioned, the reserved project is identified by a **persisted reserved
+marker the server can query**, not by configuration. Bootstrap is the only
+writer of that marker. This is what makes discovery predictable, and it is the
+property the transitional fallback lacks.
+
+**Cutover rule:** the implemented transitional fallback remains available until
+a human-usable replacement—such as the server-owned seed file—ships with the
+full provisioner and an end-to-end first-operator test. The testkit can prove
+the target shape before that point, but test infrastructure alone must not
+strand a self-hoster.
+
+That fallback is two behaviors, and both retire together:
+
+- `platform.project_id` / `NEXTGEN_PLATFORM_PROJECT_ID` pins an existing
+  project as the Console sign-in target. The pinned project must already
+  exist — a missing one is a startup configuration error, never a create.
+- With no pin, the deployment's first-created project wins, ordered by
+  `created_at` ascending so every replica resolves the same project.
+
+The pin exists only to override that guess. Once bootstrap always provisions a
+marked platform project, there is no guess left to override, so the pin is
+removed rather than carried forward — a second, configurable answer to
+"which project is the platform project" would just reintroduce the ambiguity
+the marker removes. `VITE_CONSOLE_PROJECT_ID` is unaffected; it is a
+development-only client override (§3), not a deployment fact.
+
+Deployments that already hold customer projects but no reserved platform
+project get **no adoption path**. They are recreated, consistent with the alpha
+reset that [ADR 054 §3](../../../../docs/adrs/054-customer-collaboration-grants.md)
+already requires. Promoting an existing customer project to the reserved role
+would make the Console identity boundary depend on operator guesswork again,
+which is the failure this ADR exists to end.
+
+Bootstrap inputs are server-side configuration. Secrets from them never enter
+`runtime.json`, the Console bundle, or browser-readable storage.
+
+### 3. Runtime discovery carries only the Console sign-in target
+
+The embedded Console discovers public, pre-session facts from the existing
+same-origin endpoint:
+
+```http
 GET /console/runtime.json
 
 {
-  "mode": "platform" | "standalone",
-  "console_project_id": "proj_…"   // omitted while the deployment has no project
+  "mode": "standalone" | "platform",
+  "console_project_id": "proj_platform",
+  "publishable_key": "pk_proj_..."
 }
 ```
 
-Implemented in `cmd/server/console_runtime.go`, mounted by `buildHTTPMux`
-next to the static UI handlers — deliberately outside the OpenAPI product
-surface, because it is a console-internal contract (like the embedded SPA
-mounts themselves), not part of the public API. The document is **resolved
-per request** (`no-store`) from the deployment's current state (§3), so the
-first `zitadel setup` changes the answer without a server restart.
+`console_project_id` and `publishable_key` identify the reserved platform
+project. They are omitted while bootstrap has not completed. The response is
+resolved per request and served with `no-store`, so completing bootstrap does
+not require a server restart.
 
-- Everything in it is public runtime metadata in the ADR 005 sense — ids,
-  one enum, and root ADR 036's **publishable key** (origin-scoped,
-  browser-safe by construction), for which this document is the embedded
-  console's carrier — the console-side analogue of the committed
-  `zitadel.json` a customer app reads it from. The key is not a secret: it
-  passes ADR 036's litmus test ("if this leaked into a browser bundle,
-  nothing is lost") — it is the default project's preview credential
-  (`project.read` only; no management operation accepts it). Never a
-  project secret, license key, or feature inventory. *Implemented:*
-  `publishable_key` is served alongside the project id, derived per request
-  from the default project's token encryption key, and the login widget sends it as the
-  public-plane bearer — most importantly on the handoff exchange, removing
-  the dev proxy's secret from the sign-in path.
-- The console fetches it once in the **root route's `beforeLoad`** (it must
-  resolve before the `_authed` guard picks a sign-in project) and places it
-  in router context; a fetch failure falls back to `mode: "standalone"` so a
-  broken endpoint degrades to the smallest surface, never to an accidental
-  portal.
-- This answers #527's "configuration-based ID distribution vs runtime
-  discovery" question with **both, layered**: operators configure the server;
-  the *console* always discovers at runtime. The build artifact stays
-  deployment-agnostic and the dev `.env.local` id-copying papercut
-  disappears.
+**Transitional caveat.** That paragraph describes the target. Until §2's
+cutover completes, the id is the pinned or first-created project — an ordinary
+customer project — and it is omitted because no project exists yet rather than
+because bootstrap has not run. Code and contributor docs describing today's
+behavior must say so; the field's meaning changes at cutover even though its
+name and shape do not.
 
-Alternatives rejected:
+**Placement.** The endpoint is served by the mux next to the static UI mounts
+and stays **deliberately outside the OpenAPI product surface**. It is a
+first-party contract between the server and the UI surfaces it ships — the
+embedded Console and the hosted login shell — in the same way the SPA mounts
+themselves are. Publishing it would make an internal deployment detail a
+documented surface with compatibility obligations, and it is already understood
+as an interim carrier: [`hierarchy.md`](../../../../docs/design/api/hierarchy.md)
+makes server-side discovery of the platform `project_id` target design through a
+planned `/capabilities` endpoint exposing `defaults.project_id`, and
+[`conventions.md`](../../../../docs/design/api/conventions.md) names this
+document as the closest shipped surface to it. The public contract, when it
+exists, is `/capabilities` — not this file. Its absence from the spec is a
+decision, not an oversight.
 
-- **Build-time `VITE_CONSOLE_MODE`** — violates fact 1; would force separate
-  embedded builds per deployment.
-- **Injecting metadata into `index.html`** via the static handler — saves one
-  round trip (viable later as an optimization; `index.html` is already
-  `no-store`) but couples `internal/staticui` to live config today for no
-  functional gain.
-- **A console-facing `capabilities` array in this document** — the first
-  draft of this ADR had one. Dropped: portal surfaces render post-login, so
-  per-surface gating can (and should) ride the permission model instead of a
-  second, pre-session vocabulary that the permission set would then have to
-  agree with. See §4.
+**An unreachable endpoint is an error, not a mode.** The Console must not treat
+a failed or non-`2xx` fetch as a successful answer. Without this document there
+is no sign-in project, so the Console has nothing useful to render regardless;
+guessing a mode only turns a server outage into a false product state. In
+particular, reporting "no project yet" for what is actually an unreachable API
+sends an operator to run `zitadel setup` against a problem setup cannot fix.
 
-### 3. Standalone: the first-created project is the initial default
+Three states are therefore distinct: reachable and provisioned, reachable and
+not yet provisioned (the setup hint), and unreachable or erroring (an explicit
+connectivity error, retryable). This supersedes the earlier fall-back-to-
+`standalone` rule, whose stated purpose — never degrading into an accidental
+portal — is satisfied at least as well by rendering an error, since an error
+state cannot render portal surfaces either. Development and preview builds that
+run without a backend must opt in explicitly rather than rely on a silent
+production fallback.
 
-The initial standalone Console manages one default project, and the server
-never creates it. The project the customer's integration bootstrapped —
-`zitadel setup`'s `POST /projects`, the first project in the deployment —
-**becomes the initial default**: the project the runtime document names, the
-console signs into, and the console manages. The Console initially operates on
-one project at a time; project switching and multi-project management can be
-added later without requiring a separate Console deployment for each project.
+**The hosted login shell holds the same three states, with different copy.**
+`apps/login-ui` reads this document for the same reason the Console does, so
+the rule binds it too — and the deployment topology makes the third state
+sharper there, not narrower. The shell is served from the binary's embedded
+assets and touches no storage, while the document is resolved per request from
+the default project and its encryption key; a healthy binary in front of an
+unhealthy database therefore serves the sign-in page and fails this fetch. The
+shell used to render "no project yet" for exactly that, telling the people
+trying to sign in that the deployment had never been set up.
 
-Implemented (`ProjectService.DefaultProject`,
-`internal/service/project.go`):
+What differs is who is reading. The setup hint keeps its operator copy on both
+surfaces, because a deployment with no project has no application to send an
+end user to the sign-in page in the first place. The connectivity error does
+not: "check that the Zitadel server is running" is Console copy for a Console
+audience, and the shell says instead that sign-in is unavailable and worth
+retrying, carrying the failure clause in a demoted line for whoever can act on
+it. Distinguishing the states is the requirement; matching the Console's
+wording is not.
 
-- `platform.project_id` / `NEXTGEN_PLATFORM_PROJECT_ID` set → that project
-  is the default; it must exist (a missing configured project is a startup
-  error, never a create).
-- Unset (the default) → the deployment's **first-created project**
-  (`created_at` ascending, deterministic across replicas). Resolved per
-  `runtime.json` request, so the moment `zitadel setup` creates the first
-  project, a console refresh picks it up — no server restart, no cached
-  state.
-- No project yet → the runtime document carries no `console_project_id`
-  and the console's login screen renders a "run `zitadel setup`" hint
-  instead of the widget.
+The shell also needs no backend-less opt-in, and must not grow one on
+symmetry alone. The Console's `VITE_CONSOLE_RUNTIME_FALLBACK` exists because
+real lanes serve the Console with no document to read; nothing serves the
+shell that way, and previewing it without a backend is what an explicit
+`?project_id=` covers. A flag with no consumer is only a way to reintroduce
+the silent fallback.
 
-An earlier draft of this section bootstrapped a reserved `proj_platform`
-at startup. Dropped: it left every self-host deployment with *two* projects
-— an empty one the console signed into and the real one holding the
-customer's users. Startup provisioning of a dedicated platform project
-returns as a **platform-mode** concern (#527), where the platform project
-hosts customer registration and ownership rather than the deployment's app
-users.
+The publishable key is browser-safe public-plane material under ADR 036. The
+document never contains a project secret, seed credential, license key,
+customer-project list, or permission inventory. Customer projects are
+authorized API data loaded after sign-in.
 
-### 4. Portal surfaces render from **effective permissions**
+`mode` affects product copy and which deployment features the server offers;
+it does not choose a different Console login project and does not grant access.
+`VITE_CONSOLE_PROJECT_ID` remains a development-only override.
 
-The server exposes the signed-in user's effective permission set (the
-natural carrier is the session read the console already performs at guard
-time — `GET /sessions/me` growing a `permissions` claim, or a sibling
-`GET /users/me/permissions`; the concrete surface belongs to the ADR 033
-implementation). *Effective* means the server has already intersected the
-user's grants with the deployment profile: a deployment without billing
-yields no `billing.*` permission for anyone, licensed or cloud deployments
-yield them only for users whose roles grant them.
+### 4. The embedded Console uses a first-party session credential
 
-Console mechanics (ADR 0001's `staticData` pattern, one field):
+The Console performs same-origin API calls with its HttpOnly
+`__nextgen_session` cookie. It does not receive a project secret and does not
+store a script-readable session bearer. The server resolves the platform user
+from that first-party session, then evaluates the target customer project with
+the same ADR 053 authorization resolver used for confidential automation.
+
+Cookie-authenticated unsafe methods require the exact-Origin and
+session-bound-CSRF protections in
+[ADR 053 §5](../../../../docs/adrs/053-cross-project-principals.md), which
+amends ADR 046's SameSite-only conclusion. A successful Console login therefore
+establishes identity, not blanket management authority.
+
+The development proxy may temporarily inject a project secret while the
+session-derived path is incomplete, but that is development compatibility,
+not the embedded deployment contract. Until the session resolver and the
+required assignments exist, management calls fail closed. The Console must
+not compensate by exposing a secret or treating every authenticated platform
+user as an administrator.
+
+### 5. Portal surfaces render from effective permissions
+
+Two questions govern a portal surface:
+
+- does this deployment offer the feature; and
+- may this signed-in user use it on the selected project?
+
+The server answers both. It intersects the deployment's offered features with
+the user's effective permissions for the selected target. The Console renders
+from that result through route `staticData.permission`; it does not keep a
+parallel capability vocabulary or infer authority from `mode`, membership, or
+navigation state.
 
 ```ts
 export const Route = createFileRoute("/_authed/billing/")({
   staticData: {
     nav: { label: "Billing", order: 8, icon: CreditCard },
-    permission: "billing.read", // catalog scope name, not a console-invented term
+    permission: "billing.read",
   },
-  …
+  // ...
 });
 ```
 
-- The sidebar builder (`use-nav-items`) and a `beforeLoad` check on gated
-  routes filter by the session's effective set: absent permission → no nav
-  entry, and a direct URL hit renders the not-found boundary. "Not offered
-  by this deployment" and "not granted to you" are deliberately
-  indistinguishable — the same anti-oracle stance the management API takes
-  (`internal/api/authz.go`). If the product later wants upsell surfaces
-  ("billing is available on cloud"), *that* — and only that — would justify
-  reintroducing a deployment-facts signal; it is recorded as an open
-  question, not designed here.
-- `mode` itself is used for exactly two things: **which project the console
-  signs into** (§5) and copy/branding nuances. No surface is gated on
-  `mode`.
-- #555's license-key case — a self-hosted deployment unlocking portal
-  surfaces — is a server-side config/license change that widens effective
-  permission sets. **Zero console changes**, same as the first draft, but
-  now through the permission path.
+The sidebar and a route guard hide unavailable routes, but UI gating is never
+authorization. Each API operation performs its own target-scoped check.
 
-**Bridge until ADR 033 ships:** there are no per-user grants yet, so the
-server's effective set starts as *the deployment-level set for every
-authenticated user* (billing/multi-project/support switched purely by
-config). The console code is written against effective permissions from day
-one; per-user narrowing arrives entirely server-side when the catalogs land.
+### 6. Standalone and platform differ in defaults, not primitives
 
-### 5. Sign-in target per mode
+After bootstrap, both modes use the same resources:
 
-ADR 0003's guard signs into one project. This ADR defines which:
+| Concern                | Standalone default                                           | Platform default                  |
+| ---------------------- | ------------------------------------------------------------ | --------------------------------- |
+| Console identity       | User in reserved platform project                            | User in reserved platform project |
+| Initial customer scope | Usually one seeded project                                   | Zero or many projects             |
+| Access                 | Owning-team, direct-user, team, or project-secret assignment | Same                              |
+| Project count          | UI optimized for one; additional projects allowed            | Multi-project navigation          |
+| Portal features        | Disabled unless configured/licensed                          | Configured by the platform        |
 
-`console_project_id` is deliberately the document's only sign-in project id —
-the Console initially operates on one project at a time, and what that project
-*is* follows from the mode:
-
-- **`standalone`** — the deployment's default Console project (§3 —
-  first-created, or the configured pin). `VITE_CONSOLE_PROJECT_ID` becomes
-  a dev-only override and is eventually retired in favor of the runtime
-  document.
-- **`platform`** — the reserved platform project: customers register/log in
-  on it (#527's hosted registration) and manage the customer projects their
-  teams own from the multi-project dashboard. Those customer-project ids are
-  API data scoped by the session, not deployment metadata — they never
-  belong in this document. Inspecting a child project rides on the
-  cross-project authorization model (#419/#333) and is **out of scope
-  here**, as is the claim flow (#96).
-
-### 6. UI gating is not authorization
-
-Same caveat as ADR 0003 §4, one level up — but sharpened by this revision:
-because the console gates on the *same* catalog scopes the API enforces,
-hiding and enforcement can no longer drift apart vocabulary-wise. The
-console's filter is still only a rendering courtesy; every portal API
-enforces the permission (and the deployment profile behind it) server-side.
-The runtime document and the effective-permission set are *rendering*
-contracts, never a security boundary.
+This avoids a future conversion from a special single-project security model
+to a platform model. A standalone installation can add projects and grants
+without changing its Console build or moving operator identities.
 
 ## Consequences
 
-- One console artifact serves cloud, self-host, and licensed self-host;
-  deployments differ only in server config — and per-user visibility differs
-  only in grants. Both funnel through one mechanism the console reads:
-  effective permissions.
-- The console gains a small `runtime` module (pre-session doc fetch +
-  context) and a `permission` field on route `staticData`; billing /
-  multi-project / support screens then land as ordinary gated routes under
-  `_authed` (#555 sub-issues). No console-side feature flags.
-- Self-host starts with a single-project Console experience: the Console
-  manages the same project the customer's app authenticates against — no
-  orphan bootstrap project. The deployment model leaves room for project
-  switching and multi-project management later. Before the first
-  `zitadel setup`, the Console shows a setup hint instead of a login widget.
-- **Dependencies to track (server-owned):** platform-mode provisioning of a
-  dedicated platform project (#527, future) and the effective-permission
-  exposure on the session surface (§4, an ADR 033 implementation concern).
-  Until the latter lands, the console behaves as `standalone` with no
-  portal permissions.
-- Open questions deferred: license-key format/verification (#555), Stripe
-  integration home, per-environment platform projects (#527 × ADR 035
-  environments), cross-project support access UX (#419/#333), and whether
-  upsell surfaces ever warrant exposing "offered here but not granted to
-  you" (deliberately not exposed today, §4).
+- One Console artifact and one authorization model serve cloud and self-host.
+- A newly started server remains valid without data, but Console sign-in waits
+  for an explicit, complete bootstrap.
+- The reserved platform project is no longer cloud-only and no arbitrary
+  customer project becomes the Console identity boundary.
+- Membership and access remain independent. Bootstrap writes membership,
+  ownership, and project grants explicitly, even when one transaction creates
+  all three.
+- Direct-user grants and team-derived grants are both usable from the Console;
+  neither changes team membership.
+- Standalone is simple by default but not artificially limited to one project.
+- Existing alpha databases and fixtures may be recreated after the seed
+  contract changes; no migration is promised. A deployment holding customer
+  projects but no reserved platform project is recreated, not adopted.
+- `platform.project_id` / `NEXTGEN_PLATFORM_PROJECT_ID` is scheduled for
+  removal at cutover, together with the first-created fallback it overrides.
+  It is transitional configuration, not a supported way to choose the
+  platform project.
+- A deployment whose runtime document is unreachable renders a connectivity
+  error, so a server outage no longer reads as "no project yet". Backend-less
+  development and preview builds are the cases the old silent fallback
+  actually served; they now say so with `VITE_CONSOLE_RUNTIME_FALLBACK`, and
+  the embedded build never carries it.
+- Effective-permission exposure, CSRF enforcement, and session-derived
+  target authorization are server dependencies. The Console remains
+  fail-closed until they land.
 
 ## Related work
 
 - Issues [#555](https://github.com/zitadel/nextgen/issues/555),
   [#527](https://github.com/zitadel/nextgen/issues/527),
   [#96](https://github.com/zitadel/nextgen/issues/96),
-  [#419](https://github.com/zitadel/nextgen/issues/419) /
+  [#419](https://github.com/zitadel/nextgen/issues/419), and
   [#333](https://github.com/zitadel/nextgen/issues/333).
-- [Console ADR 0001](0001-console-routing.md) (staticData/nav, derived
-  basepath), [0002](0002-console-api-access.md), [0003](0003-console-authentication.md).
-- Root ADRs [005](../../../../docs/adrs/005-public-runtime-private-credentials.md),
-  [032](../../../../docs/adrs/032-permission-catalogs.md) /
+- [Console ADR 0001](0001-console-routing.md),
+  [0002](0002-console-api-access.md), and
+  [0003](0003-console-authentication.md).
+- Root ADRs [024](../../../../docs/adrs/024-user-team-lifecycle-ownership.md),
+  [032](../../../../docs/adrs/032-permission-catalogs.md),
   [033](../../../../docs/adrs/033-internal-permission-management.md),
   [035](../../../../docs/adrs/035-configuration-environments.md),
-  [024](../../../../docs/adrs/024-user-team-lifecycle-ownership.md).
-- [`docs/design/platform/project-team-modeling.md`](../../../../docs/design/platform/project-team-modeling.md)
-  (the reserved platform project), `internal/service/project.go`
-  (`seedDefaults`), `internal/bootstrap/users/ensure.go`,
-  `internal/api/authz.go` (anti-oracle answers).
+  [036](../../../../docs/adrs/036-api-credential-planes.md),
+  [046](../../../../docs/adrs/046-claim-lifecycle-v2.md),
+  [048](../../../../docs/adrs/048-wide-events-internal-audit-primitive.md),
+  [053](../../../../docs/adrs/053-cross-project-principals.md), and
+  [054](../../../../docs/adrs/054-customer-collaboration-grants.md).

@@ -49,7 +49,7 @@ func TestConsoleRuntimeHandlerServesPublicMetadata(t *testing.T) {
 }
 
 // A deployment with no project yet answers with mode only: the console shows
-// its "run zitadel setup" state until the first project exists (ADR 0004 §3).
+// its "run zitadel setup" state until the first project exists (ADR 0004 §2).
 func TestConsoleRuntimeHandlerOmitsAbsentProject(t *testing.T) {
 	handler := newConsoleRuntimeHandler(staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil))
 
@@ -124,7 +124,7 @@ func TestConsoleRuntimeHandlerRejectsNonReadMethods(t *testing.T) {
 	assert.Equal(t, "GET, HEAD", rec.Header().Get("Allow"))
 }
 
-// TestLoadConfigReadsPlatformProjectIDEnv locks in the Console ADR 0004 §3
+// TestLoadConfigReadsPlatformProjectIDEnv locks in the Console ADR 0004 §2
 // config surface: NEXTGEN_PLATFORM_PROJECT_ID pins the default project,
 // and the empty default means "first-created project wins".
 func TestLoadConfigReadsPlatformProjectIDEnv(t *testing.T) {
