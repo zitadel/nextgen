@@ -13,6 +13,7 @@ import (
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -51,15 +52,16 @@ func signedInSession(t *testing.T, project *domain.Project, email string) (*doma
 
 	userService := harness.EnsureUserService(t)
 	user, err := userService.CreateUser(t.Context(), service.CreateUserInput{
-		ProjectID: project.ID,
-		User:      harness.EnsureTestData(t).Generator.GenerateUser(t, email),
+		ProjectID:  project.ID,
+		SchemaURL:  test_data.UserSchemaURL,
+		Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, email),
 	})
 	require.NoError(t, err)
 
 	const password = "fake-password"
 	require.NoError(t, userService.SetPassword(t.Context(), service.SetPasswordInput{
 		ProjectID: project.ID,
-		UserID:    user["id"].(string),
+		UserID:    user.ID,
 		Password:  password,
 	}))
 
@@ -67,7 +69,7 @@ func signedInSession(t *testing.T, project *domain.Project, email string) (*doma
 		harness.EnsureAuthAttemptService(t),
 		harness.EnsureSessionService(t),
 		project.ID,
-		user["email"].(string),
+		user.StringAttribute("email"),
 		password,
 	)
 	require.NoError(t, err)

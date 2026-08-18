@@ -238,6 +238,29 @@ func TestAttributes_ToMap(t *testing.T) {
 					},
 				},
 			},
+			{
+				name: "nested beyond one level",
+				attributes: Attributes{
+					{"email", "test@example.com"},
+					{"address.street", "main street"},
+					{"address.geo.latitude", 45.0},
+					{"address.geo.datum.reference.epsg", "EPSG:4326"},
+				},
+				expected: map[string]any{
+					"email": "test@example.com",
+					"address": map[string]any{
+						"street": "main street",
+						"geo": map[string]any{
+							"latitude": 45.0,
+							"datum": map[string]any{
+								"reference": map[string]any{
+									"epsg": "EPSG:4326",
+								},
+							},
+						},
+					},
+				},
+			},
 		}
 
 		for _, tc := range tcs {
@@ -249,6 +272,20 @@ func TestAttributes_ToMap(t *testing.T) {
 				assert.EqualValues(t, tc.expected, m)
 			})
 		}
+	})
+
+	t.Run("error", func(t *testing.T) {
+		t.Parallel()
+
+		// A scalar and a path descending through the same node cannot both
+		// be written: the second write would have to traverse into a string.
+		attrs := Attributes{
+			{"address", "main street"},
+			{"address.city", "examplus"},
+		}
+
+		_, err := attrs.ToMap()
+		assert.ErrorContains(t, err, "address")
 	})
 }
 

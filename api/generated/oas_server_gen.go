@@ -129,7 +129,7 @@ type Handler interface {
 	// Create user.
 	//
 	// POST /users
-	CreateUser(ctx context.Context, req *User, params CreateUserParams) (CreateUserRes, error)
+	CreateUser(ctx context.Context, req *CreateUserRequest, params CreateUserParams) (CreateUserRes, error)
 	// DeleteFlowDefinition implements deleteFlowDefinition operation.
 	//
 	// Delete a flow definition by id.
