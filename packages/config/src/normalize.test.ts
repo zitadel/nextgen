@@ -132,6 +132,24 @@ describe("normalizeSchemaBody", () => {
     expect(normalizeSchemaBody(once)).toEqual(once);
   });
 
+  // The caller hands the same parsed object to the upload payload, so a
+  // descent that stripped in place would delete nested defaults out of what
+  // gets published. The flat test above never reaches the recursion.
+  it("does not mutate a nested input and is idempotent", () => {
+    const nested = () => ({
+      properties: {
+        address: {
+          type: "object",
+          properties: { street: { type: "string", "x-editable": true } },
+        },
+      },
+    });
+    const body = nested();
+    const once = normalizeSchemaBody(body);
+    expect(body).toEqual(nested());
+    expect(normalizeSchemaBody(once)).toEqual(once);
+  });
+
   it("matches the defaults declared by the user-property meta-schema", () => {
     // Source-tree pin: the constant ships in the package, but its values are
     // spec facts owned by api/openapi. Drift here means the meta-schema
