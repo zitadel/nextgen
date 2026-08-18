@@ -149,7 +149,7 @@ type Invoker interface {
 	// Create user.
 	//
 	// POST /users
-	CreateUser(ctx context.Context, request *User, params CreateUserParams) (CreateUserRes, error)
+	CreateUser(ctx context.Context, request *CreateUserRequest, params CreateUserParams) (CreateUserRes, error)
 	// DeleteFlowDefinition invokes deleteFlowDefinition operation.
 	//
 	// Delete a flow definition by id.
@@ -414,7 +414,6 @@ type Invoker interface {
 	// QueryTeams invokes queryTeams operation.
 	//
 	// Returns the teams of a project, paginated with a cursor.
-	// Teams of every lifecycle status are returned; each carries its `status`.
 	//
 	// POST /teams/query
 	QueryTeams(ctx context.Context, request *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)
@@ -1849,12 +1848,12 @@ func (c *Client) sendCreateTeam(ctx context.Context, request *CreateTeamRequest,
 // Create user.
 //
 // POST /users
-func (c *Client) CreateUser(ctx context.Context, request *User, params CreateUserParams) (CreateUserRes, error) {
+func (c *Client) CreateUser(ctx context.Context, request *CreateUserRequest, params CreateUserParams) (CreateUserRes, error) {
 	res, err := c.sendCreateUser(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendCreateUser(ctx context.Context, request *User, params CreateUserParams) (res CreateUserRes, err error) {
+func (c *Client) sendCreateUser(ctx context.Context, request *CreateUserRequest, params CreateUserParams) (res CreateUserRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
@@ -6584,7 +6583,6 @@ func (c *Client) sendQuerySessions(ctx context.Context, request *QuerySessionsRe
 // QueryTeams invokes queryTeams operation.
 //
 // Returns the teams of a project, paginated with a cursor.
-// Teams of every lifecycle status are returned; each carries its `status`.
 //
 // POST /teams/query
 func (c *Client) QueryTeams(ctx context.Context, request *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error) {

@@ -15,7 +15,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
 vi.stubEnv("VITE_CONSOLE_API_BASE", "http://localhost/api");
 
 const USERS_URL = "http://localhost/api/users";
-const USER = { id: "user_1", givenName: "Maya", familyName: "Patel", email: "maya@acme.com" };
+const USER = {
+  id: "user_1",
+  schema: "sch_business",
+  attributes: { givenName: "Maya", familyName: "Patel", email: "maya@acme.com" },
+};
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));

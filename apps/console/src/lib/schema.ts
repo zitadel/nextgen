@@ -87,7 +87,7 @@ export function schemaFields(schema: UserSchema): SchemaField[] {
  * The design (`277:288291`) has no fixed column set: its `Filled` variant lists
  * Given name / Family name / Company name / Email while `Minimal` lists only
  * Email, because the user model is `additionalProperties: true` keyed on
- * `$schema`. The design decisions log (D4) settles what to show — every
+ * `schema`. The design decisions log (D4) settles what to show — every
  * available field rather than a curated default — so this unions rather than
  * intersects: a project with both a `business` and a `minimal` schema shows the
  * business columns, and minimal users render blank in them.

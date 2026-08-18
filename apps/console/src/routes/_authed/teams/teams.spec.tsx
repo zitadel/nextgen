@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -44,17 +44,31 @@ function team(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function renderTeams() {
+async function renderTeams(entry = "/teams") {
   const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
     import("@tanstack/react-router"),
     import("../../../router"),
   ]);
   const router = createAppRouter({
-    history: createMemoryHistory({ initialEntries: ["/teams"] }),
+    history: createMemoryHistory({ initialEntries: [entry] }),
   });
   render(<RouterProvider router={router} />);
   return router;
 }
+
+/** Records every `POST /teams/query` body, so the filter sent can be asserted. */
+function recordQueries(response: () => Response) {
+  const bodies: Record<string, unknown>[] = [];
+  server.use(
+    http.post(TEAMS_URL, async ({ request }) => {
+      bodies.push((await request.json()) as Record<string, unknown>);
+      return response();
+    }),
+  );
+  return bodies;
+}
+
+const ACTIVE_FILTER = { field: "status", operation: "equals", value: "active" };
 
 describe("teams screen", () => {
   it("renders the heading, a team row and its status", async () => {
@@ -91,7 +105,16 @@ describe("teams screen", () => {
     server.use(http.post(TEAMS_URL, () => HttpResponse.json({ teams: [] })));
     await renderTeams();
 
-    expect(await screen.findByText("No teams yet.")).toBeInTheDocument();
+    expect(await screen.findByText("No active teams yet.")).toBeInTheDocument();
+  });
+
+  it("names the search term when nothing matches it", async () => {
+    server.use(http.post(TEAMS_URL, () => HttpResponse.json({ teams: [] })));
+    await renderTeams("/teams?q=zzz");
+
+    // An empty table means something different once a question has been asked
+    // of it: nothing matched, rather than there being nothing there.
+    expect(await screen.findByText("No teams match “zzz”.")).toBeInTheDocument();
   });
 
   it("opens the team when the row is clicked", async () => {
@@ -139,14 +162,12 @@ describe("teams screen", () => {
 
   it("appends the next page and drops the button when the list is complete", async () => {
     let call = 0;
-    server.use(
-      http.post(TEAMS_URL, () => {
-        call += 1;
-        return call === 1
-          ? HttpResponse.json({ teams: [team()], next_page_token: "page-2" })
-          : HttpResponse.json({ teams: [team({ id: "team_2", name: "Acme Mobile" })] });
-      }),
-    );
+    const bodies = recordQueries(() => {
+      call += 1;
+      return call === 1
+        ? HttpResponse.json({ teams: [team()], next_page_token: "page-2" })
+        : HttpResponse.json({ teams: [team({ id: "team_2", name: "Acme Mobile" })] });
+    });
     await renderTeams();
 
     const loadMore = await screen.findByRole("button", { name: "Load more" });
@@ -157,5 +178,59 @@ describe("teams screen", () => {
     // Absent rather than disabled: its absence is how the screen says the list
     // is complete (design decisions log D5 — no total count to show instead).
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    // The token answers the question the first page asked, so page 2 repeats it.
+    expect(bodies[1]).toMatchObject({ page_token: "page-2", filter: [ACTIVE_FILTER] });
+  });
+
+  it("asks for active teams, and for deactivated ones when the tab changes", async () => {
+    const bodies = recordQueries(() => HttpResponse.json({ teams: [team()] }));
+    await renderTeams();
+
+    await screen.findByRole("table");
+    // The tabs are a server-side filter, not a client-side narrowing of the
+    // fetched page — `status` is a `team-filter-field`.
+    expect(bodies.at(-1)).toMatchObject({ filter: [ACTIVE_FILTER] });
+
+    await userEvent.click(screen.getByRole("tab", { name: "Deactivated" }));
+
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [{ field: "status", operation: "equals", value: "deactivated" }],
+      }),
+    );
+  });
+
+  it("filters by name once the search settles, and keeps the term in the URL", async () => {
+    const bodies = recordQueries(() => HttpResponse.json({ teams: [team()] }));
+    const router = await renderTeams();
+
+    await userEvent.type(await screen.findByLabelText("Search teams"), "acme");
+
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [ACTIVE_FILTER, { field: "name", operation: "contains", value: "acme" }],
+      }),
+    );
+    // In the URL rather than in component state: a filtered list is linkable and
+    // moves with the back button.
+    expect(router.state.location.search).toEqual({ status: "active", q: "acme" });
+  });
+
+  it("starts from the tab and term the URL carries", async () => {
+    const bodies = recordQueries(() => HttpResponse.json({ teams: [team()] }));
+    await renderTeams("/teams?status=deactivated&q=acme");
+
+    await screen.findByRole("table");
+    expect(bodies.at(-1)).toMatchObject({
+      filter: [
+        { field: "status", operation: "equals", value: "deactivated" },
+        { field: "name", operation: "contains", value: "acme" },
+      ],
+    });
+    expect(screen.getByRole("tab", { name: "Deactivated" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByLabelText("Search teams")).toHaveValue("acme");
   });
 });

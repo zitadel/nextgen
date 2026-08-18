@@ -93,7 +93,7 @@ Users live inside projects. A user in the platform project is a developer/admin;
 Create/list with explicit scope:
 
 ```http
-POST /users                     # body: { project_id, email, ... }
+POST /users?project_id=…        # body: { schema, attributes: { email, ... } }
 GET  /users?limit=…&page_token=…   # cursor-paginated list
 ```
 

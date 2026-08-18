@@ -2134,6 +2134,41 @@ func (s *CreateTeamRequest) Validate() error {
 	return nil
 }
 
+func (s *CreateUserRequest) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     1,
+			MinLengthSet:  true,
+			MaxLength:     0,
+			MaxLengthSet:  false,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Schema)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "schema",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s Event) Validate() error {
 	switch s.Type {
 	case AuthAttemptCreatedEventEvent:
@@ -6229,6 +6264,10 @@ func (s TeamFilterField) Validate() error {
 	switch s {
 	case "created_at":
 		return nil
+	case "name":
+		return nil
+	case "status":
+		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
@@ -6456,15 +6495,8 @@ func (s *User) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
-		if value, ok := s.ID.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
+		if err := s.ID.Validate(); err != nil {
+			return err
 		}
 		return nil
 	}(); err != nil {
@@ -6474,15 +6506,8 @@ func (s *User) Validate() error {
 		})
 	}
 	if err := func() error {
-		if value, ok := s.Metadata.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
+		if err := s.Metadata.Validate(); err != nil {
+			return err
 		}
 		return nil
 	}(); err != nil {

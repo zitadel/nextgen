@@ -108,6 +108,7 @@ Canonical examples:
 | Panel around a screen's content | `Card` |
 | Attribute chip / CLI command in prose | `InlineCode` |
 | Any searchable picker | `Combobox` (`src/components/ui/combobox.tsx`) |
+| Field with a leading icon or inline addon | `InputGroup` (`src/components/ui/input-group.tsx`) |
 | Labelled form control | `Field` + `FieldLabel` (+ `FieldError` for invalid) |
 
 ## Resource list layout — one shell for every list screen

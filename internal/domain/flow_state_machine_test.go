@@ -2754,6 +2754,144 @@ func TestFlowStateMachine_Back_PreservesCollectedData(t *testing.T) {
 	}
 }
 
+// nestedProfileSchemaContent pairs with nestedProfileDefinition: a
+// required identifier plus an object property whose leaves the flow
+// collects by dotted path.
+const nestedProfileSchemaContent string = `{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"type": "object",
+	"x-auth-methods": { "password": { "enabled": true } },
+	"required": ["email"],
+	"properties": {
+		"email": { "type": "string", "format": "email", "x-unique": "team" },
+		"address": {
+			"type": "object",
+			"properties": {
+				"street": { "type": "string" },
+				"city":   { "type": "string" },
+				"geo": {
+					"type": "object",
+					"properties": {
+						"label": { "type": "string" }
+					}
+				}
+			}
+		}
+	}
+}`
+
+func nestedProfileDefinition() *domain.FlowDefinition {
+	show := domain.FlowStepCompleteShow
+	return &domain.FlowDefinition{
+		ProjectID:  testProjectID,
+		ID:         "def-nested-profile",
+		UserSchema: defaultSchemaURL,
+		Purposes: map[domain.FlowDefinitionPurpose]string{
+			domain.FlowDefinitionPurposeRegister: "profile",
+		},
+		Steps: []domain.FlowDefinitionStep{
+			{
+				Name:   "profile",
+				Fields: []domain.Field{"email", "address.street"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "confirm"},
+				},
+			},
+			{
+				Name:   "confirm",
+				Fields: []domain.Field{"address.street", "address.city", "address.geo.label"},
+				Actions: []domain.FlowStepAction{
+					{Name: domain.FlowActionSubmit, Kind: domain.FlowActionKindSubmit, Primary: true},
+				},
+				Transitions: map[string]domain.FlowStepTransition{
+					domain.FlowActionSubmit: {Target: "done"},
+				},
+			},
+			{Name: "done", Complete: &show},
+		},
+	}
+}
+
+func TestFlowStateMachine_CollectsNestedFieldsAsADocument(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := nestedProfileDefinition()
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, nestedProfileSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att-1", nil)
+	// No existing user for the identifier, so registration proceeds.
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("", domain.ErrAuthAttemptProofRejected(nil)).
+		AnyTimes()
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	// A nested leaf renders as an ordinary scalar field named by its path.
+	streetField := findFieldByName(start.Step.Fields, "address.street")
+	require.NotNil(t, streetField)
+	assert.Equal(t, domain.FlowFieldTypeText, streetField.Type)
+	assert.False(t, streetField.Required, "leaf under an optional parent is not required")
+
+	res, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"email":          "alice@example.com",
+			"address.street": "Main Street 1",
+		},
+	})
+	require.NoError(t, err)
+
+	// The collected document keeps the shape the user schema validates,
+	// so it can be handed to create_user as-is.
+	address, ok := res.State.CollectedData.UserData["address"].(map[string]any)
+	require.True(t, ok, "dotted fields must merge into a nested object")
+	assert.Equal(t, "Main Street 1", address["street"])
+	assert.Equal(t, "alice@example.com", res.State.CollectedData.UserData["email"])
+
+	// A later step collecting the same leaf pre-fills it from the nested
+	// document rather than retyping.
+	require.Equal(t, "confirm", res.Step.Name)
+	confirmStreet := findFieldByName(res.Step.Fields, "address.street")
+	require.NotNil(t, confirmStreet)
+	require.NotNil(t, confirmStreet.Value, "nested leaf must prefill from collected data")
+	assert.Equal(t, "Main Street 1", *confirmStreet.Value)
+
+	// A second step writing different leaves of the same object merges into
+	// the map already in state instead of replacing it, and a leaf more than
+	// one level down builds the intermediate objects it descends through.
+	final, err := w.sm.Process(t.Context(), def, res.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"address.street":    "Main Street 1",
+			"address.city":      "Zurich",
+			"address.geo.label": "downtown",
+		},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]any{
+		"email": "alice@example.com",
+		"address": map[string]any{
+			"street": "Main Street 1",
+			"city":   "Zurich",
+			"geo":    map[string]any{"label": "downtown"},
+		},
+	}, final.State.CollectedData.UserData)
+}
+
 func TestFlowStateMachine_Back_DropsPendingChallenge(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)

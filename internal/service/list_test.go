@@ -64,6 +64,16 @@ func TestMapListError(t *testing.T) {
 		assert.Equal(t, "failed to list projects", de.Message)
 		assert.ErrorIs(t, err, assert.AnError)
 	})
+
+	t.Run("missing authz list filter is labeled for triage", func(t *testing.T) {
+		t.Parallel()
+		err := mapListError(ErrListFilterRequired, "failed to list users from database")
+		require.ErrorIs(t, err, domain.ErrInternal(ErrListFilterRequired))
+		var de domain.Error
+		require.ErrorAs(t, err, &de)
+		assert.Equal(t, "authz list filter missing", de.Message)
+		assert.ErrorIs(t, err, ErrListFilterRequired)
+	})
 }
 
 func TestParseSortDirection(t *testing.T) {
@@ -149,7 +159,7 @@ func TestStringFilter(t *testing.T) {
 		wantErr error
 	}{
 		{name: "equals", op: filterOpEquals, want: database.StringEqual(col, value)},
-		{name: "contains", op: filterOpContains, want: database.StringContains(col, value)},
+		{name: "contains matches case-insensitively", op: filterOpContains, want: database.StringContainsFold(col, value)},
 		{name: "not_equals not implemented", op: filterOpNotEquals, wantErr: domain.ErrNotImplemented()},
 		{name: "not_contains not implemented", op: filterOpNotContains, wantErr: domain.ErrNotImplemented()},
 		{name: "less_than is invalid for a string field", op: filterOpLessThan, wantErr: domain.ErrRequestInvalid()},

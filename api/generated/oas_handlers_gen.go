@@ -2110,7 +2110,7 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 		}
 
 		type (
-			Request  = *User
+			Request  = *CreateUserRequest
 			Params   = CreateUserParams
 			Response = CreateUserRes
 		)
@@ -8130,7 +8130,6 @@ func (s *Server) handleQuerySessionsRequest(args [0]string, argsEscaped bool, w 
 // handleQueryTeamsRequest handles queryTeams operation.
 //
 // Returns the teams of a project, paginated with a cursor.
-// Teams of every lifecycle status are returned; each carries its `status`.
 //
 // POST /teams/query
 func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

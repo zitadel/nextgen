@@ -1,6 +1,10 @@
 package domain
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"time"
 )
 
@@ -8,6 +12,44 @@ const (
 	PrefixClaim          ResourcePrefix = "claim"
 	PrefixClaimChallenge ResourcePrefix = "claim_challenge"
 )
+
+// ClaimChallengeTTL is the challenge lifetime (ADR 046 §3).
+const ClaimChallengeTTL = 10 * time.Minute
+
+// NewClaimChallengeToken mints the plaintext challenge token and the stored
+// challenge id (handoff-token pattern, ADR 046 §3): 128 bits of crypto/rand,
+// prefixed and base64url-encoded. Only the id — the SHA-256 of the plaintext —
+// is ever persisted; the plaintext travels in the claim_url and the CLI poll.
+func NewClaimChallengeToken() (plain, id string, err error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", "", ErrInternal(err).WithMessage("failed to generate claim challenge token")
+	}
+	plain = PrefixClaimChallenge.IDPrefix(base64.RawURLEncoding.EncodeToString(b))
+	return plain, HashClaimChallengeToken(plain), nil
+}
+
+// HashClaimChallengeToken derives the stored challenge id from a presented
+// plaintext token. The claim_challenges.id column is TEXT, so unlike the
+// handoff token's raw []byte hash this one is hex-encoded.
+func HashClaimChallengeToken(plain string) string {
+	sum := sha256.Sum256([]byte(plain))
+	return hex.EncodeToString(sum[:])
+}
+
+// ClaimConflictDetails is the client-facing details body of the 409
+// already_claimed response: the owning team and where to manage the project.
+type ClaimConflictDetails struct {
+	TeamID       string `json:"team_id"`
+	DashboardURL string `json:"dashboard_url"`
+}
+
+// ErrClaimNoPersonalTeam covers a claim/complete session user without an
+// active personal team. Impossible once #527's registration auto-creates it;
+// until then it guards manually seeded platform projects.
+func ErrClaimNoPersonalTeam() Error {
+	return newError(PrefixClaim.ErrorCodePrefix("no_personal_team"), "The user has no active personal team in the platform project.", nil, nil)
+}
 
 // The claim session sentinels are internal diagnostics for the claim/complete
 // session precondition (ADR 046 §2). On the wire they are always wrapped in

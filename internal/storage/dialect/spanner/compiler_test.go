@@ -1,13 +1,16 @@
 package spanner
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
 )
 
@@ -556,6 +559,29 @@ func TestCompileLimit(t *testing.T) {
 		require.Len(t, args, 1)
 		assert.Equal(t, int64(25), args[0])
 	})
+}
+
+func TestCompileListRequiresAuthzFilter(t *testing.T) {
+	t.Parallel()
+
+	const stmt = "SELECT id FROM teams"
+	opts := &database.ListOptions[domain.TeamField]{}
+
+	var compiler statementCompiler
+	err := compileList(context.Background(), &compiler, stmt, opts, teamSchema, "teams", "id")
+	require.ErrorIs(t, err, authz.ErrListFilterRequired)
+
+	ctx := service.WithAuthzListFilter(context.Background(), service.AuthzListFilter{
+		AuthzCheckParams: domain.AuthzCheckParams{
+			CatalogID: domain.SystemCatalogID, ProjectID: "proj_1", PrincipalHomeProjectID: "proj_1",
+			PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_1",
+			ObjectType: "project", Relation: "viewer",
+		},
+		ResourceKind: domain.ResourceKindTeam,
+	})
+	compiler.Reset()
+	require.NoError(t, compileList(ctx, &compiler, stmt, opts, teamSchema, "teams", "id"))
+	assert.Contains(t, compiler.String(), "EXISTS")
 }
 
 func compileProjectRead(t *testing.T, opts *database.ListOptions[domain.ProjectField]) (string, []any) {

@@ -13,11 +13,13 @@ import (
 // The management API (operator plane: schemas, flow definitions, users, teams,
 // project queries, branding, operator sessions) is gated by resolver.Check after
 // credential → ScopeContext. Path-id ops resolve scope via resource_scope_index
-// (requireResourceAccess) before Check; create/list keep an explicit project_id
-// and use requireProjectAccess, then inject an EXISTS list predicate via
-// withAuthzListFilter. MVP uses coarse project.{viewer,editor,admin}
-// (#420 expands to fine-grained catalog relations). Preview secrets
-// (project.read only) cannot call management APIs (ADR 037).
+// (requireResourceAccess) before Check; create keeps an explicit project_id and
+// requireProjectAccess. Management lists use requireProjectListAccess: project-
+// wide Allow or Forbidden (foothold, no project-wide grant) both proceed, then
+// withAuthzListFilter attaches the EXISTS predicate. NotFound still 404s.
+// MVP uses coarse project.{viewer,editor,admin} (#420 expands to fine-grained
+// catalog relations). Preview secrets (project.read only) cannot call
+// management APIs (ADR 037).
 
 // accessOp classifies a management operation for relation mapping and miss shaping.
 type accessOp int
@@ -204,14 +206,15 @@ func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resou
 		// Wrong kind for this route: same anti-oracle shape as unknown id.
 		return "", res.readMiss()
 	}
-	if err := requireProjectAccessAfterRSI(ctx, stmts, scope.ProjectID, res, op); err != nil {
+	if err := requireProjectAccessAfterRSI(ctx, stmts, scope, res, op); err != nil {
 		return "", err
 	}
 	return scope.ProjectID, nil
 }
 
 // requireProjectAccess gates a management operation via resolver.Check when
-// project_id is already known (create/list/query, project by-id, or after RSI).
+// project_id is already known (create, project by-id, or after RSI).
+// Management lists use requireProjectListAccess, not this gate.
 // DecisionNotFound → resource not-found / invalid-project shapes (404).
 // DecisionForbidden → permission_denied (403).
 func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
@@ -222,17 +225,18 @@ func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, re
 }
 
 func requireProjectAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp) error {
-	return requireProjectAccessMapped(ctx, stmts, projectID, res, op, false)
+	return requireProjectAccessMapped(ctx, stmts, projectID, res, op, false, nil)
 }
 
 // requireProjectAccessAfterRSI is requireProjectAccess for by-id ops after an
 // RSI hit: DecisionNotFound always uses readMiss (not writeMiss) so PATCH routes
-// do not leak existence via mismatched codes.
-func requireProjectAccessAfterRSI(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp) error {
-	return requireProjectAccessMapped(ctx, stmts, projectID, res, op, true)
+// do not leak existence via mismatched codes. Team-/resource-scoped grants may
+// Allow when RSI.team_id / path id match the grant (authz.md scoped Allow).
+func requireProjectAccessAfterRSI(ctx context.Context, stmts service.AuthzResolverStatements, rsi *domain.ResourceScope, res resourceAccess, op accessOp) error {
+	return requireProjectAccessMapped(ctx, stmts, rsi.ProjectID, res, op, true, rsi)
 }
 
-func requireProjectAccessMapped(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp, afterRSI bool) error {
+func requireProjectAccessMapped(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp, afterRSI bool, rsi *domain.ResourceScope) error {
 	scope, ok := GetScopeContext(ctx)
 	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
 		if afterRSI {
@@ -252,15 +256,21 @@ func requireProjectAccessMapped(ctx context.Context, stmts service.AuthzResolver
 		return res.denied()
 	}
 
-	// MVP: Check ObjectType "project" only — team-/resource-scoped Allow is out
-	// of scope until a later gate (#833).
-	dec, err := resolver.New().Check(ctx, stmts, resolver.Request{
+	req := resolver.Request{
 		PrincipalType: scope.PrincipalType,
 		PrincipalID:   scope.PrincipalID,
 		ProjectID:     projectID,
 		ObjectType:    "project",
 		Relation:      projectRelation(op),
-	})
+		TeamID:        scope.TeamID,
+	}
+	if rsi != nil {
+		req.ResourceID = rsi.ResourceID
+		if rsi.TeamID != nil {
+			req.ResourceTeamID = *rsi.TeamID
+		}
+	}
+	dec, err := resolver.New().Check(ctx, stmts, req)
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("authz permission check failed")
 	}
@@ -295,6 +305,52 @@ func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) er
 	}
 }
 
+// requireProjectListAccess gates a management list. Project-wide Allow or
+// Forbidden (foothold, no project-wide grant) both proceed so the EXISTS
+// predicate can return a partial view. NotFound (no foothold) still 404s.
+// Preview / missing credentials keep the same miss/denied shapes as create.
+func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string, res resourceAccess) (bool, error) {
+	if h == nil || h.pool == nil {
+		return false, domain.ErrInternal(errors.New("authz statements not configured"))
+	}
+	return requireProjectListAccess(ctx, h.pool.Statements(), projectID, res)
+}
+
+func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess) (bool, error) {
+	scope, ok := GetScopeContext(ctx)
+	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
+		return false, res.miss(opRead)
+	}
+
+	if !hasOperatorProjectWrite(scope.Scope) {
+		if scope.ProjectID == "" || scope.ProjectID != projectID {
+			return false, res.miss(opRead)
+		}
+		return false, res.denied()
+	}
+
+	req := resolver.Request{
+		PrincipalType: scope.PrincipalType,
+		PrincipalID:   scope.PrincipalID,
+		ProjectID:     projectID,
+		ObjectType:    "project",
+		Relation:      projectRelation(opRead),
+		TeamID:        scope.TeamID,
+	}
+	dec, err := resolver.New().Check(ctx, stmts, req)
+	if err != nil {
+		return false, domain.ErrInternal(err).WithMessage("authz permission check failed")
+	}
+	switch dec {
+	case resolver.DecisionAllow, resolver.DecisionForbidden:
+		return true, nil
+	case resolver.DecisionNotFound, resolver.DecisionUnspecified:
+		return false, res.miss(opRead)
+	default:
+		return false, res.miss(opRead)
+	}
+}
+
 // mapAuthzDecisionAfterRSI maps Check results after RSI already located the
 // resource. NotFound/Unspecified always use readMiss so write ops do not
 // advertise a different code than reads.
@@ -312,10 +368,10 @@ func mapAuthzDecisionAfterRSI(dec resolver.Decision, res resourceAccess) error {
 }
 
 // withAuthzListFilter attaches the SQL list-predicate filter for management
-// list endpoints after requireProjectAccess has already passed.
-// PrincipalHomeProjectID comes from the credential's home project while Check
-// uses the target projectID; those are equivalent until foreign footholds
-// (#333) land.
+// list endpoints after requireProjectListAccess has already passed (Allow or
+// Forbidden). PrincipalHomeProjectID comes from the credential's home project
+// while Check uses the target projectID; those are equivalent until foreign
+// footholds (#333) land.
 func (h *Handler) withAuthzListFilter(ctx context.Context, projectID string, kind domain.ResourceKind, op accessOp) (context.Context, error) {
 	scope, ok := GetScopeContext(ctx)
 	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {

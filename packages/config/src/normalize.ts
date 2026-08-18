@@ -4,9 +4,9 @@
  * The sync engine compares `.zitadel/**` files against server responses;
  * the server echoes fields the author never wrote (an empty `audience`
  * on flows) and the meta-schema declares defaults an author may or may
- * not spell out (`x-audit` on schema properties). Normalizing
- * both sides before hashing or diffing keeps a one-field edit rendering
- * as a one-field diff.
+ * not spell out (`x-audit` on schema properties). Normalizing both
+ * sides before hashing or diffing keeps a one-field edit rendering as a
+ * one-field diff.
  *
  * Normalized bodies are for COMPARISON. Never upload them, and never
  * write a normalized schema body to a file: the server stores schema
@@ -79,14 +79,25 @@ export function normalizeFlowBody(body: object): object {
  * defaults stripped: a property carrying one of the
  * {@link USER_PROPERTY_DEFAULTS} normalizes to one omitting it. Only
  * exact default values are removed; `$id` and every other field pass
- * through untouched.
+ * through untouched. Nested `properties` are descended into, so a leaf
+ * of an object property normalizes the same way a top-level one does.
  */
 export function normalizeSchemaBody(body: object): object {
   const result = structuredClone(body) as Record<string, unknown>;
-  if (!isPlainObject(result.properties)) {
-    return result;
+  stripPropertyDefaults(result);
+  return result;
+}
+
+/**
+ * Strip {@link USER_PROPERTY_DEFAULTS} from every property of an object
+ * schema, descending into nested `properties` so a leaf of an object
+ * property normalizes the same way a top-level one does.
+ */
+function stripPropertyDefaults(schema: Record<string, unknown>): void {
+  if (!isPlainObject(schema.properties)) {
+    return;
   }
-  for (const property of Object.values(result.properties)) {
+  for (const property of Object.values(schema.properties)) {
     if (!isPlainObject(property)) {
       continue;
     }
@@ -95,6 +106,6 @@ export function normalizeSchemaBody(body: object): object {
         delete property[key];
       }
     }
+    stripPropertyDefaults(property);
   }
-  return result;
 }

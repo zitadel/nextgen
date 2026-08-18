@@ -26,6 +26,24 @@ func (g *Graph) OracleCheck(projectID, principalHomeProjectID string, principalT
 	return g.ttuAllows(projectID, home, principalType, principalID, objectType, relation, now)
 }
 
+// OracleCheckParams applies OracleCheck, optional team/resource-scoped grant
+// arms (by-id Check), then the sk_team_ team constraint.
+func (g *Graph) OracleCheckParams(p domain.AuthzCheckParams) bool {
+	home := p.HomeProjectID()
+	now := time.Now()
+	allowed := g.OracleCheck(p.ProjectID, home, p.PrincipalType, p.PrincipalID, p.ObjectType, p.Relation)
+	if !allowed && p.ResourceTeamID != "" {
+		allowed = g.closureAllowsScoped(p.ProjectID, home, p.PrincipalType, p.PrincipalID, p.ObjectType, p.Relation, domain.AuthzScopeKindTeam, p.ResourceTeamID, now)
+	}
+	if !allowed && p.ResourceID != "" {
+		allowed = g.closureAllowsScoped(p.ProjectID, home, p.PrincipalType, p.PrincipalID, p.ObjectType, p.Relation, domain.AuthzScopeKindResource, p.ResourceID, now)
+	}
+	if !allowed {
+		return false
+	}
+	return g.constraintTeamAllows(p)
+}
+
 // OracleList returns resource ids of kind authorized under project / team / resource scopes.
 func (g *Graph) OracleList(projectID, principalHomeProjectID string, principalType domain.AuthzPrincipalType, principalID string, kind domain.ResourceKind, objectType, relation string) []string {
 	home := principalHomeOrProject(principalHomeProjectID, projectID)
@@ -51,6 +69,50 @@ func (g *Graph) OracleList(projectID, principalHomeProjectID string, principalTy
 		out = append(out, r.ResourceID)
 	}
 	return out
+}
+
+// OracleListParams applies OracleList then the sk_team_ team constraint.
+func (g *Graph) OracleListParams(p domain.AuthzListObjectsParams) []string {
+	ids := g.OracleList(p.ProjectID, p.HomeProjectID(), p.PrincipalType, p.PrincipalID, p.ResourceKind, p.ObjectType, p.Relation)
+	if p.ConstraintTeamID == "" {
+		return ids
+	}
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		if g.listedObjectInConstraintTeam(p, id) {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func (g *Graph) constraintTeamAllows(p domain.AuthzCheckParams) bool {
+	if p.ConstraintTeamID == "" || p.ResourceID == "" {
+		return true
+	}
+	if p.ResourceID == p.ConstraintTeamID {
+		return true
+	}
+	if p.ResourceTeamID != "" && p.ResourceTeamID == p.ConstraintTeamID {
+		return true
+	}
+	return g.isMember(p.ProjectID, p.ConstraintTeamID, p.ResourceID)
+}
+
+func (g *Graph) listedObjectInConstraintTeam(p domain.AuthzListObjectsParams, id string) bool {
+	switch p.ResourceKind {
+	case domain.ResourceKindUser:
+		return g.isMember(p.ProjectID, p.ConstraintTeamID, id)
+	case domain.ResourceKindTeam:
+		return id == p.ConstraintTeamID
+	default:
+		for _, r := range g.Resources {
+			if r.ResourceID == id && r.TeamID != nil && *r.TeamID == p.ConstraintTeamID {
+				return true
+			}
+		}
+		return false
+	}
 }
 
 // OracleFoothold mirrors HasAuthzProjectFoothold.

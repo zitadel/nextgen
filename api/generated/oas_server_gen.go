@@ -129,7 +129,7 @@ type Handler interface {
 	// Create user.
 	//
 	// POST /users
-	CreateUser(ctx context.Context, req *User, params CreateUserParams) (CreateUserRes, error)
+	CreateUser(ctx context.Context, req *CreateUserRequest, params CreateUserParams) (CreateUserRes, error)
 	// DeleteFlowDefinition implements deleteFlowDefinition operation.
 	//
 	// Delete a flow definition by id.
@@ -394,7 +394,6 @@ type Handler interface {
 	// QueryTeams implements queryTeams operation.
 	//
 	// Returns the teams of a project, paginated with a cursor.
-	// Teams of every lifecycle status are returned; each carries its `status`.
 	//
 	// POST /teams/query
 	QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)

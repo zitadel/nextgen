@@ -16,8 +16,11 @@ import (
 type CreateUserInput struct {
 	ProjectID string
 	TeamID    *string
-	User      map[string]any
-	ID        string
+	// SchemaURL names the schema Attributes is validated against.
+	SchemaURL string
+	// Attributes is the schema-defined content only, without envelope fields.
+	Attributes map[string]any
+	ID         string
 }
 
 type UserAction interface {
@@ -83,7 +86,7 @@ type ListUserTeamsOutput struct {
 
 type UserService interface {
 	ApplyActions(ctx context.Context, actions ...UserAction) (err error)
-	CreateUser(ctx context.Context, input CreateUserInput) (map[string]any, error)
+	CreateUser(ctx context.Context, input CreateUserInput) (*domain.User, error)
 	DeleteUser(ctx context.Context, input DeleteUserInput) error
 	ListUsers(ctx context.Context, input ListUsersInput) (*ListUsersOutput, error)
 	ListPasskeys(ctx context.Context, input ListPasskeysInput) (passkeys []*domain.UserPasskey, nextPage string, err error)
@@ -161,13 +164,26 @@ func (s *userService) emitUserCreateFailedBestEffort(ctx context.Context, action
 	})
 }
 
-func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ map[string]any, err error) {
+func (s *userService) CreateUser(ctx context.Context, input CreateUserInput) (_ *domain.User, err error) {
 	action := NewCreateUserAction(input, s.schemaStore)
 	if err := s.ApplyActions(ctx, action); err != nil {
 		s.emitUserCreateFailedBestEffort(ctx, action, err)
 		return nil, err
 	}
-	return action.User, nil
+
+	// The insert does not report the row's timestamps or status.
+	// TODO(vitorbari): have the insert return the row so create needs no read-back.
+	user, err := s.v2Pool.Statements().GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID),
+		database.Equal(database.Col(domain.UserFieldID), action.CreateUser.ID),
+	), UserQueryOptions{})
+	if err != nil {
+		return nil, domain.ErrInternal(err).
+			WithMessage("The user was created but could not be read back. Fetch it by id rather than retrying the create.").
+			WithDetails(domain.CreatedUserDetails{UserID: action.CreateUser.ID})
+	}
+
+	return user, nil
 }
 
 func (s *userService) DeleteUser(ctx context.Context, input DeleteUserInput) error {
@@ -350,21 +366,32 @@ func NewCreateUserAction(input CreateUserInput, schemaStore domain.JSONSchemaSto
 }
 
 func (o *CreateUserAction) Prepare(ctx context.Context) error {
-	schemaURL, err := domain.SchemaFromUserMap(o.User)
-	if err != nil {
-		return err
+	// Ahead of the lookup, which would otherwise report an empty schema as one
+	// the project does not have.
+	if o.SchemaURL == "" {
+		return domain.ErrUserInvalid().
+			WithMessage("No schema provided. A user must name the schema its attributes are validated against.")
 	}
 
-	schemaEntity, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, schemaURL)
+	schemaEntity, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, o.SchemaURL)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-			return domain.ErrUserInvalid().WithMessage("$schema is not known to the system. First create a schema, then create users.")
+			return domain.ErrUserInvalid().
+				WithMessage("schema is not known to the system. First create a schema, then create users.").
+				WithDetails(domain.UserSchemaUnknownDetails{Schema: o.SchemaURL})
 		}
 		return domain.ErrInternal(err).WithMessage("failed to get schema from database")
 	}
 
 	o.schemaJSON = schemaEntity.Schema
-	o.CreateUser, err = domain.NewCreateUser(o.ProjectID, o.TeamID, o.ID, schemaEntity.Schema, o.User)
+	o.CreateUser, err = domain.NewCreateUser(domain.CreateUserParams{
+		ProjectID:  o.ProjectID,
+		TeamID:     o.TeamID,
+		ID:         o.ID,
+		SchemaURL:  o.SchemaURL,
+		Schema:     schemaEntity.Schema,
+		Attributes: o.Attributes,
+	})
 	if err != nil {
 		return err
 	}
@@ -376,8 +403,7 @@ func (o *CreateUserAction) Apply(ctx context.Context, stmts AllStatements) error
 	if err := applyCreateUser(ctx, stmts, o.CreateUser); err != nil {
 		return err
 	}
-	o.User["id"] = o.CreateUser.ID
-	attrKeys, attrValues := audit.UserAttributeAuditFields(o.User, o.schemaJSON)
+	attrKeys, attrValues := audit.UserAttributeAuditFields(o.Attributes, o.schemaJSON)
 	return audit.Emit(ctx, stmts, audit.EmitSpec{
 		Type:       domain.EventTypeUserCreated,
 		Category:   domain.EventCategoryEntity,

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -42,7 +43,7 @@ func TestJSONSchemaStatements_CRUD(t *testing.T) {
 	assert.Contains(t, string(got.Schema), `"type":"object"`)
 	assert.Equal(t, schema.CreatedAt.UTC(), got.CreatedAt.UTC())
 
-	listed, err := stmts.ListJSONSchemas(ctx, &database.ListOptions[domain.JSONSchemaField]{
+	listed, err := stmts.ListJSONSchemas(service.WithAuthzListFilterBypass(ctx), &database.ListOptions[domain.JSONSchemaField]{
 		Filter: database.Equal(database.Col(domain.JSONSchemaFieldProjectID), project.ID),
 		Pagination: database.Page[domain.JSONSchemaField]{
 			Limit: 10,
