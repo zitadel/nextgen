@@ -28,7 +28,7 @@ Where does the component live?
 └── packages/components  (the Lit <zl-*> atoms for the login surface)
       → vanilla CSS in the atom's own zl-<atom>.css, keyed to --zl-* variables.
         Tailwind and shadcn components do not cross the shadow boundary, and
-        the console never composes these (ADR 052).
+        the console never composes these (ADR 055).
 ```
 
 ## Token contract
@@ -202,5 +202,5 @@ tokens over `dark:` utilities so surfaces re-theme automatically.
 - Don't paste CLI-generated HSL blocks into `styles.css` — the token pipeline
   owns colours.
 - Don't import login atoms into console UI. The two surfaces share tokens, not
-  components (ADR 052) — reach for the shadcn component instead, installing it
+  components (ADR 055) — reach for the shadcn component instead, installing it
   from the registry if `src/components/ui/` doesn't have it yet.

@@ -204,7 +204,7 @@ func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resou
 		// Wrong kind for this route: same anti-oracle shape as unknown id.
 		return "", res.readMiss()
 	}
-	if err := requireProjectAccessAfterRSI(ctx, stmts, scope.ProjectID, res, op); err != nil {
+	if err := requireProjectAccessAfterRSI(ctx, stmts, scope, res, op); err != nil {
 		return "", err
 	}
 	return scope.ProjectID, nil
@@ -222,17 +222,18 @@ func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, re
 }
 
 func requireProjectAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp) error {
-	return requireProjectAccessMapped(ctx, stmts, projectID, res, op, false)
+	return requireProjectAccessMapped(ctx, stmts, projectID, res, op, false, nil)
 }
 
 // requireProjectAccessAfterRSI is requireProjectAccess for by-id ops after an
 // RSI hit: DecisionNotFound always uses readMiss (not writeMiss) so PATCH routes
-// do not leak existence via mismatched codes.
-func requireProjectAccessAfterRSI(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp) error {
-	return requireProjectAccessMapped(ctx, stmts, projectID, res, op, true)
+// do not leak existence via mismatched codes. Team-/resource-scoped grants may
+// Allow when RSI.team_id / path id match the grant (authz.md scoped Allow).
+func requireProjectAccessAfterRSI(ctx context.Context, stmts service.AuthzResolverStatements, rsi *domain.ResourceScope, res resourceAccess, op accessOp) error {
+	return requireProjectAccessMapped(ctx, stmts, rsi.ProjectID, res, op, true, rsi)
 }
 
-func requireProjectAccessMapped(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp, afterRSI bool) error {
+func requireProjectAccessMapped(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp, afterRSI bool, rsi *domain.ResourceScope) error {
 	scope, ok := GetScopeContext(ctx)
 	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
 		if afterRSI {
@@ -252,15 +253,21 @@ func requireProjectAccessMapped(ctx context.Context, stmts service.AuthzResolver
 		return res.denied()
 	}
 
-	// MVP: Check ObjectType "project" only — team-/resource-scoped Allow is out
-	// of scope until a later gate (#833).
-	dec, err := resolver.New().Check(ctx, stmts, resolver.Request{
+	req := resolver.Request{
 		PrincipalType: scope.PrincipalType,
 		PrincipalID:   scope.PrincipalID,
 		ProjectID:     projectID,
 		ObjectType:    "project",
 		Relation:      projectRelation(op),
-	})
+		TeamID:        scope.TeamID,
+	}
+	if rsi != nil {
+		req.ResourceID = rsi.ResourceID
+		if rsi.TeamID != nil {
+			req.ResourceTeamID = *rsi.TeamID
+		}
+	}
+	dec, err := resolver.New().Check(ctx, stmts, req)
 	if err != nil {
 		return domain.ErrInternal(err).WithMessage("authz permission check failed")
 	}

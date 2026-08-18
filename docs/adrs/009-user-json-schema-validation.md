@@ -3,6 +3,10 @@
 > **Status:** Proposed
 > **Date:** 2026-04-30
 > **Context:** Dynamic users and schema-driven validation
+>
+> **Amended by:** [ADR 052](052-user-envelope-and-attributes.md) — the API
+> property is `schema`, not `$schema`, and it sits on an envelope beside the
+> validated `attributes` document.
 
 ## Context
 
@@ -15,6 +19,8 @@ JSON Schema is the validation mechanism. The server resolves schemas per instanc
 ## Decision
 
 ### 1. `$schema` on create and update
+
+> Amended by [ADR 052](052-user-envelope-and-attributes.md): the property is named `schema`, and the attributes it governs are nested under `attributes` rather than sitting at the top level beside it.
 
 When users are created or updated over the API, the request body includes a **`$schema`** property: a URL string that references a JSON Schema **already registered** for the instance (a row in `json_schemas`, same URL as the `url` column).
 

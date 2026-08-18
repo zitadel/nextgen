@@ -56,8 +56,11 @@ if (typeof Element !== "undefined") {
   Element.prototype.scrollIntoView ??= () => undefined;
 }
 
-// Hermetic env: Vitest (via Vite) loads `.env.local`, so without this stub a
-// developer's local VITE_CONSOLE_PROJECT_ID would leak into test requests and
-// make outcomes depend on gitignored local files. Specs that need a value
-// stub their own (vi.stubEnv wins over this default).
+// Hermetic env: Vitest (via Vite) loads `.env.local`, so without these stubs a
+// developer's local VITE_CONSOLE_PROJECT_ID would leak into test requests, and
+// a local VITE_CONSOLE_RUNTIME_FALLBACK would turn runtime-discovery failures
+// back into the standalone fallback (Console ADR 0004 §3) — both make outcomes
+// depend on gitignored local files. Specs that need a value stub their own
+// (vi.stubEnv wins over these defaults).
 vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "");
+vi.stubEnv("VITE_CONSOLE_RUNTIME_FALLBACK", "");

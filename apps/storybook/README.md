@@ -90,4 +90,4 @@ network + the MSW worker; their behaviour is covered by the
 - Visual values come from `@zitadel/design-tokens` (loaded once in
   `.storybook/preview.ts`); never hard-code colours in a story.
 - The dark canvas in `src/preview.css` matches the login surface's default
-  mode (see `docs/adrs/052-lit-only-login-surface.md`).
+  mode (see `docs/adrs/055-lit-only-login-surface.md`).

@@ -81,7 +81,7 @@ Published libraries (`packages/`):
 - `packages/components/` — the Lit atoms (`<zl-*>`) and the `<zitadel-login>`
   orchestrator that make up the login surface; each atom's CSS sits beside it.
 - `packages/design-tokens/` — the Figma-driven `--zl-*` variables, the one
-  contract the login surface and the console share (ADR 052).
+  contract the login surface and the console share (ADR 055).
 - `packages/api/` — generated TypeScript API client.
 - `packages/config/` — versioned local config schemas and defaults.
 - `packages/api-mock/` — in-process MSW handlers and the standalone mock
@@ -261,7 +261,7 @@ changes.
 
 Console screens and shared UI are driven by the Figma **Design System** file
 (`Zitadel - Design System - External`), not by flattened app mocks. There are
-two UI surfaces and they do not share components — only tokens (ADR 052). Before
+two UI surfaces and they do not share components — only tokens (ADR 055). Before
 building any UI under `apps/console/**` or
 `packages/{components,design-tokens}/**`, **decide which surface it belongs to**
 (see [`apps/console/docs/styling.md`](apps/console/docs/styling.md)):

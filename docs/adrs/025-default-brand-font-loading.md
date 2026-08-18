@@ -122,6 +122,6 @@ and pass its own href to `applyDefaultFont`.
 - [`packages/design-tokens/src/overrides.ts`](../../packages/design-tokens/src/overrides.ts) — font-family token stacks
 - [`docs/design/branding/tokens.md`](../design/branding/tokens.md) — token catalogue and asset injection
 - [ADR 014](./014-design-tokens-and-ui-react-pairs.md) — `--zl-*` token ownership
-  (superseded in part by [ADR 052](./052-lit-only-login-surface.md); the token
+  (superseded in part by [ADR 055](./055-lit-only-login-surface.md); the token
   half still stands)
 - [ADR 006](./006-web-component-renderer-direction.md) — web component direction

@@ -1,4 +1,4 @@
-# ADR 052: A Lit-only login surface, with the console on shadcn/ui
+# ADR 055: A Lit-only login surface, with the console on shadcn/ui
 
 > **Status:** Accepted — 2026-08-16
 

@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ianlancetaylor/jsonschema"
-	"github.com/zitadel/nextgen/internal/maputil"
 )
 
 const (
@@ -38,6 +37,18 @@ func ErrUserAlreadyExists() Error {
 
 func ErrUserPermissionDenied() Error {
 	return newError(PrefixUser.ErrorCodePrefix("permission_denied"), "the user management API requires the project secret", nil, nil)
+}
+
+// UserSchemaUnknownDetails names the schema a create referenced that the
+// project does not have.
+type UserSchemaUnknownDetails struct {
+	Schema string `json:"schema"`
+}
+
+// CreatedUserDetails names a user the server created, for the answer that
+// cannot carry its representation.
+type CreatedUserDetails struct {
+	UserID string `json:"user_id"`
 }
 
 // User is a hydrated user projection (header + optional EAV joins).
@@ -160,59 +171,70 @@ func (c *CreateUser) AttributeTeamScope() string {
 	return ""
 }
 
-// NewCreateUser builds a [CreateUser] from a schema-validated user map.
-// Empty id is filled by the dialect on create; non-empty id is for ceremony only.
-func NewCreateUser(projectID string, teamID *string, id string, schemabs []byte, muser map[string]any) (*CreateUser, error) {
-	if _, ok := muser["id"]; ok {
-		return nil, ErrUserInvalid().WithMessage("client cannot choose user id")
-	}
-	if _, ok := muser["metadata"]; ok {
-		return nil, ErrUserInvalid().WithMessage("metadata is readonly and cannot be set")
-	}
+// CreateUserParams are the inputs to [NewCreateUser]. A struct rather than
+// positional arguments because ID and SchemaURL are both strings: transposing
+// them would type-check and write a schema url as the row's primary key.
+type CreateUserParams struct {
+	ProjectID string
+	// TeamID is optional roster context, not lifecycle ownership — it becomes
+	// [CreateUser.InitialMembershipTeamID].
+	TeamID *string
+	// ID is empty for a server-minted id; non-empty is for ceremony only.
+	ID string
+	// SchemaURL names the schema, and Schema is that schema's document.
+	SchemaURL string
+	Schema    []byte
+	// Attributes is the instance the schema validates: envelope fields (id,
+	// schema, metadata) are not part of it, so a schema may declare properties
+	// of those names and closed-world keywords such as additionalProperties:
+	// false hold.
+	Attributes map[string]any
+}
 
-	schemaURL, err := SchemaFromUserMap(muser)
-	if err != nil {
-		return nil, err
+// NewCreateUser builds a [CreateUser] from the schema-defined attributes.
+func NewCreateUser(params CreateUserParams) (*CreateUser, error) {
+	if params.SchemaURL == "" {
+		return nil, ErrUserInvalid().
+			WithMessage("No schema provided. A user must name the schema its attributes are validated against.")
 	}
 
 	var jschema jsonschema.Schema
-	err = json.Unmarshal(schemabs, &jschema)
+	err := json.Unmarshal(params.Schema, &jschema)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal json schema")
 	}
 
-	err = jschema.Validate(muser)
+	err = jschema.Validate(params.Attributes)
 	if err != nil {
 		return nil, ErrUserInvalid().WithParent(err).WithMessage("user is not valid according to schema")
 	}
 
 	var mschema map[string]any
-	err = json.Unmarshal(schemabs, &mschema)
+	err = json.Unmarshal(params.Schema, &mschema)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal schema map")
 	}
 
-	attrs, err := CreateAttributesFromMap(muser, mschema)
+	createAttrs, err := CreateAttributesFromMap(params.Attributes, mschema)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to flatten user attributes")
 	}
 
-	return &CreateUser{
-		ProjectID:               projectID,
-		InitialMembershipTeamID: teamID,
-		ID:                      id,
-		SchemaURL:               schemaURL,
-		Attributes:              attrs,
-	}, nil
-}
-
-func SchemaFromUserMap(user map[string]any) (string, error) {
-	schemaURL, ok := maputil.Get[string](user, "$schema")
-	if !ok {
-		return "", ErrUserInvalid().
-			WithMessage("No $schema provided for the user. A schema must be provided when creating a new user. Against this schema, the user will be validated")
+	// A schema whose properties are all optional validates {}, but a user is
+	// stored as its attribute rows: with none there is nothing to write. The
+	// dialects refuse it too, so catching it here answers 400 instead of 500.
+	if len(createAttrs) == 0 {
+		return nil, ErrUserInvalid().
+			WithMessage("No attributes provided. A user must carry at least one schema-defined property.")
 	}
-	return schemaURL, nil
+
+	return &CreateUser{
+		ProjectID:               params.ProjectID,
+		InitialMembershipTeamID: params.TeamID,
+		ID:                      params.ID,
+		SchemaURL:               params.SchemaURL,
+		Attributes:              createAttrs,
+	}, nil
 }
 
 // UserField enumerates the fields of User which can be used for filtering and

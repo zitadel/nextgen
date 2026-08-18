@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -145,17 +146,19 @@ func TestManagementAuthz(t *testing.T) {
 		t.Parallel()
 
 		userJSON := helpers.MustMarshal(t, map[string]any{
-			"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
-			"email":      "authz-probe@example.com",
-			"givenName":  "Authz",
-			"familyName": "Probe",
-			"password":   "my-strong-password",
+			"schema": test_data.UserSchemaURL,
+			"attributes": map[string]any{
+				"email":      "authz-probe@example.com",
+				"givenName":  "Authz",
+				"familyName": "Probe",
+				"password":   "my-strong-password",
+			},
 		})
 
 		t.Run("bound to the token's project", func(t *testing.T) {
 			t.Parallel()
 
-			var createBody api.User
+			var createBody api.CreateUserRequest
 			require.NoError(t, createBody.UnmarshalJSON([]byte(userJSON)))
 			resp, err := foreign.CreateUser(t.Context(), &createBody, api.CreateUserParams{ProjectID: victimID})
 			require.NoError(t, err)
@@ -182,11 +185,12 @@ func TestManagementAuthz(t *testing.T) {
 			// the answer must not distinguish the user from a nonexistent one,
 			// and the user must survive.
 			victimUser, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-				ProjectID: victim.ID,
-				User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "authz-delete-probe@example.com"),
+				ProjectID:  victim.ID,
+				SchemaURL:  test_data.UserSchemaURL,
+				Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "authz-delete-probe@example.com"),
 			})
 			require.NoError(t, err)
-			victimUserID := api.UserID(victimUser["id"].(string))
+			victimUserID := api.UserID(victimUser.ID)
 
 			delResp, err := foreign.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: victimUserID})
 			require.NoError(t, err)
@@ -229,11 +233,12 @@ func TestManagementAuthz(t *testing.T) {
 			t.Parallel()
 
 			victimUser, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-				ProjectID: victim.ID,
-				User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "authz-preview-delete@example.com"),
+				ProjectID:  victim.ID,
+				SchemaURL:  test_data.UserSchemaURL,
+				Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "authz-preview-delete@example.com"),
 			})
 			require.NoError(t, err)
-			victimUserID := api.UserID(victimUser["id"].(string))
+			victimUserID := api.UserID(victimUser.ID)
 
 			delResp, err := preview.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: victimUserID})
 			require.NoError(t, err)
@@ -443,6 +448,62 @@ func TestListAuthzTeamScopedOnlyForbidden(t *testing.T) {
 	teamsResp, err := client.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
 	assertAuthzError(t, teamsResp, "team.permission_denied")
+}
+
+// TestGetAuthzTeamScopedOnlyAllow pins #833: after RSI, a team-scoped-only
+// project.viewer grant Allows by-id GetTeam for that team and denies create
+// (no RSI object on the Check).
+func TestGetAuthzTeamScopedOnlyAllow(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
+	})
+	require.NoError(t, err)
+	other, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+		ProjectID: project.ID,
+		Name:      helpers.TeamName(),
+	})
+	require.NoError(t, err)
+
+	stmts := harness.EnsureServiceDB(t).Statements()
+	asgns, err := stmts.ListAuthzAssignments(t.Context(), project.ID, domain.AuthzPrincipalTypeSKProj, project.ID, false)
+	require.NoError(t, err)
+	require.NotEmpty(t, asgns)
+	for _, a := range asgns {
+		require.NoError(t, stmts.RevokeAuthzAssignment(t.Context(), project.ID, a.ID))
+	}
+
+	scoped := &domain.AuthzAssignment{
+		ProjectID:     project.ID,
+		CatalogID:     domain.SystemCatalogID,
+		PrincipalType: domain.AuthzPrincipalTypeSKProj,
+		PrincipalID:   project.ID,
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+	scoped.ApplyScope(domain.NewTeamAssignmentScope(team.ID))
+	require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), scoped))
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	got, err := client.GetTeam(t.Context(), api.GetTeamParams{TeamID: api.TeamID(team.ID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.TeamResponse{}, got, helpers.MustMarshal(t, got))
+
+	denied, err := client.GetTeam(t.Context(), api.GetTeamParams{TeamID: api.TeamID(other.ID)})
+	require.NoError(t, err)
+	assertAuthzError(t, denied, "team.permission_denied")
+
+	createResp, err := client.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: helpers.TeamName()}, api.CreateTeamParams{ProjectID: api.ProjectID(project.ID)})
+	require.NoError(t, err)
+	assertAuthzError(t, createResp, "team.permission_denied")
 }
 
 // errorResponseParts pulls the status and error body out of any error-shaped
