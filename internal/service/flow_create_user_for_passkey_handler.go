@@ -26,12 +26,12 @@ func NewFlowCreateUserForPasskeyHandler(
 }
 
 func (h *FlowCreateUserForPasskeyHandler) CreateProvisionalUser(ctx context.Context, userID string, state *domain.FlowState) error {
-	state.CollectedData.UserData["$schema"] = state.UserSchemaURL
 	action := NewCreateUserAction(
 		CreateUserInput{
-			ProjectID: state.ProjectID,
-			User:      state.CollectedData.UserData,
-			ID:        userID,
+			ProjectID:  state.ProjectID,
+			SchemaURL:  state.UserSchemaURL,
+			Attributes: state.CollectedData.UserData,
+			ID:         userID,
 		},
 		h.schemaStore,
 	)

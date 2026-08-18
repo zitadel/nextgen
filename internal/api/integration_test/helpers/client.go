@@ -72,14 +72,21 @@ func (c *ApiClient) SetSessionToken(token string) {
 	c.securitySource.SessionToken = token
 }
 
+// ProjectSecret mints the project's bearer, for tests that send a raw request
+// instead of going through the generated client.
+func (h *Harness) ProjectSecret(t *testing.T, project *domain.Project) string {
+	t.Helper()
+
+	secret, err := h.EnsureTokenService(t).GenerateJWE(t.Context(), project.Token())
+	require.NoError(t, err)
+
+	return secret
+}
+
 func (h *Harness) SetProjectSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
 	t.Helper()
 
-	token := project.Token()
-	secret, err := h.EnsureTokenService(t).GenerateJWE(t.Context(), token)
-	require.NoError(t, err)
-
-	client.SetToken(secret)
+	client.SetToken(h.ProjectSecret(t, project))
 }
 
 // SetScopedTokenOnApiClient mints a bearer with exactly the given scopes.

@@ -84,8 +84,7 @@ func TestListUsers(t *testing.T) {
 	assert.Equal(t, "list-1@example.com", userProp(t, newest, "email"))
 	assert.Equal(t, schemaURL, newest.Schema)
 
-	metadata, ok := newest.Metadata.Get()
-	require.True(t, ok, "each user carries metadata")
+	metadata := newest.Metadata
 	assert.Equal(t, api.UserMetadataStatusActive, metadata.Status)
 	assert.False(t, metadata.CreatedAt.IsZero())
 	assert.False(t, metadata.UpdatedAt.Before(metadata.CreatedAt))
@@ -133,22 +132,21 @@ func TestListUsers(t *testing.T) {
 	assert.Empty(t, otherRes.(*api.ListUsersResponse).Users)
 }
 
-// userID reads the listed user's id, which the API carries as a typed field of
-// its own rather than as part of the schema-driven properties.
+// userID reads the listed user's id, which the API carries on the envelope
+// rather than as part of the schema-defined content.
 func userID(t *testing.T, user api.User) string {
 	t.Helper()
 
-	id, ok := user.ID.Get()
-	require.True(t, ok, "user item carries no id: %s", helpers.MustMarshal(t, user))
-	return string(id)
+	return string(user.ID)
 }
 
-// userProp reads a string property off a listed user. Everything but id,
-// $schema and metadata arrives through the schema-driven additional properties.
+// userProp reads a string property off a listed user. Everything the user
+// schema defines arrives under attributes; id, schema and metadata are the
+// envelope around it.
 func userProp(t *testing.T, user api.User, key string) string {
 	t.Helper()
 
-	raw, ok := user.AdditionalProps[key]
+	raw, ok := user.Attributes[key]
 	require.True(t, ok, "user item carries no %q: %s", key, helpers.MustMarshal(t, user))
 	var value string
 	require.NoError(t, json.Unmarshal(raw, &value))

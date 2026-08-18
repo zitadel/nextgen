@@ -14,14 +14,14 @@ post:
     content:
       application/json:
         schema:
-          $ref: user.yaml
+          $ref: create-user-request.yaml
   responses:
     '201':
       description: The user was created successfully
       content:
         application/json:
           schema:
-            $ref: create-user-response.yaml
+            $ref: user.yaml
     '400':
       description: The provided input was not valid
       content:
@@ -46,6 +46,18 @@ post:
         schema indicates that the email field should be unique across the team,
         only one user can have a given `email` attribute. See the body for more
         details.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '500':
+      description: |
+        Something went wrong on the server. This was not your fault.
+
+        One case is recoverable: the user was created but the server could not
+        read it back to answer with. The body then carries the created user's
+        id in `details.user_id`. Fetch that user by id — repeating the create
+        would conflict with the one that already exists.
       content:
         application/json:
           schema:

@@ -65,6 +65,27 @@ const defaultSchemaContent string = `{
 		}
 	}`
 
+// nestedSchemaContent carries an object property whose leaves cover the
+// nested cases: a required leaf, an optional leaf, and one keyed with
+// x-unique.
+const nestedSchemaContent string = `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"required": ["email", "address"],
+		"properties": {
+			"email": { "type": "string", "format": "email", "x-unique": "team" },
+			"address": {
+				"type": "object",
+				"required": ["street"],
+				"properties": {
+					"street": { "type": "string", "minLength": 1 },
+					"city":   { "type": "string" },
+					"zip":    { "type": "string", "x-unique": "project" }
+				}
+			}
+		}
+	}`
+
 // identifierOutcomes is what an x-unique field contributes to
 // ImplicitOutcomes — pinned here so cases stay readable.
 var identifierOutcomes = []string{
@@ -409,6 +430,120 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 			step:    "step",
 			fields:  []domain.Field{"either"},
 			wantErr: domain.ErrFlowFieldUnsupportedType,
+		},
+		{
+			name:   "nested leaf resolves through its dotted path",
+			schema: nestedSchemaContent,
+			step:   "profile",
+			fields: []domain.Field{"address.street"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{
+						Name:       "address.street",
+						TextKey:    "profile.field.address.street",
+						Type:       domain.FlowFieldTypeText,
+						Required:   true,
+						Validation: &domain.FlowFieldValidation{MinLength: 1},
+					},
+				},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		{
+			name:   "x-unique on a nested leaf makes it an identifier",
+			schema: nestedSchemaContent,
+			step:   "profile",
+			fields: []domain.Field{"address.zip"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{
+						Name:      "address.zip",
+						TextKey:   "profile.field.address.zip",
+						Type:      domain.FlowFieldTypeText,
+						Challenge: domain.FlowFieldChallengeIdentifier,
+						Unique:    domain.AttributeUniquenessProject,
+					},
+				},
+				ImplicitOutcomes: map[string][]string{"address.zip": identifierOutcomes},
+			},
+		},
+		{
+			name: "nested leaf under an optional parent is not required",
+			schema: `{
+				"type": "object",
+				"properties": {
+					"address": {
+						"type": "object",
+						"required": ["street"],
+						"properties": { "street": { "type": "string" } }
+					}
+				}
+			}`,
+			step:   "profile",
+			fields: []domain.Field{"address.street"},
+			want: domain.FlowResolvedFields{
+				Fields: []domain.FlowField{
+					{
+						Name:    "address.street",
+						TextKey: "profile.field.address.street",
+						Type:    domain.FlowFieldTypeText,
+					},
+				},
+				ImplicitOutcomes: map[string][]string{},
+			},
+		},
+		{
+			name:    "object-typed property is not collectable",
+			schema:  nestedSchemaContent,
+			step:    "profile",
+			fields:  []domain.Field{"address"},
+			wantErr: domain.ErrFlowFieldNotScalar,
+		},
+		{
+			name: "property carrying properties but no type is not collectable",
+			schema: `{
+				"type": "object",
+				"properties": {
+					"address": { "properties": { "street": { "type": "string" } } }
+				}
+			}`,
+			step:    "profile",
+			fields:  []domain.Field{"address"},
+			wantErr: domain.ErrFlowFieldNotScalar,
+		},
+		{
+			name: "array-typed property is not collectable",
+			schema: `{
+				"type": "object",
+				"properties": { "tags": { "type": "array" } }
+			}`,
+			step:    "profile",
+			fields:  []domain.Field{"tags"},
+			wantErr: domain.ErrFlowFieldNotScalar,
+		},
+		{
+			name: "property carrying items but no type is not collectable",
+			schema: `{
+				"type": "object",
+				"properties": { "tags": { "items": { "type": "string" } } }
+			}`,
+			step:    "profile",
+			fields:  []domain.Field{"tags"},
+			wantErr: domain.ErrFlowFieldNotScalar,
+		},
+		{
+			name:    "unknown nested leaf returns ErrFlowFieldUnknown",
+			schema:  nestedSchemaContent,
+			step:    "profile",
+			fields:  []domain.Field{"address.country"},
+			wantErr: domain.ErrFlowFieldUnknown,
+		},
+		{
+			name:    "path through a scalar intermediate returns ErrFlowFieldUnknown",
+			schema:  nestedSchemaContent,
+			step:    "profile",
+			fields:  []domain.Field{"email.domain"},
+			wantErr: domain.ErrFlowFieldUnknown,
 		},
 	}
 

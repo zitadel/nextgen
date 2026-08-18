@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -145,17 +146,19 @@ func TestManagementAuthz(t *testing.T) {
 		t.Parallel()
 
 		userJSON := helpers.MustMarshal(t, map[string]any{
-			"$schema":    "https://test.example.schemas.com/schemas/default-human-user.json",
-			"email":      "authz-probe@example.com",
-			"givenName":  "Authz",
-			"familyName": "Probe",
-			"password":   "my-strong-password",
+			"schema": test_data.UserSchemaURL,
+			"attributes": map[string]any{
+				"email":      "authz-probe@example.com",
+				"givenName":  "Authz",
+				"familyName": "Probe",
+				"password":   "my-strong-password",
+			},
 		})
 
 		t.Run("bound to the token's project", func(t *testing.T) {
 			t.Parallel()
 
-			var createBody api.User
+			var createBody api.CreateUserRequest
 			require.NoError(t, createBody.UnmarshalJSON([]byte(userJSON)))
 			resp, err := foreign.CreateUser(t.Context(), &createBody, api.CreateUserParams{ProjectID: victimID})
 			require.NoError(t, err)
@@ -182,11 +185,12 @@ func TestManagementAuthz(t *testing.T) {
 			// the answer must not distinguish the user from a nonexistent one,
 			// and the user must survive.
 			victimUser, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-				ProjectID: victim.ID,
-				User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "authz-delete-probe@example.com"),
+				ProjectID:  victim.ID,
+				SchemaURL:  test_data.UserSchemaURL,
+				Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "authz-delete-probe@example.com"),
 			})
 			require.NoError(t, err)
-			victimUserID := api.UserID(victimUser["id"].(string))
+			victimUserID := api.UserID(victimUser.ID)
 
 			delResp, err := foreign.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: victimUserID})
 			require.NoError(t, err)
@@ -229,11 +233,12 @@ func TestManagementAuthz(t *testing.T) {
 			t.Parallel()
 
 			victimUser, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
-				ProjectID: victim.ID,
-				User:      harness.EnsureTestData(t).Generator.GenerateUser(t, "authz-preview-delete@example.com"),
+				ProjectID:  victim.ID,
+				SchemaURL:  test_data.UserSchemaURL,
+				Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "authz-preview-delete@example.com"),
 			})
 			require.NoError(t, err)
-			victimUserID := api.UserID(victimUser["id"].(string))
+			victimUserID := api.UserID(victimUser.ID)
 
 			delResp, err := preview.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: victimUserID})
 			require.NoError(t, err)

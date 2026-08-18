@@ -22,11 +22,9 @@ func TestUserAttributeAuditFields(t *testing.T) {
 	}`)
 
 	keys, attrs := audit.UserAttributeAuditFields(map[string]any{
-		"$schema":      "https://example.test/user.json",
 		"email":        "a@example.com",
 		"display_name": "Ada",
 		"phone":        "+1",
-		"id":           "should-skip",
 	}, schema)
 
 	assert.Equal(t, []string{"display_name", "email", "phone"}, keys)
@@ -34,6 +32,24 @@ func TestUserAttributeAuditFields(t *testing.T) {
 		"email": "a@example.com",
 		"phone": "+1",
 	}, attrs)
+}
+
+// A schema property named `id` is audited like any other: the caller passes the
+// attributes object, so no name is claimed by the envelope.
+func TestUserAttributeAuditFields_EnvelopeNamesAreAudited(t *testing.T) {
+	t.Parallel()
+
+	schema := []byte(`{
+		"type":"object",
+		"properties":{"id":{"type":"string","x-audit":true}}
+	}`)
+
+	keys, attrs := audit.UserAttributeAuditFields(map[string]any{
+		"id": "employee-42",
+	}, schema)
+
+	assert.Equal(t, []string{"id"}, keys)
+	require.Equal(t, map[string]any{"id": "employee-42"}, attrs)
 }
 
 func TestUserAttributeAuditFields_NoSchemaStillReturnsKeys(t *testing.T) {
