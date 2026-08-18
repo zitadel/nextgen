@@ -137,7 +137,7 @@ func TestCreateUser(t *testing.T) {
 				err := user.UnmarshalJSON([]byte(tc.userjson))
 				require.NoError(t, err)
 
-				resp, err := client.CreateUser(t.Context(), user, params)
+				resp, err := client.CreateUser(t.Context(), user, tc.params)
 				assert.NoError(t, err)
 
 				assert.IsType(t, &api.User{}, resp, helpers.MustMarshal(t, resp))
@@ -199,6 +199,19 @@ func TestCreateUser(t *testing.T) {
 							"familyName": "Doe",
 							"password":   "my-strong-password",
 						},
+					}),
+				},
+				{
+					// A user is stored as its attribute rows, so an empty
+					// document has nothing to write and the dialects refuse
+					// it — this pins that the answer is 400 and not their
+					// 500. Against this schema `required` reports it first;
+					// the guard itself is pinned on an all-optional schema in
+					// TestNewCreateUser_AttributesRequired.
+					name: "empty attributes",
+					userjson: helpers.MustMarshal(t, map[string]any{
+						"schema":     test_data.UserSchemaURL,
+						"attributes": map[string]any{},
 					}),
 				},
 			}
