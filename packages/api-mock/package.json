@@ -52,10 +52,12 @@
     "@types/cookie-parser": "catalog:",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
+    "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "msw": "catalog:",
     "playwright": "catalog:",
     "tsx": "catalog:",
+    "vitest": "catalog:",
     "zod": "catalog:"
   },
   "msw": {
