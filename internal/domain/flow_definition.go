@@ -181,7 +181,7 @@ type FlowDefinitionAudience struct {
 
 // authMethodPrefix marks a step.fields entry as referring to an entry
 // under the user schema's `x-auth-methods` keyword (e.g.
-// "x-auth-methods#password") rather than to a top-level user property.
+// "x-auth-methods#password") rather than to a user property.
 const authMethodPrefix = "x-auth-methods#"
 
 // Field carries the raw field name from a flow-definition step.
@@ -192,7 +192,7 @@ func (f Field) String() string {
 	return string(f)
 }
 
-// IsUserProperty reports whether the field names a top-level user-schema property.
+// IsUserProperty reports whether the field names a user-schema property.
 func (f Field) IsUserProperty() bool {
 	return !f.IsAuthMethod()
 }
@@ -296,6 +296,13 @@ type FlowStepTransition struct {
 	// When Action == nil, Target refers to a step in the current flow
 	// When Action != nil, Target refers to another flow.
 	Target string
+	// Purpose, when non-nil, re-purposes the flow locally: taking this
+	// transition sets [FlowState.CurrentPurpose] to this purpose while the
+	// pinned [FlowState.Purpose] stays untouched. The purpose must be one
+	// the definition serves and Target must be that purpose's entry step
+	// (validated). Mutually exclusive with Action — a transition either
+	// pivots to another flow or re-purposes within this one, never both.
+	Purpose *FlowDefinitionPurpose
 }
 
 func (fst FlowStepTransition) IsCurrentFlow() bool {

@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 // FlowService is the flow engine's use-case surface. The API handler
@@ -30,6 +30,7 @@ type StartFlowRequest struct {
 	RedirectURI   *string
 	AuthRequestID *string
 	SessionID     *string
+	UserAgent     *domain.UserAgent
 }
 
 type SubmitFlowRequest struct {
@@ -200,7 +201,7 @@ func (s *flowService) resolveFlowSession(ctx context.Context, req StartFlowReque
 	if req.SessionID != nil {
 		return *req.SessionID, nil
 	}
-	session, err := domain.NewSession(req.Definition.ProjectID, nil)
+	session, err := domain.NewSession(req.Definition.ProjectID, req.UserAgent)
 	if err != nil {
 		return "", fmt.Errorf("flow service: create anonymous session: %w", err)
 	}

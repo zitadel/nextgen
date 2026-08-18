@@ -68,9 +68,25 @@ async function typescriptFiles(dir: string): Promise<string[]> {
 }
 
 function commandIdFromArgs(args: string): string | undefined {
-  const id = args.trim().split(/\s+/)[0];
-  return id && /^[a-z][\w:-]*$/.test(id) ? id : undefined;
+  // Leading command words form the id. Topic commands may be suggested in
+  // space form ("branding eject") or already colonized ("branding:eject");
+  // both normalize to oclif's colon id. Flags and free text end the id.
+  const words: string[] = [];
+  for (const token of args.trim().split(/\s+/)) {
+    if (!/^[a-z][\w:-]*$/.test(token)) break;
+    words.push(token);
+  }
+  return words.length > 0 ? words.join(":") : undefined;
 }
+
+describe("suggested-command id extraction", () => {
+  it("maps space and colon topic forms to the oclif id and stops at flags", () => {
+    expect(commandIdFromArgs("branding eject")).toBe("branding:eject");
+    expect(commandIdFromArgs("branding:eject")).toBe("branding:eject");
+    expect(commandIdFromArgs("setup --force")).toBe("setup");
+    expect(commandIdFromArgs("--force")).toBeUndefined();
+  });
+});
 
 describe("envelope contract", () => {
   it("a domain command emits envelope meta in JSON mode", async () => {

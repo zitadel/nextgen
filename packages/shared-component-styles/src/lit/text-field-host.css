@@ -15,7 +15,7 @@
 /* Atom playground only — `data-state` on `<zl-field>` documents Figma columns; not product API. */
 :host([data-state="hovered"]:not([disabled])) .zr-field:not(.zr-field--invalid):not(.zr-field--success)
   .zr-field__wrap:not(:focus-within) {
-  border-color: var(--zl-color-gray-500, #9e9eb2);
+  border-color: var(--zl-color-border-hover, #9e9eb2);
   background-color: color-mix(in srgb, var(--zl-color-text-primary-white, #f4f4f6) 10%, transparent);
 }
 :host([data-state="focused"]:not([disabled])) .zr-field:not(.zr-field--invalid):not(.zr-field--success)

@@ -6,6 +6,7 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 import consola from "consola";
 
 import { openInBrowser } from "../lib/browser";
+import { isAttached } from "../lib/claim-state";
 import { ZitadelError } from "../lib/errors";
 import { isObject } from "../lib/json";
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
@@ -98,7 +99,7 @@ export default class Claim extends BaseCommand {
     // The local record is authoritative enough to skip the round trip: the
     // platform enforces first-claim-wins anyway, so re-asking could only ever
     // return the same answer at the cost of a request.
-    if (secret.claimed_at && secret.team_id) {
+    if (isAttached(secret)) {
       return this.alreadyClaimed({
         project_id: secret.project_id,
         team_id: secret.team_id,

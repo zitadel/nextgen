@@ -1,24 +1,35 @@
 # ADR 028: Storage v2 — Typed Statements and Per-Dialect SQL
 
-> **Status:** Proposed (partially implemented; pre-merge checklist tracks remaining work on `new-repo`)
+> **Status:** Implemented — 2026-08-11 (originally Proposed 2026-06-23)
 > **Date:** 2026-06-23
-> **Context:** Multi-dialect SQL storage for nextgen (PostgreSQL and Spanner)
+> **Updated:** 2026-08-12
+> **Context:** Multi-dialect SQL storage for nextgen (PostgreSQL, Spanner, and SQLite)
 > **Supersedes:** docs/design/storage-v2.md (removed sketch)
+>
+> **Amendment (2026-08-11):** the `new-repo` merge landed, storage v1 was
+> removed, and the `internal/storage/v2/` tree was flattened into
+> `internal/storage/` (#790). Path references below have been repointed to the
+> flattened layout; where the text says "storage v2" it names this
+> architecture, which is now simply the storage layer. SQLite joined
+> PostgreSQL and Spanner as a third dialect after this ADR was written.
 
 ## Context
 
-nextgen storage is SQL-first and must work on PostgreSQL and Spanner. The
+nextgen storage is SQL-first and must work on PostgreSQL, Spanner, and SQLite.
+PostgreSQL and Spanner are production peers; SQLite is the zero-config local /
+homelab default. The
 historical v1 stack under `internal/storage/database/` used generic CRUD helpers
 (`getOne`, `updateOne`, `deleteOne`) with repository metadata structs, shared
 `Condition`/`QueryOpts` writers, and dialect type switches inside repository
 constructors. That pattern made entity SQL hard to review and hid dialect
 differences across the codebase.
 
-`internal/storage/v2/` is the replacement storage architecture. **Entity
-persistence is fully on v2 statements** (`AllStatements`); the entire v1
-package under `internal/storage/database/` (repositories, dialects,
-query-builder, aliases) has been removed. Remaining interim work is
-infrastructure tracked on the ADR 028 checklist (notably ID generation).
+`internal/storage/` hosts the replacement storage architecture (the "v2"
+statements model). **Entity persistence is fully on v2 statements**
+(`AllStatements`); the historical v1 repository stack (generic CRUD helpers,
+dialect type switches inside constructors, query-builder, aliases) has been
+removed. Remaining interim work is infrastructure tracked on the ADR 028
+checklist (notably ID generation).
 
 See also:
 
@@ -60,20 +71,20 @@ pool with `Pool`, `Statementer`, and `Transactioner`.
 Each dialect package owns hand-written SQL for each entity:
 
 ```
-internal/storage/v2/dialect/postgres/statement_project.go
-internal/storage/v2/dialect/spanner/statement_project.go
+internal/storage/dialect/postgres/statement_project.go
+internal/storage/dialect/spanner/statement_project.go
 ```
 
 Dynamic reads on PostgreSQL append `WHERE`, keyset pagination, `ORDER BY`, and
-`LIMIT` via [`compiler.go`](../../internal/storage/v2/dialect/postgres/compiler.go)
+`LIMIT` via [`compiler.go`](../../internal/storage/dialect/postgres/compiler.go)
 from a static `SELECT` base.
 
 ### 4. Portable filter AST
 
-[`Filter[F]`](../../internal/storage/v2/database/filter.go) is a sealed generic
+[`Filter[F]`](../../internal/storage/database/filter.go) is a sealed generic
 interface tree (`And`, `Or`, `Equal`, `GreaterThan`, `LessThan`, `CompareGreater`,
 `CompareLess`, `StringEqual`, `StringContains`, …) parameterized by a domain
-field enum (`F ~uint8`). [`Column[F]`](../../internal/storage/v2/database/column.go)
+field enum (`F ~uint8`). [`Column[F]`](../../internal/storage/database/column.go)
 wraps that enum via `database.Col(domain.ProjectFieldID)` so filters, order-by,
 and cursors cannot mix fields across entities at compile time.
 
@@ -89,17 +100,17 @@ database.CompareGreater(
 
 String matching (`StringEqual`, `StringStartsWith`, `StringContains`,
 `StringEndsWith`, and `*Fold` ignore-case variants) lives in
-[`filter_string.go`](../../internal/storage/v2/database/filter_string.go).
+[`filter_string.go`](../../internal/storage/database/filter_string.go).
 
-[`Schema[F, T]`](../../internal/storage/v2/database/schema.go) maps each field to
+[`Schema[F, T]`](../../internal/storage/database/schema.go) maps each field to
 a SQL column name and entity accessor. Dialect `schema_<entity>.go` files define
 per-entity bindings; the postgres compiler resolves `Column[F]` through the schema
 passed into `compileRead`.
 
 ### 5. Keyset pagination at the storage layer
 
-[`ListOptions[F]`](../../internal/storage/v2/database/list.go) and
-[`pagination.Cursor[F]`](../../internal/storage/v2/dialect/pagination/cursor.go) implement the
+[`ListOptions[F]`](../../internal/storage/database/list.go) and
+[`pagination.Cursor[F]`](../../internal/storage/dialect/pagination/cursor.go) implement the
 storage side of [ADR 027](027-cursor-based-pagination.md). The postgres compiler
 turns `Page.Cursor` into a keyset predicate plus `ORDER BY` and `LIMIT`. API
 token signing and opaqueness stay upstream of storage.
@@ -107,7 +118,8 @@ token signing and opaqueness stay upstream of storage.
 ### 6. Unified dialect target (end state on `new-repo`)
 
 v2 dialect implementations
-(`internal/storage/v2/dialect/postgres`, `internal/storage/v2/dialect/spanner`)
+(`internal/storage/dialect/postgres`, `internal/storage/dialect/spanner`,
+`internal/storage/dialect/sqlite`)
 must eventually own pool, migrations, Identity, and ID generation alongside
 statement execution. Entity and application paths already use statements only;
 v2 transactions are `Statementer`-only and no longer implement v1
@@ -116,7 +128,8 @@ v2 transactions are `Statementer`-only and no longer implement v1
 Production startup connects a **single v2 pool** (connect → migrate → close).
 A v1 pool is no longer created for production, and the v1 dialect tree has been
 retired (C6). The goal is a **single v2 dialect layer**, not permanent dual
-dialect code.
+dialect code. When no `database:` dialect is configured, startup uses SQLite
+under `server.data_dir`.
 
 ```mermaid
 flowchart TB
@@ -125,32 +138,37 @@ flowchart TB
         StatementIfaces["ProjectStatements / FlowDefinitionStatements"]
         serviceDB["service.DB"]
     end
-    subgraph v2core [internal/storage/v2/database]
+    subgraph storageCore [internal/storage/database]
         CoreTypes["Filter + ListOptions + dialect registry"]
         DialectReg["Dialect registry + Config.Build"]
     end
-    subgraph dialects [internal/storage/v2/dialect]
+    subgraph dialects [internal/storage/dialect]
         pg["postgres: statement_*.go + compiler.go"]
-        sp["spanner: statement_*.go partial"]
+        sp["spanner: statement_*.go"]
+        sq["sqlite: statement_*.go + compiler.go"]
     end
     subgraph endState [End state on new-repo]
-        v2Only["v2 dialects own pool tx migrations Identity ID gen"]
+        v2Only["dialects own pool tx migrations Identity ID gen"]
     end
 
     ProjectService --> serviceDB
     serviceDB --> StatementIfaces
     StatementIfaces --> pg
     StatementIfaces --> sp
+    StatementIfaces --> sq
     pg --> CoreTypes
     DialectReg --> pg
+    DialectReg --> sp
+    DialectReg --> sq
     pg -.-> endState
     sp -.-> endState
+    sq -.-> endState
 ```
 
 ### 7. Error continuity during migration
 
 v2 postgres wraps driver errors into existing v1 storage error types via
-[`error.go`](../../internal/storage/v2/dialect/postgres/error.go). Error types
+[`error.go`](../../internal/storage/dialect/postgres/error.go). Error types
 move with the dialect layer into v2 before `new-repo` merge; no parallel error
 taxonomy during transition.
 
@@ -166,15 +184,15 @@ are produced for the identifier classes in [ADR 011](011-resource-identifiers.md
 The **dialect** owns the generation strategy per class — not
 domain or service code. Domain keeps prefix rules and
 validation; storage executes generation and returns
-[`Identity`](../../internal/storage/v2/database/identity.go).
+[`Identity`](../../internal/storage/database/identity.go).
 
 PostgreSQL and Spanner already diverge on ephemeral key generation (monotonic
 identity vs bit-reversed identity per ADR 011). Colocating generation with the
 dialect avoids leaking engine-specific choices into domain or repository layers.
 
 This ADR refines [ADR 011](011-resource-identifiers.md) § Package roles:
-managed ID generation lives under `internal/storage/v2/dialect/idgen` (or is
-inlined into v2 dialect packages), not a domain-layer concern at call sites.
+managed ID generation lives under `internal/storage/dialect/idgen` (or is
+inlined into dialect packages), not a domain-layer concern at call sites.
 Concrete mechanisms are recorded in [ADR 047](047-dialect-id-generation.md).
 
 ```mermaid
@@ -199,10 +217,10 @@ flowchart LR
 These previously lived under v1 and are now owned by v2 (C3–C6):
 
 - Migrations (postgres + spanner DDL) — **done**
-- Test DSN bring-up — **done** (`v2/testdb` + `v2/dbtest`; Postgres/Spanner emulator via testcontainers, or env-provided DSNs / real Spanner instance)
-- Zero-config local SQLite — **done** (`v2/dialect/sqlite`; file under `server.data_dir`)
-- [`database.Identity`](../../internal/storage/v2/database/identity.go) (ADR 011) — **done**
-- Dialect-specific integrity error types — **done** (`v2/database/integrity_errors.go`)
+- Test DSN bring-up — **done** (`testdb` + `dbtest`; Postgres/Spanner emulator via testcontainers, or env-provided DSNs / real Spanner instance)
+- Zero-config local SQLite — **done** (`dialect/sqlite`; file under `server.data_dir`)
+- [`database.Identity`](../../internal/storage/database/identity.go) (ADR 011) — **done**
+- Dialect-specific integrity error types — **done** (`database/integrity_errors.go`)
 - Single pool at production startup — **done** (C5)
 - Retire v1 dialect tree — **done** (C6)
 - Retire leftover v1 query-builder / aliases package — **done** (C6)
@@ -222,16 +240,52 @@ Commented Go 1.27 scaffolding in
 typed `Statementer[ProjectStatements]`. Current code uses `AllStatements`
 everywhere until generics land.
 
+### 11. SQLite as zero-config local default
+
+When `database:` is omitted, the server uses **SQLite** at
+`<server.data_dir>/zitadel.db` via pure-Go [`modernc.org/sqlite`](https://pkg.go.dev/modernc.org/sqlite).
+PostgreSQL and Spanner remain the production peers (`database.postgres` /
+`database.spanner`). SQLite is the local and small-homelab default — not a
+Spanner or multi-writer production substitute.
+
+**Driver constraint — no CGO.** The product default path uses `modernc.org/sqlite`
+so `@zitadel/server` and contributor binaries stay cross-compile and CI-friendly
+without a C toolchain or libc sqlite. CGO-backed sqlite drivers are rejected for
+this default path.
+
+**Why not keep embedded Postgres for local.** The previous local path ran an
+in-process embedded Postgres alongside the server. That added a second process
+lifecycle (start / stop / reap / self-heal), port binding races under parallel
+`zitadel start` and journey load, and a heavier footprint for a CLI path that
+must not require Docker or a managed database. Local bring-up should exercise a
+real in-tree dialect package under `internal/storage/dialect/sqlite`, not a
+parallel embedded-engine path outside the statement dialect model. Postgres
+remains available explicitly when production-Postgres parity matters (config,
+Compose, or testcontainers).
+
+**Non-goals.** Single-writer pool (one open connection). `IgnoreCase` filters
+use SQLite `LOWER()`, which folds ASCII only — non-ASCII case folding can
+diverge from Postgres.
+
+**UX and DevX impact.**
+
+| Audience | Impact |
+| -------- | ------ |
+| **App-dev UX** (`zitadel start`) | Fewer prerequisites: no Docker, no Postgres install, no embedded Postgres binary/port. Same commands; faster/simpler ready path (one process + file DB). Data still under `.zitadel/local/nextgen-data`. Reset/stop semantics unchanged. Users do not pick a dialect for the happy path. |
+| **Operator / prod UX** | Unchanged — still configure Postgres or Spanner. |
+| **Contributor DevX** | No embedded Postgres binary/port management for default server runs; dialect work and `server:test-sqlite` cover the local engine. Need Postgres/Spanner only for production-parity or tagged integration tests. Tradeoff: local concurrent-writer behavior and some SQL edge cases differ from Postgres — document, do not hide. |
+
 ## Package layout
 
 ```
-internal/storage/v2/
+internal/storage/
   database/           # Dialect registry, Filter, ListOptions, ListResult
   dialect/
-    all/              # Blank-import registration (postgres + spanner)
+    all/              # Blank-import registration (postgres + spanner + sqlite)
     pagination/       # Cursor marshal/unmarshal for keyset pagination
-    postgres/         # Working reference: pool, tx, compiler, statement_*.go
-    spanner/          # Early stub: native @param SQL, partial execution
+    postgres/         # Production peer: pool, tx, compiler, statement_*.go
+    spanner/          # Production peer: native @param SQL, statements
+    sqlite/           # Local / homelab default: pool, tx, compiler, statement_*.go
 ```
 
 Service wiring lives outside v2:
@@ -245,8 +299,8 @@ Service wiring lives outside v2:
 
 | Area | Status |
 |---|---|
-| Dialect registry + config decode | Postgres and Spanner registered for v2 connect paths |
-| Entity statements | All product entities on `AllStatements` (projects, flows, schemas, teams, sessions, users/auth factors, branding, …) in postgres + spanner |
+| Dialect registry + config decode | Postgres, Spanner, and SQLite registered; omit `database:` → SQLite default |
+| Entity statements | All product entities on `AllStatements` (projects, flows, schemas, teams, sessions, users/auth factors, branding, …) in postgres, spanner, and sqlite |
 | v1 package (`internal/storage/database/`) | Removed (repositories, dialects, query-builder, aliases) |
 | Production usage | Services use `service.DB` / statements; startup owns a single v2 pool |
 | Tests | Service-layer mocks; dialect integration tests; API harness builds v2 pool |
@@ -293,15 +347,16 @@ compiler.compileRead(projectQuery, &database.ListOptions{
    dialect only; no second pool.
 
 **End state:** one dialect implementation per engine under
-`internal/storage/v2/dialect/`, owning connections, transactions, migrations,
+`internal/storage/dialect/`, owning connections, transactions, migrations,
 Identity binding, ID generation, and all entity statements. PostgreSQL and
 Spanner remain production targets; **SQLite** is the zero-config local/homelab
 default (`dialect/sqlite`, file under `server.data_dir`) and is not a Spanner
 production peer. Postgres/Spanner integration tests bring up a **Postgres
 testcontainer** or a **Spanner emulator testcontainer** by default
-(`v2/testdb`); override with `ZITADEL_TEST_POSTGRES_URL` /
+(`testdb`); override with `ZITADEL_TEST_POSTGRES_URL` /
 `ZITADEL_TEST_SPANNER_URL`, or a real Spanner instance via
-`ZITADEL_TEST_SPANNER_INSTANCE`.
+`ZITADEL_TEST_SPANNER_INSTANCE` (kept but unwired — CI is emulator-only so
+aborts stay visible, see #788; removal tracked in #793).
 
 ## Pre-merge checklist
 
@@ -315,7 +370,7 @@ items off as work lands; remove completed entries when no longer useful.
 - [x] Retire in-process embedded Postgres; local default is SQLite; Postgres/Spanner integration uses testcontainers (or env / real Spanner instance)
 - [x] Move `database.Identity` bind/scan to v2 core
 - [x] Move ID generation into v2 dialects (all resource PKs via dialect-chosen Go package; Postgres/SQLite ULID / Spanner UUID v4); retire domain-layer `idgen` and SQL IDENTITY — see [ADR 047](047-dialect-id-generation.md)
-- [x] Add `internal/storage/v2/AGENTS.md` with v2 conventions (including multi-write `withTransaction` rules)
+- [x] Add [`internal/storage/AGENTS.md`](../../internal/storage/AGENTS.md) with storage conventions (including multi-write `withTransaction` rules)
 - [x] Port remaining entities and remove v1 entity repository package
 - [x] Drop QueryExecutor bridge from app callers and v2 transactions
 - [x] Single v2 pool at production startup (C5)
@@ -341,10 +396,12 @@ items off as work lands; remove completed entries when no longer useful.
 - Keyset pagination is a first-class storage concern (ADR 027)
 - ID generation colocated with dialect-specific DDL and insert semantics (ADR 011)
 - Incremental migration without big-bang rewrite
+- SQLite local default (no CGO, no embedded Postgres) cuts CLI/contributor prerequisites while keeping Postgres/Spanner as production peers (§11)
 
 ### Negative / Risks (during transition only)
 
 - Spanner still needs per-entity hand-written SQL alongside the shared compiler; acceptable trade-off for dialect clarity
+- SQLite single-writer and ASCII `LOWER()` mean local DevX is not a full Postgres fidelity substitute; use tagged Postgres/Spanner tests when parity matters
 
 ### Resolved at merge
 

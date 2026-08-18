@@ -4,7 +4,7 @@
 
 ## Thesis
 
-One surface: `api.zitadel.cloud/*`. Stripe-shaped, Vercel-shaped. No frontend/backend/platform product split. One bearer-token auth model. Self-hosted exposes the identical API shape as cloud — the SDK does not branch on deployment mode. Versioning lives in the `Zitadel-Version` header, not in the URL.
+One surface: `api.zitadel.cloud/*`. Stripe-shaped, Vercel-shaped. No frontend/backend/platform product split. One bearer-token auth model. Self-hosted exposes the identical API shape as cloud — the SDK does not branch on deployment mode. No version segment in URLs; header-selected versioning (`Zitadel-Version`) is target design, not shipped ([`conventions.md`](conventions.md#direction-not-shipped)).
 
 Target properties:
 
@@ -30,8 +30,10 @@ Individual decisions are marked inline in each doc:
 4. [`conventions.md`](conventions.md) — IDs, errors, pagination, idempotency A/B split, capabilities split, header-based versioning.
 5. [`authn-and-auth-flows.md`](authn-and-auth-flows.md) — auth_attempts state machine, OIDC adapter, SSR handoff.
 6. [`authz.md`](authz.md) — credential × scope × permission.
-7. [`security-and-origins.md`](security-and-origins.md) — environment-gated origin wildcards, CORS, CSRF.
-8. [`resource-map.md`](resource-map.md) — the full endpoint surface grouped by concern.
+7. [`permission-storage.md`](permission-storage.md) — Wave 0 relational DDL for catalogs, assignments, membership edges, and `resource_scope_index` (feeds issue #422).
+8. [`authz-testing.md`](authz-testing.md) — L1–L4 fuzzy/property strategy for compiler, persist, and (later) resolver oracles.
+9. [`security-and-origins.md`](security-and-origins.md) — environment-gated origin wildcards, CORS, CSRF.
+10. [`resource-map.md`](resource-map.md) — the full endpoint surface grouped by concern.
 
 ## Sibling doc sets
 
@@ -52,10 +54,10 @@ for this design PR live in:
 
 - [`../platform/api/claim-api.yaml`](../platform/api/claim-api.yaml)
 - [`../platform/api/config-api.yaml`](../platform/api/config-api.yaml)
-- [`../flowengine/api/flow-api.yaml`](../flowengine/api/flow-api.yaml)
-- [`../flowengine/api/session-api.yaml`](../flowengine/api/session-api.yaml)
 
-Specs for auth_attempts, flat api_keys, imports, and capabilities are not yet written.
+The former flow-engine and session sketches were deleted once the shipped spec
+under `api/openapi/endpoints/{flow,sessions}/` became the contract of record.
+Design sketches for flat api_keys, imports, and capabilities are not yet written.
 Events are partially specified in [ADR 049](../../adrs/049-events-api-retention-export.md);
 OpenAPI sketch pending.
 Implementation OpenAPI source remains under `api/openapi/**`; generated Go code

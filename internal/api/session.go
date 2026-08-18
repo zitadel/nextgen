@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -37,7 +36,7 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 		return nil, err
 	}
 
-	return sessionWithTokenToAPI(session, tokenCrypter)
+	return sessionWithTokenToAPI(ctx, session, tokenCrypter)
 }
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
@@ -55,7 +54,7 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 		return nil, err
 	}
 
-	return sessionWithTokenToAPI(session, tokenCrypter)
+	return sessionWithTokenToAPI(ctx, session, tokenCrypter)
 }
 
 func exchangeInputFromRequest(req *api.ExchangeRequest, params api.ExchangeHandoffParams) (service.ExchangeInput, error) {
@@ -73,11 +72,12 @@ func exchangeInputFromRequest(req *api.ExchangeRequest, params api.ExchangeHando
 }
 
 func (h Handler) GetSession(ctx context.Context, params api.GetSessionParams) (api.GetSessionRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opRead); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, string(params.SessionID), sessionAccess, opRead)
+	if err != nil {
 		return nil, err
 	}
 	input := service.GetSessionInput{
-		ProjectID: string(params.ProjectID),
+		ProjectID: projectID,
 		SessionID: string(params.SessionID),
 	}
 
@@ -113,30 +113,49 @@ func (h Handler) GetMySession(ctx context.Context) (api.GetMySessionRes, error) 
 }
 
 func (h Handler) QuerySessions(ctx context.Context, req *api.QuerySessionsRequest, params api.QuerySessionsParams) (api.QuerySessionsRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opRead); err != nil {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opRead); err != nil {
 		return nil, err
 	}
-	input := service.ListSessionInput{
-		ProjectID: string(params.ProjectID),
-		// TODO: handle req
-	}
-	sessions, err := h.sessionService.List(ctx, input)
+	listed, err := h.sessionService.List(ctx, mapQuerySessionsToService(string(params.ProjectID), req))
 	if err != nil {
 		return nil, err
 	}
-	return sessionsToAPI(sessions), nil
+	resp := sessionsToAPI(listed.Sessions)
+	if listed.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(listed.NextPageToken))
+	}
+	return resp, nil
+}
+
+func mapQuerySessionsToService(projectID string, req *api.QuerySessionsRequest) service.ListSessionInput {
+	input := service.ListSessionInput{
+		ProjectID: projectID,
+		Limit:     int(req.Limit.Or(0)), // if not defined, set to default value in the service layer
+		PageToken: string(req.PageToken.Or("")),
+	}
+	if sorting, ok := req.Sorting.Get(); ok {
+		input.Sorting = sortingToService(sorting.Field, sorting.Direction)
+	}
+	for _, filter := range req.Filter {
+		input.Filters = append(input.Filters, filterToService(filter.Field, filter.Operation, filter.Value))
+	}
+	return input
 }
 
 func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionParams) (api.RevokeSessionRes, error) {
-	if err := requireProjectAccess(ctx, string(params.ProjectID), sessionAccess, opDelete); err != nil {
+	projectID, err := h.requireResourceAccess(ctx, string(params.SessionID), sessionAccess, opDelete)
+	if err != nil {
+		if errors.Is(err, errResourceGone) {
+			return &api.RevokeSessionNoContent{}, nil
+		}
 		return nil, err
 	}
 	input := service.DeleteSessionInput{
-		ProjectID: string(params.ProjectID),
+		ProjectID: projectID,
 		SessionID: string(params.SessionID),
 	}
 
-	err := h.sessionService.Delete(ctx, input)
+	err = h.sessionService.Delete(ctx, input)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +184,7 @@ func (h Handler) RevokeMySession(ctx context.Context) (api.RevokeMySessionRes, e
 		if errors.Is(err, domain.ErrSessionNotFound()) {
 			// The session is already gone; logout is idempotent. Clear the cookie
 			// and return 204 rather than surfacing a 404 for an absent session.
-			return &api.RevokeMySessionNoContent{SetCookie: deleteSessionCookie()}, nil
+			return &api.RevokeMySessionNoContent{SetCookie: deleteSessionCookie(ctx)}, nil
 		}
 		return nil, err
 	}
@@ -178,7 +197,7 @@ func (h Handler) RevokeMySession(ctx context.Context) (api.RevokeMySessionRes, e
 		return nil, err
 	}
 	return &api.RevokeMySessionNoContent{
-		SetCookie: deleteSessionCookie(),
+		SetCookie: deleteSessionCookie(ctx),
 	}, nil
 }
 
@@ -218,13 +237,13 @@ func userAgentToDomain(agent api.OptCreateSessionRequestUserAgent) *domain.UserA
 	}
 }
 
-func sessionWithTokenToAPI(session *domain.Session, encrypter op.Encrypter) (*api.SessionWithTokenResponseHeaders, error) {
+func sessionWithTokenToAPI(ctx context.Context, session *domain.Session, encrypter op.Encrypter) (*api.SessionWithTokenResponseHeaders, error) {
 	token, err := session.Token(encrypter)
 	if err != nil {
 		return nil, err
 	}
 	return &api.SessionWithTokenResponseHeaders{
-		SetCookie: setSessionCookie(token, session.ExpiresAt),
+		SetCookie: setSessionCookie(ctx, token, session.ExpiresAt),
 		Response: api.SessionWithTokenResponse{
 			Session:      *sessionToAPI(session),
 			SessionToken: token,
@@ -307,17 +326,34 @@ func sessionsToAPI(sessions []*domain.Session) *api.QuerySessionsResponse {
 	return response
 }
 
-func setSessionCookie(token string, expiresAt time.Time) string {
+func setSessionCookie(ctx context.Context, token string, expiresAt time.Time) string {
 	maxAge := max(int(time.Until(expiresAt).Seconds()), 0)
-	return sessionCookie(token, maxAge)
+	return sessionCookie(ctx, token, maxAge)
 }
 
-func deleteSessionCookie() string {
-	return sessionCookie("", 0)
+func deleteSessionCookie(ctx context.Context) string {
+	return sessionCookie(ctx, "", 0)
 }
 
-func sessionCookie(token string, maxAge int) string {
-	return fmt.Sprintf("%s=%s; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=%d", sessionCookieName, token, maxAge)
+func sessionCookie(ctx context.Context, token string, maxAge int) string {
+	c := &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    token,
+		HttpOnly: true,
+		// Secure follows the request scheme so Safari can keep the cookie on
+		// http://localhost (see cookieSecureFromContext).
+		Secure:   cookieSecureFromContext(ctx),
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
+	}
+	// http.Cookie treats MaxAge=0 as "omit Max-Age"; we always emit an
+	// explicit max-age, and map non-positive values to delete (Max-Age=0).
+	if maxAge <= 0 {
+		c.MaxAge = -1
+	} else {
+		c.MaxAge = maxAge
+	}
+	return c.String()
 }
 
 func sessionErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {

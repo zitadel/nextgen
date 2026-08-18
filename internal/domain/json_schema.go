@@ -19,7 +19,7 @@ import (
 	apischemas "github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/maputil"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const (
@@ -94,8 +94,6 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 		Schema:     schemabs,
 	}, nil
 }
-
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/json_schema.mock.go . JSONSchemaStore
 
 // JSONSchemaStore is the persistence port for JSON schemas used by
 // [JSONSchemaResolver] and service callers that only need get/create.

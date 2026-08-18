@@ -105,11 +105,70 @@ Canonical examples:
 | Org/project picker | `Popover` + `Badge` |
 | Users filters | `Tabs` |
 | Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button` |
+| Panel around a screen's content | `Card` |
+| Attribute chip / CLI command in prose | `InlineCode` |
 | Any searchable picker | `Combobox` (`src/components/ui/combobox.tsx`) |
 | Labelled form control | `Field` + `FieldLabel` (+ `FieldError` for invalid) |
 
+## Resource list layout — one shell for every list screen
+
+Every list frame draws the same shell, and each screen had grown its own version
+of it: different page gutters, different cell padding, and a header label wrapped
+in a ghost-button-shaped span on one screen but not the others. The shared
+geometry now lives in `src/components/resource-list.tsx` — compose it rather than
+restating the numbers per screen.
+
+**The page shell applies to every list screen; the table geometry only to those
+that are tables.** User schemas is a `Card` of rows rather than a table (D0a —
+resources and schemas are different page patterns; D7 — the list stays small
+enough not to need a dense one), so it takes `RESOURCE_PAGE` and
+`RESOURCE_HEADER` and nothing else.
+
+| Region | Value |
+| --- | --- |
+| Page gutter | 16px — the same inset as the table |
+| Header gutter | 24px — the page gutter plus 8px |
+| Table head | 56px tall, 24px leading / 16px trailing inset |
+| Table cell | 56px tall, 24px inset, 8px block padding |
+| Head label | display face, 12/16, 0.72px tracking, `foreground` |
+| Row icon | 16px, stroke 1.5, `muted-foreground`, 10px to its label |
+
+Two things are deliberately **not** shared, because the designs genuinely differ:
+
+- **Column widths.** Teams sits on a fixed 248px grid, Projects on thirds, and
+  the Users table is schema-driven and scrolls horizontally, so it has no fixed
+  grid to share.
+- **Vertical rhythm above the table.** Each frame places its own header block, so
+  the page's top padding and the table's top margin stay with the screen.
+
+Where a design reserves a trailing column for a row menu, keep the column even if
+the menu is not built — dropping it re-spreads every other column and moves them
+off the design's grid.
+
+Two values here look like something they are not, and a pixel diff is what caught
+both: the head label is `foreground`, not the `muted-foreground` it resembles at a
+glance; and the design's Lucide glyphs are drawn at **stroke 1.5**, where
+`lucide-react` defaults to 2 — a glyph at the default weight reads heavier than
+the design even though its box measures correctly.
+
 ## Traps that have already cost time
 
+- **A registry default is not our design system.** `components/ui/*` arrives from
+  the shadcn registry with the registry's own values, and where ours differ the
+  fix belongs in that file, once — not re-applied per screen. `Input` is the case
+  that kept coming back: stock shadcn is `bg-transparent`, so a field takes on
+  whatever surface it sits on. On the page that happens to look right; on a
+  `Card` — every detail screen — it reads as the card and looks wrong. Our design
+  fills an input with `background`, a surface of its own. If a control looks
+  wrong on one screen and right on another, suspect an inherited surface and fix
+  the component, not the screen.
+- **A flex row will shave text by a pixel rather than wrap it.** A value in a
+  `min-w-0` flex row shrinks below its natural width, and `truncate` then clips
+  it. When the shortfall is smaller than an ellipsis glyph no ellipsis renders,
+  so it reads as a missing character — a typo in an id, not truncation.
+  Negative `tracking` makes the intrinsic width borderline enough for this to
+  land on exactly one glyph. Identifiers get `shrink-0` and set their own
+  container's width; the row wraps when there is no room.
 - **Bare `border` is `currentColor`.** Tailwind v4 Preflight sets it, so a
   registry component writing `border-l` draws a near-white edge in dark mode. The
   base rule in `styles.css` points unqualified borders at the border token — and

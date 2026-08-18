@@ -17,6 +17,8 @@ import { SCHEMAS_DIR } from "../../../src/lib/user-schema";
 import { hashForState } from "../../../src/lib/sync";
 import type { ZitadelState } from "../../../src/lib/sync/types";
 
+const TEST_CLI_VERSION = "0.1.0-alpha.18";
+
 let cwd: string;
 
 beforeEach(async () => {
@@ -45,6 +47,7 @@ describe("materializeSetupResources", () => {
     await expect(
       materializeSetupResources({
         cwd,
+        cliVersion: TEST_CLI_VERSION,
         client,
         projectId: "project_123",
         force: false,
@@ -74,6 +77,7 @@ describe("materializeSetupResources", () => {
 
     await materializeSetupResources({
       cwd,
+      cliVersion: TEST_CLI_VERSION,
       client,
       projectId: "project_123",
       force: false,
@@ -101,7 +105,7 @@ describe("materializeSetupResources", () => {
       }),
     } as unknown as ZitadelClient;
 
-    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false });
+    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
 
     const schemaFile = JSON.parse(
       await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
@@ -132,7 +136,7 @@ describe("materializeSetupResources", () => {
       })),
     } as unknown as ZitadelClient;
 
-    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false });
+    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
 
     const flowFile = JSON.parse(
       await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8"),
@@ -161,6 +165,7 @@ describe("materializeSetupResources", () => {
 
     await materializeSetupResources({
       cwd,
+      cliVersion: TEST_CLI_VERSION,
       client,
       projectId: "project_123",
       force: false,
@@ -200,6 +205,7 @@ describe("materializeSetupResources", () => {
 
     const result = await materializeSetupResources({
       cwd,
+      cliVersion: TEST_CLI_VERSION,
       client,
       projectId: "project_123",
       force: false,
@@ -215,6 +221,13 @@ describe("materializeSetupResources", () => {
         join(cwd, FLOWS_DIR, "README.md"),
       ]),
     );
+    // The bare `zitadel` command doesn't exist in a scaffolded app (the CLI
+    // is not one of its dependencies) — every command mention must be the
+    // runnable public npx form.
+    for (const readme of [schemasReadme, flowsReadme]) {
+      expect(readme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} plan`);
+      expect(readme).not.toMatch(/`zitadel /);
+    }
   });
 
   it("preserves an existing README so a developer's edits are not overwritten", async () => {
@@ -230,6 +243,7 @@ describe("materializeSetupResources", () => {
 
     const result = await materializeSetupResources({
       cwd,
+      cliVersion: TEST_CLI_VERSION,
       client,
       projectId: "project_123",
       force: false,
@@ -258,6 +272,7 @@ describe("materializeSetupResources branding design", () => {
 
     await materializeSetupResources({
       cwd,
+      cliVersion: TEST_CLI_VERSION,
       client,
       projectId: "project_123",
       force: false,
@@ -291,6 +306,10 @@ describe("materializeSetupResources branding design", () => {
       id: "brnd_01KWHH",
       hash: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
+
+    const brandingReadme = await readFile(join(cwd, ".zitadel/branding/README.md"), "utf8");
+    expect(brandingReadme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} plan`);
+    expect(brandingReadme).not.toMatch(/`zitadel /);
   });
 
   it("scaffolds no branding files when no design is chosen", async () => {
@@ -301,7 +320,7 @@ describe("materializeSetupResources branding design", () => {
       createBranding,
     } as unknown as ZitadelClient;
 
-    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false });
+    await materializeSetupResources({ cwd, client, projectId: "project_123", force: false, cliVersion: TEST_CLI_VERSION });
 
     expect(createBranding).not.toHaveBeenCalled();
     const state = JSON.parse(

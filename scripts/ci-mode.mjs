@@ -4,24 +4,29 @@ import { spawnSync } from "node:child_process";
 
 import { isDirectRun } from "./dev-process.mjs";
 
-// Decides what the ci workflow runs, in two layers:
+// Decides what the ci workflow runs, in three layers:
 //
 // 1. `mode` — `version-only` for Changesets version PRs, else `full`.
 // 2. Affected gates — within full mode, the expensive tail steps (Go suites,
-//    release snapshot, journeys, real-instance e2e) are skipped when moon's
-//    affected task selection proves the change cannot reach them. Selection
-//    uses `moon query tasks --affected --downstream deep`: the deep dependent
-//    walk is what makes multi-hop chains (console → server:build → e2e
-//    suites) select correctly — `moon ci`'s own selection only marks direct
-//    dependents, which is not enough here.
+//    release snapshot, journey variants, real-instance e2e) are skipped when
+//    moon's affected task selection proves the change cannot reach them.
+//    Selection uses `moon query tasks --affected --downstream deep`: the deep
+//    dependent walk is what makes multi-hop chains (console → server:build →
+//    e2e suites) select correctly — `moon ci`'s own selection only marks
+//    direct dependents, which is not enough here.
+// 3. Journey scope — the fresh-app journey's framework matrix collapses to a
+//    single representative framework when no SDK, CLI, or journey surface
+//    moved: the scaffolded flow widget is framework-independent, so a
+//    server-only change proves as much on one framework as on the full
+//    matrix (apps/cli-journey-e2e/scripts/frameworks.mjs owns the list).
 //
 // The gates fail open: known repo-wide files no task claims (workflow
 // definitions, scripts/, moon config, root manifests and compiler/release
 // inputs) force a full run, an empty diff forces a full run, a failing or
 // unparsable query forces a full run, and an empty affected set forces a
-// full run unless every changed file is on the explicit inert allowlist —
-// unclaimed files are not assumed inert. A gate may only ever skip work
-// that provably cannot be affected.
+// full run unless every changed
+// file is on the explicit inert allowlist — unclaimed files are not assumed
+// inert. A gate may only ever skip work that provably cannot be affected.
 
 // Files whose effects moon cannot see (nothing lists them as task inputs)
 // but which reach builds, tests, or release artifacts anyway. Any touched
@@ -60,9 +65,43 @@ function isInertWhenUnclaimed(file) {
 }
 
 // Workflow steps run fixed targets, so gates are membership checks on the
-// affected set. Journeys and the snapshot are coupled both ways: the journeys
-// consume the snapshot's tarballs through the filesystem (no moon dep edge
-// exists), so either being affected must run both.
+// affected set.
+//
+// The journey variants gate on an explicit variant↔surface map expressed in
+// task space (never file globs — moon's graph stays the authority):
+//
+// - `server:test` is the go-side signal. Deliberately not `server:build`:
+//   console is embedded into the server binary, so console-only changes mark
+//   `server:build` affected — but the journeys never render the console, and
+//   embedding breakage is `server:build`'s own job inside the moon ci graph.
+//   `server:test` moves only when Go/API sources move.
+// - The shared next-scaffold surface (the passkey-first preset and test-kit
+//   consumer journeys both scaffold a Next app and drive the login widget):
+//   go side, CLI, generated API client, flow config, the testing kit,
+//   login-ui, the widget atoms, and the Next/core SDKs.
+// - The fresh-app journey additionally answers to every `sdk-*:build`,
+//   because its framework matrix exists to cover the SDKs.
+// - Any change inside the journey project itself triggers all variants.
+const GO_SIGNAL = "server:test";
+const SHARED_JOURNEY_TRIGGERS = [
+  GO_SIGNAL,
+  "cli:build",
+  "api:build",
+  "config:build",
+  "testing:build",
+  "login-ui:build",
+  "components:build",
+  "sdk-core:build",
+  "sdk-next:build",
+];
+const SDK_BUILD_RE = /^sdk-[a-z-]+:build$/;
+const JOURNEY_PROJECT_PREFIX = "cli-journey-e2e:";
+
+// Full framework matrix only when a surface that differs per framework
+// moved: an SDK build, the CLI (owns the scaffold templates), or the journey
+// project itself. Everything else proves the flow on one framework.
+const MATRIX_TRIGGERS = ["cli:build"];
+
 const GO_TEST_TARGETS = [
   "server:check-generate",
   "server:test",
@@ -71,11 +110,23 @@ const GO_TEST_TARGETS = [
   "server:test-sqlite",
 ];
 const TESTING_DEMO_TARGETS = ["testing:test-integration", "demo-next-e2e:e2e-real"];
-const CONSOLE_E2E_TARGET = "console-e2e:e2e-real";
-const SNAPSHOT_TARGET = "release:snapshot";
-const JOURNEY_PROJECT_PREFIX = "cli-journey-e2e:";
+// Both real-instance console lanes: the dev-proxy suite and the embedded
+// suite (binary-served /ui/* + API at one origin). Either being affected
+// runs the console gate — the workflow steps them sequentially so two local
+// instances do not contend.
+const CONSOLE_E2E_TARGETS = ["console-e2e:e2e-real", "console-e2e:e2e-embedded"];
 
-const ALL_GATES = ["go_tests", "snapshot", "journeys", "suites_testing_demo", "suites_console", "browsers"];
+const ALL_GATES = [
+  "go_tests",
+  "snapshot",
+  "journey_fresh_app",
+  "journey_passkey",
+  "journey_preexisting",
+  "journey_testkit",
+  "suites_testing_demo",
+  "suites_console",
+  "browsers",
+];
 
 export function computeMode(files) {
   return files.length > 0 && files.every(isVersionOutputFile) ? "version-only" : "full";
@@ -95,13 +146,17 @@ export function forceFullReason(files) {
 }
 
 /**
- * Compute the step gates for a run. `targets` is the affected task set
- * (`project:task` strings) from moon, or null when the query failed —
- * which fails open.
+ * Compute the step gates and journey-matrix scope for a run. `targets` is
+ * the affected task set (`project:task` strings) from moon, or null when
+ * the query failed — which fails open.
  */
 export function resolveGates({ mode, files, targets }) {
   if (mode === "version-only") {
-    return { gates: Object.fromEntries(ALL_GATES.map((g) => [g, false])), reason: "version-only" };
+    return {
+      gates: Object.fromEntries(ALL_GATES.map((g) => [g, false])),
+      matrix: "full",
+      reason: "version-only",
+    };
   }
   const forced =
     forceFullReason(files) ??
@@ -110,27 +165,46 @@ export function resolveGates({ mode, files, targets }) {
       ? "empty affected set for files outside the inert allowlist"
       : null);
   if (forced) {
-    return { gates: Object.fromEntries(ALL_GATES.map((g) => [g, true])), reason: forced };
+    return {
+      gates: Object.fromEntries(ALL_GATES.map((g) => [g, true])),
+      matrix: "full",
+      reason: forced,
+    };
   }
   const set = new Set(targets);
-  const journeys =
-    targets.some((t) => t.startsWith(JOURNEY_PROJECT_PREFIX)) || set.has(SNAPSHOT_TARGET);
+  const journeyProject = targets.some((t) => t.startsWith(JOURNEY_PROJECT_PREFIX));
+  const sharedSurface = SHARED_JOURNEY_TRIGGERS.some((t) => set.has(t));
+  const anySdkBuild = targets.some((t) => SDK_BUILD_RE.test(t));
+
+  const journeyFreshApp = journeyProject || sharedSurface || anySdkBuild;
+  const journeyNextScaffold = journeyProject || sharedSurface;
+  // The pre-existing-app lane covers the ADR 044 widget posture on Next and
+  // Nuxt, so it answers to the shared next-scaffold surface plus the Nuxt SDK.
+  const journeyPreexisting = journeyNextScaffold || set.has("sdk-nuxt:build");
   const suitesTestingDemo = TESTING_DEMO_TARGETS.some((t) => set.has(t));
-  const suitesConsole = set.has(CONSOLE_E2E_TARGET);
+  const suitesConsole = CONSOLE_E2E_TARGETS.some((t) => set.has(t));
+  const anyJourney = journeyFreshApp || journeyNextScaffold || journeyPreexisting;
+
   const gates = {
     go_tests: GO_TEST_TARGETS.some((t) => set.has(t)),
-    // The snapshot exists in PR CI to feed the journeys, so the gates are one.
-    snapshot: journeys,
-    journeys,
+    // The snapshot exists in PR CI to feed the journeys (the tarball handoff
+    // is a filesystem contract moon cannot see), so it runs iff any does.
+    snapshot: anyJourney,
+    journey_fresh_app: journeyFreshApp,
+    journey_passkey: journeyNextScaffold,
+    journey_preexisting: journeyPreexisting,
+    journey_testkit: journeyNextScaffold,
     suites_testing_demo: suitesTestingDemo,
     suites_console: suitesConsole,
     browsers:
       suitesTestingDemo ||
       suitesConsole ||
-      journeys ||
+      anyJourney ||
       targets.some((t) => t.endsWith(":test-browser")),
   };
-  return { gates, reason: null };
+  const matrix =
+    journeyProject || anySdkBuild || MATRIX_TRIGGERS.some((t) => set.has(t)) ? "full" : "single";
+  return { gates, matrix, reason: null };
 }
 
 export function queryAffectedTargets(base, spawn = spawnSync) {
@@ -139,7 +213,10 @@ export function queryAffectedTargets(base, spawn = spawnSync) {
     env: { ...process.env, MOON_BASE: base },
   });
   if (result.status !== 0) {
+    // A failed query fails open; make the failure diagnosable from the run
+    // log (PR #710 hit a transient failure here and the log showed nothing).
     process.stderr.write(result.stderr ?? "");
+    console.error(`# moon query failed (exit ${result.status})`);
     return null;
   }
   try {
@@ -155,6 +232,9 @@ export function queryAffectedTargets(base, spawn = spawnSync) {
       Object.keys(projectTasks).map((task) => `${project}:${task}`),
     );
   } catch {
+    console.error(
+      `# moon query returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`,
+    );
     return null;
   }
 }
@@ -182,11 +262,18 @@ function main() {
 
   const needsQuery = mode === "full" && forceFullReason(files) === null;
   const targets = needsQuery ? queryAffectedTargets(base) : [];
-  const { gates, reason } = resolveGates({ mode, files, targets });
+  const { gates, matrix, reason } = resolveGates({ mode, files, targets });
 
-  const lines = [`mode=${mode}`, ...ALL_GATES.map((g) => `${g}=${gates[g]}`)];
+  const lines = [
+    `mode=${mode}`,
+    ...ALL_GATES.map((g) => `${g}=${gates[g]}`),
+    `journey_matrix=${matrix}`,
+  ];
   for (const line of lines) {
     console.log(line);
+  }
+  if (reason && mode === "full") {
+    console.log(`# gating: full run (${reason})`);
   }
   if (process.env.GITHUB_OUTPUT) {
     appendFileSync(process.env.GITHUB_OUTPUT, lines.join("\n") + "\n");
@@ -196,8 +283,8 @@ function main() {
     const note = reason
       ? `CI gating: full run (${reason}).`
       : skipped.length === 0
-        ? "CI gating: all lanes affected."
-        : `CI gating: skipped by affected-selection: ${skipped.join(", ")}.`;
+        ? `CI gating: all lanes affected (journey matrix: ${matrix}).`
+        : `CI gating: skipped by affected-selection: ${skipped.join(", ")} (journey matrix: ${matrix}).`;
     appendFileSync(process.env.GITHUB_STEP_SUMMARY, note + "\n");
   }
 }

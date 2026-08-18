@@ -522,6 +522,16 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 			wantErr: domain.ErrFlowFieldNotScalar,
 		},
 		{
+			name: "property carrying items but no type is not collectable",
+			schema: `{
+				"type": "object",
+				"properties": { "tags": { "items": { "type": "string" } } }
+			}`,
+			step:    "profile",
+			fields:  []domain.Field{"tags"},
+			wantErr: domain.ErrFlowFieldNotScalar,
+		},
+		{
 			name:    "unknown nested leaf returns ErrFlowFieldUnknown",
 			schema:  nestedSchemaContent,
 			step:    "profile",

@@ -15,22 +15,16 @@ Start with:
 - [internal/storage/AGENTS.md](internal/storage/AGENTS.md)
 - [apps/cli-journey-e2e/AGENTS.md](apps/cli-journey-e2e/AGENTS.md)
 
-Minting a resource ID? Always use storage statements (`Ensure` /
-`NewManagedID`) — never custom ULID/UUID helpers. See root
-[AGENTS.md](AGENTS.md#resource-identifiers),
-[ADR 047](docs/adrs/047-dialect-id-generation.md), and
-[internal/storage/v2/AGENTS.md](internal/storage/v2/AGENTS.md).
+Minting a resource ID? Never write custom ULID/UUID helpers — the canonical
+minting contract lives in
+[internal/storage/AGENTS.md](internal/storage/AGENTS.md) (context:
+[ADR 047](docs/adrs/047-dialect-id-generation.md)).
 
-Building console or design-system UI (from Figma or otherwise)? Before you
-edit `apps/console/**` or `packages/{components,ui-react,shared-component-styles,design-tokens}/**`,
-read these first and classify the component before building — do not
-reverse-engineer a flattened app mock:
-
-- [apps/console/docs/styling.md](apps/console/docs/styling.md) — where a
-  component lives decides how it's styled (console-local utilities vs a
-  Lit+React pair); the 3-way decision and token authority.
-- [apps/storybook/AGENTS.md](apps/storybook/AGENTS.md) — the Figma→pair recipe
-  and the parity gate (only when it's a shared primitive the login surface needs).
+Building console or design-system UI (from Figma or otherwise)? Classify the
+component before building — do not reverse-engineer a flattened app mock. The
+3-way decision and token authority live in
+[apps/console/docs/styling.md](apps/console/docs/styling.md); the Figma→pair
+recipe and parity gate in [apps/storybook/AGENTS.md](apps/storybook/AGENTS.md).
 
 Developing the console? Use `moon run console:dev-real` — it boots a seeded real
 instance, because the console manages an instance and its list screens are only

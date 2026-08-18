@@ -13,7 +13,7 @@ import (
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 const projectFieldCreatedAt = "created_at"
@@ -120,6 +120,10 @@ func (s *projectService) Create(ctx context.Context, name string, previewOrigins
 		}
 		if err := tx.Statements().CreateSigningKey(ctx, keyset.TokenSigningKey); err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to create project token signing key in the database")
+		}
+
+		if err := tx.Statements().CreateAuthzAssignment(ctx, domain.NewSKProjProjectSetupAssignment(project.ID)); err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to seed project secret authz assignment")
 		}
 
 		if !seedDefaults {
@@ -287,7 +291,7 @@ func (s *projectService) List(ctx context.Context, req ListProjectsRequest) (*Li
 		filters = append(filters, filter)
 	}
 
-	orderBy, err := projectOrderBy(req.Sorting)
+	orderBy, err := listOrderBy(req.Sorting, domain.ProjectFieldCreatedAt, database.OrderAsc, projectField, domain.ProjectFieldID)
 	if err != nil {
 		return nil, err
 	}
@@ -317,37 +321,6 @@ func (s *projectService) List(ctx context.Context, req ListProjectsRequest) (*Li
 	}, nil
 }
 
-// projectOrderBy builds the sort order, defaulting to createdAt ascending, and
-// appends id as a tiebreaker so equal sort keys page deterministically.
-func projectOrderBy(sorting *Sorting) (database.OrderBy[domain.ProjectField], error) {
-	sortField := domain.ProjectFieldCreatedAt
-	direction := database.OrderAsc
-
-	if sorting != nil {
-		if sorting.Field != "" {
-			f, err := projectField(sorting.Field)
-			if err != nil {
-				return database.OrderBy[domain.ProjectField]{}, err
-			}
-			sortField = f
-		}
-		dir, err := parseSortDirection(sorting.Direction)
-		if err != nil {
-			return database.OrderBy[domain.ProjectField]{}, err
-		}
-		direction = dir
-	}
-
-	columns := []database.Column[domain.ProjectField]{database.Col(sortField)}
-	// id is unique, so appending it gives the sort a total order. Without it,
-	// rows sharing a sort-key value (e.g. equal createdAt) have no stable
-	// order, and cursor pagination could skip or repeat them across pages.
-	if sortField != domain.ProjectFieldID {
-		columns = append(columns, database.Col(domain.ProjectFieldID))
-	}
-	return database.OrderBy[domain.ProjectField]{Columns: columns, Direction: direction}, nil
-}
-
 // projectFilter maps an API filter predicate to a storage filter. Operations the
 // v2 filter layer cannot express return [domain.ErrNotImplemented];
 // invalid field/operation/value combinations return [domain.ErrRequestInvalid].
@@ -356,19 +329,7 @@ func projectFilter(f Filter) (database.Filter[domain.ProjectField], error) {
 	if err != nil {
 		return nil, err
 	}
-
-	raw, ok := f.Value.(string)
-	if !ok {
-		return nil, domain.ErrRequestInvalid().WithDetails("createdAt filter value must be an RFC3339 string")
-	}
-	// The createdAt filter value arrives as an untyped string (the filter-value union in the openapi contract
-	// does not specify a format for a timestamp); parse it into the time.Time needed for the comparison.
-	value, err := database.CoerceTimeValue(raw)
-	if err != nil {
-		return nil, domain.ErrRequestInvalid().WithDetails(
-			fmt.Sprintf("createdAt filter value %q is not a valid RFC3339 timestamp", raw))
-	}
-	return compareFilter(f.Operation, database.Col(field), value)
+	return createdAtFilter(f.Operation, database.Col(field), f.Value)
 }
 
 // projectField maps an API field name to its [domain.ProjectField].

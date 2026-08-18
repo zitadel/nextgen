@@ -1,6 +1,6 @@
 # Flow Definition Examples
 
-Working examples of flow definitions accepted by `POST /flow-definition`. Each
+Working examples of flow definitions accepted by `POST /flow_definitions`. Each
 example exercises a different slice of the engine's currently supported
 capabilities, ordered from minimal to combined.
 
@@ -24,9 +24,16 @@ For the shape and validation rules, see
 | [06](./06-combined-password-passkey/) | `login` + `register` | password, passkey | Both methods on both purposes plus post-signup passkey upsell. |
 | [07](./07-nested-profile-fields/) | `register` | password | Nested schema properties collected by dotted path. |
 
-The existing `default-login-flow-definition.json` at the root of this folder is
-embedded by the server as the default project flow; it mirrors example 06 but
-uses terminal `show`.
+The server's embedded default project flow is
+`packages/config/defaults/default-login.json` (via `embed.go`) — that file is
+the authority for the default flow's shape. The
+`default-login-flow-definition.json` at the root of this folder is a separate
+copy that `POST /flow_definitions` still publishes as its `defaultLoginFlow`
+OpenAPI example (`externalValue` in `../methods.yaml`); it mirrors example 06
+but uses terminal `show`, differs from the embedded default, and — unlike the
+numbered examples — is not covered by `TestExampleFlowDefinitions`, so treat
+it as illustrative only. Repointing the OpenAPI example at the authoritative
+default (or bringing this copy under the test) is a tracked follow-up.
 
 ## Reading a definition
 

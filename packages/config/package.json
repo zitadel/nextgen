@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/config",
-  "version": "0.1.0-alpha.17",
+  "version": "0.1.0-alpha.18",
   "description": "Versioned Zitadel local config schemas and defaults",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
   "bugs": {
@@ -37,6 +37,11 @@
       "@zitadel/source": "./src/schemas.ts",
       "types": "./dist/schemas.d.mts",
       "import": "./dist/schemas.mjs"
+    },
+    "./branding-url": {
+      "@zitadel/source": "./src/branding-url.ts",
+      "types": "./dist/branding-url.d.mts",
+      "import": "./dist/branding-url.mjs"
     },
     "./normalize": {
       "@zitadel/source": "./src/normalize.ts",

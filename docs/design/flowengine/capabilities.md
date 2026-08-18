@@ -22,14 +22,16 @@ to be a fast answer to "can I build flow X right now?"
 ### Resolution
 
 - Direct lookup by `name` (with optional `schema_version`). Multiple matches resolve via `pickLatestFlowVersion` — a lexicographic compare over `schema_version` strings (see [Missing → Resolution](#resolution-1)).
-- Audience-based resolution by `purpose` plus active `status`. Statement list
-  options order `created_at DESC, id DESC`; the service takes the first.
+- Audience-based resolution by `purpose` plus active `status`:
+  `user_schema_id` is a hard filter, then candidates score app match > team
+  match > project-wide > a definition scoped elsewhere. Equal scores prefer
+  newer `created_at`, then the higher ID.
 - Fails with `ErrFlowDefinitionPurposeMismatch` when a name-resolved definition doesn't serve the requested purpose.
 
 ### Definitions
 
-- `FlowDefinitionStatements` over Postgres and Spanner (storage v2).
-- Status enum: `draft`, `active`, `deprecated`, `archived`.
+- `FlowDefinitionStatements` over Postgres, Spanner, and SQLite (the storage layer).
+- API-exposed status values: `draft`, `active`.
 - Per-definition `user_schema` URL, captured into `FlowState` at `Start`.
 
 ### Steps & state machine
@@ -54,8 +56,8 @@ to be a fast answer to "can I build flow X right now?"
 ### Step response shape
 
 - `name`, `texts` (`title_key`, `description_key`), optional `error`, optional `complete`.
-- `fields` map keyed by name, per-field `type` / `text_key` / `required` / optional `value` / optional `validation`.
-- `actions` map with `text_key` and `primary` flag. Actions are unordered — the LiquidJS template decides layout.
+- `fields` **ordered array** of entries carrying `name`, `type`, `text_key`, `required`, optional `value`, optional `validation` ([ADR 021](../../adrs/021-ordered-arrays-for-step-fields-actions-gates.md)).
+- `actions` **ordered array** of entries carrying `name`, `kind`, `text_key`, and a `primary` flag. The LiquidJS template iterates the arrays in order and builds name-keyed indexes locally for lookup.
 - `challenge` populated on the issue leg of a two-phase ceremony (passkey today): `method`, `challenge_id`, ceremony-specific `options`.
 - `gates` and `sso_providers` are part of the contract but not yet emitted with content (see below).
 
@@ -67,7 +69,7 @@ These contracts exist on the wire and in the state machine but reject at runtime
 - **SSO submissions.** Submitting an action with an `sso_provider_id` is rejected.
 - **Gate proofs.** Submitting a `gate_proofs` map is rejected.
 
-`ErrUnsupported` maps to HTTP 400 with `code: "unsupported"`.
+`ErrFlowUnsupported` maps to HTTP 400 with `code: "flow.unsupported"`.
 
 ## Missing
 
@@ -95,7 +97,6 @@ Not implemented at any layer:
 
 ### Resolution
 
-- `ResolveFlowRequest.Hint` (`AppID`, `TeamID`, `UserSchemaID`) is plumbed through the service but not honored by `resolveByAudience`. Today the first match from `(status=active, purpose)` wins, with no specificity ranking.
 - `pickLatestFlowVersion` does a lexicographic compare — only correct while `schema_version` stays zero-padded `MAJOR.MINOR.PATCH`.
 
 ### Storage

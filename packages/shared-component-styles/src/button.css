@@ -42,6 +42,13 @@
   line-height: 1.25rem;
 }
 
+/* Primary reads the legacy names, which the design-tokens sheet now emits
+   as aliases of the Figma semantic pair (`--zl-color-surface-default-white:
+   var(--zl-primary)`, see design-tokens build). Stock buttons therefore take
+   the Figma `primary` values, and BOTH override paths keep working: a host
+   page overriding the legacy name beats the alias, and overriding
+   `--zl-primary` flows through it. Hover stays on the legacy hover role
+   until Figma publishes a `primary`-scoped hover value. */
 .zr-btn--primary {
   background: var(--zl-color-surface-default-white, #f4f4f6);
   color: var(--zl-color-text-button-default, #0f0f11);
@@ -52,7 +59,7 @@
 .zr-btn--primary[data-state="hovered"]:not(:disabled),
 .zr-btn--primary[data-state="pressed"]:not(:disabled),
 .zr-btn--primary[data-state="focused"]:not(:disabled) {
-  background: var(--zl-color-gray-600, #cfcfde);
+  background: var(--zl-color-surface-hover-strong, #cfcfde);
   border-color: var(--zl-color-border-default-black, #252528);
 }
 .zr-btn--primary:disabled {
@@ -68,7 +75,7 @@
 .zr-btn--secondary:active:not(:disabled),
 .zr-btn--secondary[data-state="hovered"]:not(:disabled),
 .zr-btn--secondary[data-state="pressed"]:not(:disabled) {
-  background: var(--zl-color-gray-200, #484a57);
+  background: var(--zl-color-surface-hover-subtle, #484a57);
 }
 .zr-btn--secondary:disabled {
   color: var(--zl-color-text-disabled, #686883);
@@ -83,7 +90,7 @@
 .zr-btn--text:active:not(:disabled),
 .zr-btn--text[data-state="hovered"]:not(:disabled),
 .zr-btn--text[data-state="pressed"]:not(:disabled) {
-  background: var(--zl-color-gray-200, #484a57);
+  background: var(--zl-color-surface-hover-subtle, #484a57);
 }
 .zr-btn--text:focus-visible:not(:disabled),
 .zr-btn--text[data-state="focused"]:not(:disabled) {

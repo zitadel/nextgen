@@ -40,6 +40,18 @@ export class ZitadelSurface extends LitElement {
    */
   @property({ type: String }) accessor theme: "" | ThemeMode = "";
 
+  /**
+   * Visually hide the surface's own heading block (the step title and
+   * subtitle on `<zitadel-login>`, the heading line on
+   * `<zitadel-session>`) while keeping it in the accessibility tree. For
+   * embedders whose page already carries the heading — a brand-voice
+   * "Welcome back" above the card — so the widget doesn't repeat it.
+   * Reflected so host-page CSS and DOM assertions can key off the
+   * attribute, like `variant`.
+   */
+  @property({ type: Boolean, reflect: true, attribute: "suppress-header" })
+  accessor suppressHeader = false;
+
   protected readonly themeController = new ThemeController(this);
 
   /**

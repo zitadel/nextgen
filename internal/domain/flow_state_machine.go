@@ -348,6 +348,10 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 		return r.processBack(pc)
 	}
 	if actionKind == FlowActionKindNavigate {
+		// Navigating abandons any pending ceremony; without this the
+		// stale challenge re-attaches on the next render (the mismatch
+		// cleanup below never runs on this early-return path).
+		state.ClearPendingChallenge()
 		return r.routeOutcome(pc, FlowResolvedFields{}, in.Action, false)
 	}
 
@@ -471,8 +475,62 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 	// Snapshot purpose before the flip so back can restore it.
 	prevPurpose := pc.state.CurrentPurpose
 	applyOutcomeFlip(pc.state, outcome)
+	// A declared transition purpose wins over the implicit outcome flip.
+	// Only CurrentPurpose moves; the pinned Purpose stays for telemetry/ACR.
+	// Unlike the implicit flips (which continue an in-flight resolution,
+	// e.g. register + user_already_exists verifying the found user), a
+	// declared re-purpose starts the target purpose fresh: the resolved
+	// user, collected credential material, and ceremony state must not
+	// leak across. A login-resolved user surviving into register would
+	// let passkey registration attach a credential to an existing account
+	// without proving a factor.
+	repurposeUndo := false
+	if transition.Purpose != nil {
+		hadResolvedUser := pc.state.CollectedData.UserID != ""
+		clearUserBoundState(pc.state)
+		pc.state.CollectedData.AuthMethods.Password = ""
+		if hadResolvedUser {
+			// The persisted attempt carries the resolved user as a factor,
+			// and PrepareUserChallenge refuses a second user challenge on a
+			// session-linked attempt. The flow-state reset must rotate the
+			// attempt in lockstep or the next identifier submission dies on
+			// "The user was already authenticated". The abandoned attempt
+			// ages out like any abandoned flow. No resolved user → nothing
+			// on the attempt to escape → no rotation (idle purpose toggles
+			// must not mint attempt rows).
+			attemptInput := FlowCreateAttemptInput{ProjectID: pc.state.ProjectID}
+			if pc.state.SessionID != "" {
+				sid := pc.state.SessionID
+				attemptInput.SessionID = &sid
+			}
+			attemptID, err := r.authAttempts.Start(pc.ctx, attemptInput)
+			if err != nil {
+				return FlowStepResult{}, fmt.Errorf("flow state machine: rotate auth attempt on re-purpose: %w", err)
+			}
+			pc.state.AuthAttemptID = attemptID
+		}
+		pc.state.CurrentPurpose = *transition.Purpose
 
-	r.advance(pc.state, pc.currentStep, prevPurpose, nextStep.Name)
+		// Purpose entries link to each other, forming a zero-input loop.
+		// An exact undo of the previous navigation pops the back stack
+		// instead of pushing, so toggling Sign up / Sign in cannot grow
+		// History/BackStack past one entry (unbounded growth overflows
+		// the 4 KiB encrypted-cookie budget). Anything else falls through
+		// to the normal advance.
+		if top, ok := pc.state.PeekBackStack(); ok &&
+			top.StepName == nextStep.Name && top.Purpose == *transition.Purpose &&
+			len(pc.state.History) > 0 && pc.state.History[len(pc.state.History)-1] == top.StepName {
+			pc.state.PopBackStack()
+			pc.state.History = pc.state.History[:len(pc.state.History)-1]
+			pc.state.CurrentStep = nextStep.Name
+			pc.state.IssuedAt = r.now()
+			repurposeUndo = true
+		}
+	}
+
+	if !repurposeUndo {
+		r.advance(pc.state, pc.currentStep, prevPurpose, nextStep.Name)
+	}
 
 	// after irreversible actions, clear the back stack so the user can't navigate back in the flow.
 	if irreversible {
@@ -1237,7 +1295,7 @@ func prefillFromCollected(resolved *FlowResolvedFields, collected map[string]any
 		if resolved.Fields[i].Value != nil {
 			continue
 		}
-		if v, ok := maputil.GetNested[string](collected, resolved.Fields[i].Name); ok && v != "" {
+		if v, ok := maputil.GetNested[string](collected, AttributeKey(resolved.Fields[i].Name).Nodes()); ok && v != "" {
 			val := v
 			resolved.Fields[i].Value = &val
 		}
@@ -1265,11 +1323,11 @@ func mergeCollected(state *FlowState, fields map[string]any) error {
 			return fmt.Errorf("unknown auth method %s", k)
 		}
 
-		// Field names are dotted paths for nested properties, so the
-		// collected document keeps the shape the user schema validates
-		// and the attribute store flattens back out.
-		if err := setNested(state.CollectedData.UserData, AttributeKey(k), v); err != nil {
-			return err
+		// A field name is an attribute key, so the collected document keeps
+		// the shape the user schema validates and the attribute store
+		// flattens back out.
+		if err := maputil.SetNested(state.CollectedData.UserData, AttributeKey(k).Nodes(), v); err != nil {
+			return fmt.Errorf("merge collected field %q: %w", k, err)
 		}
 	}
 	return nil
@@ -1284,7 +1342,7 @@ func FindCollectedFieldByChallenge(resolved []FlowField, collected map[string]an
 		if f.Challenge != target {
 			continue
 		}
-		if v, present := maputil.GetNested[any](collected, f.Name); present {
+		if v, present := maputil.GetNested[any](collected, AttributeKey(f.Name).Nodes()); present {
 			return f.Name, f, v, true
 		}
 	}

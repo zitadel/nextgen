@@ -4,6 +4,7 @@ import { MANAGED_MARKER } from "../../../../paths";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
+import { devScriptPortOp } from "../dev-script-port";
 import { getRenderer } from "./renderers/registry";
 import type { RendererSpec } from "./renderers/types";
 
@@ -86,6 +87,13 @@ export class NextPatcher extends AbstractRulePatcher {
     return [getRenderer(view.rendererId).dependency.name];
   }
 
+  protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
+    // The `dev` script gets the project's dev-server port pinned into it via
+    // an `edit` op eject can't auto-revert, so it has to be surfaced as a
+    // manual cleanup step like any other in-place config merge.
+    return ["package.json"];
+  }
+
   protected summary(ctx: PatchContext): { title: string; detail: string } {
     return {
       title: "Next.js integration",
@@ -148,7 +156,8 @@ function nextInfrastructureFilePaths(
 /** The Next route/request-boundary write ops plus the SDK dependency. */
 function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
   const appDir = ctx.framework.appDir;
-  const profile = renderer.templates.profilePage?.();
+  const pageContext = { useCase: ctx.useCase, posture: ctx.posture };
+  const profile = renderer.templates.profilePage?.(pageContext);
   const provider = renderer.templates.provider;
   const dts = renderer.templates.customElementsDts?.();
   const boundary = requestBoundaryFile(ctx.framework);
@@ -166,12 +175,12 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
     {
       kind: "write",
       path: join(appDir, "login/page.tsx"),
-      contents: renderer.templates.authPage("login", { useCase: ctx.useCase }).contents,
+      contents: renderer.templates.authPage("login", pageContext).contents,
     },
     {
       kind: "write",
       path: join(appDir, "register/page.tsx"),
-      contents: renderer.templates.authPage("register", { useCase: ctx.useCase }).contents,
+      contents: renderer.templates.authPage("register", pageContext).contents,
     },
     profile
       ? { kind: "write", path: join(appDir, "profile/page.tsx"), contents: profile.contents }
@@ -199,6 +208,9 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
       name: renderer.dependency.name,
       version: dependencyVersionForCli(ctx.cliVersion, renderer.dependency.version),
     },
+    // `next dev` takes its port from the command line only, so without this
+    // the app can serve a port the project does not allow as an origin.
+    devScriptPortOp(ctx.issuer),
   ].filter((op): op is FileOp => op !== undefined);
 }
 

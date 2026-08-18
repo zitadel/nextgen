@@ -174,7 +174,7 @@ type FlowStep = {
   actions: { name: string; kind: string }[];
   gateCount: number;
   ssoProviderCount: number;
-  transitions: Map<string, { target: string; action: string | null }>;
+  transitions: Map<string, { target: string; action: string | null; purpose: string | null }>;
   onSuccess: string | undefined;
   terminal: boolean;
 };
@@ -212,13 +212,17 @@ function readFlow(flow: object): FlowDef {
   if (Array.isArray(raw.steps)) {
     for (const value of raw.steps) {
       if (!isPlainObject(value)) continue;
-      const transitions = new Map<string, { target: string; action: string | null }>();
+      const transitions = new Map<
+        string,
+        { target: string; action: string | null; purpose: string | null }
+      >();
       if (isPlainObject(value.transitions)) {
         for (const [key, t] of Object.entries(value.transitions)) {
           const entry = isPlainObject(t) ? t : {};
           transitions.set(key, {
             target: str(entry.target),
             action: typeof entry.action === "string" ? entry.action : null,
+            purpose: typeof entry.purpose === "string" ? entry.purpose : null,
           });
         }
       }
@@ -422,6 +426,49 @@ function validateGraph(def: FlowDef, stepNames: Set<string>): FlowValidationIssu
 
   for (const step of def.steps) {
     for (const [key, t] of step.transitions) {
+      if (t.purpose !== null) {
+        // Local re-purposing: never combined with a cross-flow action,
+        // only to a purpose this definition serves, and only to that
+        // purpose's entry step. Mirrors the server-side validator.
+        if (t.action !== null) {
+          issues.push(
+            error(
+              "graph",
+              `step ${q(step.name)}: transition ${q(key)} declares both purpose and action; a transition either re-purposes locally or targets another flow`,
+              step.name,
+            ),
+          );
+        } else if (!(FLOW_PURPOSES as readonly string[]).includes(t.purpose)) {
+          // Verbatim-identical to the Go validator's message (which cannot
+          // print the raw value — its parse layer rejects it earlier).
+          issues.push(
+            error(
+              "graph",
+              `step ${q(step.name)}: transition ${q(key)} has invalid purpose`,
+              step.name,
+            ),
+          );
+        } else {
+          const entry = def.purposes.get(t.purpose);
+          if (entry === undefined) {
+            issues.push(
+              error(
+                "graph",
+                `step ${q(step.name)}: transition ${q(key)} re-purposes to ${q(t.purpose)}, which this definition does not serve`,
+                step.name,
+              ),
+            );
+          } else if (t.target !== entry) {
+            issues.push(
+              error(
+                "graph",
+                `step ${q(step.name)}: transition ${q(key)} re-purposes to ${q(t.purpose)} but targets ${q(t.target)}; it must target that purpose's entry step ${q(entry)}`,
+                step.name,
+              ),
+            );
+          }
+        }
+      }
       if (isCurrentFlow(t)) {
         if (!stepNames.has(t.target)) {
           issues.push(
@@ -539,27 +586,6 @@ function schemaRequired(schema: Record<string, unknown>): string[] {
   return Array.isArray(schema.required) ? schema.required.map(str).filter((n) => n !== "") : [];
 }
 
-/**
- * Mirrors `schemaReader.RequiredLeafPaths`: every name in `required`,
- * recursed through the nested `required` of each required object. A
- * required object declaring no `required` of its own ends the descent at
- * the object itself.
- */
-function requiredLeafPaths(schema: Record<string, unknown>, prefix = ""): string[] {
-  const properties = schemaProperties(schema);
-  const out: string[] = [];
-  for (const name of schemaRequired(schema)) {
-    const path = prefix === "" ? name : `${prefix}.${name}`;
-    const property = properties?.[name];
-    if (!isPlainObject(property) || schemaRequired(property).length === 0) {
-      out.push(path);
-      continue;
-    }
-    out.push(...requiredLeafPaths(property, path));
-  }
-  return out;
-}
-
 /** Mirrors `xAuthMethodsReader.IsEnabled` in flow_field_resolver_schema.go. */
 function authMethodEnabled(schema: Record<string, unknown>, method: string): boolean {
   if (!isPlainObject(schema["x-auth-methods"])) return false;
@@ -590,38 +616,12 @@ function resolveFieldChallenge(
     return { challenge: "password" };
   }
 
-  // Mirrors walkUserProperty: a nested property is addressed by its
-  // dotted path, descending one `properties` level per segment.
-  const segments = field.split(".");
-  let property: unknown = undefined;
-  let level: Record<string, unknown> | undefined = properties;
-  for (const [i, segment] of segments.entries()) {
-    property = level?.[segment];
-    if (property === undefined) {
-      return { message: `flow field: not a property in the user schema: ${q(field)}` };
-    }
-    const nested = isPlainObject(property) ? schemaProperties(property) : undefined;
-    if (i < segments.length - 1 && nested === undefined) {
-      return { message: `flow field: not a property in the user schema: ${q(field)}` };
-    }
-    level = nested;
+  const property = properties[field];
+  if (property === undefined) {
+    return { message: `flow field: not a property in the user schema: ${q(field)}` };
   }
-
   if (!isPlainObject(property)) {
     return { challenge: null };
-  }
-
-  // Mirrors deriveUserPropertyType: an object or array has no
-  // field-shaped input. A property carrying `properties` is an object
-  // even when it omits the `type` keyword.
-  if (
-    property.type === "object" ||
-    property.type === "array" ||
-    schemaProperties(property) !== undefined
-  ) {
-    return {
-      message: `flow field: not a scalar property, name a nested leaf instead: ${q(field)}`,
-    };
   }
 
   // Mirrors schemaReader.JSONType: the nullable idiom `["null", X]`
@@ -660,13 +660,8 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
       collected.add(field);
     }
   }
-  // A required leaf is covered only by itself; a required object that
-  // declares no `required` of its own is covered by any field beneath it.
-  const missing = requiredLeafPaths(raw)
-    .filter(
-      (field) =>
-        !collected.has(field) && ![...collected].some((f) => f.startsWith(`${field}.`)),
-    )
+  const missing = schemaRequired(raw)
+    .filter((field) => !collected.has(field))
     .sort();
   if (missing.length > 0) {
     issues.push(

@@ -27,21 +27,20 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * does not exist". Also covers the theme toggle writing `data-theme` and
  * persisting the preference.
  */
-// Users is the only surface with a design hand-off, so it is the only thing the
-// sidebar offers.
-const NAV_ORDER = ["Users"];
-// Absent for three different reasons, all of them deliberate:
+// The top-level surfaces with a design hand-off, in the order the design puts
+// them. `User schemas` nests beneath `Users` (`Schema directory` frame) rather
+// than adding a second top-level row.
+const NAV_ORDER = ["Projects", "Teams", "Users"];
+const NESTED_NAV = { parent: "Users", label: "User schemas" };
+// Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
 //   - Sessions was built, but `POST /sessions/query` answers 501 (#699)
-//   - Projects works and stays reachable at its URL; it has simply never been
-//     designed, so it is not advertised as a finished screen
 const NEVER_SHOWN = [
   "App groups",
   "Applications",
   "Analytics",
   "Activity Log",
   "Sessions",
-  "Projects",
 ];
 
 // A path pattern rather than an absolute URL: this spec imports the router
@@ -56,8 +55,8 @@ const server = setupServer(
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterAll(() => server.close());
 
-function renderShell() {
-  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: ["/"] }) });
+function renderShell(path = "/") {
+  const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
   render(<RouterProvider router={router} />);
 }
 
@@ -67,13 +66,33 @@ describe("app shell navigation", () => {
     await screen.findByRole("link", { name: /^Users/ });
     const nav = within(screen.getByRole("navigation", { name: "Primary" }));
 
-    const items = nav.getAllByRole("listitem");
-    expect(items.map((li) => li.textContent?.trim())).toEqual(NAV_ORDER);
+    // Only the top level: nested entries render inside their parent's
+    // `<li>`, so `getAllByRole("listitem")` alone would conflate the two.
+    const items = nav
+      .getAllByRole("listitem")
+      .filter((li) => li.parentElement?.dataset.slot === "sidebar-menu");
+    expect(items.map((li) => within(li).getAllByRole("link")[0]?.textContent?.trim())).toEqual(
+      NAV_ORDER,
+    );
 
     // Every row navigates somewhere (the logo is a separate Home link outside
     // the list), so there is no row that looks like a destination but is not.
-    const linkedRows = items.filter((li) => within(li).queryByRole("link"));
+    const linkedRows = items.filter((li) => within(li).queryAllByRole("link").length > 0);
     expect(linkedRows).toHaveLength(NAV_ORDER.length);
+  });
+
+  it("nests User schemas under Users rather than adding a top-level row", async () => {
+    renderShell();
+    await screen.findByRole("link", { name: /^Users/ });
+    const nav = within(screen.getByRole("navigation", { name: "Primary" }));
+
+    const [parent] = nav
+      .getAllByRole("listitem")
+      .filter((li) => within(li).getAllByRole("link")[0]?.textContent?.trim() === NESTED_NAV.parent);
+    expect(parent).toBeDefined();
+    expect(
+      within(parent as HTMLElement).getByRole("link", { name: NESTED_NAV.label }),
+    ).toHaveAttribute("href", "/schemas");
   });
 
   it("does not advertise screens that have no endpoint behind them", async () => {
@@ -84,6 +103,36 @@ describe("app shell navigation", () => {
     for (const label of NEVER_SHOWN) {
       expect(nav.queryByText(label)).not.toBeInTheDocument();
     }
+  });
+});
+
+/**
+ * The sidebar has two views and the route picks between them, so a settings URL
+ * restores the Settings view rather than dropping the operator back into Portal
+ * chrome. The account dropdown is the way in; `Back to app` is the way out.
+ */
+describe("settings view", () => {
+  it("shows the portal nav and the account dropdown's entry point by default", async () => {
+    renderShell();
+    await screen.findByRole("link", { name: /^Users/ });
+    expect(screen.getByRole("navigation", { name: "Primary" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Account:/ }));
+    // Log out, not Sign out, and Settings alongside it — both per the design.
+    expect(await screen.findByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Settings" })).toHaveAttribute(
+      "href",
+      "/settings",
+    );
+  });
+
+  it("swaps the portal nav for the settings view on a settings URL", async () => {
+    renderShell("/settings");
+    // The way back out is present...
+    expect(await screen.findByRole("link", { name: "Back to app" })).toHaveAttribute("href", "/");
+    // ...and the portal list is gone rather than sitting underneath it.
+    expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^Users/ })).not.toBeInTheDocument();
   });
 });
 

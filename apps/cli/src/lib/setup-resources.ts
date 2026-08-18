@@ -35,6 +35,7 @@ import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normaliz
 import { BRANDING_DIR, toBrandingWireBody } from "./branding";
 import { FLOWS_DIR } from "./flows";
 import { stableStringify } from "./json";
+import { normalizePublicCliProse } from "./public-cli";
 import { hashForState, writeBackResource } from "./sync";
 import { updateState } from "./sync/state";
 import { SCHEMAS_DIR } from "./user-schema";
@@ -70,6 +71,13 @@ export async function materializeSetupResources(opts: {
    * renders the built-in template (the `branding eject` command opts in later).
    */
   design?: string;
+  /**
+   * CLI version used to render `zitadel …` command mentions in the scaffolded
+   * READMEs as runnable `npx @zitadel/cli@<version> …` commands — the CLI is
+   * not a dependency of the generated app, so the bare command doesn't exist
+   * there.
+   */
+  cliVersion: string;
 }): Promise<MaterializeSetupResourcesResult> {
   await mkdir(join(opts.cwd, FLOWS_DIR), { recursive: true });
   await mkdir(join(opts.cwd, SCHEMAS_DIR), { recursive: true });
@@ -102,9 +110,9 @@ export async function materializeSetupResources(opts: {
   // the template body and its hash (parity is best-effort at setup).
   let schemaHash = hashForState({ normalize: normalizeSchemaBody }, schemaBody);
   try {
-    const canonical = (await opts.client.getSchemaById(encodeURIComponent(schemaId), {
-      project_id: opts.projectId,
-    })) as object;
+    const canonical = (await opts.client.getSchemaById(
+      encodeURIComponent(schemaId),
+    )) as object;
     const written = await writeBackResource(
       opts.cwd,
       DEFAULT_SCHEMA_CONFIG_PATH,
@@ -178,17 +186,35 @@ export async function materializeSetupResources(opts: {
     });
 
     const brandingReadme = join(BRANDING_DIR, "README.md");
-    if (await writeReadmeFile(opts.cwd, brandingReadme, brandingReadmeContent())) {
+    if (
+      await writeReadmeFile(
+        opts.cwd,
+        brandingReadme,
+        normalizePublicCliProse(brandingReadmeContent(), opts.cliVersion),
+      )
+    ) {
       filesWritten.push(join(opts.cwd, brandingReadme));
     }
   }
 
   const schemasReadme = join(SCHEMAS_DIR, "README.md");
   const flowsReadme = join(FLOWS_DIR, "README.md");
-  if (await writeReadmeFile(opts.cwd, schemasReadme, schemasReadmeContent())) {
+  if (
+    await writeReadmeFile(
+      opts.cwd,
+      schemasReadme,
+      normalizePublicCliProse(schemasReadmeContent(), opts.cliVersion),
+    )
+  ) {
     filesWritten.push(join(opts.cwd, schemasReadme));
   }
-  if (await writeReadmeFile(opts.cwd, flowsReadme, flowsReadmeContent())) {
+  if (
+    await writeReadmeFile(
+      opts.cwd,
+      flowsReadme,
+      normalizePublicCliProse(flowsReadmeContent(), opts.cliVersion),
+    )
+  ) {
     filesWritten.push(join(opts.cwd, flowsReadme));
   }
 

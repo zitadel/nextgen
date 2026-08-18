@@ -5,8 +5,10 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  ClaimCheck,
   ConfigCheck,
   DependencyCheck,
+  DependencyVersionCheck,
   EnvExampleCheck,
   FrameworkCheck,
   GitignoreCheck,
@@ -31,7 +33,7 @@ const tempDirs: string[] = [];
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
   metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
-  "x-auth-methods": { passkey: { enabled: true, position: 0 } },
+  "x-auth-methods": { passkey: { enabled: true } },
   properties: { email: { type: "string" } },
 };
 
@@ -627,6 +629,71 @@ describe("ManagedFilesCheck", () => {
     expect((after.details as ManagedDetails).mode).toBe("manifest");
   });
 
+  // The dev script has to be verified against the port the project
+  // *registered* as its allowed origin, not the port the app happens to start
+  // on now. Those agree at setup and diverge exactly when it matters: reading
+  // the live script would make any edited script verify against itself, and
+  // would make `--fix` write back the detected fallback instead of the port
+  // the server actually allows — leaving login broken while doctor says the
+  // wiring is applied.
+  async function makeNextProjectWithDevScript(devScript: string, issuerPort: number) {
+    const cwd = await makeProject();
+    const pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ ...pkg, scripts: { dev: devScript } }),
+    );
+    const config = JSON.parse(await readFile(join(cwd, "zitadel.json"), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({
+        ...config,
+        environments: { development: { issuer: `http://localhost:${String(issuerPort)}` } },
+      }),
+    );
+    return cwd;
+  }
+
+  function devScriptOf(cwd: string): Promise<string> {
+    return readFile(join(cwd, "package.json"), "utf8").then(
+      (raw) => (JSON.parse(raw) as { scripts: { dev: string } }).scripts.dev,
+    );
+  }
+
+  it("reports the dev script as applied only when it serves the registered port", async () => {
+    const cwd = await makeNextProjectWithDevScript("next dev --port 3456", 3456);
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("pass");
+  });
+
+  it("flags a dev script edited to a port the project does not allow", async () => {
+    // Detection would report 4000 and happily verify it against itself.
+    const cwd = await makeNextProjectWithDevScript("next dev --port 4000", 3456);
+    const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("unapplied managed config edit(s): package.json");
+  });
+
+  it("--fix restores the registered port, not the detected fallback", async () => {
+    // No declaration at all: detection falls back to 3000, so a fix driven by
+    // the live script would write 3000 and keep login broken.
+    const cwd = await makeNextProjectWithDevScript("next dev", 3456);
+    const check = new ManagedFilesCheck();
+    expect((await check.run(ctxFor(cwd))).status).toBe("warn");
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await devScriptOf(cwd)).toBe("next dev --port 3456");
+    expect(await devScriptOf(cwd)).not.toContain("3000");
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
   it("fails when a managed config wiring is detached, and --fix re-applies it", async () => {
     const cwd = await makeAngularProject();
     const check = new ManagedFilesCheck();
@@ -941,6 +1008,71 @@ describe("ProjectMatchCheck", () => {
   });
 });
 
+describe("ClaimCheck", () => {
+  /** Rewrites `.zitadel/secret`, preserving the 0600 mode doctor asserts elsewhere. */
+  async function writeSecret(cwd: string, extra: Record<string, unknown>): Promise<void> {
+    await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ ...SECRET, ...extra }));
+    await chmod(join(cwd, ".zitadel/secret"), 0o600);
+  }
+
+  /** Rewrites `zitadel.json` with a different `server`, leaving everything else intact. */
+  async function writeServer(cwd: string, server: string): Promise<void> {
+    const config = JSON.parse(await readFile(join(cwd, "zitadel.json"), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ ...config, server }));
+  }
+
+  it("warns for a cloud project with no owning team", async () => {
+    const cwd = await makeProject();
+    const outcome = await new ClaimCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("temporary until you attach it to a team");
+  });
+
+  it("passes and names the team once attached", async () => {
+    const cwd = await makeProject();
+    await writeSecret(cwd, { claimed_at: "2026-01-02T00:00:00.000Z", team_id: "team-001" });
+    const outcome = await new ClaimCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("pass");
+    expect(outcome.message).toContain("team-001");
+  });
+
+  // Local and self-hosted servers have no platform team, so there is nothing to
+  // nudge toward and a warning would be permanent noise.
+  it("passes without a nudge off the cloud", async () => {
+    for (const server of ["http://localhost:8080", "https://zitadel.example.com"]) {
+      const cwd = await makeProject();
+      await writeServer(cwd, server);
+      const outcome = await new ClaimCheck().run(ctxFor(cwd));
+      expect(outcome.status).toBe("pass");
+      expect(outcome.message).not.toContain("temporary");
+    }
+  });
+
+  // Nothing wraps a throw from this check (it implements SanityCheck directly),
+  // so an unreadable secret must not take the whole battery down with it — the
+  // `secret` check is the one that reports that problem.
+  it("skips instead of throwing when the secret cannot be read", async () => {
+    const cwd = await makeProject();
+    await rm(join(cwd, ".zitadel/secret"));
+    const outcome = await new ClaimCheck().run(ctxFor(cwd));
+    expect(outcome.status).toBe("pass");
+    expect(outcome.message).toContain("Skipped");
+  });
+
+  // `doctor --fix` calls fix() on every non-passing check. Claiming needs a
+  // browser, so this one must be inert rather than half-writing the record.
+  it("has no automatic repair", async () => {
+    const cwd = await makeProject();
+    const before = await readFile(join(cwd, ".zitadel/secret"), "utf8");
+    await new ClaimCheck().fix(ctxFor(cwd));
+    expect(await readFile(join(cwd, ".zitadel/secret"), "utf8")).toBe(before);
+    expect((await new ClaimCheck().run(ctxFor(cwd))).status).toBe("warn");
+  });
+});
+
 describe("loadPatchContext", () => {
   it("reconstructs the patch context from on-disk project files", async () => {
     const cwd = await makeProject();
@@ -993,5 +1125,140 @@ describe("loadPatchContext", () => {
     const ctx = await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0");
 
     expect(ctx.issuer).toBe("http://localhost:3005");
+  });
+
+  it("restores the recorded posture, defaulting absence to page (ADR 044)", async () => {
+    const cwd = await makeProject();
+    await writeScaffoldState(cwd, { files: {}, posture: "widget" });
+    expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).posture).toBe("widget");
+
+    // No record (legacy manifest, or none at all) restores full-page — the
+    // only posture that existed before the record.
+    await writeScaffoldState(cwd, { files: {} });
+    expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).posture).toBe("page");
+  });
+
+  it("degrades an unknown posture value to template mode, restoring page", async () => {
+    const cwd = await makeProject();
+    await writeScaffoldState(cwd, {
+      files: {},
+      posture: "split",
+    } as unknown as ScaffoldManifest);
+    // A future-shaped manifest is rejected wholesale (readScaffoldManifest
+    // returns undefined), so the context falls back to the page posture.
+    expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).posture).toBe("page");
+  });
+});
+
+describe("DependencyVersionCheck", () => {
+  it("passes when exact Zitadel pins match the CLI version", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^15", "@zitadel/sdk-next": "0.1.0-alpha.18" },
+      }),
+    );
+    const outcome = await new DependencyVersionCheck().run({
+      ...ctxFor(cwd),
+      cliVersion: "0.1.0-alpha.18",
+    });
+    expect(outcome.status).toBe("pass");
+    expect(outcome.message).toContain("1 compared");
+  });
+
+  it("warns with the exact remedy when a pin trails the CLI train", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { "@zitadel/sdk-next": "0.1.0-alpha.17" },
+        devDependencies: { "@zitadel/testing": "0.1.0-alpha.17" },
+      }),
+    );
+    const outcome = await new DependencyVersionCheck().run({
+      ...ctxFor(cwd),
+      cliVersion: "0.1.0-alpha.18",
+    });
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("@zitadel/sdk-next@0.1.0-alpha.17");
+    // No lockfile or packageManager field in the fixture, so npm is the
+    // detected fallback; the remedy must pin exactly, not caret-float.
+    const remedy =
+      "npm install --save-exact @zitadel/sdk-next@0.1.0-alpha.18 @zitadel/testing@0.1.0-alpha.18";
+    expect(outcome.message).toContain(remedy);
+    expect(outcome.details).toEqual({
+      mismatched: [
+        { name: "@zitadel/sdk-next", declared: "0.1.0-alpha.17", expected: "0.1.0-alpha.18" },
+        { name: "@zitadel/testing", declared: "0.1.0-alpha.17", expected: "0.1.0-alpha.18" },
+      ],
+      remedy_command: remedy,
+    });
+  });
+
+  it("writes the remedy with the project's own package manager", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { "@zitadel/sdk-next": "0.1.0-alpha.17" },
+      }),
+    );
+    await writeFile(join(cwd, "pnpm-lock.yaml"), "");
+    const outcome = await new DependencyVersionCheck().run({
+      ...ctxFor(cwd),
+      cliVersion: "0.1.0-alpha.18",
+    });
+    expect(outcome.status).toBe("warn");
+    // A bare `npm install` on a pnpm project would switch package managers.
+    expect(outcome.message).toContain("pnpm add --save-exact @zitadel/sdk-next@0.1.0-alpha.18");
+    expect((outcome.details as { remedy_command?: string }).remedy_command).toBe(
+      "pnpm add --save-exact @zitadel/sdk-next@0.1.0-alpha.18",
+    );
+  });
+
+  it("ignores ranges, dist-tags, and file specifiers", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: {
+          "@zitadel/sdk-next": "latest",
+          "@zitadel/components": "^0.1.0-alpha.2",
+          "@zitadel/api": "file:../local.tgz",
+        },
+      }),
+    );
+    const outcome = await new DependencyVersionCheck().run({
+      ...ctxFor(cwd),
+      cliVersion: "0.1.0-alpha.18",
+    });
+    expect(outcome.status).toBe("pass");
+    expect(outcome.message).toContain("no exactly-pinned");
+  });
+
+  it("skips the comparison for non-release CLI versions", async () => {
+    const cwd = await makeProject();
+    const outcome = await new DependencyVersionCheck().run({
+      ...ctxFor(cwd),
+      cliVersion: "workspace-dev",
+    });
+    expect(outcome.status).toBe("pass");
+    expect(outcome.message).toContain("not an exact release");
+  });
+
+  it("passes quietly when package.json is missing", async () => {
+    const cwd = await makeProject();
+    await rm(join(cwd, "package.json"));
+    const outcome = await new DependencyVersionCheck().run({
+      ...ctxFor(cwd),
+      cliVersion: "0.1.0-alpha.18",
+    });
+    // The dependency check owns that failure; this one only compares pins.
+    expect(outcome.status).toBe("pass");
   });
 });

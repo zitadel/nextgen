@@ -75,20 +75,33 @@ func (c *ApiClient) SetSessionToken(token string) {
 func (h *Harness) SetProjectSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
 	t.Helper()
 
-	tokenCrypter, err := h.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
-	require.NoError(t, err)
-	secret, err := project.ProjectSecret(tokenCrypter)
+	token := project.Token()
+	secret, err := h.EnsureTokenService(t).GenerateJWE(t.Context(), token)
 	require.NoError(t, err)
 
 	client.SetToken(secret)
 }
 
-func (h *Harness) SetPreviewSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
+// SetScopedTokenOnApiClient mints a bearer with exactly the given scopes.
+// Production only mints project and preview secrets, so this is the only way
+// for a test to hold a finer scope like session.read until ADR 036's
+// credential planes mint such tokens for real.
+func (h *Harness) SetScopedTokenOnApiClient(t *testing.T, client *ApiClient, project *domain.Project, scopes ...string) {
 	t.Helper()
 
 	tokenCrypter, err := h.EnsureKeyService(t).GetProjectCrypter(t.Context(), project.ID, domain.EncryptionKeyPurposeToken)
 	require.NoError(t, err)
-	secret, err := project.PreviewSecret(tokenCrypter)
+	token, err := (&domain.Token{ProjectID: project.ID, Scope: scopes}).JWE(tokenCrypter)
+	require.NoError(t, err)
+
+	client.SetToken(token)
+}
+
+func (h *Harness) SetPreviewSecretOnApiClient(t *testing.T, client *ApiClient, project *domain.Project) {
+	t.Helper()
+
+	token := project.PreviewToken()
+	secret, err := h.EnsureTokenService(t).GenerateJWE(t.Context(), token)
 	require.NoError(t, err)
 
 	client.SetToken(secret)

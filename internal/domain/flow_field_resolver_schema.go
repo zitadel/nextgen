@@ -3,12 +3,11 @@ package domain
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/ianlancetaylor/jsonschema/types"
 )
-
-//go:generate go tool mockgen -typed -package domainmock -destination ./mock/flow_field_resolver.schema.mock.go . SchemaResolver
 
 // SchemaResolver loads a compiled JSON schema by URL. It is the
 // loader [FlowStateMachineRuntime] depends on for runtime schema
@@ -118,18 +117,14 @@ func resolveUserPropertyField(root schemaReader, field Field, stepName string) (
 // so the path cannot continue through it — yields
 // [ErrFlowFieldUnknown] naming the whole path.
 func walkUserProperty(root schemaReader, field Field) (schemaReader, bool, error) {
-	segments := AttributeKey(field.String()).Nodes()
 	parent, required := root, true
-	for i, segment := range segments {
-		prop, ok := parent.Properties()[segment]
+	for _, segment := range AttributeKey(field.String()).Nodes() {
+		prop, ok := parent.Property(segment)
 		if !ok {
 			return schemaReader{}, false, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, field.String())
 		}
-		if _, ok := parent.RequiredSet()[segment]; !ok {
+		if !parent.Requires(segment) {
 			required = false
-		}
-		if i < len(segments)-1 && prop.Properties() == nil {
-			return schemaReader{}, false, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, field.String())
 		}
 		parent = prop
 	}
@@ -175,9 +170,11 @@ func deriveUserPropertyType(prop schemaReader, field Field) (FlowFieldType, erro
 	if err != nil {
 		return "", err
 	}
-	// A property carrying `properties` is an object even when it omits
-	// the `type` keyword, which would otherwise fall through to text.
-	if jsonType == "object" || jsonType == "array" || prop.Properties() != nil {
+	// A property carrying `properties` is an object, and one carrying
+	// `items` is an array, even when it omits the `type` keyword — which
+	// would otherwise fall through to text and store a string where the
+	// author declared a composite.
+	if jsonType == "object" || jsonType == "array" || prop.HasProperties() || prop.HasItems() {
 		return "", fmt.Errorf("%w: %q", ErrFlowFieldNotScalar, field.String())
 	}
 	if len(prop.StringEnum()) > 0 {
@@ -366,15 +363,11 @@ func (r schemaReader) Int(keyword string) int {
 	return 0
 }
 
-// Properties returns each top-level property of an object schema as
-// its own [schemaReader], or nil when `properties` is absent or
-// malformed.
+// Properties returns each property listed in this level's `properties`
+// keyword as its own [schemaReader], or nil when the keyword is absent
+// or malformed.
 func (r schemaReader) Properties() map[string]schemaReader {
-	v, ok := r.s.LookupKeyword("properties")
-	if !ok {
-		return nil
-	}
-	m, ok := v.(types.PartMapSchema)
+	m, ok := r.propertyMap()
 	if !ok {
 		return nil
 	}
@@ -383,6 +376,59 @@ func (r schemaReader) Properties() map[string]schemaReader {
 		out[name] = newSchemaReader(prop)
 	}
 	return out
+}
+
+// Property answers for one name what [schemaReader.Properties] answers
+// for every name, without materializing a reader per sibling. The walk
+// down a field's path runs on every render, so it takes this route.
+func (r schemaReader) Property(name string) (schemaReader, bool) {
+	m, ok := r.propertyMap()
+	if !ok {
+		return schemaReader{}, false
+	}
+	prop, ok := m[name]
+	if !ok {
+		return schemaReader{}, false
+	}
+	return newSchemaReader(prop), true
+}
+
+// Requires reports whether name is listed in this level's `required`
+// keyword — the single-name counterpart of [schemaReader.RequiredSet].
+func (r schemaReader) Requires(name string) bool {
+	v, ok := r.s.LookupKeyword("required")
+	if !ok {
+		return false
+	}
+	names, ok := v.(types.PartStrings)
+	if !ok {
+		return false
+	}
+	return slices.Contains(names, name)
+}
+
+// HasProperties reports whether this level carries a well-formed
+// `properties` keyword, which marks it an object even when the `type`
+// keyword is absent.
+func (r schemaReader) HasProperties() bool {
+	_, ok := r.propertyMap()
+	return ok
+}
+
+// HasItems reports whether this level carries an `items` keyword, the
+// array counterpart of [schemaReader.HasProperties].
+func (r schemaReader) HasItems() bool {
+	_, ok := r.s.LookupKeyword("items")
+	return ok
+}
+
+func (r schemaReader) propertyMap() (types.PartMapSchema, bool) {
+	v, ok := r.s.LookupKeyword("properties")
+	if !ok {
+		return nil, false
+	}
+	m, ok := v.(types.PartMapSchema)
+	return m, ok
 }
 
 // RequiredSet returns the names listed in this level's `required`
@@ -403,27 +449,48 @@ func (r schemaReader) RequiredSet() map[string]struct{} {
 	return out
 }
 
-// RequiredLeafPaths returns the dotted paths a document must carry:
-// every name in `required`, recursed through the nested `required` of
-// each required object. A required object that declares no `required`
-// of its own ends the descent at the object itself — any leaf beneath
-// it satisfies the coverage check.
-func (r schemaReader) RequiredLeafPaths() map[string]struct{} {
+// RequiredPaths returns the dotted paths a document must carry once the
+// objects named in materialized exist: every name in `required`,
+// recursed through the nested `required` of each required object. A
+// required object that declares no `required` of its own ends the
+// descent at the object itself — any leaf beneath it satisfies the
+// coverage check.
+//
+// An optional object contributes its own `required` too once it appears
+// in materialized. It only exists in the document because something
+// beneath it was collected, and from that point document validation
+// enforces the rest of its `required` list.
+func (r schemaReader) RequiredPaths(materialized map[string]struct{}) map[string]struct{} {
 	out := map[string]struct{}{}
-	r.collectRequiredLeafPaths("", out)
+	r.collectRequiredPaths("", materialized, out)
 	return out
 }
 
-func (r schemaReader) collectRequiredLeafPaths(prefix AttributeKey, out map[string]struct{}) {
+func (r schemaReader) collectRequiredPaths(prefix AttributeKey, materialized, out map[string]struct{}) {
 	properties := r.Properties()
-	for name := range r.RequiredSet() {
+	required := r.RequiredSet()
+
+	for name := range required {
 		path := prefix.AppendNode(name)
 		prop, ok := properties[name]
 		if !ok || len(prop.RequiredSet()) == 0 {
 			out[string(path)] = struct{}{}
 			continue
 		}
-		prop.collectRequiredLeafPaths(path, out)
+		prop.collectRequiredPaths(path, materialized, out)
+	}
+
+	// An optional object is invisible to the loop above, so descend into
+	// the ones a collected field materializes.
+	for name, prop := range properties {
+		if _, isRequired := required[name]; isRequired {
+			continue
+		}
+		path := prefix.AppendNode(name)
+		if _, ok := materialized[string(path)]; !ok {
+			continue
+		}
+		prop.collectRequiredPaths(path, materialized, out)
 	}
 }
 

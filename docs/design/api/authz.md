@@ -21,13 +21,17 @@ The middleware executes, in order:
 3. Scope-bound DAL query — the repository signature requires a resolved ScopeContext; no code path can query a scoped table without one
 ```
 
-Permission is denied before any resource content is fetched. Enumeration oracles are closed: failures return 404, not 403.
+Permission is denied before any resource content is fetched. Across project
+boundaries (no foothold), failures return **404**. Inside a project the
+caller already has a foothold in, missing permission returns **403**
+([ADR 033](../../adrs/033-internal-permission-management.md); **D10** in
+[`permission-storage.md`](permission-storage.md)).
 
 ## Principal types
 
 | Principal | Identifier | Scope semantics |
 |---|---|---|
-| **user** (user token) | `user_id` | Resolved against `team_memberships` and project grants for the project the user lives in. |
+| **user** (user token) | `user_id` | FGA membership checks use `authz_membership_edges` (dual-written from `team_memberships`); see D3 in [`permission-storage.md`](permission-storage.md). Roster/`team_memberships` stay lifecycle-adjacent only. |
 | **`sk_proj_…`** (claimed) | `project_id`, `team_id` (owning team) | Project-wide. |
 | **`sk_proj_…`** (pre-claim) | `project_id`, `pre_claim: true` | Project-wide against an unclaimed project. |
 | **`sk_proj_…`** (origin-scoped) | `project_id`, `origin_patterns` | Project-wide, gated on request `Origin` matching a pattern. |
@@ -40,7 +44,15 @@ A user can be in the platform project (a developer/admin) or a customer project 
 
 Permissions are flat `{resource}.{verb}` strings such as `user.read`, `project.write`, and `team_membership.write`. Multi-word resource types use `_` (for example `team_membership`, `flow_definition`), not dot nesting. Scope (which project or team) comes from the resolved grant, not from nesting in the permission name. Parent-resource permissions do not inherit into separately cataloged resources: for example, `project.write` does not imply `branding.write`, `allowed_origin.write`, or `webhook.write`. Bundles may grant those permissions together. The resolver answers: "for this principal, in this resolved scope, is this permission granted?" See [`system-permission-catalog.md`](system-permission-catalog.md) for the full list.
 
-> **Not enforced yet.** This is the target model. The server's current compatibility layer (`scopeAllowed` in `internal/api/authz.go`) still treats the legacy operator-grade `project.write` as an umbrella scope that satisfies every finer per-resource scope, including `branding.write`. Per-resource scopes become independently mintable with [ADR 036](../../adrs/036-api-credential-planes.md)'s credential planes; until then, do not assume the stricter model is enforced when configuring clients.
+> **MVP enforcement.** Path-id management handlers resolve scope via
+> `GetResourceScope` (`resource_scope_index`) **before** `resolver.Check` on
+> coarse `project.{viewer,editor,admin}` (seeded system catalog). Create/list
+> keep an explicit `project_id` and call Check directly. `CreateProject` seeds
+> an `sk_proj` ↔ `project.viewer` assignment so the returned project secret can
+> set up the project. The operator-plane ceiling still requires token scope
+> `project.write` (preview/`project.read` remains browser-plane). Fine-grained
+> `{resource}.{verb}` catalog relations land with #420; until then do not
+> assume independently mintable per-resource scopes when configuring clients.
 
 **Grants and roles** provide the mapping:
 
@@ -73,8 +85,8 @@ marks that user as team-owned.
 
 The decision engine answers `can principal P perform action A on resource R?` considering:
 
-- Direct permission grants.
-- Role assignments through team_memberships.
+- Direct permission grants (`authz_assignments`).
+- Team usersets via `authz_membership_edges` and relation closure (see [`permission-storage.md`](permission-storage.md)); `team_memberships` is roster/lifecycle only, not the check fact source.
 - Credential-class allowlists (especially `sk_team_`).
 - Resource-scope constraints (`origin_patterns`, project/team boundary, etc.).
 
@@ -88,7 +100,18 @@ An `sk_team_…` hitting `PATCH /projects/{id}` gets 404 regardless of path. The
 
 ## 404 vs 403
 
-Both "ID does not exist" and "authorisation fails" return **404 Not Found**. This closes enumeration oracles. The single exception: operations on resources the caller *already knows exist* (e.g. `PATCH /me`) return 403 when disallowed.
+- **No project foothold** (or unknown resource outside the caller's reach) →
+  **404 Not Found**. Closes cross-project enumeration oracles.
+- **Foothold in the project, missing required permission** → **403 Forbidden**.
+  Actionable for authorized callers ([ADR 033](../../adrs/033-internal-permission-management.md)).
+- Self resources the caller already knows exist (e.g. `PATCH /me`) also return
+  403 when disallowed.
+- **Delete idempotency (operators):** when `path.id` has no RSI row in the
+  caller's project scope, operators (`project.write`) get **204 No Content**;
+  preview and other callers get the resource readMiss shape (404). This is a
+  deliberate tradeoff: operators with any project secret can still distinguish
+  fabricated ids from real foreign resources (404/403 after RSI hit). See D10 in
+  [`permission-storage.md`](permission-storage.md).
 
 ## See also
 
@@ -97,3 +120,4 @@ Both "ID does not exist" and "authorisation fails" return **404 Not Found**. Thi
 - [`url-architecture.md`](url-architecture.md) — scope resolution that runs before the permission check
 - [`resource-map.md`](resource-map.md) — endpoint surface inventory
 - [`system-permission-catalog.md`](system-permission-catalog.md) — canonical permission names, bundles, and per-resource permission matrix
+- [`permission-storage.md`](permission-storage.md) — Wave 0 relational DDL, dual-write membership edges, and check SQL shape

@@ -127,6 +127,21 @@ properties:
             - pivot: push the target flow onto the stack. The current flow
               is paused and resumes when the target flow completes (auto-pop).
               Example: login → recovery → back to login.
+        purpose:
+          oneOf:
+            - type: string
+              enum: [login, register, recovery, profiling, reauth, link_account]
+            - type: 'null'
+          description: |
+            Local re-purposing. When set, taking this transition changes the
+            flow's current purpose to this value — the dispatch mode a step's
+            challenges run under — while the flow's original purpose stays
+            pinned. Must be a purpose this definition serves, and `target`
+            must be that purpose's entry step. Mutually exclusive with
+            `action`: a transition either re-purposes within this flow or
+            targets another flow, never both.
+            Example: a "Sign up" navigation on the login identifier step
+            (`{ target: register, purpose: register }`).
       additionalProperties: false
     example:
       submit:

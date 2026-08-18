@@ -7,6 +7,7 @@ import { consola } from "consola";
 import { ZitadelError } from "../errors";
 import { FLOWS_DIR } from "../flows";
 import { stableStringify } from "../json";
+import { annotateAssetWarnings } from "./asset-probe.js";
 import { validatePlannedFlows } from "./flow-validation.js";
 import type { PlanResourceChange } from "./plan-renderer.js";
 import { readState, removeFromState, updateState } from "./state.js";
@@ -205,6 +206,11 @@ export async function buildSyncPlan(
   // already published. Throws E_VALIDATION before any mutation.
   validatePlannedFlows({ actions, scannedContents, stateResources: state.resources });
 
+  // Reachability pre-flight for branding asset URLs. Annotates warnings only:
+  // the machine planning is not necessarily the machine rendering the login
+  // page, so a URL this host cannot fetch is never a reason to fail.
+  await annotateAssetWarnings(actions);
+
   return actions;
 }
 
@@ -246,7 +252,7 @@ export async function runSyncLoop(
 ): Promise<SyncLoopResult> {
   const actions = await buildSyncPlan(cwd, syncers);
   for (const action of actions) {
-    if (action.kind === "create" || action.kind === "update") {
+    if (action.kind === "create" || action.kind === "update" || action.kind === "revise") {
       for (const warning of action.warnings ?? []) {
         consola.warn(`${action.path}: ${warning.message}`);
       }

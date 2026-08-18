@@ -330,13 +330,32 @@
           "description": "When `action` is omitted, the `name` of a step in the same definition. When `action` is `switch` or `pivot`, the `name` of another flow definition in the same project."
         },
         "action": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "enum": [
             "switch",
             "pivot",
             null
           ],
           "description": "How to interpret `target`. - Omitted: transition to a step in the current definition. - `switch`: replace the current flow with the target flow.   No return; the current flow is discarded. Typical use:   navigating between peer flows like login ↔ register. - `pivot`: push the target flow onto the stack. The current   flow is paused; when the target flow completes the engine   auto-pops back. Typical use: login → recovery → back to login."
+        },
+        "purpose": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "login",
+            "register",
+            "recovery",
+            "profiling",
+            "reauth",
+            "link_account",
+            null
+          ],
+          "description": "Local re-purposing. When set, taking this transition changes the flow's current purpose to this value — the dispatch mode a step's challenges run under — while the flow's original purpose stays pinned. Must be a purpose this definition serves, and `target` must be that purpose's entry step. Mutually exclusive with `action`: a transition either re-purposes within this flow or targets another flow, never both. Example: a \"Sign up\" navigation on the login identifier step (`{ \"target\": \"register\", \"purpose\": \"register\" }`)."
         }
       }
     }

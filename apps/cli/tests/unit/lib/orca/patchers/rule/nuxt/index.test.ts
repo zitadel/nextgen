@@ -8,7 +8,7 @@ import { NuxtPatcher } from "../../../../../../../src/lib/orca/patchers/rule/nux
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 
-function ctx(appDir = "app"): PatchContext {
+function ctx(appDir = "app", scaffoldedFramework = true): PatchContext {
   return {
     framework: { id: "nuxt", appDir, devPort: 3000, url: "http://localhost:3000" },
     rendererId: "react",
@@ -22,6 +22,7 @@ function ctx(appDir = "app"): PatchContext {
     issuer: "http://localhost:3000",
     server: "https://api.zitadel.cloud",
     cliVersion: "0.1.0-alpha.0",
+    scaffoldedFramework,
   };
 }
 
@@ -94,6 +95,38 @@ describe("NuxtPatcher.plan", () => {
     expect(writeContents(plan, "pages/login.vue")).toContain(MANAGED_MARKER);
   });
 
+  it("keeps a pre-existing app's shell and homepage (ADR 044)", () => {
+    // Only fresh scaffolds get the CLI's app.vue and the /login redirect —
+    // writing them into an existing app would stomp (or conflict with) the
+    // user's own shell, theme, and landing page.
+    const plan = new NuxtPatcher().plan(ctx("app", false));
+    expect(writeContents(plan, "app/app.vue")).toBeUndefined();
+    expect(writeContents(plan, "app/pages/index.vue")).toBeUndefined();
+    expect(writeContents(plan, "app/pages/login.vue")).toContain(MANAGED_MARKER);
+  });
+
+  it("embeds widget cards with theme=auto for the widget posture (ADR 044)", () => {
+    const plan = new NuxtPatcher().plan({ ...ctx("app", false), posture: "widget" });
+    for (const path of ["app/pages/login.vue", "app/pages/register.vue", "app/pages/profile.vue"]) {
+      const page = writeContents(plan, path);
+      expect(page).toContain('variant="widget"\n        theme="auto"');
+      // Layout-neutral wrapper: no forced color scheme, the host app's own
+      // shell provides the chrome.
+      expect(page).not.toContain("color-scheme: dark");
+      expect(page).toContain("justify-content: center");
+      // The full-page alternative stays named for discoverability.
+      expect(page).toContain('variant="page"');
+    }
+  });
+
+  it("treats absent posture as the page posture (legacy restores)", () => {
+    const dflt = new NuxtPatcher().plan(ctx("app", false));
+    const paged = new NuxtPatcher().plan({ ...ctx("app", false), posture: "page" });
+    for (const path of ["app/pages/login.vue", "app/pages/register.vue", "app/pages/profile.vue"]) {
+      expect(writeContents(paged, path)).toBe(writeContents(dflt, path));
+    }
+  });
+
   it("adds the SDK dependency at the CLI's prerelease tag", () => {
     const dep = new NuxtPatcher()
       .plan(ctx())
@@ -110,6 +143,18 @@ describe("NuxtPatcher.artifacts", () => {
     });
     expect(artifacts.markedFiles).toContain("app/pages/login.vue");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-nuxt"]);
-    expect(artifacts.configEdits).toEqual(["nuxt.config.*"]);
+    // package.json is listed too: the `dev` script gets the registered
+    // dev-server port pinned into it, and eject can't auto-revert that.
+    expect(artifacts.configEdits).toEqual(["nuxt.config.*", "package.json"]);
+  });
+
+  it("declares the app shell and homepage as conditionally scaffolded", () => {
+    // Written only on fresh scaffolds, so the managed-files check must not
+    // expect them on a manifest-less pre-existing app.
+    const artifacts = new NuxtPatcher().artifacts({
+      framework: { id: "nuxt", appDir: "app", devPort: 3000, url: "http://localhost:3000" },
+      rendererId: "react",
+    });
+    expect(artifacts.conditionalFiles).toEqual(["app/app.vue", "app/pages/index.vue"]);
   });
 });

@@ -1,9 +1,15 @@
 # ADR 030: Error Model, Mapping, and Reporting
 
-> **Status:** Proposed
+> **Status:** Accepted — 2026-08-11 (originally Proposed 2026-06-26)
 > **Date:** 2026-06-26
 > **Context:** Cross-cutting error taxonomy, API contract, logging, and operational reporting
 > **Related:** [#367](https://github.com/zitadel/nextgen/issues/367), [#48](https://github.com/zitadel/nextgen/issues/48)
+>
+> **Amendment (2026-08-11):** substantial parts are shipped — the stable
+> error-code catalog over OAS (#777) and the selective details producers
+> (#799); [`error-details-producers.md`](../design/api/error-details-producers.md)
+> documents the shipped producer contract. The status moves to Implemented
+> once every decision item below is verified against code.
 
 ## Context
 
@@ -12,8 +18,8 @@
 | Layer | Location | Shape |
 |---|---|---|
 | Domain | `internal/domain/error.go` | `domain.Error` with `Code`, `Message`, `Details`, `Parent`, `Location` |
-| Storage | `internal/storage/v2/database/error.go` | Typed `database.*Error` values (`NoRowFoundError`, `UniqueError`, …) |
-| Dialect | `internal/storage/v2/dialect/*/error.go` | Driver → `database.*Error` normalization |
+| Storage | `internal/storage/database/error.go` | Typed `database.*Error` values (`NoRowFoundError`, `UniqueError`, …) |
+| Dialect | `internal/storage/dialect/*/error.go` | Driver → `database.*Error` normalization |
 | Service | `internal/service/*` | Ad-hoc `errors.AsType` mapping from storage to domain |
 | API | `internal/api/error_handler.go` | Prefix/code routing → HTTP status + `ErrorDetails` |
 | Instrumentation | `internal/instrumentation/config.go`, `zlog/` | GCP log formatting, optional masking, `ErrorConfig` knobs |
@@ -178,7 +184,7 @@ Baseline mapping:
 | `PermissionError` | `auth.unauthorized` or `ErrInternal` | Depends on whether the caller is an end user vs operator |
 | `UnknownError` | `ErrInternal(parent)` | Preserve parent for logs only |
 
-**Do not** map storage errors to domain inside `internal/storage/v2/dialect`. Dialect stays driver-aware; domain stays business-aware.
+**Do not** map storage errors to domain inside `internal/storage/dialect`. Dialect stays driver-aware; domain stays business-aware.
 
 Follow-up tracked by [#48](https://github.com/zitadel/nextgen/issues/48): introduce a small shared helper (for example `storagemap.NotFound(err) bool`) only to reduce duplicated `errors.AsType` boilerplate, not to hide resource-specific semantics.
 
@@ -192,6 +198,7 @@ Every error response is the ogen-generated `api.ErrorDetails` (`api/openapi/comp
 - **`Details` is marshalled to the client whenever a producer sets it** (standard JSON marshalling). Setting `Details` *is* the act of exposing it — there is no separate per-code allow-list.
 - `Details` must contain only **client-actionable, non-sensitive** data (field paths, schema validation issues, conflict keys). Keeping secrets/PII out is the **producer's** responsibility (Decision 6), because the value is client-facing by intent.
 - A details **container type is not a client-redaction mechanism**: a `map`/struct marshals whatever it holds, and no generic type can distinguish intended PII (for example the subject's own email on a self-scoped endpoint) from a leak. Redaction is enforced by producer discipline and review, not by the type.
+- Producer contract, reference patterns, and inventory live in [`docs/design/api/error-details-producers.md`](../design/api/error-details-producers.md) ([#585](https://github.com/zitadel/nextgen/issues/585) task B).
 
 #### HTTP status
 
@@ -325,7 +332,7 @@ The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean
 - `internal/api/error_handler.go`, `OgenErrorHandler` — sets `d.Message = err.Error()` for ogen security and decode errors (raw framework text). **Must fix / normalize.**
 - `internal/api/flow.go`, `Handler.SubmitFlowStep` — `domain.ErrRequestInvalid().WithMessage(err.Error())` surfaces raw decode/parse error text (non-domain `err`) in the field-decode and origin-validation branches. **Must fix / normalize.**
 - `internal/api/flow.go`, `mapFlowErrorStatus` — `Message: err.Error()` for `invalid_action` / `session_conflict` / `unsupported`. Mitigated by the trimmed `Error()` when `err` is a `domain.Error`, but still migrate to `flow.*` sentinels with fixed messages (Decision 2) rather than relying on `Error()`.
-- `internal/storage/v2/database/integrity_errors.go` — `IntegrityViolationError.Error()` (and `NoRowFoundError` / `ScanError` / `UnknownError`) render the wrapped `original` driver error with `%v`. For a `23505` the pg dialect stores `*pgconn.PgError` as `original` (the `23505` case in `wrapPgError`), whose `Detail` embeds the offending row — for the unique-attribute schema, `Key (project_id, team_id, key, value_hash)=(…, …, email, \x9f86d0…) already exists.`, exposing the sensitive `value_hash`. This is **log-safe-at-source** work: add a `LogValue` that emits typed fields only and stops carrying the driver `Detail` into logged output. **Log leak — must fix.**
+- `internal/storage/database/integrity_errors.go` — `IntegrityViolationError.Error()` (and `NoRowFoundError` / `ScanError` / `UnknownError`) render the wrapped `original` driver error with `%v`. For a `23505` the pg dialect stores `*pgconn.PgError` as `original` (the `23505` case in `wrapPgError`), whose `Detail` embeds the offending row — for the unique-attribute schema, `Key (project_id, team_id, key, value_hash)=(…, …, email, \x9f86d0…) already exists.`, exposing the sensitive `value_hash`. This is **log-safe-at-source** work: add a `LogValue` that emits typed fields only and stops carrying the driver `Detail` into logged output. **Log leak — must fix.**
 
 ### 7. Backwards compatibility and migration
 
@@ -366,7 +373,7 @@ The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean
 | Wire `errreport` toggles + `GCPReporting` from `log.errors.*` / format | Instrumentation | #367 |
 | Flow error sentinels + OpenAPI schemas | API / domain | #367 |
 | Shared storage error detection helpers | Storage / service | #48 |
-| Selective API `details` population | API | #367 |
+| Selective API `details` population | API | [#585](https://github.com/zitadel/nextgen/issues/585) (was #367) |
 | Align `WithLogging`: 4xx at `Info`/`Warn`, stop logging raw response bodies | API / instrumentation | #367 |
 | Deduplicate API `code → HTTP status` mapping (helper / manifest in `internal/api`; no `ErrorClass` on domain) | API | #367 |
 | Schema-declared attribute sensitivity; audit no secret/PII in path/query params | API / domain | #367 |
@@ -374,7 +381,7 @@ The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean
 ## References
 
 - `internal/domain/error.go` — canonical domain error type
-- `internal/storage/v2/database/integrity_errors.go` — storage error taxonomy
+- `internal/storage/database/integrity_errors.go` — storage error taxonomy
 - `internal/api/error_handler.go` — API mapping and `OgenErrorHandler`
 - `internal/instrumentation/config.go` — log format, masking, error reporting config
 - `api/openapi/components/error-details.yaml` — public wire shape

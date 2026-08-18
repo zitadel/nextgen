@@ -248,8 +248,7 @@ func TestDeleteUser(t *testing.T) {
 
 			// ACT
 			deleteParams := api.DeleteUserByIDParams{
-				ProjectID: api.ProjectID(project.ID),
-				UserID:    api.UserID(user["id"].(string)),
+				UserID: api.UserID(user["id"].(string)),
 			}
 			deleteResp, err := client.DeleteUserByID(t.Context(), deleteParams)
 			require.NoError(t, err)
@@ -258,8 +257,7 @@ func TestDeleteUser(t *testing.T) {
 			assert.IsType(t, &api.DeleteUserByIDNoContent{}, deleteResp, helpers.MustMarshal(t, deleteResp))
 
 			getUserParams := api.GetUserByIDParams{
-				ProjectID: api.ProjectID(project.ID),
-				UserID:    api.UserID(user["id"].(string)),
+				UserID: api.UserID(user["id"].(string)),
 			}
 			getResp, err := client.GetUserByID(t.Context(), getUserParams)
 			require.NoError(t, err)
@@ -272,8 +270,7 @@ func TestDeleteUser(t *testing.T) {
 
 			// ACT
 			deleteParams := api.DeleteUserByIDParams{
-				ProjectID: api.ProjectID(project.ID),
-				UserID:    api.UserID("user_idwhichdoesnotexist"),
+				UserID: api.UserID("user_idwhichdoesnotexist"),
 			}
 			deleteResp, err := client.DeleteUserByID(t.Context(), deleteParams)
 			require.NoError(t, err)
@@ -313,8 +310,7 @@ func TestDeleteUser(t *testing.T) {
 
 			// ACT
 			deleteParams := api.DeleteUserByIDParams{
-				ProjectID: api.ProjectID(project.ID),
-				UserID:    api.UserID(userID),
+				UserID: api.UserID(userID),
 			}
 			deleteResp, err := client.DeleteUserByID(t.Context(), deleteParams)
 			require.NoError(t, err)
@@ -323,8 +319,7 @@ func TestDeleteUser(t *testing.T) {
 			assert.IsType(t, &api.DeleteUserByIDNoContent{}, deleteResp, helpers.MustMarshal(t, deleteResp))
 
 			getUserParams := api.GetUserByIDParams{
-				ProjectID: api.ProjectID(project.ID),
-				UserID:    api.UserID(userID),
+				UserID: api.UserID(userID),
 			}
 			getResp, err := client.GetUserByID(t.Context(), getUserParams)
 			require.NoError(t, err)
@@ -356,8 +351,7 @@ func TestSetUserPassword(t *testing.T) {
 		})
 		require.NoError(t, err)
 		return api.SetUserPasswordParams{
-			ProjectID: api.ProjectID(project.ID),
-			UserID:    api.UserID(user["id"].(string)),
+			UserID: api.UserID(user["id"].(string)),
 		}, user["email"].(string)
 	}
 
@@ -446,8 +440,7 @@ func TestSetUserPassword(t *testing.T) {
 				Password: "fake-password",
 			}
 			params := api.SetUserPasswordParams{
-				ProjectID: api.ProjectID(project.ID),
-				UserID:    api.UserID("user_does-not-exist"),
+				UserID: api.UserID("user_does-not-exist"),
 			}
 
 			resp, err := projClient.SetUserPassword(t.Context(), request, params)
@@ -475,8 +468,7 @@ func TestGetUser(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	params := api.GetUserByIDParams{
-		ProjectID: api.ProjectID(project.ID),
-		UserID:    api.UserID(user["id"].(string)),
+		UserID: api.UserID(user["id"].(string)),
 	}
 
 	resp, err := client.GetUserByID(t.Context(), params)
@@ -540,8 +532,7 @@ func TestListUserTeams(t *testing.T) {
 		return res.(*api.ListUserTeamsResponse)
 	}
 	rosterParams := api.ListUserTeamsParams{
-		ProjectID: api.ProjectID(project.ID),
-		UserID:    api.UserID("user_roster-01"),
+		UserID: api.UserID("user_roster-01"),
 	}
 
 	// The whole roster, ordered by team name, each entry naming its team.
@@ -561,9 +552,8 @@ func TestListUserTeams(t *testing.T) {
 
 	// The window walks the roster one page at a time, in the same order.
 	page := listTeams(t, api.ListUserTeamsParams{
-		ProjectID: rosterParams.ProjectID,
-		UserID:    rosterParams.UserID,
-		Limit:     api.NewOptLimit(1),
+		UserID: rosterParams.UserID,
+		Limit:  api.NewOptLimit(1),
 	})
 	require.Len(t, page.Teams, 1)
 	assert.Equal(t, alpha.ID, page.Teams[0].ID)
@@ -571,7 +561,6 @@ func TestListUserTeams(t *testing.T) {
 	require.True(t, ok, "a full page carries a cursor")
 
 	page = listTeams(t, api.ListUserTeamsParams{
-		ProjectID: rosterParams.ProjectID,
 		UserID:    rosterParams.UserID,
 		Limit:     api.NewOptLimit(1),
 		PageToken: api.NewOptPageToken(pageToken),
@@ -581,8 +570,7 @@ func TestListUserTeams(t *testing.T) {
 
 	// The user endpoint answers the other question, and answers it differently.
 	userResp, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{
-		ProjectID: rosterParams.ProjectID,
-		UserID:    rosterParams.UserID,
+		UserID: rosterParams.UserID,
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.User{}, userResp, helpers.MustMarshal(t, userResp))
@@ -593,8 +581,7 @@ func TestListUserTeams(t *testing.T) {
 
 	// An unknown user is a 404, not an empty roster.
 	missing, err := client.ListUserTeams(t.Context(), api.ListUserTeamsParams{
-		ProjectID: rosterParams.ProjectID,
-		UserID:    api.UserID("user_does-not-exist"),
+		UserID: api.UserID("user_does-not-exist"),
 	})
 	require.NoError(t, err)
 	assert.IsType(t, &api.ListUserTeamsNotFound{}, missing, helpers.MustMarshal(t, missing))
@@ -718,8 +705,7 @@ func TestListPasskeys(t *testing.T) {
 			harness.RegisterPasskey(t, project.ID, userID, "second passkey")
 
 			params := api.ListUserPasskeysParams{
-				ProjectID: api.ProjectID(project.ID),
-				UserID:    api.UserID(userID),
+				UserID: api.UserID(userID),
 			}
 
 			resp, err := client.ListUserPasskeys(t.Context(), params)
@@ -742,11 +728,10 @@ func TestListPasskeys(t *testing.T) {
 		t.Run("empty passkeys", func(t *testing.T) {
 			t.Parallel()
 
-			project, user, client := dependencies(t)
+			_, user, client := dependencies(t)
 
 			params := api.ListUserPasskeysParams{
-				ProjectID: api.ProjectID(project.ID),
-				UserID:    api.UserID(user["id"].(string)),
+				UserID: api.UserID(user["id"].(string)),
 			}
 
 			resp, err := client.ListUserPasskeys(t.Context(), params)
@@ -770,8 +755,7 @@ func TestListPasskeys(t *testing.T) {
 		harness.SetProjectSecretOnApiClient(t, client, project)
 
 		resp, err := client.ListUserPasskeys(t.Context(), api.ListUserPasskeysParams{
-			ProjectID: api.ProjectID(project.ID),
-			UserID:    "user_does_not_exist",
+			UserID: "user_does_not_exist",
 		})
 		require.NoError(t, err)
 		assert.IsType(t, &api.ListUserPasskeysNotFound{}, resp, helpers.MustMarshal(t, resp))

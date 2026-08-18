@@ -11,10 +11,25 @@ import type { NavIcon } from "./components/app-shell/icons";
 export interface NavMeta {
   /** Sidebar label. */
   label: string;
-  /** Sort order in the flat sidebar list. */
+  /** Sort order among siblings (top level, or within one parent's children). */
   order: number;
-  /** Sidebar glyph (matches the design system's Lucide icon set). */
-  icon: NavIcon;
+  /**
+   * Sidebar glyph (matches the design system's Lucide icon set). Optional
+   * because a nested entry renders as text — the design's
+   * `Sidebar / SidebarMenuSubItem` carries no icon, so a nested entry that
+   * declared one would be dead data.
+   */
+  icon?: NavIcon;
+  /**
+   * Route path of the entry this one nests under, e.g. `"/users"` for
+   * `User schemas`. Nested entries render in shadcn's `SidebarMenuSub` beneath
+   * the parent — the design's `Sidebar / SidebarMenuSub` frame — and are hidden
+   * with it when the sidebar collapses to the icon rail.
+   *
+   * Matched on the parent's path rather than its label so renaming a label does
+   * not silently orphan the child.
+   */
+  parent?: string;
 }
 
 /**
@@ -34,12 +49,12 @@ export interface NavMeta {
  *   - Activity Log — no audit-log read API (#350)
  *
  * ```ts
- * import { Activity, AppWindow, BarChart3, Folder } from "lucide-react";
+ * import { Activity, AppWindow, Folder, LineChart } from "lucide-react";
  *
  * export const DESIGN_ONLY_NAV: NavMeta[] = [
  *   { label: "App groups", order: 3, icon: Folder },
  *   { label: "Applications", order: 4, icon: AppWindow },
- *   { label: "Analytics", order: 5, icon: BarChart3 },
+ *   { label: "Analytics", order: 5, icon: LineChart },
  *   { label: "Activity Log", order: 7, icon: Activity },
  * ];
  * ```

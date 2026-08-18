@@ -14,7 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
-	"github.com/zitadel/nextgen/internal/storage/v2/database"
+	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
 func createMockedProjectService(t *testing.T) (svc service.ProjectService,
@@ -96,6 +96,15 @@ func TestProjectService_Create(t *testing.T) {
 				statements.EXPECT().NewManagedID(string(domain.PrefixEncryptionKey)).Return("enc_key_minted", nil)
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 				statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
+				statements.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, a *domain.AuthzAssignment) error {
+						assert.Equal(t, domain.AuthzPrincipalTypeSKProj, a.PrincipalType)
+						assert.Equal(t, "proj_generated", a.PrincipalID)
+						assert.Equal(t, "project", a.ObjectType)
+						assert.Equal(t, "viewer", a.Relation)
+						return nil
+					},
+				)
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 			},
@@ -118,6 +127,7 @@ func TestProjectService_Create(t *testing.T) {
 				statements.EXPECT().NewManagedID(string(domain.PrefixEncryptionKey)).Return("enc_key_minted", nil)
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 				statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
+				statements.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 			},
@@ -139,6 +149,7 @@ func TestProjectService_Create(t *testing.T) {
 				statements.EXPECT().NewManagedID(string(domain.PrefixEncryptionKey)).Return("enc_key_minted", nil)
 				statements.EXPECT().CreateEncryptionKey(gomock.Any(), gomock.Any()).Times(4)
 				statements.EXPECT().CreateSigningKey(gomock.Any(), gomock.Any()).Times(1)
+				statements.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any())
 				// No schema/flow-definition seeding when seedDefaults is false.
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any()).Times(0)
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any()).Times(0)

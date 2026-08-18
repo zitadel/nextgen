@@ -56,6 +56,10 @@ Each invocation prints one JSON object:
   see what setup created versus merged into (your `package.json` is an
   `update`). `data.files_written` remains the flat list — deduplicated file
   paths only, covering both scaffolded and `.zitadel/` resource files.
+- `setup` also emits `data.design`: the starter login design it ejected and
+  published as branding revision 1, or `null` when the built-in template was
+  kept (no `.zitadel/branding/` files exist in that case). Use it to verify
+  the requested `--design` took effect without diffing the repo.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime with
   `npx @zitadel/cli@alpha start`, then retry with `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 from the target server. With the platform's
@@ -95,7 +99,14 @@ the CLI's help layer, not the envelope.
   templates by it; the planned `web-component` renderer is not yet available
   and is rejected if passed), `--dev-port` (dev-server port, also the issuer
   origin registered with Zitadel — use distinct ports to run several scaffolded
-  apps side by side), `--preset password-first|passkey-first` (the sign-in
+  apps side by side. The app must actually serve this port or the flow API
+  rejects its origin on the first submit, so setup makes the port explicit in
+  the app's own dev-server config: `server.port` + `strictPort` for Vite
+  frameworks, `serve.options.port` for Angular, and — because `next dev` and
+  `nuxt dev` take a port only from the command line — `--port` in the
+  `package.json` `dev` script for Next and Nuxt. On a pre-existing app that
+  means setup edits the `dev` script when it does not already name that port;
+  a script already on it is left untouched), `--preset password-first|passkey-first` (the sign-in
   experience the scaffold starts from: `password-first` is the default —
   email + password with passkey optional during registration; `passkey-first`
   enters login on a one-tap passkey step with an email + password fallback;
@@ -104,9 +115,57 @@ the CLI's help layer, not the envelope.
   email only; `consumer` adds given and family name; `business` also adds a
   `companyName` attribute and overlays work-email copy on the generated auth
   pages via the SDK's `businessLocales`; asked before `--preset` and recorded
-  in `zitadel.json`), `--skip-install`.
+  in `zitadel.json`), `--design centered|split|split-right|hero|minimal`
+  (starter login design: ejects the design's template into
+  `.zitadel/branding/` and publishes it as branding revision 1 during setup;
+  the interactive wizard asks this as its final question with the built-in
+  template preselected — omit the flag in non-interactive runs to keep the
+  built-in template and no branding files), `--skip-install`.
+  On Next and Nuxt, the scaffolded auth/profile pages derive their embedding
+  posture from the app: a fresh scaffold (setup created the skeleton) pins
+  `variant="page"` full-page chrome, while a pre-existing app embeds
+  `variant="widget"` cards with `theme="auto"` in a layout-neutral wrapper.
+  `theme="auto"` follows the OS `prefers-color-scheme`, not the host app's
+  own theme — edit the generated page to set `theme="light"` or
+  `theme="dark"` when the app pins its scheme. Other frameworks always
+  scaffold the page posture. The chosen posture is recorded in the scaffold
+  manifest, `doctor --fix` restores managed pages in the recorded posture,
+  and editing the generated page is the supported way to change presentation
+  — there is no config knob.
+  Widget-posture embedding levers: host-page CSS sets `--zl-*` design-token
+  custom properties on the element to bridge the app's look through the
+  widget's shadow DOM (fonts `--zl-font-family-heading`/`-sans`, radii
+  `--zl-radius-*`, primary CTA `--zl-primary`/`--zl-primary-foreground`,
+  link color `--zl-color-text-link`); the `suppress-header` attribute
+  (wrapper prop `suppressHeader`) visually hides the widget's own heading
+  block when the page already carries one, keeping it in the accessibility
+  tree. Split-family designs collapse their brand pane by container width —
+  at card width they show the compact brand mark (`logo_url`, else
+  `hero_url`, from `.zitadel/branding/branding.json`; `hero` falls back to
+  editable text), and setup warns when a widget-posture app picks `split`
+  or `split-right`.
 - `plan` — validate config and preview the sync diff without mutating anything.
 - `apply` — validate and upload repo config to the platform.
+- `plan` and `apply --dry-run` also emit `data.warnings`: non-blocking
+  findings as `{path, rule, message}`, the same text the human plan prints as
+  `# warning:` lines and `apply` prints through stderr. They never fail a run.
+  Two families exist today: flow-definition rules (`warn/…`, mirrored from the
+  server's validator) and branding asset reachability. `warn/asset-unreachable`
+  and `warn/asset-content-type` come from a bounded HEAD probe of
+  `logo_url` / `hero_url` — a URL that is well-formed but dead passes every
+  gate and then renders as a 0×0 image with nothing in the console, so the
+  probe is the only place it can be caught. It is advisory by design: the
+  machine planning is not necessarily the machine that renders the login page.
+  The probe only contacts public HTTPS destinations and re-checks every
+  redirect; loopback/private/internal targets stay inconclusive instead of
+  turning repo config into a network request from the planning host.
+  Set `ZITADEL_SKIP_ASSET_PROBE` to turn it off (offline, air-gapped CI, or a
+  CDN that only resolves from production) and `ZITADEL_ASSET_PROBE_TIMEOUT_MS`
+  to retune the per-URL budget (default 2500).
+- In the human-readable plan, a multi-line field (branding's inlined
+  `liquid_template`) renders as `(<n> lines, sha256:…)` when it is created or
+  unchanged, and as a changed-line diff when it moved — not as one escaped
+  line. Read the file itself for full content.
 - `schemas list` — inspect the revision history of a user-schema, filtered by
   `--object-type` (e.g. `human-user`). Non-interactive/`--json` prints one row
   per revision (newest first); interactive adds a picker that fetches and
@@ -120,7 +179,11 @@ the CLI's help layer, not the envelope.
   managed config wirings (Vite/Nuxt proxy merges, Angular's `angular.json`
   proxy and auth routes) through the patchers' idempotent transforms — a
   detached or missing wiring config fails, an unverifiable one warns, and
-  `--fix` re-applies it. Boundary migrations converge: a pristine leftover
+  `--fix` re-applies it. The Next/Nuxt `dev` script is verified the same way,
+  against the port recorded as the development issuer rather than the port the
+  script names today: a script moved off that port reports as an unapplied
+  config edit (a warning — a `dev` script is not the only way to choose a
+  port), and `--fix` restores the registered one. Boundary migrations converge: a pristine leftover
   `middleware.ts` from a Next 15→16 upgrade is swapped for `proxy.ts`, while
   an edited one is reported as a conflict instead of creating both (Next
   rejects the pair). The default local
@@ -129,7 +192,14 @@ the CLI's help layer, not the envelope.
   files and never replaces an existing scaffolded app file; additive repairs
   (missing `.gitignore` entries, `.env.example` keys) still append to their
   targets, and the SDK dependency is re-added only when absent — an existing
-  version pin is never rewritten.
+  version pin is never rewritten. The `dependency-version` check warns when
+  an exactly-pinned `@zitadel/*` dependency does not match the CLI's own
+  version (the packages release as one train, and a floating
+  `npx @zitadel/cli@alpha` can run ahead of the app's pins); ranges,
+  dist-tags, and `file:`/`workspace:` specifiers express a deliberate choice
+  and are not compared. The repair — an exact-pin install command for the
+  project's detected package manager — is emitted in `data.next_commands`
+  and quoted in the warning message.
 - `claim` — attach the project to a team so it becomes permanent. Mints a
   short-lived link, opens it in a browser, and blocks until the developer
   finishes signing in there, then records `claimed_at` and `team_id` in
@@ -145,11 +215,22 @@ the CLI's help layer, not the envelope.
   there is nothing to preview, because a claim is decided in a browser.
   Flags: `--no-open` (print the link instead of launching a browser),
   `--timeout <seconds>` (stop waiting sooner than the link's own expiry).
+  `setup`, `status`, and `doctor` report whether a team is attached, reading
+  `claimed_at`/`team_id` from `.zitadel/secret` (no platform call). `status`
+  carries `data.project.claim` as `{"kind": "detached"}` or
+  `{"kind": "attached", "team_id": "team_01H…", "claimed_at": "2026-08-01T09:00:00.000Z"}`,
+  and `doctor` reports a
+  `claim` check. A project with no team is only ever a **warning**, never a
+  failure — it works exactly like one with a team, so `doctor` still exits 0
+  and `--fix` deliberately does nothing (a claim needs a human in a browser).
+  All three stay silent about teams when the project's `server` in
+  `zitadel.json` is local or self-hosted, where there is nothing to attach.
 - `status` — summarize the local runtime and project state.
 - `eject` (alias `uninstall`) — remove managed files and local Zitadel state;
   requires `--force` when non-interactive.
 - `start` — start the managed local Zitadel server and persist runtime metadata
-  under `.zitadel/local/runtime.json`. Use `--runtime docker` or `--image` for
+  under `.zitadel/local/runtime.json`. The binary runtime defaults to SQLite
+  under `.zitadel/local/nextgen-data/`. Use `--runtime docker` or `--image` for
   the Docker backend.
 - `stop` — stop the managed runtime while preserving
   `.zitadel/local/nextgen-data`. Use `stop --all` to sweep all discovered
@@ -244,9 +325,9 @@ validator (`E_VALIDATION` lists rule ids such as `no-script-tag` and
 must be absolute `https://`. Keep exactly one descriptor in
 `.zitadel/branding/` — extra `*.json` files there fail the scan.
 Server-provisioned defaults remain a fallback for non-CLI project
-creation, but CLI-created projects are authored from local files first. Flow create, read, list, and
-update are available, while the server enforces lifecycle rules such as
-draft-only edits. Managed files carry a marker comment; `eject` removes only
+creation, but CLI-created projects are authored from local files first. Flow create, read, list,
+update, and delete are available, while the server enforces lifecycle rules
+such as draft-only edits. Managed files carry a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
 requires a healthy

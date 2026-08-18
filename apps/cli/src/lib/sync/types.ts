@@ -24,6 +24,17 @@ export type ResourceEntry = {
 export type ScaffoldFileClass = "infrastructure" | "presentation";
 
 /**
+ * Embedding posture of the scaffolded auth/profile pages (ADR 044). `page`
+ * pins the widgets to their full-page chrome — the fresh-scaffold default.
+ * `widget` embeds the cards in a layout-neutral wrapper inside the app's own
+ * shell — the default when setup meets a pre-existing route-based app (Next,
+ * Nuxt). Recorded in the scaffold manifest so `doctor --fix` restores the
+ * posture setup actually emitted; absence restores `page` (every scaffold
+ * before this record existed was full-page).
+ */
+export type ScaffoldPosture = "page" | "widget";
+
+/**
  * One scaffolded app file as recorded at `zitadel setup` time: the sha256 of
  * the bytes the CLI wrote (or found already matching), plus its ownership
  * class. Keys of the containing record are project-root-relative posix paths.
@@ -39,13 +50,16 @@ export type ScaffoldFileEntry = {
  * current templates. `scaffolded_framework` records whether setup created the
  * app skeleton itself (fresh directory) — repair needs it to know whether the
  * framework home page is CLI-managed. `dev_port` preserves the issuer port for
- * context reconstruction. Absent on apps scaffolded by older CLI versions;
- * consumers fall back to template-derived expectations.
+ * context reconstruction. `posture` records the emitted embedding posture of
+ * the auth/profile pages (ADR 044) so restoration reproduces it. Absent on
+ * apps scaffolded by older CLI versions; consumers fall back to
+ * template-derived expectations.
  */
 export type ScaffoldManifest = {
   files: Record<string, ScaffoldFileEntry>;
   scaffolded_framework?: boolean;
   dev_port?: number;
+  posture?: ScaffoldPosture;
 };
 
 /**
@@ -157,8 +171,9 @@ export type SyncPlanSummary = {
 export type FlowRepin = { previousId: string; schemaPath: string; newId?: string };
 
 /**
- * A non-blocking finding from plan-time flow validation (severity
- * `warning` in `@zitadel/config/validate`). Rendered as `# warning:`
+ * A non-blocking plan-time finding: a flow-validation issue of severity
+ * `warning` (`@zitadel/config/validate`), or a branding asset URL the
+ * probe could not fetch (`asset-probe.ts`). Rendered as `# warning:`
  * comment lines in the plan and `consola.warn`ed during apply; never
  * fails the run.
  */
@@ -194,6 +209,7 @@ export type SyncAction =
       previousId: string;
       oldContent: object | null;
       affectedPaths: ReadonlyArray<string>;
+      warnings?: ReadonlyArray<SyncActionWarning>;
     }
   | { kind: "delete"; path: string; syncer: ResourceSyncer; id: string; oldContent: object | null }
   | { kind: "skip"; path: string; reason: "immutable" | "no-change" };
