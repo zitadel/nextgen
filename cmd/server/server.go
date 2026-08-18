@@ -25,6 +25,7 @@ import (
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -182,7 +183,15 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		nil,
 	)
 	teamService := service.NewTeamService(serviceDBPool)
+	// The claim and dashboard URLs hang off the console. builtin_public_base is
+	// the only public-origin config today and carries the /api/schemas path, so
+	// strip it down to the origin before appending the console path; a
+	// dedicated server public-base setting should replace this when cloud
+	// deployment configuration lands.
+	consoleBase := (&url.URL{Scheme: builtinPublicBase.Scheme, Host: builtinPublicBase.Host}).String() + cfg.Server.ConsolePath
+	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
+	eventService := service.NewEventService(serviceDBPool)
 	userService := service.NewUserService(
 		serviceDBPool,
 		schemaStore,
@@ -216,10 +225,13 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	tokenService := service.NewTokenService(keyService, serviceDBPool)
 
 	// ── Default project resolution ──
-	// Console ADR 0004 §3 (standalone): the deployment tracks exactly one
-	// project — the one the customer's integration (`zitadel setup`) created
-	// first. The server never creates it; it validates an explicitly pinned
-	// id up front and otherwise reports the current state for operators.
+	// Console ADR 0004 §2's cutover rule: until a human-usable seed transport
+	// ships, the console's sign-in project is the explicitly pinned one, or
+	// else the project the customer's integration (`zitadel setup`) created
+	// first. This is the transitional fallback, not a one-project ceiling —
+	// §1 is explicit that the data model does not enforce one. The server
+	// never creates it; it validates an explicitly pinned id up front and
+	// otherwise reports the current state for operators.
 	defaultProject, err := projectService.DefaultProject(ctx, cfg.Platform.ResolvedProjectID())
 	if err != nil {
 		return fmt.Errorf("failed to resolve the default project: %w", err)
@@ -235,6 +247,20 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	exportAdapter := service.EventExportAdapter{Pool: serviceDBPool}
+	requestEventBuf := audit.NewRequestBuffer(exportAdapter, audit.DefaultRequestBufferConfig())
+	defer requestEventBuf.Close()
+
+	retentionJob := audit.NewRetentionJob(exportAdapter, cfg.Events.Retention)
+	retentionJob.Start()
+	defer retentionJob.Close()
+
+	shipper := audit.NewShipper(exportAdapter, cfg.Events.Export)
+	if err := shipper.Start(ctx); err != nil {
+		return fmt.Errorf("start event shipper: %w", err)
+	}
+	defer shipper.Close()
+
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
 			flowService,
@@ -246,8 +272,10 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			flowDefinitionSvc,
 			teamService,
 			brandingService,
+			eventService,
 			tokenService,
 			keyService,
+			claimService,
 			serviceDBPool,
 			cfg.Platform.ProjectID,
 		),
@@ -264,7 +292,8 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	}
 
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
-		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()))
+		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
+		requestEventBuf)
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -365,11 +394,16 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
 	// Empty means "the deployment's first-created project is the default"
-	// (Console ADR 0004 §3); set NEXTGEN_PLATFORM_PROJECT_ID to pin an
+	// (Console ADR 0004 §2); set NEXTGEN_PLATFORM_PROJECT_ID to pin an
 	// existing project instead. The server never creates a project itself,
 	// unless platform.bootstrap_project explicitly opts in (#605).
 	v.SetDefault("platform.project_id", "")
 	v.SetDefault("platform.bootstrap_project", false)
+	v.SetDefault("events.retention.window", 30*24*time.Hour)
+	v.SetDefault("events.retention.interval", time.Hour)
+	v.SetDefault("events.retention.enabled", true)
+	v.SetDefault("events.export.enabled", false)
+	v.SetDefault("events.export.interval", 5*time.Second)
 	v.SetDefault("instrumentation.service_name", "Zitadel")
 	v.SetDefault("instrumentation.log.level", zlog.LevelInfo)
 	v.SetDefault("instrumentation.log.streams", []zlog.Stream{
@@ -412,6 +446,14 @@ func loadConfig(configPath string) (Config, error) {
 	if err := v.Unmarshal(&cfg); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w", err)
 	}
+	// Create the data dir configuration actually selected, not the default
+	// computed above — an explicit empty data_dir still means the default.
+	if cfg.Server.DataDir == "" {
+		cfg.Server.DataDir = dataDir
+	}
+	if err := ensureServerDataDir(cfg.Server.DataDir); err != nil {
+		return Config{}, err
+	}
 	if err := ensureServerMasterKey(&cfg.Server); err != nil {
 		return Config{}, err
 	}
@@ -430,7 +472,7 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 // ----------------------------- HTTP --------------------------------------
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler http.Handler, runtime runtimeResolver) (*http.ServeMux, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	if cfg.LoginEnabled {
@@ -458,7 +500,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 	}
 
 	// Pre-session runtime metadata for the embedded UI surfaces (Console
-	// ADR 0004 §2). Named for the console, which carries it first, but it
+	// ADR 0004 §3). Named for the console, which carries it first, but it
 	// describes the deployment — the default project and its publishable key
 	// — and the hosted login shell resolves the project it signs into from
 	// the same two fields, so it is mounted for either surface rather than
@@ -470,11 +512,12 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 
 	mux.Handle("/",
 		middleware.Chain(apiHandler,
-			func(next http.Handler) http.Handler { return middleware.WithRequestIdentification(reqIdGen, next) },
+			func(next http.Handler) http.Handler { return middleware.WithRequestContextMiddleware(reqIdGen, next) },
 			middleware.WithLogging,
 			api.WithRequestHostMiddleware,
 			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
+			func(next http.Handler) http.Handler { return audit.WithRequestEventMiddleware(requestEvents, next) },
 		),
 	)
 	return mux, nil

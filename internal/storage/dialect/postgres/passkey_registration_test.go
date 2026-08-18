@@ -24,7 +24,7 @@ func uniquePasskeyRegIDs(t *testing.T) (projectID, regID, userID string) {
 func TestPasskeyRegistrationStatements_CRUD(t *testing.T) {
 	projectID, regID, userID := uniquePasskeyRegIDs(t)
 	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 
 	challenge := &domain.PasskeyRegistrationChallenge{
 		Challenge:   "test-challenge",
@@ -62,7 +62,7 @@ func TestPasskeyRegistrationStatements_CRUD(t *testing.T) {
 func TestPasskeyRegistrationStatements_Create_EmptyIDAssigned(t *testing.T) {
 	projectID, _, userID := uniquePasskeyRegIDs(t)
 	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 
 	create := &domain.CreatePasskeyRegistration{
 		ProjectID: projectID,
@@ -86,7 +86,7 @@ func TestPasskeyRegistrationStatements_Create_EmptyIDAssigned(t *testing.T) {
 func TestPasskeyRegistrationStatements_Get_Expired(t *testing.T) {
 	projectID, regID, userID := uniquePasskeyRegIDs(t)
 	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 
 	require.NoError(t, testPool.CreatePasskeyRegistration(t.Context(), &domain.CreatePasskeyRegistration{
 		ID:        regID,

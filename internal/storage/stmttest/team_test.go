@@ -179,7 +179,8 @@ func TestTeamStatements_UpdateTeam(t *testing.T) {
 			teamID := uniqueTeamID(t)
 			team := newTestTeam(projectID, teamID)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
-			require.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, teamID))
+			_, err := d.stmts.DeactivateTeam(t.Context(), projectID, teamID)
+			require.NoError(t, err)
 
 			team.Name = "updated name"
 			assert.ErrorIs(t,
@@ -246,7 +247,8 @@ func TestTeamStatements_Deactivate(t *testing.T) {
 		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
 
 		// DeactivateTeam opens its own withTransaction when called via pool.Statements().
-		require.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, teamID))
+		_, err := d.stmts.DeactivateTeam(t.Context(), projectID, teamID)
+		require.NoError(t, err)
 
 		stored, err := d.stmts.GetTeamByID(t.Context(), projectID, teamID)
 		require.NoError(t, err)
@@ -264,11 +266,13 @@ func TestTeamStatements_Deactivate_RepeatDoesNotTouchUpdatedAt(t *testing.T) {
 		teamID := uniqueTeamID(t)
 		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
 
-		require.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, teamID))
+		_, err := d.stmts.DeactivateTeam(t.Context(), projectID, teamID)
+		require.NoError(t, err)
 		deactivated, err := d.stmts.GetTeamByID(t.Context(), projectID, teamID)
 		require.NoError(t, err)
 
-		require.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, teamID))
+		_, err = d.stmts.DeactivateTeam(t.Context(), projectID, teamID)
+		require.NoError(t, err)
 		again, err := d.stmts.GetTeamByID(t.Context(), projectID, teamID)
 		require.NoError(t, err)
 
@@ -282,7 +286,8 @@ func TestTeamStatements_Deactivate_RepeatDoesNotTouchUpdatedAt(t *testing.T) {
 func TestTeamStatements_Deactivate_UnknownTeamIsNoOp(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
-		assert.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, "nonexistent"))
+		_, err := d.stmts.DeactivateTeam(t.Context(), projectID, "nonexistent")
+		assert.NoError(t, err)
 	})
 }
 
@@ -295,7 +300,8 @@ func TestTeamStatements_Deactivate_OtherProjectIsNoOp(t *testing.T) {
 		require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(ownerProjectID, teamID)))
 
 		otherProjectID := ensureProject(t, d.stmts)
-		require.NoError(t, d.stmts.DeactivateTeam(t.Context(), otherProjectID, teamID))
+		_, err := d.stmts.DeactivateTeam(t.Context(), otherProjectID, teamID)
+		require.NoError(t, err)
 
 		stored, err := d.stmts.GetTeamByID(t.Context(), ownerProjectID, teamID)
 		require.NoError(t, err)
@@ -327,7 +333,8 @@ func TestTeamStatements_Deactivate_CascadesMembershipsAndOwnedUsers(t *testing.T
 			require.NoError(t, d.stmts.CreateTeamMembership(t.Context(), membership))
 		}
 
-		require.NoError(t, d.stmts.DeactivateTeam(t.Context(), projectID, ownerTeamID))
+		_, err := d.stmts.DeactivateTeam(t.Context(), projectID, ownerTeamID)
+		require.NoError(t, err)
 
 		userStatus := func(userID string) domain.UserStatus {
 			user, err := d.stmts.GetUser(t.Context(),
@@ -390,7 +397,7 @@ func TestTeamStatements_List(t *testing.T) {
 		// Filter bounds come from the stored rows, not from what CreateTeam wrote
 		// back: the Spanner emulator returns a created_at from THEN RETURN that
 		// is a few hundred microseconds off the value it commits.
-		read, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{
+		read, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{
 			Filter: onlyFixtures,
 			Pagination: database.Page[domain.TeamField]{
 				OrderBy: database.OrderBy[domain.TeamField]{
@@ -406,7 +413,7 @@ func TestTeamStatements_List(t *testing.T) {
 
 		list := func(t *testing.T, filter database.Filter[domain.TeamField], dir database.OrderDirection) []string {
 			t.Helper()
-			res, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{
+			res, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{
 				Filter: database.And(onlyFixtures, filter),
 				Pagination: database.Page[domain.TeamField]{
 					OrderBy: database.OrderBy[domain.TeamField]{
@@ -420,7 +427,7 @@ func TestTeamStatements_List(t *testing.T) {
 		}
 
 		t.Run("scopes results to the project", func(t *testing.T) {
-			res, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{
+			res, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{
 				Filter: database.Equal(projectCol, otherProjectID),
 			})
 			require.NoError(t, err)
@@ -428,7 +435,7 @@ func TestTeamStatements_List(t *testing.T) {
 		})
 
 		t.Run("returns the stored team", func(t *testing.T) {
-			res, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{
+			res, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{
 				Filter: database.And(onlyFixtures, database.Equal(idCol, ids[0])),
 			})
 			require.NoError(t, err)
@@ -447,9 +454,10 @@ func TestTeamStatements_List(t *testing.T) {
 			deactivatedProjectID := ensureProject(t, d.stmts)
 			team := newTestTeam(deactivatedProjectID, "team-deactivated")
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), team))
-			require.NoError(t, d.stmts.DeactivateTeam(t.Context(), deactivatedProjectID, team.ID))
+			_, err := d.stmts.DeactivateTeam(t.Context(), deactivatedProjectID, team.ID)
+			require.NoError(t, err)
 
-			res, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{
+			res, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{
 				Filter: database.Equal(projectCol, deactivatedProjectID),
 			})
 			require.NoError(t, err)
@@ -503,13 +511,13 @@ func TestTeamStatements_List(t *testing.T) {
 					},
 				}
 
-				first, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{Filter: onlyFixtures, Pagination: page})
+				first, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{Filter: onlyFixtures, Pagination: page})
 				require.NoError(t, err)
 				assert.Equal(t, []string{ids[0], ids[1]}, teamIDs(first.Items))
 				require.NotEmpty(t, first.NextCursor)
 
 				page.Cursor = first.NextCursor
-				second, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{Filter: onlyFixtures, Pagination: page})
+				second, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{Filter: onlyFixtures, Pagination: page})
 				require.NoError(t, err)
 				assert.Equal(t, []string{ids[2]}, teamIDs(second.Items))
 				assert.Empty(t, second.NextCursor)
@@ -526,18 +534,18 @@ func TestTeamStatements_List(t *testing.T) {
 				},
 			}
 
-			first, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{Filter: filter, Pagination: page})
+			first, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{Filter: filter, Pagination: page})
 			require.NoError(t, err)
 			assert.Equal(t, []string{ids[1]}, teamIDs(first.Items))
 			require.NotEmpty(t, first.NextCursor)
 
 			page.Cursor = first.NextCursor
-			second, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{Filter: filter, Pagination: page})
+			second, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{Filter: filter, Pagination: page})
 			require.NoError(t, err)
 			assert.Equal(t, []string{ids[2]}, teamIDs(second.Items))
 
 			page.Cursor = second.NextCursor
-			third, err := d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{Filter: filter, Pagination: page})
+			third, err := d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{Filter: filter, Pagination: page})
 			require.NoError(t, err)
 			assert.Empty(t, teamIDs(third.Items))
 		})

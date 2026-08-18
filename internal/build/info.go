@@ -5,28 +5,27 @@ import (
 	"time"
 )
 
-// These variables are set via ldflags
+// These variables are overridden via ldflags by the local and release build
+// scripts. The defaults keep direct `go run` and `go test` invocations honest
+// without treating an unstamped development binary as a broken release.
 var (
-	version = ""
-	commit  = ""
+	version = "dev"
+	commit  = "none"
 	date    = ""
 )
 
 // dateTime is the parsed version of [date]
 var dateTime time.Time
 
-// init prevents race conditions when accessing dateTime and version.
+// init parses the ldflag-injected date before concurrent access.
 func init() {
+	if date == "" {
+		return
+	}
 	var err error
 	dateTime, err = time.Parse(time.RFC3339, date)
 	if err != nil {
-		slog.Warn("could not parse build date, using current time instead", "err", err)
-		dateTime = time.Now()
-		date = dateTime.Format(time.RFC3339)
-	}
-	if version == "" {
-		slog.Warn("no build version set, using timestamp as version")
-		version = date
+		slog.Warn("could not parse build date", "date", date, "err", err)
 	}
 }
 

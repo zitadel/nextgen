@@ -1,12 +1,25 @@
 # ADR 046: Claim Lifecycle v2
 
-> **Status:** Implemented — 2026-08-11 (Accepted 2026-07-24)
+> **Status:** Accepted (2026-07-24; partially implemented, see amendment)
 > **Date:** 2026-07-24
 >
-> **Amendment (2026-08-11):** shipped — the server serves
-> `/projects/{project_id}/claim/{init,status,complete}`, the CLI provides
-> `zitadel claim` (#754), and team attachment is reported in
+> **Amendment (2026-08-14):** partially shipped. The OpenAPI contract exposes
+> `/projects/{project_id}/claim/{init,status,complete}` (#739) and the routes
+> are mounted, but the server-side handlers are not implemented: all three
+> answer 501 until the claim service and handlers land (#611, #612). Shipped
+> so far: the contract (#739), the `claim_challenges` storage (#628, #740),
+> the platform-session precondition for `claim/complete` (#751), the CLI
+> `zitadel claim` command (#754), and team attachment reporting in
 > `setup`/`status`/`doctor` (#776).
+>
+> **Proposed amendment — [ADR 053 §5](053-cross-project-principals.md#5-first-party-human-sessions-may-call-the-operator-plane):**
+> if ADR 053 is accepted, [§2](#2-claimcomplete-is-authenticated-by-a-platform-project-session)'s
+> conclusion that SameSite semantics alone are sufficient against CSRF no longer
+> holds. Cookie-authenticated unsafe requests — `claim/complete` included —
+> additionally require an exact `Origin` match and a session-bound CSRF token in
+> a non-simple header. SameSite becomes defense in depth rather than the only
+> check. This is a wire-contract change to an already-implemented flow; do not
+> implement §2's CSRF posture from this ADR alone.
 > **Context:** The server-side contract for **claim**: the operation that turns
 > an unclaimed project into one owned by an accountable team. Supersedes the
 > Withdrawn [ADR 003](003-create-first-claim-later.md), which removed the

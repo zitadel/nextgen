@@ -108,6 +108,63 @@ func TestWriteActiveSystemCatalogID(t *testing.T) {
 	assert.Contains(t, w.b.String(), "zitadel_nextgen.authz_catalogs")
 }
 
+func TestWriteCheckAuthzScopedGrantArms(t *testing.T) {
+	t.Parallel()
+	params := domain.AuthzCheckParams{
+		CatalogID:      "cat_sys_1",
+		ProjectID:      "proj_1",
+		PrincipalType:  domain.AuthzPrincipalTypeUser,
+		PrincipalID:    "user_a",
+		ObjectType:     "project",
+		Relation:       "viewer",
+		ResourceID:     "usr_1",
+		ResourceTeamID: "team_1",
+	}
+	var w recordingWriter
+	authz.WriteCheckAuthz(&w, testEnv(&w), params)
+	assert.Contains(t, w.b.String(), "a.scope_kind = 'team' AND a.scope_team_id = ?")
+	assert.Contains(t, w.b.String(), "a.scope_kind = 'resource' AND a.scope_resource_id = ?")
+	assert.Contains(t, w.args, "team_1")
+	assert.Contains(t, w.args, "usr_1")
+}
+
+func TestWriteCheckAuthzConstraintTeam(t *testing.T) {
+	t.Parallel()
+	params := domain.AuthzCheckParams{
+		CatalogID:        "cat_sys_1",
+		ProjectID:        "proj_1",
+		PrincipalType:    domain.AuthzPrincipalTypeSKTeam,
+		PrincipalID:      "sk_team_1",
+		ObjectType:       "project",
+		Relation:         "viewer",
+		ConstraintTeamID: "team_1",
+		ResourceID:       "usr_in",
+	}
+	var w recordingWriter
+	authz.WriteCheckAuthz(&w, testEnv(&w), params)
+	assert.Contains(t, w.b.String(), "authz_membership_edges")
+	assert.Contains(t, w.args, "team_1")
+	assert.Contains(t, w.args, "usr_in")
+
+	listParams := domain.AuthzListObjectsParams{
+		AuthzCheckParams: params,
+		ResourceKind:     domain.ResourceKindUser,
+	}
+	var list recordingWriter
+	authz.WriteListAuthzObjectIDs(&list, testEnv(&list), listParams)
+	assert.Contains(t, list.b.String(), "authz_membership_edges")
+	assert.Contains(t, list.b.String(), "r.resource_kind = ?")
+	assert.Contains(t, list.b.String(), "r.resource_kind <> ?")
+	assert.Contains(t, list.args, "team_1")
+
+	withTeam := params
+	withTeam.ResourceTeamID = "team_1"
+	var checkTeam recordingWriter
+	authz.WriteCheckAuthz(&checkTeam, testEnv(&checkTeam), withTeam)
+	assert.Contains(t, checkTeam.b.String(), "authz_membership_edges")
+	assert.Contains(t, checkTeam.args, "team_1")
+}
+
 func TestWriteHasAuthzProjectFoothold(t *testing.T) {
 	t.Parallel()
 	var w recordingWriter

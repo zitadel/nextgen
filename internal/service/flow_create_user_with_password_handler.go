@@ -35,8 +35,6 @@ func NewFlowCreateUserHandler(
 var _ domain.FlowOnSuccessHandler = (*FlowCreateUserWithPasswordHandler)(nil)
 
 func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domain.FlowOnSuccessInput) (domain.FlowOnSuccessResult, error) {
-	in.State.CollectedData.UserData["$schema"] = in.UserSchemaURL
-
 	password := in.State.CollectedData.AuthMethods.Password
 	if password == "" {
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
@@ -49,9 +47,10 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 
 	createUserAction := NewCreateUserAction(
 		CreateUserInput{
-			ProjectID: in.ProjectID,
-			User:      in.State.CollectedData.UserData,
-			ID:        userID,
+			ProjectID:  in.ProjectID,
+			SchemaURL:  in.UserSchemaURL,
+			Attributes: in.State.CollectedData.UserData,
+			ID:         userID,
 		},
 		h.schemaStore,
 	)

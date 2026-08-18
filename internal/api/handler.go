@@ -22,8 +22,10 @@ type Handler struct {
 	flowDefinitionService service.FlowDefinitionService
 	teamService           *service.TeamService
 	brandingService       *service.BrandingService
+	eventService          *service.EventService
 	tokenService          service.TokenService
 	keyService            service.KeyService
+	claimService          service.ClaimService
 	pool                  *service.DB
 
 	// platformProjectID is the configured platform.project_id pin (ADR 046 §2).
@@ -42,8 +44,10 @@ func NewHandler(
 	flowDefinitionService service.FlowDefinitionService,
 	teamService *service.TeamService,
 	brandingService *service.BrandingService,
+	eventService *service.EventService,
 	tokenService service.TokenService,
 	keyService service.KeyService,
+	claimService service.ClaimService,
 	pool *service.DB,
 	platformProjectID string,
 ) *Handler {
@@ -57,8 +61,10 @@ func NewHandler(
 		flowDefinitionService: flowDefinitionService,
 		teamService:           teamService,
 		brandingService:       brandingService,
+		eventService:          eventService,
 		tokenService:          tokenService,
 		keyService:            keyService,
+		claimService:          claimService,
 		pool:                  pool,
 		platformProjectID:     platformProjectID,
 	}

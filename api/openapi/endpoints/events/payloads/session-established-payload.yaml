@@ -1,0 +1,6 @@
+title: SessionEstablishedPayload
+type: object
+description: Payload for `session.established` events.
+properties:
+  user_id:
+    type: string

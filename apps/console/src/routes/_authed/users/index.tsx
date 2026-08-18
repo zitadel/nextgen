@@ -33,7 +33,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { api } from "../../../api/zitadel";
 import { displayValue, field } from "../../../lib/record";
 import { type SchemaField, type UserSchema, schemaColumns } from "../../../lib/schema";
-import { userDisplayName } from "../../../lib/user";
+import { userAttributes, userDisplayName } from "../../../lib/user";
 
 export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the sidebar frame's row carries `lucide/User`, the
@@ -62,18 +62,15 @@ function isPresent<T>(value: T | undefined | null): value is T {
   return value !== undefined && value !== null;
 }
 
-/** Server-owned keys on a user, which are never schema attributes. */
-const RESERVED_KEYS = new Set(["id", "$schema", "metadata"]);
-
 /**
  * Columns for a set of users, from the schemas those users reference.
  *
  * Only the loaded users' schemas are fetched, not every schema in the project:
  * one nobody uses would add a column that is blank in every row. Each user
- * carries `$schema`, so the set is known without a second list call.
+ * carries `schema`, so the set is known without a second list call.
  */
 async function columnsForUsers(users: Record<string, unknown>[]): Promise<SchemaField[]> {
-  const schemaIds = [...new Set(users.map((user) => field(user, "$schema")).filter(isPresent))];
+  const schemaIds = [...new Set(users.map((user) => field(user, "schema")).filter(isPresent))];
   const schemas = await Promise.all(
     schemaIds.map(async (id) => {
       try {
@@ -112,12 +109,7 @@ function columnsFor(users: Record<string, unknown>[], schemas: UserSchema[]): Sc
 
   const keys = new Set<string>();
   for (const user of users) {
-    for (const key of Object.keys(user)) {
-      // `id`, `$schema` and `metadata` are the server's own keys, not schema
-      // attributes: `id` has its own column, `metadata` drives the Status
-      // column, and `$schema` is machine metadata an operator does not read.
-      if (!RESERVED_KEYS.has(key)) keys.add(key);
-    }
+    for (const key of Object.keys(userAttributes(user))) keys.add(key);
   }
   return [...keys].sort().map((key) => ({
     key,
@@ -361,12 +353,13 @@ function toUserRow(
   columns: SchemaField[],
 ): UserRow {
   const id = field(user, "id") ?? `unknown-user-${index}`;
+  const attributes = userAttributes(user);
   const values: Record<string, string> = {};
   for (const column of columns) {
     // Only scalars are read. A property whose value is an object or array has no
     // one-line rendering, and `JSON.stringify` in a table cell is noise — the
     // detail screen is where a structured attribute belongs.
-    const value = displayValue(user, column.key);
+    const value = displayValue(attributes, column.key);
     if (value !== undefined) values[column.key] = value;
   }
   return {
@@ -375,7 +368,7 @@ function toUserRow(
     // Used for the row menu's accessible name and the delete dialog's heading,
     // not as a column. Falls back to the email and then the id: a `minimal`
     // schema defines only `email`, so a name is genuinely absent, not missing.
-    name: userDisplayName(user) ?? field(user, "email") ?? id,
+    name: userDisplayName(attributes) ?? field(attributes, "email") ?? id,
     status: userStatus(user),
   };
 }

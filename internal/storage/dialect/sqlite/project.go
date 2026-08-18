@@ -54,9 +54,16 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 }
 
 // DeleteProjectByID implements [service.ProjectStatements].
-func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) error {
-	_, err := ps.client.Exec(ctx, deleteByIDProjectStmt, id)
-	return wrapError(err)
+func (ps projectStatements) DeleteProjectByID(ctx context.Context, id string) (bool, error) {
+	res, err := ps.client.Exec(ctx, deleteByIDProjectStmt, id)
+	if err != nil {
+		return false, wrapError(err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, wrapError(err)
+	}
+	return n > 0, nil
 }
 
 // GetProjectByID implements [service.ProjectStatements].

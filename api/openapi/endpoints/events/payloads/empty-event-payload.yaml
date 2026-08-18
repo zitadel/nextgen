@@ -1,0 +1,6 @@
+title: EmptyEventPayload
+type: object
+description: |
+  Empty payload for event types with no typed fields
+  (e.g. `project.deleted`, `user.deleted`, `session.expired`).
+additionalProperties: false

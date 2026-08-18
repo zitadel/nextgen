@@ -20,17 +20,26 @@ const (
 	defaultMasterKeyDirName = "master-keys"
 )
 
+// defaultServerDataDir computes the fallback data dir and must stay free of
+// side effects: it runs while seeding config defaults, before configuration has
+// selected a data dir. Creating a directory here would make the process depend
+// on a location it may never use — the container entrypoint sits in root-owned
+// /usr/local/bin, so an eager mkdir there aborts startup for the image's own
+// non-root user even when data_dir points somewhere writable.
+// Use ensureServerDataDir once the configured dir is known.
 func defaultServerDataDir() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("resolve executable path: %w", err)
 	}
-	path := filepath.Join(filepath.Dir(exe), defaultDataDirName)
-	err = os.MkdirAll(path, 0o700)
-	if err != nil {
-		return "", fmt.Errorf("failed to create server data dir: %w", err)
+	return filepath.Join(filepath.Dir(exe), defaultDataDirName), nil
+}
+
+func ensureServerDataDir(path string) error {
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		return fmt.Errorf("failed to create server data dir: %w", err)
 	}
-	return path, nil
+	return nil
 }
 
 func serverMasterKeyDir(cfg ServerConfig) (string, error) {

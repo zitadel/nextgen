@@ -109,7 +109,7 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
   const escaped = apiBase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
   return {
-    // Console ADR 0004 §2: the pre-session runtime-metadata document lives
+    // Console ADR 0004 §3: the pre-session runtime-metadata document lives
     // at a root path served by the Go mux; forward it as-is (public, no
     // bearer to inject).
     "/console/runtime.json": {

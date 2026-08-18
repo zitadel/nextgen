@@ -72,6 +72,7 @@ func TestFlowCreateUserWithPassword_PreMintsSharedUserID(t *testing.T) {
 			password = pw
 			return nil
 		})
+	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	f.v2Pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
 			return fn(ctx, v2TestTx{stmts: f.stmts})

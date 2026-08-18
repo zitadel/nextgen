@@ -13,7 +13,7 @@ import (
 )
 
 // consoleRuntimePath is where the embedded console discovers its pre-session
-// runtime metadata (Console ADR 0004 §2). Served by the mux directly — like
+// runtime metadata (Console ADR 0004 §3). Served by the mux directly — like
 // the static UI mounts, this is a console-internal contract, deliberately
 // outside the OpenAPI product surface.
 const consoleRuntimePath = "/console/runtime.json"
@@ -25,12 +25,12 @@ const ConsoleModeStandalone = "standalone"
 // consoleRuntime is the payload of GET /console/runtime.json. Every field is
 // public runtime metadata in the root ADR 005 sense — ids and an enum, never
 // secrets or feature inventories (per-surface gating rides effective
-// permissions, Console ADR 0004 §4).
+// permissions, Console ADR 0004 §5).
 type consoleRuntime struct {
 	// Mode is "standalone" or, in the future, "platform".
 	Mode string `json:"mode"`
 	// ConsoleProjectID is the one project the console signs into and
-	// manages: the resolved default in standalone (Console ADR 0004 §3),
+	// manages: the resolved default in standalone (Console ADR 0004 §2),
 	// the platform project in future platform mode. Omitted while the
 	// deployment has no project yet — the customer's integration
 	// (`zitadel setup`) creates the first project, which becomes the
