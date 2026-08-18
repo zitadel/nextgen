@@ -28,14 +28,28 @@ CREATE TABLE resource_scope_index (
     resource_kind STRING(MAX) NOT NULL,
     project_id    STRING(MAX) NOT NULL,
     team_id       STRING(MAX),
+    -- team_project_id is the project the referenced team lives in. Claim
+    -- (ADR 046) attaches a platform-project team to a claimed project, so for
+    -- project rows the team's home is not project_id; the FK goes through this
+    -- column so the reference stays enforced either way.
+    team_project_id STRING(MAX),
     created_at    TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     updated_at    TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     CONSTRAINT chk_resource_scope_index_resource_id CHECK (resource_id <> ''),
     CONSTRAINT chk_resource_scope_index_resource_kind CHECK (resource_kind <> ''),
+    -- A team reference is always a complete pair (an FK skips rows where
+    -- either column is NULL, so the pairing must be pinned separately).
+    CONSTRAINT chk_resource_scope_index_team_pair CHECK (
+        (team_id IS NULL AND team_project_id IS NULL)
+        OR (team_id IS NOT NULL AND team_project_id IS NOT NULL)),
+    -- Only project rows (the claim marker) may reference a team from another
+    -- project; every other kind stays same-project.
+    CONSTRAINT chk_resource_scope_index_team_home CHECK (
+        team_id IS NULL OR resource_kind = 'project' OR team_project_id = project_id),
     CONSTRAINT fk_resource_scope_index_project
         FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
     CONSTRAINT fk_resource_scope_index_team
-        FOREIGN KEY (project_id, team_id) REFERENCES teams (project_id, id) ON DELETE CASCADE
+        FOREIGN KEY (team_project_id, team_id) REFERENCES teams (project_id, id) ON DELETE CASCADE
 ) PRIMARY KEY (resource_kind, project_id, resource_id)
 -- +goose StatementEnd
 

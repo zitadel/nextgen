@@ -301,7 +301,7 @@ func TestClaimService_Complete(t *testing.T) {
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
 				unclaimedProjectStmts(s)
-				s.EXPECT().GetPersonalTeamForUser(gomock.Any(), claimPlatformProjID, "usr_1").Return(&domain.Team{ID: teamID}, nil)
+				s.EXPECT().GetPersonalTeamForUser(gomock.Any(), claimPlatformProjID, "usr_1").Return(&domain.Team{ProjectID: claimPlatformProjID, ID: teamID}, nil)
 				s.EXPECT().MarkChallengeCompleted(gomock.Any(), "proj_1", claimTokenID).Return(nil)
 				s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, a *domain.AuthzAssignment) error {
@@ -323,6 +323,10 @@ func TestClaimService_Complete(t *testing.T) {
 						assert.Equal(t, "proj_1", scope.ProjectID)
 						require.NotNil(t, scope.TeamID)
 						assert.Equal(t, teamID, *scope.TeamID)
+						// The FK pair routes through the team's home project:
+						// the platform project, not the claimed one (ADR 046).
+						require.NotNil(t, scope.TeamProjectID)
+						assert.Equal(t, claimPlatformProjID, *scope.TeamProjectID)
 						return nil
 					})
 			},
@@ -381,7 +385,7 @@ func TestClaimService_Complete(t *testing.T) {
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
 				unclaimedProjectStmts(s)
-				s.EXPECT().GetPersonalTeamForUser(gomock.Any(), claimPlatformProjID, "usr_1").Return(&domain.Team{ID: teamID}, nil)
+				s.EXPECT().GetPersonalTeamForUser(gomock.Any(), claimPlatformProjID, "usr_1").Return(&domain.Team{ProjectID: claimPlatformProjID, ID: teamID}, nil)
 				s.EXPECT().MarkChallengeCompleted(gomock.Any(), "proj_1", claimTokenID).Return(database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrProjectClaimExpired(),
@@ -391,7 +395,7 @@ func TestClaimService_Complete(t *testing.T) {
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
 				unclaimedProjectStmts(s)
-				s.EXPECT().GetPersonalTeamForUser(gomock.Any(), claimPlatformProjID, "usr_1").Return(&domain.Team{ID: teamID}, nil)
+				s.EXPECT().GetPersonalTeamForUser(gomock.Any(), claimPlatformProjID, "usr_1").Return(&domain.Team{ProjectID: claimPlatformProjID, ID: teamID}, nil)
 				s.EXPECT().MarkChallengeCompleted(gomock.Any(), "proj_1", claimTokenID).Return(nil)
 				s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).Return(errors.New("boom"))
 			},

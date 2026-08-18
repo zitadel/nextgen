@@ -412,8 +412,7 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			u2 := "usr_lp2_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), domain.NewUserResourceScope(projectID, u1)))
 			s2 := domain.NewUserResourceScope(projectID, u2)
-			tid := teamT
-			s2.TeamID = &tid
+			s2.ScopeToTeam(projectID, teamT)
 			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), s2))
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())))
@@ -452,9 +451,9 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			onU := "usr_on_u_" + uniqueSuffix(t)
 			nilTeam := "usr_nil_" + uniqueSuffix(t)
 			sT := domain.NewUserResourceScope(projectID, onT)
-			sT.TeamID = &localT
+			sT.ScopeToTeam(projectID, localT)
 			sU := domain.NewUserResourceScope(projectID, onU)
-			sU.TeamID = &localU
+			sU.ScopeToTeam(projectID, localU)
 			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), sT))
 			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), sU))
 			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), domain.NewUserResourceScope(projectID, nilTeam)))
@@ -473,9 +472,9 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			onT := "usr_leak_t_" + uniqueSuffix(t)
 			onU := "usr_leak_u_" + uniqueSuffix(t)
 			sT := domain.NewUserResourceScope(projectID, onT)
-			sT.TeamID = &localT
+			sT.ScopeToTeam(projectID, localT)
 			sU := domain.NewUserResourceScope(projectID, onU)
-			sU.TeamID = &localU
+			sU.ScopeToTeam(projectID, localU)
 			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), sT))
 			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), sU))
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
@@ -601,7 +600,7 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			u := "user_list_dedup_" + uniqueSuffix(t)
 			res := "usr_dedup_" + uniqueSuffix(t)
 			s := domain.NewUserResourceScope(projectID, res)
-			s.TeamID = &teamT
+			s.ScopeToTeam(projectID, teamT)
 			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), s))
 			// Project-wide + team-scoped grants both match the same RSI row.
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),

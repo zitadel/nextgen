@@ -23,10 +23,22 @@ CREATE TABLE resource_scope_index (
     resource_kind TEXT    NOT NULL CHECK (resource_kind <> ''),
     project_id    TEXT    NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
     team_id       TEXT,
+    -- team_project_id is the project the referenced team lives in. Claim
+    -- (ADR 046) attaches a platform-project team to a claimed project, so for
+    -- project rows the team's home is not project_id; the FK goes through this
+    -- column so the reference stays enforced either way.
+    team_project_id TEXT,
     created_at    INTEGER NOT NULL,
     updated_at    INTEGER NOT NULL,
     PRIMARY KEY (resource_kind, project_id, resource_id),
-    FOREIGN KEY (project_id, team_id) REFERENCES teams (project_id, id) ON DELETE CASCADE
+    FOREIGN KEY (team_project_id, team_id) REFERENCES teams (project_id, id) ON DELETE CASCADE,
+    -- A team reference is always a complete pair (an FK skips rows where
+    -- either column is NULL, so the pairing must be pinned separately).
+    CHECK ((team_id IS NULL AND team_project_id IS NULL)
+        OR (team_id IS NOT NULL AND team_project_id IS NOT NULL)),
+    -- Only project rows (the claim marker) may reference a team from another
+    -- project; every other kind stays same-project.
+    CHECK (team_id IS NULL OR resource_kind = 'project' OR team_project_id = project_id)
 );
 -- +goose StatementEnd
 
