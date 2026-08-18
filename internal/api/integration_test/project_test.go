@@ -180,12 +180,21 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	assert.Equal(t, []domain.Field{"x-auth-methods#password"}, registerPasswordStep.Fields)
 	require.NotNil(t, registerPasswordStep.OnSuccess)
 	assert.Equal(t, domain.FlowOnSuccessCreateUser, *registerPasswordStep.OnSuccess)
-	// Registration completes directly — no passkey upsell step; passkey
-	// registration is offered up front on the register step instead.
-	assert.Equal(t, "done", registerPasswordStep.Transitions[domain.FlowActionSubmit].Target)
+	// Setting a password hands off to the upsell rather than finishing, so a
+	// user who registered with a password is still offered a passkey. The
+	// register step keeps offering one up front for anyone who wants it there.
+	assert.Equal(t, "passkey-upsell", registerPasswordStep.Transitions[domain.FlowActionSubmit].Target)
 
-	_, ok = flowDef.FindStep("passkey-upsell")
-	assert.False(t, ok)
+	// Both ways out of the upsell finish the flow — taking the passkey and
+	// declining it. Without the skip transition a user who does not want one
+	// has no way off this step.
+	upsellStep, ok := flowDef.FindStep("passkey-upsell")
+	require.True(t, ok)
+	assert.Empty(t, upsellStep.Fields)
+	assert.Contains(t, actionNames(upsellStep.Actions), domain.FlowActionPasskeyRegister)
+	assert.Contains(t, actionNames(upsellStep.Actions), "skip")
+	assert.Equal(t, "done", upsellStep.Transitions[domain.FlowActionPasskeyRegister].Target)
+	assert.Equal(t, "done", upsellStep.Transitions["skip"].Target)
 }
 
 func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
