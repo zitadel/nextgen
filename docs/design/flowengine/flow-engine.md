@@ -80,7 +80,7 @@ POST   /flow_definitions/{id}/simulate    Dry-run with mock input
 
 Steps do not have a `type`. Instead, the engine derives behavior from the step's properties:
 
-- **`fields`** — array of user-schema property names or reserved authentication-method fields such as `x-auth-methods#password`. The engine resolves each field's type, validation, and implicit outcomes from the user schema. For example, a property with a non-empty `x-unique` scope is an identifier and implies a `user_not_found` outcome in transitions.
+- **`fields`** — array of user-schema property names or reserved authentication-method fields such as `x-auth-methods#password`. A nested property is named by its dotted path (`address.street`) — the same string the attribute store keys it under — and an object- or array-typed property is rejected, since it has no field-shaped input. The engine resolves each field's type, validation, and implicit outcomes from the user schema. For example, a property with a non-empty `x-unique` scope is an identifier and implies a `user_not_found` outcome in transitions.
 - **`on_success`** — server-side mutation to run after the step's fields validate (`"create_user"` is the only shipped value). Executes before the transition fires.
 - **`complete`** — marks the step as terminal (`"redirect"` or `"show"`).
 - **`gates`** — definition-schema contract for keyed security challenges such as `{ "captcha": { "kind": "captcha", "provider": … } }`. This is not runtime-supported today: the engine emits an empty `gates` object and rejects `gate_proofs`. Passkey is not a gate — authenticator ceremonies run as credential auth_attempts.
