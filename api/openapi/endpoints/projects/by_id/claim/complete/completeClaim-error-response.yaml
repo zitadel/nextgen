@@ -5,27 +5,90 @@ content:
     schema:
       oneOf:
         - $ref: '../../../../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../../../../components/schemas/errors/claim_challenge-not_found.yaml'
+        - $ref: '../../../../../components/schemas/errors/claim-no_personal_team.yaml'
+        - $ref: '../../../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../../../components/schemas/errors/internal.yaml'
+        - $ref: '../../../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../../../components/schemas/errors/proj-already_claimed.yaml'
+        - $ref: '../../../../../components/schemas/errors/proj-claim_expired.yaml'
+        - $ref: '../../../../../components/schemas/errors/proj-not_found.yaml'
         - $ref: '../../../../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../../../../components/schemas/errors/sess-not_found.yaml'
+        - $ref: '../../../../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../../../../components/schemas/errors/auth-unauthorized.yaml'
+          claim_challenge.not_found: '../../../../../components/schemas/errors/claim_challenge-not_found.yaml'
+          claim.no_personal_team: '../../../../../components/schemas/errors/claim-no_personal_team.yaml'
+          evt.invalid: '../../../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../../../components/schemas/errors/internal.yaml'
+          not_implemented: '../../../../../components/schemas/errors/not_implemented.yaml'
+          proj.already_claimed: '../../../../../components/schemas/errors/proj-already_claimed.yaml'
+          proj.claim_expired: '../../../../../components/schemas/errors/proj-claim_expired.yaml'
+          proj.not_found: '../../../../../components/schemas/errors/proj-not_found.yaml'
           req.invalid: '../../../../../components/schemas/errors/req-invalid.yaml'
+          sess.not_found: '../../../../../components/schemas/errors/sess-not_found.yaml'
+          unavailable: '../../../../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.unauthorized:
         summary: auth.unauthorized
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
+      claim_challenge.not_found:
+        summary: claim_challenge.not_found
+        value:
+          code: claim_challenge.not_found
+          message: 'claim challenge not found'
+      claim.no_personal_team:
+        summary: claim.no_personal_team
+        value:
+          code: claim.no_personal_team
+          message: 'The user has no active personal team in the platform project.'
+      evt.invalid:
+        summary: evt.invalid
+        value:
+          code: evt.invalid
+          message: 'event: invalid'
       internal:
         summary: internal
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      not_implemented:
+        summary: not_implemented
+        value:
+          code: not_implemented
+          message: 'This feature is not implemented yet.'
+      proj.already_claimed:
+        summary: proj.already_claimed
+        value:
+          code: proj.already_claimed
+          message: 'the project is already claimed by a team'
+      proj.claim_expired:
+        summary: proj.claim_expired
+        value:
+          code: proj.claim_expired
+          message: 'the claim challenge has expired'
+      proj.not_found:
+        summary: proj.not_found
+        value:
+          code: proj.not_found
+          message: 'project not found'
       req.invalid:
         summary: req.invalid
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      sess.not_found:
+        summary: sess.not_found
+        value:
+          code: sess.not_found
+          message: 'The session was not found'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'

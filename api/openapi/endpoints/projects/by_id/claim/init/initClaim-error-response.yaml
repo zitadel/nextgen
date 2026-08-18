@@ -5,13 +5,21 @@ content:
     schema:
       oneOf:
         - $ref: '../../../../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../../../../components/schemas/errors/claim_challenge-invalid.yaml'
         - $ref: '../../../../../components/schemas/errors/internal.yaml'
+        - $ref: '../../../../../components/schemas/errors/proj-already_claimed.yaml'
+        - $ref: '../../../../../components/schemas/errors/proj-not_found.yaml'
+        - $ref: '../../../../../components/schemas/errors/proj-permission_denied.yaml'
         - $ref: '../../../../../components/schemas/errors/req-invalid.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../../../../components/schemas/errors/auth-unauthorized.yaml'
+          claim_challenge.invalid: '../../../../../components/schemas/errors/claim_challenge-invalid.yaml'
           internal: '../../../../../components/schemas/errors/internal.yaml'
+          proj.already_claimed: '../../../../../components/schemas/errors/proj-already_claimed.yaml'
+          proj.not_found: '../../../../../components/schemas/errors/proj-not_found.yaml'
+          proj.permission_denied: '../../../../../components/schemas/errors/proj-permission_denied.yaml'
           req.invalid: '../../../../../components/schemas/errors/req-invalid.yaml'
     examples:
       auth.unauthorized:
@@ -19,11 +27,31 @@ content:
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
+      claim_challenge.invalid:
+        summary: claim_challenge.invalid
+        value:
+          code: claim_challenge.invalid
+          message: 'The claim challenge is invalid. Expected a non-empty id, project id, and initiating secret hash.'
       internal:
         summary: internal
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      proj.already_claimed:
+        summary: proj.already_claimed
+        value:
+          code: proj.already_claimed
+          message: 'the project is already claimed by a team'
+      proj.not_found:
+        summary: proj.not_found
+        value:
+          code: proj.not_found
+          message: 'project not found'
+      proj.permission_denied:
+        summary: proj.permission_denied
+        value:
+          code: proj.permission_denied
+          message: 'the project management API requires the project secret'
       req.invalid:
         summary: req.invalid
         value:
