@@ -1,8 +1,8 @@
 /**
  * Builds the public token surfaces of `@zitadel/design-tokens` from:
- *   - `src/legacy.tokens.json` — frozen legacy `--zl-color-*` surface
  *   - `src/generated/figma.tokens.json` — resolved shadcn colours + container scale
- *   - `src/overrides.ts` — fonts, motion, focus, breakpoints, gray primitives
+ *   - `src/overrides.ts` — fonts, motion, focus, breakpoints, and the roles
+ *     shadcn has no name for
  *
  * Emits four files into `src/generated/`:
  *
@@ -26,7 +26,6 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import shadcnTokens from "../src/generated/figma.tokens.json" with { type: "json" };
-import legacyTokens from "../src/legacy.tokens.json" with { type: "json" };
 import { overrides } from "../src/overrides.ts";
 
 type Hex = string;
@@ -38,33 +37,28 @@ type ModeValue = { dark: SemanticValue; light?: SemanticValue };
 type ColorToken = SemanticValue | ModeValue;
 
 /**
- * Frozen legacy source (`--zl-color-surface-*`, `--zl-color-text-*`, spacing,
- * radius, gray ramp). Kept verbatim so existing consumers keep working while
- * the new shadcn surface is migrated in — see design-tokens/README.md.
- */
-interface LegacyTokensFile {
-  $source: Record<string, unknown>;
-  primitives: {
-    color: Record<string, Hex | Record<string, Hex>>;
-    spacing: Record<string, Px>;
-    cornerRadius: Record<string, Px>;
-  };
-  /** Grid/layout primitives (columns, gutter, margin) owned by Figma's `layout/*` collection. */
-  layout?: Record<string, number>;
-  tokens: {
-    color: Record<string, Record<string, ColorToken>>;
-  };
-}
-
-/**
  * The new themed surface produced by `scripts/sync-from-export.ts` from the
  * designer's DTCG exports. Colours are shadcn-style semantic names, each with a
  * resolved `dark` and `light` hex.
  */
+/** One `box-shadow` layer, camel-cased by `sync-from-export`. */
+interface ShadowLayer {
+  offsetX: Px;
+  offsetY: Px;
+  blurRadius: Px;
+  spreadRadius: Px;
+  color: Hex;
+}
+
 interface ShadcnTokensFile {
   $source: Record<string, unknown>;
   color: Record<string, { dark: Hex; light: Hex }>;
+  /** The designer's `custom` group, keyed by raw Figma name — see `CUSTOM_ROLES`. */
+  custom: Record<string, { dark: Hex; light: Hex }>;
   radius: Record<string, Px>;
+  /** A step is one layer, or a numbered stack of them (`sm.1`, `sm.2`). */
+  shadow: Record<string, ShadowLayer | Record<string, ShadowLayer>>;
+  spacing: Record<string, Px>;
   text: Record<string, unknown>;
   fontFamily: Record<string, string>;
   fontWeight: Record<string, number>;
@@ -78,37 +72,9 @@ interface ShadcnTokensFile {
   typography: Record<string, Record<string, unknown>>;
 }
 
-const figma = legacyTokens as unknown as LegacyTokensFile;
 const shadcn = shadcnTokens as unknown as ShadcnTokensFile;
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = resolve(ROOT, "../src/generated");
-
-/** Resolve `{ "primitive": "color.gray.50" }` into the concrete hex. */
-function resolvePrimitive(ref: PrimitiveRef): Hex {
-  const parts = ref.primitive.split(".");
-  let cursor: unknown = figma.primitives;
-  for (const part of parts) {
-    if (cursor === null || typeof cursor !== "object") {
-      throw new Error(`Cannot descend into ${ref.primitive} at ${part}: parent is not an object`);
-    }
-    cursor = (cursor as Record<string, unknown>)[part];
-    if (cursor === undefined) {
-      throw new Error(`Primitive reference ${ref.primitive} not found (failed at ${part})`);
-    }
-  }
-  if (typeof cursor !== "string") {
-    throw new Error(`Primitive reference ${ref.primitive} did not resolve to a string`);
-  }
-  return cursor;
-}
-
-function resolveSemantic(value: SemanticValue): Hex {
-  return typeof value === "string" ? value : resolvePrimitive(value);
-}
-
-function isModeValue(value: ColorToken): value is ModeValue {
-  return typeof value === "object" && value !== null && "dark" in value;
-}
 
 /** Convert a Figma slash path into the `--zl-*` CSS variable name. */
 function cssVarName(category: string, ...segments: string[]): string {
@@ -124,9 +90,49 @@ function pxToRem(px: number): string {
   return `${px / 16}rem`;
 }
 
+/**
+ * Semantic name -> the Figma `custom` variable it reads. Only roles something
+ * actually consumes belong here; the group holds ~38 working variables and
+ * publishing them all would put Figma's naming into our public surface.
+ */
+const CUSTOM_ROLES: Record<string, string> = {
+  /** A control's own fill: nothing on a light page, a faint wash on a dark one. */
+  "input-fill": "transparent dark:input\\30",
+  /** The focus ring, at the opacity the design system draws it. */
+  "ring-outline": "outline",
+  /** The focus ring on an invalid control — heavier in dark, as shadcn draws it. */
+  "destructive-ring": "destructive\\20 dark:destructive\\40",
+};
+
+/** `0 1px 2px 0 #0000000d` — one Figma shadow layer as a `box-shadow` term. */
+function shadowLayer(layer: ShadowLayer): string {
+  const lengths = [layer.offsetX, layer.offsetY, layer.blurRadius, layer.spreadRadius];
+  return `${lengths.map((px) => `${px}px`).join(" ")} ${layer.color}`;
+}
+
+/**
+ * A Figma shadow step is either one layer or a numbered stack of them
+ * (`sm.1`, `sm.2`). CSS paints `box-shadow` first-term-on-top, and Figma
+ * numbers its stack the same way, so the keys sort straight into term order.
+ */
+function composeBoxShadow(step: ShadowLayer | Record<string, ShadowLayer>): string {
+  if ("offsetX" in step) return shadowLayer(step as ShadowLayer);
+  return sortedNumeric(step as Record<string, ShadowLayer>)
+    .map(([, layer]) => shadowLayer(layer))
+    .join(", ");
+}
+
+/**
+ * Document-level theme selectors, `:root`-qualified. See {@link emitCss} for
+ * why the qualification matters — a bare `[data-theme]` reaches into the login
+ * widget's host element and outranks its shadow styles.
+ */
+const DARK_ROOT_SELECTOR = ':root,\n:root[data-theme="dark"]';
+const LIGHT_ROOT_SELECTOR = ':root[data-theme="light"]';
+
 /** Generated banner so editors don't try to hand-edit the output. */
-const BANNER = `/* AUTOGENERATED by packages/design-tokens/scripts/build.ts — do not edit by hand.\n   Source: src/legacy.tokens.json + src/generated/figma.tokens.json + src/overrides.ts.\n   Re-run: moon run design-tokens:generate */\n\n`;
-const TS_BANNER = `// AUTOGENERATED by packages/design-tokens/scripts/build.ts — do not edit by hand.\n// Source: src/legacy.tokens.json + src/generated/figma.tokens.json + src/overrides.ts.\n// Re-run: moon run design-tokens:generate\n\n`;
+const BANNER = `/* AUTOGENERATED by packages/design-tokens/scripts/build.ts — do not edit by hand.\n   Source: src/generated/figma.tokens.json + src/overrides.ts.\n   Re-run: moon run design-tokens:generate */\n\n`;
+const TS_BANNER = `// AUTOGENERATED by packages/design-tokens/scripts/build.ts — do not edit by hand.\n// Source: src/generated/figma.tokens.json + src/overrides.ts.\n// Re-run: moon run design-tokens:generate\n\n`;
 
 interface BuildResult {
   css: string;
@@ -165,81 +171,81 @@ function build(): BuildResult {
    */
   const themedColorVars: string[] = [];
 
-  // ---- legacy semantic colours (mode-aware: single value = mode-independent, {dark,light} = themed) ----
-  for (const [group, members] of Object.entries(figma.tokens.color)) {
-    for (const [name, raw] of Object.entries(members)) {
-      const cssVar = cssVarName("color", group, name);
-      const path = ["color", toCamel(group), toCamel(name)];
-      if (isModeValue(raw)) {
-        const light = raw.light !== undefined ? resolveSemantic(raw.light) : undefined;
-        push(cssVar, resolveSemantic(raw.dark), path, light);
-      } else {
-        push(cssVar, resolveSemantic(raw), path);
-      }
-    }
-  }
-
-  // ---- new shadcn semantic colours (themed; `:root`/dark = dark, `[data-theme="light"]` = light) ----
-  // Emitted as `--zl-<name>` so they never collide with the legacy `--zl-color-*`
-  // namespace, letting both token systems coexist during migration.
+  // ---- semantic colours (themed; `:root`/dark = dark, `[data-theme="light"]` = light) ----
   for (const [name, { dark, light }] of Object.entries(shadcn.color)) {
     const cssVar = `--zl-${name}`;
     shadcnColorVars.push(cssVar);
     push(cssVar, dark, ["theme", toCamel(name)], light);
   }
 
-  // ---- primitive colours (re-exposed for atoms that need the raw shade) ----
-  for (const [group, members] of Object.entries(overrides.colorPrimitive)) {
-    for (const [name, value] of Object.entries(members)) {
-      push(cssVarName("color", group, name), value, ["color", group, name]);
-    }
+  // ---- roles the shadcn set has no name for ----
+  // `link` and `warning`: see `overrides.colorRole` for why each value is what
+  // it is. Themed like every other colour so they flip with the mode.
+  for (const [name, { dark, light }] of Object.entries(overrides.colorRole)) {
+    const cssVar = `--zl-${name}`;
+    shadcnColorVars.push(cssVar);
+    push(cssVar, dark, ["theme", name], light);
   }
 
-  // ---- semantic aliases (migration bridges) ----
-  // Emitted AFTER the literals so the alias wins within each theme block.
-  // References resolve against the theme-active value of the referenced
-  // variable, so one declaration covers both modes — but the two legacy
-  // names below also carry per-theme literals above, so the alias must land
-  // in the light block too (hence the explicit lightVars append).
-  //
-  // 1. The legacy primary-accent pair now aliases the shadcn `primary`
-  //    semantic: every consumer of the old names (primary button, checkbox
-  //    checked state) follows the Figma `primary` values, while host-page
-  //    overrides of EITHER name keep working — overriding the legacy name
-  //    beats the alias, and overriding `--zl-primary` flows through it.
-  // Keep these aliases CSS-only: `tokens` is the resolved-value API, while
-  // `cssVars` already points consumers at the overridable custom properties.
-  const aliasBoth = (cssVar: string, reference: string): void => {
-    cssVars.push([cssVar, reference]);
-    lightVars.push([cssVar, reference]);
-  };
-  aliasBoth("--zl-color-surface-default-white", "var(--zl-primary)");
-  aliasBoth("--zl-color-text-button-default", "var(--zl-primary-foreground)");
-  // 2. The link role: aliases the purple accent until Figma publishes a
-  //    dedicated `link` semantic. `branding.palette.link` and host pages
-  //    override this name to recolor exactly the link surfaces (card nav,
-  //    forgot-password, field links). New name, no per-theme literal to
-  //    shadow — a single :root declaration resolves per theme.
-  const linkSource = figma.tokens.color.icon?.["default-purple"];
-  if (linkSource === undefined) {
-    throw new Error("legacy token color.icon.default-purple is required for the link alias");
+  // ---- spacing (in rem) ----
+  // Tailwind's 4px ramp, which is what the design system lays out on. It
+  // replaces the old `01`…`16` scale outright: that one was non-linear (`06`
+  // and `04` were both 24px) and had no step for the 6/10/28/40px gaps the
+  // frames use, so every atom would have had to reach for a raw rem value.
+  // An empty ramp means the Tailwind collection was renamed in Figma and the
+  // sync quietly projected nothing — every atom would fall back to no spacing
+  // at all, which paints as a plausible-looking but wrong layout.
+  if (Object.keys(shadcn.spacing).length === 0) {
+    throw new Error(
+      "figma.tokens.json has no spacing ramp. Check SPACING_COLLECTION in scripts/sync-from-export.ts " +
+        "still names the collection Figma exports the `spacing/*` group from.",
+    );
   }
-  cssVars.push(["--zl-color-text-link", "var(--zl-color-icon-default-purple)"]);
-  setDeep(
-    tsTree,
-    ["color", "text", "link"],
-    resolveSemantic(isModeValue(linkSource) ? linkSource.dark : linkSource),
-  );
-  setDeep(refTree, ["color", "text", "link"], "var(--zl-color-text-link)");
-
-  // ---- spacing (in rem) — sorted by step number so 01..16 always emit in order ----
-  for (const [step, px] of sortedNumeric(figma.primitives.spacing)) {
+  for (const [step, px] of sortedSpacing(shadcn.spacing)) {
     push(cssVarName("spacing", step), pxToRem(px), ["spacing", step]);
   }
 
+  // ---- custom roles ----
+  // Figma owns the per-mode values; build owns the name. These express a
+  // behaviour no single `base` role can — a control fill that is transparent on
+  // a light page but a faint wash on a dark one — and Figma spells that out in
+  // the variable name itself (`transparent dark:input\30`), which is not a
+  // usable CSS identifier. Same division of labour as the container roles below.
+  for (const [role, figmaName] of Object.entries(CUSTOM_ROLES)) {
+    const pair = shadcn.custom?.[figmaName];
+    if (!pair) {
+      throw new Error(
+        `Figma custom role "${figmaName}" is missing from the export, so --zl-${role} cannot be emitted. ` +
+          `Was it renamed? See CUSTOM_ROLES in this file.`,
+      );
+    }
+    push(cssVarName(role), pair.dark, ["theme", toCamel(role)], pair.light);
+  }
+
   // ---- corner radius (in rem) ----
-  for (const [name, px] of Object.entries(figma.primitives.cornerRadius)) {
-    push(cssVarName("radius", name), pxToRem(px), ["radius", name]);
+  // One scale, the Figma one. The old `s`/`m`/`l` names are gone rather than
+  // aliased: they were sized against a scale the design system no longer draws
+  // with, and two live radius vocabularies is how the two drift apart.
+  for (const [name, px] of Object.entries(shadcn.radius)) {
+    push(cssVarName("radius", name), pxToRem(px), ["radius", toCamel(name)]);
+  }
+  push(cssVarName("radius", "full"), "9999px", ["radius", "full"]);
+
+  // ---- type scale: font-size + line-height per step ----
+  for (const [name, metrics] of Object.entries(shadcn.text)) {
+    const { fontSize, lineHeight } = metrics as { fontSize: Px; lineHeight: Px };
+    push(cssVarName("text", name, "size"), pxToRem(fontSize), ["text", toCamel(name), "size"]);
+    push(cssVarName("text", name, "leading"), pxToRem(lineHeight), ["text", toCamel(name), "leading"]);
+  }
+
+  // ---- font weights ----
+  for (const [name, weight] of Object.entries(shadcn.fontWeight)) {
+    push(cssVarName("font-weight", name), String(weight), ["font", "weight", name]);
+  }
+
+  // ---- elevation ----
+  for (const [name, step] of Object.entries(shadcn.shadow ?? {})) {
+    push(cssVarName("shadow", name), composeBoxShadow(step), ["shadow", toCamel(name)]);
   }
 
   // ---- overrides: font ----
@@ -258,8 +264,6 @@ function build(): BuildResult {
   // ---- overrides: focus ----
   push(cssVarName("focus", "width"), overrides.focus.width, ["focus", "width"]);
   push(cssVarName("focus", "offset"), overrides.focus.offset, ["focus", "offset"]);
-  const focusColor = resolveFocusColor();
-  push(cssVarName("focus", "color"), focusColor.dark, ["focus", "color"], focusColor.light);
 
   // ---- overrides: breakpoints ----
   for (const [name, value] of Object.entries(overrides.breakpoint)) {
@@ -270,12 +274,6 @@ function build(): BuildResult {
   // Figma owns the pixel values; build owns which scale step each role uses.
   push(cssVarName("container", "auth-card"), pxToRem(containerStep("sm")), ["container", "authCard"]);
   push(cssVarName("container", "page"), pxToRem(containerStep("7xl")), ["container", "page"]);
-
-  // ---- layout: grid columns / gutter / margin (columns unitless, spacing in rem) ----
-  for (const [name, value] of Object.entries(figma.layout ?? {})) {
-    const cssValue = name === "columns" ? String(value) : pxToRem(value);
-    push(cssVarName("layout", name), cssValue, ["layout", name]);
-  }
 
   // ---- themed groups (syntax, gradient): themed like the shadcn colours, but
   // namespaced by group so they stay clear of both `--zl-color-*` and the flat
@@ -318,45 +316,30 @@ function containerStep(name: string): Px {
   return px;
 }
 
-/**
- * The focus ring reads its colour from a legacy semantic token, so it
- * inherits that token's theming: a ring the colour of dark-mode text would
- * be invisible on a light surface. Returns both modes when the source token
- * is mode-aware.
- */
-function resolveFocusColor(): { dark: Hex; light?: Hex } {
-  const parts = overrides.focus.colorToken.split("/").map((p) => p.trim().toLowerCase().replaceAll(" ", "-"));
-  const [category, group, ...nameParts] = parts;
-  if (category !== "color" || !group) {
-    throw new Error(`overrides.focus.colorToken must look like "color/<group>/<name>", got ${overrides.focus.colorToken}`);
-  }
-  const groupTokens = figma.tokens.color[group];
-  if (!groupTokens) {
-    throw new Error(`overrides.focus.colorToken ${overrides.focus.colorToken} references unknown group ${group}`);
-  }
-  const name = nameParts.join("-");
-  const raw = groupTokens[name];
-  if (!raw) {
-    throw new Error(`overrides.focus.colorToken ${overrides.focus.colorToken} not found in figma.tokens.json (group=${group}, name=${name})`);
-  }
-  if (isModeValue(raw)) {
-    return {
-      dark: resolveSemantic(raw.dark),
-      light: raw.light !== undefined ? resolveSemantic(raw.light) : undefined,
-    };
-  }
-  return { dark: resolveSemantic(raw) };
-}
 
+/**
+ * The theme selectors are `:root`-qualified on purpose.
+ *
+ * A bare `[data-theme="dark"]` matches *any* element carrying the attribute,
+ * and `<zitadel-login>` stamps it on itself so its own shadow rules can key off
+ * the resolved theme. On a page that imports this file, that made the
+ * design-system defaults match the widget host directly — from the outer tree,
+ * where a normal declaration outranks every `:host` rule in the shadow tree.
+ * The result was that tenant branding silently painted nothing.
+ *
+ * Qualifying with `:root` keeps the document-level contract (an app flips
+ * themes by setting `data-theme` on `<html>`, which is what `apps/console`
+ * does) while leaving the widget host alone.
+ */
 function emitCss(vars: Array<[string, string]>, lightVars: Array<[string, string]>): string {
   const body = vars.map(([k, v]) => `  ${k}: ${v};`).join("\n");
-  const root = `:root,\n[data-theme="dark"] {\n${body}\n}\n`;
+  const root = `${DARK_ROOT_SELECTOR} {\n${body}\n}\n`;
   // Light mode only overrides the tokens that actually differ; everything
   // else inherits the dark `:root` values through the cascade.
   const lightBody = lightVars.map(([k, v]) => `  ${k}: ${v};`).join("\n");
   const light = lightVars.length
-    ? `\n[data-theme="light"] {\n${lightBody}\n}\n`
-    : `\n[data-theme="light"] {\n}\n`;
+    ? `\n${LIGHT_ROOT_SELECTOR} {\n${lightBody}\n}\n`
+    : `\n${LIGHT_ROOT_SELECTOR} {\n}\n`;
   return `${BANNER}${root}${light}`;
 }
 
@@ -371,6 +354,14 @@ function emitTs(values: Record<string, unknown>, refs: Record<string, unknown>, 
     `export const tokens = ${JSON.stringify(values, null, 2)} as const;\n\n` +
     `export const cssVars = ${JSON.stringify(refs, null, 2)} as const;\n\n` +
     `export const tokensCss = ${JSON.stringify(css)};\n\n` +
+    // Exported so a consumer rewriting these blocks for a shadow root matches
+    // on the same strings the emitter used. Hardcoding them on both sides is
+    // how the rewrite silently stops matching when a selector changes.
+    `export const THEME_SELECTORS = ${JSON.stringify(
+      { dark: DARK_ROOT_SELECTOR, light: LIGHT_ROOT_SELECTOR },
+      null,
+      2,
+    )} as const;\n\n` +
     `export type Tokens = typeof tokens;\nexport type CssVars = typeof cssVars;\n`;
   return `${TS_BANNER}${body}`;
 }
@@ -435,13 +426,18 @@ function emitShadcn(shadcnColorVars: string[]): string {
     const name = cssVar.replace(/^--zl-/, "");
     return `  --color-${name}: var(${cssVar});`;
   });
-  const radii = Object.entries(shadcn.radius).map(([name, px]) => `  --radius-${name}: ${pxToRem(px)};`);
+  // Alias rather than restate the pixel values: `tokens.css` now emits the same
+  // Figma radius scale as `--zl-radius-*`, and two copies of a scale drift.
+  const radii = Object.keys(shadcn.radius).map((name) => `  --radius-${name}: var(--zl-radius-${name});`);
+  const shadows = Object.keys(shadcn.shadow ?? {}).map(
+    (name) => `  --shadow-${name}: var(--zl-shadow-${name});`,
+  );
   const fonts = [
     "  --font-sans: var(--zl-font-family-sans);",
     "  --font-serif: var(--zl-font-family-heading);",
     "  --font-mono: var(--zl-font-family-mono);",
   ];
-  const body = [...colors, "", ...radii, "", ...fonts].join("\n");
+  const body = [...colors, "", ...radii, "", ...shadows, "", ...fonts].join("\n");
   return `${BANNER}@import "./tokens.css";\n\n@theme inline {\n${body}\n}\n`;
 }
 
@@ -450,6 +446,16 @@ function toCamel(s: string): string {
 }
 function sortedNumeric<V>(record: Record<string, V>): Array<[string, V]> {
   return Object.entries(record).sort(([a], [b]) => Number(a) - Number(b));
+}
+
+/**
+ * Order the spacing ramp by the size it denotes. Steps are Tailwind's, so a
+ * name is either a number, a halved number written with a dash (`2-5` = 2.5),
+ * or the literal `px` — which is the smallest of the lot.
+ */
+function sortedSpacing<V>(record: Record<string, V>): Array<[string, V]> {
+  const size = (step: string): number => (step === "px" ? 0.0625 : Number(step.replace("-", ".")));
+  return Object.entries(record).sort(([a], [b]) => size(a) - size(b));
 }
 
 async function main(): Promise<void> {

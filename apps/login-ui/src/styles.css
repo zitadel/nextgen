@@ -1,5 +1,25 @@
 @import "@zitadel/design-tokens/css/tokens.css";
 
+/* APK Futural — the brand display typeface the design uses for card titles and
+   field labels. Licensed, so it is declared per app rather than shipped by
+   `@zitadel/design-tokens`, which publishes to npm. Regular (400) is the only
+   weight the design draws. Mirrors `apps/console/src/styles.css`. */
+@font-face {
+  font-family: "APK Futural";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src:
+    url("./fonts/apk-futural/APK-Futural-Regular.woff2") format("woff2"),
+    url("./fonts/apk-futural/APK-Futural-Regular.woff") format("woff");
+}
+
+/* No token override needed: `--zl-font-family-heading` already names this face
+   ahead of Arimo (packages/design-tokens/src/overrides.ts), so declaring the
+   `@font-face` is the whole opt-in. The declaration is document-scoped, which
+   is the only scope that registers a face — an `@font-face` inside a shadow
+   tree is ignored — and shadow content resolves against it. */
+
 html,
 body {
   margin: 0;
@@ -25,8 +45,8 @@ body {
   justify-content: center;
   gap: 0.75rem;
   padding: 2.5rem 1rem;
-  background: var(--zl-color-surface-default-black);
-  color: var(--zl-color-text-primary-white);
+  background: var(--zl-background);
+  color: var(--zl-foreground);
   font-family: var(--zl-font-family-sans);
   text-align: center;
 }
@@ -41,16 +61,16 @@ body {
 .setup-hint p {
   margin: 0;
   max-width: 32rem;
-  color: var(--zl-color-text-secondary-gray);
+  color: var(--zl-muted-foreground);
   font-size: 0.875rem;
   line-height: 1.5;
 }
 
 .setup-hint code {
   border-radius: 4px;
-  background: var(--zl-color-surface-hover-subtle);
+  background: var(--zl-accent);
   padding: 0.1rem 0.35rem;
-  color: var(--zl-color-text-primary-white);
+  color: var(--zl-foreground);
   font-family: var(--zl-font-family-mono);
   font-size: 0.85em;
 }

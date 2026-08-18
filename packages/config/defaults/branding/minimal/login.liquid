@@ -2,18 +2,9 @@
   <section class="zl-minimal">
     <h1 class="zl-card-title">{{ step.texts.title_key | t: identity.display_name }}</h1>
 
-    {% if errors and errors.size > 0 %}
-      {% for err in errors %}
-        {% if err | formLevelError %}
-          {% assign alert_heading = err.text_key | alertHeading %}
-          {% assign alert_body = err.text_key | alertBody %}
-          <zl-alert severity="error" dismissible data-zl-step-error{% if alert_heading != "" %} heading="{{ alert_heading | t }}"{% endif %}>
-            {% if alert_body != "" %}{{ alert_body | t }}{% elsif err.text_key %}{{ err.text_key | t }}{% else %}{{ err.message }}{% endif %}
-          </zl-alert>
-        {% endif %}
-      {% endfor %}
-    {% endif %}
-
+    {% assign recover = actions | where: "name", "recover" | first %}
+    {% assign password_field = fields | where: "type", "password" | first %}
+    <div class="zl-field-group">
     {% for f in fields %}
       {% assign field_placeholder = f.text_key | fieldPlaceholder %}
       {% assign field_help = f.text_key | fieldHelp %}
@@ -58,6 +49,7 @@
           {% if f.required %}required{% endif %}
           {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
           {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
+          {% if recover and f.type == 'password' %}forgot-password-href="#" forgot-password-action="{{ recover.name }}" forgot-password-label="{{ recover.text_key | t }}"{% endif %}
         >
           {% if field_help != "" %}
             <span slot="help">{{ field_help }}</span>
@@ -66,8 +58,26 @@
       {% endcase %}
     {% endfor %}
 
-    {% assign recover = actions | where: "name", "recover" | first %}
-    {% if recover %}
+    {% if errors and errors.size > 0 %}
+      {% for err in errors %}
+        {% if err | formLevelError %}
+          {% assign alert_heading = err.text_key | alertHeading %}
+          {% assign alert_body = err.text_key | alertBody %}
+          <zl-alert data-zl-step-error{% if alert_heading != "" %} heading="{{ alert_heading | t }}"{% endif %}>
+            {% if alert_body != "" %}{{ alert_body | t }}{% elsif err.text_key %}{{ err.text_key | t }}{% else %}{{ err.message }}{% endif %}
+          </zl-alert>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+    </div>
+
+    <div class="zl-card-actions">
+    {% comment %}
+      A step can offer recovery without asking for a password (an identifier-only
+      screen, say). With no label row to sit on, the affordance keeps its own row
+      rather than disappearing.
+    {% endcomment %}
+    {% if recover and password_field == nil %}
       <p class="zl-card-forgot">
         <a href="#" class="zl-card-forgot__link" data-action="recover">{{ recover.text_key | t }}</a>
       </p>
@@ -129,6 +139,7 @@
         {{ 'register.action.sign_in.lead' | t }}<a href="#" class="zl-card-nav__link" data-action="sign_in" data-testid="zitadel-action-sign_in-link">{{ 'register.action.sign_in.link' | t }}</a>
       </p>
     {% endif %}
+    </div>
 
     {% if challenge %}
       {% if challenge.method == "passkey" or challenge.method == "passkey_register" %}

@@ -159,6 +159,156 @@
       "light": "#22c55e"
     }
   },
+  "custom": {
+    "background dark:input\\30": {
+      "dark": "#ffffff0b",
+      "light": "#fafafa"
+    },
+    "accent dark:input\\50": {
+      "dark": "#ffffff13",
+      "light": "#f5f5f5"
+    },
+    "outline": {
+      "dark": "#73737380",
+      "light": "#a3a3a380"
+    },
+    "destructive dark:destructive\\70": {
+      "dark": "#f87171b2",
+      "light": "#dc2626"
+    },
+    "destructive dark:destructive\\90": {
+      "dark": "#f87171e5",
+      "light": "#dc2626"
+    },
+    "destructive dark:destructive\\60": {
+      "dark": "#f8717199",
+      "light": "#dc2626"
+    },
+    "dark:input": {
+      "dark": "#ffffff26",
+      "light": "#ffffff00"
+    },
+    "input dark:input\\80": {
+      "dark": "#ffffff1f",
+      "light": "#e5e5e5"
+    },
+    "destructive\\20 dark:destructive\\40": {
+      "dark": "#f8717166",
+      "light": "#dc262633"
+    },
+    "destructive\\40 dark:destructive\\60": {
+      "dark": "#f8717199",
+      "light": "#dc262666"
+    },
+    "outline\\10 dark:outline\\20": {
+      "dark": "#73737333",
+      "light": "#a3a3a31a"
+    },
+    "accent dark:calendar\\50": {
+      "dark": "#ffffff13",
+      "light": "#f5f5f5"
+    },
+    "background dark:calendar\\30": {
+      "dark": "#ffffff0b",
+      "light": "#fafafa"
+    },
+    "blue-500 dark:blue-600": {
+      "dark": "#2563eb",
+      "light": "#3b82f6"
+    },
+    "border dark:input-dark": {
+      "dark": "#ffffff26",
+      "light": "#e5e5e5"
+    },
+    "ring dark:input-dark": {
+      "dark": "#ffffff26",
+      "light": "#a3a3a3"
+    },
+    "ring dark:input-dark 2": {
+      "dark": "#ffffff26",
+      "light": "#a3a3a3"
+    },
+    "bg-background\\20 dark:bg-background\\10": {
+      "dark": "#0a0a0a1a",
+      "light": "#ffffff33"
+    },
+    "bg-primary\\5 dark:bg-primary\\10": {
+      "dark": "#ffffff1a",
+      "light": "#1717170d"
+    },
+    "destructive\\10 dark:destructive\\20": {
+      "dark": "#f8717133",
+      "light": "#dc26261a"
+    },
+    "input\\50 dark:input\\80": {
+      "dark": "#ffffff26",
+      "light": "#e5e5e580"
+    },
+    "destructive\\20 dark:destructive\\30": {
+      "dark": "#f871714d",
+      "light": "#dc262633"
+    },
+    "destructive\\40 dark:destructive\\40": {
+      "dark": "#f8717166",
+      "light": "#dc262666"
+    },
+    "muted dark:input\\50": {
+      "dark": "#ffffff13",
+      "light": "#f5f5f5"
+    },
+    "amber\\900 dark:amber\\50": {
+      "dark": "#fffbeb",
+      "light": "#78350f"
+    },
+    "amber\\50 dark:amber\\950": {
+      "dark": "#451a03",
+      "light": "#fffbeb"
+    },
+    "amber\\200 dark:amber\\900": {
+      "dark": "#78350f",
+      "light": "#fde68a"
+    },
+    "input\\30 dark:transparent": {
+      "dark": "#ffffff01",
+      "light": "#e5e5e54d"
+    },
+    "neutral\\800 dark:neutral\\300": {
+      "dark": "#d4d4d4",
+      "light": "#262626"
+    },
+    "input\\30 dark:input\\30": {
+      "dark": "#ffffff26",
+      "light": "#e5e5e54d"
+    },
+    "alpha-30 dark:alpha-20": {
+      "dark": "#0a0a0acc",
+      "light": "#ffffffb2"
+    },
+    "input dark:input\\30": {
+      "dark": "#ffffff26",
+      "light": "#e5e5e5"
+    },
+    "ring dark:input-dark 3": {
+      "dark": "#ffffff26",
+      "light": "#a3a3a3"
+    },
+    "popover\\70": {
+      "dark": "#262626b2",
+      "light": "#ffffffb2"
+    },
+    "foreground\\10": {
+      "dark": "#fafafa1a",
+      "light": "#0a0a0a1a"
+    },
+    "transparent dark:input\\30": {
+      "dark": "#ffffff0b",
+      "light": "#ffffff00"
+    },
+    "transparent": {
+      "dark": "#ffffff00",
+      "light": "#ffffff00"
+    }
+  },
   "radius": {
     "sm": 6,
     "xs": 2,
@@ -168,6 +318,130 @@
     "2xl": 18,
     "3xl": 22,
     "4xl": 26
+  },
+  "shadow": {
+    "2xs": {
+      "offsetX": 0,
+      "offsetY": 1,
+      "blurRadius": 0,
+      "color": "#0000000d",
+      "spreadRadius": 0
+    },
+    "xs": {
+      "offsetX": 0,
+      "offsetY": 1,
+      "blurRadius": 2,
+      "spreadRadius": 0,
+      "color": "#0000000d"
+    },
+    "sm": {
+      "1": {
+        "offsetX": 0,
+        "offsetY": 1,
+        "blurRadius": 3,
+        "spreadRadius": 0,
+        "color": "#0000001a"
+      },
+      "2": {
+        "offsetX": 0,
+        "offsetY": 1,
+        "blurRadius": 2,
+        "spreadRadius": -1,
+        "color": "#0000001a"
+      }
+    },
+    "md": {
+      "1": {
+        "offsetX": 0,
+        "offsetY": 4,
+        "blurRadius": 6,
+        "spreadRadius": -1,
+        "color": "#0000001a"
+      },
+      "2": {
+        "offsetX": 0,
+        "offsetY": 2,
+        "blurRadius": 4,
+        "spreadRadius": -2,
+        "color": "#0000001a"
+      }
+    },
+    "lg": {
+      "1": {
+        "offsetX": 0,
+        "offsetY": 10,
+        "blurRadius": 15,
+        "spreadRadius": -3,
+        "color": "#0000001a"
+      },
+      "2": {
+        "offsetX": 0,
+        "offsetY": 4,
+        "blurRadius": 6,
+        "spreadRadius": -4,
+        "color": "#0000001a"
+      }
+    },
+    "xl": {
+      "1": {
+        "offsetX": 0,
+        "offsetY": 20,
+        "blurRadius": 25,
+        "spreadRadius": -5,
+        "color": "#0000001a"
+      },
+      "2": {
+        "offsetX": 0,
+        "offsetY": 8,
+        "blurRadius": 10,
+        "spreadRadius": -6,
+        "color": "#0000001a"
+      }
+    },
+    "2xl": {
+      "offsetX": 0,
+      "offsetY": 25,
+      "blurRadius": 50,
+      "spreadRadius": -12,
+      "color": "#00000040"
+    }
+  },
+  "spacing": {
+    "0": 0,
+    "1": 4,
+    "2": 8,
+    "3": 12,
+    "4": 16,
+    "5": 20,
+    "6": 24,
+    "7": 28,
+    "8": 32,
+    "9": 36,
+    "10": 40,
+    "11": 44,
+    "12": 48,
+    "14": 56,
+    "16": 64,
+    "20": 80,
+    "24": 96,
+    "28": 112,
+    "32": 128,
+    "36": 144,
+    "40": 160,
+    "44": 176,
+    "48": 192,
+    "52": 208,
+    "56": 224,
+    "60": 240,
+    "64": 256,
+    "72": 288,
+    "80": 320,
+    "96": 384,
+    "px": 1,
+    "0-5": 2,
+    "1-5": 6,
+    "2-5": 10,
+    "3-5": 14
   },
   "text": {
     "base": {

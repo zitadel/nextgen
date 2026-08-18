@@ -1,9 +1,9 @@
 import { unsafeCSS, type CSSResult } from "lit";
 
 /**
- * Wrap shared surface CSS (from `@zitadel/shared-component-styles`)
- * for Lit `static styles`. Import `.css?inline` in atoms; `@tsdown/css` inlines
- * the strings when `components` is built.
+ * Wrap an atom's co-located `.css` file for Lit `static styles`. Import it as
+ * `./zl-<atom>.css?inline`; `@tsdown/css` inlines the string when `components`
+ * is built, and Vite does the same in dev and vitest.
  */
 export function surfaceStyles(...cssChunks: string[]): CSSResult[] {
   return cssChunks.map((chunk) => unsafeCSS(chunk));

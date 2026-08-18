@@ -25,9 +25,10 @@ Where does the component live?
 │     → shadcn components + Tailwind utilities (bg-background, …).
 │       Do NOT author a bespoke CSS file or add rules to styles.css.
 │
-└── packages/components + packages/ui-react  (paired Lit + React atoms for login)
-      → style in @zitadel/shared-component-styles, keyed to legacy --zl-color-*
-        variables. The console rewrite does not compose these for new UI.
+└── packages/components  (the Lit <zl-*> atoms for the login surface)
+      → vanilla CSS in the atom's own zl-<atom>.css, keyed to --zl-* variables.
+        Tailwind and shadcn components do not cross the shadow boundary, and
+        the console never composes these (ADR 052).
 ```
 
 ## Token contract
@@ -200,5 +201,6 @@ tokens over `dark:` utilities so surfaces re-theme automatically.
 - Don't hand-roll a pill/table/tab/sidebar that shadcn already provides.
 - Don't paste CLI-generated HSL blocks into `styles.css` — the token pipeline
   owns colours.
-- Don't import `@zitadel/ui-react` atoms into new console UI; migrate remaining
-  call sites as screens are rewritten.
+- Don't import login atoms into console UI. The two surfaces share tokens, not
+  components (ADR 052) — reach for the shadcn component instead, installing it
+  from the registry if `src/components/ui/` doesn't have it yet.

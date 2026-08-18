@@ -208,5 +208,6 @@ the sidebar.
   [`apps/console/vite.config.mts`](../../vite.config.mts).
 - [`internal/staticui/handler.go`](../../../../internal/staticui/handler.go)
   — SPA fallback that makes deep links survive refresh.
-- Root [ADR 014: Design tokens and paired React components](../../../../docs/adrs/014-design-tokens-and-ui-react-pairs.md)
-  — the `@zitadel/ui-react` chrome the shell is built from.
+- Root [ADR 052: A Lit-only login surface, with the console on shadcn/ui](../../../../docs/adrs/052-lit-only-login-surface.md)
+  — the shell is built from shadcn/ui in `src/components/ui/`, sharing only
+  `--zl-*` with the login atoms.

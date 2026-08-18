@@ -17,8 +17,6 @@
     "@zitadel/sdk-core": "0.0.0",
     "@zitadel/sdk-next": "0.0.0",
     "@zitadel/sdk-nuxt": "0.0.0",
-    "@zitadel/shared-component-styles": "0.0.0",
-    "@zitadel/ui-react": "0.0.0",
     "@zitadel/cli-journey-e2e": "0.0.1",
     "@zitadel/login-ui": "0.0.1",
     "@zitadel/sdk-react": "0.0.0",

@@ -21,34 +21,21 @@
 
 /** Categories the build script emits as `--zl-*` CSS variables and `tokens.*` typed exports. */
 export interface DesignTokenOverrides {
-  /**
-   * Re-exposed Figma primitives the design system references by primitive
-   * name (e.g. `color/gray/600`) without a semantic alias. Atoms that need
-   * the raw shade for a state Figma doesn't name semantically — most
-   * famously the Button's hovered / pressed Primary background — read these
-   * directly. Values mirror `figma.tokens.json#primitives.color.gray`.
-   */
-  colorPrimitive: ColorPrimitiveTokens;
+  /** Semantic colours the shadcn role set has no name for. */
+  colorRole: ColorRoleTokens;
   font: FontTokens;
   motion: MotionTokens;
   focus: FocusTokens;
   breakpoint: BreakpointTokens;
 }
 
-export interface ColorPrimitiveTokens {
-  gray: {
-    "50": string;
-    "75": string;
-    "100": string;
-    "200": string;
-    "300": string;
-    "400": string;
-    "500": string;
-    "600": string;
-    "700": string;
-    "800": string;
-    "900": string;
-  };
+/**
+ * Roles the design system needs but shadcn does not define. Each is a
+ * `{ dark, light }` pair so it flips with the theme like every other colour.
+ */
+export interface ColorRoleTokens {
+  link: { dark: string; light: string };
+  warning: { dark: string; light: string };
 }
 
 export interface FontTokens {
@@ -58,7 +45,13 @@ export interface FontTokens {
      * environments readable. Tenants override the face via branding URLs.
      */
     sans: string;
-    /** Heading face. Same family as `sans` (Arimo), rendered bold by the chrome. */
+    /**
+     * Display face for headings and labels. Names APK Futural ahead of the body
+     * face: naming a family is not distributing it, so this package stays
+     * publishable while any surface that has licensed and `@font-face`-declared
+     * the file renders it. Everywhere else falls straight through to Arimo,
+     * which is what a font stack is for.
+     */
     heading: string;
     /** Code blocks and any monospaced data display. */
     mono: string;
@@ -84,8 +77,6 @@ export interface FocusTokens {
   width: string;
   /** Distance between the focus ring and the element edge. */
   offset: string;
-  /** Figma token path used to resolve the focus ring colour at build time. */
-  colorToken: string;
 }
 
 export interface BreakpointTokens {
@@ -100,25 +91,23 @@ export interface BreakpointTokens {
 }
 
 export const overrides: DesignTokenOverrides = {
-  colorPrimitive: {
-    gray: {
-      "50": "#0f0f11",
-      "75": "#252528",
-      "100": "#37373a",
-      "200": "#484a57",
-      "300": "#686883",
-      "400": "#82829c",
-      "500": "#9e9eb2",
-      "600": "#cfcfde",
-      "700": "#bfbfcf",
-      "800": "#e1e1e7",
-      "900": "#f4f4f6",
-    },
+  colorRole: {
+    // The frames give links no colour of their own — they take the surrounding
+    // text colour and are marked by an underline. `currentColor` says exactly
+    // that, and still gives tenants one variable to tint if they want links to
+    // stand out.
+    link: { dark: "currentColor", light: "currentColor" },
+    // No warning role exists in the design system yet; these are the Tailwind
+    // amber steps the library already registers, chosen to sit at the same
+    // weight as `--zl-destructive` in each mode. Raised with design — see the
+    // open questions on the rebuild.
+    warning: { dark: "#fbbf24", light: "#d97706" },
   },
   font: {
     family: {
       sans: '"Arimo", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif',
-      heading: '"Arimo", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif',
+      heading:
+        '"APK Futural", "Arimo", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif',
       mono: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
     },
   },
@@ -138,7 +127,6 @@ export const overrides: DesignTokenOverrides = {
   focus: {
     width: "2px",
     offset: "2px",
-    colorToken: "color/border/default white",
   },
   breakpoint: {
     xs: "26.5625rem",

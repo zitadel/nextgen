@@ -82,7 +82,6 @@
     "tsdown": "catalog:",
     "tslib": "catalog:",
     "@zitadel/api": "workspace:*",
-    "@zitadel/design-tokens": "workspace:*",
-    "@zitadel/shared-component-styles": "workspace:*"
+    "@zitadel/design-tokens": "workspace:*"
   }
 }

@@ -12,7 +12,7 @@
  *
  * Every `optimizeDepsInclude` entry must be resolvable from this app, so the
  * transitive deps of the excluded workspace packages (`dompurify`, `liquidjs`,
- * `lucide`, `lucide-react`, `xstate`, `@faker-js/faker`) are declared as
+ * `lucide`, `xstate`, `@faker-js/faker`) are declared as
  * devDependencies in `apps/storybook/package.json`. Under pnpm's strict
  * node_modules they are otherwise unresolvable from here on a clean install, so
  * Vite cannot pre-bundle them and falls back to the mid-test reload above —
@@ -20,8 +20,6 @@
  */
 export const optimizeDepsExclude = [
   "@zitadel/components",
-  "@zitadel/ui-react",
-  "@zitadel/shared-component-styles",
   "@zitadel/design-tokens",
   "@zitadel/api",
   "@zitadel/api-mock",

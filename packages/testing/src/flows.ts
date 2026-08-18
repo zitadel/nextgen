@@ -194,11 +194,15 @@ export async function loginWithPasskey(page: Page, options: { email?: string } =
 
 /**
  * Register a new user with a password: enter the (unknown) identifier,
- * advance into the registration step, continue on the password path, and
- * submit the password. Ends when the final submit is clicked — assert your
- * app's signed-in surface afterwards. Flows that route through steps the
- * default flow does not (e.g. a passkey upsell) need caller-side handling
- * after this returns.
+ * advance into the registration step, continue on the password path, submit
+ * the password, and clear the passkey enrolment offer the default flow shows
+ * once the account exists. Ends with the account created and the flow past its
+ * last interstitial — assert your app's signed-in surface afterwards.
+ *
+ * A flow that skips the offer entirely (a preset that drops the step, or one
+ * routing `register-password` straight to `done`) needs nothing extra; a test
+ * that wants to assert the offer itself should drive the steps directly rather
+ * than through this helper.
  */
 export async function registerWithPassword(
   page: Page,
@@ -213,6 +217,25 @@ export async function registerWithPassword(
   }
   await password_.fill(password);
   await flowAction(page, "submit").click();
+  await skipPasskeyUpsellIfPresent(page);
+}
+
+/**
+ * Take the `skip` action on the passkey enrolment offer, if this flow shows
+ * one. Waiting for the password control to go first means the next step has
+ * already rendered, so the offer is either on screen or not part of this flow
+ * — no polling race, and no timeout paid by flows that go straight to `done`.
+ */
+async function skipPasskeyUpsellIfPresent(page: Page): Promise<void> {
+  await passwordField(page)
+    .waitFor({ state: "hidden", timeout: 30_000 })
+    .catch(() => {
+      // A completing flow navigates away, detaching the whole widget.
+    });
+  const skip = flowAction(page, "skip");
+  if (await skip.isVisible().catch(() => false)) {
+    await skip.click();
+  }
 }
 
 /**

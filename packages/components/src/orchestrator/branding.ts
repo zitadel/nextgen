@@ -35,6 +35,12 @@ export type BrandingPalette = {
 
 export type BrandingTypography = {
   font_family?: string;
+  /**
+   * Display face for card titles and labels. Optional: without it a tenant's
+   * `font_family` sets the headings too, which is the single-font look most
+   * brands want. Naming it is how a brand keeps a separate display face.
+   */
+  font_family_heading?: string;
   font_family_mono?: string;
   scale?: number;
 };

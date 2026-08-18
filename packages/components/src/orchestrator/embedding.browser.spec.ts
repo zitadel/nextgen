@@ -179,6 +179,16 @@ const splitRightNoAssetsStep: CreateFlow201 = {
   },
 } as unknown as CreateFlow201;
 
+/** An eject from before the mark moved into the form column: no anchor, so the
+ *  orchestrator falls back to the page-shell footer slot. */
+const splitNoAnchorStep: CreateFlow201 = {
+  ...identifierStep,
+  branding: {
+    layout: "split",
+    liquid_template: splitTemplate.replace("<div data-zl-attribution-anchor></div>", ""),
+  },
+} as unknown as CreateFlow201;
+
 const splitCustomColumnsStep: CreateFlow201 = {
   ...identifierStep,
   branding: {
@@ -446,7 +456,9 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(form).toBeTruthy();
     expect(getComputedStyle(form).padding).toBe("16px");
     const brand = element.shadowRoot?.querySelector(".zl-split__brand") as HTMLElement;
-    expect(getComputedStyle(brand).padding).toBe("52px 16px");
+    // 2rem block / 1rem inline, from the spacing scale: enough to separate the
+    // panes, not enough for the brand side to set the page height over the card.
+    expect(getComputedStyle(brand).padding).toBe("32px 16px");
   });
 
   it("wide split placeholder and attribution stay centred on the form track", async () => {
@@ -478,6 +490,41 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
       el.variant = "page";
     });
     const form = element.shadowRoot?.querySelector(".zl-split__form") as HTMLElement;
+    const pill = element.shadowRoot?.querySelector(".zl-attribution > *") as HTMLElement;
+    expect(Math.abs(centerX(form) - centerX(pill))).toBeLessThanOrEqual(1);
+  });
+
+  it("the split designs hang the trustmark off the card, not off the pane seam", async () => {
+    // The shell's footer spans both panes, so a footer-slotted mark sits below
+    // the split *row* — and the row is as tall as the brand pane, which has
+    // nothing to do with the card. The templates carry an anchor in the form
+    // column so the mark keeps the same 24px the centred design gives it, at
+    // any card height and whatever the tenant's assets do to the brand pane.
+    host.style.width = "1200px";
+    const element = await mount(splitNoAssetsStep, (el) => {
+      el.variant = "page";
+    });
+    const card = element.shadowRoot?.querySelector("zl-card") as HTMLElement;
+    const mark = element.shadowRoot?.querySelector(".zl-attribution") as HTMLElement;
+    expect(mark.closest(".zl-split__form")).toBeTruthy();
+    expect(mark.getAttribute("slot")).toBeNull();
+    expect(
+      Math.round(mark.getBoundingClientRect().top - card.getBoundingClientRect().bottom),
+    ).toBe(24);
+  });
+
+  it("a split template with no anchor still slots the trustmark into the shell footer", async () => {
+    // Tenants eject these templates, so the anchor cannot be assumed. Without
+    // one the mark goes back to the footer, where the track-mirroring rules
+    // keep it under the form column rather than under the seam.
+    host.style.width = "1200px";
+    const element = await mount(splitNoAnchorStep, (el) => {
+      el.variant = "page";
+    });
+    const form = element.shadowRoot?.querySelector(".zl-split__form") as HTMLElement;
+    const mark = element.shadowRoot?.querySelector(".zl-attribution") as HTMLElement;
+    expect(mark.getAttribute("slot")).toBe("footer");
+    expect(mark.closest(".zl-split__form")).toBeNull();
     const pill = element.shadowRoot?.querySelector(".zl-attribution > *") as HTMLElement;
     expect(Math.abs(centerX(form) - centerX(pill))).toBeLessThanOrEqual(1);
   });
