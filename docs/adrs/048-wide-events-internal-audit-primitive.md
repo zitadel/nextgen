@@ -489,9 +489,9 @@ with `x-verify`, `x-editable`, and `x-mfa` — none had a consumer, and the thre
 surfaces that point named (OpenAPI `user-property`, console input masking,
 config normalize) no longer reference it. `x-audit` is the only annotation
 governing audit payloads. A value withheld from read responses is `writeOnly`,
-native JSON Schema, declared in the dialect but not yet enforced by the read
-API. The dialect keeps `additionalProperties: true`, so a document still
-carrying `x-sensitive` validates and is ignored rather than rejected.
+native JSON Schema the dialect documents rather than declares, and nothing
+enforces it yet. The dialect keeps `additionalProperties: true`, so a document
+still carrying `x-sensitive` validates and is ignored rather than rejected.
 
 ### 9. OTEL is Tier 3 export only
 

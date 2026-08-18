@@ -62,7 +62,7 @@ describe("normalizeSchemaBody", () => {
     const normalized = normalizeSchemaBody({
       objectType: "human-user",
       properties: {
-        email: { type: "string", "x-audit": false, writeOnly: false },
+        email: { type: "string", "x-audit": false },
         givenName: { type: "string" },
       },
     });
@@ -79,9 +79,13 @@ describe("normalizeSchemaBody", () => {
     const body = {
       properties: {
         email: { type: "string", "x-audit": true },
-        secret: { type: "string", writeOnly: true },
       },
     };
+    expect(normalizeSchemaBody(body)).toEqual(body);
+  });
+
+  it("keeps native keywords the dialect declares no default for", () => {
+    const body = { properties: { secret: { type: "string", writeOnly: false } } };
     expect(normalizeSchemaBody(body)).toEqual(body);
   });
 

@@ -11,13 +11,14 @@ What matters here is the contract: which schema annotations exist, how the flow 
 
 | Annotation | Scope | Consumer | Purpose |
 |---|---|---|---|
-| `writeOnly: true` | Field | Read API | Value may be written but is never returned. Declared, not yet enforced — responses currently include write-only properties |
+| `writeOnly: true` | Field | Read API | Reserved for a value that may be written but is never returned. Nothing enforces it yet — responses currently include write-only properties |
 | `x-audit: true` | Field | Audit emitter | Field value may appear in audit event payloads (allowlist; deny-by-default) |
 | `x-unique: "<scope>"` | Field | Flow Engine | Server validates uniqueness on form submit at the given scope (`project` or `team`); a non-empty scope also marks the field as an identifier used for user resolution |
 | `x-claim: "claims.email"` | Field | Flow Engine | Maps to SSO/OIDC claim for auto-population |
 | `x-auth-methods` | Schema | Policy Engine | Which auth methods this user type supports (narrows what policy can require) |
 
-`writeOnly` is native JSON Schema; the `x-*` annotations are this dialect's.
+`writeOnly` is native JSON Schema, so the dialect does not declare it; the `x-*`
+annotations are this dialect's.
 Anything else a customer writes under a property is carried verbatim and
 ignored — the dialect keeps `additionalProperties: true`, so an unrecognised
 `x-*` key is accepted rather than rejected.

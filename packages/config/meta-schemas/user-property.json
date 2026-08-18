@@ -14,11 +14,6 @@
       "const": "https://json-schema.org/draft/2020-12/schema",
       "description": "The JSON Schema version used for this schema."
     },
-    "writeOnly": {
-      "type": "boolean",
-      "default": false,
-      "description": "Whether the value may be written but is never returned by the read API. Enforcement is not implemented: responses currently include write-only properties."
-    },
     "x-unique": {
       "oneOf": [
         {

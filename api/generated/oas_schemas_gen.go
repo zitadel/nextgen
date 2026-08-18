@@ -41520,11 +41520,10 @@ func (s *UserPermissionDeniedDetails) init() UserPermissionDeniedDetails {
 
 // This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`.
 // This is done because a lot of code generators cannot handle that.
-// Native JSON Schema keywords such as `type`, `format` and `title` are accepted
-// without being listed below. One of them carries meaning for this API:
-// `writeOnly: true` marks a value that may be written but is never returned by
-// the read API. Enforcement is not implemented: responses currently include
-// write-only properties.
+// Native JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`
+// are accepted without being listed below. `writeOnly: true` is reserved for a
+// value that may be written but is never returned by the read API; nothing
+// enforces it today, so responses still include write-only properties.
 // A few properties are reserved:
 // - id: is used to return the id of the user
 // - metadata: is used to embed metadata of the user, like creation date,
