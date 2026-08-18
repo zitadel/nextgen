@@ -42,7 +42,7 @@ func newTestKey(id, projectID string, state domain.KeyState) *domain.EncryptionK
 func withProject(t *testing.T) string {
 	t.Helper()
 	project := newTestProject(uniqueProjectID(t))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), project.ID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), project.ID) })
 	require.NoError(t, testPool.CreateProject(t.Context(), project))
 	return project.ID
 }

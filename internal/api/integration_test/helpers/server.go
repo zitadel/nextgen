@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
@@ -55,8 +57,10 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 			h.EnsureFlowDefinitionService(t),
 			h.EnsureTeamService(t),
 			h.EnsureBrandingService(t),
+			h.EnsureEventService(t),
 			h.EnsureTokenService(t),
 			h.EnsureKeyService(t),
+			service.NewClaimService(h.EnsureServiceDB(t), "https://console.invalid/ui/console", domain.PlatformProjectID),
 			h.EnsureServiceDB(t),
 			"",
 		)

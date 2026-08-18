@@ -19,6 +19,9 @@ type queryExecutor interface {
 	// Update executes a write operation on the database and returns the number of rows affected.
 	// It must not be used for reading data.
 	Update(ctx context.Context, stmt spanner.Statement) (int64, error)
+	// BufferWrite queues mutations. Inside a read-write transaction they apply at
+	// commit with no intermediate RPC; outside a transaction they are Applied immediately.
+	BufferWrite(ctx context.Context, ms []*spanner.Mutation) error
 	// ReadRow reads a single row from the database and returns it. It must not be used for writing data.
 	ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error)
 }
@@ -65,6 +68,14 @@ func (c client) Update(ctx context.Context, stmt spanner.Statement) (rowCount in
 	return rowCount, wrapError(err)
 }
 
+// BufferWrite implements [queryExecutor].
+func (c client) BufferWrite(ctx context.Context, ms []*spanner.Mutation) error {
+	ctx, cancel := boundRetry(ctx)
+	defer cancel()
+	_, err := c.client.Apply(ctx, ms)
+	return wrapError(err)
+}
+
 func (c client) ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error) {
 	tx := c.client.Single()
 	defer tx.Close()
@@ -96,6 +107,11 @@ func (t tx) Write(ctx context.Context, stmt spanner.Statement, consume func(*spa
 func (t tx) Update(ctx context.Context, stmt spanner.Statement) (int64, error) {
 	n, err := t.txn.Update(ctx, stmt)
 	return n, wrapError(err)
+}
+
+// BufferWrite implements [queryExecutor].
+func (t tx) BufferWrite(ctx context.Context, ms []*spanner.Mutation) error {
+	return wrapError(t.txn.BufferWrite(ms))
 }
 
 // ReadRow implements [queryExecutor].

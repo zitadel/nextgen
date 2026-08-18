@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -151,13 +152,28 @@ func (s *PasskeyRegistrationService) Finish(ctx context.Context, in FinishRegist
 	newPasskey.ProjectID = in.ProjectID
 	newPasskey.UserID = reg.UserID
 
-	if err := stmts.CreateUserPasskey(ctx, newPasskey); err != nil {
-		return fmt.Errorf("passkey registration: store credential: %w", err)
-	}
-
-	// Best-effort cleanup; don't shadow the success.
-	_ = stmts.DeletePasskeyRegistration(ctx, in.ProjectID, in.RegistrationID)
-	return nil
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().CreateUserPasskey(ctx, newPasskey); err != nil {
+			return fmt.Errorf("passkey registration: store credential: %w", err)
+		}
+		if err := audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeAuthFactorPasskeyEnrolled,
+			Category:   domain.EventCategoryAuth,
+			ProjectID:  in.ProjectID,
+			EntityType: "user_passkey",
+			EntityID:   newPasskey.ID,
+			Payload: domain.AuthFactorPayload{
+				UserID:   reg.UserID,
+				FactorID: newPasskey.ID,
+			},
+		}); err != nil {
+			return err
+		}
+		// Best-effort cleanup; don't shadow the success.
+		_ = tx.Statements().DeletePasskeyRegistration(ctx, in.ProjectID, in.RegistrationID)
+		return nil
+	})
+	return err
 }
 
 func parseOrigins(raw []string) ([]url.URL, error) {

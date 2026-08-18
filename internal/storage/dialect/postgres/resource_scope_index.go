@@ -40,6 +40,14 @@ SELECT EXISTS (
 )`
 
 	deleteResourceScopeStmt = `DELETE FROM zitadel_nextgen.resource_scope_index WHERE resource_kind = $1 AND project_id = $2 AND resource_id = $3`
+
+	listClaimedProjectIDsStmt = `
+SELECT project_id FROM zitadel_nextgen.resource_scope_index
+WHERE resource_kind = $1
+  AND team_id IS NOT NULL AND team_id <> ''
+  AND ($2 = '' OR project_id > $2)
+ORDER BY project_id
+LIMIT $3`
 )
 
 type resourceScopeStatements struct{ statement }
@@ -111,6 +119,26 @@ func (s resourceScopeStatements) ExistsResourceScopeElsewhere(ctx context.Contex
 func (s resourceScopeStatements) DeleteResourceScope(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) error {
 	_, err := s.client.Exec(ctx, deleteResourceScopeStmt, kind.String(), projectID, resourceID)
 	return wrapError(err)
+}
+
+// ListClaimedProjectIDs implements [service.ResourceScopeStatements].
+func (s resourceScopeStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
+	if limit == 0 {
+		limit = 500
+	}
+	rows, err := s.client.Query(ctx, listClaimedProjectIDsStmt, domain.ResourceKindProject.String(), afterID, int64(limit))
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	ids, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (string, error) {
+		var id string
+		err := row.Scan(&id)
+		return id, err
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return ids, nil
 }
 
 func scanResourceScope(row pgx.CollectableRow) (*domain.ResourceScope, error) {
