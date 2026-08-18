@@ -94,7 +94,7 @@ func (s *BrandingService) Get(ctx context.Context, projectID, id string) (*domai
 // GetLatest returns the newest revision for the project, or nil (no error)
 // when the project has none — callers fall back to built-in defaults.
 func (s *BrandingService) GetLatest(ctx context.Context, projectID string) (*domain.Branding, error) {
-	result, err := s.v2Pool.Statements().ListBrandings(ctx, branding.ListOptions(projectID, 1))
+	result, err := s.v2Pool.Statements().ListBrandings(WithAuthzListFilterBypass(ctx), branding.ListOptions(projectID, 1))
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to resolve latest branding revision")
 	}
@@ -115,7 +115,7 @@ const maxBrandingListRevisions = 100
 func (s *BrandingService) List(ctx context.Context, projectID string) ([]*domain.Branding, error) {
 	result, err := s.v2Pool.Statements().ListBrandings(ctx, branding.ListOptions(projectID, maxBrandingListRevisions))
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to list branding revisions")
+		return nil, mapListError(err, "failed to list branding revisions")
 	}
 	return result.Items, nil
 }

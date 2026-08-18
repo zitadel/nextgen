@@ -70,10 +70,11 @@ func (h *Handler) DeleteTeam(ctx context.Context, params api.DeleteTeamParams) (
 }
 
 func (h *Handler) QueryTeams(ctx context.Context, req *api.QueryTeamsRequest, params api.QueryTeamsParams) (api.QueryTeamsRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), teamAccess, opRead); err != nil {
+	proceed, err := h.requireProjectListAccess(ctx, string(params.ProjectID), teamAccess)
+	if err != nil || !proceed {
 		return nil, err
 	}
-	ctx, err := h.withAuthzListFilter(ctx, string(params.ProjectID), domain.ResourceKindTeam, opRead)
+	ctx, err = h.withAuthzListFilter(ctx, string(params.ProjectID), domain.ResourceKindTeam, opRead)
 	if err != nil {
 		return nil, err
 	}

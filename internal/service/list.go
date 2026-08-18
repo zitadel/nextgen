@@ -61,6 +61,8 @@ func mapListError(err error, internalMsg string) error {
 		return domain.ErrRequestInvalid().WithDetails("invalid page token")
 	case errors.Is(err, database.ErrCursorOrderMismatch()):
 		return domain.ErrRequestInvalid().WithDetails("page token does not match the requested sorting")
+	case errors.Is(err, ErrListFilterRequired):
+		return domain.ErrInternal(err).WithMessage("authz list filter missing")
 	default:
 		return domain.ErrInternal(err).WithMessage(internalMsg)
 	}
