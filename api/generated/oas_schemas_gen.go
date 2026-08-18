@@ -6723,7 +6723,10 @@ type FlowDefinitionStep struct {
 	// validation rules, and implicit outcomes from schema annotations
 	// (e.g. a property with `x-unique` set implies a `user_not_found`
 	// transition outcome). An object- or array-typed property has no
-	// field-shaped input: collect its leaves instead.
+	// field-shaped input: collect its leaves instead. Collecting a leaf
+	// materializes every object above it, so an optional object's own
+	// `required` entries have to be collected too once any step reaches
+	// into it.
 	Fields []string `json:"fields"`
 	// Ordered list of actions the user can take. The action name is what the
 	// frontend sends back in the submit request. If omitted, the engine

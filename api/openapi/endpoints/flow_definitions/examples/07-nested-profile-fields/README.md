@@ -52,13 +52,22 @@ flowchart TD
 - **The field path and the attribute key are the same string.** That is the
   point of the dotted spelling: a step's `fields` entry, the wire field `name`,
   the submitted key, and the stored attribute key never diverge.
-- **`required` is conjunctive over the chain.** A leaf is marked required only
-  when every object above it is required too. In the example schema `address`
-  is optional at the root, so these three leaves render optional even though
-  `address` lists `street` and `city` in its own `required` — which is exactly
-  what schema validation accepts for the document as a whole. Making `address`
-  required at the root would make `address.street` and `address.city` required
-  here, and the definition would be rejected if it collected neither.
+- **A field's `required` flag is conjunctive over the chain.** A leaf is marked
+  required only when every object above it is required too. `address` is
+  optional at the root of the example schema, so all three inputs render
+  optional.
+- **Collecting into an optional object still brings its own `required` into
+  force.** The object appears in the submitted document only because a step
+  collected something beneath it, and from there the document has to satisfy
+  the rest of its `required` list. `address` lists `street` and `city`, so this
+  definition has to collect both: dropping `address.street` is rejected when the
+  definition is saved, with `required fields [address.street] in user schema are
+  missing in the flow definition steps`. A step collecting nothing under
+  `address` is fine — the object never materializes, so it demands nothing.
+- **Requiring `address` at the root demands its leaves unconditionally.**
+  `address.street` and `address.city` then have to be collected whether or not
+  any step touches the object, because the document cannot omit `address` at
+  all.
 - **Name a leaf, never the object.** `"fields": ["address"]` is rejected when
   the definition is saved: an object has no field-shaped input. The same holds
   for an array-typed property.
