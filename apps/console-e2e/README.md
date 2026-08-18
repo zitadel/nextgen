@@ -63,6 +63,14 @@ exercises the request path a customer gets, and the one that would have caught
 both shipped bugs: the console calling `/api/*` at a mux that never served it,
 and the login shell defaulting to the project id `"demo"`.
 
+Its instance is provisioned, so the login shell's non-happy paths stub
+`/console/runtime.json` per test the way the preview lane does — Console
+ADR 0004 §3 holds for the shell too, and the states it separates ("no project
+yet" vs. a server that cannot answer) are exactly the ones this lane's own
+deployment state cannot produce. The stubbed retry falls through to the real
+server, so recovery is asserted against a genuine document rather than a
+fixture.
+
 Keep feature coverage out of it. Management screens need `user.read`, which
 only the project secret carries — that is `e2e-real`'s job. This lane asserts
 that the surfaces reach the API at all.
