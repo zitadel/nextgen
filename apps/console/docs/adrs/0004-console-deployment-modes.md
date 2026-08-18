@@ -8,10 +8,13 @@
 > and the flag-gated row-only `platform.bootstrap_project` path exist. The
 > pin, the first-created fallback, and row-only bootstrap are transitional
 > behavior, not the target described here, and the pin retires with the
-> fallback (§2). The Console's current fall-back-to-`standalone` handling of an
-> unreachable runtime document contradicts §3 and is a pending change. The full
-> platform-project provisioner, first-party Console session authorization,
-> effective-permission exposure, and seed-input contract remain future work.
+> fallback (§2). §3's three discovery states are implemented: an unreachable,
+> erroring, or unreadable runtime document renders a retryable connectivity
+> error, and builds that deliberately run without one (`vite preview`, the
+> api-mock dev loop) opt back into the standalone fallback with
+> `VITE_CONSOLE_RUNTIME_FALLBACK`. The full platform-project provisioner,
+> first-party Console session authorization, effective-permission exposure,
+> and seed-input contract remain future work.
 > **Scope:** `apps/console`, plus the server-owned bootstrap and authorization
 > contracts on which it depends. See
 > [`apps/console/AGENTS.md`](../../AGENTS.md).
@@ -312,11 +315,11 @@ without changing its Console build or moving operator identities.
   removal at cutover, together with the first-created fallback it overrides.
   It is transitional configuration, not a supported way to choose the
   platform project.
-- The unreachable-endpoint rule in §3 is a **pending behavior change**: the
-  shipped Console still resolves any fetch failure to `mode: "standalone"`
-  (`apps/console/src/runtime/runtime.ts`), and `apps/console-e2e` asserts that
-  behavior against a backend-less preview. Implementing §3 means an explicit
-  error state, an opt-in for backend-less development, and an updated spec.
+- A deployment whose runtime document is unreachable renders a connectivity
+  error, so a server outage no longer reads as "no project yet". Backend-less
+  development and preview builds are the cases the old silent fallback
+  actually served; they now say so with `VITE_CONSOLE_RUNTIME_FALLBACK`, and
+  the embedded build never carries it.
 - Effective-permission exposure, CSRF enforcement, and session-derived
   target authorization are server dependencies. The Console remains
   fail-closed until they land.

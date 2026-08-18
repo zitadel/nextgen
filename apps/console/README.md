@@ -100,6 +100,18 @@ hint; refresh after setup and the console picks the new project up. Only
 `standalone` mode exists today; `platform` (cloud portal) mode is future
 work.
 
+**A server the console cannot reach is an error, not a mode** (ADR 0004 §3).
+An unreachable endpoint, a non-2xx answer, or a body that is not a runtime
+document renders a retryable "Server unavailable" screen instead of the app —
+deliberately distinct from the setup hint, because "no project yet" would send
+an operator to `zitadel setup` for a problem setup cannot fix. Running the
+console against something that serves no runtime document (a backend-less
+`vite preview`, the api-mock loop below) is the one legitimate case for the
+old behavior, and it says so explicitly: set `VITE_CONSOLE_RUNTIME_FALLBACK=1`
+*for the build or dev server*, and discovery failures resolve to `standalone`
+again with a warning in the browser console. Never set it for the embedded
+production build.
+
 The runtime document also carries the default project's **publishable key**
 (root ADR 036): a browser-safe, origin-scoped bearer the login widget sends
 on flow calls and the handoff exchange. Sign-in therefore needs no
@@ -142,6 +154,7 @@ Note `listUsers` requires `user.read`, which only the **project secret** carries
 ```sh
 PORT=8080 moon run api-mock:start          # terminal 1
 VITE_CONSOLE_PROJECT_ID=proj_dev_mock \
+  VITE_CONSOLE_RUNTIME_FALLBACK=1 \
   moon run console:dev                     # terminal 2
 ```
 
@@ -150,8 +163,11 @@ Fast and offline, and the full sign-in loop works (the mock serves
 `identifier` → `password` flow the real server emits. Use it only for chrome that
 needs no real data: it has **no user store**, so list screens cannot be
 meaningful and nothing about authorization can be proven there. It also serves no
-`/console/runtime.json`, so runtime discovery falls back to `standalone` and the
-project id must come from `VITE_CONSOLE_PROJECT_ID`.
+`/console/runtime.json`, which is why the two variables above are both required:
+`VITE_CONSOLE_RUNTIME_FALLBACK` opts this loop into the standalone fallback
+(without it the console stops on the connectivity screen, correctly — the
+document really is missing), and the project id then has to come from
+`VITE_CONSOLE_PROJECT_ID`.
 
 ### Embedded build
 
@@ -170,6 +186,7 @@ embed base path.
 | `CONSOLE_PROJECT_SECRET` | Node (dev proxy) | Bearer attached by the proxy; never shipped to the browser |
 | `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api`) |
 | `VITE_CONSOLE_PROJECT_ID` | Client | Dev override for the project id; when unset it is discovered from `/console/runtime.json` (Console ADR 0004) |
+| `VITE_CONSOLE_RUNTIME_FALLBACK` | Client (build/dev time) | Opt-in for runs with no `/console/runtime.json` (`vite preview`, api-mock): failed discovery resolves to `standalone` instead of the connectivity error. Never set it for the embedded build |
 
 ## Commands
 
