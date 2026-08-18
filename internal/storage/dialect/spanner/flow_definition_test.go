@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -54,7 +55,7 @@ func TestFlowDefinitionStatements_CRUD(t *testing.T) {
 
 	project := newTestProject(uniqueProjectID(t))
 	require.NoError(t, stmts.CreateProject(ctx, project))
-	t.Cleanup(func() { _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
 
 	def := sampleFlowDefinition(project.ID, uniqueFlowDefinitionID(t))
 	require.NoError(t, stmts.CreateFlowDefinition(ctx, def))
@@ -68,7 +69,7 @@ func TestFlowDefinitionStatements_CRUD(t *testing.T) {
 	assert.Equal(t, def.UserSchema, got.UserSchema)
 	assert.Equal(t, def.Purposes, got.Purposes)
 
-	listed, err := stmts.ListFlowDefinitions(ctx, &database.ListOptions[domain.FlowDefinitionField]{
+	listed, err := stmts.ListFlowDefinitions(service.WithAuthzListFilterBypass(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), project.ID),
 			database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), domain.FlowDefinitionPurposeLogin.String()),
@@ -103,9 +104,10 @@ func TestFlowDefinitionStatements_DeleteProjectCascades(t *testing.T) {
 	def := sampleFlowDefinition(project.ID, uniqueFlowDefinitionID(t))
 	require.NoError(t, stmts.CreateFlowDefinition(ctx, def))
 
-	require.NoError(t, stmts.DeleteProjectByID(ctx, project.ID))
+	_, err := stmts.DeleteProjectByID(ctx, project.ID)
+	require.NoError(t, err)
 
-	_, err := stmts.GetFlowDefinitionByID(ctx, project.ID, def.ID)
+	_, err = stmts.GetFlowDefinitionByID(ctx, project.ID, def.ID)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, new(database.NoRowFoundError))
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/go-faster/jx"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -24,6 +25,7 @@ const (
 )
 
 func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (api.CreateFlowRes, error) {
+	audit.BindPublicRequest(ctx, string(req.ProjectID), "", "")
 	purpose, err := domain.FlowDefinitionPurposeString(string(req.Purpose))
 	if err != nil {
 		return nil, domain.ErrFlowInvalidPurpose().WithMessage(fmt.Sprintf("unknown purpose %q", req.Purpose))
@@ -72,6 +74,9 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest) (a
 	if err != nil {
 		return nil, normalizeFlowError(err)
 	}
+	if result.State != nil {
+		audit.BindPublicRequest(ctx, result.State.ProjectID, result.State.ID, result.State.SessionID)
+	}
 
 	cookieValue, err := h.sealState(ctx, result.State)
 	if err != nil {
@@ -90,6 +95,7 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	if err != nil {
 		return nil, normalizeFlowError(err)
 	}
+	audit.BindPublicRequest(ctx, state.ProjectID, state.ID, state.SessionID)
 	if state.ID != params.ID {
 		return nil, domain.ErrFlowNotFound()
 	}
@@ -194,6 +200,7 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 	if err != nil {
 		return mapFlowGetError(err)
 	}
+	audit.BindPublicRequest(ctx, state.ProjectID, state.ID, state.SessionID)
 	if state.ID != params.ID {
 		return mapFlowGetError(domain.ErrFlowNotFound())
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -102,7 +103,7 @@ func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest)
 		filters = append(filters, database.Equal(database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
 	}
 
-	result, err := s.v2Pool.Statements().ListFlowDefinitions(ctx, &database.ListOptions[domain.FlowDefinitionField]{
+	result, err := s.v2Pool.Statements().ListFlowDefinitions(WithAuthzListFilterBypass(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(filters...),
 	})
 	if err != nil {
@@ -141,7 +142,7 @@ func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequ
 		filters = append(filters, database.Equal(database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
 	}
 
-	result, err := s.v2Pool.Statements().ListFlowDefinitions(ctx, &database.ListOptions[domain.FlowDefinitionField]{
+	result, err := s.v2Pool.Statements().ListFlowDefinitions(WithAuthzListFilterBypass(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(filters...),
 	})
 	if err != nil {
@@ -226,6 +227,14 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 		return domain.FlowStepResult{}, err
 	}
 
+	// Mint and stamp before the state machine so Path B emits during Start
+	// (auth.attempt.created) share flow_id / session_id with Path A request.api.
+	flowID, err := s.v2Pool.Statements().NewManagedID(string(domain.PrefixFlow))
+	if err != nil {
+		return domain.FlowStepResult{}, fmt.Errorf("flow service: mint flow id: %w", err)
+	}
+	audit.BindPublicRequest(ctx, req.Definition.ProjectID, flowID, sessionID)
+
 	in := domain.FlowStartInput{
 		Definition:    req.Definition,
 		Purpose:       req.Purpose,
@@ -240,11 +249,6 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 	result, err := s.stateMachine.Start(ctx, in)
 	if err != nil {
 		return domain.FlowStepResult{}, err
-	}
-
-	flowID, err := s.v2Pool.Statements().NewManagedID(string(domain.PrefixFlow))
-	if err != nil {
-		return domain.FlowStepResult{}, fmt.Errorf("flow service: mint flow id: %w", err)
 	}
 	result.State.ID = flowID
 

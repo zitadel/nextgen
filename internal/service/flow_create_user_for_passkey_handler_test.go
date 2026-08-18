@@ -23,7 +23,14 @@ const passkeyHandlerTestSchema = `{
 	"properties": {
 		"email": {"type": "string", "format": "email", "x-unique": "project"},
 		"givenName": {"type": "string"},
-		"familyName": {"type": "string"}
+		"familyName": {"type": "string"},
+		"address": {
+			"type": "object",
+			"properties": {
+				"street": {"type": "string"},
+				"zipCode": {"type": "string", "x-unique": "project"}
+			}
+		}
 	}
 }`
 
@@ -85,10 +92,11 @@ func expectSchemaLookup(f *passkeyHandlerFixture) {
 
 func expectCreateUserTx(f *passkeyHandlerFixture, createFn func(context.Context, *domain.CreateUser) error) {
 	f.stmts.EXPECT().CreateUser(gomock.Any(), gomock.Any()).DoAndReturn(createFn)
+	f.stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	f.v2Pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
 		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
 			return fn(ctx, v2TestTx{stmts: f.stmts})
-		})
+		}).AnyTimes()
 }
 
 func TestFlowCreateUserForPasskey_HonorsPreAssignedUserID(t *testing.T) {
@@ -145,6 +153,41 @@ func TestFlowCreateUserForPasskey_PersistsAllCollectedSchemaFields(t *testing.T)
 	familyAttr, ok := captured.Attributes.Get("familyName")
 	assert.True(t, ok, "attributes must contain familyName key")
 	assert.Equal(t, "Doe", familyAttr.Value)
+}
+
+// Spans the whole nested path: the state machine leaves UserData nested,
+// NewCreateUser validates it against the object-typed property, and the
+// attribute store flattens each leaf back to its dotted key.
+func TestFlowCreateUserForPasskey_PersistsNestedSchemaFields(t *testing.T) {
+	f := newPasskeyHandlerFixture(t)
+	expectSchemaLookup(f)
+
+	var captured *domain.CreateUser
+	expectCreateUserTx(f, func(_ context.Context, u *domain.CreateUser) error {
+		captured = u
+		return nil
+	})
+
+	state := passkeyFlowState(map[string]any{
+		"email": "alice@example.com",
+		"address": map[string]any{
+			"street":  "Main Street 1",
+			"zipCode": "8001",
+		},
+	})
+
+	err := f.handler.CreateProvisionalUser(t.Context(), "user_1", state)
+	require.NoError(t, err)
+	require.NotNil(t, captured)
+
+	streetAttr, ok := captured.Attributes.Get("address.street")
+	assert.True(t, ok, "nested leaf must flatten to its dotted attribute key")
+	assert.Equal(t, "Main Street 1", streetAttr.Value)
+
+	zipAttr, ok := captured.Attributes.Get("address.zipCode")
+	assert.True(t, ok, "attributes must contain address.zipCode key")
+	assert.Equal(t, "8001", zipAttr.Value)
+	assert.Equal(t, domain.AttributeUniquenessProject, zipAttr.UniqueScope, "x-unique on a nested leaf must carry through")
 }
 
 func TestFlowCreateUserForPasskey_UserAlreadyExistsIsSilent(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -76,7 +77,14 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 		if err != nil {
 			return domain.ErrInternal(err).WithMessage("failed to resolve schema when creating")
 		}
-		return nil
+		return audit.Emit(ctx, stmts, audit.EmitSpec{
+			Type:       domain.EventTypeSchemaCreated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  model.ProjectID,
+			EntityType: "json_schema",
+			EntityID:   model.URL,
+			Payload:    struct{}{},
+		})
 	})
 	if err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok {
@@ -143,7 +151,7 @@ func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType s
 		},
 	})
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to list schemas")
+		return nil, mapListError(err, "failed to list schemas")
 	}
 
 	// TODO: make list not return the entire schema, just the fields we want

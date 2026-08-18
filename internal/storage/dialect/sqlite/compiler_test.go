@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -8,7 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 )
 
 const testProjectQuery = "SELECT id, name, preview_origins, created_at, updated_at FROM projects"
@@ -234,6 +237,55 @@ func TestCompileOrderByNullable(t *testing.T) {
 	}
 }
 
+func TestCompileCompareFilterSingleColumn(t *testing.T) {
+	t.Parallel()
+
+	createdAt := time.Date(2026, 6, 26, 10, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name    string
+		filter  database.Filter[domain.ProjectField]
+		wantSQL string
+		wantArg any
+	}{
+		{
+			name:    "equal",
+			filter:  database.Equal(database.Col(domain.ProjectFieldID), "proj_1"),
+			wantSQL: "id = ?",
+			wantArg: "proj_1",
+		},
+		{
+			name:    "greater than",
+			filter:  database.GreaterThan(database.Col(domain.ProjectFieldCreatedAt), createdAt),
+			wantSQL: "created_at > ?",
+			wantArg: createdAt.UnixNano(),
+		},
+		{
+			name:    "greater than or equal",
+			filter:  database.GreaterThanOrEqual(database.Col(domain.ProjectFieldCreatedAt), createdAt),
+			wantSQL: "created_at >= ?",
+			wantArg: createdAt.UnixNano(),
+		},
+		{
+			name:    "less than",
+			filter:  database.LessThan(database.Col(domain.ProjectFieldCreatedAt), createdAt),
+			wantSQL: "created_at < ?",
+			wantArg: createdAt.UnixNano(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var c statementCompiler
+			compileFilter(&c, tt.filter, projectSchema)
+			assert.Equal(t, tt.wantSQL, c.String())
+			require.Len(t, c.args, 1)
+			assert.Equal(t, tt.wantArg, c.args[0])
+		})
+	}
+}
+
 func TestCompileCompareFilterNullableKeyset(t *testing.T) {
 	t.Parallel()
 
@@ -279,6 +331,29 @@ func TestCompileCompareFilterNullableKeyset(t *testing.T) {
 			assert.Equal(t, tt.wantArgs, c.args)
 		})
 	}
+}
+
+func TestCompileListRequiresAuthzFilter(t *testing.T) {
+	t.Parallel()
+
+	const stmt = "SELECT id FROM teams"
+	opts := &database.ListOptions[domain.TeamField]{}
+
+	var compiler statementCompiler
+	err := compileList(context.Background(), &compiler, stmt, opts, teamSchema, "teams", "id")
+	require.ErrorIs(t, err, authz.ErrListFilterRequired)
+
+	ctx := service.WithAuthzListFilter(context.Background(), service.AuthzListFilter{
+		AuthzCheckParams: domain.AuthzCheckParams{
+			CatalogID: domain.SystemCatalogID, ProjectID: "proj_1", PrincipalHomeProjectID: "proj_1",
+			PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_1",
+			ObjectType: "project", Relation: "viewer",
+		},
+		ResourceKind: domain.ResourceKindTeam,
+	})
+	compiler.Reset()
+	require.NoError(t, compileList(ctx, &compiler, stmt, opts, teamSchema, "teams", "id"))
+	assert.Contains(t, compiler.String(), "EXISTS")
 }
 
 func compileReadExpectError[F ~uint8, T any](t *testing.T, stmt string, opts *database.ListOptions[F], schema database.Schema[F, T]) error {

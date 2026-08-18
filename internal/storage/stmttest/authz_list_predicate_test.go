@@ -12,6 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 )
 
 func TestAuthzListPredicate_Teams(t *testing.T) {
@@ -141,5 +142,15 @@ func TestAuthzListPredicate_Users(t *testing.T) {
 			assert.Contains(t, got, u2)
 			assert.Contains(t, got, principal)
 		})
+	})
+}
+
+func TestAuthzListUsers_RequiresFilter(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, _ := ensureUserTestProject(t, d.stmts)
+		_, err := d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+			Filter: database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		}, service.UserQueryOptions{})
+		require.ErrorIs(t, err, authz.ErrListFilterRequired)
 	})
 }

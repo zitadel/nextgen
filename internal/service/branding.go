@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -46,12 +47,32 @@ func (s *BrandingService) Create(ctx context.Context, input CreateBrandingInput)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.v2Pool.Statements().CreateBranding(ctx, entity); err != nil {
+	if err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().CreateBranding(ctx, entity); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeBrandingCreated,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  entity.ProjectID,
+			EntityType: "branding",
+			EntityID:   entity.ID,
+			Payload: domain.BrandingPayload{
+				Layout:  entity.Layout,
+				LogoURL: entity.LogoURL,
+				FontURL: entity.FontURL,
+				HeroURL: entity.HeroURL,
+			},
+		})
+	}); err != nil {
 		// The only integrity constraint reachable from user input is the FK to
 		// projects (the ULID primary key cannot realistically collide), so a
 		// violation means the referenced project does not exist.
 		if _, ok := errors.AsType[*database.IntegrityViolationError](err); ok {
 			return nil, domain.ErrBrandingInvalid("project does not exist", err)
+		}
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to create branding revision in database")
 	}
@@ -73,7 +94,7 @@ func (s *BrandingService) Get(ctx context.Context, projectID, id string) (*domai
 // GetLatest returns the newest revision for the project, or nil (no error)
 // when the project has none — callers fall back to built-in defaults.
 func (s *BrandingService) GetLatest(ctx context.Context, projectID string) (*domain.Branding, error) {
-	result, err := s.v2Pool.Statements().ListBrandings(ctx, branding.ListOptions(projectID, 1))
+	result, err := s.v2Pool.Statements().ListBrandings(WithAuthzListFilterBypass(ctx), branding.ListOptions(projectID, 1))
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to resolve latest branding revision")
 	}
@@ -94,7 +115,7 @@ const maxBrandingListRevisions = 100
 func (s *BrandingService) List(ctx context.Context, projectID string) ([]*domain.Branding, error) {
 	result, err := s.v2Pool.Statements().ListBrandings(ctx, branding.ListOptions(projectID, maxBrandingListRevisions))
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to list branding revisions")
+		return nil, mapListError(err, "failed to list branding revisions")
 	}
 	return result.Items, nil
 }

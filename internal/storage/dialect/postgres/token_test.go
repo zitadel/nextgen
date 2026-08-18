@@ -26,7 +26,7 @@ func uniqueTokenFixtureIDs(t *testing.T) (projectID, schemaURL, userID string) {
 func ensureTokenTestUser(t *testing.T, projectID, schemaURL, userID string) {
 	t.Helper()
 	require.NoError(t, testPool.CreateProject(t.Context(), newTestProject(projectID)))
-	t.Cleanup(func() { _ = testPool.DeleteProjectByID(context.Background(), projectID) })
+	t.Cleanup(func() { _, _ = testPool.DeleteProjectByID(context.Background(), projectID) })
 
 	require.NoError(t, testPool.CreateJSONSchema(t.Context(), &domain.JSONSchema{
 		ProjectID: projectID,
@@ -200,21 +200,30 @@ func TestTokenStatements_CreateRejectsWrongIdentifier(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrInvalidTokenIdentifiers())
 }
 
-func TestTokenStatements_CreateRejectsClientTokenID(t *testing.T) {
+func TestTokenStatements_CreateKeepsPresetTokenID(t *testing.T) {
 	projectID, schemaURL, userID := uniqueTokenFixtureIDs(t)
 	ensureTokenTestUser(t, projectID, schemaURL, userID)
 
+	// Keep-if-set mirrors ensureManagedID: Spanner abort retries replay the
+	// outer Transaction with the same *Token after the first attempt minted.
 	oidcSess := "2002"
-	err := testPool.CreateToken(t.Context(), &domain.Token{
+	wantID := "tkn_preset-client-id"
+	tok := &domain.Token{
 		ProjectID:     projectID,
-		TokenID:       "42",
+		TokenID:       wantID,
 		UserID:        userID,
 		Type:          domain.TokenTypeOIDCAccessToken,
 		OIDCSessionID: &oidcSess,
 		Scope:         []string{"openid"},
+	}
+	require.NoError(t, testPool.CreateToken(t.Context(), tok))
+	t.Cleanup(func() {
+		_ = testPool.DeleteTokenByID(context.Background(), projectID, tok.TokenID)
 	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "token_id must not be set on create")
+	assert.Equal(t, wantID, tok.TokenID)
+	got, err := testPool.GetTokenByID(t.Context(), projectID, wantID)
+	require.NoError(t, err)
+	assert.Equal(t, wantID, got.TokenID)
 }
 
 func TestTokenStatements_CreateRejectsUnspecifiedType(t *testing.T) {

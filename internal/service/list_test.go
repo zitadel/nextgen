@@ -64,6 +64,16 @@ func TestMapListError(t *testing.T) {
 		assert.Equal(t, "failed to list projects", de.Message)
 		assert.ErrorIs(t, err, assert.AnError)
 	})
+
+	t.Run("missing authz list filter is labeled for triage", func(t *testing.T) {
+		t.Parallel()
+		err := mapListError(ErrListFilterRequired, "failed to list users from database")
+		require.ErrorIs(t, err, domain.ErrInternal(ErrListFilterRequired))
+		var de domain.Error
+		require.ErrorAs(t, err, &de)
+		assert.Equal(t, "authz list filter missing", de.Message)
+		assert.ErrorIs(t, err, ErrListFilterRequired)
+	})
 }
 
 func TestParseSortDirection(t *testing.T) {
@@ -113,9 +123,9 @@ func TestCompareFilter(t *testing.T) {
 		{name: "equals int", op: filterOpEquals, value: 42, want: database.Equal(col, 42)},
 		{name: "less_than time", op: filterOpLessThan, value: ts, want: database.LessThan(col, ts)},
 		{name: "greater_than time", op: filterOpGreaterThan, value: ts, want: database.GreaterThan(col, ts)},
+		{name: "greater_than_or_equal time", op: filterOpGreaterThanOrEqual, value: ts, want: database.GreaterThanOrEqual(col, ts)},
 		{name: "not_equals not implemented", op: filterOpNotEquals, value: "v", wantErr: domain.ErrNotImplemented()},
 		{name: "less_than_or_equal not implemented", op: filterOpLessThanOrEqual, value: "v", wantErr: domain.ErrNotImplemented()},
-		{name: "greater_than_or_equal not implemented", op: filterOpGreaterThanOrEqual, value: "v", wantErr: domain.ErrNotImplemented()},
 		{name: "contains is invalid for a comparable field", op: filterOpContains, value: "v", wantErr: domain.ErrRequestInvalid()},
 		{name: "not_contains is invalid for a comparable field", op: filterOpNotContains, value: "v", wantErr: domain.ErrRequestInvalid()},
 		{name: "unknown op is invalid", op: "bogus", value: "v", wantErr: domain.ErrRequestInvalid()},
@@ -149,7 +159,7 @@ func TestStringFilter(t *testing.T) {
 		wantErr error
 	}{
 		{name: "equals", op: filterOpEquals, want: database.StringEqual(col, value)},
-		{name: "contains", op: filterOpContains, want: database.StringContains(col, value)},
+		{name: "contains matches case-insensitively", op: filterOpContains, want: database.StringContainsFold(col, value)},
 		{name: "not_equals not implemented", op: filterOpNotEquals, wantErr: domain.ErrNotImplemented()},
 		{name: "not_contains not implemented", op: filterOpNotContains, wantErr: domain.ErrNotImplemented()},
 		{name: "less_than is invalid for a string field", op: filterOpLessThan, wantErr: domain.ErrRequestInvalid()},

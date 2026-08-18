@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/oidc/v3/pkg/op"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -39,8 +41,19 @@ func NewTokenService(
 }
 
 func (s *tokenService) GenerateJWE(ctx context.Context, data *domain.Token) (string, error) {
-	if err := s.v2Pool.Statements().CreateToken(ctx, data); err != nil {
-		return "", domain.ErrInternal(err).WithMessage("failed to persist token record")
+	// Spanner may retry this callback after abort; CreateToken keep-if-sets
+	// data.TokenID so a second attempt does not reject the minted id.
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().CreateToken(ctx, data); err != nil {
+			return err
+		}
+		return emitAuthTokenIssued(ctx, tx.Statements(), data.ProjectID, data.TokenID, data.SessionID, tokenUserID(data), data.Scope)
+	})
+	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return "", de
+		}
+		return "", domain.ErrInternal(err).WithMessage(fmt.Sprintf("failed to persist token record: %v", err))
 	}
 	tokenCrypter, err := s.keys.GetProjectCrypter(ctx, data.ProjectID, domain.EncryptionKeyPurposeToken)
 	if err != nil {
@@ -90,10 +103,35 @@ func (s *tokenService) RevokeToken(ctx context.Context, projectID, tokenID strin
 	if tokenID == "" {
 		return nil
 	}
-	if err := s.v2Pool.Statements().DeleteTokenByID(ctx, projectID, tokenID); err != nil {
+	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().DeleteTokenByID(ctx, projectID, tokenID); err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeAuthTokenRevoked,
+			Category:   domain.EventCategoryAuth,
+			ProjectID:  projectID,
+			EntityType: "token",
+			EntityID:   tokenID,
+			TokenID:    tokenID,
+			Payload:    domain.AuthTokenRevokedPayload{},
+		})
+	})
+	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return de
+		}
 		return domain.ErrInternal(err).WithMessage("failed to revoke token")
 	}
 	return nil
+}
+
+func tokenUserID(tok *domain.Token) *string {
+	if tok.UserID == "" {
+		return nil
+	}
+	uid := tok.UserID
+	return &uid
 }
 
 func (s *tokenService) IntrospectToken(ctx context.Context, token string) (*domain.Token, error) {
@@ -110,7 +148,9 @@ func (s *tokenService) IntrospectToken(ctx context.Context, token string) (*doma
 	}
 	// Credentials minted before token records existed carry no `jti`. They stay
 	// authentic — a token cannot be forged without the encryption key — so they
-	// keep working, unrevocable, until they are reissued.
+	// keep working, unrevocable, until they are reissued. HandleOAuth2 no longer
+	// honors that promise for typeless (pre-#760) JWEs: TokenTypeUnspecified is
+	// not a project secret, so those bearers fail the security requirement.
 	if payload.TokenID == "" {
 		return payload, nil
 	}

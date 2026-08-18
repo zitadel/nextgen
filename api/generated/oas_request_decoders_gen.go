@@ -718,7 +718,7 @@ func (s *Server) decodeCreateTeamRequest(r *http.Request) (
 }
 
 func (s *Server) decodeCreateUserRequest(r *http.Request) (
-	req *User,
+	req *CreateUserRequest,
 	rawBody []byte,
 	close func() error,
 	rerr error,
@@ -765,7 +765,7 @@ func (s *Server) decodeCreateUserRequest(r *http.Request) (
 		rawBody = append(rawBody, buf...)
 		d := jx.DecodeBytes(buf)
 
-		var request User
+		var request CreateUserRequest
 		if err := func() error {
 			if err := request.Decode(d); err != nil {
 				return err

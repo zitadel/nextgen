@@ -46,7 +46,7 @@ func CompileNullAware[F ~uint8, T any](
 			writeNullSafeEqual(w, term, schema, writeValue)
 		}
 		w.WriteString(")")
-	case database.OpGreater, database.OpLess:
+	case database.OpGreater, database.OpLess, database.OpGreaterOrEqual:
 		w.WriteString("(")
 		for i := range filter.Terms {
 			if i > 0 {
@@ -92,7 +92,7 @@ func writeNullSafeOrdered[F ~uint8, T any](
 ) {
 	col := schema.SQLName(term.Column)
 	if term.Value == nil {
-		if op == database.OpGreater {
+		if op == database.OpGreater || op == database.OpGreaterOrEqual {
 			w.WriteString(col)
 			w.WriteString(" IS NOT NULL")
 			return
@@ -111,6 +111,12 @@ func writeNullSafeOrdered[F ~uint8, T any](
 		w.WriteString(" OR ")
 		w.WriteString(col)
 		w.WriteString(" IS NULL)")
+		return
+	}
+	if op == database.OpGreaterOrEqual {
+		w.WriteString(col)
+		w.WriteString(" >= ")
+		writeValue(w, term.Value, term.Column)
 		return
 	}
 	w.WriteString(col)

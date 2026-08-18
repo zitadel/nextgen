@@ -2,7 +2,6 @@ package spanner
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"cloud.google.com/go/spanner"
@@ -49,12 +48,14 @@ func newTokenStatements(db queryExecutor) tokenStatements {
 }
 
 // CreateToken implements [service.TokenStatements].
+//
+// TokenID uses ensureManagedID (keep-if-set): Spanner ReadWriteTransaction may
+// retry the outer callback after abort, and CreateToken mutates token.TokenID
+// on the first attempt. Rejecting a non-empty id would flatten the first abort
+// into a permanent failure (#788-shaped).
 func (ts tokenStatements) CreateToken(ctx context.Context, token *domain.Token) error {
 	if err := token.ValidatePersisted(); err != nil {
 		return err
-	}
-	if token.TokenID != "" {
-		return fmt.Errorf("token_id must not be set on create")
 	}
 	if err := ensureManagedID(&token.TokenID, domain.TokenPrefix); err != nil {
 		return err
