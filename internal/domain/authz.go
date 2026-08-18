@@ -295,6 +295,24 @@ func NewSKProjProjectSetupAssignment(projectID string) *AuthzAssignment {
 	return a
 }
 
+// NewClaimTeamAssignment is the grant claim/complete writes (ADR 046 §1): the
+// team principal on the seeded project.team relation at project scope, making
+// the project owned by the claiming user's personal team. Grantor columns stay
+// unset — the schema CHECK ties grantor_id to delegation_id, so claimed-by
+// provenance is carried by the authz.granted audit event's actor instead.
+func NewClaimTeamAssignment(projectID, teamID string) *AuthzAssignment {
+	a := &AuthzAssignment{
+		ProjectID:     projectID,
+		CatalogID:     SystemCatalogID,
+		PrincipalType: AuthzPrincipalTypeTeam,
+		PrincipalID:   teamID,
+		ObjectType:    "project",
+		Relation:      "team",
+	}
+	a.ApplyScope(NewProjectAssignmentScope())
+	return a
+}
+
 // AuthzMembershipEdge is the authz projection of set membership (not lifecycle).
 // The resolver expands team grants through these edges; team_memberships remains
 // the roster table and is not read at check time.
