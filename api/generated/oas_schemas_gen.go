@@ -9272,6 +9272,10 @@ type CreateUserForbidden ErrorDetails
 
 func (*CreateUserForbidden) createUserRes() {}
 
+type CreateUserInternalServerError ErrorDetails
+
+func (*CreateUserInternalServerError) createUserRes() {}
+
 // `attributes` is the document that must satisfy the user schema named by
 // `schema`.
 // The resource primary key is server-assigned and returned in the response, so

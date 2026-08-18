@@ -50,6 +50,18 @@ post:
         application/json:
           schema:
             $ref: ../../components/error-details.yaml
+    '500':
+      description: |
+        Something went wrong on the server. This was not your fault.
+
+        One case is recoverable: the user was created but the server could not
+        read it back to answer with. The body then carries the created user's
+        id in `details.user_id`. Fetch that user by id — repeating the create
+        would conflict with the one that already exists.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
     default:
       $ref: createUser-error-response.yaml
 
