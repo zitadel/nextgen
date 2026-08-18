@@ -41474,10 +41474,6 @@ func (s *UserPermissionDeniedDetails) init() UserPermissionDeniedDetails {
 // are accepted without being listed below. `writeOnly: true` is reserved for a
 // value that may be written but is never returned by the read API; nothing
 // enforces it today, so responses still include write-only properties.
-// A few properties are reserved:
-// - id: is used to return the id of the user
-// - metadata: is used to embed metadata of the user, like creation date,
-// status,... in a return object.
 // Ref: #
 type UserProperty struct {
 	// The level of uniqueness for this property, if applicable.
