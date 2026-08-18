@@ -269,6 +269,49 @@ func TestRequireProjectAccess(t *testing.T) {
 	})
 }
 
+func TestRequireProjectListAccess(t *testing.T) {
+	stmts := stubAuthzStmts{}
+	operator := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+	})
+	preview := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID: "proj_a", Scope: []string{"project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+	})
+
+	proceed, err := requireProjectListAccess(operator, stmts, "proj_a", userAccess)
+	if err != nil || !proceed {
+		t.Fatalf("project-wide Allow should proceed: proceed=%v err=%v", proceed, err)
+	}
+
+	deny := false
+	foothold := true
+	narrow := stubAuthzStmts{allowCheck: &deny, foothold: &foothold}
+	proceed, err = requireProjectListAccess(operator, narrow, "proj_a", userAccess)
+	if err != nil || !proceed {
+		t.Fatalf("Forbidden with foothold should proceed for partial-view lists: proceed=%v err=%v", proceed, err)
+	}
+
+	proceed, err = requireProjectListAccess(operator, stmts, "proj_b", userAccess)
+	if proceed {
+		t.Fatal("no foothold must not proceed")
+	}
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+
+	proceed, err = requireProjectListAccess(preview, stmts, "proj_a", userAccess)
+	if proceed {
+		t.Fatal("preview must not proceed")
+	}
+	assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
+
+	proceed, err = requireProjectListAccess(context.Background(), stmts, "proj_a", userAccess)
+	if proceed {
+		t.Fatal("missing scope must not proceed")
+	}
+	assertDomainCode(t, err, domain.ErrUserNotFound().Code)
+}
+
 func TestListUserTeamsGateShape(t *testing.T) {
 	stmts := stubAuthzStmts{}
 	both := WithScopeContext(context.Background(), ScopeContext{
