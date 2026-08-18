@@ -83,11 +83,18 @@ caveats (including the widget's dark-only styling for now).
 
 At boot the console fetches `GET /console/runtime.json` (public, served by
 the Go server; proxied in dev) to learn the deployment `mode` and which
-project to sign into. A standalone (self-host) deployment **tracks exactly
-one project, and the server never creates it**: the first project created —
-by the customer's `zitadel setup` (`POST /projects`) — becomes the default
-the console signs into and manages. `platform.project_id` /
-`NEXTGEN_PLATFORM_PROJECT_ID` pins a specific existing project instead.
+project to sign into.
+
+The target model (ADR 0004 §1) gives every deployment a reserved *platform*
+project that the console signs into, with customer projects selected after
+sign-in; nothing enforces a one-project ceiling. **What ships today is the
+transitional fallback from §2's cutover rule:** the server never creates the
+sign-in project, and the first project created — by the customer's
+`zitadel setup` (`POST /projects`) — becomes the one the console signs into
+and manages. `platform.project_id` / `NEXTGEN_PLATFORM_PROJECT_ID` pins a
+specific existing project instead. The fallback stays until a human-usable
+seed transport ships the reserved platform project end to end.
+
 While no project exists yet, the login screen shows a "run `zitadel setup`"
 hint; refresh after setup and the console picks the new project up. Only
 `standalone` mode exists today; `platform` (cloud portal) mode is future

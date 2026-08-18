@@ -10,7 +10,7 @@
  * and that the guard behaves against a backend-less preview: unauthenticated
  * visits land on the shell-less login screen, deep links carry `?next=`, and
  * with no runtime document the login screen renders the "no project yet"
- * setup hint (Console ADR 0004 §3) instead of the widget.
+ * setup hint (Console ADR 0004 §2) instead of the widget.
  */
 import { expect, test } from "@playwright/test";
 

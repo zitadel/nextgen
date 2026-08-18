@@ -10,7 +10,7 @@ import {
 } from "./runtime";
 
 /**
- * Console runtime discovery (Console ADR 0004 §2): the document is fetched
+ * Console runtime discovery (Console ADR 0004 §3): the document is fetched
  * once, malformed or unreachable endpoints degrade to the standalone
  * fallback, and the dev env override wins over the discovered project id.
  */

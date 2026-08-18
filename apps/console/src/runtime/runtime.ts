@@ -1,5 +1,5 @@
 /**
- * Console runtime discovery (Console ADR 0004 §2).
+ * Console runtime discovery (Console ADR 0004 §3).
  *
  * The embedded console is one build artifact serving every deployment, so
  * deployment facts are discovered at boot instead of baked in: the server
@@ -7,7 +7,7 @@
  * it once before the router renders (`src/main.tsx`). Everything in the
  * document is public runtime metadata in the root ADR 005 sense — an enum
  * and project ids, never secrets or feature inventories (per-surface gating
- * rides effective permissions, ADR 0004 §4).
+ * rides effective permissions, ADR 0004 §5).
  *
  * A fetch failure — including `vite preview`, which proxies nothing — falls
  * back to `standalone` with no ids, so a broken endpoint degrades to the
@@ -19,11 +19,12 @@ export interface ConsoleRuntime {
   /** `"platform"` (cloud portal) is future work; servers send `"standalone"` today. */
   mode: "platform" | "standalone";
   /**
-   * The one project the console signs into and manages: in standalone the
-   * deployment's single tracked project — first-created (by `zitadel
-   * setup`) or the configured pin; in future platform mode, the platform
-   * project. Absent while no project exists yet; the login screen then
-   * shows its setup hint.
+   * The project used to sign in to the Console. Today this is the standalone
+   * default discovered through the first-created/configured fallback retained
+   * by ADR 0004 §2's cutover rule. The target in §3 is the reserved platform
+   * project. It identifies the Console's sign-in identity plane, not the set
+   * of customer projects that identity may manage. Absent while no project
+   * exists yet; the login screen then shows its setup hint.
    */
   console_project_id?: string;
   /**
@@ -52,6 +53,14 @@ let initialized = false;
  * Fetches the runtime document once. Idempotent; later calls return the
  * cached result. Never throws — any failure resolves to the standalone
  * fallback.
+ *
+ * That fallback is transitional. Console ADR 0004 §3 requires an unreachable
+ * or non-`2xx` endpoint to surface an explicit connectivity error instead,
+ * kept distinct from "reachable, not provisioned yet": collapsing the two
+ * reports a server outage as "no project yet" and sends operators to run
+ * `zitadel setup` against a problem setup cannot fix. Implementing it needs an
+ * opt-in for backend-less preview/dev builds, which is what the fallback
+ * actually serves today, plus an `apps/console-e2e` update.
  */
 export async function initRuntime(): Promise<ConsoleRuntime> {
   if (initialized) return runtime;
@@ -63,7 +72,9 @@ export async function initRuntime(): Promise<ConsoleRuntime> {
     }
   } catch {
     // Unreachable endpoint (preview builds, dev without a backend) — keep
-    // the standalone fallback.
+    // the standalone fallback. Note this also swallows a non-`2xx` response,
+    // so a failing server currently renders as "no project yet"; ADR 0004 §3
+    // separates the two.
   }
   return runtime;
 }
@@ -76,7 +87,7 @@ export function getRuntime(): ConsoleRuntime {
 /**
  * The project the console operates on: the `VITE_CONSOLE_PROJECT_ID` dev
  * override when set (it must match the dev proxy's project secret),
- * otherwise the discovered `console_project_id` (ADR 0004 §5).
+ * otherwise the discovered `console_project_id` (ADR 0004 §3).
  */
 export function getConsoleProjectId(): string {
   return import.meta.env.VITE_CONSOLE_PROJECT_ID || getRuntime().console_project_id || "";
