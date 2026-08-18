@@ -32,6 +32,8 @@ type Harness struct {
 	handler         dependency[*api.Handler]
 	securityHandler dependency[*api.SecurityHandler]
 
+	platformProject dependency[*domain.Project]
+
 	schemaService         dependency[*service.SchemaService]
 	sessionService        dependency[service.SessionService]
 	flowService           dependency[service.FlowService]

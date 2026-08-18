@@ -80,7 +80,7 @@ func TestClaimService_Init(t *testing.T) {
 					})
 			},
 			check: func(t *testing.T, got *service.ClaimInitResult, captured *domain.ClaimChallenge) {
-				assert.True(t, strings.HasPrefix(got.ChallengeID, "claim_challenge_"))
+				assert.True(t, strings.HasPrefix(got.ChallengeID, "ch_"))
 				assert.Equal(t, domain.HashClaimChallengeToken(got.ChallengeID), captured.ID)
 				assert.Equal(t, "proj_1", captured.ProjectID)
 				assert.Equal(t, "secret_hash_1", captured.InitiatingSecretHash)
