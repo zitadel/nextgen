@@ -223,24 +223,7 @@ describe("registration ceremonies", () => {
       { op: "click", target: action("submit") },
       { op: "fill", target: PASSWORD, value: "pw" },
       { op: "click", target: action("submit") },
-      // The default flow offers a passkey once the account exists; the helper
-      // clears it so callers still land on their signed-in surface.
-      { op: "click", target: action("skip") },
     ]);
-  });
-
-  it("registerWithPassword leaves a flow that offers no passkey upsell untouched", async () => {
-    const fake = fakePage(
-      (target) => defaultFlowVisibility(target) && !target.includes("zitadel-action-skip"),
-    );
-    await registerWithPassword(fake.page, { email: "new@example.test", password: "pw" });
-
-    // No trailing skip: a preset that routes `register-password` straight to
-    // `done` has nothing to clear, and the helper must not wait on one.
-    expect(fake.ops.filter((op) => op.op === "click").at(-1)).toEqual({
-      op: "click",
-      target: action("submit"),
-    });
   });
 
   it("registerWithPasskey takes the registration step's passkey action", async () => {

@@ -117,7 +117,7 @@ describe("setupMockHandlers", () => {
     expect(start.session_token).not.toBe(submit.session_token);
   });
 
-  test("routes register through two-step sign-up and the passkey upsell to done", async () => {
+  test("routes register through two-step sign-up to done", async () => {
     const start = await createFlow({ purpose: "register", project_id: PROJECT_ID });
     expect(start.step.name).toBe("register");
     expect(start.step.fields?.some((f) => f.name === "email")).toBe(true);
@@ -139,20 +139,10 @@ describe("setupMockHandlers", () => {
     // definition declares `x-auth-methods#password` on both.
     expect(passwordStep.step.fields?.map((f) => f.name)).toEqual([PASSWORD_FIELD]);
 
-    // The account exists from here, so the flow offers a passkey before
-    // finishing rather than dropping the user straight into `done`.
-    const upsell = await submitFlowStep(passwordStep.id, {
+    const done = await submitFlowStep(passwordStep.id, {
       session_token: passwordStep.session_token,
       action: "submit",
       fields: { [PASSWORD_FIELD]: "hunter2" },
-    });
-    expect(upsell.step.name).toBe("passkey-upsell");
-    expect(upsell.step.fields ?? []).toEqual([]);
-    expect(upsell.step.actions?.map((a) => a.name)).toEqual(["passkey_register", "skip"]);
-
-    const done = await submitFlowStep(upsell.id, {
-      session_token: upsell.session_token,
-      action: "skip",
     });
     expect(done.step.name).toBe("done");
     expect(done.step.complete).toBe("show");

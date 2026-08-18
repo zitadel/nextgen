@@ -25,7 +25,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   identifierStep,
-  passkeyUpsellStep,
   passwordStep,
   registerPasswordStep,
   registerStep,
@@ -49,7 +48,6 @@ const FIXTURES = {
   password: passwordStep,
   register: registerStep,
   "register-password": registerPasswordStep,
-  "passkey-upsell": passkeyUpsellStep,
 } as const;
 
 /** ADR 022: the engine injects `back` on steps with a predecessor. */

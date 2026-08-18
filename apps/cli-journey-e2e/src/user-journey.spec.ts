@@ -49,6 +49,7 @@ if (preset === "password-first") {
     }
     await gotoLogin(page);
     await registerWithPassword(page, { email, password, profile: registrationProfile });
+    await skipPasskeyUpsellIfVisible(page);
     await expectSignedIn(page);
     await expectSessionCookie(page);
 

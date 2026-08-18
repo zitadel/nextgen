@@ -1,3 +1,5 @@
+import type { Page } from "@playwright/test";
+
 import { expect, registerWithPassword, test } from "@zitadel/testing/playwright";
 
 /**
@@ -10,6 +12,7 @@ test("a fresh identity registers through the real flow", async ({ page, seed, zi
 
   await page.goto("/login");
   await registerWithPassword(page, { email: who.email, password: who.password });
+  await skipPasskeyUpsellIfVisible(page);
 
   await page.waitForURL(/\/admin(?:[/?#]|$)/, { timeout: 30_000 });
 
@@ -21,3 +24,16 @@ test("a fresh identity registers through the real flow", async ({ page, seed, zi
   const created = users.find((user) => user.attributes.email === who.email);
   expect(created).toBeDefined();
 });
+
+async function skipPasskeyUpsellIfVisible(page: Page): Promise<void> {
+  const skip = page.getByRole("button", { name: /skip for now/i });
+  const outcome = await Promise.race([
+    skip.waitFor({ state: "visible", timeout: 30_000 }).then(() => "upsell" as const),
+    page
+      .waitForURL(/\/admin(?:[/?#]|$)/, { timeout: 30_000 })
+      .then(() => "done" as const),
+  ]);
+  if (outcome === "upsell") {
+    await skip.click();
+  }
+}

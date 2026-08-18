@@ -134,36 +134,10 @@
       "on_success": "create_user",
       "transitions": {
         "submit": {
-          "target": "passkey-upsell"
+          "target": "done"
         },
         "user_already_exists": {
           "target": "password"
-        }
-      }
-    },
-    {
-      "name": "passkey-upsell",
-      "fields": [],
-      "actions": [
-        {
-          "name": "passkey_register",
-          "kind": "passkey_register",
-          "primary": true,
-          "text_key": "passkey-upsell.action.passkey_register"
-        },
-        {
-          "name": "skip",
-          "kind": "navigate",
-          "primary": false,
-          "text_key": "passkey-upsell.action.skip"
-        }
-      ],
-      "transitions": {
-        "passkey_register": {
-          "target": "done"
-        },
-        "skip": {
-          "target": "done"
         }
       }
     },

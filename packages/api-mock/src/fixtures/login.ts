@@ -266,22 +266,19 @@ export function recoverStep(input: StepFixtureInput): CreateFlow201 {
 }
 
 /**
- * Passkey enrolment upsell — offers a passkey once the account exists, which
- * in the default flow is straight after `register-password`.
+ * Passkey enrolment upsell — prompts the user to set up a passkey after a
+ * successful credential sign-in. Figma `6594:630`.
  */
 export function passkeyUpsellStep(input: StepFixtureInput): CreateFlow201 {
   return wrap(input, {
     name: "passkey-upsell",
-    texts: {
-      title_key: "passkey-upsell.title",
-      description_key: "passkey-upsell.description",
-    },
+    texts: { title_key: "passkey-upsell.title" },
     fields: [],
     actions: [
       {
-        name: "passkey_register",
+        name: "setup",
         kind: "passkey_register",
-        text_key: "passkey-upsell.action.passkey_register",
+        text_key: "passkey-upsell.action.setup",
         primary: true,
       },
       { name: "skip", kind: "navigate", text_key: "passkey-upsell.action.skip" },
