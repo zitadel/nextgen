@@ -42,10 +42,11 @@ func (h *Handler) GetBrandingById(ctx context.Context, params api.GetBrandingByI
 }
 
 func (h *Handler) ListBranding(ctx context.Context, params api.ListBrandingParams) (api.ListBrandingRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), brandingAccess, opRead); err != nil {
+	proceed, err := h.requireProjectListAccess(ctx, string(params.ProjectID), brandingAccess)
+	if err != nil || !proceed {
 		return nil, err
 	}
-	ctx, err := h.withAuthzListFilter(ctx, string(params.ProjectID), domain.ResourceKindBranding, opRead)
+	ctx, err = h.withAuthzListFilter(ctx, string(params.ProjectID), domain.ResourceKindBranding, opRead)
 	if err != nil {
 		return nil, err
 	}
