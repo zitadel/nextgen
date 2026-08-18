@@ -9,4 +9,9 @@ object counts as covered when a step collects one of its leaves. Collecting into
 an optional object brings its own `required` list into force, since the object
 only exists in the document because one of its leaves was collected. A property
 declaring `properties` or `items` without a `type` keyword is an object or an
-array, and is reported the same way as one that spells its type out.
+array, and is reported the same way as one that spells its type out — including
+when its `type` is the nullable union `["null", "object"]`.
+
+Field names are matched against the schema's own properties only, so a step
+naming an inherited member such as `toString` is reported as not a property in
+the user schema instead of validating clean.

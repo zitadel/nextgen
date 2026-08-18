@@ -604,16 +604,19 @@ function requiredPaths(
 ): string[] {
   const properties = schemaProperties(schema);
   const required = schemaRequired(schema);
-  const out: string[] = [];
+  // A set, like the Go `map[string]struct{}`, so a name repeated in
+  // `required` yields the path once.
+  const out = new Set<string>();
 
   for (const name of required) {
     const path = prefix === "" ? name : `${prefix}.${name}`;
-    const property = properties?.[name];
+    const property =
+      properties !== undefined && Object.hasOwn(properties, name) ? properties[name] : undefined;
     if (!isPlainObject(property) || schemaRequired(property).length === 0) {
-      out.push(path);
+      out.add(path);
       continue;
     }
-    out.push(...requiredPaths(property, materialized, path));
+    for (const nested of requiredPaths(property, materialized, path)) out.add(nested);
   }
 
   // An optional object is invisible to the loop above, so descend into
@@ -622,10 +625,10 @@ function requiredPaths(
     if (required.includes(name) || !isPlainObject(property)) continue;
     const path = prefix === "" ? name : `${prefix}.${name}`;
     if (!materialized.has(path)) continue;
-    out.push(...requiredPaths(property, materialized, path));
+    for (const nested of requiredPaths(property, materialized, path)) out.add(nested);
   }
 
-  return out;
+  return [...out];
 }
 
 /** Mirrors `xAuthMethodsReader.IsEnabled` in flow_field_resolver_schema.go. */
@@ -664,7 +667,9 @@ function resolveFieldChallenge(
   let property: unknown = undefined;
   let level: Record<string, unknown> | undefined = properties;
   for (const [i, segment] of segments.entries()) {
-    property = level?.[segment];
+    // Own properties only: Go indexes a map, where an inherited name like
+    // `toString` is simply absent.
+    property = level !== undefined && Object.hasOwn(level, segment) ? level[segment] : undefined;
     if (property === undefined) {
       return { message: `flow field: not a property in the user schema: ${q(field)}` };
     }
@@ -679,29 +684,33 @@ function resolveFieldChallenge(
     return { challenge: null };
   }
 
+  // Mirrors schemaReader.JSONType: the nullable idiom `["null", X]`
+  // reduces to X; any other multi-entry union is unsupported. Go reduces
+  // before it tests for a composite, so the union error wins and the
+  // object/array test below reads the reduced type rather than the union.
+  let jsonType = property.type;
+  if (Array.isArray(jsonType)) {
+    const nonNull = jsonType.filter((t) => t !== "null");
+    if (nonNull.length > 1) {
+      return { message: `flow field: unsupported JSON type: [${jsonType.map(str).join(" ")}]` };
+    }
+    // Undefined when every entry was "null", matching Go's empty-string case.
+    jsonType = nonNull[0];
+  }
+
   // Mirrors deriveUserPropertyType: an object or array has no
   // field-shaped input. A property carrying `properties` is an object,
   // and one carrying `items` is an array, even when it omits the `type`
   // keyword.
   if (
-    property.type === "object" ||
-    property.type === "array" ||
+    jsonType === "object" ||
+    jsonType === "array" ||
     schemaProperties(property) !== undefined ||
     "items" in property
   ) {
     return {
       message: `flow field: not a scalar property, name a nested leaf instead: ${q(field)}`,
     };
-  }
-
-  // Mirrors schemaReader.JSONType: the nullable idiom `["null", X]`
-  // reduces to X; any other multi-entry union is unsupported.
-  const jsonType = property.type;
-  if (Array.isArray(jsonType)) {
-    const nonNull = jsonType.filter((t) => t !== "null");
-    if (nonNull.length > 1) {
-      return { message: `flow field: unsupported JSON type: [${jsonType.map(str).join(" ")}]` };
-    }
   }
 
   // Mirrors deriveUnique + deriveIdentifierChallenge: any recognized
