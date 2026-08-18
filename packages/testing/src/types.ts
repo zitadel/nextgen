@@ -15,9 +15,9 @@ export interface InstanceHandle {
    */
   appOrigin?: string;
   /**
-   * Server-assigned id of the seeded user schema. User documents must
-   * reference it via their `$schema` field, so seeding needs it alongside the
-   * project credential.
+   * Server-assigned id of the seeded user schema. A user names it in `schema`
+   * and puts the schema-defined content under `attributes`, so seeding needs
+   * it alongside the project credential.
    */
   schemaId: string;
   previewSecret?: string;

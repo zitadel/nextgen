@@ -10,7 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-func (h *Handler) CreateUser(ctx context.Context, req *api.User, params api.CreateUserParams) (api.CreateUserRes, error) {
+func (h *Handler) CreateUser(ctx context.Context, req *api.CreateUserRequest, params api.CreateUserParams) (api.CreateUserRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), userAccess, opWrite); err != nil {
 		return nil, err
 	}
@@ -19,24 +19,22 @@ func (h *Handler) CreateUser(ctx context.Context, req *api.User, params api.Crea
 		teamID = new(string(params.TeamID.Value))
 	}
 
-	user, err := convertUsingJson[map[string]any](req)
+	attributes, err := convertUsingJson[map[string]any](req.Attributes)
 	if err != nil {
 		return nil, err
 	}
-	if _, hasID := (*user)["id"]; hasID {
-		return nil, domain.ErrUserInvalid().WithDetails("id is server-assigned and must not be set on create")
-	}
 
-	u, err := h.userService.CreateUser(ctx, service.CreateUserInput{
-		ProjectID: string(params.ProjectID),
-		TeamID:    teamID,
-		User:      *user,
+	user, err := h.userService.CreateUser(ctx, service.CreateUserInput{
+		ProjectID:  string(params.ProjectID),
+		TeamID:     teamID,
+		SchemaURL:  req.Schema,
+		Attributes: *attributes,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return convertUsingJson[api.CreateUserResponse](u)
+	return domainUserToApiUser(user)
 }
 
 func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDParams) (api.DeleteUserByIDRes, error) {
@@ -241,7 +239,7 @@ func domainUserToApiUser(user *domain.User) (*api.User, error) {
 		return nil, domain.ErrInternal(err).WithMessage("failed to parse user attributes")
 	}
 
-	props, err := convertUsingJson[api.UserAdditional](userData)
+	attributes, err := convertUsingJson[api.UserAttributes](userData)
 	if err != nil {
 		return nil, err
 	}
@@ -254,15 +252,15 @@ func domainUserToApiUser(user *domain.User) (*api.User, error) {
 	}
 
 	return &api.User{
-		ID:     api.NewOptUserID(api.UserID(user.ID)),
-		Schema: user.SchemaURL,
-		Metadata: api.NewOptUserMetadata(api.UserMetadata{
+		ID:         api.UserID(user.ID),
+		Schema:     user.SchemaURL,
+		Attributes: *attributes,
+		Metadata: api.UserMetadata{
 			CreatedAt:            user.Metadata.CreatedAt,
 			UpdatedAt:            user.Metadata.UpdatedAt,
 			Status:               api.UserMetadataStatus(user.Metadata.Status),
 			LifecycleOwnerTeamID: lifecycleOwnerTeamID,
-		}),
-		AdditionalProps: *props,
+		},
 	}, nil
 }
 
