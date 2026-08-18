@@ -121,7 +121,7 @@ func battleTeams(t *testing.T, d dialect) {
 	}
 	slices.Sort(want)
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.TeamField]) (*database.ListResult[*domain.Team], error) {
-		return d.stmts.ListTeams(t.Context(), &database.ListOptions[domain.TeamField]{
+		return d.stmts.ListTeams(unfilteredListCtx(t), &database.ListOptions[domain.TeamField]{
 			Filter: filter, Pagination: page,
 		})
 	}, func(team *domain.Team) string { return team.ID }, 2)
@@ -144,7 +144,7 @@ func battleUsers(t *testing.T, d dialect) {
 	}
 	slices.Sort(want)
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.UserField]) (*database.ListResult[*domain.User], error) {
-		return d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+		return d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 			Filter: filter, Pagination: page,
 		}, service.UserQueryOptions{})
 	}, func(u *domain.User) string { return u.ID }, 2)
@@ -152,7 +152,7 @@ func battleUsers(t *testing.T, d dialect) {
 	// B6: default EnsureListOptions OrderBy still pages.
 	t.Run("default_order", func(t *testing.T) {
 		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.User], error) {
-			return d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+			return d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 				Filter:     filter,
 				Pagination: database.Page[domain.UserField]{Limit: 2, Cursor: cursor},
 			}, service.UserQueryOptions{})
@@ -251,7 +251,7 @@ func battleBrandings(t *testing.T, d dialect) {
 	orderAsc := branding.NewestFirst()
 	orderAsc.Direction = database.OrderAsc
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.BrandingField]) (*database.ListResult[*domain.Branding], error) {
-		return d.stmts.ListBrandings(t.Context(), &database.ListOptions[domain.BrandingField]{
+		return d.stmts.ListBrandings(unfilteredListCtx(t), &database.ListOptions[domain.BrandingField]{
 			Filter: filter, Pagination: page,
 		})
 	}, func(b *domain.Branding) string { return b.ID }, 2)
@@ -260,7 +260,7 @@ func battleBrandings(t *testing.T, d dialect) {
 		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.Branding], error) {
 			opts := branding.ListOptions(projectID, 2)
 			opts.Pagination.Cursor = cursor
-			return d.stmts.ListBrandings(t.Context(), opts)
+			return d.stmts.ListBrandings(unfilteredListCtx(t), opts)
 		}, func(b *domain.Branding) string { return b.ID })
 		assertDrainMatch(t, want, got)
 	})
@@ -284,14 +284,14 @@ func battleFlowDefinitions(t *testing.T, d dialect) {
 	}
 	slices.Sort(want)
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.FlowDefinitionField]) (*database.ListResult[*domain.FlowDefinition], error) {
-		return d.stmts.ListFlowDefinitions(t.Context(), &database.ListOptions[domain.FlowDefinitionField]{
+		return d.stmts.ListFlowDefinitions(unfilteredListCtx(t), &database.ListOptions[domain.FlowDefinitionField]{
 			Filter: filter, Pagination: page,
 		})
 	}, func(def *domain.FlowDefinition) string { return def.ID }, 2)
 
 	t.Run("default_order", func(t *testing.T) {
 		got := pageAll(t, len(want), nil, func(cursor []byte) (*database.ListResult[*domain.FlowDefinition], error) {
-			return d.stmts.ListFlowDefinitions(t.Context(), &database.ListOptions[domain.FlowDefinitionField]{
+			return d.stmts.ListFlowDefinitions(unfilteredListCtx(t), &database.ListOptions[domain.FlowDefinitionField]{
 				Filter:     filter,
 				Pagination: database.Page[domain.FlowDefinitionField]{Limit: 2, Cursor: cursor},
 			})
@@ -321,7 +321,7 @@ func battleJSONSchemas(t *testing.T, d dialect) {
 	}
 	slices.Sort(want)
 	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.JSONSchemaField]) (*database.ListResult[*domain.JSONSchema], error) {
-		return d.stmts.ListJSONSchemas(t.Context(), &database.ListOptions[domain.JSONSchemaField]{
+		return d.stmts.ListJSONSchemas(unfilteredListCtx(t), &database.ListOptions[domain.JSONSchemaField]{
 			Filter: filter, Pagination: page,
 		})
 	}, func(s *domain.JSONSchema) string { return s.URL }, 2)

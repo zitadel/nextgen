@@ -99,11 +99,13 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
   management list endpoints inject an authz EXISTS **predicate** (same
   assignment/closure branches as `ListObjects`) via `service.AuthzListFilter`
   after `requireProjectListAccess` (Allow or Forbidden → proceed; NotFound →
-  404). Carve-outs: `QueryProjects` (the project is the boundary), `ListEvents`
-  (no RSI kind — do not migrate to EXISTS), `QuerySessions` (waits on
-  `sessionService.List`). `ListUsers` is EXISTS-wired but user RSI `team_id` is
-  NULL, so a team-scoped-only principal sees `200 []` (by-id user reads deny
-  for the same shape).
+  after `requireProjectListAccess` (Allow or Forbidden → proceed; NotFound →
+  404). `compileList` for management tables fails closed without the filter
+  ([#838](https://github.com/zitadel/nextgen/issues/838)). Intentional
+  carve-outs live in the [#839](#list-predicate-carve-outs-839) table.
+  `ListUsers` uses the predicate helper, not `compileList`, and still fails
+  closed. User RSI `team_id` is NULL, so a team-scoped-only principal sees
+  `200 []` (by-id user reads deny for the same shape).
 
 ## Locked decisions
 
@@ -630,6 +632,22 @@ bundles:
 - `#333` foreign home project, Leopard (**D11**)
 - QuerySessions list predicate (deferred until `sessionService.List` exists)
 - ListEvents EXISTS narrowing (events have no RSI kind; a naive filter would dump the audit stream)
+
+### List-predicate carve-outs ([#839](https://github.com/zitadel/nextgen/issues/839))
+
+Management `compileList` with a non-empty table name and resource-id column **requires** `AuthzListFilter` on the context ([#838](https://github.com/zitadel/nextgen/issues/838)). `compileRead` still uses `context.Background()` on purpose and is unchanged.
+
+| Endpoint | Why it is not a `compileList` + filter path |
+| --- | --- |
+| `QuerySessions` | Uses `compileRead`; `List` is not implemented. |
+| `QueryProjects` | The project **is** the scope boundary. |
+| `ListEvents` | Events have no RSI resource kind. A naive EXISTS would dump the audit stream. Do **not** migrate. |
+| `ListUsers` | Uses `maybeWriteAuthzListPredicate` by hand, not `compileList`. Still fail-closed via `RequireManagementListFilter`. |
+| `ListUserPasskeys` / `ListUserTeams` | Nested under a user already gated by `requireResourceAccess`. |
+| Nested `ListFlowDefinitions` (create uniqueness, update conflict, pivoting, login `Resolve`) | Not a management HTTP list; uses `WithAuthzListFilterBypass` so uniqueness/routing see the whole project. |
+| `GetLatest` branding | Runtime/flow resolution, not the management list endpoint. |
+
+Do not wire `QuerySessions` here; keep this table accurate until `sessionService.List` exists.
 
 ## See also
 

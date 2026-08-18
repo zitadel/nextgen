@@ -151,7 +151,7 @@ func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType s
 		},
 	})
 	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to list schemas")
+		return nil, mapListError(err, "failed to list schemas")
 	}
 
 	// TODO: make list not return the entire schema, just the fields we want
