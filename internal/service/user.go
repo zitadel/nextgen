@@ -366,6 +366,13 @@ func NewCreateUserAction(input CreateUserInput, schemaStore domain.JSONSchemaSto
 }
 
 func (o *CreateUserAction) Prepare(ctx context.Context) error {
+	// Ahead of the lookup, which would otherwise report an empty schema as one
+	// the project does not have.
+	if o.SchemaURL == "" {
+		return domain.ErrUserInvalid().
+			WithMessage("No schema provided. A user must name the schema its attributes are validated against.")
+	}
+
 	schemaEntity, err := o.schemaStore.GetJSONSchemaByID(ctx, o.ProjectID, o.SchemaURL)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
@@ -377,7 +384,14 @@ func (o *CreateUserAction) Prepare(ctx context.Context) error {
 	}
 
 	o.schemaJSON = schemaEntity.Schema
-	o.CreateUser, err = domain.NewCreateUser(o.ProjectID, o.TeamID, o.ID, o.SchemaURL, schemaEntity.Schema, o.Attributes)
+	o.CreateUser, err = domain.NewCreateUser(domain.CreateUserParams{
+		ProjectID:  o.ProjectID,
+		TeamID:     o.TeamID,
+		ID:         o.ID,
+		SchemaURL:  o.SchemaURL,
+		Schema:     schemaEntity.Schema,
+		Attributes: o.Attributes,
+	})
 	if err != nil {
 		return err
 	}

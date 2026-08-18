@@ -64,7 +64,13 @@ func TestNewCreateUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := domain.NewCreateUser("proj_1", nil, tt.id, "https://example.test/schema.json", []byte(minimalUserSchema), tt.attrs)
+			got, err := domain.NewCreateUser(domain.CreateUserParams{
+				ProjectID:  "proj_1",
+				ID:         tt.id,
+				SchemaURL:  "https://example.test/schema.json",
+				Schema:     []byte(minimalUserSchema),
+				Attributes: tt.attrs,
+			})
 			require.NoError(t, err)
 			tt.check(t, got)
 		})
@@ -84,9 +90,15 @@ func TestNewCreateUser_EnvelopeNamesAreUsable(t *testing.T) {
 		}
 	}`
 
-	got, err := domain.NewCreateUser("proj_1", nil, "user_1", "https://example.test/schema.json", []byte(schema), map[string]any{
-		"id":       "employee-42",
-		"metadata": "from the HR system",
+	got, err := domain.NewCreateUser(domain.CreateUserParams{
+		ProjectID: "proj_1",
+		ID:        "user_1",
+		SchemaURL: "https://example.test/schema.json",
+		Schema:    []byte(schema),
+		Attributes: map[string]any{
+			"id":       "employee-42",
+			"metadata": "from the HR system",
+		},
 	})
 	require.NoError(t, err)
 
@@ -113,24 +125,64 @@ func TestNewCreateUser_ClosedSchema(t *testing.T) {
 		}
 	}`
 
-	got, err := domain.NewCreateUser("proj_1", nil, "user_1", "https://example.test/schema.json", []byte(closedSchema), map[string]any{
-		"email": "alice@example.com",
+	got, err := domain.NewCreateUser(domain.CreateUserParams{
+		ProjectID: "proj_1",
+		ID:        "user_1",
+		SchemaURL: "https://example.test/schema.json",
+		Schema:    []byte(closedSchema),
+		Attributes: map[string]any{
+			"email": "alice@example.com",
+		},
 	})
 	require.NoError(t, err)
 	assert.Len(t, got.Attributes, 1)
 
-	_, err = domain.NewCreateUser("proj_1", nil, "user_1", "https://example.test/schema.json", []byte(closedSchema), map[string]any{
-		"email":      "alice@example.com",
-		"undeclared": "x",
+	_, err = domain.NewCreateUser(domain.CreateUserParams{
+		ProjectID: "proj_1",
+		ID:        "user_1",
+		SchemaURL: "https://example.test/schema.json",
+		Schema:    []byte(closedSchema),
+		Attributes: map[string]any{
+			"email":      "alice@example.com",
+			"undeclared": "x",
+		},
 	})
 	require.Error(t, err)
 }
 
 func TestNewCreateUser_SchemaURLRequired(t *testing.T) {
-	_, err := domain.NewCreateUser("proj_1", nil, "user_1", "", []byte(minimalUserSchema), map[string]any{
-		"email": "alice@example.com",
+	_, err := domain.NewCreateUser(domain.CreateUserParams{
+		ProjectID: "proj_1",
+		ID:        "user_1",
+		Schema:    []byte(minimalUserSchema),
+		Attributes: map[string]any{
+			"email": "alice@example.com",
+		},
 	})
 	require.Error(t, err)
+}
+
+// A user is stored as its attribute rows, so an empty document is refused at
+// the domain rather than reaching the dialects' identical guard, which would
+// answer 500. All-optional schemas make it a document the schema accepts.
+func TestNewCreateUser_AttributesRequired(t *testing.T) {
+	const allOptionalSchema = `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$id": "https://example.test/schema.json",
+		"type": "object",
+		"properties": {
+			"email": {"type": "string"}
+		}
+	}`
+
+	_, err := domain.NewCreateUser(domain.CreateUserParams{
+		ProjectID:  "proj_1",
+		ID:         "user_1",
+		SchemaURL:  "https://example.test/schema.json",
+		Schema:     []byte(allOptionalSchema),
+		Attributes: map[string]any{},
+	})
+	require.ErrorIs(t, err, domain.ErrUserInvalid())
 }
 
 func TestUserDisplayName(t *testing.T) {

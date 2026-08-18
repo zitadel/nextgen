@@ -171,45 +171,68 @@ func (c *CreateUser) AttributeTeamScope() string {
 	return ""
 }
 
+// CreateUserParams are the inputs to [NewCreateUser]. A struct rather than
+// positional arguments because ID and SchemaURL are both strings: transposing
+// them would type-check and write a schema url as the row's primary key.
+type CreateUserParams struct {
+	ProjectID string
+	// TeamID is optional roster context, not lifecycle ownership — it becomes
+	// [CreateUser.InitialMembershipTeamID].
+	TeamID *string
+	// ID is empty for a server-minted id; non-empty is for ceremony only.
+	ID string
+	// SchemaURL names the schema, and Schema is that schema's document.
+	SchemaURL string
+	Schema    []byte
+	// Attributes is the instance the schema validates: envelope fields (id,
+	// schema, metadata) are not part of it, so a schema may declare properties
+	// of those names and closed-world keywords such as additionalProperties:
+	// false hold.
+	Attributes map[string]any
+}
+
 // NewCreateUser builds a [CreateUser] from the schema-defined attributes.
-// Empty id is filled by the dialect on create; non-empty id is for ceremony only.
-//
-// attrs is the instance the schema validates: envelope fields (id, schema,
-// metadata) are not part of it, so a schema may declare properties of those
-// names and closed-world keywords such as additionalProperties: false hold.
-func NewCreateUser(projectID string, teamID *string, id, schemaURL string, schemabs []byte, attrs map[string]any) (*CreateUser, error) {
-	if schemaURL == "" {
+func NewCreateUser(params CreateUserParams) (*CreateUser, error) {
+	if params.SchemaURL == "" {
 		return nil, ErrUserInvalid().
 			WithMessage("No schema provided. A user must name the schema its attributes are validated against.")
 	}
 
 	var jschema jsonschema.Schema
-	err := json.Unmarshal(schemabs, &jschema)
+	err := json.Unmarshal(params.Schema, &jschema)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal json schema")
 	}
 
-	err = jschema.Validate(attrs)
+	err = jschema.Validate(params.Attributes)
 	if err != nil {
 		return nil, ErrUserInvalid().WithParent(err).WithMessage("user is not valid according to schema")
 	}
 
 	var mschema map[string]any
-	err = json.Unmarshal(schemabs, &mschema)
+	err = json.Unmarshal(params.Schema, &mschema)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to unmarshal schema map")
 	}
 
-	createAttrs, err := CreateAttributesFromMap(attrs, mschema)
+	createAttrs, err := CreateAttributesFromMap(params.Attributes, mschema)
 	if err != nil {
 		return nil, ErrInternal(err).WithMessage("failed to flatten user attributes")
 	}
 
+	// A schema whose properties are all optional validates {}, but a user is
+	// stored as its attribute rows: with none there is nothing to write. The
+	// dialects refuse it too, so catching it here answers 400 instead of 500.
+	if len(createAttrs) == 0 {
+		return nil, ErrUserInvalid().
+			WithMessage("No attributes provided. A user must carry at least one schema-defined property.")
+	}
+
 	return &CreateUser{
-		ProjectID:               projectID,
-		InitialMembershipTeamID: teamID,
-		ID:                      id,
-		SchemaURL:               schemaURL,
+		ProjectID:               params.ProjectID,
+		InitialMembershipTeamID: params.TeamID,
+		ID:                      params.ID,
+		SchemaURL:               params.SchemaURL,
 		Attributes:              createAttrs,
 	}, nil
 }
