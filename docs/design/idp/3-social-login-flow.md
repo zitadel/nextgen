@@ -55,8 +55,8 @@ The `state` record serves as the server-side, single-use anchor for the attempt:
 | :--- | :--- |
 | **Flow / Attempt ID** | Provides correlation, serving as the sole link from the callback back to the active ceremony. |
 | **Provider Slug + Connection Revision ID** | Enforces revision binding at attempt-start, ensuring the callback phase never re-resolves the slug. |
-| **Browser Binding Nonce** | A `__Host-` cookie nonce set during the `sso-redirect` step. The callback must originate from the browser that initiated the ceremony to prevent login CSRF attacks (where an attacker completes their own ceremony inside a victim's browser). The attributes are part of the contract: `Secure`, `HttpOnly`, and `Path=/` come with the `__Host-` prefix, and it must be `SameSite=Lax` because the callback arrives as a cross-site top-level GET; `Strict` would drop the cookie on exactly that navigation and fail every ceremony (the shipped `_zflow` cookie is `Strict`, so its settings cannot be copied). `Secure` on `http://localhost` works in Chrome and Firefox but not every engine, so the dev loop needs per-browser verification. |
-| **PKCE Verifier** | Required for secure code exchange during the callback. |
+| **Browser Binding Nonce** | A `__Host-` cookie nonce set during the `sso-redirect` step. The callback must originate from the browser that initiated the ceremony to prevent login CSRF attacks (where an attacker completes their own ceremony inside a victim's browser). The attributes are part of the contract: the `__Host-` prefix requires `Secure` and `Path=/` and forbids `Domain`; `HttpOnly` must be set explicitly (the prefix does not imply it), and it must be `SameSite=Lax` because the callback arrives as a cross-site top-level GET; `Strict` would drop the cookie on exactly that navigation and fail every ceremony (the shipped `_zflow` cookie is `Strict`, so its settings cannot be copied). `Secure` on `http://localhost` works in Chrome and Firefox but not every engine, so the dev loop needs per-browser verification. |
+| **PKCE Verifier** | Present when the connection enables PKCE (`pkce_enabled`, the default); the challenge is always `S256` when sent. A connection may set `pkce_enabled: false` only for a provider whose token endpoint rejects the parameters (area 1); binding then rests on `state` and, for OIDC, `nonce`. |
 | **OIDC `nonce`** | Echoed in the `id_token` to bind the issued token strictly to this authorize request. |
 | **Expiry** | Sets a bounded time window for the external leg, inheriting the attempt's overall TTL. |
 
@@ -122,7 +122,7 @@ When `is_auto_creation: true` is set, the engine **creates the account immediate
 
 ### Constraints & Edge Cases
 
-- **Cross-Schema Identities:** Known-subject resolution assumes the user belongs to the flow's pinned schema. Resolving an identity arriving through a flow pinned to a *different* schema remains an open question.
+- **Cross-Schema Identities:** Known-subject resolution assumes the user belongs to the flow's pinned schema. Resolving an identity arriving through a flow pinned to a *different* schema remains an open question. Until it is settled, v1 fails closed: when the resolved user's schema differs from the flow's pin, the attempt ends in the flow-level error surface (value-free, logged for diagnostics) rather than half-adopting either schema; the open point below owns the real resolution rules.
 - **No Auto-Linking in 851:** Linking policy fields are omitted from the current schema. All account-linking semantics are deferred to the dedicated account-linking specification.
 - **Validation Rule:** Steps containing `sso_providers` **must** explicitly route all three outcomes (`callback`, `user_not_found`, and `user_already_exists`) to prevent flow dead-ends (validator rule in [`2-auth-method-selection.md`](2-auth-method-selection.md); today only `transitions.callback` is enforced).
 

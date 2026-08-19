@@ -12,7 +12,7 @@ The Console's share of the epic is two read views: the authentication methods ea
 
 No row of area 1's [exported table](1-resource-model.md#exported-requirements) is owed by this area. The console-relevant rows there (the read API, a lineage identity) are owed by the CRUD API, and this document adds read requirements to that same work item. What this area answers is the epic's three Console acceptance criteria:
 
-- [x] "The Console shows the authentication methods defined by the latest version of each user schema." Answered in [Auth Methods Per Schema](#auth-methods-per-schema).
+- [x] "The Console shows the authentication methods defined by the latest version of each user schema." Answered in [Auth Methods Per Schema](#auth-methods-per-schema); "latest" is deliberately read as the revision active flows pin, the closest derivable signal (boundaries recorded in [The Latest-Version Gap](#the-latest-version-gap)).
 - [x] "The Console shows which Google and GitHub connections exist for the Project." Answered in [Existing Connections](#existing-connections).
 - [x] "Authentication methods and provider connections cannot be changed through the Console in this iteration." Answered in [Read-Only Scope](#read-only-scope).
 
@@ -81,7 +81,7 @@ What the platform does know is which schema documents the login configuration us
 
 - The loader also fetches the flow definitions and collects the distinct `user_schema` values of **active** flows (list plus documents; both lists are small for the same reason the schema list is). The list rows already carry `status`, so the filter is free and skips fetching draft documents.
 - Draft flows are excluded: the engine does not select drafts for new sign-ins (`api/openapi/components/flows/flow-definition-status.yaml`), and draft is both settable at creation and reachable by demoting an active flow. A draft's pin says nothing about the running configuration, and a stale draft would otherwise keep a superseded revision badged.
-- A schema row whose id is pinned carries an "In use" badge; unpinned rows render dimmed. Within a lineage, the pinned row is the latest applied revision, which is exactly the version whose methods the criterion asks to show.
+- A schema row whose id is pinned carries an "In use" badge; unpinned rows render dimmed. Within a lineage, the pinned row is the latest applied revision. Absent a lineage discriminator in the API, this pin is the closest derivable reading of the criterion's "latest" (boundaries below).
 - The list sorts by `created_at` descending, so a lineage's newest revision also sits above its superseded siblings.
 
 Boundaries, recorded rather than solved:

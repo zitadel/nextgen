@@ -12,7 +12,7 @@ This CLI journey translates developer provider selection (e.g., "Google") into a
 2. **Capture Credentials:** Collect required authentication credentials (e.g., Client ID and Client Secret).
 3. **Scaffold Files:** Generate all required resource definitions.
 4. **Preview:** Render a diff preview of planned configuration changes.
-5. **Apply:** Write changes directly to the local file system.
+5. **Write:** Save changes to the local file system (deployment stays with `plan`/`apply`).
 
 ## Integration Points
 
@@ -192,7 +192,7 @@ The setup sub-journey connects existing OAuth applications or creates new ones w
 ### Scan & Match Logic
 
 * **Identity-Based Scan:** Scans `.zitadel/idps/*.json` matching on `template` (equal to catalog key) or protocol block endpoints (`issuer` equal to `https://accounts.google.com` or `authorization_endpoint` equal to `https://github.com/login/oauth/authorize`). Endpoints take precedence if `template` conflicts.
-* **Single Hit (Reuse):** Displays slug and `client_id` for interactive confirmation; non-interactive executions auto-reuse. Extends the connection's `claim_mapping` to cover the active schema using superset semantics, without modifying existing secrets. Re-checks credential presence so missing local values yield `E_CREDENTIAL_MISSING` with a `.env.local` pointer.
+* **Single Hit (Reuse):** Displays slug and `client_id` for interactive confirmation; non-interactive executions auto-reuse only when the supplied client id (if any) matches the stored `client_id`, and fail with `E_VALIDATION` naming both ids on mismatch, never silently keeping the existing app. Extends the connection's `claim_mapping` to cover the active schema using superset semantics, without modifying existing secrets. Re-checks credential presence so missing local values yield `E_CREDENTIAL_MISSING` with a `.env.local` pointer.
 * **Multiple Hits:** Prompts interactive user selection; throws a non-interactive error listing matching candidates.
 * **No Hit (Create):** Scaffolds at catalog slug. If slug or filename collides with an unmatched connection, prompts for a new slug or throws `E_CONFLICT` using atomic file writes (`wx`). `--force` is explicitly ignored for connection files to prevent destructive overwrites of hand-authored resources.
 * **Idempotency:** Re-running with unchanged inputs is a complete no-op end-to-end, producing identical state hashes with zero reported plan changes.
