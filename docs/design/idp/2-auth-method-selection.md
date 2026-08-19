@@ -2,7 +2,7 @@
 
 > **Status:** Planning notes  
 > **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
-> **Area:** 2 of 9 (see [`README.md`](README.md))
+> **Area:** 2 of 7 (see [`README.md`](README.md))
 
 This document defines how a user schema declares which external identity providers (like Google or GitHub) its users are permitted to sign in with, and how that configuration is wired into the login flow.
 

@@ -2,7 +2,7 @@
 
 > **Status:** Planning notes  
 > **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
-> **Area:** 1 of 9 (see [`README.md`](README.md))
+> **Area:** 1 of 7 (see [`README.md`](README.md))
 
 An Identity Provider (IdP) connection is a tenant-owned configuration file that defines how Zitadel interacts with external authentication providers (such as Google or GitHub).
 
@@ -763,8 +763,8 @@ Upstream resources, such as schemas (`x-auth-methods.sso.providers`) and flow st
 
 - **Slugs cannot be renamed in place:** Any runtime binding to the old name (such as in-flight attempts, deployed releases, or identity links) would break without a migration path. Therefore, the validator strictly refuses in-place slug edits. The correct migration path is to create a new connection with the new slug, update all upstream references, and safely retire the old connection on its own schedule.
 - **Renaming a file is treated as a move:** Because state is keyed by file path, a standard `git mv` normally looks like a deletion at the old path and a creation at the new one, which would trigger a real platform delete. To prevent this, the planner intelligently pairs an orphaned state entry with the new file carrying the identical slug. It then rekeys the state without touching the platform. Since slugs are unique, this pairing is completely unambiguous. (Note: Renaming the file *and* changing the slug simultaneously is treated as a genuine delete and create).
-- **Deletion semantics:** Active deployments might pin a specific revision, and an in-flight attempt might rely on a revision that no current release pins. A "refuse-while-pinned" approach would require a grace window, whereas "tombstoning" avoids both issues. What is certain is that a connection requires a true end-of-life process, and inheriting the `SchemaSyncer`'s "not-implemented" error is unacceptable. Settled: tombstoning, in [`9-crud-api.md`](9-crud-api.md#deletion-and-slug-reservation).
-- **Identity links require a stable key:** Users created via an external provider hold identity links keyed to that connection, but no revision-stable key currently exists. Revision IDs change on every edit, which would orphan existing links. Conversely, slugs can be reused after a delete and create cycle. If a new connection reuses a retired slug but points to a different issuer, it would automatically inherit the old user links, creating a severe account-takeover risk. To resolve this, the CRUD API must either mint a permanent lineage ID that survives revisions or strictly enforce slug reservation upon deletion. Settled: the lineage row provides both at once ([`9-crud-api.md`](9-crud-api.md#resource-identity-model)).
+- **Deletion semantics:** Active deployments might pin a specific revision, and an in-flight attempt might rely on a revision that no current release pins. A "refuse-while-pinned" approach would require a grace window, whereas "tombstoning" avoids both issues. What is certain is that a connection requires a true end-of-life process, and inheriting the `SchemaSyncer`'s "not-implemented" error is unacceptable. Settled: tombstoning; the CRUD API specifies deletion and slug reservation.
+- **Identity links require a stable key:** Users created via an external provider hold identity links keyed to that connection, but no revision-stable key currently exists. Revision IDs change on every edit, which would orphan existing links. Conversely, slugs can be reused after a delete and create cycle. If a new connection reuses a retired slug but points to a different issuer, it would automatically inherit the old user links, creating a severe account-takeover risk. To resolve this, the CRUD API must either mint a permanent lineage ID that survives revisions or strictly enforce slug reservation upon deletion. Settled: the lineage row provides both at once.
 
 ## Secrets and Environments
 
@@ -816,25 +816,25 @@ Behaviors this design relies on but does not implement. Each later area opens wi
 | Requirement | Owed By |
 | :--- | :--- |
 | An SSO attempt must bind to a specific connection revision at the exact moment it starts. | [`3-social-login-flow.md`](3-social-login-flow.md) |
-| An absent verification claim must be evaluated as unverified (fail closed). | [`3-social-login-flow.md`](3-social-login-flow.md) / Engine ([`8-protocol-client.md`](8-protocol-client.md)) |
-| Truthiness evaluation must strictly accept only boolean `true` or string `"true"`. | [`3-social-login-flow.md`](3-social-login-flow.md) / Engine ([`8-protocol-client.md`](8-protocol-client.md)) |
+| An absent verification claim must be evaluated as unverified (fail closed). | [`3-social-login-flow.md`](3-social-login-flow.md) / Engine |
+| Truthiness evaluation must strictly accept only boolean `true` or string `"true"`. | [`3-social-login-flow.md`](3-social-login-flow.md) / Engine |
 | `is_auto_update` must never silently overwrite a verified property with an unverified value. | [`3-social-login-flow.md`](3-social-login-flow.md) / Engine |
 | Strict linking coverage rules must be enforced when the feature returns. | Deferred account-linking journey |
 | Slug-to-revision resolution must be securely recorded during release-bundle construction. | [#529](https://github.com/zitadel/nextgen/issues/529) bundle constructor |
-| The API surface must support `get-by-slug` and strictly enforce uniqueness on creation. | Server CRUD API ([`9-crud-api.md`](9-crud-api.md)) |
-| A revision-stable lineage identity must be established to safely maintain user identity links. | Server CRUD API + Deletion semantics ([`9-crud-api.md`](9-crud-api.md)) |
+| The API surface must support `get-by-slug` and strictly enforce uniqueness on creation. | Server CRUD API |
+| A revision-stable lineage identity must be established to safely maintain user identity links. | Server CRUD API + Deletion semantics |
 | A resolved client-secret value must be obtainable during the token exchange step. | Deferred secret-store spec (production); the development-runtime env join is [#851](https://github.com/zitadel/nextgen/issues/851) execution work (see [Open Points](#open-points)) |
-| The server must validate every connection body against `idp-connection.json` at create and revise, before a revision is stored. Client-side validation does not cover hand-authored API writes (ADR 035 keeps direct CRUD first-class), and revisions are immutable, so a stored literal secret could never be scrubbed. | Server CRUD API ([`9-crud-api.md`](9-crud-api.md)) |
-| The Go server must mirror and enforce all cross-resource validator rules. | Server validator (reads from [`9-crud-api.md`](9-crud-api.md)) |
+| The server must validate every connection body against `idp-connection.json` at create and revise, before a revision is stored. Client-side validation does not cover hand-authored API writes (ADR 035 keeps direct CRUD first-class), and revisions are immutable, so a stored literal secret could never be scrubbed. | Server CRUD API |
+| The Go server must mirror and enforce all cross-resource validator rules. | Server validator |
 
 ## Open Points
 
 - **`scaffoldedFrom` tracking:** We propose adding this optional string to `ResourceEntry` to record which shipped default originally generated a file. It acts as the merge base for upgrading scaffolded defaults later. It is cheap to record now but impossible to reconstruct later. The recommendation is to record it now and defer utilizing it until needed.
 - **The secret lifecycle:** The actual mechanics of the secret lifecycle (the store, the set-surface, the engine join, and rotation) are owned by the deferred secret-store specification. This document only contributes the structural constraints and the security pushback outlined in the section above. That ownership covers production. Development cannot wait for the spec: the local runtime inherits only the CLI process environment ([`binary.ts:70`](../../../apps/cli/src/lib/local-server/binary.ts)) or two fixed docker `--env` values ([`docker.ts:35-38`](../../../apps/cli/src/lib/local-server/docker.ts)), so `.env.local` never reaches the engine and no configured provider can complete a token exchange. Wiring the development join is [#851](https://github.com/zitadel/nextgen/issues/851) execution work, under the same never-upstream invariant.
 - **Imperative runtime disable:** We need a way to imperatively disable an IdP at runtime (e.g., `zitadel idp disable google --env prod`). This mechanism must be per-environment, execute in seconds, and remain immune to config rollbacks. Because of these requirements, it must be specified as part of the runtime surface, never as a configuration field.
-- **Deletion semantics:** We must decide between a "refuse-while-pinned" approach (which requires a grace window for in-flight attempts) or a "tombstoning" approach. This will be settled alongside the design of the CRUD API. Settled as tombstoning in [`9-crud-api.md`](9-crud-api.md).
+- **Deletion semantics:** We must decide between a "refuse-while-pinned" approach (which requires a grace window for in-flight attempts) or a "tombstoning" approach. Settled alongside the CRUD API design: tombstoning.
 - **Schema-keyed validation:** It remains undecided how strictly connection fields keyed by user-schema properties (like `claim_mapping` and `verified_claims`) should be validated. The current "superset model" limits pair-wise checks to warnings, because a simple typo and a legitimate superset key are indistinguishable to the server (meaning the server never rejects mapping content). An alternative "1:1 rule" (where a connection slug belongs to at most one schema) would allow strict, error-grade checks, but forces tenants to create redundant connections. The current validator rules record the superset status quo until a final decision is made.
-- **The CRUD API itself:** Currently, no IdP API exists. Building the endpoints, generated client, and handlers represents the largest pending work item in this domain. The surface is now designed in [`9-crud-api.md`](9-crud-api.md); implementation remains.
+- **The CRUD API itself:** Currently, no IdP API exists. Building the endpoints, generated client, and handlers represents the largest pending work item in this domain. The surface is now designed; implementation remains.
 
 ## Related
 
@@ -843,8 +843,6 @@ Behaviors this design relies on but does not implement. Each later area opens wi
 - [ADR 042](../../adrs/042-scaffolded-file-ownership-and-drift-detection.md): scaffolded app-file ownership; extended here by analogy
 - [ADR 020](../../adrs/020-credentials-out-of-user-schema.md): `x-auth-methods` as policy input
 - [`../cli/identity-surface.md`](../cli/identity-surface.md): earlier draft of this resource
-- [`8-protocol-client.md`](8-protocol-client.md): area 8, the protocol client that answers the engine rows above
-- [`9-crud-api.md`](9-crud-api.md): area 9, the CRUD surface that answers the server rows above
 - [`../platform/configuration-surface.md`](../platform/configuration-surface.md): secrets, environments (written before ADR 035 renamed push to deploy)
 - `api/openapi/endpoints/schemas/flow-definition.json`: `SSOProvider`, `Gate`
 - `apps/cli/src/lib/sync/`: `ResourceSyncer`, state, sync loop

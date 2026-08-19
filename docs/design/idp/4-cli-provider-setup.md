@@ -2,7 +2,7 @@
 
 > **Status:** Planning notes  
 > **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
-> **Area:** 4 of 9 (see [`README.md`](README.md))
+> **Area:** 4 of 7 (see [`README.md`](README.md))
 
 This CLI journey translates developer provider selection (e.g., "Google") into a fully working project configuration.
 
@@ -358,18 +358,18 @@ The epic requires connection configurations to be visible in the plan preview wh
 
 ### The `IdpSyncer` Component
 
-Defined as `{ kind: "idp", directory: ".zitadel/idps", revisioned: false, mutable: true }` and registered in `makeSyncers` (`apps/cli/src/lib/sync/syncers.ts:46-61`), using `FlowSyncer` as its precedent (`syncers.ts:156-159`). `BrandingSyncer`'s `revisioned: true` shape was considered and rejected: in the sync contract that flag means a hash change publishes a brand-new outer id via `create()` and triggers a re-pin scan (`lib/sync/types.ts:78-92`, `lib/sync/loop.ts:175-188`), while area 9 keeps the lineage id stable and revises through `PUT /idps/{id}` ([`9-crud-api.md#sync-contract`](9-crud-api.md#sync-contract)). The server mints the revision id under the stable outer id, which is the contract's `mutable` shape: `update()` on hash change.
+Defined as `{ kind: "idp", directory: ".zitadel/idps", revisioned: false, mutable: true }` and registered in `makeSyncers` (`apps/cli/src/lib/sync/syncers.ts:46-61`), using `FlowSyncer` as its precedent (`syncers.ts:156-159`). `BrandingSyncer`'s `revisioned: true` shape was considered and rejected: in the sync contract that flag means a hash change publishes a brand-new outer id via `create()` and triggers a re-pin scan (`lib/sync/types.ts:78-92`, `lib/sync/loop.ts:175-188`), while the IdP CRUD API keeps the lineage id stable and revises through `PUT /idps/{id}`. The server mints the revision id under the stable outer id, which is the contract's `mutable` shape: `update()` on hash change.
 
 * **Directory Handling:** Introduces an `IDPS_DIR` constant. Missing directories plan cleanly without error (`readJsonDir` returns empty on `ENOENT`, `lib/sync/loop.ts:506-511`).
-* **Preview Behavior:** Registration alone enables create previews via the generic plan renderer (`lib/sync/plan-renderer.ts:668-687`). Update previews cannot show a field diff until a read endpoint exists (the renderer's explicit fallback, `plan-renderer.ts:763`); with area 9's get-by-slug they upgrade to a real old-vs-new diff.
+* **Preview Behavior:** Registration alone enables create previews via the generic plan renderer (`lib/sync/plan-renderer.ts:668-687`). Update previews cannot show a field diff until a read endpoint exists (the renderer's explicit fallback, `plan-renderer.ts:763`); with the CRUD API's get-by-slug they upgrade to a real old-vs-new diff.
 * **Secret Safety:** Previews display only the variable name (`client_secret_env`), keeping output secret-free by design.
 * **Re-pin Machinery:** Not engaged. The re-pin scan is the revisioned path (`lib/sync/loop.ts:175-188`) and this syncer is not revisioned; slug references make it structurally unnecessary anyway.
 
 ### Syncer Lifecycle Methods
 
 * **`validate()`:** Evaluates against the meta-schema and validator rules from Areas 1 and 2, executing `assertEnvRefs` with the [`E_CREDENTIAL_MISSING`](#missing-credentials) split.
-* **`create()` / `update()`:** `create()` posts `POST /idps`; `update()` publishes a new immutable revision under the stable lineage id via `PUT /idps/{id}` (area 9). Both depend on the CRUD API landing. Until it exists, journey file generation, validation, and `plan` previews function independently.
-* **`delete()`:** Calls `DELETE /idps/{id}`. Area 9 settled deletion as tombstoning, so a local file delete schedules a platform delete unconditionally ([`9-crud-api.md#deletion-and-slug-reservation`](9-crud-api.md#deletion-and-slug-reservation)).
+* **`create()` / `update()`:** `create()` posts `POST /idps`; `update()` publishes a new immutable revision under the stable lineage id via `PUT /idps/{id}`. Both depend on the CRUD API landing. Until it exists, journey file generation, validation, and `plan` previews function independently.
+* **`delete()`:** Calls `DELETE /idps/{id}`. Deletion is settled as tombstoning, so a local file delete schedules a platform delete unconditionally.
 
 ### Execution Handoff
 

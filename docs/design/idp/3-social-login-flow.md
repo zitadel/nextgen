@@ -2,7 +2,7 @@
 
 > **Status:** Planning notes  
 > **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
-> **Area:** 3 of 9 (see [`README.md`](README.md))
+> **Area:** 3 of 7 (see [`README.md`](README.md))
 
 This document defines how a user signs up and signs in using external identity providers like Google or GitHub, detailing the OAuth2/OIDC redirect ceremony, identity resolution, and all available recovery paths.
 
@@ -234,9 +234,9 @@ The current rendering architecture has no built-in knowledge of SSO. The `<zl-ss
 | :--- | :--- |
 | **`sso` Submission Handling** | Stubbed at `flow_state_machine.go:331` (replaces the `ErrFlowUnsupported` branch). |
 | **`state` Record Store & Callback Route** | Unimplemented (nothing exists). |
-| **Connection Fetch Egress Policy** | Unimplemented. One policy for every tenant-authored URL the engine fetches (see [Server-Side Fetch Policy](#server-side-fetch-policy)). Design: [`8-protocol-client.md`](8-protocol-client.md). |
-| **Protocol Engines** | OIDC discovery/code exchange and explicit-endpoint OAuth2 are available in `zitadel/zitadel` ([`oidc`](https://github.com/zitadel/zitadel/tree/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/oidc), [`oauth`](https://github.com/zitadel/zitadel/tree/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/oauth)), but completely absent in `nextgen`. Design: [`8-protocol-client.md`](8-protocol-client.md). |
-| **`github_primary_email` Strategy & Registry** | Design stage only (see reference implementation in [`github/session.go#L46-L112`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/github/session.go#L46-L112)). Design: [`8-protocol-client.md`](8-protocol-client.md). |
+| **Connection Fetch Egress Policy** | Unimplemented. One policy for every tenant-authored URL the engine fetches (see [Server-Side Fetch Policy](#server-side-fetch-policy)). |
+| **Protocol Engines** | OIDC discovery/code exchange and explicit-endpoint OAuth2 are available in `zitadel/zitadel` ([`oidc`](https://github.com/zitadel/zitadel/tree/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/oidc), [`oauth`](https://github.com/zitadel/zitadel/tree/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/oauth)), but completely absent in `nextgen`. |
+| **`github_primary_email` Strategy & Registry** | Design stage only (see reference implementation in [`github/session.go#L46-L112`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/github/session.go#L46-L112)). |
 | **`create_user_with_sso` (`on_success`)** | Referenced in documentation; currently unimplemented. |
 | **Claims Mapping & Auto-Creation Gate** | Design stage only (covers claims-to-properties mapping, verification evaluation, auto-creation gating, and `is_auto_update` guards). |
 | **Per-Property Verification (`x-verify`)** | Unimplemented end to end. [#901](https://github.com/zitadel/nextgen/pull/901) removed the annotation from the dialect as unread; re-adding it lands with this work. `user_attributes` exists as bare key/value pairs without verification flags, blocking creation-time verification tracking, `is_auto_update` downgrade guards, and edit-drops-verification logic. |
@@ -258,14 +258,12 @@ The current rendering architecture has no built-in knowledge of SSO. The `<zl-ss
     * *Ownership & Scope:* Belongs to the identity-link data model (requiring a revision-stable connection identity and schema *lineage* tracking). Unreachable in Epic 851's scaffolded single-schema journey. The concrete two-schema case is recorded in area 1's [Linking Safety](1-resource-model.md#linking-safety).
 * **State Storage Shape:** Deciding between storing state fields directly on the attempt versus maintaining a dedicated table. Consumption must be atomic to handle concurrent duplicate callbacks safely (one succeeds while the second receives a reused-state error). `zitadel/zitadel` does not solve this: `SucceedIDPIntent` reads the intent and then pushes the succeeded event with no expected-sequence guard ([`idp_intent.go#L169-L199`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/command/idp_intent.go#L169-L199)), and a pending state carries no TTL, since `maxIdPIntentLifetime` bounds only the succeeded intent token ([`idp_intent_model.go#L51-L56`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/command/idp_intent_model.go#L51-L56)). Because minting is unauthenticated (any visitor on the login page can submit an SSO step), the chosen shape must also make it cheap to bound pending records per flow and rate-limit minting.
 * **Multi-Tab Behavior:** Defining rules for parallel SSO submissions initiated from a single flow (whether the last-minted state invalidates prior states or both remain valid until consumed).
-* **`sso-redirect` Step Shape:** Confirming whether `{name, redirect_url}` (sketched in example 4) serves as the official wire contract or if the redirect URL should be folded directly into the submission response payload. The return leg is equally unsettled: the browser return target after the callback must be captured at submission time into the `state` record, validated against the environment's declared issuer origin, and never taken from callback input (an attacker-supplied target is an open redirect). The record contract in area 8 carries the field; the callback route consumes it.
+* **`sso-redirect` Step Shape:** Confirming whether `{name, redirect_url}` (sketched in example 4) serves as the official wire contract or if the redirect URL should be folded directly into the submission response payload. The return leg is equally unsettled: the browser return target after the callback must be captured at submission time into the `state` record, validated against the environment's declared issuer origin, and never taken from callback input (an attacker-supplied target is an open redirect). The state record contract carries the field; the callback route consumes it.
 
 ## Related
 
 - [`1-resource-model.md`](1-resource-model.md) (area 1: connection schema, exported requirements)
 - [`2-auth-method-selection.md`](2-auth-method-selection.md) (area 2: capability/usage split)
-- [`8-protocol-client.md`](8-protocol-client.md) (area 8: the protocol client core behind the engine work above)
-- [`9-crud-api.md`](9-crud-api.md) (area 9: the CRUD surface; revision permanence, and slug resolution refuses tombstones)
 - [`../flowengine/flow-engine.md`](../flowengine/flow-engine.md) (example 4, the SSO sketch)
 - [`../flowengine/flow-engine-nodes.md`](../flowengine/flow-engine-nodes.md) (step response shape)
 - [`../flowengine/capabilities.md`](../flowengine/capabilities.md) (what is stubbed)

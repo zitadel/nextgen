@@ -16,9 +16,8 @@ available to every schema, and one connection can serve many.
 
 ## Areas
 
-The epic decomposes into nine areas, roughly in dependency order. Areas 1-7
-are design docs, one per area; areas 8 (protocol client) and 9 (CRUD API) are
-implementation designs, tracked as execution tickets rather than docs.
+The epic decomposes into seven areas, roughly in dependency order, one doc
+per area.
 
 | # | Area | Doc |
 |---|---|---|

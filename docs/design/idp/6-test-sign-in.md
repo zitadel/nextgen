@@ -2,7 +2,7 @@
 
 > **Status:** Planning notes  
 > **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
-> **Area:** 6 of 9 (see [`README.md`](README.md))
+> **Area:** 6 of 7 (see [`README.md`](README.md))
 
 ## Overview
 
@@ -327,10 +327,10 @@ The test changes nothing in the browser. Failures render exactly as area 3 speci
 
 | Requirement | Owed by |
 | :--- | :--- |
-| Diagnostic events at every callback milestone, value-free, closed vocabularies | Engine (extends area 3's engine work; taxonomy and milestone split: [`8-protocol-client.md`](8-protocol-client.md)) |
+| Diagnostic events at every callback milestone, value-free, closed vocabularies | Engine (extends area 3's engine work; owns the taxonomy and milestone split) |
 | `journey_completed` emitted at terminal handoff for SSO-resolved attempts | Engine |
 | Diagnostics read: project-scoped, ordered, cursor-anchored to server time, provider filter that never drops unattributable events | Server, reconciled with ADR 048/049's events surface (remainder settled with area 1's CRUD API) |
-| `provider_error` echoed verbatim on `provider_error_returned`; `identity_resolved` carries the outcome and unmet auto-creation conditions (property names only); `identity_resolved` fires at both `user_already_exists` execution points (callback resolution and collection-step submission) | Engine (error taxonomy: [`8-protocol-client.md`](8-protocol-client.md)) |
+| `provider_error` echoed verbatim on `provider_error_returned`; `identity_resolved` carries the outcome and unmet auto-creation conditions (property names only); `identity_resolved` fires at both `user_already_exists` execution points (callback resolution and collection-step submission) | Engine (error taxonomy) |
 | Exit copy on the area 4 and 5 surfaces names `zitadel test sign-in` | CLI (areas 4 and 5 implementation) |
 
 ---
@@ -338,7 +338,7 @@ The test changes nothing in the browser. Failures render exactly as area 3 speci
 ## Open Points
 
 - **Event storage and retention.** Owned by ADR 048/049 if the events stream carries these milestones (persisted in the `events` table, retention per ADR 049); only a dedicated in-memory channel would lose events on a server restart. Either way a mid-test gap must be detected and named by the CLI rather than reported as `no_attempt_observed`. Tied to area 3's open state-storage shape.
-- **Endpoint shape.** Whether the diagnostics read is ADR 049's `/events` (milestones as `event_type` rows, the existing `flow_id` filter, ADR 027 cursors) or a dedicated route. The deciding constraints: the closed milestone/reason vocabularies, unattributable `state_invalid` events (attempt-scoped fields null), the server-issued window cursor, and ADR 048's pre-claim read gate. Path, pagination, and authz scope naming settle there, together with the CRUD API (area 1 open point). Area 9 adds no dedicated diagnostics route; the read stays on the events surface ([`9-crud-api.md`](9-crud-api.md#boundary-and-seams)).
+- **Endpoint shape.** Whether the diagnostics read is ADR 049's `/events` (milestones as `event_type` rows, the existing `flow_id` filter, ADR 027 cursors) or a dedicated route. The deciding constraints: the closed milestone/reason vocabularies, unattributable `state_invalid` events (attempt-scoped fields null), the server-issued window cursor, and ADR 048's pre-claim read gate. Path, pagination, and authz scope naming settle there, together with the CRUD API (area 1 open point). The CRUD API adds no dedicated diagnostics route; the read stays on the events surface.
 - **Menu row.** Revisit a standing "Test sign-in" row when re-testing becomes recurring (secret rotation, #534 multi-environment). Exit copy is the only surface this iteration.
 - **Login page location.** The scaffolded path lives in app source the developer may edit and is not readable back; `zitadel.json` persistence covers new scaffolds only, and SPA widget postures may host sign-in anywhere. `--url` covers every case manually; detection beyond the recorded value is undesigned.
 - **Actor binding and observer privacy.** Nothing binds an observed attempt to the CLI run that opened the browser; on a shared development instance the report can only flag ambiguity. The intended fix is an attempt marker minted by the CLI and carried into flow creation, designed together with the diagnostics read. The same design owns the privacy rule: value-free events bound what one developer's terminal can see of a colleague's sign-in, and #534 remote targeting must not proceed without the marker.
@@ -354,8 +354,6 @@ The test changes nothing in the browser. Failures render exactly as area 3 speci
 - [`3-social-login-flow.md`](3-social-login-flow.md) (area 3: callback steps, failures table, engine work)
 - [`4-cli-provider-setup.md`](4-cli-provider-setup.md) (area 4: callback URIs, credential capture, verification separation)
 - [`5-post-claim-menu.md`](5-post-claim-menu.md) (area 5: menu-is-navigation, exit surfaces)
-- [`8-protocol-client.md`](8-protocol-client.md) (area 8: the engine core that emits the milestones and reason codes)
-- [`9-crud-api.md`](9-crud-api.md) (area 9: `GET /idps/revisions/{id}` reads the pinned revisions these events carry)
 - [ADR 048](../../adrs/048-wide-events-internal-audit-primitive.md) / [ADR 049](../../adrs/049-events-api-retention-export.md) (the shipped events surface the diagnostics read reconciles with; `ListEvents`, `internal/api/event.go`)
 - [`../flowengine/capabilities.md`](../flowengine/capabilities.md) (terminal handoff, flow cookie TTL)
 - [`../cli/identity-surface.md`](../cli/identity-surface.md) (earlier draft: the `idp test` dry-run, absorbed into preflight)

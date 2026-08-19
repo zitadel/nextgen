@@ -2,7 +2,7 @@
 
 > **Status:** Planning Notes  
 > **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
-> **Area:** 5 of 9 (see [`README.md`](README.md))
+> **Area:** 5 of 7 (see [`README.md`](README.md))
 
 ## Overview
 
@@ -250,7 +250,7 @@ Updates to existing CLI hints to drive menu discovery:
 - **Pre-claim / Local Menus:** Potential future variants for uninitialized directories or local-dev (currently fall back to help).
 - **Environment Selection:** Adding environment prompting into Preview/Apply when multi-environment support lands (#534).
 - **Project-name Caching:** Investigating if live `getProject` reads make the menu initialization feel slow.
-- **Inert Connections:** Deletion semantics are settled as tombstoning ([`9-crud-api.md`](9-crud-api.md)); what remains open is only the local UX: whether removing the last provider should prompt to delete the connection file.
+- **Inert Connections:** Deletion semantics are settled as tombstoning; what remains open is only the local UX: whether removing the last provider should prompt to delete the connection file.
 
 ## Related
 

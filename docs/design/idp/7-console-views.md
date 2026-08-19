@@ -4,7 +4,7 @@
 >
 > **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851), "Enable social login with Google and GitHub"
 >
-> **Area:** 7 of 9 (see [`README.md`](README.md))
+> **Area:** 7 of 7 (see [`README.md`](README.md))
 
 The Console's share of the epic is two read views: the authentication methods each user schema declares, and the IdP connections that exist for the Project. Nothing here is writable. Configuration changes stay in the CLI journeys (areas 4 and 5); the Console shows what those journeys produced.
 
@@ -102,12 +102,12 @@ When ADR 035's release model ships, "current configuration" becomes a real platf
 
 ### The Read Contract
 
-No IdP API exists, so this area states what the console needs from area 1's CRUD API rather than consuming a contract. That surface is now designed in [`9-crud-api.md`](9-crud-api.md), with these needs as imported requirements. Area 1's exported table already demands that "The API surface must support `get-by-slug` and strictly enforce uniqueness on creation."; the console adds the read pair:
+No IdP API exists, so this area states what the console needs from area 1's CRUD API rather than consuming a contract. The CRUD API design imports these needs as requirements. Area 1's exported table already demands that "The API surface must support `get-by-slug` and strictly enforce uniqueness on creation."; the console adds the read pair:
 
 - **List (project-scoped): one row per `slug`, serving the newest revision.** Connections have what schemas lack: a stable, project-unique lineage identity. One row per slug is exactly "which connections exist"; no client-side revision handling. Superseded revisions stay stored (area 1's immutability) but do not appear. Rows sort by `slug` ascending: stable across edits, where the served revision's `created_at` would reorder the list on every publish.
 - **Rows carry the display fields inline:** `id` (the lineage identity), `revision_id` (the served revision), `slug`, `display_name`, `protocol`, `template`, `created_at`. The schemas list has to fetch every document because its rows are `{id, created_at}`; the connections list should not repeat that shape.
 - **Get-by-slug returns the served revision's stored document** plus the row metadata. Bodies are value-free by construction (area 1's secret invariant), so the console renders the document without a redaction pass. The construction holds because the server validates bodies at create and revise (area 1's exported requirements); client-side validation alone would not cover hand-authored API writes. `client_secret_env` is a variable name and is deliberately visible: which env var feeds a connection is exactly what a developer checks before rotating a secret.
-- **A read scope following the existing naming**, alongside `schema.read` and `flow_definition.read` (`api/openapi/security/oauth2.yaml:10`). Spelling settled with the CRUD API: `idp.read` ([`9-crud-api.md`](9-crud-api.md)).
+- **A read scope following the existing naming**, alongside `schema.read` and `flow_definition.read` (`api/openapi/security/oauth2.yaml:10`). Spelling settled with the CRUD API: `idp.read`.
 
 ```jsonc
 // GET /idps?project_id=… - one row per slug, newest revision
@@ -120,12 +120,12 @@ No IdP API exists, so this area states what the console needs from area 1's CRUD
 }
 ```
 
-The sketch mirrors the flow list's pagination shape; `id` is the lineage identity and `revision_id` the served revision, the two id spaces area 9 registers ([`9-crud-api.md`](9-crud-api.md); ADR 047 owns minting). `created_at` is the served revision's creation time, which for an edited connection reads as "last updated". A lineage-level "first created" now exists on the lineage row and rides the get envelope ([`9-crud-api.md`](9-crud-api.md)); the list keeps the compact display shape.
+The sketch mirrors the flow list's pagination shape; `id` is the lineage identity and `revision_id` the served revision, the two id spaces the CRUD API registers (ADR 047 owns minting). `created_at` is the served revision's creation time, which for an edited connection reads as "last updated". A lineage-level "first created" now exists on the lineage row and rides the get envelope; the list keeps the compact display shape.
 
 ### The Screen
 
 - **Route `/idps`, nested in the sidebar under Users beside User schemas, labeled "Identity providers".** The grouping mirrors the epic's framing: providers answer "how should these users sign in?", and the two screens cross-reference each other. The sidebar rule stands: the entry appears when the endpoint exists, never as a disabled row (`apps/console/src/nav.ts:44`).
-- **List:** the schemas-list pattern (a `Card` of rows; the D0a/D7 reasoning applies unchanged: a configuration list, small, not a dense table). Each row: vendor glyph resolved from `template` with a generic fallback, `display_name`, the slug as a chip, protocol, date, and a row menu with **View** only. No status column: the list returns active connections only, deletion tombstones never appear in it ([`9-crud-api.md`](9-crud-api.md#deletion-and-slug-reservation)). (`enabled` was deliberately cut in area 1; the wire's `status` field serves tombstone reads, not the list.)
+- **List:** the schemas-list pattern (a `Card` of rows; the D0a/D7 reasoning applies unchanged: a configuration list, small, not a dense table). Each row: vendor glyph resolved from `template` with a generic fallback, `display_name`, the slug as a chip, protocol, date, and a row menu with **View** only. No status column: the list returns active connections only, deletion tombstones never appear in it. (`enabled` was deliberately cut in area 1; the wire's `status` field serves tombstone reads, not the list.)
 - **Detail `/idps/$slug`:** the schema-detail pattern. The route keys on the slug, not the served revision's id: an id changes on every edit, while the slug is the stable identity everything else references, so bookmarked URLs survive edits and always show the current revision. (The schema screens key on id only because schemas lack a lineage identity.) Header lockup (glyph, "Identity provider" eyebrow, display name), a metadata strip (slug, protocol, template, `client_id`, secret env name, date), and the stored document in the same read-only viewer the schema detail uses.
 - **Empty state** points at the only setup surface: "No identity providers yet. Set them up from the CLI: `npx zitadel` → Sign-in methods." (area 5's vocabulary).
 - **Vendors stay data here too.** The screen renders whatever connections exist and enumerates no vendor anywhere. 851 tenants will see Google and GitHub because that is what the journeys scaffold.
@@ -145,9 +145,9 @@ Tests follow the shipped layers: route specs with MSW fixtures (the `schemas.spe
 
 | Requirement | Owed by |
 | :--- | :--- |
-| Slug-keyed connections list: project-scoped, one row per slug serving the newest revision, rows carrying `slug`, `display_name`, `protocol`, `template`, `created_at` inline. | Server CRUD API ([`9-crud-api.md`](9-crud-api.md)) |
-| Get-by-slug read returning the served revision's stored, value-free document with row metadata. | Server CRUD API ([`9-crud-api.md`](9-crud-api.md)) |
-| A connection read scope following the existing `<resource>.read` naming. | Server CRUD API (`idp.read`, [`9-crud-api.md`](9-crud-api.md)) |
+| Slug-keyed connections list: project-scoped, one row per slug serving the newest revision, rows carrying `slug`, `display_name`, `protocol`, `template`, `created_at` inline. | Server CRUD API |
+| Get-by-slug read returning the served revision's stored, value-free document with row metadata. | Server CRUD API |
+| A connection read scope following the existing `<resource>.read` naming. | Server CRUD API (`idp.read`) |
 | "Current configuration" reads (the in-use derivation, any future drift view) swap to the promoted release's pin set once the release model ships. | ADR 035 / #542 release work |
 
 ## Open Points
@@ -160,7 +160,6 @@ Tests follow the shipped layers: route specs with MSW fixtures (the `schemas.spe
 ## Related
 
 - [`1-resource-model.md`](1-resource-model.md) (area 1: slug identity, immutability, secret invariant, CRUD API open point)
-- [`9-crud-api.md`](9-crud-api.md) (area 9: the CRUD surface that answers this read contract)
 - [`2-auth-method-selection.md`](2-auth-method-selection.md) (area 2: `sso.providers`, dead-capability rule)
 - [`4-cli-provider-setup.md`](4-cli-provider-setup.md) (area 4: the console read-only scope note)
 - Console ADRs 0001–0004 (`apps/console/docs/adrs/`)
