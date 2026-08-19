@@ -1,5 +1,38 @@
 # @zitadel/api
 
+## 0.1.0-alpha.19
+
+### Minor Changes
+
+- [#900](https://github.com/zitadel/nextgen/pull/900) [`e26f376`](https://github.com/zitadel/nextgen/commit/e26f37617f5d3a3f92f00c07aad89a98ee9d754f) Thanks [@vitorbari](https://github.com/vitorbari)! - Nest a user's schema-defined content under `attributes`. `POST /users` takes `schema` plus an `attributes` document, and every user response carries `id`, `schema`, `attributes` and `metadata`. The user schema now validates `attributes` alone, so closed-world keywords such as `additionalProperties: false` behave as their author intended and a schema may declare a property named `id` or `metadata`. The schema pointer is named `schema` rather than `$schema`, and `POST /users` answers with the same representation a read returns.
+
+  A user is stored as its attribute rows, so an empty `attributes` document is
+  rejected with `user.invalid`, even where the schema itself accepts it. `POST
+/users` also documents its `500`: when the user was created but could not be
+  read back, the body carries its id in `details.user_id`, and the caller should
+  fetch that user rather than repeat the create.
+
+### Patch Changes
+
+- [#856](https://github.com/zitadel/nextgen/pull/856) [`b17b2c9`](https://github.com/zitadel/nextgen/commit/b17b2c9fb3fae00f99a1864d37f3b51142ea4344) Thanks [@fforootd](https://github.com/fforootd)! - The package documentation now matches what the packages actually do. The Next and Nuxt guides drop the removed `api-base` attribute in favor of `configureZitadel()` and the `project` property; the Nuxt guide documents the Nuxt module (what `zitadel setup` wires) with its real options and the `useAuth()` / `useZitadelProject()` composables, alongside the hand-rolled middleware path with its full option set. `@zitadel/sdk-core` and `@zitadel/api` gain real documentation of their entry points, `@zitadel/config` gains a package README, and the SPA guides document the `ZitadelSession` card and point local no-proxy experiments at the local runtime's actual default port (8080). The flow-editing guide copied into `.zitadel/flows/` no longer suggests cross-flow `switch`/`pivot` transitions, which the runtime does not execute yet, and API examples use the real prefixed ID format (`proj_…`, `team_…`) instead of a retired naming scheme.
+
+- [#829](https://github.com/zitadel/nextgen/pull/829) [`fc3d154`](https://github.com/zitadel/nextgen/commit/fc3d154f2fabb722c6f94633fd6c10bc60d0a657) Thanks [@fforootd](https://github.com/fforootd)! - Preserve purpose across in-card navigation: a flow transition can declare a
+  local `purpose` (`{"target": "register", "purpose": "register"}`), and taking
+  it moves the flow's dispatch mode while the original purpose stays pinned.
+  The default login flow (and the passkey-first preset) now ship visible
+  "Sign up" / "Sign in" navigations on their entry steps built on this —
+  previously the only in-card path to registration was submitting an unknown
+  email. Validators (server-side and `@zitadel/config`) enforce that the purpose
+  is one the definition serves, that the transition targets that purpose's entry
+  step, and that `purpose` never combines with the cross-flow `action`. Navigate
+  actions now also clear a pending passkey challenge, so an abandoned prompt
+  cannot re-attach after navigating away.
+
+  Existing scaffolded apps keep their local `.zitadel/flows/default-login.json`
+  unchanged (local config stays authoritative). To adopt the in-card
+  navigations, add the two navigate actions and their purposed transitions to
+  your flow file — or re-eject the default — then `zitadel plan` / `apply`.
+
 ## 0.1.0-alpha.18
 
 ### Minor Changes
