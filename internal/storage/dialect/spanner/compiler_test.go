@@ -582,6 +582,25 @@ func TestCompileListRequiresAuthzFilter(t *testing.T) {
 	compiler.Reset()
 	require.NoError(t, compileList(ctx, &compiler, stmt, opts, teamSchema, "teams", "id"))
 	assert.Contains(t, compiler.String(), "EXISTS")
+
+	compiler.Reset()
+	allowCtx := service.WithAuthzListSkipOnce(context.Background())
+	require.NoError(t, compileList(allowCtx, &compiler, stmt, opts, teamSchema, "teams", "id"))
+	assert.NotContains(t, compiler.String(), "EXISTS")
+	compiler.Reset()
+	require.ErrorIs(t, compileList(allowCtx, &compiler, stmt, opts, teamSchema, "teams", "id"), authz.ErrListFilterRequired)
+
+	compiler.Reset()
+	unrestricted := service.WithAuthzListUnrestricted(context.Background())
+	require.NoError(t, compileList(unrestricted, &compiler, stmt, opts, teamSchema, "teams", "id"))
+	assert.NotContains(t, compiler.String(), "EXISTS")
+	compiler.Reset()
+	require.NoError(t, compileList(unrestricted, &compiler, stmt, opts, teamSchema, "teams", "id"))
+
+	nested := service.WithAuthzListUnrestricted(ctx)
+	compiler.Reset()
+	require.NoError(t, compileList(nested, &compiler, stmt, opts, teamSchema, "teams", "id"))
+	assert.NotContains(t, compiler.String(), "EXISTS", "unrestricted must ignore an inherited filter")
 }
 
 func compileProjectRead(t *testing.T, opts *database.ListOptions[domain.ProjectField]) (string, []any) {
