@@ -29,6 +29,11 @@ type Request struct {
 	ResourceID string
 	// ResourceTeamID is RSI.team_id after a by-id lookup (team-scoped grant arm).
 	ResourceTeamID string
+	// HomeProjectID is the credential's home project for membership-edge
+	// lookup (#333 / ADR 052). Empty stays empty — CheckParams does not
+	// default it to ProjectID (the target). SQL still falls back via
+	// AuthzCheckParams.HomeProjectID() when unset.
+	HomeProjectID string
 }
 
 // ListRequest is the public ListObjects input (L4 / oracle helper).
@@ -94,7 +99,7 @@ func (r *Resolver) Check(ctx context.Context, stmts service.AuthzResolverStateme
 		return d, nil
 	}
 
-	catalogID, err := r.activeCatalogID(ctx, stmts)
+	catalogID, err := r.ActiveCatalogID(ctx, stmts)
 	if err != nil {
 		return DecisionUnspecified, err
 	}
@@ -126,7 +131,7 @@ func (r *Resolver) ListObjects(ctx context.Context, stmts service.AuthzResolverS
 		!skTeamPermissionAllowed(PermissionName(req.ObjectType, req.Relation)) {
 		return []string{}, nil
 	}
-	catalogID, err := r.activeCatalogID(ctx, stmts)
+	catalogID, err := r.ActiveCatalogID(ctx, stmts)
 	if err != nil {
 		return nil, err
 	}
@@ -136,11 +141,30 @@ func (r *Resolver) ListObjects(ctx context.Context, stmts service.AuthzResolverS
 	})
 }
 
+// CheckParams is the storage Check/List payload for req, including
+// ConstraintTeamID for sk_team principals. HTTP list filters must use this
+// so EXISTS SQL matches Check.
+//
+// CheckParams does not apply the sk_team allowlist short-circuit that Check
+// uses. sk_team Checks of project.viewer are DecisionNotFound, so HTTP lists
+// never take the Forbidden / filter branch for those principals. ConstraintTeamID
+// plumbing stays so a future allowlisted project relation still constrains SQL.
+func (r *Resolver) CheckParams(ctx context.Context, stmts service.AuthzResolverStatements, req Request) (domain.AuthzCheckParams, error) {
+	catalogID, err := r.ActiveCatalogID(ctx, stmts)
+	if err != nil {
+		return domain.AuthzCheckParams{}, err
+	}
+	return checkParams(catalogID, req), nil
+}
+
 func checkParams(catalogID string, req Request) domain.AuthzCheckParams {
+	// Home vs target: HomeProjectID is the credential project; ProjectID is
+	// the protected resource's project. Do not default home to target here
+	// (#333 / ADR 052).
 	p := domain.AuthzCheckParams{
 		CatalogID:              catalogID,
 		ProjectID:              req.ProjectID,
-		PrincipalHomeProjectID: req.ProjectID,
+		PrincipalHomeProjectID: req.HomeProjectID,
 		PrincipalType:          req.PrincipalType,
 		PrincipalID:            req.PrincipalID,
 		ObjectType:             req.ObjectType,
@@ -154,7 +178,7 @@ func checkParams(catalogID string, req Request) domain.AuthzCheckParams {
 	return p
 }
 
-func (r *Resolver) activeCatalogID(ctx context.Context, stmts service.AuthzResolverStatements) (string, error) {
+func (r *Resolver) ActiveCatalogID(ctx context.Context, stmts service.AuthzResolverStatements) (string, error) {
 	if r.catalogID != "" {
 		return r.catalogID, nil
 	}

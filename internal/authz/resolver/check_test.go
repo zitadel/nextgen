@@ -21,6 +21,7 @@ func TestCheck_Orchestration(t *testing.T) {
 		PrincipalType: domain.AuthzPrincipalTypeUser,
 		PrincipalID:   "user_alice",
 		ProjectID:     "proj_1",
+		HomeProjectID: "proj_1",
 		ObjectType:    "project",
 		Relation:      "viewer",
 	}
@@ -102,6 +103,7 @@ func TestCheck_Orchestration(t *testing.T) {
 			PrincipalType: domain.AuthzPrincipalTypeSKTeam,
 			PrincipalID:   "sk_team_1",
 			ProjectID:     "proj_1",
+			HomeProjectID: "proj_1",
 			ObjectType:    "user",
 			Relation:      "read",
 			TeamID:        "team_1",
@@ -193,6 +195,7 @@ func TestListObjects_Orchestration(t *testing.T) {
 			PrincipalType: domain.AuthzPrincipalTypeUser,
 			PrincipalID:   "user_a",
 			ProjectID:     "proj_1",
+			HomeProjectID: "proj_1",
 			ObjectType:    "project",
 			Relation:      "viewer",
 		},
@@ -220,6 +223,44 @@ func TestListObjects_SKTeamDeny(t *testing.T) {
 	assert.Empty(t, ids)
 }
 
+func TestCheckParams_SKTeamConstraint(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+	stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
+
+	params, err := resolver.New().CheckParams(context.Background(), stmts, resolver.Request{
+		PrincipalType: domain.AuthzPrincipalTypeSKTeam,
+		PrincipalID:   "sk_team_1",
+		ProjectID:     "proj_1",
+		HomeProjectID: "proj_home",
+		ObjectType:    "project",
+		Relation:      "viewer",
+		TeamID:        "team_eng",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "team_eng", params.ConstraintTeamID)
+	assert.Equal(t, domain.SystemCatalogID, params.CatalogID)
+	assert.Equal(t, "proj_home", params.PrincipalHomeProjectID)
+	assert.Equal(t, "proj_1", params.ProjectID)
+}
+
+func TestCheckParams_DoesNotDefaultHomeToTarget(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	stmts := mocks.NewMockAuthzResolverStatements(ctrl)
+	stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
+
+	params, err := resolver.New().CheckParams(context.Background(), stmts, resolver.Request{
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_alice",
+		ProjectID:     "proj_target",
+		ObjectType:    "project",
+		Relation:      "viewer",
+	})
+	require.NoError(t, err)
+	assert.Empty(t, params.PrincipalHomeProjectID)
+	assert.Equal(t, "proj_target", params.ProjectID)
+}
+
 func TestListObjects_SKTeamTeamBoundDoesNotRequireResourceID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	stmts := mocks.NewMockAuthzResolverStatements(ctrl)
@@ -243,6 +284,7 @@ func TestListObjects_SKTeamTeamBoundDoesNotRequireResourceID(t *testing.T) {
 			PrincipalType: domain.AuthzPrincipalTypeSKTeam,
 			PrincipalID:   "sk",
 			ProjectID:     "proj_1",
+			HomeProjectID: "proj_1",
 			ObjectType:    "user",
 			Relation:      "read",
 			TeamID:        "team_1",

@@ -27,9 +27,11 @@ flow_definition / session path ids in addition to project / team / user.
 Path-id management handlers resolve RSI before Check (flat-by-id; no
 required query `project_id`). Management list endpoints inject an authz
 EXISTS predicate (same assignment/closure branches as `ListObjects`) into
-the resource SELECT after `requireProjectListAccess`. Project-wide Allow
-**or** Forbidden (foothold, no project-wide grant) both proceed; the EXISTS
-predicate returns the partial view. NotFound (no foothold) still 404s.
+the resource SELECT after `requireProjectListAccess` when Check is
+**Forbidden**. Project-wide **Allow** skips that EXISTS for the next list
+compile only (no RSI dual-write re-check; a grant revoked between Check and
+SELECT can still appear). Forbidden (foothold, no project-wide grant) gets
+the EXISTS partial view. NotFound (no foothold) still 404s.
 **Team-scoped HTTP list narrowing is live** for lists that inject that
 predicate (#834). It is **not** every HTTP list — see the carve-outs below.
 Fine-grained catalog relations (#420) remain a follow-up.
@@ -98,10 +100,16 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
   narrowing is live ([#834](https://github.com/zitadel/nextgen/issues/834)):
   management list endpoints inject an authz EXISTS **predicate** (same
   assignment/closure branches as `ListObjects`) via `service.AuthzListFilter`
-  after `requireProjectListAccess` (Allow or Forbidden → proceed; NotFound →
-  after `requireProjectListAccess` (Allow or Forbidden → proceed; NotFound →
-  404). `compileList` for management tables fails closed without the filter
-  ([#838](https://github.com/zitadel/nextgen/issues/838)). Intentional
+  from `requireProjectListAccess` (Allow → one-shot skip of EXISTS; Forbidden →
+  proceed with predicate; NotFound → 404). Check and the list filter share one
+  request-scoped Resolver ([#837](https://github.com/zitadel/nextgen/issues/837)).
+  Skipping EXISTS on Allow means that SELECT does not re-check RSI dual-write,
+  and a grant revoked between Check and SELECT can still appear. Forbidden
+  still gets the EXISTS partial view. `compileList` for management tables
+  fails closed without the filter ([#838](https://github.com/zitadel/nextgen/issues/838));
+  Allow's skip is consumed by the next compile, so a forgotten nested list on
+  the same request still 500s. Nested uniqueness / Resolve / GetLatest use
+  `WithAuthzListUnrestricted`, which ignores an inherited filter. Intentional
   carve-outs live in the [#839](#list-predicate-carve-outs-839) table.
   `ListUsers` uses the predicate helper, not `compileList`, and still fails
   closed. User RSI `team_id` is NULL, so a team-scoped-only principal sees
@@ -644,8 +652,8 @@ Management `compileList` with a non-empty table name and resource-id column **re
 | `ListEvents` | Events have no RSI resource kind. A naive EXISTS would dump the audit stream. Do **not** migrate. |
 | `ListUsers` | Uses `maybeWriteAuthzListPredicate` by hand, not `compileList`. Still fail-closed via `RequireManagementListFilter`. |
 | `ListUserPasskeys` / `ListUserTeams` | Nested under a user already gated by `requireResourceAccess`. |
-| Nested `ListFlowDefinitions` (create uniqueness, update conflict, pivoting, login `Resolve`) | Not a management HTTP list; uses `WithAuthzListFilterBypass` so uniqueness/routing see the whole project. |
-| `GetLatest` branding | Runtime/flow resolution, not the management list endpoint. |
+| Nested `ListFlowDefinitions` (create uniqueness, update conflict, pivoting, login `Resolve`) | Not a management HTTP list; `WithAuthzListUnrestricted` sees the whole project and ignores an inherited list filter. |
+| `GetLatest` branding | Runtime/flow resolution, not the management list endpoint; same unrestricted wrap. |
 
 Do not wire `QuerySessions` here; keep this table accurate until `sessionService.List` exists.
 
