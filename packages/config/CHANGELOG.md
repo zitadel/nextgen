@@ -1,5 +1,119 @@
 # @zitadel/config
 
+## 0.1.0-alpha.19
+
+### Minor Changes
+
+- [#804](https://github.com/zitadel/nextgen/pull/804) [`4e04e5f`](https://github.com/zitadel/nextgen/commit/4e04e5fb2a9585669b75d2b188b0966bfb23f4e7) Thanks [@vitorbari](https://github.com/vitorbari)! - `zitadel plan` understands nested user-schema properties. A step naming a leaf
+  by its dotted path validates locally the way the server validates it, an
+  object- or array-typed property is reported as not collectable, and a required
+  object counts as covered when a step collects one of its leaves. Collecting into
+  an optional object brings its own `required` list into force, since the object
+  only exists in the document because one of its leaves was collected. A property
+  declaring `properties` or `items` without a `type` keyword is an object or an
+  array, and is reported the same way as one that spells its type out — including
+  when its `type` is the nullable union `["null", "object"]`.
+
+  Field names are matched against the schema's own properties only, so a step
+  naming an inherited member such as `toString` is reported as not a property in
+  the user schema instead of validating clean.
+
+- [#901](https://github.com/zitadel/nextgen/pull/901) [`433f81c`](https://github.com/zitadel/nextgen/commit/433f81cffc3e3e8499c555aa45b2a45aa557916f) Thanks [@vitorbari](https://github.com/vitorbari)! - User schemas can now declare `x-audit: true` on a property, allowlisting that
+  attribute's value for audit event payloads. Payloads stay deny-by-default:
+  without it, an attribute contributes its key but never its value.
+
+  `x-verify`, `x-editable`, `x-sensitive` and `x-mfa` are no longer part of the
+  dialect. Nothing read them. A schema that still carries one keeps validating,
+  since a property accepts annotations the dialect does not name, but they are no
+  longer documented or offered by editor completion.
+
+### Patch Changes
+
+- [#874](https://github.com/zitadel/nextgen/pull/874) [`c2888bd`](https://github.com/zitadel/nextgen/commit/c2888bdfd3c2a21fefd76a9b7fa80507d97cd88b) Thanks [@fforootd](https://github.com/fforootd)! - Branding asset URLs (`logo_url`, `hero_url`) may now use plain `http://` with canonical loopback hosts (`localhost`, dotted-decimal `127.0.0.0/8`, `[::1]`) so local development can serve login assets straight from the app's own dev server. The login component preserves those URLs only when it also runs on a loopback HTTP page; public pages and every other URL field remain HTTPS-only. The CLI plan, server save, editor, and component gates now enforce the same syntax and explain the carve-out when rejecting a URL.
+
+- [#886](https://github.com/zitadel/nextgen/pull/886) [`61a0eee`](https://github.com/zitadel/nextgen/commit/61a0eee0abb310a834d94b72a74f351035021be8) Thanks [@fforootd](https://github.com/fforootd)! - A branding asset URL that is well-formed but unreachable no longer fails
+  silently. `logo_url` / `hero_url` cleared every gate — the CLI's shape check
+  and the server's save gate — published a revision, and then rendered as a 0×0
+  `<img>`: no plan output, no apply output, no console error.
+
+  Three changes close that hole:
+  - `plan` and `apply` probe each asset URL (HEAD, 2.5s budget, in parallel) and
+    emit a non-blocking warning when it is unreachable, returns a non-2xx
+    status, or answers with something that is not an image. Advisory by design —
+    the machine planning is not necessarily the machine rendering the login
+    page — so it never fails a run. Set `ZITADEL_SKIP_ASSET_PROBE` to turn it
+    off (offline, air-gapped CI, a CDN that only resolves from production) and
+    `ZITADEL_ASSET_PROBE_TIMEOUT_MS` to retune the per-URL budget. Only public
+    HTTPS destinations are contacted and redirects are re-validated;
+    loopback/private/internal targets remain inconclusive rather than becoming
+    network requests from the machine running the plan.
+  - The login UI hides an asset that fails to load and restores either the split
+    designs' decorative placeholder or the shipped design's authored no-logo
+    content, so a broken asset degrades to the same result as no asset instead
+    of a blank pane or missing compact brand. Templates could not do this
+    themselves: they are DOMPurify-sanitised and inline `onerror` is stripped.
+  - Branding revisions can now carry plan warnings at all; previously only
+    create/update actions could, and branding is revisioned.
+
+  Two readability fixes ride along. A branding `plan` no longer dumps the whole
+  inlined Liquid template as one escaped line: an unchanged multi-line field
+  renders as `(<n> lines, sha256:…)` and a changed one as a real line diff. And
+  the branding dialect file scaffolded into `.zitadel/meta/` now spells its
+  command mentions the way the generated app can run them
+  (`npx @zitadel/cli@<version> apply`), matching the READMEs — the bare
+  `zitadel apply` in the editor tooltip named a command that does not exist
+  there.
+
+- [#872](https://github.com/zitadel/nextgen/pull/872) [`79f5ce1`](https://github.com/zitadel/nextgen/commit/79f5ce1db6b36baab85944a667072f1936880704) Thanks [@fforootd](https://github.com/fforootd)! - Scaffolded `.zitadel/**` READMEs now show runnable `npx @zitadel/cli@<version> …` commands instead of the bare `zitadel` command, which does not exist inside a generated app. The branding dialect now explains that `layout` is the degrade preset (`centered`/`split`), not the design name — switch designs with `branding eject --design`. The branding README shows exactly where `logo_url`/`hero_url` go (and that custom fonts aren't configurable there yet), and the setup summary surfaces the `.zitadel/` customization entry points (user schema, login flow, login template) and pairs the chosen design's wizard label with its slug (e.g. "Split (reversed)" → `split-right`) so you can confirm the selection applied.
+
+- [#856](https://github.com/zitadel/nextgen/pull/856) [`b17b2c9`](https://github.com/zitadel/nextgen/commit/b17b2c9fb3fae00f99a1864d37f3b51142ea4344) Thanks [@fforootd](https://github.com/fforootd)! - The package documentation now matches what the packages actually do. The Next and Nuxt guides drop the removed `api-base` attribute in favor of `configureZitadel()` and the `project` property; the Nuxt guide documents the Nuxt module (what `zitadel setup` wires) with its real options and the `useAuth()` / `useZitadelProject()` composables, alongside the hand-rolled middleware path with its full option set. `@zitadel/sdk-core` and `@zitadel/api` gain real documentation of their entry points, `@zitadel/config` gains a package README, and the SPA guides document the `ZitadelSession` card and point local no-proxy experiments at the local runtime's actual default port (8080). The flow-editing guide copied into `.zitadel/flows/` no longer suggests cross-flow `switch`/`pivot` transitions, which the runtime does not execute yet, and API examples use the real prefixed ID format (`proj_…`, `team_…`) instead of a retired naming scheme.
+
+- [#822](https://github.com/zitadel/nextgen/pull/822) [`41f6a0a`](https://github.com/zitadel/nextgen/commit/41f6a0a7c60e28a9adecfa9d72b964a305f7ba3d) Thanks [@vitorbari](https://github.com/vitorbari)! - Drop `position` from `x-auth-methods` entries; `enabled` is now the only key. The
+  user schema declares which authentication methods a user type supports.
+  Presentation concerns such as the order methods are offered in belong to the flow
+  engine, which takes them from the order of a step's actions in the flow
+  definition.
+
+  An auth-method entry now sets `additionalProperties: false`, matching the
+  enclosing `x-auth-methods` object, which already rejects unknown method keys. A
+  schema that still carries `position` fails validation instead of being accepted
+  with the field ignored.
+
+- [#829](https://github.com/zitadel/nextgen/pull/829) [`fc3d154`](https://github.com/zitadel/nextgen/commit/fc3d154f2fabb722c6f94633fd6c10bc60d0a657) Thanks [@fforootd](https://github.com/fforootd)! - Preserve purpose across in-card navigation: a flow transition can declare a
+  local `purpose` (`{"target": "register", "purpose": "register"}`), and taking
+  it moves the flow's dispatch mode while the original purpose stays pinned.
+  The default login flow (and the passkey-first preset) now ship visible
+  "Sign up" / "Sign in" navigations on their entry steps built on this —
+  previously the only in-card path to registration was submitting an unknown
+  email. Validators (server-side and `@zitadel/config`) enforce that the purpose
+  is one the definition serves, that the transition targets that purpose's entry
+  step, and that `purpose` never combines with the cross-flow `action`. Navigate
+  actions now also clear a pending passkey challenge, so an abandoned prompt
+  cannot re-attach after navigating away.
+
+  Existing scaffolded apps keep their local `.zitadel/flows/default-login.json`
+  unchanged (local config stays authoritative). To adopt the in-card
+  navigations, add the two navigate actions and their purposed transitions to
+  your flow file — or re-eject the default — then `zitadel plan` / `apply`.
+
+- [#784](https://github.com/zitadel/nextgen/pull/784) [`9ef7096`](https://github.com/zitadel/nextgen/commit/9ef709667f1a6f7bd5126491bf4039a34a43a792) Thanks [@vitorbari](https://github.com/vitorbari)! - Schema normalization descends into nested `properties` when comparing local
+  config against the platform. Spelling out a property default (`x-editable: true`,
+  `x-sensitive: false`, `x-mfa: false`), applying, then removing it is a no-op —
+  but on a nested property the comparison could not tell, so `plan` reported a
+  change on every run and `apply` republished a revision each time.
+
+  State hashes are computed over the normalized form, so a schema that spells out
+  a default on a nested property hashes differently than it did before. The first
+  `plan` after upgrading reports a revision for that schema with an empty field
+  diff, and `apply` publishes it and re-pins the flows that reference it. It
+  happens once — the new hash is stored and every later run is a skip. Schemas
+  without a spelled-out nested default are unaffected.
+
+- [#873](https://github.com/zitadel/nextgen/pull/873) [`37e9cb9`](https://github.com/zitadel/nextgen/commit/37e9cb903943d34eebadfb44457872892f296823) Thanks [@fforootd](https://github.com/fforootd)! - Split-family login designs now look intentional out of the box. The brand pane renders a token-gradient placeholder panel until `branding.json` names a `logo_url`/`hero_url`, so a fresh `split`/`split-right` eject reads as a split layout instead of a lonely off-centre card. The "Secured with Zitadel" attribution now aligns under the form column in split-family designs (it previously centred across both panes) and recentres when the layout collapses to a single column on narrow containers.
+
+- Updated dependencies [[`b17b2c9`](https://github.com/zitadel/nextgen/commit/b17b2c9fb3fae00f99a1864d37f3b51142ea4344), [`fc3d154`](https://github.com/zitadel/nextgen/commit/fc3d154f2fabb722c6f94633fd6c10bc60d0a657), [`e26f376`](https://github.com/zitadel/nextgen/commit/e26f37617f5d3a3f92f00c07aad89a98ee9d754f)]:
+  - @zitadel/api@0.1.0-alpha.19
+
 ## 0.1.0-alpha.18
 
 ### Minor Changes
