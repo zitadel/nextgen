@@ -72,7 +72,7 @@ func TestClaimService_Init(t *testing.T) {
 			name: "ok",
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements, captured **domain.ClaimChallenge) {
 				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
-				s.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(&domain.ResourceScope{ResourceID: "proj_1"}, nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 				s.EXPECT().CreateChallenge(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, entity *domain.ClaimChallenge) error {
 						*captured = entity
@@ -92,17 +92,6 @@ func TestClaimService_Init(t *testing.T) {
 			},
 		},
 		{
-			name: "missing scope row counts as unclaimed",
-			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements, captured **domain.ClaimChallenge) {
-				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
-				s.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
-				s.EXPECT().CreateChallenge(gomock.Any(), gomock.Any()).Return(nil)
-			},
-			check: func(t *testing.T, got *service.ClaimInitResult, _ *domain.ClaimChallenge) {
-				assert.NotEmpty(t, got.ChallengeID)
-			},
-		},
-		{
 			name: "project not found",
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements, _ **domain.ClaimChallenge) {
 				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
@@ -113,7 +102,7 @@ func TestClaimService_Init(t *testing.T) {
 			name: "already claimed",
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements, _ **domain.ClaimChallenge) {
 				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
-				s.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(&domain.ResourceScope{ResourceID: "proj_1", TeamID: &teamID}, nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: teamID}, nil)
 			},
 			wantErr: domain.ErrProjectAlreadyClaimed(),
 		},
@@ -121,7 +110,7 @@ func TestClaimService_Init(t *testing.T) {
 			name: "insert failure propagates",
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements, _ **domain.ClaimChallenge) {
 				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
-				s.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(&domain.ResourceScope{ResourceID: "proj_1"}, nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 				s.EXPECT().CreateChallenge(gomock.Any(), gomock.Any()).Return(errors.New("boom"))
 			},
 			wantErr: domain.ErrInternal(nil),
@@ -158,12 +147,11 @@ func TestClaimService_Status(t *testing.T) {
 	teamID := "team_1"
 	claimedAt := time.Date(2026, 8, 14, 12, 0, 0, 0, time.UTC)
 
-	completedGrantStmts := func(s *servicemocks.MockAllStatements, assignments []*domain.AuthzAssignment) {
-		s.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(&domain.ResourceScope{ResourceID: "proj_1", TeamID: &teamID}, nil)
-		s.EXPECT().ListAuthzAssignments(gomock.Any(), "proj_1", domain.AuthzPrincipalTypeTeam, teamID, false).Return(assignments, nil)
+	claimGrant := &domain.AuthzAssignment{
+		ObjectType: "project", Relation: "team",
+		PrincipalType: domain.AuthzPrincipalTypeTeam, PrincipalID: teamID,
+		CreatedAt: claimedAt,
 	}
-	claimGrant := &domain.AuthzAssignment{ObjectType: "project", Relation: "team", CreatedAt: claimedAt}
-	decoyGrant := &domain.AuthzAssignment{ObjectType: "project", Relation: "viewer", CreatedAt: claimedAt.Add(-time.Hour)}
 
 	tests := []struct {
 		name       string
@@ -217,7 +205,7 @@ func TestClaimService_Status(t *testing.T) {
 			secretHash: "secret_hash_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(completedClaimChallenge(future), nil)
-				completedGrantStmts(s, []*domain.AuthzAssignment{decoyGrant, claimGrant})
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(claimGrant, nil)
 			},
 			want: &service.ClaimStatusResult{
 				Status:       domain.ClaimChallengeStatusCompleted,
@@ -231,7 +219,7 @@ func TestClaimService_Status(t *testing.T) {
 			secretHash: "secret_hash_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(completedClaimChallenge(past), nil)
-				completedGrantStmts(s, []*domain.AuthzAssignment{claimGrant})
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(claimGrant, nil)
 			},
 			want: &service.ClaimStatusResult{
 				Status:       domain.ClaimChallengeStatusCompleted,
@@ -241,20 +229,11 @@ func TestClaimService_Status(t *testing.T) {
 			},
 		},
 		{
-			name:       "completed but scope has no team",
-			secretHash: "secret_hash_1",
-			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(completedClaimChallenge(future), nil)
-				s.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(&domain.ResourceScope{ResourceID: "proj_1"}, nil)
-			},
-			wantErr: domain.ErrInternal(nil),
-		},
-		{
 			name:       "completed but grant row missing",
 			secretHash: "secret_hash_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(completedClaimChallenge(future), nil)
-				completedGrantStmts(s, []*domain.AuthzAssignment{decoyGrant})
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrInternal(nil),
 		},
@@ -286,7 +265,7 @@ func TestClaimService_Complete(t *testing.T) {
 
 	unclaimedProjectStmts := func(s *servicemocks.MockAllStatements) {
 		s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
-		s.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(&domain.ResourceScope{ResourceID: "proj_1"}, nil)
+		s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 	}
 
 	tests := []struct {
@@ -316,15 +295,6 @@ func TestClaimService_Complete(t *testing.T) {
 						a.CreatedAt = claimedAt
 						return nil
 					})
-				s.EXPECT().UpsertResourceScope(gomock.Any(), gomock.Any()).DoAndReturn(
-					func(_ context.Context, scope *domain.ResourceScope) error {
-						assert.Equal(t, "proj_1", scope.ResourceID)
-						assert.Equal(t, domain.ResourceKindProject, scope.ResourceKind)
-						assert.Equal(t, "proj_1", scope.ProjectID)
-						require.NotNil(t, scope.TeamID)
-						assert.Equal(t, teamID, *scope.TeamID)
-						return nil
-					})
 			},
 			want: &service.ClaimCompleteResult{ProjectID: "proj_1", TeamID: teamID, ClaimedAt: claimedAt},
 		},
@@ -345,10 +315,9 @@ func TestClaimService_Complete(t *testing.T) {
 		{
 			name: "project claimed via another challenge",
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
-				otherTeam := "team_2"
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
 				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
-				s.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(&domain.ResourceScope{ResourceID: "proj_1", TeamID: &otherTeam}, nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: "team_2"}, nil)
 			},
 			wantErr:      domain.ErrProjectAlreadyClaimed(),
 			wantConflict: "team_2",
@@ -362,7 +331,7 @@ func TestClaimService_Complete(t *testing.T) {
 			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
 				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(completedClaimChallenge(past), nil)
 				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
-				s.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(&domain.ResourceScope{ResourceID: "proj_1", TeamID: &teamID}, nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: teamID}, nil)
 			},
 			wantErr:      domain.ErrProjectAlreadyClaimed(),
 			wantConflict: "team_1",
@@ -385,6 +354,25 @@ func TestClaimService_Complete(t *testing.T) {
 				s.EXPECT().MarkChallengeCompleted(gomock.Any(), "proj_1", claimTokenID).Return(database.NewNoRowFoundError(nil))
 			},
 			wantErr: domain.ErrProjectClaimExpired(),
+		},
+		{
+			// Two different pending challenges racing on one project: the loser's
+			// grant insert conflicts on authz_assignments_one_owning_team
+			// (ADR 054 §2) and Complete re-reads the winner for the 409 details.
+			name: "lost the cross-challenge race maps the unique violation to 409",
+			setupStmt: func(t *testing.T, s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetChallengeByID(gomock.Any(), "proj_1", claimTokenID).Return(pendingClaimChallenge(future), nil)
+				unclaimedProjectStmts(s)
+				s.EXPECT().GetPersonalTeamForUser(gomock.Any(), claimPlatformProjID, "usr_1").Return(&domain.Team{ID: teamID}, nil)
+				s.EXPECT().MarkChallengeCompleted(gomock.Any(), "proj_1", claimTokenID).Return(nil)
+				s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).
+					Return(database.NewUniqueError("authz_assignments", "authz_assignments_one_owning_team", nil))
+				// The post-transaction re-read sees the winner's grant.
+				s.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
+				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: "team_2"}, nil)
+			},
+			wantErr:      domain.ErrProjectAlreadyClaimed(),
+			wantConflict: "team_2",
 		},
 		{
 			name: "grant write failure propagates",

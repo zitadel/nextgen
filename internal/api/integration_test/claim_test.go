@@ -220,11 +220,11 @@ func TestClaimHappyPath(t *testing.T) {
 	assert.True(t, strings.HasSuffix(completedStatus.DashboardURL.Path, "/projects/"+project.ID),
 		completedStatus.DashboardURL.String())
 
-	// The claim's durable side effect: the project scope now carries the team.
-	scope, err := harness.EnsureServiceDB(t).Statements().GetResourceScope(t.Context(), project.ID)
+	// The claim's durable side effect: the active owning-team grant exists
+	// (the claim source of truth, ADR 046 / ADR 054 §2).
+	grant, err := harness.EnsureServiceDB(t).Statements().GetActiveOwningTeamGrant(t.Context(), project.ID)
 	require.NoError(t, err)
-	require.NotNil(t, scope.TeamID)
-	assert.Equal(t, team.ID, *scope.TeamID)
+	assert.Equal(t, team.ID, grant.PrincipalID)
 }
 
 // TestInitClaimAlreadyClaimed pins the exact 409 wire body on a raw request:
@@ -235,17 +235,17 @@ func TestInitClaimAlreadyClaimed(t *testing.T) {
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	// The claiming team lives in the platform project, like every real claim.
 	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
-		ProjectID: project.ID,
+		ProjectID: harness.EnsurePlatformProject(t).ID,
 		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 
-	// Claimed state exactly as Complete writes it: the project scope row
-	// carrying the owning team.
-	scope := domain.NewProjectResourceScope(project.ID)
-	scope.TeamID = &team.ID
-	require.NoError(t, harness.EnsureServiceDB(t).Statements().UpsertResourceScope(t.Context(), scope))
+	// Claimed state exactly as Complete writes it: the active owning-team
+	// grant, the claim source of truth (ADR 046 / ADR 054 §2).
+	require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(),
+		domain.NewClaimTeamAssignment(project.ID, team.ID)))
 
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
 		harness.EnsureTestServer(t).URL+"/projects/"+project.ID+"/claim/init", nil)
@@ -391,6 +391,66 @@ func TestCompleteClaimConcurrent(t *testing.T) {
 			winners++
 		case *api.ProjClaimExpired, *api.AlreadyClaimedResponse:
 			losers++
+		default:
+			t.Fatalf("unexpected complete result: %T %s", results[i], helpers.MustMarshal(t, results[i]))
+		}
+	}
+	assert.Equal(t, 1, winners, "exactly one concurrent complete must win")
+	assert.Equal(t, 1, losers)
+}
+
+// TestCompleteClaimCrossChallengeRace races two completes of two DIFFERENT
+// pending challenges on one project: exactly one wins and the loser gets the
+// 409 with the winning team, on both dialects. Postgres decides it at the
+// authz_assignments_one_owning_team unique index (ADR 054 §2); Spanner's
+// serializable read-write transaction aborts and replays the loser, which then
+// sees the winner's grant in the claimed-check.
+func TestCompleteClaimCrossChallengeRace(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+
+	initClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, initClient, project)
+	challenges := []api.ChallengeID{
+		mustInitClaim(t, initClient, project.ID).ChallengeID,
+		mustInitClaim(t, initClient, project.ID).ChallengeID,
+	}
+
+	userID := harness.CreateUserWithTeam(t, harness.EnsurePlatformProject(t).ID)
+	cookie := platformSessionCookie(t, userID)
+
+	results := make([]api.CompleteClaimRes, len(challenges))
+	errs := make([]error, len(challenges))
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for i := range challenges {
+		c, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		c.SetSessionToken(cookie.Value)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start // release together so the completes genuinely overlap
+			results[i], errs[i] = c.CompleteClaim(t.Context(),
+				&api.CompleteClaimRequest{ChallengeID: challenges[i]},
+				api.CompleteClaimParams{ProjectID: api.ProjectID(project.ID)})
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	var winners, losers int
+	for i := range results {
+		require.NoError(t, errs[i])
+		switch res := results[i].(type) {
+		case *api.CompleteClaimResponse:
+			winners++
+		case *api.AlreadyClaimedResponse:
+			losers++
+			assert.NotEmpty(t, res.Details.TeamID, "the 409 must name the winning team")
 		default:
 			t.Fatalf("unexpected complete result: %T %s", results[i], helpers.MustMarshal(t, results[i]))
 		}
