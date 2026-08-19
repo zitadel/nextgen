@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import type { InstanceHandle } from "./types";
+import type { InstanceHandle, PlatformCredentials } from "./types";
 
 /**
  * The handshake file carries an InstanceHandle across process boundaries:
@@ -58,5 +58,30 @@ function validateHandle(value: unknown, source: string): InstanceHandle {
   if (!URL.canParse(handle.baseUrl as string)) {
     throw new Error(`handshake file ${source} has a malformed "baseUrl": ${handle.baseUrl}`);
   }
+  if (handle.platform !== undefined) {
+    validatePlatform(handle.platform, source);
+  }
   return handle as InstanceHandle;
+}
+
+/**
+ * The handshake is the cross-process contract, so a malformed platform block
+ * must fail here with the field name, not later with a less actionable error.
+ */
+function validatePlatform(value: unknown, source: string): void {
+  const fail = (detail: string): never => {
+    throw new Error(`handshake file ${source} has a malformed "platform" block: ${detail}`);
+  };
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    fail("not an object");
+  }
+  const platform = value as Partial<PlatformCredentials>;
+  for (const field of ["projectId", "publishableKey"] as const) {
+    if (typeof platform[field] !== "string" || platform[field].length === 0) {
+      fail(`"${field}" is required`);
+    }
+  }
+  // Unknown extra fields pass through on purpose: future platform
+  // credentials join additively, and an older reader must not reject a
+  // newer producer's handle.
 }

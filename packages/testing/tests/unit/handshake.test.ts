@@ -53,6 +53,52 @@ describe("handshake", () => {
     expect(() => readHandshakeSync(path)).toThrow(/malformed "baseUrl"/);
   });
 
+  it("round-trips the platform credential slot", async () => {
+    const withPlatform: InstanceHandle = {
+      ...handle,
+      platform: {
+        projectId: "proj_platform",
+        publishableKey: "pk_proj_platform",
+      },
+    };
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
+    const path = join(dir, "handshake.json");
+    await writeHandshake(path, withPlatform);
+    expect(readHandshakeSync(path)).toEqual(withPlatform);
+  });
+
+  it("rejects a platform block without a projectId", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
+    const path = join(dir, "handshake.json");
+    await writeFile(
+      path,
+      JSON.stringify({ ...handle, platform: { publishableKey: "pk_proj_platform" } }),
+    );
+    expect(() => readHandshakeSync(path)).toThrow(/"projectId" is required/);
+  });
+
+  it("rejects a platform block without a publishableKey", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
+    const path = join(dir, "handshake.json");
+    await writeFile(path, JSON.stringify({ ...handle, platform: { projectId: "proj_platform" } }));
+    expect(() => readHandshakeSync(path)).toThrow(/"publishableKey" is required/);
+  });
+
+  it("passes unknown platform fields through (future credentials join additively)", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
+    const path = join(dir, "handshake.json");
+    const written = {
+      ...handle,
+      platform: {
+        projectId: "proj_platform",
+        publishableKey: "pk_proj_platform",
+        someFutureCredential: "opaque",
+      },
+    };
+    await writeFile(path, JSON.stringify(written));
+    expect(readHandshakeSync(path)).toEqual(written);
+  });
+
   it("waitForHandshake resolves once the file appears", async () => {
     const dir = await mkdtemp(join(tmpdir(), "zitadel-testing-handshake-"));
     const path = join(dir, "handshake.json");

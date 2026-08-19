@@ -1,12 +1,21 @@
 import type { InstanceHandle } from "./types";
 
 /**
+ * Handle fields a template may reference: the flat string facts. Structured
+ * fields (e.g. `platform`) are not env-var material — consumers read those
+ * from the handle directly.
+ */
+type StringHandleField = {
+  [K in keyof InstanceHandle]-?: InstanceHandle[K] extends string | undefined ? K : never;
+}[keyof InstanceHandle];
+
+/**
  * Declarative mapping from an app's env var names to InstanceHandle fields.
  * A template (not a function) so it can cross process boundaries: the
  * Playwright config serializes it into the app-runner's environment, where it
  * is applied to the handle read from the handshake file.
  */
-export type AppEnvTemplate = Record<string, keyof InstanceHandle>;
+export type AppEnvTemplate = Record<string, StringHandleField>;
 
 /**
  * The env shape `@zitadel/sdk-next` apps read. Other frameworks pass their own
