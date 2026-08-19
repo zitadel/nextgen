@@ -62,7 +62,7 @@ describe("normalizeSchemaBody", () => {
     const normalized = normalizeSchemaBody({
       objectType: "human-user",
       properties: {
-        email: { type: "string", "x-editable": true, "x-sensitive": false, "x-mfa": false },
+        email: { type: "string", "x-audit": false },
         givenName: { type: "string" },
       },
     });
@@ -82,10 +82,10 @@ describe("normalizeSchemaBody", () => {
       properties: {
         address: {
           type: "object",
-          "x-editable": true,
+          "x-audit": false,
           properties: {
-            street: { type: "string", "x-editable": true, "x-sensitive": false },
-            city: { type: "string", "x-sensitive": true },
+            street: { type: "string", "x-audit": false },
+            city: { type: "string", "x-audit": true },
           },
         },
       },
@@ -96,21 +96,24 @@ describe("normalizeSchemaBody", () => {
           type: "object",
           properties: {
             street: { type: "string" },
-            city: { type: "string", "x-sensitive": true },
+            city: { type: "string", "x-audit": true },
           },
         },
       },
     });
   });
 
-  it("keeps non-default values, including non-boolean x-mfa", () => {
+  it("keeps non-default values", () => {
     const body = {
       properties: {
-        email: { type: "string", "x-editable": false },
-        phone: { type: "string", "x-mfa": "sms" },
-        secret: { type: "string", "x-sensitive": true },
+        email: { type: "string", "x-audit": true },
       },
     };
+    expect(normalizeSchemaBody(body)).toEqual(body);
+  });
+
+  it("keeps native keywords the dialect declares no default for", () => {
+    const body = { properties: { secret: { type: "string", writeOnly: false } } };
     expect(normalizeSchemaBody(body)).toEqual(body);
   });
 
@@ -126,9 +129,9 @@ describe("normalizeSchemaBody", () => {
   });
 
   it("does not mutate its input and is idempotent", () => {
-    const body = { properties: { email: { type: "string", "x-editable": true } } };
+    const body = { properties: { email: { type: "string", "x-audit": false } } };
     const once = normalizeSchemaBody(body);
-    expect(body).toEqual({ properties: { email: { type: "string", "x-editable": true } } });
+    expect(body).toEqual({ properties: { email: { type: "string", "x-audit": false } } });
     expect(normalizeSchemaBody(once)).toEqual(once);
   });
 
@@ -140,7 +143,7 @@ describe("normalizeSchemaBody", () => {
       properties: {
         address: {
           type: "object",
-          properties: { street: { type: "string", "x-editable": true } },
+          properties: { street: { type: "string", "x-audit": false } },
         },
       },
     });

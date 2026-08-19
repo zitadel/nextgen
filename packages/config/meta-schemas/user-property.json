@@ -14,17 +14,6 @@
       "const": "https://json-schema.org/draft/2020-12/schema",
       "description": "The JSON Schema version used for this schema."
     },
-    "x-verify": {
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "The verification method for this property, if applicable"
-    },
     "x-unique": {
       "oneOf": [
         {
@@ -52,20 +41,10 @@
       ],
       "description": "The claim name for this property, if applicable"
     },
-    "x-editable": {
-      "type": "boolean",
-      "default": true,
-      "description": "Whether this property is editable by the user or not"
-    },
-    "x-sensitive": {
+    "x-audit": {
       "type": "boolean",
       "default": false,
-      "description": "Whether this property contains sensitive information or not"
-    },
-    "x-mfa": {
-      "type": "boolean",
-      "default": false,
-      "description": "Whether this property is used for multi-factor authentication or not"
+      "description": "Whether this property's value may appear in audit event payloads. Audit payloads are deny-by-default: a property without this annotation contributes its key but never its value."
     },
     "properties": {
       "type": "object",

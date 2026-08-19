@@ -65695,12 +65695,6 @@ func (s *UserProperty) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *UserProperty) encodeFields(e *jx.Encoder) {
 	{
-		if s.XMinusVerify.Set {
-			e.FieldStart("x-verify")
-			s.XMinusVerify.Encode(e)
-		}
-	}
-	{
 		if s.XMinusUnique.Set {
 			e.FieldStart("x-unique")
 			s.XMinusUnique.Encode(e)
@@ -65713,21 +65707,9 @@ func (s *UserProperty) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.XMinusEditable.Set {
-			e.FieldStart("x-editable")
-			s.XMinusEditable.Encode(e)
-		}
-	}
-	{
-		if s.XMinusSensitive.Set {
-			e.FieldStart("x-sensitive")
-			s.XMinusSensitive.Encode(e)
-		}
-	}
-	{
-		if s.XMinusMfa.Set {
-			e.FieldStart("x-mfa")
-			s.XMinusMfa.Encode(e)
+		if s.XMinusAudit.Set {
+			e.FieldStart("x-audit")
+			s.XMinusAudit.Encode(e)
 		}
 	}
 	{
@@ -65745,14 +65727,11 @@ func (s *UserProperty) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfUserProperty = [7]string{
-	0: "x-verify",
-	1: "x-unique",
-	2: "x-claim",
-	3: "x-editable",
-	4: "x-sensitive",
-	5: "x-mfa",
-	6: "properties",
+var jsonFieldsNameOfUserProperty = [4]string{
+	0: "x-unique",
+	1: "x-claim",
+	2: "x-audit",
+	3: "properties",
 }
 
 // Decode decodes UserProperty from json.
@@ -65765,16 +65744,6 @@ func (s *UserProperty) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "x-verify":
-			if err := func() error {
-				s.XMinusVerify.Reset()
-				if err := s.XMinusVerify.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"x-verify\"")
-			}
 		case "x-unique":
 			if err := func() error {
 				s.XMinusUnique.Reset()
@@ -65795,35 +65764,15 @@ func (s *UserProperty) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"x-claim\"")
 			}
-		case "x-editable":
+		case "x-audit":
 			if err := func() error {
-				s.XMinusEditable.Reset()
-				if err := s.XMinusEditable.Decode(d); err != nil {
+				s.XMinusAudit.Reset()
+				if err := s.XMinusAudit.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"x-editable\"")
-			}
-		case "x-sensitive":
-			if err := func() error {
-				s.XMinusSensitive.Reset()
-				if err := s.XMinusSensitive.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"x-sensitive\"")
-			}
-		case "x-mfa":
-			if err := func() error {
-				s.XMinusMfa.Reset()
-				if err := s.XMinusMfa.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"x-mfa\"")
+				return errors.Wrap(err, "decode field \"x-audit\"")
 			}
 		case "properties":
 			if err := func() error {

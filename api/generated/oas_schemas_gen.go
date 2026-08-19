@@ -41470,29 +41470,24 @@ func (s *UserPermissionDeniedDetails) init() UserPermissionDeniedDetails {
 
 // This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`.
 // This is done because a lot of code generators cannot handle that.
+// Native JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`
+// are accepted without being listed below. `writeOnly: true` is reserved for a
+// value that may be written but is never returned by the read API; nothing
+// enforces it today, so responses still include write-only properties.
 // Ref: #
 type UserProperty struct {
-	// The verification method for this property, if applicable.
-	XMinusVerify OptNilString `json:"x-verify"`
 	// The level of uniqueness for this property, if applicable.
 	XMinusUnique OptNilUserPropertyXMinusUnique `json:"x-unique"`
 	// The claim name for this property, if applicable.
 	XMinusClaim OptNilString `json:"x-claim"`
-	// Whether this property is editable by the user or not.
-	XMinusEditable OptBool `json:"x-editable"`
-	// Whether this property contains sensitive information or not.
-	XMinusSensitive OptBool `json:"x-sensitive"`
-	// Whether this property is used for multi-factor authentication or not.
-	XMinusMfa OptBool `json:"x-mfa"`
+	// Whether this property's value may appear in audit event payloads. Audit
+	// payloads are deny-by-default: a property without this annotation
+	// contributes its key but never its value.
+	XMinusAudit OptBool `json:"x-audit"`
 	// A map of additional properties for the user definition, where the key is
 	// the property name and the value is the property schema.
 	Properties      OptUserPropertyProperties `json:"properties"`
 	AdditionalProps UserPropertyAdditional
-}
-
-// GetXMinusVerify returns the value of XMinusVerify.
-func (s *UserProperty) GetXMinusVerify() OptNilString {
-	return s.XMinusVerify
 }
 
 // GetXMinusUnique returns the value of XMinusUnique.
@@ -41505,19 +41500,9 @@ func (s *UserProperty) GetXMinusClaim() OptNilString {
 	return s.XMinusClaim
 }
 
-// GetXMinusEditable returns the value of XMinusEditable.
-func (s *UserProperty) GetXMinusEditable() OptBool {
-	return s.XMinusEditable
-}
-
-// GetXMinusSensitive returns the value of XMinusSensitive.
-func (s *UserProperty) GetXMinusSensitive() OptBool {
-	return s.XMinusSensitive
-}
-
-// GetXMinusMfa returns the value of XMinusMfa.
-func (s *UserProperty) GetXMinusMfa() OptBool {
-	return s.XMinusMfa
+// GetXMinusAudit returns the value of XMinusAudit.
+func (s *UserProperty) GetXMinusAudit() OptBool {
+	return s.XMinusAudit
 }
 
 // GetProperties returns the value of Properties.
@@ -41530,11 +41515,6 @@ func (s *UserProperty) GetAdditionalProps() UserPropertyAdditional {
 	return s.AdditionalProps
 }
 
-// SetXMinusVerify sets the value of XMinusVerify.
-func (s *UserProperty) SetXMinusVerify(val OptNilString) {
-	s.XMinusVerify = val
-}
-
 // SetXMinusUnique sets the value of XMinusUnique.
 func (s *UserProperty) SetXMinusUnique(val OptNilUserPropertyXMinusUnique) {
 	s.XMinusUnique = val
@@ -41545,19 +41525,9 @@ func (s *UserProperty) SetXMinusClaim(val OptNilString) {
 	s.XMinusClaim = val
 }
 
-// SetXMinusEditable sets the value of XMinusEditable.
-func (s *UserProperty) SetXMinusEditable(val OptBool) {
-	s.XMinusEditable = val
-}
-
-// SetXMinusSensitive sets the value of XMinusSensitive.
-func (s *UserProperty) SetXMinusSensitive(val OptBool) {
-	s.XMinusSensitive = val
-}
-
-// SetXMinusMfa sets the value of XMinusMfa.
-func (s *UserProperty) SetXMinusMfa(val OptBool) {
-	s.XMinusMfa = val
+// SetXMinusAudit sets the value of XMinusAudit.
+func (s *UserProperty) SetXMinusAudit(val OptBool) {
+	s.XMinusAudit = val
 }
 
 // SetProperties sets the value of Properties.
