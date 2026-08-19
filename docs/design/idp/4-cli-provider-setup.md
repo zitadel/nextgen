@@ -392,6 +392,9 @@ If a selected provider is specified without a Client ID, setup halts prior to re
 ```json
 {
   "status": "error",
+  "cli_version": "0.1.0-alpha.19",
+  "command": "setup",
+  "source": "https://api.zitadel.cloud",
   "code": "E_VALIDATION",
   "message": "google sign-in needs an OAuth client id",
   "hint": "Create the OAuth application at https://console.cloud.google.com/apis/credentials with callback URI http://localhost:3000/__nextgen/idp/callback, then pass --google-client-id.",

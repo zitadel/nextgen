@@ -109,6 +109,9 @@ Error envelopes carry `status: "error"` and a non-zero exit; inconclusive is dis
 // test sign-in failure envelope
 {
   "status": "error",
+  "cli_version": "0.1.0-alpha.19",
+  "command": "test:sign-in",
+  "source": "https://api.zitadel.cloud",
   "code": "E_TEST_FAILED",
   "message": "google sign-in failed during provider authentication",
   "hint": "The token endpoint rejected the client (invalid_client). Check GOOGLE_CLIENT_SECRET in .env.local, then rerun the test.",

@@ -1,7 +1,7 @@
 # Identity Providers
 
 This document contains planning notes for [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851) —
-"Enable social login with Google and Github": letting developers enable social sign-in from the
+"Enable social login with Google and GitHub": letting developers enable social sign-in from the
 CLI and guiding them through the provider setup it requires.
 
 **Status:** design discussion, nothing implemented. There is no IdP server contract

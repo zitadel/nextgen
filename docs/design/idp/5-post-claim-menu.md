@@ -80,6 +80,9 @@ The `menu` command evaluates local project state and falls back to help if the m
 
 ```json
 {
+  "cli_version": "0.1.0-alpha.19",
+  "command": "menu",
+  "source": "https://api.zitadel.cloud",
   "status": "skipped",
   "reason": "non-interactive",
   "data": {

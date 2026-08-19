@@ -2,7 +2,7 @@
 
 > **Status:** Planning notes
 >
-> **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851), "Enable social login with Google and Github"
+> **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851), "Enable social login with Google and GitHub"
 >
 > **Area:** 7 of 9 (see [`README.md`](README.md))
 
