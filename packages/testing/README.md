@@ -245,9 +245,8 @@ above.
 
 The kit's boot contract is the sanctioned way tests and dev loops obtain
 credentials: they come from the boot contract, never from a seed default —
-the rule root ADR 052 §9 sets (landing with the cross-project-access ADRs,
-PR #876). The kit owns the
-server process and its database, captures each credential from provisioning
+the rule root ADR 053 §9 sets. The kit owns the server process and its
+database, captures each credential from provisioning
 output at the moment the server mints it, and exposes it predictably on
 `handle`:
 
@@ -269,9 +268,11 @@ What this rules out, deliberately: there is no server `--test-mode`, no
 seed-document credential flag, and no other server-side door that mints
 deterministic credentials — and none may be added. The production seed
 contract stays credential-free; predictable test access is this kit's job,
-done entirely with what provisioning already returns (or, in-repo, with the
-kit's own storage access). If a credential the kit needs is not capturable at
-provisioning time, the fix is in the kit's boot path, never a server flag.
+done entirely with what provisioning already returns. If a credential the
+kit needs is not capturable at provisioning time, the fix is to extend the
+provisioning contract the boot path drives — never a server flag, and never
+direct database writes, which would bypass the provisioner and break seed
+ops for `connectZitadel` targets.
 
 The in-repo dev loop follows the same contract: `moon run console:dev-real`
 boots, seeds, and threads `handle.projectSecret` into the console dev proxy's

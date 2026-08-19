@@ -2,11 +2,11 @@ import type { ZitadelClient } from "@zitadel/api/client";
 
 /**
  * Credentials of the reserved platform project, captured by the kit at
- * provisioning time. The shape follows the direction settled in PR #876's
- * review (root ADR 052 §9 and Console ADR 0004 §2 — both still Proposed
- * there): bootstrap mints **no platform project secret** — the publishable
- * key is the only default credential, and test infrastructure gets its
- * credentials from the testkit's boot contract, not from seed defaults.
+ * provisioning time. The shape follows root ADR 053 §9 and Console ADR 0004
+ * §2 (both Proposed): bootstrap mints **no platform project secret** — the
+ * publishable key is the only default credential, and test infrastructure
+ * gets its credentials from the testkit's boot contract, not from seed
+ * defaults.
  *
  * Stub today: the server's platform-project provisioner does not exist yet,
  * so `startLocalZitadel` never populates this field. Only the fields §9

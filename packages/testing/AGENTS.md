@@ -99,30 +99,35 @@ fact changes:
   If a kit helper needs a shape the definition does not declare, the
   definition changes first (same rule as `packages/api-mock`).
 
-## Credential contract (root ADR 052 §9)
+## Credential contract (root ADR 053 §9)
 
 Predictable test/dev credentials are a property of **this kit**, never of the
 server or the production seed contract. The kit boots the process and applies
 seeds, so it captures credentials from provisioning output (`POST /projects`
 returns `project_secret` exactly once) and exposes them on `InstanceHandle`:
 `projectSecret` today; the `platform` slot (`PlatformCredentials` — reserved
-project id + publishable key, the pair the proposal itself guarantees) once
-the platform-project provisioner lands. Root ADR 052 §9 (Proposed, lands
-with PR #876) sets the rule: test infrastructure gets its credentials from
-the testkit's boot contract, not from seed defaults — paraphrased here on
-purpose; §9's exact sentence lives in the ADR, so a reword there doesn't
-strand this file. Console ADR 0004 §2 names the testkit as the bootstrap
-transport test and dev infrastructure use. Until #876 is accepted, treat
-the slot as tracking that proposal — it is inert, so a wording shift there
-moves this shape, not shipped behavior.
+project id + publishable key, the pair the ADR itself guarantees) once the
+platform-project provisioner lands. Root
+[ADR 053 §9](../../docs/adrs/053-cross-project-principals.md) (Proposed)
+sets the rule: test infrastructure gets its credentials from the testkit's
+boot contract, not from seed defaults — paraphrased here on purpose; §9's
+exact sentence lives in the ADR, so a reword there doesn't strand this file.
+[Console ADR 0004 §2](../../apps/console/docs/adrs/0004-console-deployment-modes.md)
+names the testkit as the bootstrap transport test and dev infrastructure
+use. While the ADR remains Proposed, treat the slot as tracking it — the
+slot is inert, so a change there moves this shape, not shipped behavior.
 
 Consequences for changes here:
 
 - Never add — or lean on — a server `--test-mode` flag, a seed-default
   credential, or any other server-side door that mints deterministic
   credentials. If the kit cannot capture a credential at provisioning time,
-  fix the kit's boot path (which may also write through its existing storage
-  access), not the server surface.
+  extend the provisioning contract the boot path drives (Console ADR 0004 §2
+  makes the testkit a transport of that seed input) — not the server
+  surface, and not direct database writes: the kit has no storage boundary
+  (it shells out to the CLI and provisions over HTTP), raw writes would
+  bypass the full provisioner, and seed ops must stay meaningful for
+  `connectZitadel` targets (see the Don't list).
 - New credentials extend `InstanceHandle` — the `platform` slot is the
   contract point; don't invent a parallel channel. The handle must stay
   serializable: it crosses process boundaries via the handshake file, and

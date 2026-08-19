@@ -18,7 +18,7 @@
  *                              it agrees with the secret above
  *
  * All three come from the boot-captured instance handle — the testkit's boot
- * contract is the sanctioned credential source (root ADR 052 §9, PR #876):
+ * contract is the sanctioned credential source (root ADR 053 §9):
  * the kit captures the secret from `POST /projects` provisioning output, so
  * nothing here is a developer-remembered variable and there is no server-side
  * test door to lean on. `--seed-only` prints the same three variables for a
