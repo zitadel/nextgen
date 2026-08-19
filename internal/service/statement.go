@@ -349,10 +349,6 @@ type ResourceScopeStatements interface {
 	GetResourceScopeByIDInProject(ctx context.Context, projectID, resourceID string) (*domain.ResourceScope, error)
 	ExistsResourceScopeElsewhere(ctx context.Context, kind domain.ResourceKind, resourceID, excludeProjectID string) (bool, error)
 	DeleteResourceScope(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) error
-	// ListClaimedProjectIDs returns project ids whose resource_scope_index
-	// row has team_id set (ADR 049 export visibility), ordered by project_id
-	// after afterID (empty starts at the beginning).
-	ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error)
 }
 
 // AuthzAssignmentStatements persists grants (principal → catalog relation at a scope).
@@ -365,6 +361,16 @@ type AuthzAssignmentStatements interface {
 	GetAuthzAssignment(ctx context.Context, projectID, id string) (*domain.AuthzAssignment, error)
 	ListAuthzAssignments(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string, includeRevoked bool) ([]*domain.AuthzAssignment, error)
 	RevokeAuthzAssignment(ctx context.Context, projectID, id string) error
+	// GetActiveOwningTeamGrant returns the project's active owning-team grant
+	// (object project, relation team) or NoRowFoundError when the project is
+	// unclaimed. The unique active grant is the claim source of truth
+	// (ADR 046 / ADR 054 §2); at most one active row exists per project,
+	// enforced by authz_assignments_one_owning_team.
+	GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error)
+	// ListClaimedProjectIDs returns project ids holding an active owning-team
+	// grant (ADR 049 export visibility), ordered by project_id after afterID
+	// (empty starts at the beginning).
+	ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error)
 }
 
 // AuthzMembershipEdgeStatements persists the authz projection of set membership.

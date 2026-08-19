@@ -242,3 +242,55 @@ func TestClaimStatements_GetPersonalTeamForUser(t *testing.T) {
 		})
 	})
 }
+
+// TestClaimStatements_OwningTeamGrant pins the claim source of truth
+// (ADR 046 / ADR 054 §2): the active owning-team grant answers claimed-ness,
+// export visibility lists it, and the DB keeps it unique per project on every
+// dialect (partial index on Postgres/SQLite, NULL_FILTERED owning_team_key
+// index on Spanner).
+func TestClaimStatements_OwningTeamGrant(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		t.Run("grant round-trip and revoke", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+
+			_, err := d.stmts.GetActiveOwningTeamGrant(t.Context(), projectID)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError), "unclaimed project has no grant")
+
+			teamID := "team-own-" + uniqueSuffix(t)
+			asgn := domain.NewClaimTeamAssignment(projectID, teamID)
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), asgn))
+
+			grant, err := d.stmts.GetActiveOwningTeamGrant(t.Context(), projectID)
+			require.NoError(t, err)
+			assert.Equal(t, teamID, grant.PrincipalID)
+			assert.Equal(t, domain.AuthzPrincipalTypeTeam, grant.PrincipalType)
+
+			require.NoError(t, d.stmts.RevokeAuthzAssignment(t.Context(), projectID, asgn.ID))
+			_, err = d.stmts.GetActiveOwningTeamGrant(t.Context(), projectID)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError), "revoked grant no longer claims")
+		})
+
+		t.Run("one active owning team per project", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+				domain.NewClaimTeamAssignment(projectID, "team-a-"+uniqueSuffix(t))))
+
+			err := d.stmts.CreateAuthzAssignment(t.Context(),
+				domain.NewClaimTeamAssignment(projectID, "team-b-"+uniqueSuffix(t)))
+			assert.ErrorIs(t, err, new(database.UniqueError),
+				"a second active owning-team grant must conflict (ADR 054 §2)")
+		})
+
+		t.Run("list claimed project ids", func(t *testing.T) {
+			claimed := ensureProject(t, d.stmts)
+			unclaimed := ensureProject(t, d.stmts)
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+				domain.NewClaimTeamAssignment(claimed, "team-claim-"+uniqueSuffix(t))))
+
+			ids, err := d.stmts.ListClaimedProjectIDs(t.Context(), "", 500)
+			require.NoError(t, err)
+			assert.Contains(t, ids, claimed)
+			assert.NotContains(t, ids, unclaimed)
+		})
+	})
+}
