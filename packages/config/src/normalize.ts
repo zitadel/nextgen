@@ -80,14 +80,25 @@ export function normalizeFlowBody(body: object): object {
  * defaults stripped: a property carrying `"x-editable": true` (or the
  * other {@link USER_PROPERTY_DEFAULTS}) normalizes to one omitting it.
  * Only exact default values are removed; `$id` and every other field
- * pass through untouched.
+ * pass through untouched. Nested `properties` are descended into, so a
+ * leaf of an object property normalizes the same way a top-level one does.
  */
 export function normalizeSchemaBody(body: object): object {
   const result = structuredClone(body) as Record<string, unknown>;
-  if (!isPlainObject(result.properties)) {
-    return result;
+  stripPropertyDefaults(result);
+  return result;
+}
+
+/**
+ * Strip {@link USER_PROPERTY_DEFAULTS} from every property of an object
+ * schema, descending into nested `properties` so a leaf of an object
+ * property normalizes the same way a top-level one does.
+ */
+function stripPropertyDefaults(schema: Record<string, unknown>): void {
+  if (!isPlainObject(schema.properties)) {
+    return;
   }
-  for (const property of Object.values(result.properties)) {
+  for (const property of Object.values(schema.properties)) {
     if (!isPlainObject(property)) {
       continue;
     }
@@ -96,6 +107,6 @@ export function normalizeSchemaBody(body: object): object {
         delete property[key];
       }
     }
+    stripPropertyDefaults(property);
   }
-  return result;
 }
