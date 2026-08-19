@@ -187,13 +187,8 @@ type ResourceScope struct {
 	ResourceKind ResourceKind
 	ProjectID    string
 	TeamID       *string
-	// TeamProjectID is the project the referenced team lives in; it backs the
-	// teams FK and is always set together with TeamID. For every kind except
-	// project it equals ProjectID (DB CHECK); a claimed project's row points at
-	// the claiming team's home project (the platform project, ADR 046).
-	TeamProjectID *string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 func NewProjectResourceScope(projectID string) *ResourceScope {
@@ -205,23 +200,13 @@ func NewProjectResourceScope(projectID string) *ResourceScope {
 }
 
 func NewTeamResourceScope(projectID, teamID string) *ResourceScope {
-	scope := &ResourceScope{
+	id := teamID
+	return &ResourceScope{
 		ResourceID:   teamID,
 		ResourceKind: ResourceKindTeam,
 		ProjectID:    projectID,
+		TeamID:       &id,
 	}
-	scope.ScopeToTeam(projectID, teamID)
-	return scope
-}
-
-// ScopeToTeam sets the row's team reference as the complete FK pair
-// (team_id, team_project_id) — the DB CHECK rejects one without the other.
-// teamProjectID is the team's home project: equal to the row's ProjectID for
-// every kind except project, where claim points a claimed project at a
-// platform-project team (ADR 046).
-func (s *ResourceScope) ScopeToTeam(teamProjectID, teamID string) {
-	s.TeamID = &teamID
-	s.TeamProjectID = &teamProjectID
 }
 
 // NewResourceScope builds a project-scoped RSI row (no team).

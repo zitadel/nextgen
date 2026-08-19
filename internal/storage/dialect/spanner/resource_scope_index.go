@@ -13,21 +13,20 @@ const (
 	resourceScopeIndexTable = "resource_scope_index"
 
 	upsertResourceScopeStmt = `
-INSERT INTO resource_scope_index (resource_id, resource_kind, project_id, team_id, team_project_id)
-VALUES (@p1, @p2, @p3, @p4, @p5)
+INSERT INTO resource_scope_index (resource_id, resource_kind, project_id, team_id)
+VALUES (@p1, @p2, @p3, @p4)
 ON CONFLICT (resource_kind, project_id, resource_id) DO UPDATE SET
     team_id = EXCLUDED.team_id,
-    team_project_id = EXCLUDED.team_project_id,
     updated_at = CURRENT_TIMESTAMP()
-THEN RETURN resource_id, resource_kind, project_id, team_id, team_project_id, created_at, updated_at`
+THEN RETURN resource_id, resource_kind, project_id, team_id, created_at, updated_at`
 
 	getResourceScopeStmt = `
-SELECT resource_id, resource_kind, project_id, team_id, team_project_id, created_at, updated_at
+SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
 FROM resource_scope_index
 WHERE resource_id = @p1`
 
 	getResourceScopeByIDInProjectStmt = `
-SELECT resource_id, resource_kind, project_id, team_id, team_project_id, created_at, updated_at
+SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
 FROM resource_scope_index
 WHERE project_id = @p1 AND resource_id = @p2`
 
@@ -49,7 +48,7 @@ LIMIT @p3`
 )
 
 var resourceScopeColumns = []string{
-	"resource_id", "resource_kind", "project_id", "team_id", "team_project_id", "created_at", "updated_at",
+	"resource_id", "resource_kind", "project_id", "team_id", "created_at", "updated_at",
 }
 
 type resourceScopeStatements struct{ statement }
@@ -65,7 +64,7 @@ func newResourceScopeStatements(db queryExecutor) resourceScopeStatements {
 // UpsertResourceScope implements [service.ResourceScopeStatements].
 func (s resourceScopeStatements) UpsertResourceScope(ctx context.Context, scope *domain.ResourceScope) error {
 	stmt := buildStatement(upsertResourceScopeStmt,
-		scope.ResourceID, scope.ResourceKind.String(), scope.ProjectID, spannerNullString(scope.TeamID), spannerNullString(scope.TeamProjectID),
+		scope.ResourceID, scope.ResourceKind.String(), scope.ProjectID, spannerNullString(scope.TeamID),
 	).statement()
 	return s.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		updated, err := collectOneRow(iter, scanResourceScope)
@@ -169,7 +168,7 @@ func scanResourceScope(row *spanner.Row) (*domain.ResourceScope, error) {
 	scope := new(domain.ResourceScope)
 	if err := row.Columns(
 		&scope.ResourceID, &scope.ResourceKind, &scope.ProjectID, &scope.TeamID,
-		&scope.TeamProjectID, &scope.CreatedAt, &scope.UpdatedAt,
+		&scope.CreatedAt, &scope.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}

@@ -121,12 +121,12 @@ func TestAuthzSKTeam_NonUserResourceCheckListParity(t *testing.T) {
 
 		brandIn := "brand_sk_in_" + uniqueSuffix(t)
 		brandOut := "brand_sk_out_" + uniqueSuffix(t)
-		scopeIn := &domain.ResourceScope{ResourceID: brandIn, ResourceKind: domain.ResourceKindBranding, ProjectID: projectID}
-		scopeIn.ScopeToTeam(projectID, teamIn)
-		require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), scopeIn))
-		scopeOut := &domain.ResourceScope{ResourceID: brandOut, ResourceKind: domain.ResourceKindBranding, ProjectID: projectID}
-		scopeOut.ScopeToTeam(projectID, teamOut)
-		require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), scopeOut))
+		require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), &domain.ResourceScope{
+			ResourceID: brandIn, ResourceKind: domain.ResourceKindBranding, ProjectID: projectID, TeamID: &teamIn,
+		}))
+		require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), &domain.ResourceScope{
+			ResourceID: brandOut, ResourceKind: domain.ResourceKindBranding, ProjectID: projectID, TeamID: &teamOut,
+		}))
 
 		sk := "sk_team_" + uniqueSuffix(t)
 		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),

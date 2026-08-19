@@ -230,9 +230,7 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 			return err
 		}
 		scope := domain.NewProjectResourceScope(projectID)
-		// The claiming team lives in the platform project, not the claimed one;
-		// the RSI FK routes through the team's home project (ADR 046).
-		scope.ScopeToTeam(team.ProjectID, team.ID)
+		scope.TeamID = &team.ID
 		if err := stmts.UpsertResourceScope(ctx, scope); err != nil {
 			return err
 		}

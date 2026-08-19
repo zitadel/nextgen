@@ -10,26 +10,25 @@ import (
 
 const (
 	upsertResourceScopeStmt = `
-INSERT INTO resource_scope_index (resource_id, resource_kind, project_id, team_id, team_project_id, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?)
+INSERT INTO resource_scope_index (resource_id, resource_kind, project_id, team_id, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?)
 ON CONFLICT (resource_kind, project_id, resource_id) DO UPDATE SET
     team_id = excluded.team_id,
-    team_project_id = excluded.team_project_id,
     updated_at = excluded.updated_at
-RETURNING resource_id, resource_kind, project_id, team_id, team_project_id, created_at, updated_at`
+RETURNING resource_id, resource_kind, project_id, team_id, created_at, updated_at`
 
 	getResourceScopeStmt = `
-SELECT resource_id, resource_kind, project_id, team_id, team_project_id, created_at, updated_at
+SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
 FROM resource_scope_index
 WHERE resource_id = ?`
 
 	getResourceScopeInProjectStmt = `
-SELECT resource_id, resource_kind, project_id, team_id, team_project_id, created_at, updated_at
+SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
 FROM resource_scope_index
 WHERE resource_kind = ? AND project_id = ? AND resource_id = ?`
 
 	getResourceScopeByIDInProjectStmt = `
-SELECT resource_id, resource_kind, project_id, team_id, team_project_id, created_at, updated_at
+SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
 FROM resource_scope_index
 WHERE project_id = ? AND resource_id = ?`
 
@@ -61,8 +60,8 @@ func (s resourceScopeStatements) UpsertResourceScope(ctx context.Context, scope 
 	now := nowUnixNano()
 	var createdNano, updatedNano int64
 	err := s.client.QueryRow(ctx, upsertResourceScopeStmt,
-		scope.ResourceID, scope.ResourceKind.String(), scope.ProjectID, scope.TeamID, scope.TeamProjectID, now, now,
-	).Scan(&scope.ResourceID, &scope.ResourceKind, &scope.ProjectID, &scope.TeamID, &scope.TeamProjectID, &createdNano, &updatedNano)
+		scope.ResourceID, scope.ResourceKind.String(), scope.ProjectID, scope.TeamID, now, now,
+	).Scan(&scope.ResourceID, &scope.ResourceKind, &scope.ProjectID, &scope.TeamID, &createdNano, &updatedNano)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -157,7 +156,7 @@ func scanResourceScope(rows *sql.Rows) (*domain.ResourceScope, error) {
 	var createdNano, updatedNano int64
 	if err := rows.Scan(
 		&scope.ResourceID, &scope.ResourceKind, &scope.ProjectID, &scope.TeamID,
-		&scope.TeamProjectID, &createdNano, &updatedNano,
+		&createdNano, &updatedNano,
 	); err != nil {
 		return nil, err
 	}

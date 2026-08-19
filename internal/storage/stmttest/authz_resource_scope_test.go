@@ -57,13 +57,12 @@ func TestResourceScopeStatements_UpsertGetDelete(t *testing.T) {
 			unclaimed := ensureProject(t, d.stmts)
 			teamID := "team-claim-" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(claimed, teamID)))
-			claimedScope := &domain.ResourceScope{
+			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), &domain.ResourceScope{
 				ResourceID:   claimed,
 				ResourceKind: domain.ResourceKindProject,
 				ProjectID:    claimed,
-			}
-			claimedScope.ScopeToTeam(claimed, teamID)
-			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), claimedScope))
+				TeamID:       &teamID,
+			}))
 
 			ids, err := d.stmts.ListClaimedProjectIDs(t.Context(), "", 500)
 			require.NoError(t, err)

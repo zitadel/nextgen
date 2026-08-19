@@ -38,7 +38,8 @@ func TestAuthzResolver_OracleAgreement(t *testing.T) {
 		for i, u := range users {
 			scope := domain.NewUserResourceScope(projectID, u)
 			if i%2 == 1 {
-				scope.ScopeToTeam(projectID, teamA)
+				tid := teamA
+				scope.TeamID = &tid
 			}
 			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), scope))
 			resources = append(resources, scope)

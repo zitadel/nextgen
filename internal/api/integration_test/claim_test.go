@@ -235,17 +235,16 @@ func TestInitClaimAlreadyClaimed(t *testing.T) {
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	// The claiming team lives in the platform project, like every real claim.
 	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
-		ProjectID: harness.EnsurePlatformProject(t).ID,
+		ProjectID: project.ID,
 		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
 
 	// Claimed state exactly as Complete writes it: the project scope row
-	// carrying the owning team and its home project.
+	// carrying the owning team.
 	scope := domain.NewProjectResourceScope(project.ID)
-	scope.ScopeToTeam(team.ProjectID, team.ID)
+	scope.TeamID = &team.ID
 	require.NoError(t, harness.EnsureServiceDB(t).Statements().UpsertResourceScope(t.Context(), scope))
 
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,

@@ -11,26 +11,25 @@ import (
 
 const (
 	upsertResourceScopeStmt = `
-INSERT INTO zitadel_nextgen.resource_scope_index (resource_id, resource_kind, project_id, team_id, team_project_id)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO zitadel_nextgen.resource_scope_index (resource_id, resource_kind, project_id, team_id)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT (resource_kind, project_id, resource_id) DO UPDATE SET
     team_id = EXCLUDED.team_id,
-    team_project_id = EXCLUDED.team_project_id,
     updated_at = now()
-RETURNING resource_id, resource_kind, project_id, team_id, team_project_id, created_at, updated_at`
+RETURNING resource_id, resource_kind, project_id, team_id, created_at, updated_at`
 
 	getResourceScopeStmt = `
-SELECT resource_id, resource_kind, project_id, team_id, team_project_id, created_at, updated_at
+SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
 FROM zitadel_nextgen.resource_scope_index
 WHERE resource_id = $1`
 
 	getResourceScopeInProjectStmt = `
-SELECT resource_id, resource_kind, project_id, team_id, team_project_id, created_at, updated_at
+SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
 FROM zitadel_nextgen.resource_scope_index
 WHERE resource_kind = $1 AND project_id = $2 AND resource_id = $3`
 
 	getResourceScopeByIDInProjectStmt = `
-SELECT resource_id, resource_kind, project_id, team_id, team_project_id, created_at, updated_at
+SELECT resource_id, resource_kind, project_id, team_id, created_at, updated_at
 FROM zitadel_nextgen.resource_scope_index
 WHERE project_id = $1 AND resource_id = $2`
 
@@ -64,8 +63,8 @@ func newResourceScopeStatements(client queryExecutor) resourceScopeStatements {
 // UpsertResourceScope implements [service.ResourceScopeStatements].
 func (s resourceScopeStatements) UpsertResourceScope(ctx context.Context, scope *domain.ResourceScope) error {
 	return wrapError(s.client.QueryRow(ctx, upsertResourceScopeStmt,
-		scope.ResourceID, scope.ResourceKind.String(), scope.ProjectID, scope.TeamID, scope.TeamProjectID,
-	).Scan(&scope.ResourceID, &scope.ResourceKind, &scope.ProjectID, &scope.TeamID, &scope.TeamProjectID, &scope.CreatedAt, &scope.UpdatedAt))
+		scope.ResourceID, scope.ResourceKind.String(), scope.ProjectID, scope.TeamID,
+	).Scan(&scope.ResourceID, &scope.ResourceKind, &scope.ProjectID, &scope.TeamID, &scope.CreatedAt, &scope.UpdatedAt))
 }
 
 // GetResourceScope implements [service.ResourceScopeStatements].
@@ -146,7 +145,7 @@ func scanResourceScope(row pgx.CollectableRow) (*domain.ResourceScope, error) {
 	scope := new(domain.ResourceScope)
 	if err := row.Scan(
 		&scope.ResourceID, &scope.ResourceKind, &scope.ProjectID, &scope.TeamID,
-		&scope.TeamProjectID, &scope.CreatedAt, &scope.UpdatedAt,
+		&scope.CreatedAt, &scope.UpdatedAt,
 	); err != nil {
 		return nil, err
 	}

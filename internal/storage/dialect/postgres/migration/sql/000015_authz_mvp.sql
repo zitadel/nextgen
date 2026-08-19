@@ -23,25 +23,13 @@ CREATE TABLE zitadel_nextgen.resource_scope_index (
     project_id    TEXT COLLATE "C" NOT NULL
         REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE,
     team_id       TEXT COLLATE "C",
-    -- team_project_id is the project the referenced team lives in. Claim
-    -- (ADR 046) attaches a platform-project team to a claimed project, so for
-    -- project rows the team's home is not project_id; the FK goes through this
-    -- column so the reference stays enforced either way.
-    team_project_id TEXT COLLATE "C",
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     PRIMARY KEY (resource_kind, project_id, resource_id),
-    FOREIGN KEY (team_project_id, team_id)
+    FOREIGN KEY (project_id, team_id)
         REFERENCES zitadel_nextgen.teams (project_id, id)
-        ON DELETE CASCADE,
-    -- A team reference is always a complete pair (a MATCH SIMPLE FK skips rows
-    -- where either column is NULL, so the pairing must be pinned separately).
-    CHECK ((team_id IS NULL AND team_project_id IS NULL)
-        OR (team_id IS NOT NULL AND team_project_id IS NOT NULL)),
-    -- Only project rows (the claim marker) may reference a team from another
-    -- project; every other kind stays same-project.
-    CHECK (team_id IS NULL OR resource_kind = 'project' OR team_project_id = project_id)
+        ON DELETE CASCADE
 );
 
 CREATE INDEX idx_resource_scope_index_project
@@ -294,8 +282,8 @@ SELECT id, 'project', id, NULL
 FROM zitadel_nextgen.projects
 ON CONFLICT (resource_kind, project_id, resource_id) DO NOTHING;
 
-INSERT INTO zitadel_nextgen.resource_scope_index (resource_id, resource_kind, project_id, team_id, team_project_id)
-SELECT id, 'team', project_id, id, project_id
+INSERT INTO zitadel_nextgen.resource_scope_index (resource_id, resource_kind, project_id, team_id)
+SELECT id, 'team', project_id, id
 FROM zitadel_nextgen.teams
 ON CONFLICT (resource_kind, project_id, resource_id) DO NOTHING;
 
