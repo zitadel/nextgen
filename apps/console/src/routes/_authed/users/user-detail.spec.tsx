@@ -39,9 +39,8 @@ const BUSINESS = {
 function stub({
   user = {
     id: USER_ID,
-    $schema: "sch_business",
-    email: "maya@acme.com",
-    companyName: "Acme",
+    schema: "sch_business",
+    attributes: { email: "maya@acme.com", companyName: "Acme" },
     metadata: { status: "active", created_at: "2026-07-12T09:00:00Z", updated_at: "2026-07-12T09:00:00Z" },
   },
   passkeys = [{ id: "pk_1", name: "MacBook", created_at: "2026-07-01T00:00:00Z" }],
@@ -94,10 +93,8 @@ describe("user detail", () => {
       http.get(`${USERS_URL}/${USER_ID}`, () =>
         HttpResponse.json({
           id: USER_ID,
-          $schema: "sch_business",
-          email: "maya@acme.com",
-          headcount: 42,
-          verified: false,
+          schema: "sch_business",
+          attributes: { email: "maya@acme.com", headcount: 42, verified: false },
         }),
       ),
       http.get(`${SCHEMAS_URL}/sch_business`, () =>
@@ -151,7 +148,9 @@ describe("user detail", () => {
   it("omits status and created on a record the server has not stamped", async () => {
     // `metadata` sits on an otherwise open record, so a user written before it
     // existed simply has none. Nothing is invented for it.
-    stub({ user: { id: USER_ID, $schema: "sch_business", email: "maya@acme.com" } });
+    stub({
+      user: { id: USER_ID, schema: "sch_business", attributes: { email: "maya@acme.com" } },
+    });
     await renderDetail();
     await screen.findByRole("heading", { name: "maya@acme.com" });
 

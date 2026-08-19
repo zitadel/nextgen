@@ -68,7 +68,7 @@ beforeEach(() => {
   fetchSession.mockReset();
   signOut.mockClear();
   // The login screen renders the widget only when a project id resolves
-  // (ADR 0004 §3); pin the dev override so guard tests exercise the widget
+  // (ADR 0004 §§2–3); pin the dev override so guard tests exercise the widget
   // path. The no-project test below clears it.
   vi.stubEnv("VITE_CONSOLE_PROJECT_ID", "proj_test");
 });

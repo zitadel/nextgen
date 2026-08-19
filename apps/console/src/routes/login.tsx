@@ -13,7 +13,7 @@ import { useTheme } from "../theme";
  *
  * Renders the embedded `<zitadel-login>` widget via `@zitadel/sdk-react`,
  * passing a per-element `project` **handle** built from the runtime-discovered
- * project id (Console ADR 0004 §5: env override in dev, runtime document
+ * project id (Console ADR 0004 §3: env override in dev, runtime document
  * otherwise). The handle — not discrete `projectId`/`proxyPath` props — is
  * required here: the widget's config precedence is element `project`
  * property → global `configureZitadel()` → declarative attributes
@@ -92,10 +92,11 @@ function LoginScreen() {
 }
 
 /**
- * Rendered while the deployment has no project (ADR 0004 §3: the server
- * never creates one — the customer's integration does, and the
- * first-created project becomes the console's default). Refreshing after
- * `zitadel setup` picks the new project up via the runtime document.
+ * Rendered while the deployment has no project. Under Console ADR 0004 §2's
+ * transitional cutover rule, the server still discovers the first-created or
+ * explicitly pinned project until a human-usable seed transport replaces that
+ * fallback. Refreshing after `zitadel setup` picks the new project up via the
+ * runtime document.
  */
 function NoProjectYet() {
   return (

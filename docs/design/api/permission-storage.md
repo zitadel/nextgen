@@ -27,12 +27,21 @@ flow_definition / session path ids in addition to project / team / user.
 Path-id management handlers resolve RSI before Check (flat-by-id; no
 required query `project_id`). Management list endpoints inject an authz
 EXISTS predicate (same assignment/closure branches as `ListObjects`) into
-the resource SELECT **after** a successful **project-level** Check. That
-enforces RSI-backed visibility / TOCTOU for principals that already passed
-the gate; **team-scoped HTTP list narrowing is not live yet** (SQL +
-stmttest are the substrate — see #834). Fine-grained catalog relations
-(#420) remain a follow-up; `QuerySessions` list predicate waits on
-`sessionService.List`.
+the resource SELECT after `requireProjectListAccess` when Check is
+**Forbidden**. Project-wide **Allow** skips that EXISTS for the next list
+compile only (no RSI dual-write re-check; a grant revoked between Check and
+SELECT can still appear). Forbidden (foothold, no project-wide grant) gets
+the EXISTS partial view. NotFound (no foothold) still 404s.
+**Team-scoped HTTP list narrowing is live** for lists that inject that
+predicate (#834). It is **not** every HTTP list — see the carve-outs below.
+Fine-grained catalog relations (#420) remain a follow-up.
+
+| Endpoint | Why it is not EXISTS-narrowed |
+| --- | --- |
+| `QueryProjects` | The project **is** the boundary. The caller lists their own project; there is no partial-view problem. |
+| `ListEvents` | Events have no RSI resource kind. A naive EXISTS would dump the whole audit stream to a foothold-only principal. Do **not** migrate this to EXISTS in this work. |
+| `QuerySessions` | Waits on `sessionService.List`. |
+| `ListUsers` | User RSI rows have `NULL team_id`, so a team-scoped-only principal gets `200 []`. By-id user reads deny for the same RSI shape. Do not add a membership-edge list arm here — pin the empty view so console authors are not surprised. |
 
 ### Wave 1 vs OpenFGA compiler (#421 / PR #720)
 
@@ -80,15 +89,31 @@ Authz statement interfaces in `internal/service/statement.go` stay table-shaped
   materialization helper, foothold smoke helper, active system catalog) plus
   `internal/authz/resolver` orchestration (`sk_team_` permission-name
   allowlist, decision kinds). Resolver-enforced `sk_team_` **team scope**
-  (token `team_id` + outside-team deny suite) is deferred —
+  (`Request.TeamID` → `ConstraintTeamID`, outside-team deny suite, grant
+  minting reject of project-scoped team-bound grants) landed in
   [#831](https://github.com/zitadel/nextgen/issues/831). In-project
   management handlers call `resolver.Check` (coarse
   `project.{viewer,editor,admin}` until #420) after credential resolution.
-  Management list endpoints inject an authz EXISTS **predicate** (same
+  By-id scoped Allow (team-/resource-scoped grants after RSI) is specified in
+  [`authz.md`](authz.md#scoped-allow) and landed in
+  [#833](https://github.com/zitadel/nextgen/issues/833). HTTP list
+  narrowing is live ([#834](https://github.com/zitadel/nextgen/issues/834)):
+  management list endpoints inject an authz EXISTS **predicate** (same
   assignment/closure branches as `ListObjects`) via `service.AuthzListFilter`
-  after a successful **project-level** Check (RSI-backed visibility / TOCTOU;
-  team-scoped HTTP narrowing deferred — #834); `QuerySessions` waits on
-  `sessionService.List`.
+  from `requireProjectListAccess` (Allow → one-shot skip of EXISTS; Forbidden →
+  proceed with predicate; NotFound → 404). Check and the list filter share one
+  request-scoped Resolver ([#837](https://github.com/zitadel/nextgen/issues/837)).
+  Skipping EXISTS on Allow means that SELECT does not re-check RSI dual-write,
+  and a grant revoked between Check and SELECT can still appear. Forbidden
+  still gets the EXISTS partial view. `compileList` for management tables
+  fails closed without the filter ([#838](https://github.com/zitadel/nextgen/issues/838));
+  Allow's skip is consumed by the next compile, so a forgotten nested list on
+  the same request still 500s. Nested uniqueness / Resolve / GetLatest use
+  `WithAuthzListUnrestricted`, which ignores an inherited filter. Intentional
+  carve-outs live in the [#839](#list-predicate-carve-outs-839) table.
+  `ListUsers` uses the predicate helper, not `compileList`, and still fails
+  closed. User RSI `team_id` is NULL, so a team-scoped-only principal sees
+  `200 []` (by-id user reads deny for the same shape).
 
 ## Locked decisions
 
@@ -614,6 +639,23 @@ bundles:
 - Permission grants management API / product UI
 - `#333` foreign home project, Leopard (**D11**)
 - QuerySessions list predicate (deferred until `sessionService.List` exists)
+- ListEvents EXISTS narrowing (events have no RSI kind; a naive filter would dump the audit stream)
+
+### List-predicate carve-outs ([#839](https://github.com/zitadel/nextgen/issues/839))
+
+Management `compileList` with a non-empty table name and resource-id column **requires** `AuthzListFilter` on the context ([#838](https://github.com/zitadel/nextgen/issues/838)). `compileRead` still uses `context.Background()` on purpose and is unchanged.
+
+| Endpoint | Why it is not a `compileList` + filter path |
+| --- | --- |
+| `QuerySessions` | Uses `compileRead`; `List` is not implemented. |
+| `QueryProjects` | The project **is** the scope boundary. |
+| `ListEvents` | Events have no RSI resource kind. A naive EXISTS would dump the audit stream. Do **not** migrate. |
+| `ListUsers` | Uses `maybeWriteAuthzListPredicate` by hand, not `compileList`. Still fail-closed via `RequireManagementListFilter`. |
+| `ListUserPasskeys` / `ListUserTeams` | Nested under a user already gated by `requireResourceAccess`. |
+| Nested `ListFlowDefinitions` (create uniqueness, update conflict, pivoting, login `Resolve`) | Not a management HTTP list; `WithAuthzListUnrestricted` sees the whole project and ignores an inherited list filter. |
+| `GetLatest` branding | Runtime/flow resolution, not the management list endpoint; same unrestricted wrap. |
+
+Do not wire `QuerySessions` here; keep this table accurate until `sessionService.List` exists.
 
 ## See also
 

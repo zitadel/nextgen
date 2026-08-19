@@ -36,6 +36,9 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 	if err != nil {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
+	if !payload.Type.IsProjectSecret() {
+		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
 
 	scope := ScopeContext{
 		ProjectID:     payload.ProjectID,
@@ -184,6 +187,8 @@ type ScopeContext struct {
 	// OAuth2 project secrets are sk_proj with PrincipalID == ProjectID.
 	PrincipalType domain.AuthzPrincipalType
 	PrincipalID   string
+	// TeamID is the token team for sk_team_ principals (resolver ConstraintTeamID).
+	TeamID string
 }
 
 func WithScopeContext(ctx context.Context, scopeCtx ScopeContext) context.Context {

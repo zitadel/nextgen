@@ -237,7 +237,8 @@ above.
   bearer for everything else) → `POST /schemas` (server assigns the schema id)
   → `POST /flow_definitions` (default login flow pinned to that schema id).
   Templates come from `@zitadel/config/defaults`.
-- **Seeding** is `POST /users` (the body carries `$schema: <schema id>`) +
+- **Seeding** is `POST /users` (the body names the schema in `schema` and puts
+  the schema-defined content under `attributes`) +
   `PUT /users/{id}/password` with `is_change_required: false`.
 
 ## Credentials: the boot contract

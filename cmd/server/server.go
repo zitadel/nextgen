@@ -183,6 +183,13 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 		nil,
 	)
 	teamService := service.NewTeamService(serviceDBPool)
+	// The claim and dashboard URLs hang off the console. builtin_public_base is
+	// the only public-origin config today and carries the /api/schemas path, so
+	// strip it down to the origin before appending the console path; a
+	// dedicated server public-base setting should replace this when cloud
+	// deployment configuration lands.
+	consoleBase := (&url.URL{Scheme: builtinPublicBase.Scheme, Host: builtinPublicBase.Host}).String() + cfg.Server.ConsolePath
+	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	userService := service.NewUserService(
@@ -218,10 +225,13 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 	tokenService := service.NewTokenService(keyService, serviceDBPool)
 
 	// ── Default project resolution ──
-	// Console ADR 0004 §3 (standalone): the deployment tracks exactly one
-	// project — the one the customer's integration (`zitadel setup`) created
-	// first. The server never creates it; it validates an explicitly pinned
-	// id up front and otherwise reports the current state for operators.
+	// Console ADR 0004 §2's cutover rule: until a human-usable seed transport
+	// ships, the console's sign-in project is the explicitly pinned one, or
+	// else the project the customer's integration (`zitadel setup`) created
+	// first. This is the transitional fallback, not a one-project ceiling —
+	// §1 is explicit that the data model does not enforce one. The server
+	// never creates it; it validates an explicitly pinned id up front and
+	// otherwise reports the current state for operators.
 	defaultProject, err := projectService.DefaultProject(ctx, cfg.Platform.ResolvedProjectID())
 	if err != nil {
 		return fmt.Errorf("failed to resolve the default project: %w", err)
@@ -265,6 +275,7 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			eventService,
 			tokenService,
 			keyService,
+			claimService,
 			serviceDBPool,
 			cfg.Platform.ProjectID,
 		),
@@ -383,7 +394,7 @@ func loadConfig(configPath string) (Config, error) {
 	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
 	// Empty means "the deployment's first-created project is the default"
-	// (Console ADR 0004 §3); set NEXTGEN_PLATFORM_PROJECT_ID to pin an
+	// (Console ADR 0004 §2); set NEXTGEN_PLATFORM_PROJECT_ID to pin an
 	// existing project instead. The server never creates a project itself,
 	// unless platform.bootstrap_project explicitly opts in (#605).
 	v.SetDefault("platform.project_id", "")
@@ -489,7 +500,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 	}
 
 	// Pre-session runtime metadata for the embedded UI surfaces (Console
-	// ADR 0004 §2). Named for the console, which carries it first, but it
+	// ADR 0004 §3). Named for the console, which carries it first, but it
 	// describes the deployment — the default project and its publishable key
 	// — and the hosted login shell resolves the project it signs into from
 	// the same two fields, so it is mounted for either surface rather than

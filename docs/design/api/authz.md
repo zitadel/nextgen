@@ -54,6 +54,19 @@ Permissions are flat `{resource}.{verb}` strings such as `user.read`, `project.w
 > `{resource}.{verb}` catalog relations land with #420; until then do not
 > assume independently mintable per-resource scopes when configuring clients.
 
+## Scoped Allow
+
+Locked for [#833](https://github.com/zitadel/nextgen/issues/833) / [#834](https://github.com/zitadel/nextgen/issues/834). List SQL already evaluates team- and resource-scoped grant arms. By-id Check uses those arms after an RSI hit; HTTP lists proceed on Forbidden and attach the EXISTS predicate.
+
+| Path | Rule |
+| --- | --- |
+| **By-id (after RSI hit)** | Allow when a **team-scoped** grant’s `scope_team_id` equals the row’s `RSI.team_id`, **or** a **resource-scoped** grant’s `scope_resource_id` equals the path id, **and** the catalog relation still matches (`viewer` / `editor` / `admin`). |
+| **Create** (no RSI row) | Still requires a **project-scoped** Allow. A principal whose only grant is team- or resource-scoped cannot create project-wide resources. |
+| **List** | [#834](https://github.com/zitadel/nextgen/issues/834) / [#837](https://github.com/zitadel/nextgen/issues/837): project-wide Allow skips EXISTS for the next compile only. Forbidden (foothold, no project-wide Allow) proceeds and `requireProjectListAccess` attaches the EXISTS predicate (partial view). NotFound (no foothold) still 404s. |
+| **403 vs 404** | Unchanged (**D10**). Scoped Allow is still inside a project foothold. |
+
+Bare `requireProjectAccess` (create / project-by-id without an RSI object) must not treat a team-scoped grant as project-wide Allow. Management lists use `requireProjectListAccess`, not this gate.
+
 **Grants and roles** provide the mapping:
 
 - **Grant** — an explicit access record: `user ↔ app` (can access this app), `team ↔ project` (this team has access to this project), `user ↔ role-in-team`.

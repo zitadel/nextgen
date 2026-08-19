@@ -3,6 +3,10 @@
 > **Status:** Proposed
 > **Date:** 2026-06-01
 > **Context:** User schema, flow engine credential references
+>
+> **Amended by:** [ADR 052](052-user-envelope-and-attributes.md) — the user
+> schema describes the response's `attributes` object, not the whole response
+> body.
 
 ## Context
 
@@ -92,6 +96,8 @@ properties:
 
 The v2 document is now a valid shape for `GET /users/{id}` responses.
 
+> Amended by [ADR 052](052-user-envelope-and-attributes.md): it describes the `attributes` object within that response. `id`, `schema` and `metadata` are the server-owned envelope around it and are not schema properties.
+
 ### Flow definition
 
 **Before** — password is a schema property; passkey is a magic action name:
@@ -150,6 +156,8 @@ picks; the wiring is on the descriptor.
 
 - User schema cleanly describes the user object including the
   `GET /users/{id}` response shape. Credentials cannot leak through it.
+  *(Amended by [ADR 052](052-user-envelope-and-attributes.md): the described
+  shape is the response's `attributes` object.)*
 - Schema, flow engine, and storage agree that credentials are not
   attributes.
 - Adding a new credential kind extends `x-auth-methods` and the

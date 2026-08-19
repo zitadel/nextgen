@@ -24,8 +24,9 @@ export function identity(): Identity {
 
 /**
  * Create a user that can immediately complete the password login flow:
- * `POST /users` (the body must carry `$schema: <schema id>`) followed by
- * `PUT /users/{id}/password` with `is_change_required: false`.
+ * `POST /users` (the body carries `schema: <schema id>` and the schema-defined
+ * content under `attributes`) followed by `PUT /users/{id}/password` with
+ * `is_change_required: false`.
  *
  * Defaults mint a unique email per call (email is x-unique per project), which
  * is what makes per-test seeding parallel-safe on a shared instance.
@@ -38,15 +39,14 @@ export async function seedUser(
   const fresh = identity();
   const email = input.email ?? fresh.email;
   const password = input.password ?? fresh.password;
-  // Reserved fields win over attributes: the returned SeededUser must never
-  // disagree with what was actually created (a silently overridden email or
-  // $schema would yield credentials that cannot log in).
+  // `email` wins over the templated attributes: the returned SeededUser must
+  // never disagree with what was actually created, since a silently overridden
+  // email would yield credentials that cannot log in.
   const user = (await client.createUser(
     {
-      ...input.attributes,
-      $schema: context.schemaId,
-      email,
-    } as Parameters<ZitadelClient["createUser"]>[0],
+      schema: context.schemaId,
+      attributes: { ...input.attributes, email },
+    },
     { project_id: context.projectId },
   )) as Record<string, unknown>;
   const id = requireString(user.id, "user id");

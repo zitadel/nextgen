@@ -9272,40 +9272,54 @@ type CreateUserForbidden ErrorDetails
 
 func (*CreateUserForbidden) createUserRes() {}
 
-// The content of this response is determined by the configured
-// schema for users.
+type CreateUserInternalServerError ErrorDetails
+
+func (*CreateUserInternalServerError) createUserRes() {}
+
+// `attributes` is the document that must satisfy the user schema named by
+// `schema`.
+// The resource primary key is server-assigned and returned in the response, so
+// the request carries no `id`; `metadata` is server-owned for the same reason.
+// Neither is part of this schema, which is what frees a user schema to declare
+// properties of those names.
+// A request carrying any other top-level property is rejected rather than
+// ignored. `attributes` stays open, since the user schema is what determines
+// what belongs in it.
 // Ref: #
-type CreateUserResponse struct {
-	// The unique identifier of the created user.
-	ID              string `json:"id"`
-	AdditionalProps CreateUserResponseAdditional
+type CreateUserRequest struct {
+	// The schema that defines the content of `attributes`. These schemas can be
+	// created using the `/schemas` endpoint. A default schema is provided.
+	Schema string `json:"schema"`
+	// The user's schema-defined content. Validated against `schema`; a
+	// property the schema does not permit is rejected with `user.invalid`.
+	Attributes CreateUserRequestAttributes `json:"attributes"`
 }
 
-// GetID returns the value of ID.
-func (s *CreateUserResponse) GetID() string {
-	return s.ID
+// GetSchema returns the value of Schema.
+func (s *CreateUserRequest) GetSchema() string {
+	return s.Schema
 }
 
-// GetAdditionalProps returns the value of AdditionalProps.
-func (s *CreateUserResponse) GetAdditionalProps() CreateUserResponseAdditional {
-	return s.AdditionalProps
+// GetAttributes returns the value of Attributes.
+func (s *CreateUserRequest) GetAttributes() CreateUserRequestAttributes {
+	return s.Attributes
 }
 
-// SetID sets the value of ID.
-func (s *CreateUserResponse) SetID(val string) {
-	s.ID = val
+// SetSchema sets the value of Schema.
+func (s *CreateUserRequest) SetSchema(val string) {
+	s.Schema = val
 }
 
-// SetAdditionalProps sets the value of AdditionalProps.
-func (s *CreateUserResponse) SetAdditionalProps(val CreateUserResponseAdditional) {
-	s.AdditionalProps = val
+// SetAttributes sets the value of Attributes.
+func (s *CreateUserRequest) SetAttributes(val CreateUserRequestAttributes) {
+	s.Attributes = val
 }
 
-func (*CreateUserResponse) createUserRes() {}
+// The user's schema-defined content. Validated against `schema`; a
+// property the schema does not permit is rejected with `user.invalid`.
+type CreateUserRequestAttributes map[string]jx.Raw
 
-type CreateUserResponseAdditional map[string]jx.Raw
-
-func (s *CreateUserResponseAdditional) init() CreateUserResponseAdditional {
+func (s *CreateUserRequestAttributes) init() CreateUserRequestAttributes {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -28998,52 +29012,6 @@ func (o OptUserDeletedEventMetadata) Or(d UserDeletedEventMetadata) UserDeletedE
 	return d
 }
 
-// NewOptUserID returns new OptUserID with value set to v.
-func NewOptUserID(v UserID) OptUserID {
-	return OptUserID{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptUserID is optional UserID.
-type OptUserID struct {
-	Value UserID
-	Set   bool
-}
-
-// IsSet returns true if OptUserID was set.
-func (o OptUserID) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptUserID) Reset() {
-	var v UserID
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptUserID) SetTo(v UserID) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptUserID) Get() (v UserID, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptUserID) Or(d UserID) UserID {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptUserInvalidDetails returns new OptUserInvalidDetails with value set to v.
 func NewOptUserInvalidDetails(v UserInvalidDetails) OptUserInvalidDetails {
 	return OptUserInvalidDetails{
@@ -29084,52 +29052,6 @@ func (o OptUserInvalidDetails) Get() (v UserInvalidDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUserInvalidDetails) Or(d UserInvalidDetails) UserInvalidDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptUserMetadata returns new OptUserMetadata with value set to v.
-func NewOptUserMetadata(v UserMetadata) OptUserMetadata {
-	return OptUserMetadata{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptUserMetadata is optional UserMetadata.
-type OptUserMetadata struct {
-	Value UserMetadata
-	Set   bool
-}
-
-// IsSet returns true if OptUserMetadata was set.
-func (o OptUserMetadata) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptUserMetadata) Reset() {
-	var v UserMetadata
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptUserMetadata) SetTo(v UserMetadata) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptUserMetadata) Get() (v UserMetadata, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptUserMetadata) Or(d UserMetadata) UserMetadata {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -39700,30 +39622,30 @@ func (*UpdateTeamUnauthorized) updateTeamRes() {}
 
 // A user represents an individual identity in the system. It can be used to
 // represent a human user, but also a service account or any other type of
-// identity. The content of a user is determined by the configured schema for
-// users, this is only a base schema.
-// The server assigns the resource primary key (`id`) on create. Clients must
-// not send `id` in the create body; it is returned in the create response.
+// identity.
+// `attributes` is the document that satisfies the user schema named by
+// `schema`: its property names and types are defined entirely by that schema,
+// and it is what the schema validates. The rest of the object — `id`,
+// `schema`, `metadata` — is the server-owned envelope. Keeping the two apart
+// means a schema may name a property `id` or `metadata` without colliding with
+// the envelope, and closed-world keywords (`additionalProperties: false`,
+// `propertyNames`, `unevaluatedProperties`) behave as their author expects.
 // Ref: #
 type User struct {
-	ID       OptUserID       `json:"id"`
-	Metadata OptUserMetadata `json:"metadata"`
-	// The schema that defines the content of the user. These schemas can be
+	ID UserID `json:"id"`
+	// The schema that defines the content of `attributes`. These schemas can be
 	// created using the `/schemas` endpoint. A default schema is provided.
-	// This schema can be retrieved using the same endpoint. The schema will
-	// be used to validate the user's properties.
-	Schema          string `json:"$schema"`
-	AdditionalProps UserAdditional
+	// This schema can be retrieved using the same endpoint.
+	Schema string `json:"schema"`
+	// The user's content, satisfying the schema named by `schema`. Property
+	// names and types are determined entirely by that schema.
+	Attributes UserAttributes `json:"attributes"`
+	Metadata   UserMetadata   `json:"metadata"`
 }
 
 // GetID returns the value of ID.
-func (s *User) GetID() OptUserID {
+func (s *User) GetID() UserID {
 	return s.ID
-}
-
-// GetMetadata returns the value of Metadata.
-func (s *User) GetMetadata() OptUserMetadata {
-	return s.Metadata
 }
 
 // GetSchema returns the value of Schema.
@@ -39731,19 +39653,19 @@ func (s *User) GetSchema() string {
 	return s.Schema
 }
 
-// GetAdditionalProps returns the value of AdditionalProps.
-func (s *User) GetAdditionalProps() UserAdditional {
-	return s.AdditionalProps
+// GetAttributes returns the value of Attributes.
+func (s *User) GetAttributes() UserAttributes {
+	return s.Attributes
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *User) GetMetadata() UserMetadata {
+	return s.Metadata
 }
 
 // SetID sets the value of ID.
-func (s *User) SetID(val OptUserID) {
+func (s *User) SetID(val UserID) {
 	s.ID = val
-}
-
-// SetMetadata sets the value of Metadata.
-func (s *User) SetMetadata(val OptUserMetadata) {
-	s.Metadata = val
 }
 
 // SetSchema sets the value of Schema.
@@ -39751,24 +39673,19 @@ func (s *User) SetSchema(val string) {
 	s.Schema = val
 }
 
-// SetAdditionalProps sets the value of AdditionalProps.
-func (s *User) SetAdditionalProps(val UserAdditional) {
-	s.AdditionalProps = val
+// SetAttributes sets the value of Attributes.
+func (s *User) SetAttributes(val UserAttributes) {
+	s.Attributes = val
 }
 
+// SetMetadata sets the value of Metadata.
+func (s *User) SetMetadata(val UserMetadata) {
+	s.Metadata = val
+}
+
+func (*User) createUserRes()  {}
 func (*User) getMyUserRes()   {}
 func (*User) getUserByIDRes() {}
-
-type UserAdditional map[string]jx.Raw
-
-func (s *UserAdditional) init() UserAdditional {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
 
 // Merged schema.
 // Ref: #
@@ -39815,6 +39732,19 @@ func (s *UserAlreadyExists) SetDetails(val OptUserAlreadyExistsDetails) {
 type UserAlreadyExistsDetails map[string]jx.Raw
 
 func (s *UserAlreadyExistsDetails) init() UserAlreadyExistsDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// The user's content, satisfying the schema named by `schema`. Property
+// names and types are determined entirely by that schema.
+type UserAttributes map[string]jx.Raw
+
+func (s *UserAttributes) init() UserAttributes {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -41540,33 +41470,24 @@ func (s *UserPermissionDeniedDetails) init() UserPermissionDeniedDetails {
 
 // This schema is missing `"allOf": [{"$ref": "https://json-schema.org/draft/2020-12/schema"}],`.
 // This is done because a lot of code generators cannot handle that.
-// A few properties are reserved:
-// - id: is used to return the id of the user
-// - metadata: is used to embed metadata of the user, like creation date,
-// status,... in a return object.
+// Native JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`
+// are accepted without being listed below. `writeOnly: true` is reserved for a
+// value that may be written but is never returned by the read API; nothing
+// enforces it today, so responses still include write-only properties.
 // Ref: #
 type UserProperty struct {
-	// The verification method for this property, if applicable.
-	XMinusVerify OptNilString `json:"x-verify"`
 	// The level of uniqueness for this property, if applicable.
 	XMinusUnique OptNilUserPropertyXMinusUnique `json:"x-unique"`
 	// The claim name for this property, if applicable.
 	XMinusClaim OptNilString `json:"x-claim"`
-	// Whether this property is editable by the user or not.
-	XMinusEditable OptBool `json:"x-editable"`
-	// Whether this property contains sensitive information or not.
-	XMinusSensitive OptBool `json:"x-sensitive"`
-	// Whether this property is used for multi-factor authentication or not.
-	XMinusMfa OptBool `json:"x-mfa"`
+	// Whether this property's value may appear in audit event payloads. Audit
+	// payloads are deny-by-default: a property without this annotation
+	// contributes its key but never its value.
+	XMinusAudit OptBool `json:"x-audit"`
 	// A map of additional properties for the user definition, where the key is
 	// the property name and the value is the property schema.
 	Properties      OptUserPropertyProperties `json:"properties"`
 	AdditionalProps UserPropertyAdditional
-}
-
-// GetXMinusVerify returns the value of XMinusVerify.
-func (s *UserProperty) GetXMinusVerify() OptNilString {
-	return s.XMinusVerify
 }
 
 // GetXMinusUnique returns the value of XMinusUnique.
@@ -41579,19 +41500,9 @@ func (s *UserProperty) GetXMinusClaim() OptNilString {
 	return s.XMinusClaim
 }
 
-// GetXMinusEditable returns the value of XMinusEditable.
-func (s *UserProperty) GetXMinusEditable() OptBool {
-	return s.XMinusEditable
-}
-
-// GetXMinusSensitive returns the value of XMinusSensitive.
-func (s *UserProperty) GetXMinusSensitive() OptBool {
-	return s.XMinusSensitive
-}
-
-// GetXMinusMfa returns the value of XMinusMfa.
-func (s *UserProperty) GetXMinusMfa() OptBool {
-	return s.XMinusMfa
+// GetXMinusAudit returns the value of XMinusAudit.
+func (s *UserProperty) GetXMinusAudit() OptBool {
+	return s.XMinusAudit
 }
 
 // GetProperties returns the value of Properties.
@@ -41604,11 +41515,6 @@ func (s *UserProperty) GetAdditionalProps() UserPropertyAdditional {
 	return s.AdditionalProps
 }
 
-// SetXMinusVerify sets the value of XMinusVerify.
-func (s *UserProperty) SetXMinusVerify(val OptNilString) {
-	s.XMinusVerify = val
-}
-
 // SetXMinusUnique sets the value of XMinusUnique.
 func (s *UserProperty) SetXMinusUnique(val OptNilUserPropertyXMinusUnique) {
 	s.XMinusUnique = val
@@ -41619,19 +41525,9 @@ func (s *UserProperty) SetXMinusClaim(val OptNilString) {
 	s.XMinusClaim = val
 }
 
-// SetXMinusEditable sets the value of XMinusEditable.
-func (s *UserProperty) SetXMinusEditable(val OptBool) {
-	s.XMinusEditable = val
-}
-
-// SetXMinusSensitive sets the value of XMinusSensitive.
-func (s *UserProperty) SetXMinusSensitive(val OptBool) {
-	s.XMinusSensitive = val
-}
-
-// SetXMinusMfa sets the value of XMinusMfa.
-func (s *UserProperty) SetXMinusMfa(val OptBool) {
-	s.XMinusMfa = val
+// SetXMinusAudit sets the value of XMinusAudit.
+func (s *UserProperty) SetXMinusAudit(val OptBool) {
+	s.XMinusAudit = val
 }
 
 // SetProperties sets the value of Properties.

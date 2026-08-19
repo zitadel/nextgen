@@ -586,6 +586,51 @@ function schemaRequired(schema: Record<string, unknown>): string[] {
   return Array.isArray(schema.required) ? schema.required.map(str).filter((n) => n !== "") : [];
 }
 
+/**
+ * Mirrors `schemaReader.RequiredPaths`: every name in `required`,
+ * recursed through the nested `required` of each required object. A
+ * required object declaring no `required` of its own ends the descent at
+ * the object itself.
+ *
+ * An optional object contributes its own `required` too once it appears
+ * in `materialized`. It only exists in the document because something
+ * beneath it was collected, and from that point document validation
+ * enforces the rest of its `required` list.
+ */
+function requiredPaths(
+  schema: Record<string, unknown>,
+  materialized: ReadonlySet<string>,
+  prefix = "",
+): string[] {
+  const properties = schemaProperties(schema);
+  const required = schemaRequired(schema);
+  // A set, like the Go `map[string]struct{}`, so a name repeated in
+  // `required` yields the path once.
+  const out = new Set<string>();
+
+  for (const name of required) {
+    const path = prefix === "" ? name : `${prefix}.${name}`;
+    const property =
+      properties !== undefined && Object.hasOwn(properties, name) ? properties[name] : undefined;
+    if (!isPlainObject(property) || schemaRequired(property).length === 0) {
+      out.add(path);
+      continue;
+    }
+    for (const nested of requiredPaths(property, materialized, path)) out.add(nested);
+  }
+
+  // An optional object is invisible to the loop above, so descend into
+  // the ones a collected field materializes.
+  for (const [name, property] of Object.entries(properties ?? {})) {
+    if (required.includes(name) || !isPlainObject(property)) continue;
+    const path = prefix === "" ? name : `${prefix}.${name}`;
+    if (!materialized.has(path)) continue;
+    for (const nested of requiredPaths(property, materialized, path)) out.add(nested);
+  }
+
+  return [...out];
+}
+
 /** Mirrors `xAuthMethodsReader.IsEnabled` in flow_field_resolver_schema.go. */
 function authMethodEnabled(schema: Record<string, unknown>, method: string): boolean {
   if (!isPlainObject(schema["x-auth-methods"])) return false;
@@ -616,22 +661,56 @@ function resolveFieldChallenge(
     return { challenge: "password" };
   }
 
-  const property = properties[field];
-  if (property === undefined) {
-    return { message: `flow field: not a property in the user schema: ${q(field)}` };
+  // Mirrors walkUserProperty: a nested property is addressed by its
+  // dotted path, descending one `properties` level per segment.
+  const segments = field.split(".");
+  let property: unknown = undefined;
+  let level: Record<string, unknown> | undefined = properties;
+  for (const [i, segment] of segments.entries()) {
+    // Own properties only: Go indexes a map, where an inherited name like
+    // `toString` is simply absent.
+    property = level !== undefined && Object.hasOwn(level, segment) ? level[segment] : undefined;
+    if (property === undefined) {
+      return { message: `flow field: not a property in the user schema: ${q(field)}` };
+    }
+    const nested = isPlainObject(property) ? schemaProperties(property) : undefined;
+    if (i < segments.length - 1 && nested === undefined) {
+      return { message: `flow field: not a property in the user schema: ${q(field)}` };
+    }
+    level = nested;
   }
+
   if (!isPlainObject(property)) {
     return { challenge: null };
   }
 
   // Mirrors schemaReader.JSONType: the nullable idiom `["null", X]`
-  // reduces to X; any other multi-entry union is unsupported.
-  const jsonType = property.type;
+  // reduces to X; any other multi-entry union is unsupported. Go reduces
+  // before it tests for a composite, so the union error wins and the
+  // object/array test below reads the reduced type rather than the union.
+  let jsonType = property.type;
   if (Array.isArray(jsonType)) {
     const nonNull = jsonType.filter((t) => t !== "null");
     if (nonNull.length > 1) {
       return { message: `flow field: unsupported JSON type: [${jsonType.map(str).join(" ")}]` };
     }
+    // Undefined when every entry was "null", matching Go's empty-string case.
+    jsonType = nonNull[0];
+  }
+
+  // Mirrors deriveUserPropertyType: an object or array has no
+  // field-shaped input. A property carrying `properties` is an object,
+  // and one carrying `items` is an array, even when it omits the `type`
+  // keyword.
+  if (
+    jsonType === "object" ||
+    jsonType === "array" ||
+    schemaProperties(property) !== undefined ||
+    "items" in property
+  ) {
+    return {
+      message: `flow field: not a scalar property, name a nested leaf instead: ${q(field)}`,
+    };
   }
 
   // Mirrors deriveUnique + deriveIdentifierChallenge: any recognized
@@ -654,14 +733,23 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
   }
 
   // Required-fields coverage (validateRequiredUserSchemaFields).
-  const collected = new Set<string>();
+  // Collecting `address.street` covers the leaf and every object above
+  // it, since an object materializes once one of its children is
+  // collected. The same prefixes are what the schema treats as
+  // materialized, so an optional object's own `required` list comes into
+  // force here too.
+  const covered = new Set<string>();
   for (const step of def.steps) {
     for (const field of step.fields) {
-      collected.add(field);
+      let path = "";
+      for (const node of field.split(".")) {
+        path = path === "" ? node : `${path}.${node}`;
+        covered.add(path);
+      }
     }
   }
-  const missing = schemaRequired(raw)
-    .filter((field) => !collected.has(field))
+  const missing = requiredPaths(raw, covered)
+    .filter((field) => !covered.has(field))
     .sort();
   if (missing.length > 0) {
     issues.push(

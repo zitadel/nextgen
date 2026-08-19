@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/compare"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pattern"
@@ -25,9 +26,11 @@ func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *databa
 	return compileList[F, T](context.Background(), c, stmt, opt, schema, "", "")
 }
 
-// compileList builds a list SELECT with optional authz EXISTS injection before
+// compileList builds a list SELECT with authz EXISTS injection before
 // ORDER BY / LIMIT. tableName and resourceIDCol identify the outer resource row
-// (e.g. "teams", "id"); empty skips authz.
+// (e.g. "teams", "id"); empty skips authz (compileRead).
+// A non-empty table+column pair is the management-list path and requires
+// AuthzListFilterFromContext (#838).
 func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stmt string, opt *database.ListOptions[F], schema database.Schema[F, T], tableName, resourceIDCol string) error {
 	c.WriteString(stmt)
 
@@ -58,6 +61,9 @@ func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stm
 		hasWhere = true
 	}
 	if tableName != "" && resourceIDCol != "" {
+		if err := authz.RequireManagementListFilter(ctx); err != nil {
+			return err
+		}
 		maybeWriteAuthzListPredicate(ctx, c, &hasWhere, tableName, resourceIDCol)
 	}
 
