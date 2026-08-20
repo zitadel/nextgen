@@ -17,7 +17,7 @@ This document specifies the initial interactive management surface of the CLI. C
 ### Imported Requirements (from `4-cli-provider-setup.md`)
 - [x] **Re-enterable Sub-Journey:** "Callable behind the "Sign-in methods" interface with the reuse branch as default mode." (see *Adding and Removing Methods*)
 - [x] **Multi-Schema Reuse Activation:** "Multi-schema reuse logic is specified but unreachable in Epic 851's single-schema flow; activates with the Area 5 post-claim menu." (see *Schema Selection*)
-- [x] **"Skip for now" Destination:** Provides a concrete menu target for skipped setup providers (see *Guidance Updates*).
+- [x] **"Skip for now" Destination:** "The setup sub-journey's skip path hands the dropped provider to a concrete menu target; the final summary names it." Answered in [Guidance Updates](#guidance-updates).
 
 ### Acceptance Criteria Mapping
 
@@ -161,13 +161,13 @@ Sign-in methods for human-user (.zitadel/schemas/default-human-user.json)
 - **Seeding:** Pre-selections read directly from the schema's current `x-auth-methods`.
 - **Hints:** Providers resolve as `(configured)` if a corresponding connection file exists in `.zitadel/idps/`; otherwise `(requires setup)`. The hint states file presence only: applied-ness is the drift warning's job, and only area 6 may say a provider works.
 - **Custom Providers:** Providers outside the standard catalog render as read-only notes and pass through recomposition untouched.
-- **Drift Warning:** If the file hash mismatches the last-applied record in `.zitadel/state.json` (hash mechanics: `lib/sync/loop.ts:566`), the UI appends `includes local changes not yet applied`.
+- **Drift Warning:** If the file hash mismatches the last-applied record in `.zitadel/state.json` (hash mechanics: `hashForState`, `lib/sync/loop.ts:577`), the UI appends `includes local changes not yet applied`.
 
 > **Interpretation Note:** The epic's Console criterion reads "latest schema version" as the latest applied revision (the active-flow pin). This journey reads the working tree because the tree is what it edits; the drift warning bridges the two readings.
 
 ### In-Place Recomposition Rules
 The CLI must edit user configurations in place without destroying customizations:
-1. **Owned Regions:** The generator exclusively owns `x-auth-methods` entries and Area 4 flow scaffold deltas (e.g., `sso_providers` arrays, `register-sso` steps, password toggles).
+1. **Owned Regions:** The generator exclusively owns `x-auth-methods` entries and Area 4 flow scaffold deltas (e.g., `sso_providers` arrays, `register-sso` steps, password toggles, and the conflict step's password field and passkey action, which follow the method set).
 2. **Atomicity:** Edits are computed in-memory, validated against meta-schemas/cross-resource rules, and written atomically.
 3. **Safety Bailout:** An owned region is edited, in either direction, only when its current value equals what the scaffold expects (e.g. `register.user_already_exists` reverts to `password` only if it currently targets `sso-conflict`). On any other value the CLI aborts with `E_CONFLICT`, writes nothing, and points the user to manual editing.
 
@@ -198,10 +198,10 @@ Reuses existing `plan` and `apply` internals (`buildSyncPlan`, `renderPlan`, `su
 Addressable directly via `zitadel console`.
 
 ### URL Resolution & Persistence
-The console URL is minted server-side (`consoleBaseURL + "/projects/" + projectID`, `internal/service/claim.go:302-304`); the CLI cannot derive it locally, and it is deliberately absent from `GET /projects/{id}`.
+The console URL is minted server-side (`consoleBaseURL + "/projects/" + projectID`, `internal/service/claim.go:292-294`); the CLI cannot derive it locally, and it is deliberately absent from `GET /projects/{id}`.
 1. **Storage:** The CLI writes `dashboard_url` to `.zitadel/secret` upon successful `zitadel claim`.
 2. **Standard Execution:** Reads `dashboard_url` from the secret, prints it, and opens the system browser (unless `--no-open` is passed).
-3. **Legacy Backfill:** If `dashboard_url` is absent, the CLI calls `initClaim`, intercepts the expected `409 Conflict`, extracts the URL from the response details, backfills the secret, and opens the browser. This is a dependency, not shipped behavior: the 409 contract requires `details.team_id` and `details.dashboard_url` (`api/openapi/endpoints/projects/by_id/claim/init/already-claimed-response.yaml`) and the service attaches them (`internal/service/claim.go:296-299`), but the init-claim handler is still the generated 501 stub (`internal/api/handler.go` embeds `api.UnimplementedHandler`; [#909](https://github.com/zitadel/nextgen/pull/909) added the service behind the 501 endpoints). The backfill works once that handler is wired.
+3. **Legacy Backfill:** If `dashboard_url` is absent, the CLI calls `initClaim`, intercepts the expected `409 Conflict`, extracts the URL from the response details, backfills the secret, and opens the browser. The server side is in place: the 409 contract requires `details.team_id` and `details.dashboard_url` (`api/openapi/endpoints/projects/by_id/claim/init/already-claimed-response.yaml`), the service attaches them (`internal/service/claim.go:285-290`).
 4. **Mismatch Handling:** If `initClaim` unexpectedly succeeds on the platform (minting a challenge) while the local record says attached, it indicates a desync; the CLI halts without continuing the challenge (it expires on its own) and advises running `zitadel claim`.
 
 ---
@@ -240,13 +240,14 @@ Updates to existing CLI hints to drive menu discovery:
 | **Test Journey Surface** | Exit copy (or a menu row) hands off to the test journey; CLI avoids asserting that auth "works". | Area 6 |
 | **Cancellation Signal** | Sub-journey prompts must distinguish user cancellation from validation failure (today both throw `E_VALIDATION` via `bail()`), so the menu loop can return silently on cancel. Tracked as `E_CANCELLED` in Area 4's errors.ts work item. | Area 4 (prompt funnel) |
 | **Claim-State Read API** | Server needs an authenticated read returning `dashboard_url` without minting a challenge (to replace the 409 backfill). | Server Contract |
+| **E2E Strategy** | e2e coverage belongs to `apps/cli-journey-e2e`; Area 6 settles the strategy. | Area 6 |
 
 ---
 
 ## Open Points
 
 - **Command Spellings:** Final confirmation of `menu`, `configure` topic, `console`, and lifecycle of placeholders.
-- **#542 Sequencing:** This area ships against the current `plan`/`apply` surface, but ADR 035 removes both commands outright (`deploy` replaces `apply`; "plan has no replacement", `035-configuration-environments.md:178`). When the release model lands, the **Preview and apply changes** row, the sync extraction, and the `zitadel plan`/`zitadel apply` strings in the skipped envelope swap to the `deploy`/`status` surface; the extraction work item is rework if #542 lands first.
+- **#542 Sequencing:** This area ships against the current `plan`/`apply` surface, but ADR 035 removes both commands outright (`deploy` replaces `apply`; "plan has no replacement", [ADR 035, CLI](../../adrs/035-configuration-environments.md#cli)). When the release model lands, the **Preview and apply changes** row, the sync extraction, and the `zitadel plan`/`zitadel apply` strings in the skipped envelope swap to the `deploy`/`status` surface; the extraction work item is rework if #542 lands first.
 - **Pre-claim / Local Menus:** Potential future variants for uninitialized directories or local-dev (currently fall back to help).
 - **Environment Selection:** Adding environment prompting into Preview/Apply when multi-environment support lands (#534).
 - **Project-name Caching:** Investigating if live `getProject` reads make the menu initialization feel slow.

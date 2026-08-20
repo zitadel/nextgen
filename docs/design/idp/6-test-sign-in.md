@@ -19,7 +19,7 @@ This document defines how a developer verifies that an applied social-login conf
 - [x] **Failure-details channel (area 3):** "Details are written to server logs and the test journey (area 6); tenant-side misconfigurations are hidden from the end user." Answered in [Diagnostic events](#diagnostic-events) and [End-user surface](#end-user-surface).
 - [x] **Test journey handoff (area 4):** "Provides execution target for exit copy; applying changes is never presented as working sign-in." Answered in [Entry points](#entry-points): the target is `zitadel test sign-in`.
 - [x] **Test journey surface (area 5):** "Exit copy (or a menu row) hands off to the test journey; CLI avoids asserting that auth "works"." Decided in [Entry points](#entry-points): exit copy this iteration, no menu row.
-- [x] **E2E strategy (area 5 work item):** e2e coverage belongs to `apps/cli-journey-e2e`. Answered in [E2E strategy](#e2e-strategy).
+- [x] **E2E strategy (area 5):** "e2e coverage belongs to `apps/cli-journey-e2e`; Area 6 settles the strategy." Answered in [E2E strategy](#e2e-strategy).
 
 ### Acceptance Criteria Mapping
 
@@ -145,7 +145,7 @@ Ordered and fail-fast; each failure names its fix. `--check` stops here.
 | 2 | App dev server responds at the development origin (`readDevelopmentIssuer`, `lib/project.ts:180`) | `E_VALIDATION`: start the app (`npm run dev`); the login page must be served |
 | 3 | A connection file exists for `--provider` and passes validation | `E_VALIDATION` with `zitadel configure sign-in-methods` |
 | 4 | Secret value present locally (`assertEnvRefs` split, area 4) | `E_CREDENTIAL_MISSING` naming the variable and `.env.local` |
-| 5 | Connection, schema, and flow applied and drift-free (state hash vs file hash, `lib/sync/loop.ts:566`) | Never applied: `E_VALIDATION` with `zitadel apply`. Drifted: warning; the test proceeds against the applied revisions and says so. |
+| 5 | Connection, schema, and flow applied and drift-free (state hash vs file hash: `hashForState`, `lib/sync/loop.ts:577`) | Never applied: `E_VALIDATION` with `zitadel apply`. Drifted: warning; the test proceeds against the applied revisions and says so. |
 | 6 | Provider actually offered: the schema's `sso.providers` lists it and an applied flow carries it in `sso_providers` with all three outcomes routed (area 2 validation rules) | `E_VALIDATION` naming the missing side |
 | 7 | The environment declares an exact issuer, not `issuer_pattern` (area 3 exclusion) | `E_VALIDATION` |
 | 8 | OIDC only: discovery document fetch resolves authorize and token endpoints, or explicit overrides exist | Warning, not an error: names the issuer and notes the engine will fail the same way if it is a typo |

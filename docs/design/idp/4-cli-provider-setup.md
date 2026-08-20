@@ -27,11 +27,11 @@ A single journey unit powers two distinct callers:
 
 ## Imported Requirements
 
-What [`3-social-login-flow.md`](3-social-login-flow.md#exported-requirements) and [`2-auth-method-selection.md`](2-auth-method-selection.md#open-points) expect this area to answer:
+What [`3-social-login-flow.md`](3-social-login-flow.md#exported-requirements) and [`2-auth-method-selection.md`](2-auth-method-selection.md#exported-requirements) expect this area to answer:
 
 - [x] **Callback URI Surface:** Expose `{origin}/__nextgen/idp/callback` in the setup journey and per environment. Answered in [Callback URIs](#callback-uris).
 - [x] **Flow Scaffolding:** Scaffold `sso_providers` on the entry steps (both, in the shipped shared-entry default) and the conflict step with its login route. Answered in [Flow architecture decisions](#flow-architecture-decisions). In the shipped single-definition default, this routes as an in-definition navigation rather than a `switch` (mirrored in Area 3's navigation mechanics).
-- [x] **Register-Step Topology:** Settled in favor of a shared entry step, resolving Area 2's open point that "both single-step and multi-step topologies are functionally valid. The final choice was a CLI scaffolding decision" ([Flow architecture decisions](#flow-architecture-decisions)).
+- [x] **Register-Step Topology:** Settled in favor of a shared entry step, resolving Area 2's exported row that "both single-step and multi-step topologies are functionally valid. The final choice was a CLI scaffolding decision" ([Flow architecture decisions](#flow-architecture-decisions)).
 
 ### Excluded Scope
 
@@ -92,7 +92,7 @@ The callback URI follows Area 3's exact specification (`{environment issuer}/__n
 
 The journey iterates over all environment definitions declared in `zitadel.json`, evaluating them by declaration type:
 
-- **Exact Issuers (`issuer`):** Environments declared with an `issuer` property generate one copyable URI per origin. The platform schema types `issuer` as either a string or an array of exact origins (`../platform/configuration-surface.md:144`).
+- **Exact Issuers (`issuer`):** Environments declared with an `issuer` property generate one copyable URI per origin. The platform schema types `issuer` as either a string or an array of exact origins ([`configuration-surface.md`, `zitadel.json`](../platform/configuration-surface.md#zitadeljson--the-root)).
 - **Pattern Issuers (`issuer_pattern`):** Environments declared with an `issuer_pattern` are explicitly excluded. Because pattern classes cannot produce an enumerable set of exact origins, they fail the exact-match redirect requirements enforced by external providers.
 
 ### Default Output Example
@@ -106,7 +106,7 @@ preview       excluded: declared by issuer_pattern, not an exact issuer
 
 **Preview Shape Divergence**
 A structural divergence exists between the platform contract and CLI implementations:
-* **Platform Contract:** Types `issuer_pattern` as a wildcard string (e.g., `"https://*.vercel.app"`, see `../platform/configuration-surface.md:326`) and places exact-origin arrays under `issuer`.
+* **Platform Contract:** Types `issuer_pattern` as a wildcard string (e.g., `"https://*.vercel.app"`, see [`configuration-surface.md`, Environments](../platform/configuration-surface.md#environments)) and places exact-origin arrays under `issuer`.
 * **CLI Implementation:** Seeds `issuer_pattern` as an array containing a single exact development origin (`setup/index.ts:636` via `base.ts:317-323`).
 
 Under the platform specification, exact origins belong in `preview.issuer` (which would render preview environments includable). Pending full reconciliation, the journey excludes environments based strictly on declaration kind (`issuer_pattern`), printing the declaration type as the reason rather than evaluating its contents.
@@ -214,22 +214,40 @@ The flow topology is built on five key design decisions, followed by runtime exe
 
 ### Flow Architecture Decisions
 
-1. **Shared Entry:** The shipped default serves both login and registration in a single definition (`packages/config/defaults/default-login.json`). The scaffold attaches `sso_providers` to both entry steps, satisfying Area 3's purpose-independent outcome mapping without forcing definition forks or unnecessary churn (resolving Area 2's open point).
-2. **Three Outcomes per SSO Step:** Each step carrying `sso_providers` explicitly handles all three required Area 3 outcomes (`callback`, `user_not_found`, and `user_already_exists`):
-   - **`identifier` step:** `user_not_found` targets `register` (acting as the offer-register step). `callback` and `user_already_exists` are SSO-only keys on this step.
-   - **`register` step:** Typed resolution triggers `user_not_found` under login dispatch and `user_already_exists` under register dispatch. The engine flips `CurrentPurpose` on the `identifier` bounce (`../flowengine/capabilities.md:43`), making `register.user_not_found` SSO-only.
-3. **Collection Step (`register-sso`):** Modeled after `register-password`:
-   - **Fields:** Renders the schema fields from the register entry (default: `email` plus active use-case properties; the scaffold below shows the minimal schema, so its steps carry `email` only).
-   - **Execution:** Prefills values from mapped claims, enforces completion of empty required fields, and drops verification if prefilled values are modified.
-   - **Action:** Runs `on_success: "create_user_with_sso"` to consume the resolved external identity.
-   - **Collision Route:** Routes `user_already_exists` to `sso-conflict` if modified field values collide upon submission.
-4. **Conflict Step (`sso-conflict`):** Contains no input fields and presents a single primary sign-in action (`{ "target": "identifier", "purpose": "login" }`), formatted for repeated exposure during deterministic conflict loops.
-   - **`switch` vs. `pivot` Reconciliation:** `switch` and `pivot` target *other* flow definitions (`packages/config/meta-schemas/flow-definition.json`, `$defs.Transition`). In single-definition defaults, standard in-definition navigation is used with no return stack. If a tenant separates login and register into distinct definitions, the transition updates to set `"action": "switch"` and targets the login definition (dropping `purpose`). `pivot` is never scaffolded.
-5. **Retargeting `register.user_already_exists`:** Retargeted from `password` to `sso-conflict`. Shared by typed-email and SSO collisions, this prevents dropping SSO users onto a password step without context. Sign-in routes back to `identifier` with input field values preserved across step boundaries (`../flowengine/capabilities.md:47`).
+#### 1. Shared Entry for Login and Registration
+The shipped default configuration (`packages/config/defaults/default-login.json`) handles both login and registration within a single definition. By attaching `sso_providers` to both entry steps, we satisfy Area 3's purpose-independent outcome mapping. This prevents unnecessary definition forks and resolves the register-step topology [open point from Area 2](2-auth-method-selection.md#open-points).
+
+#### 2. The Three-Outcome Rule for SSO Steps
+Every step carrying `sso_providers` must explicitly handle three outcomes: `callback`, `user_not_found`, and `user_already_exists`.
+*   **Identifier Step:** The `user_not_found` outcome targets the `register` step (acting as an offer to register). The `callback` and `user_already_exists` keys function as SSO-only routes.
+*   **Register Step:** The engine flips `CurrentPurpose` upon bouncing from the identifier step ([`capabilities.md`](../flowengine/capabilities.md#steps--state-machine)). Typed resolution fires `user_not_found` only under login dispatch and `user_already_exists` only under register dispatch, and `register` always runs under register purpose after the bounce, so typed input on `register` can only fire `user_already_exists`. This makes `register.user_not_found` an SSO-only route.
+
+#### 3. The SSO Collection Step (`register-sso`)
+Modeled after `register-password`, this step finalizes external identity provisioning.
+*   **Fields:** Renders schema fields from the register entry (defaulting to `email` plus any active use-case properties).
+*   **Execution:** Pre-fills values from mapped IdP claims and enforces completion for empty required fields. If a user modifies a pre-filled value, its verification status is dropped.
+*   **Action:** Executes `on_success: "create_user_with_sso"` upon submission to consume the identity.
+*   **Collision Routing:** If a modified field causes a collision upon submission, `user_already_exists` routes the user to `sso-conflict`.
+
+#### 4. The Unified Conflict Step (`sso-conflict`)
+This is a comprehensive recovery step presented under "account exists" messaging. Because the system cannot know which methods the colliding account possesses, it offers every method the schema enables: the password field, the passkey action, and the SSO provider buttons (the scaffold shows all three because the shipped default enables them; Area 5 owns these pieces and they follow the method set). The engine binds the attempt to the colliding account.
+*   **SSO Outcomes:** Carrying `sso_providers` puts the step under the three-outcome rule:
+    *   `callback` routes to `done`: the user signed in with a provider already linked to that account.
+    *   `user_already_exists` targets the step itself: clicking the colliding provider again re-runs the ceremony and resolves identically, so the step re-renders with the same options. The copy is written to be seen more than once.
+    *   `user_not_found` routes to `register`: reachable only if the provider returns a different, unknown email (the user switched provider accounts mid-loop).
+    *   A wrong password re-renders the step with an error and no transition ([`capabilities.md`](../flowengine/capabilities.md#steps--state-machine)); `user_already_exists` comes from identifier resolution, never from the password field.
+*   **Navigation Fallback:** Includes a secondary `sign_in` action targeting `identifier` (`{ "target": "identifier", "purpose": "login" }`) so the user can back out and use a different account.
+*   **Transition Logic:** Standard in-definition navigation is used. If a tenant separates login and register into distinct definitions, the transition updates to `"action": "switch"` targeting the login definition (dropping `purpose`). The `pivot` action is never scaffolded.
+
+#### 5. Retargeting Registration Collisions
+The `register.user_already_exists` outcome is retargeted from the `password` step to the new `sso-conflict` step.
+*   **The Rationale:** A colliding account might be SSO-only. Routing directly to `password` fails if the user has no password or passkey configured.
+*   **The Benefit:** Because `sso-conflict` offers all methods, a typed-email user with a password still recovers in one step, preserving the efficiency of the shipped default.
+*   **State Preservation:** The fallback routing back to `identifier` preserves input field values across step boundaries ([`capabilities.md`](../flowengine/capabilities.md#steps--state-machine)).
 
 #### UX Trade-offs & Identity Lifecycle
 
-- **Double-Redirect on Login Sign-Up:** `identifier.user_not_found` retains its target (`register`) so typed-email users are not routed into `create_user_with_sso`. An unknown SSO user starting on the sign-in page lands on `register` (email prefilled) and clicks the provider button a second time to reach `register-sso`. Register-entry sign-ups require only one ceremony.
+- **Double-Redirect on Login Sign-Up:** `identifier.user_not_found` retains its target (`register`) so typed-email users are not routed into `create_user_with_sso`. An unknown SSO user starting on the sign-in page lands on `register` (email prefilled) and clicks the provider button a second time to reach `register-sso`. This applies only when the provider did not return every required property; a complete profile is created on the first ceremony and goes `callback → done` from `identifier` ([area 3](3-social-login-flow.md#creation-without-collection-is_auto_creation)). Register-entry sign-ups require only one ceremony.
 - **Identity Lifetime Boundary:** Area 3 keeps the resolved external identity "an ephemeral object attached directly to the attempt that dies when the attempt completes or expires". The scaffold never persists it, so crossing the conflict step boundary means the sign-in path re-runs the provider ceremony rather than reusing a resolved identity.
 
 <details open>
@@ -325,10 +343,21 @@ The flow topology is built on five key design decisions, followed by runtime exe
     },
     {
       "name": "sso-conflict", /* added step */
+      "fields": ["x-auth-methods#password"],
       "actions": [
-        { "name": "sign_in", "kind": "navigate", "primary": true, "text_key": "sso-conflict.action.sign_in" }
+        { "name": "submit", "kind": "submit", "primary": true, "text_key": "sso-conflict.action.submit" },
+        { "name": "passkey", "kind": "passkey", "primary": false, "text_key": "sso-conflict.action.passkey" },
+        { "name": "sign_in", "kind": "navigate", "primary": false, "text_key": "sso-conflict.action.sign_in" }
+      ],
+      "sso_providers": [
+        { "id": "google", "name": "Google", "template": "google" }
       ],
       "transitions": {
+        "submit": { "target": "done" },
+        "passkey": { "target": "done" },
+        "callback": { "target": "done" },
+        "user_not_found": { "target": "register" },
+        "user_already_exists": { "target": "sso-conflict" },
         "sign_in": { "target": "identifier", "purpose": "login" }
       }
     },
@@ -345,10 +374,10 @@ The flow topology is built on five key design decisions, followed by runtime exe
 * **Enum Extension:** The shipped `on_success` enum in `flow-definition.json` (`$defs.Step`) currently contains `["create_user"]`. Scaffolding requires adding `create_user_with_sso` (the handler specified in Area 3). Adding this enum value only widens acceptance, non-breaking per the same principle Area 1's forward-compatibility table documents for connection files.
 * **Validation Suite:** Verified via [`packages/config/src/idp-design-docs.test.ts`](../../../packages/config/src/idp-design-docs.test.ts). The scaffolded block validates against the flow meta-schema once `create_user_with_sso` joins the enum:
     - Every `sso_providers` step explicitly routes all three required outcomes.
-    - Conflict routing and provider IDs align across all three design documents.
+    - Conflict routing matches Area 3's exported Flow Scaffolding row, and provider ids align across Areas 1, 2, and 4: the scaffold's and Area 2's end-to-end step's `sso_providers[].id` equal Area 1's example slug.
     - Imported requirements are pinned by containment assertions against Area 3's exported table, causing the test suite to fail if a sibling edit breaks cross-doc alignment.
 * New steps introduce the following localization requirements:
-  * **Action Keys:** `register-sso.action.submit` and `sso-conflict.action.sign_in`.
+  * **Action Keys:** `register-sso.action.submit`, `sso-conflict.action.submit`, `sso-conflict.action.passkey`, and `sso-conflict.action.sign_in`.
   * **Step Titles:** Derived dynamically from step names.
   * **Copy Scope:** Conflict-step copy falls under Area 3's exported locale requirements; `register-sso.*` keys extend the exported localization table.
 
@@ -358,7 +387,7 @@ The epic requires connection configurations to be visible in the plan preview wh
 
 ### The `IdpSyncer` Component
 
-Defined as `{ kind: "idp", directory: ".zitadel/idps", revisioned: false, mutable: true }` and registered in `makeSyncers` (`apps/cli/src/lib/sync/syncers.ts:46-61`), using `FlowSyncer` as its precedent (`syncers.ts:156-159`). `BrandingSyncer`'s `revisioned: true` shape was considered and rejected: in the sync contract that flag means a hash change publishes a brand-new outer id via `create()` and triggers a re-pin scan (`lib/sync/types.ts:78-92`, `lib/sync/loop.ts:175-188`), while the IdP CRUD API keeps the lineage id stable and revises through `PUT /idps/{id}`. The server mints the revision id under the stable outer id, which is the contract's `mutable` shape: `update()` on hash change.
+Defined as `{ kind: "idp", directory: ".zitadel/idps", revisioned: false, mutable: true }` and registered in `makeSyncers` (`apps/cli/src/lib/sync/syncers.ts:46-61`), using `FlowDefinitionSyncer` as its precedent (`syncers.ts:154-159`). `BrandingSyncer`'s `revisioned: true` shape was considered and rejected: in the sync contract that flag means a hash change publishes a brand-new outer id via `create()` and triggers a re-pin scan (`lib/sync/types.ts:78-92`, `lib/sync/loop.ts:175-188`), while the IdP CRUD API keeps the lineage id stable and revises through `PUT /idps/{id}`. The server mints the revision id under the stable outer id, which is the contract's `mutable` shape: `update()` on hash change.
 
 * **Directory Handling:** Introduces an `IDPS_DIR` constant. Missing directories plan cleanly without error (`readJsonDir` returns empty on `ENOENT`, `lib/sync/loop.ts:506-511`).
 * **Preview Behavior:** Registration alone enables create previews via the generic plan renderer (`lib/sync/plan-renderer.ts:668-687`). Update previews cannot show a field diff until a read endpoint exists (the renderer's explicit fallback, `plan-renderer.ts:763`); with the CRUD API's get-by-slug they upgrade to a real old-vs-new diff.
@@ -454,12 +483,13 @@ If a selected provider is specified without a Client ID, setup halts prior to re
 | **Default Locale Entries** | Includes translation keys for `register-sso.*` and `sso-conflict.*` (extends Area 3). | Login UI / Locale Work |
 | **Validation Rule** | Enforces that steps with `on_success: create_user_with_sso` route `user_already_exists`. | Validator Work (Area 2) |
 | **Multi-Schema Reuse** | Multi-schema reuse logic is specified but unreachable in Epic 851's single-schema flow; activates with the Area 5 post-claim menu. | Post-claim menu (Area 5) |
+| **"Skip for now" Destination** | The setup sub-journey's skip path hands the dropped provider to a concrete menu target; the final summary names it. | Post-claim menu (Area 5) |
 
 ## Open Points
 
 * **Flag Spelling & Multi-Select Wiring:** Settles `--auth-methods` and per-provider flag names with Area 2 generator recomposition, fixing the contract (Client IDs supplied by flag, secrets strictly excluded from argv).
 * **Prefilled Console Deep-Links:** Evaluating prefilled query params (name, homepage, callback URL) for provider consoles (supported by GitHub, unsupported by Google).
-* **`issuer_pattern` Shape Reconciliation:** Resolves structural divergence where CLI writes exact origin arrays (`base.ts:317-323`) while the platform contract types wildcard strings (`../platform/configuration-surface.md:144, 326`).
+* **`issuer_pattern` Shape Reconciliation:** Resolves structural divergence where CLI writes exact origin arrays (`base.ts:317-323`) while the platform contract types wildcard strings ([`configuration-surface.md`, `zitadel.json`](../platform/configuration-surface.md#zitadeljson--the-root); [`configuration-surface.md`, Environments](../platform/configuration-surface.md#environments)).
 * **`scaffoldedFrom` Provenance:** Pending Area 1's specification for recording provenance data on generated connection resources.
 * **Multi-Schema Connection Reuse:** Multi-schema reuse logic is specified but unreachable in Epic 851's single-schema flow; activates with the Area 5 post-claim menu.
 * **Secret Rotation UX:** Defining explicit rotation workflows beyond existing no-clobber behavior in `.env.local` (deferred to Area 1 secret-store spec).

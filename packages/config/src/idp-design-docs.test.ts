@@ -166,7 +166,8 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
     false,
   ],
   // provisioning (linking policy deferred with the account-linking journey)
-  ["851 provisioning flags", { ...oidc, provisioning: { is_creation_allowed: true, is_auto_creation: false } }, true],
+  ["851 provisioning flags", { ...oidc, provisioning: { is_creation_allowed: true, is_auto_creation: true } }, true],
+  ["always-collect opt-out", { ...oidc, provisioning: { is_auto_creation: false } }, true],
   ["auto_linking (deferred — no linking in 851)", { ...oidc, provisioning: { auto_linking: "never" } }, false],
   ["is_linking_allowed (deferred)", { ...oidc, provisioning: { is_linking_allowed: true } }, false],
   ["is_auto_update (deferred — awaits per-property verification state)", { ...oidc, provisioning: { is_auto_update: false } }, false],
@@ -271,12 +272,15 @@ describe("x-auth-methods snippets (2-auth-method-selection.md · Decision)", () 
 });
 
 describe("end-to-end flow step (2-auth-method-selection.md · End to end)", () => {
+  const raw = authMethodSelection.match(
+    /```jsonc\n\/\/ \.zitadel\/flows\/customers-login\.json[^\n]*\n(\{[\s\S]*?\n\})\n```/,
+  )?.[1];
+  if (!raw) throw new Error("end-to-end customers-login.json block not found");
+  const step = JSON.parse(raw.replace(/\/\*[\s\S]*?\*\//g, "")) as {
+    sso_providers: { id: string }[];
+  };
+
   it("validates against the shipped flow meta-schema's Step definition", () => {
-    const raw = authMethodSelection.match(
-      /```jsonc\n\/\/ \.zitadel\/flows\/customers-login\.json[^\n]*\n(\{[\s\S]*?\n\})\n```/,
-    )?.[1];
-    expect(raw).toBeTruthy();
-    const step = JSON.parse(raw!.replace(/\/\*[\s\S]*?\*\//g, "")) as object;
     const flowMeta = JSON.parse(
       readFileSync(join(repoRoot, "packages/config/meta-schemas/flow-definition.json"), "utf8"),
     ) as object;
@@ -284,6 +288,10 @@ describe("end-to-end flow step (2-auth-method-selection.md · End to end)", () =
       .addSchema(flowMeta, "flow-def")
       .compile({ $ref: "flow-def#/$defs/Step" });
     expect(validateStep(step)).toBe(true);
+  });
+
+  it("its provider id is area 1's connection slug, like the area 4 scaffold", () => {
+    expect(step.sso_providers.map((p) => p.id)).toEqual([(googleExample as { slug: string }).slug]);
   });
 });
 
@@ -294,6 +302,8 @@ describe("scaffolded flow (4-cli-provider-setup.md · The scaffolded flow)", () 
   if (!raw) throw new Error("scaffolded default-login.json block not found");
   type ScaffoldStep = {
     name: string;
+    fields?: string[];
+    actions?: Array<{ kind: string }>;
     on_success?: string;
     sso_providers?: Array<{ id: string }>;
     transitions?: Record<string, { target: string; action?: string; purpose?: string }>;
@@ -326,7 +336,7 @@ describe("scaffolded flow (4-cli-provider-setup.md · The scaffolded flow)", () 
 
   it("every step carrying sso_providers routes all three outcomes", () => {
     const ssoSteps = flow.steps.filter((s) => s.sso_providers);
-    expect(ssoSteps.map((s) => s.name)).toEqual(["identifier", "register"]);
+    expect(ssoSteps.map((s) => s.name)).toEqual(["identifier", "register", "sso-conflict"]);
     for (const step of ssoSteps) {
       for (const outcome of ["callback", "user_not_found", "user_already_exists"]) {
         expect(step.transitions?.[outcome], `${step.name} routes ${outcome}`).toBeDefined();
@@ -344,6 +354,11 @@ describe("scaffolded flow (4-cli-provider-setup.md · The scaffolded flow)", () 
       target: flow.purposes["login"],
       purpose: "login",
     });
+    // One-step recovery for every account type: password field, passkey
+    // action, and the provider buttons all sit on the conflict step itself.
+    expect(byName.get("sso-conflict")!.fields).toEqual(["x-auth-methods#password"]);
+    expect(byName.get("sso-conflict")!.actions?.map((a) => a.kind)).toEqual(["submit", "passkey", "navigate"]);
+    expect(byName.get("sso-conflict")!.transitions!["user_already_exists"]!.target).toBe("sso-conflict");
     for (const step of flow.steps) {
       for (const t of Object.values(step.transitions ?? {})) {
         expect(t.action).not.toBe("pivot");
@@ -353,7 +368,7 @@ describe("scaffolded flow (4-cli-provider-setup.md · The scaffolded flow)", () 
 
   it("provider ids reference area 1's connection slug", () => {
     const ids = flow.steps.flatMap((s) => (s.sso_providers ?? []).map((p) => p.id));
-    expect(ids).toEqual(["google", "google"]);
+    expect(ids).toEqual(["google", "google", "google"]);
     expect((googleExample as { slug: string }).slug).toBe("google");
   });
 
@@ -419,7 +434,7 @@ describe("sibling quotes pinned verbatim (4-cli-provider-setup.md)", () => {
 });
 
 describe("sibling quotes pinned verbatim (5-post-claim-menu.md)", () => {
-  // Same discipline as area 4's pins: area 5 imports two area-4 rows by
+  // Same discipline as area 4's pins: area 5 imports three area-4 rows by
   // quote, so a reword on either side must name both files.
   const squash = (s: string) => s.replace(/\s+/g, " ");
   it.each([
@@ -430,6 +445,10 @@ describe("sibling quotes pinned verbatim (5-post-claim-menu.md)", () => {
     [
       "multi-schema reuse open point (area 4)",
       "Multi-schema reuse logic is specified but unreachable in Epic 851's single-schema flow; activates with the Area 5 post-claim menu.",
+    ],
+    [
+      "skip-for-now destination row (area 4)",
+      "The setup sub-journey's skip path hands the dropped provider to a concrete menu target; the final summary names it.",
     ],
   ])("%s appears in the source doc and area 5", (_name, quote) => {
     expect(squash(providerSetup)).toContain(quote);
@@ -619,8 +638,8 @@ describe("verdict catalog (6-test-sign-in.md)", () => {
 });
 
 describe("sibling quotes pinned verbatim (6-test-sign-in.md)", () => {
-  // Area 6 imports one row from each of areas 3, 4, and 5; a reword on
-  // either side must name both files.
+  // Area 6 imports one row each from areas 3 and 4 and two from area 5; a
+  // reword on either side must name both files.
   const squash = (s: string) => s.replace(/\s+/g, " ");
   it.each([
     [
@@ -637,6 +656,11 @@ describe("sibling quotes pinned verbatim (6-test-sign-in.md)", () => {
       "test journey surface row (area 5)",
       postClaimMenu,
       'Exit copy (or a menu row) hands off to the test journey; CLI avoids asserting that auth "works".',
+    ],
+    [
+      "e2e strategy row (area 5)",
+      postClaimMenu,
+      "e2e coverage belongs to `apps/cli-journey-e2e`; Area 6 settles the strategy.",
     ],
   ])("%s appears in the source doc and area 6", (_name, source, quote) => {
     expect(squash(source)).toContain(quote);

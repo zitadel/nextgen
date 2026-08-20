@@ -66,9 +66,10 @@ per area.
   store, ADR 035 amendments, unwritten engine behaviour) are recorded as open
   questions or constraints — never assumed into the design.
 
-- Every area doc opens with an **Imported requirements** checklist naming which rows of
-  [`1-resource-model.md`](1-resource-model.md#exported-requirements) (and later tables) it
-  answers.
+- Every area doc ends with an **Exported requirements** table and opens with an
+  **Imported requirements** checklist naming which rows of earlier areas' tables it
+  answers. An import with no matching row is a missing row in the exporting doc, not
+  a looser citation.
 - Schemas and examples embedded in these docs are verified by
   [`packages/config/src/idp-design-docs.test.ts`](../../../packages/config/src/idp-design-docs.test.ts),
   which extracts them from the markdown — edit a doc's JSON block and the test sees it.

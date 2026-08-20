@@ -8,9 +8,9 @@ This document defines how a user schema declares which external identity provide
 
 ## Imported Requirements
 
-- [x] **Stable `slug` on the connection** ([`1-resource-model.md`](1-resource-model.md)). Answered: both the `sso.providers` array and `sso_providers[].id` reference connections strictly by their slugs.
+- [x] **Stable `slug` on the connection** ([`1-resource-model.md`](1-resource-model.md#exported-requirements)): "user schemas and flow definitions reference connections by slug only, never by revision id." Answered: both the `sso.providers` array and `sso_providers[].id` reference connections strictly by their slugs.
 
-The requirements exported by this area are tracked elsewhere: the Go mirror of the cross-resource SSO rules lives in area 1's [exported table](1-resource-model.md#exported-requirements), while the register-step and conflict-step scaffolding rules (owed to area 4) are detailed in [`3-social-login-flow.md`](3-social-login-flow.md).
+This area's own exports are in [Exported Requirements](#exported-requirements). The Go mirror of the cross-resource SSO rules is tracked in area 1's [exported table](1-resource-model.md#exported-requirements), and the conflict-step scaffolding rules (owed to area 4) are detailed in [`3-social-login-flow.md`](3-social-login-flow.md).
 
 ## The Three-Way Linkage
 
@@ -173,7 +173,7 @@ The validation model strictly follows the established password precedent: the fl
 | **Full outcome routing** | **New:** A step with `sso_providers` must properly route `user_not_found` and `user_already_exists`. The engine fires three possible outcomes, and routing only the callback dead-ends the other two. |
 | **Empty `claim_mapping` intersection** | **New (Warning):** If an offered provider's `claim_mapping` shares zero properties with the pinned schema, the pairing prefills nothing. Sign-up will degrade to fully manual data collection. |
 | **Empty `verified_claims` intersection** | **New (Warning):** If a provider's `verified_claims` keys share no properties with the pinned schema, the verification state has nowhere to land. |
-| **Wildcard `issuer_pattern` conflict** | **Warning:** An environment declaring a wildcard `issuer_pattern` cannot produce the exact redirect URIs that external providers require. *(Note: Environment declarations are currently design-only; the `issuer` / `issuer_pattern` shapes live in `../platform/configuration-surface.md:325-326`, and persistence lands with [#534](https://github.com/zitadel/nextgen/issues/534)).* Plan warns because exact environments may coexist in the same project; deploying a social-login flow to a pattern environment is the error-grade moment, enforced once #534's persistence lands. |
+| **Wildcard `issuer_pattern` conflict** | **Warning:** An environment declaring a wildcard `issuer_pattern` cannot produce the exact redirect URIs that external providers require. *(Note: Environment declarations are currently design-only; the `issuer` / `issuer_pattern` shapes live in [`configuration-surface.md`, Environments](../platform/configuration-surface.md#environments), and persistence lands with [#534](https://github.com/zitadel/nextgen/issues/534)).* Plan warns because exact environments may coexist in the same project; deploying a social-login flow to a pattern environment is the error-grade moment, enforced once #534's persistence lands. |
 | **Dead capability** | **Warning:** A schema lists a provider that no flow ever offers. The Console would advertise a sign-in method that has no actual login path. |
 | **Collection-step conflict routing** | **New:** A step whose `on_success` is `create_user_with_sso` must route `user_already_exists`. Area 3 fires that outcome at collection-step submission as well as at callback resolution, and requires the conflict transition attached to both steps. |
 
@@ -215,7 +215,13 @@ Because every hop in this chain uses a slug rather than a revision ID, editing o
 - **The register step topology:** Social sign-up requires `sso_providers` on the `register` step, not just on the `identifier` step. Because the flow outcome model in [`3-social-login-flow.md`](3-social-login-flow.md) is purpose-independent, both single-step and multi-step topologies are functionally valid. The final choice was a CLI scaffolding decision, which is now settled in [`4-cli-provider-setup.md`](4-cli-provider-setup.md#flow-architecture-decisions) in favor of a shared entry step.
 - **Breaking schema migrations:** Switching to `sso-auth-method.json` is a breaking change for one specific schema state: any payload containing `sso: {"enabled": true}` without a `providers` array. While this was valid under the legacy `auth-method.json`, it fails the new conditional validation. Existing stored schema revisions are immutable and unaffected, but attempting to re-publish or edit an affected schema body will trigger a validation error until a non-empty `providers` list is added or the `sso` block is removed. Schemas omitting the `sso` entry entirely remain unaffected.
 
-## Exported Requirement
+## Exported Requirements
+
+| Requirement | Owed By |
+| :--- | :--- |
+| **Pair-level `claim_mapping` intersection:** warn when an offered provider's `claim_mapping` shares zero properties with the pinned schema (the [Validation Rules](#validation-rules) row). | `validate.ts` and the Go server mirror, at flow create and update |
+| **Pair-level `verified_claims` intersection:** warn when a provider's `verified_claims` keys share no properties with the pinned schema. | `validate.ts` and the Go server mirror, at flow create and update |
+| **Register-step topology:** "both single-step and multi-step topologies are functionally valid. The final choice was a CLI scaffolding decision" ([Open Points](#open-points)). | [`4-cli-provider-setup.md`](4-cli-provider-setup.md#flow-architecture-decisions) (settled: shared entry step) |
 
 The two pairing validation rows live in this document rather than with the connection's validation rules because the flow definition is the sole document that references both sides simultaneously: its `user_schema` field pins the schema revision, while its `sso_providers` array names the connection slug. As a result, only flow-level validation can evaluate the exact schema-connection pair.
 

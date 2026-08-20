@@ -44,7 +44,7 @@ Because external identity providers require exact-match redirect URIs, the path 
 
 While the shape is finalized, both structural halves depend on pending architecture:
 
-- **Origin Resolution:** The origin relies on the environment's declared issuer (`issuer` / `issuer_pattern`, typed in `../platform/configuration-surface.md:325-326`; ADR 035 defers per-environment value shape to a follow-up ADR). Environments remain unimplemented: no Go or API types exist. Currently, only the local development origin can be derived (via the dev-port setting). Multi-environment derivation will land under issue [#534](https://github.com/zitadel/nextgen/issues/534) (part of [#529](https://github.com/zitadel/nextgen/issues/529)). Note that pattern environments using `issuer_pattern` can never produce an exact URI, so social sign-in cannot work there; area 2 grades the conflict a warning because exact environments can coexist in the same project, and the error-grade check is deploying a social-login flow to a pattern environment, which lands with #534's environment persistence.
+- **Origin Resolution:** The origin relies on the environment's declared issuer (`issuer` / `issuer_pattern`, typed in [`configuration-surface.md`, Environments](../platform/configuration-surface.md#environments); ADR 035 defers per-environment value shape to a follow-up ADR). Environments remain unimplemented: no Go or API types exist. Currently, only the local development origin can be derived (via the dev-port setting). Multi-environment derivation will land under issue [#534](https://github.com/zitadel/nextgen/issues/534) (part of [#529](https://github.com/zitadel/nextgen/issues/529)). Note that pattern environments using `issuer_pattern` can never produce an exact URI, so social sign-in cannot work there; area 2 grades the conflict a warning because exact environments can coexist in the same project, and the error-grade check is deploying a social-login flow to a pattern environment, which lands with #534's environment persistence.
 - **Server Routing:** The route does not exist yet. The `/__nextgen` path serves as a client-side proxy prefix, but the server currently mounts no handlers under it. The callback requires the proxy to forward the path and a dedicated server route to receive it, alongside any necessary prefix-rewriting logic.
 
 ### The `state` Record
@@ -90,11 +90,10 @@ The callback phase executes six sequential steps in order, failing closed on err
 
 ### Server-Side Fetch Policy
 
-Every URL the engine fetches for a connection is tenant-authored: the discovery document, `jwks_uri`, the token endpoint, the userinfo endpoint, and any strategy fetch. On shared infrastructure that is a server-side request forgery surface. One engine-internal egress policy covers all of these fetches; it is not configurable per connection:
+Every URL the engine fetches for a connection is tenant-authored: the discovery document, `jwks_uri`, the token endpoint, the userinfo endpoint, and any strategy fetch. On shared infrastructure that is a server-side request forgery surface. The guard is not specific to connections: webhooks, actions, and any other tenant URL the engine fetches later need the same one, the way `zitadel/zitadel` centralizes it in one deny list. The egress policy is therefore its own epic (to be filed), which owns the deny mechanics and evaluates an operator-configurable allowlist mode for locked-down installations. This area consumes it as a dependency and carries two constraints into it:
 
-- Resolve the host, reject private, loopback, link-local, and metadata ranges (RFC 1918, `127.0.0.0/8`, `169.254.169.254`, and their IPv6 equivalents), and connect to the address that passed the check. Repeat the check on every redirect hop.
-- Cap redirect count, response size, and total fetch time.
-- Send only the connection's own credentials. No instance-internal headers or credentials ride along.
+- **Blocking for 851.** The callback processor fetches discovery, JWKS, token, userinfo, and the strategy URL, so SSO cannot ship to shared infrastructure without at least the baseline deny behaviour: resolve the host, reject private, loopback, link-local, and metadata ranges (RFC 1918, `127.0.0.0/8`, `169.254.169.254`, and their IPv6 equivalents), connect to the address that passed the check, and repeat the check on every redirect hop; cap redirect count, response size, and total fetch time; send only the connection's own credentials, never instance-internal headers.
+- **Not configurable per connection.** The connection schema carries no egress fields. Operator-level configuration is the epic's question.
 
 Local development instances may relax the loopback rejection so `http://localhost` providers work, matching the schema's TLS carve-out ([area 1](1-resource-model.md#the-connection-schema)).
 
@@ -106,20 +105,16 @@ A single `transitions.callback` cannot route returning users and new users to di
 | :--- | :--- | :--- |
 | **Known subject** | `callback` | **Done** (Authenticated). The engine applies `is_auto_update` with downgrade guards. Identity is pinned strictly to `(connection, subject)`, never claims, preventing profile edits from forking accounts. An auto-update write that would violate `x-unique` is dropped for that property; sign-in proceeds and the skip surfaces in diagnostics as the property name only. Conflict vocabulary stays reserved for unknown subjects. |
 | **Unknown subject** | `user_not_found` | **Data collection step** (register flows) or an **offer-register step** (login flows). |
-| **Unknown subject with unique-property collision** | `user_already_exists` | **Conflict resolution step**. |
+| **Unknown subject with unique-property collision** | `user_already_exists` | **Conflict resolution step**. The engine binds the attempt to the colliding account, so a password or passkey submit on that step authenticates that account (the same binding `register → password` relies on for a typed collision; here the value comes from the mapped claim). The credential must still be correct, so this adds no oracle beyond the enumeration note below. |
 
-### Auto-Creation (`is_auto_creation`)
+### Creation Without Collection (`is_auto_creation`)
 
-When `is_auto_creation: true` is set, the engine **creates the account immediately without pausing for collection** and fires `callback` as a newly authenticated user, provided two conditions are met:
+When `is_auto_creation: true` is set (the default), the engine **creates the account immediately without pausing for collection** and fires `callback` as a newly authenticated user, provided the mapped claims supply every required property in the schema.
 
-1. Mapped claims supply every required property in the schema.
-2. Every required property carrying an `x-verify` method is verified for this attempt (per Step 5 of Callback Processing).
-
-* **Verification Example:** A required `givenName` only needs a non-empty value, whereas a required `email` with `x-verify` must also arrive verified.
-* **Fallback Behavior:** If either condition fails, execution degrades to `user_not_found` → data collection.
+* **Fallback Behavior:** If a required property is missing, execution degrades to `user_not_found` → data collection, prefilled with what did arrive. This is the epic's new-user journey: the user provides only what the provider did not return.
+* **Always Collect:** `is_auto_creation: false` routes every new user through the collection step regardless of completeness. `is_creation_allowed: false` routes `user_not_found` to an authored error step instead, preventing dead ends.
 * **Static Warnings:** The plan phase warns when a pairing makes the gate statically dead (see [validator rules](1-resource-model.md#validator-rules)).
-* **Dialect Dependency:** `x-verify` was removed from the dialect as unread ([#901](https://github.com/zitadel/nextgen/pull/901)); this gate is its first consumer. The annotation returns with the engine work below (see [Engine Work](#engine-work) and the dependency note in [`1-resource-model.md`](1-resource-model.md#linking-safety)).
-* **Scaffolding Default:** Epic 851 scaffolds `is_auto_creation: false` by default to enforce the review-and-complete journey. Setting `is_creation_allowed: false` routes `user_not_found` to an authored error step, preventing dead ends.
+* **Verification Gating (deferred):** A second condition joins the check when `x-verify` returns to the dialect: every required property carrying `x-verify` must also arrive verified (per Step 5 of Callback Processing), otherwise the attempt degrades to collection. A required `givenName` then needs only a non-empty value, whereas a required `email` with `x-verify` must also arrive verified. `x-verify` was removed as unread ([#901](https://github.com/zitadel/nextgen/pull/901)); this gate is its first consumer, and no schema can carry it today, so 851 cannot enforce verification on either creation path and does not claim to. Enforcement becomes real per schema, when an author marks a property `x-verify`; committed connections do not change. See [Engine Work](#engine-work) and the dependency note in [`1-resource-model.md`](1-resource-model.md#linking-safety).
 
 ### Constraints & Edge Cases
 
@@ -136,7 +131,7 @@ The schema author determines which fields the collection step renders, while the
 * **Claim Mapping:** The engine prefills step fields using mapped claims configured in `claim_mapping`.
 * **Required Fields:** Required schema properties that arrive empty must be manually completed by the user.
 * **Optional Fields:** Omitted optional provider claims block nothing and are silently skipped.
-* **User Edits:** Prefilled fields remain editable. Per-property editability rules (`x-editable`) were removed from the dialect as unread ([#901](https://github.com/zitadel/nextgen/pull/901)); until the annotation returns with the collection-step implementation, editability is uniform. The confirmation step acts as a safety catch for wrong accounts.
+* **User Edits:** Prefilled fields remain editable. Per-property editability rules (`x-editable`) were removed from the dialect as unread ([#901](https://github.com/zitadel/nextgen/pull/901)); until the annotation returns with the collection-step implementation, editability is uniform.
 * **Verification Loss on Edit:** Editing a prefilled value immediately revokes its verified status. Because the provider only vouches for its own returned data, modified inputs must re-enter the standard verification pipeline (`x-verify`). This prevents users from replacing a verified prefilled email with an arbitrary address while retaining the verified flag.
 
 ### Wire Contract Compatibility
@@ -236,11 +231,11 @@ The current rendering architecture has no built-in knowledge of SSO. The `<zl-ss
 | :--- | :--- |
 | **`sso` Submission Handling** | Stubbed at `flow_state_machine.go:331` (replaces the `ErrFlowUnsupported` branch). |
 | **`state` Record Store & Callback Route** | Unimplemented (nothing exists). |
-| **Connection Fetch Egress Policy** | Unimplemented. One policy for every tenant-authored URL the engine fetches (see [Server-Side Fetch Policy](#server-side-fetch-policy)). |
+| **Connection Fetch Egress Policy** | Unimplemented. Owned by the egress-policy epic as a blocking dependency of 851 (see [Server-Side Fetch Policy](#server-side-fetch-policy)). |
 | **Protocol Engines** | OIDC discovery/code exchange and explicit-endpoint OAuth2 are available in `zitadel/zitadel` ([`oidc`](https://github.com/zitadel/zitadel/tree/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/oidc), [`oauth`](https://github.com/zitadel/zitadel/tree/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/oauth)), but completely absent in `nextgen`. |
 | **`github_primary_email` Strategy & Registry** | Design stage only (see reference implementation in [`github/session.go#L46-L112`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/github/session.go#L46-L112)). |
 | **`create_user_with_sso` (`on_success`)** | Referenced in documentation; currently unimplemented. |
-| **Claims Mapping & Auto-Creation Gate** | Design stage only (covers claims-to-properties mapping, verification evaluation, auto-creation gating, and `is_auto_update` guards). |
+| **Claims Mapping & Creation Gate** | Design stage only (covers claims-to-properties mapping, the completeness gate, and verification evaluation into diagnostics; verification gating and `is_auto_update` guards wait for `x-verify`). |
 | **Per-Property Verification (`x-verify`)** | Unimplemented end to end. [#901](https://github.com/zitadel/nextgen/pull/901) removed the annotation from the dialect as unread; re-adding it lands with this work. `user_attributes` exists as bare key/value pairs without verification flags, blocking creation-time verification tracking, `is_auto_update` downgrade guards, and edit-drops-verification logic. |
 
 ## Exported Requirements
@@ -250,8 +245,9 @@ The current rendering architecture has no built-in knowledge of SSO. The `<zl-ss
 | **Callback URI Surface:** Expose `{origin}/__nextgen/idp/callback` in the setup journey and per environment. | CLI Journey (Area 4) |
 | **Flow Scaffolding:** Scaffold `sso_providers` on the entry steps (both, in the shipped shared-entry default) and the conflict step with its login route. | CLI Journey (Area 4) |
 | **Callback Route:** Register route under the server HTTP surface; the scaffolded proxy matcher is already prefix-wide (`/__nextgen/:path*`), so no patcher work remains. | Server |
-| **Localization Keys:** Export conflict-step copy, error copy, and provider button labels as `text_key` entries. | Login UI / Locale Work |
+| **Localization Keys:** Export conflict-step copy (the account-exists explanation plus its submit, passkey, and sign-in actions), error copy, and provider button labels as `text_key` entries. | Login UI / Locale Work |
 | **UI & Branding Assets:** Add conditional SSO blocks to all five branding `login.liquid` templates and `default.liquid`; add provider glyphs to `zl-icon`. | Branding Defaults / Components |
+| **Failure-Details Channel:** Details are written to server logs and the test journey (area 6); tenant-side misconfigurations are hidden from the end user. | Test journey (Area 6) |
 
 ## Open Points
 

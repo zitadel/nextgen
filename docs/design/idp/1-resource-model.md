@@ -44,22 +44,21 @@ A connection operates similarly to a flow definition within the Zitadel GitOps s
 Most vendor-specific implementation is configuration. The model prioritizes configuration for data, named strategies for behavior.
 
 ### Context
-zitadel/zitadel implements each vendor as a Go package. Google is 53 lines: an issuer
-URL, one authorize parameter, one username rule. GitLab is 47 lines of endpoints.
-Most of that code is configuration written in Go.
+zitadel/zitadel implements each vendor as a Go package. Most of that code is
+configuration written in Go.
 
-| Provider | LOC | What is actually vendor-specific |
-|---|---|---|
-| [Google](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/google/google.go) | 53 | issuer, `prompt=select_account`, username falls back to email |
-| [GitLab](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/gitlab/gitlab.go) | 47 | endpoints |
-| [Zitadel](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/zitadel/zitadel.go) | 33 | issuer |
-| [AzureAD](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/azuread/azuread.go) | 361 | tenant-templated URLs, forced scopes, claim mapping |
-| [GitHub](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/github/github.go) | 308 | endpoints, userinfo mapping, private-email fetch |
-| [Apple](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/apple/apple.go) | 145 | `form_post` response mode, signed client secret |
+| Provider | What is actually vendor-specific |
+|---|---|
+| [Google](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/google/google.go) | issuer, `prompt=select_account`, username falls back to email |
+| [GitLab](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/gitlab/gitlab.go) | endpoints |
+| [Zitadel](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/zitadel/zitadel.go) | issuer |
+| [AzureAD](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/azuread/azuread.go) | tenant-templated URLs, forced scopes, claim mapping |
+| [GitHub](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/github/github.go) | endpoints, userinfo mapping, private-email fetch |
+| [Apple](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/apple/apple.go) | `form_post` response mode, signed client secret |
 
-The packages sit on five protocol engines: [`oidc`](https://github.com/zitadel/zitadel/tree/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/oidc) (349 LOC),
-[`oauth`](https://github.com/zitadel/zitadel/tree/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/oauth) (346), [`jwt`](https://github.com/zitadel/zitadel/tree/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/jwt) (317), [`saml`](https://github.com/zitadel/zitadel/tree/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/saml) (606),
-[`ldap`](https://github.com/zitadel/zitadel/tree/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/ldap) (796).
+The packages sit on five protocol engines: [`oidc`](https://github.com/zitadel/zitadel/tree/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/oidc),
+[`oauth`](https://github.com/zitadel/zitadel/tree/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/oauth), [`jwt`](https://github.com/zitadel/zitadel/tree/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/jwt), [`saml`](https://github.com/zitadel/zitadel/tree/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/saml),
+[`ldap`](https://github.com/zitadel/zitadel/tree/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/ldap).
 
 Across all six vendors, only three things are behaviour rather than data:
 
@@ -154,7 +153,7 @@ Setup scaffolds one file per selected provider.
   },
   "provisioning": {
     "is_creation_allowed": true,
-    "is_auto_creation": false
+    "is_auto_creation": true
   },
   "oidc": {
     "issuer": "https://accounts.google.com",
@@ -195,7 +194,7 @@ Setup scaffolds one file per selected provider.
   },
   "provisioning": {
     "is_creation_allowed": true,
-    "is_auto_creation": false
+    "is_auto_creation": true
   },
   "oauth2": {
     "authorization_endpoint": "https://github.com/login/oauth/authorize",
@@ -331,7 +330,7 @@ with `scaffoldedFrom` proposed as an addition; see [Open points](#open-points).
     "provisioning": {
       "type": "object",
       "additionalProperties": false,
-      "description": "What Zitadel may do with the resulting identity. `is_creation_allowed` permits creating a user from this provider at all; `is_auto_creation` decides whether creation happens automatically when the provider's claims satisfy every required property (verified, for properties carrying `x-verify`), or the flow stops to collect. Linking policy (`is_linking_allowed`, `auto_linking`) returns with the deferred account-linking journey, and `is_auto_update` with per-property verification state - both additive.",
+      "description": "What Zitadel may do with the resulting identity. `is_creation_allowed` permits creating a user from this provider at all; `is_auto_creation` decides whether creation happens without a collection step when the provider's claims satisfy every required property, or the flow always stops to collect. Verification gating joins that check when `x-verify` returns to the dialect. Linking policy (`is_linking_allowed`, `auto_linking`) returns with the deferred account-linking journey, and `is_auto_update` with per-property verification state - both additive.",
       "properties": {
         "is_creation_allowed": {
           "type": "boolean",
@@ -339,7 +338,7 @@ with `scaffoldedFrom` proposed as an addition; see [Open points](#open-points).
         },
         "is_auto_creation": {
           "type": "boolean",
-          "default": false
+          "default": true
         }
       }
     },
@@ -639,9 +638,9 @@ These flags directly transcribe the legacy provider options ([`oidc/oidc.go#L41-
 | Flag | Behavior / Question it answers |
 | :--- | :--- |
 | `is_creation_allowed` | Can this provider create new users at all? |
-| `is_auto_creation` | Should users be created silently if claims cover all required properties (and verified where `x-verify` is present), or should the flow stop to collect missing data? |
+| `is_auto_creation` | Should users be created without a collection step when claims cover all required properties, or should the flow always stop to collect? Verification gating (properties carrying `x-verify` must arrive verified) joins the check when the annotation returns. |
 
-By default, 851 scaffolds `is_auto_creation: false` to ensure users manually review and complete their data. The complete logic for this is detailed under the [resolution branches](3-social-login-flow.md#resolution-branches) in Area 3.
+Both flags default to `true`: a user whose provider returned everything the schema requires is created without a form, and the collection step appears only for what is missing, which is the epic's new-user journey. Neither flag can enforce verification in 851; that arrives with `x-verify`. The complete logic for this is detailed under the [resolution branches](3-social-login-flow.md#resolution-branches) in Area 3.
 
 *Note:* The legacy flags that governed account linking (`is_linking_allowed`, `auto_linking`) have been removed from this initial release. See [Linking safety](#linking-safety) for details.
 
@@ -702,7 +701,7 @@ Epic 851 does not include account linking. The linking fields are excluded from 
 - **Username matching limitations:** Username matching has no verification equivalent. Subject-based matching is the only strongly secure variant.
 - **Subject matching is not schema-aware:** A single connection can serve several schemas, so one person's Google account can legitimately back both a Customers user and an Employees user. The link key `(connection, subject)` carries no schema, a user row carries exactly one (`users.schema_url`, `internal/storage/dialect/postgres/migration/sql/000004_users.sql:5`), and a flow definition names exactly one (`user_schema`, `api/openapi/components/flows/flow-definition.yaml:26`). A subject lookup can therefore return a record the active flow's schema does not own. Linking must settle whether identity spaces are per schema or per project before it can match on subject at all; the open question lives in [area 3](3-social-login-flow.md#open-points).
 
-The `verified_claims` field itself stays in the 851 schema: the auto-creation gate reads it to decide whether claims may create a user silently. The deferred `is_auto_update` will also read it when that flag returns.
+The `verified_claims` field itself stays in the 851 schema. Its 851 reader is diagnostics: the callback evaluates each entry into the resolved identity's verification results, which the test journey reports (area 6). Gating creation on those results and persisting them on the user both return with `x-verify`, as does the deferred `is_auto_update`. Keeping the field now means the committed connection shape does not change when they do.
 
 **The `x-verify` Dependency:**
 `x-verify` no longer exists in the dialect. [#901](https://github.com/zitadel/nextgen/pull/901) removed it (together with `x-editable`, `x-sensitive`, and `x-mfa`) because nothing read it, stating the removed annotations "can be re-added once they become required". [`user-property.json`](../../../packages/config/meta-schemas/user-property.json) today carries only `x-unique`, `x-claim`, and `x-audit`. This design is the first consumer: every `x-verify` reference in these documents describes the returning annotation, not the shipped dialect.
@@ -813,6 +812,7 @@ Behaviors this design relies on but does not implement. Each later area opens wi
 
 | Requirement | Owed By |
 | :--- | :--- |
+| A stable `slug` is the connection's identity: user schemas and flow definitions reference connections by slug only, never by revision id. | [`2-auth-method-selection.md`](2-auth-method-selection.md) |
 | An SSO attempt must bind to a specific connection revision at the exact moment it starts. | [`3-social-login-flow.md`](3-social-login-flow.md) |
 | An absent verification claim must be evaluated as unverified (fail closed). | [`3-social-login-flow.md`](3-social-login-flow.md) / Engine |
 | Truthiness evaluation must strictly accept only boolean `true` or string `"true"`. | [`3-social-login-flow.md`](3-social-login-flow.md) / Engine |
