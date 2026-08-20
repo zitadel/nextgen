@@ -11,12 +11,12 @@ import (
 )
 
 const (
-	createJSONSchemaStmt = `INSERT INTO json_schemas (project_id, url, object_type, payload, created_at)
-VALUES (?, ?, ?, ?, ?) RETURNING project_id, url, object_type, created_at, payload`
+	createJSONSchemaStmt = `INSERT INTO json_schemas (project_id, url, object_type, kind, payload, created_at)
+VALUES (?, ?, ?, ?, ?, ?) RETURNING project_id, url, object_type, kind, created_at, payload`
 
 	deleteByIDJSONSchemaStmt = `DELETE FROM json_schemas WHERE project_id = ? AND url = ?`
 
-	jsonSchemaQuery = `SELECT project_id, url, object_type, created_at, payload FROM json_schemas`
+	jsonSchemaQuery = `SELECT project_id, url, object_type, kind, created_at, payload FROM json_schemas`
 )
 
 type jsonSchemaStatements struct{ statement }
@@ -37,7 +37,7 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 	}
 	return withTransaction(ctx, js.client, func(ctx context.Context, tx queryExecutor) error {
 		row := tx.QueryRow(ctx, createJSONSchemaStmt,
-			schema.ProjectID, schema.URL, schema.ObjectType, payload, now,
+			schema.ProjectID, schema.URL, schema.ObjectType, schema.Kind, payload, now,
 		)
 		scanned, err := scanJSONSchemaRow(row)
 		if err != nil {
@@ -115,16 +115,21 @@ func scanJSONSchemaRow(row *sql.Row) (*domain.JSONSchema, error) {
 	schema := new(domain.JSONSchema)
 	var (
 		objectType  sql.NullString
+		kind        sql.NullString
 		createdNano int64
 		payloadStr  sql.NullString
 	)
-	if err := row.Scan(&schema.ProjectID, &schema.URL, &objectType, &createdNano, &payloadStr); err != nil {
+	if err := row.Scan(&schema.ProjectID, &schema.URL, &objectType, &kind, &createdNano, &payloadStr); err != nil {
 		return nil, err
 	}
 	schema.CreatedAt = timeFromUnixNano(createdNano)
 	if objectType.Valid {
 		v := objectType.String
 		schema.ObjectType = &v
+	}
+	if kind.Valid {
+		v := kind.String
+		schema.Kind = &v
 	}
 	schema.Schema = nullJSONBytes(payloadStr)
 	return schema, nil
@@ -134,16 +139,21 @@ func scanJSONSchema(rows *sql.Rows) (*domain.JSONSchema, error) {
 	schema := new(domain.JSONSchema)
 	var (
 		objectType  sql.NullString
+		kind        sql.NullString
 		createdNano int64
 		payloadStr  sql.NullString
 	)
-	if err := rows.Scan(&schema.ProjectID, &schema.URL, &objectType, &createdNano, &payloadStr); err != nil {
+	if err := rows.Scan(&schema.ProjectID, &schema.URL, &objectType, &kind, &createdNano, &payloadStr); err != nil {
 		return nil, err
 	}
 	schema.CreatedAt = timeFromUnixNano(createdNano)
 	if objectType.Valid {
 		v := objectType.String
 		schema.ObjectType = &v
+	}
+	if kind.Valid {
+		v := kind.String
+		schema.Kind = &v
 	}
 	schema.Schema = nullJSONBytes(payloadStr)
 	return schema, nil
@@ -172,5 +182,11 @@ var jsonSchemaSchema = database.NewSchema(map[domain.JSONSchemaField]database.Fi
 		SQLName:  "created_at",
 		Accessor: func(s *domain.JSONSchema) any { return s.CreatedAt },
 		Coerce:   database.CoerceTime,
+	},
+	domain.JSONSchemaFieldKind: {
+		SQLName:  "kind",
+		Accessor: func(s *domain.JSONSchema) any { return database.NullableValue(s.Kind) },
+		Coerce:   database.CoerceString,
+		Nullable: true,
 	},
 })

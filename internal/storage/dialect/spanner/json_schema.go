@@ -14,13 +14,13 @@ import (
 
 const (
 	jsonSchemasTable         = "json_schemas"
-	createJSONSchemaStmt     = `INSERT INTO json_schemas (project_id, url, object_type, payload) VALUES (@p1, @p2, @p3, @p4) THEN RETURN project_id, url, object_type, created_at, payload`
+	createJSONSchemaStmt     = `INSERT INTO json_schemas (project_id, url, object_type, kind, payload) VALUES (@p1, @p2, @p3, @p4, @p5) THEN RETURN project_id, url, object_type, kind, created_at, payload`
 	deleteByIDJSONSchemaStmt = `DELETE FROM json_schemas WHERE project_id = @p1 AND url = @p2`
-	jsonSchemaQuery          = "SELECT project_id, url, object_type, created_at, payload FROM json_schemas"
+	jsonSchemaQuery          = "SELECT project_id, url, object_type, kind, created_at, payload FROM json_schemas"
 )
 
 var jsonSchemaColumns = []string{
-	"project_id", "url", "object_type", "created_at", "payload",
+	"project_id", "url", "object_type", "kind", "created_at", "payload",
 }
 
 type jsonSchemaStatements struct{ statement }
@@ -39,7 +39,7 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 		return err
 	}
 	return withTransaction(ctx, js.db, func(ctx context.Context, tx queryExecutor) error {
-		stmt := buildStatement(createJSONSchemaStmt, schema.ProjectID, schema.URL, schema.ObjectType, encodeJSONSchemaPayload(schema.Schema)).statement()
+		stmt := buildStatement(createJSONSchemaStmt, schema.ProjectID, schema.URL, schema.ObjectType, schema.Kind, encodeJSONSchemaPayload(schema.Schema)).statement()
 		if err := tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 				scanned, err := js.scanJSONSchema(row)
@@ -115,7 +115,7 @@ func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *data
 func (js jsonSchemaStatements) scanJSONSchema(row *spanner.Row) (*domain.JSONSchema, error) {
 	schema := new(domain.JSONSchema)
 	var payload spanner.NullJSON
-	if err := row.Columns(&schema.ProjectID, &schema.URL, &schema.ObjectType, &schema.CreatedAt, &payload); err != nil {
+	if err := row.Columns(&schema.ProjectID, &schema.URL, &schema.ObjectType, &schema.Kind, &schema.CreatedAt, &payload); err != nil {
 		return nil, err
 	}
 	data, err := decodeJSONSchemaPayload(payload)
@@ -167,5 +167,11 @@ var jsonSchemaSchema = database.NewSchema(map[domain.JSONSchemaField]database.Fi
 		SQLName:  "created_at",
 		Accessor: func(s *domain.JSONSchema) any { return s.CreatedAt },
 		Coerce:   database.CoerceTime,
+	},
+	domain.JSONSchemaFieldKind: {
+		SQLName:  "kind",
+		Accessor: func(s *domain.JSONSchema) any { return database.NullableValue(s.Kind) },
+		Coerce:   database.CoerceString,
+		Nullable: true,
 	},
 })

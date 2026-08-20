@@ -78,6 +78,7 @@ func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams)
 	schemas, err := h.schemaService.ListSchemas(ctx,
 		string(params.ProjectID),
 		params.ObjectType.Value,
+		string(params.Kind.Value),
 		params.Offset.Value,
 		string(params.PageToken.Value),
 	)

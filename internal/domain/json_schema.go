@@ -48,6 +48,7 @@ type JSONSchema struct {
 	ProjectID  string
 	URL        string
 	ObjectType *string
+	Kind       *string
 	CreatedAt  time.Time
 	Schema     []byte
 }
@@ -62,6 +63,7 @@ const (
 	JSONSchemaFieldURL
 	JSONSchemaFieldObjectType
 	JSONSchemaFieldCreatedAt
+	JSONSchemaFieldKind
 )
 
 func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error) {
@@ -86,10 +88,16 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 		objectType = &ot
 	}
 
+	var kind *string
+	if k, ok := maputil.Get[string](schema, "kind"); ok {
+		kind = &k
+	}
+
 	return &JSONSchema{
 		ProjectID:  projectID,
 		URL:        schemaID,
 		ObjectType: objectType,
+		Kind:       kind,
 		CreatedAt:  time.Now().UTC(),
 		Schema:     schemabs,
 	}, nil

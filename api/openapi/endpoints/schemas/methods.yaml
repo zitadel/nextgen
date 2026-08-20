@@ -93,6 +93,22 @@ get:
       schema:
         type: string
         maxLength: 256
+    - name: kind
+      in: query
+      description: |
+        The kind of schema to filter by, read from the stored document's
+        `kind` property.
+
+        `schema-url` is not a kind: it discriminates the create request body,
+        not a stored schema. A schema registered by URL is stored as whatever
+        document the URL served, and declares its own kind.
+
+        Schemas whose stored document declares no kind are excluded from a
+        filtered result.
+      schema:
+        type: string
+        enum:
+          - user-schema
   security:
     - oauth2:
         - schema.read

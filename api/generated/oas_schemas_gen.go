@@ -18809,6 +18809,40 @@ func (s *ListFlowDefinitionsPurpose) UnmarshalText(data []byte) error {
 	}
 }
 
+type ListSchemasKind string
+
+const (
+	ListSchemasKindUserSchema ListSchemasKind = "user-schema"
+)
+
+// AllValues returns all ListSchemasKind values.
+func (ListSchemasKind) AllValues() []ListSchemasKind {
+	return []ListSchemasKind{
+		ListSchemasKindUserSchema,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ListSchemasKind) MarshalText() ([]byte, error) {
+	switch s {
+	case ListSchemasKindUserSchema:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ListSchemasKind) UnmarshalText(data []byte) error {
+	switch ListSchemasKind(data) {
+	case ListSchemasKindUserSchema:
+		*s = ListSchemasKindUserSchema
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type ListSchemasResponse []ListSchemasResponseItem
 
 func (*ListSchemasResponse) listSchemasRes() {}
@@ -24024,6 +24058,52 @@ func (o OptListFlowDefinitionsPurpose) Get() (v ListFlowDefinitionsPurpose, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptListFlowDefinitionsPurpose) Or(d ListFlowDefinitionsPurpose) ListFlowDefinitionsPurpose {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptListSchemasKind returns new OptListSchemasKind with value set to v.
+func NewOptListSchemasKind(v ListSchemasKind) OptListSchemasKind {
+	return OptListSchemasKind{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptListSchemasKind is optional ListSchemasKind.
+type OptListSchemasKind struct {
+	Value ListSchemasKind
+	Set   bool
+}
+
+// IsSet returns true if OptListSchemasKind was set.
+func (o OptListSchemasKind) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptListSchemasKind) Reset() {
+	var v ListSchemasKind
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptListSchemasKind) SetTo(v ListSchemasKind) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptListSchemasKind) Get() (v ListSchemasKind, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptListSchemasKind) Or(d ListSchemasKind) ListSchemasKind {
 	if v, ok := o.Get(); ok {
 		return v
 	}

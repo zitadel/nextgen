@@ -6908,6 +6908,10 @@ func (s *Server) handleListSchemasRequest(args [0]string, argsEscaped bool, w ht
 					Name: "object_type",
 					In:   "query",
 				}: params.ObjectType,
+				{
+					Name: "kind",
+					In:   "query",
+				}: params.Kind,
 			},
 			Raw: r,
 		}

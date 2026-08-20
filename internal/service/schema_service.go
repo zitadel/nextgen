@@ -129,13 +129,21 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 	return schema, nil
 }
 
-func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType string, offset int, token string) ([]ListSchemasOutputItem, error) {
+func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType, kind string, offset int, token string) ([]ListSchemasOutputItem, error) {
 	filters := []database.Filter[domain.JSONSchemaField]{
 		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
 	}
 	if objectType != "" {
 		filters = append(filters,
 			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType),
+		)
+	}
+	// Rows with no recorded kind — schemas ingested by URL and $ref targets
+	// pulled in during resolution (#812) — are NULL here, so an equality
+	// filter excludes them.
+	if kind != "" {
+		filters = append(filters,
+			database.Equal(database.Col(domain.JSONSchemaFieldKind), kind),
 		)
 	}
 

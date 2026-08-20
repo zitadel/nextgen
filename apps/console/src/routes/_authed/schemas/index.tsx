@@ -31,7 +31,10 @@ export const Route = createFileRoute("/_authed/schemas/")({
     // document. The list is configuration and stays small (~20, decisions log
     // D0a/D7), so fetching them together is cheap and there is no pagination
     // to interleave with.
-    const entries = await api.listSchemas({ project_id: projectId });
+    // `kind` scopes the list to user schemas. The screen is titled `User
+    // schemas` and only knows how to render one, so this is the contract the
+    // rows already assume rather than a new restriction.
+    const entries = await api.listSchemas({ project_id: projectId, kind: "user-schema" });
     const documents = await Promise.all(
       entries.map(async (entry) => {
         try {
