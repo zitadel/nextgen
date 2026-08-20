@@ -99,6 +99,10 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
   // vars to the client; loading with an empty prefix here stays config-time
   // and server-side only, so `.env.local` works without exporting the vars in
   // the shell. The process environment still wins for CI/one-off overrides.
+  // Normally nobody sets these by hand: `console:dev-real` (and the e2e-real
+  // suite) thread both from the boot-captured @zitadel/testing instance
+  // handle (`scripts/dev-real.mts`) — hand-set values are for pointing at an
+  // already-running instance.
   const nodeEnv = loadEnv(mode, import.meta.dirname, "");
   const backendUrl =
     process.env.CONSOLE_BACKEND_URL || nodeEnv.CONSOLE_BACKEND_URL || defaultBackendUrl;
@@ -109,7 +113,7 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
   const escaped = apiBase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
   return {
-    // Console ADR 0004 §2: the pre-session runtime-metadata document lives
+    // Console ADR 0004 §3: the pre-session runtime-metadata document lives
     // at a root path served by the Go mux; forward it as-is (public, no
     // bearer to inject).
     "/console/runtime.json": {

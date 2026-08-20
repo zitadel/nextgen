@@ -26,9 +26,19 @@ func (g *Graph) OracleCheck(projectID, principalHomeProjectID string, principalT
 	return g.ttuAllows(projectID, home, principalType, principalID, objectType, relation, now)
 }
 
-// OracleCheckParams applies OracleCheck then the sk_team_ team constraint.
+// OracleCheckParams applies OracleCheck, optional team/resource-scoped grant
+// arms (by-id Check), then the sk_team_ team constraint.
 func (g *Graph) OracleCheckParams(p domain.AuthzCheckParams) bool {
-	if !g.OracleCheck(p.ProjectID, p.HomeProjectID(), p.PrincipalType, p.PrincipalID, p.ObjectType, p.Relation) {
+	home := p.HomeProjectID()
+	now := time.Now()
+	allowed := g.OracleCheck(p.ProjectID, home, p.PrincipalType, p.PrincipalID, p.ObjectType, p.Relation)
+	if !allowed && p.ResourceTeamID != "" {
+		allowed = g.closureAllowsScoped(p.ProjectID, home, p.PrincipalType, p.PrincipalID, p.ObjectType, p.Relation, domain.AuthzScopeKindTeam, p.ResourceTeamID, now)
+	}
+	if !allowed && p.ResourceID != "" {
+		allowed = g.closureAllowsScoped(p.ProjectID, home, p.PrincipalType, p.PrincipalID, p.ObjectType, p.Relation, domain.AuthzScopeKindResource, p.ResourceID, now)
+	}
+	if !allowed {
 		return false
 	}
 	return g.constraintTeamAllows(p)

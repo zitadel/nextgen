@@ -43,10 +43,7 @@ func (h Handler) GetFlowDefinition(ctx context.Context, params api.GetFlowDefini
 }
 
 func (h Handler) ListFlowDefinitions(ctx context.Context, params api.ListFlowDefinitionsParams) (api.ListFlowDefinitionsRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), flowDefinitionAccess, opRead); err != nil {
-		return nil, err
-	}
-	ctx, err := h.withAuthzListFilter(ctx, string(params.ProjectID), domain.ResourceKindFlowDefinition, opRead)
+	ctx, err := h.requireProjectListAccess(ctx, string(params.ProjectID), flowDefinitionAccess, domain.ResourceKindFlowDefinition)
 	if err != nil {
 		return nil, err
 	}

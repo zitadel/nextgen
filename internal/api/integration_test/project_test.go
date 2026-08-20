@@ -141,7 +141,7 @@ func TestCreateProjectProvisionsDefaultLoginFlow(t *testing.T) {
 	assert.Equal(t, schemaURL, schema.URL)
 
 	listed, err := harness.EnsureServiceDB(t).Statements().ListFlowDefinitions(
-		t.Context(),
+		service.WithAuthzListUnrestricted(t.Context()),
 		&database.ListOptions[domain.FlowDefinitionField]{
 			Filter: database.And(
 				database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), project.ID),
@@ -212,7 +212,7 @@ func TestCreateProjectSkipsDefaultLoginFlow(t *testing.T) {
 	require.Error(t, err)
 
 	listed, err := harness.EnsureServiceDB(t).Statements().ListFlowDefinitions(
-		t.Context(),
+		service.WithAuthzListUnrestricted(t.Context()),
 		&database.ListOptions[domain.FlowDefinitionField]{
 			Filter: database.And(
 				database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),

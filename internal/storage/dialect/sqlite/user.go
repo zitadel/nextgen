@@ -116,8 +116,11 @@ func (us userStatements) CreateUser(ctx context.Context, user *domain.CreateUser
 }
 
 // GetUser implements [service.UserStatements].
+// By-id lookup is compileRead-shaped (#839): WithAuthzListUnrestricted skips
+// the #838 tripwire and ignores an inherited list filter. HTTP ListUsers is
+// the management path that must fail closed.
 func (us userStatements) GetUser(ctx context.Context, filter database.Filter[domain.UserField], opts service.UserQueryOptions) (*domain.User, error) {
-	result, err := us.ListUsers(ctx, &database.ListOptions[domain.UserField]{Filter: filter}, opts)
+	result, err := us.ListUsers(service.WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.UserField]{Filter: filter}, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +136,9 @@ func (us userStatements) GetUser(ctx context.Context, filter database.Filter[dom
 
 // ListUsers implements [service.UserStatements].
 func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+	if err := authz.RequireManagementListFilter(ctx); err != nil {
+		return nil, err
+	}
 	filter = v2user.EnsureListOptions(filter)
 
 	readFilter, err := v2user.ApplyCursor(filter.Filter, filter.Pagination)

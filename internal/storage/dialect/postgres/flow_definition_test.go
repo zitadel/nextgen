@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -85,7 +86,7 @@ func TestFlowDefinitionStatements_ListAndDelete(t *testing.T) {
 	def := sampleFlowDefinition(projectID, uniqueFlowDefinitionID(t))
 	require.NoError(t, testPool.CreateFlowDefinition(t.Context(), def))
 
-	listed, err := testPool.ListFlowDefinitions(t.Context(), &database.ListOptions[domain.FlowDefinitionField]{
+	listed, err := testPool.ListFlowDefinitions(service.WithAuthzListUnrestricted(t.Context()), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
 			database.Equal(database.Col(domain.FlowDefinitionFieldName), def.Name),
@@ -139,7 +140,7 @@ func TestFlowDefinitionStatements_ListByPurpose(t *testing.T) {
 	require.NoError(t, testPool.CreateFlowDefinition(t.Context(), login))
 	require.NoError(t, testPool.CreateFlowDefinition(t.Context(), register))
 
-	listed, err := testPool.ListFlowDefinitions(t.Context(), &database.ListOptions[domain.FlowDefinitionField]{
+	listed, err := testPool.ListFlowDefinitions(service.WithAuthzListUnrestricted(t.Context()), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
 			database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), domain.FlowDefinitionPurposeLogin.String()),
@@ -166,7 +167,7 @@ func TestFlowDefinitionStatements_ListByStatus(t *testing.T) {
 	require.NoError(t, testPool.CreateFlowDefinition(t.Context(), draft))
 	require.NoError(t, testPool.CreateFlowDefinition(t.Context(), active))
 
-	listed, err := testPool.ListFlowDefinitions(t.Context(), &database.ListOptions[domain.FlowDefinitionField]{
+	listed, err := testPool.ListFlowDefinitions(service.WithAuthzListUnrestricted(t.Context()), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
 			database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),

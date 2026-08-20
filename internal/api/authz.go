@@ -10,13 +10,10 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// The management API (operator plane: schemas, flow definitions, users, teams,
-// project queries, branding, operator sessions) is gated by resolver.Check after
-// credential → ScopeContext. Path-id ops resolve scope via resource_scope_index
-// (requireResourceAccess) before Check; create/list keep an explicit project_id
-// and use requireProjectAccess, then inject an EXISTS list predicate via
-// withAuthzListFilter. MVP uses coarse project.{viewer,editor,admin}
-// (#420 expands to fine-grained catalog relations). Preview secrets
+// The management API is gated by resolver.Check after credential → ScopeContext.
+// Path-id ops resolve RSI then Check; create uses requireProjectAccess.
+// Lists use requireProjectListAccess: project-wide Allow stamps a one-shot
+// EXISTS skip, Forbidden attaches the predicate, NotFound 404s. Preview secrets
 // (project.read only) cannot call management APIs (ADR 037).
 
 // accessOp classifies a management operation for relation mapping and miss shaping.
@@ -204,14 +201,15 @@ func requireResourceAccess(ctx context.Context, stmts resourceAccessStmts, resou
 		// Wrong kind for this route: same anti-oracle shape as unknown id.
 		return "", res.readMiss()
 	}
-	if err := requireProjectAccessAfterRSI(ctx, stmts, scope.ProjectID, res, op); err != nil {
+	if err := requireProjectAccessAfterRSI(ctx, stmts, scope, res, op); err != nil {
 		return "", err
 	}
 	return scope.ProjectID, nil
 }
 
 // requireProjectAccess gates a management operation via resolver.Check when
-// project_id is already known (create/list/query, project by-id, or after RSI).
+// project_id is already known (create, project by-id, or after RSI).
+// Management lists use requireProjectListAccess, not this gate.
 // DecisionNotFound → resource not-found / invalid-project shapes (404).
 // DecisionForbidden → permission_denied (403).
 func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
@@ -222,52 +220,86 @@ func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, re
 }
 
 func requireProjectAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp) error {
-	return requireProjectAccessMapped(ctx, stmts, projectID, res, op, false)
+	return requireProjectAccessMapped(ctx, stmts, projectID, res, op, nil)
 }
 
 // requireProjectAccessAfterRSI is requireProjectAccess for by-id ops after an
 // RSI hit: DecisionNotFound always uses readMiss (not writeMiss) so PATCH routes
-// do not leak existence via mismatched codes.
-func requireProjectAccessAfterRSI(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp) error {
-	return requireProjectAccessMapped(ctx, stmts, projectID, res, op, true)
+// do not leak existence via mismatched codes. Team-/resource-scoped grants may
+// Allow when RSI.team_id / path id match the grant (authz.md scoped Allow).
+func requireProjectAccessAfterRSI(ctx context.Context, stmts service.AuthzResolverStatements, rsi *domain.ResourceScope, res resourceAccess, op accessOp) error {
+	return requireProjectAccessMapped(ctx, stmts, rsi.ProjectID, res, op, rsi)
 }
 
-func requireProjectAccessMapped(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp, afterRSI bool) error {
-	scope, ok := GetScopeContext(ctx)
-	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
-		if afterRSI {
-			return res.readMiss()
-		}
-		return res.miss(op)
-	}
-
-	if !hasOperatorProjectWrite(scope.Scope) {
-		// Foreign / unbound → anti-oracle miss; same project → denied (preview).
-		if scope.ProjectID == "" || scope.ProjectID != projectID {
-			if afterRSI {
-				return res.readMiss()
-			}
-			return res.miss(op)
-		}
-		return res.denied()
-	}
-
-	// MVP: Check ObjectType "project" only — team-/resource-scoped Allow is out
-	// of scope until a later gate (#833).
-	dec, err := resolver.New().Check(ctx, stmts, resolver.Request{
-		PrincipalType: scope.PrincipalType,
-		PrincipalID:   scope.PrincipalID,
-		ProjectID:     projectID,
-		ObjectType:    "project",
-		Relation:      projectRelation(op),
-	})
+func requireProjectAccessMapped(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, op accessOp, rsi *domain.ResourceScope) error {
+	dec, err := checkProjectAccess(ctx, resolver.New(), stmts, projectID, op, rsi)
 	if err != nil {
-		return domain.ErrInternal(err).WithMessage("authz permission check failed")
+		return mapCeilingError(err, res, op, rsi)
 	}
-	if afterRSI {
+	if rsi != nil {
 		return mapAuthzDecisionAfterRSI(dec, res)
 	}
 	return mapAuthzDecision(dec, res, op)
+}
+
+var (
+	errAuthzNoScope       = errors.New("authz: missing credential scope")
+	errAuthzPreviewDenied = errors.New("authz: preview credential denied")
+)
+
+func mapCeilingError(err error, res resourceAccess, op accessOp, rsi *domain.ResourceScope) error {
+	switch {
+	case errors.Is(err, errAuthzNoScope):
+		if rsi != nil {
+			return res.readMiss()
+		}
+		return res.miss(op)
+	case errors.Is(err, errAuthzPreviewDenied):
+		return res.denied()
+	default:
+		return err
+	}
+}
+
+func projectCheckRequest(scope ScopeContext, projectID string, op accessOp, rsi *domain.ResourceScope) resolver.Request {
+	req := resolver.Request{
+		PrincipalType: scope.PrincipalType,
+		PrincipalID:   scope.PrincipalID,
+		ProjectID:     projectID,
+		HomeProjectID: scope.ProjectID,
+		ObjectType:    "project",
+		Relation:      projectRelation(op),
+		TeamID:        scope.TeamID,
+	}
+	if rsi != nil {
+		req.ResourceID = rsi.ResourceID
+		if rsi.TeamID != nil {
+			req.ResourceTeamID = *rsi.TeamID
+		}
+	}
+	return req
+}
+
+// checkProjectAccess runs the credential ceiling then resolver.Check.
+// Ceiling failures are errAuthzNoScope / errAuthzPreviewDenied; Check
+// failures are already domain.ErrInternal.
+func checkProjectAccess(ctx context.Context, r *resolver.Resolver, stmts service.AuthzResolverStatements, projectID string, op accessOp, rsi *domain.ResourceScope) (resolver.Decision, error) {
+	scope, ok := GetScopeContext(ctx)
+	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
+		return resolver.DecisionUnspecified, errAuthzNoScope
+	}
+	if !hasOperatorProjectWrite(scope.Scope) {
+		// Foreign / unbound → anti-oracle miss; same project → denied (preview).
+		if scope.ProjectID == "" || scope.ProjectID != projectID {
+			return resolver.DecisionUnspecified, errAuthzNoScope
+		}
+		return resolver.DecisionUnspecified, errAuthzPreviewDenied
+	}
+	dec, err := r.Check(ctx, stmts, projectCheckRequest(scope, projectID, op, rsi))
+	if err != nil {
+		return resolver.DecisionUnspecified, domain.ErrInternal(err).WithMessage("authz permission check failed")
+	}
+	return dec, nil
 }
 
 // hasOperatorProjectWrite is the credential-plane ceiling: only the full
@@ -295,6 +327,35 @@ func mapAuthzDecision(dec resolver.Decision, res resourceAccess, op accessOp) er
 	}
 }
 
+// requireProjectListAccess gates a management list and attaches the list
+// context: Allow stamps a one-shot EXISTS skip (consumed by the next
+// compileList / ListUsers); Forbidden attaches the EXISTS predicate via
+// the same Resolver used for Check; NotFound 404s.
+func (h *Handler) requireProjectListAccess(ctx context.Context, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, error) {
+	if h == nil || h.pool == nil {
+		return ctx, domain.ErrInternal(errors.New("authz statements not configured"))
+	}
+	return requireProjectListAccess(ctx, h.pool.Statements(), projectID, res, kind)
+}
+
+func requireProjectListAccess(ctx context.Context, stmts service.AuthzResolverStatements, projectID string, res resourceAccess, kind domain.ResourceKind) (context.Context, error) {
+	r := resolver.New()
+	dec, err := checkProjectAccess(ctx, r, stmts, projectID, opRead, nil)
+	if err != nil {
+		return ctx, mapCeilingError(err, res, opRead, nil)
+	}
+	switch dec {
+	case resolver.DecisionAllow:
+		return service.WithAuthzListSkipOnce(ctx), nil
+	case resolver.DecisionForbidden:
+		return withAuthzListFilter(ctx, r, stmts, projectID, kind, opRead)
+	case resolver.DecisionNotFound, resolver.DecisionUnspecified:
+		return ctx, res.miss(opRead)
+	default:
+		return ctx, res.miss(opRead)
+	}
+}
+
 // mapAuthzDecisionAfterRSI maps Check results after RSI already located the
 // resource. NotFound/Unspecified always use readMiss so write ops do not
 // advertise a different code than reads.
@@ -311,38 +372,20 @@ func mapAuthzDecisionAfterRSI(dec resolver.Decision, res resourceAccess) error {
 	}
 }
 
-// withAuthzListFilter attaches the SQL list-predicate filter for management
-// list endpoints after requireProjectAccess has already passed.
-// PrincipalHomeProjectID comes from the credential's home project while Check
-// uses the target projectID; those are equivalent until foreign footholds
-// (#333) land.
-func (h *Handler) withAuthzListFilter(ctx context.Context, projectID string, kind domain.ResourceKind, op accessOp) (context.Context, error) {
+// withAuthzListFilter attaches the EXISTS list predicate using the same
+// CheckParams builder as resolver.Check (including ConstraintTeamID).
+func withAuthzListFilter(ctx context.Context, r *resolver.Resolver, stmts service.AuthzResolverStatements, projectID string, kind domain.ResourceKind, op accessOp) (context.Context, error) {
 	scope, ok := GetScopeContext(ctx)
 	if !ok || scope.PrincipalType == "" || scope.PrincipalID == "" {
 		return ctx, domain.ErrInternal(nil).WithMessage("authz list filter requires credential scope")
 	}
-	if h == nil || h.pool == nil {
-		return ctx, domain.ErrInternal(errors.New("authz statements not configured"))
-	}
-	catalogID, err := h.pool.Statements().ActiveSystemCatalogID(ctx)
+	params, err := r.CheckParams(ctx, stmts, projectCheckRequest(scope, projectID, op, nil))
 	if err != nil {
 		return ctx, domain.ErrInternal(err).WithMessage("authz catalog lookup failed")
 	}
-	home := scope.ProjectID
-	if home == "" {
-		home = projectID
-	}
 	return service.WithAuthzListFilter(ctx, service.AuthzListFilter{
-		AuthzCheckParams: domain.AuthzCheckParams{
-			CatalogID:              catalogID,
-			ProjectID:              projectID,
-			PrincipalHomeProjectID: home,
-			PrincipalType:          scope.PrincipalType,
-			PrincipalID:            scope.PrincipalID,
-			ObjectType:             "project",
-			Relation:               projectRelation(op),
-		},
-		ResourceKind: kind,
+		AuthzCheckParams: params,
+		ResourceKind:     kind,
 	}), nil
 }
 

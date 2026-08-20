@@ -106,6 +106,14 @@ func run(m *testing.M) int {
 	return m.Run()
 }
 
+// unfilteredListCtx is for storage-layer list tests that are not HTTP
+// management lists. Production compileList requires AuthzListFilter, a
+// one-shot Allow skip, or WithAuthzListUnrestricted (#838 / #837).
+func unfilteredListCtx(t *testing.T) context.Context {
+	t.Helper()
+	return service.WithAuthzListUnrestricted(t.Context())
+}
+
 // forEachDialect runs fn once per brought-up dialect as a subtest named after the dialect.
 func forEachDialect(t *testing.T, fn func(t *testing.T, d dialect)) {
 	t.Helper()

@@ -65,7 +65,7 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 		require.NoError(t, d.stmts.CreateUser(t.Context(), user1))
 		require.NoError(t, d.stmts.CreateUser(t.Context(), user2))
 
-		list, err := d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+		list, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 			Filter: database.Equal(database.Col(domain.UserFieldProjectID), projectID),
 			Pagination: database.Page[domain.UserField]{
 				OrderBy: database.OrderBy[domain.UserField]{
@@ -86,7 +86,7 @@ func TestUserStatements_ListAndLookupHydrateAttributes(t *testing.T) {
 			{Key: "email", Value: "alpha@example.com"},
 			{Key: "name", Value: "Alpha"},
 		}
-		matches, err := d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+		matches, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 			Filter: database.Equal(database.Col(domain.UserFieldProjectID), projectID),
 		}, service.UserQueryOptions{
 			Attributes:    attrs,
@@ -134,7 +134,7 @@ func TestUserStatements_ListUsersAttributesAndAttributeKeys(t *testing.T) {
 		}
 
 		t.Run("AttributesMatchOnly", func(t *testing.T) {
-			list, err := d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+			list, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 				Filter: projectFilter,
 			}, service.UserQueryOptions{
 				Attributes: []domain.Attribute{{Key: "email", Value: "alpha@example.com"}},
@@ -149,7 +149,7 @@ func TestUserStatements_ListUsersAttributesAndAttributeKeys(t *testing.T) {
 		})
 
 		t.Run("AttributesMatchWithSubsetAttributeKeys", func(t *testing.T) {
-			list, err := d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+			list, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 				Filter: projectFilter,
 			}, service.UserQueryOptions{
 				Attributes: []domain.Attribute{
@@ -165,7 +165,7 @@ func TestUserStatements_ListUsersAttributesAndAttributeKeys(t *testing.T) {
 		})
 
 		t.Run("AttributeKeysOnlyHydrate", func(t *testing.T) {
-			list, err := d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+			list, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 				Filter:     projectFilter,
 				Pagination: orderByID,
 			}, service.UserQueryOptions{
@@ -207,7 +207,7 @@ func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
 				require.NoError(t, d.stmts.CreateUser(t.Context(), user))
 			}
 
-			page, err := d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+			page, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 				Filter: projectFilter,
 				Pagination: database.Page[domain.UserField]{
 					OrderBy: orderByID.OrderBy,
@@ -221,7 +221,7 @@ func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
 			assert.NotEmpty(t, page.NextCursor)
 			assert.Equal(t, []string{"user_unified_1", "user_unified_2"}, userIDs(page.Items))
 
-			page2, err := d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+			page2, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 				Filter: projectFilter,
 				Pagination: database.Page[domain.UserField]{
 					OrderBy: orderByID.OrderBy,
@@ -248,7 +248,7 @@ func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
 				Status:    domain.MembershipStatusActive,
 			}))
 
-			list, err := d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+			list, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 				Filter: projectFilter,
 				Pagination: database.Page[domain.UserField]{
 					OrderBy: orderByID.OrderBy,
@@ -276,7 +276,7 @@ func TestUserStatements_ListUsersUnifiedFilters(t *testing.T) {
 				}
 			}
 
-			list, err := d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+			list, err := d.stmts.ListUsers(unfilteredListCtx(t), &database.ListOptions[domain.UserField]{
 				Filter: projectFilter,
 				Pagination: database.Page[domain.UserField]{
 					OrderBy: orderByID.OrderBy,

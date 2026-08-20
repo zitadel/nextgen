@@ -57,20 +57,30 @@ func WriteHasAuthzProjectFoothold(w ArgWriter, env Env, projectID string, princi
 // WriteCheckAuthz emits SELECT (allowed), (foothold) in one round-trip.
 func WriteCheckAuthz(w ArgWriter, env Env, params domain.AuthzCheckParams) {
 	w.WriteString("SELECT (")
-	if params.ConstraintTeamID != "" && params.ResourceID != "" {
-		w.WriteString("(")
-		writeProjectScopedClosureExists(w, env, params)
-		w.WriteString(" OR ")
-		writeFullTTUExists(w, env, params)
-		w.WriteString(") AND ")
-		writeCheckedObjectInConstraintTeam(w, env, params)
-	} else {
-		writeProjectScopedClosureExists(w, env, params)
-		w.WriteString(" OR ")
-		writeFullTTUExists(w, env, params)
-	}
+	writeCheckAllowed(w, env, params)
 	w.WriteString("), ")
 	writeFoothold(w, env, params.ProjectID, params.PrincipalType, params.PrincipalID)
+}
+
+func writeCheckAllowed(w ArgWriter, env Env, params domain.AuthzCheckParams) {
+	w.WriteString("(")
+	writeProjectScopedClosureExists(w, env, params)
+	w.WriteString(" OR ")
+	writeFullTTUExists(w, env, params)
+	if params.ResourceTeamID != "" {
+		w.WriteString(" OR ")
+		writeScopedClosureExists(w, env, params, "team", "")
+		// writeScopedClosureExists for team expects a SQL expr; bind ResourceTeamID.
+	}
+	if params.ResourceID != "" {
+		w.WriteString(" OR ")
+		writeScopedClosureExists(w, env, params, "resource", "")
+	}
+	w.WriteString(")")
+	if params.ConstraintTeamID != "" && params.ResourceID != "" {
+		w.WriteString(" AND ")
+		writeCheckedObjectInConstraintTeam(w, env, params)
+	}
 }
 
 // WriteListAuthzObjectIDs emits SELECT resource_id … ORDER BY resource_id.
@@ -187,7 +197,7 @@ func writeListedObjectInConstraintTeam(w ArgWriter, env Env, params domain.Authz
 // writeUserMembershipInTeam emits EXISTS on authz_membership_edges: user is a
 // member of a team. setIDExpr / memberIDExpr are raw SQL column refs; when
 // empty, setID / memberID are bound arguments. Check, List, TTU, and
-// principal-match all use this helper so ADR 052's home-project switch is one edit.
+// principal-match all use this helper so ADR 053's home-project switch is one edit.
 func writeUserMembershipInTeam(w ArgWriter, env Env, projectID, setIDExpr, setID, memberIDExpr, memberID string) {
 	w.WriteString(`EXISTS (
         SELECT 1
@@ -296,10 +306,18 @@ func writeScopedClosureExists(w ArgWriter, env Env, params domain.AuthzCheckPara
 		w.WriteString("a.scope_kind = 'project'")
 	case "team":
 		w.WriteString("a.scope_kind = 'team' AND a.scope_team_id = ")
-		w.WriteString(scopeIDExpr)
+		if scopeIDExpr != "" {
+			w.WriteString(scopeIDExpr)
+		} else {
+			w.WriteArg(params.ResourceTeamID)
+		}
 	case "resource":
 		w.WriteString("a.scope_kind = 'resource' AND a.scope_resource_id = ")
-		w.WriteString(scopeIDExpr)
+		if scopeIDExpr != "" {
+			w.WriteString(scopeIDExpr)
+		} else {
+			w.WriteArg(params.ResourceID)
+		}
 	default:
 		panic("unknown scope kind " + scopeKind)
 	}

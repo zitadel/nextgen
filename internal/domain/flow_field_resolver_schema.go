@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/ianlancetaylor/jsonschema"
 	"github.com/ianlancetaylor/jsonschema/types"
@@ -24,7 +25,8 @@ type SchemaResolver interface {
 // Translation map (user meta-schema → [FlowField]):
 //
 //   - `type` + `format` → [FlowFieldType]
-//   - top-level `required` membership → [FlowField.Required]
+//   - `required` membership at every level of the field's path →
+//     [FlowField.Required]
 //   - `minLength`, `maxLength`, `format` → [FlowFieldValidation]
 //   - `x-unique` (non-empty) → [FlowFieldChallengeIdentifier] +
 //     [FlowImplicitOutcomeUserNotFound] + [FlowField.Unique]
@@ -41,8 +43,6 @@ var _ FlowFieldResolver = (*SchemaFieldResolver)(nil)
 
 func (r *SchemaFieldResolver) Resolve(schema *jsonschema.Schema, stepName string, fieldNames []Field) (FlowResolvedFields, error) {
 	root := newSchemaReader(schema)
-	properties := root.Properties()
-	required := root.RequiredSet()
 	authMethods, err := root.AuthMethods()
 	if err != nil {
 		return FlowResolvedFields{}, fmt.Errorf("flow field resolver: read x-auth-methods: %w", err)
@@ -60,7 +60,7 @@ func (r *SchemaFieldResolver) Resolve(schema *jsonschema.Schema, stepName string
 		case field.IsAuthMethod():
 			ff, err = resolveAuthMethodField(authMethods, field, stepName)
 		default:
-			ff, err = resolveUserPropertyField(properties, required, field, stepName)
+			ff, err = resolveUserPropertyField(root, field, stepName)
 		}
 		if err != nil {
 			return FlowResolvedFields{}, err
@@ -77,17 +77,19 @@ func (r *SchemaFieldResolver) Resolve(schema *jsonschema.Schema, stepName string
 	}, nil
 }
 
-// resolveUserPropertyField builds a [FlowField] from a top-level
-// property of the user schema. Returns [ErrFlowFieldUnknown] when the
-// property is absent, [ErrFlowFieldUnsupportedType] when the JSON
-// `type` keyword is an ambiguous union.
-func resolveUserPropertyField(properties map[string]schemaReader, required map[string]struct{}, field Field, stepName string) (FlowField, error) {
-	prop, ok := properties[field.String()]
-	if !ok {
-		return FlowField{}, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, field.String())
+// resolveUserPropertyField builds a [FlowField] from a property of the
+// user schema, addressed by its dotted path. Returns
+// [ErrFlowFieldUnknown] when the path does not resolve,
+// [ErrFlowFieldNotScalar] when it lands on an object or array, and
+// [ErrFlowFieldUnsupportedType] when the JSON `type` keyword is an
+// ambiguous union.
+func resolveUserPropertyField(root schemaReader, field Field, stepName string) (FlowField, error) {
+	prop, required, err := walkUserProperty(root, field)
+	if err != nil {
+		return FlowField{}, err
 	}
 
-	fieldType, err := deriveUserPropertyType(prop)
+	fieldType, err := deriveUserPropertyType(prop, field)
 	if err != nil {
 		return FlowField{}, err
 	}
@@ -100,14 +102,33 @@ func resolveUserPropertyField(properties map[string]schemaReader, required map[s
 		Type:      fieldType,
 		Challenge: deriveIdentifierChallenge(unique),
 		Unique:    unique,
-	}
-	if _, ok := required[field.String()]; ok {
-		ff.Required = true
+		Required:  required,
 	}
 	if v := buildValidation(prop); v != nil {
 		ff.Validation = v
 	}
 	return ff, nil
+}
+
+// walkUserProperty resolves a field's dotted path against the user
+// schema, descending one `properties` level per segment, and reports
+// whether every segment is listed in its own level's `required`. A
+// missing segment — or an intermediate one that holds no `properties`,
+// so the path cannot continue through it — yields
+// [ErrFlowFieldUnknown] naming the whole path.
+func walkUserProperty(root schemaReader, field Field) (schemaReader, bool, error) {
+	parent, required := root, true
+	for _, segment := range AttributeKey(field.String()).Nodes() {
+		prop, ok := parent.Property(segment)
+		if !ok {
+			return schemaReader{}, false, fmt.Errorf("%w: %q", ErrFlowFieldUnknown, field.String())
+		}
+		if !parent.Requires(segment) {
+			required = false
+		}
+		parent = prop
+	}
+	return parent, required, nil
 }
 
 // resolveAuthMethodField builds a [FlowField] from an
@@ -142,11 +163,19 @@ func resolveAuthMethodField(authMethods xAuthMethodsReader, field Field, stepNam
 // JSON `type` keywords to a [FlowFieldType]. A closed `enum` surfaces
 // as `select`; JSON `type: boolean` surfaces as `checkbox`. Returns
 // [ErrFlowFieldUnsupportedType] when the JSON `type` is an ambiguous
-// union the resolver cannot reduce to a single kind.
-func deriveUserPropertyType(prop schemaReader) (FlowFieldType, error) {
+// union the resolver cannot reduce to a single kind, and
+// [ErrFlowFieldNotScalar] when the property has no field-shaped input.
+func deriveUserPropertyType(prop schemaReader, field Field) (FlowFieldType, error) {
 	jsonType, err := prop.JSONType()
 	if err != nil {
 		return "", err
+	}
+	// A property carrying `properties` is an object, and one carrying
+	// `items` is an array, even when it omits the `type` keyword — which
+	// would otherwise fall through to text and store a string where the
+	// author declared a composite.
+	if jsonType == "object" || jsonType == "array" || prop.HasProperties() || prop.HasItems() {
+		return "", fmt.Errorf("%w: %q", ErrFlowFieldNotScalar, field.String())
 	}
 	if len(prop.StringEnum()) > 0 {
 		return FlowFieldTypeSelect, nil
@@ -334,15 +363,11 @@ func (r schemaReader) Int(keyword string) int {
 	return 0
 }
 
-// Properties returns each top-level property of an object schema as
-// its own [schemaReader], or nil when `properties` is absent or
-// malformed.
+// Properties returns each property listed in this level's `properties`
+// keyword as its own [schemaReader], or nil when the keyword is absent
+// or malformed.
 func (r schemaReader) Properties() map[string]schemaReader {
-	v, ok := r.s.LookupKeyword("properties")
-	if !ok {
-		return nil
-	}
-	m, ok := v.(types.PartMapSchema)
+	m, ok := r.propertyMap()
 	if !ok {
 		return nil
 	}
@@ -353,7 +378,60 @@ func (r schemaReader) Properties() map[string]schemaReader {
 	return out
 }
 
-// RequiredSet returns the names listed in the top-level `required`
+// Property answers for one name what [schemaReader.Properties] answers
+// for every name, without materializing a reader per sibling. The walk
+// down a field's path runs on every render, so it takes this route.
+func (r schemaReader) Property(name string) (schemaReader, bool) {
+	m, ok := r.propertyMap()
+	if !ok {
+		return schemaReader{}, false
+	}
+	prop, ok := m[name]
+	if !ok {
+		return schemaReader{}, false
+	}
+	return newSchemaReader(prop), true
+}
+
+// Requires reports whether name is listed in this level's `required`
+// keyword — the single-name counterpart of [schemaReader.RequiredSet].
+func (r schemaReader) Requires(name string) bool {
+	v, ok := r.s.LookupKeyword("required")
+	if !ok {
+		return false
+	}
+	names, ok := v.(types.PartStrings)
+	if !ok {
+		return false
+	}
+	return slices.Contains(names, name)
+}
+
+// HasProperties reports whether this level carries a well-formed
+// `properties` keyword, which marks it an object even when the `type`
+// keyword is absent.
+func (r schemaReader) HasProperties() bool {
+	_, ok := r.propertyMap()
+	return ok
+}
+
+// HasItems reports whether this level carries an `items` keyword, the
+// array counterpart of [schemaReader.HasProperties].
+func (r schemaReader) HasItems() bool {
+	_, ok := r.s.LookupKeyword("items")
+	return ok
+}
+
+func (r schemaReader) propertyMap() (types.PartMapSchema, bool) {
+	v, ok := r.s.LookupKeyword("properties")
+	if !ok {
+		return nil, false
+	}
+	m, ok := v.(types.PartMapSchema)
+	return m, ok
+}
+
+// RequiredSet returns the names listed in this level's `required`
 // keyword as a set.
 func (r schemaReader) RequiredSet() map[string]struct{} {
 	out := map[string]struct{}{}
@@ -369,6 +447,51 @@ func (r schemaReader) RequiredSet() map[string]struct{} {
 		out[n] = struct{}{}
 	}
 	return out
+}
+
+// RequiredPaths returns the dotted paths a document must carry once the
+// objects named in materialized exist: every name in `required`,
+// recursed through the nested `required` of each required object. A
+// required object that declares no `required` of its own ends the
+// descent at the object itself — any leaf beneath it satisfies the
+// coverage check.
+//
+// An optional object contributes its own `required` too once it appears
+// in materialized. It only exists in the document because something
+// beneath it was collected, and from that point document validation
+// enforces the rest of its `required` list.
+func (r schemaReader) RequiredPaths(materialized map[string]struct{}) map[string]struct{} {
+	out := map[string]struct{}{}
+	r.collectRequiredPaths("", materialized, out)
+	return out
+}
+
+func (r schemaReader) collectRequiredPaths(prefix AttributeKey, materialized, out map[string]struct{}) {
+	properties := r.Properties()
+	required := r.RequiredSet()
+
+	for name := range required {
+		path := prefix.AppendNode(name)
+		prop, ok := properties[name]
+		if !ok || len(prop.RequiredSet()) == 0 {
+			out[string(path)] = struct{}{}
+			continue
+		}
+		prop.collectRequiredPaths(path, materialized, out)
+	}
+
+	// An optional object is invisible to the loop above, so descend into
+	// the ones a collected field materializes.
+	for name, prop := range properties {
+		if _, isRequired := required[name]; isRequired {
+			continue
+		}
+		path := prefix.AppendNode(name)
+		if _, ok := materialized[string(path)]; !ok {
+			continue
+		}
+		prop.collectRequiredPaths(path, materialized, out)
+	}
 }
 
 // AuthMethods returns a reader over the root schema's `x-auth-methods`

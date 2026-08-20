@@ -1,5 +1,112 @@
 # @zitadel/components
 
+## 0.1.0-alpha.19
+
+### Minor Changes
+
+- [#830](https://github.com/zitadel/nextgen/pull/830) [`35d25c3`](https://github.com/zitadel/nextgen/commit/35d25c3add44611197363ff088fc940ee3858c78) Thanks [@fforootd](https://github.com/fforootd)! - Theming and header controls for the login surface:
+  - The primary button now consumes the semantic `--zl-primary` /
+    `--zl-primary-foreground` pair (Figma-owned values; the previous legacy
+    role tokens remain as fallback). Expect a slight visual shift on stock
+    buttons; setting the pair on the host element — or
+    `branding.palette.primary` / `branding.palette.on_primary`, which now
+    feed both vocabularies — restyles the CTA. Hover intentionally stays on
+    the legacy hover role until Figma publishes a primary-scoped hover value.
+  - `branding.palette.link` finally reaches the links: card navigation,
+    forgot-password, and field links consume a new `--zl-color-text-link`
+    contract variable (defined by default as an alias of the existing purple
+    accent, which resolves per theme). Previously the palette key recolored
+    pills instead of links.
+  - New `suppress-header` boolean on `<zitadel-login>` and
+    `<zitadel-session>` (and a `suppressHeader` prop on every framework
+    wrapper): visually hides the widget's own heading block while keeping it
+    in the accessibility tree — for embeds whose page already carries the
+    heading. Works with user-ejected branding templates too.
+
+### Patch Changes
+
+- [#875](https://github.com/zitadel/nextgen/pull/875) [`d1e967d`](https://github.com/zitadel/nextgen/commit/d1e967d74ee339f9695f73185dd3097b19f527a2) Thanks [@fforootd](https://github.com/fforootd)! - The login widget now uses clearer identifier-step copy and avoids misleading initial focus:
+  - The identifier step's primary button now says "Continue" ("Weiter" /
+    "Continua") instead of "Sign in". The step branches to registration when
+    the email is unknown, so "Sign in" promised an outcome the step cannot
+    guarantee.
+  - The widget no longer paints a focus ring on the primary action when a
+    page-mode flow loads on a field-less step (e.g. the passkey-first
+    preset's entry step). Script-moved focus with no prior interaction
+    matches `:focus-visible`, which made the ring read as a pre-selected
+    state. Initial focus now lands only on input fields; step swaps keep
+    moving focus to the first control, where the browser derives the ring
+    from the user's actual input modality.
+
+- [#874](https://github.com/zitadel/nextgen/pull/874) [`c2888bd`](https://github.com/zitadel/nextgen/commit/c2888bdfd3c2a21fefd76a9b7fa80507d97cd88b) Thanks [@fforootd](https://github.com/fforootd)! - Branding asset URLs (`logo_url`, `hero_url`) may now use plain `http://` with canonical loopback hosts (`localhost`, dotted-decimal `127.0.0.0/8`, `[::1]`) so local development can serve login assets straight from the app's own dev server. The login component preserves those URLs only when it also runs on a loopback HTTP page; public pages and every other URL field remain HTTPS-only. The CLI plan, server save, editor, and component gates now enforce the same syntax and explain the carve-out when rejecting a URL.
+
+- [#886](https://github.com/zitadel/nextgen/pull/886) [`61a0eee`](https://github.com/zitadel/nextgen/commit/61a0eee0abb310a834d94b72a74f351035021be8) Thanks [@fforootd](https://github.com/fforootd)! - A branding asset URL that is well-formed but unreachable no longer fails
+  silently. `logo_url` / `hero_url` cleared every gate — the CLI's shape check
+  and the server's save gate — published a revision, and then rendered as a 0×0
+  `<img>`: no plan output, no apply output, no console error.
+
+  Three changes close that hole:
+  - `plan` and `apply` probe each asset URL (HEAD, 2.5s budget, in parallel) and
+    emit a non-blocking warning when it is unreachable, returns a non-2xx
+    status, or answers with something that is not an image. Advisory by design —
+    the machine planning is not necessarily the machine rendering the login
+    page — so it never fails a run. Set `ZITADEL_SKIP_ASSET_PROBE` to turn it
+    off (offline, air-gapped CI, a CDN that only resolves from production) and
+    `ZITADEL_ASSET_PROBE_TIMEOUT_MS` to retune the per-URL budget. Only public
+    HTTPS destinations are contacted and redirects are re-validated;
+    loopback/private/internal targets remain inconclusive rather than becoming
+    network requests from the machine running the plan.
+  - The login UI hides an asset that fails to load and restores either the split
+    designs' decorative placeholder or the shipped design's authored no-logo
+    content, so a broken asset degrades to the same result as no asset instead
+    of a blank pane or missing compact brand. Templates could not do this
+    themselves: they are DOMPurify-sanitised and inline `onerror` is stripped.
+  - Branding revisions can now carry plan warnings at all; previously only
+    create/update actions could, and branding is revisioned.
+
+  Two readability fixes ride along. A branding `plan` no longer dumps the whole
+  inlined Liquid template as one escaped line: an unchanged multi-line field
+  renders as `(<n> lines, sha256:…)` and a changed one as a real line diff. And
+  the branding dialect file scaffolded into `.zitadel/meta/` now spells its
+  command mentions the way the generated app can run them
+  (`npx @zitadel/cli@<version> apply`), matching the READMEs — the bare
+  `zitadel apply` in the editor tooltip named a command that does not exist
+  there.
+
+- [#856](https://github.com/zitadel/nextgen/pull/856) [`b17b2c9`](https://github.com/zitadel/nextgen/commit/b17b2c9fb3fae00f99a1864d37f3b51142ea4344) Thanks [@fforootd](https://github.com/fforootd)! - The package documentation now matches what the packages actually do. The Next and Nuxt guides drop the removed `api-base` attribute in favor of `configureZitadel()` and the `project` property; the Nuxt guide documents the Nuxt module (what `zitadel setup` wires) with its real options and the `useAuth()` / `useZitadelProject()` composables, alongside the hand-rolled middleware path with its full option set. `@zitadel/sdk-core` and `@zitadel/api` gain real documentation of their entry points, `@zitadel/config` gains a package README, and the SPA guides document the `ZitadelSession` card and point local no-proxy experiments at the local runtime's actual default port (8080). The flow-editing guide copied into `.zitadel/flows/` no longer suggests cross-flow `switch`/`pivot` transitions, which the runtime does not execute yet, and API examples use the real prefixed ID format (`proj_…`, `team_…`) instead of a retired naming scheme.
+
+- [#870](https://github.com/zitadel/nextgen/pull/870) [`b7235f7`](https://github.com/zitadel/nextgen/commit/b7235f7a0ede460e504376974b370d3d95e0d3c6) Thanks [@fforootd](https://github.com/fforootd)! - Update DOMPurify to address sanitizer bypass vulnerabilities in `@zitadel/components`.
+
+- [#885](https://github.com/zitadel/nextgen/pull/885) [`f1049fd`](https://github.com/zitadel/nextgen/commit/f1049fd1b07086ffd070ecdd0b2d80958efd72f2) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel setup` now pins the dev-server port in the scaffolded `dev` script for Next and Nuxt, so the app serves the port setup registered as the project's allowed origin. Previously a bare `next dev` / `nuxt dev` ignored that port and defaulted to 3000 — and Next silently moved to 3001 when 3000 was busy — so login rendered but the first submit failed with `origin "http://localhost:3000" is not allowed for this project`. The other frameworks already pinned the port in their own dev-server config (Vite's `server.port` + `strictPort`, Angular's `serve.options.port`) and are unchanged. An explicit port also turns a busy port into a loud `EADDRINUSE` instead of a silent move to a rejected origin.
+
+  `doctor` verifies that dev script against the port recorded as the development issuer, so a script moved to another port is reported as an unapplied config edit and `doctor --fix` restores the registered port. `eject` now lists `package.json` among the edits it cannot auto-revert.
+
+  A login that cannot start — a rejected origin being the most common cause — now reports the failure inside the login card instead of leaving a bare line of text on an otherwise empty page.
+
+- [#873](https://github.com/zitadel/nextgen/pull/873) [`37e9cb9`](https://github.com/zitadel/nextgen/commit/37e9cb903943d34eebadfb44457872892f296823) Thanks [@fforootd](https://github.com/fforootd)! - Split-family login designs now look intentional out of the box. The brand pane renders a token-gradient placeholder panel until `branding.json` names a `logo_url`/`hero_url`, so a fresh `split`/`split-right` eject reads as a split layout instead of a lonely off-centre card. The "Secured with Zitadel" attribution now aligns under the form column in split-family designs (it previously centred across both panes) and recentres when the layout collapses to a single column on narrow containers.
+
+- [#888](https://github.com/zitadel/nextgen/pull/888) [`11e6ab5`](https://github.com/zitadel/nextgen/commit/11e6ab57d611f4dc0f9732b958bff1302d4ea689) Thanks [@fforootd](https://github.com/fforootd)! - A `hero_url` no longer decides how tall the sign-in page is. In the `split` and
+  `split-right` designs the brand pane took its height from the image, so an asset
+  that is tall, square, or an SVG with no width/height of its own — the kind every
+  framework scaffold ships in `public/` — stretched the pane past the viewport and
+  pushed the "Secured with Zitadel" attribution below the fold. The hero now spans
+  the brand pane's width with a capped height: a conventional wide banner renders
+  exactly as before, and a taller asset is cropped to fit instead of growing the
+  page. Set `--zl-split-hero-max-height` on the template root to raise or lower the
+  cap for a design that wants a taller pane.
+
+- [#888](https://github.com/zitadel/nextgen/pull/888) [`11e6ab5`](https://github.com/zitadel/nextgen/commit/11e6ab57d611f4dc0f9732b958bff1302d4ea689) Thanks [@fforootd](https://github.com/fforootd)! - A tall `logo_url` no longer stretches the `split` / `split-right` brand pane. The
+  logo was capped in width but not in height, so a portrait lockup — a mark stacked
+  above a wordmark, say — kept the height its own proportions asked for and grew the
+  pane past the viewport. It is now capped in both directions and scales down whole,
+  never cropped: a logo that already fit is untouched, and a small one is still shown
+  at its own size rather than blown up to fill the pane. When a logo and a hero share
+  the pane the logo takes the smaller header-mark cap, so the two together still leave
+  the "Secured with Zitadel" badge on screen. Set `--zl-split-logo-max-height` on the
+  template root if your lockup wants more room.
+- Updated dependencies [[`c2888bd`](https://github.com/zitadel/nextgen/commit/c2888bdfd3c2a21fefd76a9b7fa80507d97cd88b), [`61a0eee`](https://github.com/zitadel/nextgen/commit/61a0eee0abb310a834d94b72a74f351035021be8), [`79f5ce1`](https://github.com/zitadel/nextgen/commit/79f5ce1db6b36baab85944a667072f1936880704), [`b17b2c9`](https://github.com/zitadel/nextgen/commit/b17b2c9fb3fae00f99a1864d37f3b51142ea4344), [`41f6a0a`](https://github.com/zitadel/nextgen/commit/41f6a0a7c60e28a9adecfa9d72b964a305f7ba3d), [`fc3d154`](https://github.com/zitadel/nextgen/commit/fc3d154f2fabb722c6f94633fd6c10bc60d0a657), [`4e04e5f`](https://github.com/zitadel/nextgen/commit/4e04e5fb2a9585669b75d2b188b0966bfb23f4e7), [`9ef7096`](https://github.com/zitadel/nextgen/commit/9ef709667f1a6f7bd5126491bf4039a34a43a792), [`37e9cb9`](https://github.com/zitadel/nextgen/commit/37e9cb903943d34eebadfb44457872892f296823), [`433f81c`](https://github.com/zitadel/nextgen/commit/433f81cffc3e3e8499c555aa45b2a45aa557916f)]:
+  - @zitadel/config@0.1.0-alpha.19
+
 ## 0.1.0-alpha.18
 
 ### Minor Changes

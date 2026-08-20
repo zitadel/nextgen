@@ -1,5 +1,183 @@
 # @zitadel/server
 
+## 0.1.0-alpha.19
+
+### Minor Changes
+
+- [#807](https://github.com/zitadel/nextgen/pull/807) [`c0b5a68`](https://github.com/zitadel/nextgen/commit/c0b5a6867d457d3cea495293b43584ce47af7f7b) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Gate in-project management APIs through the authz permission resolver (403/404 by foothold) and seed sk_proj grants on CreateProject so the project secret can set up the project.
+
+- [#894](https://github.com/zitadel/nextgen/pull/894) [`46ccc08`](https://github.com/zitadel/nextgen/commit/46ccc080befcd6f1401248f1a891e37c0d1d8626) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Management list endpoints now return a filtered view when the caller has a project foothold but only a team- or resource-scoped grant, instead of HTTP 403.
+
+- [#811](https://github.com/zitadel/nextgen/pull/811) [`982e885`](https://github.com/zitadel/nextgen/commit/982e8853b94a748c420ddf2614206225ae76eb94) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Inject an authz EXISTS list predicate into management list queries after a successful project-level Check. The predicate enforces RSI-backed visibility / TOCTOU for principals that already passed the gate. Team-scoped HTTP list narrowing is not live yet; SQL + stmttest are the substrate for a follow-up ([#834](https://github.com/zitadel/nextgen/issues/834)).
+
+- [#801](https://github.com/zitadel/nextgen/pull/801) [`20ad1fe`](https://github.com/zitadel/nextgen/commit/20ad1fe1fd369688676d939d9eda9adf94ef7330) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Add the authz permission resolver library (Check / ListObjects), storage statements, and L4 oracle tests across Postgres, Spanner, and SQLite.
+
+- [#809](https://github.com/zitadel/nextgen/pull/809) [`6904475`](https://github.com/zitadel/nextgen/commit/690447504a4a1a524074103c7d28c4332711c4bd) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Dual-write schema, branding, flow definition, and session creates into resource_scope_index so flat-by-id permission checks can resolve project scope for those path ids.
+
+- [#810](https://github.com/zitadel/nextgen/pull/810) [`a0c8f7a`](https://github.com/zitadel/nextgen/commit/a0c8f7ab8b7646e10a2d1ecc73e2594eb64957cc) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Resolve path-id management API scope from resource_scope_index before the permission check, and drop the required project_id query parameter from by-id operations. The CLI sync/setup path matches that contract and no longer sends project_id on get/update/delete by id.
+
+- [#893](https://github.com/zitadel/nextgen/pull/893) [`a869184`](https://github.com/zitadel/nextgen/commit/a86918457a25755974c24066307724f50dd77077) Thanks [@adlerhurst](https://github.com/adlerhurst)! - A team- or resource-scoped grant can now authorize a by-id management read or write when the resource lives in that team (or is the granted resource). Creating project-wide resources still requires a project-scoped grant.
+
+- [#785](https://github.com/zitadel/nextgen/pull/785) [`215ca5c`](https://github.com/zitadel/nextgen/commit/215ca5c7cb6d179424469308f5aac33d809af3c8) Thanks [@vitorbari](https://github.com/vitorbari)! - Flow steps can now collect nested user-schema properties by their dotted path,
+  for example `"fields": ["address.street"]`. The field renders like any other
+  scalar input and its value is stored under the same `address.street` attribute
+  key the user API already uses, so it reads back as a nested object.
+
+  A nested field is only marked required when every object above it is required
+  too, and a required object is satisfied by collecting one of its leaves: a
+  schema declaring `required: ["address"]` with `address.required: ["street"]` is
+  satisfied by a step collecting `address.street`. Collecting into an _optional_
+  object brings its own `required` list into force for the same reason — the
+  object exists in the document only because one of its leaves was collected, so
+  a step collecting `shipping.city` must collect `shipping.street` too. Naming an
+  object- or array-typed property directly is rejected when the flow definition is
+  saved instead of failing part way through the flow.
+
+- [#816](https://github.com/zitadel/nextgen/pull/816) [`c4d9c76`](https://github.com/zitadel/nextgen/commit/c4d9c76e5ca0f15b41ffabb6383f4f77187abacd) Thanks [@bastionstack](https://github.com/bastionstack)! - The console now has Projects screens. The directory lists the projects it can see with their creation date, and opening one shows its id and creation date beside the name, where the name can be edited and saved. Projects returns to the sidebar as a designed screen rather than a key/value view reachable only by URL.
+
+- [#914](https://github.com/zitadel/nextgen/pull/914) [`d5ba4d2`](https://github.com/zitadel/nextgen/commit/d5ba4d268a84c57ced65ef8cbb99735c108617de) Thanks [@bastionstack](https://github.com/bastionstack)! - The console's Teams directory can be searched by name and filtered by status. Search matches part of a name, ignoring case, across every team in the project rather than only the page on screen; the `Active` and `Deactivated` tabs narrow the list the same way. Both are kept in the page's address, so a filtered list can be linked, reloaded, and stepped back through.
+
+- [#813](https://github.com/zitadel/nextgen/pull/813) [`659ad19`](https://github.com/zitadel/nextgen/commit/659ad192b4defde50ea326e46e63663b01ff29d1) Thanks [@bastionstack](https://github.com/bastionstack)! - The console now has Teams screens. The directory lists every team in the project with its status and creation date, walking the rest with `Load more`. Opening a team shows its id and creation date beside the name, and its name can be edited and saved. `Add` opens a drawer that creates a team. Search and the status tabs are not built yet: the team query endpoint filters on creation date only, so both would narrow the loaded page while appearing to narrow the whole set.
+
+- [#808](https://github.com/zitadel/nextgen/pull/808) [`72cfb92`](https://github.com/zitadel/nextgen/commit/72cfb928e78a96b7d47bac217f13ec8cb603851a) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Add `GET /events` and `GET /events/{id}` for project audit events. List is newest-first by default (`order=desc`); pass `order=asc` for oldest-first. Callers need `events.read` (or the transitional `project.write` umbrella); pre-claim projects return an empty list or 404 until claim stamps the project team. Login/flow HTTP and `POST /projects` emit `request.api` when `project_id` is known. Path B events copy `request_id` from the HTTP request even without a token. `createFlow` stamps `flow_id` before `auth.attempt.created` so both events share it.
+
+- [#900](https://github.com/zitadel/nextgen/pull/900) [`e26f376`](https://github.com/zitadel/nextgen/commit/e26f37617f5d3a3f92f00c07aad89a98ee9d754f) Thanks [@vitorbari](https://github.com/vitorbari)! - Nest a user's schema-defined content under `attributes`. `POST /users` takes `schema` plus an `attributes` document, and every user response carries `id`, `schema`, `attributes` and `metadata`. The user schema now validates `attributes` alone, so closed-world keywords such as `additionalProperties: false` behave as their author intended and a schema may declare a property named `id` or `metadata`. The schema pointer is named `schema` rather than `$schema`, and `POST /users` answers with the same representation a read returns.
+
+  A user is stored as its attribute rows, so an empty `attributes` document is
+  rejected with `user.invalid`, even where the schema itself accepts it. `POST
+/users` also documents its `500`: when the user was created but could not be
+  read back, the body carries its id in `details.user_id`, and the caller should
+  fetch that user rather than repeat the create.
+
+- [#806](https://github.com/zitadel/nextgen/pull/806) [`a5efd98`](https://github.com/zitadel/nextgen/commit/a5efd985176dc67884c5eae2b80963e64ad05783) Thanks [@grvijayan](https://github.com/grvijayan)! - `POST /sessions/query` now returns real results instead of not-implemented. Filter on `created_at`, `user_id`, and `state`, sort on `created_at` or `user_id` (newest first by default), and page with `limit` and `page_token`.
+
+- [#848](https://github.com/zitadel/nextgen/pull/848) [`c470f07`](https://github.com/zitadel/nextgen/commit/c470f0741df9a767fda0930b8cb63a3ad607674b) Thanks [@grvijayan](https://github.com/grvijayan)! - Add `name` and `status` as filter and sort fields on `POST /teams/query`. A `name` filter matches case-insensitively with both `equals` and `contains`, because team names are unique per project case-insensitively. `status` filters on the contract's two values, `active` and `deactivated`.
+
+  `contains` on a text field is now a case-insensitive substring match on every query endpoint, not only on teams.
+
+  Teams pending purge no longer surface through the API: `getTeam` answers 404 for them, and `queryTeams` omits them. They previously read as `deactivated`.
+
+- [#852](https://github.com/zitadel/nextgen/pull/852) [`0e8ac0c`](https://github.com/zitadel/nextgen/commit/0e8ac0c41c6e958fe3fc52eee8750381a8a16919) Thanks [@bastionstack](https://github.com/bastionstack)! - The account menu at the bottom of the console sidebar now opens a settings area with its own sidebar view and a row back to the portal. Both views are available expanded and collapsed.
+
+- [#901](https://github.com/zitadel/nextgen/pull/901) [`433f81c`](https://github.com/zitadel/nextgen/commit/433f81cffc3e3e8499c555aa45b2a45aa557916f) Thanks [@vitorbari](https://github.com/vitorbari)! - User schemas can now declare `x-audit: true` on a property, allowlisting that
+  attribute's value for audit event payloads. Payloads stay deny-by-default:
+  without it, an attribute contributes its key but never its value.
+
+  `x-verify`, `x-editable`, `x-sensitive` and `x-mfa` are no longer part of the
+  dialect. Nothing read them. A schema that still carries one keeps validating,
+  since a property accepts annotations the dialect does not name, but they are no
+  longer documented or offered by editor completion.
+
+- [#808](https://github.com/zitadel/nextgen/pull/808) [`72cfb92`](https://github.com/zitadel/nextgen/commit/72cfb928e78a96b7d47bac217f13ec8cb603851a) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Align Events API Path B payloads: create snapshots and update deltas use shared allowlisted fields (including project preview_origins and user attribute_keys / x-audit attributes); auth checks carry auth_attempt_id for SIEM join; attempt and schema create payloads stay empty with identity on event columns.
+
+### Patch Changes
+
+- [#875](https://github.com/zitadel/nextgen/pull/875) [`d1e967d`](https://github.com/zitadel/nextgen/commit/d1e967d74ee339f9695f73185dd3097b19f527a2) Thanks [@fforootd](https://github.com/fforootd)! - The login widget now uses clearer identifier-step copy and avoids misleading initial focus:
+  - The identifier step's primary button now says "Continue" ("Weiter" /
+    "Continua") instead of "Sign in". The step branches to registration when
+    the email is unknown, so "Sign in" promised an outcome the step cannot
+    guarantee.
+  - The widget no longer paints a focus ring on the primary action when a
+    page-mode flow loads on a field-less step (e.g. the passkey-first
+    preset's entry step). Script-moved focus with no prior interaction
+    matches `:focus-visible`, which made the ring read as a pre-selected
+    state. Initial focus now lands only on input fields; step swaps keep
+    moving focus to the first control, where the browser derives the ring
+    from the user's actual input modality.
+
+- [#896](https://github.com/zitadel/nextgen/pull/896) [`e146a1e`](https://github.com/zitadel/nextgen/commit/e146a1ee1da307d57285ec6c7ddafeda155e339f) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Management lists skip the authz EXISTS filter for one compile when Check already returned project-wide Allow. That skip does not re-check RSI dual-write, and a grant revoked between Check and SELECT can still appear. Forbidden lists still get the EXISTS partial view.
+
+- [#895](https://github.com/zitadel/nextgen/pull/895) [`7f44430`](https://github.com/zitadel/nextgen/commit/7f44430c35ffbb01a14666dd43c38f0a88647482) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Management list queries now fail closed if the authz list filter is missing from the request, instead of returning every row in the project.
+
+- [#890](https://github.com/zitadel/nextgen/pull/890) [`051ed71`](https://github.com/zitadel/nextgen/commit/051ed7162e58a0ff9fc3c488f9c747925b376b6d) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Management APIs no longer treat session, OIDC, or PAT bearers as the project secret. Only project and preview tokens mint an `sk_proj` principal. Pre-[#760](https://github.com/zitadel/nextgen/issues/760) project secrets with no Type field (`TokenTypeUnspecified`) also stop authenticating.
+
+- [#891](https://github.com/zitadel/nextgen/pull/891) [`15fe470`](https://github.com/zitadel/nextgen/commit/15fe4707660fe2a8f62c64e5ee59e957bc3703c6) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Team service principals (`sk_team_`) can no longer act on users or teams outside the token's team, even if a project-wide grant exists. Project-scoped team-bound grants are rejected at mint time. HTTP wiring for the constraint lands in the stacked follow-ups ([#893](https://github.com/zitadel/nextgen/issues/893)–[#895](https://github.com/zitadel/nextgen/issues/895)).
+
+- [#874](https://github.com/zitadel/nextgen/pull/874) [`c2888bd`](https://github.com/zitadel/nextgen/commit/c2888bdfd3c2a21fefd76a9b7fa80507d97cd88b) Thanks [@fforootd](https://github.com/fforootd)! - Branding asset URLs (`logo_url`, `hero_url`) may now use plain `http://` with canonical loopback hosts (`localhost`, dotted-decimal `127.0.0.0/8`, `[::1]`) so local development can serve login assets straight from the app's own dev server. The login component preserves those URLs only when it also runs on a loopback HTTP page; public pages and every other URL field remain HTTPS-only. The CLI plan, server save, editor, and component gates now enforce the same syntax and explain the carve-out when rejecting a URL.
+
+- [#872](https://github.com/zitadel/nextgen/pull/872) [`79f5ce1`](https://github.com/zitadel/nextgen/commit/79f5ce1db6b36baab85944a667072f1936880704) Thanks [@fforootd](https://github.com/fforootd)! - Scaffolded `.zitadel/**` READMEs now show runnable `npx @zitadel/cli@<version> …` commands instead of the bare `zitadel` command, which does not exist inside a generated app. The branding dialect now explains that `layout` is the degrade preset (`centered`/`split`), not the design name — switch designs with `branding eject --design`. The branding README shows exactly where `logo_url`/`hero_url` go (and that custom fonts aren't configurable there yet), and the setup summary surfaces the `.zitadel/` customization entry points (user schema, login flow, login template) and pairs the chosen design's wizard label with its slug (e.g. "Split (reversed)" → `split-right`) so you can confirm the selection applied.
+
+- [#889](https://github.com/zitadel/nextgen/pull/889) [`18ed11e`](https://github.com/zitadel/nextgen/commit/18ed11e03f33ef76c4bcf0f4814f9a5c7de6d640) Thanks [@fforootd](https://github.com/fforootd)! - Released Zitadel server binaries now report the published package version instead of a build timestamp, and no longer log a missing-metadata warning at startup. Source builds report the revision they were built from, and locally built Docker images identify themselves as source builds rather than claiming the published version.
+
+- [#904](https://github.com/zitadel/nextgen/pull/904) [`aa86726`](https://github.com/zitadel/nextgen/commit/aa86726343946ea2adf10757bf47a0a9c2d71237) Thanks [@fforootd](https://github.com/fforootd)! - The console now tells an unreachable server apart from a deployment that has no
+  project yet. Its boot-time configuration read (`GET /console/runtime.json`) used
+  to resolve every failure — a dropped connection, a `500`, an unreadable body —
+  to the same "No project yet" screen, so an outage read as missing setup and sent
+  operators to run `zitadel setup` against a problem setup cannot fix. Those cases
+  now render a "Server unavailable" screen naming what went wrong, with a retry
+  button that re-reads the configuration in place once the server is back. A
+  server that answers normally but has no project still shows the setup hint,
+  unchanged.
+
+- [#856](https://github.com/zitadel/nextgen/pull/856) [`b17b2c9`](https://github.com/zitadel/nextgen/commit/b17b2c9fb3fae00f99a1864d37f3b51142ea4344) Thanks [@fforootd](https://github.com/fforootd)! - The package documentation now matches what the packages actually do. The Next and Nuxt guides drop the removed `api-base` attribute in favor of `configureZitadel()` and the `project` property; the Nuxt guide documents the Nuxt module (what `zitadel setup` wires) with its real options and the `useAuth()` / `useZitadelProject()` composables, alongside the hand-rolled middleware path with its full option set. `@zitadel/sdk-core` and `@zitadel/api` gain real documentation of their entry points, `@zitadel/config` gains a package README, and the SPA guides document the `ZitadelSession` card and point local no-proxy experiments at the local runtime's actual default port (8080). The flow-editing guide copied into `.zitadel/flows/` no longer suggests cross-flow `switch`/`pivot` transitions, which the runtime does not execute yet, and API examples use the real prefixed ID format (`proj_…`, `team_…`) instead of a retired naming scheme.
+
+- [#822](https://github.com/zitadel/nextgen/pull/822) [`41f6a0a`](https://github.com/zitadel/nextgen/commit/41f6a0a7c60e28a9adecfa9d72b964a305f7ba3d) Thanks [@vitorbari](https://github.com/vitorbari)! - Drop `position` from `x-auth-methods` entries; `enabled` is now the only key. The
+  user schema declares which authentication methods a user type supports.
+  Presentation concerns such as the order methods are offered in belong to the flow
+  engine, which takes them from the order of a step's actions in the flow
+  definition.
+
+  An auth-method entry now sets `additionalProperties: false`, matching the
+  enclosing `x-auth-methods` object, which already rejects unknown method keys. A
+  schema that still carries `position` fails validation instead of being accepted
+  with the field ignored.
+
+- [#857](https://github.com/zitadel/nextgen/pull/857) [`009fd77`](https://github.com/zitadel/nextgen/commit/009fd774f7f59bf3cf319b9753ac81b17ac7c873) Thanks [@fforootd](https://github.com/fforootd)! - Fix the two embedded UI surfaces the server hosts.
+
+  The console at `/ui/console/` failed to load: it sent every API request to
+  `/api/*`, a path the server does not serve, so the sign-in screen showed
+  "POST /api/flow returned 404". It now calls the API at the server's own root,
+  where it has always been. Nothing to change on your side — `/api` was only ever
+  the console dev server's path.
+
+  The hosted sign-in page at `/ui/login/` showed "flow definition: not found"
+  unless you passed `?project_id=`. It now signs into the deployment's project by
+  default (the first one created, or the one pinned with
+  `NEXTGEN_PLATFORM_PROJECT_ID`), and shows a short setup hint when the
+  deployment has no project yet. An explicit `?project_id=` still wins.
+
+- [#858](https://github.com/zitadel/nextgen/pull/858) [`91738b9`](https://github.com/zitadel/nextgen/commit/91738b93e445fc3dd3731a04f76fb3de24436cdb) Thanks [@fforootd](https://github.com/fforootd)! - The embedded console and the test kit's `seedUser` follow the flat-by-id management contract: path-id operations (get/delete user, list passkeys, set password, get schema, get flow definition, get/update team) no longer send a `project_id` query parameter — the server resolves the scope from the resource id itself.
+
+- [#854](https://github.com/zitadel/nextgen/pull/854) [`a0c9fbe`](https://github.com/zitadel/nextgen/commit/a0c9fbe9b6ba36e973b219236b64741441262235) Thanks [@grvijayan](https://github.com/grvijayan)! - Ignore-case list filters (contains, starts with, ends with) now lowercase both the column and the search term inside the database. Searching for a value exactly as stored always finds the row, even when the database's LOWER disagrees with Go's lowercasing (for example C-locale PostgreSQL or SQLite).
+
+- [#829](https://github.com/zitadel/nextgen/pull/829) [`fc3d154`](https://github.com/zitadel/nextgen/commit/fc3d154f2fabb722c6f94633fd6c10bc60d0a657) Thanks [@fforootd](https://github.com/fforootd)! - Preserve purpose across in-card navigation: a flow transition can declare a
+  local `purpose` (`{"target": "register", "purpose": "register"}`), and taking
+  it moves the flow's dispatch mode while the original purpose stays pinned.
+  The default login flow (and the passkey-first preset) now ship visible
+  "Sign up" / "Sign in" navigations on their entry steps built on this —
+  previously the only in-card path to registration was submitting an unknown
+  email. Validators (server-side and `@zitadel/config`) enforce that the purpose
+  is one the definition serves, that the transition targets that purpose's entry
+  step, and that `purpose` never combines with the cross-flow `action`. Navigate
+  actions now also clear a pending passkey challenge, so an abandoned prompt
+  cannot re-attach after navigating away.
+
+  Existing scaffolded apps keep their local `.zitadel/flows/default-login.json`
+  unchanged (local config stays authoritative). To adopt the in-card
+  navigations, add the two navigate actions and their purposed transitions to
+  your flow file — or re-eject the default — then `zitadel plan` / `apply`.
+
+- [#906](https://github.com/zitadel/nextgen/pull/906) [`af41826`](https://github.com/zitadel/nextgen/commit/af4182696e569afd78be406045108dd7f9c6675e) Thanks [@fforootd](https://github.com/fforootd)! - The hosted sign-in shell at `/ui/login/` now tells a deployment it cannot reach
+  apart from one that has no project yet. Its boot-time configuration read
+  (`GET /console/runtime.json`) used to resolve every failure — a dropped
+  connection, a `500`, an unreadable body — to the same "No project yet" screen,
+  so a server whose database was down still served the sign-in page and then told
+  the people trying to sign in to run `npx @zitadel/cli setup`. Those cases now
+  render a "Sign-in is unavailable" screen with a retry button that re-reads the
+  configuration in place, and name the underlying failure in a secondary line for
+  whoever can act on it. A deployment that answers normally but has no project
+  still shows the setup hint, unchanged.
+
+- [#908](https://github.com/zitadel/nextgen/pull/908) [`3818717`](https://github.com/zitadel/nextgen/commit/3818717d9fd079828b742adf6624955e80966308) Thanks [@fforootd](https://github.com/fforootd)! - The Zitadel server container now starts as the non-root user it ships with. It previously created a data directory next to its own entrypoint before reading configuration, which is not writable by that user, so the container exited before serving — and setting a data directory via environment or config file did not avoid it. This also fixes `zitadel start --runtime docker`, which failed the same way.
+
+- [#855](https://github.com/zitadel/nextgen/pull/855) [`be64eaa`](https://github.com/zitadel/nextgen/commit/be64eaaf3a7348d40e95874bb13c1b341cd816ed) Thanks [@adlerhurst](https://github.com/adlerhurst)! - Local HTTP runtimes (`http://localhost`) now omit the `Secure` flag on `_zflow` and `__nextgen_session` cookies so Safari can complete register/login; HTTPS responses still set `Secure`.
+
+- [#885](https://github.com/zitadel/nextgen/pull/885) [`f1049fd`](https://github.com/zitadel/nextgen/commit/f1049fd1b07086ffd070ecdd0b2d80958efd72f2) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel setup` now pins the dev-server port in the scaffolded `dev` script for Next and Nuxt, so the app serves the port setup registered as the project's allowed origin. Previously a bare `next dev` / `nuxt dev` ignored that port and defaulted to 3000 — and Next silently moved to 3001 when 3000 was busy — so login rendered but the first submit failed with `origin "http://localhost:3000" is not allowed for this project`. The other frameworks already pinned the port in their own dev-server config (Vite's `server.port` + `strictPort`, Angular's `serve.options.port`) and are unchanged. An explicit port also turns a busy port into a loud `EADDRINUSE` instead of a silent move to a rejected origin.
+
+  `doctor` verifies that dev script against the port recorded as the development issuer, so a script moved to another port is reported as an unapplied config edit and `doctor --fix` restores the registered port. `eject` now lists `package.json` among the edits it cannot auto-revert.
+
+  A login that cannot start — a rejected origin being the most common cause — now reports the failure inside the login card instead of leaving a bare line of text on an otherwise empty page.
+
 ## 0.1.0-alpha.18
 
 ### Minor Changes

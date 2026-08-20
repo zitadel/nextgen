@@ -157,6 +157,12 @@ export async function buildSyncPlan(
       // or merely reordered file a skip; a spurious mismatch here would
       // publish a garbage schema revision. Writes always store the new
       // format, so state converges on the next real change.
+      //
+      // Only the two pre-normalization formats are accepted, not earlier
+      // generations of a normalizer. Widening a normalizer changes this
+      // hash for the bodies it newly touches, which costs one no-op
+      // revision on the next apply; keeping a copy of every past
+      // normalizer to avoid that would outlast the state files it serves.
       const unchanged =
         entry.hash === hash ||
         entry.hash === hashResourceContent(content) ||
