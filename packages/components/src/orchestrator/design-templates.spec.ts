@@ -17,6 +17,7 @@ const locale: Record<string, string> = {
   "identifier.title": "Sign in",
   "identifier.field.email": "Work email",
   "identifier.field.remember": "Remember me",
+  "identifier.field.department": "Department",
   "identifier.action.register.lead": "New here? ",
   "identifier.action.register.link": "Create an account",
   "submit.continue": "Continue",
@@ -29,6 +30,13 @@ const step: CreateFlow201Step = {
   fields: [
     { name: "email", type: "email", text_key: "identifier.field.email", required: true },
     { name: "remember", type: "checkbox", text_key: "identifier.field.remember" },
+    {
+      name: "department",
+      type: "select",
+      text_key: "identifier.field.department",
+      required: true,
+      validation: { enum: ["Engineering", "Support"] },
+    },
   ],
   actions: [
     { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
@@ -54,6 +62,17 @@ const context = {
   challenge: null,
 };
 
+/**
+ * Parses rendered HTML into a queryable fragment so attribute assertions read
+ * the decoded attribute value rather than matching the serialiser's escaping
+ * (`options='{...}'` comes back out as `options="{&quot;...&quot;}"`).
+ */
+function parseFragment(html: string): DocumentFragment {
+  const element = document.createElement("template");
+  element.innerHTML = html;
+  return element.content;
+}
+
 function renderDesign(design: string): string {
   const engine = createLiquidEngine({ locale });
   const { template } = getDefaultBrandingConfig(design);
@@ -70,9 +89,25 @@ describe("branding design catalog", () => {
       it("renders the declared field and primary action after the full pipeline", () => {
         expect(html).toContain('name="email"');
         expect(html).toContain('data-testid="zitadel-field-remember"');
+        expect(html).toContain('data-testid="zitadel-field-department"');
         expect(html).toContain('data-testid="zitadel-action-submit"');
         expect(html).toContain('data-action="register"');
         expect(html).toContain('data-action="recover"');
+      });
+
+      it("serialises a select field's enum into the <zl-select> options attribute", () => {
+        // The `{% case f.type %}` field loop is duplicated byte-identically
+        // across all six templates (each design is independently ejectable per
+        // ADR 037), and `select` is the one arm the shared fixture used to
+        // never reach — it was only ever covered through `default.liquid`.
+        const select = parseFragment(html).querySelector('zl-select[name="department"]');
+        expect(select).not.toBeNull();
+        expect(select?.getAttribute("label")).toBe("Department");
+        expect(select?.hasAttribute("required")).toBe(true);
+        expect(JSON.parse(select?.getAttribute("options") ?? "null")).toEqual([
+          { value: "Engineering", label: "Engineering" },
+          { value: "Support", label: "Support" },
+        ]);
       });
 
       it("consumes its mandatory_gates marker", () => {
@@ -81,6 +116,9 @@ describe("branding design catalog", () => {
         // append a second field or submit button.
         expect(html.match(/data-testid="zitadel-field-email"/g) ?? []).toHaveLength(1);
         expect(html.match(/data-testid="zitadel-action-submit"/g) ?? []).toHaveLength(1);
+        // A required `select` already renders as <zl-select>; the patcher must
+        // recognise it and not append a generic <zl-field> alongside.
+        expect(html.match(/data-testid="zitadel-field-department"/g) ?? []).toHaveLength(1);
       });
 
       it("survives sanitisation structurally", () => {
