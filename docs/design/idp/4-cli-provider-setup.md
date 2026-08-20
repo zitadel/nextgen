@@ -134,15 +134,15 @@ Following Area 1's principle that "vendor knowledge is data," the catalog is imp
 
 | Field | Purpose & Usage |
 | :--- | :--- |
-| **Protocol Block**<br>*(endpoints/issuer, pins, scopes, `supplementary_fetch`, `verified_claims` recipe)* | Populates connection files based on Area 1's test-verified examples, injecting the prompted `client_id` and the intersection of the claim recipe with the active schema (`claim_mapping`). |
-| **Claim Recipe**<br>*(schema property concept → provider claim name)* | Drives `claim_mapping` generation by intersecting recipe mappings with schema properties, ensuring the generator only emits mapping targets relevant to the selected use case. |
+| **Protocol Block**<br>*(endpoints/issuer, pins, scopes, `supplementary_fetch`, `verified_claims` defaults)* | Populates connection files based on Area 1's test-verified examples, injecting the prompted `client_id` and the intersection of the claim table with the active schema (`claim_mapping`). |
+| **Claim Table**<br>*(schema property concept → provider claim name)* | Drives `claim_mapping` generation by intersecting its rows with schema properties, ensuring the generator only emits mapping targets relevant to the selected use case. |
 | **Display Name & `template`** | Populates `sso_providers` step entries and CLI console output. |
 | **Console URL & Docs URL** | Surfaced during the announce step and within error envelopes. |
 | **Callback Guidance**<br>*(multi-URI client vs. app-per-environment)* | Surfaced during the announce step to guide developer app registration. |
 
 ### Mapping Defaults
 
-The default slug matches the catalog key. For the default schema, `email` is mapped across both providers; use-case properties (`givenName`, `familyName`) are added per the recipe whenever present in both the target schema and the provider recipe (GitHub has no `familyName` source, and its `givenName` maps to the full-name `name` claim; see area 1's claim-mapping caveat).
+The default slug matches the catalog key. For the default schema, `email` is mapped across both providers; use-case properties (`givenName`, `familyName`) are added whenever present in both the target schema and the provider's claim table (GitHub has no `familyName` source, and its `givenName` maps to the full-name `name` claim; see area 1's claim-mapping caveat).
 
 ## Credential Capture
 
@@ -387,7 +387,7 @@ The epic requires connection configurations to be visible in the plan preview wh
 
 ### The `IdpSyncer` Component
 
-Defined as `{ kind: "idp", directory: ".zitadel/idps", revisioned: false, mutable: true }` and registered in `makeSyncers` (`apps/cli/src/lib/sync/syncers.ts:46-61`), using `FlowDefinitionSyncer` as its precedent (`syncers.ts:154-159`). `BrandingSyncer`'s `revisioned: true` shape was considered and rejected: in the sync contract that flag means a hash change publishes a brand-new outer id via `create()` and triggers a re-pin scan (`lib/sync/types.ts:78-92`, `lib/sync/loop.ts:175-188`), while the IdP CRUD API keeps the lineage id stable and revises through `PUT /idps/{id}`. The server mints the revision id under the stable outer id, which is the contract's `mutable` shape: `update()` on hash change.
+Defined as `{ kind: "idp", directory: ".zitadel/idps", revisioned: false, mutable: true }` and registered in `makeSyncers` (`apps/cli/src/lib/sync/syncers.ts:46-61`), using `FlowDefinitionSyncer` as its precedent (`syncers.ts:154-159`). `BrandingSyncer`'s `revisioned: true` shape was considered and rejected: in the sync contract that flag means a hash change publishes a brand-new outer id via `create()` and triggers a re-pin scan (`lib/sync/types.ts:78-92`, `lib/sync/loop.ts:175-188`), while the IdP CRUD API keeps the connection id stable and revises through `PUT /idps/{id}`. The server mints the revision id under the stable outer id, which is the contract's `mutable` shape: `update()` on hash change.
 
 * **Directory Handling:** Introduces an `IDPS_DIR` constant. Missing directories plan cleanly without error (`readJsonDir` returns empty on `ENOENT`, `lib/sync/loop.ts:506-511`).
 * **Preview Behavior:** Registration alone enables create previews via the generic plan renderer (`lib/sync/plan-renderer.ts:668-687`). Update previews cannot show a field diff until a read endpoint exists (the renderer's explicit fallback, `plan-renderer.ts:763`); with the CRUD API's get-by-slug they upgrade to a real old-vs-new diff.
@@ -397,7 +397,7 @@ Defined as `{ kind: "idp", directory: ".zitadel/idps", revisioned: false, mutabl
 ### Syncer Lifecycle Methods
 
 * **`validate()`:** Evaluates against the meta-schema and validator rules from Areas 1 and 2, executing `assertEnvRefs` with the [`E_CREDENTIAL_MISSING`](#missing-credentials) split.
-* **`create()` / `update()`:** `create()` posts `POST /idps`; `update()` publishes a new immutable revision under the stable lineage id via `PUT /idps/{id}`. Both depend on the CRUD API landing. Until it exists, journey file generation, validation, and `plan` previews function independently.
+* **`create()` / `update()`:** `create()` posts `POST /idps`; `update()` publishes a new immutable revision under the unique connection id via `PUT /idps/{id}`. Both depend on the CRUD API landing. Until it exists, journey file generation, validation, and `plan` previews function independently.
 * **`delete()`:** Calls `DELETE /idps/{id}`. Deletion is settled as tombstoning, so a local file delete schedules a platform delete unconditionally.
 
 ### Execution Handoff
