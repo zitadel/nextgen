@@ -189,6 +189,11 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   ["verified_claims number rejected", { ...oidc, verified_claims: { email: 42 } }, false],
   ["verified_claims $-typo rejected", { ...oidc, verified_claims: { email: "$strateggy" } }, false],
   ["old $strategy sentinel rejected", { ...oidc, verified_claims: { email: "$strategy" } }, false],
+  // claim_mapping value classes: plain string = exact top-level claim key;
+  // $-strings and non-strings are reserved for future mapping forms
+  ["claim_mapping dotted value accepted (dot is part of the key)", { ...oidc, claim_mapping: { email: "plan.name" } }, true],
+  ["claim_mapping $-value rejected (reserved)", { ...oidc, claim_mapping: { email: "$expr" } }, false],
+  ["claim_mapping object value rejected (reserved)", { ...oidc, claim_mapping: { email: { expr: "login" } } }, false],
   // dropped root fields
   ["kind (dropped)", { ...oidc, kind: "idp" }, false],
   ["enabled (dropped — availability is the policy gates + runtime disable)", { ...oidc, enabled: true }, false],
