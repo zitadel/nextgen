@@ -23,7 +23,7 @@ A single journey unit powers two distinct callers:
 
 > **Architecture Note:** The journey writes strictly to the local working tree. Upload belongs to the sync commands (`plan`/`apply` today, `deploy` under ADR 035): ADR 007's split is that repo files describe configuration while server APIs own runtime resources, and this journey stays on the file side of that line.
 
-> **Scope Note:** These two callers are the only setup surfaces this iteration. The Console is read-only: the developer explicitly cannot "configure or manage identity provider connections through the Console in this iteration" (epic, Console experience; the read-only views are Area 7). There is no API journey either: no IdP CRUD API exists yet (area 1's largest open point; ADR 007 marks resource-like IdP commands experimental until their server contracts are real). When that API lands, ADR 035 keeps direct per-resource CRUD as a first-class write path beside file sync, so an API client writes connections through it rather than through this journey's files.
+> **Scope Note:** These two callers are the only setup surfaces this iteration. The Console is read-only: the developer explicitly cannot "configure or manage identity provider connections through the Console in this iteration" (epic, Console experience). There is no API journey either: no IdP CRUD API exists yet (area 1's largest open point; ADR 007 marks resource-like IdP commands experimental until their server contracts are real). When that API lands, ADR 035 keeps direct per-resource CRUD as a first-class write path beside file sync, so an API client writes connections through it rather than through this journey's files.
 
 ## Imported Requirements
 

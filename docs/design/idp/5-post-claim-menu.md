@@ -163,7 +163,7 @@ Sign-in methods for human-user (.zitadel/schemas/default-human-user.json)
 - **Custom Providers:** Providers outside the standard catalog render as read-only notes and pass through recomposition untouched.
 - **Drift Warning:** If the file hash mismatches the last-applied record in `.zitadel/state.json` (hash mechanics: `lib/sync/loop.ts:566`), the UI appends `includes local changes not yet applied`.
 
-> **Interpretation Note:** Area 7 reads "latest schema version" as the latest applied revision (the active-flow pin). This journey reads the working tree because the tree is what it edits; the drift warning bridges the two readings.
+> **Interpretation Note:** The epic's Console criterion reads "latest schema version" as the latest applied revision (the active-flow pin). This journey reads the working tree because the tree is what it edits; the drift warning bridges the two readings.
 
 ### In-Place Recomposition Rules
 The CLI must edit user configurations in place without destroying customizations:

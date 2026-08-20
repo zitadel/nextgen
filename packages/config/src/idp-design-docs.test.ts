@@ -13,9 +13,9 @@ import { describe, expect, it } from "vitest";
 // value classes, protocol arms, scope requirements),
 // so the receipt must be checkable from the repo, not a session scratchpad.
 // Covers 1-resource-model.md, 2-auth-method-selection.md, 4-cli-provider-setup.md,
-// 5-post-claim-menu.md, 6-test-sign-in.md, and 7-console-views.md;
+// 5-post-claim-menu.md, and 6-test-sign-in.md;
 // 3-social-login-flow.md embeds no validatable JSON blocks, but its cross-doc
-// rows are pinned as quotes (areas 3<->4, 4<->5, {3,4,5}<->6, and {1,2,4}<->7)
+// rows are pinned as quotes (areas 3<->4, 4<->5, and {3,4,5}<->6)
 // so sibling rewrites fail loudly.
 // When the schema lands as a real meta-schema file, point this test at it
 // and delete the extraction.
@@ -43,10 +43,6 @@ const postClaimMenu = readFileSync(
 );
 const testSignIn = readFileSync(
   join(repoRoot, "docs/design/idp/6-test-sign-in.md"),
-  "utf8",
-);
-const consoleViews = readFileSync(
-  join(repoRoot, "docs/design/idp/7-console-views.md"),
   "utf8",
 );
 
@@ -648,86 +644,6 @@ describe("sibling quotes pinned verbatim (6-test-sign-in.md)", () => {
   });
 });
 
-describe("console views (7-console-views.md)", () => {
-  // Area 7 imports its premises by quote from areas 1, 2, and 4, and embeds
-  // two machine-checkable sketches: the x-auth-methods example must satisfy
-  // area 2's proposed composite, and the connections-list sketch must agree
-  // field by field with area 1's example connection files.
-  const squash = (s: string) => s.replace(/\s+/g, " ");
-
-  it.each([
-    [
-      "secret invariant (area 1)",
-      resourceModel,
-      "Secret resolution must never happen upstream of anything that is diffed, hashed, committed, or printed.",
-    ],
-    [
-      "get-by-slug API row (area 1)",
-      resourceModel,
-      "The API surface must support `get-by-slug` and strictly enforce uniqueness on creation.",
-    ],
-    [
-      "UI-visibility rationale (area 2)",
-      authMethodSelection,
-      "Both the post-claim journey and the Console need to display exactly which authentication methods a schema supports.",
-    ],
-    [
-      "dead-capability consequence (area 2)",
-      authMethodSelection,
-      "The Console would advertise a sign-in method that has no actual login path.",
-    ],
-    [
-      "read-only scope note (area 4)",
-      providerSetup,
-      'the developer explicitly cannot "configure or manage identity provider connections through the Console in this iteration"',
-    ],
-  ])("%s appears in the source doc and area 7", (_name, source, quote) => {
-    expect(squash(source)).toContain(quote);
-    expect(squash(consoleViews)).toContain(quote);
-  });
-
-  it("the x-auth-methods example validates against area 2's composite", () => {
-    const raw = consoleViews.match(
-      /```jsonc\n\/\/ Customers schema as the console reads it\n"x-auth-methods": (\{[\s\S]*?\n\})\n```/,
-    )?.[1];
-    expect(raw).toBeTruthy();
-    const snippet = JSON.parse(raw!) as object;
-    const metaSchemaDir = join(repoRoot, "packages/config/meta-schemas");
-    const shippedAuthMethod = JSON.parse(
-      readFileSync(join(metaSchemaDir, "auth-method.json"), "utf8"),
-    ) as object;
-    const proposed = JSON.parse(
-      readFileSync(join(metaSchemaDir, "auth-methods.json"), "utf8"),
-    ) as { properties: Record<string, { $ref: string }> };
-    proposed.properties["sso"] = { $ref: "sso-auth-method.json" };
-    const composite = ajv()
-      .addSchema(shippedAuthMethod, "auth-method.json")
-      .addSchema(ssoAuthMethodSchema as object, "sso-auth-method.json")
-      .compile(proposed);
-    expect(composite(snippet)).toBe(true);
-  });
-
-  it("the connections-list sketch agrees with area 1's example connections", () => {
-    const sketch = extractJson(
-      consoleViews,
-      /```jsonc\n\/\/ GET \/idps[^\n]*\n(\{[\s\S]*?\n\})\n```/,
-    ) as {
-      idps: Array<{ slug: string; display_name: string; protocol: string; template: string }>;
-    };
-    const examples: Record<string, { display_name: string; protocol: string; template: string }> = {
-      google: googleExample as never,
-      github: githubExample as never,
-    };
-    expect(sketch.idps.map((row) => row.slug).sort()).toEqual(["github", "google"]);
-    for (const row of sketch.idps) {
-      const example = examples[row.slug]!;
-      expect(row.display_name).toBe(example.display_name);
-      expect(row.protocol).toBe(example.protocol);
-      expect(row.template).toBe(example.template);
-    }
-  });
-});
-
 describe("dialect dependency (x-verify removed in #901)", () => {
   // Doc 1's dependency note claims the dialect carries exactly x-unique,
   // x-claim, and x-audit today. Assert that against the real file, so any
@@ -765,7 +681,6 @@ describe("cross-doc anchors resolve (docs/design/idp)", () => {
     "4-cli-provider-setup.md": providerSetup,
     "5-post-claim-menu.md": postClaimMenu,
     "6-test-sign-in.md": testSignIn,
-    "7-console-views.md": consoleViews,
   };
   const slugs = (doc: string) =>
     new Set(

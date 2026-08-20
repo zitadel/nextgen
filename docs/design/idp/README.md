@@ -16,7 +16,7 @@ available to every schema, and one connection can serve many.
 
 ## Areas
 
-The epic decomposes into seven areas, roughly in dependency order, one doc
+The epic decomposes into six areas, roughly in dependency order, one doc
 per area.
 
 | # | Area | Doc |
@@ -27,7 +27,6 @@ per area.
 | 4 | **Provider setup sub-journey** — callback URI surfacing, credential capture, preview | [`4-cli-provider-setup.md`](4-cli-provider-setup.md) |
 | 5 | **Post-claim CLI menu** — Project menu, Configure submenu, "Sign-in methods" | [`5-post-claim-menu.md`](5-post-claim-menu.md) |
 | 6 | **Test-sign-in journey** — distinguishing provider misconfiguration from journey failure | [`6-test-sign-in.md`](6-test-sign-in.md) |
-| 7 | **Console read-only views** — auth methods per latest schema version, existing connections | [`7-console-views.md`](7-console-views.md) |
 
 ## Cross-cutting
 
