@@ -20,12 +20,17 @@ const ClaimChallengeTTL = 10 * time.Minute
 // challenge id (handoff-token pattern, ADR 046 §3): 128 bits of crypto/rand,
 // prefixed and base64url-encoded. Only the id — the SHA-256 of the plaintext —
 // is ever persisted; the plaintext travels in the claim_url and the CLI poll.
+//
+// The plaintext uses the wire prefix "ch_" (challenge-id.yaml pins
+// ^ch_[a-zA-Z0-9_-]+$, shared with the api-mock and CLI, and ogen validates it
+// on input and output). PrefixClaimChallenge stays for error codes only; the
+// stored id is an unprefixed hex digest either way.
 func NewClaimChallengeToken() (plain, id string, err error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		return "", "", ErrInternal(err).WithMessage("failed to generate claim challenge token")
 	}
-	plain = PrefixClaimChallenge.IDPrefix(base64.RawURLEncoding.EncodeToString(b))
+	plain = "ch_" + base64.RawURLEncoding.EncodeToString(b)
 	return plain, HashClaimChallengeToken(plain), nil
 }
 

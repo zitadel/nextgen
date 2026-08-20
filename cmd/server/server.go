@@ -277,7 +277,9 @@ func run(ctx context.Context, cfg Config, userFiles []string) error {
 			keyService,
 			claimService,
 			serviceDBPool,
-			cfg.Platform.ProjectID,
+			// Resolved, not the raw pin: in bootstrap mode project_id is empty
+			// and an empty handler pin rejects every claim/complete session.
+			cfg.Platform.ResolvedProjectID(),
 		),
 		api.NewSecurityHandler(tokenService),
 		oasapi.WithMiddleware(

@@ -210,6 +210,13 @@ CREATE UNIQUE INDEX authz_assignments_unique_active
     )
     WHERE revoked_at IS NULL AND delegation_id IS NULL;
 
+-- ADR 054 §2: at most one active owning-team grant per project. The active
+-- key above includes the principal, so on its own it lets two teams race into
+-- concurrent ownership; this narrows the winner of a claim race to one row.
+CREATE UNIQUE INDEX authz_assignments_one_owning_team
+    ON zitadel_nextgen.authz_assignments (project_id)
+    WHERE object_type = 'project' AND relation = 'team' AND revoked_at IS NULL;
+
 CREATE TABLE zitadel_nextgen.authz_membership_edges (
     project_id  TEXT COLLATE "C" NOT NULL
         REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE,
@@ -300,6 +307,7 @@ ON CONFLICT DO NOTHING;
 
 -- +goose Down
 DROP TABLE IF EXISTS zitadel_nextgen.authz_membership_edges;
+DROP INDEX IF EXISTS zitadel_nextgen.authz_assignments_one_owning_team;
 DROP INDEX IF EXISTS zitadel_nextgen.authz_assignments_unique_active;
 DROP INDEX IF EXISTS zitadel_nextgen.idx_authz_assignments_delegation;
 DROP INDEX IF EXISTS zitadel_nextgen.idx_authz_assignments_principal_project;

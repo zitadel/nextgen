@@ -33,7 +33,10 @@ func TestNewClaimChallengeToken(t *testing.T) {
 
 	plain, id, err := domain.NewClaimChallengeToken()
 	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(plain, "claim_challenge_"))
+	assert.True(t, strings.HasPrefix(plain, "ch_"))
+	// Wire pattern pinned by challenge-id.yaml; ogen validates it on both
+	// input and output, so a drift here breaks every claim endpoint.
+	assert.Regexp(t, `^ch_[a-zA-Z0-9_-]+$`, plain)
 	assert.Equal(t, domain.HashClaimChallengeToken(plain), id)
 	assert.Regexp(t, hexDigest, id)
 
