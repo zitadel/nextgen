@@ -1,16 +1,18 @@
 # ADR 046: Claim Lifecycle v2
 
-> **Status:** Accepted (2026-07-24; partially implemented, see amendment)
+> **Status:** Implemented (accepted 2026-07-24; fully implemented 2026-08-20)
 > **Date:** 2026-07-24
 >
-> **Amendment (2026-08-14):** partially shipped. The OpenAPI contract exposes
-> `/projects/{project_id}/claim/{init,status,complete}` (#739) and the routes
-> are mounted, but the server-side handlers are not implemented: all three
-> answer 501 until the claim service and handlers land (#611, #612). Shipped
-> so far: the contract (#739), the `claim_challenges` storage (#628, #740),
-> the platform-session precondition for `claim/complete` (#751), the CLI
+> **Amendment (2026-08-20):** fully implemented. The server serves
+> `/projects/{project_id}/claim/{init,status,complete}`: the claim service
+> (#909) and the handlers with integration tests (#912) landed on top of the
+> contract (#739), the `claim_challenges` storage (#628, #740), the
+> platform-session precondition for `claim/complete` (#751), the CLI
 > `zitadel claim` command (#754), and team attachment reporting in
-> `setup`/`status`/`doctor` (#776).
+> `setup`/`status`/`doctor` (#776). Claim state is the unique active
+> owning-team grant in `authz_assignments` (the database enforces one owner
+> per project), which anticipates proposed ADR 054 §2. The console claim page
+> is still open (#615), so the browser leg of the flow has no guided UI yet.
 >
 > **Proposed amendment — [ADR 053 §5](053-cross-project-principals.md#5-first-party-human-sessions-may-call-the-operator-plane):**
 > if ADR 053 is accepted, [§2](#2-claimcomplete-is-authenticated-by-a-platform-project-session)'s
