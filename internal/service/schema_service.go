@@ -129,7 +129,10 @@ func (s *SchemaService) GetSchema(ctx context.Context, projectID string, teamID 
 	return schema, nil
 }
 
-func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType, kind string, offset int, token string) ([]ListSchemasOutputItem, error) {
+// kind is nil when the caller did not filter by one. It is a pointer rather
+// than a zero value because JSONSchemaKindUnknown is a real stored kind, so it
+// cannot double as "no filter".
+func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType string, kind *domain.JSONSchemaKind, offset int, token string) ([]ListSchemasOutputItem, error) {
 	filters := []database.Filter[domain.JSONSchemaField]{
 		database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
 	}
@@ -141,9 +144,9 @@ func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType, 
 	// Schemas persisted without their document being parsed — ingested by URL,
 	// or a $ref target pulled in during resolution (#812) — are stored as
 	// domain.JSONSchemaKindUnknown, which no filterable kind matches.
-	if kind != "" {
+	if kind != nil {
 		filters = append(filters,
-			database.Equal(database.Col(domain.JSONSchemaFieldKind), kind),
+			database.Equal(database.Col(domain.JSONSchemaFieldKind), kind.String()),
 		)
 	}
 

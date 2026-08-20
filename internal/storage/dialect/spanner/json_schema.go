@@ -39,7 +39,7 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 		return err
 	}
 	return withTransaction(ctx, js.db, func(ctx context.Context, tx queryExecutor) error {
-		stmt := buildStatement(createJSONSchemaStmt, schema.ProjectID, schema.URL, schema.ObjectType, schema.Kind, encodeJSONSchemaPayload(schema.Schema)).statement()
+		stmt := buildStatement(createJSONSchemaStmt, schema.ProjectID, schema.URL, schema.ObjectType, schema.Kind.String(), encodeJSONSchemaPayload(schema.Schema)).statement()
 		if err := tx.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 			_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
 				scanned, err := js.scanJSONSchema(row)
@@ -114,10 +114,18 @@ func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *data
 
 func (js jsonSchemaStatements) scanJSONSchema(row *spanner.Row) (*domain.JSONSchema, error) {
 	schema := new(domain.JSONSchema)
-	var payload spanner.NullJSON
-	if err := row.Columns(&schema.ProjectID, &schema.URL, &schema.ObjectType, &schema.Kind, &schema.CreatedAt, &payload); err != nil {
+	var (
+		payload spanner.NullJSON
+		kind    string
+	)
+	if err := row.Columns(&schema.ProjectID, &schema.URL, &schema.ObjectType, &kind, &schema.CreatedAt, &payload); err != nil {
 		return nil, err
 	}
+	parsedKind, err := domain.JSONSchemaKindString(kind)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	schema.Kind = parsedKind
 	data, err := decodeJSONSchemaPayload(payload)
 	if err != nil {
 		return nil, err
@@ -170,7 +178,7 @@ var jsonSchemaSchema = database.NewSchema(map[domain.JSONSchemaField]database.Fi
 	},
 	domain.JSONSchemaFieldKind: {
 		SQLName:  "kind",
-		Accessor: func(s *domain.JSONSchema) any { return s.Kind },
+		Accessor: func(s *domain.JSONSchema) any { return s.Kind.String() },
 		Coerce:   database.CoerceString,
 	},
 })

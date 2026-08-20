@@ -14,7 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-func createJSONSchemaWithKind(t *testing.T, stmts service.AllStatements, projectID, url, kind string) {
+func createJSONSchemaWithKind(t *testing.T, stmts service.AllStatements, projectID, url string, kind domain.JSONSchemaKind) {
 	t.Helper()
 	require.NoError(t, stmts.CreateJSONSchema(t.Context(), &domain.JSONSchema{
 		ProjectID: projectID,
@@ -31,11 +31,11 @@ func TestJSONSchemaStatements_KindRoundTrips(t *testing.T) {
 		suffix := uniqueSuffix(t)
 
 		url := "https://example.com/schemas/kind-" + suffix
-		createJSONSchemaWithKind(t, d.stmts, projectID, url, "user-schema")
+		createJSONSchemaWithKind(t, d.stmts, projectID, url, domain.JSONSchemaKindUserSchema)
 
 		got, err := d.stmts.GetJSONSchemaByID(t.Context(), projectID, url)
 		require.NoError(t, err)
-		assert.Equal(t, "user-schema", got.Kind)
+		assert.Equal(t, domain.JSONSchemaKindUserSchema, got.Kind)
 	})
 }
 
@@ -45,15 +45,14 @@ func TestJSONSchemaStatements_ListFilterByKind(t *testing.T) {
 		suffix := uniqueSuffix(t)
 
 		wanted := "https://example.com/schemas/wanted-" + suffix
-		createJSONSchemaWithKind(t, d.stmts, projectID, wanted, "user-schema")
-		createJSONSchemaWithKind(t, d.stmts, projectID, "https://example.com/schemas/other-"+suffix, "flow-definition")
+		createJSONSchemaWithKind(t, d.stmts, projectID, wanted, domain.JSONSchemaKindUserSchema)
 		// Schemas persisted without their document being parsed (#812) land here.
 		createJSONSchemaWithKind(t, d.stmts, projectID, "https://example.com/schemas/unknown-"+suffix, domain.JSONSchemaKindUnknown)
 
 		result, err := d.stmts.ListJSONSchemas(unfilteredListCtx(t), &database.ListOptions[domain.JSONSchemaField]{
 			Filter: database.And(
 				database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
-				database.Equal(database.Col(domain.JSONSchemaFieldKind), "user-schema"),
+				database.Equal(database.Col(domain.JSONSchemaFieldKind), domain.JSONSchemaKindUserSchema.String()),
 			),
 		})
 		require.NoError(t, err)
@@ -62,7 +61,7 @@ func TestJSONSchemaStatements_ListFilterByKind(t *testing.T) {
 		for _, item := range result.Items {
 			urls = append(urls, item.URL)
 		}
-		// Both a different kind and an unparsed one are excluded.
+		// An unparsed schema is excluded.
 		assert.Equal(t, []string{wanted}, urls)
 	})
 }

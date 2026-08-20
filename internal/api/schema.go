@@ -75,10 +75,21 @@ func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams)
 	if err != nil {
 		return nil, err
 	}
+	// The wire enum and the domain enum carry the same values, but the mapping
+	// is explicit so an added kind cannot silently pass through unrecognised.
+	var kind *domain.JSONSchemaKind
+	if params.Kind.Set {
+		parsed, err := domain.JSONSchemaKindString(string(params.Kind.Value))
+		if err != nil {
+			return nil, err
+		}
+		kind = &parsed
+	}
+
 	schemas, err := h.schemaService.ListSchemas(ctx,
 		string(params.ProjectID),
 		params.ObjectType.Value,
-		string(params.Kind.Value),
+		kind,
 		params.Offset.Value,
 		string(params.PageToken.Value),
 	)

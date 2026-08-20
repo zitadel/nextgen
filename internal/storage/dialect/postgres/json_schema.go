@@ -29,10 +29,16 @@ func (js jsonSchemaStatements) CreateJSONSchema(ctx context.Context, schema *dom
 		return err
 	}
 	return withTransaction(ctx, js.client, func(ctx context.Context, tx queryExecutor) error {
-		if err := tx.QueryRow(ctx, createJSONSchemaStmt, schema.ProjectID, schema.URL, schema.ObjectType, schema.Kind, schema.Schema).
-			Scan(&schema.ProjectID, &schema.URL, &schema.ObjectType, &schema.Kind, &schema.CreatedAt, &schema.Schema); err != nil {
+		var kind string
+		if err := tx.QueryRow(ctx, createJSONSchemaStmt, schema.ProjectID, schema.URL, schema.ObjectType, schema.Kind.String(), schema.Schema).
+			Scan(&schema.ProjectID, &schema.URL, &schema.ObjectType, &kind, &schema.CreatedAt, &schema.Schema); err != nil {
 			return wrapError(err)
 		}
+		parsedKind, err := domain.JSONSchemaKindString(kind)
+		if err != nil {
+			return wrapError(err)
+		}
+		schema.Kind = parsedKind
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindSchema, schema.ProjectID, schema.URL))
 	})
@@ -112,9 +118,15 @@ func (js jsonSchemaStatements) ListJSONSchemas(ctx context.Context, filter *data
 
 func (js jsonSchemaStatements) scanJSONSchema(row pgx.CollectableRow) (*domain.JSONSchema, error) {
 	schema := new(domain.JSONSchema)
-	if err := row.Scan(&schema.ProjectID, &schema.URL, &schema.ObjectType, &schema.Kind, &schema.CreatedAt, &schema.Schema); err != nil {
+	var kind string
+	if err := row.Scan(&schema.ProjectID, &schema.URL, &schema.ObjectType, &kind, &schema.CreatedAt, &schema.Schema); err != nil {
 		return nil, err
 	}
+	parsedKind, err := domain.JSONSchemaKindString(kind)
+	if err != nil {
+		return nil, err
+	}
+	schema.Kind = parsedKind
 	return schema, nil
 }
 
@@ -144,7 +156,7 @@ var jsonSchemaSchema = database.NewSchema(map[domain.JSONSchemaField]database.Fi
 	},
 	domain.JSONSchemaFieldKind: {
 		SQLName:  "kind",
-		Accessor: func(s *domain.JSONSchema) any { return s.Kind },
+		Accessor: func(s *domain.JSONSchema) any { return s.Kind.String() },
 		Coerce:   database.CoerceString,
 	},
 })
