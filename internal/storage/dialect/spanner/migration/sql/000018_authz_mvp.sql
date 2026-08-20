@@ -201,6 +201,9 @@ CREATE TABLE authz_assignments (
     revoked_at        TIMESTAMP,
     -- Concatenated uniqueness key when revoked_at IS NULL AND delegation_id IS NULL; else NULL.
     active_unique_key STRING(MAX),
+    -- project_id when this is an active owning-team grant (object 'project',
+    -- relation 'team', not revoked); else NULL. ADR 054 §2 one-owner stand-in.
+    owning_team_key   STRING(MAX),
     created_at        TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     updated_at        TIMESTAMP NOT NULL DEFAULT (CURRENT_TIMESTAMP()),
     CONSTRAINT chk_authz_assignments_id CHECK (id <> ''),
@@ -242,6 +245,14 @@ CREATE NULL_FILTERED INDEX idx_authz_assignments_delegation
 -- +goose StatementBegin
 CREATE UNIQUE NULL_FILTERED INDEX authz_assignments_unique_active
     ON authz_assignments (active_unique_key)
+-- +goose StatementEnd
+
+-- ADR 054 §2: at most one active owning-team grant per project. The active
+-- key above includes the principal, so on its own it lets two teams race into
+-- concurrent ownership; this narrows the winner of a claim race to one row.
+-- +goose StatementBegin
+CREATE UNIQUE NULL_FILTERED INDEX authz_assignments_one_owning_team
+    ON authz_assignments (owning_team_key)
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -355,6 +366,9 @@ DROP INDEX idx_authz_membership_edges_member
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE authz_membership_edges
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX authz_assignments_one_owning_team
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX authz_assignments_unique_active

@@ -51,6 +51,25 @@ UPDATE authz_assignments
 SET revoked_at = ?, updated_at = ?
 WHERE project_id = ? AND id = ? AND revoked_at IS NULL
 RETURNING revoked_at, updated_at`
+
+	getActiveOwningTeamGrantStmt = `
+SELECT id, project_id, catalog_id,
+       principal_type, principal_id, object_type, relation,
+       scope_kind, scope_team_id, scope_resource_id,
+       grantor_type, grantor_id, delegation_id,
+       expires_at, revoked_at, created_at, updated_at
+FROM authz_assignments
+WHERE project_id = ? AND object_type = 'project' AND relation = 'team'
+  AND revoked_at IS NULL
+ORDER BY created_at, id
+LIMIT 1`
+
+	listClaimedProjectIDsStmt = `
+SELECT DISTINCT project_id FROM authz_assignments
+WHERE object_type = 'project' AND relation = 'team' AND revoked_at IS NULL
+  AND (? = '' OR project_id > ?)
+ORDER BY project_id
+LIMIT ?`
 )
 
 type authzAssignmentStatements struct{ statement }
@@ -128,6 +147,44 @@ func (s authzAssignmentStatements) RevokeAuthzAssignment(ctx context.Context, pr
 		return wrapError(err)
 	}
 	return nil
+}
+
+// GetActiveOwningTeamGrant implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error) {
+	rows, err := s.client.Query(ctx, getActiveOwningTeamGrantStmt, projectID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	assignment, err := collectExactlyOneRow(rows, scanAuthzAssignment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return assignment, nil
+}
+
+// ListClaimedProjectIDs implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
+	if limit == 0 {
+		limit = 500
+	}
+	rows, err := s.client.Query(ctx, listClaimedProjectIDsStmt, afterID, afterID, int64(limit))
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, wrapError(err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, wrapError(err)
+	}
+	return ids, nil
 }
 
 func scanAuthzAssignment(rows *sql.Rows) (*domain.AuthzAssignment, error) {

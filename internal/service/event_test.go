@@ -29,9 +29,7 @@ func TestEventService_List_preClaimEmpty(t *testing.T) {
 	svc, stmts := newMockedEventService(t)
 
 	stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
-	stmts.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(&domain.ResourceScope{
-		ResourceID: "proj_1", ProjectID: "proj_1",
-	}, nil)
+	stmts.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 
 	resp, err := svc.List(context.Background(), service.ListEventsRequest{ProjectID: "proj_1"})
 	require.NoError(t, err)
@@ -43,9 +41,7 @@ func TestEventService_Get_preClaimNotFound(t *testing.T) {
 	svc, stmts := newMockedEventService(t)
 
 	stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
-	stmts.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(&domain.ResourceScope{
-		ResourceID: "proj_1", ProjectID: "proj_1",
-	}, nil)
+	stmts.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
 
 	_, err := svc.Get(context.Background(), "proj_1", "evt_1")
 	require.Error(t, err)
@@ -55,11 +51,8 @@ func TestEventService_Get_preClaimNotFound(t *testing.T) {
 func TestEventService_List_claimedAppliesFilters(t *testing.T) {
 	svc, stmts := newMockedEventService(t)
 
-	teamID := "team_1"
 	stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
-	stmts.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(&domain.ResourceScope{
-		ResourceID: "proj_1", ProjectID: "proj_1", TeamID: &teamID,
-	}, nil)
+	stmts.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: "team_1"}, nil)
 
 	now := time.Now().UTC()
 	want := &domain.Event{
@@ -91,11 +84,8 @@ func TestEventService_List_claimedAppliesFilters(t *testing.T) {
 func TestEventService_List_orderAsc(t *testing.T) {
 	svc, stmts := newMockedEventService(t)
 
-	teamID := "team_1"
 	stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
-	stmts.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(&domain.ResourceScope{
-		ResourceID: "proj_1", ProjectID: "proj_1", TeamID: &teamID,
-	}, nil)
+	stmts.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: "team_1"}, nil)
 	stmts.EXPECT().ListEvents(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.EventField]) (*database.ListResult[*domain.Event], error) {
 			assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
@@ -109,11 +99,8 @@ func TestEventService_List_orderAsc(t *testing.T) {
 func TestEventService_List_invalidOrder(t *testing.T) {
 	svc, stmts := newMockedEventService(t)
 
-	teamID := "team_1"
 	stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
-	stmts.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(&domain.ResourceScope{
-		ResourceID: "proj_1", ProjectID: "proj_1", TeamID: &teamID,
-	}, nil)
+	stmts.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: "team_1"}, nil)
 
 	_, err := svc.List(context.Background(), service.ListEventsRequest{ProjectID: "proj_1", Order: "sideways"})
 	require.Error(t, err)
@@ -123,11 +110,8 @@ func TestEventService_List_invalidOrder(t *testing.T) {
 func TestEventService_Get_claimed(t *testing.T) {
 	svc, stmts := newMockedEventService(t)
 
-	teamID := "team_1"
 	stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
-	stmts.EXPECT().GetResourceScope(gomock.Any(), "proj_1").Return(&domain.ResourceScope{
-		ResourceID: "proj_1", ProjectID: "proj_1", TeamID: &teamID,
-	}, nil)
+	stmts.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: "team_1"}, nil)
 	stmts.EXPECT().GetEventByID(gomock.Any(), "proj_1", "evt_1").Return(&domain.Event{
 		ProjectID: "proj_1", ID: "evt_1", EventType: domain.EventTypeUserCreated,
 	}, nil)

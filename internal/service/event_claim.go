@@ -9,10 +9,11 @@ import (
 )
 
 // projectIsClaimed reports whether a project has completed claim (ADR 046 / 049):
-// the project exists and resource_scope_index.team_id is set.
+// the project exists and holds an active owning-team grant, the claim source
+// of truth (ADR 054 §2).
 func projectIsClaimed(ctx context.Context, stmts interface {
 	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
-	GetResourceScope(ctx context.Context, resourceID string) (*domain.ResourceScope, error)
+	GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error)
 }, projectID string) (bool, error) {
 	_, err := stmts.GetProjectByID(ctx, projectID)
 	if err != nil {
@@ -21,12 +22,11 @@ func projectIsClaimed(ctx context.Context, stmts interface {
 		}
 		return false, domain.ErrInternal(err).WithMessage("failed to load project for events visibility")
 	}
-	scope, err := stmts.GetResourceScope(ctx, projectID)
-	if err != nil {
+	if _, err := stmts.GetActiveOwningTeamGrant(ctx, projectID); err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return false, nil
 		}
-		return false, domain.ErrInternal(err).WithMessage("failed to load project scope for events visibility")
+		return false, domain.ErrInternal(err).WithMessage("failed to load claim grant for events visibility")
 	}
-	return scope.TeamID != nil && *scope.TeamID != "", nil
+	return true, nil
 }

@@ -70,9 +70,10 @@ var _ ClaimService = (*claimService)(nil)
 // waits on go 1.27 generic methods; see the commented block in database.go.
 
 // claimedProjectStatements is what the claimed-check reads (Init, Complete).
+// The active owning-team grant is the claim source of truth (ADR 046 / 054 §2).
 type claimedProjectStatements interface {
 	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
-	GetResourceScope(ctx context.Context, resourceID string) (*domain.ResourceScope, error)
+	GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error)
 }
 
 // claimStatements is the claim service's full statement surface.
@@ -82,9 +83,7 @@ type claimStatements interface {
 	GetChallengeByID(ctx context.Context, projectID, id string) (*domain.ClaimChallenge, error)
 	MarkChallengeCompleted(ctx context.Context, projectID, id string) error
 	GetPersonalTeamForUser(ctx context.Context, projectID, userID string) (*domain.Team, error)
-	ListAuthzAssignments(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string, includeRevoked bool) ([]*domain.AuthzAssignment, error)
 	CreateAuthzAssignment(ctx context.Context, assignment *domain.AuthzAssignment) error
-	UpsertResourceScope(ctx context.Context, scope *domain.ResourceScope) error
 	InsertEvent(ctx context.Context, event *domain.Event) error
 }
 
@@ -154,28 +153,19 @@ func (s *claimService) Status(ctx context.Context, projectID, challengeID, secre
 }
 
 // completedStatus reconstructs team and claim time from the grant written at
-// complete. Missing scope or grant on a completed challenge is corrupt state:
-// both are written in the same transaction that marks completion.
+// complete. A missing grant on a completed challenge is corrupt state: it is
+// written in the same transaction that marks completion.
 func (s *claimService) completedStatus(ctx context.Context, stmts claimStatements, projectID string) (*ClaimStatusResult, error) {
-	scope, err := stmts.GetResourceScope(ctx, projectID)
-	if err != nil || scope.TeamID == nil || *scope.TeamID == "" {
-		return nil, domain.ErrInternal(err).WithMessage("completed claim challenge without a project-team scope")
-	}
-	assignments, err := stmts.ListAuthzAssignments(ctx, projectID, domain.AuthzPrincipalTypeTeam, *scope.TeamID, false)
+	grant, err := stmts.GetActiveOwningTeamGrant(ctx, projectID)
 	if err != nil {
-		return nil, domain.ErrInternal(mapStorageError(err)).WithMessage("failed to load claim grant")
+		return nil, domain.ErrInternal(mapStorageError(err)).WithMessage("completed claim challenge without a project-team grant")
 	}
-	for _, a := range assignments {
-		if a.ObjectType == "project" && a.Relation == "team" {
-			return &ClaimStatusResult{
-				Status:       domain.ClaimChallengeStatusCompleted,
-				TeamID:       *scope.TeamID,
-				ClaimedAt:    a.CreatedAt,
-				DashboardURL: s.dashboardURL(projectID),
-			}, nil
-		}
-	}
-	return nil, domain.ErrInternal(nil).WithMessage("completed claim challenge without a project-team grant")
+	return &ClaimStatusResult{
+		Status:       domain.ClaimChallengeStatusCompleted,
+		TeamID:       grant.PrincipalID,
+		ClaimedAt:    grant.CreatedAt,
+		DashboardURL: s.dashboardURL(projectID),
+	}, nil
 }
 
 func (s *claimService) Complete(ctx context.Context, projectID, challengeID, userID string) (*ClaimCompleteResult, error) {
@@ -198,11 +188,11 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 		// completed challenge always reports 409 with the owning team rather
 		// than 410 (matching the OpenAPI contract and the api-mock).
 		//
-		// Two different pending challenges racing on one project can still
-		// double-write the grant under read committed: this check is app-level
-		// and UpsertResourceScope overwrites team_id. Accepted for alpha; the
-		// upgrade path is a conditional update (team_id IS NULL) or a partial
-		// unique index on the grant.
+		// Two different pending challenges racing on one project cannot
+		// double-write the grant: authz_assignments_one_owning_team keeps at
+		// most one active owning-team row per project (ADR 054 §2), so the
+		// losing insert conflicts and Complete's caller-side handler below
+		// turns it into the same 409.
 		teamID, err := claimedTeamID(ctx, stmts, projectID)
 		if err != nil {
 			return err
@@ -229,11 +219,6 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 		if err := stmts.CreateAuthzAssignment(ctx, asgn); err != nil {
 			return err
 		}
-		scope := domain.NewProjectResourceScope(projectID)
-		scope.TeamID = &team.ID
-		if err := stmts.UpsertResourceScope(ctx, scope); err != nil {
-			return err
-		}
 		// claimed_by_user_id provenance (ADR 046 §1) lives on the audit event:
 		// the grantor columns are reserved for delegations by a schema CHECK.
 		actorType := domain.EventActorTypeHuman
@@ -258,6 +243,14 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 	})
 	if err != nil {
 		err = mapStorageError(err)
+		// A unique violation out of this transaction is the lost cross-challenge
+		// claim race (authz_assignments_one_owning_team): the winner's grant
+		// committed first. Re-read it for the 409's owning-team details.
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			if teamID, terr := claimedTeamID(ctx, s.v2Pool.Statements(), projectID); terr == nil && teamID != nil {
+				return nil, s.alreadyClaimedErr(projectID, *teamID)
+			}
+		}
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
 		}
@@ -267,8 +260,8 @@ func (s *claimService) Complete(ctx context.Context, projectID, challengeID, use
 }
 
 // claimedTeamID resolves the claim state all three legs branch on: a missing
-// project is ErrProjectNotFound, an unclaimed project (no scope row or no
-// team) is (nil, nil), a claimed project returns its owning team id.
+// project is ErrProjectNotFound, an unclaimed project (no active owning-team
+// grant) is (nil, nil), a claimed project returns its owning team id.
 // projectIsClaimed (event_claim.go) is deliberately not reused: events
 // visibility treats a missing project as unclaimed, while claim needs the 404
 // and the team id for the 409 details.
@@ -279,17 +272,14 @@ func claimedTeamID(ctx context.Context, stmts claimedProjectStatements, projectI
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to load project for claim")
 	}
-	scope, err := stmts.GetResourceScope(ctx, projectID)
+	grant, err := stmts.GetActiveOwningTeamGrant(ctx, projectID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, nil
 		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to load project scope for claim")
+		return nil, domain.ErrInternal(err).WithMessage("failed to load claim grant for project")
 	}
-	if scope.TeamID == nil || *scope.TeamID == "" {
-		return nil, nil
-	}
-	return scope.TeamID, nil
+	return &grant.PrincipalID, nil
 }
 
 func (s *claimService) alreadyClaimedErr(projectID, teamID string) error {

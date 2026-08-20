@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
-	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -47,6 +46,7 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 	defer h.handler.mutex.Unlock()
 
 	if h.handler.value == nil {
+		platform := h.EnsurePlatformProject(t)
 		h.handler.value = api.NewHandler(
 			h.EnsureFlowService(t),
 			h.EnsureAuthAttemptService(t),
@@ -60,9 +60,9 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 			h.EnsureEventService(t),
 			h.EnsureTokenService(t),
 			h.EnsureKeyService(t),
-			service.NewClaimService(h.EnsureServiceDB(t), "https://console.invalid/ui/console", domain.PlatformProjectID),
+			service.NewClaimService(h.EnsureServiceDB(t), "https://console.invalid/ui/console", platform.ID),
 			h.EnsureServiceDB(t),
-			"",
+			platform.ID,
 		)
 	}
 	return h.handler.value

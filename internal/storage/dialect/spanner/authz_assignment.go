@@ -21,13 +21,13 @@ INSERT INTO authz_assignments (
     principal_type, principal_id, object_type, relation,
     scope_kind, scope_team_id, scope_resource_id,
     grantor_type, grantor_id, delegation_id,
-    expires_at, revoked_at, active_unique_key
+    expires_at, revoked_at, active_unique_key, owning_team_key
 ) VALUES (
     @p1, @p2, @p3,
     @p4, @p5, @p6, @p7,
     @p8, @p9, @p10,
     @p11, @p12, @p13,
-    @p14, @p15, @p16
+    @p14, @p15, @p16, @p17
 ) THEN RETURN created_at, updated_at`
 
 	listAuthzAssignmentsStmt = `
@@ -43,9 +43,29 @@ ORDER BY created_at, id`
 
 	revokeAuthzAssignmentStmt = `
 UPDATE authz_assignments
-SET revoked_at = CURRENT_TIMESTAMP(), updated_at = CURRENT_TIMESTAMP(), active_unique_key = NULL
+SET revoked_at = CURRENT_TIMESTAMP(), updated_at = CURRENT_TIMESTAMP(),
+    active_unique_key = NULL, owning_team_key = NULL
 WHERE project_id = @p1 AND id = @p2 AND revoked_at IS NULL
 THEN RETURN revoked_at, updated_at`
+
+	getActiveOwningTeamGrantStmt = `
+SELECT id, project_id, catalog_id,
+       principal_type, principal_id, object_type, relation,
+       scope_kind, scope_team_id, scope_resource_id,
+       grantor_type, grantor_id, delegation_id,
+       expires_at, revoked_at, created_at, updated_at
+FROM authz_assignments
+WHERE project_id = @p1 AND object_type = 'project' AND relation = 'team'
+  AND revoked_at IS NULL
+ORDER BY created_at, id
+LIMIT 1`
+
+	listClaimedProjectIDsStmt = `
+SELECT DISTINCT project_id FROM authz_assignments
+WHERE object_type = 'project' AND relation = 'team' AND revoked_at IS NULL
+  AND (@p1 = '' OR project_id > @p1)
+ORDER BY project_id
+LIMIT @p2`
 )
 
 var authzAssignmentColumns = []string{
@@ -80,6 +100,7 @@ func (s authzAssignmentStatements) CreateAuthzAssignment(ctx context.Context, a 
 		a.ScopeKind.String(), spannerNullString(a.ScopeTeamID), spannerNullString(a.ScopeResourceID),
 		spannerNullString(a.GrantorType), spannerNullString(a.GrantorID), spannerNullString(a.DelegationID),
 		spannerNullTime(a.ExpiresAt), spannerNullTime(a.RevokedAt), spannerNullString(activeUniqueKey(a)),
+		spannerNullString(owningTeamKey(a)),
 	).statement()
 	return s.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
 		_, err := collectOneRow(iter, func(row *spanner.Row) (struct{}, error) {
@@ -135,6 +156,46 @@ func scanAuthzAssignment(row *spanner.Row) (*domain.AuthzAssignment, error) {
 	return a, nil
 }
 
+// GetActiveOwningTeamGrant implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error) {
+	var assignment *domain.AuthzAssignment
+	err := s.db.Query(ctx, buildStatement(getActiveOwningTeamGrantStmt, projectID).statement(), func(iter *spanner.RowIterator) error {
+		found, qErr := collectOneRow(iter, scanAuthzAssignment)
+		if qErr != nil {
+			return qErr
+		}
+		assignment = found
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return assignment, nil
+}
+
+// ListClaimedProjectIDs implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
+	if limit == 0 {
+		limit = 500
+	}
+	var ids []string
+	err := s.db.Query(ctx, buildStatement(listClaimedProjectIDsStmt, afterID, int64(limit)).statement(), func(iter *spanner.RowIterator) error {
+		var qErr error
+		ids, qErr = collectRows(iter, func(row *spanner.Row) (string, error) {
+			var id string
+			if err := row.Columns(&id); err != nil {
+				return "", err
+			}
+			return id, nil
+		})
+		return qErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
 // activeUniqueKey is Spanner's stand-in for Postgres's partial unique index on
 // active (non-revoked, non-delegated) assignments. Returns nil when the row must
 // not participate in uniqueness.
@@ -154,6 +215,18 @@ func activeUniqueKey(a *domain.AuthzAssignment) *string {
 		a.ProjectID, a.CatalogID, a.PrincipalType.String(), a.PrincipalID,
 		a.ObjectType, a.Relation, a.ScopeKind.String(), scopeTeam, scopeResource,
 	}, "\x1f")
+	return &key
+}
+
+// owningTeamKey is Spanner's stand-in for Postgres's partial unique index
+// authz_assignments_one_owning_team (ADR 054 §2: at most one active
+// owning-team grant per project). project_id while the grant is an active
+// project/team row, NULL otherwise.
+func owningTeamKey(a *domain.AuthzAssignment) *string {
+	if a.RevokedAt != nil || a.ObjectType != "project" || a.Relation != "team" {
+		return nil
+	}
+	key := a.ProjectID
 	return &key
 }
 
