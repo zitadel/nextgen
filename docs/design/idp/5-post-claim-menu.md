@@ -2,7 +2,7 @@
 
 > **Status:** Planning Notes  
 > **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
-> **Area:** 5 of 7 (see [`README.md`](README.md))
+> **Area:** 5 of 6 (see [`README.md`](README.md))
 
 ## Overview
 

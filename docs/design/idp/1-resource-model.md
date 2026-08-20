@@ -2,7 +2,7 @@
 
 > **Status:** Planning notes  
 > **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
-> **Area:** 1 of 7 (see [`README.md`](README.md))
+> **Area:** 1 of 6 (see [`README.md`](README.md))
 
 An Identity Provider (IdP) connection is a tenant-owned configuration file that defines how Zitadel interacts with external authentication providers (such as Google or GitHub).
 

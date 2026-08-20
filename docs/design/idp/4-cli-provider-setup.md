@@ -2,7 +2,7 @@
 
 > **Status:** Planning notes  
 > **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
-> **Area:** 4 of 7 (see [`README.md`](README.md))
+> **Area:** 4 of 6 (see [`README.md`](README.md))
 
 This CLI journey translates developer provider selection (e.g., "Google") into a fully working project configuration.
 

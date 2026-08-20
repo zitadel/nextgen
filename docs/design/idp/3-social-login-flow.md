@@ -2,7 +2,7 @@
 
 > **Status:** Planning notes  
 > **Epic:** [zitadel/nextgen#851](https://github.com/zitadel/nextgen/issues/851)  
-> **Area:** 3 of 7 (see [`README.md`](README.md))
+> **Area:** 3 of 6 (see [`README.md`](README.md))
 
 This document defines how a user signs up and signs in using external identity providers like Google or GitHub, detailing the OAuth2/OIDC redirect ceremony, identity resolution, and all available recovery paths.
 
@@ -90,7 +90,7 @@ The callback phase executes six sequential steps in order, failing closed on err
 
 ### Server-Side Fetch Policy
 
-Every URL the engine fetches for a connection is tenant-authored: the discovery document, `jwks_uri`, the token endpoint, the userinfo endpoint, and any strategy fetch. On shared infrastructure that is a server-side request forgery surface. The guard is not specific to connections: webhooks, actions, and any other tenant URL the engine fetches later need the same one, the way `zitadel/zitadel` centralizes it in one deny list. The egress policy is therefore its own epic (to be filed), which owns the deny mechanics and evaluates an operator-configurable allowlist mode for locked-down installations. This area consumes it as a dependency and carries two constraints into it:
+Every URL the engine fetches for a connection is tenant-authored: the discovery document, `jwks_uri`, the token endpoint, the userinfo endpoint, and any strategy fetch. On shared infrastructure that is a server-side request forgery surface. The guard is not specific to connections: webhooks, actions, and any other tenant URL the engine fetches later need the same one, the way `zitadel/zitadel` centralizes it in one deny list. The egress policy is therefore its own epic ([#928](https://github.com/zitadel/nextgen/issues/928)), which owns the deny mechanics and evaluates an operator-configurable allowlist mode for locked-down installations. This area consumes it as a dependency and carries two constraints into it:
 
 - **Blocking for 851.** The callback processor fetches discovery, JWKS, token, userinfo, and the strategy URL, so SSO cannot ship to shared infrastructure without at least the baseline deny behaviour: resolve the host, reject private, loopback, link-local, and metadata ranges (RFC 1918, `127.0.0.0/8`, `169.254.169.254`, and their IPv6 equivalents), connect to the address that passed the check, and repeat the check on every redirect hop; cap redirect count, response size, and total fetch time; send only the connection's own credentials, never instance-internal headers.
 - **Not configurable per connection.** The connection schema carries no egress fields. Operator-level configuration is the epic's question.
@@ -231,7 +231,7 @@ The current rendering architecture has no built-in knowledge of SSO. The `<zl-ss
 | :--- | :--- |
 | **`sso` Submission Handling** | Stubbed at `flow_state_machine.go:331` (replaces the `ErrFlowUnsupported` branch). |
 | **`state` Record Store & Callback Route** | Unimplemented (nothing exists). |
-| **Connection Fetch Egress Policy** | Unimplemented. Owned by the egress-policy epic as a blocking dependency of 851 (see [Server-Side Fetch Policy](#server-side-fetch-policy)). |
+| **Connection Fetch Egress Policy** | Unimplemented. Owned by [#928](https://github.com/zitadel/nextgen/issues/928) as a blocking dependency of 851 (see [Server-Side Fetch Policy](#server-side-fetch-policy)). |
 | **Protocol Engines** | OIDC discovery/code exchange and explicit-endpoint OAuth2 are available in `zitadel/zitadel` ([`oidc`](https://github.com/zitadel/zitadel/tree/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/oidc), [`oauth`](https://github.com/zitadel/zitadel/tree/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/oauth)), but completely absent in `nextgen`. |
 | **`github_primary_email` Strategy & Registry** | Design stage only (see reference implementation in [`github/session.go#L46-L112`](https://github.com/zitadel/zitadel/blob/d488ecb07ffe82d1e5493e9482be48a3e82397cc/internal/idp/providers/github/session.go#L46-L112)). |
 | **`create_user_with_sso` (`on_success`)** | Referenced in documentation; currently unimplemented. |
