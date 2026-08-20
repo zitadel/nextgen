@@ -3671,8 +3671,8 @@ type ListSchemasParams struct {
 	// `schema-url` is not a kind: it discriminates the create request body,
 	// not a stored schema. A schema registered by URL is stored as whatever
 	// document the URL served, and declares its own kind.
-	// Schemas whose stored document declares no kind are excluded from a
-	// filtered result.
+	// A schema stored without its document being parsed has no kind that
+	// could be read, and is excluded from every filtered result.
 	Kind OptListSchemasKind `json:",omitempty,omitzero"`
 }
 

@@ -24,6 +24,11 @@ import (
 
 const (
 	PrefixJSONSchema ResourcePrefix = "sch"
+
+	// JSONSchemaKindUnknown is recorded when a schema is persisted without its
+	// document being parsed, so its declared kind was never read. Filtering by
+	// kind never matches it.
+	JSONSchemaKindUnknown = "unknown"
 )
 
 func ErrJSONSchemaNotFound() Error {
@@ -48,7 +53,7 @@ type JSONSchema struct {
 	ProjectID  string
 	URL        string
 	ObjectType *string
-	Kind       *string
+	Kind       string
 	CreatedAt  time.Time
 	Schema     []byte
 }
@@ -88,9 +93,11 @@ func NewJSONSchema(projectID string, schemabs []byte) (_ *JSONSchema, err error)
 		objectType = &ot
 	}
 
-	var kind *string
+	// A document with no kind is rejected by the meta-schema moments later, but
+	// NewJSONSchema runs first, so it still needs a value to store.
+	kind := JSONSchemaKindUnknown
 	if k, ok := maputil.Get[string](schema, "kind"); ok {
-		kind = &k
+		kind = k
 	}
 
 	return &JSONSchema{
@@ -386,9 +393,14 @@ func (r *JSONSchemaResolver) getFromDatabase(ctx context.Context, store JSONSche
 	if err != nil {
 		return nil, err
 	}
+	// TODO(#812): a fetched document is persisted without being parsed or
+	// validated, so its declared kind is never read and ObjectType/CreatedAt go
+	// unset too. #812 routes this path through NewJSONSchema and settles how a
+	// $ref fragment differs from a root schema; until then the kind is unknown.
 	dbSchema = &JSONSchema{
 		ProjectID: projectID,
 		URL:       schemaURL,
+		Kind:      JSONSchemaKindUnknown,
 		Schema:    data,
 	}
 	if err := store.CreateJSONSchema(ctx, dbSchema); err != nil {

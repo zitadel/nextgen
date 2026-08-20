@@ -318,10 +318,10 @@ func TestSchemaRevisions(t *testing.T) {
 
 // A schema created through the posted-body path records the `kind` its document
 // declares, and listing by that kind returns it. The exclusion half of the
-// contract — a different kind, and a row stored with no kind at all — is proven
-// in stmttest, where a schema can be written directly; the API cannot produce
-// either, because `kind` is an enum of one and the create path always populates
-// it.
+// contract — a different kind, and an unparsed schema stored as `unknown` — is
+// proven in stmttest, where a schema can be written directly; the API cannot
+// produce either, because `kind` is an enum of one and the create path always
+// populates it.
 func TestSchemaKindFilter(t *testing.T) {
 	t.Parallel()
 

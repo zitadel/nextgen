@@ -1,11 +1,11 @@
 -- +goose NO TRANSACTION
 -- +goose Up
 -- Promote the document's `kind` discriminator to a column so schemas can be
--- listed by kind without reading every payload. Nullable: schemas ingested by
--- URL and $ref targets fetched during resolution are stored without it (#812),
--- and a NULL kind is excluded from a kind-filtered list.
+-- listed by kind without reading every payload. Schemas persisted without
+-- their document being parsed are recorded as 'unknown' (see #812), which no
+-- kind filter matches.
 -- +goose StatementBegin
-ALTER TABLE json_schemas ADD COLUMN kind STRING(256)
+ALTER TABLE json_schemas ADD COLUMN kind STRING(256) NOT NULL DEFAULT ('unknown')
 -- +goose StatementEnd
 
 -- +goose Down

@@ -170,8 +170,7 @@ var jsonSchemaSchema = database.NewSchema(map[domain.JSONSchemaField]database.Fi
 	},
 	domain.JSONSchemaFieldKind: {
 		SQLName:  "kind",
-		Accessor: func(s *domain.JSONSchema) any { return database.NullableValue(s.Kind) },
+		Accessor: func(s *domain.JSONSchema) any { return s.Kind },
 		Coerce:   database.CoerceString,
-		Nullable: true,
 	},
 })

@@ -115,21 +115,16 @@ func scanJSONSchemaRow(row *sql.Row) (*domain.JSONSchema, error) {
 	schema := new(domain.JSONSchema)
 	var (
 		objectType  sql.NullString
-		kind        sql.NullString
 		createdNano int64
 		payloadStr  sql.NullString
 	)
-	if err := row.Scan(&schema.ProjectID, &schema.URL, &objectType, &kind, &createdNano, &payloadStr); err != nil {
+	if err := row.Scan(&schema.ProjectID, &schema.URL, &objectType, &schema.Kind, &createdNano, &payloadStr); err != nil {
 		return nil, err
 	}
 	schema.CreatedAt = timeFromUnixNano(createdNano)
 	if objectType.Valid {
 		v := objectType.String
 		schema.ObjectType = &v
-	}
-	if kind.Valid {
-		v := kind.String
-		schema.Kind = &v
 	}
 	schema.Schema = nullJSONBytes(payloadStr)
 	return schema, nil
@@ -139,21 +134,16 @@ func scanJSONSchema(rows *sql.Rows) (*domain.JSONSchema, error) {
 	schema := new(domain.JSONSchema)
 	var (
 		objectType  sql.NullString
-		kind        sql.NullString
 		createdNano int64
 		payloadStr  sql.NullString
 	)
-	if err := rows.Scan(&schema.ProjectID, &schema.URL, &objectType, &kind, &createdNano, &payloadStr); err != nil {
+	if err := rows.Scan(&schema.ProjectID, &schema.URL, &objectType, &schema.Kind, &createdNano, &payloadStr); err != nil {
 		return nil, err
 	}
 	schema.CreatedAt = timeFromUnixNano(createdNano)
 	if objectType.Valid {
 		v := objectType.String
 		schema.ObjectType = &v
-	}
-	if kind.Valid {
-		v := kind.String
-		schema.Kind = &v
 	}
 	schema.Schema = nullJSONBytes(payloadStr)
 	return schema, nil
@@ -185,8 +175,7 @@ var jsonSchemaSchema = database.NewSchema(map[domain.JSONSchemaField]database.Fi
 	},
 	domain.JSONSchemaFieldKind: {
 		SQLName:  "kind",
-		Accessor: func(s *domain.JSONSchema) any { return database.NullableValue(s.Kind) },
+		Accessor: func(s *domain.JSONSchema) any { return s.Kind },
 		Coerce:   database.CoerceString,
-		Nullable: true,
 	},
 })

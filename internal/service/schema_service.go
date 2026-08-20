@@ -138,9 +138,9 @@ func (s *SchemaService) ListSchemas(ctx context.Context, projectID, objectType, 
 			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType),
 		)
 	}
-	// Rows with no recorded kind — schemas ingested by URL and $ref targets
-	// pulled in during resolution (#812) — are NULL here, so an equality
-	// filter excludes them.
+	// Schemas persisted without their document being parsed — ingested by URL,
+	// or a $ref target pulled in during resolution (#812) — are stored as
+	// domain.JSONSchemaKindUnknown, which no filterable kind matches.
 	if kind != "" {
 		filters = append(filters,
 			database.Equal(database.Col(domain.JSONSchemaFieldKind), kind),

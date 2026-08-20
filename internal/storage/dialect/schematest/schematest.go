@@ -49,13 +49,8 @@ func TokenNullableBindings(t *testing.T, schema database.Schema[domain.TokenFiel
 
 func JSONSchemaNullableBindings(t *testing.T, schema database.Schema[domain.JSONSchemaField, domain.JSONSchema]) {
 	t.Helper()
-	cols := []database.Column[domain.JSONSchemaField]{
-		database.Col(domain.JSONSchemaFieldObjectType),
-		database.Col(domain.JSONSchemaFieldKind),
-	}
-	assertNullableBindings(t, schema, cols,
-		&domain.JSONSchema{ObjectType: new("user"), Kind: new("user-schema")},
-		[]any{"user", "user-schema"})
+	cols := []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldObjectType)}
+	assertNullableBindings(t, schema, cols, &domain.JSONSchema{ObjectType: new("user")}, []any{"user"})
 }
 
 func CryptoKeyNullableBindings(

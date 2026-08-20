@@ -14,7 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-func createJSONSchemaWithKind(t *testing.T, stmts service.AllStatements, projectID, url string, kind *string) {
+func createJSONSchemaWithKind(t *testing.T, stmts service.AllStatements, projectID, url, kind string) {
 	t.Helper()
 	require.NoError(t, stmts.CreateJSONSchema(t.Context(), &domain.JSONSchema{
 		ProjectID: projectID,
@@ -30,23 +30,12 @@ func TestJSONSchemaStatements_KindRoundTrips(t *testing.T) {
 		projectID := ensureProject(t, d.stmts)
 		suffix := uniqueSuffix(t)
 
-		kind := "user-schema"
-		withKind := "https://example.com/schemas/kind-" + suffix
-		createJSONSchemaWithKind(t, d.stmts, projectID, withKind, &kind)
+		url := "https://example.com/schemas/kind-" + suffix
+		createJSONSchemaWithKind(t, d.stmts, projectID, url, "user-schema")
 
-		got, err := d.stmts.GetJSONSchemaByID(t.Context(), projectID, withKind)
+		got, err := d.stmts.GetJSONSchemaByID(t.Context(), projectID, url)
 		require.NoError(t, err)
-		require.NotNil(t, got.Kind)
-		assert.Equal(t, "user-schema", *got.Kind)
-
-		// Schemas ingested by URL and $ref targets pulled in during resolution
-		// are stored without a kind (#812); the column has to accept that.
-		withoutKind := "https://example.com/schemas/nokind-" + suffix
-		createJSONSchemaWithKind(t, d.stmts, projectID, withoutKind, nil)
-
-		got, err = d.stmts.GetJSONSchemaByID(t.Context(), projectID, withoutKind)
-		require.NoError(t, err)
-		assert.Nil(t, got.Kind)
+		assert.Equal(t, "user-schema", got.Kind)
 	})
 }
 
@@ -55,16 +44,16 @@ func TestJSONSchemaStatements_ListFilterByKind(t *testing.T) {
 		projectID := ensureProject(t, d.stmts)
 		suffix := uniqueSuffix(t)
 
-		userSchema, otherKind := "user-schema", "flow-definition"
 		wanted := "https://example.com/schemas/wanted-" + suffix
-		createJSONSchemaWithKind(t, d.stmts, projectID, wanted, &userSchema)
-		createJSONSchemaWithKind(t, d.stmts, projectID, "https://example.com/schemas/other-"+suffix, &otherKind)
-		createJSONSchemaWithKind(t, d.stmts, projectID, "https://example.com/schemas/null-"+suffix, nil)
+		createJSONSchemaWithKind(t, d.stmts, projectID, wanted, "user-schema")
+		createJSONSchemaWithKind(t, d.stmts, projectID, "https://example.com/schemas/other-"+suffix, "flow-definition")
+		// Schemas persisted without their document being parsed (#812) land here.
+		createJSONSchemaWithKind(t, d.stmts, projectID, "https://example.com/schemas/unknown-"+suffix, domain.JSONSchemaKindUnknown)
 
 		result, err := d.stmts.ListJSONSchemas(unfilteredListCtx(t), &database.ListOptions[domain.JSONSchemaField]{
 			Filter: database.And(
 				database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
-				database.Equal(database.Col(domain.JSONSchemaFieldKind), userSchema),
+				database.Equal(database.Col(domain.JSONSchemaFieldKind), "user-schema"),
 			),
 		})
 		require.NoError(t, err)
@@ -73,8 +62,7 @@ func TestJSONSchemaStatements_ListFilterByKind(t *testing.T) {
 		for _, item := range result.Items {
 			urls = append(urls, item.URL)
 		}
-		// A different kind is excluded, and so is a NULL kind — an equality
-		// filter must not let unkinded rows through.
+		// Both a different kind and an unparsed one are excluded.
 		assert.Equal(t, []string{wanted}, urls)
 	})
 }
