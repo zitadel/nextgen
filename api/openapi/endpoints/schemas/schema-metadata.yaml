@@ -1,0 +1,9 @@
+title: SchemaMetadata
+type: object
+required:
+  - created_at
+properties:
+  created_at:
+    type: string
+    format: date-time
+    description: The time when the schema was created.

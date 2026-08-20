@@ -2143,7 +2143,7 @@ func encodeGetReadyResponse(response GetReadyRes, w http.ResponseWriter, span tr
 
 func encodeGetSchemaByIdResponse(response GetSchemaByIdRes, w http.ResponseWriter, span trace.Span) error {
 	switch response := response.(type) {
-	case *GetSchemaByIdOK:
+	case *Schema:
 		if err := func() error {
 			if err := response.Validate(); err != nil {
 				return err

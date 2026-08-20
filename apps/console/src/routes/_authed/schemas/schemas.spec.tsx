@@ -65,13 +65,22 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
+const CREATED_AT = "2026-07-12T16:59:04Z";
+
+/** One `{id, schema, metadata}` wire envelope around a document. */
+function envelope(id: string, doc: object) {
+  return { id, schema: doc, metadata: { created_at: CREATED_AT } };
+}
+
 /** `GET /schemas` plus `GET /schemas/{id}` for one document. */
 function serveBusiness() {
   server.use(
     http.get(SCHEMAS_URL, () =>
-      HttpResponse.json([{ id: "sch_business", created_at: "2026-07-12T16:59:04Z" }]),
+      HttpResponse.json({ schemas: [envelope("sch_business", BUSINESS)] }),
     ),
-    http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS)),
+    http.get(`${SCHEMAS_URL}/sch_business`, () =>
+      HttpResponse.json(envelope("sch_business", BUSINESS)),
+    ),
   );
 }
 
@@ -109,16 +118,13 @@ describe("user schemas list", () => {
     // loads — `GET /schemas/{id}` serialises from a Go map and its key order is
     // randomised. It is not a claim about which method is offered first: that
     // is the flow's, from the order of its step's actions.
+    const both = {
+      ...BUSINESS,
+      "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
+    };
     server.use(
-      http.get(SCHEMAS_URL, () =>
-        HttpResponse.json([{ id: "sch_both", created_at: "2026-07-12T16:59:04Z" }]),
-      ),
-      http.get(`${SCHEMAS_URL}/sch_both`, () =>
-        HttpResponse.json({
-          ...BUSINESS,
-          "x-auth-methods": { password: { enabled: true }, passkey: { enabled: true } },
-        }),
-      ),
+      http.get(SCHEMAS_URL, () => HttpResponse.json({ schemas: [envelope("sch_both", both)] })),
+      http.get(`${SCHEMAS_URL}/sch_both`, () => HttpResponse.json(envelope("sch_both", both))),
     );
     await renderAt("/schemas");
     expect(await screen.findByText("Passkey + Password")).toBeInTheDocument();
@@ -134,7 +140,7 @@ describe("user schemas list", () => {
     expect(screen.getByText("Created")).toBeInTheDocument();
     // Derived rather than hardcoded: the row renders the viewer's locale, so
     // asserting one locale's output would pass only on machines set to it.
-    const created = new Date("2026-07-12T16:59:04Z").toLocaleDateString(undefined, {
+    const created = new Date(CREATED_AT).toLocaleDateString(undefined, {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -173,7 +179,7 @@ describe("user schemas list", () => {
     // cost that row's detail, not the screen.
     server.use(
       http.get(SCHEMAS_URL, () =>
-        HttpResponse.json([{ id: "sch_broken", created_at: "2026-07-12T16:59:04Z" }]),
+        HttpResponse.json({ schemas: [envelope("sch_broken", {})] }),
       ),
       http.get(`${SCHEMAS_URL}/sch_broken`, () => new HttpResponse(null, { status: 500 })),
     );
@@ -210,10 +216,8 @@ describe("user schema detail", () => {
     // more than one level, so it is inert; the segments either side of it still
     // navigate.
     server.use(
-      http.get(SCHEMAS_URL, () =>
-        HttpResponse.json([{ id: "sch_deep", created_at: "2026-07-12T16:59:04Z" }]),
-      ),
-      http.get(`${SCHEMAS_URL}/sch_deep`, () => HttpResponse.json(DEEP)),
+      http.get(SCHEMAS_URL, () => HttpResponse.json({ schemas: [envelope("sch_deep", DEEP)] })),
+      http.get(`${SCHEMAS_URL}/sch_deep`, () => HttpResponse.json(envelope("sch_deep", DEEP))),
     );
     await renderAt("/schemas/sch_deep");
     await screen.findByRole("heading", { name: "Deep" });

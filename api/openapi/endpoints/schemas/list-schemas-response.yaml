@@ -1,13 +1,9 @@
-type: array
-items:
-  type: object
-  required:
-    - id
-    - created_at
-  properties:
-    id:
-      type: string
-      description: The unique identifier for this schema.
-    created_at:
-      type: string
-      format: date-time
+type: object
+description: List of schemas, newest first.
+required:
+  - schemas
+properties:
+  schemas:
+    type: array
+    items:
+      $ref: schema.yaml

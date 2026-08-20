@@ -256,10 +256,12 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(ownerDelete.status).toBe(204);
   });
 
-  test("GET /schemas/:id round-trips the raw uploaded document (no zod re-shaping)", async () => {
+  test("GET /schemas/:id round-trips the raw uploaded document inside the envelope (no zod re-shaping)", async () => {
     // The real server persists the uploaded JSON Schema bytes verbatim, and
     // schema documents legitimately carry fields the request zod strips
-    // (title, description, custom x-* extensions). The mock must do the same.
+    // (title, description, custom x-* extensions). The mock must do the same,
+    // serving the document under `schema` in the {id, schema, metadata}
+    // envelope.
     const doc = {
       kind: "user-schema",
       metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
@@ -276,7 +278,38 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
     const res = await fetch(`${BASE}/schemas/${id}`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(doc);
+    const body = (await res.json()) as {
+      id: string;
+      schema: unknown;
+      metadata: { created_at: string };
+    };
+    expect(body.id).toBe(id);
+    expect(body.schema).toEqual(doc);
+    expect(typeof body.metadata.created_at).toBe("string");
+  });
+
+  test("GET /schemas lists envelopes carrying the full document", async () => {
+    const doc = {
+      kind: "user-schema",
+      metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+      objectType: "conformance-list",
+      "x-auth-methods": { password: { enabled: true } },
+    };
+    const create = await fetch(`${BASE}/schemas?project_id=proj_schema_list`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(doc),
+    });
+    const { id } = (await create.json()) as { id: string };
+
+    const res = await fetch(`${BASE}/schemas?project_id=proj_schema_list`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      schemas: Array<{ id: string; schema: unknown; metadata: { created_at: string } }>;
+    };
+    const row = body.schemas.find((entry) => entry.id === id);
+    expect(row?.schema).toEqual(doc);
+    expect(typeof row?.metadata.created_at).toBe("string");
   });
 
   test("POST /schemas with invalid kind returns spec-compliant 400 envelope", async () => {

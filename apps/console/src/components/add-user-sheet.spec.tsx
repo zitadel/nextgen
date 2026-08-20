@@ -56,12 +56,22 @@ function stubSchemas(
     http.get(USERS_URL, () => HttpResponse.json({ users: [] })),
     http.post(PROJECTS_QUERY_URL, () => HttpResponse.json({ projects })),
     http.get(SCHEMAS_URL, () =>
-      HttpResponse.json(
-        Object.keys(schemas).map((id) => ({ id, created_at: "2026-07-01T00:00:00Z" })),
-      ),
+      HttpResponse.json({
+        schemas: Object.entries(schemas).map(([id, body]) => ({
+          id,
+          schema: body,
+          metadata: { created_at: "2026-07-01T00:00:00Z" },
+        })),
+      }),
     ),
     ...Object.entries(schemas).map(([id, body]) =>
-      http.get(`${SCHEMAS_URL}/${id}`, () => HttpResponse.json(body)),
+      http.get(`${SCHEMAS_URL}/${id}`, () =>
+        HttpResponse.json({
+          id,
+          schema: body,
+          metadata: { created_at: "2026-07-01T00:00:00Z" },
+        }),
+      ),
     ),
   );
 }

@@ -50,10 +50,10 @@ async function projectSchema(zitadel: {
   api: { getSchemaById: (id: string) => Promise<unknown> };
   handle: { schemaId: string };
 }) {
-  const schema = (await zitadel.api.getSchemaById(zitadel.handle.schemaId)) as {
-    properties?: Record<string, unknown>;
-    required?: string[];
+  const envelope = (await zitadel.api.getSchemaById(zitadel.handle.schemaId)) as {
+    schema?: { properties?: Record<string, unknown>; required?: string[] };
   };
+  const schema = envelope.schema ?? {};
   return {
     properties: Object.keys(schema.properties ?? {}).sort(),
     required: new Set(schema.required ?? []),

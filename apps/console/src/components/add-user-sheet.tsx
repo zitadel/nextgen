@@ -124,12 +124,10 @@ function AddUserForm({
     void (async () => {
       try {
         const projectId = getConsoleProjectId();
-        const listed = await api.listSchemas({ project_id: projectId });
-        // `listSchemas` returns only `{ id, created_at }`, so each schema's
-        // document — the properties this form renders — needs its own fetch.
+        const listed = (await api.listSchemas({ project_id: projectId })).schemas;
         const options = await Promise.all(
           listed.map(async (entry) => {
-            const schema = (await api.getSchemaById(entry.id)) as UserSchema;
+            const schema = (await api.getSchemaById(entry.id)).schema as UserSchema;
             return {
               id: entry.id,
               schema,

@@ -26,16 +26,14 @@ export const Route = createFileRoute("/_authed/schemas/")({
   staticData: { nav: { label: "User schemas", order: 1, parent: "/users" } },
   loader: async () => {
     const projectId = getConsoleProjectId();
-    // `GET /schemas` returns `{ id, created_at }` and nothing else, so the
-    // row's name, attributes and sign-in methods all have to come from each
-    // document. The list is configuration and stays small (~20, decisions log
-    // D0a/D7), so fetching them together is cheap and there is no pagination
+    // The list is configuration and stays small (~20, decisions log D0a/D7),
+    // so fetching the documents together is cheap and there is no pagination
     // to interleave with.
-    const entries = await api.listSchemas({ project_id: projectId });
+    const entries = (await api.listSchemas({ project_id: projectId })).schemas;
     const documents = await Promise.all(
       entries.map(async (entry) => {
         try {
-          return (await api.getSchemaById(entry.id)) as UserSchema;
+          return (await api.getSchemaById(entry.id)).schema as UserSchema;
         } catch {
           // One unreadable document costs its row's detail, not the screen.
           return undefined;
@@ -46,7 +44,7 @@ export const Route = createFileRoute("/_authed/schemas/")({
     // and the row keeps the console's camelCase.
     return entries.map((entry, index) => ({
       id: entry.id,
-      createdAt: entry.created_at,
+      createdAt: entry.metadata.created_at,
       schema: documents[index],
     }));
   },
