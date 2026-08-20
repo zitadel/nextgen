@@ -83,7 +83,7 @@ func (s *SchemaService) CreateSchema(ctx context.Context, input CreateSchemaInpu
 			ProjectID:  model.ProjectID,
 			EntityType: "json_schema",
 			EntityID:   model.URL,
-			Payload:    struct{}{},
+			Payload:    domain.SchemaCreatedPayloadSnapshot(model),
 		})
 	})
 	if err != nil {

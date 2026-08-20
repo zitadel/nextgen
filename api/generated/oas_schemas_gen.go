@@ -33990,7 +33990,7 @@ type SchemaCreatedEvent struct {
 	FlowID OptNilString `json:"flow_id"`
 	// Additional emit-time metadata (already redacted).
 	Metadata OptSchemaCreatedEventMetadata `json:"metadata"`
-	Payload  EmptyEventPayload             `json:"payload"`
+	Payload  SchemaCreatedPayload          `json:"payload"`
 }
 
 // GetID returns the value of ID.
@@ -34099,7 +34099,7 @@ func (s *SchemaCreatedEvent) GetMetadata() OptSchemaCreatedEventMetadata {
 }
 
 // GetPayload returns the value of Payload.
-func (s *SchemaCreatedEvent) GetPayload() EmptyEventPayload {
+func (s *SchemaCreatedEvent) GetPayload() SchemaCreatedPayload {
 	return s.Payload
 }
 
@@ -34209,7 +34209,7 @@ func (s *SchemaCreatedEvent) SetMetadata(val OptSchemaCreatedEventMetadata) {
 }
 
 // SetPayload sets the value of Payload.
-func (s *SchemaCreatedEvent) SetPayload(val EmptyEventPayload) {
+func (s *SchemaCreatedEvent) SetPayload(val SchemaCreatedPayload) {
 	s.Payload = val
 }
 
@@ -34404,6 +34404,39 @@ func (s *SchemaCreatedEventMetadata) init() SchemaCreatedEventMetadata {
 		*s = m
 	}
 	return m
+}
+
+// Allowlisted fields for `schema.created`. The schema document itself is
+// omitted — it is customer-authored and unbounded, and the event's `entity_id`
+// already identifies which schema was created.
+// Ref: #
+type SchemaCreatedPayload struct {
+	// The kind the stored document declares. `unknown` when the schema was
+	// persisted without its document being parsed.
+	Kind OptString `json:"kind"`
+	// The customer-chosen object type the schema describes. Absent when the
+	// document declares none.
+	ObjectType OptString `json:"object_type"`
+}
+
+// GetKind returns the value of Kind.
+func (s *SchemaCreatedPayload) GetKind() OptString {
+	return s.Kind
+}
+
+// GetObjectType returns the value of ObjectType.
+func (s *SchemaCreatedPayload) GetObjectType() OptString {
+	return s.ObjectType
+}
+
+// SetKind sets the value of Kind.
+func (s *SchemaCreatedPayload) SetKind(val OptString) {
+	s.Kind = val
+}
+
+// SetObjectType sets the value of ObjectType.
+func (s *SchemaCreatedPayload) SetObjectType(val OptString) {
+	s.ObjectType = val
 }
 
 type SchemaURI url.URL
