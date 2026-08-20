@@ -85,11 +85,11 @@ func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams)
 		return nil, err
 	}
 
-	resp := make(api.ListSchemasResponse, len(schemas), len(schemas))
+	resp := make(api.ListSchemasResponse, len(schemas))
 
 	for i, schema := range schemas {
 		resp[i] = api.ListSchemasResponseItem{
-			ID:        schema.ID,
+			ID:        schema.URL,
 			CreatedAt: schema.CreatedAt,
 		}
 	}
