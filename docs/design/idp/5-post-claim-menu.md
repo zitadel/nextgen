@@ -154,16 +154,16 @@ Sign-in methods for human-user (.zitadel/schemas/default-human-user.json)
 ◆ How should these users sign in?
 │ ◼ Passkey
 │ ◻ Password
-│ ◼ Google (connected)
+│ ◼ Google (configured)
 │ ◻ GitHub (requires setup)
 ```
 
 - **Seeding:** Pre-selections read directly from the schema's current `x-auth-methods`.
-- **Hints:** Providers resolve as `(connected)` if a corresponding connection file exists in `.zitadel/idps/`; otherwise `(requires setup)`.
+- **Hints:** Providers resolve as `(configured)` if a corresponding connection file exists in `.zitadel/idps/`; otherwise `(requires setup)`. The hint states file presence only: applied-ness is the drift warning's job, and only area 6 may say a provider works.
 - **Custom Providers:** Providers outside the standard catalog render as read-only notes and pass through recomposition untouched.
 - **Drift Warning:** If the file hash mismatches the last-applied record in `.zitadel/state.json` (hash mechanics: `lib/sync/loop.ts:566`), the UI appends `includes local changes not yet applied`.
 
-> **Interpretation Note:** Area 7 reads "latest schema version" as the platform's latest revision. This journey reads the working tree because the tree is what it edits; the drift warning bridges the two readings.
+> **Interpretation Note:** Area 7 reads "latest schema version" as the latest applied revision (the active-flow pin). This journey reads the working tree because the tree is what it edits; the drift warning bridges the two readings.
 
 ### In-Place Recomposition Rules
 The CLI must edit user configurations in place without destroying customizations:

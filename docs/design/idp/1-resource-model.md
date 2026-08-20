@@ -280,7 +280,7 @@ with `scaffoldedFrom` proposed as an addition; see [Open points](#open-points).
         "github",
         "okta"
       ],
-      "description": "Rendering hint (logo, brand colors) consumed by the login template, not by the engine."
+      "description": "Names the catalog entry this file was scaffolded from. Keys vendor knowledge only: glyphs and button branding, the setup scan/match, and catalog claim recipes. Carries no protocol behavior: conduct comes only from the protocol blocks."
     },
     "display_name": {
       "type": "string",
@@ -331,17 +331,13 @@ with `scaffoldedFrom` proposed as an addition; see [Open points](#open-points).
     "provisioning": {
       "type": "object",
       "additionalProperties": false,
-      "description": "What Zitadel may do with the resulting identity. `is_creation_allowed` permits creating a user from this provider at all; `is_auto_creation` decides whether creation happens automatically when the provider's claims satisfy every required property (verified, for properties carrying `x-verify`), or the flow stops to collect. Linking policy (`is_linking_allowed`, `auto_linking`) returns with the deferred account-linking journey - additive.",
+      "description": "What Zitadel may do with the resulting identity. `is_creation_allowed` permits creating a user from this provider at all; `is_auto_creation` decides whether creation happens automatically when the provider's claims satisfy every required property (verified, for properties carrying `x-verify`), or the flow stops to collect. Linking policy (`is_linking_allowed`, `auto_linking`) returns with the deferred account-linking journey, and `is_auto_update` with per-property verification state - both additive.",
       "properties": {
         "is_creation_allowed": {
           "type": "boolean",
           "default": true
         },
         "is_auto_creation": {
-          "type": "boolean",
-          "default": false
-        },
-        "is_auto_update": {
           "type": "boolean",
           "default": false
         }
@@ -644,7 +640,6 @@ These flags directly transcribe the legacy provider options ([`oidc/oidc.go#L41-
 | :--- | :--- |
 | `is_creation_allowed` | Can this provider create new users at all? |
 | `is_auto_creation` | Should users be created silently if claims cover all required properties (and verified where `x-verify` is present), or should the flow stop to collect missing data? |
-| `is_auto_update` | Should the system refresh stored user attributes during subsequent sign-ins? |
 
 By default, 851 scaffolds `is_auto_creation: false` to ensure users manually review and complete their data. The complete logic for this is detailed under the [resolution branches](3-social-login-flow.md#resolution-branches) in Area 3.
 
@@ -660,6 +655,7 @@ Several fields have been intentionally excluded from the initial schema based on
 | `response_mode` (`form_post`) | When Apple is scoped (the current 851 callback supports GET only).                                                                                                                                                                                              |
 | `dynamic_authorize_parameters` | Once a design exists for sourcing runtime values in the authorize URL.                                                                                                                                                                                          |
 | `is_linking_allowed`, `auto_linking` | When the deferred account-linking journey is designed and implemented.                                                                                                                                                                              |
+| `is_auto_update` | When per-property verification state exists (the `x-verify` return). Until then the engine could only treat it as `false`, a committed no-op whose behavior would later change under tenants. Its exported contract stands: never silently overwrite a verified property with an unverified value. |
 | `enabled` | **Not planned.** An unlisted connection is already inert. Furthermore, a config flag is a poor mechanism for an emergency disable (due to release latency, and rollbacks would inadvertently re-enable it). Imperative runtime disabling remains an open point. |
 | `kind`, `audience`, `default_schema` | **Cut completely.** No identified use case or need.                                                                                                                                                                                                             |
 
@@ -706,12 +702,12 @@ Epic 851 does not include account linking. The linking fields are excluded from 
 - **Username matching limitations:** Username matching has no verification equivalent. Subject-based matching is the only strongly secure variant.
 - **Subject matching is not schema-aware:** A single connection can serve several schemas, so one person's Google account can legitimately back both a Customers user and an Employees user. The link key `(connection, subject)` carries no schema, a user row carries exactly one (`users.schema_url`, `internal/storage/dialect/postgres/migration/sql/000004_users.sql:5`), and a flow definition names exactly one (`user_schema`, `api/openapi/components/flows/flow-definition.yaml:26`). A subject lookup can therefore return a record the active flow's schema does not own. Linking must settle whether identity spaces are per schema or per project before it can match on subject at all; the open question lives in [area 3](3-social-login-flow.md#open-points).
 
-The `verified_claims` field itself remains in 851 because the user creation and `is_auto_update` processes consume it.
+The `verified_claims` field itself stays in the 851 schema: the auto-creation gate reads it to decide whether claims may create a user silently. The deferred `is_auto_update` will also read it when that flag returns.
 
 **The `x-verify` Dependency:**
 `x-verify` no longer exists in the dialect. [#901](https://github.com/zitadel/nextgen/pull/901) removed it (together with `x-editable`, `x-sensitive`, and `x-mfa`) because nothing read it, stating the removed annotations "can be re-added once they become required". [`user-property.json`](../../../packages/config/meta-schemas/user-property.json) today carries only `x-unique`, `x-claim`, and `x-audit`. This design is the first consumer: every `x-verify` reference in these documents describes the returning annotation, not the shipped dialect.
 
-The annotation returns with the engine work that first reads it, the way `x-audit` returned with its emitter (#808). The step 5 gate evaluation ([area 3](3-social-login-flow.md#callback-processing)) needs only the annotation and the attempt. Recording the result at creation, the `is_auto_update` downgrade guard, and dropping verification on edit also need per-property state tracking, which does not exist either (`user_attributes` stores bare key/value pairs; listed as engine work in [area 3](3-social-login-flow.md#engine-work)). On return, the free-form `string` value should tighten to an enum of implemented methods, per the same nothing-without-implementation rule that governs [deferred and cut fields](#deferred-and-cut-fields). The two validator rules below that pair `verified_claims` with `x-verify` activate when it returns. Until that per-property state exists, the engine treats `is_auto_update` as `false` (fail closed), whatever the connection sets.
+The annotation returns with the engine work that first reads it, the way `x-audit` returned with its emitter (#808). The step 5 gate evaluation ([area 3](3-social-login-flow.md#callback-processing)) needs only the annotation and the attempt. Recording the result at creation, the `is_auto_update` downgrade guard, and dropping verification on edit also need per-property state tracking, which does not exist either (`user_attributes` stores bare key/value pairs; listed as engine work in [area 3](3-social-login-flow.md#engine-work)). On return, the free-form `string` value should tighten to an enum of implemented methods, per the same nothing-without-implementation rule that governs [deferred and cut fields](#deferred-and-cut-fields). The two validator rules below that pair `verified_claims` with `x-verify` activate when it returns. That dependency is why `is_auto_update` itself is deferred rather than shipped as a settable no-op (see [deferred and cut fields](#deferred-and-cut-fields)).
 
 
 ## Validator Rules
@@ -832,7 +828,7 @@ Behaviors this design relies on but does not implement. Each later area opens wi
 ## Open Points
 
 - **`scaffoldedFrom` tracking:** We propose adding this optional string to `ResourceEntry` to record which shipped default originally generated a file. It acts as the merge base for upgrading scaffolded defaults later. It is cheap to record now but impossible to reconstruct later. The recommendation is to record it now and defer utilizing it until needed.
-- **The secret lifecycle:** The actual mechanics of the secret lifecycle (the store, the set-surface, the engine join, and rotation) are owned by the deferred secret-store specification. This document only contributes the structural constraints and the security pushback outlined in the section above. That ownership covers production. Development cannot wait for the spec: the local runtime inherits only the CLI process environment ([`binary.ts:70`](../../../apps/cli/src/lib/local-server/binary.ts)) or two fixed docker `--env` values ([`docker.ts:35-38`](../../../apps/cli/src/lib/local-server/docker.ts)), so `.env.local` never reaches the engine and no configured provider can complete a token exchange. Wiring the development join is [#851](https://github.com/zitadel/nextgen/issues/851) execution work, under the same never-upstream invariant.
+- **The secret lifecycle:** The actual mechanics of the secret lifecycle (the store, the set-surface, the engine join, and rotation) are owned by the deferred secret-store specification. This document only contributes the structural constraints and the security pushback outlined in the section above. That ownership covers production. Development cannot wait for the spec: the local runtime inherits only the CLI process environment ([`binary.ts:70`](../../../apps/cli/src/lib/local-server/binary.ts)) or two fixed docker `--env` values ([`docker.ts:35-38`](../../../apps/cli/src/lib/local-server/docker.ts)), so `.env.local` never reaches the engine and no configured provider can complete a token exchange. Wiring the development join is [#851](https://github.com/zitadel/nextgen/issues/851) execution work, under the same never-upstream invariant; area 4 owns it in [Work Items](4-cli-provider-setup.md#work-items).
 - **Imperative runtime disable:** We need a way to imperatively disable an IdP at runtime (e.g., `zitadel idp disable google --env prod`). This mechanism must be per-environment, execute in seconds, and remain immune to config rollbacks. Because of these requirements, it must be specified as part of the runtime surface, never as a configuration field.
 - **Deletion semantics:** We must decide between a "refuse-while-pinned" approach (which requires a grace window for in-flight attempts) or a "tombstoning" approach. Settled alongside the CRUD API design: tombstoning.
 - **Schema-keyed validation:** It remains undecided how strictly connection fields keyed by user-schema properties (like `claim_mapping` and `verified_claims`) should be validated. The current "superset model" limits pair-wise checks to warnings, because a simple typo and a legitimate superset key are indistinguishable to the server (meaning the server never rejects mapping content). An alternative "1:1 rule" (where a connection slug belongs to at most one schema) would allow strict, error-grade checks, but forces tenants to create redundant connections. The current validator rules record the superset status quo until a final decision is made.

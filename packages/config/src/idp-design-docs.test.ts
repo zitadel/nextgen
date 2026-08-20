@@ -13,10 +13,10 @@ import { describe, expect, it } from "vitest";
 // value classes, protocol arms, scope requirements),
 // so the receipt must be checkable from the repo, not a session scratchpad.
 // Covers 1-resource-model.md, 2-auth-method-selection.md, 4-cli-provider-setup.md,
-// 6-test-sign-in.md, and 7-console-views.md;
-// 3-social-login-flow.md and 5-post-claim-menu.md embed no validatable JSON
-// blocks, but their cross-doc rows are pinned as quotes (areas 3<->4, 4<->5,
-// {3,4,5}<->6, and {1,2,4}<->7) so sibling rewrites fail loudly.
+// 5-post-claim-menu.md, 6-test-sign-in.md, and 7-console-views.md;
+// 3-social-login-flow.md embeds no validatable JSON blocks, but its cross-doc
+// rows are pinned as quotes (areas 3<->4, 4<->5, {3,4,5}<->6, and {1,2,4}<->7)
+// so sibling rewrites fail loudly.
 // When the schema lands as a real meta-schema file, point this test at it
 // and delete the extraction.
 
@@ -170,9 +170,10 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
     false,
   ],
   // provisioning (linking policy deferred with the account-linking journey)
-  ["851 provisioning flags", { ...oidc, provisioning: { is_creation_allowed: true, is_auto_creation: false, is_auto_update: false } }, true],
+  ["851 provisioning flags", { ...oidc, provisioning: { is_creation_allowed: true, is_auto_creation: false } }, true],
   ["auto_linking (deferred — no linking in 851)", { ...oidc, provisioning: { auto_linking: "never" } }, false],
   ["is_linking_allowed (deferred)", { ...oidc, provisioning: { is_linking_allowed: true } }, false],
+  ["is_auto_update (deferred — awaits per-property verification state)", { ...oidc, provisioning: { is_auto_update: false } }, false],
   ["unknown provisioning flag", { ...oidc, provisioning: { is_magic: true } }, false],
   ["default_schema (dropped field)", { ...oidc, provisioning: { default_schema: "user-human" } }, false],
   [
@@ -185,6 +186,7 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
     true,
   ],
   // verified_claims value classes
+  ["verified_claims literal true accepted (Entra trust)", { ...oidc, verified_claims: { email: true } }, true],
   ["verified_claims false rejected", { ...oidc, verified_claims: { email: false } }, false],
   ["verified_claims number rejected", { ...oidc, verified_claims: { email: 42 } }, false],
   ["verified_claims $-typo rejected", { ...oidc, verified_claims: { email: "$strateggy" } }, false],
@@ -194,6 +196,10 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
   ["claim_mapping dotted value accepted (dot is part of the key)", { ...oidc, claim_mapping: { email: "plan.name" } }, true],
   ["claim_mapping $-value rejected (reserved)", { ...oidc, claim_mapping: { email: "$expr" } }, false],
   ["claim_mapping object value rejected (reserved)", { ...oidc, claim_mapping: { email: { expr: "login" } } }, false],
+  // slug bounds (pattern + maxLength) and the documented pkce opt-out
+  ["slug uppercase rejected", { ...oidc, slug: "Google" }, false],
+  ["slug over 64 chars rejected", { ...oidc, slug: "a".repeat(65) }, false],
+  ["pkce_enabled false accepted (documented opt-out)", { ...oidc, oidc: { ...oidcBlock, pkce_enabled: false } }, true],
   // dropped root fields
   ["kind (dropped)", { ...oidc, kind: "idp" }, false],
   ["enabled (dropped — availability is the policy gates + runtime disable)", { ...oidc, enabled: true }, false],
@@ -354,6 +360,28 @@ describe("scaffolded flow (4-cli-provider-setup.md · The scaffolded flow)", () 
     expect(ids).toEqual(["google", "google"]);
     expect((googleExample as { slug: string }).slug).toBe("google");
   });
+
+  it("stripping the marked deltas yields the shipped default exactly", () => {
+    // The doc marks every SSO delta with an inline comment; reversing those
+    // deltas must reproduce packages/config/defaults/default-login.json, so
+    // an unmarked drift from the shipped default goes red.
+    expect(raw.match(/\/\* (?:added(?: step)?|was "password") \*\//g)).toHaveLength(9);
+    const stripped = JSON.parse(JSON.stringify(flow)) as typeof flow;
+    stripped.steps = stripped.steps.filter(
+      (s) => s.name !== "register-sso" && s.name !== "sso-conflict",
+    );
+    for (const step of stripped.steps) delete step.sso_providers;
+    const byName = new Map(stripped.steps.map((s) => [s.name, s]));
+    delete byName.get("identifier")!.transitions!["callback"];
+    delete byName.get("identifier")!.transitions!["user_already_exists"];
+    delete byName.get("register")!.transitions!["callback"];
+    delete byName.get("register")!.transitions!["user_not_found"];
+    byName.get("register")!.transitions!["user_already_exists"] = { target: "password" };
+    const shipped = JSON.parse(
+      readFileSync(join(repoRoot, "packages/config/defaults/default-login.json"), "utf8"),
+    ) as unknown;
+    expect(stripped).toEqual(shipped);
+  });
 });
 
 describe("sibling quotes pinned verbatim (4-cli-provider-setup.md)", () => {
@@ -370,7 +398,7 @@ describe("sibling quotes pinned verbatim (4-cli-provider-setup.md)", () => {
     [
       "flow scaffolding row (area 3)",
       socialLoginFlow,
-      "**Flow Scaffolding:** Scaffold `sso_providers` on register-purpose steps and the conflict step with its login route.",
+      "**Flow Scaffolding:** Scaffold `sso_providers` on the entry steps (both, in the shipped shared-entry default) and the conflict step with its login route.",
     ],
     [
       "register-step topology open point (area 2)",
@@ -418,10 +446,29 @@ describe("sibling quotes pinned verbatim (5-post-claim-menu.md)", () => {
   });
 });
 
+describe("skipped envelope (5-post-claim-menu.md · Non-interactive)", () => {
+  // The doc's one JSON block: the non-interactive skip envelope. Pin the
+  // wire fields the CLI contract names, so an envelope reshape goes red.
+  const envelope = extractJson(
+    postClaimMenu,
+    /```json\n(\{[\s\S]*?"status": "skipped"[\s\S]*?\n\})\n```/,
+  ) as Record<string, unknown> & { next_commands: string[] };
+
+  it("carries the meta trio, the skip reason, and recovery commands", () => {
+    expect(envelope["cli_version"]).toBeTypeOf("string");
+    expect(envelope["command"]).toBe("menu");
+    expect(envelope["source"]).toBeTypeOf("string");
+    expect(envelope["status"]).toBe("skipped");
+    expect(envelope["reason"]).toBe("non-interactive");
+    expect(envelope.next_commands.length).toBeGreaterThan(0);
+  });
+});
+
 describe("forward compatibility (1-resource-model.md · Forward compatibility)", () => {
-  // The documented extension path: secret_strategy returns as a closed enum
-  // with secret_params, and client_secret_env relaxes from unconditional to
-  // conditional. Every file valid today must stay valid.
+  // The documented extension paths: secret_strategy returns as a closed enum
+  // with secret_params, client_secret_env relaxes from unconditional to
+  // conditional, and is_auto_update returns with per-property verification
+  // state. Every file valid today must stay valid.
   it("today's examples survive the post-Apple extension", () => {
     const extended = JSON.parse(JSON.stringify(connectionSchema)) as {
       properties: Record<string, { required: string[]; properties: Record<string, unknown>; allOf?: unknown[] }>;
@@ -452,9 +499,17 @@ describe("forward compatibility (1-resource-model.md · Forward compatibility)",
         },
       ];
     }
+    const provisioning = extended.properties["provisioning"]!;
+    provisioning.properties["is_auto_update"] = { type: "boolean", default: false };
     const validateExtended = ajv().compile(extended);
     expect(validateExtended(googleExample)).toBe(true);
     expect(validateExtended(githubExample)).toBe(true);
+    expect(
+      validateExtended({
+        ...oidc,
+        provisioning: { is_creation_allowed: true, is_auto_update: true },
+      }),
+    ).toBe(true);
     expect(
       validateExtended({
         ...root,
@@ -521,6 +576,35 @@ describe("verdict catalog (6-test-sign-in.md)", () => {
     const table = testSignIn.slice(start, end);
     for (const code of [...catalog.reason_codes, ...catalog.cli_reasons]) {
       expect(table, code).toContain(`\`${code}\``);
+    }
+  });
+
+  it("the classification table's verdict column stays inside the catalog", () => {
+    // Reverse direction of the coverage test: a code invented in the table
+    // but absent from the catalog must go red too. Scoped to the Verdict
+    // column because the Signal and note columns legitimately name wire
+    // values and config fields. `provider_error` is the echoed envelope
+    // field, not a code.
+    const start = testSignIn.indexOf("| Signal | Verdict |");
+    const end = testSignIn.indexOf("\n## ", start);
+    const rows = testSignIn
+      .slice(start, end)
+      .split("\n")
+      .slice(2)
+      .filter((line) => line.startsWith("|"));
+    expect(rows.length).toBeGreaterThan(0);
+    const known = new Set([
+      ...catalog.verdicts,
+      ...catalog.milestones,
+      ...catalog.reason_codes,
+      ...catalog.cli_reasons,
+      "provider_error",
+    ]);
+    for (const row of rows) {
+      const verdictCell = row.split("|")[2] ?? "";
+      for (const [, token] of verdictCell.matchAll(/`([a-z0-9_]+)`/g)) {
+        expect(known.has(token!), `${token} escaped the catalog`).toBe(true);
+      }
     }
   });
 
@@ -667,5 +751,37 @@ describe("dialect dependency (x-verify removed in #901)", () => {
   it("both docs name the removal PR", () => {
     expect(resourceModel).toContain("https://github.com/zitadel/nextgen/pull/901");
     expect(socialLoginFlow).toContain("https://github.com/zitadel/nextgen/pull/901");
+  });
+});
+
+describe("cross-doc anchors resolve (docs/design/idp)", () => {
+  // The quote pins guard text; this guards the links. Every
+  // [text](N-doc.md#fragment) and in-doc [text](#fragment) must hit a real
+  // heading under GitHub's slugging, or the link 404s silently.
+  const docs: Record<string, string> = {
+    "1-resource-model.md": resourceModel,
+    "2-auth-method-selection.md": authMethodSelection,
+    "3-social-login-flow.md": socialLoginFlow,
+    "4-cli-provider-setup.md": providerSetup,
+    "5-post-claim-menu.md": postClaimMenu,
+    "6-test-sign-in.md": testSignIn,
+    "7-console-views.md": consoleViews,
+  };
+  const slugs = (doc: string) =>
+    new Set(
+      [...doc.matchAll(/^#{1,6} (.+)$/gm)].map((m) =>
+        m[1]!.toLowerCase().replace(/[^\w\- ]/g, "").trim().replace(/ /g, "-"),
+      ),
+    );
+  const headings = new Map(Object.entries(docs).map(([name, text]) => [name, slugs(text)]));
+
+  it.each(Object.keys(docs))("%s", (name) => {
+    const links = [...docs[name]!.matchAll(/\]\((?:([1-9][a-z-]*\.md))?#([\w-]+)\)/g)];
+    for (const [, file, fragment] of links) {
+      expect(
+        headings.get(file ?? name)!.has(fragment!),
+        `${name} links ${file ?? "(self)"}#${fragment}`,
+      ).toBe(true);
+    }
   });
 });

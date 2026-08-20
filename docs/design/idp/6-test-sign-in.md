@@ -120,7 +120,7 @@ Error envelopes carry `status: "error"` and a non-zero exit; inconclusive is dis
     "verdict": "failed_provider",
     "reason_code": "token_exchange_rejected",
     "provider": "google",
-    "connection_revision": "idprev_01KWJ0Q9AEB7N4S1D8F2K6M3PX",
+    "connection_revision_id": "idprev_01KWJ0Q9AEB7N4S1D8F2K6M3PX",
     "last_milestone": "callback_received",
     "milestones": ["attempt_started", "callback_received"],
     "console_url": "https://console.cloud.google.com/apis/credentials",

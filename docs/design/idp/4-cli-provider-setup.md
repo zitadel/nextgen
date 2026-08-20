@@ -30,12 +30,12 @@ A single journey unit powers two distinct callers:
 What [`3-social-login-flow.md`](3-social-login-flow.md#exported-requirements) and [`2-auth-method-selection.md`](2-auth-method-selection.md#open-points) expect this area to answer:
 
 - [x] **Callback URI Surface:** Expose `{origin}/__nextgen/idp/callback` in the setup journey and per environment. Answered in [Callback URIs](#callback-uris).
-- [x] **Flow Scaffolding:** Scaffold `sso_providers` on register-purpose steps and the conflict step with its login route. Answered in [Flow architecture decisions](#flow-architecture-decisions). In the shipped single-definition default, this routes as an in-definition navigation rather than a `switch` (mirrored in Area 3's navigation mechanics).
+- [x] **Flow Scaffolding:** Scaffold `sso_providers` on the entry steps (both, in the shipped shared-entry default) and the conflict step with its login route. Answered in [Flow architecture decisions](#flow-architecture-decisions). In the shipped single-definition default, this routes as an in-definition navigation rather than a `switch` (mirrored in Area 3's navigation mechanics).
 - [x] **Register-Step Topology:** Settled in favor of a shared entry step, resolving Area 2's open point that "both single-step and multi-step topologies are functionally valid. The final choice was a CLI scaffolding decision" ([Flow architecture decisions](#flow-architecture-decisions)).
 
 ### Excluded Scope
 
-- **Secret Values at Token Exchange:** Deferred to Area 1's secret-store specification.
+- **Production Secret Delivery at Token Exchange:** Deferred to Area 1's secret-store specification. The development-runtime join is 851 work, owned in [Work Items](#work-items).
 - **Callback Route Server Implementation:** Handled by Area 3 (Server).
 
 > **Note on Proxy Scope:** The CLI journey surfaces and captures configurations but never resolves secrets or serves routes directly. The framework matcher is already prefix-wide (`/__nextgen/:path*`, defined in `lib/orca/patchers/rule/next/index.ts:32`), meaning no new proxy patcher is required; only the server-side route implementation remains outstanding.
@@ -173,7 +173,7 @@ Missing credentials fall into two distinct execution states:
 
 ### Missing Client ID (Capture-Time)
 - **Interactive:** The prompt pauses and waits for user input.
-- **Non-Interactive:** Fails immediately with an error before writing resources.
+- **Non-Interactive:** Fails immediately with an error before writing resources when a create is required; a scan match needs no client id and follows the reuse rule ([Create or Reuse](#create-or-reuse)).
 - **Environment Reference:** Passing a `${VAR}` reference defers evaluation to plan-time presence checks via `E_CREDENTIAL_MISSING`.
 
 ### Missing Secret Value (Plan/Apply-Time)
@@ -192,7 +192,7 @@ The setup sub-journey connects existing OAuth applications or creates new ones w
 ### Scan & Match Logic
 
 * **Identity-Based Scan:** Scans `.zitadel/idps/*.json` matching on `template` (equal to catalog key) or protocol block endpoints (`issuer` equal to `https://accounts.google.com` or `authorization_endpoint` equal to `https://github.com/login/oauth/authorize`). Endpoints take precedence if `template` conflicts.
-* **Single Hit (Reuse):** Displays slug and `client_id` for interactive confirmation; non-interactive executions auto-reuse only when the supplied client id (if any) matches the stored `client_id`, and fail with `E_VALIDATION` naming both ids on mismatch, never silently keeping the existing app. Extends the connection's `claim_mapping` to cover the active schema using superset semantics, without modifying existing secrets. Re-checks credential presence so missing local values yield `E_CREDENTIAL_MISSING` with a `.env.local` pointer.
+* **Single Hit (Reuse):** Displays slug and `client_id` for interactive confirmation; non-interactive executions auto-reuse when no client id was supplied (reuse writes no new resource, so the Missing Client ID rule does not engage) or when the supplied id matches the stored `client_id`; a mismatch fails with `E_VALIDATION` naming both ids, never silently keeping the existing app. Extends the connection's `claim_mapping` to cover the active schema using superset semantics, without modifying existing secrets. Re-checks credential presence so missing local values yield `E_CREDENTIAL_MISSING` with a `.env.local` pointer.
 * **Multiple Hits:** Prompts interactive user selection; throws a non-interactive error listing matching candidates.
 * **No Hit (Create):** Scaffolds at catalog slug. If slug or filename collides with an unmatched connection, prompts for a new slug or throws `E_CONFLICT` using atomic file writes (`wx`). `--force` is explicitly ignored for connection files to prevent destructive overwrites of hand-authored resources.
 * **Idempotency:** Re-running with unchanged inputs is a complete no-op end-to-end, producing identical state hashes with zero reported plan changes.
@@ -387,7 +387,7 @@ In non-interactive mode (triggered by non-TTY `stdin`/`stdout` or explicit `--js
 
 ### Missing Client ID Validation
 
-If a selected provider is specified without a Client ID, setup halts prior to resource generation. The returned error envelope outputs the setup guidance normally shown in interactive mode:
+If a selected provider is specified without a Client ID, setup halts prior to resource generation (create path; a reuse match needs no client id, see [Create or Reuse](#create-or-reuse)). The returned error envelope outputs the setup guidance normally shown in interactive mode:
 
 ```json
 {
@@ -441,6 +441,7 @@ If a selected provider is specified without a Client ID, setup halts prior to re
 | **Environment File Resolution** | Updates presence checks to inspect `.env.local` and `.env` (matching `port.ts:33`). |
 | **Secret Key Collision Messaging** | Replaces generic "already matches target" message (`setup/index.ts:313-315`) with a specific no-clobber notice. |
 | **Gitignore Gate** | New: validates `.env.local` via `git check-ignore` and confirms it is untracked. The nearest existing check (`doctor/checks/gitignore.ts:17-18`) only verifies `.gitignore` entries. |
+| **Dev-Runtime Secret Join** | New: at local-runtime spawn, the CLI resolves the connection's declared env refs from `.env.local` and injects them into the engine process environment (today `binary.ts:70` passes only the CLI process env; `docker.ts:35-38` passes two fixed values), so the engine's name-to-value join works at token exchange. Development only, downstream of everything diffed or printed. Production delivery (fetch and decrypt from the store) stays with area 1's deferred secret-store spec. |
 | **`create_user_with_sso`** | Adds meta-schema enum value and implements the Area 3 engine handler. |
 | **Doctor `env-example` Check** | Reconciles resource env refs with the scaffold (resolving drift between `doctor/checks/env-example.ts:7` and `base.ts:239-245`). |
 
