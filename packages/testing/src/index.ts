@@ -102,6 +102,7 @@ export type {
   LocalZitadel,
   LocalZitadelRuntime,
   MintedSession,
+  PlatformCredentials,
   SeededUser,
   SeedSessionInput,
   SeedUserInput,
