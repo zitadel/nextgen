@@ -54,12 +54,12 @@ SSO strictly follows this same pattern. Rather than dynamically injecting `sso_p
 We explicitly list SSO providers in the user schema rather than relying on a generic `sso.enabled` toggle, and rather than having the connection reference the schema.
 
 **Why we rejected a generic `sso.enabled` toggle:**
-- **Philosophical alignment:** The epic frames specific providers (like Google or GitHub) as direct peers to passwords and passkeys. They answer the fundamental question, *"How should these users sign in?"*, making them an intrinsic property of the schema rather than a mere flow detail.
+- **Peers of password and passkey:** The epic frames Google and GitHub as answers to "how should these users sign in?", a property of the schema.
 - **UI Visibility:** Both the post-claim journey and the Console need to display exactly which authentication methods a schema supports. A generic `sso.enabled` flag would only allow them to render a vague "SSO: on".
 
 **Why we rejected having the connection list its schemas:**
 - **Avoiding Cascading Revisions:** Schemas do not have stable names; they are identified by revision IDs. If a connection referenced schemas, every schema edit would force a new connection revision, requiring complex `FlowRepin`-style rewrite mechanisms. Instead, connections use stable `slug`s specifically so they can be safely referenced by revision-named resources (like schemas) without triggering a cascade.
-- **Lookup Efficiency:** The system frequently asks, *"Which providers does this schema offer?"* (for UI and post-claim rendering). By storing the list in the schema, this becomes a fast, direct read from a document those views already hold. If the connection held the list instead, every UI render would have to scan every connection in the Project and match brittle revision IDs. The reverse question, *"Which schemas reference this connection?"*, is only asked infrequently during plan validation, making it perfectly acceptable for the validator to compute it by scanning the working tree.
+- **Lookup Efficiency:** "Which providers does this schema offer?" is asked on every UI and post-claim render, and the schema is a document those views already hold. The reverse question is asked only at plan time, where scanning the working tree is fine.
 
 ### What Each State Means
 
@@ -78,7 +78,7 @@ Removing a provider by hand is a two-file edit, and the plan says so: a flow pin
 
 ### Schema Location for `providers`
 
-Because `auth-method.json` is referenced (`$ref`) by all five authentication slots, simply adding `providers` to it would allow nonsensical configurations like `password.providers`. To solve this, we introduce a new `sso-auth-method.json` schema that extends the base definition. The main `auth-methods.json` schema then specifically points its `sso` slot to this new file. This cleanly aligns with our existing structural patterns (such as the split between `user-property.json` and `property-name.json`) and matches how `meta-schemas.ts` enumerates files for publishing.
+Because `auth-method.json` is referenced (`$ref`) by all five authentication slots, simply adding `providers` to it would allow nonsensical configurations like `password.providers`. To solve this, we introduce a new `sso-auth-method.json` schema that extends the base definition. The main `auth-methods.json` schema then specifically points its `sso` slot to this new file. Same split as `user-property.json` / `property-name.json`.
 
 ### `providers` and `enabled` Must Agree
 
@@ -92,8 +92,6 @@ The draft: [`schemas/sso-auth-method.json`](schemas/sso-auth-method.json).
 The `enabled` field remains strictly required, matching the behavior of the other four authentication methods.
 
 - **Migration friendly:** A bare `{"enabled": false}` object is perfectly valid. This allows an existing schema to introduce the `sso` slot before it actually defines any providers.
-- **No dormant list:** Turning SSO off drops the list. Git keeps the old one; the file does not carry a state that looks paused and behaves as removed.
-- **Multi-file impact:** Disabling SSO is never a single-file edit. If you set `enabled: false` on the schema, but a flow still actively offers those providers, the validator will immediately flag it as an error.
 
 These exact schema constraints (specifically that `{"enabled": false}` is valid for migrations, that `enabled: false` with a list is rejected, and that `enabled: true` paired with an empty or missing `providers` list is rejected) are verified in [`packages/config/src/idp-design-docs.test.ts`](../../../packages/config/src/idp-design-docs.test.ts).
 
@@ -110,7 +108,7 @@ The validation model strictly follows the established password precedent: the fl
 | **Full outcome routing** | **New:** A step with `sso_providers` must properly route `identity_unknown` and `user_already_exists`. The engine fires three possible outcomes, and routing only the callback dead-ends the other two. |
 | **Empty `claim_mapping` intersection** | **New (Warning):** If an offered provider's `claim_mapping` shares zero properties with the pinned schema, the pairing prefills nothing. Sign-up will degrade to fully manual data collection. |
 | **Empty `verified_claims` intersection** | **New (Warning):** If a provider's `verified_claims` keys share no properties with the pinned schema, the verification state has nowhere to land. |
-| **Wildcard `issuer_pattern` conflict** | **Warning:** An environment declaring a wildcard `issuer_pattern` cannot produce the exact redirect URIs that external providers require. *(Note: Environment declarations are currently design-only; the `issuer` / `issuer_pattern` shapes live in [`configuration-surface.md`, Environments](../platform/configuration-surface.md#environments), and persistence lands with [#534](https://github.com/zitadel/nextgen/issues/534)).* Plan warns, never errors: a release is one artifact promoted through every environment, and exact and pattern environments coexist in one project, so a pattern environment must not block the release. In a pattern environment the engine leaves the provider buttons out at render ([area 3](3-social-login-flow.md#constraints--edge-cases)). |
+| **Wildcard `issuer_pattern` conflict** | **Warning:** An environment declaring a wildcard `issuer_pattern` cannot produce the exact redirect URIs providers require (environments are design-only until [#534](https://github.com/zitadel/nextgen/issues/534)). Plan warns, never errors: a release is one artifact promoted through every environment, so a pattern environment must not block it. The engine leaves the provider buttons out at render ([area 3](3-social-login-flow.md#constraints--edge-cases)). |
 | **Dead capability** | **Warning:** A schema lists a provider that no flow ever offers. The Console would advertise a sign-in method that has no actual login path. |
 | **Collection-step conflict routing** | **New:** A step whose `on_success` is `create_user_with_sso` must route `user_already_exists`. Area 3 fires that outcome at collection-step submission as well as at callback resolution, and requires the conflict transition attached to both steps. |
 
@@ -120,16 +118,11 @@ The validation model strictly follows the established password precedent: the fl
 
 The validator deliberately **does not** cross-check `sso_providers[].name` or `sso_providers[].template` against the connection file.
 
-While these fields duplicate properties found on the connection, this duplication is intentional:
-*   `name` is the display name surfaced to the user and is often localized client-side.
-*   `template` acts as a rendering hint.
-
-A flow is fully permitted to legitimately override both of these values to suit the context of the user journey. Only the `id` (the slug) is strictly required to resolve.
+`name` is display copy, often localized client-side, and `template` a rendering hint; a flow may override both. Only `id` (the slug) must resolve.
 
 ## Open Points
 
-- **Generators around a method set:** `sign-in-preset.ts` currently acts as a single-select over two presets (`password-first` and `passkey-first`), driving both schema and flow generation through `getDefaultHumanUserSchema` and `getDefaultLoginFlow`. These are keyed strictly by preset (`PRESET_TEMPLATES`), with the specific use case applied via post-transforms to avoid maintaining a combinatorial matrix. Auth methods can follow this exact pattern: a base template transformed dynamically based on the selected method set. The epic requires a multi-select interface covering four methods (with passkeys pre-selected and Google/GitHub flagged as "additional setup required"). Recomposing these generators around a method set rather than a preset enum represents the main CLI work in this area and remains to be fully designed.
-- **The register step topology:** Social sign-up requires `sso_providers` on the `register` step, not just on the `identifier` step. Because the flow outcome model in [`3-social-login-flow.md`](3-social-login-flow.md) is purpose-independent, both single-step and multi-step topologies are functionally valid. The final choice was a CLI scaffolding decision, which is now settled in [`4-cli-provider-setup.md`](4-cli-provider-setup.md#flow-architecture-decisions) in favor of a shared entry step.
+- **Generators around a method set:** `sign-in-preset.ts` is a single-select over two presets that drives both the schema and the flow generator, with the use case applied as a post-transform. The epic needs a multi-select over four methods (passkey pre-selected, Google and GitHub flagged as needing setup). Recomposing the generators around a method set instead of a preset is the main CLI work in this area and is not designed yet.
 - **Breaking schema migrations:** Switching to `sso-auth-method.json` is a breaking change for one specific schema state: any payload containing `sso: {"enabled": true}` without a `providers` array. While this was valid under the legacy `auth-method.json`, it fails the new conditional validation. Existing stored schema revisions are immutable and unaffected, but attempting to re-publish or edit an affected schema body will trigger a validation error until a non-empty `providers` list is added or the `sso` block is removed. Schemas omitting the `sso` entry entirely remain unaffected.
 
 ## Exported Requirements
