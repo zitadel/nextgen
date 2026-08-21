@@ -42,6 +42,9 @@ const TOKENS_FILE = resolve(ROOT, "../src/generated/figma.tokens.json");
 /** Single flat "mode" bucket for collections that declare no modes. */
 const NO_MODE = "*";
 
+/** Collection that owns the `spacing/*` layout ramp. See its projection below. */
+const SPACING_COLLECTION = "1--tailwindcss";
+
 type Raw = string | number | boolean;
 interface DtcgLeaf {
   $type?: string;
@@ -320,6 +323,20 @@ function buildColorSurface(theme: ParsedCollection, registry: Registry): Record<
 }
 
 /**
+ * The `custom` group beside `base`: values a component needs that differ per
+ * mode in a way no single `base` role expresses — a fill that is transparent in
+ * light and a faint white wash in dark, say. Their Figma names spell out that
+ * behaviour (`transparent dark:input\30`), which makes them unusable as CSS
+ * variable names, so `build.ts` maps the ones we consume onto semantic names of
+ * our own. Kept keyed by the raw Figma name here so that mapping is explicit.
+ */
+function buildCustomSurface(theme: ParsedCollection, registry: Registry): Record<string, ThemedColor> {
+  const paths = [...leavesForMode(theme, "light").keys()].filter((p) => p.startsWith("custom."));
+  const entries = paths.map((path) => ({ path, name: path.slice("custom.".length) }));
+  return resolveThemedPairs(theme, registry, entries).pairs;
+}
+
+/**
  * Project a non-semantic Light/Dark collection (`Syntax`, `Gradient Colors`)
  * into `themed.<group>`, where `<group>` is the leaves' shared first segment:
  * `syntax.key` -> `themed.syntax.key`, `gradient.red.start` ->
@@ -364,6 +381,24 @@ function setNested(target: Record<string, unknown>, path: string, value: Raw): v
   cursor[parts[parts.length - 1]!] = value;
 }
 
+/**
+ * Project a flat, one-level group without camel-casing its keys.
+ *
+ * `setNested` camel-cases each segment, which is right for `offset-x` ->
+ * `offsetX` but destroys a numeric ramp: Tailwind's `1-5` (6px) would land as
+ * `15`, indistinguishable from a real `15` step and neighbouring a `16` step
+ * worth 4rem. Step names are data here, not identifiers.
+ */
+function buildFlatGroup(group: string, source: Map<string, Raw>, registry: Registry): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const prefix = `${group}.`;
+  for (const path of source.keys()) {
+    if (!path.startsWith(prefix)) continue;
+    out[path.slice(prefix.length)] = registry.resolve(path, NO_MODE);
+  }
+  return out;
+}
+
 /** Project a single-mode group (e.g. `radius`, `text`) into a resolved tree. */
 function buildGroup(group: string, singleMode: Map<string, Raw>, registry: Registry): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -392,7 +427,17 @@ export interface SyncedTokens {
     staleCollectionRoles: string[];
   };
   color: Record<string, ThemedColor>;
+  /** The `custom` group, keyed by its raw Figma name. See `buildCustomSurface`. */
+  custom: Record<string, ThemedColor>;
   radius: Record<string, unknown>;
+  /**
+   * Figma's `shadow/*` scale. Steps are either a single layer (`xs`) or a
+   * numbered stack of them (`sm.1`, `sm.2`); `build.ts` composes both shapes
+   * into one `box-shadow` value.
+   */
+  shadow: Record<string, unknown>;
+  /** Tailwind's 4px layout ramp (`0-5` = 2px … `20` = 80px) — what the frames lay out on. */
+  spacing: Record<string, unknown>;
   text: Record<string, unknown>;
   fontFamily: Record<string, unknown>;
   fontWeight: Record<string, unknown>;
@@ -444,6 +489,7 @@ export function syncTokens(
 
   const semantic = semanticCollection(assigned);
   const color = buildColorSurface(semantic, registry);
+  const custom = buildCustomSurface(semantic, registry);
   if (Object.keys(color).length === 0) {
     throw new Error(`Semantic collection ${semantic.name} (${semantic.file}) produced no colours`);
   }
@@ -473,6 +519,18 @@ export function syncTokens(
     const flat = c.leaves.get(NO_MODE);
     if (flat) for (const [path, value] of flat) singleMode.set(path, value);
   }
+
+  // The layout scale is Tailwind's, and it lives in the Tailwind collection —
+  // which stays `registry-only` because its colour ramps are alias fodder, not
+  // tokens we publish. Pull out this one group by name rather than promoting the
+  // whole collection: it also declares `breakpoint`, which `2--theme` owns, and
+  // merging the two would make one silently win.
+  const spacingSource = new Map<string, Raw>();
+  for (const [c] of assigned) {
+    if (c.name !== SPACING_COLLECTION) continue;
+    const flat = c.leaves.get(NO_MODE);
+    if (flat) for (const [path, value] of flat) spacingSource.set(path, value);
+  }
   const typography: Record<string, Record<string, unknown>> = {};
   const typographyOwners = new Map<string, string>();
   for (const c of withRole(assigned, "viewport")) {
@@ -497,7 +555,10 @@ export function syncTokens(
       staleCollectionRoles: stale,
     },
     color,
+    custom,
     radius: buildGroup("radius", singleMode, registry),
+    shadow: buildGroup("shadow", singleMode, registry),
+    spacing: buildFlatGroup("spacing", spacingSource, registry),
     text: buildGroup("text", singleMode, registry),
     fontFamily: buildGroup("font", singleMode, registry),
     fontWeight: buildGroup("font-weight", singleMode, registry),

@@ -125,8 +125,8 @@ does not change.
 
 - **Dark-only widget.** The widget's surface CSS still uses the legacy
   dark-only login tokens (root ADR 014 §5), so the login screen renders the
-  dark treatment in both console themes. Accepted for v1; resolves with the
-  shared-component-styles token migration.
+  dark treatment in both console themes. Accepted for v1; resolves as the login
+  atoms migrate onto the shadcn token roles.
 - **Full-page reload on sign-in.** The widget's document navigation reboots
   the SPA with the cookie present. Accepted; an `onFlowComplete` +
   `router.navigate` in-SPA handoff is possible later.

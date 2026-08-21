@@ -7,7 +7,6 @@ dependsOn:
   - "api-mock"
   - "components"
   - "design-tokens"
-  - "ui-react"
 
 tasks:
   lint:
@@ -15,7 +14,6 @@ tasks:
     deps:
       - "components:build"
       - "design-tokens:build"
-      - "ui-react:build"
 
   typecheck:
     # Runs `tsc --build`: it compiles the referenced `api`/`api-mock` composite
@@ -29,7 +27,6 @@ tasks:
       - "api-mock:build"
       - "components:build"
       - "design-tokens:build"
-      - "ui-react:build"
 
   build:
     command: "corepack pnpm run build"
@@ -37,7 +34,6 @@ tasks:
       - "api:build"
       - "components:build"
       - "design-tokens:build"
-      - "ui-react:build"
     outputs:
       - "storybook-static/**/*"
     options:
@@ -60,7 +56,6 @@ tasks:
       - "api:build"
       - "components:build"
       - "design-tokens:build"
-      - "ui-react:build"
 
   dev:
     command: "corepack pnpm run dev"

@@ -4,8 +4,7 @@ import { classMap } from "lit/directives/class-map.js";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { live } from "lit/directives/live.js";
 
-import selectHost from "@zitadel/shared-component-styles/lit/select-host.css?inline";
-import selectSurface from "@zitadel/shared-component-styles/select.css?inline";
+import selectStyles from "./zl-select.css?inline";
 
 import { emit } from "../internal/emit.js";
 import { nextUid } from "../internal/unique-id.js";
@@ -57,7 +56,7 @@ export class ZlSelect extends LitElement {
 
   static override styles = [
     baseHostStyles,
-    ...surfaceStyles(selectHost, selectSurface),
+    ...surfaceStyles(selectStyles),
   ];
 
   /**

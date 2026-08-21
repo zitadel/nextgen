@@ -25,18 +25,13 @@ function liquidRaw(): Plugin {
  * `import { ... } from "@zitadel/components/atoms"` without dragging
  * in the orchestrator (and its `liquidjs` + `dompurify` dependencies).
  *
- * Internal `@zitadel/*` workspace packages (`api`, `design-tokens`,
- * `shared-component-styles`) are inlined into the dist so consumers only
- * need to install `@zitadel/components` itself — no transitive
- * registry deps. `@zitadel/api-mock` stays external because it's a
- * test-only helper consumers never import.
+ * Internal `@zitadel/*` workspace packages (`api`, `design-tokens`) are inlined
+ * into the dist so consumers only need to install `@zitadel/components` itself
+ * — no transitive registry deps. `@zitadel/api-mock` stays external because
+ * it's a test-only helper consumers never import.
  */
 /** Internal workspace deps are always inlined so the published package is self-contained. */
-const INLINE_INTERNAL = [
-  /^@zitadel\/api(\/|$)/,
-  /^@zitadel\/design-tokens(\/|$)/,
-  /^@zitadel\/shared-component-styles(\/|$)/,
-];
+const INLINE_INTERNAL = [/^@zitadel\/api(\/|$)/, /^@zitadel\/design-tokens(\/|$)/];
 
 /**
  * Published workspace deps that stay EXTERNAL in the library build (declared

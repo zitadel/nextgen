@@ -55,8 +55,8 @@ export class ZitadelLogout extends LitElement {
         width: 2.5rem;
         height: 2.5rem;
         border-radius: 9999px;
-        background: ${t.color.surface.defaultWhite};
-        color: ${t.color.text.buttonDefault};
+        background: ${t.theme.primary};
+        color: ${t.theme.primaryForeground};
         font-size: 0.875rem;
         font-weight: 600;
         display: inline-flex;
@@ -70,17 +70,17 @@ export class ZitadelLogout extends LitElement {
         ${focusVisibleStyles};
       }
       .trigger[aria-expanded="true"] {
-        box-shadow: 0 0 0 2px ${t.focus.color};
+        box-shadow: 0 0 0 2px ${t.theme.ring};
       }
 
       .dropdown {
         position: absolute;
-        top: calc(100% + ${t.spacing["02"]});
+        top: calc(100% + ${t.spacing["2"]});
         right: 0;
         width: 14rem;
-        background: ${t.color.surface.defaultPrimaryGray};
-        border: 1px solid ${t.color.border.defaultGray100};
-        border-radius: ${t.radius.m};
+        background: ${t.theme.popover};
+        border: 1px solid ${t.theme.border};
+        border-radius: ${t.radius.lg};
         box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
         z-index: 9999;
         overflow: hidden;
@@ -89,17 +89,17 @@ export class ZitadelLogout extends LitElement {
       .preview {
         display: flex;
         align-items: center;
-        gap: ${t.spacing["03"]};
-        padding: ${t.spacing["03"]};
-        border-bottom: 1px solid ${t.color.border.defaultGray100};
+        gap: ${t.spacing["4"]};
+        padding: ${t.spacing["4"]};
+        border-bottom: 1px solid ${t.theme.border};
       }
       .preview-avatar {
         flex-shrink: 0;
         width: 2.5rem;
         height: 2.5rem;
         border-radius: 9999px;
-        background: ${t.color.surface.defaultWhite};
-        color: ${t.color.text.buttonDefault};
+        background: ${t.theme.primary};
+        color: ${t.theme.primaryForeground};
         font-size: 0.875rem;
         font-weight: 600;
         display: inline-flex;
@@ -113,14 +113,14 @@ export class ZitadelLogout extends LitElement {
       .preview-name {
         font-size: 0.875rem;
         font-weight: 600;
-        color: ${t.color.text.primaryWhite};
+        color: ${t.theme.foreground};
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
       .preview-email {
         font-size: 0.75rem;
-        color: ${t.color.text.secondaryGray};
+        color: ${t.theme.mutedForeground};
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -128,24 +128,24 @@ export class ZitadelLogout extends LitElement {
       }
 
       .actions {
-        padding: ${t.spacing["02"]};
+        padding: ${t.spacing["2"]};
       }
       .signout-btn {
         all: unset;
         cursor: pointer;
         display: flex;
         align-items: center;
-        gap: ${t.spacing["02"]};
+        gap: ${t.spacing["2"]};
         width: 100%;
-        padding: ${t.spacing["02"]} ${t.spacing["03"]};
-        border-radius: ${t.radius.s};
-        color: ${t.color.text.error};
+        padding: ${t.spacing["2"]} ${t.spacing["4"]};
+        border-radius: ${t.radius.md};
+        color: ${t.theme.destructive};
         font-size: 0.875rem;
         font-weight: 500;
         box-sizing: border-box;
       }
       .signout-btn:hover:not([disabled]) {
-        background: color-mix(in srgb, ${t.color.text.error} 12%, transparent);
+        background: color-mix(in srgb, ${t.theme.destructive} 12%, transparent);
       }
       .signout-btn:focus-visible {
         ${focusVisibleStyles};
@@ -173,11 +173,11 @@ export class ZitadelLogout extends LitElement {
       }
 
       .error-bar {
-        padding: ${t.spacing["02"]} ${t.spacing["03"]};
+        padding: ${t.spacing["2"]} ${t.spacing["4"]};
         font-size: 0.75rem;
-        color: ${t.color.text.error};
-        background: color-mix(in srgb, ${t.color.text.error} 12%, transparent);
-        border-top: 1px solid ${t.color.border.defaultGray100};
+        color: ${t.theme.destructive};
+        background: color-mix(in srgb, ${t.theme.destructive} 12%, transparent);
+        border-top: 1px solid ${t.theme.border};
       }
     `,
   ];

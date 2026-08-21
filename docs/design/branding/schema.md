@@ -68,6 +68,7 @@ Every field is optional; omitting a field falls back to the built-in default. A 
 
   "typography": {
     "font_family": "Arimo, ui-sans-serif, system-ui, sans-serif",
+    "font_family_heading": "\"APK Futural\", Arimo, ui-sans-serif, system-ui, sans-serif",
     "font_family_mono": "ui-monospace, SFMono-Regular, monospace",
     "scale": 1.0
   },
@@ -143,7 +144,8 @@ Each value is any valid CSS `<color>` (hex, `rgb()`, etc.). Null uses built-in d
 
 #### `typography` (object)
 
-- **`font_family`**: CSS stack; include a generic family (`serif` / `sans-serif` / `monospace`).
+- **`font_family`**: CSS stack; include a generic family (`serif` / `sans-serif` / `monospace`). Sets the body face and, unless `font_family_heading` says otherwise, the display face too.
+- **`font_family_heading`**: optional display stack for card titles and labels. Name it to keep a separate display face from the body font.
 - **`font_family_mono`**: optional mono stack (OTP, keys).
 - **`scale`**: multiplier on `--zl-font-size-*`; default `1.0`, clamp `0.75`–`1.25`.
 

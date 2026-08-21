@@ -1,8 +1,10 @@
 import { useRouter } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { ApiError } from "@zitadel/api/runtime/fetch";
-import { Alert, Icon } from "@zitadel/ui-react";
+import { AlertCircle, Loader2, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
+
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { fetchSession, invalidateSessionCache } from "../auth/session";
 
@@ -12,7 +14,7 @@ const STATE_ROW = "flex items-center gap-2 text-muted-foreground";
 export function PendingState() {
   return (
     <div className={STATE_ROW} role="status" aria-live="polite">
-      <Icon name="spinner" spin label="Loading" />
+      <Loader2 className="size-4 animate-spin" aria-hidden />
       <span>Loading…</span>
     </div>
   );
@@ -70,17 +72,21 @@ export function ErrorState({ error }: ErrorComponentProps) {
     if (sessionAlive) {
       return (
         <div className={STATE_ROW}>
-          <Alert severity="error" heading="Console API not authorized">
-            You are signed in, but the console&apos;s API requests are not authorized. In
-            development, check that the dev proxy&apos;s <code>CONSOLE_PROJECT_SECRET</code> is set
-            and belongs to the current project (ADR 0003 §4).
+          <Alert variant="destructive">
+            <AlertCircle aria-hidden />
+            <AlertTitle>Console API not authorized</AlertTitle>
+            <AlertDescription>
+              You are signed in, but the console&apos;s API requests are not authorized. In
+              development, check that the dev proxy&apos;s <code>CONSOLE_PROJECT_SECRET</code> is
+              set and belongs to the current project (ADR 0003 §4).
+            </AlertDescription>
           </Alert>
         </div>
       );
     }
     return (
       <div className={STATE_ROW} role="status" aria-live="polite">
-        <Icon name="spinner" spin label="Checking session" />
+        <Loader2 className="size-4 animate-spin" aria-hidden />
         <span>Checking your session…</span>
       </div>
     );
@@ -89,8 +95,10 @@ export function ErrorState({ error }: ErrorComponentProps) {
   const { heading, message } = describeError(error);
   return (
     <div className={STATE_ROW}>
-      <Alert severity="error" heading={heading}>
-        {message}
+      <Alert variant="destructive">
+        <AlertCircle aria-hidden />
+        <AlertTitle>{heading}</AlertTitle>
+        <AlertDescription>{message}</AlertDescription>
       </Alert>
     </div>
   );
@@ -100,8 +108,12 @@ export function ErrorState({ error }: ErrorComponentProps) {
 export function NotFoundState() {
   return (
     <div className={STATE_ROW}>
-      <Alert severity="warning" heading="Not found">
-        The page or resource you were looking for does not exist.
+      <Alert>
+        <TriangleAlert aria-hidden />
+        <AlertTitle>Not found</AlertTitle>
+        <AlertDescription>
+          The page or resource you were looking for does not exist.
+        </AlertDescription>
       </Alert>
     </div>
   );

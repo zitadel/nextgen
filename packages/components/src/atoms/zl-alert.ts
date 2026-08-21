@@ -1,8 +1,7 @@
 import { LitElement, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
-import alertHost from "@zitadel/shared-component-styles/lit/alert-host.css?inline";
-import alertSurface from "@zitadel/shared-component-styles/alert.css?inline";
+import alertStyles from "./zl-alert.css?inline";
 
 import { emit } from "../internal/emit.js";
 import type { AtomManifest } from "../manifest.js";
@@ -53,7 +52,7 @@ import type { IconName } from "./zl-icon.js";
 export class ZlAlert extends LitElement {
   static override styles = [
     baseHostStyles,
-    ...surfaceStyles(alertHost, alertSurface),
+    ...surfaceStyles(alertStyles),
   ];
 
   @property({ reflect: true }) accessor severity: "error" | "success" | "warning" | "info" = "error";

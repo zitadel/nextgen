@@ -5,8 +5,6 @@ The unified component workbench. **One** Storybook instance — built with
 orchestrator:
 
 - **Lit atoms** (`@zitadel/components`, `<zl-*>`) — native web-components stories.
-- **Paired React** (`@zitadel/ui-react`, `<Checkbox>` …) — mounted into the
-  story's DOM node through [`src/react-render.ts`](src/react-render.ts).
 - **Orchestrator** (`<zitadel-login>`) — the Flow API is mocked by
   `@zitadel/api-mock` through `msw-storybook-addon`; flow purpose and tenant
   branding are story controls.
@@ -22,9 +20,8 @@ plus a host that iframes them — more moving parts, not fewer. We avoid that:
 - React components render into a returned `Node` (lit-html renders nodes), so
   they sit in the same instance.
 
-The result is true Lit ↔ React parity, side by side, in one tool. Each paired
-component is **one** story file under an `Atoms/<Name>` title that exports two
-stories — `Lit` and `React` — so the two implementations sit next to each other
+Each atom is **one** story file under an `Atoms/<Name>` title exporting a
+single `Default` story
 in the sidebar with no extra per-renderer or `Playground` nesting.
 
 ## Run it
@@ -35,15 +32,14 @@ moon run storybook:build   # static build into storybook-static/
 moon run storybook:test    # run every story as a real-browser test
 ```
 
-`dev`/`build`/`test` depend on `components:build`, `ui-react:build`, and
-`design-tokens:build`, because the atom registration import resolves the built
-`@zitadel/components` entry and the React surface CSS comes from the built
-token layer.
+`dev`/`build`/`test` depend on `components:build` and `design-tokens:build`,
+because the atom registration import resolves the built `@zitadel/components`
+entry and the `--zl-*` variables come from the built token layer.
 
 ## Coverage
 
-Every paired atom has a story file with side-by-side `Lit` + `React` stories
-under `Atoms/<Name>`, plus the orchestrator under `Orchestrator/`:
+Every atom has a story file exporting `Default` under `Atoms/<Name>`, plus
+the orchestrator under `Orchestrator/`:
 
 | Story | Lit | React | `play` |
 | --- | --- | --- | --- |
@@ -83,10 +79,8 @@ network + the MSW worker; their behaviour is covered by the
   driven by `args`/`argTypes` controls (the "knobs") — not a grid of static
   instances and not one story per state. Use a control (e.g. `previewState`) to
   flip interaction states rather than rendering a hand-rolled matrix.
-- **Mirror pairs in one file.** A paired component is a single story file with
-  two stories, `Lit` and `React`, under one `Atoms/<Name>` title sharing the
-  same args, so divergence is obvious in the sidebar. Parity is structural
-  (both consume the shared `.zr-*` CSS).
+- **One story file per atom.** `src/<id>.stories.ts` exports a single
+  `Default` story under an `Atoms/<Name>` title.
 - **Don't duplicate behaviour upward.** A renderer gets a `play` function only
   when no lower layer already proves the behaviour. The Lit atoms own their
   toggle/form/focus behaviour in `packages/components` specs (`*.spec.ts` +
@@ -95,5 +89,5 @@ network + the MSW worker; their behaviour is covered by the
   spec, so their story's `play` is the sole behavioural test for them.
 - Visual values come from `@zitadel/design-tokens` (loaded once in
   `.storybook/preview.ts`); never hard-code colours in a story.
-- The dark canvas in `src/preview.css` matches the design system's only
-  published mode (see `docs/adrs/014-design-tokens-and-ui-react-pairs.md`).
+- The dark canvas in `src/preview.css` matches the login surface's default
+  mode (see `docs/adrs/055-lit-only-login-surface.md`).

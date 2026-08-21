@@ -78,9 +78,10 @@ Published libraries (`packages/`):
 - `packages/sdk-*` — public TypeScript SDKs: `sdk-core` plus one package per
   supported framework (currently next, nuxt, react, vue, angular, qwik,
   solid, svelte).
-- `packages/components/` (shared Lit atoms), `packages/ui-react/` (paired
-  React implementations), `packages/design-tokens/` and
-  `packages/shared-component-styles/` (shared visual design).
+- `packages/components/` — the Lit atoms (`<zl-*>`) and the `<zitadel-login>`
+  orchestrator that make up the login surface; each atom's CSS sits beside it.
+- `packages/design-tokens/` — the Figma-driven `--zl-*` variables, the one
+  contract the login surface and the console share (ADR 055).
 - `packages/api/` — generated TypeScript API client.
 - `packages/config/` — versioned local config schemas and defaults.
 - `packages/api-mock/` — in-process MSW handlers and the standalone mock
@@ -259,37 +260,33 @@ changes.
 ## Building UI (console and design system)
 
 Console screens and shared UI are driven by the Figma **Design System** file
-(`Zitadel - Design System - External`), not by flattened app mocks. Before
+(`Zitadel - Design System - External`), not by flattened app mocks. There are
+two UI surfaces and they do not share components — only tokens (ADR 055). Before
 building any UI under `apps/console/**` or
-`packages/{components,ui-react,shared-component-styles,design-tokens}/**`,
-**classify the component first** (see
-[`apps/console/docs/styling.md`](apps/console/docs/styling.md)):
+`packages/{components,design-tokens}/**`, **decide which surface it belongs to**
+(see [`apps/console/docs/styling.md`](apps/console/docs/styling.md)):
 
-1. **Existing pair** (`Button`, `Card`, `Pill`, `Icon`, `TextField`, `Select`,
-   `Checkbox`, `Alert`, `PageShell` — the registry is
-   [`packages/shared-component-styles/pairs.json`](packages/shared-component-styles/pairs.json)) —
-   compose it from `@zitadel/ui-react`.
-2. **Console-only chrome** (shell, page layout, tables, app widgets) — build in
-   `apps/console` with the **unprefixed shadcn utility contract**
-   (`bg-background`, `text-muted-foreground`, …) from
+1. **The console** (shell, page layout, tables, app widgets — most console UI) —
+   compose **shadcn/ui** from `apps/console/src/components/ui/`, installing from
+   the registry when a component is missing, and style with the **unprefixed
+   shadcn utility contract** (`bg-background`, `text-muted-foreground`, …) from
    `@zitadel/design-tokens/css/shadcn.css`. Do **not** use `bg-zl-*`/`text-zl-*`
    utilities there — the canonical statement of this console exception is in
    [`packages/design-tokens/AGENTS.md`](packages/design-tokens/AGENTS.md).
-   Most console UI is this; do not pre-build a Lit twin for it.
-3. **A new primitive the login / web-component surface also needs** — build it
-   as a Lit + React pair via the Storybook recipe
-   ([`apps/storybook/AGENTS.md`](apps/storybook/AGENTS.md)) and iterate there
-   behind the parity + a11y gates, not on a console mock.
+   Do not import login atoms into console UI, and do not build a Lit twin for it.
+2. **The login surface** (`<zitadel-login>` and the `<zl-*>` atoms) — Lit in
+   shadow DOM, vanilla CSS keyed to `--zl-*`. No Tailwind, no shadcn components:
+   neither survives the shadow boundary. Add or change an atom via the Storybook
+   recipe ([`apps/storybook/AGENTS.md`](apps/storybook/AGENTS.md)) and iterate
+   there behind the a11y gate, not on a console mock.
 
-The pairs are theme-portable: legacy tokens are authored as `{ dark, light }`
-pairs and flip via `[data-theme="light"]` (amended ADR 014 §5), and the pairs'
-surface CSS consumes mode-aware semantic tokens. When adding surface CSS,
+Both surfaces are theme-portable: tokens are authored as `{ dark, light }` pairs
+and flip via `[data-theme="light"]` (amended ADR 014 §5). When adding atom CSS,
 never reach for the raw `--zl-color-gray-*` ramp — it is mode-independent by
-design; use the semantic tokens. The canonical statement of that invariant is
-in [`packages/shared-component-styles/AGENTS.md`](packages/shared-component-styles/AGENTS.md).
+design; use the semantic tokens.
 
-Where the component lives decides the iteration tool: console-local UI iterates
-on the console dev server, verified at light/dark and each breakpoint; pairs
+Where the component lives decides the iteration tool: console UI iterates on the
+console dev server, verified at light/dark and each breakpoint; login atoms
 iterate in Storybook. A missing visual value is a **new token** in
 `@zitadel/design-tokens`, never a magic value — except licensed brand assets
 (e.g. display fonts), which stay in the consuming app because
