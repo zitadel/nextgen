@@ -104,15 +104,15 @@ A single `transitions.callback` cannot route returning users and new users to di
 | Resolution State | Outcome Fired | Typical Route Target |
 | :--- | :--- | :--- |
 | **Known subject** | `callback` | **Done** (Authenticated). The engine applies `is_auto_update` with downgrade guards. Identity is pinned strictly to `(connection, subject)`, never claims, preventing profile edits from forking accounts. An auto-update write that would violate `x-unique` is dropped for that property; sign-in proceeds and the skip surfaces in diagnostics as the property name only. Conflict vocabulary stays reserved for unknown subjects. |
-| **Unknown subject** | `user_not_found` | **Data collection step** (register flows) or an **offer-register step** (login flows). |
+| **Unknown subject** | `user_not_found` | **Data collection step** (register flows) or an **offer-register step** (login flows). Under `creation: disabled`, an **authored error step**. |
 | **Unknown subject with unique-property collision** | `user_already_exists` | **Conflict resolution step**. The engine binds the attempt to the colliding account, so a password or passkey submit on that step authenticates that account (the same binding `register → password` relies on for a typed collision; here the value comes from the mapped claim). The credential must still be correct, so this adds no oracle beyond the enumeration note below. |
 
-### Creation Without Collection (`is_auto_creation`)
+### Creation Without Collection (`creation: auto`)
 
-When `is_auto_creation: true` is set (the default), the engine **creates the account immediately without pausing for collection** and fires `callback` as a newly authenticated user, provided the mapped claims supply every required property in the schema.
+Under `creation: auto` (the default), the engine **creates the account immediately without pausing for collection** and fires `callback` as a newly authenticated user, provided the mapped claims supply every required property in the schema.
 
 * **Fallback Behavior:** If a required property is missing, execution degrades to `user_not_found` → data collection, prefilled with what did arrive. This is the epic's new-user journey: the user provides only what the provider did not return.
-* **Always Collect:** `is_auto_creation: false` routes every new user through the collection step regardless of completeness. `is_creation_allowed: false` routes `user_not_found` to an authored error step instead, preventing dead ends.
+* **Disabled:** `creation: disabled` routes `user_not_found` to an authored error step instead, so the provider signs in existing users only. The deferred `auto_only` fails closed on incomplete claims rather than collecting ([area 1](1-resource-model.md#provisioning)).
 * **Static Warnings:** The plan phase warns when a pairing makes the gate statically dead (see [validator rules](1-resource-model.md#validator-rules)).
 * **Verification Gating (deferred):** A second condition joins the check when `x-verify` returns to the dialect: every required property carrying `x-verify` must also arrive verified (per Step 5 of Callback Processing), otherwise the attempt degrades to collection. A required `givenName` then needs only a non-empty value, whereas a required `email` with `x-verify` must also arrive verified. `x-verify` was removed as unread ([#901](https://github.com/zitadel/nextgen/pull/901)); this gate is its first consumer, and no schema can carry it today, so 851 cannot enforce verification on either creation path and does not claim to. Enforcement becomes real per schema, when an author marks a property `x-verify`; committed connections do not change. See [Engine Work](#engine-work) and the dependency note in [`1-resource-model.md`](1-resource-model.md#linking-safety).
 

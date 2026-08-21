@@ -283,9 +283,9 @@ Milestones map to area 3's callback processing: `attempt_started` (submission ac
 | State expired before the callback returned | `inconclusive` (`attempt_expired`) | The external leg outlived the attempt TTL (slow consent screens); the TTL is locked, not configurable (`../api/authn-and-auth-flows.md`, TTL). Rerun; recurring expiry on a fast consent points at an engine defect, read `zitadel logs`. |
 | Resolution or `create_user_with_sso` fails | `failed_journey` (`engine_error`) | Engine-side failure. Recovery points at `zitadel logs` for the deep detail (area 3's channel). |
 | `identity_resolved` with `user_already_exists` | `conflict_route` | The ceremony succeeded and the account collides; the authored recovery route engaged, exactly what areas 3 and 4 scaffold for. Test fresh sign-up with a different provider account. |
-| Window expires after `identity_resolved` with `user_not_found` | `inconclusive` (`window_expired`), outcome reported | The collection step is waiting for input; complete it or rerun. When auto-creation was enabled, the report names the unmet condition from `identity_resolved` (missing vs unverified property names). |
+| Window expires after `identity_resolved` with `user_not_found` | `inconclusive` (`window_expired`), outcome reported | The collection step is waiting for input; complete it or rerun. Under `creation: auto`, the report names the unmet condition from `identity_resolved` (missing vs unverified property names). |
 
-**Success report.** `pass` names the branch that ran: returning user (`callback` on a known subject), new user through collection, or auto-created (`is_auto_creation`). `conflict_route` reports that the ceremony worked and the conflict wiring engaged. Both name the connection revision the attempt bound, so a drifted working tree cannot be mistaken for what was tested (preflight check 5 prints the same drift status).
+**Success report.** `pass` names the branch that ran: returning user (`callback` on a known subject), new user through collection, or created without collection (`creation: auto`). `conflict_route` reports that the ceremony worked and the conflict wiring engaged. Both name the connection revision the attempt bound, so a drifted working tree cannot be mistaken for what was tested (preflight check 5 prints the same drift status).
 
 ---
 

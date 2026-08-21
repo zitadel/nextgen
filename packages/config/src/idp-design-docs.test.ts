@@ -166,8 +166,12 @@ const connectionCases: ReadonlyArray<[string, object, boolean]> = [
     false,
   ],
   // provisioning (linking policy deferred with the account-linking journey)
-  ["851 provisioning flags", { ...oidc, provisioning: { is_creation_allowed: true, is_auto_creation: true } }, true],
-  ["always-collect opt-out", { ...oidc, provisioning: { is_auto_creation: false } }, true],
+  ["creation auto (default)", { ...oidc, provisioning: { creation: "auto" } }, true],
+  ["creation disabled", { ...oidc, provisioning: { creation: "disabled" } }, true],
+  ["creation auto_only (deferred — no fail-closed branch in 851)", { ...oidc, provisioning: { creation: "auto_only" } }, false],
+  ["creation collect (not planned)", { ...oidc, provisioning: { creation: "collect" } }, false],
+  ["is_creation_allowed (replaced by creation)", { ...oidc, provisioning: { is_creation_allowed: true } }, false],
+  ["is_auto_creation (replaced by creation)", { ...oidc, provisioning: { is_auto_creation: true } }, false],
   ["auto_linking (deferred — no linking in 851)", { ...oidc, provisioning: { auto_linking: "never" } }, false],
   ["is_linking_allowed (deferred)", { ...oidc, provisioning: { is_linking_allowed: true } }, false],
   ["is_auto_update (deferred — awaits per-property verification state)", { ...oidc, provisioning: { is_auto_update: false } }, false],
@@ -516,13 +520,14 @@ describe("forward compatibility (1-resource-model.md · Forward compatibility)",
     }
     const provisioning = extended.properties["provisioning"]!;
     provisioning.properties["is_auto_update"] = { type: "boolean", default: false };
+    (provisioning.properties["creation"] as { enum: string[] }).enum.push("auto_only");
     const validateExtended = ajv().compile(extended);
     expect(validateExtended(googleExample)).toBe(true);
     expect(validateExtended(githubExample)).toBe(true);
     expect(
       validateExtended({
         ...oidc,
-        provisioning: { is_creation_allowed: true, is_auto_update: true },
+        provisioning: { creation: "auto_only", is_auto_update: true },
       }),
     ).toBe(true);
     expect(

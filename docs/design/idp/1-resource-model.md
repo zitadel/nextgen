@@ -152,8 +152,7 @@ Setup scaffolds one file per selected provider.
     "email": "email_verified"
   },
   "provisioning": {
-    "is_creation_allowed": true,
-    "is_auto_creation": true
+    "creation": "auto"
   },
   "oidc": {
     "issuer": "https://accounts.google.com",
@@ -193,8 +192,7 @@ Setup scaffolds one file per selected provider.
     "email": "$supplementary_fetch"
   },
   "provisioning": {
-    "is_creation_allowed": true,
-    "is_auto_creation": true
+    "creation": "auto"
   },
   "oauth2": {
     "authorization_endpoint": "https://github.com/login/oauth/authorize",
@@ -330,15 +328,15 @@ with `scaffoldedFrom` proposed as an addition; see [Open points](#open-points).
     "provisioning": {
       "type": "object",
       "additionalProperties": false,
-      "description": "What Zitadel may do with the resulting identity. `is_creation_allowed` permits creating a user from this provider at all; `is_auto_creation` decides whether creation happens without a collection step when the provider's claims satisfy every required property, or the flow always stops to collect. Verification gating joins that check when `x-verify` returns to the dialect. Linking policy (`is_linking_allowed`, `auto_linking`) returns with the deferred account-linking journey, and `is_auto_update` with per-property verification state - both additive.",
+      "description": "How far this provider's data is trusted. `creation` names what happens to an unknown subject: `disabled` never creates a user, `auto` creates one without a collection step when the claims satisfy every required property and otherwise stops to collect what is missing. Verification gating joins that check when `x-verify` returns to the dialect. Deferred, all additive: the `auto_only` value (complete claims or fail closed), linking policy (`is_linking_allowed`, `auto_linking`) with the account-linking journey, and `is_auto_update` with per-property verification state.",
       "properties": {
-        "is_creation_allowed": {
-          "type": "boolean",
-          "default": true
-        },
-        "is_auto_creation": {
-          "type": "boolean",
-          "default": true
+        "creation": {
+          "type": "string",
+          "enum": [
+            "disabled",
+            "auto"
+          ],
+          "default": "auto"
         }
       }
     },
@@ -619,7 +617,7 @@ with `scaffoldedFrom` proposed as an addition; see [Open points](#open-points).
 
 How to read the schema:
 
-- **Root vs. Protocol Blocks:** The root level defines universal requirements: identity (`slug`, `protocol`, `template`, `display_name`), resolution (`subject_claim`, `claim_mapping`, `verified_claims`), and policy (`provisioning`). Protocol-specific plumbing is isolated inside nested blocks.
+- **Root vs. Protocol Blocks:** The root level defines universal requirements: identity (`slug`, `protocol`, `template`, `display_name`), resolution (`subject_claim`, `claim_mapping`, `verified_claims`), and trust (`provisioning`). Protocol-specific plumbing is isolated inside nested blocks.
 - **Protocol Selection:** The `protocol` field dictates the active block. Using `if protocol == "oidc"` requires the `oidc` block and explicitly forbids `oauth2`. Adding future protocols is a mechanical backend process that tenant files never see.
 - **Precise Error Messages:** The schema uses `if`/`then` conditionals rather than `oneOf`. While `oneOf` throws generic "all arms failed" errors, `if`/`then` pinpoints the exact issue (e.g., `/oidc must have required property 'client_id'`).
 - **Intentional Duplication:** The two protocol blocks duplicate ten shared fields. Factoring them out would require `unevaluatedProperties`, which many third-party validators do not support. Since a connection file only ever contains one block, this duplication is safer and more compatible.
@@ -632,15 +630,21 @@ How to read the schema:
 
 ### Provisioning
 
-The provisioning policy is controlled by three flags, all retaining their Epic 851 behaviors. 
-These flags directly transcribe the legacy provider options ([`oidc/oidc.go#L41-L60`](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/oidc/oidc.go#L41-L60) `WithCreationAllowed` / `WithAutoCreation` / `WithAutoUpdate`):
+`creation` names what the engine does with an unknown subject. zitadel/zitadel expresses the same thing as two booleans ([`oidc/oidc.go#L41-L60`](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/oidc/oidc.go#L41-L60) `WithCreationAllowed` / `WithAutoCreation`), which grew one bit at a time: a single `autoRegister` flag ([zitadel/zitadel#2336](https://github.com/zitadel/zitadel/pull/2336)), then the pair ([zitadel/zitadel#5247](https://github.com/zitadel/zitadel/pull/5247)), then a strict meaning for the previously meaningless combination `auto=true, allowed=false` ([zitadel/zitadel#8420](https://github.com/zitadel/zitadel/pull/8420), with a technical advisory because behaviour changed). Four states behind two bits, easy to transcribe wrong. This design names the states instead, so each one carries its flow-authoring obligation on its face.
 
-| Flag | Behavior / Question it answers |
-| :--- | :--- |
-| `is_creation_allowed` | Can this provider create new users at all? |
-| `is_auto_creation` | Should users be created without a collection step when claims cover all required properties, or should the flow always stop to collect? Verification gating (properties carrying `x-verify` must arrive verified) joins the check when the annotation returns. |
+| `creation` | Legacy bits | Unknown subject |
+| :--- | :--- | :--- |
+| `disabled` | allowed=false, auto=false | `user_not_found` routes to an authored error step. The provider signs in existing users only. |
+| `auto` (default) | allowed=true, auto=true | Claims cover every required property: the user is created without a form. Otherwise the collection step, prefilled with what arrived. The epic's new-user journey. |
 
-Both flags default to `true`: a user whose provider returned everything the schema requires is created without a form, and the collection step appears only for what is missing, which is the epic's new-user journey. Neither flag can enforce verification in 851; that arrives with `x-verify`. The complete logic for this is detailed under the [resolution branches](3-social-login-flow.md#resolution-branches) in Area 3.
+Two further states exist behind the bits; neither ships in 851:
+
+- `auto_only` (allowed=false, auto=true): complete claims create the user, incomplete ones fail closed at an error step. The "trust the provider, no user input" mode of zitadel/zitadel#8420. Returns as an additive enum value once the engine has the fail-closed branch; when `x-verify` lands, an unverified identifier property fails closed here and drops to collection under `auto`, so that rule needs no further field.
+- `collect` (allowed=true, auto=false), always the collection step, is not planned. Wanting the user to stop means wanting a property from them, and a required property the provider cannot supply already forces collection under `auto`. Editing prefilled verified values only drops their verification.
+
+Neither shipped value enforces verification in 851; that arrives with `x-verify`. The complete logic is under the [resolution branches](3-social-login-flow.md#resolution-branches) in area 3.
+
+**A ceiling, not a policy.** The connection states how far this provider's data is trusted, which varies by provider. Whether a given user type may sign up at all is a property of the user type, owned by authentication method settings ([#898](https://github.com/zitadel/nextgen/issues/898)). That policy may narrow the connection's value (a Google connection at `auto` serving Customers at `auto` and Employees at `disabled`), never widen it; the effective rule is the intersection, as #898 states. The connection is the only layer that exists in 851. Recorded under [Product decisions](README.md#product-decisions).
 
 *Note:* The legacy flags that governed account linking (`is_linking_allowed`, `auto_linking`) have been removed from this initial release. See [Linking safety](#linking-safety) for details.
 
@@ -654,6 +658,7 @@ Several fields have been intentionally excluded from the initial schema based on
 | `response_mode` (`form_post`) | When Apple is scoped (the current 851 callback supports GET only).                                                                                                                                                                                              |
 | `dynamic_authorize_parameters` | Once a design exists for sourcing runtime values in the authorize URL.                                                                                                                                                                                          |
 | `is_linking_allowed`, `auto_linking` | When the deferred account-linking journey is designed and implemented.                                                                                                                                                                              |
+| `creation: auto_only` | When the engine has the fail-closed branch for incomplete claims ([Provisioning](#provisioning)). Additive enum value. |
 | `is_auto_update` | When per-property verification state exists (the `x-verify` return). Until then the engine could only treat it as `false`, a committed no-op whose behavior would later change under tenants. Its exported contract stands: never silently overwrite a verified property with an unverified value. |
 | `enabled` | **Not planned.** An unlisted connection is already inert. Furthermore, a config flag is a poor mechanism for an emergency disable (due to release latency, and rollbacks would inadvertently re-enable it). Imperative runtime disabling remains an open point. |
 | `kind`, `audience`, `default_schema` | **Cut completely.** No identified use case or need.                                                                                                                                                                                                             |
@@ -726,9 +731,9 @@ These are cross-file and state-dependent rules that a single-file JSON schema ca
 | **Missing `x-verify` Method** | Warning | A `verified_claims` key points to a property that lacks an `x-verify` method (verification with nowhere to land). Activates when `x-verify` returns (see the dependency note under [Linking Safety](#linking-safety)).                                                                                                       |
 | **Invalid Strategy Pointer** | Error | `"$supplementary_fetch"` is used without selecting a strategy, or the selected strategy's contract does not verify that specific property.                                                                              |
 | **Inert Connection** | Warning | The connection is referenced by zero schemas. No flow can offer it, making it completely inert.                                                                                                                         |
-| **Impossible Registration** | Warning | A flow registration step offers this provider, but `is_creation_allowed` is `false`. The user will never be able to successfully sign up.                                                                               |
-| **Impossible Auto-Creation (Data)** | Warning | `is_auto_creation` is `true`, but a referencing schema requires a property that the `claim_mapping` does not target. Every sign-in will stop to collect the missing data.                                               |
-| **Impossible Auto-Creation (Verification)**| Warning | `is_auto_creation` is `true`, but a referencing schema requires an `x-verify` property that lacks a `verified_claims` entry. Absent entries evaluate as unverified, meaning the auto-creation condition can never pass. Activates when `x-verify` returns. |
+| **Impossible Registration** | Warning | A flow registration step offers this provider, but `creation` is `disabled`. The user will never be able to successfully sign up. With `disabled`, `user_not_found` must route to an error step; with `auto`, to a collection or offer-register step.                                                                               |
+| **Impossible Auto-Creation (Data)** | Warning | `creation` is `auto`, but a referencing schema requires a property that the `claim_mapping` does not target. Every sign-in will stop to collect the missing data.                                               |
+| **Impossible Auto-Creation (Verification)**| Warning | `creation` is `auto`, but a referencing schema requires an `x-verify` property that lacks a `verified_claims` entry. Absent entries evaluate as unverified, meaning the auto-creation condition can never pass. Activates when `x-verify` returns. |
 | **Missing Env Vars** | Error / Warning | Referenced environment variables are missing from the local environment. Interactive journeys and test preflight raise `E_CREDENTIAL_MISSING` as an error (the developer is present to fix it). Batch `plan` only warns, so one IdP file cannot force secrets into every CI pipeline; the authoritative presence check is the server's, at deploy time (see [Upstream Security Pushback](#upstream-security-pushback)). Shipped `assertEnvRefs` hard-fails `plan` for schemas and flows today, so the batch relaxation is a deliberate change. |
 | **Literal Secret** | Error | A hardcoded `client_secret` is present (returns a friendly error message, though the schema strictly rejects it anyway).                                                                                                |
 | **Leaked Secret** | Warning | A secret-shaped key is found inside `static_authorize_parameters`. This value would be committed to source control and appended to the public authorize URL. Warning, not Error, because the detection is heuristic; the definite cases already error (`client_secret` via Literal Secret, engine-owned keys via Reserved Authorize Parameter). |

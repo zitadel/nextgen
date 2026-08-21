@@ -247,7 +247,7 @@ The `register.user_already_exists` outcome is retargeted from the `password` ste
 
 #### UX Trade-offs & Identity Lifecycle
 
-- **Double-Redirect on Login Sign-Up:** `identifier.user_not_found` retains its target (`register`) so typed-email users are not routed into `create_user_with_sso`. An unknown SSO user starting on the sign-in page lands on `register` (email prefilled) and clicks the provider button a second time to reach `register-sso`. This applies only when the provider did not return every required property; a complete profile is created on the first ceremony and goes `callback → done` from `identifier` ([area 3](3-social-login-flow.md#creation-without-collection-is_auto_creation)). Register-entry sign-ups require only one ceremony.
+- **Double-Redirect on Login Sign-Up:** `identifier.user_not_found` retains its target (`register`) so typed-email users are not routed into `create_user_with_sso`. An unknown SSO user starting on the sign-in page lands on `register` (email prefilled) and clicks the provider button a second time to reach `register-sso`. This applies only when the provider did not return every required property; a complete profile is created on the first ceremony and goes `callback → done` from `identifier` ([area 3](3-social-login-flow.md#creation-without-collection-creation-auto)). Register-entry sign-ups require only one ceremony.
 - **Identity Lifetime Boundary:** Area 3 keeps the resolved external identity "an ephemeral object attached directly to the attempt that dies when the attempt completes or expires". The scaffold never persists it, so crossing the conflict step boundary means the sign-in path re-runs the provider ceremony rather than reusing a resolved identity.
 
 <details open>
