@@ -116,7 +116,7 @@ When multi-environment support lands with [#534](https://github.com/zitadel/next
 * **Google OAuth:** A single client ID accepts multiple registered redirect URIs.
 * **GitHub OAuth:** A GitHub OAuth App accepts only a single callback URL, requiring separate OAuth Apps per origin rather than per environment.
 
-*Note:* Area 1 assumes only that `client_id` values differ between environments (the motivation for `${VAR}` references); whether that means separate OAuth apps (GitHub) or one app with several redirect URIs (Google) is vendor policy. These provider capabilities must be re-verified against live developer consoles prior to shipping.
+*Note:* Whether several URIs mean separate OAuth apps (GitHub) or one app with several redirect URIs (Google) is vendor policy, to be re-verified against live developer consoles prior to shipping. What it means for the credentials is under [Credential Capture](#credential-capture).
 
 **Copyable Output Mechanics**: To ensure reliability across interactive and automated environments:
 * **Terminal Display:** Printed verbatim on standalone lines for direct terminal copying.
@@ -145,6 +145,10 @@ Following Area 1's principle that "vendor knowledge is data," the catalog is imp
 The default slug matches the catalog key. For the default schema, `email` is mapped across both providers; use-case properties (`givenName`, `familyName`) are added whenever present in both the target schema and the provider's claim table (GitHub has no `familyName` source, and its `givenName` maps to the full-name `name` claim; see area 1's claim-mapping caveat).
 
 ## Credential Capture
+
+Credentials are per environment; the connection is not. The connection file carries references: `client_secret_env` is always a variable name, and `client_id` is a `${VAR}` reference when it differs per environment (area 1, [Open Points](1-resource-model.md#open-points)). One revision is promoted unchanged and each environment supplies its own values. Which values differ is vendor policy: a GitHub OAuth App accepts one callback URL, so GitHub needs one app per origin and a `${GITHUB_CLIENT_ID}` per environment; a Google client accepts several redirect URIs, so one literal client id can serve them all.
+
+In 851 the journey captures one client id and one secret, for development, the only environment that exists ([README](README.md#scope-for-851)). Further environments add values, not connection edits, once [#534](https://github.com/zitadel/nextgen/issues/534) defines them, the secret store holds their secrets, and `${VAR}` resolution at the engine makes a reference client id usable.
 
 ### Client ID Rules
 

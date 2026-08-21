@@ -200,7 +200,7 @@ The authored conflict transition must be explicitly attached to both steps.
 
 ### Identity Lifecycle & Deferred Linking Seam
 
-* **Conflict Boundary Handling:** The verified external identity is **discarded at the conflict boundary**. No user record is created, no email-based linking is attempted, and the user receives a clear explanation without reaching a dead end. Until the linking journey ships, this loop is deterministic: a user clicking "Continue with Google" repeatedly will land on the same conflict step.
+* **Account linking is out of scope:** The verified external identity is **discarded at the conflict boundary**. No user record is created, no email-based linking is attempted, and the user receives a clear explanation without reaching a dead end. Linking is the epic's future work, so 851 does not use the moment on the conflict step when the person has proven both the existing account and the external identity. The identity dies with the attempt, and every later sign-in through that provider repeats the conflict until the linking journey ships.
 * **Seam for Deferred Account Linking:** The deferred journey will attach at the resolved external identity object; nothing else about that journey is designed here. As a consequence, 851 requires the `create_user_with_sso` `on_success` handler, but does **not** implement or require `link_sso`.
 
 ## Failures and Recovery
