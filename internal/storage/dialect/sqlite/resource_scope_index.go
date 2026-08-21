@@ -39,14 +39,6 @@ SELECT EXISTS (
 )`
 
 	deleteResourceScopeStmt = `DELETE FROM resource_scope_index WHERE resource_kind = ? AND project_id = ? AND resource_id = ?`
-
-	listClaimedProjectIDsStmt = `
-SELECT project_id FROM resource_scope_index
-WHERE resource_kind = ?
-  AND team_id IS NOT NULL AND team_id <> ''
-  AND (? = '' OR project_id > ?)
-ORDER BY project_id
-LIMIT ?`
 )
 
 type resourceScopeStatements struct{ statement }
@@ -125,30 +117,6 @@ func (s resourceScopeStatements) ExistsResourceScopeElsewhere(ctx context.Contex
 func (s resourceScopeStatements) DeleteResourceScope(ctx context.Context, kind domain.ResourceKind, projectID, resourceID string) error {
 	_, err := s.client.Exec(ctx, deleteResourceScopeStmt, kind.String(), projectID, resourceID)
 	return wrapError(err)
-}
-
-// ListClaimedProjectIDs implements [service.ResourceScopeStatements].
-func (s resourceScopeStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
-	if limit == 0 {
-		limit = 500
-	}
-	rows, err := s.client.Query(ctx, listClaimedProjectIDsStmt, domain.ResourceKindProject.String(), afterID, afterID, int64(limit))
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	defer rows.Close()
-	var ids []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, wrapError(err)
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, wrapError(err)
-	}
-	return ids, nil
 }
 
 func scanResourceScope(rows *sql.Rows) (*domain.ResourceScope, error) {

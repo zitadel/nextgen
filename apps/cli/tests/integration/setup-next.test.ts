@@ -323,7 +323,7 @@ describe("Next setup integration", () => {
     expect(planOutput).toContain("will publish a new revision");
     expect(planOutput).toContain("user_schema will be re-pinned to the new revision");
     expect(planOutput).not.toContain("audience");
-    expect(planOutput).not.toContain("x-editable");
+    expect(planOutput).not.toContain("x-audit");
 
     // The Elina journey: use the new field in the register step and publish
     // schema + flow in ONE apply — the CLI re-pins user_schema to the freshly

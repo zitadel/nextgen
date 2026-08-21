@@ -602,7 +602,7 @@ describe("normalized hashing and write-back", () => {
       const canonical = {
         kind: "user-schema",
         title: "Canonical",
-        properties: { email: { type: "string", "x-editable": true } },
+        properties: { email: { type: "string", "x-audit": false } },
       };
 
       const { changed } = await writeBackResource(
@@ -617,7 +617,7 @@ describe("normalized hashing and write-back", () => {
       const onDisk = JSON.parse(
         await readFile(join(cwd, ".zitadel/schemas/user.json"), "utf8"),
       ) as { properties: { email: Record<string, unknown> } };
-      expect(onDisk.properties.email["x-editable"]).toBe(true);
+      expect(onDisk.properties.email["x-audit"]).toBe(false);
     } finally {
       await rm(cwd, { recursive: true, force: true });
     }

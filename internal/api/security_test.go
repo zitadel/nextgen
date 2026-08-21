@@ -1,6 +1,8 @@
 package api
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"testing"
 
@@ -55,6 +57,8 @@ func TestHandleOAuth2(t *testing.T) {
 			require.Equal(t, domain.AuthzPrincipalTypeSKProj, got.PrincipalType)
 			require.Equal(t, tc.token.ProjectID, got.PrincipalID)
 			require.Equal(t, tc.token.Scope, got.Scope)
+			sum := sha256.Sum256([]byte("raw-bearer"))
+			require.Equal(t, hex.EncodeToString(sum[:]), got.SecretHash)
 		})
 	}
 

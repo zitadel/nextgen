@@ -62,7 +62,7 @@ Locked for [#833](https://github.com/zitadel/nextgen/issues/833) / [#834](https:
 | --- | --- |
 | **By-id (after RSI hit)** | Allow when a **team-scoped** grant’s `scope_team_id` equals the row’s `RSI.team_id`, **or** a **resource-scoped** grant’s `scope_resource_id` equals the path id, **and** the catalog relation still matches (`viewer` / `editor` / `admin`). |
 | **Create** (no RSI row) | Still requires a **project-scoped** Allow. A principal whose only grant is team- or resource-scoped cannot create project-wide resources. |
-| **List** | [#834](https://github.com/zitadel/nextgen/issues/834): Forbidden (foothold, no project-wide Allow) proceeds and `withAuthzListFilter` attaches the EXISTS predicate (partial view). NotFound (no foothold) still 404s. |
+| **List** | [#834](https://github.com/zitadel/nextgen/issues/834) / [#837](https://github.com/zitadel/nextgen/issues/837): project-wide Allow skips EXISTS for the next compile only. Forbidden (foothold, no project-wide Allow) proceeds and `requireProjectListAccess` attaches the EXISTS predicate (partial view). NotFound (no foothold) still 404s. |
 | **403 vs 404** | Unchanged (**D10**). Scoped Allow is still inside a project foothold. |
 
 Bare `requireProjectAccess` (create / project-by-id without an RSI object) must not treat a team-scoped grant as project-wide Allow. Management lists use `requireProjectListAccess`, not this gate.

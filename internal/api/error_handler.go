@@ -125,6 +125,9 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return teamErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixProject.ErrorCodePrefix("")):
 		return projectErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixClaimChallenge.ErrorCodePrefix("")),
+		strings.HasPrefix(e.Code, domain.PrefixClaim.ErrorCodePrefix("")):
+		return claimErrorResponse(e)
 	case e.Code == domain.ErrNotImplemented().Code:
 		return errorResponseWithStatusCode(http.StatusNotImplemented, e)
 	case e.Code == domain.ErrUnavailable().Code:

@@ -120,7 +120,7 @@ export interface ResourceSyncer {
   /**
    * Reduce a body to its canonical comparison form: strip server-echoed
    * noise (empty `audience`) and spelled-out meta-schema defaults
-   * (`x-editable` et al) so hashing and diff rendering treat semantically
+   * (`x-audit` et al) so hashing and diff rendering treat semantically
    * identical bodies as identical. Comparison only — never applied to
    * upload payloads or written to files (the server does not materialize
    * the stripped defaults, so dropping them from stored bytes would lose

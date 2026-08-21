@@ -62,7 +62,7 @@ describe("normalizeSchemaBody", () => {
     const normalized = normalizeSchemaBody({
       objectType: "human-user",
       properties: {
-        email: { type: "string", "x-editable": true, "x-sensitive": false, "x-mfa": false },
+        email: { type: "string", "x-audit": false },
         givenName: { type: "string" },
       },
     });
@@ -75,14 +75,45 @@ describe("normalizeSchemaBody", () => {
     });
   });
 
-  it("keeps non-default values, including non-boolean x-mfa", () => {
+  // A leaf of an object property normalizes the same way a top-level one
+  // does, or its defaults would read as a permanent diff.
+  it("strips defaults from nested properties too", () => {
+    const normalized = normalizeSchemaBody({
+      properties: {
+        address: {
+          type: "object",
+          "x-audit": false,
+          properties: {
+            street: { type: "string", "x-audit": false },
+            city: { type: "string", "x-audit": true },
+          },
+        },
+      },
+    });
+    expect(normalized).toEqual({
+      properties: {
+        address: {
+          type: "object",
+          properties: {
+            street: { type: "string" },
+            city: { type: "string", "x-audit": true },
+          },
+        },
+      },
+    });
+  });
+
+  it("keeps non-default values", () => {
     const body = {
       properties: {
-        email: { type: "string", "x-editable": false },
-        phone: { type: "string", "x-mfa": "sms" },
-        secret: { type: "string", "x-sensitive": true },
+        email: { type: "string", "x-audit": true },
       },
     };
+    expect(normalizeSchemaBody(body)).toEqual(body);
+  });
+
+  it("keeps native keywords the dialect declares no default for", () => {
+    const body = { properties: { secret: { type: "string", writeOnly: false } } };
     expect(normalizeSchemaBody(body)).toEqual(body);
   });
 
@@ -98,9 +129,27 @@ describe("normalizeSchemaBody", () => {
   });
 
   it("does not mutate its input and is idempotent", () => {
-    const body = { properties: { email: { type: "string", "x-editable": true } } };
+    const body = { properties: { email: { type: "string", "x-audit": false } } };
     const once = normalizeSchemaBody(body);
-    expect(body).toEqual({ properties: { email: { type: "string", "x-editable": true } } });
+    expect(body).toEqual({ properties: { email: { type: "string", "x-audit": false } } });
+    expect(normalizeSchemaBody(once)).toEqual(once);
+  });
+
+  // The caller hands the same parsed object to the upload payload, so a
+  // descent that stripped in place would delete nested defaults out of what
+  // gets published. The flat test above never reaches the recursion.
+  it("does not mutate a nested input and is idempotent", () => {
+    const nested = () => ({
+      properties: {
+        address: {
+          type: "object",
+          properties: { street: { type: "string", "x-audit": false } },
+        },
+      },
+    });
+    const body = nested();
+    const once = normalizeSchemaBody(body);
+    expect(body).toEqual(nested());
     expect(normalizeSchemaBody(once)).toEqual(once);
   });
 

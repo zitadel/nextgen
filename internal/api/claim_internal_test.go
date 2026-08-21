@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
@@ -203,4 +204,50 @@ func TestSessionCookieOperationsIncludeCompleteClaim(t *testing.T) {
 	t.Parallel()
 
 	require.True(t, sessionCookieOperations[api.CompleteClaimOperation])
+}
+
+// Every public claim error code must map to its documented HTTP status
+// (mirrors TestProjectErrorResponse; the proj.* claim codes are covered there).
+func TestClaimErrorResponse(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  domain.Error
+		want int
+	}{
+		{"challenge_not_found", domain.ErrClaimChallengeNotFound(), http.StatusNotFound},
+		{"challenge_invalid", domain.ErrClaimChallengeInvalid(), http.StatusBadRequest},
+		{"no_personal_team", domain.ErrClaimNoPersonalTeam(), http.StatusInternalServerError},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := claimErrorResponse(tt.err); got.StatusCode != tt.want {
+				t.Fatalf("claimErrorResponse(%q) status = %d, want %d", tt.err.Code, got.StatusCode, tt.want)
+			}
+		})
+	}
+}
+
+func TestAlreadyClaimedResponse(t *testing.T) {
+	t.Parallel()
+
+	conflict := domain.ErrProjectAlreadyClaimed().WithDetails(domain.ClaimConflictDetails{
+		TeamID:       "team_1",
+		DashboardURL: "https://console.invalid/ui/console/projects/proj_1",
+	})
+
+	resp, ok := alreadyClaimedResponse(conflict)
+	require.True(t, ok)
+	require.Equal(t, domain.ErrProjectAlreadyClaimed().Code, resp.Code)
+	require.Equal(t, api.TeamID("team_1"), resp.Details.TeamID)
+	require.Equal(t, "https://console.invalid/ui/console/projects/proj_1", resp.Details.DashboardURL.String())
+
+	_, ok = alreadyClaimedResponse(domain.ErrProjectClaimExpired())
+	require.False(t, ok, "wrong code must fall back to the generic envelope")
+
+	_, ok = alreadyClaimedResponse(domain.ErrProjectAlreadyClaimed())
+	require.False(t, ok, "conflict without details must fall back to the generic envelope")
 }

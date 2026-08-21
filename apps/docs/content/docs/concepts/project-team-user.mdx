@@ -17,4 +17,4 @@ A user is an identity inside a project. Users can be self-owned or team-owned de
 
 ## Preview note
 
-Some design docs still describe target claim and platform lifecycle behavior. The CLI exposes `zitadel claim` and the OpenAPI spec exposes the claim endpoints, but the server-side handlers are not implemented yet, so a claim cannot complete against a real server.
+Some design docs still describe target claim and platform lifecycle behavior. Claim is implemented server-side: a claimed project is one that carries an active owning-team grant, and the CLI, the OpenAPI endpoints, and the server handlers are all shipped. The console claim page is not shipped yet, so the browser leg of the flow has no guided UI.

@@ -483,6 +483,25 @@ payloads use a **deny-by-default** model:
 Secrets, passwords, challenge material, and token values are **never** included
 regardless of annotation.
 
+### Amendment (2026-08-14): `x-audit` is declared; `x-sensitive` is gone
+
+`x-audit` is now part of the user-schema dialect
+(`api/openapi/endpoints/schemas/user-property.json`), declared as a boolean. The
+emitter enables the value for any non-empty string other than `"false"`, so the
+declaration is the narrower of the two: `x-audit: "no"` would have enabled the
+value while reading as a refusal, and now fails validation at push instead.
+Point 2's `"identifier"` spelling is not part of the dialect — a field used to
+correlate events is marked `x-audit: true` like any other.
+
+Point 4 above no longer holds. `x-sensitive` was removed from the dialect along
+with `x-verify`, `x-editable`, and `x-mfa` — none had a consumer, and the three
+surfaces that point named (OpenAPI `user-property`, console input masking,
+config normalize) no longer reference it. `x-audit` is the only annotation
+governing audit payloads. A value withheld from read responses is `writeOnly`,
+native JSON Schema the dialect documents rather than declares, and nothing
+enforces it yet. The dialect keeps `additionalProperties: true`, so a document
+still carrying `x-sensitive` validates and is ignored rather than rejected.
+
 ### 9. OTEL is Tier 3 export only
 
 OpenTelemetry remains an **export format** for forwarding to an operator's

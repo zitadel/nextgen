@@ -1887,6 +1887,45 @@ func (c *MockAllStatementsExistsResourceScopeElsewhereCall) DoAndReturn(f func(c
 	return c
 }
 
+// GetActiveOwningTeamGrant mocks base method.
+func (m *MockAllStatements) GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetActiveOwningTeamGrant", ctx, projectID)
+	ret0, _ := ret[0].(*domain.AuthzAssignment)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetActiveOwningTeamGrant indicates an expected call of GetActiveOwningTeamGrant.
+func (mr *MockAllStatementsMockRecorder) GetActiveOwningTeamGrant(ctx, projectID any) *MockAllStatementsGetActiveOwningTeamGrantCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveOwningTeamGrant", reflect.TypeOf((*MockAllStatements)(nil).GetActiveOwningTeamGrant), ctx, projectID)
+	return &MockAllStatementsGetActiveOwningTeamGrantCall{Call: call}
+}
+
+// MockAllStatementsGetActiveOwningTeamGrantCall wrap *gomock.Call
+type MockAllStatementsGetActiveOwningTeamGrantCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetActiveOwningTeamGrantCall) Return(arg0 *domain.AuthzAssignment, arg1 error) *MockAllStatementsGetActiveOwningTeamGrantCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetActiveOwningTeamGrantCall) Do(f func(context.Context, string) (*domain.AuthzAssignment, error)) *MockAllStatementsGetActiveOwningTeamGrantCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetActiveOwningTeamGrantCall) DoAndReturn(f func(context.Context, string) (*domain.AuthzAssignment, error)) *MockAllStatementsGetActiveOwningTeamGrantCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetAuthAttemptByHandoffToken mocks base method.
 func (m *MockAllStatements) GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffToken []byte) (*domain.AuthAttempt, error) {
 	m.ctrl.T.Helper()
@@ -9257,45 +9296,6 @@ func (c *MockResourceScopeStatementsIsStatementsCall) DoAndReturn(f func()) *Moc
 	return c
 }
 
-// ListClaimedProjectIDs mocks base method.
-func (m *MockResourceScopeStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListClaimedProjectIDs", ctx, afterID, limit)
-	ret0, _ := ret[0].([]string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListClaimedProjectIDs indicates an expected call of ListClaimedProjectIDs.
-func (mr *MockResourceScopeStatementsMockRecorder) ListClaimedProjectIDs(ctx, afterID, limit any) *MockResourceScopeStatementsListClaimedProjectIDsCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListClaimedProjectIDs", reflect.TypeOf((*MockResourceScopeStatements)(nil).ListClaimedProjectIDs), ctx, afterID, limit)
-	return &MockResourceScopeStatementsListClaimedProjectIDsCall{Call: call}
-}
-
-// MockResourceScopeStatementsListClaimedProjectIDsCall wrap *gomock.Call
-type MockResourceScopeStatementsListClaimedProjectIDsCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockResourceScopeStatementsListClaimedProjectIDsCall) Return(arg0 []string, arg1 error) *MockResourceScopeStatementsListClaimedProjectIDsCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockResourceScopeStatementsListClaimedProjectIDsCall) Do(f func(context.Context, string, uint32) ([]string, error)) *MockResourceScopeStatementsListClaimedProjectIDsCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockResourceScopeStatementsListClaimedProjectIDsCall) DoAndReturn(f func(context.Context, string, uint32) ([]string, error)) *MockResourceScopeStatementsListClaimedProjectIDsCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // UpsertResourceScope mocks base method.
 func (m *MockResourceScopeStatements) UpsertResourceScope(ctx context.Context, scope *domain.ResourceScope) error {
 	m.ctrl.T.Helper()
@@ -9392,6 +9392,45 @@ func (c *MockAuthzAssignmentStatementsCreateAuthzAssignmentCall) Do(f func(conte
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAuthzAssignmentStatementsCreateAuthzAssignmentCall) DoAndReturn(f func(context.Context, *domain.AuthzAssignment) error) *MockAuthzAssignmentStatementsCreateAuthzAssignmentCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetActiveOwningTeamGrant mocks base method.
+func (m *MockAuthzAssignmentStatements) GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetActiveOwningTeamGrant", ctx, projectID)
+	ret0, _ := ret[0].(*domain.AuthzAssignment)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetActiveOwningTeamGrant indicates an expected call of GetActiveOwningTeamGrant.
+func (mr *MockAuthzAssignmentStatementsMockRecorder) GetActiveOwningTeamGrant(ctx, projectID any) *MockAuthzAssignmentStatementsGetActiveOwningTeamGrantCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveOwningTeamGrant", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).GetActiveOwningTeamGrant), ctx, projectID)
+	return &MockAuthzAssignmentStatementsGetActiveOwningTeamGrantCall{Call: call}
+}
+
+// MockAuthzAssignmentStatementsGetActiveOwningTeamGrantCall wrap *gomock.Call
+type MockAuthzAssignmentStatementsGetActiveOwningTeamGrantCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthzAssignmentStatementsGetActiveOwningTeamGrantCall) Return(arg0 *domain.AuthzAssignment, arg1 error) *MockAuthzAssignmentStatementsGetActiveOwningTeamGrantCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthzAssignmentStatementsGetActiveOwningTeamGrantCall) Do(f func(context.Context, string) (*domain.AuthzAssignment, error)) *MockAuthzAssignmentStatementsGetActiveOwningTeamGrantCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthzAssignmentStatementsGetActiveOwningTeamGrantCall) DoAndReturn(f func(context.Context, string) (*domain.AuthzAssignment, error)) *MockAuthzAssignmentStatementsGetActiveOwningTeamGrantCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -9506,6 +9545,45 @@ func (c *MockAuthzAssignmentStatementsListAuthzAssignmentsCall) Do(f func(contex
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAuthzAssignmentStatementsListAuthzAssignmentsCall) DoAndReturn(f func(context.Context, string, domain.AuthzPrincipalType, string, bool) ([]*domain.AuthzAssignment, error)) *MockAuthzAssignmentStatementsListAuthzAssignmentsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListClaimedProjectIDs mocks base method.
+func (m *MockAuthzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListClaimedProjectIDs", ctx, afterID, limit)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListClaimedProjectIDs indicates an expected call of ListClaimedProjectIDs.
+func (mr *MockAuthzAssignmentStatementsMockRecorder) ListClaimedProjectIDs(ctx, afterID, limit any) *MockAuthzAssignmentStatementsListClaimedProjectIDsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListClaimedProjectIDs", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListClaimedProjectIDs), ctx, afterID, limit)
+	return &MockAuthzAssignmentStatementsListClaimedProjectIDsCall{Call: call}
+}
+
+// MockAuthzAssignmentStatementsListClaimedProjectIDsCall wrap *gomock.Call
+type MockAuthzAssignmentStatementsListClaimedProjectIDsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthzAssignmentStatementsListClaimedProjectIDsCall) Return(arg0 []string, arg1 error) *MockAuthzAssignmentStatementsListClaimedProjectIDsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthzAssignmentStatementsListClaimedProjectIDsCall) Do(f func(context.Context, string, uint32) ([]string, error)) *MockAuthzAssignmentStatementsListClaimedProjectIDsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthzAssignmentStatementsListClaimedProjectIDsCall) DoAndReturn(f func(context.Context, string, uint32) ([]string, error)) *MockAuthzAssignmentStatementsListClaimedProjectIDsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

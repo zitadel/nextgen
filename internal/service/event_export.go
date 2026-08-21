@@ -55,7 +55,7 @@ func collectProjectIDs(
 }
 
 // ListClaimedProjectIDs returns project IDs that have completed claim
-// (resource_scope_index.team_id set), matching ADR 049 export visibility.
+// (active owning-team grant, ADR 054 §2), matching ADR 049 export visibility.
 func (a EventExportAdapter) ListClaimedProjectIDs(ctx context.Context) ([]string, error) {
 	var (
 		after string

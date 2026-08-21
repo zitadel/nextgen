@@ -52,6 +52,28 @@ UPDATE zitadel_nextgen.authz_assignments
 SET revoked_at = now(), updated_at = now()
 WHERE project_id = $1 AND id = $2 AND revoked_at IS NULL
 RETURNING revoked_at, updated_at`
+
+	// Literal 'project'/'team' so the planner can serve this from the partial
+	// index authz_assignments_one_owning_team; the relation names match
+	// domain.NewClaimTeamAssignment and the seeded system catalog.
+	getActiveOwningTeamGrantStmt = `
+SELECT id, project_id, catalog_id,
+       principal_type, principal_id, object_type, relation,
+       scope_kind, scope_team_id, scope_resource_id,
+       grantor_type, grantor_id, delegation_id,
+       expires_at, revoked_at, created_at, updated_at
+FROM zitadel_nextgen.authz_assignments
+WHERE project_id = $1 AND object_type = 'project' AND relation = 'team'
+  AND revoked_at IS NULL
+ORDER BY created_at, id
+LIMIT 1`
+
+	listClaimedProjectIDsStmt = `
+SELECT DISTINCT project_id FROM zitadel_nextgen.authz_assignments
+WHERE object_type = 'project' AND relation = 'team' AND revoked_at IS NULL
+  AND ($1 = '' OR project_id > $1)
+ORDER BY project_id
+LIMIT $2`
 )
 
 type authzAssignmentStatements struct{ statement }
@@ -111,6 +133,39 @@ func (s authzAssignmentStatements) ListAuthzAssignments(ctx context.Context, pro
 func (s authzAssignmentStatements) RevokeAuthzAssignment(ctx context.Context, projectID, id string) error {
 	var revokedAt, updatedAt time.Time
 	return wrapError(s.client.QueryRow(ctx, revokeAuthzAssignmentStmt, projectID, id).Scan(&revokedAt, &updatedAt))
+}
+
+// GetActiveOwningTeamGrant implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error) {
+	rows, err := s.client.Query(ctx, getActiveOwningTeamGrantStmt, projectID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	assignment, err := pgx.CollectExactlyOneRow(rows, scanAuthzAssignment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return assignment, nil
+}
+
+// ListClaimedProjectIDs implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, afterID string, limit uint32) ([]string, error) {
+	if limit == 0 {
+		limit = 500
+	}
+	rows, err := s.client.Query(ctx, listClaimedProjectIDsStmt, afterID, int64(limit))
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	ids, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (string, error) {
+		var id string
+		err := row.Scan(&id)
+		return id, err
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return ids, nil
 }
 
 func scanAuthzAssignment(row pgx.CollectableRow) (*domain.AuthzAssignment, error) {

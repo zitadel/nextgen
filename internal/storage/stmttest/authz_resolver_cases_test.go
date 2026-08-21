@@ -3,6 +3,7 @@
 package stmttest
 
 import (
+	"context"
 	"sort"
 	"testing"
 	"time"
@@ -11,7 +12,22 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
+
+// createOwningTeamGrant seeds a project.team tupleset grant and revokes it on
+// subtest cleanup: these cases share one project fixture, and
+// authz_assignments_one_owning_team allows only one active owning-team row
+// per project (ADR 054 §2), so each subtest must free the slot it takes.
+func createOwningTeamGrant(t *testing.T, stmts service.AllStatements, a *domain.AuthzAssignment) {
+	t.Helper()
+	require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), a))
+	t.Cleanup(func() {
+		// t.Context() is already canceled during cleanup; a re-revoke of an
+		// explicitly revoked grant is a harmless NoRowFoundError.
+		_ = stmts.RevokeAuthzAssignment(context.Background(), a.ProjectID, a.ID)
+	})
+}
 
 func TestAuthzResolverStatements_Cases(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
@@ -292,8 +308,8 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			team := "team_ttu_mem_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
 			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(projectID, team, u)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope())))
+			createOwningTeamGrant(t, d.stmts,
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope()))
 			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
 			assert.True(t, allowed)
 		})
@@ -302,8 +318,8 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			u := "user_ttu_nomem_" + uniqueSuffix(t)
 			team := "team_ttu_nomem_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope())))
+			createOwningTeamGrant(t, d.stmts,
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope()))
 			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
 			assert.False(t, allowed)
 		})
@@ -316,7 +332,7 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			a := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope())
 			past := time.Now().Add(-time.Hour)
 			a.ExpiresAt = &past
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), a))
+			createOwningTeamGrant(t, d.stmts, a)
 			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
 			assert.False(t, allowed)
 		})
@@ -337,8 +353,8 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			// Shortcut requires principal_type = user; team principal must not use it.
 			team := "team_ttu_prin_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope())))
+			createOwningTeamGrant(t, d.stmts,
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope()))
 			allowed, _ := check(t, base(domain.AuthzPrincipalTypeTeam, team, "project", "viewer"))
 			assert.False(t, allowed)
 		})
@@ -346,8 +362,8 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 		t.Run("check ttu malformed tupleset principal type deny", func(t *testing.T) {
 			// Tupleset project.team must use principal_type=team; a user principal must not participate in TTU.
 			u := "user_ttu_badts_" + uniqueSuffix(t)
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "team", domain.NewProjectAssignmentScope())))
+			createOwningTeamGrant(t, d.stmts,
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "team", domain.NewProjectAssignmentScope()))
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "team", "member", domain.NewResourceAssignmentScope(u))))
 			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
@@ -359,8 +375,8 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			u := "user_ttu_gteam_" + uniqueSuffix(t)
 			team := "team_ttu_gteam_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope())))
+			createOwningTeamGrant(t, d.stmts,
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope()))
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "team", "member", domain.NewTeamAssignmentScope(team))))
 			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
@@ -372,8 +388,8 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			u := "user_ttu_gres_" + uniqueSuffix(t)
 			team := "team_ttu_gres_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope())))
+			createOwningTeamGrant(t, d.stmts,
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope()))
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "team", "member", domain.NewResourceAssignmentScope(team))))
 			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
@@ -385,8 +401,8 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			u := "user_ttu_gproj_" + uniqueSuffix(t)
 			team := "team_ttu_gproj_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope())))
+			createOwningTeamGrant(t, d.stmts,
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope()))
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "team", "member", domain.NewProjectAssignmentScope())))
 			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
@@ -399,8 +415,8 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			teamOther := "team_ttu_other_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamTS)))
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamOther)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, teamTS, "project", "team", domain.NewProjectAssignmentScope())))
+			createOwningTeamGrant(t, d.stmts,
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, teamTS, "project", "team", domain.NewProjectAssignmentScope()))
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "team", "member", domain.NewTeamAssignmentScope(teamOther))))
 			allowed, _ := check(t, base(domain.AuthzPrincipalTypeUser, u, "project", "viewer"))
@@ -411,8 +427,8 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			u := "user_ttu_gexp_" + uniqueSuffix(t)
 			team := "team_ttu_gexp_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope())))
+			createOwningTeamGrant(t, d.stmts,
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope()))
 			a := newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "team", "member", domain.NewTeamAssignmentScope(team))
 			past := time.Now().Add(-time.Hour)
 			a.ExpiresAt = &past
@@ -544,8 +560,8 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			res := "usr_list_ttu_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
 			require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(projectID, team, u)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope())))
+			createOwningTeamGrant(t, d.stmts,
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope()))
 			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), domain.NewUserResourceScope(projectID, res)))
 			params := base(domain.AuthzPrincipalTypeUser, u, "project", "viewer")
 			allowed, _ := check(t, params)
@@ -558,8 +574,8 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			team := "team_list_gteam_" + uniqueSuffix(t)
 			res := "usr_list_gteam_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope())))
+			createOwningTeamGrant(t, d.stmts,
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope()))
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "team", "member", domain.NewTeamAssignmentScope(team))))
 			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), domain.NewUserResourceScope(projectID, res)))
@@ -574,8 +590,8 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			team := "team_list_gres_" + uniqueSuffix(t)
 			res := "usr_list_gres_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, team)))
-			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
-				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope())))
+			createOwningTeamGrant(t, d.stmts,
+				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeTeam, team, "project", "team", domain.NewProjectAssignmentScope()))
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
 				newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "team", "member", domain.NewResourceAssignmentScope(team))))
 			require.NoError(t, d.stmts.UpsertResourceScope(t.Context(), domain.NewUserResourceScope(projectID, res)))

@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"net"
 	"net/http"
 	"net/url"
@@ -40,6 +42,7 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
 
+	secretSum := sha256.Sum256([]byte(t.Token))
 	scope := ScopeContext{
 		ProjectID:     payload.ProjectID,
 		Scope:         payload.Scope,
@@ -47,6 +50,7 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 		// Project secrets are JWEs without a stable key id; the project id is
 		// the durable principal for sk_proj grants (survives rotate/claim).
 		PrincipalID: payload.ProjectID,
+		SecretHash:  hex.EncodeToString(secretSum[:]),
 	}
 
 	ctx = WithScopeContext(ctx, scope)
@@ -189,6 +193,10 @@ type ScopeContext struct {
 	PrincipalID   string
 	// TeamID is the token team for sk_team_ principals (resolver ConstraintTeamID).
 	TeamID string
+	// SecretHash is the hex SHA-256 of the presented bearer string: the
+	// proof-of-possession seam for the claim flow (ADR 046 §3). The claim
+	// service stores it on init and compares it on status.
+	SecretHash string
 }
 
 func WithScopeContext(ctx context.Context, scopeCtx ScopeContext) context.Context {

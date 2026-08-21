@@ -99,6 +99,51 @@ fact changes:
   If a kit helper needs a shape the definition does not declare, the
   definition changes first (same rule as `packages/api-mock`).
 
+## Credential contract (root ADR 053 §9)
+
+Predictable test/dev credentials are a property of **this kit**, never of the
+server or the production seed contract. The kit boots the process and applies
+seeds, so it captures credentials from provisioning output (`POST /projects`
+returns `project_secret` exactly once) and exposes them on `InstanceHandle`:
+`projectSecret` today; the `platform` slot (`PlatformCredentials` — reserved
+project id + publishable key, the pair the ADR itself guarantees) once the
+platform-project provisioner lands. Root
+[ADR 053 §9](../../docs/adrs/053-cross-project-principals.md) (Proposed)
+sets the rule: test infrastructure gets its credentials from the testkit's
+boot contract, not from seed defaults — paraphrased here on purpose; §9's
+exact sentence lives in the ADR, so a reword there doesn't strand this file.
+[Console ADR 0004 §2](../../apps/console/docs/adrs/0004-console-deployment-modes.md)
+names the testkit as the bootstrap transport test and dev infrastructure
+use. While the ADR remains Proposed, treat the slot as tracking it — the
+slot is inert, so a change there moves this shape, not shipped behavior.
+
+Consequences for changes here:
+
+- Never add — or lean on — a server `--test-mode` flag, a seed-default
+  credential, or any other server-side door that mints deterministic
+  credentials. If the kit cannot capture a credential at provisioning time,
+  extend the provisioning contract the boot path drives (Console ADR 0004 §2
+  makes the testkit a transport of that seed input) — not the server
+  surface, and not direct database writes: the kit has no storage boundary
+  (it shells out to the CLI and provisions over HTTP), raw writes would
+  bypass the full provisioner, and seed ops must stay meaningful for
+  `connectZitadel` targets (see the Don't list).
+- New credentials extend `InstanceHandle` — the `platform` slot is the
+  contract point; don't invent a parallel channel. The handle must stay
+  serializable: it crosses process boundaries via the handshake file, and
+  `AppEnvTemplate` deliberately reaches only its flat string fields.
+- Declare a credential field only when its design is settled: additions are
+  churn-free minors, removals are not, so deferred credentials (the platform
+  automation principal, a boot-minted operator session) join as optional
+  fields when their ADRs land — never pre-frozen, and never with an invented
+  wire prefix in code or fixtures. Serialize only non-derivable state: a
+  session cookie is rebuilt from its token (`SESSION_COOKIE_NAME` +
+  constants), so a future serialized session is `{ sessionToken, expiresAt }`,
+  not a stored cookie object.
+- Dev loops feed from boot output: `console:dev-real` threads
+  `handle.projectSecret` into the Vite proxy env itself (and prints it under
+  `--seed-only`). Don't reintroduce developer-remembered credential env vars.
+
 ## Moon layering
 
 The layer is `tool`, not `library` — deliberately between the e2e suites

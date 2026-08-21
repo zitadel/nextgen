@@ -215,6 +215,15 @@ CREATE UNIQUE INDEX authz_assignments_unique_active
     WHERE revoked_at IS NULL AND delegation_id IS NULL;
 -- +goose StatementEnd
 
+-- ADR 054 §2: at most one active owning-team grant per project. The active
+-- key above includes the principal, so on its own it lets two teams race into
+-- concurrent ownership; this narrows the winner of a claim race to one row.
+-- +goose StatementBegin
+CREATE UNIQUE INDEX authz_assignments_one_owning_team
+    ON authz_assignments (project_id)
+    WHERE object_type = 'project' AND relation = 'team' AND revoked_at IS NULL;
+-- +goose StatementEnd
+
 -- +goose StatementBegin
 CREATE TABLE authz_membership_edges (
     project_id  TEXT    NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
@@ -328,6 +337,9 @@ DROP INDEX IF EXISTS idx_authz_membership_edges_member;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS authz_membership_edges;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS authz_assignments_one_owning_team;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS authz_assignments_unique_active;
