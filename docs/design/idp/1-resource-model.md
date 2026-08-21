@@ -41,8 +41,6 @@ A connection operates similarly to a flow definition within the Zitadel GitOps s
 
 ## Vendor knowledge is data
 
-Most vendor-specific implementation is configuration. The model prioritizes configuration for data, named strategies for behavior.
-
 ### Context
 zitadel/zitadel implements each vendor as a Go package, and most of that code is configuration written in Go: issuers, endpoints, forced scopes, claim mappings. Across its six vendors only three things are behaviour rather than data: GitHub fetches `/user/emails` when the profile email is private and keeps the `primary && verified` address; Apple signs its own client secret (an ES256 JWT with a one-hour expiry, so an implementation caches and refreshes); Apple uses `response_mode=form_post`, which turns the callback into a POST.
 
@@ -62,9 +60,7 @@ While this mechanism is built for general use,
 Epic 851 introduces just `supplementary_fetch` to support GitHub.
 Currently, `github_primary_email` is its only entry, as GitHub is the only provider in this release requiring a custom action. 
 Google’s setup, by contrast, is entirely data-driven. 
-When Apple is integrated later, its signed secret will introduce a second slot (`secret_strategy`). 
-Using this registry approach prevents us from hardcoding `if provider == "github"` branches in the core engine,
-which is exactly the hardcoded pattern this design aims to remove.
+When Apple is integrated later, its signed secret will introduce a second slot (`secret_strategy`).
 
 **Two rules keep this mechanism predictable:**
 
@@ -74,24 +70,11 @@ For instance, `github_primary_email` requires `oauth2` and `user:email`, while e
 The JSON schema enforces the name, protocol, and scope parts of these contracts via closed enums and conditional checks, 
 causing typos or unshipped strategies to fail at validation; the verified-properties part is a validator rule. Adding a new strategy is a non-breaking change.
 
-**Strategies are the definitive authority:** If selected, a strategy always runs, 
-replacing any same-named claims from userinfo or the `id_token`. 
-For example, GitHub's default userinfo might return a hidden or unverified public email, 
-while the fetch strategy guarantees a primary verified address. 
-Running the strategy unconditionally ensures stable connection behavior 
-rather than relying on user-specific profile quirks. This guarantees that `verified_claims: {"email": "$supplementary_fetch"}` always resolves correctly, 
-at the cost of one additional HTTP request per login.
-
-While the list of behavioral edge cases will grow as new providers are added, 
-the architectural boundary stays intact. 
-Every new behavior is isolated to one registry entry and one enum value,
-ensuring that each new vendor is always implemented as pure configuration data.
+**Strategies are the definitive authority:** If selected, a strategy always runs and replaces same-named claims from userinfo or the `id_token`, so `verified_claims: {"email": "$supplementary_fetch"}` always resolves, at the cost of one request per login.
 
 ## Example
 
 Setup scaffolds one file per selected provider: [`google.json`](schemas/google.json) (OIDC, discovery supplies the endpoints) and [`github.json`](schemas/github.json) (OAuth2, no discovery, endpoints explicit). Both store env var references, never secret values, and both carry a `claim_mapping` generated from the active user schema.
-
-Tracking is handled by `state.json`, which uses `id`, `hash`, and `previousId`, with `scaffoldedFrom` proposed as an addition; see [Open points](#open-points).
 
 ## The connection schema
 
@@ -99,7 +82,7 @@ The full draft: [`schemas/idp-connection.json`](schemas/idp-connection.json).
 How to read the schema:
 
 - **Root vs. Protocol Blocks:** The root level defines universal requirements: identity (`slug`, `protocol`, `template`, `display_name`), resolution (`subject_claim`, `claim_mapping`, `verified_claims`), and trust (`provisioning`). Protocol-specific plumbing is isolated inside nested blocks.
-- **Protocol Selection:** The `protocol` field dictates the active block. Using `if protocol == "oidc"` requires the `oidc` block and explicitly forbids `oauth2`. Adding future protocols is a mechanical backend process that tenant files never see.
+- **Protocol Selection:** The `protocol` field dictates the active block. Using `if protocol == "oidc"` requires the `oidc` block and explicitly forbids `oauth2`.
 - **Precise Error Messages:** The schema uses `if`/`then` conditionals rather than `oneOf`. While `oneOf` throws generic "all arms failed" errors, `if`/`then` pinpoints the exact issue (e.g., `/oidc must have required property 'client_id'`).
 - **Intentional Duplication:** The two protocol blocks duplicate ten shared fields. Factoring them out would require `unevaluatedProperties`, which many third-party validators do not support. Since a connection file only ever contains one block, this duplication is safer and more compatible.
 - **Scope Enforcement:** In the OIDC block, `scopes` must contain `openid` (enforced via `required` and `contains`, as JSON Schema `default` values do not inject data). Without `openid`, it is not a valid OIDC connection.
@@ -111,7 +94,7 @@ How to read the schema:
 
 ### Provisioning
 
-`creation` names what the engine does with an unknown subject. zitadel/zitadel expresses the same thing as two booleans ([`oidc/oidc.go#L41-L60`](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/oidc/oidc.go#L41-L60) `WithCreationAllowed` / `WithAutoCreation`), which grew one bit at a time: a single `autoRegister` flag ([zitadel/zitadel#2336](https://github.com/zitadel/zitadel/pull/2336)), then the pair ([zitadel/zitadel#5247](https://github.com/zitadel/zitadel/pull/5247)), then a strict meaning for the previously meaningless combination `auto=true, allowed=false` ([zitadel/zitadel#8420](https://github.com/zitadel/zitadel/pull/8420), with a technical advisory because behaviour changed). Four states behind two bits, easy to transcribe wrong. This design names the states instead, so each one carries its flow-authoring obligation on its face.
+`creation` names what the engine does with an unknown subject. zitadel/zitadel expresses the same thing as two booleans ([`oidc/oidc.go#L41-L60`](https://github.com/zitadel/zitadel/blob/632a5196800c5919e5043d482846ec59d7fad88e/internal/idp/providers/oidc/oidc.go#L41-L60) `WithCreationAllowed` / `WithAutoCreation`), four states behind two bits. This design names the states instead.
 
 | `creation` | Legacy bits | Unknown subject |
 | :--- | :--- | :--- |
@@ -120,14 +103,12 @@ How to read the schema:
 
 Two further states exist behind the bits; neither ships in 851:
 
-- `auto_only` (allowed=false, auto=true): complete claims create the user, incomplete ones fail closed at an error step. The "trust the provider, no user input" mode of zitadel/zitadel#8420. Returns as an additive enum value once the engine has the fail-closed branch; when `x-verify` lands, an unverified identifier property fails closed here and drops to collection under `auto`, so that rule needs no further field.
+- `auto_only` (allowed=false, auto=true): complete claims create the user, incomplete ones fail closed at an error step. The "trust the provider, no user input" mode of zitadel/zitadel#8420. Returns as an additive enum value once the engine has the fail-closed branch; when `x-verify` returns, an unverified identifier property fails closed here and drops to collection under `auto`, so that rule needs no further field.
 - `collect` (allowed=true, auto=false), always the collection step, is not planned. Wanting the user to stop means wanting a property from them, and a required property the provider cannot supply already forces collection under `auto`. Editing prefilled verified values only drops their verification.
 
 Neither shipped value enforces verification in 851; that arrives with `x-verify`. The complete logic is under the [resolution branches](3-social-login-flow.md#resolution-branches) in area 3.
 
 **A ceiling, not a policy.** The connection states how far this provider's data is trusted, which varies by provider. Whether a given user type may sign up at all is a property of the user type, owned by authentication method settings ([#898](https://github.com/zitadel/nextgen/issues/898)). That policy may narrow the connection's value (a Google connection at `auto` serving Customers at `auto` and Employees at `disabled`), never widen it; the effective rule is the intersection, as #898 states. The connection is the only layer that exists in 851. Recorded under [Product decisions](README.md#product-decisions).
-
-*Note:* The legacy flags that governed account linking (`is_linking_allowed`, `auto_linking`) have been removed from this initial release. See [Linking safety](#linking-safety) for details.
 
 ### Deferred and Cut Fields
 
@@ -144,8 +125,8 @@ Several fields have been intentionally excluded from the initial schema based on
 | `enabled` | **Not planned.** An unlisted connection is already inert. Furthermore, a config flag is a poor mechanism for an emergency disable (due to release latency, and rollbacks would inadvertently re-enable it). Imperative runtime disabling remains an open point. |
 | `kind`, `audience`, `default_schema` | **Cut completely.** No identified use case or need.                                                                                                                                                                                                             |
 
-- **No `audience`:** Unlike flows, which the engine dynamically selects via audience matching (e.g., app-level overrides project-level), connections are never dynamically selected. Instead, they are explicitly referenced by `slug` and gated by a schema's provider list. Scoping already cascades cleanly: schemas define allowable providers, flows offer a subset of those providers, and flows are selected per app. Adding an `audience` field to the connection would just introduce a second, conflicting scoping axis.
-- **No `default_schema`:** Users always arrive through a specific flow, and it is the flow that pins the active `user_schema`. Because a single IdP connection is explicitly designed to serve multiple schemas, hardcoding a default schema on the connection itself is unnecessary.
+- **No `audience`:** Connections are referenced by slug and gated by the schema's provider list; a second scoping axis would conflict with that.
+- **No `default_schema`:** The flow pins the schema, and one connection serves many.
 
 ## Claim Mapping
 
@@ -160,7 +141,7 @@ The `claim_mapping` block translates the tenant's internal property names (keys)
 - **Known Limitation:** If two schemas use the exact same property name but need it populated from different provider claims, they cannot share a connection. The workaround is to create a second connection with a distinct `slug`.
 - **No Annotation Conflicts:** The currently unused `x-claim` annotation on user properties dictates what claim Zitadel emits, meaning it does not conflict with this incoming connection mapping.
 - **Catalog Data Caveat:** GitHub exposes no given/family name split; its `name` claim is the full display name. The catalog claim table still maps `givenName: "name"` as the pragmatic default, which puts a full name into `givenName`. Tenants wanting precise name semantics drop that mapping and let the collection step ask. `familyName` has no GitHub source and is never mapped.
-- **Validation vs. Runtime Safety:** Unknown-target checks run primarily during the plan phase. The CLI can validate mappings against every referencing schema (i.e., schemas listing the connection's slug in x-auth-methods.sso.providers) because it reads the entire working tree. The server cannot easily do this because schema revisions lack a stable lineage identity. Instead, the server enforces consistency during flow creation and updates. At runtime, the active schema revision pinned by the flow strictly filters the mapping, and any unmatched keys, whether accidental typos or intentional superset configurations, are safely ignored. A connection create or revise is deliberately not a server-side pair-check trigger: the CLI plan re-lints every pair on any working-tree change, and for hand-authored API writes the runtime filter is the safety net, so a stale pairing degrades to unmatched-key filtering (and, where auto-creation gates on a verified claim, to fail-closed collection) rather than misbehavior. The trade-off is that pair-level warnings for such writes lag until the next plan or flow write.
+- **Validation vs. Runtime Safety:** Unknown-target checks run at plan, against every referencing schema; the CLI reads the working tree, and the server checks at flow create and update, since schema revisions have no stable lineage. At runtime the flow's pinned schema revision filters the mapping; unmatched keys are ignored. A connection create or revise triggers no server-side pair check: the CLI re-lints every pair on any working-tree change, and for hand-authored API writes the runtime filter is the safety net, so their warnings lag until the next plan or flow write.
 
 The `verified_claims` field is the companion map for verification state, offering three value forms:
 
@@ -174,7 +155,7 @@ A `$`-prefixed value acts as a pointer to the strategy field of the same name
 in the protocol block. For instance, `"$supplementary_fetch"` defers to whatever 
 the `supplementary_fetch` field selects. The strategy's backend contract (its server-side definition) must formally declare that it knows how to verify that specific property. If you write a pointer without selecting a strategy, or map it to a property the strategy cannot verify, you will get a validator error.
 
-All `$`-values are reserved. Currently, only `$supplementary_fetch` exists, making any other `$`-string an automatic validation error. This prefix is exactly what makes strict validation possible. Because standard claim names are provider-controlled and unverifiable during the plan phase, a typo in a plain value would silently fail to verify, but a typo in a `$`-value triggers a hard schema error. This prefix also keeps the pointer out of the standard claim-name namespace, following the `$schema` and `$ref` convention of marking values that the machinery itself interprets. One adjacent slip stays out of its reach: the string `"true"` is a claim name, not the boolean `true`, so it sends the engine looking for a claim literally named `true` and lands fail-closed. The validator should warn on the literal strings `"true"` and `"false"` here, in the warning tier of the rules below.
+All `$` values are reserved. Only `$supplementary_fetch` exists, so any other `$` string is a schema error. A typo in a plain claim name fails silently (claim names are provider-controlled and unchecked at plan time); a typo in a `$` value fails hard. One slip stays out of reach: the string `"true"` is a claim name, not the boolean, so it sends the engine looking for a claim named `true` and fails closed. The validator warns on the literal strings `"true"` and `"false"` here.
 
 The list of allowable pointers will grow only when a new claim-verifying strategy *slot* is added, requiring just one `const` per slot, making it a non-breaking change. Introducing new strategies to an existing slot requires no schema changes, because the pointer references the field name, not the specific strategy.
 
@@ -192,7 +173,7 @@ The `verified_claims` field itself stays in the 851 schema. Its 851 reader is di
 **The `x-verify` Dependency:**
 `x-verify` no longer exists in the dialect. [#901](https://github.com/zitadel/nextgen/pull/901) removed it (together with `x-editable`, `x-sensitive`, and `x-mfa`) because nothing read it, stating the removed annotations "can be re-added once they become required". [`user-property.json`](../../../packages/config/meta-schemas/user-property.json) today carries only `x-unique`, `x-claim`, and `x-audit`. This design is the first consumer: every `x-verify` reference in these documents describes the returning annotation, not the shipped dialect.
 
-The annotation returns with the engine work that first reads it, the way `x-audit` returned with its emitter (#808). The step 5 gate evaluation ([area 3](3-social-login-flow.md#callback-processing)) needs only the annotation and the attempt. Recording the result at creation, the `is_auto_update` downgrade guard, and dropping verification on edit also need per-property state tracking, which does not exist either (`user_attributes` stores bare key/value pairs). On return, the free-form `string` value should tighten to an enum of implemented methods, per the same nothing-without-implementation rule that governs [deferred and cut fields](#deferred-and-cut-fields). The two validator rules below that pair `verified_claims` with `x-verify` activate when it returns. That dependency is why `is_auto_update` itself is deferred rather than shipped as a settable no-op (see [deferred and cut fields](#deferred-and-cut-fields)).
+The annotation returns with the engine work that first reads it. The step 5 gate evaluation ([area 3](3-social-login-flow.md#callback-processing)) needs only the annotation and the attempt. Recording the result at creation, the `is_auto_update` downgrade guard, and dropping verification on edit also need per-property state tracking, which does not exist either (`user_attributes` stores bare key/value pairs). On return, the free-form `string` value should tighten to an enum of implemented methods, per the same nothing-without-implementation rule that governs [deferred and cut fields](#deferred-and-cut-fields). The two validator rules below that pair `verified_claims` with `x-verify` activate when it returns. That dependency is why `is_auto_update` itself is deferred rather than shipped as a settable no-op (see [deferred and cut fields](#deferred-and-cut-fields)).
 
 ## Validator Rules
 
@@ -234,19 +215,19 @@ Editing a connection publishes a new, immutable revision rather than modifying i
 
 Upstream resources, such as schemas (`x-auth-methods.sso.providers`) and flow steps (`sso_providers[].id`), always reference connections by their `slug` (e.g., `google`), never by their revision ID.
 
-- **Avoiding Cascading Updates:** If references relied on revision IDs, a single connection edit would trigger a cascade. A new connection revision means a new ID; every referencing schema would have to be updated (publishing new schema revisions), which would in turn force every flow pinning those schemas to re-pin. By referencing the `slug`, nothing upstream needs to move.
+- **No cascade:** A new connection revision means a new revision id; references by slug mean no schema or flow has to move.
 - **Restoring Determinism:** The trade-off of referencing a slug is late binding (the name `google` does not explicitly state which revision should run). To maintain strict determinism, two exported mechanisms handle resolution:
   1. The auth attempt binds the current revision at the exact moment it starts.
   2. The release bundle securely records which revision each slug resolved to at the time of construction.
 
 ## Connection Lifecycle
 
-- **Slugs cannot be renamed in place:** Any runtime binding to the old name (such as in-flight attempts, deployed releases, or identity links) would break without a migration path. Therefore, the validator strictly refuses in-place slug edits. The correct migration path is to create a new connection with the new slug, update all upstream references, and safely retire the old connection on its own schedule.
-- **Renaming a file is treated as a move:** Because state is keyed by file path, a standard `git mv` normally looks like a deletion at the old path and a creation at the new one, which would trigger a real platform delete. To prevent this, the planner intelligently pairs an orphaned state entry with the new file carrying the identical slug. It then rekeys the state without touching the platform. Since slugs are unique, this pairing is completely unambiguous. (Note: Renaming the file *and* changing the slug simultaneously is treated as a genuine delete and create).
-- **Deletion semantics:** Active deployments might pin a specific revision, and an in-flight attempt might rely on a revision that no current release pins. A "refuse-while-pinned" approach would require a grace window, whereas "tombstoning" avoids both issues. What is certain is that a connection requires a true end-of-life process, and inheriting the `SchemaSyncer`'s "not-implemented" error is unacceptable. Open; decided with the CRUD API design, and it must not break a live flow ([Open Points](#open-points)).
+- **Slugs cannot be renamed in place:** In-flight attempts, deployed releases, and identity links bind to the name, so the validator refuses the edit. Create a new connection with the new slug, update the references, and retire the old one on its own schedule.
+- **Renaming a file is a move:** State is keyed by file path, so a `git mv` would look like a delete and a create. The planner pairs an orphaned state entry with the new file carrying the same slug and rekeys without touching the platform; slugs are unique, so the pairing is unambiguous. Renaming the file and changing the slug at once is a delete and a create.
+- **Deletion:** Open, decided with the CRUD API; it must not break a live flow ([Open Points](#open-points)).
 - **Identity links key on the connection id:** Users created through a provider hold identity links tied directly to the connection's unique ID. To guarantee these links survive safe edits and are never inherited by unrelated connections, the CRUD API enforces strict mutation rules:
     - **Stable IDs:** A unique connection ID is minted at creation and shared across every revision, ensuring edits never orphan existing links.
-    - **Slug Reuse:** If a connection is deleted and its slug is reused, the new connection receives a brand new ID, protecting the old links. *(Note: Whether a retired slug remains permanently reserved to prevent schema and flow references from accidentally landing on the new connection is an open question tied to the deletion design).*
+    - **Slug Reuse:** If a connection is deleted and its slug is reused, the new connection receives a brand new ID, protecting the old links. *(Note: Whether a retired slug remains permanently reserved to prevent schema and flow references from resolving to the new connection is an open question tied to the deletion design).*
     - **Immutable Authority Fields:** Changing *who* answers for a subject (e.g., the `issuer` or `subject_claim`) while keeping the same connection ID would cause silent account takeover: subject `12345` at a new issuer would inherit the account of subject `12345` from the old one. Therefore, these fields are fixed for life. The validator and server will explicitly refuse such edits as an **Identity-Critical Revision**.
     - **Authority Migrations:** A true authority change requires creating a new connection with a new ID, and users must sign up again under it. Preserving links across an authority change is not included in this design.
 
@@ -297,7 +278,7 @@ Connection files are committed to version control and entirely tenant-owned. The
 | Adding an optional property, a new enum value, a new protocol block, or relaxing a requirement. | No |
 | Adding a required property, tightening a constraint, or adding new requirements to an existing enum value. | **Yes** |
 
-The risk of breaking changes is exactly why unimplemented values are excluded from the initial schema. Shipping a placeholder now and attaching requirements to it later would instantly break existing tenant configurations. To verify this intended extension path, the testing "receipt suite" proves that a future schema (one incorporating Apple-specific fields like `secret_strategy`, `secret_params`, and `response_mode`) will seamlessly validate every file that passes today.
+This is why unimplemented values are excluded: a placeholder that gains requirements later breaks existing files. The receipt suite checks that a future schema with Apple's fields (`secret_strategy`, `secret_params`, `response_mode`) validates every file that passes today.
 
 **Reverse Compatibility:** The reverse direction is intentionally not protected. An older version of the validator will actively reject a newer file containing unknown fields. This is the accepted trade-off required to maintain strict and effective typo-catching.
 
@@ -323,7 +304,7 @@ Behaviors this design relies on but does not implement.
 
 ## Open Points
 
-- **`scaffoldedFrom` tracking:** We propose adding this optional string to `ResourceEntry` to record which shipped default originally generated a file. It acts as the merge base for upgrading scaffolded defaults later. It is cheap to record now but impossible to reconstruct later. The recommendation is to record it now and defer utilizing it until needed.
+- **`scaffoldedFrom` tracking:** An optional string on `ResourceEntry` recording which shipped default generated a file, the merge base for upgrading scaffolded defaults later. Record it now; it cannot be reconstructed afterwards.
 - **The secret lifecycle:** The actual mechanics of the secret lifecycle (the store, the set-surface, the engine join, and rotation) are owned by the deferred secret-store specification. This document only contributes the structural constraints and the security pushback outlined in the section above. That ownership covers production. Development cannot wait for the spec: the local runtime inherits only the CLI process environment ([`binary.ts:70`](../../../apps/cli/src/lib/local-server/binary.ts)) or two fixed docker `--env` values ([`docker.ts:35-38`](../../../apps/cli/src/lib/local-server/docker.ts)), so `.env.local` never reaches the engine and no configured provider can complete a token exchange. Wiring the development join is [#851](https://github.com/zitadel/nextgen/issues/851) execution work, under the same never-upstream invariant; area 4 owns it ([Exported Requirements](4-cli-provider-setup.md#exported-requirements)).
 - **Imperative runtime disable:** We need a way to imperatively disable an IdP at runtime (e.g., `zitadel idp disable google --env prod`). This mechanism must be per-environment, execute in seconds, and remain immune to config rollbacks. Because of these requirements, it must be specified as part of the runtime surface, never as a configuration field.
 - **Deletion semantics:** We must decide between a "refuse-while-pinned" approach (which requires a grace window for in-flight attempts) or a "tombstoning" approach. Decided with the CRUD API design.
