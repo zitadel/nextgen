@@ -6,7 +6,7 @@ CLI and guiding them through the provider setup it requires.
 
 **Status:** design discussion, nothing implemented. There is no IdP server contract
 yet ([ADR 007](../../adrs/007-gitops-configuration-surface.md)), so every decision
-here is provisional until the API lands.
+here is provisional until the API exists.
 
 **Scope split.** Authentication methods belong to a user schema; provider
 connections are separate Project-level resources. The CLI presents Google and
@@ -64,45 +64,13 @@ Product decisions that change what customers can model, not only how the code is
 
 | Decision | Status in the docs | Options | Where |
 |---|---|---|---|
-| One connection shared by several user schemas | One connection can serve many schemas (epic). A user belongs to one schema, and an identity link is `(connection, subject)` with no schema on it. When the same Google account arrives through a second schema's journey, area 3 fails closed with a flow-level error (option 3, as a dead end rather than an explanation) and lists the rule as open. Reachable in 851 once two schemas enable the same connection through the post-claim schema picker ([area 4](4-cli-provider-setup.md#post-claim-re-entry)). | • resolve to the same Project user<br>• allow a separate user under each schema: the link becomes `(connection, schema, subject)`. Needs a revision-stable schema identity (`users.schema_url` names a revision, and schema lineage exists only in the CLI's local state) and a per-schema uniqueness scope (`x-unique` offers project or team), or the second sign-up collides on shared unique properties and lands on the conflict step<br>• refuse the identity for the second schema | [3](3-social-login-flow.md#open-points), [1](1-resource-model.md#linking-safety) |
+| One connection shared by several user schemas | One connection can serve many schemas (epic). A user belongs to one schema, and an identity link is `(connection, subject)` with no schema on it. When the same Google account arrives through a second schema's journey, area 3 fails closed with a flow-level error (option 3, as a dead end rather than an explanation) and lists the rule as open. Reachable in 851 once two schemas enable the same connection through the post-claim schema picker ([area 4](4-cli-provider-setup.md#post-claim-re-entry)). | • resolve to the same Project user<br>• allow a separate user under each schema: the link becomes `(connection, schema, subject)`. Needs a revision-stable schema identity (`users.schema_url` names a revision, and schema lineage exists only in the CLI's local state) and a per-schema uniqueness scope (`x-unique` offers project or team), or the second sign-up collides on shared unique properties and reaches the conflict step<br>• refuse the identity for the second schema | [3](3-social-login-flow.md#open-points), [1](1-resource-model.md#linking-safety) |
 | Provisioning on the connection or in a policy | The connection carries `creation` as a ceiling: how far this provider's data is trusted. Per-user-type behaviour (Customers may sign up with Google, Employees only sign in) belongs to authentication method settings ([#898](https://github.com/zitadel/nextgen/issues/898)), which may narrow the connection's value and never widen it; the effective rule is the intersection, as #898 states. 851 ships the connection layer only. | • ceiling on the connection, narrowed by a later policy (docs)<br>• policy only: #898 has no resource yet, so 851 would ship without a creation control<br>• a per-connection policy file (`.zitadel/policies/idps.json` with a per-slug list): #898 keys social settings by method kind, not by provider | [1](1-resource-model.md#provisioning) |
 | Edits that change who a subject is | Identity links key on the connection id. An in-place change of `issuer`, `subject_claim`, or an authority endpoint would re-key every link: subject `12345` at Company B's tenant resolves to the account Company A's `12345` created. The docs fix these fields for the life of a connection, like the slug; the CLI refuses the edit and the server refuses the revision. A real authority change is a new connection, and users sign up again under it. | • fixed for the connection's life, new connection for a real change (docs)<br>• warn and re-key (the earlier text; allows a custom-domain move in place at the cost of the reassignment above)<br>• a link-transfer operation for legitimate migrations: not designed, returns with custom providers, whose issuers can move; 851's cannot | [1](1-resource-model.md#connection-lifecycle) |
 | What `enabled: false` means for a method | A provider is in one of four states for a user type: connection unused, listed but offered in no flow, offered in a flow, removed. Each has one meaning and a validator rule ([area 2](2-auth-method-selection.md#what-each-state-means)). A disabled slot is always `{"enabled": false}` with no `providers` array; a flow that still offers the provider is a plan error, as it is for `password` today. | • disabled invalidates the flow, the plan says which step to fix; the picker makes both edits (docs, password precedent)<br>• disabled pauses: `enabled` says whether, `providers` says which; flows keep their steps, the engine hides the button at render, the validator warns. One engine filter would also serve connection deletion. Changes what `enabled: false` means for every method, so it is a platform decision, not an 851 one | [2](2-auth-method-selection.md#what-each-state-means) |
 | Removing a method existing users depend on | Not SSO-specific; surfaced by the Sign-in methods journey and recorded here, owned by authentication methods at large. The picker keeps one method selected and knows nothing about users. Removing `password` strands password-only users: at the conflict step they are offered only the remaining methods, and adding a new credential to an existing account needs a proof they no longer have. Password to passkey does the same. Linking covers only users who linked before the removal. Email recovery would give stranded users a way back in for every method; the engine has none yet ([`capabilities.md`](../flowengine/capabilities.md#missing)). | • at-least-one only (docs); the lockout is silent<br>• a fixed warning in the removal step: users who hold only this method will be unable to sign in, the journey does not check<br>• staged removal: the method stops being offered to new users, existing users keep it and are asked to add another at their next sign-in, removal completes when no one depends on it; needs a per-method "existing users only" state and a migration step | [area 2](2-auth-method-selection.md#what-each-state-means) |
 | Social sign-in in pattern environments | Providers accept only registered, exact redirect URIs, and an `issuer_pattern` environment (per-PR previews) has a new origin every deploy, so no ceremony can complete there. The docs hide the provider buttons at render in such environments, record a diagnostic, and let the release deploy; the plan warns. Social sign-in is tested in development and on exact environments. | • hidden at render, release promotes unchanged (docs)<br>• error at deploy: a project with previews could never promote a release containing social login<br>• serving dynamic origins at all: open, platform-level ([#534](https://github.com/zitadel/nextgen/issues/534)); any approach needs a fixed registered callback that hands back to the originating origin, and area 3 records the constraints such a design must meet | [3](3-social-login-flow.md#open-points), [4](4-cli-provider-setup.md#multi-environment-evaluation) |
 | Superset or 1:1 for schema-keyed fields | Decided by the epic: "the same Project-level provider connection can support multiple user schemas". The docs follow it: one connection's `claim_mapping` and `verified_claims` may name properties of several schemas, and each schema uses the rows it declares. What stays open is how strictly those fields can be checked, since a typo and a key meant for another schema look alike: a target no referencing schema owns errors, one another schema could own warns, and the server checks less than the CLI. | • superset (epic): one connection reused across schemas, partial mismatches warn, and the row above must be decided<br>• 1:1: one connection per schema even for the same OAuth app; error-grade checks, identity resolution schema-specific by construction, connection config and credentials duplicated; changes the epic's criterion | [1](1-resource-model.md#open-points) |
-
-## Cross-cutting
-
-- **Where auth methods live.** `x-auth-methods` at the user-schema root. The `sso`
-  slot gains a `providers` list of connection slugs via a new `sso-auth-method.json`
-  — see [`2-auth-method-selection.md`](2-auth-method-selection.md).
-- **Capability vs usage.** Schema declares capability, flow declares usage, the
-  validator enforces consistency. Mirrors how `password` already works; nothing is
-  derived at apply time.
-- **Everything references connections by slug**, never by revision id. A new
-  connection revision therefore doesn't need an update in user schemas or flows.
-- **Where connections live.** `.zitadel/idps/*.json`, synced like schemas and
-  flows. See [`1-resource-model.md`](1-resource-model.md).
-- **Secrets.** Env refs (`client_secret_env`), never literal values in committed
-  config — the `flowEnvRefs` convention (`apps/cli/src/lib/flows/env-refs.ts`,
-  both `${VAR}` and `*_env` styles; every syncer enforces it via `assertEnvRefs`,
-  `apps/cli/src/lib/sync/syncers.ts:69`). The lifecycle behind it (store, resolution,
-  rotation) is an **open question** owned by the deferred secret-store spec;
-  immutable server revisions constrain any answer — stored revisions must stay value-free.
-  See [`1-resource-model.md`](1-resource-model.md#secrets-and-environments).
-- **Vendor knowledge is data.** The goal throughout is to avoid zitadel/zitadel's
-  per-vendor Go packages. Protocol is a closed discriminator; vendor is open.
-- **Claim mapping is tenant-authored data**, keyed by the tenant's own user-schema
-  property names, with superset semantics across schemas — never mapping code.
-- **Intra-document rules in the schema; cross-document rules in the validator.**
-  Protocol blocks plus `if`/`then` on a `const` discriminator (precise errors, unlike
-  `oneOf`); only genuinely cross-resource rules are mirrored between `validate.ts`
-  and the server.
-- **snake_case, matching flow definitions and `api/openapi/components/`.** User schemas
-  are camelCase only because they *are* JSON Schema documents.
-- **Reconciled with [`../cli/identity-surface.md`](../cli/identity-surface.md)** — the
-  earlier draft of the same resource. See [`1-resource-model.md`](1-resource-model.md).
 
 ## Conventions
 
@@ -117,6 +85,10 @@ Product decisions that change what customers can model, not only how the code is
   [`schemas/`](schemas/) and are verified by
   [`packages/config/src/idp-design-docs.test.ts`](../../../packages/config/src/idp-design-docs.test.ts)
   (runs in CI via `config:test`), which also checks every intra-series link.
+- snake_case, matching flow definitions and `api/openapi/components/`; user schemas
+  are camelCase only because they are JSON Schema documents.
+- Reconciled with [`../cli/identity-surface.md`](../cli/identity-surface.md), the
+  earlier draft of the same resource (area 1).
 
 ## Related
 
