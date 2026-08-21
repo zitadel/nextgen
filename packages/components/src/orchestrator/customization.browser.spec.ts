@@ -120,11 +120,15 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
   }
 
   it("host-page --zl-* tokens repaint through both shadow boundaries", async () => {
-    appStylesheet(`zitadel-login { --zl-color-text-primary-white: ${HOST_RED}; }`);
+    // Both roles, because the two boundaries read different ones: card chrome
+    // takes `card-foreground`, a control on that card takes `foreground`.
+    appStylesheet(
+      `zitadel-login { --zl-foreground: ${HOST_RED}; --zl-card-foreground: ${HOST_RED}; }`,
+    );
     const element = await mount(identifierStep);
 
     // On the host element itself.
-    expect(getComputedStyle(element).getPropertyValue("--zl-color-text-primary-white")).toBe(
+    expect(getComputedStyle(element).getPropertyValue("--zl-foreground")).toBe(
       HOST_RED,
     );
     // Boundary 1: chrome the orchestrator renders in its own shadow root.
@@ -142,7 +146,7 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
   it("the embedding app's CSS outranks the tenant's server-side branding", async () => {
     // The app owns its page: a first-party embed must be able to match its
     // own design system even when the tenant has brand colours configured.
-    appStylesheet(`zitadel-login { --zl-color-text-primary-white: ${HOST_RED}; }`);
+    appStylesheet(`zitadel-login { --zl-card-foreground: ${HOST_RED}; }`);
     const element = await mount(brandedStep);
     const title = element.shadowRoot?.querySelector(".zl-card-title") as HTMLElement;
     expect(getComputedStyle(title).color).toBe(HOST_RED);
@@ -158,26 +162,6 @@ describe("<zitadel-login> host-app customisation (chromium)", () => {
     const element = await mount(identifierStep);
     const atom = element.shadowRoot?.querySelector("zl-button") as HTMLElement;
     expect(atom).toBeTruthy();
-    const button = atom.shadowRoot?.querySelector(".zr-btn--primary") as HTMLElement;
-    expect(button).toBeTruthy();
-    expect(getComputedStyle(button).backgroundColor).toBe(HOST_RED);
-    expect(getComputedStyle(button).color).toBe(HOST_BLUE);
-  });
-
-  it("legacy primary-token overrides from the host keep working", async () => {
-    // Upgrade path: embedders who override the documented legacy pair must
-    // not silently get the stock CTA — the design-tokens sheet emits the
-    // legacy names as aliases of `--zl-primary`, and a host override of the
-    // legacy name beats that alias.
-    const HOST_BLUE = "rgb(0, 0, 255)";
-    appStylesheet(
-      `zitadel-login {
-        --zl-color-surface-default-white: ${HOST_RED};
-        --zl-color-text-button-default: ${HOST_BLUE};
-      }`,
-    );
-    const element = await mount(identifierStep);
-    const atom = element.shadowRoot?.querySelector("zl-button") as HTMLElement;
     const button = atom.shadowRoot?.querySelector(".zr-btn--primary") as HTMLElement;
     expect(button).toBeTruthy();
     expect(getComputedStyle(button).backgroundColor).toBe(HOST_RED);

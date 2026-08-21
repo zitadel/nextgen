@@ -38,8 +38,10 @@ function SessionsPlaceholder() {
 // --- Parked: the sessions table (see the note above) -------------------------
 //
 // import { useRouter } from "@tanstack/react-router";
-// import { Button, Pill } from "@zitadel/ui-react";
 // import { useState } from "react";
+//
+// import { Button } from "@/components/ui/button";
+// import { StatusBadge } from "@/components/status-badge";
 //
 // import { api } from "../../../api/zitadel";
 // import { getConsoleProjectId } from "../../../runtime/runtime";
@@ -81,9 +83,7 @@ function SessionsPlaceholder() {
 //           { header: "User", cell: (session) => session.user_id ?? "anonymous" },
 //           {
 //             header: "State",
-//             cell: (session) => (
-//               <Pill tone={session.state === "active" ? "success" : "neutral"}>{session.state}</Pill>
-//             ),
+//             cell: (session) => <StatusBadge status={session.state} />,
 //           },
 //           { header: "Created", cell: (session) => session.created_at },
 //           { header: "Expires", cell: (session) => session.expires_at },
@@ -91,11 +91,14 @@ function SessionsPlaceholder() {
 //             header: "",
 //             cell: (session) => (
 //               <Button
-//                 hierarchy="text"
-//                 size="small"
-//                 loading={revoking === session.session_id}
+//                 variant="ghost"
+//                 size="sm"
+//                 disabled={revoking === session.session_id}
 //                 onClick={() => void revoke(session.session_id)}
 //               >
+//                 {revoking === session.session_id && (
+//                   <Loader2 className="size-3 animate-spin" aria-hidden />
+//                 )}
 //                 Revoke
 //               </Button>
 //             ),

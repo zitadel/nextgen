@@ -18,11 +18,7 @@ const packagesDir = resolve(here, "../../../packages");
 // Source dirs of the workspace packages whose edits should hot-reload in the
 // dev server. pnpm symlinks these through `node_modules`, so Vite never adds
 // them to its watcher (see the watch plugin below for the full explanation).
-const watchedSrcDirs = [
-  resolve(packagesDir, "shared-component-styles/src"),
-  resolve(packagesDir, "components/src"),
-  resolve(packagesDir, "ui-react/src"),
-];
+const watchedSrcDirs = [resolve(packagesDir, "components/src")];
 
 // Token bumped on every watched-source edit, served at `RELOAD_TOKEN_PATH`. The
 // preview iframe polls it and does a real `location.reload()` on change.
@@ -49,11 +45,10 @@ const reloadPollerScript = `<script>
 </script>`;
 
 /**
- * One Storybook instance, two renderers. The framework is the web-components
- * (Vite) builder so the Lit `<zl-*>` atoms and the `<zitadel-login>`
- * orchestrator get native stories. The paired React components render into a
- * DOM node via `src/react-render.ts`, which lets a single web-components
- * Storybook host both libraries — see `apps/storybook/README.md`.
+ * The workbench for the login surface. The framework is the web-components
+ * (Vite) builder, which is the whole story now that the atoms are Lit-only —
+ * the `<zl-*>` atoms and the `<zitadel-login>` orchestrator get native stories.
+ * See `apps/storybook/README.md`.
  *
  * `@zitadel/api-mock`'s public dir is served statically so MSW finds
  * `mockServiceWorker.js` at `/mockServiceWorker.js` (the orchestrator stories
@@ -61,7 +56,7 @@ const reloadPollerScript = `<script>
  */
 const config: StorybookConfig = {
   framework: "@storybook/web-components-vite",
-  stories: ["../src/**/*.stories.@(ts|tsx)"],
+  stories: ["../src/**/*.stories.ts"],
   addons: ["@storybook/addon-a11y", "@storybook/addon-vitest"],
   staticDirs: [{ from: apiMockPublicDir, to: "/" }],
   // Inject the workspace-source reload poller into the preview iframe.
@@ -73,8 +68,8 @@ const config: StorybookConfig = {
       include: [...(viteConfig.optimizeDeps?.include ?? []), ...optimizeDepsInclude],
     };
     // Resolve workspace `@zitadel/*` packages that publish a `@zitadel/source`
-    // export condition (e.g. `@zitadel/ui-react`) to their TS source, so they run
-    // from source in the dev server instead of their built `dist`.
+    // export condition to their TS source, so they run from source in the dev
+    // server instead of their built `dist`.
     viteConfig.resolve ??= {};
     viteConfig.resolve.conditions = ["@zitadel/source", ...(viteConfig.resolve.conditions ?? [])];
     // `@zitadel/components` intentionally does NOT publish a `@zitadel/source`

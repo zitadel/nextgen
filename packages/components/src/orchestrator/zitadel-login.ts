@@ -9,7 +9,7 @@ import type {
   SubmitFlowStepBodyFields,
 } from "@zitadel/api/generated/model";
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
-import { zitadelAttributionPillInnerHtml } from "@zitadel/shared-component-styles/attribution-markup";
+import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
 import type { Liquid, Template } from "liquidjs";
 import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -440,7 +440,19 @@ export class ZitadelLogin extends ZitadelSurface {
    * any tenant-supplied values (`custom_link`) are escaped via `escapeHtml`.
    */
   private injectAttribution(rendered: string): string {
-    const html = this.renderAttributionHtml();
+    // A template that names where the trustmark goes wins over the footer slot.
+    // The split designs use it to keep the mark with their form column: the
+    // shell's footer spans both panes, so it would otherwise sit 24px below the
+    // *row*, and the row is as tall as the brand pane rather than the card.
+    // `ALLOW_DATA_ATTR` keeps the anchor through the sanitiser, which may have
+    // normalised it to `data-zl-attribution-anchor=""`.
+    const anchor = /<div\s+data-zl-attribution-anchor(?:="")?\s*>\s*<\/div>/;
+    if (anchor.test(rendered)) {
+      // Suppressed attribution replaces the anchor with nothing, so the form
+      // column does not keep a 24px gap below an element that renders empty.
+      return rendered.replace(anchor, this.renderAttributionHtml("inline"));
+    }
+    const html = this.renderAttributionHtml("footer");
     if (!html) return rendered;
     if (rendered.includes("</zl-page-shell>")) {
       return rendered.replace("</zl-page-shell>", `${html}</zl-page-shell>`);
@@ -455,19 +467,24 @@ export class ZitadelLogin extends ZitadelSurface {
    * community / OSS deployments. Licensed tenants can suppress the badge
    * entirely or swap it for a `custom_link` value.
    */
-  private renderAttributionHtml(): string {
+  private renderAttributionHtml(placement: "footer" | "inline" = "footer"): string {
     const attribution = this.branding?.attribution;
     const show = attribution?.show_zitadel !== false;
     const custom = attribution?.custom_link;
     if (!show && !custom) {
       return "";
     }
-    if (custom) {
-      const safeHref = escapeHtml(String(custom.href));
-      const safeLabel = escapeHtml(String(custom.label));
-      return `<div slot="footer" part="attribution" class="zl-attribution"><zl-pill tone="neutral" href="${safeHref}">${safeLabel}</zl-pill></div>`;
-    }
-    return `<div slot="footer" part="attribution" class="zl-attribution"><zl-pill tone="neutral" href="https://zitadel.com" part="attribution-pill" aria-label="Secured with Zitadel">${zitadelAttributionPillInnerHtml()}</zl-pill></div>`;
+    // The design sets the trustmark as plain text beside the logotype rather
+    // than inside a chip. It also draws a session-lifetime badge next to it —
+    // not rendered, because nothing on the flow response carries an expiry to
+    // put in it. A badge showing an invented duration would be worse than none.
+    const mark = custom
+      ? `<a class="zl-trustmark__mark" part="attribution-mark" href="${escapeHtml(
+          String(custom.href),
+        )}">${escapeHtml(String(custom.label))}</a>`
+      : `<a class="zl-trustmark__mark" part="attribution-mark" href="https://zitadel.com" aria-label="Secured with Zitadel">${zitadelTrustmarkInnerHtml()}</a>`;
+    const slot = placement === "footer" ? ` slot="footer"` : "";
+    return `<div${slot} part="attribution" class="zl-attribution zl-trustmark">${mark}</div>`;
   }
 
   /** Declarative config read from this element's attributes. */

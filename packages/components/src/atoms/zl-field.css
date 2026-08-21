@@ -1,0 +1,220 @@
+/* Styles for `<zl-field>` — shadow host rules first, then the painted surface. */
+
+:host {
+  display: block;
+}
+::slotted([slot="prefix"]),
+::slotted([slot="suffix"]) {
+  color: var(--zl-muted-foreground);
+  display: inline-flex;
+}
+.zr-field__help[hidden],
+.zr-field__error[hidden] {
+  display: none;
+}
+
+/* Atom playground only — `data-state` on `<zl-field>` documents the Figma state
+   columns without needing a real pointer or focus. Not product API. */
+:host([data-state="hovered"]:not([disabled])) .zr-field:not(.zr-field--invalid):not(.zr-field--success)
+  .zr-field__wrap:not(:focus-within) {
+  border-color: var(--zl-ring);
+}
+:host([data-state="focused"]:not([disabled])) .zr-field:not(.zr-field--invalid):not(.zr-field--success)
+  .zr-field__wrap {
+  border-color: var(--zl-ring);
+  box-shadow:
+    0 0 0 3px var(--zl-ring-outline),
+    var(--zl-shadow-xs);
+}
+:host([data-state="focused"]:not([disabled])) .zr-field--invalid .zr-field__wrap {
+  border-color: var(--zl-destructive);
+  box-shadow:
+    0 0 0 3px var(--zl-destructive-ring),
+    var(--zl-shadow-xs);
+}
+
+.zr-field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--zl-spacing-3);
+  font-family: var(--zl-font-family-sans);
+}
+.zr-field__label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zl-spacing-2);
+  width: 100%;
+}
+.zr-field__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zl-spacing-1);
+  font-family: var(--zl-font-family-heading);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  color: var(--zl-foreground);
+}
+/* The forgot-password affordance, which the design sits on the label row rather
+   than under the control. It takes no colour of its own — the design
+   distinguishes it by the underline alone. */
+.zr-field__link {
+  flex-shrink: 0;
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  color: inherit;
+  text-decoration: none;
+  text-underline-offset: 4px;
+}
+.zr-field__link:hover {
+  text-decoration: underline;
+}
+.zr-field__link:focus-visible {
+  outline: var(--zl-focus-width) solid var(--zl-ring);
+  outline-offset: var(--zl-focus-offset);
+  border-radius: var(--zl-radius-xs);
+}
+.zr-field__required {
+  color: var(--zl-destructive);
+}
+.zr-field--disabled .zr-field__label {
+  color: var(--zl-muted-foreground);
+}
+
+.zr-field__wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--zl-spacing-1);
+  height: var(--zl-spacing-9);
+  padding-block: var(--zl-spacing-1);
+  padding-inline: var(--zl-spacing-2-5);
+  border: 1px solid var(--zl-input);
+  border-radius: var(--zl-radius-md);
+  background: var(--zl-input-fill);
+  box-shadow: var(--zl-shadow-xs);
+  overflow: visible;
+  transition:
+    border-color var(--zl-duration-fast) var(--zl-easing-standard),
+    box-shadow var(--zl-duration-fast) var(--zl-easing-standard);
+}
+.zr-field__wrap--trailing {
+  padding-inline-end: var(--zl-spacing-8);
+}
+.zr-field:not(.zr-field--disabled) .zr-field__wrap:hover:not(:focus-within) {
+  border-color: var(--zl-ring);
+}
+/* One ring, drawn outside the border, plus the control's own elevation. */
+.zr-field:not(.zr-field--invalid):not(.zr-field--disabled) .zr-field__wrap:focus-within {
+  border-color: var(--zl-ring);
+  box-shadow:
+    0 0 0 3px var(--zl-ring-outline),
+    var(--zl-shadow-xs);
+  outline: none;
+}
+.zr-field--invalid .zr-field__wrap {
+  border-color: var(--zl-destructive);
+}
+.zr-field--invalid .zr-field__wrap:focus-within {
+  box-shadow:
+    0 0 0 3px var(--zl-destructive-ring),
+    var(--zl-shadow-xs);
+  outline: none;
+}
+.zr-field--success .zr-field__wrap {
+  border-color: var(--zl-success);
+}
+.zr-field--disabled .zr-field__wrap {
+  background: var(--zl-muted);
+  opacity: 0.5;
+}
+.zr-field--disabled .zr-field__wrap:hover {
+  border-color: var(--zl-input);
+}
+
+.zr-field__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--zl-foreground);
+  font-family: inherit;
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  font-weight: var(--zl-font-weight-normal);
+}
+.zr-field__input[type="password"] {
+  letter-spacing: 0.125rem;
+}
+.zr-field__input::placeholder {
+  color: var(--zl-muted-foreground);
+  letter-spacing: normal;
+}
+.zr-field__input:focus,
+.zr-field__input:focus-visible {
+  outline: none;
+}
+.zr-field__input:disabled {
+  cursor: not-allowed;
+}
+
+.zr-field__trailing {
+  position: absolute;
+  right: var(--zl-spacing-2-5);
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--zl-spacing-4);
+  height: var(--zl-spacing-4);
+  color: var(--zl-muted-foreground);
+}
+.zr-field__trailing-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  line-height: 0;
+}
+.zr-field__trailing-action:focus-visible {
+  outline: var(--zl-focus-width) solid var(--zl-ring);
+  outline-offset: var(--zl-focus-offset);
+  border-radius: var(--zl-radius-xs);
+}
+.zr-field__trailing-action:disabled {
+  cursor: not-allowed;
+}
+.zr-field--invalid .zr-field__trailing {
+  color: var(--zl-destructive);
+}
+.zr-field--success .zr-field__trailing {
+  color: var(--zl-success);
+}
+
+/* Description and validation copy all sit at the control's own text size — the
+   sign-up frame's password hint is 14/20, not a smaller caption. */
+.zr-field__help {
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  color: var(--zl-muted-foreground);
+}
+.zr-field__success {
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  color: var(--zl-success);
+}
+.zr-field__error {
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  color: var(--zl-destructive);
+}

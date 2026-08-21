@@ -23,7 +23,6 @@
     "@zitadel/sdk-nuxt": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/design-tokens": "workspace:*",
-    "@zitadel/shared-component-styles": "workspace:*",
     "nuxt": "catalog:"
   },
   "devDependencies": {

@@ -72,6 +72,10 @@ describe("branding design catalog", () => {
         expect(html).toContain('data-testid="zitadel-field-remember"');
         expect(html).toContain('data-testid="zitadel-action-submit"');
         expect(html).toContain('data-action="register"');
+        // Recovery normally rides on the password field's label row. This step
+        // declares no password field, so it falls back to a row of its own
+        // rather than dropping the affordance.
+        expect(html).not.toContain('forgot-password-action="recover"');
         expect(html).toContain('data-action="recover"');
       });
 

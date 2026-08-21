@@ -1,7 +1,5 @@
 ---
 "@zitadel/components": patch
-"@zitadel/ui-react": patch
-"@zitadel/shared-component-styles": patch
 ---
 
 Login flow: enforce required fields client-side and show inline errors on every control.

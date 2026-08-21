@@ -7,7 +7,6 @@ dependsOn:
   - "components"
   - "design-tokens"
   - "sdk-next"
-  - "shared-component-styles"
 
 tasks:
   lint:
